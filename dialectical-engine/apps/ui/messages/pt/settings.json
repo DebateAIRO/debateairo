@@ -179,5 +179,12 @@
   "settings.security.codesRemaining": "Códigos de recuperação: {count}",
   "settings.security.regenerate": "Gerar novos códigos de recuperação",
   "settings.security.lockoutReminder": "Ainda não tem códigos de recuperação nem chave de acesso. Se perder o telefone, estes permitem-lhe voltar a entrar de imediato.",
-  "settings.security.refreshFailed": "Não foi possível atualizar os detalhes de segurança. Recarregue a página."
+  "settings.security.refreshFailed": "Não foi possível atualizar os detalhes de segurança. Recarregue a página.",
+  "settings.security.pendingRecovery.title": "Alguém começou a substituir a sua aplicação de autenticação",
+  "settings.security.pendingRecovery.body": "Alguém usou a sua palavra-passe e uma ligação recebida por e-mail para começar a substituir a aplicação de autenticação desta conta. Poderá concluir a substituição a partir de {time}.",
+  "settings.security.pendingRecovery.bodyReady": "Alguém usou a sua palavra-passe e uma ligação recebida por e-mail para começar a substituir a aplicação de autenticação desta conta. Já pode concluir a substituição: use a ligação que recebeu por e-mail.",
+  "settings.security.pendingRecovery.keep": "Até lá, a sua aplicação de autenticação atual, os códigos de recuperação e as sessões continuam a funcionar. Se não foi você, cancele a substituição.",
+  "settings.security.pendingRecovery.cancel": "Cancelar",
+  "settings.security.pendingRecovery.cancelled": "Substituição cancelada.",
+  "settings.security.pendingRecovery.failed": "Não foi possível cancelá-la. Recarregue a página e tente novamente."
 }

@@ -168,3 +168,140 @@ tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded number
 #   `v3NodeScoreDetails(v3)` moved from the drawer into apps/ui/lib/v3/adapter.ts.
 #   blinds: nothing — the row is that one pin; the drawer's raw-value bans run in "forbids
 #   raw-value JSX on the executable drawer projection".
+
+# JOINED 2026-10-09 (branch feat/2026-10-09-integration-all, off origin/dev@23402d10e): `pnpm run
+# test:integration-all` runs every integration suite (tests/ci-integration-all.txt) through this gate. Measured on
+# clean origin/dev@23402d10e as one vitest process: 220 files, 2,556 tests, 17 failed in 10 files — the same 17 as a
+# file-by-file run of dev@c8cf8e063 the same day. NONE is a product defect (read of the code and history; nothing was
+# changed to make anything pass). The owner ruled the same day to record them here, each with its reason, so the
+# command fails only on a NEW red. 15 are below. The other 2 (preview-auth-dev-startup.test.ts) are NOT listed: that
+# suite starts the real API and UI stage processes and needs a production UI build (apps/ui/.next) that a clean
+# checkout lacks, so its verdict depends on the checkout — listed, it would turn "stale" on any machine with a build.
+# tests/ci-integration-all.txt leaves it out with a `!` line printed on every run, as tests/ci-integration-auth.txt
+# already does. No CI job runs these 10 files today, so these entries change no CI verdict.
+#
+# 13 of the 15 fail with MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE. Each builds an older or incomplete migration
+# ledger by hand and calls migrate() to upgrade or replay. Since merge 065708c19 (explicit migration lineage, on dev
+# through PR #82, a51171b50, 2026-10-07) migrate() continues only from an empty database, a named cohort
+# (migrations/lineage/auth-dev-20261006.json: auth94, auth103, auth106, dev95) or a complete one, and refuses anything
+# else BY DESIGN (packages/db/src/migration-lineage.ts identifyLineage; tests/integration/auth-dev-lineage.test.ts
+# asserts that refusal). Those upgrade paths no longer exist in production, so the tests are stale. Fix: run the
+# migration's own SQL inside a rolled-back transaction on a fresh database, or retire the upgrade-from-old-state part.
+tests/integration/obs-agent-05-pg-monitor.test.ts > OBS-05 V-29 statistics window replaces pg_monitor > leaves the agent's principal in no predefined role and applies 0068 once, replay-safe
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0068 ledger row (lines 149, 160) and calls
+#   migrate() to replay 0068 (see above).
+#   blinds: the rest of the test: 0068's own refusal guards (OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP,
+#   OBS_STATS_OWNER_NOT_EXCLUSIVE)
+#   and its replay-safety; they still ship and run on a fresh migrate, but nothing proves they fire.
+tests/integration/obs-agent-05-pg-monitor.test.ts > OBS-05 V-29 statistics window replaces pg_monitor > refuses to finish 0068 while the agent reaches a predefined role by another path
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0068 ledger row (lines 149, 160) and calls
+#   migrate() to replay 0068 (see above).
+#   blinds: the rest of the test: 0068's own refusal guards (OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP,
+#   OBS_STATS_OWNER_NOT_EXCLUSIVE)
+#   and its replay-safety; they still ship and run on a fresh migrate, but nothing proves they fire.
+tests/integration/obs-agent-05-pg-monitor.test.ts > OBS-05 V-29 statistics window replaces pg_monitor > refuses to adopt a statistics owner that has a member
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0068 ledger row (lines 149, 160) and calls
+#   migrate() to replay 0068 (see above).
+#   blinds: the rest of the test: 0068's own refusal guards (OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP,
+#   OBS_STATS_OWNER_NOT_EXCLUSIVE)
+#   and its replay-safety; they still ship and run on a fresh migrate, but nothing proves they fire.
+tests/integration/obs-agent-05-pg-monitor.test.ts > OBS-05 V-29 statistics window replaces pg_monitor > refuses to adopt a statistics owner that owns any other object
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0068 ledger row (lines 149, 160) and calls
+#   migrate() to replay 0068 (see above).
+#   blinds: the rest of the test: 0068's own refusal guards (OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP,
+#   OBS_STATS_OWNER_NOT_EXCLUSIVE)
+#   and its replay-safety; they still ship and run on a fresh migrate, but nothing proves they fire.
+tests/integration/obs-agent-dl7-f9-threshold-operator.test.ts > DL7-F9: the daemon can no longer re-rule its own monitor > applies 0071 replay-safely and refuses to finish while the daemon can still INSERT
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0071 ledger row (line 65) and calls
+#   migrate() to replay 0071 (see above).
+#   blinds: the rest of the test: 0071's replay-safety and its refusal while the daemon can still INSERT.
+tests/integration/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION database contract > preserves legacy algorithm version 5 while allocating and replaying the new development receipt
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test applies every migration file below 0055 by readdir
+#   (line 76), then calls migrate() (see above).
+#   blinds: the rest of the test: the 0055 upgrade of historical register rows; the other 25 cases of the file run.
+tests/integration/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION database contract > upgrades exact historical v1/v4 bytes, initializes production off, ignores generic versions, and rolls back forward
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test applies every migration file below 0055 by readdir
+#   (line 76), then calls migrate() (see above).
+#   blinds: the rest of the test: the 0055 upgrade of historical register rows; the other 25 cases of the file run.
+tests/integration/s6-content-encryption-database.test.ts > S6 content encryption on disposable PostgreSQL > migrates a default-off pre-0038 legacy run through the final schema
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   BILLING_0093_RUNTIME_FUNCTIONS: the test applies migration files in readdir (alphabetical)
+#   order outside migrate(). PR #82 (merge 065708c19) added 0092_internal_funded_allowance and
+#   0093_internal_provider_admission beside dev's 0092/0093, so 0092_internal… now runs before 0093_billing_runtime_role
+#   and 0093's exact-grant check refuses. migrate() runs the planned order and is unaffected. Stale test; fix: walk
+#   the order from loadMigrationPlan() instead of the folder.
+#   blinds: the rest of that one case (a pre-0038 legacy run through the final schema); the other 49 cases of the
+#   file run.
+tests/integration/support-cases.test.ts > SUP-02 cases > returns a shredded case discriminator without unwrapping and preserves ciphertext bytes
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   readByToken returns null: the test fixes its dates at 2026-09-07 and passes no clock, and the
+#   30-day case-token lifetime (5e05905cc, PR #8) made that token expired from 2026-10-07 12:00 UTC. A calendar time
+#   bomb in the test, not a product change; fix: pass clock: () => shreddedAt.
+#   blinds: the rest of that one case (no unwrap, ciphertext bytes preserved); the other 34 cases run.
+tests/integration/support-shred.test.ts > SUP-07 support key schema and transaction-bound integrity > replays after 0055 is already recorded and rejects hostile catalog lookalikes
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0054 ledger row (line 850) and calls
+#   migrate() to replay it (see above).
+#   blinds: the rest of the test: 0054's replay and its refusal of hostile catalog lookalikes; the other 23 cases run.
+tests/integration/support-upgrade-catalog.test.ts > support migration upgrade convergence > repairs a ledgered historical 0050 in a later migration and replays idempotently
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0054 and 0055 ledger rows (line 85), drops
+#   columns, then calls migrate() (see above).
+#   blinds: the whole file (its only test): the repair of a ledgered historical 0050 and its idempotent replay.
+tests/integration/t6-legacy-audit-residual-database.test.ts > T6 legacy audit erasure residual on real PostgreSQL > preserves legacy rows, reports only exact counts, and denies application roles
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0032 and 0043 ledger rows (lines 44-47)
+#   and calls migrate() (see above).
+#   blinds: the whole file (its only test): 0043's legacy-row residual report and its denial of application roles.
+tests/integration/tint1-upgrade-migration.test.ts > TINT1 · the forward revoke reaches a database that ALREADY applied 0052 > finds the isolation attestation failing on the 0052-recorded state, and the production migrator closing it
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test applies every migration file through 0052 by readdir,
+#   then calls migrate() (see above).
+#   blinds: the whole file (its three tests): 0054's forward revoke on a database that already applied 0052.
+tests/integration/tint1-upgrade-migration.test.ts > TINT1 · the forward revoke reaches a database that ALREADY applied 0052 > is idempotent: re-running 0054's own SQL neither throws nor restores the grant
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test applies every migration file through 0052 by readdir,
+#   then calls migrate() (see above).
+#   blinds: the whole file (its three tests): 0054's forward revoke on a database that already applied 0052.
+tests/integration/tint1-upgrade-migration.test.ts > TINT1 · the forward revoke reaches a database that ALREADY applied 0052 > removes a privilege and nothing else: the guard function and its trigger both survive
+#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
+#   tests/ci-integration-all.txt; the same
+#   message file by file on dev@c8cf8e063 the same day).
+#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test applies every migration file through 0052 by readdir,
+#   then calls migrate() (see above).
+#   blinds: the whole file (its three tests): 0054's forward revoke on a database that already applied 0052.

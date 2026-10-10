@@ -179,5 +179,12 @@
   "settings.security.codesRemaining": "Codes de récupération : {count}",
   "settings.security.regenerate": "Générer de nouveaux codes de récupération",
   "settings.security.lockoutReminder": "Vous n’avez encore ni codes de récupération ni clé d’accès. Si vous perdez votre téléphone, ils vous permettent de revenir aussitôt dans votre compte.",
-  "settings.security.refreshFailed": "Les informations de sécurité n’ont pas pu être actualisées. Rechargez la page."
+  "settings.security.refreshFailed": "Les informations de sécurité n’ont pas pu être actualisées. Rechargez la page.",
+  "settings.security.pendingRecovery.title": "Quelqu’un a commencé à remplacer votre application d’authentification",
+  "settings.security.pendingRecovery.body": "Quelqu’un a utilisé votre mot de passe et un lien reçu par e-mail pour commencer à remplacer l’application d’authentification de ce compte. Vous pourrez terminer ce remplacement à partir de {time}.",
+  "settings.security.pendingRecovery.bodyReady": "Quelqu’un a utilisé votre mot de passe et un lien reçu par e-mail pour commencer à remplacer l’application d’authentification de ce compte. Vous pouvez terminer ce remplacement maintenant : utilisez le lien reçu par e-mail.",
+  "settings.security.pendingRecovery.keep": "D’ici là, votre application d’authentification actuelle, vos codes de récupération et vos sessions actives continuent de fonctionner. Si ce n’est pas vous, annulez ce remplacement.",
+  "settings.security.pendingRecovery.cancel": "Annuler",
+  "settings.security.pendingRecovery.cancelled": "Remplacement annulé.",
+  "settings.security.pendingRecovery.failed": "Nous n’avons pas pu l’annuler. Rechargez la page et réessayez."
 }

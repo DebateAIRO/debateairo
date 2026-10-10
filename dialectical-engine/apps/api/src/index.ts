@@ -1299,6 +1299,9 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/account/auth-methods", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/account/auth-methods/remove", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/account/recovery-codes/regenerate", auth:"user",resource:"session-self",action:"consumer-security" },
+  // Owner ruling 2026-10-09: an authenticator recovery waiting its 24 hours, read and cancelled from Settings → Security.
+  { route: "GET /v1/account/mfa-recovery", auth:"user",resource:"session-self",action:"consumer-security" },
+  { route: "POST /v1/account/mfa-recovery/cancel", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/auth/passkeys/step-up/options", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/auth/passkeys/step-up/complete", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
@@ -1896,8 +1899,8 @@ function csrfCookie(value: string, maxAgeSeconds: number): string {
 
 /** All verified consumer methods share this sole public bearer/cookie projection. */
 function completeAuthenticatedResponse(reply:FastifyReply,result:LoginResult):FastifyReply {
-  const response=AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session,
-    ...(result.replacementRecoveryCode===undefined?{}:{replacement_recovery_code:result.replacementRecoveryCode})});
+  // Design note 2026-10-09 item 3: a used recovery code is never refilled, so no replacement code is returned.
+  const response=AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session});
   reply.header("set-cookie",[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.csrfToken,SESSION_IDLE_MAX_AGE_SECONDS),...(exactCookie(reply.request.headers.cookie,SOCIAL_BROWSER_COOKIE)===null?[]:[`${SOCIAL_BROWSER_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`])]);
   return reply.send(response);
 }
@@ -2383,16 +2386,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!parsed.success || !passwordWithinRequestBound(parsed.data)) throw new AuthFlowError("AUTH_INPUT_INVALID");
     if (signup) {
       const body = request.body as Record<string, unknown>;
-      try { body.phone = normalizeManualPhone(body.phone); } catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+      // The phone is optional (owner ruling 2026-10-09); a given one must still parse.
+      if (body.phone !== undefined) {
+        try { body.phone = normalizeManualPhone(body.phone); } catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+      }
     }
     mailDisplays.set(request, Object.freeze({ locale: parsed.data.ui_locale, timeZone: parsed.data.time_zone }));
     const body = request.body as Record<string, unknown>;
     const admission = await options.registration?.admitSource?.(socialSignup
-      ? {route:"social",source:sourceFor(request),input:{email:parsed.data.email,phone:typeof body.phone === "string" ? body.phone : "",adultAffirmed:body.adult_affirmed===true}}
+      ? {route:"social",source:sourceFor(request),input:{email:parsed.data.email,phone:typeof body.phone === "string" ? body.phone : null,adultAffirmed:body.adult_affirmed===true}}
       : path === "/v1/auth/register"
       ? { route: "register", source: sourceFor(request), input: {
           email: typeof body.email === "string" ? body.email : "", password: typeof body.password === "string" ? body.password : "",
-          phone: typeof body.phone === "string" ? body.phone : "", recoveryEmail: null, adultAffirmed: body.adult_affirmed === true
+          phone: typeof body.phone === "string" ? body.phone : null, recoveryEmail: null, adultAffirmed: body.adult_affirmed === true
         } }
       : { route: "resend", source: sourceFor(request), input: { email: parsed.data.email } });
     if (admission !== undefined) sourceAdmissions.set(request, admission);
@@ -2581,6 +2587,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const security=options.consumerSecurity;
     api.get('/v1/account/auth-methods',routePolicy('GET /v1/account/auth-methods'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/auth-methods',sourceFor(request).ip))return reply;return reply.send(await security.authMethods(request.authenticatedSession!));});
     api.post('/v1/account/auth-methods/remove',credentialRoutePolicy('POST /v1/account/auth-methods/remove'),async(request,reply)=>{await security.removeAuthMethod(request.body,request.authenticatedSession!,sourceFor(request));return reply.status(204).send();});
+    api.get('/v1/account/mfa-recovery',routePolicy('GET /v1/account/mfa-recovery'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/mfa-recovery',sourceFor(request).ip))return reply;return reply.send(await security.pendingMfaRecovery(request.authenticatedSession!));});
+    api.post('/v1/account/mfa-recovery/cancel',credentialRoutePolicy('POST /v1/account/mfa-recovery/cancel'),async(request,reply)=>reply.send(await security.cancelPendingMfaRecovery(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/account/recovery-codes/regenerate',credentialRoutePolicy('POST /v1/account/recovery-codes/regenerate'),async(request,reply)=>reply.send(await security.regenerateRecoveryCodes(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/auth/passkeys/step-up/complete',{...credentialRoutePolicy('POST /v1/auth/passkeys/step-up/complete'),bodyLimit:32768},async(request,reply)=>{

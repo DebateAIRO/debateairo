@@ -204,10 +204,13 @@ describe("streamlined consumer auth boundary", () => {
     expect(contract.ResendVerificationRequestSchema.safeParse({ ...RESEND_INPUT, [field]: true }).success).toBe(false);
   });
 
-  it("requires a phone and fresh bounded anti-bot proof without accepting regional legal locales", () => {
+  it("takes an optional phone and requires fresh bounded anti-bot proof without accepting regional legal locales", () => {
     expect(contract.RegisterRequestSchema?.safeParse(REGISTRATION_INPUT).success).toBe(true);
+    // Owner ruling 2026-10-09: the phone is optional; a given one may not be blank.
     const { phone: _phone, ...withoutPhone } = REGISTRATION_INPUT;
-    expect(contract.RegisterRequestSchema.safeParse(withoutPhone).success).toBe(false);
+    expect(contract.RegisterRequestSchema.safeParse(withoutPhone).success).toBe(true);
+    expect(contract.RegisterRequestSchema.safeParse({ ...REGISTRATION_INPUT, phone: "   " }).success).toBe(false);
+    expect(contract.RegisterRequestSchema.safeParse({ ...REGISTRATION_INPUT, phone: null }).success).toBe(false);
     for (const [schema, input] of [[contract.RegisterRequestSchema, REGISTRATION_INPUT], [contract.ResendVerificationRequestSchema, RESEND_INPUT]] as const) {
       const { turnstile_token: _token, ...withoutProof } = input;
       expect(schema.safeParse(withoutProof).success).toBe(false);
@@ -306,7 +309,9 @@ describe("streamlined consumer auth boundary", () => {
     expect(registration.requestBody?.content["application/json"].schema.$ref).toBe("#/components/schemas/RegisterRequestSchema");
     expect(registration.responses?.["202"].content["application/json"].schema.$ref).toBe("#/components/schemas/RegistrationVerificationAckSchema");
     expect(resend.requestBody?.content["application/json"].schema.$ref).toBe("#/components/schemas/ResendVerificationRequestSchema");
-    expect(document.components.schemas.RegisterRequestSchema?.required).toContain("phone");
+    // Owner ruling 2026-10-09: published, but optional.
+    expect(document.components.schemas.RegisterRequestSchema?.properties).toHaveProperty("phone");
+    expect(document.components.schemas.RegisterRequestSchema?.required).not.toContain("phone");
     expect(document.components.schemas.RegisterRequestSchema?.additionalProperties).toBe(false);
     expect(inventory.resources).toHaveProperty("RegisterRequestSchema");
     expect(inventory.resources).toHaveProperty("ResendVerificationRequestSchema");

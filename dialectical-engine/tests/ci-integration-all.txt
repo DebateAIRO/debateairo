@@ -1,0 +1,50 @@
+# tests/ci-integration-all.txt — EVERY integration suite in ONE vitest process: `pnpm run test:integration-all`.
+#
+# Gate: the same as `pnpm run test:ci-integration` (tools/ci-known-red.mjs): failures are judged against
+# tests/ci-known-red.txt, and host-sensitive cases (tests/ci-flaky.txt) are printed but never gate. Files still run
+# one at a time, each with its own embedded PostgreSQL (vitest.config.ts fileParallelism: false); what the single
+# process saves is vitest's own launch per file (measured below).
+#
+# Why (2026-10-09): running all of tests/integration file by file — one `pnpm exec vitest run <file>` each — took
+# 61 minutes on the owner's 16 GB Mac (227 files on the NETOPIA branch that day): 34 for registration-database and 27
+# for the other 226, of which the 15 longest (20-130 s each, mostly register/publication suites) took about 14.
+#
+# Measured 2026-10-09 on clean origin/dev@23402d10e, 220 files in one process (this list before preview-auth-dev-startup
+# was left out; it adds ~35 s): 27 minutes (1,633 s; 2,556 tests, 17 failed in 10 files, all recorded in
+# tests/ci-known-red.txt or left out below). Where the time goes: 20 minutes are the tests themselves (15 files take
+# 15 of them, dev-deployment-register alone 2.5) and about 7 are each file's own setup, mostly starting its embedded
+# PostgreSQL and migrating it (~2 s a file). One process saves only
+# vitest's launch, 2-4 minutes against the file-by-file runs of the same day (27-32 minutes for the same files). The
+# owner accepted the 27 minutes (2026-10-09); a bigger cut needs the suites to share database setup, a separate task.
+# The command itself, after merging dev@4c62127c7 (226 files with the two above left out), on a quiet Mac (81% memory
+# free, no other test run): 22 minutes (1,326 s), 2,622 tests, CI_KNOWN_RED_GATE new=0 known=15 stale=0. The first
+# measurement ran while other sessions were busy, so expect 22-27 minutes depending on the machine's load.
+# The gate prints little until the end: it reads vitest's JSON report, so expect a quiet terminal for the whole run.
+# What it judges: every failed test by name, a file's own error (import failure, a file-level hook that threw) under
+# the bare file path, and every listed file that did not run. What it cannot see: vitest's "Unhandled Errors" (left
+# out of the JSON report; they still print in the run's output and turn vitest's own exit code red).
+#
+# Local command; no CI job runs this list. CI runs tests/ci-integration-auth.txt on every pull request (job
+# auth-integration in .github/workflows/security.yml) and tests/ci-integration-registration.txt from its own workflow.
+#
+# Forms (tools/ci-known-red.mjs expandTargets): a one-directory glob names every test file there, so a new suite joins
+# without an edit; a `!` line leaves out one file of THIS list and is printed as "NOT RUN on purpose" before and after
+# every run. A `!` line that matches nothing fails the run, so a stale exclusion cannot linger; so does a glob that
+# would skip a test file vitest runs in that directory (a .test.tsx, a sub-folder), so nothing is dropped in silence.
+
+tests/integration/*.test.ts
+
+# EXCLUDED: registration-database.test.ts — about 34 minutes alone (its timing-equivalence statistics and memory
+# tripwires dominate), more than this whole run without it. It has its own workflow,
+# .github/workflows/registration-integration.yml (nightly against dev, and on pull requests touching migrations, the
+# database package or the sign-up paths). To include it here, run `pnpm run test:integration-all:with-registration`
+# (this list plus tests/ci-integration-registration.txt).
+!tests/integration/registration-database.test.ts
+
+# EXCLUDED: preview-auth-dev-startup.test.ts — a deployment rehearsal, not a self-contained suite: it starts the real
+# API and UI stage processes, and the UI process needs a production build (apps/ui/.next) that a clean checkout does
+# not have, so both of its rehearsal cases fail with PREVIEW_STAGE_PROCESS_EXITED there (measured 2026-10-09 on
+# origin/dev@23402d10e) and could pass on a machine that has a build. A known-red entry would then turn "stale" and
+# fail the run, so it is left out here instead, as tests/ci-integration-auth.txt already does. Run it alone after
+# building the UI: `pnpm exec vitest run tests/integration/preview-auth-dev-startup.test.ts`.
+!tests/integration/preview-auth-dev-startup.test.ts

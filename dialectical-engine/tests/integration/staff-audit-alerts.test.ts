@@ -37,7 +37,7 @@ it('keeps audit/outbox/receipt immutable and runtime readiness/mapping/dispatch 
  for(const table of ['audit_event','alert_outbox','alert_delivery_receipt'])for(const sql of [`DELETE FROM staff.${table}`,`TRUNCATE staff.${table} CASCADE`])await expect(database.pool.query(sql)).rejects.toMatchObject({code:'55000'});
  await expect(runtime.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5)',['a'.repeat(64),generation,'capture-v1',randomUUID(),new Date(Date.now()+60000)])).rejects.toMatchObject({code:'42501'});
  const acl=(await database.pool.query(`SELECT p.oid::regprocedure::text AS signature,pg_get_userbyid(p.proowner) AS owner,p.proacl::text AS acl,p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='staff' AND p.proname IN ('claim_alert_delivery','settle_alert_delivery','read_alert_delivery_status','read_alert_key_mapping','read_alert_user_mapping','publish_independent_alert_readiness','read_independent_alert_readiness') ORDER BY signature`)).rows;
- expect(acl).toHaveLength(7);for(const row of acl){expect(row.owner).toBe('debateai_staff_security_owner');expect(row.proconfig).toContain('search_path=pg_catalog');expect(row.acl).not.toMatch(/[,{]=X/);}console.info('[TASK5_EXACT_FUNCTION_ACL]',JSON.stringify(acl));
+ expect(acl).toHaveLength(7);for(const row of acl){expect(row.owner).toBe('debateai_staff_security_owner');expect(row.proconfig,row.signature).toEqual(['claim_alert_delivery(','publish_independent_alert_readiness(','read_independent_alert_readiness('].some(n=>row.signature.startsWith('staff.'+n))?['search_path=pg_catalog, pg_temp']:['search_path=pg_catalog']);expect(row.acl).not.toMatch(/[,{]=X/);}console.info('[TASK5_EXACT_FUNCTION_ACL]',JSON.stringify(acl));
 });
 it('claims concurrently without collapse of event purposes and rejects fabricated/stale acknowledgement',async()=>{
  await ready();await database.pool.query('INSERT INTO staff.alert_dispatch_state(outbox_id,terminal) SELECT outbox_id,true FROM staff.alert_outbox ON CONFLICT(outbox_id) DO UPDATE SET terminal=true');const target=await account(),keyRef=(await database.pool.query('SELECT audit_token FROM identity."user" WHERE user_id=$1',[target.userId])).rows[0].audit_token;const eventId=randomUUID(),operationId=randomUUID();await authorize(operationId);await database.pool.query("INSERT INTO staff.audit_event(event_id,operation_id,request_sha256,event_type,reason_code) VALUES($1,$2,$3,'INVITE','TEAM_ONBOARDING')",[eventId,operationId,'c'.repeat(64)]);await database.pool.query("INSERT INTO staff.alert_outbox(event_id,purpose,key_ref,encrypted_payload) SELECT $1,p,$2,$3 FROM unnest(ARRAY['INDEPENDENT_METADATA_ALERT','TARGET_INVITATION']) p",[eventId,keyRef,envelope]);
@@ -125,11 +125,93 @@ it('keeps target invitation handle/recipient scope separate and refuses cipherte
  }finally{destroyKek(kek);await rm(root,{recursive:true,force:true});}
 });
 it('captures exact new function/table/column/role ACLs and denies every non-enumerated seam',async()=>{
- const names=['require_alert_readiness_jit','publish_independent_alert_readiness','revoke_independent_alert_readiness','read_independent_alert_readiness','authorize_alert_operation','require_alert_operation','guard_alert_audit_insert','guard_alert_outbox_insert','guard_alert_commit','read_alert_user_mapping','read_alert_key_mapping','claim_alert_delivery','settle_alert_delivery','read_alert_delivery_status'];
+ const names=['require_alert_readiness_jit','publish_independent_alert_readiness','revoke_independent_alert_readiness','read_independent_alert_readiness','authorize_alert_operation','require_alert_operation','guard_alert_audit_insert','guard_alert_outbox_insert','guard_alert_commit','read_alert_user_mapping','read_alert_key_mapping','claim_alert_delivery','settle_alert_delivery','read_alert_delivery_status','release_alert_delivery'];
  const functions=(await database.pool.query(`SELECT p.oid::regprocedure::text AS signature,p.proname,pg_get_userbyid(p.proowner) AS owner,p.prosecdef,p.proconfig,p.proacl::text AS acl,EXISTS(SELECT 1 FROM aclexplode(COALESCE(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0 AND a.privilege_type='EXECUTE') AS public,has_function_privilege('debateai_runtime',p.oid,'EXECUTE') AS runtime,has_function_privilege('debateai_staff_recovery',p.oid,'EXECUTE') AS recovery FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='staff' AND p.proname=ANY($1) ORDER BY signature`,[names])).rows;
- expect(functions).toHaveLength(14);const runtimeNames=['read_independent_alert_readiness','authorize_alert_operation','read_alert_user_mapping','read_alert_key_mapping','claim_alert_delivery','settle_alert_delivery','read_alert_delivery_status'];for(const f of functions){expect(f.owner).toBe('debateai_staff_security_owner');expect(f.prosecdef).toBe(true);expect(f.proconfig).toEqual(['search_path=pg_catalog']);expect(f.public).toBe(false);expect(f.runtime).toBe(runtimeNames.includes(f.proname));expect(f.recovery).toBe(['publish_independent_alert_readiness','revoke_independent_alert_readiness'].includes(f.proname));}
+ expect(functions).toHaveLength(15);// Auth DB batch review: these five also search pg_temp last, so a temp object cannot shadow a type they use.
+ const tempLast=['require_alert_readiness_jit','publish_independent_alert_readiness','revoke_independent_alert_readiness','read_independent_alert_readiness','claim_alert_delivery','release_alert_delivery'];const runtimeNames=['read_independent_alert_readiness','authorize_alert_operation','read_alert_user_mapping','read_alert_key_mapping','claim_alert_delivery','settle_alert_delivery','read_alert_delivery_status','release_alert_delivery'];for(const f of functions){expect(f.owner).toBe('debateai_staff_security_owner');expect(f.prosecdef).toBe(true);expect(f.proconfig,f.proname).toEqual(tempLast.includes(f.proname)?['search_path=pg_catalog, pg_temp']:['search_path=pg_catalog']);expect(f.public).toBe(false);expect(f.runtime).toBe(runtimeNames.includes(f.proname));expect(f.recovery).toBe(['publish_independent_alert_readiness','revoke_independent_alert_readiness'].includes(f.proname));}
  const tables=(await database.pool.query(`SELECT c.oid::regclass::text AS relation,pg_get_userbyid(c.relowner) AS owner,c.relacl::text AS acl FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='staff' AND c.relkind='r' ORDER BY relation`)).rows;
  const columns=(await database.pool.query(`SELECT c.oid::regclass::text AS relation,a.attname,a.attacl::text AS acl FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN('staff','identity') AND a.attnum>0 AND NOT a.attisdropped AND a.attacl IS NOT NULL ORDER BY relation,a.attnum`)).rows;
  const roles=(await database.pool.query(`SELECT r.rolname,r.rolcanlogin,r.rolinherit,r.rolsuper,r.rolcreatedb,r.rolcreaterole,r.rolreplication,r.rolbypassrls,ARRAY(SELECT p.rolname FROM pg_auth_members m JOIN pg_roles p ON p.oid=m.roleid WHERE m.member=r.oid ORDER BY p.rolname) AS memberships FROM pg_roles r WHERE r.rolname IN('debateai_runtime','debateai_staff_security_owner','debateai_staff_recovery','debateai_prod_staff_recovery') ORDER BY r.rolname`)).rows;
  const witness={functions,tables,columns,roles};console.info('[TASK5_EXACT_CATALOG_ACL]',JSON.stringify(witness));
+});
+
+// Design note 2026-10-09 item 4: a password-less, peer-authenticated readiness writer replaces the minted JIT password.
+async function asWriter<T>(role:string,use:(c:import('pg').PoolClient)=>Promise<T>):Promise<T>{const c=await database.pool.connect();try{await c.query(`SET SESSION AUTHORIZATION ${role}`);return await use(c);}finally{await c.query('RESET SESSION AUTHORIZATION').catch(()=>undefined);c.release();}}
+it('the readiness writer is a password-less login that can only publish and revoke readiness',async()=>{
+ const role=(await database.pool.query(`SELECT rolcanlogin,rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls,rolconnlimit,(SELECT count(*)::int FROM pg_auth_members m WHERE m.member=r.oid OR m.roleid=r.oid) AS memberships FROM pg_roles r WHERE rolname='debateai_staff_readiness_writer'`)).rows;
+ expect(role).toEqual([{rolcanlogin:true,rolsuper:false,rolcreatedb:false,rolcreaterole:false,rolreplication:false,rolbypassrls:false,rolconnlimit:2,memberships:0}]);
+ expect((await database.pool.query(`SELECT rolpassword IS NULL AS none FROM pg_authid WHERE rolname='debateai_staff_readiness_writer'`)).rows[0].none).toBe(true);
+ const callable=(await database.pool.query(`SELECT p.oid::regprocedure::text AS signature FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname NOT IN('pg_catalog','information_schema','public') AND has_schema_privilege('debateai_staff_readiness_writer',n.oid,'USAGE') AND has_function_privilege('debateai_staff_readiness_writer',p.oid,'EXECUTE') ORDER BY 1`)).rows.map(r=>r.signature);
+ expect(callable).toEqual(['staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamp with time zone)','staff.revoke_independent_alert_readiness(uuid)']);
+ expect((await database.pool.query(`SELECT count(*)::int AS n FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname NOT IN('pg_catalog','information_schema') AND (has_table_privilege('debateai_staff_readiness_writer',c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') OR has_any_column_privilege('debateai_staff_readiness_writer',c.oid,'SELECT,INSERT,UPDATE,REFERENCES'))`)).rows[0].n).toBe(0);
+ // The API runtime gains nothing.
+ for(const runtimeRole of ['debateai_runtime','debateai_billing_runtime','debateai_authorization_runtime'])expect((await database.pool.query(`SELECT has_function_privilege($1,'staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz)','EXECUTE') OR has_function_privilege($1,'staff.revoke_independent_alert_readiness(uuid)','EXECUTE') OR pg_has_role($1,'debateai_staff_readiness_writer','MEMBER') AS any`,[runtimeRole])).rows[0].any).toBe(false);
+ const fresh=randomUUID();
+ await asWriter('debateai_staff_readiness_writer',async c=>{
+  expect((await c.query('SELECT session_user::text AS who')).rows[0].who).toBe('debateai_staff_readiness_writer');
+  expect((await c.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5) AS value',['a'.repeat(64),fresh,'capture-v1',randomUUID(),new Date(Date.now()+60000)])).rows[0].value).toBe(true);
+  expect((await c.query("SELECT staff.read_independent_alert_readiness($1,$2) AS value",['a'.repeat(64),fresh]).catch(e=>({rows:[{value:e.code}]}))).rows[0].value).toBe('42501');
+ });
+ expect((await database.pool.query("SELECT staff.read_independent_alert_readiness($1,$2) AS value",['a'.repeat(64),fresh])).rows[0].value).toBe('READY');
+ await asWriter('debateai_staff_readiness_writer',async c=>{expect((await c.query('SELECT staff.revoke_independent_alert_readiness($1) AS value',[fresh])).rows[0].value).toBe(true);await expect(c.query('SELECT * FROM staff.independent_alert_readiness')).rejects.toMatchObject({code:'42501'});});
+ expect((await database.pool.query("SELECT staff.read_independent_alert_readiness($1,$2) AS value",['a'.repeat(64),fresh])).rows[0].value).toBe('UNAVAILABLE');
+ // Any other login holding the capability is still refused by the guard, exactly as before.
+ await database.pool.query("DO $$BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='task5_impostor') THEN CREATE ROLE task5_impostor LOGIN IN ROLE debateai_staff_recovery;END IF;END$$");
+ await asWriter('task5_impostor',async c=>{await expect(c.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5)',['a'.repeat(64),randomUUID(),'capture-v1',randomUUID(),new Date(Date.now()+60000)])).rejects.toThrow('STAFF_RECOVERY_JIT_REQUIRED');});
+ await ready();
+});
+// Design note 2026-10-09 item 5: a claim given back before any send keeps the row's attempts.
+it('releases a live claim without spending an attempt and refuses a stale or foreign release',async()=>{
+ await ready();await database.pool.query('INSERT INTO staff.alert_dispatch_state(outbox_id,terminal) SELECT outbox_id,true FROM staff.alert_outbox ON CONFLICT(outbox_id) DO UPDATE SET terminal=true');
+ const target=await account(),keyRef=(await database.pool.query('SELECT audit_token FROM identity."user" WHERE user_id=$1',[target.userId])).rows[0].audit_token,eventId=randomUUID(),operationId=randomUUID();await authorize(operationId);
+ await database.pool.query("INSERT INTO staff.audit_event(event_id,operation_id,request_sha256,event_type,reason_code) VALUES($1,$2,$3,'INVITE','TEAM_ONBOARDING')",[eventId,operationId,'d'.repeat(64)]);
+ await database.pool.query("INSERT INTO staff.alert_outbox(event_id,purpose,key_ref,encrypted_payload) VALUES($1,'INDEPENDENT_METADATA_ALERT',$2,$3)",[eventId,keyRef,envelope]);
+ const state=async(outboxId:string)=>(await database.pool.query('SELECT attempts,claim_token,terminal FROM staff.alert_dispatch_state WHERE outbox_id=$1',[outboxId])).rows[0];
+ const [first]=(await runtime.query('SELECT staff.claim_alert_delivery(1) AS value')).rows[0].value;expect(first.eventId).toBe(eventId);expect(first.attempt).toBe(1);
+ expect((await runtime.query('SELECT staff.release_alert_delivery($1,$2) AS value',[first.outboxId,randomUUID()])).rows[0].value).toBe(false);
+ expect((await runtime.query('SELECT staff.release_alert_delivery($1,$2) AS value',[first.outboxId,first.claimToken])).rows[0].value).toBe(true);
+ expect(await state(first.outboxId)).toEqual({attempts:0,claim_token:null,terminal:false});
+ expect((await runtime.query('SELECT staff.release_alert_delivery($1,$2) AS value',[first.outboxId,first.claimToken])).rows[0].value).toBe(false);
+ const [again]=(await runtime.query('SELECT staff.claim_alert_delivery(1) AS value')).rows[0].value;expect(again.outboxId).toBe(first.outboxId);expect(again.attempt).toBe(1);
+ expect((await database.pool.query('SELECT count(*)::int AS n FROM staff.alert_delivery_receipt WHERE outbox_id=$1',[first.outboxId])).rows[0].n).toBe(0);
+ await database.pool.query("UPDATE staff.alert_dispatch_state SET claimed_until=clock_timestamp()-interval '1 second' WHERE outbox_id=$1",[again.outboxId]);
+ expect((await runtime.query('SELECT staff.release_alert_delivery($1,$2) AS value',[again.outboxId,again.claimToken])).rows[0].value).toBe(false);
+ expect((await database.pool.query("SELECT has_function_privilege('debateai_staff_readiness_writer','staff.release_alert_delivery(uuid,uuid)','EXECUTE') AS writer")).rows[0].writer).toBe(false);
+});
+// Auth DB batch review 2026-10-09: no role but the owner may create temporary objects, so nothing can shadow a type
+// or relation a definer function resolves; the readiness writer is adopted only when it carries nothing extra.
+it('no runtime role or the readiness writer can create a temporary object',async()=>{
+ const roles=['debateai_runtime','debateai_billing_runtime','debateai_authorization_runtime','debateai_mfa_recovery_runtime','debateai_staff_recovery','debateai_staff_readiness_writer','task5_runtime'];
+ for(const role of roles)expect((await database.pool.query("SELECT has_database_privilege($1,current_database(),'TEMPORARY') AS temp",[role])).rows[0].temp,role).toBe(false);
+ await asWriter('debateai_staff_readiness_writer',async c=>{await expect(c.query('CREATE TEMP TABLE shadow_probe(x int)')).rejects.toMatchObject({code:'42501'});await expect(c.query('CREATE TYPE pg_temp.timestamptz AS (x int)')).rejects.toMatchObject({code:'42501'});});
+ await expect(runtime.query('CREATE TEMP TABLE shadow_probe(x int)')).rejects.toMatchObject({code:'42501'});
+ // How many other definer functions still search pg_temp implicitly first (mitigated by the revoke above).
+ const left=(await database.pool.query(`SELECT count(*)::int AS n FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE p.prosecdef AND n.nspname NOT IN('pg_catalog','information_schema') AND NOT EXISTS(SELECT 1 FROM unnest(coalesce(p.proconfig,'{}')) s WHERE s LIKE 'search_path=%pg_temp')`)).rows[0].n;
+ console.info('[DEFINER_SEARCH_PATH_WITHOUT_PG_TEMP]',left);
+});
+async function batchSql(){const { readFile }=await import('node:fs/promises');const { AUTH_DB_BATCH_MIGRATION }=await import('../../packages/db/src/migration-forward-auth-db-batch.js');return readFile(new URL(`../../migrations/${AUTH_DB_BATCH_MIGRATION}`,import.meta.url),'utf8');}
+async function writerGuard(){const sql=await batchSql();const begin=sql.indexOf('-- readiness-writer-guard:begin'),end=sql.indexOf('-- readiness-writer-guard:end');expect(begin).toBeGreaterThan(-1);expect(end).toBeGreaterThan(begin);return sql.slice(begin,end);}
+it('adopts an existing readiness writer only when it has no settings, password, expiry, ownership or extra privilege',async()=>{
+ const guard=await writerGuard();await database.pool.query(guard);
+ const refused=async(tamper:string,undo:string,code:string)=>{await database.pool.query(tamper);try{await expect(database.pool.query(guard)).rejects.toThrow(code);}finally{await database.pool.query(undo);}await database.pool.query(guard);};
+ await refused("ALTER ROLE debateai_staff_readiness_writer SET work_mem='1MB'","ALTER ROLE debateai_staff_readiness_writer RESET ALL",'STAFF_READINESS_WRITER_SETTINGS');
+ await refused("ALTER ROLE debateai_staff_readiness_writer IN DATABASE debateai_s00 SET statement_timeout='1s'","ALTER ROLE debateai_staff_readiness_writer IN DATABASE debateai_s00 RESET ALL",'STAFF_READINESS_WRITER_SETTINGS');
+ await refused("ALTER ROLE debateai_staff_readiness_writer PASSWORD 'tamper-only'","ALTER ROLE debateai_staff_readiness_writer PASSWORD NULL",'STAFF_READINESS_WRITER_ATTRIBUTES');
+ await refused("ALTER ROLE debateai_staff_readiness_writer VALID UNTIL 'infinity'","UPDATE pg_authid SET rolvaliduntil=NULL WHERE rolname='debateai_staff_readiness_writer'",'STAFF_READINESS_WRITER_ATTRIBUTES');
+ await refused('GRANT SELECT ON staff.alert_outbox TO debateai_staff_readiness_writer','REVOKE SELECT ON staff.alert_outbox FROM debateai_staff_readiness_writer','STAFF_READINESS_WRITER_PRIVILEGES');
+ await refused('GRANT CREATE ON SCHEMA staff TO debateai_staff_readiness_writer','REVOKE CREATE ON SCHEMA staff FROM debateai_staff_readiness_writer','STAFF_READINESS_WRITER_PRIVILEGES');
+ await refused('GRANT EXECUTE ON FUNCTION staff.read_independent_alert_readiness(text,uuid) TO debateai_staff_readiness_writer','REVOKE EXECUTE ON FUNCTION staff.read_independent_alert_readiness(text,uuid) FROM debateai_staff_readiness_writer','STAFF_READINESS_WRITER_PRIVILEGES');
+ await refused('GRANT TEMPORARY ON DATABASE debateai_s00 TO debateai_staff_readiness_writer','REVOKE TEMPORARY ON DATABASE debateai_s00 FROM debateai_staff_readiness_writer','STAFF_READINESS_WRITER_PRIVILEGES');
+ await refused('CREATE TABLE public.writer_owned(x int);ALTER TABLE public.writer_owned OWNER TO debateai_staff_readiness_writer','DROP TABLE public.writer_owned','STAFF_READINESS_WRITER_OWNS_OBJECTS');
+});
+it("the batch's verifier refuses a readiness writer with a password or an expiry",async()=>{
+ const { readFile }=await import('node:fs/promises');const verifier=await readFile(new URL('../../migrations/lineage/verify-auth-db-batch.sql',import.meta.url),'utf8');await database.pool.query(verifier);
+ for(const [tamper,undo] of [["ALTER ROLE debateai_staff_readiness_writer PASSWORD 'tamper-only'","ALTER ROLE debateai_staff_readiness_writer PASSWORD NULL"],["ALTER ROLE debateai_staff_readiness_writer VALID UNTIL 'infinity'","UPDATE pg_authid SET rolvaliduntil=NULL WHERE rolname='debateai_staff_readiness_writer'"],["ALTER ROLE debateai_staff_readiness_writer SET work_mem='1MB'","ALTER ROLE debateai_staff_readiness_writer RESET ALL"]] as const){
+  await database.pool.query(tamper);try{await expect(database.pool.query(verifier)).rejects.toThrow('MIGRATION_FORWARD_AUTH_DB_BATCH_WRITER_DRIFT');}finally{await database.pool.query(undo);}
+ }
+ await database.pool.query(verifier);
+ // Any role but the owner (and superusers) holding TEMPORARY is refused, not only the runtimes and the writer.
+ const temp=(verb:string)=>database.pool.query(`DO $$BEGIN EXECUTE format('${verb} TEMPORARY ON DATABASE %I ${verb==='GRANT'?'TO':'FROM'} debateai_support',current_database());END$$`);
+ await temp('GRANT');try{await expect(database.pool.query(verifier)).rejects.toThrow('MIGRATION_FORWARD_AUTH_DB_BATCH_TEMP_DRIFT debateai_support');}finally{await temp('REVOKE');}
+ await database.pool.query(verifier);
 });

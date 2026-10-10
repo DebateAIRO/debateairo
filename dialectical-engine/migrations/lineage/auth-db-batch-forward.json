@@ -1,0 +1,21 @@
+{
+  "version": "auth-db-batch-forward-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0111_billing_netopia.sql",
+    "manifestSha256": "4de5a0f0160c536857dd8a7a3ce485400593860e2f75e8d01e934da04b2e57f7",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0112_auth_db_batch.sql",
+    "sha256": "a6cf443e41d81d5eda4ff6414ec0ec4e899d10fbedf84bb1bc7869a550c2f062"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "supplementalVerifier": {
+    "path": "lineage/verify-auth-db-batch.sql",
+    "sha256": "f51cad66c07b12798cf784d707bb9eedd313dea621f0ce941db56522c7134810"
+  }
+}
