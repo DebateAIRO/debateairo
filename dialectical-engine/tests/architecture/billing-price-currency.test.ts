@@ -9,6 +9,9 @@ import { describe, expect, it } from "vitest";
  * chose. The settings (packages/register), the fold's pre-Part-C default (packages/billing-core/src/subscription.ts)
  * and the AI-credit side (credit, caps, cost envelopes, budget, evaluator, story policy) keep USD and are not scanned.
  * Task C3 extends this file to the mail renderer and the UI's money helper.
+ *
+ * An exemption is one line, never a file: an ALLOWED entry names its file and the exact trimmed source line, and a
+ * stale or reworded entry fails the second case. C3 adds the mail renderer's default-currency lines the same way.
  */
 const ENGINE = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -23,12 +26,17 @@ const PRICE_FILES: ReadonlyArray<string> = Object.freeze([
   "packages/db/src/billing.ts"
 ]);
 
-/** File (relative to dialectical-engine/) → why a quoted USD is right there. */
-const ALLOWED: Readonly<Record<string, string>> = Object.freeze({
-  // C1's D10: the owner's check command lists the whole currency set read from the register, in the plans line's order
-  // (RON, EUR, USD). It names every currency, never a charge's, and prices nothing.
-  "apps/api/src/billing/check-cli.ts": "the check command's display order of the three currencies (spec 2026-10-05 §2.16.1)"
-});
+/** One exempted line: its file (relative to dialectical-engine/), its exact trimmed text, and why a quoted USD is right. */
+type AllowedLine = Readonly<{ file: string; text: string; reason: string }>;
+const ALLOWED: ReadonlyArray<AllowedLine> = Object.freeze([
+  Object.freeze({
+    file: "apps/api/src/billing/check-cli.ts",
+    text: 'const CURRENCY_LINE_ORDER: ReadonlyArray<BillingCurrency> = Object.freeze(["RON", "EUR", "USD"]);',
+    reason: "C1's D10: the check command's display order of the three currencies; it names every currency and prices nothing"
+  })
+]);
+const isAllowed = (file: string, text: string): boolean =>
+  ALLOWED.some((entry) => entry.file === file && entry.text === text);
 
 const QUOTED_USD = /["'`]USD["'`]/u;
 const isScanned = (name: string): boolean => name.endsWith(".ts") && !/\.(?:test|spec)\.ts$/u.test(name);
@@ -53,7 +61,7 @@ describe("the price side names no currency of its own (spec 2026-10-05 §2.16.4)
   it("has no quoted USD outside ALLOWED", () => {
     const hits = priceSideFiles().flatMap((file) => readFileSync(join(ENGINE, file), "utf8").split("\n")
       .map((line, index) => ({ file, line: index + 1, text: line.trim() }))
-      .filter((entry) => QUOTED_USD.test(entry.text) && ALLOWED[entry.file] === undefined));
+      .filter((entry) => QUOTED_USD.test(entry.text) && !isAllowed(entry.file, entry.text)));
     expect(hits).toEqual([]);
   });
 
@@ -68,6 +76,10 @@ describe("the price side names no currency of its own (spec 2026-10-05 §2.16.4)
       "packages/billing-core/src/ports.ts",
       "packages/db/src/billing.ts"
     ]));
-    for (const file of Object.keys(ALLOWED)) expect(priceSideFiles()).toContain(file);
+    for (const entry of ALLOWED) {
+      expect(priceSideFiles()).toContain(entry.file);
+      const lines = readFileSync(join(ENGINE, entry.file), "utf8").split("\n").map((line) => line.trim());
+      expect(lines, `${entry.file} no longer holds the exempted line`).toContain(entry.text);
+    }
   });
 });
