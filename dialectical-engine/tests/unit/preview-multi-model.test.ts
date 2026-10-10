@@ -60,7 +60,7 @@ describe("the reviewed rows equal the shared parity file (contract A §1, §3)",
       .toEqual(fixtureRows.map(({ worst_case_reservation_usd: _worst, input_nano_usd_per_token: _in, output_nano_usd_per_token: _out, ...row }) => row));
     expect(fixtureFile.schema).toBe("preview-model-rows-v1");
     expect(fixtureFile.provider).toBe("deepinfra");
-    expect(fixtureFile.reservation).toEqual({ formula: expect.any(String), overhead_bytes: 2048, worst_case_request_bytes: 128 * 1024, per_call_cap_usd: "0.25" });
+    expect(fixtureFile.reservation).toEqual({ formula: expect.any(String), overhead_bytes: 2048, worst_case_request_bytes: 256 * 1024, per_call_cap_usd: "0.25" });
   });
   it("prices are whole nano-USD per token (USD per million x 1000)", () => {
     expect(PREVIEW_MODEL_ROWS.map(row => [row.inputNanoUsdPerToken, row.outputNanoUsdPerToken]))
@@ -70,17 +70,17 @@ describe("the reviewed rows equal the shared parity file (contract A §1, §3)",
     expect(PREVIEW_MODEL_ROWS.map(row => [row.inputPriceMicrosPerMillion, row.outputPriceMicrosPerMillion]))
       .toEqual([[150_000, 500_000], [200_000, 600_000], [430_000, 870_000], [113_000, 382_000]]);
   });
-  it("the worst-case reservation (128 KiB body) equals the file and stays under the $0.25 per-call cap", () => {
+  it("the worst-case reservation (256 KiB body) equals the file and stays under the $0.25 per-call cap", () => {
     for (const fixture of fixtureRows) {
-      const reserved = previewReservationNanoUsd(previewModelRow(fixture.model)!, 128 * 1024);
+      const reserved = previewReservationNanoUsd(previewModelRow(fixture.model)!, 256 * 1024);
       expect(previewNanoUsdText(reserved)).toBe(fixture.worst_case_reservation_usd);
       expect(reserved < 250_000_000n).toBe(true);
     }
-    expect(fixtureRows.map(row => row.worst_case_reservation_usd)).toEqual(["0.036352000", "0.046284800", "0.085749760", "0.027559936"]);
+    expect(fixtureRows.map(row => row.worst_case_reservation_usd)).toEqual(["0.056012800", "0.072499200", "0.142110720", "0.042371072"]);
   });
-  it("owner ruling 2026-10-10: every row's answer cap is 32,768 tokens and every request body is capped at 128 KiB", () => {
+  it("owner ruling 2026-10-10: every row's answer cap is 32,768 tokens and every request body is capped at 256 KiB", () => {
     expect(PREVIEW_ANSWER_CAP_TOKENS).toBe(32_768);
-    expect(PREVIEW_REQUEST_BODY_MAX_BYTES).toBe(131_072);
+    expect(PREVIEW_REQUEST_BODY_MAX_BYTES).toBe(262_144);
     for (const row of PREVIEW_MODEL_ROWS) {
       expect(row.outputBound).toBe(32_768);
       // What the gateway asks for is clamped to the cap, and a health check asks for 8,192.
@@ -187,7 +187,7 @@ describe("the guarded fetch sends only what the gate accepts for the body's row 
       { model: MIMO, max_tokens: 0, messages },
       { model: MIMO, max_tokens: 8, messages, stream: false }
     ]) await expect(post(body)).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
-    const oversize = { model: MIMO, max_tokens: 8, messages: [{ role: "user", content: "x".repeat(128 * 1024) }] };
+    const oversize = { model: MIMO, max_tokens: 8, messages: [{ role: "user", content: "x".repeat(256 * 1024) }] };
     await expect(post(oversize)).rejects.toThrow();
     expect(executions).toHaveLength(0);
   });
@@ -348,16 +348,16 @@ describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 32768
     ]) await expect(post(refused)).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
     expect(executions).toHaveLength(0);
   });
-  it("reserves exactly 0.027559936 for a 128 KiB body: every prompt byte at the full input price", async () => {
+  it("reserves exactly 0.042371072 for a 256 KiB body: every prompt byte at the full input price", async () => {
     const { executions, post } = recordingFetch();
     const empty = JSON.stringify(body({ messages: [{ role: "user", content: "" }] }));
-    const full = body({ messages: [{ role: "user", content: "x".repeat(128 * 1024 - Buffer.byteLength(empty)) }] });
-    expect(Buffer.byteLength(JSON.stringify(full))).toBe(128 * 1024);
+    const full = body({ messages: [{ role: "user", content: "x".repeat(256 * 1024 - Buffer.byteLength(empty)) }] });
+    expect(Buffer.byteLength(JSON.stringify(full))).toBe(256 * 1024);
     await post(full);
-    expect(executions.map(execution => execution.reservedUsd)).toEqual(["0.027559936"]);
-    expect(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(QWEN)!, 128 * 1024))).toBe("0.027559936");
-    // One byte more (the hard 128 KiB cap, owner ruling 2026-10-10) is refused before any reservation.
-    const over = body({ messages: [{ role: "user", content: "x".repeat(128 * 1024 - Buffer.byteLength(empty) + 1) }] });
+    expect(executions.map(execution => execution.reservedUsd)).toEqual(["0.042371072"]);
+    expect(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(QWEN)!, 256 * 1024))).toBe("0.042371072");
+    // One byte more (the hard 256 KiB cap, owner ruling 2026-10-10) is refused before any reservation.
+    const over = body({ messages: [{ role: "user", content: "x".repeat(256 * 1024 - Buffer.byteLength(empty) + 1) }] });
     await expect(post(over)).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
     expect(executions).toHaveLength(1);
   });

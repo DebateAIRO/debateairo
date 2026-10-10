@@ -4,9 +4,9 @@ Offline only: temporary directories, fake dispatch functions, local socket pairs
 No private files, real keys, real ledgers, or upstream calls. The v3 model table has its own
 file (preview_budget_authority_v3_test.py). v3 changes seen here: the GO names a provider and
 its enabled models; activate refuses max_concurrent_calls x the largest enabled worst case
-(GLM: $0.036352) above the pot, so the small-pot tests run with one slot. Since the per-call caps
-(owner ruling 2026-10-10: output bound 32768, 128 KiB body) one GLM hold is about $0.0167, below the
-smallest pot one slot allows, so those tests spend with two settled calls before the edge.
+(GLM: $0.0560128) above the pot, so the small-pot tests run with one slot (a $0.06 pot). Since the
+per-call caps (owner rulings 2026-10-10: output bound 32768, 256 KiB body) one small GLM hold is about
+$0.0167, so those tests make three settled calls (or three holds) before the edge.
 """
 import contextlib
 import hashlib
@@ -388,26 +388,27 @@ class PhaseTests(GateTest):
 
 class DailyPotTests(GateTest):
     def spend_to(self, gate, total):
-        # Two settled calls that leave exactly one more hold before total. Each charge stays within
-        # its own reservation (GLM's output bound 32768, owner ruling 2026-10-10, makes one hold
-        # about $0.0167, less than the smallest pot that 1 x the GLM worst case allows).
-        gate.call('op-1', charge='0.0166')
-        gate.call('op-2', charge=str(Decimal(total) - RESERVED - Decimal('0.0166')))
+        # Four settled calls that leave exactly one more hold before total (0.07). Each charge stays
+        # within its own reservation (GLM's output bound 32768, owner ruling 2026-10-10, makes one
+        # small hold about $0.0167), and each call before the edge still fits a $0.06 pot.
+        for operation_id, charge in (('op-1', '0.0166'), ('op-2', '0.0166'), ('op-3', '0.01')):
+            gate.call(operation_id, charge=charge)
+        gate.call('op-4', charge=str(Decimal(total) - RESERVED - Decimal('0.0432')))
 
     def test_exactly_at_the_daily_cap_is_allowed(self):
-        gate = self.gate(daily_budget_usd='0.05', max_concurrent_calls=1).ready()
-        self.spend_to(gate, '0.05')
-        self.assertEqual(gate.call('op-3')['status'], 200)
-        self.assertEqual(gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-3']['state'], 'settled')
+        gate = self.gate(daily_budget_usd='0.07', max_concurrent_calls=1).ready()
+        self.spend_to(gate, '0.07')
+        self.assertEqual(gate.call('op-5')['status'], 200)
+        self.assertEqual(gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-5']['state'], 'settled')
 
     def test_one_cent_over_the_daily_cap_is_refused_with_team_budget_code(self):
-        gate = self.gate(daily_budget_usd='0.04', max_concurrent_calls=1).ready()
-        self.spend_to(gate, '0.05')
+        gate = self.gate(daily_budget_usd='0.06', max_concurrent_calls=1).ready()
+        self.spend_to(gate, '0.07')
         dispatched = []
         with self.refused('TEAM_DAILY_BUDGET_REACHED'):
-            gate.call('op-3', dispatch=lambda *args: dispatched.append(args))
+            gate.call('op-5', dispatch=lambda *args: dispatched.append(args))
         self.assertEqual(dispatched, [])
-        self.assertEqual(len(gate.day('2026-10-08')['entries']), 2)
+        self.assertEqual(len(gate.day('2026-10-08')['entries']), 4)
         self.assertEqual(gate.status()['state'], 'active')
 
     def test_daily_post_limit_refuses_with_its_own_code_and_resets_next_day(self):
@@ -421,10 +422,10 @@ class DailyPotTests(GateTest):
         self.assertEqual(gate.call('op-3')['status'], 200)
 
     def test_day_rolls_over_at_bucharest_midnight_not_utc_midnight(self):
-        gate = self.gate(daily_budget_usd='0.04', max_concurrent_calls=1).ready()
+        gate = self.gate(daily_budget_usd='0.06', max_concurrent_calls=1).ready()
         gate.clock.set('2026-10-08T20:59:59+00:00')  # 23:59:59 local
-        gate.call('op-1', charge=str(RESERVED))
-        gate.call('op-1b', charge=str(RESERVED))  # Two full holds: a third is over 0.04.
+        for operation_id in ('op-1', 'op-1b', 'op-1c'):  # Three full holds: a fourth is over 0.06.
+            gate.call(operation_id, charge=str(RESERVED))
         with self.refused('TEAM_DAILY_BUDGET_REACHED'):
             gate.call('op-2')
         gate.clock.set('2026-10-08T21:00:00+00:00')  # 00:00:00 local, still 2026-10-08 in UTC
@@ -442,17 +443,17 @@ class DailyPotTests(GateTest):
                 self.assertEqual(bridge.bucharest_day(datetime.fromisoformat(moment)), day)
 
     def test_spring_forward_day_has_twenty_three_hours_of_team_budget(self):
-        gate = self.gate(daily_budget_usd='0.04', max_concurrent_calls=1)
+        gate = self.gate(daily_budget_usd='0.06', max_concurrent_calls=1)
         gate.clock.set('2026-03-28T22:00:00+00:00')  # 00:00 on 2026-03-29, UTC+2
         gate.ready()
         gate.clock.set('2026-03-29T20:59:59+00:00')  # 23:59:59 on 2026-03-29, UTC+3
-        gate.call('op-1', charge=str(RESERVED))
-        gate.call('op-1b', charge=str(RESERVED))  # Two full holds: a third is over 0.04.
+        for operation_id in ('op-1', 'op-1b', 'op-1c'):  # Three full holds: a fourth is over 0.06.
+            gate.call(operation_id, charge=str(RESERVED))
         with self.refused('TEAM_DAILY_BUDGET_REACHED'):
             gate.call('op-2')
         gate.clock.set('2026-03-29T21:00:00+00:00')
         self.assertEqual(gate.call('op-2')['status'], 200)
-        self.assertEqual(len(gate.day('2026-03-29')['entries']), 2)
+        self.assertEqual(len(gate.day('2026-03-29')['entries']), 3)
         self.assertEqual(len(gate.day('2026-03-30')['entries']), 1)
 
     def test_reservation_counts_on_the_day_it_was_made_even_if_it_settles_after_midnight(self):
@@ -790,11 +791,11 @@ class HaltTests(GateTest):
         self.assertEqual(status['halts'][0]['at'], '2026-10-08T09:00:00+00:00')
 
     def test_reactivation_after_halt_keeps_history_and_uncertain_amount_counts_on_its_own_day(self):
-        gate = self.gate(daily_budget_usd='0.04', max_concurrent_calls=1).ready()
+        gate = self.gate(daily_budget_usd='0.06', max_concurrent_calls=1).ready()
 
         def broken(_body, _key):
             raise TimeoutError('deadline')
-        for operation_id in ('op-1', 'op-1b'):  # Two full uncertain holds: a third is over 0.04.
+        for operation_id in ('op-1', 'op-1b', 'op-1c'):  # Three full uncertain holds: a fourth is over 0.06.
             with self.refused('NEW_CHARGE_UNCERTAIN'):
                 gate.call(operation_id, dispatch=broken)
             gate.activate()
@@ -1157,9 +1158,9 @@ class IpcTests(GateTest):
         self.assertEqual(json.loads(payload)['status'], 200)
 
     def test_budget_and_limit_refusals_reach_the_409_body_with_their_own_code(self):
-        gate = self.gate(daily_budget_usd='0.04', max_concurrent_calls=1).ready()
-        gate.call('op-0', charge='0.0166')
-        gate.call('op-0b', charge='0.0166')  # 0.0332 + one more hold (about 0.0167) is over 0.04.
+        gate = self.gate(daily_budget_usd='0.06', max_concurrent_calls=1).ready()
+        for operation_id in ('op-0', 'op-0b', 'op-0c'):  # 0.0498 + one more hold (about 0.0167) is over 0.06.
+            gate.call(operation_id, charge='0.0166')
         line, payload = self.exchange(gate, self.ok)
         self.assertIn(b' 409 ', line)
         self.assertEqual(json.loads(payload), {'error': 'TEAM_DAILY_BUDGET_REACHED'})

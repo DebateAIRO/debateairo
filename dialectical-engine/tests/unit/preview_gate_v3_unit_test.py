@@ -233,12 +233,12 @@ class UnitFileTests(unittest.TestCase):
                      'TEAM_TOTAL_BUDGET_EXCEEDED', 'unbilled_release_ceiling', 'PROBE_FENCE_REQUIRED',
                      # The two round-2 documentation findings: the midnight overlap, and a predecessor
                      # hash that is written down only.
-                     '**Midnight overlap.**', '10 x $0.0857 = $0.86', 'It never checks it against v2',
+                     '**Midnight overlap.**', '10 x $0.1421 = $1.42', 'It never checks it against v2',
                      # 10 at once fits the $10.00 pot with all four switched on (MiMo's worst case),
                      # owner ruling 2026-10-10 (pots and per-call caps).
-                     '$0.08574976 (MiMo) | $0.8574976 | yes', '(128 KiB)', '32,768'):
+                     '$0.14211072 (MiMo) | $1.4211072 | yes', '(256 KiB)', '32,768', 'about 236 KiB'):
             self.assertIn(name, readme)
-        for old in ('"3.50"', '"4.00"', '256 KiB', '163,840', '$0.2276'):  # Figures before the ruling.
+        for old in ('"3.50"', '"4.00"', '128 KiB', '163,840', '$0.2276', '$0.0857'):  # Superseded figures.
             self.assertNotIn(old, readme)
         go_line = [line for line in readme.splitlines() if line.startswith('jq -n') and 'go-v3' in line]
         self.assertEqual(len(go_line), 1)

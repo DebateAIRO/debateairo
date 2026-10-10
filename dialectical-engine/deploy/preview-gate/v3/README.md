@@ -29,10 +29,10 @@ What is new in v3:
 
 | Model | Maker | Price the gate charges (per million tokens, in / out) | Longest answer allowed (tokens) | Thinking | JSON mode | Most one call can set aside |
 |---|---|---|---|---|---|---|
-| `zai-org/GLM-5.3-Flash` | Z.AI | $0.15 / $0.50 | 32,768 | "high" | allowed | $0.0364 |
-| `deepseek-ai/DeepSeek-V4.1-Flash` | DeepSeek | $0.20 / $0.60 | 32,768 | "high" | not allowed | $0.0463 |
-| `XiaomiMiMo/MiMo-V2.6-Pro` | Xiaomi | $0.43 / $0.87 | 32,768 | none sent | not allowed | $0.0857 |
-| `Qwen/Qwen3.8-Flash` | Alibaba | $0.113 / $0.382 | 32,768 | none sent | not allowed | $0.0276 |
+| `zai-org/GLM-5.3-Flash` | Z.AI | $0.15 / $0.50 | 32,768 | "high" | allowed | $0.0560 |
+| `deepseek-ai/DeepSeek-V4.1-Flash` | DeepSeek | $0.20 / $0.60 | 32,768 | "high" | not allowed | $0.0725 |
+| `XiaomiMiMo/MiMo-V2.6-Pro` | Xiaomi | $0.43 / $0.87 | 32,768 | none sent | not allowed | $0.1421 |
+| `Qwen/Qwen3.8-Flash` | Alibaba | $0.113 / $0.382 | 32,768 | none sent | not allowed | $0.0424 |
 
 - The prices are DeepInfra's list prices. GLM and DeepSeek are on promotion today (50% and 30%
   off), so the gate counts more than the real bill. That is the careful side. Qwen3.8-Flash (not
@@ -40,13 +40,15 @@ What is new in v3:
   promotion.
 - "Thinking" tokens are charged as answer tokens. If the answer does not prove that they are
   already inside its answer count, the gate charges them on top. That is the careful side too.
-- "Most one call can set aside" is for the largest question the gate accepts (128 KiB). No
+- "Most one call can set aside" is for the largest question the gate accepts (256 KiB). No
   model may ever set aside more than $0.25 for one call; a test checks every row.
 - Two limits per call, the same for every model (owner ruling, 2026-10-10): an answer may be at
-  most 32,768 tokens long, and a question (the whole request) at most 128 KiB. The gate refuses
-  anything larger before it sets money aside. There is room to spare: today no call the app makes
-  asks for more than 24,000 answer tokens (a debate turn 8,192, a health check 8,192, the story
-  writer 12,000 and 24,000 on its retry), and the largest real request seen was about 51 KB.
+  most 32,768 tokens long, and a question (the whole request) at most 256 KiB. The gate refuses
+  anything larger before it sets money aside. Why these sizes: today no call the app makes asks
+  for more than 24,000 answer tokens (a debate turn 8,192, a health check 8,192, the story writer
+  12,000 and 24,000 on its retry). The question limit stays at 256 KiB because the story writer's
+  requests reach about 236 KiB at the "high" story size; an ordinary request is much smaller (the
+  largest seen was about 51 KB).
 - Whether DeepSeek, MiMo and Qwen accept these settings, and whether they name themselves exactly
   in their answers, is not yet measured. The `probe` measures it with one paid call each, before
   they are switched on.
@@ -86,10 +88,10 @@ allow), each setting aside the largest worst case of the switched-on models, mus
 
 | Switched on | Largest worst case | x 10 calls at once | Fits in $10.00? |
 |---|---|---|---|
-| GLM only (the first `activate`) | $0.036352 (GLM) | $0.36352 | yes |
-| All four | $0.08574976 (MiMo) | $0.8574976 | yes ($9.14 to spare) |
+| GLM only (the first `activate`) | $0.0560128 (GLM) | $0.560128 | yes |
+| All four | $0.14211072 (MiMo) | $1.4211072 | yes ($8.57 to spare) |
 
-The smallest pot that passes with all four switched on is $0.86.
+The smallest pot that passes with all four switched on is $1.43.
 
 ## Decisions you should know about
 
@@ -122,7 +124,7 @@ The smallest pot that passes with all four switched on is $0.86.
   started. A call that starts just before midnight is paid just after it, while the new day's pot
   is already open. So within one calendar day the real bill can go above the pot by up to
   10 calls (the number that may run at once) x the largest amount one call may set aside: at most
-  10 x $0.0857 = $0.86 with all four models switched on. The probe adds one more call to that.
+  10 x $0.1421 = $1.42 with all four models switched on. The probe adds one more call to that.
   That is by design: the pot limits what is set aside per Bucharest day, not the calendar day's
   bill.
 - **The gate code binds the model list.** The list lives in `preview_budget_helper.py`, whose
@@ -269,7 +271,7 @@ stat -c '%a %U:%G %h %s' /var/lib/debateai-v3-preview/provider-deepinfra-authori
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as in v2. No one else may ask. |
 | `daily_budget_usd` | `"10.00"` | DeepInfra's share of the $12 team total (owner ruling, 2026-10-10; Anthropic has $2.00). A string with two decimals; at most `"10.00"`, and `activate` checks the sum with the other gates' GOs. |
 | `max_paid_posts_per_day` | `2000` | A second fuse on the number of paid calls (owner ruling, 2026-10-10). Refusals kept as unbilled ($0) do not count. |
-| `max_concurrent_calls` | `10` | Owner ruling ("10 at once"); 10 is the most a v3 GO may ask (v2 stays at most 8). 10 x $0.0857 (MiMo) = $0.86 fits in $10.00. |
+| `max_concurrent_calls` | `10` | Owner ruling ("10 at once"); 10 is the most a v3 GO may ask (v2 stays at most 8). 10 x $0.1421 (MiMo) = $1.42 fits in $10.00. |
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
 | `predecessor_ledger_sha256` | v2 state hash | Optional. Records which v2 state this pot follows. Written down only; never checked. |
 

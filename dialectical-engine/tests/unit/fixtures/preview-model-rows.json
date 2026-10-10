@@ -1,11 +1,11 @@
 {
   "schema": "preview-model-rows-v1",
-  "about": "The reviewed DeepInfra model rows of the preview spending gate (contract A section 1). The gate (packages/providers/ops/preview_budget_helper.py) and the app (packages/providers/src) must both equal this file; a price change is a reviewed change to both sides and to this file. Prices are list prices in USD per million tokens. effort null means the request carries no reasoning_effort field. Per-call caps (owner ruling 2026-10-10), the same for every row: output_bound (the max_tokens ceiling and the reservation's output term) 32768 tokens, and a hard request body cap of 128 KiB (worst_case_request_bytes).",
+  "about": "The reviewed DeepInfra model rows of the preview spending gate (contract A section 1). The gate (packages/providers/ops/preview_budget_helper.py) and the app (packages/providers/src) must both equal this file; a price change is a reviewed change to both sides and to this file. Prices are list prices in USD per million tokens. effort null means the request carries no reasoning_effort field. Per-call caps (owner ruling 2026-10-10), the same for every row: output_bound (the max_tokens ceiling and the reservation's output term) 32768 tokens, and a hard request body cap of 256 KiB (worst_case_request_bytes; story requests reach about 236 KiB at the high story size).",
   "provider": "deepinfra",
   "reservation": {
     "formula": "((request utf-8 bytes + overhead_bytes) * input price + output_bound * output price) / 1000000",
     "overhead_bytes": 2048,
-    "worst_case_request_bytes": 131072,
+    "worst_case_request_bytes": 262144,
     "per_call_cap_usd": "0.25"
   },
   "rows": [
@@ -19,7 +19,7 @@
       "output_bound": 32768,
       "effort": "high",
       "json_object": true,
-      "worst_case_reservation_usd": "0.036352000"
+      "worst_case_reservation_usd": "0.056012800"
     },
     {
       "model": "deepseek-ai/DeepSeek-V4.1-Flash",
@@ -31,7 +31,7 @@
       "output_bound": 32768,
       "effort": "high",
       "json_object": false,
-      "worst_case_reservation_usd": "0.046284800"
+      "worst_case_reservation_usd": "0.072499200"
     },
     {
       "model": "XiaomiMiMo/MiMo-V2.6-Pro",
@@ -43,7 +43,7 @@
       "output_bound": 32768,
       "effort": null,
       "json_object": false,
-      "worst_case_reservation_usd": "0.085749760"
+      "worst_case_reservation_usd": "0.142110720"
     },
     {
       "model": "Qwen/Qwen3.8-Flash",
@@ -55,7 +55,7 @@
       "output_bound": 32768,
       "effort": null,
       "json_object": false,
-      "worst_case_reservation_usd": "0.027559936"
+      "worst_case_reservation_usd": "0.042371072"
     }
   ]
 }

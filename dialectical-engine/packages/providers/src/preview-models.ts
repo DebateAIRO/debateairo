@@ -39,9 +39,10 @@ export const PREVIEW_DEEPINFRA_BASE_URL = "https://api.deepinfra.com/v1/openai" 
 const PREVIEW_CONTEXT_WINDOW_TOKENS = 1_048_576;
 /**
  * Request bodies above this are refused before any reservation (contract A §2). Owner ruling
- * 2026-10-10: a HARD cap of 128 KiB for every row (the largest real request seen was about 51 KB).
+ * 2026-10-10 (evening): a HARD cap of 256 KiB for every row, because a story request at the "high"
+ * story size reaches about 236 KiB (the largest ordinary request seen was about 51 KB).
  */
-export const PREVIEW_REQUEST_BODY_MAX_BYTES = 128 * 1024;
+export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
 /**
  * Owner ruling 2026-10-10: every reviewed row's answer cap (its max_tokens ceiling and the output side
  * of every reservation). No call the app makes asks for more than 24,000 today (debate calls and health

@@ -318,13 +318,15 @@ class DeepInfraProfile:
     host = 'api.deepinfra.com'
     path = '/v1/openai/chat/completions'
     per_call_cap_usd = Decimal('0.25')
-    # Per-call caps (owner ruling 2026-10-10), the same for every row: a hard 128 KiB request body
+    # Per-call caps (owner rulings 2026-10-10), the same for every row: a hard 256 KiB request body
     # cap here, and output_bound 32768 (the max_tokens ceiling and the reservation's output term)
-    # in each row below. Measured then: no call the app makes asks for more than 24,000 tokens
-    # (debate 8,192, health checks 8,192, storyteller 12,000 then 24,000 on retry), and the largest
-    # real request seen was about 51 KB. Full-size worst cases: GLM $0.036352, DeepSeek $0.0462848,
-    # MiMo $0.08574976, Qwen $0.027559936 (tests/unit/fixtures/preview-model-rows.json).
-    max_request_bytes = 128 * 1024
+    # in each row below. The 256 KiB is kept because story requests reach about 236 KiB at the
+    # "high" story size (the largest ordinary request seen was about 51 KB). No call the app makes
+    # asks for more than 24,000 answer tokens (debate 8,192, health checks 8,192, storyteller
+    # 12,000 then 24,000 on retry). Full-size worst cases ((262,144 + 2,048) x input + 32,768 x
+    # output): GLM $0.0560128, DeepSeek $0.0724992, MiMo $0.14211072, Qwen $0.042371072
+    # (tests/unit/fixtures/preview-model-rows.json).
+    max_request_bytes = 256 * 1024
     redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
     rows = {row.model: row for row in (
         ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 32768, 'high', True),

@@ -105,12 +105,12 @@ class ReviewedTableTests(GateTest):
                                                    row.output_bound, row.effort, row.json_object))
 
     def test_every_reviewed_row_fits_the_per_call_cap_for_a_full_size_request(self):
-        # Owner ruling 2026-10-10: a hard 128 KiB body cap and output bound 32768 for every row.
-        self.assertEqual((DEEPINFRA.per_call_cap_usd, DEEPINFRA.max_request_bytes), (Decimal('0.25'), 128 * 1024))
+        # Owner rulings 2026-10-10: a hard 256 KiB body cap and output bound 32768 for every row.
+        self.assertEqual((DEEPINFRA.per_call_cap_usd, DEEPINFRA.max_request_bytes), (Decimal('0.25'), 256 * 1024))
         self.assertEqual({row.output_bound for row in DEEPINFRA.rows.values()}, {32768})
         self.assertLessEqual(DEEPINFRA.per_call_cap_usd, bridge.MAX_PROFILE_CALL_CAP_USD)
-        expected = {MODEL: Decimal('0.036352'), DEEPSEEK: Decimal('0.0462848'), MIMO: Decimal('0.08574976'),
-                    QWEN: Decimal('0.027559936')}
+        expected = {MODEL: Decimal('0.0560128'), DEEPSEEK: Decimal('0.0724992'), MIMO: Decimal('0.14211072'),
+                    QWEN: Decimal('0.042371072')}
         for name, profile in bridge.helper.PROFILES.items():
             for model, row in profile.rows.items():
                 with self.subTest(provider=name, model=model):
@@ -120,7 +120,7 @@ class ReviewedTableTests(GateTest):
                     if name == 'deepinfra':
                         self.assertEqual(worst, expected[model])
         go = bridge.read_go(self.gate(enabled_models=ALL).go_path)
-        for model in ALL:  # A real request of exactly 128 KiB reserves exactly the worst case.
+        for model in ALL:  # A real request of exactly 256 KiB reserves exactly the worst case.
             with self.subTest(model=model):
                 _, reserved, _, _ = bridge.validate_request(envelope(sized_body(model, DEEPINFRA.max_request_bytes)), go)
                 self.assertEqual(reserved, expected[model])
@@ -197,11 +197,11 @@ class GoV3Tests(GateTest):
                 bridge.read_go(gate.write_go(name='bad.json', **changes))
 
     def test_activate_refuses_concurrency_times_the_largest_enabled_worst_case_over_the_pot(self):
-        # GLM worst case 0.036352 (x4 = 0.145408); MiMo 0.08574976 (x4 = 0.34299904);
-        # DeepSeek 0.0462848 (x4 = 0.1851392).
-        for enabled, budget, ok in (([MODEL], '0.14', False), ([MODEL], '0.15', True),
-                                    ([MODEL, MIMO], '0.34', False), ([MODEL, MIMO], '0.35', True),
-                                    ([MODEL, DEEPSEEK], '0.18', False), ([MODEL, DEEPSEEK], '0.19', True)):
+        # GLM worst case 0.0560128 (x4 = 0.2240512); MiMo 0.14211072 (x4 = 0.56844288);
+        # DeepSeek 0.0724992 (x4 = 0.2899968).
+        for enabled, budget, ok in (([MODEL], '0.22', False), ([MODEL], '0.23', True),
+                                    ([MODEL, MIMO], '0.56', False), ([MODEL, MIMO], '0.57', True),
+                                    ([MODEL, DEEPSEEK], '0.28', False), ([MODEL, DEEPSEEK], '0.29', True)):
             with self.subTest(enabled=enabled, budget=budget):
                 gate = self.gate(enabled_models=enabled, daily_budget_usd=budget)
                 gate.init()  # init does not judge the pot; activate does.
@@ -211,7 +211,7 @@ class GoV3Tests(GateTest):
                     with self.refused('CONCURRENCY_EXCEEDS_BUDGET'):
                         gate.activate()
                     self.assertEqual(gate.control()['state'], 'initialized')
-        gate = self.gate(enabled_models=[MIMO], daily_budget_usd='0.08', max_concurrent_calls=1)
+        gate = self.gate(enabled_models=[MIMO], daily_budget_usd='0.14', max_concurrent_calls=1)
         gate.init()
         with self.refused('CONCURRENCY_EXCEEDS_BUDGET'):
             gate.activate()
@@ -227,9 +227,9 @@ class GoV3Tests(GateTest):
         for limit in (0, 11, 12, 100, True, 10.0, '10'):
             with self.subTest(limit=limit), self.refused('ROOT_GO_INVALID'):
                 bridge.read_go(gate.write_go(name='bad.json', max_concurrent_calls=limit))
-        # The pot check still holds at 10: 10 x MiMo's worst case (0.08574976) = 0.8574976, which
+        # The pot check still holds at 10: 10 x MiMo's worst case (0.14211072) = 1.4211072, which
         # the owner's $10.00 DeepInfra pot (ruling 2026-10-10) holds.
-        for budget, ok in (('0.85', False), ('0.86', True), ('10.00', True)):
+        for budget, ok in (('1.42', False), ('1.43', True), ('10.00', True)):
             with self.subTest(budget=budget):
                 gate = self.gate(enabled_models=ALL, daily_budget_usd=budget, max_concurrent_calls=10)
                 gate.init()
@@ -427,10 +427,10 @@ class RemainingTests(GateTest):
         gate.call('op-1', charge='0.01')
         self.assertEqual(self.report(gate, slots=gate.slots), {
             'state': 'active', 'window_open': True, 'remaining_usd': '4.99', 'remaining_calls': 499,
-            'max_concurrent_calls': 4, 'largest_reservation_usd': '0.036352', 'enabled_models': [MODEL]})
+            'max_concurrent_calls': 4, 'largest_reservation_usd': '0.0560128', 'enabled_models': [MODEL]})
         gate = self.gate(enabled_models=[MODEL, MIMO]).ready()
         self.assertEqual((self.report(gate)['largest_reservation_usd'], self.report(gate)['remaining_usd']),
-                         ('0.08574976', '5.00'))
+                         ('0.14211072', '5.00'))
 
     def test_it_never_writes_creates_or_reads_the_key(self):
         gate = self.gate().ready()
@@ -1050,8 +1050,8 @@ class QwenRowTests(GateTest):
         row = DEEPINFRA.rows[QWEN]
         self.assertEqual((row.maker, row.input_usd_per_m, row.output_usd_per_m, row.output_bound, row.effort, row.json_object),
                          ('Alibaba', Decimal('0.113'), Decimal('0.382'), 32768, None, False))
-        # ((131072 + 2048) x 0.113 + 32768 x 0.382) / 1e6, under the $0.25 cap (caps: owner, 2026-10-10).
-        self.assertEqual(bridge.worst_case_reservation(DEEPINFRA, row), Decimal('0.027559936'))
+        # ((262144 + 2048) x 0.113 + 32768 x 0.382) / 1e6, under the $0.25 cap (caps: owner, 2026-10-10).
+        self.assertEqual(bridge.worst_case_reservation(DEEPINFRA, row), Decimal('0.042371072'))
         self.assertTrue(bridge.row_reviewed(DEEPINFRA, QWEN, row))
 
     def test_qwen_takes_no_effort_and_no_json_mode(self):

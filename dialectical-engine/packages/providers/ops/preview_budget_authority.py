@@ -114,7 +114,7 @@ CONTROL_SCHEMA = 'preview-provider-budget-control-v3'
 DAY_SCHEMA = 'preview-provider-budget-day-v3'
 RESERVATION_OVERHEAD_BYTES = 2048  # Bytes the provider may add around the request (the app reserves the same).
 # Outer bounds on what a profile may declare as its own per-call cap and request size (DeepInfra:
-# $0.25 and 128 KiB, owner ruling 2026-10-10). A unit test pins every reviewed row under its profile's cap.
+# $0.25 and 256 KiB, owner ruling 2026-10-10). A unit test pins every reviewed row under its profile's cap.
 MAX_PROFILE_CALL_CAP_USD = Decimal('1.00')
 MAX_PROFILE_REQUEST_BYTES = 1024 * 1024
 MAX_PRICE_USD_PER_M = Decimal('10.00')  # A price above this is a typo, not a preview model.
