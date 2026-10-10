@@ -3,17 +3,18 @@
  * half-way; ESTIMATE before it starts, with a tolerance, not a worst case).
  *
  * Plain words: before a preview debate is created, the app works out the model calls it will make
- * (every call site with the repeat attempts the basis allows, the answer loop, the story with the
- * storyteller's one repair, the runner's health checks each time it picks the debate up, this ask's
- * own health checks, and the one retry of a call the gate proved unbilled), puts each call on the
- * model that makes it (so each gate is charged only for its own models' calls), prices each call at
- * an AVERAGE call of that kind by that model (4,000 tokens in and 1,200 out until the app has
- * measured at least 20 of its own such calls, then the measured average) at the row's list price
- * today, adds 15%, adds what the gate may hold at once for calls in flight (its concurrency limit x
- * its largest reservation), and holds back the same figure for every earlier preview debate that has
- * not finished (a debate still writing its story: the story's calls). One ask at a time is estimated
- * and started (the admission lock), so two asks never both count the same money. How a call is
- * priced is ONE switch (previewEstimatePricer, PREVIEW_ESTIMATE_PRICING_MODE).
+ * (each debate step once, the answer loop, the story with the storyteller's one repair, the runner's
+ * health checks each time it picks the debate up, this ask's own health checks, and the one retry of
+ * a call the gate proved unbilled), puts each call on the model that makes it (so each gate is
+ * charged only for its own models' calls), prices each call at a REALISTIC WORST CASE (owner ruling,
+ * 2026-10-10: its prompt at 64 KiB, its answer at the full max_tokens that call asks for; a health
+ * check at its fixed one-line prompt) at the row's list price, adds 15%, adds what the gate may hold
+ * at once for calls in flight (its concurrency limit x its largest reservation, from the gate's own
+ * reply), and holds back the same figure for every earlier preview debate that has not finished (a
+ * debate still writing its story: the story's calls). One ask at a time is estimated and started
+ * (the admission lock), so two asks never both count the same money. How a call is priced and how
+ * the debate's calls are counted is ONE switch (PREVIEW_ESTIMATE_PRICING_MODE: previewEstimatePricer
+ * and previewDebateCallCount); the calibrated average and the strict bound stay one constant away.
  * Then it asks the gate what is left of today's team money and calls.
  * - Too little money or too few calls left: the existing daily refusal ("today's limit is used up"),
  *   retry at the gate's reset (midnight in Bucharest).
@@ -131,12 +132,19 @@ export const PREVIEW_CALIBRATION_WINDOW_DAYS = 14;
 /**
  * The strict upper bound's input side (STRICT_BOUND mode only, 6f62b6ba3): no per-call-type cap on a
  * prompt's size exists in the engine's code, so the one hard ceiling is the guarded fetch's: a body
- * above 256 KiB is refused before it is sent, and the gate reserves (body bytes + 2048) x the input
+ * above 128 KiB (owner ruling, 2026-10-10) is refused before it is sent, and the gate reserves (body bytes + 2048) x the input
  * price. A health check's body is the fixed one-line probe, well under 1 KiB.
  */
 export const PREVIEW_STRICT_INPUT_TOKENS_PER_CALL = previewChargedInputTokens(PREVIEW_REQUEST_BODY_MAX_BYTES);
 const PREVIEW_PROBE_BODY_MAX_BYTES = 1024;
 export const PREVIEW_STRICT_PROBE_INPUT_TOKENS = previewChargedInputTokens(PREVIEW_PROBE_BODY_MAX_BYTES);
+/**
+ * The realistic worst case's input side (owner ruling, 2026-10-10): a prompt of 64 KiB, plus the
+ * gate's 2,048 template allowance (65,536 + 2,048 token-equivalents). The largest real request seen
+ * on the preview was about 51 KB; the hard cap the guarded fetch and the gate enforce is 128 KiB.
+ */
+export const PREVIEW_REALISTIC_INPUT_BYTES = 64 * 1024;
+export const PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL = previewChargedInputTokens(PREVIEW_REALISTIC_INPUT_BYTES);
 /**
  * Review finding 3: a runner restart (a crash, a deploy) after the claim lapses re-claims the debate
  * and health-checks its whole panel again; nothing in the engine bounds how often that happens. The
@@ -167,7 +175,8 @@ export type PreviewUnfinishedRun = Readonly<{
  * The max_tokens each kind of call sends on the preview, before its row's own bound clamps it:
  * previewCallBound's ceiling (the register's bound, at least the generation floor) for every
  * one-attempt debate call; the storyteller's first attempt at its ceiling and its second at the
- * length-retry ceiling; the story checker at its ceiling. Only the STRICT_BOUND mode prices with it.
+ * length-retry ceiling; the story checker at its ceiling. The REALISTIC_WORST_CASE and STRICT_BOUND
+ * modes price with it.
  */
 export type PreviewCallOutputTokens = Readonly<{ debate: number; storyteller: number; storytellerRetry: number; storyChecker: number }>;
 
@@ -268,35 +277,67 @@ export function calibratedEstimatePricer(measured: PreviewMeasuredCallUsage): Pr
   };
 }
 /**
- * STRICT_BOUND (6f62b6ba3): every call at its most, input at the largest body the gate accepts,
- * output at the max_tokens that call sends, clamped to the row; a health check at its fixed body and
- * the generation floor.
+ * Every call at `inputTokens` in and the max_tokens that call sends out (clamped to the row); a health
+ * check at its fixed one-line body and the generation floor.
  */
-export function strictUpperBoundPricer(output: PreviewCallOutputTokens): PreviewCallPricer {
+function sentOutputPricer(inputTokens: bigint, output: PreviewCallOutputTokens): PreviewCallPricer {
   const sent: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, number>> = {
     DEBATE: output.debate, STORYTELLER: output.storyteller, STORYTELLER_RETRY: output.storytellerRetry, STORY_CHECKER: output.storyChecker
   };
   return (row, type) => type === "PROBE"
     ? previewCallNanoUsd(row, PREVIEW_STRICT_PROBE_INPUT_TOKENS, PREVIEW_GLM_GENERATION_TOKEN_FLOOR)
-    : previewCallNanoUsd(row, PREVIEW_STRICT_INPUT_TOKENS_PER_CALL, sent[type]);
+    : previewCallNanoUsd(row, inputTokens, sent[type]);
+}
+/**
+ * STRICT_BOUND (6f62b6ba3): every call at its most, input at the largest body the gate accepts,
+ * output at the max_tokens that call sends, clamped to the row; a health check at its fixed body and
+ * the generation floor.
+ */
+export function strictUpperBoundPricer(output: PreviewCallOutputTokens): PreviewCallPricer {
+  return sentOutputPricer(PREVIEW_STRICT_INPUT_TOKENS_PER_CALL, output);
+}
+/**
+ * REALISTIC_WORST_CASE (owner ruling, 2026-10-10): every call's input at a realistic maximum of 64 KiB
+ * (PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL), its output at the max_tokens that call asks for (clamped
+ * to the row); a health check at its fixed body and the generation floor, as in the strict bound.
+ */
+export function realisticWorstCasePricer(output: PreviewCallOutputTokens): PreviewCallPricer {
+  return sentOutputPricer(PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, output);
 }
 
-export type PreviewPricingMode = "CALIBRATED_ESTIMATE" | "STRICT_BOUND";
+export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" | "STRICT_BOUND";
 /**
- * THE ACTIVE PRICING MODE: CALIBRATED_ESTIMATE. The owner's own rule (2026-09-28) is an ESTIMATE with
- * a tolerance, not a worst case, and the owner chose it again on 2026-10-10 (option 2): the strict
- * bound priced a free debate at about $13 and a premium one at about $98 while real ones cost under a
- * cent, so nothing fit the $4 day. To switch (for example back to STRICT_BOUND, or to a measured-cap
- * mode added beside these two), change this one constant; nothing else reads the mode.
+ * THE ACTIVE PRICING MODE: REALISTIC_WORST_CASE (owner ruling, 2026-10-10, replacing the calibrated
+ * average of option 2). Why, in one sentence: an average could let a debate start that then runs out
+ * of money half-way, while a realistic worst case per step (64 KiB in, the full answer out) still fits
+ * a whole debate in the $10.00 day, so a started debate is not cut off for money.
+ * To switch (back to CALIBRATED_ESTIMATE, to STRICT_BOUND, or to a mode added beside these), change
+ * this one constant; previewEstimatePricer and previewDebateCallCount follow it, nothing else reads it.
  */
-export const PREVIEW_ESTIMATE_PRICING_MODE: PreviewPricingMode = "CALIBRATED_ESTIMATE";
+export const PREVIEW_ESTIMATE_PRICING_MODE: PreviewPricingMode = "REALISTIC_WORST_CASE";
 /** THE ONE PRICING SWITCH: the pricer for `mode` (default: the active mode above). */
 export function previewEstimatePricer(context: Readonly<{ measured: PreviewMeasuredCallUsage; callOutputTokens: PreviewCallOutputTokens }>,
   mode: PreviewPricingMode = PREVIEW_ESTIMATE_PRICING_MODE): PreviewCallPricer {
   switch (mode) {
+    case "REALISTIC_WORST_CASE": return realisticWorstCasePricer(context.callOutputTokens);
     case "CALIBRATED_ESTIMATE": return calibratedEstimatePricer(context.measured);
     case "STRICT_BOUND": return strictUpperBoundPricer(context.callOutputTokens);
   }
+}
+/**
+ * How a debate's own calls are counted: PER_STEP, each call site once (the owner's ruling of
+ * 2026-10-10 for the realistic worst case: a repeat attempt is the exception, and the 15% margin and
+ * the unbilled retry cover it); BASIS_CEILING, the larger of that and the basis's own
+ * max_model_attempts, which counts every repeat attempt every site may make (the earlier modes).
+ * A basis without a per-site split is always counted at its ceiling.
+ */
+export type PreviewDebateCallCount = "PER_STEP" | "BASIS_CEILING";
+/** Only the calibrated mode reads the app's recorded usage (so only it can be refused for an unreadable ledger). */
+export function previewModeReadsMeasuredUsage(mode: PreviewPricingMode = PREVIEW_ESTIMATE_PRICING_MODE): boolean {
+  return mode === "CALIBRATED_ESTIMATE";
+}
+export function previewDebateCallCount(mode: PreviewPricingMode = PREVIEW_ESTIMATE_PRICING_MODE): PreviewDebateCallCount {
+  return mode === "REALISTIC_WORST_CASE" ? "PER_STEP" : "BASIS_CEILING";
 }
 
 /** The calls of one debate, by part; `total` is what the gate's call count must allow (before the margin). */
@@ -315,10 +356,10 @@ function offPanelRoleRefs(panel: readonly PreviewPanelMember[], roleProviderRefs
 }
 
 /**
- * The calls one debate makes, from the basis admission resolved (the count is the one the estimate
- * had before option 2; only the pricing changed):
- * - debate: the larger of one call per site (`expectedCallsByRoleFromBasis`) and the basis's own
- *   ceiling `max_model_attempts`, which counts every repeat attempt per site;
+ * The calls one debate makes, from the basis admission resolved:
+ * - debate: PER_STEP (the active mode's count), one call per site (`expectedCallsByRoleFromBasis`);
+ *   BASIS_CEILING, the larger of that and the basis's own ceiling `max_model_attempts`, which counts
+ *   every repeat attempt per site (a basis without a split is always counted at its ceiling);
  * - story: per round, the storyteller twice and the story checker once;
  * - probes: the runner's paid health checks at every pickup, one per panel member plus one per role
  *   ref not on the panel, times (1 + the hold cap: `hold_cap` on the basis, else the register's,
@@ -335,6 +376,7 @@ export function previewExpectedCalls(input: Readonly<{
   storyRounds: number;
   maxCooldownHoldsPerRun: number;
   askProbeTargets?: number;
+  debateCallCount?: PreviewDebateCallCount;
 }>): PreviewExpectedCalls {
   if (!wholeNumber(input.storyRounds)) throw new TypeError("PREVIEW_STORY_ROUNDS_INVALID");
   if (!wholeNumber(input.maxCooldownHoldsPerRun)) throw new TypeError("PREVIEW_HOLD_CAP_INVALID");
@@ -342,7 +384,8 @@ export function previewExpectedCalls(input: Readonly<{
   if (!wholeNumber(askProbes)) throw new TypeError("PREVIEW_ASK_PROBE_TARGETS_INVALID");
   const sites = debateSitesByRole(input.basis);
   const ceiling = positiveInteger(input.basis.max_model_attempts) ? input.basis.max_model_attempts : 0;
-  const debate = Math.max(sites === null ? 0 : sites.total, ceiling);
+  const perStep = (input.debateCallCount ?? previewDebateCallCount()) === "PER_STEP";
+  const debate = sites !== null && perStep ? sites.total : Math.max(sites === null ? 0 : sites.total, ceiling);
   if (debate < 1) throw new TypeError("PREVIEW_BASIS_HAS_NO_CALL_COUNT");
   const probes = previewPickups(input.basis, input.maxCooldownHoldsPerRun)
     * (input.panel.length + offPanelRoleRefs(input.panel, input.roleProviderRefs).length);
@@ -394,6 +437,7 @@ export function previewCallShares(input: Readonly<{
   askProbeModelIds?: readonly string[];
   roleModelOfRef?: (ref: string) => string;
   storyOnly?: boolean;
+  debateCallCount?: PreviewDebateCallCount;
 }>): PreviewCallShares {
   const askProbeModelIds = input.askProbeModelIds ?? [];
   const expected = previewExpectedCalls({ ...input, askProbeTargets: askProbeModelIds.length });
@@ -489,13 +533,14 @@ export type PreviewEstimateSettings = Readonly<{
 }>;
 
 /**
- * Pure: what a NEW debate needs of each gate, at `pricer` (default: the active mode with no measured
- * usage, so the default averages). Throws for a model the preview does not review.
+ * Pure: what a NEW debate needs of each gate, at `pricer` and `debateCallCount` (defaults: the active
+ * mode, with no measured usage). Throws for a model the preview does not review.
  */
 export function estimatePreviewGateNeeds(input: PreviewEstimateSettings & Readonly<{
   basis: Readonly<Record<string, unknown>>;
   panel: readonly PreviewPanelMember[];
   pricer?: PreviewCallPricer;
+  debateCallCount?: PreviewDebateCallCount;
 }>): readonly PreviewGateNeed[] {
   if (input.panel.length === 0) throw new TypeError("PREVIEW_PANEL_EMPTY");
   const reviewedRow = (model: string): PreviewModelRow => {
@@ -520,7 +565,8 @@ export function estimatePreviewGateNeeds(input: PreviewEstimateSettings & Readon
  * is dearest, on the DeepInfra gate, the only gate today.
  */
 export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: PreviewEstimateSettings,
-  pricer: PreviewCallPricer = previewEstimatePricer({ measured: [], callOutputTokens: settings.callOutputTokens })): readonly PreviewGateNeed[] {
+  pricer: PreviewCallPricer = previewEstimatePricer({ measured: [], callOutputTokens: settings.callOutputTokens }),
+  debateCallCount: PreviewDebateCallCount = previewDebateCallCount()): readonly PreviewGateNeed[] {
   const dearestRow = PREVIEW_MODEL_ROWS.reduce((best, row) => pricer(row, "DEBATE") > pricer(best, "DEBATE") ? row : best);
   const rowOf = (model: string): PreviewModelRow => previewModelRow(model) ?? dearestRow;
   const byGate = new Map<PreviewGateKey, string[]>();
@@ -529,7 +575,7 @@ export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: 
     byGate.set(gate, [...(byGate.get(gate) ?? []), model]);
   }
   const calls = previewCallShares({ ...settings, askProbeModelIds: [], basis: run.basis, panel: run.panel,
-    roleModelOfRef: (ref) => previewModelRowForRef(ref)?.model ?? dearestRow.model, storyOnly: run.phase === "STORY" });
+    roleModelOfRef: (ref) => previewModelRowForRef(ref)?.model ?? dearestRow.model, storyOnly: run.phase === "STORY", debateCallCount });
   return gateNeeds(byGate, calls, rowOf, pricer);
 }
 
@@ -650,16 +696,18 @@ export async function assertPreviewBudgetAdmits(
   let needs: readonly PreviewGateNeed[];
   let held: Map<PreviewGateKey, PreviewGateHeld>;
   try {
-    // The app's own recorded usage calibrates the averages; the same pricing holds back every
-    // unfinished debate, so a new debate and a running one are counted alike.
-    const measured = await gate!.readMeasuredCallUsage?.() ?? [];
+    // The active mode prices and counts (the calibrated mode would use the app's own recorded usage);
+    // the same pricing and count hold back every unfinished debate, so a new debate and a running
+    // one are counted alike.
+    const measured = previewModeReadsMeasuredUsage() ? await gate!.readMeasuredCallUsage?.() ?? [] : [];
     const pricer = previewEstimatePricer({ measured, callOutputTokens: gate!.callOutputTokens });
-    needs = estimatePreviewGateNeeds({ ...input, ...gate!, pricer });
+    const debateCallCount = previewDebateCallCount();
+    needs = estimatePreviewGateNeeds({ ...input, ...gate!, pricer, debateCallCount });
     const unfinished = await gate!.readUnfinishedRuns();
     if (unfinished.length > PREVIEW_UNFINISHED_RUNS_MAX) throw new TypeError("PREVIEW_UNFINISHED_RUNS_TOO_MANY");
     held = new Map();
     for (const run of unfinished) {
-      for (const hold of estimateUnfinishedRunHolds(run, gate!, pricer)) {
+      for (const hold of estimateUnfinishedRunHolds(run, gate!, pricer, debateCallCount)) {
         const sum = held.get(hold.gate) ?? { calls: 0, nanoUsd: 0n };
         held.set(hold.gate, { calls: sum.calls + hold.callsWithMargin, nanoUsd: sum.nanoUsd + hold.callsNanoUsd });
       }
