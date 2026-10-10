@@ -187,42 +187,6 @@ tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded number
 # else BY DESIGN (packages/db/src/migration-lineage.ts identifyLineage; tests/integration/auth-dev-lineage.test.ts
 # asserts that refusal). Those upgrade paths no longer exist in production, so the tests are stale. Fix: run the
 # migration's own SQL inside a rolled-back transaction on a fresh database, or retire the upgrade-from-old-state part.
-tests/integration/obs-agent-05-pg-monitor.test.ts > OBS-05 V-29 statistics window replaces pg_monitor > leaves the agent's principal in no predefined role and applies 0068 once, replay-safe
-#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
-#   tests/ci-integration-all.txt; the same
-#   message file by file on dev@c8cf8e063 the same day).
-#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0068 ledger row (lines 149, 160) and calls
-#   migrate() to replay 0068 (see above).
-#   blinds: the rest of the test: 0068's own refusal guards (OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP,
-#   OBS_STATS_OWNER_NOT_EXCLUSIVE)
-#   and its replay-safety; they still ship and run on a fresh migrate, but nothing proves they fire.
-tests/integration/obs-agent-05-pg-monitor.test.ts > OBS-05 V-29 statistics window replaces pg_monitor > refuses to finish 0068 while the agent reaches a predefined role by another path
-#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
-#   tests/ci-integration-all.txt; the same
-#   message file by file on dev@c8cf8e063 the same day).
-#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0068 ledger row (lines 149, 160) and calls
-#   migrate() to replay 0068 (see above).
-#   blinds: the rest of the test: 0068's own refusal guards (OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP,
-#   OBS_STATS_OWNER_NOT_EXCLUSIVE)
-#   and its replay-safety; they still ship and run on a fresh migrate, but nothing proves they fire.
-tests/integration/obs-agent-05-pg-monitor.test.ts > OBS-05 V-29 statistics window replaces pg_monitor > refuses to adopt a statistics owner that has a member
-#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
-#   tests/ci-integration-all.txt; the same
-#   message file by file on dev@c8cf8e063 the same day).
-#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0068 ledger row (lines 149, 160) and calls
-#   migrate() to replay 0068 (see above).
-#   blinds: the rest of the test: 0068's own refusal guards (OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP,
-#   OBS_STATS_OWNER_NOT_EXCLUSIVE)
-#   and its replay-safety; they still ship and run on a fresh migrate, but nothing proves they fire.
-tests/integration/obs-agent-05-pg-monitor.test.ts > OBS-05 V-29 statistics window replaces pg_monitor > refuses to adopt a statistics owner that owns any other object
-#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
-#   tests/ci-integration-all.txt; the same
-#   message file by file on dev@c8cf8e063 the same day).
-#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0068 ledger row (lines 149, 160) and calls
-#   migrate() to replay 0068 (see above).
-#   blinds: the rest of the test: 0068's own refusal guards (OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP,
-#   OBS_STATS_OWNER_NOT_EXCLUSIVE)
-#   and its replay-safety; they still ship and run on a fresh migrate, but nothing proves they fire.
 tests/integration/obs-agent-dl7-f9-threshold-operator.test.ts > DL7-F9: the daemon can no longer re-rule its own monitor > applies 0071 replay-safely and refuses to finish while the daemon can still INSERT
 #   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
 #   tests/ci-integration-all.txt; the same
