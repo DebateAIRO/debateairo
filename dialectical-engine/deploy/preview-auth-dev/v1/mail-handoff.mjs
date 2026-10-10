@@ -29,14 +29,20 @@ export function selectCanonicalMail(message,options) {
   const id=/^<(password-reset|backup-email|mfa-recovery)-([0-9a-f-]{36})@v3-preview\.dezbatere\.ro>$/i.exec(headers.get('message-id')??'');if(!id)refuse();
   const expiry=/expires at ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z)\./.exec(text);
   const expiresAt=expiry?new Date(expiry[1]):new Date(0);
+  // WAITING (24-hour authenticator replacement wait) states its notBefore in the body; an unparsable time cannot re-render.
+  const wait=/nothing is replaced before ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z)\./.exec(text);
   const path=id[1]==='password-reset'?'/reset-password':id[1]==='backup-email'?'/verify-backup-email':'/recover-authenticator';
   const links=text.split('\r\n').filter(line=>line.startsWith(`${PREVIEW_ORIGIN}${path}#`));const proofs={};
-  for(const link of links){const match=/^#(token|cancel)=([A-Za-z0-9_-]{43})$/.exec(new URL(link).hash);if(!match||proofs[match[1]])refuse();proofs[match[1]]=match[2];}
-  const events=id[1]==='password-reset'?['PROOF','COMPLETED','CANCELLED','REFUSED']:id[1]==='backup-email'?['PROOF','VERIFIED']:['PROOF','STARTED','COMPLETED','CANCELLED','REFUSED'];
+  // Only the authenticator recovery family ever carries a finish link.
+  const kinds=id[1]==='mfa-recovery'?/^#(token|cancel|finish)=([A-Za-z0-9_-]{43})$/:/^#(token|cancel)=([A-Za-z0-9_-]{43})$/;
+  for(const link of links){const match=kinds.exec(new URL(link).hash);if(!match||proofs[match[1]])refuse();proofs[match[1]]=match[2];}
+  const events=id[1]==='password-reset'?['PROOF','COMPLETED','CANCELLED','REFUSED']:id[1]==='backup-email'?['PROOF','VERIFIED']:['PROOF','STARTED','WAITING','FINISH','COMPLETED','CANCELLED','REFUSED'];
   for(const event of events){
    const dto={messageId:id[2],recipient:headers.get('to'),expiresAt,event,
     ...(event==='PROOF'?{token:proofs.token}:{}),
-    ...((event==='PROOF'&&id[1]!=='backup-email'||event==='STARTED'&&proofs.cancel)?{cancelToken:proofs.cancel}:{})};
+    ...((event==='PROOF'&&id[1]!=='backup-email'||(event==='STARTED'||event==='WAITING')&&proofs.cancel)?{cancelToken:proofs.cancel}:{}),
+    ...(event==='WAITING'?{notBefore:wait?new Date(wait[1]):new Date(Number.NaN)}:{}),
+    ...(event==='FINISH'?{finishToken:proofs.finish}:{})};
    try{const rendered=id[1]==='password-reset'?options.renderPasswordResetMail(dto,options):options.renderEmailRecoveryMail({...dto,flow:id[1]==='backup-email'?'backup_email':'mfa_recovery'},options);
     if(Buffer.from(rendered).equals(message))return {family:'external',message};
    }catch{/* Only exact equality from an admitted public producer can select a family. */}

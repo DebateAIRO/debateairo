@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { generateAuthenticationOptions } from '@simplewebauthn/server';
-import { AuthMethodsResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, PasskeyAuthenticationOptionsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, StepUpAuthorizationRequestSchema, type AuthMethodsResponse, type PasskeyAuthenticationOptionsResponse, type StepUpResponse } from '@debateai/contract';
+import { AuthMethodsResponseSchema, MfaRecoveryPendingCancelRequestSchema, MfaRecoveryPendingResponseSchema, type MfaRecoveryPendingResponse, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, PasskeyAuthenticationOptionsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, StepUpAuthorizationRequestSchema, type AuthMethodsResponse, type PasskeyAuthenticationOptionsResponse, type StepUpResponse } from '@debateai/contract';
 import { generateRecoveryCodes, hashRecoveryCode, hashToken, type Argon2Executor } from '@debateai/crypto';
 import type { AuthSourceContext, PostgresConsumerSecurityRepository, ProfileSession } from '@debateai/db';
 import type { MfaPolicy, AuthPolicy } from '@debateai/register';
@@ -29,6 +29,8 @@ const handleHash = (value: string) => digest('consumer-passkey:STEP_UP\0' + valu
 export const consumerSecuritySession = (session: AuthenticatedSession): ProfileSession => ({ userId: session.userId, sessionId: session.session.session_id, tokenHash: session.tokenHash });
 export interface ConsumerSecurityApplication {
     authMethods(session: AuthenticatedSession): Promise<AuthMethodsResponse>;
+    pendingMfaRecovery(session: AuthenticatedSession): Promise<MfaRecoveryPendingResponse>;
+    cancelPendingMfaRecovery(input: unknown, session: AuthenticatedSession, source: AuthSourceContext): Promise<{ status: 'cancelled' }>;
     beginPasskeyStepUp(input: unknown, session: AuthenticatedSession, source: AuthSourceContext): Promise<PasskeyAuthenticationOptionsResponse>;
     completePasskeyStepUp(input: unknown, session: AuthenticatedSession, source: AuthSourceContext): Promise<Readonly<{
         sessionToken: string;
@@ -56,6 +58,9 @@ export class ConsumerSecurityService implements ConsumerSecurityApplication {
     }
     private async passwordPath(session: AuthenticatedSession) { const passwordHashSnapshot = await this.repository.readPasswordState(consumerSecuritySession(session)); return { admittedProviders:await this.sessions.socialBindings?.()??[],passwordHashSnapshot, passwordUsable: consumerPasswordUsable(passwordHashSnapshot, this.dependencies.authPolicy) }; }
     async authMethods(session: AuthenticatedSession): Promise<AuthMethodsResponse> { const record = await this.repository.authMethods(consumerSecuritySession(session), await this.passwordPath(session)) as AuthMethodsResponse; return AuthMethodsResponseSchema.parse({ ...record, methods: record.methods.map(method => ({ ...method, created_at: new Date(method.created_at).toISOString(), last_used_at: method.last_used_at === null ? null : new Date(method.last_used_at).toISOString() })) }); }
+    /** Owner ruling 2026-10-09: any signed-in session sees an authenticator recovery that is waiting its 24 hours, and can cancel it. */
+    async pendingMfaRecovery(session: AuthenticatedSession): Promise<MfaRecoveryPendingResponse> { const record = await this.repository.pendingMfaRecovery(consumerSecuritySession(session)); return MfaRecoveryPendingResponseSchema.parse({ pending: record === null ? null : { not_before: new Date(record.notBefore).toISOString(), started_at: new Date(record.waitingAt).toISOString() } }); }
+    async cancelPendingMfaRecovery(input: unknown, session: AuthenticatedSession, source: AuthSourceContext): Promise<{ status: 'cancelled' }> { parseConsumerSecurityInput(MfaRecoveryPendingCancelRequestSchema, input); if (await this.repository.cancelPendingMfaRecovery(consumerSecuritySession(session), source) !== 'CANCELLED') throw new AuthFlowError('MFA_ENROLLMENT_STATE_INVALID'); return { status: 'cancelled' }; }
     async beginPasskeyStepUp(input: unknown, session: AuthenticatedSession, source: AuthSourceContext): Promise<PasskeyAuthenticationOptionsResponse> {
         const parsed = parseConsumerSecurityInput(BeginPasskeyStepUpRequestSchema, input), admission = await this.sessions.admit('STEP_UP_BEGIN', session.userId, source), handle = random(), challenge = random();
         const result = await this.repository.beginStepUp({ ...admission, ...consumerSecuritySession(session), handleHash: handleHash(handle), challengeHash: digest(challenge), bindingHash: this.sessions.bindingHash(source), rpId: this.rpId, origin: this.origin, authorization: parsed.authorization });

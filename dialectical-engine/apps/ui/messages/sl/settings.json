@@ -180,5 +180,12 @@
   "settings.security.codesRemaining": "Obnovitvene kode: {count}",
   "settings.security.regenerate": "Ustvari nove obnovitvene kode",
   "settings.security.lockoutReminder": "Še nimate obnovitvenih kod ali ključa za dostop. Če izgubite telefon, se z njimi takoj vrnete v račun.",
-  "settings.security.refreshFailed": "Varnostnih podatkov ni bilo mogoče osvežiti. Znova naložite stran."
+  "settings.security.refreshFailed": "Varnostnih podatkov ni bilo mogoče osvežiti. Znova naložite stran.",
+  "settings.security.pendingRecovery.title": "Nekdo je začel zamenjavo vaše aplikacije za preverjanje pristnosti",
+  "settings.security.pendingRecovery.body": "Nekdo je z vašim geslom in povezavo iz e-pošte začel zamenjavo aplikacije za preverjanje pristnosti na tem računu. Dokončate jo lahko od {time}.",
+  "settings.security.pendingRecovery.bodyReady": "Nekdo je z vašim geslom in povezavo iz e-pošte začel zamenjavo aplikacije za preverjanje pristnosti na tem računu. Zdaj jo lahko dokončate: uporabite povezavo iz e-pošte.",
+  "settings.security.pendingRecovery.keep": "Dokler ni dokončana, vaša trenutna aplikacija za preverjanje pristnosti, obnovitvene kode in seje še naprej delujejo. Če to niste bili vi, jo prekličite.",
+  "settings.security.pendingRecovery.cancel": "Prekliči",
+  "settings.security.pendingRecovery.cancelled": "Zamenjava je preklicana.",
+  "settings.security.pendingRecovery.failed": "Zamenjave ni bilo mogoče preklicati. Ponovno naložite stran in poskusite znova."
 }

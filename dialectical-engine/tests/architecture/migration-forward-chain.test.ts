@@ -50,7 +50,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains 0111 to the recipe, to 0110's manifest and to the verifier in force after 0110 (the sealed one)", async () => {
     const plan = await loadMigrationPlan();
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
-    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql"]);
+    // The auth DB batch (0112) follows 0111 (migrations/lineage/README.md).
+    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql"]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
     // as its base verifier: after 0110, the sealed verifier is the one in force.
@@ -152,7 +153,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       }, "MIGRATION_FORWARD111_MANIFEST");
       // The same refusal when 0110's own manifest changes under 0111 (its bytes are what 0111 is bound to).
       await refusal("lineage/auth-dev-preview-20261006-forward110.json", (text) => `${text}\n`, "MIGRATION_FORWARD111_MANIFEST");
-      const extra = join(root, "migrations/0112_unbound_step.sql");
+      const extra = join(root, "migrations/0199_unbound_step.sql");
       await writeFile(extra, "SELECT 1;\n");
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_LINEAGE_REFUSED SOURCE_INVENTORY") });
       await rm(extra);

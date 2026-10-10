@@ -177,5 +177,12 @@
   "settings.security.codesRemaining": "恢复代码：{count}",
   "settings.security.regenerate": "生成新的恢复代码",
   "settings.security.lockoutReminder": "您还没有恢复代码或通行密钥。如果您丢失了手机，有了它们即可立即重新登录。",
-  "settings.security.refreshFailed": "无法刷新安全信息。请重新加载页面。"
+  "settings.security.refreshFailed": "无法刷新安全信息。请重新加载页面。",
+  "settings.security.pendingRecovery.title": "有人开始更换您的身份验证器应用",
+  "settings.security.pendingRecovery.body": "有人使用您的密码和一封电子邮件中的链接，开始更换此账户的身份验证器应用。您可以从 {time} 起完成更换。",
+  "settings.security.pendingRecovery.bodyReady": "有人使用您的密码和一封电子邮件中的链接，开始更换此账户的身份验证器应用。现在即可完成更换，请使用您邮箱中的链接。",
+  "settings.security.pendingRecovery.keep": "在完成之前，您当前的身份验证器应用、恢复代码和会话仍可继续使用。如果这不是您本人的操作，请取消。",
+  "settings.security.pendingRecovery.cancel": "取消",
+  "settings.security.pendingRecovery.cancelled": "已取消恢复。",
+  "settings.security.pendingRecovery.failed": "无法取消。请刷新页面后重试。"
 }

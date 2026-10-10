@@ -82,7 +82,8 @@ describe("auth front-door parity", () => {
 
     expect(login).toMatch(/client\.beginLogin/);
     expect(login).toMatch(/client\.completeLogin/);
-    expect(login).toMatch(/replacement_recovery_code/);
+    // Review M4 2026-10-09: a used recovery code is never refilled, so sign-in has no replacement-code branch.
+    expect(login).not.toMatch(/replacement_recovery_code/);
     for (const [key, english] of [
       ["auth.passkey.signIn", "Sign in with a passkey"],
       ["auth.login.useRecoveryCode", "Use a recovery code"],

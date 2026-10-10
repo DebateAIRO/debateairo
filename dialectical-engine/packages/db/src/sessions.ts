@@ -310,7 +310,6 @@ export class PostgresSessionRepository {
   async completeRecoveryLogin(input: Readonly<{
     challenge: LoginChallengeRecord;
     recoveryCodeId: string;
-    replacementHash: string;
     bindingHash: string;
     sessionId: string;
     sessionTokenHash: string;
@@ -331,7 +330,7 @@ export class PostgresSessionRepository {
           challengeId:input.challenge.challengeId,challengeHash:input.challenge.challengeTokenHash,factorId:input.challenge.factorId,secretCiphertext:input.challenge.secretCiphertext,
           bindingHash:input.bindingHash,browserHash:input.browserHash,admittedProviders:input.admittedProviders,
           material:{sessionId:input.sessionId,sessionTokenHash:input.sessionTokenHash,csrfTokenHash:input.csrfTokenHash,sessionBindingContext:input.sessionBindingContext,idleExpiresAt:input.idleExpiresAt,absoluteExpiresAt:input.absoluteExpiresAt},
-          recoveryCodeId:input.recoveryCodeId,recoveryCodeHash:input.recoveryCodeHash,replacementHash:input.replacementHash};
+          recoveryCodeId:input.recoveryCodeId,recoveryCodeHash:input.recoveryCodeHash};
         return (await client.query('SELECT identity.complete_social_login($1,$2) valid',[p,{ipArgon2id:prepared.ipArgon2id,userAgentArgon2id:prepared.userAgentArgon2id}])).rows[0]?.valid===true;
       }
       const result = await client.query<{ valid: boolean }>(`
@@ -340,7 +339,7 @@ export class PostgresSessionRepository {
         ) AS valid
       `, [input.challenge.userId,input.challenge.ownerRef,input.challenge.passwordHash,
         input.challenge.factorId,input.challenge.challengeId,input.challenge.challengeTokenHash,
-        input.bindingHash,input.recoveryCodeId,input.replacementHash,input.sessionId,
+        input.bindingHash,input.recoveryCodeId,null,input.sessionId,
         input.sessionTokenHash,input.csrfTokenHash,JSON.stringify(input.sessionBindingContext),
         input.occurredAt,input.idleExpiresAt,input.absoluteExpiresAt,JSON.stringify({
           ipArgon2id: prepared.ipArgon2id,userAgentArgon2id: prepared.userAgentArgon2id

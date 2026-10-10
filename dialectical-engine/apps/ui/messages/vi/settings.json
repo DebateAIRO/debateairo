@@ -177,5 +177,12 @@
   "settings.security.codesRemaining": "Mã khôi phục: {count}",
   "settings.security.regenerate": "Tạo mã khôi phục mới",
   "settings.security.lockoutReminder": "Bạn chưa có mã khôi phục hoặc khóa truy cập. Nếu bạn làm mất điện thoại, chúng giúp bạn vào lại ngay.",
-  "settings.security.refreshFailed": "Không thể làm mới thông tin bảo mật. Hãy tải lại trang."
+  "settings.security.refreshFailed": "Không thể làm mới thông tin bảo mật. Hãy tải lại trang.",
+  "settings.security.pendingRecovery.title": "Ai đó đã bắt đầu thay thế ứng dụng xác thực của bạn",
+  "settings.security.pendingRecovery.body": "Ai đó đã dùng mật khẩu của bạn và liên kết qua email để bắt đầu thay thế ứng dụng xác thực cho tài khoản này. Bạn có thể hoàn tất từ {time}.",
+  "settings.security.pendingRecovery.bodyReady": "Ai đó đã dùng mật khẩu của bạn và liên kết qua email để bắt đầu thay thế ứng dụng xác thực cho tài khoản này. Bạn có thể hoàn tất ngay bây giờ, bằng liên kết trong email của bạn.",
+  "settings.security.pendingRecovery.keep": "Cho đến khi hoàn tất, ứng dụng xác thực hiện tại, mã khôi phục và các phiên đăng nhập vẫn hoạt động. Nếu không phải bạn, hãy hủy.",
+  "settings.security.pendingRecovery.cancel": "Hủy",
+  "settings.security.pendingRecovery.cancelled": "Đã hủy quá trình khôi phục.",
+  "settings.security.pendingRecovery.failed": "Chúng tôi không thể hủy. Hãy tải lại trang rồi thử lại."
 }

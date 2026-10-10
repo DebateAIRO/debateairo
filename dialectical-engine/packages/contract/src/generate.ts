@@ -45,6 +45,8 @@ const staffEndpointContracts: Record<string, Record<string, unknown>> = {
   "GET /v1/account/auth-methods": response(reference("AuthMethodsResponseSchema")),
   "POST /v1/account/auth-methods/remove": {...request(reference("RemoveAuthMethodRequestSchema")),responses:{"204":{description:"Authentication method removed with a viable sign-in path retained"}}},
   "POST /v1/account/recovery-codes/regenerate": {...request(reference("RegenerateRecoveryCodesRequestSchema")),...response(reference("RecoveryCodesResponseSchema"))},
+  "GET /v1/account/mfa-recovery": response(reference("MfaRecoveryPendingResponseSchema")),
+  "POST /v1/account/mfa-recovery/cancel": {...request(reference("MfaRecoveryPendingCancelRequestSchema")),...response(reference("MfaRecoveryPendingCancelledSchema"))},
 
   "POST /v1/auth/mfa/totp/begin": {...request(reference("BeginTotpEnrollmentRequestSchema")),...response(reference("TotpEnrollmentOptionsResponseSchema"))},
   "POST /v1/auth/mfa/totp/verify": {...request(reference("CompleteTotpEnrollmentRequestSchema")),...response(reference("TotpEnrollmentResponseSchema"))},

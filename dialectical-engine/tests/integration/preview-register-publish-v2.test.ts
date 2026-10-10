@@ -51,7 +51,8 @@ describe('publish kit v2 on PostgreSQL 18 (source evidence, not the Linux operat
       // Sealed versions were never edited.
       expect(await readSealedSnapshot(pool, '4')).toEqual(v4);
       expect(await readSealedSnapshot(pool, '5')).toEqual(current);
-      expect((await pool.query('SELECT max(register_version)::text v FROM register.register_version')).rows[0].v).toBe('6');
+      // Nothing was written by the refused attempts: no version 7 (an explicit version, never a latest selection).
+      expect((await pool.query('SELECT count(*)::int n FROM register.register_version WHERE register_version=$1', ['7'])).rows[0].n).toBe(0);
     } finally { await db.stop(); }
   }, 180000);
 });

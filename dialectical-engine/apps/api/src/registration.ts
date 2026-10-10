@@ -38,7 +38,11 @@ export interface RegisterInput {
   readonly email: string;
   readonly password: string;
   readonly recoveryEmail?: string | null;
-  readonly phone: string;
+  /**
+   * Optional (owner ruling 2026-10-09): absent, null or blank stores no phone; any other value must
+   * parse. Blank is "none" because the byte-pinned S04 register mount hands "" when no phone was sent.
+   */
+  readonly phone?: string | null;
   /**
    * True only when the API's age gate found a date of birth of at least MIN_AGE; the
    * date itself never reaches this service. Registration records that result.
@@ -489,7 +493,7 @@ function validEmail(value: unknown): value is string {
 interface PendingRegistration {
   readonly email: string;
   readonly recoveryEmail: string | null;
-  readonly phone: string;
+  readonly phone: string | null;
   readonly emailBlindIndex: Buffer;
   readonly passwordHash: string | null;
   readonly social?: SocialSignupAuthority;
@@ -692,9 +696,13 @@ export class RegistrationService implements RegistrationApplication {
       || input.adultAffirmed !== true) {
       throw new AuthFlowError("AUTH_INPUT_INVALID");
     }
-    let phone: string;
-    try { phone = normalizeManualPhone(input.phone); }
-    catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+    let phone: string | null = null;
+    if (typeof input.phone === "string" && input.phone.trim() !== "") {
+      try { phone = normalizeManualPhone(input.phone); }
+      catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+    } else if (input.phone !== undefined && input.phone !== null && typeof input.phone !== "string") {
+      throw new AuthFlowError("AUTH_INPUT_INVALID");
+    }
     // Age gate (R3-3): the source's country — the edge's, else the country gate's lookup — is
     // recorded with the result, never decisive.
     const countryCode = typeof rawSource.countryCode === "string" && /^[A-Z]{2}$/.test(rawSource.countryCode)
@@ -1492,7 +1500,7 @@ export class RegistrationService implements RegistrationApplication {
       const dek = generateDek();
       const emailPlaintext = Buffer.from(input.email, "utf8");
       const recoveryPlaintext = input.recoveryEmail === null ? null : Buffer.from(input.recoveryEmail, "utf8");
-      const phonePlaintext = Buffer.from(input.phone, "utf8");
+      const phonePlaintext = input.phone === null ? null : Buffer.from(input.phone, "utf8");
       try {
         const keyId = `user-dek:${userId}`;
         const emailCiphertext = encrypt(dek, emailPlaintext, [
@@ -1501,7 +1509,8 @@ export class RegistrationService implements RegistrationApplication {
         const recoveryEmailCiphertext = recoveryPlaintext === null ? null : encrypt(dek, recoveryPlaintext, [
           "identity", "user.recovery_email_ciphertext", userId, "run:none", userId, keyId, "1"
         ]);
-        const phoneCiphertext = encrypt(dek, phonePlaintext, [
+        // No phone given: no ciphertext, source, status or time is stored (the profile stays empty).
+        const phoneCiphertext = phonePlaintext === null ? null : encrypt(dek, phonePlaintext, [
           "identity", "user.phone_ciphertext", userId, "run:none", userId, keyId, "1"
         ]);
         const acceptances = input.documents === null || this.dependencies.legalAcceptance === undefined
@@ -1517,9 +1526,9 @@ export class RegistrationService implements RegistrationApplication {
           emailCiphertext,
           recoveryEmailCiphertext,
           phoneCiphertext,
-          phoneSource: "manual" as const,
-          phoneVerificationStatus: "unverified" as const,
-          phoneUpdatedAt: input.requestedAt,
+          phoneSource: phoneCiphertext === null ? null : "manual" as const,
+          phoneVerificationStatus: phoneCiphertext === null ? null : "unverified" as const,
+          phoneUpdatedAt: phoneCiphertext === null ? null : input.requestedAt,
           passwordHash: input.passwordHash,
           pseudonym,
           adultAffirmedAt: input.requestedAt,
@@ -1563,7 +1572,7 @@ export class RegistrationService implements RegistrationApplication {
       } finally {
         emailPlaintext.fill(0);
         recoveryPlaintext?.fill(0);
-        phonePlaintext.fill(0);
+        phonePlaintext?.fill(0);
         dek.fill(0);
       }
     }
