@@ -170,8 +170,15 @@ describe("legal documents — generated data", () => {
       );
       for (const document of [TERMS_OF_SERVICE, PRIVACY_POLICY]) {
         const all = [...document.sections.map((entry) => entry.title), ...allTexts(document)].join("\n");
-        expect(all).not.toMatch(/United Kingdom|\bUK\b|Ukrain|Israel|Thailand|Philippines|only if listed|Reserved/u);
+        expect(all).not.toMatch(/\bUK\b|Ukrain|Israel|Thailand|Philippines|only if listed|Reserved/u);
       }
+      // The United Kingdom is not served (owner's ruling of 9 October 2026), but since the owner's answer of
+      // 10 October 2026 the service is hosted there (OVHcloud, London). The Terms never name it; the Privacy
+      // Policy names it only where it says where data is held or goes.
+      expect(allTexts(TERMS_OF_SERVICE).filter((text) => text.includes("United Kingdom"))).toEqual([]);
+      const ukMentions = allTexts(PRIVACY_POLICY).filter((text) => text.includes("United Kingdom"));
+      expect(ukMentions.length).toBeGreaterThan(0);
+      for (const text of ukMentions) expect(text).toMatch(/OVHcloud|EU countries, the United Kingdom|other EU countries, the United Kingdom/u);
     });
 
     it("says the support chat sends text to a model too, right after the debate paragraph", () => {
@@ -188,7 +195,7 @@ describe("legal documents — generated data", () => {
       expect(texts(section(TERMS_OF_SERVICE, "12"))[0]).toBe(
         "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]"
       );
-      expect(allTexts(TERMS_OF_SERVICE).some((text) => text.includes("[state your discretionary refund policy]"))).toBe(true);
+      expect(allTexts(TERMS_OF_SERVICE).some((text) => text.includes("we refund the share of that period's price you have not used, measured by the plan's usage, however many days have passed"))).toBe(true);
     });
 
     it("leaves no markdown syntax in any string a reader sees", () => {
@@ -265,12 +272,12 @@ describe("legal documents — generated data", () => {
       expect(texts(section(PRIVACY_POLICY, "00"))[0]!.startsWith("We collect what an account needs")).toBe(true);
     });
 
-    it("turns the collection table into eleven rows joined with em dashes", () => {
+    it("turns the collection table into twelve rows joined with em dashes", () => {
       const collect = section(PRIVACY_POLICY, "02");
       expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p"]);
       const table = collect.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
-      expect(table.items).toHaveLength(11);
+      expect(table.items).toHaveLength(12);
       expect(table.items[0]!.startsWith("Account — Email address and recovery email address")).toBe(true);
       expect(table.items[0]!.endsWith("— You, at registration")).toBe(true);
     });
