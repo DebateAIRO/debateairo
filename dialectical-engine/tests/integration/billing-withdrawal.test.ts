@@ -105,7 +105,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     expect(expected).toBeGreaterThan(18_150_000);
     const response = await run.withdraw();
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ refund: microsToDecimal(expected) });
+    expect(response.json()).toEqual({ refund: microsToDecimal(expected), currency: "USD" });
     const events = await run.billing.subscriptionEvents(run.seeded.subscriptionId);
     expect(events.at(-1)).toMatchObject({ kind: "WITHDRAWN", data: { refund_micros: expected } });
     expect(foldSubscription(events).status).toBe("WITHDRAWN");
@@ -250,7 +250,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
   it("writes no refund intent and sends M8 at once when the whole credit was used", async () => {
     const run = await start("p12d-used", { activatedDaysAgo: 1, taxCountry: "RO", spentMicros: 5_000_000 });
     const response = await run.withdraw();
-    expect(response.json()).toEqual({ refund: "0.00" });
+    expect(response.json()).toEqual({ refund: "0.00", currency: "USD" });
     expect(foldSubscription(await run.billing.subscriptionEvents(run.seeded.subscriptionId)).status).toBe("WITHDRAWN");
     expect(await refundRequests(run.billing, run.seeded.initialChargeId)).toEqual([]);
     expect((await m8Of(run.seeded.subscriptionId))[0]?.payload).toMatchObject({ "param.refundAmount": "0.00" });
@@ -293,7 +293,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     });
     const response = await run.withdraw();
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ refund: null });
+    expect(response.json()).toEqual({ refund: null, currency: "USD" });
     const events = await run.billing.subscriptionEvents(run.seeded.subscriptionId);
     expect(events.at(-1)).toMatchObject({
       kind: "WITHDRAWN", data: { refund_micros: null, refund_by_owner: true, source: "SETTINGS" }
@@ -334,7 +334,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
       }
     )));
     const response = await run.withdraw();
-    expect(response.json()).toEqual({ refund: null });
+    expect(response.json()).toEqual({ refund: null, currency: "USD" });
     // The upgrade's intent was written first (newest first) and went back with the savepoint, job and all.
     expect(await refundRequests(run.billing, upgrade.chargeId)).toEqual([]);
     // No job of any kind (a refund job or its follow-ups) names the upgrade's payment.

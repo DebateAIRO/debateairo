@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { THINKING_LEVEL_TOKEN } from "./index.js";
-import { PREVIEW_GLM_OUTPUT_RESERVATION } from "./preview-test.js";
+import { PREVIEW_MAX_OUTPUT_BOUND, previewModelRow } from "./preview-models.js";
 import type { ProviderDiscoveryTarget } from "./index.js";
 
 /**
@@ -71,7 +71,7 @@ export async function observeProviderTarget(input: Readonly<{
   const probedAt = input.clock();
   let state: ProviderProbeObservation;
   try {
-    if(input.tokenCeiling!==undefined&&(!Number.isSafeInteger(input.tokenCeiling)||input.tokenCeiling<1||input.tokenCeiling>PREVIEW_GLM_OUTPUT_RESERVATION))throw new TypeError("PROVIDER_PROBE_TOKEN_CEILING_INVALID");
+    if(input.tokenCeiling!==undefined&&(!Number.isSafeInteger(input.tokenCeiling)||input.tokenCeiling<1||input.tokenCeiling>(previewModelRow(input.target.model)?.outputBound??PREVIEW_MAX_OUTPUT_BOUND)))throw new TypeError("PROVIDER_PROBE_TOKEN_CEILING_INVALID");
     if(input.thinkingLevel!==undefined&&(!THINKING_LEVEL_TOKEN.test(input.thinkingLevel)||input.target.thinkingParameter===undefined||!input.target.thinkingLevels?.includes(input.thinkingLevel)))throw new TypeError("PROVIDER_PROBE_THINKING_INVALID");
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (input.target.authorizationHeader !== undefined) {

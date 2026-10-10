@@ -87,7 +87,7 @@ import threading
 import time
 import types
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from socketserver import ThreadingMixIn
@@ -917,6 +917,16 @@ def assess_reply(status, response, reserved, elapsed, profile, row, moment):
     return changes, halt_reason, charge, {'status': status, 'body': json.dumps(response, ensure_ascii=True, default=str)}
 
 
+NANO_USD = Decimal('0.000000001')  # /remaining's amounts: the app parses at most 9 decimals.
+
+
+def nano_text(amount, rounding):
+    """Plain decimal text with at most 9 decimals; only an amount with more is rounded (as told)."""
+    if amount.as_tuple().exponent < -9:
+        amount = amount.quantize(NANO_USD, rounding=rounding)
+    return format(amount, 'f')
+
+
 def remaining_input_valid(input):
     return isinstance(input, dict) and set(input) == {'scope_id'} and isinstance(input['scope_id'], str)
 
@@ -948,10 +958,13 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
         raise SafetyError('REMAINING_UNAVAILABLE')  # The state names a row this code no longer reviews.
     return control['scope_id'], allowed, {
             'state': control['state'], 'window_open': bool(window_open(control, moment) and go_current and serving),
-            'remaining_usd': format(max(Decimal(0), budget - spend), 'f'),
+            # The app reads amounts as exact nano-USD (at most 9 decimals). A provider's reported cost
+            # can carry more, so what is left is rounded DOWN and the largest hold UP: never in the
+            # app's favour.
+            'remaining_usd': nano_text(max(Decimal(0), budget - spend), ROUND_FLOOR),
             'remaining_calls': max(0, limits['max_paid_posts_per_day'] - len(ledger['entries'])),
             'max_concurrent_calls': limits['max_concurrent_calls'],
-            'largest_reservation_usd': format(largest_reservation(profile, control['enabled_models']), 'f'),
+            'largest_reservation_usd': nano_text(largest_reservation(profile, control['enabled_models']), ROUND_CEILING),
             'enabled_models': list(control['enabled_models'])}
 
 

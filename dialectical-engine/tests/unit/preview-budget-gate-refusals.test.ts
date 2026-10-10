@@ -101,6 +101,17 @@ describe("the preview spending gate's 409 refusal body", () => {
     await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
   });
 
+  it.each(["PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"])(
+    "owner ruling 5: %s (a provably unbilled call, hold released) is the transient retry path, never a money stop",
+    async (code) => {
+      const { port } = await gate({ status: 409, body: JSON.stringify({ error: code }) });
+      const refusal: unknown = await port.execute(execution).then(() => null, (error: unknown) => error);
+      expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+      expect(isRunLevelSpendStop(refusal)).toBe(false);
+      expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
+    }
+  );
+
   it("CONCURRENCY_LIMIT_REACHED is a transient provider failure: never a money stop, never a run-level spend stop", async () => {
     // Too many GLM calls in flight is the gate's own 429: nothing was reserved or spent, and
     // the same call fits once one in flight settles. It is the transport failure every vendor
@@ -132,7 +143,7 @@ describe("the preview spending gate's 409 refusal body", () => {
         fetchImplementation: createPreviewGuardedFetch(port),
         persistRawArtifact: async (artifact) => artifact.artifactId, appendLedgerEntry: async (entry) => entry.attemptId,
         assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
-      }), preview);
+      }), preview, target);
       return gateway.call({
         runId: "run:synthetic", subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
         bound: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 5000 }, contractHash: "contract:test", providerRef: REF,
@@ -142,6 +153,11 @@ describe("the preview spending gate's 409 refusal body", () => {
     const busy = await call("CONCURRENCY_LIMIT_REACHED");
     expect(busy).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
     expect(isRunLevelSpendStop(busy)).toBe(false);
+    for (const unsent of ["PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"]) {
+      const refusal = await call(unsent);
+      expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+      expect(isRunLevelSpendStop(refusal)).toBe(false);
+    }
     await expect(call("PREVIEW_TEST_AUTHORITY_STOPPED")).resolves.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
   });
 

@@ -93,7 +93,8 @@ export function createInitialSettlement(deps: Readonly<{
       await enqueueEmail(deps.repository, client, {
         template: "M1", recipient: { kind: "CUSTOMER", customerId: context.customerId }, dedupeRef: subscription.subscriptionId,
         params: {
-          plan: quote.planId, totalAmount: microsToDecimal(context.charge.totalMicros), renewDate: periodEnd.toISOString(),
+          plan: quote.planId, totalAmount: microsToDecimal(context.charge.totalMicros), currency: context.charge.currency,
+          renewDate: periodEnd.toISOString(),
           // The Terms online today; the accepted text itself is the attachment, from the archive (Q-3).
           cancelPageUrl: page("/cancel"), termsUrl: page("/terms"),
           ...(withdrawal ? { withdrawalDays: String(deps.policy.withdrawalDays) } : {})

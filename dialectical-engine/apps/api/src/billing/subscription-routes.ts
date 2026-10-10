@@ -151,7 +151,7 @@ export function installSubscriptionRoutes(
     return answer(reply, async () => {
       const result = await withdraw(deps, { authenticated, grantToken: parsed.data.step_up_grant });
       return reply.send(BillingWithdrawResponseSchema.parse({
-        refund: result.refundMicros === null ? null : microsToDecimal(result.refundMicros)
+        refund: result.refundMicros === null ? null : microsToDecimal(result.refundMicros), currency: result.currency
       }));
     });
   });

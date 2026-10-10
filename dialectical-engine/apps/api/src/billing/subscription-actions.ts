@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
 import type { EntitlementRepository } from "@debateai/db";
-import { planById } from "@debateai/register";
+import { planById, planNetPrice } from "@debateai/register";
 import { enqueueEmail } from "./email-job.js";
 import { isThisPaymentSystem } from "./outbox.js";
 import { quoteTax, storedTaxContext } from "./stored-tax-context.js";
@@ -200,16 +200,19 @@ export async function scheduleDowngrade(
   const before = await deps.billing.subscriptionForOwner(ownerRef);
   if (before === null || before.status !== "ACTIVE") refuse(409, "NOT_SUBSCRIBED");
   const target = planById(deps.plans, planId);
-  if (target.netPriceMicros >= planById(deps.plans, before.planId).netPriceMicros) refuse(422, "DOWNGRADE_NOT_LOWER");
+  // Spec 2026-10-05 §2.16.3: both prices in the subscription's own currency.
+  const targetNetMicros = planNetPrice(target, before.currency);
+  if (targetNetMicros >= planNetPrice(planById(deps.plans, before.planId), before.currency)) refuse(422, "DOWNGRADE_NOT_LOWER");
   if (before.scheduledDowngradePlanId === planId) return;
   const context = await storedTaxContext({ billing: deps.billing, recordsKey: deps.recordsKey }, before);
-  const recurring = await quoteTax(deps.tax, deps.policy, context, target.netPriceMicros, now);
+  const recurring = await quoteTax(deps.tax, deps.policy, context, targetNetMicros, now);
   const written = await deps.billing.withTransaction(async (client) => {
     const locked = await lockedSubscription(deps, client, ownerRef);
     if (locked === null || locked.state.subscriptionId !== before.subscriptionId || locked.state.status !== "ACTIVE") {
       refuse(409, "NOT_SUBSCRIBED");
     }
-    if (target.netPriceMicros >= planById(deps.plans, locked.state.planId).netPriceMicros) {
+    if (planNetPrice(target, locked.state.currency)
+      >= planNetPrice(planById(deps.plans, locked.state.planId), locked.state.currency)) {
       refuse(422, "DOWNGRADE_NOT_LOWER");
     }
     // Asking again for the plan already scheduled stays a quiet success: its renewal charge, if written, is priced at it.

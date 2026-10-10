@@ -20,6 +20,15 @@ it("the preview Free and Premium cards each render exactly GLM in the existing c
  expect(container.querySelector("#planTier-free")?.getAttribute("role")).toBe("radio");
  await act(async()=>root.unmount());
 });
+it("the reviewed two-roster flag shows two models on Free and three on Premium",async()=>{
+ vi.stubEnv("NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON",'{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]}');vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
+ const {default:Page}=await import("../../apps/ui/app/new/NewDebatePageClient.js");
+ const container=document.createElement("div");document.body.append(container);const root=createRoot(container);
+ await act(async()=>{root.render(<Page catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog}/>);await Promise.resolve();});
+ expect([...container.querySelectorAll("#planTier-free .ndTierModel")].map(el=>el.textContent?.trim())).toEqual(["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"]);
+ expect([...container.querySelectorAll("#planTier-premium .ndTierModel")].map(el=>el.textContent?.trim())).toEqual(["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]);
+ await act(async()=>root.unmount());
+});
 it("without the public preview flag both cards keep the contract's rosters",async()=>{
  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
  const {default:Page}=await import("../../apps/ui/app/new/NewDebatePageClient.js");

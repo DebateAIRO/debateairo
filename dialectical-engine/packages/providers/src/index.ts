@@ -4,6 +4,7 @@ import { z } from "zod";
 import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
+import { PREVIEW_DEEPINFRA_BASE_URL, previewModelRow } from "./preview-models.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
 // not organ aliases. A debater's model may hold either role; the CALL is
@@ -278,10 +279,17 @@ export type ProviderTargetGatewayControls = Readonly<{
   thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
   contextWindowTokens?: number;
   supportsJsonObjectResponse?: boolean;
+  /** Contract A §2: a reviewed preview row's output bound; max_tokens is never sent above it. */
+  maxOutputTokens?: number;
 }>;
 
+/** The reviewed DeepInfra row behind an endpoint and model, if any (contract A §1). */
+function reviewedDeepInfraRow(endpoint:string,model:string) {
+  return endpoint === PREVIEW_DEEPINFRA_BASE_URL ? previewModelRow(model) : undefined;
+}
+/** Row-driven: only a reviewed DeepInfra row whose json_object is true may send response_format. */
 function isJsonObjectResponseTarget(endpoint:string,model:string):boolean {
-  return endpoint === "https://api.deepinfra.com/v1/openai" && model === "zai-org/GLM-5.3-Flash";
+  return reviewedDeepInfraRow(endpoint,model)?.jsonObject === true;
 }
 export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): ProviderTargetGatewayControls {
   return Object.freeze({
@@ -289,7 +297,8 @@ export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): 
       thinking: Object.freeze({ parameter: target.thinkingParameter, levels: target.thinkingLevels })
     }),
     ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens }),
-    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{})
+    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{}),
+    ...(reviewedDeepInfraRow(target.baseUrl,target.model)===undefined?{}:{maxOutputTokens:reviewedDeepInfraRow(target.baseUrl,target.model)!.outputBound})
   });
 }
 
@@ -1121,6 +1130,12 @@ export interface OpenAICompatibleGatewayOptions {
   /** Model scorecard §2.10: from the target's `context_window_tokens`. Absent = no window check. */
   readonly contextWindowTokens?: number;
   /**
+   * Contract A §2 (preview multi-model, 2026-10-10): the target's largest `max_tokens`. Every
+   * attempt's bound, a length retry's raised one included, is clamped to it before the body is
+   * built, so the guarded fetch never sees a bound its row refuses. Absent = no clamp.
+   */
+  readonly maxOutputTokens?: number;
+  /**
    * Model scorecard §2.3: records each attempt's prompt just before it is sent.
    * Optional: the unit doubles and a gateway with no debate run record none.
    * The runner's `createPostgresProviderGateway` always supplies it
@@ -1477,6 +1492,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     if (options.contextWindowTokens !== undefined && !isContextWindowTokens(options.contextWindowTokens)) {
       throw new TypeError("PROVIDER_GATEWAY_CONTEXT_WINDOW_INVALID");
     }
+    if (options.maxOutputTokens !== undefined
+      && (!Number.isSafeInteger(options.maxOutputTokens) || options.maxOutputTokens < 1)) {
+      throw new TypeError("PROVIDER_GATEWAY_MAX_OUTPUT_TOKENS_INVALID");
+    }
     assertJsonObjectResponseCapability(options);
     this.#options = options;
   }
@@ -1541,7 +1560,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         || estimateWindowTokens(packet.messages) + tokenCeiling <= contextWindowTokens;
 
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
-      const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
+      const attemptTokenCeiling = Math.min(
+        lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures),
+        this.#options.maxOutputTokens ?? Number.MAX_SAFE_INTEGER
+      );
       /**
        * Task review fix round 1, finding 3. PROVIDER_CONTEXT_WINDOW_EXCEEDED
        * means "this prompt is over this candidate's window", and the picker
@@ -2144,3 +2166,5 @@ export {
 } from "./provider-probe.js";
 
 export * from "./preview-test.js";
+export * from "./preview-models.js";
+export * from "./preview-remaining.js";

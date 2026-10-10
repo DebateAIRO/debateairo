@@ -438,6 +438,16 @@ class RemainingTests(GateTest):
         report = self.report(gate)
         self.assertEqual((report['remaining_usd'], report['remaining_calls']), ('0', 0))
 
+    def test_remaining_amounts_never_carry_more_than_nine_decimals(self):
+        # A reported cost with 13 decimals settles as the held amount; the app parses at most 9.
+        gate = self.gate(daily_budget_usd='3.00').ready()
+        gate.call('op-1', charge='0.0123456789012')
+        report = self.report(gate)
+        self.assertEqual(report['remaining_usd'], '2.987654321')  # 2.9876543210988 rounded down
+        self.assertRegex(report['largest_reservation_usd'], r'^[0-9]+\.[0-9]{1,9}$')
+        self.assertGreaterEqual(Decimal(report['largest_reservation_usd']),
+                                bridge.largest_reservation(bridge.profile_of('deepinfra'), ['zai-org/GLM-5.3-Flash']))
+
     def exchange(self, gate, data, path='/remaining', uid=PEER, remaining=True):
         server_side, client_side = socket.socketpair()
         payload = json.dumps(data).encode()

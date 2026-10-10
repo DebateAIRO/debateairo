@@ -1,7 +1,7 @@
 // tests/support/fake-tax-engine.ts
 import { TypedDomainError } from "@debateai/kernel";
 import type {
-  RefundRecord, SaleRecord, TaxEngine, TaxErrorCode, TaxIdCheck, TaxLocation, TaxQuote
+  PriceCurrency, RefundRecord, SaleRecord, TaxEngine, TaxErrorCode, TaxIdCheck, TaxLocation, TaxQuote
 } from "@debateai/billing-core";
 import {
   FAKE_REVERSE_CHARGE_COUNTRIES, fakeTaxDecision, fakeTaxIdIsValid, fakeTaxMicros
@@ -14,6 +14,8 @@ export { FAKE_REVERSE_CHARGE_COUNTRIES, fakeTaxDecision, fakeTaxIdIsValid, fakeT
 export class FakeTaxEngine implements TaxEngine {
   readonly sales: SaleRecord[] = [];
   readonly refunds: RefundRecord[] = [];
+  /** Spec 2026-10-05 §2.16.4: the currency of every quote asked, in order. */
+  readonly quotedCurrencies: PriceCurrency[] = [];
   readonly #failures: TaxErrorCode[] = [];
   readonly #saleDocuments = new Map<string, { documentId: string; number: string; url: string | null }>();
   readonly #refundDocuments = new Map<string, { documentId: string; number: string }>();
@@ -28,9 +30,10 @@ export class FakeTaxEngine implements TaxEngine {
   }
 
   async quote(i: Readonly<{
-    netMicros: number; currency: "USD"; location: TaxLocation; taxId: string | null; taxCode: "saas" | "eservice"; date: Date;
+    netMicros: number; currency: PriceCurrency; location: TaxLocation; taxId: string | null; taxCode: "saas" | "eservice"; date: Date;
   }>): Promise<TaxQuote> {
     this.#maybeFail();
+    this.quotedCurrencies.push(i.currency);
     // P2-M29: by postal code, as Quaderno and the HTTP fake price it (a state the buyer typed is never sent).
     const decision = fakeTaxDecision({ country: i.location.country, postalCode: i.location.postalCode, taxId: i.taxId });
     const taxMicros = decision.status === "TAXABLE" ? fakeTaxMicros(i.netMicros, decision.basisPoints) : 0;

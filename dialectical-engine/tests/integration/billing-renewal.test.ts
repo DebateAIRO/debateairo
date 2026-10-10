@@ -40,7 +40,8 @@ const requestedCodes = async (chargeId: string) => ((await h.repository.charge(c
 /** A billingPlans version published later with Plus at 25.00 (Terms §12's case). */
 const plusAt25: BillingPlans = Object.freeze({
   ...testBillingPlans, sourceRef: "test:billing-plans:plus-25",
-  plans: testBillingPlans.plans.map((plan) => (plan.planId === "PLUS" ? { ...plan, netPriceMicros: 25_000_000 } : plan))
+  plans: testBillingPlans.plans.map((plan) => (plan.planId === "PLUS"
+    ? { ...plan, netPrices: { ...plan.netPrices, USD: 25_000_000 } } : plan))
 });
 const append = async (subscriptionId: string, kind: Parameters<typeof subscriptionEvent>[1], data: Record<string, string>) => {
   const state = foldSubscription(await h.repository.subscriptionEvents(subscriptionId));

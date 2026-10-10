@@ -57,7 +57,8 @@ export async function recordQuadernoDocument(
     await enqueueEmail(repository, client, {
       template: "M2_INVOICE_LINK", recipient: { kind: "CUSTOMER", customerId: charge.customerId }, dedupeRef: charge.chargeId,
       params: {
-        plan: charge.planId, totalAmount: microsToDecimal(charge.chargeTotalMicros), chargeDate: charge.paidAt.toISOString(),
+        plan: charge.planId, totalAmount: microsToDecimal(charge.chargeTotalMicros), currency: charge.currency,
+        chargeDate: charge.paidAt.toISOString(),
         invoiceUrl: quadernoInvoiceLink(document.url, input.publicAppUrl)
       },
       notBefore: now

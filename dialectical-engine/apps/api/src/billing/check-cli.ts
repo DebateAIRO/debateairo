@@ -13,6 +13,7 @@ import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import type { Pool } from "pg";
 import { paymentErrorCode, SELLER_COMPANY, type CardPayments, type SellerCompany } from "@debateai/billing-core";
+import type { BillingCurrency } from "@debateai/contract";
 import { readCustodyAuthorizationHeader } from "@debateai/crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -20,8 +21,9 @@ import {
   publishedIpnKeyFingerprint, type NetopiaConfig, type TrustedKey
 } from "@debateai/payments-netopia";
 import {
-  loadBillingCheckEnvironment, loadBillingOperatorEnvironment, readBillingEnvironmentGroup, readBillingPlans,
-  readBillingPolicy, readCountryPolicy, type BillingCheckEnvironment
+  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, loadBillingCheckEnvironment,
+  loadBillingOperatorEnvironment, planById, planNetPrice, readBillingEnvironmentGroup, readBillingPlans,
+  readBillingPolicy, readCountryPolicy, type BillingCheckEnvironment, type BillingPlans
 } from "@debateai/register";
 import {
   assertMailedCompanyFacts, productionTrustedKeyOwners, readTrustedKeyFile, smartBillCompanyCif, type TrustedKeyFileOwners
@@ -32,7 +34,15 @@ import { assertLiveInvoicersAreLive, assertStageInvoicersAreSandboxes } from "./
 export type CheckLine = Readonly<{ ok: boolean; text: string }>;
 /** What the published register version says, read on the API's own read-only principal. */
 export type RegisterFacts = Readonly<{
-  registerVersion: number; billingEnabled: boolean | null; planCurrency: string | null; countryPolicy: boolean;
+  registerVersion: number; billingEnabled: boolean | null; countryPolicy: boolean;
+  /**
+   * Spec 2026-10-05 §2.16.1 (Part C): whether the plans are the owner's price list (only when they are not the engine's
+   * own row and do not still carry its placeholder EUR and RON prices), how many listed countries pay in each currency,
+   * and the rule's default.
+   */
+  plans: Readonly<{
+    ownPriceList: boolean; countriesIn: Readonly<Record<BillingCurrency, number>>; defaultCurrency: BillingCurrency;
+  }> | null;
 }>;
 export type BillingCheckDeps = Readonly<{
   environment: BillingCheckEnvironment;
@@ -321,11 +331,55 @@ async function registerLines(deps: BillingCheckDeps): Promise<CheckLine[]> {
     facts.billingEnabled === null ? cross(`Register version ${version} has no billingPolicy row.`)
       : facts.billingEnabled ? tick(`Billing is switched on in register version ${version}.`)
         : tick(`Billing is off in register version ${version}: with NETOPIA's four settings complete, the API serves only NETOPIA's message (the provider-only mode).`),
-    facts.planCurrency === null ? cross(`Register version ${version} has no billingPlans row.`)
-      : tick(`The plans of register version ${version} are priced in ${facts.planCurrency}.`),
+    plansLine(version, facts.plans),
     facts.countryPolicy ? tick(`Register version ${version} carries countryPolicy.`)
       : cross(`Register version ${version} has no countryPolicy row: billing cannot be switched on without it (README §14.8).`)
   ];
+}
+
+/** Spec 2026-10-05 §2.16.1: the order the plans line names the currencies in. */
+const CURRENCY_LINE_ORDER: ReadonlyArray<BillingCurrency> = Object.freeze(["RON", "EUR", "USD"]);
+
+/**
+ * Spec 2026-10-05 §2.16.2 and §2.17.3 (go-live row 73): what the plans line needs from the published billingPlans.
+ * They are the owner's price list only when they are not the engine's own row and do not still carry its placeholder
+ * EUR and RON prices. A hosted file's billingPlans is sealed under the file's own sourceRef
+ * (apps/runner/src/hosted-register-publish.ts:822-829), so a copy of the kit's example (deploy/vps/README.md §14.4)
+ * can only be recognised by those placeholder prices. USD is not compared: those are the owner's own prices of
+ * 29 September.
+ */
+export function registerPlansFacts(plans: BillingPlans | null): RegisterFacts["plans"] {
+  if (plans === null) return null;
+  const engine = billingPlansFromValue(
+    BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef
+  );
+  const placeholders = engine.plans.every((enginePlan) => {
+    const published = planById(plans, enginePlan.planId);
+    return planNetPrice(published, "EUR") === planNetPrice(enginePlan, "EUR")
+      && planNetPrice(published, "RON") === planNetPrice(enginePlan, "RON");
+  });
+  const countriesIn: Record<BillingCurrency, number> = { USD: 0, EUR: 0, RON: 0 };
+  for (const currency of Object.values(plans.currencyByCountry.countries)) countriesIn[currency] += 1;
+  return Object.freeze({
+    ownPriceList: plans.sourceRef !== BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef && !placeholders,
+    countriesIn: Object.freeze(countriesIn),
+    defaultCurrency: plans.currencyByCountry.defaultCurrency
+  });
+}
+
+function plansLine(version: string, plans: RegisterFacts["plans"]): CheckLine {
+  if (plans === null) return cross(`Register version ${version} has no billingPlans row.`);
+  if (!plans.ownPriceList) {
+    return cross(`The plans of register version ${version} are the engine's own row, whose EUR and RON prices are placeholders: publish your price list (README §14.4).`);
+  }
+  const parts = CURRENCY_LINE_ORDER
+    .filter((currency) => currency !== plans.defaultCurrency && plans.countriesIn[currency] > 0)
+    .map((currency) => {
+      const count = plans.countriesIn[currency];
+      return count === 1 ? `1 country pays in ${currency}` : `${String(count)} countries pay in ${currency}`;
+    })
+    .join(", ");
+  return tick(`The plans of register version ${version} carry your prices in USD, EUR and RON: ${parts}; every other country pays in ${plans.defaultCurrency}.`);
 }
 
 function companyLine(company: SellerCompany): CheckLine {
@@ -410,7 +464,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
           readBillingPolicy(pool, version), readBillingPlans(pool, version), readCountryPolicy(pool, version)
         ]);
         return Object.freeze({
-          registerVersion: version, billingEnabled: policy?.enabled ?? null, planCurrency: plans?.currency ?? null,
+          registerVersion: version, billingEnabled: policy?.enabled ?? null,
+          plans: registerPlansFacts(plans),
           countryPolicy: countryPolicy !== null
         });
       },
