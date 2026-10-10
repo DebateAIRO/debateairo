@@ -551,6 +551,8 @@ install -m 0644 deploy/postgres/postgresql.hardening.conf \
   /etc/postgresql/18/main/conf.d/hardening.conf
 install -m 0640 -o postgres -g postgres deploy/postgres/pg_hba.conf.template \
   /etc/postgresql/18/main/pg_hba.conf
+install -m 0640 -o postgres -g postgres deploy/postgres/pg_ident.conf.template \
+  /etc/postgresql/18/main/pg_ident.conf
 install -d -m 0700 -o postgres -g postgres /etc/debateai/postgres-tls
 # server.crt SAN must include IP:127.0.0.1 and IP:::1; server.key is 0600 postgres:postgres
 systemctl restart postgresql
@@ -574,6 +576,21 @@ What the two config files pin, and why:
   `postgres` OS user (that is how backups run), `hostssl` on `127.0.0.1/32` and `::1/128`, and
   `host all all 0.0.0.0/0 reject` + `::/0 reject` **last**. First match wins, so order is
   load-bearing. `hatchet` is reachable only by `debateai_prod_hatchet` (audit L7-F2).
+- **No line for the staff readiness writer, and no ident map.** The auth DB batch step creates
+  `debateai_staff_readiness_writer` (no password, may only publish and withdraw the staff alert
+  readiness row). Only the private preview's team-unlock helper uses it, and the preview admits
+  it by peer from one dedicated no-login OS user (`debateai-readiness`) with lines it writes
+  itself (`deploy/preview-lifecycle/v1/README.md` step 7). This VPS has no such helper, so its
+  `pg_hba.conf` names that login nowhere (it exists but cannot log in) and `pg_ident.conf` is
+  installed with **no maps at all**. Nothing to create here: no `debateai-readiness` user, no
+  readiness line. Never map `root` to any role: peer only sees a uid, and a process running as
+  uid 0 that reaches the socket (for example a root process in the Hatchet container, which
+  bind-mounts `/var/run/postgresql`) would count as root. To confirm on the VPS, this must print
+  `0` and `0`:
+
+  ```sh
+  sudo -u postgres psql -XAt -c "SELECT count(*) FROM pg_hba_file_rules WHERE 'debateai_staff_readiness_writer' = ANY(user_name)" -c "SELECT count(*) FROM pg_ident_file_mappings"
+  ```
 - So there are exactly **two ways in**, and every client URL must say which: the unix socket
   (`@localhost/debateai?host=/var/run/postgresql`, what every service uses), or TLS on loopback
   (`@127.0.0.1/debateai?sslmode=verify-full&sslrootcert=/etc/debateai/postgres-tls/ca.crt`). A

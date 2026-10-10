@@ -127,9 +127,11 @@ async function lockedQueue(rows=1){
  const queue:Record<string,unknown>[]=[];
  for(let i=0;i<rows;i++){const operationId=uuid(),intent=await producer.mutation({event:'DISABLE',operationId,keyUserId:userId,actorStaffId:null,subjectStaffId:null,reason:{code:'SECURITY_RESPONSE'}});
   queue.push({outboxId:uuid(),eventId:uuid(),operationId,keyRef,claimToken:uuid(),event:'DISABLE',purpose:'INDEPENDENT_METADATA_ALERT',envelope:intent.envelope,attempt:1});}
- const seen={claims:0,settled:[] as Array<{outcome:string;failure:unknown}>,sent:[] as string[],lines:[] as string[]};
+ const seen={claims:0,settled:[] as Array<{outcome:string;failure:unknown}>,released:[] as string[],sent:[] as string[],lines:[] as string[]};
  const repository={claim:async()=>{seen.claims++;return queue.splice(0,1);},resolveClaim:async()=>({state:'CURRENT',mapping:{userId,keyRef}}),
-  settle:async(_claim:unknown,outcome:string,failure:unknown)=>{seen.settled.push({outcome,failure});return true;},status:async()=>({pending:queue.length,acked:0,severed:0,exhausted:0})};
+  settle:async(_claim:unknown,outcome:string,failure:unknown)=>{seen.settled.push({outcome,failure});return true;},
+  // Like staff.release_alert_delivery: the claim goes back to the queue with its attempt unspent.
+  release:async(claim:{outboxId:string})=>{seen.released.push(claim.outboxId);queue.unshift(claim as Record<string,unknown>);return true;},status:async()=>({pending:queue.length,acked:0,severed:0,exhausted:0})};
  return {key,keys,queue,seen,repository,dispatcher:(readiness:()=>Promise<'READY'|'UNAVAILABLE'>)=>new alerts.StaffAlertDispatcher({keys,repository:repository as never,
   independentTransport:{send:async(_id:string,message:{event:string})=>{seen.sent.push(message.event);return 'ACK' as const;}},readiness,logEvent:(line:string)=>{seen.lines.push(line);}} as never)};
 }
@@ -155,14 +157,18 @@ it('treats a throwing or hung readiness read as locked and claims nothing',async
   expect(q.seen.claims).toBe(0);expect(q.seen.lines).toEqual([waitingLine,waitingLine]);
  }finally{q.key.fill(0);}
 });
-it('a readiness lapse after the claim settles only that one attempt and stops claiming the rest of the batch',async()=>{
- const q=await lockedQueue(3);const answers:Array<'READY'|'UNAVAILABLE'>=['READY','UNAVAILABLE'];
+// Design note 2026-10-09 item 5: a lapse between the pre-claim check and the send gives the claim back uncounted.
+it('a readiness lapse after the claim releases that claim without spending its attempt and stops the batch',async()=>{
+ const q=await lockedQueue(3);const first=q.queue[0]!.outboxId;const answers:Array<'READY'|'UNAVAILABLE'>=['READY','UNAVAILABLE'];
  const dispatcher=q.dispatcher(async()=>answers.shift()??'UNAVAILABLE');
  try{
-  expect(await dispatcher.drain({limit:5})).toEqual({acked:0,pending:2});
+  expect(await dispatcher.drain({limit:5})).toEqual({acked:0,pending:3});
   expect(q.seen.claims).toBe(1);expect(q.seen.sent).toEqual([]);
-  expect(q.seen.settled).toEqual([{outcome:'FAILED',failure:'TRANSPORT_UNAVAILABLE'}]);
+  expect(q.seen.settled).toEqual([]);expect(q.seen.released).toEqual([first]);
   expect(q.seen.lines).toEqual([waitingLine]);
+  answers.push('READY','READY','READY','READY','READY','READY');
+  expect(await dispatcher.drain({limit:5})).toEqual({acked:3,pending:0});
+  expect(q.seen.sent).toEqual(['DISABLE','DISABLE','DISABLE']);
  }finally{q.key.fill(0);}
 });
 it('stop() during the pre-claim readiness read returns promptly and claims nothing',async()=>{

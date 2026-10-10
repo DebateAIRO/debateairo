@@ -37,6 +37,9 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/auth/mfa-recovery/complete", auth: "public", origin: "trusted", resource: "identity", action: "complete-mfa-recovery" },
   { route: "POST /v1/auth/mfa-recovery/cancel", auth: "public", origin: "trusted", resource: "identity", action: "cancel-mfa-recovery" },
   { route: "POST /v1/auth/mfa-recovery/cancel-current", auth: "public", origin: "trusted", resource: "identity", action: "cancel-current-mfa-recovery" },
+  // Owner ruling 2026-10-09: the emailed finish link after the 24-hour wait.
+  { route: "POST /v1/auth/mfa-recovery/finish/status", auth: "public", origin: "trusted", resource: "identity", action: "read-mfa-recovery-finish" },
+  { route: "POST /v1/auth/mfa-recovery/finish", auth: "public", origin: "trusted", resource: "identity", action: "finish-mfa-recovery" },
 
   // Approved account-flow capabilities: exact authority and Origin classes, independent of declaration order.
   ...['begin','status','passkey-options','complete'].map((step,index)=>({route:index===0?'POST /v1/account/social/{provider}/step-up/begin':`POST /v1/account/social/step-up/${step}`,auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'})),
@@ -52,7 +55,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   ...['recovery/prove','recovery/enrollment/options','recovery/enrollment/complete','recovery/enrollment/status','recovery/enrollment/complete-evidence','onboarding/status','onboarding/complete'].map(path=>({route:`POST /v1/auth/${path}`,auth:'public',origin:'trusted',resource:'identity',action:'restricted-onboarding'})),
   ...['options','complete'].map(step=>({route:`POST /v1/auth/passkeys/enrollment/${step}`,auth:'public',origin:'trusted',session:'optional',resource:'identity',action:`passkey-enrollment-${step}`})),
   ...['options','complete'].map(step=>({route:`POST /v1/auth/passkeys/login/${step}`,auth:'public',origin:'trusted',resource:'identity',action:`passkey-login-${step}`})),
-  ...['GET /v1/account/auth-methods','POST /v1/account/auth-methods/remove','POST /v1/account/recovery-codes/regenerate','POST /v1/auth/passkeys/step-up/options','POST /v1/auth/passkeys/step-up/complete'].map(route=>({route,auth:'user',resource:'session-self',action:'consumer-security'})),
+  ...['GET /v1/account/auth-methods','POST /v1/account/auth-methods/remove','POST /v1/account/recovery-codes/regenerate','GET /v1/account/mfa-recovery','POST /v1/account/mfa-recovery/cancel','POST /v1/auth/passkeys/step-up/options','POST /v1/auth/passkeys/step-up/complete'].map(route=>({route,auth:'user',resource:'session-self',action:'consumer-security'})),
   { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
   { route: "POST /v1/auth/register", auth: "public", origin: "trusted", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
@@ -304,10 +307,10 @@ describe("S7 deny-by-default authorization", () => {
     // 18 staff contract routes + the two internal-allowance routes.
     expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(20);
     expect(staffContractInventory.routes).toHaveLength(18);
-    // The merged closed inventory adds the nineteen external recovery routes to the current ordinary inventory and 20 staff/internal
+    // The merged closed inventory adds the twenty-one external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
-    // GET /v1/billing/subscription/card beside dev's 158.
-    expect(contractInventory.routes).toHaveLength(159);
+    // GET /v1/billing/subscription/card, and the auth DB batch adds four MFA-recovery wait routes, beside dev's 158.
+    expect(contractInventory.routes).toHaveLength(163);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

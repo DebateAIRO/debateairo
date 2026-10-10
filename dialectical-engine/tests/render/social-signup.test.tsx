@@ -26,7 +26,7 @@ it('renders only a server-advertised provider and does not advertise unconfigure
 });
 import { SocialCompleteFlow } from '../../apps/ui/components/auth/SocialCompleteFlow.js';
 import type { ContractClient } from '@debateai/contract';
-it('scrubs a signup continuation before fetching prefill and renders required manual phone without password or provider phone data', async () => {
+it('scrubs a signup continuation before fetching prefill and renders the optional manual phone without password or provider phone data', async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     window.history.replaceState(null, '', '/social/complete#kind=signup&token=' + 'a'.repeat(43));
     const host = document.createElement('div');
@@ -37,6 +37,7 @@ it('scrubs a signup continuation before fetching prefill and renders required ma
         await act(async () => root.render(<SocialCompleteFlow client={client}/>));
         expect(host.querySelector<HTMLInputElement>('input[name=email]')?.value).toBe('relay@privaterelay.appleid.com');
         expect(host.querySelector<HTMLInputElement>('input[name=phone]')?.type).toBe('tel');
+        expect(host.querySelector<HTMLInputElement>('input[name=phone]')?.required).toBe(false);
         expect(host.querySelector('input[type=password]')).toBeNull();
         expect(host.querySelector('script')).toBeNull();
         expect(host.textContent).toContain('<script>untrusted name</script>');

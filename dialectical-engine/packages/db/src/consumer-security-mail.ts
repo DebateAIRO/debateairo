@@ -10,7 +10,7 @@ export type ConsumerSecurityNotice = Readonly<{
     messageId: string;
     channelType: 'email' | 'recovery_email';
     addressCiphertext: CryptoEnvelope;
-    eventKind: 'METHOD_CHANGED' | 'CODES_REGENERATED' | 'RECOVERY_PROVED' | 'RECOVERY_COMPLETED';
+    eventKind: 'METHOD_CHANGED' | 'CODES_REGENERATED' | 'RECOVERY_PROVED' | 'RECOVERY_COMPLETED' | 'RECOVERY_CODE_USED';
     happenedAt: string;
 }>;
 /** Shared ordering with erasure: key lease -> security subject -> channel/account -> notice. */

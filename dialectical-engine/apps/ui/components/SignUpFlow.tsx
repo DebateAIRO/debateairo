@@ -159,7 +159,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 setRefused(true);
                 return;
             }
-            const acknowledgement = await client.register({ email: submitted, password: rawPassword, phone: rawPhone, country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: isoDate, terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, locale: catalogLocale(locale), ui_locale: locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
+            const acknowledgement = await client.register({ email: submitted, password: rawPassword, ...(rawPhone.trim() === '' ? {} : { phone: rawPhone }), country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: isoDate, terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, locale: catalogLocale(locale), ui_locale: locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
             setEmail('');
             setPhone('');
             setRegion(EMPTY_REGION_PICK);
@@ -234,7 +234,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             setEmail(e.target.value);
             edit('email');
         }} required autoFocus disabled={busy} aria-invalid={!!errors.email || undefined} aria-describedby={errors.email ? 'signup-email-error' : undefined}/><InlineFieldMessage id="signup-email-error" message={fieldError('email')}/></div>
- <PhoneField catalog={catalog} value={phone} onChange={raw => {
+ <PhoneField optional catalog={catalog} value={phone} onChange={raw => {
             setPhone(raw);
             edit('phone');
         }} error={fieldError('phone')} disabled={busy}/>

@@ -421,6 +421,7 @@ apps/ui/components/KnownPasswordRecoveryLink.tsx
 apps/ui/components/LanguageSwitcher.tsx
 apps/ui/components/LibraryComposer.tsx
 apps/ui/components/LoginFlow.tsx
+apps/ui/components/MfaRecoveryCatalog.tsx
 apps/ui/components/MfaRecoveryFlow.tsx
 apps/ui/components/ModeToggle.tsx
 apps/ui/components/ModelPresentation.tsx
@@ -570,6 +571,7 @@ apps/ui/lib/i18n/debateViews.test.mjs
 apps/ui/lib/i18n/legal.test.mjs
 apps/ui/lib/i18n/localeChoice.ts
 apps/ui/lib/i18n/locales.ts
+apps/ui/lib/i18n/mfaRecovery.test.mjs
 apps/ui/lib/i18n/misc.test.mjs
 apps/ui/lib/i18n/public.test.mjs
 apps/ui/lib/i18n/questionLocale.ts
@@ -840,6 +842,7 @@ packages/db/src/index.ts
 packages/db/src/internal-allowance.ts
 packages/db/src/legacy-claim.ts
 packages/db/src/legal-acceptance.ts
+packages/db/src/migration-forward-auth-db-batch.ts
 packages/db/src/migration-forward-chain.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
