@@ -64,9 +64,9 @@ parked. The split (owner ruling, 2026-10-10):
 | Gate | Pot per day | Calls per day | Calls at once | Status |
 |---|---|---|---|---|
 | DeepInfra (this gate) | $10.00 | 2,000 | 10 | this README |
-| Anthropic (Claude Haiku) | $2.00 | 400 | 2 | its own gate: README-anthropic.md |
+| Anthropic (Claude Haiku) | $2.00 | 600 | 2 | its own gate: README-anthropic.md |
 | Google | none | - | - | parked; the split is set again if it comes back |
-| **Total** | **$12.00** | **2,400** | | |
+| **Total** | **$12.00** | **2,600** | | |
 
 Until the Anthropic gate is open, the preview spends at most $10.00 a day.
 
@@ -465,7 +465,7 @@ the step that makes it safe.
 3. **Switch all four on: a new GO, then `stop` and `activate`** ("Switching on DeepSeek, MiMo and
    Qwen", step 2). `activate` must show all four in `enabled_models`, and the start check run by
    hand must print `"status": "ok"` with all four. No restart: `max_concurrent_calls` stays 10.
-4. **The Anthropic gate**, by its own README: Claude Haiku, $2.00 a day, 400 calls, 2 at once. Its
+4. **The Anthropic gate**, by its own README: Claude Haiku, $2.00 a day, 600 calls (owner ruling 2026-10-10), 2 at once. Its
    `activate` adds this gate's pot: $10.00 + $2.00 = $12.00, exactly the team total. One cent more on
    either side is refused (`TEAM_TOTAL_BUDGET_EXCEEDED`).
 5. **The new register version, only now.** It names the reviewed model references (now with

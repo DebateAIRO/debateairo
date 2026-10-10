@@ -33,7 +33,7 @@
  * gate the config does not name has no port, so a debate needing it is refused (as unavailable)
  * before it starts.
  */
-import { TypedDomainError } from "@debateai/kernel";
+import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import {
   createPreviewRemainingRpcPort,
   lengthRetryTokenCeiling,
@@ -133,9 +133,9 @@ export const PREVIEW_ESTIMATE_DEFAULT_OUTPUT_TOKENS = 1_200n;
  * that kind by that model within the window. 20 keeps one unusually long or short call from moving
  * the average much (one outlier shifts it by at most 1/20), and is reached after a few debates.
  */
-export const PREVIEW_CALIBRATION_MIN_SAMPLES = 20;
+const PREVIEW_CALIBRATION_MIN_SAMPLES = 20;
 /** Only calls recorded within this many days count: older calls ran on older prompts. */
-export const PREVIEW_CALIBRATION_WINDOW_DAYS = 14;
+const PREVIEW_CALIBRATION_WINDOW_DAYS = 14;
 /**
  * The strict upper bound's input side (STRICT_BOUND mode only, 6f62b6ba3): no per-call-type cap on a
  * prompt's size exists in the engine's code, so the one hard ceiling is the guarded fetch's: a body
@@ -151,7 +151,7 @@ export const PREVIEW_STRICT_PROBE_INPUT_TOKENS = previewChargedInputTokens(PREVI
  * Japanese or Korean); this is the estimate only, the gate's own reservation keeps one byte = one token.
  * The gate's 2,048 template allowance is added to the bytes first.
  */
-export const PREVIEW_ESTIMATE_BYTES_PER_TOKEN = 3;
+const PREVIEW_ESTIMATE_BYTES_PER_TOKEN = 3;
 export function previewEstimateInputTokens(requestBytes: number): bigint {
   const perToken = BigInt(PREVIEW_ESTIMATE_BYTES_PER_TOKEN);
   return (previewChargedInputTokens(requestBytes) + perToken - 1n) / perToken;
@@ -161,7 +161,7 @@ export function previewEstimateInputTokens(requestBytes: number): bigint {
  * = 22,528 tokens. The largest ordinary request seen on the preview was about 51 KB; the hard cap the
  * guarded fetch and the gate enforce is 256 KiB.
  */
-export const PREVIEW_REALISTIC_INPUT_BYTES = 64 * 1024;
+const PREVIEW_REALISTIC_INPUT_BYTES = 64 * 1024;
 export const PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL = previewEstimateInputTokens(PREVIEW_REALISTIC_INPUT_BYTES);
 /** The ask's story size (composition_budget_tier): how much debate material the verdict story may read. */
 export type PreviewStoryTier = "low" | "medium" | "high";
@@ -367,6 +367,7 @@ export function previewEstimatePricer(context: Readonly<{ measured: PreviewMeasu
     case "REALISTIC_WORST_CASE": return realisticWorstCasePricer(context.callOutputTokens, context.storyTier);
     case "CALIBRATED_ESTIMATE": return calibratedEstimatePricer(context.measured);
     case "STRICT_BOUND": return strictUpperBoundPricer(context.callOutputTokens);
+    default: return exhaustive(mode);
   }
 }
 /**
@@ -441,7 +442,7 @@ export function previewExpectedCalls(input: Readonly<{
 
 /** The basis's one-call-per-site split: the panel's calls and the answer writer's and checker's; null without a split. */
 function debateSitesByRole(basis: Readonly<Record<string, unknown>>):
-  Readonly<{ panel: number; answerWriter: number; answerChecker: number; total: number }> | null {
+  Readonly<{ panel: number; reviewer: number; answerWriter: number; answerChecker: number; total: number }> | null {
   let byRole: ReturnType<typeof expectedCallsByRoleFromBasis>;
   try {
     byRole = expectedCallsByRoleFromBasis(basis);
@@ -450,8 +451,27 @@ function debateSitesByRole(basis: Readonly<Record<string, unknown>>):
   }
   const total = Object.values(byRole).reduce((sum, calls) => sum + calls, 0);
   if (total < 1) return null;
-  return Object.freeze({ panel: total - byRole.ANSWER_WRITER - byRole.ANSWER_CHECKER,
+  return Object.freeze({ panel: total - byRole.ANSWER_WRITER - byRole.ANSWER_CHECKER, reviewer: byRole.REVIEWER,
     answerWriter: byRole.ANSWER_WRITER, answerChecker: byRole.ANSWER_CHECKER, total });
+}
+
+/**
+ * Per gate, the panel member whose realistic debate call costs the most (a model off the reviewed rows
+ * is its own gate), in panel order, with how many panel members that gate serves.
+ */
+function dearestPanelMemberPerGate(panelModels: readonly string[]): readonly Readonly<{ model: string; gateMembers: number }>[] {
+  const realisticCall = (model: string): bigint => {
+    const row = previewModelRow(model);
+    return row === undefined ? 0n : previewCallNanoUsd(row, PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, PREVIEW_GLM_GENERATION_TOKEN_FLOOR);
+  };
+  const dearest = new Map<string, { model: string; gateMembers: number }>();
+  for (const model of panelModels) {
+    const gate = previewGateKeyOf(model) ?? `model:${model}`;
+    const current = dearest.get(gate);
+    if (current === undefined) dearest.set(gate, { model, gateMembers: 1 });
+    else dearest.set(gate, { model: realisticCall(model) > realisticCall(current.model) ? model : current.model, gateMembers: current.gateMembers + 1 });
+  }
+  return Object.freeze([...dearest.values()].map((entry) => Object.freeze(entry)));
 }
 
 /** One part of a debate's calls: `numerator / denominator` calls of one kind by one model. */
@@ -508,7 +528,19 @@ export function previewCallShares(input: Readonly<{
     if (sites === null) {
       for (const model of panelModels) addDebate(model, debate);
     } else {
-      for (const model of panelModels) addDebate(model, BigInt(sites.panel) * debate);
+      // Every panel step but the reviews is shared evenly: each member states one position, authors its own
+      // root's tree and its cross-exchanges, and judges every node another maker authored (apps/runner/src/
+      // index.ts:5291-5326: the judge seats called per node are all the others, panelCallCap = members - 1).
+      for (const model of panelModels) addDebate(model, BigInt(sites.panel - sites.reviewer) * debate);
+      // A node's ONE review goes to a different maker chosen in a fixed order, alternating only against
+      // that author's latest reviewer (selectDifferentMakerReviewer, apps/runner/src/index.ts:834), so one
+      // member can take far more than an even share. So each gate is charged, at its dearest panel member,
+      // every review its members could take: all of them when it has two or more panel members, else the
+      // reviews of the other members' nodes (a member never reviews its own maker's nodes, an even
+      // 1/members of them). The careful side: with two gates a review is counted on both.
+      for (const { model, gateMembers } of dearestPanelMemberPerGate(panelModels)) {
+        addDebate(model, BigInt(sites.reviewer) * debate * (gateMembers >= 2 ? members : members - 1n));
+      }
       addDebate(input.roleModels.answerWriter, BigInt(sites.answerWriter) * debate * members);
       addDebate(input.roleModels.answerChecker, BigInt(sites.answerChecker) * debate * members);
     }
@@ -676,33 +708,94 @@ function logRefusal(kind: "unavailable" | "shortfall", reason: string): void {
  */
 export type PreviewAdmissionLock = Readonly<{ acquire(): Promise<void>; release(): Promise<void> }>;
 export const PREVIEW_ADMISSION_LOCK_NAME = "debateai.preview.admission" as const;
-export function createPreviewAdmissionLock(pool: Pick<Pool, "connect">): PreviewAdmissionLock {
+/**
+ * Review (2026-10-10): waiting asks must not hold pool connections. Each ask used to take a connection
+ * and block in pg_advisory_xact_lock with no timeout, while the holder needed ANOTHER connection from
+ * the same pool (the unfinished debates, then the run): about as many waiting asks as the pool has
+ * connections froze the whole API. Now the asks of this process queue IN PROCESS first (the preview
+ * API is one process), so at most one of them holds a connection for the lock; a wait longer than
+ * PREVIEW_ADMISSION_WAIT_MS gives up. The database lock stays (another process) with a lock_timeout
+ * backstop. Either failure refuses as "not reachable right now" (retry in a minute), never the
+ * daily-limit sentence.
+ */
+const PREVIEW_ADMISSION_WAIT_MS = 30_000;
+const PREVIEW_ADMISSION_LOCK_TIMEOUT = "10s";
+type InProcessTurns = { held: boolean; waiting: Array<() => void> };
+const IN_PROCESS_TURNS = new WeakMap<object, InProcessTurns>();
+/** Waits for this process's turn at `key`; resolves to a release function, or rejects after `waitMs`. */
+function inProcessTurn(key: object, waitMs: number): Promise<() => void> {
+  let turns = IN_PROCESS_TURNS.get(key);
+  if (turns === undefined) { turns = { held: false, waiting: [] }; IN_PROCESS_TURNS.set(key, turns); }
+  const queue = turns;
+  let done = false;
+  const releaseTurn = (): void => {
+    if (done) return;
+    done = true;
+    const next = queue.waiting.shift();
+    if (next === undefined) queue.held = false; else next();
+  };
+  if (!queue.held) {
+    queue.held = true;
+    return Promise.resolve(releaseTurn);
+  }
+  return new Promise((resolve, reject) => {
+    const grant = (): void => { clearTimeout(timer); resolve(releaseTurn); };
+    const timer = setTimeout(() => {
+      const index = queue.waiting.indexOf(grant);
+      if (index >= 0) queue.waiting.splice(index, 1);
+      reject(new TypeError("PREVIEW_ADMISSION_WAIT_EXPIRED"));
+    }, waitMs);
+    queue.waiting.push(grant);
+  });
+}
+export function createPreviewAdmissionLock(pool: Pick<Pool, "connect">,
+  options: Readonly<{ waitMs?: number }> = {}): PreviewAdmissionLock {
   let client: PoolClient | undefined;
+  let releaseTurn: (() => void) | undefined;
   let released = false;
+  const freeTurn = (): void => {
+    const turn = releaseTurn;
+    releaseTurn = undefined;
+    turn?.();
+  };
   const release = async (): Promise<void> => {
     released = true;
     const held = client;
     client = undefined;
-    if (held === undefined) return;
-    let broken: Error | undefined;
-    try { await held.query("COMMIT"); } catch (error) {
-      broken = error instanceof Error ? error : new Error("PREVIEW_ADMISSION_LOCK_RELEASE_FAILED");
+    try {
+      if (held === undefined) return;
+      let broken: Error | undefined;
+      try { await held.query("COMMIT"); } catch (error) {
+        broken = error instanceof Error ? error : new Error("PREVIEW_ADMISSION_LOCK_RELEASE_FAILED");
+      }
+      // A connection whose COMMIT failed is destroyed, never reused with the lock possibly held.
+      held.release(broken);
+    } finally {
+      freeTurn();
     }
-    // A connection whose COMMIT failed is destroyed, never reused with the lock possibly held.
-    held.release(broken);
   };
   return Object.freeze({
     async acquire() {
       if (client !== undefined) return;
       if (released) throw new TypeError("PREVIEW_ADMISSION_LOCK_RELEASED");
-      const connection = await pool.connect();
+      releaseTurn ??= await inProcessTurn(pool, options.waitMs ?? PREVIEW_ADMISSION_WAIT_MS);
+      if (released) { freeTurn(); throw new TypeError("PREVIEW_ADMISSION_LOCK_RELEASED"); }
+      let connection: PoolClient;
+      try {
+        connection = await pool.connect();
+      } catch (error) {
+        freeTurn();
+        throw error;
+      }
       client = connection;
       try {
         await connection.query("BEGIN");
+        await connection.query(`SET LOCAL lock_timeout = '${PREVIEW_ADMISSION_LOCK_TIMEOUT}'`);
         await connection.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [PREVIEW_ADMISSION_LOCK_NAME]);
       } catch (error) {
         client = undefined;
         connection.release(error instanceof Error ? error : new Error("PREVIEW_ADMISSION_LOCK_FAILED"));
+        freeTurn();
         throw error;
       }
     },

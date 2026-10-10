@@ -22,7 +22,7 @@ they hide the Anthropic key folder (install step 3a, which comes BEFORE the Anth
   future"). So the near-term setup is two gates: DeepInfra (GLM, DeepSeek, MiMo, Qwen) and this
   Anthropic gate (Claude Haiku). Google comes later, with its own gate.
 - **Daily split of the $12 team total (owner's ruling, 2026-10-10 evening):** DeepInfra $10.00
-  (2,000 calls a day, 10 at once), Anthropic $2.00 (400 calls a day, 2 at once). This README's
+  (2,000 calls a day, 10 at once), Anthropic $2.00 (600 calls a day, owner's ruling 2026-10-10 late; 2 at once). This README's
   Anthropic GO says `"2.00"`. One GO may ask at most $10.00, and each gate's `activate` refuses if
   the GO files add up to more than $12.00.
 - **Ready for Google later, already now:** every gate's unit hides a Google key folder and GO,
@@ -262,7 +262,7 @@ own folder.
 | `target_host` | `vps-a156d797` | The server's host name, as in the DeepInfra GO. The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as for DeepInfra. |
 | `daily_budget_usd` | `"2.00"` | Anthropic's share of the $12 team total (DeepInfra $10.00), owner's ruling of 2026-10-10 (evening). One GO may ask at most `"10.00"`; `activate` refuses if all gates' GO files add up to more than $12.00. |
-| `max_paid_posts_per_day` | `400` | A second fuse. |
+| `max_paid_posts_per_day` | `600` | A second fuse (owner's ruling, 2026-10-10 late). |
 | `max_concurrent_calls` | `2` | See "2 calls at the same time" above. |
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
 
@@ -273,7 +273,7 @@ aside the largest worst case, fit in the pot: 2 x $0.214016 = $0.428032, inside 
 G=/opt/debateai-v3-preview/operator/anthropic-budget-v1
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"anthropic",enabled_models:["claude-haiku-5-5"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"2.00",max_paid_posts_per_day:400,max_concurrent_calls:2,open_days:31}' > /root/preview-archive/provider-anthropic-go-v1.json
+jq -n --arg b "$BR" --arg h "$HE" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"anthropic",enabled_models:["claude-haiku-5-5"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"2.00",max_paid_posts_per_day:600,max_concurrent_calls:2,open_days:31}' > /root/preview-archive/provider-anthropic-go-v1.json
 install -o root -g root -m 0600 /root/preview-archive/provider-anthropic-go-v1.json /etc/debateai-v3-preview/provider-anthropic-go-v1.json
 jq -c . /etc/debateai-v3-preview/provider-anthropic-go-v1.json
 ```

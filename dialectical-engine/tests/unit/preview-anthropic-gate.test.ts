@@ -325,7 +325,7 @@ describe("each gate's IPC goes to its own socket", () => {
     folder = await mkdtemp(join(tmpdir(), "pb-"));
     const deepinfraSocket = join(folder, "d.sock"), anthropicSocket = join(folder, "a.sock");
     const remaining = (models: string[]) => JSON.stringify({ state: "active", window_open: true, remaining_usd: "2.00",
-      remaining_calls: 400, max_concurrent_calls: 2, largest_reservation_usd: "0.214016", enabled_models: models });
+      remaining_calls: 600, max_concurrent_calls: 2, largest_reservation_usd: "0.214016", enabled_models: models });
     const deepinfraSeen = await listen(deepinfraSocket, () => remaining([GLM]));
     const anthropicSeen = await listen(anthropicSocket, body => body.includes("requestBody")
       ? JSON.stringify({ status: 200, body: haikuReply() }) : remaining([HAIKU]));
@@ -360,9 +360,9 @@ describe("the estimate asks every gate the debate uses, unfinished debates inclu
   const callOutputTokens = Object.freeze({ debate: 8192, storyteller: 12_000, storytellerRetry: 24_000, storyChecker: 8192 });
   const estimateSettings = Object.freeze({ roleModels, roleProviderRefs: ["preview:fixture-a", "preview:deepseek-v4-1-flash", "preview:fixture-b"],
     storyRounds: 2, callOutputTokens, maxCooldownHoldsPerRun: 2 });
-  /** The Anthropic gate's /remaining under the owner's GO: $2.00, 400 calls, 2 at once x $0.214016. */
+  /** The Anthropic gate's /remaining under the owner's GO: $2.00, 600 calls, 2 at once x $0.214016. */
   const answer = (models: string[], change: Partial<PreviewGateRemaining> = {}): PreviewGateRemaining => Object.freeze({
-    state: "active", windowOpen: true, remainingNanoUsd: 2_000_000_000n, remainingCalls: 400, maxConcurrentCalls: 2,
+    state: "active", windowOpen: true, remainingNanoUsd: 2_000_000_000n, remainingCalls: 600, maxConcurrentCalls: 2,
     largestReservationNanoUsd: 214_016_000n, enabledModels: models, ...change });
   /** The DeepInfra gate's: $10.00, 2,000 calls, 10 at once x MiMo's worst case. */
   const deepinfra = async () => answer([GLM, DEEPSEEK, MIMO, QWEN], { remainingNanoUsd: 10_000_000_000n, remainingCalls: 2000,
@@ -385,8 +385,8 @@ describe("the estimate asks every gate the debate uses, unfinished debates inclu
     for (const depth of [1, 2, 3]) {
       const [deepinfraNeed, anthropicNeed] = needsOf(ALL_FIVE, depth);
       expect([deepinfraNeed!.gate, anthropicNeed!.gate]).toEqual(["deepinfra", "anthropic"]);
-      // Calls x 1.15 + 2 in flight within 400; money x 1.15 + 2 x $0.214016 within $2.00.
-      expect(anthropicNeed!.callsWithMargin + 2).toBeLessThanOrEqual(400);
+      // Calls x 1.15 + 2 in flight within 600; money x 1.15 + 2 x $0.214016 within $2.00.
+      expect(anthropicNeed!.callsWithMargin + 2).toBeLessThanOrEqual(600);
       expect(anthropicNeed!.callsNanoUsd + 428_032_000n <= 2_000_000_000n).toBe(true);
       await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU]) },
         { askProbeModelIds: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU] }), { basis: basisFor(ALL_FIVE.length, depth), panel: ALL_FIVE })).resolves.toBeUndefined();

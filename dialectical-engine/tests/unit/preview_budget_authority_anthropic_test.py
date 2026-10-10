@@ -118,9 +118,9 @@ class AnthropicTest(unittest.TestCase):
             gate.close()
 
     def gate(self, **changes):
-        # The proposed GO (README-anthropic.md): $2.00 and 400 calls a day, 2 calls in flight.
+        # The proposed GO (README-anthropic.md): $2.00 and 600 calls a day, 2 calls in flight.
         go = {'provider': 'anthropic', 'enabled_models': [HAIKU], 'daily_budget_usd': '2.00',
-              'max_paid_posts_per_day': 400, 'max_concurrent_calls': 2, **changes}
+              'max_paid_posts_per_day': 600, 'max_concurrent_calls': 2, **changes}
         gate = Gate(bridge, **go)
         self.gates.append(gate)
         return gate
@@ -829,7 +829,7 @@ class RemainingAndProbeTests(AnthropicTest):
                                        'largest_reservation_usd', 'enabled_models'})
         self.assertEqual({k: report[k] for k in ('state', 'window_open', 'remaining_calls', 'max_concurrent_calls',
                                                  'enabled_models')},
-                         {'state': 'active', 'window_open': True, 'remaining_calls': 399, 'max_concurrent_calls': 2,
+                         {'state': 'active', 'window_open': True, 'remaining_calls': 599, 'max_concurrent_calls': 2,
                           'enabled_models': [HAIKU]})
         self.assertEqual((Decimal(report['remaining_usd']), Decimal(report['largest_reservation_usd'])),
                          (Decimal('1.99965'), Decimal('0.214016')))
