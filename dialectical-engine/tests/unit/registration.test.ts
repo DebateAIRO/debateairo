@@ -2090,6 +2090,11 @@ describe("open sign-up mail: the domain question at sign-up (G5)", () => {
       await expect(harness.service.register({ ...input, recoveryEmail: "backup@gone.test" }, source("dns-recovery")))
         .rejects.toMatchObject({ code: "EMAIL_INVALID" });
       expect(asked).toEqual(["example.test", "gone.test"]);
+      expect(harness.createdInputs).toEqual([]);
+    } finally { harness.restore(); }
+  });
+});
+
 // Owner ruling 2026-10-09: the phone is optional. Without one, the repository is handed no phone
 // at all (no ciphertext, source, status or time); a given phone is still normalized and encrypted.
 describe("phone at the registration service", () => {
