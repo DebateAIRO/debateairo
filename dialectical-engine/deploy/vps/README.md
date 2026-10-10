@@ -3311,8 +3311,8 @@ read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=de
 ```
 
    Once NETOPIA's settlement form covers them, also run `start --currency RON` and `start --currency EUR` (each then
-   paid on its page, and `status --order` for each), so the recording shows a payment's status and message in each
-   currency.
+   paid on its page, and `status --order` and `fixture --order` run for each, within the same 14 days), so the
+   recording shows a payment's status and message in each currency.
 
    Once NETOPIA's messages for the three orders have arrived, and within 14 days (the raw messages are deleted after
    that), store each order's messages: run this once for each of the three ids (the payment's, the card check's and
@@ -3327,7 +3327,7 @@ read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=de
    folder, turn it into fixtures:
 
 ```sh
-# Paste the path of the copied capture folder and press Enter; then the day you recorded, as YYYY-MM-DD (for example 2026-10-20), and press Enter.
+# Paste the path of the copied capture folder and press Enter; then the last day you recorded, as YYYY-MM-DD (for example 2026-10-20), and press Enter.
 read -r CAPTURE_DIR && read -r RECORDED_ON && pnpm exec tsx tools/billing/scrub-netopia-fixture.ts --capture-dir "$CAPTURE_DIR" --out tests/fixtures/netopia --recorded-on "$RECORDED_ON"
 ```
 
