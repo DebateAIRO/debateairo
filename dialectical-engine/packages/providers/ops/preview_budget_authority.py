@@ -659,6 +659,10 @@ class CallNotSent(SafetyError):
     handler does not halt for it: nothing paid can have been lost."""
 
 
+class UnbilledRefusal(Exception):
+    """The provider answered with a refusal its profile proves unbilled: handled as not sent."""
+
+
 def release_unsent(private, entry_id, day, now):
     """Lock, count one provably unsent call (halting at UNSENT_HALT_STREAK in a row), drop its
     pending hold from the day ledger, clear it from in flight, unlock.
@@ -763,7 +767,12 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
                                                      profile=profile)
             status, response = send(outgoing, key)
             response = helper.redact(response if isinstance(response, dict) else {}, key, profile.redaction_patterns)
-        except helper.RequestNotSent:
+            # Owner ruling 5 (2026-10-10): a refusal the profile proves unbilled (DeepInfra: a 429
+            # with an error and no usage, choices or cost anywhere) counts as not sent. A hook that
+            # fails lands in the uncertain branch below, as any doubt does.
+            if profile.unbilled_refusal(status, response):
+                raise UnbilledRefusal()
+        except (helper.RequestNotSent, UnbilledRefusal) as unsent:
             try:
                 outcome = release_unsent(private, entry_id, day, now)
             except BaseException:
@@ -773,8 +782,9 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
                     'elapsed_seconds': round(time.monotonic() - started, 6)}, 'uncertain_charge', budget, now, slots)
                 log_event({**event, 'status': 'uncertain', **outcome})
                 raise SafetyError('NEW_CHARGE_UNCERTAIN') from None
-            log_event({**event, 'status': 'not_sent', **outcome})
-            raise CallNotSent('PROVIDER_NOT_REACHED') from None
+            refused = isinstance(unsent, UnbilledRefusal)
+            log_event({**event, 'status': 'not_sent', 'reason': 'unbilled_refusal' if refused else 'not_reached', **outcome})
+            raise CallNotSent('PROVIDER_REFUSED_UNBILLED' if refused else 'PROVIDER_NOT_REACHED') from None
         except BaseException as error:
             outcome = settle_or_halt(private, entry_id, day, {
                 'state': 'uncertain', 'held_usd': str(reserved), 'reason': 'transport_failure',

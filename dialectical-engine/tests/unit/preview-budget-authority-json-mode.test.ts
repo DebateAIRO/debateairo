@@ -34,7 +34,7 @@ describe('production preview spending guard optional JSON mode', () => {
     const result = runPython('tests/unit/preview_budget_authority_v3_test.py', 30000);
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
-    expect(result.stderr).toContain('Ran 38 tests');
+    expect(result.stderr).toContain('Ran 43 tests');
     expect(result.stderr).toContain('OK');
   });
   it('checks the reviewed gate v3 systemd files and the enabled-model start check offline', () => {

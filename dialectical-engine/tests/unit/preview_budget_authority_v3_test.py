@@ -630,6 +630,66 @@ class ProbeTests(GateTest):
         self.assertEqual(gate.status()['today_by_model'], {DEEPSEEK: {'spend_usd': '0.0004', 'posts': 1}})
 
 
+class UnbilledRefusalTests(GateTest):
+    """Owner ruling 5 (2026-10-10): a 429 the profile proves unbilled counts as not sent."""
+    RATE_LIMITED = {'error': {'message': 'Rate limit exceeded', 'type': 'rate_limit'}}
+
+    def test_a_429_without_usage_is_released_and_the_streak_grows_to_a_halt(self):
+        gate = self.gate().ready()
+        for number in range(1, 5):
+            with self.refused('PROVIDER_REFUSED_UNBILLED'):
+                gate.call('op-%d' % number, dispatch=lambda _s, _k: (429, dict(self.RATE_LIMITED)))
+            status = gate.status()
+            self.assertEqual((status['state'], status['unsent_streak'], status['today_posts'], status['today_spend_usd'],
+                              status['in_flight']), ('active', number, 0, '0', 0))
+        self.assertEqual(gate.day('2026-10-08')['entries'], {})
+        self.assertIn('"reason": "unbilled_refusal"', self.out.getvalue())
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call('op-5', dispatch=lambda _s, _k: (429, dict(self.RATE_LIMITED)))
+        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'provider_unreachable'))
+
+    def test_a_settled_reply_resets_the_streak_and_ipc_does_not_halt(self):
+        gate = self.gate().ready()
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call('op-1', dispatch=lambda _s, _k: (429, dict(self.RATE_LIMITED)))
+        gate.call('op-2')
+        self.assertEqual(gate.status()['unsent_streak'], 0)
+        self.assertEqual(json.loads(bridge.refusal_body(bridge.CallNotSent('PROVIDER_REFUSED_UNBILLED'))),
+                         {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'})
+
+    def test_a_429_carrying_usage_is_settled_and_halts(self):
+        gate = self.gate().ready()
+        reply = {**self.RATE_LIMITED, 'usage': {'prompt_tokens': 10, 'completion_tokens': 0}}
+        with self.refused('AUTHORITY_HALTED'):
+            gate.call('op-1', dispatch=lambda _s, _k: (429, reply))
+        entry = entry_of(gate, 'op-1')
+        self.assertEqual((entry['state'], gate.status()['reason']), ('settled', 'provider_error_or_model_identity'))
+
+    def test_anything_ambiguous_stays_uncertain_and_halts(self):
+        nested_cost = {'error': {'message': 'slow down', 'detail': {'estimated_cost': 0}}}
+        for name, status, reply in (('500_without_usage', 500, dict(self.RATE_LIMITED)),
+                                    ('429_without_error', 429, {'detail': 'slow down'}),
+                                    ('429_empty_error', 429, {'error': ''}),
+                                    ('429_with_choices', 429, {**self.RATE_LIMITED, 'choices': []}),
+                                    ('429_nested_cost', 429, nested_cost),
+                                    ('429_not_json', 429, {'_invalid_json': True}),
+                                    ('529_without_usage', 529, dict(self.RATE_LIMITED))):
+            with self.subTest(name):
+                gate = self.gate().ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    gate.call('op-1', dispatch=lambda _s, _k, c=status, r=reply: (c, r))
+                entry = entry_of(gate, 'op-1')
+                self.assertEqual((entry['state'], Decimal(entry['held_usd'])), ('uncertain', Decimal(entry['reserved_usd'])))
+                self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'uncertain_charge'))
+
+    def test_a_failing_hook_is_uncertain_and_halts(self):
+        gate = self.gate().ready()
+        with patch.object(DEEPINFRA, 'unbilled_refusal', side_effect=RuntimeError('synthetic')), \
+                self.refused('NEW_CHARGE_UNCERTAIN'):
+            gate.call('op-1', dispatch=lambda _s, _k: (429, dict(self.RATE_LIMITED)))
+        self.assertEqual(gate.status()['reason'], 'uncertain_charge')
+
+
 class ProfileTests(GateTest):
     def test_transport_takes_host_path_and_auth_header_from_the_profile(self):
         sent = []

@@ -213,6 +213,20 @@ def redact(value, key, patterns=()):
     return value
 
 
+def names_any_key(value, names):
+    """Whether any object at any depth of a parsed JSON value has one of these keys."""
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            if any(name in item for name in names):
+                return True
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            stack.extend(item)
+    return False
+
+
 # One reviewed model of a profile. Prices are the vendor's LIST prices in USD per million tokens
 # (the careful side while a vendor runs a promotion); the gate reserves and settles with them.
 # output_bound is both the max_tokens ceiling and what a call reserves for output. effort is
@@ -271,6 +285,14 @@ class DeepInfraProfile:
     def reply_model(self, response):
         """Where the reply names the model that answered."""
         return response.get('model')
+
+    def unbilled_refusal(self, status, response):
+        """True only for a refusal that provably billed nothing (owner ruling 5, 2026-10-10): HTTP
+        429, a JSON object with an error field, and no usage, choices or estimated_cost key at any
+        depth. The gate then releases the hold as for a call never sent (it counts toward the
+        unsent streak). Anything else is accounted (and halts) as before."""
+        return (status == 429 and isinstance(response, dict) and bool(response.get('error'))
+                and not names_any_key(response, ('usage', 'choices', 'estimated_cost')))
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
