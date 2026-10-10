@@ -1,11 +1,15 @@
 /**
  * 0114: the rotation pin is insert-once and immutable, the two maker laws and the eligible-list rules hold in the
- * database, and the story gains its storyteller repair count (spec 2026-10-11, Part 3; rulings C and E).
+ * database, and the story gains its storyteller repair count (spec 2026-10-11, Part 3; rulings C and E). The db access
+ * (Task 4) inserts, reads and counts the pins, and refuses a malformed pin before the database does.
  */
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { RunRepository, migrate } from "@debateai/db";
+import {
+  RunRepository, insertRunRoleRotation, migrate, readRoleRotationCounts, readRunRoleRotation, type RunRoleRotationInput
+} from "@debateai/db";
+import { pickRotatedRoles, roleRotationSeed, type RoleRotationCounts, type RotatedRoles } from "@debateai/scorecard";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -145,5 +149,136 @@ describe("0114: a forward step, applied once", () => {
     await db().query(sql);
     await db().query(sql);
     expect(await constraints()).toEqual(before);
+  });
+});
+
+const role = (providerRef: string, modelId: string, maker: string) => ({ providerRef, modelId, maker });
+const A = role("p:a", "model-a", "Maker A");
+const B = role("p:b", "model-b", "Maker B");
+const C = role("p:c", "model-c", "Maker C");
+const RULE = "LEAST_SHARE_SEEDED_TIE_V1" as const;
+const pin = (runId: string, eligibleModelIds: readonly string[] = ["model-a", "model-b", "model-c"]): RunRoleRotationInput =>
+  ({ runId, rule: RULE, answerWriter: A, answerChecker: B, storyteller: C, storyChecker: A, eligibleModelIds });
+/** An executor that fails the test if a query ever reaches it: a refusal here happened before the database. */
+const unreachable = { query: async () => { throw new Error("REACHED_DATABASE"); } } as never;
+
+describe("insertRunRoleRotation / readRunRoleRotation", () => {
+  it("round-trips one pin, eligible model ids included, and answers null for a run without one", async () => {
+    const runId = await createRun("round-trip");
+    await insertRunRoleRotation(db(), pin(runId));
+    const pinned = await readRunRoleRotation(db(), runId);
+    expect(pinned).toMatchObject({ runId, rule: RULE, answerWriter: A, answerChecker: B, storyteller: C, storyChecker: A });
+    expect(pinned!.eligibleModelIds).toEqual(["model-a", "model-b", "model-c"]);
+    expect(pinned!.createdAt).toBeInstanceOf(Date);
+    expect(Object.isFrozen(pinned)).toBe(true);
+    expect(Object.isFrozen(pinned!.answerWriter)).toBe(true);
+    expect(Object.isFrozen(pinned!.eligibleModelIds)).toBe(true);
+    expect(await readRunRoleRotation(db(), await createRun("none"))).toBeNull();
+  });
+  it("takes the picker's RotatedRoles as they are: { runId, ...rotated }", async () => {
+    const rotated: RotatedRoles = pickRotatedRoles({
+      panel: [
+        { provider_ref: "p:a", maker: "Maker A", model_id: "model-a" },
+        { provider_ref: "p:b", maker: "Maker B", model_id: "model-b" },
+        { provider_ref: "p:a2", maker: "Maker A", model_id: "model-a2" }
+      ],
+      counts: {},
+      seed: roleRotationSeed({ as_of: "2026-10-11T00:00:00.000Z", question_line: "Which models rotate?" })
+    })!;
+    const runId = await createRun("picked");
+    const input = { runId, ...rotated } satisfies RunRoleRotationInput;
+    await insertRunRoleRotation(db(), input);
+    const pinned = await readRunRoleRotation(db(), runId);
+    expect(pinned).toMatchObject({ ...rotated, runId, eligibleModelIds: ["model-a", "model-b"] });
+  });
+  it("refuses a malformed pin before the database does", async () => {
+    const runId = randomUUID();
+    const refused = (input: RunRoleRotationInput) =>
+      expect(insertRunRoleRotation(unreachable, input)).rejects.toThrow("RUN_ROLE_ROTATION_INVALID");
+    await refused({ ...pin(runId), answerChecker: A });
+    await refused({ ...pin(runId), storyteller: B, storyChecker: B });
+    await refused({ ...pin(runId), rule: "OTHER" as never });
+    await refused({ ...pin(runId), answerWriter: role("p:a", " ", "Maker A") });
+    await refused({ ...pin(runId), storyChecker: role("p:a", "model-a", "M".repeat(257)) });
+    // The eligible list: 2 to 16 strings, each non-blank and at most 256 characters, holding all four picks.
+    await refused(pin(runId, ["model-a", "model-b"]));
+    await refused(pin(runId, ["model-a"]));
+    await refused(pin(runId, ["model-a", "model-b", "model-c", " "]));
+    await refused(pin(runId, ["model-a", "model-b", "model-c", ""]));
+    await refused(pin(runId, ["model-a", "model-b", "model-c", "x".repeat(257)]));
+    await refused(pin(runId, ["model-a", "model-b", "model-c", ...others(14)]));
+    await refused(pin(runId, ["model-a", "model-b", "model-c", null as never]));
+    await refused(pin(runId, "model-a,model-b,model-c" as never));
+    await refused(pin(runId, [, "model-a", "model-b", "model-c"] as never));
+    await refused({ ...pin(runId), eligibleModelIds: undefined as never });
+    await expect(insertRunRoleRotation(unreachable, pin(runId))).rejects.toThrow("REACHED_DATABASE");
+  });
+  it("accepts a list with repeats and at the bounds (16 entries, 256 characters)", async () => {
+    for (const [label, list] of [
+      ["repeat", ["model-a", "model-b", "model-c", "model-a"]],
+      ["sixteen", ["model-a", "model-b", "model-c", ...others(13)]],
+      ["long", ["model-a", "model-b", "model-c", "x".repeat(256)]]
+    ] as const) {
+      const runId = await createRun(`bounds-${label}`);
+      await insertRunRoleRotation(db(), pin(runId, list));
+      expect((await readRunRoleRotation(db(), runId))!.eligibleModelIds).toEqual(list);
+    }
+  });
+});
+
+describe("readRoleRotationCounts", () => {
+  const tally = (counts: RoleRotationCounts, roleName: keyof RoleRotationCounts, modelId: string) =>
+    counts[roleName]?.[modelId] ?? { picked: 0, eligible: 0 };
+  const moved = (before: RoleRotationCounts, after: RoleRotationCounts, roleName: keyof RoleRotationCounts, modelId: string) => {
+    const [from, to] = [tally(before, roleName, modelId), tally(after, roleName, modelId)];
+    return { picked: to.picked - from.picked, eligible: to.eligible - from.eligible };
+  };
+
+  it("counts, per role and model id, the pins naming it and the pins it was eligible in", async () => {
+    const before: RoleRotationCounts = await readRoleRotationCounts(db());
+    for (const label of ["count-1", "count-2"]) {
+      await insertRunRoleRotation(db(), { runId: await createRun(label), rule: RULE, answerWriter: C, answerChecker: B, storyteller: B,
+        storyChecker: C, eligibleModelIds: ["model-b", "model-c", "model-d"] });
+    }
+    await insertRunRoleRotation(db(), { runId: await createRun("count-3"), rule: RULE, answerWriter: A, answerChecker: B, storyteller: A,
+      storyChecker: B, eligibleModelIds: ["model-a", "model-b"] });
+    const after: RoleRotationCounts = await readRoleRotationCounts(db());
+    expect(moved(before, after, "ANSWER_WRITER", "model-c")).toEqual({ picked: 2, eligible: 2 });
+    expect(moved(before, after, "ANSWER_WRITER", "model-a")).toEqual({ picked: 1, eligible: 1 });
+    expect(moved(before, after, "ANSWER_WRITER", "model-b")).toEqual({ picked: 0, eligible: 3 });
+    expect(moved(before, after, "ANSWER_CHECKER", "model-b")).toEqual({ picked: 3, eligible: 3 });
+    expect(moved(before, after, "STORYTELLER", "model-b")).toEqual({ picked: 2, eligible: 3 });
+    expect(moved(before, after, "STORYTELLER", "model-a")).toEqual({ picked: 1, eligible: 1 });
+    expect(moved(before, after, "STORY_CHECKER", "model-c")).toEqual({ picked: 2, eligible: 2 });
+    expect(moved(before, after, "STORY_CHECKER", "model-b")).toEqual({ picked: 1, eligible: 3 });
+    // Eligible but never picked: present in every role with picked 0.
+    for (const roleName of ["ANSWER_WRITER", "ANSWER_CHECKER", "STORYTELLER", "STORY_CHECKER"] as const) {
+      expect(after[roleName]!["model-d"]).toEqual({ picked: 0, eligible: tally(before, roleName, "model-d").eligible + 2 });
+    }
+    expect(Object.keys(after).sort()).toEqual(["ANSWER_CHECKER", "ANSWER_WRITER", "STORYTELLER", "STORY_CHECKER"]);
+    expect(Object.isFrozen(after)).toBe(true);
+    expect(Object.isFrozen(after.ANSWER_WRITER)).toBe(true);
+    expect(Object.isFrozen(after.ANSWER_WRITER!["model-c"])).toBe(true);
+  });
+  it("counts a model once per pin even when the pin's list repeats it (ruling E)", async () => {
+    const before = await readRoleRotationCounts(db());
+    await insertRunRoleRotation(db(), { runId: await createRun("count-repeat"), rule: RULE, answerWriter: A, answerChecker: B, storyteller: B,
+      storyChecker: A, eligibleModelIds: ["model-a", "model-b", "model-a", "model-e", "model-e"] });
+    const after = await readRoleRotationCounts(db());
+    expect(moved(before, after, "ANSWER_WRITER", "model-a")).toEqual({ picked: 1, eligible: 1 });
+    expect(moved(before, after, "STORY_CHECKER", "model-a")).toEqual({ picked: 1, eligible: 1 });
+    expect(moved(before, after, "ANSWER_CHECKER", "model-e")).toEqual({ picked: 0, eligible: 1 });
+  });
+  it("feeds the picker as they are", async () => {
+    const counts = await readRoleRotationCounts(db());
+    const rotated = pickRotatedRoles({
+      panel: [
+        { provider_ref: "p:a", maker: "Maker A", model_id: "model-a" },
+        { provider_ref: "p:b", maker: "Maker B", model_id: "model-b" }
+      ],
+      counts,
+      seed: roleRotationSeed({ as_of: "2026-10-11T00:00:00.000Z", question_line: "Which counts?" })
+    });
+    expect(rotated).not.toBeNull();
   });
 });
