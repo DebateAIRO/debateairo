@@ -226,12 +226,19 @@ const UNCHECKED_CLOUD = Object.freeze({
   checkedOn: null
 } as const);
 
-/** One row per model family the product runs, in the registry's order. */
+/**
+ * One row per model family the product runs, in the registry's order. `entity` is the contracting party the
+ * provider's published API terms name for a business customer in the EEA (looked up 10 October 2026: Anthropic
+ * Commercial Terms; OpenAI Services Agreement/DPA; Google Cloud contracting-entity table; xAI enterprise terms).
+ * A `contact` is filled only where the provider's own privacy policy confirms it. Both stay in square brackets (the
+ * Register's "not confirmed yet" mark) and `checkedOn` stays null until the owner checks each row against the signed
+ * contract and the account settings in use.
+ */
 export const MODEL_PROVIDERS: readonly ProviderRegisterEntry[] = Object.freeze([
-  { ...UNCHECKED_CLOUD, key: "claude", provider: "Anthropic", models: "Claude", entity: "[Anthropic …]" },
-  { ...UNCHECKED_CLOUD, key: "gpt", provider: "OpenAI", models: "GPT", entity: "[OpenAI …]" },
-  { ...UNCHECKED_CLOUD, key: "gemini", provider: "Google", models: "Gemini", entity: "[Google …]" },
-  { ...UNCHECKED_CLOUD, key: "grok", provider: "xAI", models: "Grok", entity: "[xAI …]" },
+  { ...UNCHECKED_CLOUD, key: "claude", provider: "Anthropic", models: "Claude", entity: "[Anthropic Ireland, Limited]", homeCountryKey: "legal.providers.ireland", contact: "[privacy@anthropic.com]" },
+  { ...UNCHECKED_CLOUD, key: "gpt", provider: "OpenAI", models: "GPT", entity: "[OpenAI Ireland Limited]", homeCountryKey: "legal.providers.ireland" },
+  { ...UNCHECKED_CLOUD, key: "gemini", provider: "Google", models: "Gemini", entity: "[Google Cloud EMEA Limited]", homeCountryKey: "legal.providers.ireland" },
+  { ...UNCHECKED_CLOUD, key: "grok", provider: "xAI", models: "Grok", entity: "[X.AI LLC]" },
   {
     key: "qwen",
     provider: "Qwen",
