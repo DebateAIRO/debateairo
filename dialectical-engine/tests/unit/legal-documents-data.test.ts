@@ -69,13 +69,13 @@ describe("legal documents — generated data", () => {
   describe("Terms of Service", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(TERMS_OF_SERVICE.key).toBe("terms");
-      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.2 · EFFECTIVE [DATE]");
+      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.2 · EFFECTIVE 12 OCTOBER 2026");
       expect(TERMS_OF_SERVICE.title).toBe("What you agree to");
       expect(TERMS_OF_SERVICE.lede).toBe(
-        "The contract between you and DebateAIRO S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
+        "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
       );
       expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.2");
-      expect(TERMS_OF_SERVICE.contact).toBe("[legal@dezbatere.ro]");
+      expect(TERMS_OF_SERVICE.contact).toBe("support@dezbatere.ro");
       expect(TERMS_OF_SERVICE.bodyLabel).toBe("Terms of Service text");
       expect(TERMS_OF_SERVICE.sectionIdPrefix).toBe("terms-section-");
       expect(TERMS_OF_SERVICE.titleId).toBe("terms-modal-title");
@@ -114,13 +114,12 @@ describe("legal documents — generated data", () => {
       expect(who.blocks.map((block) => block.kind)).toEqual(["p", "list", "p"]);
       const table = who.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
-      expect(table.items).toHaveLength(11);
-      expect(table.items[0]).toBe(
-        "Registered office — [street, number, sector, postal code], Bucharest, Romania"
-      );
-      expect(table.items[6]).toBe("Privacy and data protection — privacy@dezbatere.ro");
-      expect(table.items[9]).toBe(
-        "Removal orders for terrorist content (EU Regulation 2021/784) — [dsa@dezbatere.ro] — our contact point for these orders; Romanian and English; see section 10"
+      expect(table.items).toHaveLength(12);
+      expect(table.items[0]).toBe("Registered office — Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romania");
+      expect(table.items[5]).toBe("Telephone — +40 748 793 490");
+      expect(table.items[7]).toBe("Privacy and data protection — privacy@dezbatere.ro");
+      expect(table.items[10]).toBe(
+        "Removal orders for terrorist content (EU Regulation 2021/784) — office@dezbatere.ro — our contact point for these orders; Romanian and English; see section 10"
       );
       const closing = who.blocks[2]!;
       if (closing.kind !== "p") throw new Error("unreachable");
@@ -189,7 +188,7 @@ describe("legal documents — generated data", () => {
       expect(texts(section(TERMS_OF_SERVICE, "12"))[0]).toBe(
         "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]"
       );
-      expect(allTexts(TERMS_OF_SERVICE).some((text) => text.includes("[abuse@dezbatere.ro]"))).toBe(true);
+      expect(allTexts(TERMS_OF_SERVICE).some((text) => text.includes("[state your discretionary refund policy]"))).toBe(true);
     });
 
     it("leaves no markdown syntax in any string a reader sees", () => {
@@ -233,7 +232,7 @@ describe("legal documents — generated data", () => {
   describe("Privacy Policy", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(PRIVACY_POLICY.key).toBe("privacy");
-      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.3 · EFFECTIVE [DATE]");
+      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.3 · EFFECTIVE 12 OCTOBER 2026");
       expect(PRIVACY_POLICY.title).toBe("What we store, and why");
       expect(PRIVACY_POLICY.lede).toBe(
         "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end."

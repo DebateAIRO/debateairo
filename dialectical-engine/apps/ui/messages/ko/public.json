@@ -201,6 +201,6 @@
   "public.publication.contentCheck.groundIllegal": "해당 텍스트는 불법일 수도 있습니다.",
   "public.publication.contentCheck.automated": "이 결정은 자동화된 도구가 내렸습니다. 아직 사람이 검토하지 않았습니다.",
   "public.publication.contentCheck.stillPrivate": "토론은 변경 없이 비공개로 유지됩니다. 본인만 볼 수 있습니다.",
-  "public.publication.contentCheck.appeal": "사람에게 이 결정의 재검토를 요청하려면 6개월 이내에 [appeals@dezbatere.ro]로 연락하세요.",
+  "public.publication.contentCheck.appeal": "사람에게 이 결정의 재검토를 요청하려면 6개월 이내에 office@dezbatere.ro로 연락하세요.",
   "public.publication.contentCheck.unavailable": "현재 콘텐츠 검사를 사용할 수 없어 아무것도 게시되지 않았습니다. 토론은 비공개로 유지됩니다. 몇 분 후 다시 시도하세요."
 }

@@ -204,6 +204,6 @@
   "public.publication.contentCheck.groundIllegal": "Текст також може бути незаконним.",
   "public.publication.contentCheck.automated": "Це рішення ухвалив автоматизований інструмент. Людина його ще не переглядала.",
   "public.publication.contentCheck.stillPrivate": "Ваша дискусія залишається приватною та незмінною. Тільки ви можете її бачити.",
-  "public.publication.contentCheck.appeal": "Щоб попросити людину переглянути це рішення, напишіть на [appeals@dezbatere.ro] протягом шести місяців.",
+  "public.publication.contentCheck.appeal": "Щоб попросити людину переглянути це рішення, напишіть на office@dezbatere.ro протягом шести місяців.",
   "public.publication.contentCheck.unavailable": "Перевірка вмісту зараз недоступна, тому нічого не було оприлюднено. Ваша дискусія залишається приватною. Спробуйте ще раз за кілька хвилин."
 }

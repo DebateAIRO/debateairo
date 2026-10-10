@@ -24,7 +24,7 @@ const copy = {
   groundIllegal: "The text may also be illegal.",
   automated: "This decision was made by an automated tool. No person has reviewed it yet.",
   stillPrivate: "Your debate stays private and unchanged. Only you can see it.",
-  appeal: "To ask a person to review this decision, write to [appeals@dezbatere.ro] within six months.",
+  appeal: "To ask a person to review this decision, write to office@dezbatere.ro within six months.",
   unavailable: "The content check is not available right now, so nothing was published. Your debate stays private. Try again in a few minutes."
 };
 const locales = ["ar", "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "ga", "he", "hi", "hr", "hu", "id", "it", "ja", "ko", "lt", "lv", "mt", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "vi", "zh"];
@@ -301,7 +301,7 @@ describe("locales", () => {
   it.each(locales)("provides the full statement in %s", (locale) => {
     const catalog = JSON.parse(readFileSync(resolve(process.cwd(), `apps/ui/messages/${locale}/public.json`), "utf8")) as Record<string, string>;
     expect(Object.keys(copy).filter((key) => typeof catalog[prefix + key] !== "string" || catalog[prefix + key]!.trim() === "")).toEqual([]);
-    expect(catalog[prefix + "appeal"]).toContain("[appeals@dezbatere.ro]");
+    expect(catalog[prefix + "appeal"]).toContain("office@dezbatere.ro");
   });
   // Property (pt-N1): the ground line names the Terms with the exact name the app's own Terms link uses in that locale
   // (`chrome.legal.terms`), compared case-insensitively in the locale (a capital letter mid-sentence is spelling, not a name).
