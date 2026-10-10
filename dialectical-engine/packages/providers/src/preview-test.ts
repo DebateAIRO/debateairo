@@ -1,7 +1,7 @@
 /** One opt-in private preview test; normal provider/roster behavior stays unchanged. */
 import { createHash, randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
-import { TypedDomainError } from "@debateai/kernel";
+import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel";
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import {
@@ -182,6 +182,18 @@ export function assertPreviewProviderTargets(config: PreviewTargetRosters | unde
   if ([...config.free_model_ids, ...(config.premium_model_ids ?? [])].some(model => !served.has(model))) refused();
 }
 /**
+ * On the preview, every role the register names (answer writer and checker, storyteller and story
+ * checker) must be a declared target: a role on a ref the app cannot reach would fail at claim,
+ * after the debate has started. Refused at boot instead (API and runner).
+ */
+export function assertPreviewRoleTargets(
+  config: PreviewTargetRosters | undefined, targets: readonly ProviderDiscoveryTarget[], roleRefs: readonly string[]
+): void {
+  if (config === undefined) return;
+  const declared = new Set(targets.map(target => target.providerRef));
+  if (roleRefs.length === 0 || roleRefs.some(ref => !declared.has(ref))) refused();
+}
+/**
  * The probe's controls for one reviewed target: "high" only where the row has an effort switch,
  * and the generation floor, never above the row's bound. Throws for a target off the reviewed rows.
  */
@@ -189,6 +201,17 @@ export function previewProbeControls(target: Readonly<{ model: string }>): Reado
   const reviewed = previewModelRow(target.model) ?? refused();
   return Object.freeze({ ...(reviewed.effort === null ? {} : { thinkingLevel: reviewed.effort }),
     tokenCeiling: Math.min(PREVIEW_GLM_GENERATION_TOKEN_FLOOR, reviewed.outputBound) });
+}
+/**
+ * Contract A §2: on the preview only, a target's gateway never asks for more output than its
+ * reviewed row allows (max_tokens is clamped to the row's bound, length retries included), so the
+ * guarded fetch never meets a bound the gate refuses. Off the preview nothing is added.
+ */
+export function previewTargetGatewayControls(
+  config: PreviewProviderTestConfig | undefined, target: Readonly<{ model: string }>
+): Readonly<{ maxOutputTokens?: number }> {
+  if (config === undefined) return Object.freeze({});
+  return Object.freeze({ maxOutputTokens: (previewModelRow(target.model) ?? refused()).outputBound });
 }
 export function previewCallBound(bound: CallBound, config: PreviewProviderTestConfig | undefined): CallBound {
   return config === undefined ? bound : Object.freeze({ maxAttempts: 1, tokenCeiling: Math.max(bound.tokenCeiling, PREVIEW_GLM_GENERATION_TOKEN_FLOOR), deadlineMs: PREVIEW_GLM_DEADLINE_MS });
@@ -214,7 +237,10 @@ function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
 export function withPreviewProviderCallPolicy(gateway: ProviderGateway, config: PreviewProviderTestConfig, target: Readonly<{ model: string }>): ProviderGateway {
   const reviewed = previewModelRow(target.model) ?? refused();
   return Object.freeze({ call(request: ProviderCallRequest) {
-    if (request.thinkingLevel !== undefined && (reviewed.effort === null || request.thinkingLevel !== config.requested_thinking_level)) {
+    // A row with no effort switch runs at the vendor default, so "DEFAULT_ONLY" asks for exactly that.
+    const asksNoLevel = request.thinkingLevel === undefined
+      || (reviewed.effort === null && request.thinkingLevel === THINKING_LEVEL_DEFAULT_ONLY);
+    if (!asksNoLevel && (reviewed.effort === null || request.thinkingLevel !== config.requested_thinking_level)) {
       throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", reviewed.effort === null
         ? "The private preview connection for this model has no thinking level"
         : "The private preview connection is configured for high only");

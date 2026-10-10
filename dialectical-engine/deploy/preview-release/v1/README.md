@@ -23,9 +23,17 @@ command to run, so earlier releases were staged with throwaway scripts and hand-
   environment (`env -i`). On a Mac it refuses.
 
 The website is built with a fixed list of public values (the site address, the Turnstile site key,
-the free model list, `NODE_ENV=production`). They are the same constants the reviewed start-up
+the model list, `NODE_ENV=production`). They are the same constants the reviewed start-up
 check demands from `ui.env`, so the build and the running site cannot disagree. `build-env`
 prints them with their sha256 so you can compare `ui.env` by hash, without printing it.
+
+The model list is one of two reviewed lists, picked by name with `--models` (on `build-env` and
+`ui-build`): `glm-only` (the default: GLM only, the list the preview has used so far) or
+`multi-model` (Free: GLM and DeepSeek; Premium: GLM, DeepSeek and MiMo). The list is baked into
+the website when it is built, so changing it means a new build. The build writes the list it used
+into `.next/preview-model-roster.json` (covered by the build manifest), and the UI start-up check
+refuses unless `ui.env` names the same list. Which list belongs at which moment is in
+`deploy/preview-gate/v3/README.md`, "Switching on the new models, in order".
 
 Only the values above are set. Three other public flags are read only at build time and are left
 unset, which means their built-in defaults: `NEXT_PUBLIC_VERDICT_FIRST_UI` (verdict-first layout
@@ -55,13 +63,13 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | Command | What it does |
 |---|---|
 | `source-manifest --repository <clean git clone> --root <release root> --role api\|ui\|runner --out <file>` | runs `generateSourceManifest` with uid 0 and writes it; prints `{path,sha256,bytes}` |
-| `build-env` | prints the fixed public UI build values and their sha256; reads no file |
-| `ui-build --source <ui source manifest> --out <file>` | checks the UI root against its manifest, builds with the fixed values, re-checks that the build changed no inventoried source byte, checks the build, writes the build manifest |
+| `build-env [--models glm-only\|multi-model]` | prints the fixed public UI build values (for that model list; default `glm-only`) and their sha256; reads no file |
+| `ui-build --source <ui source manifest> [--models glm-only\|multi-model] --out <file>` | checks the UI root against its manifest, builds with the fixed values and that model list (default `glm-only`), records the list in the build, re-checks that the build changed no inventoried source byte, checks the build, writes the build manifest |
 | `verify --source <file> [--ui-build <file>]` | re-runs `verifySourceManifest` (and `verifyUiBuildManifest`) against the exact file bytes |
 | `operator-digest --source <file>` | prints `operatorManifestSha256` (the shared function the launchers use) and the operator file count |
 | `launch-plan --service api\|ui\|runner --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, everything else from `--from`; for `--service runner` the API plan may be `--from` (identity from the runner OS account, runner.env custody); `validateLaunchPlan` before writing |
 | `native-plan --operation apply-and-plan\|verify --from <existing native plan> --source-manifest <candidate api manifest> --out <file>` | new native plan for a candidate API root; `verify` carries the `approval` of `--from` over unchanged; the reviewed `validateNativePlan` before writing |
-| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval |
+| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> [--checker glm\|deepseek --deepseek-enabled-on-gate yes] --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval. The answer checker stays GLM unless `--checker deepseek` is given together with `--deepseek-enabled-on-gate yes` (your statement that the gate's GO switches DeepSeek on); `publish` carries the plan's choice |
 | `native-plan --operation publish --from <the plan above> --proposal <what the native operator printed for it> --source-manifest <same manifest> --out <file>` | step 2, after the owner reviewed the proposal: re-hashes every value the proposal shows and its `deltaSha256`, checks it belongs to that plan (release, operator digest, base), copies the approval from it, picks a fresh `publicationId`, and prints the approval it wrote |
 | `native-plan --operation verify --from <the publish plan> --publication <what the native operator printed for publish> --source-manifest <manifest> --out <file>` | step 3: the verify plan for the NEW publication (same id, base and snapshot as the publish plan) |
 | `launch-plan … --publication <what the native operator printed for publish>` | launch plans that carry the new publication instead of the old plan's; the `--native-attestation` proof must already name it |
@@ -102,6 +110,8 @@ Expect six lines `{"path":…,"sha256":…,"bytes":…}`.
 
 **3. Check the public build values against `ui.env`, by hash only.** First the tool's values,
 then the same keys from `ui.env` (this prints hashes, never the file):
+
+Give `build-env` the same `--models` you will give `ui-build` in step 4 (none means `glm-only`).
 
 ```sh
 rel build-env

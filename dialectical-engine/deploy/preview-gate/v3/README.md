@@ -371,10 +371,70 @@ systemd-run --quiet --wait --pipe --collect -p IPAddressDeny=any -p IPAddressAll
 - The last command is the start check, run by hand once: it must print `"status": "ok"` with all
   switched-on models.
 - Then the app side: the API's and runner's model lists, and a new sealed register version. Those
-  steps belong to the app's runbook. The gate refuses any model the GO does not switch on, whatever
-  the app asks for.
+  steps belong to the app's runbook; the order of all of it is in "Switching on the new models, in
+  order" below. The gate refuses any model the GO does not switch on, whatever the app asks for.
 
 To switch a model off again: the same, with the model taken out of `enabled_models`.
+
+## Switching on the new models, in order
+
+The gate is one of four places that name the models. The other three belong to the app: the
+API's and runner's model lists (`PREVIEW_PROVIDER_TEST_CONFIG_JSON`, plus their list of model
+addresses `PROVIDER_DISCOVERY_TARGETS_JSON`), the sealed register version (which models write and
+check an answer), and the website's model list (`NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON`, baked
+in when the website is built). They must move in this order. At every step, nothing offers or
+uses a model before the step that makes it safe.
+
+1. **Gate v3 with GLM only.** The switch-over above, with `enabled_models:["zai-org/GLM-5.3-Flash"]`
+   in the GO.
+2. **The app on the new code, with the old (legacy) model list.** The API and runner keep the
+   five-key `PREVIEW_PROVIDER_TEST_CONFIG_JSON` (`free_model_ids:["zai-org/GLM-5.3-Flash"]`), the
+   current register version and the two GLM addresses. Build the website with the default list
+   (`ui-build` without `--models`, which means `--models glm-only`); `ui.env` keeps
+   `NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON=["zai-org/GLM-5.3-Flash"]`.
+3. **A new register version with the four reviewed model references, the checker still on GLM,
+   and the four model addresses, in ONE restart.** Plan the register version without `--checker`
+   (deploy/preview-release/v1/README.md, register publication); its delta shows only
+   `configuredProviderSet` and `providerFamilyMap` (plus any row the release itself changes). In
+   the same restart, set the API's and runner's `REGISTER_VERSION` to it and their
+   `PROVIDER_DISCOVERY_TARGETS_JSON` to the four addresses. Why one restart: the app refuses to
+   start when its list of addresses is not exactly the register's list of models.
+4. **The website's list stays the old one** (`glm-only`).
+5. **Probe DeepSeek, then MiMo** ("Switching on DeepSeek and MiMo", step 1, one model at a time).
+6. **A new GO that switches them on, then `activate`** ("Switching on DeepSeek and MiMo", step 2).
+7. **The API's and runner's model lists: the six-key form.** Free: GLM and DeepSeek. Premium: all
+   three:
+   `"free_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]`
+   (the other four keys unchanged). This needs step 6: before a debate starts, the app refuses a
+   model the gate has not switched on.
+8. **A new register version with the checker on DeepSeek.** Plan it with
+   `--checker deepseek --deepseek-enabled-on-gate yes`. The second flag is your statement that
+   step 6 is done; without it the tool refuses. Its delta shows `evaluatorRoleRef` and
+   `storyCheckerRoleRef` moving to `preview:deepseek-v4-1-flash` (the answer is then checked by a
+   different maker from the one that wrote it). This needs step 6 too: with the checker on a model
+   the gate refuses, every debate would be refused. Steps 7 and 8 may swap.
+9. **The website's new list.** Build the website again with `--models multi-model`, and set
+   `ui.env` to the same list:
+   `NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON={"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]}`.
+   The website refuses to start when `ui.env` and its build disagree. Best in the same restart as
+   step 7. If not, step 7 first: a website that offers fewer models than the API is harmless; one
+   that offers a model the API refuses is not.
+
+No program reads `api.env`, `runner.env` and `ui.env` together (each service reads only its own),
+so before the restart of steps 7 and 9, compare the website's list with the API's and runner's
+lists yourself. Each line must say `match`; an error means a key is missing (stop and ask):
+
+```sh
+E=/etc/debateai-v3-preview/auth-dev-v1
+for S in api runner; do jq -nr --arg s "$S" --arg ui "$(sed -n 's/^NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON=//p' $E/ui.env)" --arg app "$(sed -n 's/^PREVIEW_PROVIDER_TEST_CONFIG_JSON=//p' $E/$S.env)" '($ui|fromjson) as $u | ($app|fromjson) as $a | (if ($u|type)=="array" then ($a|has("premium_model_ids")|not) and $a.free_model_ids==$u else $a.free_model_ids==$u.free and $a.premium_model_ids==$u.premium end) as $ok | "\($s): \(if $ok then "match" else "MISMATCH" end)"'; done
+```
+
+The synthetic stage check (deploy/preview-auth-dev/v1, `run-stage.mjs`) makes the same
+comparison between the website build and its own API settings, which use the old five-key list,
+so it accepts only a `glm-only` website.
+
+To go back, walk the same steps backwards: the website's list first (a `glm-only` build), then the
+app's model lists, then a register version without `--checker`, then the GO.
 
 ## Daily operations
 

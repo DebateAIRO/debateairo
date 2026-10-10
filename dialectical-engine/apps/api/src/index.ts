@@ -1793,11 +1793,12 @@ export function askRefusalPublicMessage(code: string, message: string): string {
 
 /**
  * The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. A refusal that
- * names its own reset instant (the preview gate's day ends at Bucharest midnight) uses that one.
+ * names its own retry instant uses that one, whatever its status: the preview gate's day ends at
+ * Bucharest midnight, and a preview gate that cannot be used right now asks for about a minute.
  */
 export function askRefusalRetryAfter(code: string, now: Date, retryAt?: Date): string | null {
-  if (askRefusalStatus(code) !== 429) return null;
   if (retryAt !== undefined && Number.isFinite(retryAt.getTime()) && retryAt.getTime() > now.getTime()) return retryAt.toUTCString();
+  if (askRefusalStatus(code) !== 429) return null;
   const midnight = new Date(Date.UTC(
     now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1
   ));
@@ -4274,7 +4275,7 @@ export async function evaluateAskAdmission(
     try {
       await assertPreviewBudgetAdmits(settings.previewBudgetGate, {
         basis: envelopeBasis,
-        panelModelIds: filteredPanel.map((member) => member.model_id)
+        panel: filteredPanel
       });
     } catch (error) {
       markAskRefusal(error);

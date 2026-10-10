@@ -457,11 +457,9 @@ describe("PR B — the target and the register pick the wire", () => {
     ])[0]!;
     expect(native.baseUrl).toBe(BASE_URL);
     expect(native.adapterKind).toBe(ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND);
-    // The gate PR: Claude Haiku is a reviewed preview row, so its output bound (32,768) caps max_tokens.
     expect(providerTargetGatewayControls(native)).toStrictEqual({
       thinking: { parameter: "reasoning_effort", levels: ["high"] },
-      adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
-      maxOutputTokens: 32_768
+      adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND
     });
     const elsewhere = JSON.stringify([{ provider_ref: "vendor:anthropic", base_url: "https://api.deepinfra.com/v1/openai", model: MODEL }]);
     for (const configured of [

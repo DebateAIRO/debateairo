@@ -9,7 +9,8 @@ import {
   OpenAICompatibleProviderGateway, PREVIEW_MODEL_ROWS_BY_PROVIDER, PREVIEW_REVIEWED_PROVIDER_REFS, assertPreviewProviderTargets,
   createPreviewGuardedFetch, observeProviderTarget, parsePreviewProviderTestConfig, parseProviderDiscoveryTargets,
   previewModelRow, previewNanoUsdText, previewPlanTierRosters, previewProbeControls, previewReservationNanoUsd,
-  previewTargetJsonRow, providerTargetGatewayControls, withPreviewProviderCallPolicy,
+  previewTargetJsonRow, providerTargetGatewayControls, withPreviewProviderCallPolicy, previewTargetGatewayControls,
+  assertPreviewRoleTargets,
   type PreviewBudgetExecution, type ProviderCallRequest, type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
@@ -200,7 +201,7 @@ function previewGateway(model: string) {
       usage: { prompt_tokens: 10, completion_tokens: 20 } }) };
   } });
   const native = new OpenAICompatibleProviderGateway({ endpoint: target.baseUrl, model: target.model, maker: target.maker,
-    ...providerTargetGatewayControls(target), fetchImplementation,
+    ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(parse(MULTI), target), fetchImplementation,
     persistRawArtifact: async artifact => artifact.artifactId, appendLedgerEntry: async entry => entry.attemptId,
     assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined });
   return { executions, target, gateway: withPreviewProviderCallPolicy(native, parse(MULTI)!, target) };
@@ -227,6 +228,22 @@ describe("each target's gateway sends a request its row accepts", () => {
       await gateway.call({ ...RESULT_REQUEST, lane: "story", callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER", preferredResponseFormat: "json_object" });
       expect(Object.hasOwn(JSON.parse(executions[0]!.requestBody), "response_format")).toBe(model === GLM);
     }
+  });
+  it("MiMo takes DEFAULT_ONLY as no level; an effort row still refuses it", async () => {
+    const mimo = previewGateway(MIMO);
+    await mimo.gateway.call({ ...RESULT_REQUEST, thinkingLevel: "DEFAULT_ONLY" });
+    expect(JSON.parse(mimo.executions[0]!.requestBody)).not.toHaveProperty("reasoning_effort");
+    const deepseek = previewGateway(DEEPSEEK);
+    await expect((async () => deepseek.gateway.call({ ...RESULT_REQUEST, thinkingLevel: "DEFAULT_ONLY" }))())
+      .rejects.toMatchObject({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" });
+  });
+  it("the row output cap applies on the preview only", () => {
+    const target = { model: DEEPSEEK };
+    expect(previewTargetGatewayControls(parse(MULTI), target)).toEqual({ maxOutputTokens: 131_072 });
+    expect(previewTargetGatewayControls(parse(LEGACY), { model: GLM })).toEqual({ maxOutputTokens: 163_840 });
+    expect(previewTargetGatewayControls(undefined, target)).toEqual({});
+    expect(providerTargetGatewayControls({ ...targets(PREVIEW_REVIEWED_PROVIDER_REFS)[2]! })).toEqual({ thinking: { parameter: "reasoning_effort", levels: ["high"] }, contextWindowTokens: 1_048_576 });
+    expect(() => previewTargetGatewayControls(parse(MULTI), { model: "other/model" })).toThrow();
   });
   it("the policy refuses a target off the reviewed rows", () => {
     expect(() => withPreviewProviderCallPolicy({ call: async () => { throw new Error("unreachable"); } }, parse(MULTI)!, { model: "other/model" })).toThrow();
@@ -266,4 +283,18 @@ describe("the hosted root-broker rule accepts any reviewed row, exactly", () => 
     ["an unreviewed ref", "preview:fixture-a", { provider_ref: "preview:other" }],
     ["a credential file", "preview:mimo-v2-6-pro", { api_authorization_file: "/root/fixture/api.header" }]
   ])("refuses %s", (_name, ref, change) => { expect(() => gateHostedRoster(broker(ref, change))).toThrow(); });
+});
+
+describe("every register role is a declared target on the preview (boot check)", () => {
+  const declared = targets(PREVIEW_REVIEWED_PROVIDER_REFS);
+  it("accepts roles among the declared refs and ignores everything off the preview", () => {
+    expect(() => assertPreviewRoleTargets(parse(MULTI), declared, ["preview:fixture-a", "preview:fixture-b", "preview:fixture-a", "preview:fixture-b"])).not.toThrow();
+    expect(() => assertPreviewRoleTargets(parse(MULTI), declared, ["preview:fixture-a", "preview:deepseek-v4-1-flash"])).not.toThrow();
+    expect(() => assertPreviewRoleTargets(undefined, [], ["anything"])).not.toThrow();
+  });
+  it("refuses a role on an undeclared ref, or no roles at all", () => {
+    expect(() => assertPreviewRoleTargets(parse(LEGACY), targets(["preview:fixture-a", "preview:fixture-b"]), ["preview:fixture-a", "preview:deepseek-v4-1-flash"]))
+      .toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+    expect(() => assertPreviewRoleTargets(parse(MULTI), declared, [])).toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+  });
 });

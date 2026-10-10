@@ -25,8 +25,14 @@ import {
 } from "@debateai/providers";
 import {
   estimatePreviewGateNeeds,
+  estimateUnfinishedRunHolds,
+  previewGateEstimateCalls,
   previewGateEstimateNanoUsd,
   previewExpectedCalls,
+  PreviewGateUnavailableRefusal,
+  PREVIEW_UNAVAILABLE_RETRY_MS,
+  PREVIEW_UNFINISHED_RUNS_SQL,
+  type PreviewUnfinishedRun,
   nextBucharestMidnight,
   PreviewDailyLimitRefusal,
   type PreviewBudgetGateSettings
@@ -52,17 +58,27 @@ const ASK = Object.freeze({
 /** A two-debater, depth-1 basis as computeStructuralCeilingBasis mints it (2 roots x 3 nodes + 2 exchanges). */
 function basis(panelSize: number): Readonly<Record<string, unknown>> {
   return Object.freeze({
-    kind: "COMPUTED_STRUCTURAL_CEILING", panel_size: panelSize, depth: 1, max_model_attempts: 999,
+    kind: "COMPUTED_STRUCTURAL_CEILING", panel_size: panelSize, depth: 1, max_model_attempts: 120, hold_cap: 2,
     call_sites: { author: 8, panel: 8, reviewer: 8, serve: 6 },
     serve_leg: { synthesis_loop_sites: 6, selected: "SYNTHESIS_LOOP" }
   });
 }
-// 8 + 8 + 8 + 6 debate calls + 4 story calls (2 roles x 2 rounds).
-const EXPECTED_CALLS = 34;
+const PANEL = Object.freeze([
+  { provider_ref: "preview:fixture-a", model_id: GLM },
+  { provider_ref: "preview:deepseek-v4-1-flash", model_id: DEEPSEEK }
+]);
+// One call per site is 2 + 4 + 2 + 8 + 8 + 3 + 3 = 30; the basis's ceiling with repeat attempts is 120.
+// Story: 2 rounds x (storyteller twice + checker) = 6. Pickup health checks: (1 + hold_cap 2) x
+// (2 panel members + fixture-b, the checker, off the panel) = 9. Total 135.
+const EXPECTED_CALLS = 135;
+// With the 15% margin: ceil(155.25) = 156; plus 4 in flight = 160 calls needed.
+const CALLS_NEEDED = 160;
 // DeepSeek is the dearest: 4,000 x 200 + 1,200 x 600 = 1,520,000 nano-USD per call.
-// 34 x 1,520,000 x 115 / 100 = 59,432,000; plus 4 in flight x 131,481,600 (DeepSeek's worst case).
+// 135 x 1,520,000 x 115 / 100 = 235,980,000; plus 4 in flight x 131,481,600 (DeepSeek's worst case).
 const LARGEST = 131_481_600n;
-const ESTIMATE = 59_432_000n + 4n * LARGEST;
+const CALLS_NANO = 235_980_000n;
+const ESTIMATE = CALLS_NANO + 4n * LARGEST;
+const UNAVAILABLE = "ASK_MODEL_CANDIDATE_UNAVAILABLE";
 
 function remainingWith(patch: Partial<PreviewGateRemaining> = {}): PreviewGateRemaining {
   return Object.freeze({
@@ -73,11 +89,15 @@ function remainingWith(patch: Partial<PreviewGateRemaining> = {}): PreviewGateRe
 
 type Counters = { probes: number; remaining: number };
 
-function gateWith(counters: Counters, answer: () => Promise<PreviewGateRemaining>): PreviewBudgetGateSettings {
+function gateWith(counters: Counters, answer: () => Promise<PreviewGateRemaining>,
+  unfinished: readonly PreviewUnfinishedRun[] = []): PreviewBudgetGateSettings {
   return Object.freeze({
     remaining: { deepinfra: async () => { counters.remaining += 1; return answer(); } },
-    roleModelIds: [GLM, DEEPSEEK, GLM, DEEPSEEK],
-    storyCalls: 4
+    roleModelIds: [GLM, GLM, GLM, GLM],
+    roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"],
+    storyCalls: 6,
+    maxCooldownHoldsPerRun: 2,
+    readUnfinishedRuns: async () => unfinished
   });
 }
 
@@ -97,26 +117,40 @@ function settings(counters: Counters, extra: Partial<RunCreationSettings> = {}):
     ...extra
   } as RunCreationSettings;
 }
+const ROLES = { roleModelIds: [GLM, GLM], roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"], storyCalls: 6, maxCooldownHoldsPerRun: 2 };
 
-describe("the start-of-debate estimate (pure)", () => {
-  it("counts every call site, the answer loop and the story, and prices every call at the dearest model", () => {
-    expect(previewExpectedCalls(basis(2), 4)).toBe(EXPECTED_CALLS);
-    const [need] = estimatePreviewGateNeeds({ basis: basis(2), panelModelIds: [GLM, DEEPSEEK], roleModelIds: [GLM, DEEPSEEK], storyCalls: 4 });
-    expect(need).toMatchObject({ gate: "deepinfra", dearestModelId: DEEPSEEK, expectedCalls: EXPECTED_CALLS, callsNanoUsd: 59_432_000n });
+describe("the start-of-debate estimate is an upper bound (pure)", () => {
+  it("counts repeat attempts, the story with its repair, and every pickup health check", () => {
+    expect(previewExpectedCalls({ basis: basis(2), panel: PANEL, ...ROLES })).toEqual({ debate: 120, story: 6, probes: 9, total: EXPECTED_CALLS });
+    const [need] = estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES });
+    expect(need).toMatchObject({ gate: "deepinfra", dearestModelId: DEEPSEEK, expectedCalls: EXPECTED_CALLS, callsWithMargin: 156, callsNanoUsd: CALLS_NANO });
     expect(previewGateEstimateNanoUsd(need!, remainingWith())).toBe(ESTIMATE);
+    expect(previewGateEstimateCalls(need!, remainingWith())).toBe(CALLS_NEEDED);
+  });
+
+  it("each part moves the count: one call per site when the ceiling is lower, the hold cap, off-panel roles, the story", () => {
+    const base = { basis: basis(2), panel: PANEL, ...ROLES };
+    // Sites (30) win over a smaller ceiling.
+    expect(previewExpectedCalls({ ...base, basis: { ...basis(2), max_model_attempts: 10 } }).debate).toBe(30);
+    // The register's hold cap is used when the basis has none.
+    expect(previewExpectedCalls({ ...base, basis: { ...basis(2), hold_cap: undefined }, maxCooldownHoldsPerRun: 4 }).probes).toBe(5 * 3);
+    // A role already on the panel is not probed twice.
+    expect(previewExpectedCalls({ ...base, roleProviderRefs: ["preview:fixture-a", "preview:deepseek-v4-1-flash"] }).probes).toBe(3 * 2);
+    expect(previewExpectedCalls({ ...base, storyCalls: 0 }).total).toBe(EXPECTED_CALLS - 6);
+    expect(() => previewExpectedCalls({ ...base, basis: { panel_size: 2 } })).toThrow("PREVIEW_BASIS_HAS_NO_CALL_COUNT");
   });
 
   it("a role model dearer than the panel sets the price; an unreviewed model is refused", () => {
-    const [need] = estimatePreviewGateNeeds({ basis: basis(2), panelModelIds: [GLM, DEEPSEEK], roleModelIds: [MIMO], storyCalls: 0 });
+    const [need] = estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES, roleModelIds: [MIMO] });
     expect(need!.dearestModelId).toBe(MIMO);
-    expect(() => estimatePreviewGateNeeds({ basis: basis(2), panelModelIds: [GLM], roleModelIds: ["other/model"], storyCalls: 0 })).toThrow();
+    expect(() => estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES, roleModelIds: ["other/model"] })).toThrow();
   });
 
-  it("falls back to max_model_attempts for a basis with no call-site split", () => {
-    // 1 call of GLM: 4,000 x 150 + 1,200 x 500 = 1,200,000; x 1.15 = 1,380,000.
-    const one = { panel_size: 1, max_model_attempts: 1 };
-    const [need] = estimatePreviewGateNeeds({ basis: one, panelModelIds: [GLM], roleModelIds: [], storyCalls: 0 });
-    expect(need!.callsNanoUsd).toBe(1_380_000n);
+  it("an unfinished debate holds its whole estimate; an older model off the rows is priced at the dearest row", () => {
+    const [hold] = estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL }, ROLES);
+    expect(hold).toMatchObject({ gate: "deepinfra", callsWithMargin: 156, callsNanoUsd: CALLS_NANO });
+    const [old] = estimateUnfinishedRunHolds({ basis: basis(2), panel: [{ provider_ref: "preview:other", model_id: "old/model" }] }, ROLES);
+    expect(old!.dearestModelId).toBe(MIMO);
   });
 });
 
@@ -128,44 +162,69 @@ describe("evaluateAskAdmission on the preview asks the gate before any run exist
     expect(counters).toEqual({ probes: 1, remaining: 1 });
   });
 
-  it("admits at exactly the estimate and refuses one nano-USD below it", async () => {
+  it("admits at exactly the estimate and refuses one nano-USD or one call below it with the daily code", async () => {
     const counters = { probes: 0, remaining: 0 };
     await expect(evaluateAskAdmission(settings(counters, {
-      previewBudgetGate: gateWith(counters, async () => remainingWith({ remainingNanoUsd: ESTIMATE }))
+      previewBudgetGate: gateWith(counters, async () => remainingWith({ remainingNanoUsd: ESTIMATE, remainingCalls: CALLS_NEEDED }))
     }), ASK)).resolves.toBeDefined();
     await expect(evaluateAskAdmission(settings(counters, {
       previewBudgetGate: gateWith(counters, async () => remainingWith({ remainingNanoUsd: ESTIMATE - 1n }))
     }), ASK)).rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
+    await expect(evaluateAskAdmission(settings(counters, {
+      previewBudgetGate: gateWith(counters, async () => remainingWith({ remainingCalls: CALLS_NEEDED - 1 }))
+    }), ASK)).rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
+  });
+
+  it("debates still running hold their estimate: a pot that fits one debate refuses the second", async () => {
+    const counters = { probes: 0, remaining: 0 };
+    const pot = remainingWith({ remainingNanoUsd: ESTIMATE + CALLS_NANO - 1n });
+    const running = [{ basis: basis(2), panel: PANEL }];
+    await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => pot) }), ASK)).resolves.toBeDefined();
+    await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => pot, running) }), ASK))
+      .rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
+    // The calls held count too.
+    const calls = remainingWith({ remainingCalls: CALLS_NEEDED + 155 });
+    await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => calls, running) }), ASK))
+      .rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
   });
 
   it.each([
     ["the gate is halted", { state: "halted" as const }],
     ["the gate is only initialized", { state: "initialized" as const }],
     ["the gate's window is closed", { windowOpen: false }],
-    ["too few calls are left", { remainingCalls: EXPECTED_CALLS - 1 }],
     ["a panel model is not enabled", { enabledModels: [GLM] }],
     ["nothing is enabled", { enabledModels: [] }]
-  ])("refuses with the daily code when %s", async (_name, patch) => {
+  ])("refuses as not available right now (not the daily limit) when %s", async (_name, patch) => {
     const counters = { probes: 0, remaining: 0 };
     await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => remainingWith(patch)) }), ASK))
-      .rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
+      .rejects.toMatchObject({ name: "AskRefusal", code: UNAVAILABLE });
     expect(counters).toEqual({ probes: 1, remaining: 1 });
   });
 
-  it("refuses when a role model (the answer checker) is not enabled, though the panel is", async () => {
+  it("refuses as not available when a role model (the answer checker) is not enabled, though the panel is", async () => {
     const counters = { probes: 0, remaining: 0 };
     const gate = { ...gateWith(counters, async () => remainingWith({ enabledModels: [GLM, DEEPSEEK] })), roleModelIds: [GLM, MIMO] };
     await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gate }), ASK))
-      .rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
+      .rejects.toMatchObject({ name: "AskRefusal", code: UNAVAILABLE });
   });
 
-  it("refuses when the gate cannot be asked, and when no gate port was built (fail closed)", async () => {
+  it("refuses as not available when the gate cannot be asked, the running debates cannot be read, or no settings were built", async () => {
     const counters = { probes: 0, remaining: 0 };
     await expect(evaluateAskAdmission(settings(counters, {
       previewBudgetGate: gateWith(counters, async () => { throw new Error("socket gone"); })
-    }), ASK)).rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
+    }), ASK)).rejects.toMatchObject({ name: "AskRefusal", code: UNAVAILABLE });
+    await expect(evaluateAskAdmission(settings(counters, {
+      previewBudgetGate: { ...gateWith(counters, async () => remainingWith()), readUnfinishedRuns: async () => { throw new Error("db gone"); } }
+    }), ASK)).rejects.toMatchObject({ name: "AskRefusal", code: UNAVAILABLE });
     await expect(evaluateAskAdmission(settings(counters), ASK))
-      .rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
+      .rejects.toMatchObject({ name: "AskRefusal", code: UNAVAILABLE });
+  });
+
+  it("the not-available refusal asks for a retry in about a minute", () => {
+    const now = new Date("2026-10-10T10:00:00.000Z");
+    const refusal = new AskRefusal(new PreviewGateUnavailableRefusal(new Date(now.getTime() + PREVIEW_UNAVAILABLE_RETRY_MS)));
+    expect(askRefusalRetryAfter(refusal.code, now, refusal.retryAt)).toBe("Sat, 10 Oct 2026 10:01:00 GMT");
+    expect(refusal.message).not.toMatch(/gate|nano|USD|halted/u);
   });
 
   it("off the preview the gate is never asked, even when a port is present", async () => {
@@ -205,6 +264,39 @@ describe("the real submit and the HTTP boundary", () => {
       .rejects.toBeInstanceOf(TypeError);
     // Discovery is the only model call either ask made.
     expect(counters).toEqual({ probes: 2, remaining: 2 });
+  });
+
+  it("answers 422 with the not-available code, a fixed plain message and a one-minute Retry-After when the gate is halted", async () => {
+    const counters = { probes: 0, remaining: 0 };
+    const that = self({ previewBudgetGate: gateWith(counters, async () => remainingWith({ state: "halted" })) }, counters);
+    const application = new Proxy({}, {
+      get: (_target, property) => property === "submit"
+        ? async (askRequest: AskRequest, session: never, p: never) => PostgresAskApplication.prototype.submit.call(that as never, askRequest, session, p)
+        : async () => null
+    }) as AskApplication;
+    const api = buildApi({
+      previewProviderTestConfig: PREVIEW, previewTeamUserIds: [member.authenticated.userId],
+      application, sessions: testSessionApplication([member]), allowedOrigin: TEST_APP_ORIGIN
+    });
+    try {
+      const before = Date.now();
+      const response = await api.inject({ method: "POST", url: "/v1/asks", headers: testSessionHeaders(member, true), payload: ASK });
+      expect(response.statusCode).toBe(422);
+      expect(response.json()).toMatchObject({ error: UNAVAILABLE });
+      expect(JSON.stringify(response.json())).not.toMatch(/halted|gate|nano/u);
+      const retryAt = Date.parse(String(response.headers["retry-after"]));
+      expect(retryAt - before).toBeGreaterThan(50_000);
+      expect(retryAt - before).toBeLessThan(70_000);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("reads unfinished debates as runs with a READY or CLAIMED job and no FAILED one, bounded", () => {
+    expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/work\.state IN \('READY', 'CLAIMED'\)/u);
+    expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/NOT EXISTS[\s\S]*work\.state = 'FAILED'/u);
+    expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/SELECT run\.envelope_basis, run\.discovered_panel/u);
+    expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/LIMIT 65$/u);
   });
 
   it("answers 429 DAILY_COST_ENVELOPE_REACHED with a Retry-After and no figures", async () => {

@@ -1,4 +1,4 @@
-import { assertPreviewProviderTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
 import { readModelScorecard, readEngineVersion } from "@debateai/register";
 import { readPreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { PasswordResetService } from "./password-reset.js";
@@ -492,8 +492,12 @@ if (previewConfig !== undefined) {
 }
 const previewFetch = previewConfig === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewConfig));
 // Contract A §5: the preview's start-of-debate estimate asks the gate what is left today (read-only).
-const previewBudgetGate = previewConfig === undefined ? undefined : await boot.run("preview-budget-gate",
-  () => readPreviewBudgetGateSettings(pool, environment.REGISTER_VERSION, previewConfig));
+const previewBudgetGate = previewConfig === undefined ? undefined : await boot.run("preview-budget-gate", async () => {
+  const settings = await readPreviewBudgetGateSettings(pool, environment.REGISTER_VERSION, previewConfig);
+  // Every role the register names must be a declared target, or its debates would fail at claim.
+  assertPreviewRoleTargets(previewConfig, declaredProviderTargets, settings.roleProviderRefs);
+  return settings;
+});
 const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
   resolveProviderTargetCredentials(declaredProviderTargets, readCustodyAuthorizationHeader));
 const resolveProviderPanel = createProviderDiscoveryResolver({

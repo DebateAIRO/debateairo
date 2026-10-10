@@ -15,14 +15,14 @@ import {
   OpenAICompatibleProviderGateway, PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_MODEL_ROWS, PREVIEW_MODEL_ROWS_BY_PROVIDER,
   PREVIEW_REVIEWED_PROVIDER_REFS, assertPreviewProviderTargets, createPreviewBudgetRpcPorts, createPreviewGuardedFetch,
   observeProviderTarget, parsePreviewProviderTestConfig, parseProviderDiscoveryTargets, previewModelRow, previewNanoUsdText,
-  previewProbeControls, previewProviderSocket, previewRefsAreReviewedSet, previewReservationNanoUsd, previewTargetJsonRow,
+  previewProbeControls, previewProviderSocket, previewTargetGatewayControls, previewRefsAreReviewedSet, previewReservationNanoUsd, previewTargetJsonRow,
   providerTargetGatewayControls, withPreviewProviderCallPolicy,
   type PreviewBudgetExecution, type PreviewBudgetPort, type PreviewGateRemaining, type PreviewProviderTestConfig,
   type ProviderCallRequest, type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import { anthropicMessagesRequestBody } from "../../packages/providers/src/anthropic-messages.js";
 import {
-  assertPreviewBudgetAdmits, estimatePreviewGateNeeds, previewGateKeyOf, previewRemainingPorts,
+  assertPreviewBudgetAdmits, estimatePreviewGateNeeds, estimateUnfinishedRunHolds, previewGateKeyOf, previewRemainingPorts,
   type PreviewBudgetGateSettings
 } from "../../apps/api/src/preview-budget-estimate.js";
 import { gateHostedRoster } from "../../apps/runner/src/hosted-provider-set.js";
@@ -298,48 +298,70 @@ describe("each gate's IPC goes to its own socket", () => {
   });
 });
 
-describe("the estimate asks every gate the debate uses (never stop half-way)", () => {
-  // The same depth-1 basis the estimate's own tests use (34 calls with 4 story calls); the gate split is what matters here.
-  const basis = Object.freeze({ kind: "COMPUTED_STRUCTURAL_CEILING", panel_size: 2, depth: 1, max_model_attempts: 999,
+describe("the estimate asks every gate the debate uses, unfinished debates included (never stop half-way)", () => {
+  // Sites 8 + 8 + 8 + 6 = 30 = the ceiling; with 4 story calls and no hold cap: probes = 3 panel + 1 off-panel role.
+  const basis = Object.freeze({ kind: "COMPUTED_STRUCTURAL_CEILING", panel_size: 3, depth: 1, max_model_attempts: 30,
     call_sites: { author: 8, panel: 8, reviewer: 8, serve: 6 }, serve_leg: { synthesis_loop_sites: 6, selected: "SYNTHESIS_LOOP" } });
+  const PANEL = Object.freeze([{ provider_ref: "preview:fixture-a", model_id: GLM }, { provider_ref: "preview:deepseek-v4-1-flash", model_id: DEEPSEEK },
+    { provider_ref: HAIKU_REF, model_id: HAIKU }]);
+  const DEEPINFRA_PANEL = Object.freeze(PANEL.slice(0, 2));
   const answer = (models: string[], change: Partial<PreviewGateRemaining> = {}): PreviewGateRemaining => Object.freeze({
-    state: "active", windowOpen: true, remainingNanoUsd: 1_000_000_000n, remainingCalls: 400, maxConcurrentCalls: 4,
+    state: "active", windowOpen: true, remainingNanoUsd: 1_000_000_000n, remainingCalls: 400, maxConcurrentCalls: 2,
     largestReservationNanoUsd: 247_040_000n, enabledModels: models, ...change });
-  const settings = (remaining: PreviewBudgetGateSettings["remaining"], roleModelIds = [GLM, DEEPSEEK]): PreviewBudgetGateSettings =>
-    Object.freeze({ remaining, roleModelIds, storyCalls: 4 });
+  const settings = (remaining: PreviewBudgetGateSettings["remaining"], change: Partial<PreviewBudgetGateSettings> = {}): PreviewBudgetGateSettings =>
+    Object.freeze({ remaining, roleModelIds: [GLM, GLM], roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"], storyCalls: 4,
+      maxCooldownHoldsPerRun: 0, readUnfinishedRuns: async () => [], ...change });
+  const deepinfra = async () => answer([GLM, DEEPSEEK], { remainingNanoUsd: 3_000_000_000n, remainingCalls: 1200, maxConcurrentCalls: 4,
+    largestReservationNanoUsd: 131_481_600n });
   it("maps Haiku to the Anthropic gate and splits a three-maker panel over both gates", () => {
     expect(previewGateKeyOf(HAIKU)).toBe("anthropic");
     expect(previewGateKeyOf(GLM)).toBe("deepinfra");
-    const needs = estimatePreviewGateNeeds({ basis, panelModelIds: [GLM, DEEPSEEK, HAIKU], roleModelIds: [GLM, DEEPSEEK], storyCalls: 4 });
+    const needs = estimatePreviewGateNeeds({ basis, panel: PANEL, roleModelIds: [GLM, GLM], roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"],
+      storyCalls: 4, maxCooldownHoldsPerRun: 0 });
     expect(needs.map(need => [need.gate, need.modelIds])).toEqual([["deepinfra", [GLM, DEEPSEEK]], ["anthropic", [HAIKU]]]);
-    // 34 expected calls x (4,000 x 625 + 1,200 x 2,500) nano-USD x 1.15, rounded up.
-    expect(needs[1]!.expectedCalls).toBe(34);
-    expect(needs[1]!.callsNanoUsd).toBe((34n * 5_500_000n * 115n + 99n) / 100n);
+    // 30 + 4 + 4 = 38 calls; x 1.15 = 44 calls; 38 x (4,000 x 625 + 1,200 x 2,500) nano-USD x 1.15 = $0.24035.
+    expect([needs[1]!.expectedCalls, needs[1]!.callsWithMargin, needs[1]!.callsNanoUsd]).toEqual([38, 44, 240_350_000n]);
   });
   it("admits a three-maker debate only when both gates answer and fit", async () => {
-    const deepinfra = async () => answer([GLM, DEEPSEEK], { remainingNanoUsd: 3_000_000_000n, largestReservationNanoUsd: 131_481_600n });
-    const panel = { basis, panelModelIds: [GLM, DEEPSEEK, HAIKU] };
-    // Two Haiku calls in flight at most: 34 calls (0.21505) + 2 x 0.24704 held = $0.70913 fits a fresh $1.00 pot.
-    const anthropic = async () => answer([HAIKU], { maxConcurrentCalls: 2 });
-    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic }), panel)).resolves.toBeUndefined();
-    // Open question for the owner: with 4 in flight (the first proposed GO), 4 x 0.24704 = 0.98816 is held
-    // for calls in flight alone, so even a fresh $1.00 pot cannot carry one Haiku debate ($1.20321).
-    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU]) }), panel))
-      .rejects.toMatchObject({ message: expect.stringContaining("the debate needs 1203210000") });
-    await expect(assertPreviewBudgetAdmits(settings({ deepinfra }), panel)).rejects.toMatchObject({ code: "DAILY_COST_ENVELOPE_REACHED",
-      message: expect.stringContaining("no remaining port for gate anthropic") });
-    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([], { maxConcurrentCalls: 2 }) }), panel))
-      .rejects.toMatchObject({ message: expect.stringContaining(`gate does not serve ${HAIKU}`) });
-    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU], { maxConcurrentCalls: 2, remainingNanoUsd: 700_000_000n }) }), panel))
+    const panel = { basis, panel: PANEL };
+    // $0.24035 for the calls + 2 in flight x $0.24704 = $0.73443: a fresh $1.00 pot carries it.
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU]) }), panel)).resolves.toBeUndefined();
+    // With 4 in flight (the first proposed GO), the holds alone are $0.98816: no Haiku debate could start.
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU], { maxConcurrentCalls: 4 }) }), panel))
+      .rejects.toMatchObject({ code: "DAILY_COST_ENVELOPE_REACHED" });
+    // No Anthropic gate configured, or Haiku not switched on there: "not available right now".
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra }), panel)).rejects.toMatchObject({ code: "ASK_MODEL_CANDIDATE_UNAVAILABLE" });
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([]) }), panel))
+      .rejects.toMatchObject({ code: "ASK_MODEL_CANDIDATE_UNAVAILABLE" });
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU], { remainingNanoUsd: 700_000_000n }) }), panel))
       .rejects.toMatchObject({ code: "DAILY_COST_ENVELOPE_REACHED" });
     // A role model on Haiku needs the Anthropic gate even when the panel does not use it.
-    await expect(assertPreviewBudgetAdmits(settings({ deepinfra }, [GLM, HAIKU]), { basis, panelModelIds: [GLM, DEEPSEEK] }))
-      .rejects.toMatchObject({ message: expect.stringContaining("no remaining port for gate anthropic") });
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra }, { roleModelIds: [GLM, HAIKU], roleProviderRefs: ["preview:fixture-a", HAIKU_REF] }),
+      { basis, panel: DEEPINFRA_PANEL })).rejects.toMatchObject({ code: "ASK_MODEL_CANDIDATE_UNAVAILABLE" });
     // A DeepInfra-only debate never asks the Anthropic gate.
     let asked = 0;
     await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => { asked += 1; return answer([HAIKU]); } }),
-      { basis, panelModelIds: [GLM, DEEPSEEK] })).resolves.toBeUndefined();
+      { basis, panel: DEEPINFRA_PANEL })).resolves.toBeUndefined();
     expect(asked).toBe(0);
+  });
+  it("an unfinished Haiku debate is held on the Anthropic gate, not on DeepInfra's", async () => {
+    const unfinished = [{ basis, panel: PANEL }];
+    const held = estimateUnfinishedRunHolds(unfinished[0]!, settings({}));
+    expect(held.map(hold => hold.gate)).toEqual(["deepinfra", "anthropic"]);
+    expect(held[1]!.callsNanoUsd).toBe(240_350_000n);
+    const panel = { basis, panel: PANEL };
+    // One unfinished Haiku debate holds $0.24035: $0.24035 + $0.24035 + $0.49408 = $0.97478 still fits $1.00 ...
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU]) },
+      { readUnfinishedRuns: async () => unfinished }), panel)).resolves.toBeUndefined();
+    // ... two do not ($1.21513).
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU]) },
+      { readUnfinishedRuns: async () => [...unfinished, ...unfinished] }), panel)).rejects.toMatchObject({ code: "DAILY_COST_ENVELOPE_REACHED" });
+    // An unfinished DeepInfra-only debate holds nothing on the Anthropic gate.
+    const deepinfraOnly = estimateUnfinishedRunHolds({ basis, panel: DEEPINFRA_PANEL }, settings({}));
+    expect(deepinfraOnly.map(hold => hold.gate)).toEqual(["deepinfra"]);
+    // An older run naming a model off the reviewed rows is held on DeepInfra, never on Anthropic.
+    const older = estimateUnfinishedRunHolds({ basis, panel: [{ provider_ref: "preview:old", model_id: "retired/model" }] }, settings({}));
+    expect(older.map(hold => hold.gate)).toEqual(["deepinfra"]);
   });
 });
 
@@ -360,11 +382,13 @@ describe("Haiku's gateway, through the guarded fetch, sends the wire contract's 
       sent.push({ url: String(input), headers: Object.fromEntries(new Headers(init?.headers).entries()) });
       return guarded(input, init);
     };
+    const config = parse(THREE_MAKERS)!;
+    // The runner's preview wiring: the row's bound (previewTargetGatewayControls) caps max_tokens.
     const native = new OpenAICompatibleProviderGateway({ endpoint: target.baseUrl, model: target.model, maker: target.maker,
-      ...providerTargetGatewayControls(target), fetchImplementation,
+      ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(config, target), fetchImplementation,
       persistRawArtifact: async artifact => artifact.artifactId, appendLedgerEntry: async entry => entry.attemptId,
       assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined });
-    const gateway = withPreviewProviderCallPolicy(native, parse(THREE_MAKERS)!, target);
+    const gateway = withPreviewProviderCallPolicy(native, config, target);
     await gateway.call(REQUEST);
     expect(sent[0]!.url).toBe(PREVIEW_ANTHROPIC_MESSAGES_URL);
     expect(Object.keys(sent[0]!.headers)).not.toContain("x-api-key");
