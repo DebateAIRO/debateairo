@@ -48,7 +48,7 @@ export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
  * of every reservation). No call the app makes asks for more than 24,000 today (debate calls and health
  * checks 8,192, the storyteller 12,000 then 24,000 on its retry).
  */
-export const PREVIEW_ANSWER_CAP_TOKENS = 32_768;
+const PREVIEW_ANSWER_CAP_TOKENS = 32_768;
 /** Template allowance added to the body's bytes on the input side of a reservation (contract A §3). */
 const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 

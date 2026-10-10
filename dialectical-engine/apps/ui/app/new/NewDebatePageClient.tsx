@@ -5,7 +5,7 @@ import { AiNotice } from "@/components/AiNotice";
 
 import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, expansionDepthMaxFor } from "@debateai/contract";
 import { createDebate, contractClient } from "@/lib/api";
 import { modelDot } from "@/lib/models";
 import { SCRUTINY_DEPTHS, ScrutinyDepth } from "@/lib/scrutinyDepth";
@@ -28,7 +28,7 @@ import {
   planCardNamesRoster,
   type ScorecardSignal
 } from "@/lib/modelStrength";
-import { previewDepthMax, previewPlanRoster } from "@/lib/previewPlanRoster";
+import { previewPlanRoster } from "@/lib/previewPlanRoster";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
   buildNewDebateAskConfig,
@@ -43,8 +43,9 @@ import billingEnglish from "@/messages/en/billing.json";
 
 // NEXT_PUBLIC is intentionally a direct reference so Next inlines this public build flag.
 const displayPlanTierRosters = previewPlanRoster(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON, PLAN_TIER_ROSTERS);
-// Owner ruling 2026-10-10: the private preview offers depth 1 to 3 for now; hosted builds keep 1 to 5.
-const depthMax = previewDepthMax(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON, EXPANSION_DEPTH_MAX);
+// Owner ruling 2026-10-10: a preview build (its public model-list flag is set) offers a shallower ceiling,
+// declared beside the depth bound in @debateai/contract; hosted builds keep the whole range.
+const depthMax = expansionDepthMaxFor(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON !== undefined);
 
 type AdaptiveDepthMode = "fixed" | "manual" | "recommended" | "adaptive";
 
@@ -422,7 +423,8 @@ function NewDebateForm({
               label={t(catalog, "newDebate.treeDepth")}
               hint={t(catalog, "newDebate.treeDepthHint")}
               min={EXPANSION_DEPTH_MIN}
-              max={depthMax}
+              max={EXPANSION_DEPTH_MAX}
+              limit={depthMax}
               value={depth}
               disabled={planTier === "free"}
               onChange={setDepth}
@@ -677,7 +679,8 @@ function SliderRow({
   label,
   hint,
   min,
-  max,
+  max: rangeMax,
+  limit,
   step = 1,
   value,
   disabled = false,
@@ -688,11 +691,14 @@ function SliderRow({
   hint: string;
   min: number;
   max: number;
+  /** A deployment's narrower ceiling inside [min, max] (the preview's depth). */
+  limit?: number;
   step?: number;
   value: number;
   disabled?: boolean;
   onChange: (value: number) => void;
 }) {
+  const max = limit === undefined ? rangeMax : Math.min(rangeMax, limit);
   const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
   return (
     <div className="ndRow ndRowSlider">

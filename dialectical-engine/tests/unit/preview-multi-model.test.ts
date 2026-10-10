@@ -10,7 +10,7 @@ import {
   createPreviewGuardedFetch, observeProviderTarget, parsePreviewProviderTestConfig, parseProviderDiscoveryTargets,
   previewModelRow, previewNanoUsdText, previewPlanTierRosters, previewProbeControls, previewReservationNanoUsd,
   previewTargetJsonRow, providerTargetGatewayControls, withPreviewProviderCallPolicy, previewTargetGatewayControls,
-  assertPreviewRoleTargets, PREVIEW_ANSWER_CAP_TOKENS, PREVIEW_REQUEST_BODY_MAX_BYTES,
+  assertPreviewRoleTargets, PREVIEW_REQUEST_BODY_MAX_BYTES,
   type PreviewBudgetExecution, type ProviderCallRequest, type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
@@ -79,7 +79,7 @@ describe("the reviewed rows equal the shared parity file (contract A §1, §3)",
     expect(fixtureRows.map(row => row.worst_case_reservation_usd)).toEqual(["0.056012800", "0.072499200", "0.142110720", "0.042371072"]);
   });
   it("owner ruling 2026-10-10: every row's answer cap is 32,768 tokens and every request body is capped at 256 KiB", () => {
-    expect(PREVIEW_ANSWER_CAP_TOKENS).toBe(32_768);
+
     expect(PREVIEW_REQUEST_BODY_MAX_BYTES).toBe(262_144);
     for (const row of PREVIEW_MODEL_ROWS) {
       expect(row.outputBound).toBe(32_768);

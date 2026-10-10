@@ -30,7 +30,7 @@
  * Each row maps to its gate by `previewGateKeyOf`; a later per-provider socket map adds keys there
  * and one port per key in `PreviewBudgetGateSettings.remaining`, without changing the estimate.
  */
-import { TypedDomainError } from "@debateai/kernel";
+import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import {
   createPreviewRemainingRpcPort,
   lengthRetryTokenCeiling,
@@ -127,9 +127,9 @@ export const PREVIEW_ESTIMATE_DEFAULT_OUTPUT_TOKENS = 1_200n;
  * that kind by that model within the window. 20 keeps one unusually long or short call from moving
  * the average much (one outlier shifts it by at most 1/20), and is reached after a few debates.
  */
-export const PREVIEW_CALIBRATION_MIN_SAMPLES = 20;
+const PREVIEW_CALIBRATION_MIN_SAMPLES = 20;
 /** Only calls recorded within this many days count: older calls ran on older prompts. */
-export const PREVIEW_CALIBRATION_WINDOW_DAYS = 14;
+const PREVIEW_CALIBRATION_WINDOW_DAYS = 14;
 /**
  * The strict upper bound's input side (STRICT_BOUND mode only, 6f62b6ba3): no per-call-type cap on a
  * prompt's size exists in the engine's code, so the one hard ceiling is the guarded fetch's: a body
@@ -145,7 +145,7 @@ export const PREVIEW_STRICT_PROBE_INPUT_TOKENS = previewChargedInputTokens(PREVI
  * Japanese or Korean); this is the estimate only, the gate's own reservation keeps one byte = one token.
  * The gate's 2,048 template allowance is added to the bytes first.
  */
-export const PREVIEW_ESTIMATE_BYTES_PER_TOKEN = 3;
+const PREVIEW_ESTIMATE_BYTES_PER_TOKEN = 3;
 export function previewEstimateInputTokens(requestBytes: number): bigint {
   const perToken = BigInt(PREVIEW_ESTIMATE_BYTES_PER_TOKEN);
   return (previewChargedInputTokens(requestBytes) + perToken - 1n) / perToken;
@@ -155,7 +155,7 @@ export function previewEstimateInputTokens(requestBytes: number): bigint {
  * = 22,528 tokens. The largest ordinary request seen on the preview was about 51 KB; the hard cap the
  * guarded fetch and the gate enforce is 256 KiB.
  */
-export const PREVIEW_REALISTIC_INPUT_BYTES = 64 * 1024;
+const PREVIEW_REALISTIC_INPUT_BYTES = 64 * 1024;
 export const PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL = previewEstimateInputTokens(PREVIEW_REALISTIC_INPUT_BYTES);
 /** The ask's story size (composition_budget_tier): how much debate material the verdict story may read. */
 export type PreviewStoryTier = "low" | "medium" | "high";
@@ -361,6 +361,7 @@ export function previewEstimatePricer(context: Readonly<{ measured: PreviewMeasu
     case "REALISTIC_WORST_CASE": return realisticWorstCasePricer(context.callOutputTokens, context.storyTier);
     case "CALIBRATED_ESTIMATE": return calibratedEstimatePricer(context.measured);
     case "STRICT_BOUND": return strictUpperBoundPricer(context.callOutputTokens);
+    default: return exhaustive(mode);
   }
 }
 /**
