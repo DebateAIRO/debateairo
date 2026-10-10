@@ -224,7 +224,7 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
       .toBeLessThan(initializer.indexOf("const commitAcknowledgedAt = new Date()"));
 
     const compatibilitySchedule = compatibilityTest.slice(
-      compatibilityTest.indexOf('it("upgrades exact historical v1/v4 bytes'),
+      compatibilityTest.indexOf('it("keeps exact historical v1/v4 bytes'),
       compatibilityTest.indexOf('it("accepts legacy 755')
     );
     const developmentSchedule = developmentTest.slice(
