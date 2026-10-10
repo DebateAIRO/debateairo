@@ -214,6 +214,24 @@ def redact(value, key, patterns=()):
     return value
 
 
+# Any of these keys anywhere in a reply means it may have been billed (ruling 5 refuses to call it unsent).
+BILLED_KEYS = ('usage', 'choices', 'estimated_cost', 'cost', 'inference_status')
+
+
+def names_any_key_prefixed(value, prefix):
+    """Whether any object at any depth of a parsed JSON value has a key starting with prefix."""
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            if any(isinstance(key, str) and key.startswith(prefix) for key in item):
+                return True
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            stack.extend(item)
+    return False
+
+
 def names_any_key(value, names):
     """Whether any object at any depth of a parsed JSON value has one of these keys."""
     stack = [value]
@@ -329,11 +347,12 @@ class DeepInfraProfile:
 
     def unbilled_refusal(self, status, response):
         """True only for a refusal that provably billed nothing (owner ruling 5, 2026-10-10): HTTP
-        429, a JSON object with an error field, and no usage, choices or estimated_cost key at any
-        depth. The gate then releases the hold as for a call never sent (it counts toward the
+        429, a JSON object with an error field, and no usage, choices, cost, estimated_cost,
+        inference_status (DeepInfra's native cost block) or tokens_* key at any depth. The gate then releases the hold as for a call never sent (it counts toward the
         unsent streak). Anything else is accounted (and halts) as before."""
         return (status == 429 and isinstance(response, dict) and bool(response.get('error'))
-                and not names_any_key(response, ('usage', 'choices', 'estimated_cost')))
+                and not names_any_key(response, BILLED_KEYS)
+                and not names_any_key_prefixed(response, 'tokens_'))
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),

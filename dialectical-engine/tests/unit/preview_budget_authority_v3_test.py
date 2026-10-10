@@ -687,6 +687,12 @@ class UnbilledRefusalTests(GateTest):
                                     ('429_empty_error', 429, {'error': ''}),
                                     ('429_with_choices', 429, {**self.RATE_LIMITED, 'choices': []}),
                                     ('429_nested_cost', 429, nested_cost),
+                                    # Review 2026-10-10: DeepInfra's native cost block and token counts.
+                                    ('429_inference_status', 429, {**self.RATE_LIMITED, 'inference_status': {'cost': 0.0001}}),
+                                    ('429_cost', 429, {**self.RATE_LIMITED, 'cost': 0}),
+                                    ('429_tokens_generated', 429, {**self.RATE_LIMITED, 'meta': {'tokens_generated': 3}}),
+                                    # Judged on the raw reply: redaction would drop this 'headers' subtree.
+                                    ('429_usage_under_redacted_key', 429, {**self.RATE_LIMITED, 'headers': {'usage': {'prompt_tokens': 1}}}),
                                     ('429_not_json', 429, {'_invalid_json': True}),
                                     ('529_without_usage', 529, dict(self.RATE_LIMITED))):
             with self.subTest(name):
@@ -703,6 +709,22 @@ class UnbilledRefusalTests(GateTest):
                 self.refused('NEW_CHARGE_UNCERTAIN'):
             gate.call('op-1', dispatch=lambda _s, _k: (429, dict(self.RATE_LIMITED)))
         self.assertEqual(gate.status()['reason'], 'uncertain_charge')
+
+
+class RemainingProbeWindowTests(GateTest):
+    """Review 2026-10-10: a probe id in flight makes the next reservation wait or halt, so /remaining
+    says the window is shut and the app starts no debate into it."""
+
+    def test_a_probe_id_in_flight_shuts_the_window(self):
+        gate = self.gate().ready()
+        report = bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, slots=gate.slots, now=gate.clock)
+        self.assertTrue(report['window_open'])
+        with bridge.TeamStore(gate.private) as store:
+            control = store.control()
+            control['in_flight'][bridge.PROBE_ENTRY_PREFIX + 'x'] = '2026-10-08'
+            store.save_control(control)
+        report = bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, slots=gate.slots, now=gate.clock)
+        self.assertFalse(report['window_open'])
 
 
 class DatedVendorProfile(FakeVendorProfile):
