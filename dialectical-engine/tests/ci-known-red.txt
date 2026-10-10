@@ -187,13 +187,6 @@ tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded number
 # else BY DESIGN (packages/db/src/migration-lineage.ts identifyLineage; tests/integration/auth-dev-lineage.test.ts
 # asserts that refusal). Those upgrade paths no longer exist in production, so the tests are stale. Fix: run the
 # migration's own SQL inside a rolled-back transaction on a fresh database, or retire the upgrade-from-old-state part.
-tests/integration/obs-agent-dl7-f9-threshold-operator.test.ts > DL7-F9: the daemon can no longer re-rule its own monitor > applies 0071 replay-safely and refuses to finish while the daemon can still INSERT
-#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
-#   tests/ci-integration-all.txt; the same
-#   message file by file on dev@c8cf8e063 the same day).
-#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0071 ledger row (line 65) and calls
-#   migrate() to replay 0071 (see above).
-#   blinds: the rest of the test: 0071's replay-safety and its refusal while the daemon can still INSERT.
 tests/integration/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION database contract > preserves legacy algorithm version 5 while allocating and replaying the new development receipt
 #   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
 #   tests/ci-integration-all.txt; the same
