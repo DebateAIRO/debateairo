@@ -60,18 +60,18 @@ describe('production preview spending guard optional JSON mode', () => {
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
     expect(result.stderr).toContain('Ran 27 tests');
-    expect(result.stderr).toContain('OK');
+    expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the Anthropic gate systemd files and its address check offline', () => {
     const result = runPython('tests/unit/preview_gate_v3_anthropic_unit_test.py', 10000);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stderr).toContain('Ran 13 tests');
-    expect(result.stderr).toContain('OK');
+    expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the guided key command shared by all provider gates offline (fake terminal, no real key)', () => {
     const result = runPython('tests/unit/preview_key_test.py', 20000);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stderr).toContain('Ran 15 tests');
-    expect(result.stderr).toContain('OK');
+    expect(summaryLine(result.stderr)).toBe('OK');
   });
 });

@@ -526,8 +526,9 @@ class AnthropicProfile:
     def unbilled_refusal(self, status, response):
         """True only for Anthropic's own "slow down" answers (owner ruling 5, 2026-10-10): HTTP 429
         or 529, a body of exactly type "error", error (and an optional request_id string), an
-        error type of rate_limit_error or overloaded_error, and no usage, content or model key at
-        any depth. Anything else is accounted (and halts) as before."""
+        error type of rate_limit_error or overloaded_error, and no usage, content or model key, no
+        other billed key (BILLED_KEYS) and no tokens_* key at any depth. The core passes the RAW
+        reply (before redaction drops any subtree). Anything else is accounted (and halts) as before."""
         if status not in (429, 529) or not isinstance(response, dict):
             return False
         if set(response) not in ({'type', 'error'}, {'type', 'error', 'request_id'}):
@@ -536,7 +537,8 @@ class AnthropicProfile:
         return (response['type'] == 'error' and isinstance(error, dict)
                 and error.get('type') in ('rate_limit_error', 'overloaded_error')
                 and isinstance(response.get('request_id', ''), str)
-                and not names_any_key(response, ('usage', 'content', 'model')))
+                and not names_any_key(response, BILLED_KEYS + ('content', 'model'))
+                and not names_any_key_prefixed(response, 'tokens_'))
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),

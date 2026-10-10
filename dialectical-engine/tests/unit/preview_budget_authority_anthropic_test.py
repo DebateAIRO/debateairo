@@ -449,6 +449,11 @@ class UnbilledAndUnsentTests(AnthropicTest):
             '429_extra_top_key': (429, {**self.RATE, 'detail': 'slow down'}),
             '429_request_id_number': (429, {**self.RATE, 'request_id': 7}),
             '429_not_json': (429, {'_invalid_json': True}),
+            '429_tokens_prefixed': (429, {'type': 'error', 'error': {'type': 'rate_limit_error', 'tokens_billed': 3}}),
+            '529_cost': (529, {'type': 'error', 'error': {'type': 'overloaded_error', 'cost': '0.001'}}),
+            # Judged on the RAW reply: redaction would drop this 'headers' subtree and hide the usage.
+            '429_usage_under_redacted_key': (429, {'type': 'error', 'error': {'type': 'rate_limit_error',
+                                                                             'headers': {'usage': {'output_tokens': 5}}}}),
             '429_empty': (429, {}),
         }
         for name, (status, reply) in cases.items():
