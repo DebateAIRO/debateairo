@@ -54,6 +54,13 @@ export interface StoryRecordInput {
   readonly pointNumbers: Readonly<Record<string, string>> | null;
   /** The question's language (spec §14.3): a BCP-47 tag or "und"; null when the run held none. */
   readonly languageTag: string | null;
+  /**
+   * Role rotation (spec 2026-10-11 Part 3, migration 0114): how many of the story's rounds had a storyteller
+   * reply accepted only after the format repair try (0..32). Null: a story that failed before any storyteller
+   * reply (or one written before 0114). A readable operational column, outside the sealed content and its
+   * attestation, like `rounds`.
+   */
+  readonly storytellerRepairs: number | null;
 }
 
 export interface StoredStory extends StoryRecordInput {
@@ -64,6 +71,8 @@ export interface StoredStory extends StoryRecordInput {
 const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 /** `serve.answer.answer_version` is a PostgreSQL `integer`: anything above cannot name a version. */
 const PG_INTEGER_MAX = 2_147_483_647;
+/** Migration 0114: `serve.answer_story.storyteller_repairs` is NULL or 0..32. */
+const STORYTELLER_REPAIRS_MAX = 32;
 
 const StoredStoryContentSchema = z.object({
   body: StoryBodySchema.nullable(),
@@ -89,6 +98,7 @@ interface StoryRow {
   readonly checker_lineage: unknown;
   readonly rounds: number;
   readonly artifact_refs: unknown;
+  readonly storyteller_repairs: number | null;
   readonly content: unknown;
   readonly content_ciphertext: CryptoEnvelope | null;
   readonly created_at: Date;
@@ -181,6 +191,14 @@ export class StoryRepository {
       );
     }
     const content: StoredStoryContent = parsed.data;
+    // Migration 0114's CHECK, held here too, so an out-of-range count is refused typed and before any seal.
+    const repairs = record.storytellerRepairs;
+    if (repairs !== null && (!Number.isSafeInteger(repairs) || repairs < 0 || repairs > STORYTELLER_REPAIRS_MAX)) {
+      throw new TypedDomainError(
+        "STORY_RECORD_INVALID",
+        "The story record does not match its declared shape: storytellerRepairs"
+      );
+    }
     const violation = outcomeViolation(record.outcome, record.failureCode, content.body, content.reservation);
     if (violation !== null) {
       throw new TypedDomainError(
@@ -197,9 +215,9 @@ export class StoryRepository {
           `INSERT INTO serve.answer_story (
              story_id, run_id, answer_id, answer_version, outcome, failure_code, shape_id,
              pack_version, pack_fingerprint, storyteller_lineage, checker_lineage, rounds,
-             artifact_refs, content, content_ciphertext, content_attestation
+             artifact_refs, content, content_ciphertext, content_attestation, storyteller_repairs
            ) VALUES (
-             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::jsonb,$14::jsonb,$15::jsonb,$16
+             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::jsonb,$14::jsonb,$15::jsonb,$16,$17
            )
            ON CONFLICT (answer_id, answer_version) DO NOTHING
            RETURNING story_id::text AS story_id`,
@@ -211,7 +229,8 @@ export class StoryRepository {
             record.rounds, JSON.stringify(record.artifactRefs),
             JSON.stringify(sealed === null ? content : CONTENT_JSON_SENTINEL),
             sealed === null ? null : JSON.stringify(sealed.envelope),
-            sealed?.attestation ?? null
+            sealed?.attestation ?? null,
+            record.storytellerRepairs
           ]
         );
         return inserted.rowCount === 1 ? "INSERTED" : "ALREADY_PRESENT";
@@ -268,7 +287,7 @@ export class StoryRepository {
               story.answer_id::text AS answer_id, story.answer_version, story.outcome,
               story.failure_code, story.shape_id, story.pack_version, story.pack_fingerprint,
               story.storyteller_lineage, story.checker_lineage, story.rounds, story.artifact_refs,
-              story.content, story.content_ciphertext, story.created_at
+              story.storyteller_repairs, story.content, story.content_ciphertext, story.created_at
        FROM target
        JOIN serve.answer_story AS story
          ON story.answer_id = target.answer_id AND story.answer_version <= target.answer_version
@@ -313,6 +332,7 @@ export class StoryRepository {
           verdictBasis: content.data.verdictBasis,
           pointNumbers: content.data.pointNumbers === null ? null : Object.freeze({ ...content.data.pointNumbers }),
           languageTag: content.data.languageTag,
+          storytellerRepairs: row.storyteller_repairs,
           createdAt: row.created_at
         };
         return Object.freeze(stored);

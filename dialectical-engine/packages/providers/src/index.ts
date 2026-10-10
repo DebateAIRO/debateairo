@@ -219,6 +219,12 @@ export interface ProviderCallResult {
   readonly thinkingLevel?: string;
   /** Model scorecard §2.3: the vendor-reported thinking tokens of the accepted attempt; null when not reported. */
   readonly reasoningTokens?: number | null;
+  /**
+   * Role rotation (spec 2026-10-11 Part 3): repair packets sent before the accepted reply (0: accepted as
+   * first asked). A length retry re-sends the original packet and is not a repair. A gateway or double
+   * that builds its own result and leaves it out means 0.
+   */
+  readonly repairAttempts?: number;
 }
 
 export interface ProviderGateway {
@@ -1640,6 +1646,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     }
     /** W10/2: how many attempts of THIS call were cut off at the bound. */
     let lengthFailures = 0;
+    /** Role rotation (spec 2026-10-11 Part 3): how many repair packets this call adopted. */
+    let repairAttempts = 0;
     let lastContentRejection: {
       attempts: number;
       parseStatus: ProviderContentRejectionStatus;
@@ -2094,6 +2102,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // through the same door as the first packet, with no exception.
             assertFramedPrompt(repair);
             attemptPacket = repair;
+            repairAttempts += 1;
           }
           continue;
         }
@@ -2143,7 +2152,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           maker: this.#options.maker,
           modelVersion: responseJson.model,
           thinkingLevel: thinkingLevelUsed,
-          reasoningTokens
+          reasoningTokens,
+          repairAttempts
         };
       } catch (error) {
         /**
