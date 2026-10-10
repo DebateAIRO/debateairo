@@ -193,9 +193,9 @@ describe("S08 / FX-PRV-01a/01b/02 / FX-C52-04 — maker predicates", () => {
 });
 
 describe("S08 / FX-HR-H2a/H2b/H6 / P18 — isolation and receipts", () => {
-  it("ships three adapters selected by configuration and accepts a provider-local plugin", () => {
+  it("ships four adapters selected by configuration and accepts a provider-local plugin", () => {
     expect(BUILT_IN_PROVIDER_ADAPTERS.map((row) => row.adapterKind)).toEqual([
-      "openai-compatible-http", "vllm-openai-compatible-http", "anthropic-messages-http"
+      "openai-compatible-http", "vllm-openai-compatible-http", "google-gemini-http", "anthropic-messages-http"
     ]);
     expect(selectProviderAdapter("provider:vllm", [
       { providerRef: "provider:remote", adapterKind: "openai-compatible-http", maker: "maker:remote" },
