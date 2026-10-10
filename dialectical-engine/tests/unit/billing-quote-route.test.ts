@@ -15,7 +15,7 @@ const RESULT: QuoteResult = Object.freeze({
     kind: "SUBSCRIBE", netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: 24_200_000, taxCountry: "RO",
     taxRegion: null, taxRateBasisPoints: 2_100, taxStatus: "TAXABLE", taxName: "VAT", quadernoRef: null,
     expiresAt: new Date(NOW.getTime() + 1_800_000), createdAt: NOW, locationCiphertext: Buffer.alloc(1), keyId: "k",
-    recurringTotalMicros: null
+    recurringTotalMicros: null, currency: "USD"
   } as unknown as QuoteResult["quote"],
   declaredCountry: "RO", countryConfirmNeeded: true, ipCountry: "DE", addressRequired: false,
   renewsOn: new Date("2026-11-01T10:00:00.000Z"), withdrawalDays: 14
@@ -45,7 +45,7 @@ describe("P8b POST /v1/billing/quote", () => {
     const response = await post(api, { plan_id: "PLUS", country: "RO", postal_code: "010101", name: "Ana Pop" });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
-      quote_ref: RESULT.quote.quoteId, plan_id: "PLUS", net: "20.00", tax: "4.20", total: "24.20",
+      quote_ref: RESULT.quote.quoteId, plan_id: "PLUS", net: "20.00", tax: "4.20", total: "24.20", currency: "USD",
       tax_name: "VAT", tax_rate_bp: 2100, tax_country: "RO", tax_region: null, tax_status: "TAXABLE",
       country: "RO", ip_country: "DE", country_confirm_needed: true, address_required: false,
       renews_on: "2026-11-01T10:00:00.000Z", withdrawal_days: 14, expires_at: "2026-10-01T10:30:00.000Z"

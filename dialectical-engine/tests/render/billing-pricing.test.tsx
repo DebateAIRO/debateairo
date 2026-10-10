@@ -21,16 +21,21 @@ vi.mock("next/headers", async () => {
 });
 
 import PricingPage from "../../apps/ui/app/pricing/page.js";
+import { formatMoney } from "../../apps/ui/lib/billing/format.js";
+import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
+import billingRomanian from "../../apps/ui/messages/ro/billing.json" with { type: "json" };
 
 const PLANS = Object.freeze({
   currency: "USD" as const,
   plans: [
-    { plan_id: "FREE" as const, net_price: "0.00", allowance_vs_plus: "0.04" },
-    { plan_id: "PLUS" as const, net_price: "20.00", allowance_vs_plus: "1" },
-    { plan_id: "PRO" as const, net_price: "50.00", allowance_vs_plus: "4" },
-    { plan_id: "MAX" as const, net_price: "200.00", allowance_vs_plus: "30" }
+    { plan_id: "FREE" as const, net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.04" },
+    { plan_id: "PLUS" as const, net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" },
+    { plan_id: "PRO" as const, net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, allowance_vs_plus: "4" },
+    { plan_id: "MAX" as const, net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "30" }
   ]
 });
+/** Spec 2026-10-05 §2.16.5: the sentence under the cards (it names no currency). */
+const CURRENCY_NOTE = billingEnglish["billing.pricing.currencyNote"];
 
 async function renderPricing(): Promise<Document> {
   return new JSDOM(renderToStaticMarkup(await PricingPage())).window.document;
@@ -60,6 +65,20 @@ describe("P18 /pricing", () => {
     expect(free.querySelector("a")?.getAttribute("href")).toBe("/sign-up");
     expect(document.querySelector('a[href="/terms"]')).not.toBeNull();
     expect(document.querySelector('a[href="/privacy"]')).not.toBeNull();
+    expect(document.body.textContent).toContain(CURRENCY_NOTE);
+  });
+
+  it("shows the prices in the currency the visitor's connection pays in, with the note under the cards (spec 2026-10-05 §2.16.1)", async () => {
+    mocks.getBillingPlans.mockResolvedValue({ ...PLANS, currency: "RON" });
+    const document = await renderPricing();
+    const plus = document.querySelector('[data-plan="PLUS"]')!;
+    expect(plus.textContent).toContain(`${formatMoney("en", "100.00", "RON")} a month`);
+    expect(plus.textContent).not.toContain("$");
+    expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain(formatMoney("en", "250.00", "RON"));
+    expect(document.body.textContent).toContain(CURRENCY_NOTE);
+    // The note follows the cards.
+    const cards = document.querySelector("[data-pricing-cards]")!;
+    expect(cards.nextElementSibling?.textContent).toBe(CURRENCY_NOTE);
   });
 
   it("never shows a dollar amount of AI credit", async () => {
@@ -75,6 +94,8 @@ describe("P18 /pricing", () => {
     const document = await renderPricing();
     expect(document.body.textContent).toContain("The plans can't be shown right now. Please try again in a minute.");
     expect(document.querySelector("[data-plan]")).toBeNull();
+    // No cards, no note about their currency.
+    expect(document.body.textContent).not.toContain(CURRENCY_NOTE);
   });
 
   it("speaks the reader's locale", async () => {
@@ -82,5 +103,6 @@ describe("P18 /pricing", () => {
     mocks.locale = "ro";
     const document = await renderPricing();
     expect(document.querySelector("h1")?.textContent).not.toBe("Choose how much you debate");
+    expect(document.body.textContent).toContain(billingRomanian["billing.pricing.currencyNote"]);
   });
 });

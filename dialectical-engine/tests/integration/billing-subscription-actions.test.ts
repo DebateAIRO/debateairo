@@ -384,8 +384,8 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     const listed = await api.inject({ method: "GET", url: "/v1/billing/invoices", headers });
     expect(listed.statusCode).toBe(200);
     expect(listed.json()).toEqual({ invoices: [
-      { number: "DBAI-0043", issued_on: issued["0043"], total: "12.10", kind: "CREDIT_NOTE", url: null },
-      { number: "DBAI-0042", issued_on: issued["0042"], total: "24.20", kind: "INVOICE", url: null }
+      { number: "DBAI-0043", issued_on: issued["0043"], total: "12.10", currency: "USD", kind: "CREDIT_NOTE", url: null },
+      { number: "DBAI-0042", issued_on: issued["0042"], total: "24.20", currency: "USD", kind: "INVOICE", url: null }
     ] });
     await api.close();
   });

@@ -111,6 +111,9 @@ export async function startCardChange(deps: CardDeps, input: CardChangeInput): P
   const payer = payerFromProfile(profile, email);
   if (payer === null) refuse(422, "BILLING_ADDRESS_REQUIRED");
   const hold = cardCheckHoldMicros();
+  // Spec 2026-10-05 §2.16.4: the check is in the subscription's currency (the locked state below is the same
+  // subscription, and a subscription's currency never changes); 0 is 0 in any currency.
+  const currency = before.currency;
   const chargeId = newChargeId();
   await deps.billing.withTransaction(async (client) => {
     const locked = await lockedSubscription(deps, client, input.ownerRef);
@@ -128,7 +131,7 @@ export async function startCardChange(deps: CardDeps, input: CardChangeInput): P
       chargeId, ownerRef: input.ownerRef, subscriptionId: before.subscriptionId, kind: "CARD_CHECK" as const,
       attempt: sameKey.length + 1,
       periodStart: input.now, periodEnd: new Date(input.now.getTime() + 86_400_000), quoteId: null,
-      netMicros: hold, taxMicros: 0, totalMicros: hold, currency: "USD" as const, createdAt: input.now,
+      netMicros: hold, taxMicros: 0, totalMicros: hold, currency, createdAt: input.now,
       paymentProvider: "netopia" as const, paymentEnvironment: environment
     }));
     await deps.billing.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", input.now, {
@@ -147,7 +150,7 @@ export async function startCardChange(deps: CardDeps, input: CardChangeInput): P
   const redirectUrl = await startHostedCharge(hostedStartDeps(deps, environment), {
     operation: "card_check", now: input.now,
     start: {
-      orderId: chargeId, amountMicros: hold, currency: "USD", description: deps.orderText("CARD_CHECK", input.locale, {}),
+      orderId: chargeId, amountMicros: hold, currency, description: deps.orderText("CARD_CHECK", input.locale, {}),
       payer, clientId: clientIdOf(stored.customerId), returnUrl: paymentReturnUrl(deps.publicAppUrl, "/settings/card", chargeId),
       notifyUrl: netopiaNotifyUrl(deps.publicAppUrl), language: netopiaLanguageOf(input.locale)
     }

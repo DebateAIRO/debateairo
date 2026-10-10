@@ -135,7 +135,7 @@ function state(overrides: Partial<SubscriptionState> = {}): SubscriptionState {
     cancelRequested: true, scheduledDowngradePlanId: null,
     activatedAt: ACTIVATED, endedCause: null, pastDueSince: null, retryIndex: 0, renewalPostponedUntil: null,
     announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "netopia", paymentEnvironment: "sandbox",
-    cardTokenId: null,
+    cardTokenId: null, currency: "USD",
     ...overrides
   });
 }

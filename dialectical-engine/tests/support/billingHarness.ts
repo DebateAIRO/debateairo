@@ -121,10 +121,14 @@ export class HarnessPayments implements CardPayments {
   /** Saved-card charges NETOPIA actually made for this subscription (PAID, or PAID with the answer lost). */
   madeFor(subscriptionId: string): number { return this.#made.get(subscriptionId) ?? 0; }
 
-  /** A person paying a hosted payment (a checkout, an upgrade or a card check) on NETOPIA's page. */
+  /**
+   * A person paying a hosted payment (a checkout, an upgrade or a card check) on NETOPIA's page, in the currency the
+   * page was started in (spec 2026-10-05 §2.16.4; the hosted start stores it), so an EUR or RON checkout is paid in its own.
+   */
   pay(chargeId: string, input: Readonly<{ amountMicros: number; cardCountry: string | null }>): PaymentReport {
     const report = stubPaymentReport(chargeId, input.amountMicros === 0 ? "AUTHORIZED" : "PAID", {
-      amountMicros: input.amountMicros, currency: "USD", cardCountry: input.cardCountry, occurredAt: this.clock()
+      amountMicros: input.amountMicros, currency: this.reports.get(chargeId)?.currency ?? "USD", cardCountry: input.cardCountry,
+      occurredAt: this.clock()
     });
     this.reports.set(chargeId, report);
     return report;
@@ -242,6 +246,8 @@ export type BillingHarness = Readonly<{
     countryConfirmed?: boolean; company?: Readonly<{ name: string; vatId: string; address: string }>;
     /** The postal code and the free-text state or county the buyer typed (defaults below). */
     postalCode?: string; region?: string;
+    /** The `billingPlans` version the quote is made under (`quotesWith`); default the harness's `quotes`. */
+    plans?: BillingPlans;
   }>): Promise<Purchase>;
   refunds: RefundDesk;
   verify: VerifyPaymentHandler;
@@ -380,7 +386,7 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       const country = input.country ?? "RO";
       const postalCode = input.postalCode
         ?? ({ US: "10001", CA: "K1A 0B1", RO: "010011", DE: "10115" } as Readonly<Record<string, string>>)[country] ?? "00000";
-      const quoted = await quotes.create({
+      const quoted = await (input.plans === undefined ? quotes : quotesWith(input.plans)).create({
         ownerRef, ip: "198.51.100.7", planId: input.planId ?? "PLUS", country, name: null, firstName: "Test",
         lastName: "Buyer", phone: "+40712345678", street: "Strada Test 1", region: input.region ?? "Bucuresti",
         postalCode, city: "Sector 1", company: input.company ?? null, now: clock.now
