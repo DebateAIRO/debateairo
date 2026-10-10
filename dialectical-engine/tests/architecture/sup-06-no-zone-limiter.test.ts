@@ -41,7 +41,7 @@ describe("SUP-06 remains outside the identity security zone", () => {
     expect(main).toContain(
       // DL7-F7: the lease pool is held by the boot custody ledger until handover.
       "const supportRelayLeasePool = boot.hold(\n"
-      + "  createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 })\n"
+      + "  createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.supportRelayLease)\n"
       + ")"
     );
     expect(main).toContain(
@@ -68,7 +68,7 @@ describe("SUP-06 remains outside the identity security zone", () => {
     // constant feeds both assertions so the needle can never again drift away
     // from the thing whose position is being compared.
     const supportPoolDeclaration =
-      "const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL))";
+      "const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.support))";
     expect(main).toContain(supportPoolDeclaration);
     expect(main.indexOf(supportPoolDeclaration))
       .toBeLessThan(main.indexOf("const supportRelayLeasePool"));

@@ -8,7 +8,7 @@ import {
   loadKekRing,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { configureContentEncryption, createPool, EntitlementRepository, PostgresInternalAllowanceRepository, RunRepository } from "@debateai/db";
+import { configureContentEncryption, createPool, EntitlementRepository, PostgresInternalAllowanceRepository, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
@@ -75,7 +75,7 @@ configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
 // Absent, this is the single key it has always loaded. The runner only ever
 // READS this store, so no write ever chooses between the two.
 const kek = loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH);
-const pool = createPool(environment.DATABASE_URL);
+const pool = createPool(environment.DATABASE_URL, RUNNER_DATABASE_POOLS.runtime);
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   const users = new FileUserDekStore(environment.USER_DEK_STORE_PATH!, kek);
   configureContentEncryption(pool, new ContentCipher(
@@ -510,7 +510,10 @@ await refusePreviewOutsiderWork({
   ...postgresRunnerPreviewTeamGateStore(pool),
   log: (line) => console.warn(JSON.stringify(line))
 });
-const worker = await hatchet.worker(environment.HATCHET_WORKER_NAME);
+// Connection budget (2026-10-10, owner ruling): at most 8 debates at once, each
+// holding two of the pool's connections; the rest wait in Hatchet's queue
+// (packages/db/src/pool-budget.ts). Unset, Hatchet hands one worker 100.
+const worker = await hatchet.worker(environment.HATCHET_WORKER_NAME, { slots: RUNNER_CAPACITY.concurrentRuns });
 await worker.registerWorkflows([task]);
 const started = worker.start();
 await worker.waitUntilReady(30_000);
