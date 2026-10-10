@@ -16,7 +16,7 @@
 // preview:fixture-a and preview:fixture-b stay GLM (Z.AI) so runs pinned to the sealed two-GLM version
 // keep resolving, plus one ref per new model with its own maker. requiredDistinctMakers stays 1 (a missing
 // second maker serves with marks, never blocks). The answer writer stays fixture-a (GLM). By default the
-// checker stays fixture-b (GLM), as in the sealed two-GLM version: a version with four refs can then be
+// checker stays fixture-b (GLM), as in the sealed two-GLM version: a version with five refs can then be
 // published while the gate has only GLM switched on. Moving the checker (and the story checker that
 // follows it, story-policy.ts) to the DeepSeek ref is a separate, explicit choice, `checker: 'deepseek'`,
 // which refuses unless the operator also states `deepseekEnabledOnGate: true` (the gate's GO switches

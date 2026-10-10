@@ -6,13 +6,13 @@ const STAFF=['STAFF_ACCESS_POLICY_VERSION','STAFF_WEBAUTHN_ORIGIN','STAFF_WEBAUT
  * The only public model lists the preview UI may be built and run with, one per stage of the switch-on
  * order (deploy/preview-gate/v3/README.md, "Switching on the new models, in order"):
  * - `glm-only`: the legacy array, GLM for Free and Premium (until the gate and the API offer more);
- * - `multi-model`: Free gets two makers (Z.AI, DeepSeek), Premium three (plus Xiaomi).
+ * - `multi-model`: Free gets two makers (Z.AI, DeepSeek), Premium four (plus Xiaomi and Alibaba).
  * The value is baked into the website when it is built (release-artifacts.mjs `ui-build --models`),
  * ui-build.mjs records it next to the build, and narrowEnvironment demands that ui.env says the same.
  */
 export const PREVIEW_MODEL_ROSTER_FLAGS=Object.freeze({
  'glm-only':'["zai-org/GLM-5.3-Flash"]',
- 'multi-model':'{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]}'
+ 'multi-model':'{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash"]}'
 });
 /** The default build value (the stage before the API offers more than GLM): the legacy array. */
 export const PREVIEW_FREE_MODEL_IDS_JSON=PREVIEW_MODEL_ROSTER_FLAGS['glm-only'];

@@ -5,7 +5,7 @@ import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel"
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import {
-  PREVIEW_CONTEXT_WINDOW_TOKENS, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
+  PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
   PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRow, previewModelRowForRef, previewNanoUsdText, previewReservationNanoUsd,
   previewRostersHonourMakerRule, type PreviewModelRow
 } from "./preview-models.js";
@@ -150,7 +150,7 @@ export function assertPreviewProviderTargets(config: PreviewTargetRosters | unde
         : target.thinkingParameter !== "reasoning_effort" || target.thinkingLevels?.length !== 1 || target.thinkingLevels[0] !== reviewed.effort)
       || target.inputPriceMicrosPerMillionTokens !== reviewed.inputPriceMicrosPerMillion
       || target.outputPriceMicrosPerMillionTokens !== reviewed.outputPriceMicrosPerMillion
-      || target.contextWindowTokens !== PREVIEW_CONTEXT_WINDOW_TOKENS
+      || target.contextWindowTokens !== reviewed.contextWindowTokens
       || target.authorizationHeader !== undefined || target.authorizationFile !== undefined) refused();
   }
   const served = new Set(targets.map(target => target.model));
@@ -206,7 +206,7 @@ function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
 }
 /**
  * The preview's per-call policy for ONE target. A row with an effort switch runs every call at the
- * configured level ("high"); a row without one (MiMo) never sends a level, and a request that asks
+ * configured level ("high"); a row without one (MiMo, Qwen) never sends a level, and a request that asks
  * for one is refused before anything is sent.
  */
 export function withPreviewProviderCallPolicy(gateway: ProviderGateway, config: PreviewProviderTestConfig, target: Readonly<{ model: string }>): ProviderGateway {

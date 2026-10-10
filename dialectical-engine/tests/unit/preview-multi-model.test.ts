@@ -20,11 +20,12 @@ import { framedFixturePacket } from "../support/framed-packet.js";
 const GLM = "zai-org/GLM-5.3-Flash";
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
 const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
+const QWEN = "Qwen/Qwen3.8-Flash";
 const URL_COMPLETIONS = "https://api.deepinfra.com/v1/openai/chat/completions";
 const BASE = { deployment: "v3-preview", requested_thinking_level: "high",
   budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "preview-fixture" };
 const LEGACY = { ...BASE, free_model_ids: [GLM] };
-const MULTI = { ...BASE, free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO] };
+const MULTI = { ...BASE, free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN] };
 const parse = (value: unknown) => parsePreviewProviderTestConfig(JSON.stringify(value));
 const messages = [{ role: "user", content: "synthetic" }];
 
@@ -48,7 +49,7 @@ function recordingFetch() {
 }
 
 describe("the reviewed rows equal the shared parity file (contract A §1, §3)", () => {
-  it("has exactly the three rows, in order, field for field", () => {
+  it("has exactly the four rows, in order, field for field", () => {
     expect(PREVIEW_MODEL_ROWS.map(row => ({ model: row.model, maker: row.maker, input_usd_per_m: row.inputUsdPerM,
       output_usd_per_m: row.outputUsdPerM, output_bound: row.outputBound, effort: row.effort, json_object: row.jsonObject })))
       .toEqual(fixtureRows.map(({ worst_case_reservation_usd: _worst, input_nano_usd_per_token: _in, output_nano_usd_per_token: _out, ...row }) => row));
@@ -58,11 +59,11 @@ describe("the reviewed rows equal the shared parity file (contract A §1, §3)",
   });
   it("prices are whole nano-USD per token (USD per million x 1000)", () => {
     expect(PREVIEW_MODEL_ROWS.map(row => [row.inputNanoUsdPerToken, row.outputNanoUsdPerToken]))
-      .toEqual([[150n, 500n], [200n, 600n], [430n, 870n]]);
+      .toEqual([[150n, 500n], [200n, 600n], [430n, 870n], [113n, 382n]]);
     expect(PREVIEW_MODEL_ROWS.map(row => [row.inputNanoUsdPerToken, row.outputNanoUsdPerToken]))
       .toEqual(fixtureRows.map(row => [BigInt(row.input_nano_usd_per_token), BigInt(row.output_nano_usd_per_token)]));
     expect(PREVIEW_MODEL_ROWS.map(row => [row.inputPriceMicrosPerMillion, row.outputPriceMicrosPerMillion]))
-      .toEqual([[150_000, 500_000], [200_000, 600_000], [430_000, 870_000]]);
+      .toEqual([[150_000, 500_000], [200_000, 600_000], [430_000, 870_000], [113_000, 382_000]]);
   });
   it("the worst-case reservation (256 KiB body) equals the file and stays under the $0.25 per-call cap", () => {
     for (const fixture of fixtureRows) {
@@ -70,7 +71,7 @@ describe("the reviewed rows equal the shared parity file (contract A §1, §3)",
       expect(previewNanoUsdText(reserved)).toBe(fixture.worst_case_reservation_usd);
       expect(reserved < 250_000_000n).toBe(true);
     }
-    expect(fixtureRows.map(row => row.worst_case_reservation_usd)).toEqual(["0.121548800", "0.131481600", "0.227635200"]);
+    expect(fixtureRows.map(row => row.worst_case_reservation_usd)).toEqual(["0.121548800", "0.131481600", "0.227635200", "0.079923200"]);
   });
 });
 
@@ -83,10 +84,17 @@ describe("configuration accepts both forms (contract A §6)", () => {
   });
   it("the six-key form returns the configured rosters, and re-validates after a round trip", () => {
     const config = parse(MULTI)!;
-    expect(previewPlanTierRosters(config, PLAN_TIER_ROSTERS)).toEqual({ free: [GLM, DEEPSEEK], premium: [GLM, DEEPSEEK, MIMO] });
+    expect(previewPlanTierRosters(config, PLAN_TIER_ROSTERS)).toEqual({ free: [GLM, DEEPSEEK], premium: [GLM, DEEPSEEK, MIMO, QWEN] });
     expect(parse(config)).toEqual(config);
     expect(Object.isFrozen(config.premium_model_ids)).toBe(true);
     expect(parse({ ...BASE, free_model_ids: [GLM], premium_model_ids: [GLM] })).toMatchObject({ premium_model_ids: [GLM] });
+  });
+  it("accepts Qwen in either roster, under the two-maker rule", () => {
+    expect(parse({ ...BASE, free_model_ids: [GLM, QWEN], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN] }))
+      .toMatchObject({ free_model_ids: [GLM, QWEN], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN] });
+    expect(parse({ ...BASE, free_model_ids: [DEEPSEEK, QWEN], premium_model_ids: [QWEN, GLM] }))
+      .toMatchObject({ free_model_ids: [DEEPSEEK, QWEN], premium_model_ids: [QWEN, GLM] });
+    expect(parse({ ...BASE, free_model_ids: [QWEN], premium_model_ids: [QWEN] })).toMatchObject({ premium_model_ids: [QWEN] });
   });
   it.each([
     ["a one-maker Free roster while two makers exist", { ...MULTI, free_model_ids: [GLM] }],
@@ -97,7 +105,9 @@ describe("configuration accepts both forms (contract A §6)", () => {
     ["a missing premium list with a non-GLM free list", { ...BASE, free_model_ids: [GLM, DEEPSEEK] }],
     ["a legacy form with another model", { ...BASE, free_model_ids: [DEEPSEEK] }],
     ["an extra key", { ...MULTI, anthropic_budget_socket: "/run/debateai-v3-preview/a.sock" }],
-    ["a non-array roster", { ...MULTI, premium_model_ids: GLM }]
+    ["a non-array roster", { ...MULTI, premium_model_ids: GLM }],
+    ["a one-maker Premium roster of Qwen alone", { ...MULTI, premium_model_ids: [QWEN] }],
+    ["Qwen twice", { ...MULTI, premium_model_ids: [GLM, QWEN, QWEN] }]
   ])("refuses %s", (_name, value) => {
     expect(() => parse(value)).toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
   });
@@ -132,7 +142,10 @@ describe("each declared target is checked against its reviewed row", () => {
     ["DeepSeek on the GLM ref's model", 2, { model: GLM }],
     ["a credential header", 1, { authorization_header: "Bearer synthetic" }],
     ["another window", 3, { context_window_tokens: 131_072 }],
-    ["another base URL", 2, { base_url: "https://api.deepinfra.com/v1" }]
+    ["another base URL", 2, { base_url: "https://api.deepinfra.com/v1" }],
+    ["Qwen with a thinking switch", 4, { thinking_parameter: "reasoning_effort", thinking_levels: ["high"] }],
+    ["Qwen at the shared window instead of its own", 4, { context_window_tokens: 1_048_576 }],
+    ["Qwen at its cached-input price", 4, { input_price_micros_per_million: 14_000 }]
   ])("refuses %s", (_name, index, change) => {
     expect(() => assertPreviewProviderTargets(parse(MULTI), mutate(index, change))).toThrow();
   });
@@ -219,7 +232,7 @@ describe("each target's gateway sends a request its row accepts", () => {
     expect(executions).toHaveLength(1);
   });
   it("a story JSON request reaches the vendor as JSON only on GLM", async () => {
-    for (const model of [GLM, DEEPSEEK, MIMO]) {
+    for (const model of [GLM, DEEPSEEK, MIMO, QWEN]) {
       const { executions, gateway } = previewGateway(model);
       await gateway.call({ ...RESULT_REQUEST, lane: "story", callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER", preferredResponseFormat: "json_object" });
       expect(Object.hasOwn(JSON.parse(executions[0]!.requestBody), "response_format")).toBe(model === GLM);
@@ -292,5 +305,83 @@ describe("every register role is a declared target on the preview (boot check)",
     expect(() => assertPreviewRoleTargets(parse(LEGACY), targets(["preview:fixture-a", "preview:fixture-b"]), ["preview:fixture-a", "preview:deepseek-v4-1-flash"]))
       .toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
     expect(() => assertPreviewRoleTargets(parse(MULTI), declared, [])).toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+  });
+});
+
+describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 131072, its own window", () => {
+  const body = (change: Record<string, unknown> = {}) => ({ model: QWEN, max_tokens: 131_072, messages, ...change });
+  it("its reviewed row, ref and target row", () => {
+    expect(previewModelRow(QWEN)).toMatchObject({ maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
+      inputNanoUsdPerToken: 113n, outputNanoUsdPerToken: 382n, outputBound: 131_072, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 });
+    expect(PREVIEW_REVIEWED_PROVIDER_REFS).toEqual(["preview:fixture-a", "preview:fixture-b", "preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro", "preview:qwen-3-8-flash"]);
+    expect(previewTargetJsonRow("preview:qwen-3-8-flash")).toEqual({ provider_ref: "preview:qwen-3-8-flash",
+      base_url: "https://api.deepinfra.com/v1/openai", model: QWEN, input_price_micros_per_million: 113_000,
+      output_price_micros_per_million: 382_000, context_window_tokens: 1_000_000 });
+    expect(providerTargetGatewayControls(targets(PREVIEW_REVIEWED_PROVIDER_REFS)[4]!)).toEqual({ contextWindowTokens: 1_000_000 });
+  });
+  it("the guarded fetch refuses reasoning_effort, response_format and a bound above 131072, before any reservation", async () => {
+    const { executions, post } = recordingFetch();
+    for (const refused of [
+      body({ reasoning_effort: "high" }),
+      body({ response_format: { type: "json_object" } }),
+      body({ reasoning_effort: "high", response_format: { type: "json_object" } }),
+      body({ max_tokens: 131_073 }),
+      body({ max_tokens: 0 })
+    ]) await expect(post(refused)).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+    expect(executions).toHaveLength(0);
+  });
+  it("reserves exactly 0.079923200 for a 256 KiB body: every prompt byte at the full input price", async () => {
+    const { executions, post } = recordingFetch();
+    const empty = JSON.stringify(body({ messages: [{ role: "user", content: "" }] }));
+    const full = body({ messages: [{ role: "user", content: "x".repeat(256 * 1024 - Buffer.byteLength(empty)) }] });
+    expect(Buffer.byteLength(JSON.stringify(full))).toBe(256 * 1024);
+    await post(full);
+    expect(executions.map(execution => execution.reservedUsd)).toEqual(["0.079923200"]);
+    expect(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(QWEN)!, 256 * 1024))).toBe("0.079923200");
+    // One byte more is refused before any reservation.
+    const over = body({ messages: [{ role: "user", content: "x".repeat(256 * 1024 - Buffer.byteLength(empty) + 1) }] });
+    await expect(post(over)).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+    expect(executions).toHaveLength(1);
+  });
+  it("the gateway clamps max_tokens to 131072 on every attempt, length retries included, and never sends a level or JSON", async () => {
+    const target = targets(PREVIEW_REVIEWED_PROVIDER_REFS)[4]!;
+    const executions: PreviewBudgetExecution[] = [];
+    const replies = ["length", "length", "stop"];
+    const fetchImplementation = createPreviewGuardedFetch({ execute: async input => {
+      executions.push(input);
+      const finish = replies[executions.length - 1]!;
+      return { status: 200, body: JSON.stringify({ id: "synthetic", model: QWEN,
+        choices: [{ message: { content: finish === "stop" ? "{}" : "{\"cut" }, finish_reason: finish }],
+        usage: { prompt_tokens: 10, completion_tokens: 20 } }) };
+    } });
+    const native = new OpenAICompatibleProviderGateway({ endpoint: target.baseUrl, model: target.model, maker: target.maker,
+      ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(parse(MULTI), target), fetchImplementation,
+      persistRawArtifact: async artifact => artifact.artifactId, appendLedgerEntry: async entry => entry.attemptId,
+      assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined });
+    const classifyContent = (content: string) => {
+      try { JSON.parse(content); return { parseStatus: "PARSED", parseError: null }; }
+      catch { return { parseStatus: "PARSE_FAILED", parseError: "not JSON" }; }
+    };
+    await native.call({ ...RESULT_REQUEST, providerRef: "preview:qwen-3-8-flash", preferredResponseFormat: "json_object",
+      bound: { maxAttempts: 3, tokenCeiling: 100_000, deadlineMs: 5_000 }, classifyContent: classifyContent as never });
+    const sent = executions.map(execution => JSON.parse(execution.requestBody));
+    expect(sent.map(request => request.max_tokens)).toEqual([100_000, 131_072, 131_072]);
+    for (const request of sent) expect(Object.keys(request).sort()).toEqual(["max_tokens", "messages", "model"]);
+  });
+  it("the preview policy never sends a level to Qwen and takes DEFAULT_ONLY as none", async () => {
+    const { executions, gateway } = previewGateway(QWEN);
+    await gateway.call({ ...RESULT_REQUEST, thinkingLevel: "DEFAULT_ONLY", bound: { maxAttempts: 1, tokenCeiling: 200_000, deadlineMs: 5_000 } });
+    expect(JSON.parse(executions[0]!.requestBody)).toEqual({ model: QWEN, max_tokens: 131_072, messages: expect.any(Array) });
+    await expect((async () => gateway.call({ ...RESULT_REQUEST, thinkingLevel: "high" }))()).rejects.toMatchObject({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" });
+    expect(executions).toHaveLength(1);
+    expect(previewProbeControls({ model: QWEN })).toEqual({ tokenCeiling: 8192 });
+  });
+  it("the hosted root-broker rule refuses Qwen off its exact row", () => {
+    const broker = (change: Record<string, unknown>) => JSON.stringify({ providers: [{ ...previewTargetJsonRow("preview:qwen-3-8-flash"),
+      adapter_kind: "openai-compatible-http", maker: "Alibaba", vetting: {}, preview_budget_authority: true, ...change }] });
+    expect(() => gateHostedRoster(broker({}))).not.toThrow();
+    for (const change of [{ maker: "Qwen" }, { context_window_tokens: 1_048_576 }, { input_price_micros_per_million: 14_000 },
+      { thinking_parameter: "reasoning_effort", thinking_levels: ["high"] }, { model: "Qwen/Qwen3.8" }])
+      expect(() => gateHostedRoster(broker(change))).toThrow();
   });
 });

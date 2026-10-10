@@ -154,12 +154,12 @@ describe("Step 1: the Premium coarse fit estimates the roster the preview really
 });
 
 describe("multi-model (contract A §6): a two-maker preview roster is a real two-maker debate",()=>{
- const DEEPSEEK="deepseek-ai/DeepSeek-V4.1-Flash";const MIMO="XiaomiMiMo/MiMo-V2.6-Pro";
- const MULTI={...CONFIG,free_model_ids:[MODEL,DEEPSEEK],premium_model_ids:[MODEL,DEEPSEEK,MIMO]};
+ const DEEPSEEK="deepseek-ai/DeepSeek-V4.1-Flash";const MIMO="XiaomiMiMo/MiMo-V2.6-Pro";const QWEN="Qwen/Qwen3.8-Flash";
+ const MULTI={...CONFIG,free_model_ids:[MODEL,DEEPSEEK],premium_model_ids:[MODEL,DEEPSEEK,MIMO,QWEN]};
  const member=(provider_ref:string,maker:string,model_id:string)=>({provider_ref,maker,model_id,probe_evidence_ref:`fixture:${provider_ref}`,probed_at:"2026-10-10T00:00:00Z"});
- const discovered=[member("preview:fixture-a","Z.AI",MODEL),member("preview:fixture-b","Z.AI",MODEL),member("preview:deepseek-v4-1-flash","DeepSeek",DEEPSEEK),member("preview:mimo-v2-6-pro","Xiaomi",MIMO)];
- const gate={remaining:{deepinfra:async()=>({state:"active" as const,windowOpen:true,remainingNanoUsd:3_000_000_000n,remainingCalls:1200,maxConcurrentCalls:4,largestReservationNanoUsd:227_635_200n,enabledModels:[MODEL,DEEPSEEK,MIMO]})},roleModelIds:[MODEL,DEEPSEEK],storyCalls:0,roleProviderRefs:[],maxCooldownHoldsPerRun:0,readUnfinishedRuns:async()=>[]};
- it.each([["free",[MODEL,DEEPSEEK]],["premium",[MODEL,DEEPSEEK,MIMO]]] as const)("the %s roster maps to a panel of distinct makers: CAPABLE, no SINGLE-LINEAGE or CRITIQUE-UNAVAILABLE",async(tier,models)=>{
+ const discovered=[member("preview:fixture-a","Z.AI",MODEL),member("preview:fixture-b","Z.AI",MODEL),member("preview:deepseek-v4-1-flash","DeepSeek",DEEPSEEK),member("preview:mimo-v2-6-pro","Xiaomi",MIMO),member("preview:qwen-3-8-flash","Alibaba",QWEN)];
+ const gate={remaining:{deepinfra:async()=>({state:"active" as const,windowOpen:true,remainingNanoUsd:3_000_000_000n,remainingCalls:1200,maxConcurrentCalls:4,largestReservationNanoUsd:227_635_200n,enabledModels:[MODEL,DEEPSEEK,MIMO,QWEN]})},roleModelIds:[MODEL,DEEPSEEK],storyCalls:0,roleProviderRefs:[],maxCooldownHoldsPerRun:0,readUnfinishedRuns:async()=>[]};
+ it.each([["free",[MODEL,DEEPSEEK]],["premium",[MODEL,DEEPSEEK,MIMO,QWEN]]] as const)("the %s roster maps to a panel of distinct makers: CAPABLE, no SINGLE-LINEAGE or CRITIQUE-UNAVAILABLE",async(tier,models)=>{
   const config=feature("parsePreviewProviderTestConfig")(JSON.stringify(MULTI));
   const result=await evaluateAskAdmission(settings({previewProviderTestConfig:config,previewBudgetGate:gate,resolveDiscoveredPanel:async()=>discovered}),{...ask,plan_tier:tier} as unknown as AskRequest);
   expect(result.discoveredPanel.map(x=>x.model_id)).toEqual(models);

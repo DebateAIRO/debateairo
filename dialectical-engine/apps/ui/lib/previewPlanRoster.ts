@@ -6,7 +6,8 @@
 const PREVIEW_MODEL_MAKERS: Readonly<Record<string, string>> = Object.freeze({
   "zai-org/GLM-5.3-Flash": "Z.AI",
   "deepseek-ai/DeepSeek-V4.1-Flash": "DeepSeek",
-  "XiaomiMiMo/MiMo-V2.6-Pro": "Xiaomi"
+  "XiaomiMiMo/MiMo-V2.6-Pro": "Xiaomi",
+  "Qwen/Qwen3.8-Flash": "Alibaba"
 });
 const LEGACY_PREVIEW_MODEL = "zai-org/GLM-5.3-Flash";
 

@@ -3,7 +3,9 @@
  *
  * Plain words: the preview may call exactly these models, each at its own list price, with its
  * own largest answer size ("output bound"), its own "effort" thinking switch and its own
- * JSON-answer switch. The root gate holds the same table in Python; a parity test reads
+ * JSON-answer switch. Every prompt token is charged at the full input price, cached or not (the
+ * cheaper cached-input price some vendors list is never used, so a reservation never undercounts).
+ * The root gate holds the same table in Python; a parity test reads
  * tests/unit/fixtures/preview-model-rows.json so the two copies cannot drift. Changing a row is a
  * reviewed code change on both sides, never a configuration edit.
  *
@@ -27,11 +29,14 @@ export type PreviewModelRow = Readonly<{
   effort: "high" | null;
   /** Whether response_format {"type":"json_object"} may be sent. */
   jsonObject: boolean;
+  /** The most tokens one call may take in, prompt and answer together (vendor documentation). */
+  contextWindowTokens: number;
 }>;
 
 /** The preview connection's one base URL and window, shared by every row. */
 export const PREVIEW_DEEPINFRA_BASE_URL = "https://api.deepinfra.com/v1/openai" as const;
-export const PREVIEW_CONTEXT_WINDOW_TOKENS = 1_048_576 as const;
+/** The window of every row that does not state its own (GLM, DeepSeek, MiMo). */
+const PREVIEW_CONTEXT_WINDOW_TOKENS = 1_048_576;
 /** Request bodies above this are refused before any reservation (contract A §2). */
 export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
 /** Template allowance added to the body's bytes on the input side of a reservation (contract A §3). */
@@ -39,17 +44,19 @@ const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 
 function row(input: Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;
-  outputBound: number; effort: "high" | null; jsonObject: boolean;
+  outputBound: number; effort: "high" | null; jsonObject: boolean; contextWindowTokens?: number;
 }>): PreviewModelRow {
+  // USD per million with two or three decimals ("0.15", "0.113") is a whole nano-USD per token.
   const nano = (usdPerM: string): bigint => {
-    const match = /^(\d+)\.(\d{2})$/u.exec(usdPerM);
+    const match = /^(\d+)\.(\d{2,3})$/u.exec(usdPerM);
     if (match === null) throw new TypeError("PREVIEW_MODEL_ROW_PRICE_INVALID");
-    return BigInt(match[1]!) * 1000n + BigInt(match[2]!) * 10n;
+    return BigInt(match[1]!) * 1000n + BigInt(match[2]!.padEnd(3, "0"));
   };
   const inputNanoUsdPerToken = nano(input.inputUsdPerM);
   const outputNanoUsdPerToken = nano(input.outputUsdPerM);
   return Object.freeze({
     ...input,
+    contextWindowTokens: input.contextWindowTokens ?? PREVIEW_CONTEXT_WINDOW_TOKENS,
     inputNanoUsdPerToken,
     outputNanoUsdPerToken,
     inputPriceMicrosPerMillion: Number(inputNanoUsdPerToken) * 1000,
@@ -63,7 +70,10 @@ export const PREVIEW_MODEL_ROWS: readonly PreviewModelRow[] = Object.freeze([
   row({ model: "deepseek-ai/DeepSeek-V4.1-Flash", maker: "DeepSeek", inputUsdPerM: "0.20", outputUsdPerM: "0.60",
     outputBound: 131_072, effort: "high", jsonObject: false }),
   row({ model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
-    outputBound: 131_072, effort: null, jsonObject: false })
+    outputBound: 131_072, effort: null, jsonObject: false }),
+  // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
+  row({ model: "Qwen/Qwen3.8-Flash", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
+    outputBound: 131_072, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 })
 ]);
 
 /** The reviewed row for an exact model id, or undefined. */
@@ -83,7 +93,8 @@ export const PREVIEW_PROVIDER_REF_MODELS: Readonly<Record<string, string>> = Obj
   "preview:fixture-a": "zai-org/GLM-5.3-Flash",
   "preview:fixture-b": "zai-org/GLM-5.3-Flash",
   "preview:deepseek-v4-1-flash": "deepseek-ai/DeepSeek-V4.1-Flash",
-  "preview:mimo-v2-6-pro": "XiaomiMiMo/MiMo-V2.6-Pro"
+  "preview:mimo-v2-6-pro": "XiaomiMiMo/MiMo-V2.6-Pro",
+  "preview:qwen-3-8-flash": "Qwen/Qwen3.8-Flash"
 });
 /** The reviewed provider set, in register order. */
 export const PREVIEW_REVIEWED_PROVIDER_REFS = Object.freeze(Object.keys(PREVIEW_PROVIDER_REF_MODELS));
@@ -103,7 +114,7 @@ export function previewTargetJsonRow(providerRef: string): Readonly<Record<strin
     input_price_micros_per_million: reviewed.inputPriceMicrosPerMillion,
     output_price_micros_per_million: reviewed.outputPriceMicrosPerMillion,
     ...(reviewed.effort === null ? {} : { thinking_parameter: "reasoning_effort", thinking_levels: Object.freeze([reviewed.effort]) }),
-    context_window_tokens: PREVIEW_CONTEXT_WINDOW_TOKENS
+    context_window_tokens: reviewed.contextWindowTokens
   });
 }
 

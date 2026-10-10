@@ -19,6 +19,7 @@ import type { AskRequest } from "@debateai/contract";
 import {
   createPreviewRemainingRpcPort,
   parsePreviewProviderTestConfig,
+  previewModelRow,
   PREVIEW_GATE_UNREACHABLE,
   type PreviewGateRemaining,
   type PreviewProviderTestConfig
@@ -29,6 +30,8 @@ import {
   previewGateEstimateCalls,
   previewGateEstimateNanoUsd,
   previewExpectedCalls,
+  previewAverageCallNanoUsd,
+  previewGateKeyOf,
   PreviewGateUnavailableRefusal,
   PREVIEW_UNFINISHED_RUNS_SQL,
   type PreviewUnfinishedRun,
@@ -42,8 +45,9 @@ import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionH
 const GLM = "zai-org/GLM-5.3-Flash";
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
 const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
+const QWEN = "Qwen/Qwen3.8-Flash";
 const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
-  deployment: "v3-preview", free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO],
+  deployment: "v3-preview", free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN],
   requested_thinking_level: "high", budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture"
 }))!;
 const ASK = Object.freeze({
@@ -151,6 +155,21 @@ describe("the start-of-debate estimate is an upper bound (pure)", () => {
     const [old] = estimateUnfinishedRunHolds({ basis: basis(2), panel: [{ provider_ref: "preview:other", model_id: "old/model" }] }, ROLES);
     expect(old!.dearestModelId).toBe(MIMO);
   });
+
+  it("Qwen is priced from its own row, on the DeepInfra gate", () => {
+    // 4,000 x 113 + 1,200 x 382 = 910,400 nano-USD per average call (no cached-input discount).
+    expect(previewAverageCallNanoUsd(previewModelRow(QWEN)!)).toBe(910_400n);
+    expect(previewGateKeyOf(QWEN)).toBe("deepinfra");
+    const input = { basis: basis(1), panel: [{ provider_ref: "preview:qwen-3-8-flash", model_id: QWEN }],
+      roleModelIds: [QWEN], roleProviderRefs: ["preview:qwen-3-8-flash"], storyCalls: 6, maxCooldownHoldsPerRun: 2 };
+    const total = BigInt(previewExpectedCalls(input).total);
+    expect(estimatePreviewGateNeeds(input)).toEqual([expect.objectContaining({ gate: "deepinfra", modelIds: [QWEN], dearestModelId: QWEN,
+      callsNanoUsd: (total * 910_400n * 115n + 99n) / 100n })]);
+    // On the four-maker Premium panel it is one more model on the same gate; MiMo stays the dearest.
+    const premium = [...PANEL, { provider_ref: "preview:mimo-v2-6-pro", model_id: MIMO }, { provider_ref: "preview:qwen-3-8-flash", model_id: QWEN }];
+    expect(estimatePreviewGateNeeds({ basis: basis(4), panel: premium, ...ROLES })).toEqual([
+      expect.objectContaining({ gate: "deepinfra", modelIds: [GLM, DEEPSEEK, MIMO, QWEN], dearestModelId: MIMO })]);
+  });
 });
 
 describe("evaluateAskAdmission on the preview asks the gate before any run exists", () => {
@@ -198,6 +217,23 @@ describe("evaluateAskAdmission on the preview asks the gate before any run exist
     await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => remainingWith(patch)) }), ASK))
       .rejects.toMatchObject({ name: "AskRefusal", code: UNAVAILABLE });
     expect(counters).toEqual({ probes: 1, remaining: 1 });
+  });
+
+  it("a Premium debate with Qwen on the panel asks the DeepInfra gate, and is refused until the gate switches Qwen on", async () => {
+    const premiumAsk = { ...ASK, plan_tier: "premium" } as unknown as AskRequest;
+    const member = (provider_ref: string, maker: string, model_id: string) =>
+      ({ provider_ref, maker, model_id, probe_evidence_ref: `fixture:${provider_ref}`, probed_at: "2026-10-10T00:00:00Z" });
+    const panel = [member("preview:fixture-a", "Z.AI", GLM), member("preview:deepseek-v4-1-flash", "DeepSeek", DEEPSEEK),
+      member("preview:mimo-v2-6-pro", "Xiaomi", MIMO), member("preview:qwen-3-8-flash", "Alibaba", QWEN)];
+    const counters = { probes: 0, remaining: 0 };
+    const withEnabled = (enabledModels: string[]) => settings(counters, { resolveDiscoveredPanel: async () => panel,
+      previewBudgetGate: gateWith(counters, async () => remainingWith({ enabledModels, largestReservationNanoUsd: 227_635_200n })) });
+    await expect(evaluateAskAdmission(withEnabled([GLM, DEEPSEEK, MIMO]), premiumAsk)).rejects.toMatchObject({ name: "AskRefusal", code: UNAVAILABLE });
+    expect(counters.remaining).toBe(1);
+    const result = await evaluateAskAdmission(withEnabled([GLM, DEEPSEEK, MIMO, QWEN]), premiumAsk);
+    expect(result.discoveredPanel.map((entry) => entry.model_id)).toEqual([GLM, DEEPSEEK, MIMO, QWEN]);
+    expect(result.criticUnavailableCap).toEqual({ serves: true, conditionMarks: [], confidenceBandCapRequired: false, liftCondition: null });
+    expect(counters.remaining).toBe(2);
   });
 
   it("refuses as not available when a role model (the answer checker) is not enabled, though the panel is", async () => {

@@ -14,15 +14,15 @@ describe('source-derived strict preview environment',()=>{
 });
 
 const LEGACY_FLAG='["zai-org/GLM-5.3-Flash"]';
-const MULTI_FLAG='{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]}';
-const GLM='zai-org/GLM-5.3-Flash',DEEPSEEK='deepseek-ai/DeepSeek-V4.1-Flash',MIMO='XiaomiMiMo/MiMo-V2.6-Pro';
+const MULTI_FLAG='{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash"]}';
+const GLM='zai-org/GLM-5.3-Flash',DEEPSEEK='deepseek-ai/DeepSeek-V4.1-Flash',MIMO='XiaomiMiMo/MiMo-V2.6-Pro',QWEN='Qwen/Qwen3.8-Flash';
 const apiConfig=(lists:Record<string,unknown>)=>JSON.stringify({deployment:'v3-preview',requested_thinking_level:'high',budget_socket:'/run/debateai-v3-preview/deepinfra-budget-v3.sock',scope_id:'preview-scope',...lists});
 describe('the website\'s model list: one reviewed value per stage of the switch-on order',()=>{
  it('names exactly the legacy array and the two-list value, legacy as the default build value',()=>{
   expect(env.PREVIEW_MODEL_ROSTER_FLAGS).toEqual({'glm-only':LEGACY_FLAG,'multi-model':MULTI_FLAG});
   expect(env.PREVIEW_FREE_MODEL_IDS_JSON).toBe(LEGACY_FLAG);
   for(const value of [LEGACY_FLAG,MULTI_FLAG])expect(env.isReviewedModelRosterFlag(value)).toBe(true);
-  for(const value of [undefined,'',' '+LEGACY_FLAG,'["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"]',MULTI_FLAG.replace(',"XiaomiMiMo/MiMo-V2.6-Pro"',''),JSON.stringify(JSON.parse(MULTI_FLAG),null,1)])expect(env.isReviewedModelRosterFlag(value)).toBe(false);
+  for(const value of [undefined,'',' '+LEGACY_FLAG,'["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"]',MULTI_FLAG.replace(',"Qwen/Qwen3.8-Flash"',''),MULTI_FLAG.replace(',"XiaomiMiMo/MiMo-V2.6-Pro"',''),JSON.stringify(JSON.parse(MULTI_FLAG),null,1)])expect(env.isReviewedModelRosterFlag(value)).toBe(false);
  });
  const ui=(flag:string)=>({NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:flag});
  it('ui.env must name the list the website was built with',()=>{
@@ -35,13 +35,14 @@ describe('the website\'s model list: one reviewed value per stage of the switch-
  });
  it.each([
   ['the legacy array with the legacy five-key config',LEGACY_FLAG,apiConfig({free_model_ids:[GLM]}),true],
-  ['the two-list value with the six-key config holding the same lists',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO]}),true],
+  ['the two-list value with the six-key config holding the same lists',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO,QWEN]}),true],
+  ['the two-list value with the premium list before Qwen',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO]}),false],
   ['the legacy array with a six-key config',LEGACY_FLAG,apiConfig({free_model_ids:[GLM],premium_model_ids:[GLM]}),false],
-  ['the legacy array with the six-key multi config',LEGACY_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO]}),false],
+  ['the legacy array with the six-key multi config',LEGACY_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO,QWEN]}),false],
   ['the two-list value with the legacy config (the website would offer models the API refuses)',MULTI_FLAG,apiConfig({free_model_ids:[GLM]}),false],
   ['the two-list value with a narrower premium list',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK]}),false],
-  ['the two-list value with lists in another order',MULTI_FLAG,apiConfig({free_model_ids:[DEEPSEEK,GLM],premium_model_ids:[GLM,DEEPSEEK,MIMO]}),false],
-  ['the two-list value with free and premium swapped',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK,MIMO],premium_model_ids:[GLM,DEEPSEEK]}),false],
+  ['the two-list value with lists in another order',MULTI_FLAG,apiConfig({free_model_ids:[DEEPSEEK,GLM],premium_model_ids:[GLM,DEEPSEEK,MIMO,QWEN]}),false],
+  ['the two-list value with free and premium swapped',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK,MIMO,QWEN],premium_model_ids:[GLM,DEEPSEEK]}),false],
   ['a config with an extra key',LEGACY_FLAG,apiConfig({free_model_ids:[GLM],extra:true}),false],
   ['no API config',LEGACY_FLAG,undefined,false],
   ['an API config that is not JSON',LEGACY_FLAG,'{',false],
