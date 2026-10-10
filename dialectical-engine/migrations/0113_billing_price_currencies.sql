@@ -1,9 +1,10 @@
 -- 0113 — prices in RON, EUR and USD by region (spec 2026-10-05 §2.16, Part C, revised 10 October 2026). Every plan has
 -- a price in each currency and the buyer's tax country picks one; each subscription keeps it for good. So the currency
 -- is recorded where each price is: on the quote (a new column), on the charge (0086's column, whose CHECK allowed USD
--- only) and in CREATED's data (`currency`). A forward step of the chain after 0111 (migrations/lineage/README.md; its
--- manifest lineage/billing-price-currencies-forward0113.json binds these bytes; it adds no billing relation and no
--- function, so lineage/verify-effective-capabilities-111.sql stays the verifier in force).
+-- only) and in CREATED's data (`currency`). A forward step of the chain after dev's 0112, the auth DB batch
+-- (migrations/lineage/README.md; its manifest lineage/billing-price-currencies-forward0113.json binds these bytes;
+-- it adds no billing relation and no function, so lineage/verify-effective-capabilities-111.sql, which 0112 keeps,
+-- stays the verifier in force).
 -- Forward-only and replayable: the column is added only when absent; each replaced CHECK is dropped IF EXISTS and added
 -- again. Quote rows written before this step were all priced in US dollars: ADD COLUMN ... DEFAULT 'USD' fills them
 -- without an UPDATE (0085's append-only guard refuses updates), then the default is dropped, so every writer must name

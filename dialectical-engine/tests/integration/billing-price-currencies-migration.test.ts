@@ -10,12 +10,14 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 
 /**
  * Spec 2026-10-05 §2.16 (Part C, revised 10 October 2026): every plan has a price in USD, EUR and RON, and each
- * subscription keeps its currency for good. Part C's forward step after 0111 records the currency on the quote (a new
- * column, older rows read USD), lets a charge be in any of the three, and checks CREATED's `data.currency`. It runs once,
- * after 0111, with its own receipt, and replays.
+ * subscription keeps its currency for good. Part C's forward step records the currency on the quote (a new column,
+ * older rows read USD), lets a charge be in any of the three, and checks CREATED's `data.currency`. It is chained after
+ * dev's 0112 (the auth DB batch, itself after 0111): it runs once, on a database at 0112, with its own receipt, and
+ * replays.
  */
 const MIGRATIONS = new URL("../../migrations/", import.meta.url);
 const NETOPIA_STEP = "0111_billing_netopia.sql";
+const BATCH_STEP = "0112_auth_db_batch.sql";
 const PART_C_STEP = "0113_billing_price_currencies.sql";
 const PART_C_MANIFEST = "lineage/billing-price-currencies-forward0113.json";
 // A made-up key id, built from pieces so the whole value never appears as one secret-shaped literal.
@@ -81,8 +83,9 @@ async function catalogState() {
 
 beforeAll(async () => {
   database = await startTestDatabase();
-  await seedDevLineageThroughStep(database.pool, NETOPIA_STEP);
-  // One quote row as 0111 knows the table: no currency column yet.
+  // A database as dev at 7db4a7b72 leaves it: the chain applied through the auth DB batch (0112).
+  await seedDevLineageThroughStep(database.pool, BATCH_STEP);
+  // One quote row as 0111 and 0112 know the table: no currency column yet.
   await query(`INSERT INTO billing.quote (quote_id, owner_ref, plan_id, kind, net_micros, tax_micros, total_micros,
       tax_country, tax_region, tax_rate_bp, tax_status, tax_name, quaderno_ref, created_at, expires_at,
       location_ciphertext, key_id)
@@ -128,21 +131,25 @@ describe("Part C's migration step: the currency of every quote, charge and subsc
     expect(constraints.map((row) => row.conname)).not.toContain("charge_currency_check");
   });
 
-  it("records the step once, after 0111, with its manifest's digest; a second migrate() changes neither ledger", async () => {
+  it("records the step once, after 0112, with its manifest's digest; a second migrate() changes neither ledger", async () => {
     const plan = await loadMigrationPlan();
     const before = await migrationState();
     expect(before.ledger.map((row) => row.name).filter((name) => name === PART_C_STEP)).toHaveLength(1);
-    expect(before.steps.map((row) => row.source_name)).toEqual([NETOPIA_STEP, PART_C_STEP]);
+    expect(before.steps.map((row) => row.source_name)).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP]);
     const step = plan.forwardChain.find((entry) => entry.name === PART_C_STEP)!;
     const netopia = plan.forwardChain.find((entry) => entry.name === NETOPIA_STEP)!;
-    expect(before.steps[1]).toMatchObject({
-      source_name: PART_C_STEP, base_recipe_sha256: plan.recipeSha256, previous_manifest_sha256: netopia.manifestSha256,
+    const batch = plan.forwardChain.find((entry) => entry.name === BATCH_STEP)!;
+    expect(before.steps[2]).toMatchObject({
+      source_name: PART_C_STEP, base_recipe_sha256: plan.recipeSha256, previous_manifest_sha256: batch.manifestSha256,
       forward_manifest_sha256: sha256(await readFile(new URL(PART_C_MANIFEST, MIGRATIONS))),
       source_sha256: sha256(await readFile(new URL(PART_C_STEP, MIGRATIONS))), verifier_sha256: step.verifierSha256
     });
-    const applied0111 = before.ledger.find((row) => row.name === NETOPIA_STEP)!.applied_at as Date;
+    // 0112 keeps 0111's effective verifier, and so does 0113.
+    expect(step.verifierSha256).toBe(batch.verifierSha256);
+    expect(step.verifierSha256).toBe(netopia.verifierSha256);
+    const applied0112 = before.ledger.find((row) => row.name === BATCH_STEP)!.applied_at as Date;
     const applied0113 = before.ledger.find((row) => row.name === PART_C_STEP)!.applied_at as Date;
-    expect(applied0113.getTime()).toBeGreaterThan(applied0111.getTime());
+    expect(applied0113.getTime()).toBeGreaterThan(applied0112.getTime());
     await migrate(database.pool);
     expect(await migrationState()).toEqual(before);
   });

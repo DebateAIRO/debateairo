@@ -1156,7 +1156,8 @@ changes a price or the rule by publishing a new register version; a published ve
   `0113_billing_price_currencies.sql`, chained after 0111 (the chain needs only increasing names). Before the pull
   request C5 re-chains it after the last step on `origin/dev` (after 0112 if the auth batch merged first), or renumbers
   it 0112 if Part C must merge first (then the batch renumbers). `<NNNN>` below is that number. Dev's sealed and merged
-  files (0108, 0110, 0111 and their manifests, loaders and verifiers) are never edited.
+  files (0108, 0110, 0111 and their manifests, loaders and verifiers) are never edited. Done in C5a (10 October 2026):
+  the batch merged first as 0112 (`origin/dev` 7db4a7b72), so Part C's step keeps 0113 and is chained after 0112.
 - **The files** (new files only): the SQL; `lineage/billing-price-currencies-forward<NNNN>.json` (bound to the recipe,
   to the previous step's name, manifest and verifier, and naming the previous step's verifier as its own, because the
   step adds no billing relation and no function); `packages/db/src/migration-forward<NNNN>.ts`; one loader appended to

@@ -88,17 +88,23 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     }
   });
 
-  it("chains Part C's 0113 to the recipe, to 0111's manifest and to 0111's verifier, which it keeps in force", async () => {
+  it("chains Part C's 0113 after dev's 0112: the recipe, 0112's manifest and the effective verifier 0112 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
-    const [netopia, step] = plan.forwardChain;
+    const [netopia, batch, step] = plan.forwardChain;
+    expect(plan.forwardChain.map((entry) => entry.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql", "0113_billing_price_currencies.sql"]);
+    // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
+    const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
+    expect(batchManifest.verifier.path).toBe("lineage/verify-effective-capabilities-111.sql");
+    expect(batch!.verifierSha256).toBe(sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql")));
+    expect(batch!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/billing-price-currencies-forward0113.json")).toString("utf8"));
     expect(manifest).toEqual({
       version: "billing-price-currencies-forward0113-v1",
       baseRecipeSha256: plan.recipeSha256,
       previous: {
-        name: "0111_billing_netopia.sql",
-        manifestSha256: netopia!.manifestSha256,
-        verifierSha256: netopia!.verifierSha256
+        name: "0112_auth_db_batch.sql",
+        manifestSha256: sha256(await bytesOf("lineage/auth-db-batch-forward.json")),
+        verifierSha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql"))
       },
       migration: { name: "0113_billing_price_currencies.sql", sha256: sha256(await bytesOf("0113_billing_price_currencies.sql")) },
       verifier: {
@@ -107,10 +113,13 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       }
     });
     expect(step!.manifestSha256).toBe(sha256(await bytesOf("lineage/billing-price-currencies-forward0113.json")));
-    expect(step!.previousName).toBe(netopia!.name);
-    expect(step!.previousManifestSha256).toBe(netopia!.manifestSha256);
-    expect(step!.previousVerifierSha256).toBe(netopia!.verifierSha256);
+    expect(step!.previousName).toBe(batch!.name);
+    expect(step!.previousManifestSha256).toBe(batch!.manifestSha256);
+    expect(step!.previousVerifierSha256).toBe(batch!.verifierSha256);
     expect(step!.verifierSql).toBe((await bytesOf("lineage/verify-effective-capabilities-111.sql")).toString("utf8"));
+    // Its checks are its postcondition (the quote's column and the three CHECKs, compared on every replay); it has no
+    // supplemental verifier of its own.
+    expect(step!.replayVerifierSql).toBeUndefined();
   });
 
   it("supersedes the sealed verifier with NETOPIA's nine tables and two purges, and nothing else", async () => {
@@ -138,7 +147,17 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(readme).not.toMatch(/0109|forward109|-109/u);
   });
 
-  it("refuses a changed 0111, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
+  it("documents Part C's 0113 as the step after 0112, with its manifest, its loader and the verifier it keeps", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## Part C's prices (0113)"));
+    expect(section.startsWith("## Part C's prices (0113)")).toBe(true);
+    for (const needle of ["0112", "auth-db-batch-forward.json", "billing-price-currencies-forward0113.json",
+      "verify-effective-capabilities-111.sql", "packages/db/src/migration-forward0113.ts", "MIGRATION_FORWARD0113_",
+      "replayVerifierSql", "`STEPS`"]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
+    expect(readme).not.toContain("else renumbered 0112");
+  });
+
+  it("refuses a changed 0111 or 0113, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
     const root = await mkdtemp(join(tmpdir(), "forward-chain-111-"));
     try {
       await mkdir(join(root, "packages/db/src"), { recursive: true });
@@ -178,6 +197,17 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       }, "MIGRATION_FORWARD111_MANIFEST");
       // The same refusal when 0110's own manifest changes under 0111 (its bytes are what 0111 is bound to).
       await refusal("lineage/auth-dev-preview-20261006-forward110.json", (text) => `${text}\n`, "MIGRATION_FORWARD111_MANIFEST");
+      // Part C's 0113 changed by one character, and its manifest bound to 0111 (where it was built) instead of 0112.
+      await refusal("0113_billing_price_currencies.sql", (text) => text.replace("RON", "RoN"), "MIGRATION_FORWARD0113_SOURCE_DIGEST");
+      const forward111Digest = sha256(await bytesOf("lineage/billing-netopia-forward111.json"));
+      await refusal("lineage/billing-price-currencies-forward0113.json", (text) => {
+        const manifest = JSON.parse(text);
+        manifest.previous.name = "0111_billing_netopia.sql";
+        manifest.previous.manifestSha256 = forward111Digest;
+        return `${JSON.stringify(manifest, null, 2)}\n`;
+      }, "MIGRATION_FORWARD0113_MANIFEST");
+      // The same refusal when 0112's own manifest changes under 0113 (its bytes are what 0113 is bound to).
+      await refusal("lineage/auth-db-batch-forward.json", (text) => `${text}\n`, "MIGRATION_FORWARD0113_MANIFEST");
       const extra = join(root, "migrations/0199_unbound_step.sql");
       await writeFile(extra, "SELECT 1;\n");
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_LINEAGE_REFUSED SOURCE_INVENTORY") });

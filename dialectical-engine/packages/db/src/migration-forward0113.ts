@@ -4,15 +4,16 @@ import type { PoolClient } from 'pg';
 import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-chain.js';
 
 /**
- * Part C's migration (spec 2026-10-05 §2.16, prices in RON, EUR and USD) as the chain step after 0111
- * (migrations/lineage/README.md). It adds no billing relation and no function, so 0111's verifier stays in force and is
- * named as its own. Its working number is 0113; it is renumbered and re-chained at merge time if dev moved (§2.16.6).
+ * Part C's migration (spec 2026-10-05 §2.16, prices in RON, EUR and USD) as the chain step after dev's 0112, the auth DB
+ * batch (migrations/lineage/README.md). It adds no billing relation and no function, so the effective verifier 0112
+ * keeps in force (0111's) stays in force and is named as its own. Its checks are its postcondition (the quote's column
+ * and the three CHECKs), compared on every later migrate(); it has no supplemental verifier, so no replayVerifierSql.
  */
 const NAME='0113_billing_price_currencies.sql';
 const VERSION='billing-price-currencies-forward0113-v1';
 const MANIFEST_PATH='lineage/billing-price-currencies-forward0113.json';
 const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql';
-const PREVIOUS='0111_billing_netopia.sql';
+const PREVIOUS='0112_auth_db_batch.sql';
 const CONSTRAINTS=['charge_currency_known','quote_currency_known','subscription_event_created_currency_known'] as const;
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0113_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
