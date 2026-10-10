@@ -1,19 +1,50 @@
 #!/usr/bin/env python3
-"""Root-owned private preview spending gate, v2: one shared team pot per Bucharest day. No retries.
+"""Root-owned private preview spending gate, v3: one provider, its reviewed model table, one pot
+per Bucharest day. No retries.
 
-init creates fresh v2 state from a hash-bound GO; activate opens it on the reviewed Linux host
-for open_days; serve is Root-operated Unix IPC and the only reader of Root's provider key;
-stop halts; status is read-only. Before any phase, the helper's custody (root-owned, writable by
-no one else) and, with a GO, its bound hash are checked; only then do those exact bytes run.
+The GO (schema v3, root-owned, bound by hash at activate) names one provider profile (`provider`)
+and the reviewed models of that profile it switches on (`enabled_models`). The profile and its
+model rows (prices, output bound, effort, JSON mode) live in the helper's code, so the GO's
+helper_sha256 binds them: a price change is a reviewed code change, never a GO edit. A v2 GO (one
+fixed model) is refused. A model the GO does not enable is refused before any reservation or key
+read; each call reserves its own row's worst case ((request bytes + 2048) x input price + output
+bound x output price, per million, at the profile's reservation prices for that moment, never
+above the row's ceiling prices) and settles at the profile's prices for that row and moment (or
+the provider's reported cost, the larger); its ledger entry records the model, its maker, the
+reservation and settlement prices and the bound; and a reply naming any other model than that
+entry's halts. No reviewed row may reserve more than its profile's per_call_cap_usd for a
+full-size request (profile.max_request_bytes, at its ceiling prices), and activate refuses a GO
+whose max_concurrent_calls x largest enabled worst case exceeds daily_budget_usd. The profile
+API (the helper's DeepInfraProfile docstring lists it) is all the core calls, so a new provider
+is one reviewed profile class.
+
+init creates fresh v3 state from a hash-bound GO; activate opens it on the reviewed Linux host
+for open_days; serve is Root-operated Unix IPC and, with probe, the only reader of Root's
+provider key; stop halts; status is read-only (and shows today's spend per model); probe (root
+only) makes one tiny paid call to a reviewed model, enabled or not, through the same
+reserve/settle/halt path, to measure it before the owner enables it. Before any phase, the helper's custody (root-owned,
+writable by no one else) and, with a GO, its bound hash are checked; only then do those exact
+bytes run.
 Each call reserves its worst case under a short ledger lock, the lock is released for the one
 fixed upstream HTTPS request, and the charge is then settled under the lock. Uncertainty,
 missing usage, overrun, a provider error, another model, a lost reply or any failure after the
 reservation halts every new call until Root re-activates; calls already in flight finish and
 settle. A halt is written before the ledger entry it explains, and serve start halts on any
 call a crash interrupted. If a settlement or a halt cannot be written, the running server
-reserves nothing more until it is restarted.
-The retired v1 ledger (budget-ledger.json) is never opened, and serve refuses the retired v1
-socket name (provider-budget.sock): v2 always serves on its own, explicitly named socket.
+reserves nothing more until it is restarted. A probe runs in its own process beside serve and
+holds the probe lock while it runs: serve start refuses while it is held (PROBE_RUNNING), and a
+probe entry left in flight once the lock is free (a probe that died or could not settle) halts
+serve's next reservation (interrupted_probe).
+The v2 and v1 state (other schemas, other folders) is never opened, and serve refuses the retired
+socket names (v1's provider-budget.sock, v2's team-budget-v2.sock): v3 always serves on its own,
+explicitly named socket.
+
+IPC (one Unix socket, the same peer-uid allow-list for both paths): POST /complete makes one
+paid call; POST /remaining is read-only (shared lock, no file created or written, the key never
+read) and answers what is left of today's pot and call count, the concurrency, the largest
+enabled reservation and the enabled models, so the app can refuse a debate before it starts. It
+reads the state at most once per REMAINING_MIN_SECONDS (answers in between reuse that read), so
+peers asking in a loop cannot starve the exclusive lock that reservations and halts need.
 
 Stopping and restarting serve: SIGTERM (systemctl stop) closes the socket at once, reserves
 nothing more, lets the calls already in flight finish and settle (a reply that cannot be written
@@ -27,13 +58,19 @@ Provably unsent calls (by design): if the TCP connect or the TLS handshake fails
 byte is written, nothing billable reached the provider. That call's hold is released and only it
 fails; the gate does not halt. UNSENT_HALT_STREAK such failures in a row (kept in the control
 file, so a restart does not reset them) halt with provider_unreachable. Any settled reply or an
-activation resets the streak. Anything after the connect stays uncertain and halts as before.
+activation resets the streak. Anything after the connect stays uncertain and halts as before,
+with one exception (owner ruling 5, 2026-10-10): a reply the profile's unbilled_refusal proves
+unbilled (DeepInfra: a 429 with an error and no usage, choices or estimated_cost anywhere) is
+handled exactly like a provably unsent call. The caller sees PROVIDER_NOT_REACHED or
+PROVIDER_REFUSED_UNBILLED for these two (nothing billed, hold released); every other refusal
+outside the three pot codes is the opaque PREVIEW_TEST_AUTHORITY_STOPPED.
 
 Day boundary (by design): a call is charged to the Bucharest day on which it was reserved, even
 when it settles after midnight. So the real upstream charges made within one calendar day can
-exceed daily_budget_usd by up to max_concurrent_calls x one reservation (about $0.08-0.12 each):
-calls reserved just before midnight are paid just after it, while the new day's pot is already
-open.
+exceed daily_budget_usd by up to max_concurrent_calls x the largest enabled reservation (at most
+the profile's per_call_cap_usd each): calls reserved just before midnight are paid just after it, while
+the new day's pot is already open. A probe runs beside serve, so for its one call up to
+max_concurrent_calls + 1 calls may be in flight; the pot itself is still checked under the lock.
 """
 import argparse
 import fcntl
@@ -50,18 +87,26 @@ import threading
 import time
 import types
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from socketserver import ThreadingMixIn
 from zoneinfo import ZoneInfo
 
 sys.dont_write_bytecode = True
-MODEL = 'zai-org/GLM-5.3-Flash'
-OUTPUT_BOUND = 163840
-GO_SCHEMA = 'preview-provider-budget-go-v2'
-CONTROL_SCHEMA = 'preview-provider-budget-control-v2'
-DAY_SCHEMA = 'preview-provider-budget-day-v2'
+GO_SCHEMA = 'preview-provider-budget-go-v3'
+CONTROL_SCHEMA = 'preview-provider-budget-control-v3'
+DAY_SCHEMA = 'preview-provider-budget-day-v3'
+RESERVATION_OVERHEAD_BYTES = 2048  # Bytes the provider may add around the request (the app reserves the same).
+# Outer bounds on what a profile may declare as its own per-call cap and request size (DeepInfra:
+# $0.25 and 256 KiB). A unit test pins every reviewed row under its profile's cap.
+MAX_PROFILE_CALL_CAP_USD = Decimal('1.00')
+MAX_PROFILE_REQUEST_BYTES = 1024 * 1024
+MAX_PRICE_USD_PER_M = Decimal('10.00')  # A price above this is a typo, not a preview model.
+MAX_OUTPUT_BOUND = 1048576
+MODEL_ID_PATTERN = re.compile(r'([A-Za-z0-9][A-Za-z0-9._-]{0,63}/)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}')
+MAX_REMAINING_IPC_BYTES = 4096
+REMAINING_MIN_SECONDS = 1.0  # /remaining reads the state at most this often (see RemainingAnswers).
 TEAM_DAY_ZONE = 'Europe/Bucharest'
 CONTROL_NAME = 'team-control.json'
 LOCK_NAME = 'team.lock'
@@ -85,15 +130,23 @@ IPC_READ_TIMEOUT_SECONDS = 10  # Each header or body read on the 0666 socket.
 MAX_IPC_CONNECTIONS = 32  # Connections beyond this are closed unread, without a thread.
 UNSENT_HALT_STREAK = 5  # Provably unsent calls in a row before the gate halts (provider_unreachable).
 STOPPED = 'PREVIEW_TEST_AUTHORITY_STOPPED'
-PUBLIC_REFUSALS = frozenset({'TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED'})
-GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'model', 'requested_effort',
+# Codes the caller may see. The last two mean this call's hold is already released and nothing was
+# billed (not reached; an unbilled refusal), so the app may treat them as a transient failure.
+PUBLIC_REFUSALS = frozenset({'TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED',
+                             'PROVIDER_NOT_REACHED', 'PROVIDER_REFUSED_UNBILLED'})
+GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'provider', 'enabled_models',
                          'scope_id', 'target_host', 'allowed_peer_uids', 'daily_budget_usd', 'max_paid_posts_per_day',
                          'max_concurrent_calls', 'open_days'})
 GO_OPTIONAL = frozenset({'predecessor_ledger_sha256'})
 DAY_PATTERN = re.compile(r'[0-9]{4}-[0-9]{2}-[0-9]{2}')
 SOCKET_PATTERN = re.compile(r'/run/debateai-v3-preview/[a-z0-9-]+\.sock')
-RETIRED_SOCKET_NAMES = frozenset({'provider-budget.sock'})  # v1's name: old clients must never reach v2.
+# v1's and v2's names: a client still configured for an older gate must never reach this one.
+RETIRED_SOCKET_NAMES = frozenset({'provider-budget.sock', 'team-budget-v2.sock'})
 STALE_PROBE_SECONDS = 2
+CALL_ENTRY_PREFIX = 'preview-test:'
+PROBE_ENTRY_PREFIX = 'preview-probe:'
+PROBE_LOCK_NAME = 'team-probe.lock'  # Held by a running probe; serve start and reservations check it.
+PROBE_EXCERPT_CHARS = 80
 ENTRY_STATES = ('pending', 'settled', 'uncertain')
 
 
@@ -212,15 +265,74 @@ def _int_in(value, low, high):
     return type(value) is int and low <= value <= high
 
 
+def reservation_for(request_bytes, row, prices):
+    """One call's hold: (request bytes + 2048) x input price + output bound x output price, per
+    million tokens, at the given (input, output) prices. The app computes the same figure in nano-USD."""
+    input_price, output_price = prices
+    return (Decimal(request_bytes + RESERVATION_OVERHEAD_BYTES) * input_price
+            + Decimal(row.output_bound) * output_price) / Decimal(1000000)
+
+
+def worst_case_reservation(profile, row):
+    """A full-size request at the highest prices the row can ever reserve at (ceiling_prices):
+    one figure for the per-call cap, the activate check and /remaining, whatever the date."""
+    return reservation_for(profile.max_request_bytes, row, profile.ceiling_prices(row))
+
+
+def _price_ok(value):
+    return type(value) is Decimal and value.is_finite() and Decimal(0) < value <= MAX_PRICE_USD_PER_M
+
+
+def prices_ok(prices):
+    return isinstance(prices, tuple) and len(prices) == 2 and all(_price_ok(price) for price in prices)
+
+
+def row_reviewed(profile, model, row):
+    """A row the gate will price with: positive ceiling prices under MAX_PRICE_USD_PER_M, a sane
+    bound, a known effort rule, a valid path, and a full-size request that reserves no more than
+    the profile's per-call cap."""
+    return bool(isinstance(model, str) and MODEL_ID_PATTERN.fullmatch(model) and '..' not in model
+                and getattr(row, 'model', None) == model and isinstance(row.maker, str) and 1 <= len(row.maker) <= 64
+                and prices_ok(profile.ceiling_prices(row)) and helper.path_valid(profile.path_for(row))
+                and _int_in(row.output_bound, 1, MAX_OUTPUT_BOUND) and row.effort in ('high', None)
+                and type(row.json_object) is bool and worst_case_reservation(profile, row) <= profile.per_call_cap_usd)
+
+
+def profile_of(provider):
+    """The reviewed profile a GO names, or None. Its cap and size must be in bounds and every row
+    of it must pass review."""
+    profile = helper.PROFILES.get(provider) if isinstance(provider, str) else None
+    try:
+        reviewed = bool(
+            profile is not None and getattr(profile, 'name', None) == provider and profile.rows
+            and type(profile.per_call_cap_usd) is Decimal and Decimal(0) < profile.per_call_cap_usd <= MAX_PROFILE_CALL_CAP_USD
+            and _int_in(profile.max_request_bytes, 1024, MAX_PROFILE_REQUEST_BYTES)
+            and all(row_reviewed(profile, m, r) for m, r in profile.rows.items()))
+    except Exception:  # noqa: BLE001 - a profile that cannot even be checked is not reviewed
+        reviewed = False
+    return profile if reviewed else None
+
+
+def enabled_models_valid(models, profile):
+    return bool(profile is not None and isinstance(models, list) and models
+                and all(isinstance(model, str) and model in profile.rows for model in models)
+                and len(set(models)) == len(models))
+
+
+def largest_reservation(profile, models):
+    return max(worst_case_reservation(profile, profile.rows[model]) for model in models)
+
+
 def valid_go(go):
     if not isinstance(go, dict) or not GO_REQUIRED <= set(go) or not set(go) <= GO_REQUIRED | GO_OPTIONAL:
         return False
     budget, uids = go['daily_budget_usd'], go['allowed_peer_uids']
     predecessor = go.get('predecessor_ledger_sha256', '0' * 64)
+    profile = profile_of(go['provider'])
     return bool(
         go['schema'] == GO_SCHEMA and go['allow_paid_calls'] is True
         and go['bridge_sha256'] == BRIDGE_SHA256 and go['helper_sha256'] == HELPER_SHA256
-        and go['model'] == MODEL and go['requested_effort'] == 'high'
+        and enabled_models_valid(go['enabled_models'], profile)
         and isinstance(go['scope_id'], str) and re.fullmatch(r'[a-z0-9][a-z0-9-]{0,95}', go['scope_id'])
         and isinstance(go['target_host'], str) and re.fullmatch(r'[A-Za-z0-9.-]{1,128}', go['target_host'])
         and isinstance(uids, list) and uids and all(type(uid) is int and uid >= 0 for uid in uids)
@@ -272,8 +384,14 @@ def day_spend(ledger):
 
 
 def validate_control(control):
+    # Only the shape of provider and enabled_models: a later code change that drops a row must never
+    # make the state unreadable, or stop and status (the emergency switch) would refuse too. The
+    # GO check, run before every paid call, is where rows are judged.
     in_flight = control.get('in_flight') if isinstance(control, dict) else None
+    models = control.get('enabled_models') if isinstance(control, dict) else None
     if not (isinstance(control, dict) and control.get('schema') == CONTROL_SCHEMA
+            and isinstance(control.get('provider'), str) and isinstance(models, list) and models
+            and all(isinstance(model, str) for model in models)
             and control.get('state') in ('initialized', 'active', 'halted') and isinstance(control.get('limits'), dict)
             and isinstance(in_flight, dict) and all(isinstance(k, str) and isinstance(v, str) and DAY_PATTERN.fullmatch(v)
                                                     for k, v in in_flight.items())):
@@ -354,17 +472,33 @@ def _halt(control, reason, moment, entry_id=None):
         control['halts_dropped'] = control.get('halts_dropped', 0) + 1
 
 
+def spend_by_model(ledger):
+    """Today's held amount and call count per model (every entry records its model)."""
+    totals = {}
+    for entry in ledger['entries'].values():
+        model = entry.get('model') if isinstance(entry.get('model'), str) else 'unknown'
+        spend, posts = totals.get(model, (Decimal(0), 0))
+        totals[model] = (spend + helper.decimal_amount(entry['held_usd']), posts + 1)
+    return {model: {'spend_usd': format(spend, 'f'), 'posts': posts} for model, (spend, posts) in sorted(totals.items())}
+
+
+def window_open(control, moment):
+    return control['state'] == 'active' and moment < datetime.fromisoformat(control['open_until_utc'])
+
+
 def day_summary(control, ledger, moment):
     budget, spend = Decimal(control['limits']['daily_budget_usd']), day_spend(ledger)
     open_until = control.get('open_until_utc')
     return {'state': control['state'], 'reason': control['reason'], 'halted_at': control.get('halted_at'),
+            'provider': control['provider'], 'enabled_models': control['enabled_models'],
             'unsent_streak': control.get('unsent_streak', 0), 'open_until_utc': open_until,
-            'window_open': control['state'] == 'active' and moment < datetime.fromisoformat(open_until),
+            'window_open': window_open(control, moment),
             'today': ledger['day'], 'daily_budget_usd': control['limits']['daily_budget_usd'],
-            'today_spend_usd': str(spend), 'remaining_today_usd': str(max(Decimal(0), budget - spend)),
+            'today_spend_usd': format(spend, 'f'), 'remaining_today_usd': format(max(Decimal(0), budget - spend), 'f'),
             'today_posts': len(ledger['entries']), 'max_paid_posts_per_day': control['limits']['max_paid_posts_per_day'],
             'in_flight': len(control['in_flight']),
             'today_uncertain': sum(1 for entry in ledger['entries'].values() if entry['state'] == 'uncertain'),
+            'today_by_model': spend_by_model(ledger),
             'halts': control.get('halts', []), 'halts_dropped': control.get('halts_dropped', 0)}
 
 
@@ -375,14 +509,14 @@ def init_state(private, go_path, now=None):
         if store.has_control():
             raise SafetyError('STATE_ALREADY_EXISTS')
         control = {'schema': CONTROL_SCHEMA, 'scope_id': go['scope_id'], 'target_host': go['target_host'],
-                   'state': 'initialized', 'reason': None, 'go_sha256': go_sha, 'limits': limits_of(go),
+                   'provider': go['provider'], 'enabled_models': go['enabled_models'], 'state': 'initialized', 'reason': None, 'go_sha256': go_sha, 'limits': limits_of(go),
                    'predecessor_ledger_sha256': go.get('predecessor_ledger_sha256'),
                    'initialized_at': iso(current(now)), 'activated_at': None, 'active_host': None,
                    'open_until_utc': None, 'halted_at': None, 'activations': 0, 'in_flight': {},
                    'halts': [], 'halts_dropped': 0}
         store.save_control(control)
     return {'state': 'initialized', 'scope_id': go['scope_id'], 'target_host': go['target_host'],
-            'go_sha256': go_sha, 'predecessor_ledger_sha256': control['predecessor_ledger_sha256']}
+            'provider': go['provider'], 'enabled_models': go['enabled_models'], 'go_sha256': go_sha, 'predecessor_ledger_sha256': control['predecessor_ledger_sha256']}
 
 
 def activate(private, go_path, host=None, platform=None, now=None):
@@ -391,12 +525,18 @@ def activate(private, go_path, host=None, platform=None, now=None):
     host, platform = host or socket.gethostname(), platform or sys.platform
     if platform != 'linux' or host != go['target_host']:
         raise SafetyError('ACTIVATION_REFUSED')
+    # Every slot holding the largest enabled worst case at once must still fit the day's pot.
+    profile = profile_of(go['provider'])
+    if go['max_concurrent_calls'] * largest_reservation(profile, go['enabled_models']) > Decimal(go['daily_budget_usd']):
+        raise SafetyError('CONCURRENCY_EXCEEDS_BUDGET')
     with TeamStore(private) as store:
         control = store.control()
-        if control['state'] not in ('initialized', 'halted') or control['scope_id'] != go['scope_id']:
+        if control['state'] not in ('initialized', 'halted') or control['scope_id'] != go['scope_id'] \
+                or control['provider'] != go['provider']:
             raise SafetyError('ACTIVATION_REFUSED')
         moment = current(now)
         control.update(state='active', last_halt_reason=control['reason'], reason=None, go_sha256=go_sha,
+                       enabled_models=go['enabled_models'],
                        limits=limits_of(go), target_host=go['target_host'], active_host=host,
                        activated_at=iso(moment), open_until_utc=iso(moment + timedelta(days=go['open_days'])),
                        activations=control['activations'] + 1, unsent_streak=0)
@@ -426,75 +566,115 @@ def status(private, now=None):
         return day_summary(control, store.ledger(bucharest_day(moment)), moment)
 
 
-def valid_response_format(body):
-    if not isinstance(body, dict):
-        return False
-    fields = {'model', 'reasoning_effort', 'max_tokens', 'messages'}
-    if set(body) == fields:
-        return True
-    if set(body) != fields | {'response_format'}:
-        return False
-    mode = body['response_format']
-    return isinstance(mode, dict) and set(mode) == {'type'} and mode['type'] == 'json_object'
+def validate_request(input, go, probe=False, moment=None):
+    """The exact outgoing bytes, the reservation, the model row and the reservation prices of one
+    request, or a refusal.
 
-
-def validate_request(input, go):
+    Pure: no state, no key. The model is looked up first: a model that is not a reviewed row of the
+    GO's profile, or (outside a probe) not in the GO's enabled_models, is refused here, so before
+    any reservation or key read. Then the row's own request rules (effort, JSON mode, max_tokens
+    bound) and the reservation at the profile's prices for this moment (never above the row's
+    ceiling), which must equal the caller's to the digit.
+    """
+    profile = profile_of(go['provider'])
+    if profile is None:
+        raise SafetyError('ROOT_GO_INVALID')
     if not isinstance(input, dict) or set(input) != {'scope_id', 'operationId', 'requestBody', 'requestSha256', 'reservedUsd'} \
             or input['scope_id'] != go['scope_id'] or not isinstance(input['operationId'], str) \
             or not re.fullmatch(r'[A-Za-z0-9-]{1,96}', input['operationId']) or not isinstance(input['requestBody'], str) \
-            or len(input['requestBody'].encode()) > 256 * 1024 \
+            or len(input['requestBody'].encode()) > profile.max_request_bytes \
             or hashlib.sha256(input['requestBody'].encode()).hexdigest() != input['requestSha256']:
         raise SafetyError('REQUEST_SCOPE_INVALID')
     try:
         body = json.loads(input['requestBody'])
     except ValueError:
         raise SafetyError('REQUEST_INVALID') from None
-    if not valid_response_format(body) or body['model'] != MODEL or body['reasoning_effort'] != 'high' \
-            or type(body['max_tokens']) is not int or not 1 <= body['max_tokens'] <= OUTPUT_BOUND \
-            or not isinstance(body['messages'], list) or not body['messages'] \
-            or any(not isinstance(m, dict) or set(m) != {'role', 'content'} or m['role'] not in ('system', 'user', 'assistant')
-                   or not isinstance(m['content'], str) for m in body['messages']):
+    model = profile.requested_model(body)
+    if not isinstance(model, str):
+        raise SafetyError('REQUEST_PARAMETERS_INVALID')
+    row = profile.rows.get(model)
+    if row is None or not (probe or model in go['enabled_models']):
+        raise SafetyError('MODEL_NOT_ALLOWED')
+    if not profile.body_valid(body, row):
         raise SafetyError('REQUEST_PARAMETERS_INVALID')
     raw = input['requestBody'].encode()
     # The exact bytes that will go upstream, fixed before any reservation: a body that cannot be
     # encoded (a lone UTF-16 surrogate) is refused here, never after the connection opens. The
     # reservation prices len(raw), so the bytes sent may never be longer than that.
     try:
-        outgoing = helper.canonical(body)
+        outgoing = profile.request_bytes(body)
     except (UnicodeError, ValueError, TypeError):
         raise SafetyError('REQUEST_INVALID') from None
     if not isinstance(outgoing, bytes) or len(outgoing) > len(raw):
         raise SafetyError('REQUEST_INVALID')
-    reserved = (Decimal(len(raw) + 2048) * Decimal('0.15') + Decimal(OUTPUT_BOUND) * Decimal('0.50')) / Decimal(1000000)
+    prices, ceiling = profile.reservation_prices(row, moment or helper.utc_now()), profile.ceiling_prices(row)
+    if not prices_ok(prices) or prices[0] > ceiling[0] or prices[1] > ceiling[1] \
+            or not helper.path_valid(profile.path_for(row)):
+        raise SafetyError('REQUEST_INVALID')  # Cannot happen for a reviewed profile; checked anyway.
+    reserved = reservation_for(len(raw), row, prices)
+    if reserved > profile.per_call_cap_usd:
+        raise SafetyError('REQUEST_INVALID')  # Cannot happen for a reviewed row; checked anyway.
     if helper.decimal_amount(input['reservedUsd']) != reserved:
         raise SafetyError('RESERVATION_MISMATCH')
-    return outgoing, reserved
+    return outgoing, reserved, row, prices
 
 
-def reserve_call(private, go, go_sha, input, reserved, host, peer_uid, now):
+def probe_running(store):
+    """Whether a probe process holds the probe lock right now (a non-blocking try; never waits)."""
+    if not helper.file_exists(store.dir_fd, PROBE_LOCK_NAME):
+        return False
+    fd = helper.secure_open(store.dir_fd, PROBE_LOCK_NAME, os.O_RDONLY)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return True
+    finally:
+        os.close(fd)
+    return False
+
+
+def entry_id_of(go, input, probe=False):
+    # A probe's entries have their own prefix, which no IPC operationId can produce.
+    return (PROBE_ENTRY_PREFIX if probe else CALL_ENTRY_PREFIX) + go['scope_id'] + ':' + input['operationId']
+
+
+def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now, probe=False, prices=None):
     """Lock, check state and today's team limits, durably write the pending hold, unlock."""
+    prices = (row.input_usd_per_m, row.output_usd_per_m) if prices is None else prices
     with TeamStore(private) as store:
         control = store.control()
         if control['state'] != 'active' or control['go_sha256'] != go_sha or control['active_host'] != host \
                 or control['scope_id'] != go['scope_id']:
             raise SafetyError('AUTHORITY_STOPPED')
         moment = current(now)
+        # A probe id still in flight while no probe holds the probe lock: that probe died or could
+        # not settle, so its hold may be paid and unrecorded. Halt, as serve start does for a crash.
+        probes = sorted(i for i in control['in_flight'] if i.startswith(PROBE_ENTRY_PREFIX))
+        if probes and not probe_running(store):
+            _halt(control, 'interrupted_probe', moment, probes[0])
+            store.save_control(control)
+            raise SafetyError('AUTHORITY_STOPPED')
         if moment >= datetime.fromisoformat(control['open_until_utc']):
             _halt(control, 'open_window_expired', moment)
             store.save_control(control)
             raise SafetyError('AUTHORITY_EXPIRED')
         day = bucharest_day(moment)
         ledger = store.ledger(day)
-        entry_id = 'preview-test:' + go['scope_id'] + ':' + input['operationId']
+        entry_id = entry_id_of(go, input, probe)
         if entry_id in ledger['entries'] or entry_id in control['in_flight']:
             raise SafetyError('DUPLICATE_OPERATION')
         if len(ledger['entries']) >= go['max_paid_posts_per_day']:
             raise SafetyError('DAILY_CALL_LIMIT_REACHED')
         if day_spend(ledger) + reserved > Decimal(go['daily_budget_usd']):
             raise SafetyError('TEAM_DAILY_BUDGET_REACHED')
+        # The entry records what this call was priced as: identity checks and settlement use it.
         ledger['entries'][entry_id] = {'state': 'pending', 'reserved_usd': str(reserved), 'held_usd': str(reserved),
                                        'reserved_at': iso(moment), 'request_sha256': input['requestSha256'],
-                                       'requested_effort': 'high', 'model': MODEL, 'peer_uid': peer_uid}
+                                       'provider': go['provider'], 'model': row.model, 'maker': row.maker,
+                                       'reserve_input_usd_per_m': str(prices[0]), 'reserve_output_usd_per_m': str(prices[1]),
+                                       'output_bound': row.output_bound,
+                                       'requested_effort': row.effort or 'none', 'peer_uid': peer_uid,
+                                       **({'probe': True} if probe else {})}
         data = helper.encode_json(ledger)
         if len(data) > DAY_LEDGER_RESERVE_BYTES:
             raise SafetyError('DAY_LEDGER_FULL')
@@ -546,6 +726,10 @@ def record_settlement(private, entry_id, day, changes, halt_reason, budget, now)
 class CallNotSent(SafetyError):
     """This call failed before any request byte was written, and its hold was released. The IPC
     handler does not halt for it: nothing paid can have been lost."""
+
+
+class UnbilledRefusal(Exception):
+    """The provider answered with a refusal its profile proves unbilled: handled as not sent."""
 
 
 def release_unsent(private, entry_id, day, now):
@@ -618,13 +802,18 @@ class CallSlots:
 
 
 def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, key_loader=None, host=None,
-                    platform=None, now=None, slot_wait=SLOT_WAIT_SECONDS, cancelled=None, on_reserved=None):
+                    platform=None, now=None, slot_wait=SLOT_WAIT_SECONDS, cancelled=None, on_reserved=None,
+                    probe=False, on_settled=None):
+    """One paid call. probe is only ever passed by probe() (root, checked there): it allows a
+    reviewed model the GO does not enable and root as the caller; everything else is the same."""
     accepted = time.monotonic()
     now = now or helper.utc_now
     go, go_sha = load_go(go_path)
-    outgoing, reserved = validate_request(input, go)
+    profile = profile_of(go['provider'])
+    outgoing, reserved, row, prices = validate_request(input, go, probe=probe, moment=current(now))
     host, platform = host or socket.gethostname(), platform or sys.platform
-    if platform != 'linux' or host != go['target_host'] or type(peer_uid) is not int or peer_uid not in go['allowed_peer_uids']:
+    if platform != 'linux' or host != go['target_host'] or type(peer_uid) is not int \
+            or not (peer_uid in go['allowed_peer_uids'] or probe and peer_uid == 0):
         raise SafetyError('EXECUTION_AUTHORITY_REFUSED')
     if slots.limit != go['max_concurrent_calls']:
         raise SafetyError('SERVE_RESTART_REQUIRED')
@@ -636,17 +825,23 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         key = (key_loader or helper.read_key)(private)
         if slots.tripped:
             raise SafetyError('AUTHORITY_STOPPED')
-        entry_id, day = reserve_call(private, go, go_sha, input, reserved, host, peer_uid, now)
+        entry_id, day = reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now, probe, prices)
         if on_reserved is not None:
             on_reserved(entry_id)
         budget, started = Decimal(go['daily_budget_usd']), time.monotonic()
         event = {'event': 'preview_provider_paid_post', 'operation_id': input['operationId'], 'day': day}
         try:
             # The upstream timeout is what remains after the slot wait and the reservation lock.
-            send = dispatch or helper.HttpsTransport(timeout=max(1.0, CALL_DEADLINE_SECONDS - (time.monotonic() - accepted)))
+            send = dispatch or helper.HttpsTransport(timeout=max(1.0, CALL_DEADLINE_SECONDS - (time.monotonic() - accepted)),
+                                                     profile=profile, path=profile.path_for(row))
             status, response = send(outgoing, key)
-            response = helper.redact(response if isinstance(response, dict) else {}, key)
-        except helper.RequestNotSent:
+            response = helper.redact(response if isinstance(response, dict) else {}, key, profile.redaction_patterns)
+            # Owner ruling 5 (2026-10-10): a refusal the profile proves unbilled (DeepInfra: a 429
+            # with an error and no usage, choices or cost anywhere) counts as not sent. A hook that
+            # fails lands in the uncertain branch below, as any doubt does.
+            if profile.unbilled_refusal(status, response):
+                raise UnbilledRefusal()
+        except (helper.RequestNotSent, UnbilledRefusal) as unsent:
             try:
                 outcome = release_unsent(private, entry_id, day, now)
             except BaseException:
@@ -656,8 +851,9 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
                     'elapsed_seconds': round(time.monotonic() - started, 6)}, 'uncertain_charge', budget, now, slots)
                 log_event({**event, 'status': 'uncertain', **outcome})
                 raise SafetyError('NEW_CHARGE_UNCERTAIN') from None
-            log_event({**event, 'status': 'not_sent', **outcome})
-            raise CallNotSent('PROVIDER_NOT_REACHED') from None
+            refused = isinstance(unsent, UnbilledRefusal)
+            log_event({**event, 'status': 'not_sent', 'reason': 'unbilled_refusal' if refused else 'not_reached', **outcome})
+            raise CallNotSent('PROVIDER_REFUSED_UNBILLED' if refused else 'PROVIDER_NOT_REACHED') from None
         except BaseException as error:
             outcome = settle_or_halt(private, entry_id, day, {
                 'state': 'uncertain', 'held_usd': str(reserved), 'reason': 'transport_failure',
@@ -667,15 +863,18 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             raise SafetyError('NEW_CHARGE_UNCERTAIN') from None
         elapsed = round(time.monotonic() - started, 6)
         try:
-            changes, halt_reason, charge, reply = assess_reply(status, response, reserved, elapsed)
+            changes, halt_reason, charge, reply = assess_reply(status, response, reserved, elapsed, profile, row,
+                                                               current(now))
         except BaseException:
             # Paid but unaccountable: keep the full hold and stop, as for a transport failure.
             changes, halt_reason, charge, reply = ({'state': 'uncertain', 'held_usd': str(reserved),
                                                     'reason': 'accounting_failure', 'elapsed_seconds': elapsed},
                                                    'uncertain_charge', None, None)
         outcome = settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots)
-        log_event({**event, 'status': changes['state'], 'halt_reason': halt_reason, 'guard_charge_usd': charge,
-                   'elapsed_seconds': elapsed, **outcome})
+        log_event({**event, 'model': row.model, 'status': changes['state'], 'halt_reason': halt_reason,
+                   'guard_charge_usd': charge, 'elapsed_seconds': elapsed, **outcome})
+        if on_settled is not None:
+            on_settled({'changes': changes, 'halt_reason': halt_reason, 'response': response, 'row': row, **outcome})
         if charge is None:
             raise SafetyError('NEW_CHARGE_UNCERTAIN')
         if halt_reason is not None:
@@ -685,11 +884,22 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         slots.release()
 
 
-def assess_reply(status, response, reserved, elapsed):
-    """Ledger changes, halt reason, guard charge and caller reply for one redacted provider reply."""
-    accounting = bounded_accounting(helper.account_response(response))
+def bounded_model_name(value):
+    """What a reply named as its model, kept short in the ledger (any other value is recorded as None)."""
+    return value if isinstance(value, str) and len(value) <= 128 else None
+
+
+def assess_reply(status, response, reserved, elapsed, profile, row, moment):
+    """Ledger changes, halt reason, guard charge and caller reply for one redacted provider reply.
+    Settled at the profile's prices for this row and moment (recorded in the entry); the reply
+    must name this call's own model, not just any reviewed or enabled one."""
+    accounting = bounded_accounting(profile.account(response, row, moment))
     charge = accounting.get('guard_charge_usd')
-    changes = {'accounting': accounting, 'elapsed_seconds': elapsed, 'http_status': status if type(status) is int else None}
+    named = profile.reply_model(response)
+    changes = {'accounting': accounting, 'elapsed_seconds': elapsed, 'http_status': status if type(status) is int else None,
+               'reply_model': bounded_model_name(named),
+               'settle_input_usd_per_m': accounting.get('input_usd_per_m'),
+               'settle_output_usd_per_m': accounting.get('output_usd_per_m')}
     if charge is None or accounting.get('usage_valid') is not True:
         # A reported cost alone is not usage: without valid token counts the charge is uncertain.
         # With both, the guard charge is the larger of the token list price and the reported cost.
@@ -699,12 +909,179 @@ def assess_reply(status, response, reserved, elapsed):
     changes.update(state='settled', held_usd=str(amount), overrun_usd=str(max(Decimal(0), amount - reserved)))
     if amount > reserved:
         halt_reason = 'charge_overrun'
-    elif status != 200 or response.get('model') != MODEL:
+    elif status != 200 or named != row.model:
         halt_reason = 'provider_error_or_model_identity'
     else:
         halt_reason = None
     # ASCII escapes keep any lone surrogate in a provider reply encodable all the way to the caller.
     return changes, halt_reason, charge, {'status': status, 'body': json.dumps(response, ensure_ascii=True, default=str)}
+
+
+NANO_USD = Decimal('0.000000001')  # /remaining's amounts: the app parses at most 9 decimals.
+
+
+def nano_text(amount, rounding):
+    """Plain decimal text with at most 9 decimals; only an amount with more is rounded (as told)."""
+    if amount.as_tuple().exponent < -9:
+        amount = amount.quantize(NANO_USD, rounding=rounding)
+    return format(amount, 'f')
+
+
+def remaining_input_valid(input):
+    return isinstance(input, dict) and set(input) == {'scope_id'} and isinstance(input['scope_id'], str)
+
+
+def remaining_snapshot(private, go_path, slots=None, now=None):
+    """(scope_id, allowed peer uids, reply) for POST /remaining: what is left today, read-only
+    (shared lock; no file is created or written; the key is never read). The uids are those of the
+    GO on disk now (none if it does not load), as /complete re-checks them on every call.
+
+    window_open says whether a call could be reserved right now apart from money and count: the
+    state is active, the window has not run out, the GO on disk is the one activated, and this
+    server has not stopped reserving (a stop, a trip, or a concurrency change awaiting restart).
+    """
+    now = now or helper.utc_now
+    with TeamStore(private, shared=True) as store:
+        control = store.control()
+        moment = current(now)
+        ledger = store.ledger(bucharest_day(moment))
+    try:
+        go, go_sha = load_go(go_path)
+        go_current, allowed = go_sha == control['go_sha256'], frozenset(go['allowed_peer_uids'])
+    except SafetyError:
+        go_current, allowed = False, frozenset()
+    limits = control['limits']
+    serving = slots is None or (not slots.tripped and slots.limit == limits['max_concurrent_calls'])
+    budget, spend = Decimal(limits['daily_budget_usd']), day_spend(ledger)
+    profile = profile_of(control['provider'])
+    if profile is None or not all(model in profile.rows for model in control['enabled_models']):
+        raise SafetyError('REMAINING_UNAVAILABLE')  # The state names a row this code no longer reviews.
+    return control['scope_id'], allowed, {
+            'state': control['state'], 'window_open': bool(window_open(control, moment) and go_current and serving),
+            # The app reads amounts as exact nano-USD (at most 9 decimals). A provider's reported cost
+            # can carry more, so what is left is rounded DOWN and the largest hold UP: never in the
+            # app's favour.
+            'remaining_usd': nano_text(max(Decimal(0), budget - spend), ROUND_FLOOR),
+            'remaining_calls': max(0, limits['max_paid_posts_per_day'] - len(ledger['entries'])),
+            'max_concurrent_calls': limits['max_concurrent_calls'],
+            'largest_reservation_usd': nano_text(largest_reservation(profile, control['enabled_models']), ROUND_CEILING),
+            'enabled_models': list(control['enabled_models'])}
+
+
+def remaining_answer(snapshot, input, uid):
+    scope_id, allowed, reply = snapshot
+    if uid is not None and uid not in allowed:
+        raise SafetyError('IPC_REQUEST_REFUSED')
+    if input['scope_id'] != scope_id:
+        raise SafetyError('REMAINING_REQUEST_INVALID')
+    return reply
+
+
+def remaining_report(private, go_path, input, slots=None, now=None, uid=None):
+    """One /remaining answer for exactly {"scope_id": <this state's scope>} (and, with uid, a peer
+    the GO on disk allows); anything else refuses."""
+    if not remaining_input_valid(input):
+        raise SafetyError('REMAINING_REQUEST_INVALID')
+    return remaining_answer(remaining_snapshot(private, go_path, slots, now), input, uid)
+
+
+class RemainingAnswers:
+    """serve's /remaining: the state is read at most once per REMAINING_MIN_SECONDS, by one thread
+    at a time, and every answer in between reuses that read (or its refusal). So a peer asking in a
+    loop, even on every connection slot, cannot keep the shared lock held and starve the exclusive
+    lock that reservations, settlements and halts need. The input is checked on every request."""
+
+    def __init__(self, private, go_path, slots, min_seconds=None, clock=time.monotonic, now=None):
+        self.private, self.go_path, self.slots, self.clock, self.now = private, go_path, slots, clock, now
+        self.min_seconds = REMAINING_MIN_SECONDS if min_seconds is None else min_seconds
+        self._lock, self._at, self._snapshot = threading.Lock(), None, None
+
+    def __call__(self, input, uid=None):
+        if not remaining_input_valid(input):
+            raise SafetyError('REMAINING_REQUEST_INVALID')
+        with self._lock:
+            if self._at is None or self.clock() - self._at >= self.min_seconds:
+                try:
+                    self._snapshot = remaining_snapshot(self.private, self.go_path, self.slots, self.now)
+                except SafetyError:
+                    self._snapshot = None
+                self._at = self.clock()
+            snapshot = self._snapshot
+        if snapshot is None:
+            raise SafetyError('REMAINING_UNAVAILABLE')
+        return remaining_answer(snapshot, input, uid)
+
+
+def probe_summary(observed, profile):
+    """The probe's printout: no key (the reply was redacted with it) and no reply text beyond a
+    short, single-line excerpt."""
+    response, row, accounting = observed['response'], observed['row'], observed['changes'].get('accounting') or {}
+    text = profile.reply_text(response)
+    excerpt = re.sub(r'\s+', ' ', text)[:PROBE_EXCERPT_CHARS] if isinstance(text, str) else None
+    max_tokens, completion = min(1024, row.output_bound), accounting.get('completion_tokens')
+    return {'status': 'probed', 'provider': profile.name, 'model': row.model, 'maker': row.maker,
+            'sent': {'max_tokens': max_tokens, 'effort': row.effort or 'none'},
+            # A model that bills past max_tokens would overrun its reservation in real use: do not enable it.
+            'completion_within_max_tokens': completion <= max_tokens if type(completion) is int else None,
+            'http_status': observed['changes'].get('http_status'),
+            'model_echoed_exactly': observed['changes'].get('reply_model') == row.model,
+            'reply_model': observed['changes'].get('reply_model'),
+            'usage': {name: accounting.get(name) for name in ('prompt_tokens', 'completion_tokens', 'total_tokens',
+                                                             'reasoning_tokens', 'cached_tokens', 'usage_valid')},
+            'guard_charge_usd': accounting.get('guard_charge_usd'),
+            'provider_estimated_cost_usd': accounting.get('provider_estimated_cost_usd'),
+            'entry_state': observed['changes'].get('state'), 'halt_reason': observed['halt_reason'],
+            'authority': observed.get('authority'), 'reply_excerpt': excerpt}
+
+
+def probe(private, go_path, model, *, dispatch=None, key_loader=None, host=None, platform=None, uid=None, now=None):
+    """Root only: one tiny paid call ("Reply exactly: OK") to a reviewed model of the GO's provider,
+    even one the GO does not enable yet, through the normal reserve/settle/halt path. It counts in
+    today's pot and call count, and a non-200 reply or another model in the reply halts the gate
+    like any call. Prints status, whether the reply named the exact model, usage and the charge."""
+    go = read_go(go_path)
+    host, platform = host or socket.gethostname(), platform or sys.platform
+    uid = os.getuid() if uid is None else uid
+    if platform != 'linux' or uid != 0 or host != go['target_host']:
+        raise SafetyError('ROOT_PROBE_REFUSED')
+    profile = profile_of(go['provider'])
+    row = profile.rows.get(model) if isinstance(model, str) else None
+    if row is None:
+        raise SafetyError('MODEL_NOT_REVIEWED')
+    raw = json.dumps(profile.probe_body(row), ensure_ascii=False, separators=(',', ':'))
+    prices = profile.reservation_prices(row, current(now or helper.utc_now))
+    request = {'scope_id': go['scope_id'], 'operationId': 'probe-%x' % time.time_ns(), 'requestBody': raw,
+               'requestSha256': hashlib.sha256(raw.encode()).hexdigest(),
+               'reservedUsd': str(reservation_for(len(raw.encode()), row, prices))}
+    observed = {}
+    # Held for the whole probe: serve start refuses while it is held (so a restart cannot turn the
+    # probe's call into a recovery halt), and a probe id left in flight without it halts serve's
+    # next reservation (a probe that died or could not settle).
+    lock_fd = hold_probe_lock(private)
+    try:
+        execute_request(private, go_path, request, peer_uid=0, slots=CallSlots(go['max_concurrent_calls']),
+                        dispatch=dispatch, key_loader=key_loader, host=host, platform=platform, now=now, probe=True,
+                        on_settled=observed.update)
+    except SafetyError:
+        if not observed:
+            raise  # Refused, not sent, or uncertain: the refusal code says which.
+    finally:
+        os.close(lock_fd)
+    return probe_summary(observed, profile)
+
+
+def hold_probe_lock(private):
+    dir_fd = helper.private_dir_fd(private)
+    try:
+        fd = helper.secure_open(dir_fd, PROBE_LOCK_NAME, os.O_RDWR, create=True)
+    finally:
+        os.close(dir_fd)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        raise SafetyError('PROBE_ALREADY_RUNNING') from None
+    return fd
 
 
 def recover_interrupted(private, now=None):
@@ -718,6 +1095,8 @@ def recover_interrupted(private, now=None):
     """
     now = now or helper.utc_now
     with TeamStore(private) as store:
+        if probe_running(store):
+            raise SafetyError('PROBE_RUNNING')  # Its call is live, not interrupted; systemd retries the start.
         control = store.control()
         moment, in_flight = current(now), control['in_flight']
         ledgers = {day: store.ledger(day) for day in sorted(set(in_flight.values()) | {bucharest_day(moment)})}
@@ -785,7 +1164,7 @@ def refusal_body(error):
     return json.dumps({'error': code}).encode()
 
 
-def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_uid, now=None):
+def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_uid, now=None, remaining=None):
     class Handler(BaseHTTPRequestHandler):
         timeout = IPC_READ_TIMEOUT_SECONDS  # An idle or slow client cannot hold a thread forever.
 
@@ -810,7 +1189,29 @@ def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_u
             except BaseException:
                 slots.trip()
 
+        def answer_remaining(self):
+            # Read-only: nothing is reserved, so a refused or lost reply needs no halt.
+            try:
+                uid = peer_uid_of(self.connection)
+                length = int(self.headers.get('content-length', '0'))
+                if remaining is None or uid not in allowed_uids or not 1 <= length <= MAX_REMAINING_IPC_BYTES:
+                    raise SafetyError('IPC_REQUEST_REFUSED')
+                encoded = json.dumps(remaining(json.loads(self.rfile.read(length)), uid), ensure_ascii=True).encode('ascii')
+            except BaseException as error:  # noqa: BLE001 - every refusal is the same fixed body
+                try:
+                    self.reply(409, refusal_body(error))
+                except BaseException:
+                    pass
+                return
+            try:
+                self.reply(200, encoded)
+            except BaseException:
+                pass
+
         def do_POST(self):
+            if self.path == '/remaining':
+                self.answer_remaining()
+                return
             reserved = []
             try:
                 uid = peer_uid_of(self.connection)
@@ -986,7 +1387,8 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None, own
         # this (main) thread takes them with sigwait: no Python signal handler runs at all. A stop
         # signal that came earlier ended the process the default way (the next start recovers).
         signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
-        server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots),
+        server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots,
+                                                                    remaining=RemainingAnswers(private, go_path, slots)),
                                      allowed_uids=frozenset(go['allowed_peer_uids']))
         info = os.stat(socket_path, follow_symlinks=False)
         bound, failure = (info.st_dev, info.st_ino), []
@@ -1001,7 +1403,8 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None, own
         try:
             os.chmod(socket_path, 0o666)
             runner.start()
-            emit({'status': 'serving', 'socket': str(socket_path), 'max_concurrent_calls': slots.limit,
+            emit({'status': 'serving', 'socket': str(socket_path), 'provider': go['provider'],
+                  'enabled_models': go['enabled_models'], 'max_concurrent_calls': slots.limit,
                   'stale_socket_removed': stale_removed, 'interrupted_calls_found': recovered['interrupted'],
                   'unrecorded_uncertain_found': recovered['unrecorded_uncertain']})
             signal.sigwait(STOP_SIGNALS)
@@ -1024,13 +1427,14 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None, own
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('phase', choices=('init', 'activate', 'serve', 'stop', 'status'))
+    parser.add_argument('phase', choices=('init', 'activate', 'serve', 'stop', 'status', 'probe'))
     parser.add_argument('--private', type=Path, required=True)
     parser.add_argument('--go', type=Path)
     parser.add_argument('--socket', type=Path)  # serve only, and required there: no built-in name.
+    parser.add_argument('--model')  # probe only, and required there.
     args = parser.parse_args(argv)
     try:
-        uses_go = args.phase in ('init', 'activate', 'serve')
+        uses_go = args.phase in ('init', 'activate', 'serve', 'probe')
         if uses_go and args.go is None:
             raise SafetyError('ROOT_GO_REQUIRED')
         # No helper code runs before its custody, and with a GO its bound hash, are checked.
@@ -1043,6 +1447,10 @@ def main(argv=None):
             result = stop_authority(args.private)
         elif args.phase == 'status':
             result = status(args.private)
+        elif args.phase == 'probe':
+            if args.model is None:
+                raise SafetyError('MODEL_REQUIRED')
+            result = probe(args.private, args.go, args.model)
         else:
             if args.socket is None:
                 raise SafetyError('ROOT_SOCKET_REQUIRED')

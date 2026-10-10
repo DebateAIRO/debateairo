@@ -62,7 +62,7 @@ const RESULT: ProviderCallResult = {
 };
 async function forwarded(request: ProviderCallRequest): Promise<ProviderCallRequest> {
   let received: ProviderCallRequest | undefined;
-  await withPreviewProviderCallPolicy({ call: async effective => { received = effective; return RESULT; } }, CONFIG).call(request);
+  await withPreviewProviderCallPolicy({ call: async effective => { received = effective; return RESULT; } }, CONFIG, { model: MODEL }).call(request);
   if (received === undefined) throw new Error("PREVIEW_REQUEST_NOT_FORWARDED");
   return received;
 }
@@ -83,7 +83,7 @@ function nativeHarness(contents: readonly string[]) {
     persistRawArtifact: async artifact => { artifacts.push(artifact); return artifact.artifactId; },
     appendLedgerEntry: async entry => { ledger.push(entry); return entry.attemptId; }
   });
-  return { gateway: withPreviewProviderCallPolicy(native, CONFIG), executions, artifacts, ledger };
+  return { gateway: withPreviewProviderCallPolicy(native, CONFIG, { model: MODEL }), executions, artifacts, ledger };
 }
 
 describe("preview storyteller v2 safe repair allowance", () => {
@@ -157,7 +157,7 @@ describe("preview storyteller v2 safe repair allowance", () => {
 
   it("still refuses a weaker thinking request before forwarding", async () => {
     let calls = 0;
-    const gateway = withPreviewProviderCallPolicy({ call: async () => { calls++; return RESULT; } }, CONFIG);
+    const gateway = withPreviewProviderCallPolicy({ call: async () => { calls++; return RESULT; } }, CONFIG, { model: MODEL });
     expect(() => gateway.call({ ...storyRequest(), thinkingLevel: "medium" })).toThrow(expect.objectContaining({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" }));
     expect(calls).toBe(0);
   });

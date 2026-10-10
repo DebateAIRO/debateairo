@@ -139,7 +139,7 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     });
     expect(expected).toBeGreaterThan(0);
     expect(await recordOwnerWithdrawal(stores(), { ownerRef: seeded.ownerRef, receivedAt }))
-      .toEqual({ kind: "REFUNDING", refundMicros: expected });
+      .toEqual({ kind: "REFUNDING", refundMicros: expected, currency: "USD" });
     expect((await rows().subscriptionEvents(seeded.subscriptionId)).at(-1)).toMatchObject({
       kind: "WITHDRAWN", data: { refund_micros: expected, source: "OWNER", withdrew_at: receivedAt.toISOString() }
     });
@@ -272,7 +272,7 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     const audit = recordingAudit();
     // 3.00 through RefundDesk, and 5.00 the owner refunded in NETOPIA's admin for this withdrawal.
     expect(await settleOwnerWithdrawal(stores(audit), { ownerRef: seeded.ownerRef, refundMicros: 3_000_000, dashboardMicros: 5_000_000 }))
-      .toEqual({ kind: "SETTLED", refundMicros: 3_000_000, dashboardMicros: 5_000_000 });
+      .toEqual({ kind: "SETTLED", refundMicros: 3_000_000, dashboardMicros: 5_000_000, currency: "USD" });
     // Only the payment no dashboard refund touched takes it; the touched one is the owner's to judge.
     expect(await withdrawalRequests(upgrade.chargeId)).toEqual([["7720001", 3_000_000]]);
     expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([]);
@@ -324,7 +324,7 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
       .rejects.toThrow("BILLING_WITHDRAW_EXCEEDS_PAID");
     expect(await rows().withdrawalOwnerSettlement(seeded.subscriptionId)).toBeNull();
     const settle = parseWithdrawArguments(["--owner", seeded.ownerRef, "--refund", "0.00", "--dashboard", "17.59"]);
-    expect(await runWithdrawCommand(stores(), settle)).toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 17_590_000 });
+    expect(await runWithdrawCommand(stores(), settle)).toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 17_590_000, currency: "USD" });
     // Nothing moves through RefundDesk, so M8 goes now, worded as refunded (D7's `mail.M8.refunded`).
     expect((await m8Of(seeded.subscriptionId))[0]?.payload).toMatchObject({ "param.refundAmount": "17.59", "param.plan": "PLUS" });
     // P2-M7's control: a settlement with money due keeps today's M8, its params unchanged.
@@ -347,7 +347,7 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
       .toEqual({ kind: "OWNER_REVIEW" });
     // `--refund 0.00` with no dashboard part.
     expect(await runWithdrawCommand(stores(), parseWithdrawArguments(["--owner", seeded.ownerRef, "--refund", "0.00"])))
-      .toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 0 });
+      .toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 0, currency: "USD" });
     const [m8] = await m8Of(seeded.subscriptionId);
     expect(m8?.payload).toMatchObject({ "param.refundAmount": "0.00", "param.ownerSettled": "true" });
     // P2-M7: the money had usually gone back already (here, a dashboard refund), so M8 never says that the part already
@@ -404,9 +404,9 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
     // credit share is larger than its half day of 17. Before W6 the whole 147.62 was charged 13.5 of 30 days: 81.19.
     const expected = 132_480_000;
     const settings = await viaSettings("w6-worked", workedExample, withdrewAt, 3_000_000);
-    expect(await settings.run()).toEqual({ refundMicros: expected });
+    expect(await settings.run()).toEqual({ refundMicros: expected, currency: "USD" });
     const command = await viaCommand(workedExample, withdrewAt, 3_000_000);
-    expect(await command.run()).toEqual({ kind: "REFUNDING", refundMicros: expected });
+    expect(await command.run()).toEqual({ kind: "REFUNDING", refundMicros: expected, currency: "USD" });
     for (const { seeded } of [settings, command]) {
       expect((await rows().subscriptionEvents(seeded.subscriptionId)).at(-1))
         .toMatchObject({ kind: "WITHDRAWN", data: { refund_micros: expected, withdrew_at: withdrewAt.toISOString() } });
@@ -440,7 +440,7 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
       at: new Date(activatedAt.getTime() + 14 * DAY), netMicros: 96_000_000, taxMicros: 20_160_000,
       monthCreditOverrideMicros: 82_333_333
     });
-    expect(await command(after.seeded, day13)).toEqual({ kind: "REFUNDING", refundMicros: 128_260_000 });
+    expect(await command(after.seeded, day13)).toEqual({ kind: "REFUNDING", refundMicros: 128_260_000, currency: "USD" });
     expect((await rows().subscriptionEvents(after.seeded.subscriptionId)).at(-1))
       .toMatchObject({ kind: "WITHDRAWN", data: { refund_micros: 128_260_000, withdrew_at: day13.toISOString() } });
     // A4(b) unchanged, newest first: the upgrade's payment goes back whole, then Plus's 12.10.
@@ -467,7 +467,7 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
     });
     // Plus 24.20 × 17/30 = 13.71 (its days), Max 127.05 × 17 days of its 17.5 days and a minute = 123.41: 137.12.
     expect(expected).toBe(137_120_000);
-    expect(await command(before.seeded, day13)).toEqual({ kind: "REFUNDING", refundMicros: expected });
+    expect(await command(before.seeded, day13)).toEqual({ kind: "REFUNDING", refundMicros: expected, currency: "USD" });
     expect(await withdrawalRequests(before.upgradeChargeId)).toEqual([[before.upgradeTransactionId, 127_050_000]]);
     expect(await withdrawalRequests(before.seeded.initialChargeId))
       .toEqual([[before.seeded.providerPaymentId, expected - 127_050_000]]);
@@ -483,7 +483,7 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
     const tuesdayMidnight = new Date("2026-09-21T21:00:00.000Z");
     const refund = (await (await viaSettings("w6-monday", saturday, mondayEvening, 0)).run()).refundMicros;
     expect(refund).toBeGreaterThan(0);
-    expect(await (await viaCommand(saturday, mondayEvening, 0)).run()).toEqual({ kind: "REFUNDING", refundMicros: refund });
+    expect(await (await viaCommand(saturday, mondayEvening, 0)).run()).toEqual({ kind: "REFUNDING", refundMicros: refund, currency: "USD" });
     await expect((await viaSettings("w6-tuesday", saturday, tuesdayMidnight, 0)).run())
       .rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });
     await expect((await viaCommand(saturday, tuesdayMidnight, 0)).run()).rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });

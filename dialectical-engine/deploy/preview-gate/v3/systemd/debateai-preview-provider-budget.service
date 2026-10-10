@@ -1,0 +1,72 @@
+# Install as /etc/systemd/system/debateai-preview-provider-budget.service (root:root 0644).
+# It REPLACES the v2 unit of the same name (archive that first; README step 6). The lifecycle
+# target and the API drop-in already Wants= this exact name, so it starts at boot only through
+# debateai-preview.target; it has no [Install] section of its own.
+# Base: the reviewed v2 unit, hardening unchanged. Changes: the v3 paths and socket, the start
+# check of every model the GO switches on (deepinfra_models.py, still no key sent) in place of
+# the one fixed GLM probe, and the v2 state folder hidden from the v3 gate.
+[Unit]
+Description=DebateAI preview: DeepInfra spending gate v3 (reviewed model table, one daily pot, Europe/Bucharest)
+Documentation=file:///opt/debateai-v3-preview/operator/deepinfra-budget-v3/README.md
+Wants=network-online.target
+After=network-online.target nss-lookup.target
+# Same policy as the lifecycle drop-ins: at most 4 tries in 15 minutes, then one email.
+StartLimitIntervalSec=900
+StartLimitBurst=4
+OnFailure=debateai-preview-alert@%n.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+# 1. Every address api.deepinfra.com has today must be in the allow-list drop-in, or the gate
+#    does not start (DEEPINFRA_ADDRESSES_CHANGED; README "DeepInfra addresses").
+ExecStartPre=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/deepinfra_addresses.py check --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf
+# 2. Every model the GO switches on is listed upstream: one GET per model, reached through the
+#    same address filter, no key sent, no redirect followed (README "Start checks").
+ExecStartPre=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/deepinfra_models.py check --go /etc/debateai-v3-preview/provider-deepinfra-go-v3.json
+ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py serve --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 --go /etc/debateai-v3-preview/provider-deepinfra-go-v3.json --socket /run/debateai-v3-preview/deepinfra-budget-v3.sock
+# Restart after a crash. Safe because a restart can never spend more: the pot, the ledger and a
+# halt live on disk; serve start halts on any call the crash interrupted, and only root's
+# `activate` re-opens a halted gate. A start-up refusal (exit 2) retries too, then emails.
+Restart=on-failure
+RestartMode=direct
+RestartSec=30
+# SIGTERM: the socket closes at once and nothing more is reserved; calls in flight finish and
+# settle (600 s deadline, plus 2 x 10 s locks), and each reply then gets 30 s or the gate halts;
+# the socket file is removed and serve exits 0. After 700 s systemd sends SIGKILL; the next
+# start then removes the stale socket and halts on any interrupted call.
+KillSignal=SIGTERM
+TimeoutStopSec=700
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+LimitCORE=0
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RemoveIPC=yes
+ReadWritePaths=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 /run/debateai-v3-preview
+InaccessiblePaths=-/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/etc/debateai-v3-preview/api.env -/root -/var/lib/postgresql -/etc/postfix
+InaccessiblePaths=-/etc/debateai-v3-preview/auth-dev-v1 -/var/lib/debateai-v3-preview/provider-test-authority -/var/lib/debateai-v3-preview/api -/etc/debateai-v3-preview/lifecycle
+# The v2 gate's state (its key, ledgers and GO): the v3 gate never needs them.
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# Nothing but the local resolver stub (127.0.0.53; /etc/resolv.conf is systemd-resolved's
+# stub-resolv.conf, measured). Not all of localhost: that would open local services such as
+# the mail relay on port 25. The DeepInfra /32s come from 50-deepinfra-addresses.conf.
+IPAddressDeny=any
+IPAddressAllow=127.0.0.53/32

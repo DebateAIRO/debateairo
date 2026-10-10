@@ -3,6 +3,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   decimalToMicros,
   microsToDecimal,
+  type PriceCurrency,
   type RefundRecord,
   type SaleRecord,
   type TaxEngine,
@@ -131,7 +132,7 @@ export class QuadernoTaxEngine implements TaxEngine {
   }
 
   async quote(i: Readonly<{
-    netMicros: number; currency: "USD"; location: TaxLocation; taxId: string | null; taxCode: "saas" | "eservice"; date: Date;
+    netMicros: number; currency: PriceCurrency; location: TaxLocation; taxId: string | null; taxCode: "saas" | "eservice"; date: Date;
   }>): Promise<TaxQuote> {
     const query = new URLSearchParams({
       to_country: i.location.country, amount: microsToDecimal(i.netMicros), currency: i.currency,
@@ -150,6 +151,9 @@ export class QuadernoTaxEngine implements TaxEngine {
     const totalMicros = quadernoAmountMicros(reply.total_amount);
     if (netMicros !== i.netMicros) refused("SUBTOTAL_MISMATCH");
     if (taxMicros < 0 || totalMicros !== netMicros + taxMicros) refused("TOTAL_MISMATCH");
+    // Spec 2026-10-05 §2.16.4: the answer names the currency we asked for, or the quote is not ours to charge. An answer
+    // that names none (absent or null) proves nothing, so it is refused too (CF1: money-2, tax-3).
+    if (reply.currency !== i.currency) refused("CURRENCY_MISMATCH");
     const country = text(reply.country);
     if (country === null || !/^[A-Za-z]{2}$/u.test(country)) refused("COUNTRY_INVALID");
     return Object.freeze({
@@ -178,7 +182,7 @@ export class QuadernoTaxEngine implements TaxEngine {
     const customer = i.customer;
     const created = await this.#send("POST", "/transactions", {
       type: "sale",
-      currency: "USD",
+      currency: i.currency,
       date: isoDate(i.issuedOn),
       customer: {
         // No invented name: a buyer who gave none is sent without one (P8 collects it where the law needs it).
@@ -226,7 +230,7 @@ export class QuadernoTaxEngine implements TaxEngine {
     }
     const created = await this.#send("POST", "/transactions", {
       type: "refund",
-      currency: "USD",
+      currency: i.currency,
       date: isoDate(i.issuedOn),
       // The line's text is the caller's, in the customer's language (P10a, from the catalogue) — never ours.
       items: [{ description: i.description, quantity: 1, amount: Number(microsToDecimal(i.refundTotalMicros)) }],

@@ -18,7 +18,7 @@ import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
 import { dailyLimitMessageCatalog, legalGateMessageCatalog } from "@/lib/v3/requestFailure";
 import { composerRoomCatalog } from "@/lib/billing/roomCatalog";
-import { formatUsd } from "@/lib/billing/format";
+import { formatMoney } from "@/lib/billing/format";
 import { availablePaymentMarks } from "@/lib/billing/paymentMarks";
 import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
 
@@ -38,9 +38,12 @@ async function landingPlans(locale: string, headerStore: Headers): Promise<Landi
     ).getBillingPlans();
     const lowest = answer.plans
       .filter((plan) => plan.plan_id !== "FREE")
-      .map((plan) => plan.net_price)
+      // Spec 2026-10-05 §2.16.1: in the currency the visitor's connection pays in.
+      .map((plan) => plan.net_prices[answer.currency])
       .sort((left, right) => Number(left) - Number(right))[0];
-    return Object.freeze({ lowestPaidPrice: lowest === undefined ? null : formatUsd(locale, lowest), footer: footer(true) });
+    return Object.freeze({
+      lowestPaidPrice: lowest === undefined ? null : formatMoney(locale, lowest, answer.currency), footer: footer(true)
+    });
   } catch (failure) {
     return Object.freeze({
       lowestPaidPrice: null,

@@ -4,7 +4,15 @@ import { e164Phone, isRomanianInvoiceLocality, postcodeOptional } from "@debatea
 import type { BillingRepository, QuoteRow } from "@debateai/db";
 import type { GeoLookup } from "@debateai/geo";
 import { TypedDomainError } from "@debateai/kernel";
-import { planById, type BillingPlans, type BillingPolicy, type CountryPolicy, type PlanId } from "@debateai/register";
+import {
+  planById,
+  planNetPrice,
+  priceCurrencyFor,
+  type BillingPlans,
+  type BillingPolicy,
+  type CountryPolicy,
+  type PlanId
+} from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
 import { decidePaymentPlace, placeRefusal } from "./place.js";
 import { sealQuoteLocation, taxLocationOf, type QuoteLocation } from "./records.js";
@@ -150,14 +158,19 @@ export class QuoteService implements QuoteServicePort {
       region: input.region, postalCode: input.postalCode, city: input.city, street: input.street,
       ip: input.ip === "unknown" ? null : input.ip, ipCountry: place.ipCountry, company
     });
+    // Spec 2026-10-05 §2.16.1: the tax location's country picks the currency, and the plan's price in it.
+    const currency = priceCurrencyFor(this.deps.plans, validated.country);
+    const netMicros = planNetPrice(plan, currency);
     const taxQuote = await this.taxCall(this.deps.tax.quote({
-      netMicros: plan.netPriceMicros, currency: "USD", location: taxLocationOf(validated), taxId,
-      taxCode: this.deps.policy.taxCode, date: input.now
+      netMicros, currency, location: taxLocationOf(validated), taxId, taxCode: this.deps.policy.taxCode, date: input.now
     }));
-    if (taxQuote.netMicros !== plan.netPriceMicros) throw this.refused(new BillingRefusal(503, "TAX_SERVICE_UNAVAILABLE"));
+    // The tax is the plan's net in that currency, for a country of that currency, or the quote is not ours to sell.
+    if (taxQuote.netMicros !== netMicros || priceCurrencyFor(this.deps.plans, taxQuote.taxCountry) !== currency) {
+      throw this.refused(new BillingRefusal(503, "TAX_SERVICE_UNAVAILABLE"));
+    }
     const quoteId = randomUUID();
     const sealed = sealQuoteLocation(this.deps.recordsKey, quoteId, validated);
-    const quote = Object.freeze({
+    const quote: QuoteRow = Object.freeze({
       quoteId, ownerRef: input.ownerRef, planId: input.planId, kind: "SUBSCRIBE",
       netMicros: taxQuote.netMicros, taxMicros: taxQuote.taxMicros, totalMicros: taxQuote.totalMicros,
       taxCountry: taxQuote.taxCountry, taxRegion: taxQuote.taxRegion, taxRateBasisPoints: taxQuote.taxRateBasisPoints,
@@ -165,8 +178,8 @@ export class QuoteService implements QuoteServicePort {
       expiresAt: new Date(input.now.getTime() + this.deps.policy.quoteTtlSeconds * 1_000), createdAt: input.now,
       locationCiphertext: sealed.ciphertext, keyId: sealed.keyId,
       // R-31: only an UPGRADE quote carries a recurring total different from its amount due (P12c).
-      recurringTotalMicros: null
-    }) as QuoteRow;
+      recurringTotalMicros: null, currency
+    });
     await this.deps.repository.withTransaction((client) => this.deps.repository.insertQuote(client, quote));
     return Object.freeze({
       quote,

@@ -383,7 +383,7 @@ describe("Task 14b · the operator's hosted register file", () => {
       expect(sealed, row.rowKey).not.toContain("fixture-path");
       // The provider targets' own price members (`input_/output_price_micros_per_million`).
       // Paid plans B4a: the code-owned `billingPlans` row legitimately seals the PLANS' prices
-      // (`net_price_micros`), which come from no provider target, so the guard names the
+      // (`net_prices`), which come from no provider target, so the guard names the
       // provider-target members instead of every "price".
       expect(sealed, row.rowKey).not.toContain("_price_micros_per_million");
     }

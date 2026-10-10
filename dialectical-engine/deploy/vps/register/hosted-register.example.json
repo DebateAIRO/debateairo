@@ -43,14 +43,23 @@
   "askRoomReads": { "key": "owner", "limit": 60, "window_ms": 60000, "capacity": 65536 },
   "billingPlans": {
     "kind": "BILLING_PLANS",
-    "currency": "USD",
+    "credit_currency": "USD",
+    "currency_by_country": {
+      "default": "USD",
+      "countries": {
+        "RO": "RON", "AT": "EUR", "BE": "EUR", "BG": "EUR", "HR": "EUR", "CY": "EUR", "CZ": "EUR", "DK": "EUR",
+        "EE": "EUR", "FI": "EUR", "FR": "EUR", "DE": "EUR", "GR": "EUR", "HU": "EUR", "IE": "EUR", "IT": "EUR",
+        "LV": "EUR", "LT": "EUR", "LU": "EUR", "MT": "EUR", "NL": "EUR", "PL": "EUR", "PT": "EUR", "SK": "EUR",
+        "SI": "EUR", "ES": "EUR", "SE": "EUR", "NO": "EUR", "IS": "EUR", "LI": "EUR", "CH": "EUR", "GB": "EUR"
+      }
+    },
     "minor_units_per_unit": 1000000,
     "plans": [
-      { "plan_id": "FREE", "tier": "free", "net_price_micros": 0, "monthly_credit_micros": 200000, "day_bp": null, "week_bp": null, "finish_bp": 11000,
+      { "plan_id": "FREE", "tier": "free", "net_prices": { "USD": 0, "EUR": 0, "RON": 0 }, "monthly_credit_micros": 200000, "day_bp": null, "week_bp": null, "finish_bp": 11000,
         "fixed_gauges": { "risk_tier": "standard", "composition_budget_tier": "low", "depth": 2 } },
-      { "plan_id": "PLUS", "tier": "premium", "net_price_micros": 20000000, "monthly_credit_micros": 5000000, "day_bp": 2000, "week_bp": 5000, "finish_bp": 11000, "fixed_gauges": null },
-      { "plan_id": "PRO", "tier": "premium", "net_price_micros": 50000000, "monthly_credit_micros": 20000000, "day_bp": 2000, "week_bp": 5000, "finish_bp": 11000, "fixed_gauges": null },
-      { "plan_id": "MAX", "tier": "premium", "net_price_micros": 200000000, "monthly_credit_micros": 150000000, "day_bp": 2000, "week_bp": 5000, "finish_bp": 11000, "fixed_gauges": null }
+      { "plan_id": "PLUS", "tier": "premium", "net_prices": { "USD": 20000000, "EUR": 20000000, "RON": 100000000 }, "monthly_credit_micros": 5000000, "day_bp": 2000, "week_bp": 5000, "finish_bp": 11000, "fixed_gauges": null },
+      { "plan_id": "PRO", "tier": "premium", "net_prices": { "USD": 50000000, "EUR": 50000000, "RON": 250000000 }, "monthly_credit_micros": 20000000, "day_bp": 2000, "week_bp": 5000, "finish_bp": 11000, "fixed_gauges": null },
+      { "plan_id": "MAX", "tier": "premium", "net_prices": { "USD": 200000000, "EUR": 200000000, "RON": 1000000000 }, "monthly_credit_micros": 150000000, "day_bp": 2000, "week_bp": 5000, "finish_bp": 11000, "fixed_gauges": null }
     ]
   },
   "billingPolicy": {
