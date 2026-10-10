@@ -19,6 +19,8 @@ beforeAll(async () => {
   first = probe(plan.forwardChain.at(-1)!, "0199_replay_probe.sql");
 }, 300_000);
 const NETOPIA = "0111_billing_netopia.sql";
+/** Part C's step, chained after the auth DB batch (spec 2026-10-05 §2.16.6); it keeps 0111's verifier in force too. */
+const PART_C = "0113_billing_price_currencies.sql";
 afterAll(async () => { await db?.stop(); });
 
 const READINESS_PUBLISH = "staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz)";
@@ -52,14 +54,16 @@ const runtimeMayPublish = async (): Promise<boolean> =>
 it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch (0112) is appended after it", async () => {
   // First in this file: the probe steps below add ledger rows that the real migrate() would refuse as unknown.
   const real = await loadMigrationPlan();
-  expect(real.forwardChain.map((step) => step.name)).toEqual([NETOPIA, AUTH_DB_BATCH_MIGRATION]);
-  const [netopia, batch] = real.forwardChain;
+  expect(real.forwardChain.map((step) => step.name)).toEqual([NETOPIA, AUTH_DB_BATCH_MIGRATION, PART_C]);
+  const [netopia, batch, partC] = real.forwardChain;
   const applied = new Set(await ledger());
-  expect(applied.has(NETOPIA) && applied.has(AUTH_DB_BATCH_MIGRATION)).toBe(true);
-  // The batch keeps 0111's effective-capability verifier: with 0112 last, the verifier in force is 0111's, byte for byte.
+  expect(applied.has(NETOPIA) && applied.has(AUTH_DB_BATCH_MIGRATION) && applied.has(PART_C)).toBe(true);
+  // The batch and Part C's step keep 0111's effective-capability verifier: with 0113 last, the verifier in force is
+  // 0111's, byte for byte.
   expect(batch!.verifierSha256).toBe(netopia!.verifierSha256);
+  expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
   expect(effectiveForwardVerifierSql(real, applied)).toBe(netopia!.verifierSql);
-  // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0112 last.
+  // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0113 last.
   await db.pool.query("GRANT SELECT ON billing.card_token TO debateai_authorization_runtime");
   try {
     await expect(migrate(db.pool)).rejects.toThrow("BILLING_NETOPIA_111_TABLE_PRIVILEGE card_token");

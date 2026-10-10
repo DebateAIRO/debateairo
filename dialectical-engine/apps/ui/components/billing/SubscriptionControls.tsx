@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { ContractHttpError, type ContractClient } from "@debateai/contract";
+import { ContractHttpError, type BillingCurrency, type ContractClient } from "@debateai/contract";
 import { contractClient } from "@/lib/api";
-import { formatLongDate, formatUsd, planName } from "@/lib/billing/format";
+import { formatLongDate, formatMoney, planName } from "@/lib/billing/format";
 import type { PaidPlanId } from "@/lib/billing/plans";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -122,11 +122,14 @@ class PlanPriceUnavailable extends Error {
   }
 }
 
-/** P12d's answer: a refund, nothing due back ("0.00"), or null when the owner settles what is still due. */
-function withdrawDoneText(catalog: MessageCatalog, locale: LocaleCode, refund: string | null): string {
+/**
+ * P12d's answer: a refund, nothing due back ("0.00"), or null when the owner settles what is still due; the refund is
+ * in the answer's `currency`, the subscription's own (spec 2026-10-05 §2.16.5).
+ */
+function withdrawDoneText(catalog: MessageCatalog, locale: LocaleCode, refund: string | null, currency: BillingCurrency): string {
   if (refund === null) return t(catalog, "billing.subscription.withdrawOwnerReview");
   if (/^0+\.00$/u.test(refund)) return t(catalog, "billing.subscription.withdrawNothingDue");
-  return t(catalog, "billing.subscription.withdrawDone", { amount: formatUsd(locale, refund) });
+  return t(catalog, "billing.subscription.withdrawDone", { amount: formatMoney(locale, refund, currency) });
 }
 
 /** The step-up itself was refused (wrong password or code, or no grant came back): the one "check your code" case. */
@@ -173,7 +176,10 @@ export function SubscriptionControls({
   const [upgrade, setUpgrade] = useState<Readonly<{ planId: UpgradeTarget; quote: UpgradeQuote }> | null>(null);
   const [upgradeCharge, setUpgradeCharge] = useState<Readonly<{ planId: UpgradeTarget; chargeRef: string }> | null>(null);
   const [upgradeAgreed, setUpgradeAgreed] = useState(false);
-  const [downgrade, setDowngrade] = useState<Readonly<{ planId: DowngradeTarget; netPrice: string }> | null>(null);
+  // The lower plan's price in the subscription's own currency (spec 2026-10-05 §2.16.3), never the visitor's.
+  const [downgrade, setDowngrade] = useState<Readonly<{
+    planId: DowngradeTarget; netPrice: string; currency: BillingCurrency;
+  }> | null>(null);
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -276,22 +282,26 @@ export function SubscriptionControls({
       setCode("");
       setPanel("NONE");
       await reload();
-      setMessage(withdrawDoneText(catalog, locale, withdrawn.refund));
+      setMessage(withdrawDoneText(catalog, locale, withdrawn.refund, withdrawn.currency));
     }, withdrawFailureWords);
   }
 
-  /** Ruling Q-7: read the lower plan's public net price first; nothing moves until the person confirms. */
-  function askDowngrade(planId: DowngradeTarget): void {
+  /**
+   * Ruling Q-7: read the lower plan's public net price first; nothing moves until the person confirms. The price is
+   * the one in the subscription's currency (spec 2026-10-05 §2.16.3): a plan change never crosses currencies, whatever
+   * currency the visitor's connection would pay in.
+   */
+  function askDowngrade(planId: DowngradeTarget, currency: BillingCurrency): void {
     void run(async () => {
       let netPrice: string | null = null;
       try {
-        netPrice = (await client.getBillingPlans()).plans.find((plan) => plan.plan_id === planId)?.net_price ?? null;
+        netPrice = (await client.getBillingPlans()).plans.find((plan) => plan.plan_id === planId)?.net_prices[currency] ?? null;
       } catch {
         netPrice = null;
       }
       if (netPrice === null) throw new PlanPriceUnavailable();
       setUpgrade(null);
-      setDowngrade({ planId, netPrice });
+      setDowngrade({ planId, netPrice, currency });
     }, (failure) => (failure instanceof PlanPriceUnavailable ? PLANS_UNAVAILABLE : ACTION_FAILED));
   }
 
@@ -303,10 +313,10 @@ export function SubscriptionControls({
       // A7: the lower plan's total is now the announced one (renewal_total), so the sentence names it.
       const fresh = await reload();
       const total = fresh?.renewal_total ?? null;
-      setMessage(total === null
+      setMessage(fresh === null || total === null
         ? t(catalog, "billing.subscription.downgradedNoTotal", { plan: planName(catalog, planId), date: nextRenewalText })
         : t(catalog, "billing.subscription.downgraded", {
-          plan: planName(catalog, planId), date: nextRenewalText, total: formatUsd(locale, total)
+          plan: planName(catalog, planId), date: nextRenewalText, total: formatMoney(locale, total, fresh.currency)
         }));
     }, downgradeFailureWords);
   }
@@ -336,7 +346,7 @@ export function SubscriptionControls({
               // Ruling Q-1: no past date is promised while the renewal is retried; nothing has failed.
               ? <p className="setStatus">{t(catalog, "billing.subscription.renewalProcessing")}</p>
               : live.renews_on !== null && live.renewal_total !== null
-                ? <p className="setStatus">{t(catalog, "billing.subscription.renews", { date: date(live.renews_on), total: formatUsd(locale, live.renewal_total) })}</p>
+                ? <p className="setStatus">{t(catalog, "billing.subscription.renews", { date: date(live.renews_on), total: formatMoney(locale, live.renewal_total, live.currency) })}</p>
                 : null}
           {live.scheduled_downgrade_plan_id !== null && nextRenewal !== null ? (
             <p className="setStatus">{t(catalog, "billing.subscription.downgradeScheduled", {
@@ -388,7 +398,7 @@ export function SubscriptionControls({
                 </button>
               )) : null}
               {DOWNGRADE_TARGETS.filter((planId) => rankOf(planId) < currentRank).map((planId) => (
-                <button key={planId} type="button" className="setBtn" disabled={busy} onClick={() => askDowngrade(planId)}>
+                <button key={planId} type="button" className="setBtn" disabled={busy} onClick={() => askDowngrade(planId, live.currency)}>
                   {t(catalog, "billing.subscription.downgradeTo", { plan: planName(catalog, planId) })}
                 </button>
               ))}
@@ -398,7 +408,7 @@ export function SubscriptionControls({
             <div>
               {/* Ruling Q-7: the lower plan's net price from GET /v1/billing/plans, "+ tax", from the renewal date. */}
               <p className="setCardNote">{t(catalog, "billing.subscription.downgradeConfirm", {
-                plan: planName(catalog, downgrade.planId), price: formatUsd(locale, downgrade.netPrice), date: nextRenewalText
+                plan: planName(catalog, downgrade.planId), price: formatMoney(locale, downgrade.netPrice, downgrade.currency), date: nextRenewalText
               })}</p>
               <div className="setCardRow">
                 <button type="button" className="setBtn" disabled={busy} onClick={() => confirmDowngrade(downgrade.planId)}>
@@ -413,15 +423,16 @@ export function SubscriptionControls({
           {upgrade !== null ? (
             <div>
               <p className="billingTotal">{t(catalog, "billing.subscription.upgradeQuote", {
-                total: formatUsd(locale, upgrade.quote.total), date: date(upgrade.quote.renews_on), plan: planName(catalog, upgrade.planId),
+                total: formatMoney(locale, upgrade.quote.total, upgrade.quote.currency), date: date(upgrade.quote.renews_on),
+                plan: planName(catalog, upgrade.planId),
                 // A7: this is the price the next renewal charges without an M3 notice, so it is seen before paying.
-                recurringTotal: formatUsd(locale, upgrade.quote.recurring_total)
+                recurringTotal: formatMoney(locale, upgrade.quote.recurring_total, upgrade.quote.currency)
               })}</p>
               {/* Spec §2.18: the card-saving agreement with the new plan's monthly total, before NETOPIA's page. */}
               <label className="billingConsent">
                 <input id="upgrade-agreement" type="checkbox" checked={upgradeAgreed}
                   onChange={(event) => setUpgradeAgreed(event.target.checked)} />
-                <span>{t(catalog, "billing.consent.renewal", { total: formatUsd(locale, upgrade.quote.recurring_total) })}</span>
+                <span>{t(catalog, "billing.consent.renewal", { total: formatMoney(locale, upgrade.quote.recurring_total, upgrade.quote.currency) })}</span>
               </label>
               <div className="setCardRow">
                 <button type="button" className="setBtn" disabled={busy || !upgradeAgreed || renewalConsent === null}
@@ -447,7 +458,7 @@ export function SubscriptionControls({
                     }
                     goToPayment(started.redirect_url);
                   }, upgradeFailureWords); }}>
-                  {t(catalog, "billing.subscription.upgradePay", { amount: formatUsd(locale, upgrade.quote.total) })}
+                  {t(catalog, "billing.subscription.upgradePay", { amount: formatMoney(locale, upgrade.quote.total, upgrade.quote.currency) })}
                 </button>
               </div>
             </div>
@@ -518,7 +529,7 @@ export function SubscriptionControls({
               {invoices.map((invoice) => (
                 <li key={`${invoice.kind}:${invoice.number}`}>
                   {t(catalog, "billing.subscription.invoiceRow", {
-                    number: invoice.number, date: formatLongDate(locale, invoice.issued_on), total: formatUsd(locale, invoice.total)
+                    number: invoice.number, date: formatLongDate(locale, invoice.issued_on), total: formatMoney(locale, invoice.total, invoice.currency)
                   })}
                   {invoice.kind === "CREDIT_NOTE" ? <> · {t(catalog, "billing.subscription.creditNote")}</> : null}
                   {invoice.url !== null ? <> · <a href={invoice.url} rel="noopener noreferrer" target="_blank">{t(catalog, "billing.subscription.openInvoice")}</a></> : null}

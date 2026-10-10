@@ -174,7 +174,7 @@ describe("T9-C1 route split & chrome", () => {
   it("with billing on, the landing's footer links pricing, cancel and withdraw", async () => {
     routeMocks.getBillingPlans.mockResolvedValueOnce({
       currency: "USD",
-      plans: [{ plan_id: "PLUS", net_price: "20.00", allowance_vs_plus: "1" }]
+      plans: [{ plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" }]
     });
     const footer = (await renderRoute(null)).querySelector("footer.siteFooterFull");
     for (const href of ["/pricing", "/cancel", "/withdraw"]) expect(footer?.querySelector(`a[href="${href}"]`), href).not.toBeNull();
@@ -392,15 +392,27 @@ describe("T9-C4 landing content", () => {
     routeMocks.getBillingPlans.mockResolvedValueOnce({
       currency: "USD",
       plans: [
-        { plan_id: "FREE", net_price: "0.00", allowance_vs_plus: "0.04" },
-        { plan_id: "MAX", net_price: "200.00", allowance_vs_plus: "30" },
-        { plan_id: "PLUS", net_price: "20.00", allowance_vs_plus: "1" }
+        { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.04" },
+        { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "30" },
+        { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" }
       ]
     });
     const document = await renderRoute(null);
     const pricing = document.querySelector('[data-landing-section="pricing"]');
     expect(pricing?.textContent).toContain("Start free. Paid plans start at $20.00 a month plus tax. Cancel whenever.");
     expect(pricing?.querySelector('a[href="/pricing"]')?.textContent).toBe("See the plans");
+  });
+
+  it("names the lowest paid price in the currency the visitor's connection pays in (spec 2026-10-05 §2.16.1)", async () => {
+    routeMocks.getBillingPlans.mockResolvedValueOnce({
+      currency: "EUR",
+      plans: [
+        { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.04" },
+        { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "19.00", RON: "100.00" }, allowance_vs_plus: "1" }
+      ]
+    });
+    const pricing = (await renderRoute(null)).querySelector('[data-landing-section="pricing"]');
+    expect(pricing?.textContent).toContain("Paid plans start at €19.00 a month plus tax.");
   });
 
   it("renders every binding landing paragraph verbatim in its owning subtree", async () => {

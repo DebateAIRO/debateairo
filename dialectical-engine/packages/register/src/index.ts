@@ -1100,6 +1100,8 @@ export {
   billingPlansFromValue,
   planById,
   planCapMicros,
+  planNetPrice,
+  priceCurrencyFor,
   readBillingPlans,
   type BillingPlan,
   type BillingPlans,

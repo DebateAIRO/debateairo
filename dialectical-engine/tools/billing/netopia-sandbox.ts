@@ -2,10 +2,10 @@
 // N22 (spec 2026-10-05 §2.20.3): OWNER-RUN recording of NETOPIA (the sandbox, or a small live test in provider-only mode),
 // run on the host under systemd-run with the API's EnvironmentFile, like the other billing commands:
 //   pnpm billing:netopia-sandbox check
-//   pnpm billing:netopia-sandbox start   --capture-dir D [--amount 1.00] [--client-id-at order|instrument] [--installments 0|1] [--payer F]
-//   pnpm billing:netopia-sandbox zero    --capture-dir D [--client-id-at order|instrument] [--installments 0|1] [--payer F]
+//   pnpm billing:netopia-sandbox start   --capture-dir D [--amount 1.00] [--currency USD|EUR|RON] [--client-id-at order|instrument] [--installments 0|1] [--payer F]
+//   pnpm billing:netopia-sandbox zero    --capture-dir D [--currency USD|EUR|RON] [--client-id-at order|instrument] [--installments 0|1] [--payer F]
 //   pnpm billing:netopia-sandbox status  --capture-dir D (--order <tool order> [--no-ntp-id] | --unknown-order)
-//   pnpm billing:netopia-sandbox charge  --capture-dir D --from-order <tool order> [--amount 1.00] [--payer F] [--payer-ip IP]
+//   pnpm billing:netopia-sandbox charge  --capture-dir D --from-order <tool order> [--amount 1.00] [--currency USD|EUR|RON] [--payer F] [--payer-ip IP]
 //   pnpm billing:netopia-sandbox fixture --capture-dir D --order <tool order>   (within 14 days: the raw messages are purged after)
 // On live, start, zero and charge refuse without --live --i-understand-this-charges-my-card (and need --payer; charge --payer-ip).
 // D is a private 0700 folder outside the repository; every capture is a RAW 0600 file for scrub-netopia-fixture.ts, which this
@@ -16,7 +16,9 @@ import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { TypedDomainError } from "@debateai/kernel";
-import { paymentErrorCode, type CardPayments, type Payer, type PaymentEnvironment, type PaymentReport, type SecretToken } from "@debateai/billing-core";
+import {
+  paymentErrorCode, type CardPayments, type Payer, type PaymentEnvironment, type PaymentReport, type PriceCurrency, type SecretToken
+} from "@debateai/billing-core";
 import { BillingRepository } from "@debateai/db";
 import { loadApiEnvironment, readNetopiaEnvironmentGroup } from "@debateai/register";
 import { loadSecretKey, openRecord, readCustodyAuthorizationHeader } from "@debateai/crypto";
@@ -49,12 +51,14 @@ const SANDBOX_PAYER: Payer = Object.freeze({
 
 export type ToolCommand =
   | Readonly<{ command: "check" }>
-  | Readonly<{ command: "start" | "zero"; captureDir: string; amountMicros: number; clientIdAt: "order" | "instrument"; installments: 0 | 1; payerFile: string | null; live: boolean }>
+  | Readonly<{ command: "start" | "zero"; captureDir: string; amountMicros: number; currency: PriceCurrency; clientIdAt: "order" | "instrument"; installments: 0 | 1; payerFile: string | null; live: boolean }>
   | Readonly<{ command: "status"; captureDir: string; orderId: string | null; withNtpId: boolean }>
-  | Readonly<{ command: "charge"; captureDir: string; fromOrder: string; amountMicros: number; payerFile: string | null; payerIp: string | null; live: boolean }>
+  | Readonly<{ command: "charge"; captureDir: string; fromOrder: string; amountMicros: number; currency: PriceCurrency; payerFile: string | null; payerIp: string | null; live: boolean }>
   | Readonly<{ command: "fixture"; captureDir: string; orderId: string }>;
 
-const WITH_VALUE: ReadonlySet<string> = new Set(["--capture-dir", "--amount", "--client-id-at", "--installments", "--payer", "--order", "--from-order", "--payer-ip"]);
+const WITH_VALUE: ReadonlySet<string> = new Set([
+  "--capture-dir", "--amount", "--currency", "--client-id-at", "--installments", "--payer", "--order", "--from-order", "--payer-ip"
+]);
 const SWITCHES: ReadonlySet<string> = new Set(["--no-ntp-id", "--unknown-order", "--live", "--i-understand-this-charges-my-card"]);
 function usage(why: string): never {
   throw new TypeError(`NETOPIA_SANDBOX_USAGE:${why.replace(/^-+/u, "")}`);
@@ -81,6 +85,11 @@ export function parseSandboxArguments(argv: readonly string[]): ToolCommand {
     try { micros = netopiaAmountToMicros(text); } catch { return usage("amount"); }
     return micros >= MIN_TOOL_AMOUNT_MICROS && micros <= MAX_TOOL_AMOUNT_MICROS ? micros : usage("amount");
   };
+  // Part C (spec 2026-10-05 §2.16.4): the tool's orders are not charges; the flag only shows NETOPIA's answer per currency.
+  const currencyOf = (): PriceCurrency => {
+    const value = values.get("--currency") ?? "USD";
+    return value === "USD" || value === "EUR" || value === "RON" ? value : usage("currency");
+  };
   const toolOrderOf = (name: string): string => {
     const value = values.get(name) ?? usage(name);
     return TOOL_ORDER.test(value) ? value : usage(name);
@@ -92,7 +101,7 @@ export function parseSandboxArguments(argv: readonly string[]): ToolCommand {
     if (clientIdAt !== "order" && clientIdAt !== "instrument") usage("client-id-at");
     if (installments !== "0" && installments !== "1") usage("installments");
     return Object.freeze({
-      command, captureDir, amountMicros: command === "zero" ? 0 : amountOf(values.get("--amount") ?? "1.00"), clientIdAt,
+      command, captureDir, amountMicros: command === "zero" ? 0 : amountOf(values.get("--amount") ?? "1.00"), currency: currencyOf(), clientIdAt,
       installments: installments === "1" ? 1 : 0, payerFile: values.get("--payer") ?? null, live
     });
   }
@@ -103,7 +112,7 @@ export function parseSandboxArguments(argv: readonly string[]): ToolCommand {
   if (command === "charge") {
     return Object.freeze({
       command, captureDir, fromOrder: toolOrderOf("--from-order"), amountMicros: amountOf(values.get("--amount") ?? "1.00"),
-      payerFile: values.get("--payer") ?? null, payerIp: values.get("--payer-ip") ?? null, live
+      currency: currencyOf(), payerFile: values.get("--payer") ?? null, payerIp: values.get("--payer-ip") ?? null, live
     });
   }
   if (command === "fixture") return Object.freeze({ command, captureDir, orderId: toolOrderOf("--order") });
@@ -239,7 +248,7 @@ async function start(command: Extract<ToolCommand, { command: "start" | "zero" }
   let kind = `${run}-answer-error`;
   try {
     const started = await session.payments({ clientIdLocation: command.clientIdAt, installments: command.installments }).startHostedPayment({
-      orderId, amountMicros: command.amountMicros, currency: "USD", description: RECORDING_DESCRIPTION, payer,
+      orderId, amountMicros: command.amountMicros, currency: command.currency, description: RECORDING_DESCRIPTION, payer,
       clientId: randomBytes(16).toString("hex"), returnUrl: `${session.publicAppUrl}/`, notifyUrl: notifyUrlOf(session), language: "ro"
     });
     kind = `${run}-answer`;
@@ -249,6 +258,23 @@ async function start(command: Extract<ToolCommand, { command: "start" | "zero" }
   } finally {
     writeExchanges(command.captureDir, session, from, { request: `${run}-request`, answer: kind }, orderId, at);
   }
+}
+
+/** NETOPIA's exact decimal for micros: at least the cents, and any further digit it sent (never rounded). */
+function exactDecimal(micros: number): string {
+  const whole = Math.trunc(Math.abs(micros) / 1_000_000);
+  const fraction = String(Math.abs(micros) % 1_000_000).padStart(6, "0").replace(/0{1,4}$/u, "");
+  return `${micros < 0 ? "-" : ""}${whole}.${fraction.padEnd(2, "0")}`;
+}
+
+/**
+ * CF1 (ops-4, go-live row 74): the status line the owner reads back: the state, NETOPIA's status, and the amount and the
+ * currency NETOPIA's answer gives (for example `PAID:3:121.00 RON`), or NO_AMOUNT / NO_CURRENCY when it gives none. The
+ * owner checks that it names the currency the payment was started in: VERIFY_PAYMENT refuses any other.
+ */
+export function sandboxStatusLine(read: PaymentReport): string {
+  const amount = read.amountMicros === null ? "NO_AMOUNT" : exactDecimal(read.amountMicros);
+  return `${read.state}:${read.providerStatus}:${amount} ${read.currency ?? "NO_CURRENCY"}`;
 }
 
 async function status(command: Extract<ToolCommand, { command: "status" }>, session: SandboxSession, output: SandboxOutput, at: Date): Promise<number> {
@@ -261,7 +287,7 @@ async function status(command: Extract<ToolCommand, { command: "status" }>, sess
   let line: string;
   try {
     read = await session.payments(DEFAULT_REQUEST_FACTS).status({ orderId, providerPaymentId: ntpId });
-    line = read === "NO_SUCH_ORDER" ? "NO_SUCH_ORDER" : `${read.state}:${read.providerStatus}`;
+    line = read === "NO_SUCH_ORDER" ? "NO_SUCH_ORDER" : sandboxStatusLine(read);
   } catch (error) {
     line = codeOf(error);
   }
@@ -288,7 +314,7 @@ async function charge(command: Extract<ToolCommand, { command: "charge" }>, sess
   let kind = "charge-answer-error";
   try {
     const report = await session.payments(DEFAULT_REQUEST_FACTS).chargeSavedCard({
-      orderId, amountMicros: command.amountMicros, currency: "USD", description: RECORDING_DESCRIPTION, payer, cardToken: card,
+      orderId, amountMicros: command.amountMicros, currency: command.currency, description: RECORDING_DESCRIPTION, payer, cardToken: card,
       payerIp: command.payerIp ?? SANDBOX_PAYER_IP, returnUrl: `${session.publicAppUrl}/`, notifyUrl: notifyUrlOf(session), language: "ro"
     });
     kind = answeredOrderReused(report) ? "charge-answer-56" : report.state === "DECLINED" ? "charge-answer-declined" : "charge-answer";

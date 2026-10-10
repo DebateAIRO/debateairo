@@ -58,9 +58,9 @@ async function insertQuote(i: Readonly<{
   return database.pool.query(`
     INSERT INTO billing.quote (quote_id, owner_ref, plan_id, kind, net_micros, tax_micros, total_micros, tax_country,
       tax_region, tax_rate_bp, tax_status, tax_name, quaderno_ref, created_at, expires_at, location_ciphertext, key_id,
-      recurring_total_micros)
+      recurring_total_micros, currency)
     VALUES ($1, $2, 'PLUS', $3, 20000000, 4200000, 24200000, 'RO', NULL, 2100, 'TAXABLE', 'VAT', NULL,
-      $4::timestamptz, $4::timestamptz + interval '30 minutes', '\\x01', $5, $6)
+      $4::timestamptz, $4::timestamptz + interval '30 minutes', '\\x01', $5, $6, 'USD')
   `, [i.quoteId, i.ownerRef, i.kind, i.createdAt, keyId, i.recurringTotalMicros]);
 }
 

@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
 import { createObservationDatabasePort } from "../../apps/observation-agent/src/core/database.js";
 import { readPostgresCapacity } from "../../apps/observation-agent/src/modules/postgres-capacity/query.js";
+import { replayMigrationRolledBack } from "../support/migrationReplay.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 // V-29 (owner ruling 2026-09-22, finding DL5-F8). Migration 0059 made the agent's
@@ -16,6 +17,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 
 const legacyMigrationPath = resolve("migrations/0059_observation_pg_monitor.sql");
 const windowMigrationPath = resolve("migrations/0068_observation_stats_window.sql");
+const WINDOW_MIGRATION = "0068_observation_stats_window.sql";
 const agentRole = "debateai_observation_agent";
 const agentPassword = "v29-agent-only";
 const statementMarker = "V29_OTHER_SESSION_STATEMENT_TEXT";
@@ -144,62 +146,47 @@ describe("OBS-05 V-29 statistics window replaces pg_monitor", () => {
       { name: "0068_observation_stats_window.sql", applied: "1" }
     ] });
 
-    // Replay: forget 0068 in the ledger and apply it again over its own end state.
-    await fixture().pool.query(
-      "DELETE FROM public.debateai_schema_migration WHERE name='0068_observation_stats_window.sql'"
-    );
-    await expect(migrate(fixture().pool)).resolves.toBeUndefined();
-    await expect(fixture().pool.query(predefinedMemberships))
-      .resolves.toMatchObject({ rows: [{ roles: [] }] });
+    // Replay: apply 0068's own SQL again over its own end state, and look before the rollback.
+    // (migrate() refuses a ledger with 0068's row removed, by design: tests/support/migrationReplay.ts.)
+    expect(await replayMigrationRolledBack(fixture().pool, WINDOW_MIGRATION, {
+      after: (client) => expect(client.query(predefinedMemberships))
+        .resolves.toMatchObject({ rows: [{ roles: [] }] })
+    })).toBe("APPLIED");
   });
 
   // 0068 ends with guards that refuse, rather than warn: its REVOKE only removes the
   // direct pg_monitor grant, and its role creation adopts a pre-existing role silently.
-  async function replayWindowMigration(): Promise<string> {
-    await fixture().pool.query(
-      "DELETE FROM public.debateai_schema_migration WHERE name='0068_observation_stats_window.sql'"
-    );
-    try {
-      await migrate(fixture().pool);
-      return "APPLIED";
-    } catch (error) {
-      return (error as Error).message;
-    }
-  }
+  // Each drift is set up inside the replay's own transaction, so the rollback removes it;
+  // the replay without it then applies, so the drift alone caused the refusal.
+  const replayWindowMigration = (drift?: string): Promise<string> =>
+    replayMigrationRolledBack(fixture().pool, WINDOW_MIGRATION, {
+      before: async (client) => {
+        if (drift !== undefined) await client.query(drift);
+      }
+    });
 
   it("refuses to finish 0068 while the agent reaches a predefined role by another path", async () => {
-    await fixture().pool.query("CREATE ROLE v29_indirect_path NOLOGIN");
-    await fixture().pool.query("GRANT pg_read_all_settings TO v29_indirect_path");
-    await fixture().pool.query(`GRANT v29_indirect_path TO ${agentRole}`);
-    try {
-      expect(await replayWindowMigration()).toMatch(/^OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP/u);
-    } finally {
-      await fixture().pool.query("DROP ROLE v29_indirect_path");
-    }
+    expect(await replayWindowMigration(`
+      CREATE ROLE v29_indirect_path NOLOGIN;
+      GRANT pg_read_all_settings TO v29_indirect_path;
+      GRANT v29_indirect_path TO ${agentRole};
+    `)).toMatch(/^OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP/u);
     expect(await replayWindowMigration()).toBe("APPLIED");
   });
 
   it("refuses to adopt a statistics owner that has a member", async () => {
-    await fixture().pool.query("CREATE ROLE v29_owner_member NOLOGIN");
-    await fixture().pool.query("GRANT debateai_obs_stats_owner TO v29_owner_member");
-    try {
-      expect(await replayWindowMigration()).toMatch(/^OBS_STATS_OWNER_NOT_EXCLUSIVE/u);
-    } finally {
-      await fixture().pool.query("DROP ROLE v29_owner_member");
-    }
+    expect(await replayWindowMigration(`
+      CREATE ROLE v29_owner_member NOLOGIN;
+      GRANT debateai_obs_stats_owner TO v29_owner_member;
+    `)).toMatch(/^OBS_STATS_OWNER_NOT_EXCLUSIVE: members/u);
     expect(await replayWindowMigration()).toBe("APPLIED");
   });
 
   it("refuses to adopt a statistics owner that owns any other object", async () => {
-    await fixture().pool.query("CREATE TABLE public.v29_adopted_object (id integer)");
-    await fixture().pool.query(
-      "ALTER TABLE public.v29_adopted_object OWNER TO debateai_obs_stats_owner"
-    );
-    try {
-      expect(await replayWindowMigration()).toMatch(/^OBS_STATS_OWNER_NOT_EXCLUSIVE/u);
-    } finally {
-      await fixture().pool.query("DROP TABLE public.v29_adopted_object");
-    }
+    expect(await replayWindowMigration(`
+      CREATE TABLE public.v29_adopted_object (id integer);
+      ALTER TABLE public.v29_adopted_object OWNER TO debateai_obs_stats_owner;
+    `)).toMatch(/^OBS_STATS_OWNER_NOT_EXCLUSIVE: owns 1 other object/u);
     expect(await replayWindowMigration()).toBe("APPLIED");
   });
 

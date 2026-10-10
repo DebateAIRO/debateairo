@@ -10,7 +10,7 @@ import legalEnglish from "../../apps/ui/messages/en/legal.json" with { type: "js
 import { CONSENT_KEY, subscribeToPreferenceRequests } from "../../apps/ui/lib/consent.js";
 import { LOCALE_COOKIE } from "../../apps/ui/lib/i18n/locales.js";
 import {
-  ANPC_ADR_URL,
+  ADR_URL,
   COMPANY,
   isUnverified,
   LEGAL_BROWSER_STORAGE,
@@ -131,6 +131,13 @@ describe("the legal notice states the company and seller details from one consta
     render(
       <LegalNoticeBody legalCatalog={catalog(locale, "legal")} chromeCatalog={catalog(locale, "chrome")} locale={locale as never} />
     );
+  it("ends the seller sentence with one full stop, though the company name already ends in one", () => {
+    const view = render(
+      <LegalNoticeBody legalCatalog={catalog("en", "legal")} chromeCatalog={catalog("en", "chrome")} locale="en" billingOn />
+    );
+    expect(view.textContent).toContain("your invoices are with DMS Merchandise Shop S.R.L.");
+    expect(view.textContent).not.toContain("S.R.L..");
+  });
   const factCell = (view: HTMLElement, labelKey: string, locale = "en") =>
     [...view.querySelectorAll(".legalFactTable tr")]
       .find((row) => row.querySelector("th")?.textContent === catalog(locale, "legal")[labelKey])
@@ -213,11 +220,11 @@ describe("the legal notice states the company and seller details from one consta
     expect(factCell(ro, "legal.notice.contact.languages", "ro")?.textContent).toBe("Română și engleză");
   });
 
-  it("links ANPC's dispute resolution, the terms, AI transparency and the reading list — and not the closed EU ODR platform", () => {
+  it("links the dispute resolution route the Terms name, the terms, AI transparency and the reading list — and not the closed EU ODR platform", () => {
     const view = renderNotice("en");
     const hrefs = [...view.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "");
-    expect(hrefs).toContain(ANPC_ADR_URL);
-    expect(ANPC_ADR_URL).toBe("https://reclamatiisal.anpc.ro");
+    expect(hrefs).toContain(ADR_URL);
+    expect(ADR_URL).toBe("https://www.onoratainstanta.ro");
     expect(hrefs).toEqual(
       expect.arrayContaining(["/ai-transparency", "/terms#legal-section-13", "/terms#legal-section-18", "/terms", "/privacy", "/cookies", "/providers"])
     );

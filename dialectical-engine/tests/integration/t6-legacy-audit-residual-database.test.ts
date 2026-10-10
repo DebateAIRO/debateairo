@@ -1,10 +1,15 @@
-import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
+import { applyMigrationSql, migrationSql, retiredUpgradeReason } from "../support/migrationReplay.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
+
+const LEGACY_MIGRATIONS = [
+  "0032_registration_audit_erasure_checks.sql",
+  "0043_legacy_audit_erasure_residual.sql"
+] as const;
 
 const applicationRoles = [
   "debateai_runtime",
@@ -34,46 +39,50 @@ afterAll(async () => database?.stop());
 describe("T6 legacy audit erasure residual on real PostgreSQL", () => {
   it("preserves legacy rows, reports only exact counts, and denies application roles", async () => {
     await migrate(database.pool);
-    await database.pool.query(
-      "ALTER TABLE identity.audit_event DROP CONSTRAINT audit_event_actor_ciphertext_null"
-    );
-    await database.pool.query(
-      "ALTER TABLE identity.audit_event DROP CONSTRAINT audit_event_target_id_no_email"
-    );
-    await database.pool.query(`
-      DELETE FROM public.debateai_schema_migration WHERE name=ANY($1::text[])
-    `, [[
-      "0032_registration_audit_erasure_checks.sql",
-      "0043_legacy_audit_erasure_residual.sql"
-    ]]);
+    // Until merge 065708c19 this test removed the 0032 and 0043 ledger rows and let migrate()
+    // run them again over legacy rows. migrate() now refuses that ledger, and every ledger it
+    // does continue from already records both, so no database reaches 0032 or 0043 through
+    // migrate() with pre-0032 rows any more. What the two files do to such rows still ships, so
+    // the pre-0032 state is rebuilt on the migrated database and their own SQL runs over it.
+    expect(await retiredUpgradeReason(database.pool, LEGACY_MIGRATIONS)).toEqual({
+      refusal: "MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE", unrecorded: []
+    });
 
     const rows = [
       { actor: {}, target: "legacy-both@example.test", hashByte: 0xb1 },
       { actor: {}, target: randomUUID(), hashByte: 0xb2 },
       { actor: null, target: "legacy-target@example.test", hashByte: 0xb3 }
     ];
-    for (const [index, row] of rows.entries()) {
-      await database.pool.query(`
-        INSERT INTO identity.audit_event (
-          this_hash,actor_ciphertext,actor_key_ref,event_type,target_type,target_id,
-          occurred_at,source_context,decision,success
-        ) VALUES ($1,$2::jsonb,$3,'identity.legacy','identity.user',$4,
-          clock_timestamp(),$5::jsonb,'ALLOW',true)
-      `, [
-        Buffer.alloc(32, row.hashByte),
-        row.actor === null ? null : JSON.stringify(row.actor),
-        `legacy-actor-${index}`,
-        row.target,
-        JSON.stringify({ legacyFixture: index })
-      ]);
-    }
+    // One transaction, as migrate() runs them: the checks 0032 adds are not there yet, three
+    // rows break them, then 0032's and 0043's own SQL in the plan's order. The ledger is untouched.
+    await applyMigrationSql(database.pool, LEGACY_MIGRATIONS, async (client) => {
+      await client.query(
+        "ALTER TABLE identity.audit_event DROP CONSTRAINT audit_event_actor_ciphertext_null"
+      );
+      await client.query(
+        "ALTER TABLE identity.audit_event DROP CONSTRAINT audit_event_target_id_no_email"
+      );
+      for (const [index, row] of rows.entries()) {
+        await client.query(`
+          INSERT INTO identity.audit_event (
+            this_hash,actor_ciphertext,actor_key_ref,event_type,target_type,target_id,
+            occurred_at,source_context,decision,success
+          ) VALUES ($1,$2::jsonb,$3,'identity.legacy','identity.user',$4,
+            clock_timestamp(),$5::jsonb,'ALLOW',true)
+        `, [
+          Buffer.alloc(32, row.hashByte),
+          row.actor === null ? null : JSON.stringify(row.actor),
+          `legacy-actor-${index}`,
+          row.target,
+          JSON.stringify({ legacyFixture: index })
+        ]);
+      }
+    });
 
-    await expect(migrate(database.pool)).resolves.toBeUndefined();
-    const migration = await readFile(
-      new URL("../../migrations/0043_legacy_audit_erasure_residual.sql", import.meta.url),
-      "utf8"
-    );
-    await expect(database.pool.query(migration)).resolves.toBeDefined();
+    // 0043 once more over its own end state: it must replay.
+    await expect(database.pool.query(
+      await migrationSql("0043_legacy_audit_erasure_residual.sql")
+    )).resolves.toBeDefined();
 
     const summary = await database.pool.query(`
       SELECT * FROM identity.legacy_audit_erasure_residual_v

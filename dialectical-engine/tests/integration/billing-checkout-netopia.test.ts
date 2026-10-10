@@ -256,7 +256,7 @@ describe("N18 the checkout starts NETOPIA's page (spec §2.6.2)", () => {
 });
 
 describe("N18 one open checkout at a time (spec §2.6.3)", () => {
-  it("gives the same page again for an untouched payment of the same purchase within 30 minutes, with no second start", async () => {
+  it("gives the same page again for an untouched payment of the same purchase within 15 minutes, with no second start", async () => {
     const w = world();
     const first = await w.start(await w.quote());
     advance(5 * MINUTE);
@@ -268,6 +268,19 @@ describe("N18 one open checkout at a time (spec §2.6.3)", () => {
       .toEqual([{ outcome: "PENDING" }]);
     const accepted = await database.pool.query("SELECT kind FROM legal.acceptance WHERE owner_ref = $1", [w.ownerRef]);
     expect(accepted.rowCount).toBe(4);
+  });
+
+  it("starts a new page for the same purchase after 15 minutes, inside NETOPIA's 20-minute page life (N-25)", async () => {
+    const w = world();
+    const first = await w.start(await w.quote());
+    advance(16 * MINUTE);
+    const again = await w.start(await w.quote());
+    expect(again.reused).toBe(false);
+    expect(again.chargeId).not.toBe(first.chargeId);
+    expect(w.payments.starts).toHaveLength(2);
+    const before = (await w.repository.charge(first.chargeId))!;
+    expect((await w.repository.subscriptionEvents(before.subscriptionId)).at(-1))
+      .toMatchObject({ kind: "ENDED", data: { cause: "ABANDONED", reason: "NEW_CHECKOUT" } });
   });
 
   it("answers CHECKOUT_PENDING naming the charge while it is paid or almost, or while NETOPIA cannot say", async () => {
@@ -365,7 +378,7 @@ describe("N18 one open checkout at a time (spec §2.6.3)", () => {
       .toMatchObject({ status: 409, code: "CHECKOUT_PENDING", chargeRef: charges[0]!.chargeId });
   });
 
-  it("makes a new charge from the new quote when the buyer's phone, street or last name changed within 30 minutes (A3 (b))", async () => {
+  it("makes a new charge from the new quote when the buyer's phone, street or last name changed within 15 minutes (A3 (b))", async () => {
     const w = world();
     const first = await w.start(await w.quote());
     const customer = await w.repository.customerByOwner(w.ownerRef);
