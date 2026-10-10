@@ -494,7 +494,8 @@ const previewFetch = previewConfig === undefined ? undefined : createPreviewGuar
 // Contract A §5: the preview's start-of-debate estimate asks the gate what is left today (read-only).
 const previewBudgetGate = previewConfig === undefined ? undefined : await boot.run("preview-budget-gate", async () => {
   // Every declared target is health-checked at ask time, paid through the gate even when the ask is refused.
-  const settings = await readPreviewBudgetGateSettings(pool, environment.REGISTER_VERSION, previewConfig, declaredProviderTargets.length);
+  const settings = await readPreviewBudgetGateSettings(pool, environment.REGISTER_VERSION, previewConfig,
+    declaredProviderTargets.map((target) => target.model));
   // Every role the register names must be a declared target, or its debates would fail at claim.
   assertPreviewRoleTargets(previewConfig, declaredProviderTargets, settings.roleProviderRefs);
   return settings;
