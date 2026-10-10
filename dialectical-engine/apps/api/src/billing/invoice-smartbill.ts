@@ -79,7 +79,8 @@ export async function recordSmartBillDocument(
     await enqueueEmail(repository, client, {
       template: "M2_INVOICE_ATTACHED", recipient: { kind: "CUSTOMER", customerId: charge.customerId }, dedupeRef: charge.chargeId,
       params: {
-        plan: charge.planId, totalAmount: microsToDecimal(charge.chargeTotalMicros), chargeDate: charge.paidAt.toISOString(),
+        plan: charge.planId, totalAmount: microsToDecimal(charge.chargeTotalMicros), currency: charge.currency,
+        chargeDate: charge.paidAt.toISOString(),
         // P2-M33: one number in one form, `<series>-<number>`, as Settings, the owner's summary and commands show it.
         invoiceNumber: `${document.series}-${document.number}`
       },

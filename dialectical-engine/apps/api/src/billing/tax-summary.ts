@@ -1,5 +1,5 @@
 import { exhaustive } from "@debateai/kernel";
-import { microsToDecimal, type TaxStatus } from "@debateai/billing-core";
+import { microsToDecimal, type PriceCurrency, type TaxStatus } from "@debateai/billing-core";
 import type {
   BillingJobQueries, BillingRepository, NoticeQuarantineCursor, NoticeQuarantineRow, TaxSummaryRow
 } from "@debateai/db";
@@ -70,6 +70,8 @@ export type PaymentToCheckItem = Readonly<{
 export type TaxSummaryLine = Readonly<{
   taxCountry: string;
   taxRegion: string | null;
+  /** Spec 2026-10-05 §2.16.5: the currency of every figure on this line; a line never sums across currencies. */
+  currency: PriceCurrency;
   scheme: string | null;
   authority: TaxAuthorityEntry | null;
   netMicros: number;
@@ -87,7 +89,7 @@ export type TaxSummaryLine = Readonly<{
 }>;
 /** A refund made in NETOPIA's admin whose amount our rows cannot know; `upToMicros` is its upper bound. */
 export type UnknownRefundItem = Readonly<{
-  chargeId: string; taxCountry: string; taxRegion: string | null; upToMicros: number; at: Date;
+  chargeId: string; taxCountry: string; taxRegion: string | null; upToMicros: number; currency: PriceCurrency; at: Date;
 }>;
 export type TaxSummary = Readonly<{
   quarter: TaxQuarter;
@@ -99,7 +101,9 @@ export type TaxSummary = Readonly<{
    * `saleRecorded` false (Part 4 final review C-19): the charge holds no SUCCEEDED (a checkout charged back before we
    * verified it), so no sale was ever counted for it.
    */
-  chargebacks: ReadonlyArray<Readonly<{ chargeId: string; taxCountry: string; amountMicros: number; at: Date; saleRecorded: boolean }>>;
+  chargebacks: ReadonlyArray<Readonly<{
+    chargeId: string; taxCountry: string; amountMicros: number; currency: PriceCurrency; at: Date; saleRecorded: boolean;
+  }>>;
   /**
    * Not subtracted from any line: the owner reads each amount in NETOPIA's admin, records its credit note with
    * `--amount`, and until then adjusts that country by hand. Never a charge with a REFUNDED_BEFORE_START line (C-5).
@@ -325,7 +329,7 @@ export function buildTaxSummary(input: Readonly<{
   unverifiedNotices?: ReadonlyArray<UnverifiedNoticeDay>;
   authorities: TaxAuthorities;
 }>): TaxSummary {
-  type Working = { taxCountry: string; taxRegion: string | null; authority: TaxAuthorityEntry | null;
+  type Working = { taxCountry: string; taxRegion: string | null; currency: PriceCurrency; authority: TaxAuthorityEntry | null;
     netMicros: number; taxMicros: number; sales: number; refunds: number; unknownRefunds: number;
     statusCounts: Record<TaxStatus, number> };
   const groups = new Map<string, Working>();
@@ -345,8 +349,8 @@ export function buildTaxSummary(input: Readonly<{
       // For the accountant: the sale stays counted where it was made; the bank took the money back. C-19: a charge-back
       // of a payment we never verified has no sale anywhere, and its line says so.
       chargebacks.push(Object.freeze({
-        chargeId: row.chargeId, taxCountry: row.taxCountry, amountMicros: row.amountMicros, at: row.at,
-        saleRecorded: row.saleRecorded
+        chargeId: row.chargeId, taxCountry: row.taxCountry, amountMicros: row.amountMicros, currency: row.currency,
+        at: row.at, saleRecorded: row.saleRecorded
       }));
       continue;
     }
@@ -357,8 +361,9 @@ export function buildTaxSummary(input: Readonly<{
       continue;
     }
     const authority = taxAuthorityFor(input.authorities, row.taxCountry, row.taxStatus);
-    const key = `${row.taxCountry}\u0000${row.taxRegion ?? ""}\u0000${authority?.scheme ?? ""}`;
-    const group = groups.get(key) ?? { taxCountry: row.taxCountry, taxRegion: row.taxRegion, authority,
+    // Spec 2026-10-05 §2.16.5: one block per country or state, scheme and currency; amounts are never summed across.
+    const key = `${row.taxCountry}\u0000${row.taxRegion ?? ""}\u0000${authority?.scheme ?? ""}\u0000${row.currency}`;
+    const group = groups.get(key) ?? { taxCountry: row.taxCountry, taxRegion: row.taxRegion, currency: row.currency, authority,
       netMicros: 0, taxMicros: 0, sales: 0, refunds: 0, unknownRefunds: 0, statusCounts: zeroCounts() };
     if (row.type === "SALE") {
       group.netMicros += row.chargeNetMicros;
@@ -375,7 +380,8 @@ export function buildTaxSummary(input: Readonly<{
       // understate this country's sales and tax; it is listed for the owner instead, and changes no figure. (A charge
       // refunded before its plan started never reaches here: see the C-5 skip above.)
       unknownRefunds.push(Object.freeze({
-        chargeId: row.chargeId, taxCountry: row.taxCountry, taxRegion: row.taxRegion, upToMicros: row.amountMicros, at: row.at
+        chargeId: row.chargeId, taxCountry: row.taxCountry, taxRegion: row.taxRegion, upToMicros: row.amountMicros,
+        currency: row.currency, at: row.at
       }));
       group.unknownRefunds += 1;
     } else {
@@ -391,9 +397,10 @@ export function buildTaxSummary(input: Readonly<{
   const lines = [...groups.values()]
     .sort((left, right) => (countryName.of(left.taxCountry) ?? left.taxCountry).localeCompare(countryName.of(right.taxCountry) ?? right.taxCountry)
       || (left.taxRegion ?? "").localeCompare(right.taxRegion ?? "")
-      || (left.authority?.scheme ?? "").localeCompare(right.authority?.scheme ?? ""))
+      || (left.authority?.scheme ?? "").localeCompare(right.authority?.scheme ?? "")
+      || left.currency.localeCompare(right.currency))
     .map((group) => Object.freeze({
-      taxCountry: group.taxCountry, taxRegion: group.taxRegion, scheme: group.authority?.scheme ?? null,
+      taxCountry: group.taxCountry, taxRegion: group.taxRegion, currency: group.currency, scheme: group.authority?.scheme ?? null,
       authority: group.authority, netMicros: group.netMicros, taxMicros: group.taxMicros,
       sales: group.sales, refunds: group.refunds, unknownRefunds: group.unknownRefunds,
       statusCounts: Object.freeze({ ...group.statusCounts })
@@ -461,13 +468,14 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
   const out: string[] = [
     `DebateAI tax summary for ${quarter.label} (${longDate(quarter.from)} to ${longDate(new Date(quarter.to.getTime() - 86_400_000))}, UTC)`,
     `From our own records: ${plural(summary.sales, "sale", "sales")} and ${plural(summary.refunds, "refund", "refunds")}.`
-      + " Amounts are US dollars; one block per country or state and tax scheme.",
+      + " Each amount is in the currency it was charged in; one block per country or state, tax scheme and currency.",
     ""
   ];
   for (const line of summary.lines) {
     const place = `${countryName.of(line.taxCountry) ?? line.taxCountry}${line.taxRegion === null ? "" : `, ${line.taxRegion}`}`;
     out.push(`${place}${line.scheme === null ? "" : ` (${line.scheme})`}`);
-    out.push(`  Net sales ${microsToDecimal(line.netMicros)} USD, tax collected ${microsToDecimal(line.taxMicros)} USD,`
+    out.push(`  Net sales ${microsToDecimal(line.netMicros)} ${line.currency},`
+      + ` tax collected ${microsToDecimal(line.taxMicros)} ${line.currency},`
       + ` from ${plural(line.sales, "sale", "sales")} and ${plural(line.refunds, "refund", "refunds")}.`);
     if (line.unknownRefunds > 0) {
       out.push(`  Not subtracted: ${plural(line.unknownRefunds, "refund", "refunds")} made in NETOPIA's admin,`
@@ -525,7 +533,7 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
   section(summary.chargebacks, "Charge-backs this quarter: none.",
     "Charge-backs this quarter (the card holder's bank took the money back; the sale above still counts until the"
       + " accountant decides, except for a line that says no sale was recorded for it):",
-    (item) => `charge ${item.chargeId}, ${item.taxCountry}, ${microsToDecimal(item.amountMicros)} USD, on ${isoDay(item.at)}`
+    (item) => `charge ${item.chargeId}, ${item.taxCountry}, ${microsToDecimal(item.amountMicros)} ${item.currency}, on ${isoDay(item.at)}`
       + (item.saleRecorded ? "" : ": no sale was recorded for it"));
   section(summary.unknownRefunds, "Refunds made in NETOPIA's admin, amount unknown: none.",
     // P4-K (P2-W12): once the owner records the credit note with its amount, `quarterSummaryRows` subtracts it.
@@ -534,7 +542,7 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " credit notes to check by hand gives), and the summary then subtracts it at that amount; until then, adjust that"
       + " country's net sales and tax by hand, at most the amount shown):",
     (item) => `charge ${item.chargeId}, ${item.taxCountry}${item.taxRegion === null ? "" : `, ${item.taxRegion}`},`
-      + ` up to ${microsToDecimal(item.upToMicros)} USD, on ${isoDay(item.at)}`);
+      + ` up to ${microsToDecimal(item.upToMicros)} ${item.currency}, on ${isoDay(item.at)}`);
   // W12 (P2-I16, P2-I17): every dead document job, whatever its code; what to do once per job kind and code (fix I-1).
   // `pnpm billing:invoice` records a document issued or found by hand, or re-queues the job, and the line then leaves
   // the list; each kind's commands are printed under its bullet.

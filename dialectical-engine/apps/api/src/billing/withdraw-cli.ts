@@ -15,7 +15,7 @@
 import { pathToFileURL } from "node:url";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import { PostgresModelSpendStore } from "@debateai/budget";
-import { decimalToMicros, foldSubscription, microsToDecimal } from "@debateai/billing-core";
+import { decimalToMicros, foldSubscription, microsToDecimal, type PriceCurrency } from "@debateai/billing-core";
 import {
   BillingJobQueries,
   BillingRepository,
@@ -46,11 +46,12 @@ export type WithdrawArguments =
   | Readonly<{ kind: "RECORD"; ownerRef: string; receivedAt: Date | null }>
   /** `dashboardMicros`: what the owner refunded in NETOPIA's admin for this withdrawal (0 without `--dashboard`). */
   | Readonly<{ kind: "SETTLE"; ownerRef: string; refundMicros: number; dashboardMicros: number }>;
+/** `currency`: the subscription's own, the one every amount of the withdrawal is in (spec 2026-10-05 §2.16.5). */
 export type WithdrawResult =
-  | Readonly<{ kind: "REFUNDING"; refundMicros: number }>
+  | Readonly<{ kind: "REFUNDING"; refundMicros: number; currency: PriceCurrency }>
   | Readonly<{ kind: "NOTHING_DUE" }>
   | Readonly<{ kind: "OWNER_REVIEW" }>
-  | Readonly<{ kind: "SETTLED"; refundMicros: number; dashboardMicros: number }>;
+  | Readonly<{ kind: "SETTLED"; refundMicros: number; dashboardMicros: number; currency: PriceCurrency }>;
 /** P12d's withdrawal inputs over the operator pool. */
 export type WithdrawStores = WithdrawalDeps;
 export type WithdrawCliOutput = Readonly<{ stdout(text: string): void; stderr(text: string): void }>;
@@ -142,7 +143,7 @@ export async function recordOwnerWithdrawal(
   if (outcome.refundMicros === null) return Object.freeze({ kind: "OWNER_REVIEW" as const });
   return outcome.refundMicros === 0
     ? Object.freeze({ kind: "NOTHING_DUE" as const })
-    : Object.freeze({ kind: "REFUNDING" as const, refundMicros: outcome.refundMicros });
+    : Object.freeze({ kind: "REFUNDING" as const, refundMicros: outcome.refundMicros, currency: outcome.currency });
 }
 
 /**
@@ -160,7 +161,7 @@ export async function settleOwnerWithdrawal(
   stores: WithdrawStores, input: Readonly<{ ownerRef: string; refundMicros: number; dashboardMicros: number }>
 ): Promise<WithdrawResult> {
   const now = stores.clock();
-  const refunds = await stores.billing.withTransaction(async (client) => {
+  const settled = await stores.billing.withTransaction(async (client) => {
     await stores.jobs.lockOwner(client, input.ownerRef);
     const waiting = (await stores.billing.withdrawalsAwaitingOwner(input.ownerRef, client))[0];
     if (waiting === undefined) throw new TypeError("BILLING_WITHDRAW_NOT_AWAITING_OWNER");
@@ -194,18 +195,21 @@ export async function settleOwnerWithdrawal(
           template: "M8", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
           dedupeRef: waiting.subscriptionId,
           params: {
-            plan: waiting.planId, refundAmount: microsToDecimal(input.dashboardMicros),
+            plan: waiting.planId, refundAmount: microsToDecimal(input.dashboardMicros), currency: folded.currency,
             ...(input.dashboardMicros === 0 && input.refundMicros === 0 ? { ownerSettled: "true" } : {})
           },
           notBefore: now
         });
       }
     }
-    return allocations.length;
+    return { refunds: allocations.length, currency: folded.currency };
   });
-  stores.audit("billing.withdrawal.settled", { refunds });
-  if (refunds > 0) stores.kick();
-  return Object.freeze({ kind: "SETTLED" as const, refundMicros: input.refundMicros, dashboardMicros: input.dashboardMicros });
+  stores.audit("billing.withdrawal.settled", { refunds: settled.refunds });
+  if (settled.refunds > 0) stores.kick();
+  return Object.freeze({
+    kind: "SETTLED" as const, refundMicros: input.refundMicros, dashboardMicros: input.dashboardMicros,
+    currency: settled.currency
+  });
 }
 
 export async function runWithdrawCommand(stores: WithdrawStores, input: WithdrawArguments): Promise<WithdrawResult> {
@@ -220,7 +224,7 @@ export function renderWithdrawResult(result: WithdrawResult, input: WithdrawArgu
   const owner = `owner ${input.ownerRef}`;
   switch (result.kind) {
     case "REFUNDING":
-      return `The withdrawal of ${owner} is recorded: the plan has ended and ${microsToDecimal(result.refundMicros)} USD`
+      return `The withdrawal of ${owner} is recorded: the plan has ended and ${microsToDecimal(result.refundMicros)} ${result.currency}`
         + " goes back to the card. M8 follows once the refund is done.\n";
     case "NOTHING_DUE":
       return `The withdrawal of ${owner} is recorded: the plan has ended and nothing was due back. M8 is queued.\n`;
@@ -236,12 +240,12 @@ export function renderWithdrawResult(result: WithdrawResult, input: WithdrawArgu
       if (result.refundMicros === 0) {
         return result.dashboardMicros === 0
           ? `The withdrawal of ${owner} is settled: nothing more goes back. M8 is queued.\n`
-          : `The withdrawal of ${owner} is settled: ${microsToDecimal(result.dashboardMicros)} USD was refunded in`
+          : `The withdrawal of ${owner} is settled: ${microsToDecimal(result.dashboardMicros)} ${result.currency} was refunded in`
             + " NETOPIA's admin. M8 is queued.\n";
       }
-      return `The withdrawal of ${owner} is settled: ${microsToDecimal(result.refundMicros)} USD goes back to the card`
+      return `The withdrawal of ${owner} is settled: ${microsToDecimal(result.refundMicros)} ${result.currency} goes back to the card`
         + (result.dashboardMicros === 0 ? ""
-          : ` and ${microsToDecimal(result.dashboardMicros)} USD was refunded in NETOPIA's admin`
+          : ` and ${microsToDecimal(result.dashboardMicros)} ${result.currency} was refunded in NETOPIA's admin`
             + ` (M8 says ${microsToDecimal(result.refundMicros + result.dashboardMicros)})`)
         + ". M8 follows once the refund is done.\n";
     default:

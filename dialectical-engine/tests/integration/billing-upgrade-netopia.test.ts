@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   foldSubscription, microsToDecimal, paymentError, upgradeMonthCreditOverrideMicros, upgradeProrationMicros,
-  type HostedPaymentStart, type HostedPaymentStarted
+  type HostedPaymentStart, type HostedPaymentStarted, type PriceCurrency
 } from "@debateai/billing-core";
 import { BillingUpgradePendingErrorSchema, BillingUpgradeResponseSchema } from "@debateai/contract";
-import { BillingRepository, createPool, EntitlementRepository, migrate } from "@debateai/db";
+import { BillingJobQueries, BillingRepository, createPool, EntitlementRepository, migrate } from "@debateai/db";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
-import { AdjustableTaxEngine, StubGeo } from "../support/billingFixtures.js";
+import { AdjustableTaxEngine, StubGeo, testBillingPolicy, testRegionalPlans } from "../support/billingFixtures.js";
 import {
   mountSubscriptionRoutes, recordingAudit, seedNetopiaSubscription, subscriptionDeps, testAgreement,
   testCardToken, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
@@ -16,6 +16,9 @@ import {
 import { netopiaVerifyHandler, verifyJob } from "../support/netopia-verify.js";
 import { StubCardPayments, stubPaymentReport } from "../support/stub-card-payments.js";
 import { chargeStatusOf } from "../../apps/api/src/billing/charge-status.js";
+import { englishOrderText } from "../../apps/api/src/billing/order-text.js";
+import { RenewalService } from "../../apps/api/src/billing/renewal.js";
+import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-renewal.js";
 import { openBillingProfile, openPaymentUrl, sealBillingProfile, sealCardToken } from "../../apps/api/src/billing/records.js";
 import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { quoteUpgrade, startUpgrade } from "../../apps/api/src/billing/upgrade.js";
@@ -49,6 +52,8 @@ class ScriptedStarts extends StubCardPayments {
 
 async function start(label: string, options: Readonly<{
   paymentEnvironment?: "sandbox" | "live"; planId?: "PLUS" | "PRO";
+  /** Part C (spec 2026-10-05 §2.16.3): the subscription's currency; with one, the plans are the engine's region rule. */
+  currency?: PriceCurrency;
 }> = {}) {
   const identity = testHttpIdentity(label);
   const clock = { now: new Date() };
@@ -57,10 +62,13 @@ async function start(label: string, options: Readonly<{
   const audit = recordingAudit();
   const seeded = await seedNetopiaSubscription(database.pool, {
     ownerRef: identity.authenticated.ownerRef, planId: options.planId ?? "PLUS", activatedAt: new Date(clock.now.getTime() - 5 * DAY),
-    taxCountry: "RO"
+    taxCountry: "RO",
+    ...(options.currency === undefined ? {} : { currency: options.currency }),
+    ...(options.currency === "RON" ? { netMicros: 100_000_000 } : {})
   });
   const deps = subscriptionDeps(database.pool, {
     payments, geo, audit, clock: () => clock.now, accountEmail: { read: async () => EMAIL },
+    ...(options.currency === undefined ? {} : { plans: testRegionalPlans }),
     ...(options.paymentEnvironment === undefined ? {} : { paymentEnvironment: options.paymentEnvironment })
   });
   const api = await mountSubscriptionRoutes(deps, identity);
@@ -81,10 +89,10 @@ async function start(label: string, options: Readonly<{
 }
 type Run = Awaited<ReturnType<typeof start>>;
 
-/** NETOPIA reads the order PAID at the charge's own amount, and VERIFY_PAYMENT decides it (N10's path). */
+/** NETOPIA reads the order PAID at the charge's own amount and currency, and VERIFY_PAYMENT decides it (N10's path). */
 async function pay(run: Run, chargeRef: string): Promise<void> {
   const charge = (await repository.charge(chargeRef))!;
-  run.payments.scriptStatus(chargeRef, stubPaymentReport(chargeRef, "PAID", { amountMicros: charge.totalMicros }));
+  run.payments.scriptStatus(chargeRef, stubPaymentReport(chargeRef, "PAID", { amountMicros: charge.totalMicros, currency: charge.currency }));
   expect(await run.verify.handle(verifyJob(chargeRef, run.clock.now), run.clock.now)).toEqual({ kind: "DONE" });
 }
 
@@ -163,6 +171,62 @@ describe("N12 an upgrade on NETOPIA's page (spec §2.10)", () => {
     await run.api.close();
   });
 
+  it("a RON subscription upgrades on NETOPIA's page in RON", async () => {
+    const run = await start("c2-upgrade-ron", { currency: "RON" });
+    const quoted = await run.quote("PRO");
+    const response = await run.upgrade("PRO", quoted.quote_ref);
+    expect(response.statusCode, response.body).toBe(200);
+    const chargeRef = BillingUpgradeResponseSchema.parse(response.json()).charge_ref;
+    const quote = (await repository.quote(quoted.quote_ref, run.identity.authenticated.ownerRef))!;
+    expect(quote.currency).toBe("RON");
+    const charge = (await repository.charge(chargeRef))!;
+    expect(charge).toMatchObject({ kind: "UPGRADE", currency: "RON", totalMicros: quote.totalMicros });
+    expect(run.payments.hosted).toEqual([
+      expect.objectContaining({ orderId: chargeRef, currency: "RON", amountMicros: quote.totalMicros })
+    ]);
+    expect(microsToDecimal(quote.totalMicros)).toBe(quoted.total);
+
+    // CF1 (tests-1): paid, the upgrade records PRO's RON price as the net every later renewal charges (Terms §12)…
+    await pay(run, chargeRef);
+    expect((await stateOf(run.seeded.subscriptionId))).toMatchObject({ planId: "PRO", status: "ACTIVE", currency: "RON" });
+    const [upgraded, ...moreUpgrades] = await upgradedEvents(run.seeded.subscriptionId);
+    expect(moreUpgrades).toEqual([]);
+    expect(upgraded!.data).toMatchObject({ recurring_net_micros: 250_000_000, quote_ref: quoted.quote_ref });
+    // …and the next renewal charges it: a RENEWAL in RON at PRO's 250.00 RON net, on the saved card.
+    const renewal = new RenewalService({
+      repository, jobs: new BillingJobQueries(database.pool), entitlements: new EntitlementRepository(database.pool),
+      tax: run.deps.tax, settlement: createRenewalSettlement({
+        repository, entitlements: new EntitlementRepository(database.pool), policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL
+      }),
+      policy: testBillingPolicy, plans: testRegionalPlans, recordsKey: TEST_RECORDS_KEY, publicAppUrl: TEST_PUBLIC_APP_URL,
+      audit: run.audit, clock: () => run.clock.now, kick: () => undefined,
+      netopia: { payments: run.payments, paymentEnvironment: "sandbox", recipients: { currentAddress: async () => EMAIL }, orderText: englishOrderText }
+    });
+    run.clock.now = new Date(run.seeded.periodEnd.getTime() + MINUTE);
+    expect(await renewal.renew(run.seeded.subscriptionId)).toBe("charged");
+    const renewals = (await repository.chargesForSubscription(run.seeded.subscriptionId)).filter((charge) => charge.kind === "RENEWAL");
+    expect(renewals).toEqual([expect.objectContaining({ currency: "RON", netMicros: 250_000_000 })]);
+    expect(run.payments.charges).toEqual([
+      expect.objectContaining({ orderId: renewals[0]!.chargeId, currency: "RON", amountMicros: renewals[0]!.totalMicros })
+    ]);
+    await run.api.close();
+  });
+
+  it("refuses an upgrade quote in another currency than the subscription's as the writer's bug it would be", async () => {
+    const run = await start("c2-upgrade-mismatch");
+    const quoted = await run.quote("PRO");
+    const usd = (await repository.quote(quoted.quote_ref, run.identity.authenticated.ownerRef))!;
+    const eur = { ...usd, quoteId: randomUUID(), currency: "EUR" as const };
+    await repository.withTransaction((client) => repository.insertQuote(client, eur));
+    await expect(startUpgrade(run.deps, {
+      ownerRef: run.identity.authenticated.ownerRef, userId: run.identity.authenticated.userId, planId: "PRO",
+      quoteRef: eur.quoteId, ip: BUYER_IP, userAgent: "c2", locale: "en", agreement: testAgreement("en")!
+    })).rejects.toMatchObject({ code: "BILLING_CURRENCY_MISMATCH" });
+    expect(await upgradeCharges(run.seeded.subscriptionId)).toEqual([]);
+    expect(run.payments.hosted).toEqual([]);
+    await run.api.close();
+  });
+
   it("answers the same page for the same quote while it is payable, and never opens a second one", async () => {
     const run = await start("n12-reuse");
     const quoted = await run.quote("PRO");
@@ -177,6 +241,28 @@ describe("N12 an upgrade on NETOPIA's page (spec §2.10)", () => {
     expect(run.payments.startCalls).toBe(1);
     expect(run.payments.statusReads.map((read) => read.providerPaymentId))
       .toEqual([`ntp-${first.charge_ref.slice(0, 12)}`, `ntp-${first.charge_ref.slice(0, 12)}`]);
+    await run.api.close();
+  });
+
+  it("hands the same quote's page back only within 15 minutes of its start, then asks for a fresh price (N-25)", async () => {
+    const run = await start("n12-reuse-window");
+    const quoted = await run.quote("PRO");
+    const first = BillingUpgradeResponseSchema.parse((await run.upgrade("PRO", quoted.quote_ref)).json());
+    run.payments.scriptStatus(first.charge_ref, stubPaymentReport(first.charge_ref, "PENDING", { providerStatus: "1" }));
+    // NETOPIA's page lasts 20 minutes; 16 minutes on, the quote (30 minutes) still lives but its page is not handed back.
+    run.clock.now = new Date(run.clock.now.getTime() + 16 * MINUTE);
+    const refused = await run.upgrade("PRO", quoted.quote_ref);
+    expect(refused.statusCode, refused.body).toBe(409);
+    expect(refused.json()).toMatchObject({ error: "QUOTE_EXPIRED" });
+    expect((await trail(first.charge_ref)).at(-1)).toEqual(["FAILED", "NO_TRANSACTION"]);
+    expect(run.payments.startCalls).toBe(1);
+    // A fresh price opens a second page.
+    const fresh = await run.upgrade("PRO", (await run.quote("PRO")).quote_ref);
+    expect(fresh.statusCode, fresh.body).toBe(200);
+    const second = BillingUpgradeResponseSchema.parse(fresh.json());
+    expect(second.charge_ref).not.toBe(first.charge_ref);
+    expect(second.redirect_url).not.toBe(first.redirect_url);
+    expect(run.payments.startCalls).toBe(2);
     await run.api.close();
   });
 

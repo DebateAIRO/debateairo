@@ -560,21 +560,25 @@ export class RenewalService {
   ): Readonly<{ quote: QuoteRow; charge: ChargeRow }> {
     const quoteId = randomUUID();
     const sealed = sealQuoteLocation(this.deps.recordsKey, quoteId, priced.location);
-    const quote = Object.freeze({
+    const quote: QuoteRow = Object.freeze({
       quoteId, ownerRef: state.ownerRef, planId: priced.planId, kind: "RENEWAL",
       netMicros: priced.tax.netMicros, taxMicros: priced.tax.taxMicros, totalMicros: priced.tax.totalMicros,
       taxCountry: priced.tax.taxCountry, taxRegion: priced.tax.taxRegion, taxRateBasisPoints: priced.tax.taxRateBasisPoints,
       taxStatus: priced.tax.status, taxName: priced.tax.taxName, quadernoRef: priced.tax.reference,
       expiresAt: new Date(now.getTime() + this.deps.policy.quoteTtlSeconds * 1_000), createdAt: now,
-      locationCiphertext: sealed.ciphertext, keyId: sealed.keyId, recurringTotalMicros: null
-    }) as QuoteRow;
-    const charge = Object.freeze({
+      locationCiphertext: sealed.ciphertext, keyId: sealed.keyId, recurringTotalMicros: null,
+      // Spec 2026-10-05 §2.16.3: a renewal (and each retry) is priced in the subscription's own currency.
+      currency: state.currency
+    });
+    const charge: ChargeRow = Object.freeze({
       chargeId: newChargeId(), ownerRef: state.ownerRef, subscriptionId: state.subscriptionId, kind: "RENEWAL", attempt, periodStart,
       periodEnd: computeWindows(state.periodAnchorAt!, periodStart).month.end, quoteId,
-      netMicros: quote.netMicros, taxMicros: quote.taxMicros, totalMicros: quote.totalMicros, currency: "USD", createdAt: now,
+      netMicros: quote.netMicros, taxMicros: quote.taxMicros, totalMicros: quote.totalMicros,
+      // Spec 2026-10-05 §2.16.4: the charge is in its quote's currency, the subscription's (a dunning retry inherits it).
+      currency: quote.currency, createdAt: now,
       // Spec §2.5.4: every charge of a subscription is paid in the system the subscription was created in.
       paymentProvider: state.paymentProvider, paymentEnvironment: state.paymentEnvironment
-    }) as ChargeRow;
+    });
     return Object.freeze({ quote, charge });
   }
 
@@ -756,7 +760,8 @@ export class RenewalService {
       template: "M3", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
       dedupeRef: `${fresh.subscriptionId}:${fresh.currentPeriodEnd.toISOString()}:${priced.tax.totalMicros}`,
       params: {
-        plan: priced.planId, totalAmount: microsToDecimal(priced.tax.totalMicros), chargeDate: chargeDate.toISOString(),
+        plan: priced.planId, totalAmount: microsToDecimal(priced.tax.totalMicros), currency: fresh.currency,
+        chargeDate: chargeDate.toISOString(),
         // A25: M3 links to the /cancel page, never to a token.
         cancelPageUrl: new URL("/cancel", this.deps.publicAppUrl).toString()
       },
@@ -885,7 +890,7 @@ export class RenewalService {
     const quote = charge.quoteId === null ? null : await this.deps.repository.quote(charge.quoteId, charge.ownerRef);
     const locale = stored.profile?.locale ?? "en";
     return Object.freeze({
-      orderId: charge.chargeId, amountMicros: charge.totalMicros, currency: "USD" as const,
+      orderId: charge.chargeId, amountMicros: charge.totalMicros, currency: charge.currency,
       description: netopia.orderText("ORDER_PLAN", locale, { plan: planName(quote?.planId ?? state.planId) }),
       payer, cardToken: openCardToken(this.deps.recordsKey, card), payerIp,
       returnUrl: paymentReturnUrl(this.deps.publicAppUrl, "/checkout/return", charge.chargeId),

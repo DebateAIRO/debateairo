@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SubscriptionState } from "@debateai/billing-core";
 import type { ChargeRow, QuoteRow } from "@debateai/db";
 import { chargeInCurrentPeriod, upgradeSucceededWrites } from "../../apps/api/src/billing/upgrade.js";
-import { testBillingPlans } from "../support/billingFixtures.js";
+import { testBillingPlans, testRegionalPlans } from "../support/billingFixtures.js";
 
 const START = new Date("2026-10-01T00:00:00.000Z");
 const END = new Date("2026-10-31T00:00:00.000Z");
@@ -13,7 +13,7 @@ const state = (overrides: Partial<SubscriptionState> = {}): SubscriptionState =>
   periodAnchorAt: START, currentPeriodStart: START, currentPeriodEnd: END,
   cancelRequested: false, scheduledDowngradePlanId: null, activatedAt: START, endedCause: null, pastDueSince: null, retryIndex: 0,
   renewalPostponedUntil: null, announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "netopia",
-  paymentEnvironment: "sandbox", cardTokenId: null,
+  paymentEnvironment: "sandbox", cardTokenId: null, currency: "USD",
   ...overrides
 });
 
@@ -22,7 +22,7 @@ const quote: QuoteRow = Object.freeze({
   netMicros: 15_000_000, taxMicros: 3_150_000, totalMicros: 18_150_000, taxCountry: "RO", taxRegion: null,
   taxRateBasisPoints: 2_100, taxStatus: "TAXABLE", taxName: "VAT", quadernoRef: null,
   createdAt: MIDDLE, expiresAt: new Date(MIDDLE.getTime() + 1_800_000),
-  locationCiphertext: Buffer.alloc(0), keyId: "k", recurringTotalMicros: 60_500_000
+  locationCiphertext: Buffer.alloc(0), keyId: "k", recurringTotalMicros: 60_500_000, currency: "USD"
 });
 
 /** P12c's key: the charge runs from its quote's creation to the end of the period it was quoted in. */
@@ -45,6 +45,26 @@ describe("P12c what the UPGRADE settlement writes when an upgrade is paid", () =
     });
     expect(writes.entitlement).toEqual({
       planId: "PRO", periodAnchorAt: START, cause: "UPGRADED", paidThrough: END, monthCreditOverrideMicros: 12_500_000
+    });
+  });
+
+  it("CF1 (tests-1): a RON subscription upgrading PLUS to PRO records PRO's RON price as the next renewals' net", () => {
+    // Terms §12: every renewal after the upgrade charges this net. PRO is 250.00 RON but 50.00 USD and 50.00 EUR, so only
+    // RON tells the subscription's currency from a price read in another one (spec 2026-10-05 §2.16.3).
+    const now = new Date(MIDDLE.getTime() + 5_000);
+    const ronQuote: QuoteRow = Object.freeze({
+      ...quote, netMicros: 75_000_000, taxMicros: 15_750_000, totalMicros: 90_750_000, recurringTotalMicros: 302_500_000,
+      currency: "RON"
+    });
+    const ronCharge: ChargeRow = Object.freeze({
+      ...charge(), netMicros: 75_000_000, taxMicros: 15_750_000, totalMicros: 90_750_000, currency: "RON"
+    });
+    const writes = upgradeSucceededWrites({
+      state: state({ currency: "RON", announcedTotalMicros: 121_000_000 }), charge: ronCharge, quote: ronQuote,
+      plans: testRegionalPlans, currentMonthCreditOverrideMicros: null, now
+    });
+    expect(writes.subscriptionEvent.data).toEqual({
+      announced_total_micros: 302_500_000, quote_ref: "q-1", recurring_net_micros: 250_000_000
     });
   });
 

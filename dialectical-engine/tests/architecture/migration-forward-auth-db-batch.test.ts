@@ -40,13 +40,15 @@ describe("auth database batch: the forward step after NETOPIA's 0111", () => {
     for (const source of recipe.sources) expect(sha256(await bytesOf(source.name)), source.name).toBe(source.sha256);
   });
 
-  it("is the chain's last step, after 0111, bound to the recipe, 0111's manifest and the verifier it keeps (0111's)", async () => {
+  it("is the chain's step after 0111, bound to the recipe, 0111's manifest and the verifier it keeps (0111's)", async () => {
     expect(AUTH_DB_BATCH_MIGRATION).toMatch(/^\d{4}_auth_db_batch\.sql$/u);
     const plan = await loadMigrationPlan();
     expect(plan.forwardChain.map((step) => step.name)).toContain(AUTH_DB_BATCH_MIGRATION);
     const step = plan.forwardChain.find((entry) => entry.name === AUTH_DB_BATCH_MIGRATION)!;
     expect(AUTH_DB_BATCH_MIGRATION).toBe("0112_auth_db_batch.sql");
-    expect(plan.forwardChain.at(-1)).toBe(step);
+    // It was the last step until Part C's 0113 was chained directly after it (spec 2026-10-05 §2.16.6).
+    expect(plan.forwardChain.at(-1)!.name).toBe("0113_billing_price_currencies.sql");
+    expect(plan.forwardChain.at(-1)!.previousName).toBe(step.name);
     const netopia = plan.forwardChain.find((entry) => entry.name === "0111_billing_netopia.sql")!;
     expect(plan.forwardChain.indexOf(step)).toBe(plan.forwardChain.indexOf(netopia) + 1);
     expect(step.previousName).toBe(netopia.name);
