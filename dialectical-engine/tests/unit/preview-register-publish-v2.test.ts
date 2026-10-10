@@ -26,6 +26,8 @@ const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(
  * can be published while the gate has only GLM switched on.
  */
 const MULTI_MODEL_KEYS = ['configuredProviderSet', 'providerFamilyMap'];
+/** Role rotation (spec 2026-10-11): the row the v2 source adds on top of every base that predates it (the live v8 and v9 both lack it). */
+const ROTATION_KEY = 'answerRoleRotationPolicy';
 const PROVIDER_SET_ROW = 'configuredProviderSet';
 /** With the explicit DeepSeek checker choice, the checker and the story checker that follows it move too. */
 const DEEPSEEK_CHECKER_KEYS = ['configuredProviderSet', 'evaluatorRoleRef', 'providerFamilyMap', 'storyCheckerRoleRef'];
@@ -59,11 +61,12 @@ describe('publish kit v2: source closure', () => {
     const bootstrap = await loadBootstrapRegister();
     const rows = await buildPreviewSourceRowsV2(bootstrap, runtime);
     expect(rows.map(row => row.rowKey).sort()).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2].sort());
-    expect(rows).toHaveLength(66);
+    expect(rows).toHaveLength(67);
     const v1 = await buildPreviewSourceRows(bootstrap, runtime);
     const differing = rows.filter(row => JSON.stringify(row) !== JSON.stringify(v1.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey);
-    expect(differing).toEqual(MULTI_MODEL_KEYS);
+    expect(differing).toEqual([...MULTI_MODEL_KEYS, 'answerRoleRotationPolicy']);
     const value = (key: string) => JSON.parse(rows.find(row => row.rowKey === key)!.valueJsonText);
+    expect(value('answerRoleRotationPolicy')).toEqual({ kind: 'ANSWER_ROLE_ROTATION_POLICY', enabled: true, rule: 'LEAST_SHARE_SEEDED_TIE_V1' });
     expect(value('configuredProviderSet')).toEqual(REVIEWED_PROVIDER_SET);
     expect(value('synthesizerRoleRef').providerRef).toBe('preview:fixture-a');
     expect(value('storytellerRoleRef').providerRef).toBe('preview:fixture-a');
@@ -85,13 +88,13 @@ describe('publish kit v2: source closure', () => {
 });
 
 describe('publish kit v2: composing from the current version', () => {
-  it('from the 65-row base it produces v1\'s snapshot except the two multi-model rows, reporting the three keys as added', async () => {
+  it('from the 65-row base it produces v1\'s snapshot except the two multi-model rows and the role rotation row, reporting the three keys and the rotation row as added', async () => {
     const f = await fixture();
     const v1 = composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v8 as any, baseRegisterVersion: '8', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v8 as any) });
     const v2 = compose(f.source, f.v8, '8');
-    expect(v2.rows.map(row => row.rowKey)).toEqual(v1.rows.map(row => row.rowKey));
-    for (const row of v2.rows) if (!MULTI_MODEL_KEYS.includes(row.rowKey)) expect(row).toEqual(v1.rows.find(old => old.rowKey === row.rowKey));
-    expect(v2.addedKeys).toEqual(V1_ADDITIONS);
+    expect(v2.rows.map(row => row.rowKey)).toEqual([...v1.rows.map(row => row.rowKey), ROTATION_KEY].sort((a, b) => a.localeCompare(b, 'en')));
+    for (const row of v2.rows) if (!MULTI_MODEL_KEYS.includes(row.rowKey) && row.rowKey !== ROTATION_KEY) expect(row).toEqual(v1.rows.find(old => old.rowKey === row.rowKey));
+    expect(v2.addedKeys).toEqual([ROTATION_KEY, ...V1_ADDITIONS]);
     expect(v2.changedKeys).toEqual(['configuredProviderSet', 'nodeRuntimeVersion', 'providerFamilyMap']);
     for (const key of V1_ADDITIONS) {
       const entry = v2.delta.find(row => row.rowKey === key)!;
@@ -102,13 +105,14 @@ describe('publish kit v2: composing from the current version', () => {
     expect(v2.delta.find(row => row.rowKey === 'nodeRuntimeVersion')).toMatchObject({ change: 'changed', reason: 'observed-node-runtime', oldValueJsonText: '"v22.23.1"', newValueJsonText: '"v26.8.2"' });
   });
 
-  it('changes a value on top of the 68-row two-GLM version that v1 refuses, and the delta shows only that change plus the two multi-model rows (the role rows stay unchanged)', async () => {
+  it('changes a value on top of the 68-row two-GLM version that v1 refuses, and the delta shows only that change, the two multi-model rows and the added role rotation row (the role rows stay unchanged)', async () => {
     const f = await fixture();
     expect(() => composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v9 as any, baseRegisterVersion: '9', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v9 as any) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
     const before = structuredClone(f.v9);
     const plan = compose(f.source, f.v9);
-    expect(plan.rows).toHaveLength(68);
-    expect(plan.addedKeys).toEqual([]);
+    expect(plan.rows).toHaveLength(69);
+    expect(plan.addedKeys).toEqual([ROTATION_KEY]);
+    expect(plan.rows.find(row => row.rowKey === ROTATION_KEY)).toEqual(f.source.find(row => row.rowKey === ROTATION_KEY));
     expect(plan.changedKeys).toEqual(['composerContractHash', ...MULTI_MODEL_KEYS]);
     const providerSet = plan.delta.find(row => row.rowKey === PROVIDER_SET_ROW)!;
     const refsOf = (text: string) => JSON.parse(text).providers.map((p: any) => p.providerRef);
@@ -131,7 +135,7 @@ describe('publish kit v2: composing from the current version', () => {
     expect(plan.deltaSha256).toBe(previewDeltaSha256V2(plan.delta));
     expect(plan.baseRegisterVersion).toBe('9');
     // Every other row, the base-owned ones included, is the base row byte for byte.
-    for (const row of plan.rows) if (row.rowKey !== 'composerContractHash' && !MULTI_MODEL_KEYS.includes(row.rowKey)) expect(row).toEqual(f.v9.find(base => base.rowKey === row.rowKey));
+    for (const row of plan.rows) if (row.rowKey !== 'composerContractHash' && row.rowKey !== ROTATION_KEY && !MULTI_MODEL_KEYS.includes(row.rowKey)) expect(row).toEqual(f.v9.find(base => base.rowKey === row.rowKey));
     for (const key of ['synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef']) expect(plan.delta.map(entry => entry.rowKey)).not.toContain(key);
     expect(f.v9).toEqual(before);
   });
@@ -140,8 +144,8 @@ describe('publish kit v2: composing from the current version', () => {
     const f = await fixture();
     const base = f.v9.filter(row => row.rowKey !== 'taxAuthorities');
     const plan = compose(f.source, base);
-    expect(plan.rows).toHaveLength(68);
-    expect(plan.addedKeys).toEqual(['taxAuthorities']);
+    expect(plan.rows).toHaveLength(69);
+    expect(plan.addedKeys).toEqual([ROTATION_KEY, 'taxAuthorities']);
     expect(plan.changedKeys).toEqual(['composerContractHash', ...MULTI_MODEL_KEYS]);
     expect(plan.rows.find(row => row.rowKey === 'taxAuthorities')).toEqual(f.source.find(row => row.rowKey === 'taxAuthorities'));
   });
@@ -224,14 +228,14 @@ describe('publish kit v2: the checker choice (GLM by default, DeepSeek only on t
     const f = await fixture();
     const source = await build(DEEPSEEK);
     const differing = source.filter(row => JSON.stringify(row) !== JSON.stringify(f.v1Source.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey);
-    expect(differing).toEqual(DEEPSEEK_CHECKER_KEYS);
+    expect(differing).toEqual([...DEEPSEEK_CHECKER_KEYS, ROTATION_KEY]);
     expect(ref(source, 'evaluatorRoleRef')).toBe('preview:deepseek-v4-1-flash');
     expect(ref(source, 'storyCheckerRoleRef')).toBe('preview:deepseek-v4-1-flash');
     expect(ref(source, 'synthesizerRoleRef')).toBe('preview:fixture-a');
     expect(ref(source, 'storytellerRoleRef')).toBe('preview:fixture-a');
     const plan = compose(source, f.v9);
     expect(plan.changedKeys).toEqual(['composerContractHash', ...DEEPSEEK_CHECKER_KEYS]);
-    expect(plan.addedKeys).toEqual([]);
+    expect(plan.addedKeys).toEqual([ROTATION_KEY]);
     expect(JSON.parse(plan.delta.find(entry => entry.rowKey === 'evaluatorRoleRef')!.oldValueJsonText!).providerRef).toBe('preview:fixture-b');
     expect(JSON.parse(plan.delta.find(entry => entry.rowKey === 'evaluatorRoleRef')!.newValueJsonText).providerRef).toBe('preview:deepseek-v4-1-flash');
   });

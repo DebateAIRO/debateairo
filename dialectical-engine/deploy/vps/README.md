@@ -1796,6 +1796,7 @@ version must carry, besides the algorithm's own rows:
 | `costEnvelopePolicy` | both services refuse: `COST_ENVELOPE_POLICY_UNRESOLVED` |
 | `publicationCheckPolicy` | the API refuses: `PUBLICATION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the publication-check deadline release on carries it (the code-owned 60000 ms, or the file's member); a version sealed before that release does not |
 | `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
+| `answerRoleRotationPolicy` | optional: without it the engine keeps its fixed roles. The file's `answerRoleRotation` member seals it (`"Upgrading to role rotation"` below); the API reads it at start-up, and a malformed row refuses the boot (`ANSWER_ROLE_ROTATION_POLICY_INVALID`) |
 | `admissionPolicy`, with the three support budgets | the API refuses: `SUPPORT_ADMISSION_SCOPES_NOT_SEALED`; and, with the band, `ask_room_reads` (from the file's `askRoomReads`), else the API refuses with `ASK_ROOM_ADMISSION_UNSEALED` |
 | `configuredProviderSet`, every vendor vetted | the publication refuses `PROVIDER_VENDOR_NOT_VETTED`; a target not in it refuses `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` |
 | the support configuration rows (`support_enabled`, `support_model_ref`, the limits) | the support chat has no configuration; §13's commands change these rows, each change a new version |
@@ -1821,6 +1822,8 @@ version must carry, besides the algorithm's own rows:
 - seals the file's `countryPolicy`, when the file carries it, as that version's `countryPolicy`
   row; a file without it publishes no `countryPolicy` row, so that version has no country gate
   (A14). The kit's example leaves it out; §5 "Country data" says what must hold before you add it;
+- seals the file's `answerRoleRotation` member, when the file carries it, as the `answerRoleRotationPolicy`
+  row; a file without it publishes no such row (the fixed roles, as before);
 - then runs the start-up readers against the new version, and only then prints the version to pin.
 
 `providerTargets` in the file (prices, addresses, credential paths) is never sealed: it is there
@@ -1869,6 +1872,35 @@ sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM regi
 
 Four rows is the pass. Then set `REGISTER_VERSION` to that version in both `EnvironmentFile`s
 and restart both units.
+
+### Upgrading to role rotation
+
+Per-debate role rotation (spec 2026-10-11) gives each of a debate's four jobs (the answer writer, the answer
+checker, the storyteller and the story checker) to a model of that debate's own panel: the one that has done that
+job least often so far. The choice is written down for the debate when it is accepted, and it never changes after
+that. The rotation is off until the register says otherwise: without the `answerRoleRotation` member the engine keeps
+its fixed roles, exactly as before. This release adds migration `migrations/0114_role_rotation.sql` (a new table,
+`core.run_role_rotation`, and a new column on `serve.answer_story`), so the migration comes first. In this order,
+before the API and the runner next start on this code:
+
+1. **Apply the migration.** Open the migrator window (§4 step 2), run `pnpm db:migrate` and then `hardening.sql` as
+   §4 step 3 does, and close the window (§4 step 5).
+2. **Publish a register version with the member.** Add `"answerRoleRotation": { "enabled": true }` to the top level of
+   `/etc/debateai/register/hosted-register.json` (`deploy/vps/register/README.md`), then run the dry run and the
+   publish exactly as above. The plan's `row_keys=` line names `answerRoleRotationPolicy`. Pin the version the publish
+   prints as `REGISTER_VERSION` in both `EnvironmentFile`s.
+3. **Restart the API and the runner** (`systemctl restart debateai-api debateai-runner`). The API reads the setting at
+   start-up; the runner never reads it, and a debate accepted before the restart keeps the roles it was given. A
+   debate whose panel has models from two or more companies is rotated once the API runs the new version; a panel
+   from one company keeps the fixed roles.
+
+`pnpm hosted:publish-provider-set` copies the rows of the version it starts from, this row included, so a later
+vendor change does not switch the rotation off. Pin the newest version that command prints.
+
+**Rolling back** needs no migration step. Remove the `answerRoleRotation` member from the file, publish again (a new
+version; the sealed one stays as it is), pin that version in both `EnvironmentFile`s and restart both units. Without
+the row the API reads the setting as absent, and the engine keeps its fixed roles. Debates already rotated keep their
+pins. An older checkout ignores the new table and column, so nothing needs reverting for the migration.
 
 ---
 

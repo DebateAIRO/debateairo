@@ -25,6 +25,8 @@
 // PR B (2026-10-10): the source set also carries Anthropic's reviewed ref (preview:claude-haiku-5-5,
 // maker Anthropic, adapter kind anthropic-messages-http). A base may be any reviewed set: DeepInfra's
 // refs plus any other reviewed providers' refs, in register order.
+// Role rotation (spec 2026-10-11): the source also carries the answerRoleRotationPolicy row, enabled, so the
+// preview rotates the four roles over each debate's own panel. A base without it (the live v9) shows it as `added`.
 // The delta now carries the old and new canonical values, so the owner reviews values, not hashes;
 // deltaSha256 binds that exact document and the approval binds deltaSha256.
 import { createHash } from 'node:crypto';
@@ -33,6 +35,7 @@ import {
   canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256,
   parseRegisterVersionText, buildConfiguredProviderSetSealedRow, buildConfiguredProviderSetDeploymentRow,
   PASSWORD_RESET_POLICY_REGISTER_ROW, BACKUP_EMAIL_POLICY_REGISTER_ROW, MFA_RECOVERY_POLICY_REGISTER_ROW,
+  answerRoleRotationPolicyRow,
   type BootstrapRegister, type RegisterPublicationRow
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
@@ -55,12 +58,13 @@ const COMPOSER = 'preview-register-composer-v2' as const;
 export const PREVIEW_BASE_OWNED_KEYS = Object.freeze(['internalAllowancePolicy','staffAccessPolicy'] as const);
 const FORBIDDEN_KEYS = Object.freeze(['modelScorecard','supportActivation']);
 /**
- * The reviewed source closure: exactly the keys buildPreviewSourceRowsV2 must produce (66 at
- * dev b75e4c294, the same keys the live v9 holds minus the two base-owned ones).
+ * The reviewed source closure: exactly the keys buildPreviewSourceRowsV2 must produce (67 at
+ * dev 5109a5501 plus role rotation: the 66 of dev b75e4c294 and answerRoleRotationPolicy; the same keys the
+ * live v9 holds minus the two base-owned ones, plus that row once it is published).
  * A new register row reaches the preview only by being added here.
  */
 export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
-  'acceptanceOrganCostBounds','admissionPolicy','auditSourceIpKdfPolicy','backupEmailVerificationPolicy','billingPlans','billingPolicy',
+  'acceptanceOrganCostBounds','admissionPolicy','answerRoleRotationPolicy','auditSourceIpKdfPolicy','backupEmailVerificationPolicy','billingPlans','billingPolicy',
   'branchFreezeEpsilon','candidateConfidenceBand','channelPolicy','claimTypeCompositionMap','composerContractHash','compositionBundleBudget',
   'configuredProviderSet','conformanceContractHash','consumerRecoveryPolicy','costEnvelopePolicy','countryPolicy','disagreementQuantity',
   'disagreementThreshold','dispersionScale','downgradeBands','envelopeFormulaInputs','evaluatorCallBound','evaluatorLoopMaxRounds',
@@ -117,7 +121,9 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
   const projected:BootstrapRegister={...bootstrap,values:{...bootstrap.values,nodeRuntimeVersion:runtime.nodeVersion},resolution:{...bootstrap.resolution,
     nodeRuntimeVersion:`preview-auth-dev-v1 actual Node ${runtime.nodeVersion}; measured ${runtime.observedAt}; source ${runtime.sourceRevision}/${runtime.sourceTree}; operator sha256:${runtime.operatorSha256}`}};
   const rows=[...await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef},'local'),
-    ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+    ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef})),
+    // Role rotation (spec 2026-10-11): the preview rotates the four roles over each debate's own panel.
+    answerRoleRotationPolicyRow(true,'docs/superpowers/specs/2026-10-11-role-rotation-design.md; owner 2026-10-10')];
   if(!sameKeys(rows.map(row=>row.rowKey),PREVIEW_SOURCE_ROW_KEYS_V2))fail('source-key-list');
   return Object.freeze(rows.map(row=>Object.freeze(row)));
 }
