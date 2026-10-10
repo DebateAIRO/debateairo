@@ -10,7 +10,7 @@ import {
   createPreviewGuardedFetch, observeProviderTarget, parsePreviewProviderTestConfig, parseProviderDiscoveryTargets,
   previewModelRow, previewNanoUsdText, previewPlanTierRosters, previewProbeControls, previewReservationNanoUsd,
   previewTargetJsonRow, providerTargetGatewayControls, withPreviewProviderCallPolicy, previewTargetGatewayControls,
-  assertPreviewRoleTargets, PREVIEW_REQUEST_BODY_MAX_BYTES,
+  assertPreviewRoleTargets, PREVIEW_REQUEST_BODY_MAX_BYTES, previewSealedRoleFallbackCovered,
   type PreviewBudgetExecution, type ProviderCallRequest, type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
@@ -327,6 +327,24 @@ describe("every register role is a declared target on the preview (boot check)",
     expect(() => assertPreviewRoleTargets(parse(LEGACY), targets(["preview:fixture-a", "preview:fixture-b"]), ["preview:fixture-a", "preview:deepseek-v4-1-flash"]))
       .toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
     expect(() => assertPreviewRoleTargets(parse(MULTI), declared, [])).toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+  });
+});
+
+describe("role rotation, Task 11: a sealed answer role may stand in for an unavailable pinned member only when the estimate covers it", () => {
+  // A rotated debate's estimate prices only its panel's models, each on its own gate, and admission found every one of
+  // them switched on there (spec 2026-10-11 Part 5). So a sealed ref is covered exactly when its model is a panel model.
+  const panel = (...models: string[]) => models.map((model_id) => ({ model_id }));
+  it("covers a sealed ref whose model is on the panel, also through its second ref (fixture-b is GLM)", () => {
+    expect(previewSealedRoleFallbackCovered("preview:fixture-a", panel(GLM, DEEPSEEK))).toBe(true);
+    expect(previewSealedRoleFallbackCovered("preview:fixture-b", panel(DEEPSEEK, GLM))).toBe(true);
+    expect(previewSealedRoleFallbackCovered("preview:deepseek-v4-1-flash", panel(GLM, DEEPSEEK, MIMO, QWEN))).toBe(true);
+  });
+  it("does not cover a model off the panel (never priced or found switched on), even on a gate the panel uses", () => {
+    expect(previewSealedRoleFallbackCovered("preview:fixture-a", panel(DEEPSEEK, MIMO))).toBe(false);
+    expect(previewSealedRoleFallbackCovered("preview:claude-haiku-5-5", panel(GLM, DEEPSEEK))).toBe(false);
+  });
+  it("does not cover a ref the preview never reviewed", () => {
+    expect(previewSealedRoleFallbackCovered("provider:unreviewed", panel(GLM, DEEPSEEK))).toBe(false);
   });
 });
 

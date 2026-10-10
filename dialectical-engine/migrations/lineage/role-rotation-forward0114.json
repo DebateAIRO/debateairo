@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0114_role_rotation.sql",
-    "sha256": "464bc3b96379090722fbdcd83900c6b4329f14483528bfc40013655ae1a1bd39"
+    "sha256": "e03066561642c8503a0e24a1527f1c70b8ad2814946c5868bc145a24e9520f99"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

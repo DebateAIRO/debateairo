@@ -214,7 +214,9 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(section.startsWith("## Role rotation (0114)")).toBe(true);
     for (const needle of ["0113", "0114_role_rotation.sql", "role-rotation-forward0114.json",
       "verify-effective-capabilities-111.sql", "packages/db/src/migration-forward0114.ts", "replayVerifierSql",
-      "core.run_role_rotation", "serve.answer_story.storyteller_repairs", "renumber"
+      "core.run_role_rotation", "serve.answer_story.storyteller_repairs", "renumber",
+      // Task 11: the disclosure's fallback reason per role.
+      "serve.serve_disclosure", "ROLE_UNAVAILABLE"
     ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain("role rotation (0114, below) the fourth");
   });

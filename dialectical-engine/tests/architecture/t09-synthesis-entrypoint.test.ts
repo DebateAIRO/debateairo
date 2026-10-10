@@ -144,17 +144,48 @@ describe("T9 production entry point wiring", () => {
     expect(guard).toContain("if (!(error instanceof TypeError)) throw error;");
     expect(guard).toContain('reason: "RUN_ROLE_ROTATION_INVALID"');
     expect(guard).toContain('throw new TypedDomainError("RUN_ROLE_ROTATION_INVALID",');
-    // The per-claim policy: the boot policy with the two answer refs replaced, nothing else.
+    // The per-claim policy: the boot policy with the two answer refs replaced (by the pin's, or by a role's
+    // stand-in), nothing else.
     expect(source).toContain(
-      "const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined || rotationPin === null"
+      "const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined || rotationPin === null || rotationStandIns === null"
     );
-    expect(source).toContain("synthesizerRoleRef: rotationPin.answerWriter.providerRef,");
-    expect(source).toContain("evaluatorRoleRef: rotationPin.answerChecker.providerRef");
+    expect(source).toContain("synthesizerRoleRef: rotationStandIns.writerRef ?? rotationPin.answerWriter.providerRef,");
+    expect(source).toContain("evaluatorRoleRef: rotationStandIns.checkerRef ?? rotationPin.answerChecker.providerRef");
     // The serve chain reads the per-claim policy, never the boot one.
     expect(source).toContain("const synthesisRoles = synthesisRolePolicy;");
     expect(source).not.toContain("const synthesisRoles = this.settings.synthesisRolePolicy;");
     // The pre-claim J24 (2) check still names the sealed refs.
     expect(source).toContain("? this.settings.synthesisRolePolicy.synthesizerRoleRef");
     expect(source).toContain(": this.settings.synthesisRolePolicy.evaluatorRoleRef;");
+  });
+
+  /**
+   * Role rotation, Task 11 (orchestrator ruling 2026-10-11, "always an answer"): a pinned answer member that is not
+   * claim-eligible hands its role to the SEALED register ref, only when the debate's estimate covers that ref
+   * (`answerRoleFallbackCovered`), BEFORE today's off-panel probe and J24 refusal run on the per-claim policy. The
+   * disclosure keeps the pin as planned and receives the stand-ins, so the stand-in is a fallback for ROLE_UNAVAILABLE.
+   */
+  it("lets the sealed answer role stand in for an unavailable pinned member, before today's probe and J24 (Task 11)", async () => {
+    const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    const standIn = source.indexOf("const standInFor = (pinnedRef: string, sealedRef: string): string | null =>");
+    const policy = source.indexOf("const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined");
+    const probe = source.indexOf("const sealedRefRoles = SYNTHESIS_ROLES.filter((role) => {");
+    const refusal = source.indexOf("reason: `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:${role}`");
+    expect(standIn).toBeGreaterThan(-1);
+    expect(policy).toBeGreaterThan(standIn);
+    expect(probe).toBeGreaterThan(policy);
+    expect(refusal).toBeGreaterThan(probe);
+    const rule = source.slice(standIn, policy);
+    // Only for a member not claim-eligible, never the pinned ref itself, and only when the estimate covers the ref.
+    expect(rule).toContain("configuredMakers.some((maker) => maker.providerRef === pinnedRef) || sealedRef === pinnedRef");
+    expect(rule).toContain("|| !(this.settings.answerRoleFallbackCovered?.({ roleRef: sealedRef, panel: run.discoveredPanel }) ?? true)");
+    expect(rule).toContain("standInFor(rotationPin.answerWriter.providerRef, this.settings.synthesisRolePolicy.synthesizerRoleRef)");
+    expect(rule).toContain("standInFor(rotationPin.answerChecker.providerRef, this.settings.synthesisRolePolicy.evaluatorRoleRef)");
+    // The disclosure plans the pin's refs and is told the stand-ins.
+    expect(source).toContain(": { writerRef: rotationPin.answerWriter.providerRef, checkerRef: rotationPin.answerChecker.providerRef },");
+    expect(source).toContain("...(rotationStandIns === null ? {} : { standIns: rotationStandIns })");
+    // The preview's runner answers the money question with the preview's own rule.
+    const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
+    expect(main).toContain("previewSealedRoleFallbackCovered(roleRef, panel)");
   });
 });

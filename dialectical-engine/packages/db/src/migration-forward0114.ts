@@ -6,7 +6,8 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
 /**
  * Role rotation's migration (spec 2026-10-11, Part 3) as the chain step after 0113. It adds no billing relation and
  * no function, so the effective verifier 0113 keeps in force (0111's) stays in force and is named as its own. Its
- * checks are its postcondition (the pin table's columns and eight CHECKs, and the story column and its CHECK),
+ * checks are its postcondition (the pin table's columns and eight CHECKs, the story column and its CHECK, and the
+ * serve disclosure's two per-role reason columns and three CHECKs, with 0076's one reason rule gone: Task 11),
  * compared on every later migrate(); it has no supplemental verifier, so no replayVerifierSql.
  */
 const NAME='0114_role_rotation.sql';
@@ -16,29 +17,35 @@ const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql';
 const PREVIOUS='0113_billing_price_currencies.sql';
 const CONSTRAINTS=['run_role_rotation_rule_known','run_role_rotation_identities_present','run_role_rotation_checker_other_maker',
  'run_role_rotation_story_checker_other_maker','run_role_rotation_eligible_count','run_role_rotation_eligible_no_null',
- 'run_role_rotation_eligible_entries','run_role_rotation_eligible_has_picks','answer_story_storyteller_repairs_bounded'] as const;
-/** The pin table's 16 columns and the story's one. */
-const COLUMNS=17;
+ 'run_role_rotation_eligible_entries','run_role_rotation_eligible_has_picks','answer_story_storyteller_repairs_bounded',
+ 'serve_disclosure_role_reasons_known','serve_disclosure_role_reasons_are_whole','serve_disclosure_fallback_names_its_reasons'] as const;
+/** 0076's one reason rule, which 0114 replaces with the per-role one: it must be gone. */
+const REPLACED='serve_disclosure_fallback_names_its_reason';
+/** The pin table's 16 columns, the story's one and the disclosure's two. */
+const COLUMNS=19;
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0114_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 const exactKeys=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
 const digest=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
 
-/** What the step creates: the pin table's columns, the story column, and the definitions of the nine CHECKs. */
+/** What the step creates: the pin table's columns, the story and disclosure columns, the twelve CHECKs' definitions. */
 async function postconditionEvidence(client:PoolClient):Promise<string>{
  const rows=(await client.query(`
   SELECT 'column' AS kind,a.attrelid::regclass::text||'.'||a.attname::text AS name,jsonb_build_object(
     'type',format_type(a.atttypid,a.atttypmod),'required',a.attnotnull,'default',a.atthasdef) AS facts
   FROM pg_attribute a
-  WHERE (a.attrelid='core.run_role_rotation'::regclass OR (a.attrelid='serve.answer_story'::regclass AND a.attname='storyteller_repairs'))
+  WHERE (a.attrelid='core.run_role_rotation'::regclass OR (a.attrelid='serve.answer_story'::regclass AND a.attname='storyteller_repairs')
+    OR (a.attrelid='serve.serve_disclosure'::regclass AND a.attname IN ('writer_fallback_reason','checker_fallback_reason')))
    AND a.attnum>0 AND NOT a.attisdropped
   UNION ALL
   SELECT 'constraint',k.conname::text,jsonb_build_object('relation',k.conrelid::regclass::text,'definition',pg_get_constraintdef(k.oid))
   FROM pg_constraint k
-  WHERE k.conrelid IN ('core.run_role_rotation'::regclass,'serve.answer_story'::regclass) AND k.conname=ANY($1::text[])
+  WHERE k.conrelid IN ('core.run_role_rotation'::regclass,'serve.answer_story'::regclass,'serve.serve_disclosure'::regclass)
+   AND (k.conname=ANY($1::text[]) OR k.conname=$2)
   ORDER BY 1,2
- `,[CONSTRAINTS])).rows as Array<{kind:string}>;
- if(rows.filter(row=>row.kind==='column').length!==COLUMNS||rows.filter(row=>row.kind==='constraint').length!==CONSTRAINTS.length){
+ `,[CONSTRAINTS,REPLACED])).rows as Array<{kind:string;name:string}>;
+ if(rows.filter(row=>row.kind==='column').length!==COLUMNS||rows.filter(row=>row.kind==='constraint').length!==CONSTRAINTS.length
+  ||rows.some(row=>row.kind==='constraint'&&row.name===REPLACED)){
   return fail('POSTCONDITION_OBJECTS');
  }
  return sha(JSON.stringify(rows));

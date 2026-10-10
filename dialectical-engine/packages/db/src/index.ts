@@ -49,10 +49,13 @@ export {
 export {
   FLOOR_BASIS_INCOMPLETE_SQL,
   SERVE_DISCLOSURE_BODY_STOPS,
+  SERVE_DISCLOSURE_FALLBACK_REASONS,
   SERVE_DISCLOSURE_FLOOR_STATES,
   SERVE_DISCLOSURE_SERVE_STOPS,
   ServeDisclosureRepository,
+  serveDisclosureFallbackReasonOf,
   type ServeDisclosureBodyStop,
+  type ServeDisclosureFallbackReason,
   type ServeDisclosureFloorState,
   type ServeDisclosureModel,
   type ServeDisclosureRead,

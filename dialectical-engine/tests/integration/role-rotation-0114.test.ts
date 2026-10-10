@@ -127,6 +127,86 @@ describe("0114: serve.answer_story.storyteller_repairs", () => {
   });
 });
 
+/**
+ * Task 11 (orchestrator ruling 2026-10-11, "always an answer"): a rotated debate whose pinned answer member is
+ * unavailable at claim is served by the sealed register role, disclosed as a fallback for ROLE_UNAVAILABLE. 0114 names
+ * the reason PER ROLE beside 0076's run-level `fallback_reason`, which keeps its meaning: money was used. A fallback with
+ * no per-role reason is the money fallback, as every row before 0114 and every run that is not rotated records it.
+ * The answer trigger and the foreign keys are set aside (replica role, rolled back) so only the CHECKs are tested.
+ */
+describe("0114: serve.serve_disclosure names each role's fallback reason (Task 11)", () => {
+  type Row = Readonly<{ writer: "PINNED" | "STAND_IN"; checker: "PINNED" | "STAND_IN"; fallbackReason?: string | null;
+    writerReason?: string | null; checkerReason?: string | null }>;
+  const disclosure = async (row: Row) => {
+    const client = await db().connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL session_replication_role=replica");
+      await client.query(`INSERT INTO serve.serve_disclosure (answer_id, answer_version, run_id,
+          writer_planned_ref, checker_planned_ref, writer_served_ref, checker_served_ref,
+          writer_fallback, checker_fallback, fallback_reason, checker_same_as_writer,
+          writer_fallback_reason, checker_fallback_reason)
+        VALUES ($1, 1, $2, 'p:pinned-writer', 'p:pinned-checker', $3, $4, $5, $6, $7, false, $8, $9)`,
+      [randomUUID(), randomUUID(),
+        row.writer === "PINNED" ? "p:pinned-writer" : "p:sealed-writer", row.checker === "PINNED" ? "p:pinned-checker" : "p:sealed-checker",
+        row.writer !== "PINNED", row.checker !== "PINNED", row.fallbackReason ?? null, row.writerReason ?? null, row.checkerReason ?? null]);
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+  };
+  it("adds two nullable per-role reason columns and swaps 0076's reason rule for the per-role one", async () => {
+    const columns = (await db().query(`SELECT column_name, data_type, is_nullable FROM information_schema.columns
+      WHERE table_schema='serve' AND table_name='serve_disclosure' AND column_name LIKE '%fallback_reason' ORDER BY column_name`)).rows;
+    expect(columns).toEqual([
+      { column_name: "checker_fallback_reason", data_type: "text", is_nullable: "YES" },
+      { column_name: "fallback_reason", data_type: "text", is_nullable: "YES" },
+      { column_name: "writer_fallback_reason", data_type: "text", is_nullable: "YES" }
+    ]);
+    const names = (await db().query(`SELECT conname FROM pg_constraint WHERE conrelid='serve.serve_disclosure'::regclass
+      AND (conname LIKE 'serve_disclosure_fallback%' OR conname LIKE 'serve_disclosure_role_reasons%') ORDER BY conname`)).rows
+      .map((row) => row.conname);
+    expect(names).toEqual([
+      "serve_disclosure_fallback_names_its_reasons", "serve_disclosure_fallback_reason_check",
+      "serve_disclosure_role_reasons_are_whole", "serve_disclosure_role_reasons_known"
+    ]);
+  });
+  it("accepts today's rows unchanged: no fallback, and a money fallback with no per-role reason", async () => {
+    await expect(disclosure({ writer: "PINNED", checker: "PINNED" })).resolves.toBeUndefined();
+    await expect(disclosure({ writer: "STAND_IN", checker: "STAND_IN", fallbackReason: "MONEY" })).resolves.toBeUndefined();
+  });
+  it("accepts a stand-in for an unavailable model, alone (no money) or beside a money fallback", async () => {
+    await expect(disclosure({ writer: "STAND_IN", checker: "PINNED", writerReason: "ROLE_UNAVAILABLE" })).resolves.toBeUndefined();
+    await expect(disclosure({ writer: "STAND_IN", checker: "STAND_IN", fallbackReason: "MONEY",
+      writerReason: "ROLE_UNAVAILABLE", checkerReason: "MONEY" })).resolves.toBeUndefined();
+    await expect(disclosure({ writer: "STAND_IN", checker: "STAND_IN",
+      writerReason: "ROLE_UNAVAILABLE", checkerReason: "ROLE_UNAVAILABLE" })).resolves.toBeUndefined();
+  });
+  it("says money was used exactly when a role fell back for money", async () => {
+    // A stand-in for an unavailable model is not money.
+    await expect(disclosure({ writer: "STAND_IN", checker: "PINNED", fallbackReason: "MONEY", writerReason: "ROLE_UNAVAILABLE" }))
+      .rejects.toThrow(/serve_disclosure_fallback_names_its_reasons/u);
+    // 0076's rule still holds for a row without per-role reasons: a fallback names its reason.
+    await expect(disclosure({ writer: "STAND_IN", checker: "PINNED" })).rejects.toThrow(/serve_disclosure_fallback_names_its_reasons/u);
+    await expect(disclosure({ writer: "STAND_IN", checker: "PINNED", fallbackReason: "MONEY", writerReason: "MONEY" })).resolves.toBeUndefined();
+    await expect(disclosure({ writer: "STAND_IN", checker: "PINNED", writerReason: "MONEY" }))
+      .rejects.toThrow(/serve_disclosure_fallback_names_its_reasons/u);
+  });
+  it("names a per-role reason for every fallback or for none, and only for a fallback", async () => {
+    await expect(disclosure({ writer: "STAND_IN", checker: "STAND_IN", fallbackReason: "MONEY", writerReason: "ROLE_UNAVAILABLE" }))
+      .rejects.toThrow(/serve_disclosure_role_reasons_are_whole/u);
+    await expect(disclosure({ writer: "PINNED", checker: "PINNED", writerReason: "ROLE_UNAVAILABLE" }))
+      .rejects.toThrow(/serve_disclosure_role_reasons_are_whole/u);
+  });
+  it("knows two reasons, per role; the run-level column still knows only money", async () => {
+    // (PostgreSQL tests the CHECKs in name order; each row below passes every rule but the one it names.)
+    await expect(disclosure({ writer: "STAND_IN", checker: "PINNED", writerReason: "CHEAPER" }))
+      .rejects.toThrow(/serve_disclosure_role_reasons_known/u);
+    await expect(disclosure({ writer: "STAND_IN", checker: "PINNED", fallbackReason: "ROLE_UNAVAILABLE", writerReason: "MONEY" }))
+      .rejects.toThrow(/serve_disclosure_fallback_reason_check/u);
+  });
+});
+
 describe("0114: a forward step, applied once", () => {
   it("is recorded after 0113 and a second migrate() changes nothing", async () => {
     const steps = (await db().query("SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name")).rows
@@ -143,7 +223,8 @@ describe("0114: a forward step, applied once", () => {
   });
   it("replays: the SQL run twice more by hand leaves the same constraints", async () => {
     const constraints = async () => (await db().query(`SELECT conrelid::regclass::text AS relation, conname, pg_get_constraintdef(oid) AS definition
-      FROM pg_constraint WHERE conrelid IN ('core.run_role_rotation'::regclass, 'serve.answer_story'::regclass) ORDER BY 1, 2`)).rows;
+      FROM pg_constraint WHERE conrelid IN ('core.run_role_rotation'::regclass, 'serve.answer_story'::regclass, 'serve.serve_disclosure'::regclass)
+      ORDER BY 1, 2`)).rows;
     const before = await constraints();
     const sql = await readFile(new URL(STEP, MIGRATIONS), "utf8");
     await db().query(sql);

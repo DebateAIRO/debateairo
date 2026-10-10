@@ -11954,11 +11954,28 @@ describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come f
     }));
     return JSON.stringify(story);
   };
-  /** A claim-time probe: `ref` is ABSENT, every other member HEALTHY with its pinned model (T9/J24's probe). */
-  const absentFor = (ref: string): NonNullable<WalkingSkeletonSettings["claimTimeProbe"]> => async (member) =>
-    member.provider_ref === ref
+  /** A claim-time probe: each of `refs` is ABSENT, every other member HEALTHY with its pinned model (T9/J24's probe). */
+  const absentFor = (...refs: string[]): NonNullable<WalkingSkeletonSettings["claimTimeProbe"]> => async (member) =>
+    refs.includes(member.provider_ref)
       ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
       : { state: "HEALTHY", modelId: member.model_id, failureCode: null };
+  /** The sealed refs of every scenario below: the primary holds both answer roles (`runnerSettings`). */
+  const SEALED_REF = SEAT_ROUTES.primary.providerRef;
+  const j24Events = async (runId: string) => (await database.pool.query<{ value_json: Record<string, unknown> }>(
+    `SELECT value_json FROM core.run_progress_event
+      WHERE run_id=$1 AND kind='ledger.could_not_do' AND value_json->>'state'='SYNTHESIS_ROLE_PROVIDER_ABSENT'`,
+    [runId]
+  )).rows.map((row) => row.value_json);
+  /** Task 11's money rule, recorded: which sealed refs the runner asked about, with the debate's frozen panel. */
+  const coverage = (answer: boolean) => {
+    const asked: Array<Readonly<{ roleRef: string; panel: readonly string[] }>> = [];
+    const answerRoleFallbackCovered: NonNullable<WalkingSkeletonSettings["answerRoleFallbackCovered"]> = (input) => {
+      asked.push({ roleRef: input.roleRef, panel: input.panel.map((member) => member.provider_ref) });
+      return answer;
+    };
+    return { asked, answerRoleFallbackCovered };
+  };
+  const PANEL_REFS = [SEAT_ROUTES.primary.providerRef, SEAT_ROUTES.secondary.providerRef, SEAT_ROUTES.third.providerRef];
   const workItemOf = async (runId: string) => (await database.pool.query<{ state: string; terminal_reason: string | null }>(
     "SELECT state, terminal_reason FROM core.work_item WHERE run_id=$1", [runId]
   )).rows;
@@ -12038,11 +12055,104 @@ describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come f
     })]);
   });
 
-  it("a pinned writer absent at claim refuses the run with J24, terminally, with today's event", async () => {
+  /**
+   * Task 11 (orchestrator ruling 2026-10-11, "always an answer"): a pinned answer member not claim-eligible hands its
+   * role to the SEALED register ref (today's unpinned role, today's probe and J24), when the debate's estimate covers
+   * that ref's model. The disclosure keeps the pin as planned and names the reason ROLE_UNAVAILABLE for that role.
+   */
+  it("a pinned writer absent at claim: the sealed writer serves, disclosed as a fallback for ROLE_UNAVAILABLE", async () => {
+    const covered = coverage(true);
+    const scenario = await executeSeatScenario({
+      label: "rotation-writer-stand-in", rotation: ROTATION, panelSize: 3,
+      ...rotationDoubles("rotation-writer-stand-in", "primary", "third"),
+      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef), answerRoleFallbackCovered: covered.answerRoleFallbackCovered }
+    });
+    expect(scenario.error).toBeNull();
+    expect(covered.asked).toEqual([{ roleRef: SEALED_REF, panel: PANEL_REFS }]);
+    const answerId = answerIdOf(scenario);
+    expect(await servedRoundMakers(answerId)).toEqual([expect.objectContaining({
+      writer: SEALED_REF, checker: SEAT_ROUTES.third.providerRef
+    })]);
+    const row = await disclosureRowOf(answerId);
+    expect(row).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.secondary.providerRef, writerServedRef: SEALED_REF,
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef, checkerServedRef: SEAT_ROUTES.third.providerRef,
+      writerFallback: true, checkerFallback: false,
+      writerFallbackReason: "ROLE_UNAVAILABLE", fallbackReason: null, checkerSameAsWriter: false
+    });
+    expect(row).not.toHaveProperty("checkerFallbackReason");
+    expect(await j24Events(scenario.runId)).toEqual([]);
+  });
+
+  it("a pinned checker absent at claim: the sealed checker serves, disclosed as a fallback for ROLE_UNAVAILABLE", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-checker-stand-in", rotation: ROTATION, panelSize: 3,
+      ...rotationDoubles("rotation-checker-stand-in", "secondary", "primary"),
+      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef) }
+    });
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(await servedRoundMakers(answerId)).toEqual([expect.objectContaining({
+      writer: SEAT_ROUTES.secondary.providerRef, checker: SEALED_REF
+    })]);
+    const row = await disclosureRowOf(answerId);
+    expect(row).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.secondary.providerRef, writerServedRef: SEAT_ROUTES.secondary.providerRef,
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef, checkerServedRef: SEALED_REF,
+      writerFallback: false, checkerFallback: true,
+      checkerFallbackReason: "ROLE_UNAVAILABLE", fallbackReason: null
+    });
+    expect(row).not.toHaveProperty("writerFallbackReason");
+  });
+
+  it("a sealed checker off the panel stands in only after today's claim-time probe finds it healthy", async () => {
+    // The sealed checker is the twin route (the primary's maker, not on the frozen panel): probed as today.
+    const probed: string[] = [];
+    const scenario = await executeSeatScenario({
+      label: "rotation-off-panel-stand-in", rotation: ROTATION, panelSize: 3, twin: true,
+      ...rotationDoubles("rotation-off-panel-stand-in", "secondary", "primary"),
+      settings: {
+        claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef),
+        synthesisRolePolicy: { ...runnerSettings().synthesisRolePolicy, evaluatorRoleRef: SEAT_TWIN.providerRef, identicalRoleRefs: false },
+        claimTimeSynthesisRoleProbe: async (providerRef) => {
+          probed.push(providerRef);
+          return { state: "HEALTHY", modelId: SEAT_TWIN.model, failureCode: null };
+        }
+      }
+    });
+    expect(scenario.error).toBeNull();
+    expect(probed).toEqual([SEAT_TWIN.providerRef]);
+    expect(await disclosureRowOf(answerIdOf(scenario))).toMatchObject({
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef, checkerServedRef: SEAT_TWIN.providerRef,
+      checkerFallback: true, checkerFallbackReason: "ROLE_UNAVAILABLE", fallbackReason: null
+    });
+  });
+
+  it("a pinned writer absent and the sealed writer absent too: today's J24 refusal, naming the sealed ref", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-both-absent", rotation: ROTATION, panelSize: 3, ...rotationDoubles("rotation-both-absent", "primary", "third"),
+      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef, SEALED_REF) }
+    });
+    expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId))
+      .toEqual([{ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:SYNTHESIZER" }]);
+    expect(await j24Events(scenario.runId)).toEqual([{
+      state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+      call_site_key: `SYNTHESIZER:${SEALED_REF}`,
+      role_ref: SEALED_REF,
+      role: "SYNTHESIZER",
+      absent_failure_code: "CLAIM_PROVIDER_ABSENT"
+    }]);
+  });
+
+  it("a pinned writer absent at claim whose sealed writer the estimate does not cover refuses with J24, terminally, with today's event", async () => {
+    const covered = coverage(false);
     const scenario = await executeSeatScenario({
       label: "rotation-absent", rotation: ROTATION, panelSize: 3, ...rotationDoubles("rotation-absent", "secondary", "third"),
-      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef) }
+      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef), answerRoleFallbackCovered: covered.answerRoleFallbackCovered }
     });
+    expect(covered.asked).toEqual([{ roleRef: SEALED_REF, panel: PANEL_REFS }]);
     expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
     expect(scenario.calls).toEqual([]);
     expect(await workItemOf(scenario.runId))

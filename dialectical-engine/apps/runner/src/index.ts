@@ -2081,6 +2081,17 @@ export interface WalkingSkeletonSettings {
     readonly modelId: string | null;
     readonly failureCode: string | null;
   }>;
+  /**
+   * Role rotation, Task 11 (orchestrator ruling 2026-10-11): may the SEALED answer-role ref `roleRef` stand in for a
+   * rotated debate's pinned member that is not claim-eligible? Only when the debate's start-of-debate estimate already
+   * covers that ref's model. Absent: yes — off the preview the estimate prices the sealed roles exactly as for a debate
+   * that is not rotated. The preview's runner answers with `previewSealedRoleFallbackCovered` (its rotated estimate
+   * prices only the panel's models). No: the pinned role refuses with today's J24.
+   */
+  readonly answerRoleFallbackCovered?: (input: Readonly<{
+    roleRef: string;
+    panel: readonly DiscoveredPanelMember[];
+  }>) => boolean;
   readonly scoringOperator?: ScoringOperatorRegisterInput;
   readonly runDeathPolicy?: RunDeathPolicy;
   readonly hiddenNodeScoreThreshold?: {
@@ -3033,10 +3044,13 @@ export function serveFloorOf(input: Readonly<{
  *
  * Content-free: provider refs, codes and counts. The served refs are the
  * makers that wrote and checked the round the answer serves (null when the
- * answer has no checked round). A served maker other than the planned one can
- * only be the money fallback — every other substitution is refused — so the
- * fallback flags and the reason are derived from the refs, and migration 0076
- * refuses a row where they disagree. `checkerSameAsWriter` is R9's disclosure:
+ * answer has no checked round). On a run that is not rotated, a served maker
+ * other than the planned one can only be the money fallback — every other
+ * substitution is refused — so the fallback flags and the reason are derived
+ * from the refs, and migration 0076 refuses a row where they disagree. On a
+ * rotated run (Task 11, migration 0114) the planned refs are the pin's, and a
+ * sealed register ref that stood in for an unavailable pinned member is the one
+ * other substitution: its role's reason is ROLE_UNAVAILABLE, named per role. `checkerSameAsWriter` is R9's disclosure:
  * DEGRADED-DIVERSITY reads the SEALED refs, so a fallback that put both roles
  * on one maker is recorded here instead. The digest fields (Task M4) are the
  * rung and the points left out of the digest the answer-writer was handed
@@ -3056,9 +3070,22 @@ export function buildServeDisclosureRecord(input: Readonly<{
   digest: Readonly<{ rung: number; pointsOmitted: number }> | null;
   /** The floor of a components-only answer (`serveFloorOf`), or null. */
   floor: ServeFloor | null;
+  /**
+   * Role rotation, Task 11 (orchestrator ruling 2026-10-11): a rotated run's stand-ins — per answer role, the sealed
+   * register ref that took the role because the pinned member was not claim-eligible, or null when the pin held it.
+   * Present only on a rotated run; the record then names each fallback's reason per role. Absent on every other run,
+   * whose record is today's to the byte.
+   */
+  standIns?: Readonly<{ writerRef: string | null; checkerRef: string | null }>;
 }>): ServeDisclosureRecord {
   const writerFallback = input.served !== null && input.served.writerRef !== input.planned.writerRef;
   const checkerFallback = input.served !== null && input.served.checkerRef !== input.planned.checkerRef;
+  // A role the stand-in served fell back because its pinned model was unavailable; any other served model than the
+  // planned one was chosen for money (a stand-in a cheaper model then replaced included: what served was chosen for money).
+  const reasonOf = (fallback: boolean, servedRef: string | undefined, standIn: string | null | undefined) =>
+    !fallback ? null : standIn !== null && standIn !== undefined && servedRef === standIn ? "ROLE_UNAVAILABLE" as const : "MONEY" as const;
+  const writerReason = reasonOf(writerFallback, input.served?.writerRef, input.standIns?.writerRef);
+  const checkerReason = reasonOf(checkerFallback, input.served?.checkerRef, input.standIns?.checkerRef);
   return Object.freeze({
     answerId: input.answerId,
     answerVersion: input.answerVersion,
@@ -3069,7 +3096,9 @@ export function buildServeDisclosureRecord(input: Readonly<{
     checkerServedRef: input.served?.checkerRef ?? null,
     writerFallback,
     checkerFallback,
-    fallbackReason: writerFallback || checkerFallback ? "MONEY" as const : null,
+    fallbackReason: writerReason === "MONEY" || checkerReason === "MONEY" ? "MONEY" as const : null,
+    ...(input.standIns === undefined || writerReason === null ? {} : { writerFallbackReason: writerReason }),
+    ...(input.standIns === undefined || checkerReason === null ? {} : { checkerFallbackReason: checkerReason }),
     checkerSameAsWriter: input.served !== null && input.served.checkerRef === input.served.writerRef,
     bodyStop: input.body.bodyStop,
     pointsWithoutReview: input.body.pointsWithoutReview,
@@ -4818,15 +4847,31 @@ export class WalkingSkeletonRunner {
         "Every provider pinned at ask time was absent when the runner claimed the work item"
       );
     }
+    // Role rotation, Task 11 (orchestrator ruling 2026-10-11 under the owner's delegation, "always an answer"): a
+    // pinned answer member that is not claim-eligible hands its role back to the SEALED register ref for that role —
+    // today's unpinned role, with today's off-panel probe and today's J24 below — when the debate's estimate already
+    // covers that ref's model (`answerRoleFallbackCovered`). Not covered, or the sealed ref is the pinned one: no
+    // stand-in, and the pinned role refuses with today's J24. The pin stays the disclosure's planned ref, so the
+    // stand-in is recorded as that role's fallback for ROLE_UNAVAILABLE (`rotationStandIns`).
+    const standInFor = (pinnedRef: string, sealedRef: string): string | null =>
+      configuredMakers.some((maker) => maker.providerRef === pinnedRef) || sealedRef === pinnedRef
+        || !(this.settings.answerRoleFallbackCovered?.({ roleRef: sealedRef, panel: run.discoveredPanel }) ?? true)
+        ? null
+        : sealedRef;
+    const rotationStandIns = this.settings.synthesisRolePolicy === undefined || rotationPin === null ? null : Object.freeze({
+      writerRef: standInFor(rotationPin.answerWriter.providerRef, this.settings.synthesisRolePolicy.synthesizerRoleRef),
+      checkerRef: standInFor(rotationPin.answerChecker.providerRef, this.settings.synthesisRolePolicy.evaluatorRoleRef)
+    });
     // Role rotation: a rotated run's per-claim policy is the boot policy with the two answer-role refs
-    // replaced by the pin's (bounds and loop bound unchanged). Every per-run use below reads this one
-    // value; the pre-claim J24 (2) check above keeps the sealed refs, the fallback a one-maker debate needs.
-    const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined || rotationPin === null
+    // replaced by the pin's, or by a role's stand-in (bounds and loop bound unchanged). Every per-run use below
+    // reads this one value; the pre-claim J24 (2) check above keeps the sealed refs, the fallback a one-maker
+    // debate needs.
+    const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined || rotationPin === null || rotationStandIns === null
       ? this.settings.synthesisRolePolicy
       : Object.freeze({
         ...this.settings.synthesisRolePolicy,
-        synthesizerRoleRef: rotationPin.answerWriter.providerRef,
-        evaluatorRoleRef: rotationPin.answerChecker.providerRef
+        synthesizerRoleRef: rotationStandIns.writerRef ?? rotationPin.answerWriter.providerRef,
+        evaluatorRoleRef: rotationStandIns.checkerRef ?? rotationPin.answerChecker.providerRef
       });
     if (synthesisRolePolicy === undefined) {
       // Unreachable: the pre-claim gate refuses first. Typed rather than
@@ -8096,7 +8141,10 @@ export class WalkingSkeletonRunner {
             writerRef: plannedRoleRef(writerPlannedByRound.get(answeredRound.round), "writer"),
             checkerRef: plannedRoleRef(checkerPlannedByRound.get(answeredRound.round), "checker")
           }
-        : { writerRef: synthesisRoles.synthesizerRoleRef, checkerRef: synthesisRoles.evaluatorRoleRef },
+        // Role rotation, Task 11: a rotated run plans its pin's refs, so a stand-in is disclosed as a fallback.
+        : rotationPin === null
+          ? { writerRef: synthesisRoles.synthesizerRoleRef, checkerRef: synthesisRoles.evaluatorRoleRef }
+          : { writerRef: rotationPin.answerWriter.providerRef, checkerRef: rotationPin.answerChecker.providerRef },
       served: answeredRound === undefined ? null : {
         writerRef: servedRoleRef(servedDrafts.get(answeredRound.candidateRef)?.providerRef, "writer"),
         checkerRef: servedRoleRef(servedChecks.get(answeredRound.verdictRef), "checker")
@@ -8104,7 +8152,8 @@ export class WalkingSkeletonRunner {
       body: serveDisclosureBody,
       serveStop: serveLoopStopOf(servePhaseFailure),
       digest: serveDisclosureDigestFacts(writerDigest),
-      floor
+      floor,
+      ...(rotationStandIns === null ? {} : { standIns: rotationStandIns })
     }));
     await runnerStage(
       "ANSWER_MEMORY_OBSERVATION_FAILED",

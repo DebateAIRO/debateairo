@@ -74,10 +74,12 @@ after 0112 when it merged with dev at 7db4a7b72, keeping its number, the next fr
 
 The fourth chain step, after Part C's 0113 (spec `docs/superpowers/specs/2026-10-11-role-rotation-design.md`, Part 3):
 `0114_role_rotation.sql`, `role-rotation-forward0114.json`, `packages/db/src/migration-forward0114.ts`. It creates
-`core.run_role_rotation` (insert-once, immutable; the four picked roles and the eligible model ids) and adds
-`serve.answer_story.storyteller_repairs`. No billing relation or function, so `verify-effective-capabilities-111.sql`
-stays the verifier in force; no `replayVerifierSql`: its checks are its postcondition digest (the pin table's 16
-columns, the story column and the nine CHECKs). If `origin/dev` takes 0114 first, renumber this step at merge time
+`core.run_role_rotation` (insert-once, immutable; the four picked roles and the eligible model ids), adds
+`serve.answer_story.storyteller_repairs`, and gives `serve.serve_disclosure` a fallback reason per role
+(`writer_fallback_reason`, `checker_fallback_reason`: MONEY or ROLE_UNAVAILABLE), replacing 0076's one reason rule with
+the per-role one (Task 11). No billing relation or function, so `verify-effective-capabilities-111.sql` stays the
+verifier in force; no `replayVerifierSql`: its checks are its postcondition digest (the pin table's 16 columns, the
+story column, the two disclosure columns and the twelve CHECKs, with 0076's replaced rule absent). If `origin/dev` takes 0114 first, renumber this step at merge time
 (its manifest, loader name and `previous` follow), as C1's recipe above says.
 
 ## Replay: every applied step keeps its own checks

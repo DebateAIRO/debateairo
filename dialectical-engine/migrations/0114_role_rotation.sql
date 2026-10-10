@@ -2,7 +2,8 @@
 -- chain after 0113 (migrations/lineage/README.md; its manifest lineage/role-rotation-forward0114.json binds these
 -- bytes; it adds no billing relation and no function, so lineage/verify-effective-capabilities-111.sql stays the
 -- verifier in force). Forward-only and replayable: CREATE TABLE IF NOT EXISTS, ADD COLUMN IF NOT EXISTS, each
--- constraint dropped IF EXISTS and added again.
+-- constraint dropped IF EXISTS and added again. Three parts: the pin table, the story's repair count, and the serve
+-- disclosure's per-role fallback reason (at the end).
 --
 -- core.run_role_rotation: the four roles admission picked for one rotated debate, pinned beside the run the moment
 -- it exists and BEFORE its work is queued, with the model ids that were eligible for them. Provider refs, model ids
@@ -95,3 +96,28 @@ ALTER TABLE serve.answer_story ADD COLUMN IF NOT EXISTS storyteller_repairs inte
 ALTER TABLE serve.answer_story DROP CONSTRAINT IF EXISTS answer_story_storyteller_repairs_bounded;
 ALTER TABLE serve.answer_story ADD CONSTRAINT answer_story_storyteller_repairs_bounded
   CHECK (storyteller_repairs IS NULL OR (storyteller_repairs >= 0 AND storyteller_repairs <= 32));
+
+-- serve.serve_disclosure: the fallback's reason PER ROLE (orchestrator ruling 2026-10-11 under the owner's delegation,
+-- "always an answer" and "user-facing text must stay true"). A rotated debate whose pinned answer member is not
+-- claim-eligible is served by the sealed register role, recorded as planned = the pinned ref and served = the sealed
+-- one: a fallback whose reason is ROLE_UNAVAILABLE, not money. 0076's run-level fallback_reason keeps its meaning and
+-- its one value: money was used. A fallback with no per-role reason is the money fallback, as every row written before
+-- 0114 and every row of a run without rotation records it (byte for byte as before: both new columns NULL). A row
+-- that names a reason per role names one for each of its fallbacks and for nothing else. 0076 itself is untouched;
+-- its one reason rule is replaced here by the per-role one, which says the same of every row without per-role reasons.
+ALTER TABLE serve.serve_disclosure ADD COLUMN IF NOT EXISTS writer_fallback_reason text;
+ALTER TABLE serve.serve_disclosure ADD COLUMN IF NOT EXISTS checker_fallback_reason text;
+ALTER TABLE serve.serve_disclosure DROP CONSTRAINT IF EXISTS serve_disclosure_role_reasons_known;
+ALTER TABLE serve.serve_disclosure ADD CONSTRAINT serve_disclosure_role_reasons_known CHECK (
+  (writer_fallback_reason IS NULL OR writer_fallback_reason IN ('MONEY', 'ROLE_UNAVAILABLE'))
+  AND (checker_fallback_reason IS NULL OR checker_fallback_reason IN ('MONEY', 'ROLE_UNAVAILABLE')));
+ALTER TABLE serve.serve_disclosure DROP CONSTRAINT IF EXISTS serve_disclosure_role_reasons_are_whole;
+ALTER TABLE serve.serve_disclosure ADD CONSTRAINT serve_disclosure_role_reasons_are_whole CHECK (
+  (writer_fallback_reason IS NULL AND checker_fallback_reason IS NULL)
+  OR ((writer_fallback_reason IS NOT NULL) = writer_fallback AND (checker_fallback_reason IS NOT NULL) = checker_fallback));
+ALTER TABLE serve.serve_disclosure DROP CONSTRAINT IF EXISTS serve_disclosure_fallback_names_its_reason;
+ALTER TABLE serve.serve_disclosure DROP CONSTRAINT IF EXISTS serve_disclosure_fallback_names_its_reasons;
+ALTER TABLE serve.serve_disclosure ADD CONSTRAINT serve_disclosure_fallback_names_its_reasons CHECK (
+  (fallback_reason IS NOT NULL) = (
+    (writer_fallback AND COALESCE(writer_fallback_reason, 'MONEY') = 'MONEY')
+    OR (checker_fallback AND COALESCE(checker_fallback_reason, 'MONEY') = 'MONEY')));

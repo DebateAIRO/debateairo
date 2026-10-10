@@ -648,7 +648,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Role rotation (spec 2026-10-11, Part 3): the reviewed module after it gained the 0114 pin's access
 // (insertRunRoleRotation, readRunRoleRotation, readRoleRotationCounts), merged with the connection budget above.
 // migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "72d93999a5b49ea832c63b17bfdf21d18c1fb488c87cd2d24465a90ed0538722";
+// Role rotation, Task 11: the reviewed module after it exported the serve disclosure's per-role fallback reason
+// (SERVE_DISCLOSURE_FALLBACK_REASONS, serveDisclosureFallbackReasonOf). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "ee03d708fcb090f400bf710591f964123d67c001c3d4e10cbe8c627fff123021";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"
