@@ -180,27 +180,28 @@ tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded number
 # tests/ci-integration-all.txt leaves it out with a `!` line printed on every run, as tests/ci-integration-auth.txt
 # already does. No CI job runs these 10 files today, so these entries change no CI verdict.
 #
-# 13 of the 15 fail with MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE. Each builds an older or incomplete migration
-# ledger by hand and calls migrate() to upgrade or replay. Since merge 065708c19 (explicit migration lineage, on dev
+# 13 of the 15 failed with MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE. Each built an older or incomplete migration
+# ledger by hand and called migrate() to upgrade or replay. Since merge 065708c19 (explicit migration lineage, on dev
 # through PR #82, a51171b50, 2026-10-07) migrate() continues only from an empty database, a named cohort
 # (migrations/lineage/auth-dev-20261006.json: auth94, auth103, auth106, dev95) or a complete one, and refuses anything
 # else BY DESIGN (packages/db/src/migration-lineage.ts identifyLineage; tests/integration/auth-dev-lineage.test.ts
-# asserts that refusal). Those upgrade paths no longer exist in production, so the tests are stale. Fix: run the
-# migration's own SQL inside a rolled-back transaction on a fresh database, or retire the upgrade-from-old-state part.
-tests/integration/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION database contract > preserves legacy algorithm version 5 while allocating and replaying the new development receipt
-#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
-#   tests/ci-integration-all.txt; the same
-#   message file by file on dev@c8cf8e063 the same day).
-#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test applies every migration file below 0055 by readdir
-#   (line 76), then calls migrate() (see above).
-#   blinds: the rest of the test: the 0055 upgrade of historical register rows; the other 25 cases of the file run.
-tests/integration/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION database contract > upgrades exact historical v1/v4 bytes, initializes production off, ignores generic versions, and rolls back forward
-#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
-#   tests/ci-integration-all.txt; the same
-#   message file by file on dev@c8cf8e063 the same day).
-#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test applies every migration file below 0055 by readdir
-#   (line 76), then calls migrate() (see above).
-#   blinds: the rest of the test: the 0055 upgrade of historical register rows; the other 25 cases of the file run.
+# asserts that refusal).
+#
+# SHRUNK 2026-10-10 (branch fix/2026-10-10-lineage-refused-tests): those 13 entries are gone, each deleted in the
+# commit that turned its file green; the 2 below remain. None was made green by relaxing the lineage rule
+# (migration-lineage.ts is untouched). Each test now runs the migration's OWN SQL — the digest-checked bytes migrate()
+# runs, via tests/support/migrationReplay.ts — on a database migrate() finished, and never edits the ledger. The
+# 0068, 0071 and 0054-support replays and every refusal guard run in a transaction that is rolled back, with the drift
+# each guard refuses set up inside it. TINT1 (0054 revoke), T6 (0032 + 0043 over legacy rows) and the support catalog
+# repair (0054 + 0055) commit, because their checks need other connections. The "upgrade from an older ledger" part of
+# TINT1, T6, the catalog repair and the two register-history cases is retired with a CHECKED reason
+# (retiredUpgradeReason): migrate() refuses that database's ledger without those names, and every cohort and the
+# complete ledger already record them. Every re-expressed guard and replay check was proved by a mutant of the
+# migration's SQL that turned it red (listed in each commit). Two replays are NOT neutral on the final schema: 0054
+# re-creates the five support_shred_dirty_* markers 0065 retired, and 0055 re-grants debateai_runtime EXECUTE on
+# publish_register_version and import_historical_register_version, which 0065 revoked. migrate() never re-runs a
+# recorded migration, so no real database meets either; the tests keep those replays rolled back, except the catalog
+# repair, which commits both on its own throwaway database and checks nothing those leftovers touch.
 tests/integration/s6-content-encryption-database.test.ts > S6 content encryption on disposable PostgreSQL > migrates a default-off pre-0038 legacy run through the final schema
 #   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
 #   tests/ci-integration-all.txt; the same
