@@ -642,9 +642,13 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // N26m/N26n (PR-54): the reviewed module after the NETOPIA branch merged dev (its billing exports and #101's
 // applyForward110) and added the forward chain (migrate() runs the superseding verifier, applyForward110, then
 // applyForwardChain; migrations/lineage/README.md).
+// Connection budget (2026-10-10, docs/operations/2026-10-10-database-connection-budget.md): the reviewed
+// module after createPool gained a pool name, a busy marker (isDatabasePoolBusy) and a busy log line, and the
+// support control-plane pool took its size from packages/db/src/pool-budget.ts. migrate() is byte-identical.
 // Role rotation (spec 2026-10-11, Part 3): the reviewed module after it gained the 0114 pin's access
-// (insertRunRoleRotation, readRunRoleRotation, readRoleRotationCounts). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "7b1af062a40f175a9635ae2bf75f20d7f72df30fcee8be39da473e639867c976";
+// (insertRunRoleRotation, readRunRoleRotation, readRoleRotationCounts), merged with the connection budget above.
+// migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "72d93999a5b49ea832c63b17bfdf21d18c1fb488c87cd2d24465a90ed0538722";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

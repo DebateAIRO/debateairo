@@ -569,9 +569,10 @@ export function previewCallShares(input: Readonly<{
       // root's tree and its cross-exchanges, and judges every node another maker authored (apps/runner/src/
       // index.ts:5291-5326: the judge seats called per node are all the others, panelCallCap = members - 1).
       for (const model of panelModels) addDebate(model, BigInt(sites.panel - sites.reviewer) * debate);
-      // A node's ONE review goes to a different maker chosen in a fixed order, alternating only against
-      // that author's latest reviewer (selectDifferentMakerReviewer, apps/runner/src/index.ts:834), so one
-      // member can take far more than an even share. So each gate is charged, at its dearest panel member,
+      // A node's ONE review goes to a different maker taken in turn round the debate's seeded circle
+      // (selectDifferentMakerReviewer, apps/runner/src/index.ts), even per author over a long debate but
+      // not per member in a short one, so one member can still take more than an even share. So each gate
+      // is charged, at its dearest panel member,
       // every review its members could take: all of them when it has two or more panel members, else the
       // reviews of the other members' nodes (a member never reviews its own maker's nodes, an even
       // 1/members of them). The careful side: with two gates a review is counted on both.

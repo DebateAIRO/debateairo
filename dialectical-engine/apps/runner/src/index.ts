@@ -833,20 +833,71 @@ interface PanelDegradationRecord {
   readonly reason: string;
 }
 
+/**
+ * Owner ruling 2026-10-10 — "shuffled per debate, then taken in turn". Each
+ * maker's place in one debate's reviewer circle: a key seeded by the run id
+ * alone (no clock, no Math.random), so the same debate always draws the same
+ * circle and different debates draw different ones. Sorting by a seeded key is
+ * a seeded shuffle that does not depend on the order the panel lists its
+ * makers in, and a maker missing from one node's candidates (down, or its
+ * seat's member filtered) does not reorder the others.
+ */
+function reviewerTurnKey(runId: string, maker: string): string {
+  return createHash("sha256")
+    .update(JSON.stringify(["debateai:reviewer-turn-order:v1", runId, maker]), "utf8")
+    .digest("hex");
+}
+
+const compareReviewerTurn = (
+  left: { readonly key: string; readonly maker: string },
+  right: { readonly key: string; readonly maker: string }
+): number => left.key < right.key ? -1 : left.key > right.key ? 1 : left.maker < right.maker ? -1 : left.maker > right.maker ? 1 : 0;
+
+/** One debate's reviewer circle: the distinct makers in their seeded order. */
+export function reviewerTurnOrder(runId: string, makers: readonly string[]): readonly string[] {
+  return Object.freeze([...new Set(makers)]
+    .map((maker) => ({ maker, key: reviewerTurnKey(runId, maker) }))
+    .sort(compareReviewerTurn)
+    .map((entry) => entry.maker));
+}
+
+/**
+ * The reviewer of one node: always a different maker from its author, taken
+ * IN TURN round this debate's seeded circle (`reviewerTurnOrder`). The turn
+ * after the author's latest recorded reviewer is the next maker clockwise that
+ * is not the author; an author with no review yet starts at the maker after
+ * itself, so a debate's first reviews go once round the whole circle and every
+ * maker reviews. One author's reviews therefore spread over the other makers
+ * to within one review of each other.
+ *
+ * A pure function of (run, author, candidate makers, latest reviewer): the only
+ * moving input is the latest reviewer, which changes only when a review for
+ * that author LANDS — and a reviewed node is never reviewed again — so a
+ * retried node is given the same reviewer. Of several candidates of the chosen
+ * maker (two refs of one model), the first listed is taken, as before.
+ */
 export function selectDifferentMakerReviewer<T extends { readonly maker: string }>(
+  runId: string,
   authorMaker: string,
   configuredMakers: readonly T[],
   latestReviewerMaker: string | null = null
 ): T {
   const candidates = configuredMakers.filter((candidate) => candidate.maker !== authorMaker);
-  const reviewer = candidates.find((candidate) => candidate.maker !== latestReviewerMaker) ?? candidates[0];
-  if (reviewer === undefined) {
+  if (candidates.length === 0) {
     throw new TypedDomainError(
       "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE",
       `No configured maker differs from node author ${authorMaker}`
     );
   }
-  return reviewer;
+  const circle = [...new Set(candidates.map((candidate) => candidate.maker))]
+    .map((maker) => ({ maker, key: reviewerTurnKey(runId, maker) }))
+    .sort(compareReviewerTurn);
+  // The place the turn moves on from: the latest reviewer's, or the author's own
+  // when it has none (or the latest is the author's maker, which cannot review).
+  const from = latestReviewerMaker === null || latestReviewerMaker === authorMaker ? authorMaker : latestReviewerMaker;
+  const fromEntry = { maker: from, key: reviewerTurnKey(runId, from) };
+  const next = circle.find((entry) => compareReviewerTurn(entry, fromEntry) > 0) ?? circle[0]!;
+  return candidates.find((candidate) => candidate.maker === next.maker)!;
 }
 
 /**
@@ -1473,7 +1524,7 @@ export async function runReviewCatchUp(input: {
   let reviewed = 0;
   for (const node of work) {
     const latestReviewerMaker = await input.dependencies.readLatestReviewerMaker(input.runId, node.authorMaker);
-    const reviewer = selectDifferentMakerReviewer(node.authorMaker, reviewers, latestReviewerMaker);
+    const reviewer = selectDifferentMakerReviewer(input.runId, node.authorMaker, reviewers, latestReviewerMaker);
     const callSiteKey = reviewCatchUpCallSiteKey(input.invocationId, node.nodeId);
     const outcome = await withCooldownRetry({
       runId: input.runId,
@@ -6308,7 +6359,7 @@ export class WalkingSkeletonRunner {
         const reviewerSeats = seatBook.assigned
           ? rotateSeats(seatBook.reviewer, seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey: reviewCallSiteKey }))
           : seatBook.reviewer;
-        const reviewer = selectDifferentMakerReviewer(authoredNode.maker, reviewerSeats.flatMap((seat) => {
+        const reviewer = selectDifferentMakerReviewer(run.runId, authoredNode.maker, reviewerSeats.flatMap((seat) => {
           const planned = seatCallPlan(seat, reviewCallSiteKey, differentMaker);
           const first = seatCaller.plan(seat, reviewCallSiteKey, planned.options);
           return first === null ? [] : [{ seat, maker: first.maker, plan: planned }];
@@ -9296,6 +9347,21 @@ export function captureFailureEnvelope(input: {
   });
 }
 
+/**
+ * How long a debate may wait for a free place on a runner before Hatchet gives
+ * it up. The runner takes 8 at once (RUNNER_CAPACITY.concurrentRuns); Hatchet's own
+ * default is 5 minutes, shorter than one debate. Owner ruling 2026-10-10.
+ */
+export const RUNNER_QUEUE_WAIT_LIMIT = "30m" as const;
+
+/**
+ * How long one debate may run before Hatchet gives it up. One task is one whole
+ * debate; a task declared without a limit is registered by the SDK with '60s'.
+ * Owner ruling 2026-10-10: 60 minutes in every deployment, the preview's value
+ * since 2026-10-06.
+ */
+export const RUNNER_EXECUTION_LIMIT = "3600s" as const;
+
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
   readonly runner: WalkingSkeletonRunner;
@@ -9311,7 +9377,8 @@ export function declareHatchetWalkingSkeletonTask(input: {
   return input.client.task({
     name: input.workflowName,
     retries: input.engineRetries,
-    ...(input.previewExecutionTimeout===undefined?{}:{executionTimeout:input.previewExecutionTimeout}),
+    scheduleTimeout: RUNNER_QUEUE_WAIT_LIMIT,
+    executionTimeout: input.previewExecutionTimeout ?? RUNNER_EXECUTION_LIMIT,
     // S06 capture binding. It was written in e8d99d33 and destroyed by the
     // conflict resolution in merge 1c9578a2, which took the mainline side of
     // this file whole; the test that specifies it survived the same merge.

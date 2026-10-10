@@ -856,6 +856,7 @@ packages/db/src/obs-schema.ts
 packages/db/src/onboarding-evidence.ts
 packages/db/src/owner-recovery.ts
 packages/db/src/password-reset.ts
+packages/db/src/pool-budget.ts
 packages/db/src/private-stream.ts
 packages/db/src/publication-check.ts
 packages/db/src/publication-lease.ts

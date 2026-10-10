@@ -15,6 +15,8 @@ import type {
 import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
+export * from "./pool-budget.js";
+import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
 import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";
 
@@ -827,10 +829,65 @@ async function runWaitingLineIsApplied(
 }
 type UntypedMethod = (...args: unknown[]) => unknown;
 
+/**
+ * Connection budget (2026-10-10, src/pool-budget.ts): a pool that could not
+ * hand out a connection in time, or a server that is full, is BUSY — the same
+ * call a moment later can succeed. pg-pool's own words for its two waits
+ * (pg-pool index.js "timeout exceeded when trying to connect" for the queue,
+ * "Connection terminated due to connection timeout" for a slow connect) and
+ * Postgres's too_many_connections. Marked by origin in a WeakSet, never by
+ * message, so a failure merely quoting those words is not busy.
+ */
+const busyPoolFailures = new WeakSet<TypedDomainError>();
+type BusyReason = "WAIT_TIMEOUT" | "CONNECT_TIMEOUT" | "SERVER_FULL";
+
+function busyReason(error: unknown): BusyReason | undefined {
+  if (!(error instanceof Error) || error instanceof TypedDomainError) return undefined;
+  if (error.message === "timeout exceeded when trying to connect") return "WAIT_TIMEOUT";
+  if (error.message === "Connection terminated due to connection timeout") return "CONNECT_TIMEOUT";
+  return (error as Error & Readonly<{ code?: unknown }>).code === "53300" ? "SERVER_FULL" : undefined;
+}
+
+/** True when this failure, or one it wraps as `cause`, is a busy pool or a full server. */
+export function isDatabasePoolBusy(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
+    if (current instanceof TypedDomainError && busyPoolFailures.has(current)) return true;
+    current = current.cause;
+  }
+  return false;
+}
+
 function typedPoolFailure(error: unknown): TypedDomainError {
   if (error instanceof TypedDomainError && error.code === DATABASE_POOL_FAILED) return error;
   const detail = error instanceof Error ? error.message : String(error);
-  return new TypedDomainError(DATABASE_POOL_FAILED, `PostgreSQL pool operation failed: ${detail}`);
+  const failure = new TypedDomainError(DATABASE_POOL_FAILED, `PostgreSQL pool operation failed: ${detail}`);
+  if (busyReason(error) !== undefined) busyPoolFailures.add(failure);
+  return failure;
+}
+
+const BUSY_LOG_INTERVAL_MS = 10_000;
+
+/**
+ * One journal line per pool per 10 s when it runs dry, with how many callers
+ * were turned away since the last line — the operator's signal (and the alert's)
+ * that a pool is too small or the server is full, without a line per request.
+ */
+function busyReporter(pool: Pool, name: string): (error: unknown) => void {
+  let lastLoggedAt = Number.NEGATIVE_INFINITY;
+  let turnedAway = 0;
+  return (error) => {
+    const reason = busyReason(error);
+    if (reason === undefined) return;
+    turnedAway += 1;
+    const now = performance.now();
+    if (now - lastLoggedAt < BUSY_LOG_INTERVAL_MS) return;
+    lastLoggedAt = now;
+    const options = pool.options as Readonly<{ max?: number }>;
+    console.error(`[DATABASE_POOL_BUSY] pool=${name} reason=${reason} max=${String(options.max ?? 10)}`
+      + ` open=${String(pool.totalCount)} waiting=${String(pool.waitingCount)} turned_away=${String(turnedAway)}`);
+    turnedAway = 0;
+  };
 }
 
 function typedQueryFailure(error: unknown): unknown {
@@ -880,7 +937,7 @@ function wrapClientQueries(client: PoolClient): PoolClient {
 
 export function createPool(
   connectionString: string,
-  options: Readonly<{ max?: number; connectionTimeoutMillis?: number }> = {}
+  options: Readonly<{ max?: number; connectionTimeoutMillis?: number; name?: string }> = {}
 ): Pool {
   if (options.max !== undefined
     && (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100)) {
@@ -891,7 +948,12 @@ export function createPool(
       || options.connectionTimeoutMillis < 1 || options.connectionTimeoutMillis > 600_000)) {
     throw new TypeError("DATABASE_POOL_CONNECTION_TIMEOUT_INVALID");
   }
-  const pool = new PgPool({ connectionString,...options });
+  if (options.name !== undefined && !/^[a-z][a-z0-9:-]{0,47}$/u.test(options.name)) {
+    throw new TypeError("DATABASE_POOL_NAME_INVALID");
+  }
+  const { name, ...sizing } = options;
+  const pool = new PgPool({ connectionString, ...sizing, ...(name === undefined ? {} : { application_name: name }) });
+  const reportBusy = busyReporter(pool, name ?? "unnamed");
   let terminalFailure: TypedDomainError | undefined;
 
   pool.on("error", (error: Error) => {
@@ -927,6 +989,7 @@ export function createPool(
     const callback = args.at(-1);
     if (typeof callback === "function") {
       return connect((error: unknown, client: PoolClient | undefined, release: unknown) => {
+        if (error !== undefined && error !== null) reportBusy(error);
         callback(
           error === undefined || error === null ? error : typedPoolFailure(error),
           client === undefined ? undefined : wrapClientQueries(client),
@@ -938,7 +1001,10 @@ export function createPool(
       const result = connect();
       return result instanceof Promise
         ? result.then((client: PoolClient) => wrapClientQueries(client))
-          .catch((error: unknown) => Promise.reject(typedPoolFailure(error)))
+          .catch((error: unknown) => {
+            reportBusy(error);
+            return Promise.reject(typedPoolFailure(error));
+          })
         : result;
     } catch (error) {
       throw typedPoolFailure(error);
@@ -951,8 +1017,9 @@ export function createPool(
 export function createSupportControlPlanePool(connectionString: string): Pool {
   const pool = new PgPool({
     connectionString,
-    max: 2,
-    connectionTimeoutMillis: 200,
+    max: SUPPORT_CONTROL_PLANE_POOL.max,
+    connectionTimeoutMillis: SUPPORT_CONTROL_PLANE_POOL.connectionTimeoutMillis,
+    application_name: SUPPORT_CONTROL_PLANE_POOL.name,
     statement_timeout: 700,
     query_timeout: 750
   });
