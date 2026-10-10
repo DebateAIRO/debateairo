@@ -16,10 +16,12 @@ import {
   type RunCreationSettings
 } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
+import { computeStructuralCeilingBasis } from "@debateai/register";
 import {
   createPreviewRemainingRpcPort,
   parsePreviewProviderTestConfig,
   previewModelRow,
+  type PreviewModelRow,
   PREVIEW_GATE_UNREACHABLE,
   type PreviewGateRemaining,
   type PreviewProviderTestConfig
@@ -30,8 +32,17 @@ import {
   previewGateEstimateCalls,
   previewGateEstimateNanoUsd,
   previewExpectedCalls,
-  previewAverageCallNanoUsd,
+  previewCallNanoUsd,
+  previewDebateNanoUsd,
   previewGateKeyOf,
+  createPreviewAdmissionLock,
+  assertPreviewBudgetAdmits,
+  PREVIEW_ADMISSION_LOCK_NAME,
+  PREVIEW_ESTIMATE_INPUT_TOKENS_PER_CALL,
+  PREVIEW_ESTIMATE_PROBE_INPUT_TOKENS,
+  type PreviewAdmissionLock,
+  type PreviewCallOutputTokens,
+  previewCallOutputTokens,
   PreviewGateUnavailableRefusal,
   PREVIEW_UNFINISHED_RUNS_SQL,
   type PreviewUnfinishedRun,
@@ -70,22 +81,26 @@ const PANEL = Object.freeze([
   { provider_ref: "preview:fixture-a", model_id: GLM },
   { provider_ref: "preview:deepseek-v4-1-flash", model_id: DEEPSEEK }
 ]);
-// One call per site is 2 + 4 + 2 + 8 + 8 + 3 + 3 = 30; the basis's ceiling with repeat attempts is 120.
-// Story: 2 rounds x (storyteller twice + checker) = 6. Pickup health checks: (1 + hold_cap 2) x
-// (2 panel members + fixture-b, the checker, off the panel) = 9. Total 135.
-const EXPECTED_CALLS = 135;
-// With the 15% margin: ceil(155.25) = 156; plus 4 in flight = 160 calls needed.
-const CALLS_NEEDED = 160;
-// DeepSeek is the dearest: 4,000 x 200 + 1,200 x 600 = 1,520,000 nano-USD per call.
-// 135 x 1,520,000 x 115 / 100 = 235,980,000; plus 4 in flight x 131,481,600 (DeepSeek's worst case).
+/** The max_tokens each call sends on the preview with today's register bounds (all organ and synthesis bounds 2,048 -> the 8,192 floor). */
+const OUTPUT: PreviewCallOutputTokens = Object.freeze({ debate: 8192, storyteller: 12_000, storytellerRetry: 24_000, storyChecker: 8192 });
+// Calls: debate 120 (the basis's ceiling beats its 30 sites); story 2 rounds x 3 = 6; pickup health checks
+// (1 + hold_cap 2 + 2 restarts) x (2 panel members + fixture-b, the checker, off the panel) = 15; this
+// ask's own health checks 5; one unbilled retry per one-attempt call 120 + 2 = 122. Total 268.
+const EXPECTED_CALLS = 268;
+// With the 15% margin: ceil(308.2) = 309; plus 4 in flight = 313 calls needed.
+const CALLS_NEEDED = 313;
+// Each call at its most, at the dearest row for its shape (DeepSeek throughout), input 264,192 tokens:
+// debate 264,192 x 200 + 8,192 x 600 = 57,753,600; storyteller 60,038,400 + its retry 67,238,400 + checker
+// 57,753,600 per round; a health check 3,072 x 200 + 8,192 x 600 = 5,529,600.
+// 120 x 57,753,600 + 2 x 185,030,400 + 20 x 5,529,600 = 7,411,084,800; x 1.15 = 8,522,747,520.
+const CALLS_NANO = 8_522_747_520n;
 const LARGEST = 131_481_600n;
-const CALLS_NANO = 235_980_000n;
 const ESTIMATE = CALLS_NANO + 4n * LARGEST;
 const UNAVAILABLE = "ASK_MODEL_CANDIDATE_UNAVAILABLE";
 
 function remainingWith(patch: Partial<PreviewGateRemaining> = {}): PreviewGateRemaining {
   return Object.freeze({
-    state: "active", windowOpen: true, remainingNanoUsd: 3_000_000_000n, remainingCalls: 1200,
+    state: "active", windowOpen: true, remainingNanoUsd: 100_000_000_000n, remainingCalls: 100_000,
     maxConcurrentCalls: 4, largestReservationNanoUsd: LARGEST, enabledModels: [GLM, DEEPSEEK], ...patch
   });
 }
@@ -98,7 +113,9 @@ function gateWith(counters: Counters, answer: () => Promise<PreviewGateRemaining
     remaining: { deepinfra: async () => { counters.remaining += 1; return answer(); } },
     roleModelIds: [GLM, GLM, GLM, GLM],
     roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"],
-    storyCalls: 6,
+    storyRounds: 2,
+    callOutputTokens: OUTPUT,
+    askProbeTargets: 5,
     maxCooldownHoldsPerRun: 2,
     readUnfinishedRuns: async () => unfinished
   });
@@ -120,51 +137,75 @@ function settings(counters: Counters, extra: Partial<RunCreationSettings> = {}):
     ...extra
   } as RunCreationSettings;
 }
-const ROLES = { roleModelIds: [GLM, GLM], roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"], storyCalls: 6, maxCooldownHoldsPerRun: 2 };
+const ROLES = { roleModelIds: [GLM, GLM], roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"], storyRounds: 2,
+  callOutputTokens: OUTPUT, askProbeTargets: 5, maxCooldownHoldsPerRun: 2 };
 
 describe("the start-of-debate estimate is an upper bound (pure)", () => {
-  it("counts repeat attempts, the story with its repair, and every pickup health check", () => {
-    expect(previewExpectedCalls({ basis: basis(2), panel: PANEL, ...ROLES })).toEqual({ debate: 120, story: 6, probes: 9, total: EXPECTED_CALLS });
+  it("counts repeat attempts, the story with its repair, every pickup and ask health check, and the unbilled retries", () => {
+    expect(previewExpectedCalls({ basis: basis(2), panel: PANEL, ...ROLES }))
+      .toEqual({ debate: 120, story: 6, probes: 15, askProbes: 5, unbilledRetries: 122, total: EXPECTED_CALLS });
     const [need] = estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES });
-    expect(need).toMatchObject({ gate: "deepinfra", dearestModelId: DEEPSEEK, expectedCalls: EXPECTED_CALLS, callsWithMargin: 156, callsNanoUsd: CALLS_NANO });
+    expect(need).toMatchObject({ gate: "deepinfra", dearestModelId: DEEPSEEK, expectedCalls: EXPECTED_CALLS, callsWithMargin: 309, callsNanoUsd: CALLS_NANO });
     expect(previewGateEstimateNanoUsd(need!, remainingWith())).toBe(ESTIMATE);
     expect(previewGateEstimateCalls(need!, remainingWith())).toBe(CALLS_NEEDED);
   });
 
-  it("each part moves the count: one call per site when the ceiling is lower, the hold cap, off-panel roles, the story", () => {
+  it("prices each call at its most: input at the largest body the gate accepts, output at what it may send, clamped to the row", () => {
+    expect(PREVIEW_ESTIMATE_INPUT_TOKENS_PER_CALL).toBe(262_144n + 2048n);
+    expect(PREVIEW_ESTIMATE_PROBE_INPUT_TOKENS).toBe(1024n + 2048n);
+    const glm = previewModelRow(GLM)!;
+    expect(previewCallNanoUsd(glm, 264_192n, 8192)).toBe(264_192n * 150n + 8192n * 500n);
+    // A ceiling above the row's own bound is clamped to it (the gateway never sends more).
+    expect(previewCallNanoUsd(previewModelRow(QWEN)!, 0n, 200_000)).toBe(131_072n * 382n);
+    // No cached-input discount: every prompt token at the full input price.
+    expect(previewCallNanoUsd(previewModelRow(QWEN)!, 1_000_000n, 0)).toBe(113_000_000n);
+  });
+
+  it("each part moves the count: one call per site when the ceiling is lower, the hold cap, off-panel roles, the story, the ask's probes", () => {
     const base = { basis: basis(2), panel: PANEL, ...ROLES };
     // Sites (30) win over a smaller ceiling.
     expect(previewExpectedCalls({ ...base, basis: { ...basis(2), max_model_attempts: 10 } }).debate).toBe(30);
-    // The register's hold cap is used when the basis has none.
-    expect(previewExpectedCalls({ ...base, basis: { ...basis(2), hold_cap: undefined }, maxCooldownHoldsPerRun: 4 }).probes).toBe(5 * 3);
+    // The register's hold cap is used when the basis has none; two restarts are always allowed.
+    expect(previewExpectedCalls({ ...base, basis: { ...basis(2), hold_cap: undefined }, maxCooldownHoldsPerRun: 4 }).probes).toBe(7 * 3);
     // A role already on the panel is not probed twice.
-    expect(previewExpectedCalls({ ...base, roleProviderRefs: ["preview:fixture-a", "preview:deepseek-v4-1-flash"] }).probes).toBe(3 * 2);
-    expect(previewExpectedCalls({ ...base, storyCalls: 0 }).total).toBe(EXPECTED_CALLS - 6);
+    expect(previewExpectedCalls({ ...base, roleProviderRefs: ["preview:fixture-a", "preview:deepseek-v4-1-flash"] }).probes).toBe(5 * 2);
+    expect(previewExpectedCalls({ ...base, storyRounds: 0 }).total).toBe(EXPECTED_CALLS - 6 - 2);
+    expect(previewExpectedCalls({ ...base, askProbeTargets: 0 }).total).toBe(EXPECTED_CALLS - 5);
     expect(() => previewExpectedCalls({ ...base, basis: { panel_size: 2 } })).toThrow("PREVIEW_BASIS_HAS_NO_CALL_COUNT");
   });
 
   it("a role model dearer than the panel sets the price; an unreviewed model is refused", () => {
     const [need] = estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES, roleModelIds: [MIMO] });
     expect(need!.dearestModelId).toBe(MIMO);
+    expect(need!.callsNanoUsd > CALLS_NANO).toBe(true);
     expect(() => estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES, roleModelIds: ["other/model"] })).toThrow();
   });
 
-  it("an unfinished debate holds its whole estimate; an older model off the rows is priced at the dearest row", () => {
+  it("an unfinished debate holds its whole estimate but its ask's probes; an older model off the rows is priced at the dearest row", () => {
     const [hold] = estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL }, ROLES);
-    expect(hold).toMatchObject({ gate: "deepinfra", callsWithMargin: 156, callsNanoUsd: CALLS_NANO });
+    const withoutAsk = previewExpectedCalls({ basis: basis(2), panel: PANEL, ...ROLES, askProbeTargets: 0 });
+    expect(hold).toMatchObject({ gate: "deepinfra", expectedCalls: EXPECTED_CALLS - 5, callsWithMargin: 303,
+      callsNanoUsd: (previewDebateNanoUsd([previewModelRow(GLM)!, previewModelRow(DEEPSEEK)!], withoutAsk, 2, OUTPUT) * 115n + 99n) / 100n });
+    expect(hold!.callsNanoUsd).toBe(CALLS_NANO - (5n * 5_529_600n * 115n) / 100n);
     const [old] = estimateUnfinishedRunHolds({ basis: basis(2), panel: [{ provider_ref: "preview:other", model_id: "old/model" }] }, ROLES);
     expect(old!.dearestModelId).toBe(MIMO);
   });
 
+  it("a debate only writing its story holds the story's calls: 3 per round plus the checker's retry", () => {
+    const [story] = estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL, phase: "STORY" }, ROLES);
+    // 2 x (60,038,400 + 67,238,400 + 57,753,600) = 370,060,800; x 1.15 = 425,569,920.
+    expect(story).toMatchObject({ gate: "deepinfra", expectedCalls: 8, callsWithMargin: 10, callsNanoUsd: 425_569_920n });
+    expect(estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL, phase: "STORY" }, { ...ROLES, storyRounds: 0 })[0])
+      .toMatchObject({ expectedCalls: 0, callsNanoUsd: 0n });
+  });
+
   it("Qwen is priced from its own row, on the DeepInfra gate", () => {
-    // 4,000 x 113 + 1,200 x 382 = 910,400 nano-USD per average call (no cached-input discount).
-    expect(previewAverageCallNanoUsd(previewModelRow(QWEN)!)).toBe(910_400n);
     expect(previewGateKeyOf(QWEN)).toBe("deepinfra");
-    const input = { basis: basis(1), panel: [{ provider_ref: "preview:qwen-3-8-flash", model_id: QWEN }],
-      roleModelIds: [QWEN], roleProviderRefs: ["preview:qwen-3-8-flash"], storyCalls: 6, maxCooldownHoldsPerRun: 2 };
-    const total = BigInt(previewExpectedCalls(input).total);
+    const input = { ...ROLES, basis: basis(1), panel: [{ provider_ref: "preview:qwen-3-8-flash", model_id: QWEN }],
+      roleModelIds: [QWEN], roleProviderRefs: ["preview:qwen-3-8-flash"] };
+    const calls = previewExpectedCalls(input);
     expect(estimatePreviewGateNeeds(input)).toEqual([expect.objectContaining({ gate: "deepinfra", modelIds: [QWEN], dearestModelId: QWEN,
-      callsNanoUsd: (total * 910_400n * 115n + 99n) / 100n })]);
+      callsNanoUsd: (previewDebateNanoUsd([previewModelRow(QWEN)!], calls, 2, OUTPUT) * 115n + 99n) / 100n })]);
     // On the four-maker Premium panel it is one more model on the same gate; MiMo stays the dearest.
     const premium = [...PANEL, { provider_ref: "preview:mimo-v2-6-pro", model_id: MIMO }, { provider_ref: "preview:qwen-3-8-flash", model_id: QWEN }];
     expect(estimatePreviewGateNeeds({ basis: basis(4), panel: premium, ...ROLES })).toEqual([
@@ -195,13 +236,14 @@ describe("evaluateAskAdmission on the preview asks the gate before any run exist
 
   it("debates still running hold their estimate: a pot that fits one debate refuses the second", async () => {
     const counters = { probes: 0, remaining: 0 };
-    const pot = remainingWith({ remainingNanoUsd: ESTIMATE + CALLS_NANO - 1n });
+    // A running debate holds its estimate without its own ask's health checks: 8,490,952,320 and 303 calls.
+    const pot = remainingWith({ remainingNanoUsd: ESTIMATE + 8_490_952_320n - 1n });
     const running = [{ basis: basis(2), panel: PANEL }];
     await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => pot) }), ASK)).resolves.toBeDefined();
     await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => pot, running) }), ASK))
       .rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
     // The calls held count too.
-    const calls = remainingWith({ remainingCalls: CALLS_NEEDED + 155 });
+    const calls = remainingWith({ remainingCalls: CALLS_NEEDED + 302 });
     await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => calls, running) }), ASK))
       .rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
   });
@@ -280,6 +322,104 @@ describe("evaluateAskAdmission on the preview asks the gate before any run exist
   });
 });
 
+/** An in-memory stand-in for the advisory lock: one holder at a time, waiters queue in order. */
+function memoryLock(events: string[], name: string, state: { tail: Promise<void> }): PreviewAdmissionLock {
+  let releaseHeld: (() => void) | undefined;
+  return {
+    async acquire() {
+      const previous = state.tail;
+      let unlock!: () => void;
+      state.tail = new Promise<void>((resolve) => { unlock = resolve; });
+      await previous;
+      releaseHeld = unlock;
+      events.push(`${name}:acquired`);
+    },
+    async release() {
+      if (releaseHeld === undefined) return;
+      const unlock = releaseHeld;
+      releaseHeld = undefined;
+      events.push(`${name}:released`);
+      unlock();
+    }
+  };
+}
+
+describe("one ask at a time is estimated and started on the preview (review finding 2)", () => {
+  it("the lock is a transaction-scoped advisory lock on one connection, released by COMMIT, idempotent", async () => {
+    const queries: string[] = [];
+    const releases: unknown[] = [];
+    const client = { query: async (sql: string, values?: unknown[]) => { queries.push(values === undefined ? sql : `${sql} ${JSON.stringify(values)}`); return { rows: [] }; },
+      release: (error?: unknown) => { releases.push(error); } };
+    const lock = createPreviewAdmissionLock({ connect: async () => client } as never);
+    await lock.acquire();
+    await lock.acquire();
+    expect(queries).toEqual(["BEGIN", `SELECT pg_advisory_xact_lock(hashtextextended($1, 0)) ${JSON.stringify([PREVIEW_ADMISSION_LOCK_NAME])}`]);
+    await lock.release();
+    await lock.release();
+    expect(queries.at(-1)).toBe("COMMIT");
+    expect(releases).toEqual([undefined]);
+    await expect(lock.acquire()).rejects.toThrow("PREVIEW_ADMISSION_LOCK_RELEASED");
+  });
+
+  it("a lock that cannot be taken frees its connection as broken, and the ask is refused as not available", async () => {
+    const releases: unknown[] = [];
+    const client = { query: async (sql: string) => { if (sql !== "BEGIN") throw new Error("lock timeout"); return { rows: [] }; },
+      release: (error?: unknown) => { releases.push(error); } };
+    const lock = createPreviewAdmissionLock({ connect: async () => client } as never);
+    await expect(lock.acquire()).rejects.toThrow("lock timeout");
+    expect(releases).toHaveLength(1);
+    expect(releases[0]).toBeInstanceOf(Error);
+    await lock.release();
+    expect(releases).toHaveLength(1);
+    const counters = { probes: 0, remaining: 0 };
+    await expect(assertPreviewBudgetAdmits(gateWith(counters, async () => remainingWith()), { basis: basis(2), panel: PANEL }, undefined,
+      createPreviewAdmissionLock({ connect: async () => client } as never))).rejects.toBeInstanceOf(PreviewGateUnavailableRefusal);
+    expect(counters.remaining).toBe(0);
+  });
+
+  it("two asks at once: the second estimates only after the first debate is held, so a pot for one admits one", async () => {
+    // A pot that fits exactly one debate: the estimate plus nothing held.
+    const pot = remainingWith({ remainingNanoUsd: ESTIMATE });
+    const started: PreviewUnfinishedRun[] = [];
+    const events: string[] = [];
+    const counters = { probes: 0, remaining: 0 };
+    const gate = gateWith(counters, async () => pot);
+    const live = { ...gate, readUnfinishedRuns: async () => [...started] };
+    const state = { tail: Promise.resolve() };
+    const ask = async (name: string) => {
+      const lock = memoryLock(events, name, state);
+      try {
+        await evaluateAskAdmission(settings(counters, { previewBudgetGate: live }), ASK, null, lock);
+        // What submit does next while holding the lock: the run row, then its READY job.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        started.push({ basis: basis(2), panel: PANEL });
+        events.push(`${name}:queued`);
+        return "admitted";
+      } catch (error) {
+        return (error as { code?: string }).code;
+      } finally {
+        await lock.release();
+      }
+    };
+    expect(await Promise.all([ask("first"), ask("second")])).toEqual(["admitted", "DAILY_COST_ENVELOPE_REACHED"]);
+    expect(events).toEqual(["first:acquired", "first:queued", "first:released", "second:acquired", "second:released"]);
+    // Without the lock both asks read the same empty list and both pass: what the lock prevents.
+    started.length = 0;
+    const unlocked = await Promise.all([1, 2].map(() => evaluateAskAdmission(settings(counters, { previewBudgetGate: live }), ASK).then(() => "admitted")));
+    expect(unlocked).toEqual(["admitted", "admitted"]);
+  });
+
+  it("the output ceilings: the preview floor, the storyteller's retry at twice its ceiling, no story means none", () => {
+    const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
+      budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture", free_model_ids: [GLM] }))!;
+    expect(previewCallOutputTokens(config, { debate: [2048, 16_000], story: { storyteller: 12_000, checker: 2048 } }))
+      .toEqual({ debate: 16_000, storyteller: 12_000, storytellerRetry: 24_000, storyChecker: 8192 });
+    expect(previewCallOutputTokens(config, { debate: [2048], story: null })).toEqual({ debate: 8192, storyteller: 0, storytellerRetry: 0, storyChecker: 0 });
+    const invalid = "PREVIEW_CALL_CEILINGS_INVALID";
+    expect(() => previewCallOutputTokens(config, { debate: [], story: null })).toThrow(invalid);
+  });
+});
+
 describe("the real submit and the HTTP boundary", () => {
   const member = testHttpIdentity("estimate-member");
   /** `this` for the real submit; a run would be created through the private admission pools, which a fake has not. */
@@ -299,6 +439,20 @@ describe("the real submit and the HTTP boundary", () => {
       .rejects.toBeInstanceOf(TypeError);
     // Discovery is the only model call either ask made.
     expect(counters).toEqual({ probes: 2, remaining: 2 });
+  });
+
+  it("submit takes the lock for the estimate and releases it whether the ask is refused or fails later", async () => {
+    const counters = { probes: 0, remaining: 0 };
+    const events: string[] = [];
+    const state = { tail: Promise.resolve() };
+    const locked = (answer: () => Promise<PreviewGateRemaining>) =>
+      self({ previewBudgetGate: { ...gateWith(counters, answer), openAdmissionLock: () => memoryLock(events, "ask", state) } }, counters);
+    await expect(PostgresAskApplication.prototype.submit.call(locked(async () => remainingWith({ remainingNanoUsd: 1_000_000n })) as never,
+      ASK, member.authenticated.session, principal as never)).rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
+    expect(events).toEqual(["ask:acquired", "ask:released"]);
+    await expect(PostgresAskApplication.prototype.submit.call(locked(async () => remainingWith()) as never,
+      ASK, member.authenticated.session, principal as never)).rejects.toBeInstanceOf(TypeError);
+    expect(events).toEqual(["ask:acquired", "ask:released", "ask:acquired", "ask:released"]);
   });
 
   it("answers 422 with the not-available code, a fixed plain message and a one-minute Retry-After when the gate is halted", async () => {
@@ -332,6 +486,11 @@ describe("the real submit and the HTTP boundary", () => {
     expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/NOT EXISTS[\s\S]*work\.state = 'FAILED'/u);
     expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/SELECT run\.envelope_basis, run\.discovered_panel/u);
     expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/LIMIT 65$/u);
+    // Review finding 4: a debate writing its story (answer served, no story row yet, a call within the window) is held too.
+    expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/THEN 'DEBATE' ELSE 'STORY' END AS phase/u);
+    expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/\$1::boolean\s+AND EXISTS \(SELECT 1 FROM serve\.answer AS answer WHERE answer\.run_id = run\.run_id\)/u);
+    expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/NOT EXISTS \(SELECT 1 FROM serve\.answer_story AS story WHERE story\.run_id = run\.run_id\)/u);
+    expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/entry\.finished_at > clock_timestamp\(\) - make_interval\(secs => \$2::integer\)/u);
   });
 
   it("answers 429 DAILY_COST_ENVELOPE_REACHED with a Retry-After and no figures", async () => {
@@ -497,5 +656,41 @@ describe("Retry-After names the gate's reset: the next midnight in Bucharest, ac
     expect(new AskRefusal(new PreviewDailyLimitRefusal("synthetic", now)).retryAt).toEqual(now);
     // A reset instant already past is ignored (never a Retry-After in the past).
     expect(askRefusalRetryAfter(refusal.code, new Date("2026-10-26T00:00:00.000Z"), refusal.retryAt)).toBe("Tue, 27 Oct 2026 00:00:00 GMT");
+  });
+});
+
+describe("what one debate is estimated at with today's register (review finding 1: pinned $ per debate)", () => {
+  const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
+    budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture", free_model_ids: [GLM] }))!;
+  // Today's register: the three organ bounds and both synthesis bounds at 2,048, the storyteller 12,000, its checker 2,048.
+  const output = previewCallOutputTokens(config, { debate: [2048, 2048, 2048, 2048, 2048], story: { storyteller: 12_000, checker: 2048 } });
+  // PR B's Haiku row (Anthropic gate): $0.625 / $2.50 per million, bound 32,768. A local literal until B is merged.
+  const HAIKU: PreviewModelRow = Object.freeze({ model: "fixture/claude-haiku", maker: "Anthropic", inputUsdPerM: "0.625", outputUsdPerM: "2.50",
+    inputNanoUsdPerToken: 625n, outputNanoUsdPerToken: 2500n, inputPriceMicrosPerMillion: 625_000, outputPriceMicrosPerMillion: 2_500_000,
+    outputBound: 32_768, effort: null, jsonObject: false, contextWindowTokens: 200_000 });
+  const rows = (...models: string[]) => models.map((model) => previewModelRow(model)!);
+  const basisFor = (panelSize: number, depth: number) => computeStructuralCeilingBasis({ panelSize, depth, judgeMaxAttempts: 3, organMaxAttempts: 3,
+    maxRecompose: 2, maxCooldownHoldsPerRun: 2, finalRetryAttempts: 1, branchingFactor: 2, compositionSegmentCap: 2, fixedOrgansPerComposition: 4,
+    reviewerCallsPerNode: 1, synthesizerMaxRounds: 3, evaluatorMaxRounds: 3, maxDepth: 5 });
+  const figure = (gates: Record<string, readonly PreviewModelRow[]>, panelSize: number, depth: number) => {
+    const panel = Array.from({ length: panelSize }, (_, index) => ({ provider_ref: `fixture:${String(index)}`, model_id: "fixture" }));
+    const calls = previewExpectedCalls({ basis: basisFor(panelSize, depth), panel, roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"],
+      storyRounds: 2, maxCooldownHoldsPerRun: 2, askProbeTargets: 5 });
+    return Object.fromEntries(Object.entries(gates).map(([gate, gateRows]) =>
+      [gate, { calls: Math.ceil((calls.total * 115) / 100), nanoUsd: (previewDebateNanoUsd(gateRows, calls, 2, output) * 115n + 99n) / 100n }]));
+  };
+  it("free GLM + DeepSeek, premium GLM, DeepSeek, MiMo, Qwen, and premium with Haiku added: calls and money per gate", () => {
+    expect(output).toEqual({ debate: 8192, storyteller: 12_000, storytellerRetry: 24_000, storyChecker: 8192 });
+    const premium = rows(GLM, DEEPSEEK, MIMO, QWEN);
+    // Depth 2, the website's default.
+    expect(figure({ deepinfra: rows(GLM, DEEPSEEK) }, 2, 2)).toEqual({ deepinfra: { calls: 485, nanoUsd: 13_469_374_080n } });
+    expect(figure({ deepinfra: premium }, 4, 2)).toEqual({ deepinfra: { calls: 1655, nanoUsd: 98_121_967_776n } });
+    expect(figure({ deepinfra: premium, anthropic: [HAIKU] }, 5, 2)).toEqual({
+      deepinfra: { calls: 2627, nanoUsd: 156_482_940_576n }, anthropic: { calls: 2627, nanoUsd: 241_049_752_000n } });
+    // Depth 1, the smallest debate.
+    expect(figure({ deepinfra: rows(GLM, DEEPSEEK) }, 2, 1)).toEqual({ deepinfra: { calls: 282, nanoUsd: 7_624_709_760n } });
+    expect(figure({ deepinfra: premium }, 4, 1)).toEqual({ deepinfra: { calls: 1030, nanoUsd: 60_357_748_896n } });
+    expect(figure({ deepinfra: premium, anthropic: [HAIKU] }, 5, 1)).toEqual({
+      deepinfra: { calls: 1707, nanoUsd: 100_947_324_576n }, anthropic: { calls: 1707, nanoUsd: 155_673_752_000n } });
   });
 });

@@ -21,6 +21,11 @@ const GLM = "zai-org/GLM-5.3-Flash";
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
 const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
 const QWEN = "Qwen/Qwen3.8-Flash";
+/** The window every other row declares; Qwen declares its own. */
+const SHARED_WINDOW = { context_window_tokens: 1_048_576 };
+/** A request body with no effort switch and no JSON switch. */
+const BARE_BODY = ["max" + "_tokens", "messages", "model"];
+const DEFAULT_LEVEL = "DEFAULT_ONLY";
 const URL_COMPLETIONS = "https://api.deepinfra.com/v1/openai/chat/completions";
 const BASE = { deployment: "v3-preview", requested_thinking_level: "high",
   budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "preview-fixture" };
@@ -144,7 +149,7 @@ describe("each declared target is checked against its reviewed row", () => {
     ["another window", 3, { context_window_tokens: 131_072 }],
     ["another base URL", 2, { base_url: "https://api.deepinfra.com/v1" }],
     ["Qwen with a thinking switch", 4, { thinking_parameter: "reasoning_effort", thinking_levels: ["high"] }],
-    ["Qwen at the shared window instead of its own", 4, { context_window_tokens: 1_048_576 }],
+    ["Qwen at the shared window instead of its own", 4, SHARED_WINDOW],
     ["Qwen at its cached-input price", 4, { input_price_micros_per_million: 14_000 }]
   ])("refuses %s", (_name, index, change) => {
     expect(() => assertPreviewProviderTargets(parse(MULTI), mutate(index, change))).toThrow();
@@ -343,7 +348,7 @@ describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 13107
     await expect(post(over)).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
     expect(executions).toHaveLength(1);
   });
-  it("the gateway clamps max_tokens to 131072 on every attempt, length retries included, and never sends a level or JSON", async () => {
+  it("the gateway clamps every attempt's answer size to 131072, length retries included, and never sends a level or JSON", async () => {
     const target = targets(PREVIEW_REVIEWED_PROVIDER_REFS)[4]!;
     const executions: PreviewBudgetExecution[] = [];
     const replies = ["length", "length", "stop"];
@@ -366,11 +371,12 @@ describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 13107
       bound: { maxAttempts: 3, tokenCeiling: 100_000, deadlineMs: 5_000 }, classifyContent: classifyContent as never });
     const sent = executions.map(execution => JSON.parse(execution.requestBody));
     expect(sent.map(request => request.max_tokens)).toEqual([100_000, 131_072, 131_072]);
-    for (const request of sent) expect(Object.keys(request).sort()).toEqual(["max_tokens", "messages", "model"]);
+    for (const request of sent) expect(Object.keys(request).sort()).toEqual(BARE_BODY);
   });
   it("the preview policy never sends a level to Qwen and takes DEFAULT_ONLY as none", async () => {
     const { executions, gateway } = previewGateway(QWEN);
-    await gateway.call({ ...RESULT_REQUEST, thinkingLevel: "DEFAULT_ONLY", bound: { maxAttempts: 1, tokenCeiling: 200_000, deadlineMs: 5_000 } });
+    const bound = { maxAttempts: 1, tokenCeiling: 200_000, deadlineMs: 5_000 };
+    await gateway.call({ ...RESULT_REQUEST, thinkingLevel: DEFAULT_LEVEL, bound });
     expect(JSON.parse(executions[0]!.requestBody)).toEqual({ model: QWEN, max_tokens: 131_072, messages: expect.any(Array) });
     await expect((async () => gateway.call({ ...RESULT_REQUEST, thinkingLevel: "high" }))()).rejects.toMatchObject({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" });
     expect(executions).toHaveLength(1);

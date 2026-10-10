@@ -125,10 +125,15 @@ export function previewNanoUsdText(value: bigint): string {
   return `${source.slice(0, -9)}.${source.slice(-9)}`;
 }
 
+/** The input tokens the gate reserves for a body of `bodyBytes`: the bytes plus its 2048-token template allowance. */
+export function previewChargedInputTokens(bodyBytes: number): bigint {
+  if (!Number.isSafeInteger(bodyBytes) || bodyBytes < 0) throw new TypeError("PREVIEW_BODY_BYTES_INVALID");
+  return BigInt(bodyBytes + PREVIEW_RESERVATION_TEMPLATE_BYTES);
+}
+
 /** Contract A §3: ((body bytes + 2048) x input + output_bound x output), in nano-USD. */
 export function previewReservationNanoUsd(reviewed: PreviewModelRow, bodyBytes: number): bigint {
-  if (!Number.isSafeInteger(bodyBytes) || bodyBytes < 0) throw new TypeError("PREVIEW_BODY_BYTES_INVALID");
-  return BigInt(bodyBytes + PREVIEW_RESERVATION_TEMPLATE_BYTES) * reviewed.inputNanoUsdPerToken
+  return previewChargedInputTokens(bodyBytes) * reviewed.inputNanoUsdPerToken
     + BigInt(reviewed.outputBound) * reviewed.outputNanoUsdPerToken;
 }
 

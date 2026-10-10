@@ -35,10 +35,10 @@ describe('the website\'s model list: one reviewed value per stage of the switch-
  });
  it.each([
   ['the legacy array with the legacy five-key config',LEGACY_FLAG,apiConfig({free_model_ids:[GLM]}),true],
-  ['the two-list value with the six-key config holding the same lists',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO,QWEN]}),true],
+  ['the two-list value with the six-field config holding the same lists',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO,QWEN]}),true],
   ['the two-list value with the premium list before Qwen',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO]}),false],
   ['the legacy array with a six-key config',LEGACY_FLAG,apiConfig({free_model_ids:[GLM],premium_model_ids:[GLM]}),false],
-  ['the legacy array with the six-key multi config',LEGACY_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO,QWEN]}),false],
+  ['the legacy array with the six-field multi config',LEGACY_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO,QWEN]}),false],
   ['the two-list value with the legacy config (the website would offer models the API refuses)',MULTI_FLAG,apiConfig({free_model_ids:[GLM]}),false],
   ['the two-list value with a narrower premium list',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK]}),false],
   ['the two-list value with lists in another order',MULTI_FLAG,apiConfig({free_model_ids:[DEEPSEEK,GLM],premium_model_ids:[GLM,DEEPSEEK,MIMO,QWEN]}),false],

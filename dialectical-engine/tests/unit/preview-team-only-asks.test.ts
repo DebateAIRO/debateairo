@@ -43,6 +43,8 @@ const ASK = Object.freeze({
 
 type Counters = { submitted: number; probes: number; quota: number; country: number };
 
+/** The estimate's register-derived settings: no story, debate calls at the preview floor, no ask-time checks. */
+const GATE_SHAPE = { storyRounds: 0, callOutputTokens: { debate: 8192, storyteller: 0, storytellerRetry: 0, storyChecker: 0 }, askProbeTargets: 0 };
 /**
  * The application the route hands an admitted ask to. Its submit runs the REAL admission
  * evaluation, whose discovery resolver is where the paid probe happens, so a probe counted
@@ -52,7 +54,7 @@ function application(counters: Counters): AskApplication {
   const settings: RunCreationSettings = {
     previewProviderTestConfig: PREVIEW,
     // The preview's start-of-debate estimate: an ample pot (tests/unit/preview-budget-estimate.test.ts covers refusals).
-    previewBudgetGate: {remaining:{deepinfra:async()=>({state:"active",windowOpen:true,remainingNanoUsd:3_000_000_000n,remainingCalls:1200,maxConcurrentCalls:4,largestReservationNanoUsd:131_481_600n,enabledModels:[MODEL]})},roleModelIds:[],storyCalls:0,roleProviderRefs:[],maxCooldownHoldsPerRun:0,readUnfinishedRuns:async()=>[]},
+    previewBudgetGate: {remaining:{deepinfra:async()=>({state:"active",windowOpen:true,remainingNanoUsd:1_000_000_000_000n,remainingCalls:100_000,maxConcurrentCalls:4,largestReservationNanoUsd:131_481_600n,enabledModels:[MODEL]})},roleModelIds:[],...GATE_SHAPE,roleProviderRefs:[],maxCooldownHoldsPerRun:0,readUnfinishedRuns:async()=>[]},
     strangerSampleRate: 0, registerVersion: 5, batteryVersion: "fixture", settlementWatchHandle: "fixture",
     resolveDiscoveredPanel: async () => {
       counters.probes += 1;

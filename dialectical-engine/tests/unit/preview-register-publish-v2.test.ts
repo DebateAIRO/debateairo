@@ -26,6 +26,7 @@ const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(
  * can be published while the gate has only GLM switched on.
  */
 const MULTI_MODEL_KEYS = ['configuredProviderSet', 'providerFamilyMap'];
+const PROVIDER_SET_ROW = 'configuredProviderSet';
 /** With the explicit DeepSeek checker choice, the checker and the story checker that follows it move too. */
 const DEEPSEEK_CHECKER_KEYS = ['configuredProviderSet', 'evaluatorRoleRef', 'providerFamilyMap', 'storyCheckerRoleRef'];
 const DEEPSEEK = { checker: 'deepseek', deepseekEnabledOnGate: true } as const;
@@ -104,10 +105,11 @@ describe('publish kit v2: composing from the current version', () => {
     expect(plan.rows).toHaveLength(68);
     expect(plan.addedKeys).toEqual([]);
     expect(plan.changedKeys).toEqual(['composerContractHash', ...MULTI_MODEL_KEYS]);
-    expect(JSON.parse(plan.delta.find(row => row.rowKey === 'configuredProviderSet')!.newValueJsonText).providers.map((p: any) => p.providerRef))
+    const providerSet = plan.delta.find(row => row.rowKey === PROVIDER_SET_ROW)!;
+    const refsOf = (text: string) => JSON.parse(text).providers.map((p: any) => p.providerRef);
+    expect(refsOf(providerSet.newValueJsonText))
       .toEqual(['preview:fixture-a', 'preview:fixture-b', 'preview:deepseek-v4-1-flash', 'preview:mimo-v2-6-pro', 'preview:qwen-3-8-flash']);
-    expect(JSON.parse(plan.delta.find(row => row.rowKey === 'configuredProviderSet')!.oldValueJsonText!).providers.map((p: any) => p.providerRef))
-      .toEqual(['preview:fixture-a', 'preview:fixture-b']);
+    expect(refsOf(providerSet.oldValueJsonText!)).toEqual(['preview:fixture-a', 'preview:fixture-b']);
     for (const key of MULTI_MODEL_KEYS) {
       const entry = plan.delta.find(row => row.rowKey === key)!;
       expect(entry).toMatchObject({ change: 'changed', reason: 'reviewed-current-source-facet',
