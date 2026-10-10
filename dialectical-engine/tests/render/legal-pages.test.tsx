@@ -487,14 +487,15 @@ describe("the model providers page lists the model families the product runs", (
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
   });
 
-  it("on the private preview's GLM build, lists DeepInfra just before the support chat's model", async () => {
+  it("on the private preview's GLM build, lists DeepInfra just before the support chat's model, and no hosted cloud row", async () => {
     vi.stubEnv("NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON", "[\"zai-org/GLM-5.3-Flash\"]");
     vi.resetModules();
     try {
       const preview = await import("../../apps/ui/components/legal/LegalBodies.js");
       const view = render(<preview.LegalProvidersBody legalCatalog={legalEnglish} />);
       const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
-      expect(headings).toEqual([...MODEL_PROVIDERS.map(({ provider }) => provider), "DeepInfra", "Support chat model"]);
+      // Owner, 10 October 2026: a preview names only the companies that receive text on it.
+      expect(headings).toEqual(["Qwen", "DeepInfra", "Support chat model"]);
     } finally {
       vi.unstubAllEnvs();
       vi.resetModules();
