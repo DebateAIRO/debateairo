@@ -21,7 +21,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from preview_budget_authority_fixture import (  # noqa: E402
-    DEEPSEEK, HELPER_SOURCE, HOST, KEY, MIMO, MODEL, PEER, ROWS, SCOPE, SOURCE, Gate, body, envelope, go_document,
+    DEEPSEEK, HELPER_SOURCE, file_sha, HOST, KEY, MIMO, MODEL, PEER, ROWS, SCOPE, SOURCE, Gate, body, envelope, go_document,
     load_bridge, provider_response, reservation_of)
 
 bridge = load_bridge()
@@ -87,7 +87,7 @@ class ReviewedTableTests(GateTest):
         parity = json.loads(PARITY.read_text())
         self.assertEqual((parity['provider'], parity['reservation']['overhead_bytes'],
                           parity['reservation']['worst_case_request_bytes'], Decimal(parity['reservation']['per_call_cap_usd'])),
-                         ('deepinfra', bridge.RESERVATION_OVERHEAD_BYTES, bridge.MAX_REQUEST_BYTES, bridge.MAX_CALL_RESERVATION_USD))
+                         ('deepinfra', bridge.RESERVATION_OVERHEAD_BYTES, DEEPINFRA.max_request_bytes, DEEPINFRA.per_call_cap_usd))
         self.assertEqual([row['model'] for row in parity['rows']], list(DEEPINFRA.rows))
         for expected in parity['rows']:
             with self.subTest(model=expected['model']):
@@ -97,31 +97,31 @@ class ReviewedTableTests(GateTest):
                                   'input_nano_usd_per_token': int(row.input_usd_per_m * 1000),
                                   'output_nano_usd_per_token': int(row.output_usd_per_m * 1000),
                                   'output_bound': row.output_bound, 'effort': row.effort, 'json_object': row.json_object,
-                                  'worst_case_reservation_usd': '%.9f' % bridge.worst_case_reservation(row)},
+                                  'worst_case_reservation_usd': '%.9f' % bridge.worst_case_reservation(DEEPINFRA, row)},
                                  expected)
                 # The fixture's own rows also equal the independent copy the other tests use.
                 self.assertEqual(ROWS[row.model], (row.maker, str(row.input_usd_per_m), str(row.output_usd_per_m),
                                                    row.output_bound, row.effort, row.json_object))
 
     def test_every_reviewed_row_fits_the_per_call_cap_for_a_full_size_request(self):
-        self.assertEqual(bridge.MAX_CALL_RESERVATION_USD, Decimal('0.25'))
-        self.assertEqual(bridge.MAX_REQUEST_BYTES, 256 * 1024)
+        self.assertEqual((DEEPINFRA.per_call_cap_usd, DEEPINFRA.max_request_bytes), (Decimal('0.25'), 256 * 1024))
+        self.assertLessEqual(DEEPINFRA.per_call_cap_usd, bridge.MAX_PROFILE_CALL_CAP_USD)
         expected = {MODEL: Decimal('0.1215488'), DEEPSEEK: Decimal('0.1314816'), MIMO: Decimal('0.2276352')}
         for name, profile in bridge.helper.PROFILES.items():
             for model, row in profile.rows.items():
                 with self.subTest(provider=name, model=model):
-                    worst = bridge.worst_case_reservation(row)
-                    self.assertLessEqual(worst, bridge.MAX_CALL_RESERVATION_USD)
-                    self.assertTrue(bridge.row_reviewed(model, row))
+                    worst = bridge.worst_case_reservation(profile, row)
+                    self.assertLessEqual(worst, profile.per_call_cap_usd)
+                    self.assertTrue(bridge.row_reviewed(profile, model, row))
                     if name == 'deepinfra':
                         self.assertEqual(worst, expected[model])
         go = bridge.read_go(self.gate(enabled_models=ALL).go_path)
         for model in ALL:  # A real request of exactly 256 KiB reserves exactly the worst case.
             with self.subTest(model=model):
-                _, reserved, _ = bridge.validate_request(envelope(sized_body(model, bridge.MAX_REQUEST_BYTES)), go)
+                _, reserved, _, _ = bridge.validate_request(envelope(sized_body(model, DEEPINFRA.max_request_bytes)), go)
                 self.assertEqual(reserved, expected[model])
                 with self.refused('REQUEST_SCOPE_INVALID'):
-                    bridge.validate_request(envelope(sized_body(model, bridge.MAX_REQUEST_BYTES + 1)), go)
+                    bridge.validate_request(envelope(sized_body(model, DEEPINFRA.max_request_bytes + 1)), go)
 
     def test_the_table_lives_in_the_hash_bound_helper_only(self):
         helper_text, gate_text = HELPER_SOURCE.read_text(), SOURCE.read_text()
@@ -272,11 +272,13 @@ class ModelCallTests(GateTest):
                 self.assertEqual(gate.call(model.split('/')[0], value=value, dispatch=observe)['status'], 200)
                 entry = entry_of(gate, model.split('/')[0])
                 maker, price_in, price_out, bound, effort, _json = ROWS[model]
-                self.assertEqual({k: entry[k] for k in ('provider', 'model', 'maker', 'input_usd_per_m', 'output_usd_per_m',
-                                                        'output_bound', 'requested_effort', 'reserved_usd', 'state',
-                                                        'reply_model')},
-                                 {'provider': 'deepinfra', 'model': model, 'maker': maker, 'input_usd_per_m': price_in,
-                                  'output_usd_per_m': price_out, 'output_bound': bound,
+                self.assertEqual({k: entry[k] for k in ('provider', 'model', 'maker', 'reserve_input_usd_per_m',
+                                                        'reserve_output_usd_per_m', 'settle_input_usd_per_m',
+                                                        'settle_output_usd_per_m', 'output_bound', 'requested_effort',
+                                                        'reserved_usd', 'state', 'reply_model')},
+                                 {'provider': 'deepinfra', 'model': model, 'maker': maker, 'reserve_input_usd_per_m': price_in,
+                                  'reserve_output_usd_per_m': price_out, 'settle_input_usd_per_m': price_in,
+                                  'settle_output_usd_per_m': price_out, 'output_bound': bound,
                                   'requested_effort': effort or 'none', 'reserved_usd': str(reservation_of(raw, model)),
                                   'state': 'settled', 'reply_model': model})
                 self.assertEqual(Decimal(entry['held_usd']), expected[model])
@@ -330,7 +332,9 @@ class ModelCallTests(GateTest):
                    body(model=MIMO, max_tokens=0)]
         for value in allowed:
             with self.subTest(allowed=value):
-                outgoing, reserved, row = bridge.validate_request(envelope(value), go)
+                outgoing, reserved, row, prices = bridge.validate_request(envelope(value), go)
+                self.assertEqual(prices, (DEEPINFRA.rows[value['model']].input_usd_per_m,
+                                          DEEPINFRA.rows[value['model']].output_usd_per_m))
                 self.assertEqual((json.loads(outgoing), row.model), (value, value['model']))
                 self.assertEqual(reserved, reservation_of(json.dumps(value), value['model']))
         for value in refused:
@@ -440,8 +444,8 @@ class RemainingTests(GateTest):
         client_side.sendall(b'POST ' + path.encode() + b' HTTP/1.0\r\nContent-Type: application/json\r\n'
                             b'Content-Length: ' + str(len(payload)).encode() + b'\r\n\r\n' + payload)
 
-        def answer(request):
-            return bridge.remaining_report(gate.private, gate.go_path, request, slots=gate.slots, now=gate.clock)
+        def answer(request, peer):
+            return bridge.remaining_report(gate.private, gate.go_path, request, slots=gate.slots, now=gate.clock, uid=peer)
         handler = bridge.make_handler(gate.private, [PEER], no_network, gate.slots, peer_uid_of=lambda _c: uid,
                                       now=gate.clock, remaining=answer if remaining else None)
         thread = threading.Thread(target=handler, args=(server_side, '', types.SimpleNamespace()))
@@ -654,8 +658,9 @@ class UnbilledRefusalTests(GateTest):
             gate.call('op-1', dispatch=lambda _s, _k: (429, dict(self.RATE_LIMITED)))
         gate.call('op-2')
         self.assertEqual(gate.status()['unsent_streak'], 0)
+        # The app maps this code to its transient retry path: nothing was billed, the hold is gone.
         self.assertEqual(json.loads(bridge.refusal_body(bridge.CallNotSent('PROVIDER_REFUSED_UNBILLED'))),
-                         {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'})
+                         {'error': 'PROVIDER_REFUSED_UNBILLED'})
 
     def test_a_429_carrying_usage_is_settled_and_halts(self):
         gate = self.gate().ready()
@@ -690,6 +695,184 @@ class UnbilledRefusalTests(GateTest):
         self.assertEqual(gate.status()['reason'], 'uncertain_charge')
 
 
+class DatedVendorProfile(FakeVendorProfile):
+    """A vendor whose price rises on a date (as Google's will) and whose path names the model."""
+    name = 'datedvendor'
+    rows = {'dated/model-1': bridge.helper.ModelRow('dated/model-1', 'DatedMaker', Decimal('0.10'), Decimal('0.20'),
+                                                     4096, None, False)}
+    RISE = bridge.datetime.fromisoformat('2026-10-09T00:00:00+00:00')
+
+    def path_for(self, row):
+        return '/v1/models/' + row.model + ':generate'
+
+    def reservation_prices(self, row, moment):
+        return (Decimal('0.20'), Decimal('0.40')) if moment >= self.RISE else (row.input_usd_per_m, row.output_usd_per_m)
+
+    def ceiling_prices(self, row):
+        return Decimal('0.20'), Decimal('0.40')
+
+    def account(self, response, row, moment):
+        return bridge.helper.account_response(response, *self.reservation_prices(row, moment))
+
+
+class ProfileApiTests(GateTest):
+    def dated_gate(self):
+        guard = patch.dict(bridge.helper.PROFILES, {'datedvendor': DatedVendorProfile()})
+        guard.start()
+        self.addCleanup(guard.stop)
+        return self.gate(provider='datedvendor', enabled_models=['dated/model-1']).ready()
+
+    def dated_request(self, operation_id, prices):
+        value = {'model': 'dated/model-1', 'max_tokens': 100, 'messages': [{'role': 'user', 'content': 'hi'}]}
+        raw = json.dumps(value)
+        reserved = (Decimal(len(raw.encode()) + 2048) * prices[0] + Decimal(4096) * prices[1]) / Decimal(1000000)
+        return {'scope_id': SCOPE, 'operationId': operation_id, 'requestBody': raw,
+                'requestSha256': hashlib.sha256(raw.encode()).hexdigest(), 'reservedUsd': str(reserved)}
+
+    def test_reservation_and_settlement_use_the_profile_prices_for_the_moment_and_the_entry_records_both(self):
+        gate = self.dated_gate()
+        usage = {'prompt_tokens': 1000, 'completion_tokens': 0}  # $0.0002 at the risen price.
+        seen = []
+
+        def dispatch(_sent, _key):
+            gate.clock.set('2026-10-09T00:00:01+00:00')  # The price rises while the call runs.
+            return 200, {'model': 'dated/model-1', 'usage': usage}
+
+        class Recorder:
+            def __init__(self, timeout, profile, path):
+                seen.append(path)
+
+            def __call__(self, sent, key):
+                return dispatch(sent, key)
+        gate.clock.set('2026-10-08T20:00:00+00:00')
+        request = self.dated_request('op-1', (Decimal('0.10'), Decimal('0.20')))
+        with patch.object(bridge.helper, 'HttpsTransport', Recorder):
+            bridge.execute_request(gate.private, gate.go_path, request, peer_uid=PEER, slots=gate.slots,
+                                   key_loader=lambda _p: KEY, host=HOST, platform='linux', now=gate.clock)
+        self.assertEqual(seen, ['/v1/models/dated/model-1:generate'])
+        entry = gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-1']
+        self.assertEqual({k: entry[k] for k in ('reserve_input_usd_per_m', 'reserve_output_usd_per_m',
+                                                'settle_input_usd_per_m', 'settle_output_usd_per_m', 'held_usd')},
+                         {'reserve_input_usd_per_m': '0.10', 'reserve_output_usd_per_m': '0.20',
+                          'settle_input_usd_per_m': '0.20', 'settle_output_usd_per_m': '0.40', 'held_usd': '0.0002'})
+        with self.refused('RESERVATION_MISMATCH'):  # After the rise, the old price is refused.
+            bridge.execute_request(gate.private, gate.go_path, self.dated_request('op-2', (Decimal('0.10'), Decimal('0.20'))),
+                                   peer_uid=PEER, slots=gate.slots, dispatch=no_network, key_loader=no_network,
+                                   host=HOST, platform='linux', now=gate.clock)
+
+    def test_worst_cases_use_the_ceiling_prices_and_the_profile_cap(self):
+        profile, row = DatedVendorProfile(), DatedVendorProfile.rows['dated/model-1']
+        self.assertEqual(bridge.worst_case_reservation(profile, row),
+                         (Decimal(profile.max_request_bytes + 2048) * Decimal('0.20') + 4096 * Decimal('0.40')) / Decimal(1000000))
+        for change in ({'per_call_cap_usd': Decimal('0.0001')}, {'per_call_cap_usd': Decimal('1.01')},
+                       {'per_call_cap_usd': 0.25}, {'max_request_bytes': 10}, {'max_request_bytes': 2 * 1024 * 1024},
+                       {'name': 'other-name'}):
+            with self.subTest(change=change):
+                broken = DatedVendorProfile()
+                for attribute, value in change.items():
+                    setattr(broken, attribute, value)
+                with patch.dict(bridge.helper.PROFILES, {'datedvendor': broken}):
+                    self.assertIsNone(bridge.profile_of('datedvendor'))
+
+    def test_reservation_prices_above_the_ceiling_are_refused(self):
+        gate = self.dated_gate()
+        profile = bridge.helper.PROFILES['datedvendor']
+        with patch.object(profile, 'reservation_prices', lambda _row, _moment: (Decimal('0.30'), Decimal('0.40'))), \
+                self.refused('REQUEST_INVALID'):
+            bridge.validate_request(self.dated_request('op-1', (Decimal('0.30'), Decimal('0.40'))), gate.go)
+
+    def test_refusal_body_passes_only_the_public_codes(self):
+        for code in ('PROVIDER_NOT_REACHED', 'PROVIDER_REFUSED_UNBILLED', 'TEAM_DAILY_BUDGET_REACHED',
+                     'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED'):
+            self.assertEqual(json.loads(bridge.refusal_body(bridge.CallNotSent(code))), {'error': code})
+        for code in ('MODEL_NOT_ALLOWED', 'NEW_CHARGE_UNCERTAIN', 'AUTHORITY_HALTED', 'AUTHORITY_STOPPED', 'RESERVATION_MISMATCH',
+                     'REMAINING_REQUEST_INVALID', 'PROBE_RUNNING', 'SETTLEMENT_FAILED', 'provider_not_reached'):
+            self.assertEqual(json.loads(bridge.refusal_body(SafetyError(code))), {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'})
+        self.assertEqual(json.loads(bridge.refusal_body(ValueError('PROVIDER_NOT_REACHED'))),
+                         {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'})
+
+    def test_status_amounts_are_never_in_scientific_notation(self):
+        gate = self.gate().ready()
+        gate.call('op-1', charge='0.00000001')
+        text = json.dumps(gate.status())
+        self.assertNotIn('E-', text)
+        self.assertEqual(gate.status()['today_by_model'][MODEL]['spend_usd'], '0.00000001')
+
+
+class ProbeLockTests(GateTest):
+    def test_serve_start_refuses_while_a_probe_runs_and_a_second_probe_is_refused(self):
+        gate = self.gate().ready()
+        held = []
+
+        def dispatch(_sent, _key):
+            with self.refused('PROBE_RUNNING'):
+                bridge.recover_interrupted(gate.private, now=gate.clock)
+            with self.refused('PROBE_ALREADY_RUNNING'):
+                ProbeTests.probe(self, gate, MIMO, dispatch=no_network)
+            held.append(True)
+            return 200, provider_response('0.0004', DEEPSEEK, content='OK')
+        summary = ProbeTests.probe(self, gate, DEEPSEEK, dispatch)
+        self.assertEqual((held, summary['entry_state'], gate.status()['state']), ([True], 'settled', 'active'))
+        self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 0, 'unrecorded_uncertain': 0})
+        self.assertEqual(list(gate.day('2026-10-08')['entries'])[0].split(':')[0], 'preview-probe')
+
+    def test_a_probe_left_in_flight_without_its_lock_halts_the_next_reservation(self):
+        gate = self.gate().ready()
+        go = bridge.read_go(gate.go_path)
+        request = envelope(body(model=DEEPSEEK), 'probe-1')
+        _, reserved, row, prices = bridge.validate_request(request, go, probe=True)
+        bridge.reserve_call(gate.private, go, file_sha(gate.go_path), request, reserved, row, HOST, 0, gate.clock,
+                            True, prices)  # The probe process died here: its lock is gone.
+        dispatched = []
+        with self.refused('AUTHORITY_STOPPED'):
+            gate.call('op-1', dispatch=lambda *args: dispatched.append(args))
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason'], dispatched), ('halted', 'interrupted_probe', []))
+        self.assertEqual(status['halts'][0]['entry_id'], 'preview-probe:' + SCOPE + ':probe-1')
+
+    def test_an_ipc_operation_named_like_a_probe_is_an_ordinary_call(self):
+        gate = self.gate().ready()
+        entered, results = threading.Event(), {}
+        release = threading.Event()
+
+        def blocking(_sent, _key):
+            entered.set()
+            release.wait(5)
+            return 200, provider_response('0.01', MODEL)
+        thread = threading.Thread(target=lambda: results.update(r=gate.call('probe-x', dispatch=blocking)))
+        thread.start()
+        try:
+            self.assertTrue(entered.wait(3))
+            self.assertEqual(gate.call('op-2')['status'], 200)  # No probe halt for a 'probe-' operationId.
+        finally:
+            release.set()
+            thread.join(5)
+        self.assertEqual((results['r']['status'], gate.status()['state']), (200, 'active'))
+
+    def test_probe_reports_whether_the_model_kept_to_max_tokens(self):
+        for completion, within in ((1024, True), (1025, False)):
+            with self.subTest(completion=completion):
+                gate = self.gate().ready()
+                summary = ProbeTests.probe(self, gate, DEEPSEEK, lambda _s, _k, c=completion: (200, {
+                    'model': DEEPSEEK, 'usage': {'prompt_tokens': 5, 'completion_tokens': c}}))
+                self.assertEqual(summary['completion_within_max_tokens'], within)
+
+
+class RemainingPeerTests(GateTest):
+    def test_remaining_checks_the_peer_against_the_go_on_disk_now(self):
+        gate = self.gate(allowed_peer_uids=[PEER, 77]).ready()
+        report = bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, now=gate.clock, uid=77)
+        self.assertTrue(report['window_open'])
+        gate.write_go(allowed_peer_uids=[PEER])  # The owner removed uid 77 (not yet activated).
+        with self.refused('IPC_REQUEST_REFUSED'):
+            bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, now=gate.clock, uid=77)
+        self.assertFalse(bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, now=gate.clock,
+                                                 uid=PEER)['window_open'])
+        gate.go_path.write_text('{')
+        with self.refused('IPC_REQUEST_REFUSED'):
+            bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, now=gate.clock, uid=PEER)
+
+
 class ProfileTests(GateTest):
     def test_transport_takes_host_path_and_auth_header_from_the_profile(self):
         sent = []
@@ -719,8 +902,9 @@ class ProfileTests(GateTest):
             def close(self):
                 pass
         with patch.object(bridge.helper.http.client, 'HTTPSConnection', Connection):
-            _HTTPS(timeout=5, profile=DEEPINFRA)(b'{}', KEY)
-            _HTTPS(timeout=5, profile=FakeVendorProfile())(b'{}', KEY)
+            _HTTPS(timeout=5, profile=DEEPINFRA, path=DEEPINFRA.path_for(DEEPINFRA.rows[MODEL]))(b'{}', KEY)
+            fake = FakeVendorProfile()
+            _HTTPS(timeout=5, profile=fake, path=fake.path_for(fake.rows['fake/model-1']))(b'{}', KEY)
         self.assertEqual(sent, [
             'api.deepinfra.com', ('POST', '/v1/openai/chat/completions', b'{}',
                                   {'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json',
@@ -730,11 +914,13 @@ class ProfileTests(GateTest):
                                         'Accept': 'application/json'})])
 
     def test_a_profile_path_with_a_query_or_no_leading_slash_is_refused(self):
-        for path in ('/v1/x?key=abc', 'v1/x'):
-            profile = FakeVendorProfile()
-            profile.path = path
+        for path in ('/v1/x?key=abc', 'v1/x', '/v1/x#y', '/v1/../x', '/v1/x y', None):
             with self.subTest(path=path), self.refused('profile_path_invalid'):
-                _HTTPS(timeout=5, profile=profile)
+                _HTTPS(timeout=5, profile=FakeVendorProfile(), path=path)
+            profile = FakeVendorProfile()
+            profile.path_for = lambda _row, path=path: path
+            with self.subTest(review=path), patch.dict(bridge.helper.PROFILES, {'fakevendor': profile}):
+                self.assertIsNone(bridge.profile_of('fakevendor'))  # A GO naming it is refused.
 
     def test_redaction_blanks_the_key_bearer_tokens_and_the_profile_key_shapes(self):
         value = {'a': 'x ' + KEY, 'b': ['Bearer abc.def'], 'c': 'leak fk-ABCDEFGH12 end', 'x-api-key': 'k',

@@ -188,7 +188,8 @@ def account_response(response, input_price, output_price):
     configured = ((Decimal(prompt) * input_price + Decimal(completion) * output_price) / Decimal(1000000)) if valid else None
     provider = decimal_amount(usage.get('estimated_cost', response.get('estimated_cost')))
     reliable = [value for value in (configured, provider) if value is not None]
-    return {'prompt_tokens': prompt if integer(prompt) else None, 'completion_tokens': completion if integer(completion) else None,
+    return {'input_usd_per_m': str(input_price), 'output_usd_per_m': str(output_price),  # The settlement prices.
+            'prompt_tokens': prompt if integer(prompt) else None, 'completion_tokens': completion if integer(completion) else None,
             'total_tokens': total if integer(total) else None, 'cached_tokens': cached if integer(cached) else None,
             'reasoning_tokens': reasoning if integer(reasoning) else None, 'usage_valid': valid,
             'configured_price_cost_usd': str(configured) if configured is not None else None,
@@ -235,21 +236,61 @@ def names_any_key(value, names):
 ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound effort json_object')
 
 
+PATH_PATTERN = re.compile(r'/[A-Za-z0-9._~:/-]{0,511}')
+
+
+def path_valid(path):
+    """A fixed request path: no query (so never a key in a URL), no fragment, no '..'."""
+    return isinstance(path, str) and bool(PATH_PATTERN.fullmatch(path)) and '..' not in path
+
+
 class DeepInfraProfile:
     """api.deepinfra.com, OpenAI chat-completions shape, Bearer key. Rows reviewed 2026-10-10
     (contract A section 1); whether each model takes reasoning_effort and echoes its exact id is
-    measured by the gate's root-only probe before a row is enabled."""
+    measured by the gate's root-only probe before a row is enabled.
+
+    The profile API (every profile implements all of it; the gate's core calls nothing else):
+      name, host                         the GO's `provider` value; the HTTPS host (port 443)
+      per_call_cap_usd (Decimal)         no row may reserve more than this for one full-size request
+      max_request_bytes (int)            the largest request body accepted (and priced)
+      redaction_patterns (tuple of str)  regexes for the vendor's key shapes, blanked in replies
+      rows {model: ModelRow}             the reviewed models
+      path_for(row) -> str               the POST path (checked: no '?', starts with '/')
+      auth_headers(key) -> dict          the header(s) carrying the key
+      requested_model(body) -> str|None  where the request names its model
+      body_valid(body, row) -> bool      the exact request shape this row accepts
+      request_bytes(body) -> bytes       the bytes sent (never longer than the bytes priced)
+      reservation_prices(row, moment) -> (in, out)  USD per million used to reserve at moment
+      ceiling_prices(row) -> (in, out)   the highest prices the row can ever reserve at (worst cases)
+      account(response, row, moment) -> dict  usage and guard charge (see account_response's keys)
+      reply_model(response) -> str|None  where the reply names the model that answered
+      unbilled_refusal(status, response) -> bool  a refusal that provably billed nothing
+      probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024)
+      reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
+    """
     name = 'deepinfra'
     host = 'api.deepinfra.com'
     path = '/v1/openai/chat/completions'
+    per_call_cap_usd = Decimal('0.25')
+    max_request_bytes = 256 * 1024
     redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
     rows = {row.model: row for row in (
         ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 163840, 'high', True),
         ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 131072, 'high', False),
         ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 131072, None, False))}
 
+    def path_for(self, row):
+        return self.path
+
     def auth_headers(self, key):
         return {'Authorization': 'Bearer ' + key}
+
+    def reservation_prices(self, row, moment):
+        """DeepInfra's list prices do not change with the date or the prompt size."""
+        return row.input_usd_per_m, row.output_usd_per_m
+
+    def ceiling_prices(self, row):
+        return row.input_usd_per_m, row.output_usd_per_m
 
     def requested_model(self, body):
         """Where the request names its model (looked up before anything else is checked)."""
@@ -279,7 +320,7 @@ class DeepInfraProfile:
         """The exact bytes sent upstream for a body that passed body_valid."""
         return canonical(body)
 
-    def account(self, response, row):
+    def account(self, response, row, moment):
         return account_response(response, row.input_usd_per_m, row.output_usd_per_m)
 
     def reply_model(self, response):
@@ -321,11 +362,12 @@ PROFILES = {profile.name: profile for profile in (DeepInfraProfile(),)}
 class HttpsTransport:
     """Direct verified HTTPS only. http.client follows no redirects or env proxies."""
 
-    def __init__(self, timeout, profile, max_response_bytes=MAX_RESPONSE_BYTES):
-        # Host, path and auth header come from the GO's profile; the path carries no query (no key in a URL).
-        if '?' in profile.path or not profile.path.startswith('/'):
+    def __init__(self, timeout, profile, path, max_response_bytes=MAX_RESPONSE_BYTES):
+        # Host and auth header come from the GO's profile, the path from its path_for(row); the
+        # path carries no query (no key in a URL).
+        if not path_valid(path):
             raise SafetyError('profile_path_invalid')  # noqa: F821 - provided by the gate
-        self.profile = profile
+        self.profile, self.path = profile, path
         self.max_response_bytes = min(max_response_bytes, MAX_RESPONSE_BYTES)
         self.timeout = min(timeout, MAX_TIMEOUT_SECONDS)
 
@@ -352,7 +394,7 @@ class HttpsTransport:
                 remaining()
             except Exception:  # noqa: BLE001 - every failure before the request is the same fact
                 raise RequestNotSent('request_not_sent') from None
-            connection.request('POST', self.profile.path, body=payload,
+            connection.request('POST', self.path, body=payload,
                                headers={**self.profile.auth_headers(key), 'Content-Type': 'application/json',
                                         'Accept': 'application/json'})
             remaining()

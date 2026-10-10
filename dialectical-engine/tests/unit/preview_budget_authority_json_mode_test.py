@@ -28,7 +28,7 @@ def valid_response_format(value):
 class RequestModeTests(unittest.TestCase):
     def test_existing_four_field_request_keeps_identical_body_and_reservation(self):
         request = envelope(body())
-        outgoing, reserved, row = bridge.validate_request(request, GO)
+        outgoing, reserved, row, _prices = bridge.validate_request(request, GO)
         self.assertEqual(row, GLM)
         self.assertEqual(outgoing, bridge.helper.canonical(body()))
         self.assertEqual(json.loads(outgoing), body())
@@ -40,7 +40,7 @@ class RequestModeTests(unittest.TestCase):
         compact = envelope(value, separators=(',', ':'))
         spaced = envelope(value, indent=2)
         for request in (compact, spaced):
-            outgoing, reserved, _row = bridge.validate_request(request, GO)
+            outgoing, reserved, _row, _prices = bridge.validate_request(request, GO)
             self.assertEqual(outgoing, bridge.helper.canonical(value))
             self.assertEqual(str(reserved), request['reservedUsd'])
         self.assertNotEqual(compact['requestSha256'], spaced['requestSha256'])

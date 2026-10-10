@@ -40,7 +40,7 @@ _HTTPS = bridge.helper.HttpsTransport  # Kept before setUp swaps in no_network.
 
 
 def REAL_TRANSPORT(timeout):  # noqa: N802 - the real transport class, bound to the DeepInfra profile
-    return _HTTPS(timeout=timeout, profile=DEEPINFRA)
+    return _HTTPS(timeout=timeout, profile=DEEPINFRA, path=DEEPINFRA.path)
 
 
 def file_sha_text(text):
@@ -530,7 +530,7 @@ class DailyPotTests(GateTest):
         seen = []
 
         class Recorder:
-            def __init__(self, timeout, profile):
+            def __init__(self, timeout, profile, path):
                 seen.append(timeout)
                 self.profile = profile
 
@@ -548,7 +548,7 @@ class DailyPotTests(GateTest):
         seen, clock = [], [1000.0]
 
         class Recorder:
-            def __init__(self, timeout, profile):
+            def __init__(self, timeout, profile, path):
                 seen.append(timeout)
 
             def __call__(self, _body, _key):
@@ -658,7 +658,7 @@ class RequestBytesTests(GateTest):
         self.assertEqual(typescript, '0.082248350')
         request = {'scope_id': SCOPE, 'operationId': 'op-1', 'requestBody': raw,
                    'requestSha256': file_sha_text(raw), 'reservedUsd': typescript}
-        _, reserved, _row = bridge.validate_request(request, bridge.read_go(self.gate().go_path))
+        _, reserved, _row, _prices = bridge.validate_request(request, bridge.read_go(self.gate().go_path))
         self.assertEqual(reserved, Decimal('0.08224835'))
 
 
@@ -793,7 +793,7 @@ class HaltTests(GateTest):
         gate = self.gate().ready()
         go = bridge.read_go(gate.go_path)
         request = envelope(body(), 'op-1')
-        _, reserved, row = bridge.validate_request(request, go)
+        _, reserved, row, _prices = bridge.validate_request(request, go)
         bridge.reserve_call(gate.private, go, file_sha(gate.go_path), request, reserved, row, HOST, PEER, gate.clock)
         self.assertEqual(gate.status()['in_flight'], 1)
         self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 1, 'unrecorded_uncertain': 0})
@@ -901,7 +901,7 @@ class CrashRecoveryTests(GateTest):
                 gate = self.gate().ready()
                 go = bridge.read_go(gate.go_path)
                 request = envelope(body(), 'op-1')
-                _, reserved, row = bridge.validate_request(request, go)
+                _, reserved, row, _prices = bridge.validate_request(request, go)
                 bridge.reserve_call(gate.private, go, file_sha(gate.go_path), request, reserved, row, HOST, PEER,
                                     gate.clock)
                 ledger_path = gate.private / 'team-ledger-2026-10-08.json'
@@ -1149,8 +1149,9 @@ class IpcTests(GateTest):
         self.assertEqual(json.loads(payload), {'error': 'TEAM_DAILY_BUDGET_REACHED'})
         self.assertEqual(gate.status()['state'], 'active')
 
-    def test_refusal_body_maps_only_the_three_team_codes(self):
-        for code in ('TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED'):
+    def test_refusal_body_maps_only_the_public_codes(self):
+        for code in ('TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED',
+                     'PROVIDER_NOT_REACHED', 'PROVIDER_REFUSED_UNBILLED'):
             self.assertEqual(json.loads(bridge.refusal_body(SafetyError(code))), {'error': code})
         for error in (SafetyError('AUTHORITY_STOPPED'), SafetyError('NEW_CHARGE_UNCERTAIN'),
                       ValueError('TEAM_DAILY_BUDGET_REACHED'), KeyboardInterrupt()):
@@ -1419,7 +1420,8 @@ class UnsentCallTests(GateTest):
     def test_ipc_does_not_halt_for_an_unsent_call(self):
         gate = self.gate().ready()
         line, payload = IpcTests.exchange(self, gate, lambda _client: self.unsent)
-        self.assertEqual((line, json.loads(payload)), (b'HTTP/1.0 409 Conflict', {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'}))
+        # Nothing billed and the hold released: the one code the app may retry on (ruling of 2026-10-10).
+        self.assertEqual((line, json.loads(payload)), (b'HTTP/1.0 409 Conflict', {'error': 'PROVIDER_NOT_REACHED'}))
         self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', 1))
 
 

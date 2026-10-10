@@ -74,13 +74,13 @@ def listed(model, opener):
             status, raw = response.status, response.read(REPLY_BYTES + 1)
     except urllib.error.HTTPError:
         return False  # 404, a redirect, and friends: DeepInfra answered, and not with the model.
-    except (OSError, ValueError):
+    except Exception:  # noqa: BLE001 - no usable answer at all (DNS, connect, TLS, timeout, a broken reply)
         raise Refusal('MODEL_CHECK_UNAVAILABLE', {'model': model}) from None
     if status != 200 or len(raw) > REPLY_BYTES:
         return False
     try:
         return isinstance(json.loads(raw), dict)
-    except ValueError:
+    except (ValueError, RecursionError):
         return False
 
 

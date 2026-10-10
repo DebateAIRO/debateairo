@@ -113,12 +113,23 @@ largest worst case of the switched-on models, must fit in the pot. With all thre
     preview, and read the result before re-opening.
   - It runs next to the running service, so for that one call up to 5 calls may be in flight.
     The pot is still checked under the lock, so it cannot overspend.
-  - Do not restart the service while a probe runs: the restart would treat the probe's call as
-    interrupted and halt (fail closed).
+  - While a probe runs, the service refuses to start (`PROBE_RUNNING`; systemd retries 30 s
+    later), so a restart cannot mistake the probe's call for an interrupted one. Only one probe
+    runs at a time (`PROBE_ALREADY_RUNNING`). If a probe dies before it has recorded its cost,
+    the service's next call halts the gate (`interrupted_probe`): check the billing page, then
+    `activate`.
   - It prints the answer's status, whether the answer named the exact model, the token counts,
     the charge, and at most 80 characters of the answer (on one line). Never the key.
 - **The halt email names the v3 command.** The lifecycle alert (`alert.mjs`) now gives the v3
   `activate` command. Step 9 installs the new copy.
+- **DeepInfra saying "too many requests" no longer halts.** Owner ruling of 2026-10-10: an answer
+  429 that carries an error and no token counts, no answer and no cost anywhere is treated like a
+  call that never reached DeepInfra. Nothing is charged, that call alone fails, and the app may
+  try again later. Five such failures in a row (or mixed with unreachable calls) halt with
+  `provider_unreachable`. Any other error answer still halts.
+- **The model check script has no custody check of its own.** Like the address script, it is
+  protected only by being root-owned in the root-owned gate folder (step 1 checks that with
+  `namei`). It never reads the key.
 - **"Not sent", the halt email, the restart policy, stop, the stale-socket clean-up and the key
   rules are unchanged from v2.** See `deploy/preview-gate/v2/README.md` for why each one is safe.
 
@@ -325,7 +336,7 @@ main protections.
 
 ```sh
 P=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3; GO=/etc/debateai-v3-preview/provider-deepinfra-go-v3.json; A=/opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py
-systemd-run --quiet --wait --pipe --collect -p IPAddressDeny=any -p IPAddressAllow=127.0.0.53/32 $(sed -n 's#^IPAddressAllow=#-p IPAddressAllow=#p' /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf) -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p NoNewPrivileges=yes /usr/bin/python3 -I $A probe --private $P --go $GO --model deepseek-ai/DeepSeek-V4.1-Flash
+systemd-run --quiet --wait --pipe --collect -p IPAddressDeny=any -p IPAddressAllow=127.0.0.53/32 $(sed -n 's#^IPAddressAllow=#-p IPAddressAllow=#p' /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf) -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6' -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model deepseek-ai/DeepSeek-V4.1-Flash
 ```
 
 For MiMo, use `--model XiaomiMiMo/MiMo-V2.6-Pro` instead.
@@ -338,6 +349,7 @@ How to read the one line it prints:
 | `model_echoed_exactly` | `true` | The answer named another model (`reply_model` shows which). The gate halted. Do not switch it on. |
 | `usage.usage_valid` | `true` | DeepInfra did not report usable token counts. The gate halted. Do not switch it on. |
 | `usage.reasoning_tokens` | above 0 for DeepSeek | DeepSeek ignored the thinking setting. Not a halt, but tell the reviewers before switching it on. |
+| `completion_within_max_tokens` | `true` | The model was billed for more answer than it was allowed. In real use it could cost more than the gate sets aside. Do not switch it on. |
 | `reply_excerpt` | `OK` (or close) | Not a halt. A thinking model may spend its 1,024 tokens on thinking and answer nothing. |
 | `guard_charge_usd` | a few hundredths of a cent | What the call was charged in the pot. |
 | `authority` | `active` | `halted`: read the line, then re-open with `activate` (Daily operations). |
