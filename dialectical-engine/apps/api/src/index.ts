@@ -103,7 +103,7 @@ import {
   AskRoomResponseSchema
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
-import { assertPreviewBudgetAdmits, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
+import { assertPreviewBudgetAdmits, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
 import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
@@ -4187,7 +4187,8 @@ async function admitWithScorecard(input: Readonly<{
 export async function evaluateAskAdmission(
   settings: RunCreationSettings,
   ask: AskRequest,
-  personRoom: PersonRoomInput | null = null
+  personRoom: PersonRoomInput | null = null,
+  previewAdmissionLock?: PreviewAdmissionLock
 ): Promise<AskAdmission> {
   const previewConfig=validatePreviewProviderTestConfig(settings.previewProviderTestConfig);
   if(previewConfig!==undefined&&settings.modelPicker?.scorecard.state==="VALID")
@@ -4273,10 +4274,11 @@ export async function evaluateAskAdmission(
   // basis resolved; the only model calls so far are discovery's. A refusal is the daily code (429).
   if (previewConfig !== undefined) {
     try {
+      // Review finding 2: with the submit's lock, taken here and held until the debate is queued.
       await assertPreviewBudgetAdmits(settings.previewBudgetGate, {
         basis: envelopeBasis,
         panel: filteredPanel
-      });
+      }, undefined, previewAdmissionLock);
     } catch (error) {
       markAskRefusal(error);
     }
@@ -4493,7 +4495,13 @@ export class PostgresAskApplication implements AskApplication {
       );
       return Object.freeze({ ...accepted, ...appliedField });
     }
-    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment } = await evaluateAskAdmission(this.settings, ask);
+    // Review finding 2 (preview only): one ask at a time is estimated and started. The lock is taken
+    // inside admission just before the estimate, and released once this debate's first job is queued
+    // (or on any refusal or failure), so the next ask's estimate already holds this debate.
+    const previewAdmissionLock = validatePreviewProviderTestConfig(this.settings.previewProviderTestConfig) === undefined
+      ? undefined : this.settings.previewBudgetGate?.openAdmissionLock?.();
+    try {
+    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment } = await evaluateAskAdmission(this.settings, ask, null, previewAdmissionLock);
     const argumentLanguage = detectArgumentLanguage(ask.question_line);
     let runId:string;
     // Set the moment startRun commits: the lease's release can still throw
@@ -4595,6 +4603,8 @@ export class PostgresAskApplication implements AskApplication {
         ...firstRunJob(runId),
         nodeSet: []
       });
+      // The job is READY: the next ask's estimate holds this debate from here on.
+      await previewAdmissionLock?.release();
       setupStep = "DISPATCH";
       await this.dispatcher.dispatch({ runId, workItemId });
     } catch (error) {
@@ -4610,6 +4620,9 @@ export class PostgresAskApplication implements AskApplication {
           model_strength_stepped_down: modelAssignment.steppedDown,
           ...appliedField
         };
+    } finally {
+      await previewAdmissionLock?.release();
+    }
   }
 
   /**

@@ -5,7 +5,7 @@ import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel"
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import {
-  PREVIEW_CONTEXT_WINDOW_TOKENS, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
+  PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
   PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRow, previewModelRowForRef, previewNanoUsdText, previewReservationNanoUsd,
   previewRostersHonourMakerRule, type PreviewModelRow
 } from "./preview-models.js";
@@ -150,7 +150,7 @@ export function assertPreviewProviderTargets(config: PreviewTargetRosters | unde
         : target.thinkingParameter !== "reasoning_effort" || target.thinkingLevels?.length !== 1 || target.thinkingLevels[0] !== reviewed.effort)
       || target.inputPriceMicrosPerMillionTokens !== reviewed.inputPriceMicrosPerMillion
       || target.outputPriceMicrosPerMillionTokens !== reviewed.outputPriceMicrosPerMillion
-      || target.contextWindowTokens !== PREVIEW_CONTEXT_WINDOW_TOKENS
+      || target.contextWindowTokens !== reviewed.contextWindowTokens
       || target.authorizationHeader !== undefined || target.authorizationFile !== undefined) refused();
   }
   const served = new Set(targets.map(target => target.model));
@@ -205,12 +205,35 @@ function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
   catch { return false; }
 }
 /**
- * The preview's per-call policy for ONE target. A row with an effort switch runs every call at the
- * configured level ("high"); a row without one (MiMo) never sends a level, and a request that asks
- * for one is refused before anything is sent.
+ * Owner ruling 5 (2026-10-10): how long the preview waits before its one retry of a call the gate
+ * proved was never billed (PROVIDER_NOT_REACHED, PROVIDER_REFUSED_UNBILLED).
  */
-export function withPreviewProviderCallPolicy(gateway: ProviderGateway, config: PreviewProviderTestConfig, target: Readonly<{ model: string }>): ProviderGateway {
+const PREVIEW_UNBILLED_RETRY_COOLDOWN_MS = 60_000;
+/** A gate refusal for a call that provably cost nothing: the vendor was never reached, or refused unbilled. */
+export class PreviewUnbilledRefusal extends TypedDomainError {
+  constructor() { super("PROVIDER_CALL_FAILED", "Private preview call was not billed and did not reach an answer"); }
+}
+/** The refusal itself, or the gateway's PROVIDER_CALL_FAILED wrapping it as its cause. */
+function previewCallWasUnbilled(error: unknown): boolean {
+  return error instanceof PreviewUnbilledRefusal || (typeof error === "object" && error !== null
+    && (error as { cause?: unknown }).cause instanceof PreviewUnbilledRefusal);
+}
+/**
+ * The preview's per-call policy for ONE target. A row with an effort switch runs every call at the
+ * configured level ("high"); a row without one (MiMo, Qwen) never sends a level, and a request that asks
+ * for one is refused before anything is sent.
+ *
+ * Owner ruling 5: a one-attempt call the gate proves was never billed is sent ONCE more after
+ * PREVIEW_UNBILLED_RETRY_COOLDOWN_MS (the runner's own retry would meet the call site's spent
+ * attempt). Only those two refusals; never a second retry; never on the storyteller, whose two
+ * attempts already include one after any failure. The start-of-debate estimate counts this retry.
+ */
+export function withPreviewProviderCallPolicy(
+  gateway: ProviderGateway, config: PreviewProviderTestConfig, target: Readonly<{ model: string }>,
+  options: Readonly<{ sleep?: (milliseconds: number) => Promise<void> }> = {}
+): ProviderGateway {
   const reviewed = previewModelRow(target.model) ?? refused();
+  const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => { setTimeout(resolve, milliseconds); }));
   return Object.freeze({ call(request: ProviderCallRequest) {
     // A row with no effort switch runs at the vendor default, so "DEFAULT_ONLY" asks for exactly that.
     const asksNoLevel = request.thinkingLevel === undefined
@@ -220,11 +243,17 @@ export function withPreviewProviderCallPolicy(gateway: ProviderGateway, config: 
         ? "The private preview connection for this model has no thinking level"
         : "The private preview connection is configured for high only");
     }
-    const bound = previewCallBound(request.bound, config);
+    const previewBound = previewCallBound(request.bound, config);
+    const bound = previewStoryRepairAllowed(request) ? Object.freeze({ ...previewBound, maxAttempts: 2 }) : previewBound;
     // One explicit level replaces whatever the request carried: the configured level on an effort
     // row; DEFAULT_ONLY on a row without one, which the gateway treats exactly as "no level".
-    return gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
-      bound: previewStoryRepairAllowed(request) ? Object.freeze({ ...bound, maxAttempts: 2 }) : bound });
+    const send = () => gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level, bound });
+    if (bound.maxAttempts !== 1) return send();
+    return send().catch(async (error: unknown) => {
+      if (!previewCallWasUnbilled(error)) throw error;
+      await sleep(PREVIEW_UNBILLED_RETRY_COOLDOWN_MS);
+      return send();
+    });
   } });
 }
 export interface PreviewBudgetExecution {
@@ -282,8 +311,9 @@ const PREVIEW_DAILY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_DAILY_BUDGET_
  * Owner ruling 5 (2026-10-10): a call the gate proves never billed (PROVIDER_NOT_REACHED: the
  * connect or TLS handshake failed before a byte was written; PROVIDER_REFUSED_UNBILLED: a vendor
  * 429/529 with no usage and a provably unbilled body) released its hold, so it is the same
- * transient failure as a busy gate: PROVIDER_CALL_FAILED, retried after the cooldown, never a
- * money stop. The gate must list both codes as public refusals for them to arrive here.
+ * transient failure as a busy gate: PROVIDER_CALL_FAILED (as PreviewUnbilledRefusal, which
+ * withPreviewProviderCallPolicy sends once more after its cooldown), never a money stop. The gate
+ * must list both codes as public refusals for them to arrive here.
  */
 const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED", "PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"]);
 function previewAuthorityRefusal(status: number | undefined, row: unknown): TypedDomainError {
@@ -293,8 +323,9 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
     return new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "Private preview team budget for today is used up");
   }
   if (typeof code === "string" && PREVIEW_TRANSIENT_REFUSALS.has(code)) {
-    return new TypedDomainError("PROVIDER_CALL_FAILED", code === "CONCURRENCY_LIMIT_REACHED"
-      ? "Private preview gate is at its limit of calls in flight" : "Private preview call was not billed and did not reach an answer");
+    return code === "CONCURRENCY_LIMIT_REACHED"
+      ? new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate is at its limit of calls in flight")
+      : new PreviewUnbilledRefusal();
   }
   return new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request");
 }
