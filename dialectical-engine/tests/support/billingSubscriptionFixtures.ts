@@ -91,12 +91,15 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
    * for a checkout already made, so its quote, its INITIAL charge and its CREATED all carry it.
    */
   currency?: PriceCurrency;
+  /** The records key the sealed location, profile and card are sealed with (a harness's own key; default TEST_RECORDS_KEY). */
+  recordsKey?: Buffer;
 }>): Promise<SeededNetopiaSubscription> {
   const billing = new BillingRepository(pool);
   const entitlements = new EntitlementRepository(pool);
   const environment = input.paymentEnvironment ?? "sandbox";
   const rate = input.taxRateBasisPoints ?? 2_100;
   const currency = input.currency ?? "USD";
+  const recordsKey = input.recordsKey ?? TEST_RECORDS_KEY;
   const netMicros = input.netMicros ?? planNetPrice(planById(testBillingPlans, input.planId), currency);
   const taxMicros = Math.floor(netMicros * rate / 10_000 / 10_000) * 10_000;
   const totalMicros = netMicros + taxMicros;
@@ -109,13 +112,13 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
   const periodEnd = computeWindows(periodStart, periodStart).month.end;
   const checkoutAt = new Date(periodStart.getTime() - 60_000);
   const payer = { firstName: "Test", lastName: "Subscriber", phone: "+40712345678" } as const;
-  const location = sealQuoteLocation(TEST_RECORDS_KEY, initialQuoteId, {
+  const location = sealQuoteLocation(recordsKey, initialQuoteId, {
     name: "Test Subscriber", ...payer, country: input.taxCountry, region: null, postalCode: "010101", city: "Bucuresti",
     street: "Strada Exemplu 1", ip: "192.0.2.10", ipCountry: input.taxCountry, company: null
   });
   const customerId = await billing.withTransaction(async (client) => {
     const customer = await billing.ensureCustomer(client, { ownerRef: input.ownerRef, locale: "en", now: checkoutAt });
-    const profile = sealBillingProfile(TEST_RECORDS_KEY, customer.customerId, {
+    const profile = sealBillingProfile(recordsKey, customer.customerId, {
       email: input.email ?? `${input.ownerRef}@example.test`, locale: "en", name: "Test Subscriber", ...payer,
       paymentIp: "192.0.2.10", country: input.taxCountry, region: null, postalCode: "010101", city: "Bucuresti",
       street: "Strada Exemplu 1", company: null
@@ -142,7 +145,7 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
     await billing.appendChargeEvent(client, chargeEvent(initialChargeId, "SUCCEEDED", periodStart, {
       providerPaymentId, amountMicros: totalMicros, errorCode: null, providerCreatedAt: periodStart
     }));
-    const sealedCard = sealCardToken(TEST_RECORDS_KEY, cardTokenId, testCardToken(["test", "card", cardTokenId.slice(0, 8)].join("-")));
+    const sealedCard = sealCardToken(recordsKey, cardTokenId, testCardToken(["test", "card", cardTokenId.slice(0, 8)].join("-")));
     await billing.insertCardToken(client, {
       tokenId: cardTokenId, customerId: customer.customerId, paymentProvider: "netopia", paymentEnvironment: environment,
       sourceChargeId: initialChargeId, sourceToolOrder: null, sourceNoticeId: null, sourcePaidAt: periodStart,

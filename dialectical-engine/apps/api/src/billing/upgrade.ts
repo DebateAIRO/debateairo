@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
-import { microsToDecimal, upgradeMonthCreditOverrideMicros, upgradeProrationMicros, type SubscriptionState } from "@debateai/billing-core";
+import {
+  microsToDecimal, upgradeMonthCreditOverrideMicros, upgradeProrationMicros, type PriceCurrency, type SubscriptionState
+} from "@debateai/billing-core";
 import type { BillingUpgradeQuoteResponse, BillingUpgradeResponse } from "@debateai/contract";
 import type { BillingRepository, ChargeRow, EntitlementRepository, QuoteRow } from "@debateai/db";
 import { netopiaLanguageOf } from "@debateai/payments-netopia";
@@ -148,7 +150,7 @@ type OpenUpgrade =
 
 type Prepared =
   | Readonly<{ kind: "EXISTING"; chargeId: string; redirectUrl: string | null }>
-  | Readonly<{ kind: "NEW"; chargeId: string; totalMicros: number }>;
+  | Readonly<{ kind: "NEW"; chargeId: string; totalMicros: number; currency: PriceCurrency }>;
 
 export type UpgradeInput = Readonly<{
   ownerRef: string; userId: string; planId: "PRO" | "MAX"; quoteRef: string; ip: string; userAgent: string;
@@ -199,7 +201,7 @@ export async function startUpgrade(deps: SubscriptionRouteDeps, input: UpgradeIn
   const redirectUrl = await startHostedCharge(hostedStartDeps(deps, environment), {
     operation: "upgrade", now,
     start: {
-      orderId: prepared.chargeId, amountMicros: prepared.totalMicros, currency: "USD",
+      orderId: prepared.chargeId, amountMicros: prepared.totalMicros, currency: prepared.currency,
       description: deps.orderText("ORDER_PLAN", input.locale, { plan: planName(input.planId) }), payer,
       clientId: clientIdOf(stored.customerId),
       returnUrl: paymentReturnUrl(deps.publicAppUrl, "/checkout/return", prepared.chargeId),
@@ -300,6 +302,10 @@ async function prepareUpgrade(
     || !servedByNetopia(deps, state)) {
     refuse(409, "NOT_SUBSCRIBED");
   }
+  // Spec 2026-10-05 §2.16.3: the quote is priced in the subscription's currency; another one is the writer's bug.
+  if (quote.currency !== state.currency) {
+    throw new TypedDomainError("BILLING_CURRENCY_MISMATCH", "The upgrade quote and the subscription name different currencies");
+  }
   // A renewal since the quote moved the period: the prorated price no longer holds.
   if (quote.createdAt.getTime() < state.currentPeriodStart.getTime()) refuse(409, "QUOTE_EXPIRED");
   // Another upgrade applied since the quote changed the plan it was priced from: its price no longer holds.
@@ -324,12 +330,13 @@ async function prepareUpgrade(
     && charge.periodStart.getTime() === quote.createdAt.getTime());
   if (sameKey.length >= 4) refuse(409, "QUOTE_EXPIRED");
   const chargeId = newChargeId();
-  const charge = Object.freeze({
+  const charge: ChargeRow = Object.freeze({
     chargeId, ownerRef: state.ownerRef, subscriptionId: state.subscriptionId, kind: "UPGRADE",
     attempt: sameKey.length + 1, periodStart: quote.createdAt, periodEnd: state.currentPeriodEnd,
     quoteId: quote.quoteId, netMicros: quote.netMicros, taxMicros: quote.taxMicros, totalMicros: quote.totalMicros,
-    currency: "USD", createdAt: now, paymentProvider: "netopia", paymentEnvironment: context.environment
-  }) as ChargeRow;
+    // Spec 2026-10-05 §2.16.4: the charge is in its quote's currency, the subscription's.
+    currency: quote.currency, createdAt: now, paymentProvider: "netopia", paymentEnvironment: context.environment
+  });
   await deps.billing.insertCharge(client, charge);
   // A3(a), after the charge row it names: a second use of this quote rolls the whole attempt back.
   if (await deps.billing.useQuote(client, { quoteId: quote.quoteId, usedAt: now, chargeId }) === "ALREADY_USED") {
@@ -347,7 +354,7 @@ async function prepareUpgrade(
     customerId: context.customerId, at: now, locale: context.profile.locale, profileCiphertext: sealed.ciphertext,
     keyId: sealed.keyId
   });
-  return Object.freeze({ kind: "NEW" as const, chargeId, totalMicros: quote.totalMicros });
+  return Object.freeze({ kind: "NEW" as const, chargeId, totalMicros: quote.totalMicros, currency: charge.currency });
 }
 
 export type UpgradeSucceededWrites = Readonly<{

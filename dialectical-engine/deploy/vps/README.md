@@ -3310,6 +3310,10 @@ systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --prop
 read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox charge --capture-dir /var/tmp/netopia-capture --from-order "$ORDER"
 ```
 
+   Once NETOPIA's settlement form covers them, also run `start --currency RON` and `start --currency EUR` (each then
+   paid on its page, and `status --order` for each), so the recording shows a payment's status and message in each
+   currency.
+
    Once NETOPIA's messages for the three orders have arrived, and within 14 days (the raw messages are deleted after
    that), store each order's messages: run this once for each of the three ids (the payment's, the card check's and
    the charge's):

@@ -17,6 +17,8 @@ export type TaxIdCheck = Readonly<{ valid: boolean; name: string | null; checked
 export type SaleLine = Readonly<{ description: string; netMicros: number; taxMicros: number; taxRateBasisPoints: number }>;
 export type SaleRecord = Readonly<{
   chargeId: string; transactionId: string; issuedOn: Date;
+  /** Spec 2026-10-05 §2.16.4: the charge's currency, which is its subscription's; every line is in it. */
+  currency: PriceCurrency;
   customer: Readonly<{
     name: string | null; email: string; country: string; region: string | null; postalCode: string | null;
     city: string | null; street: string | null; taxId: string | null; locale: string;
@@ -28,7 +30,10 @@ export type SaleRecord = Readonly<{
   processor: "netopia";
 }>;
 export type RefundRecord = Readonly<{
-  chargeId: string; transactionId: string; issuedOn: Date; refundTotalMicros: number;
+  chargeId: string; transactionId: string; issuedOn: Date;
+  /** The refunded charge's currency (spec 2026-10-05 §2.16.4). */
+  currency: PriceCurrency;
+  refundTotalMicros: number;
   original: Readonly<{ documentId: string; number: string }>;
   /**
    * The credit line's text in the customer's locale (P10a takes it from the catalogue, as it does a sale line's

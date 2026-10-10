@@ -22,7 +22,7 @@ const customer = (overrides: Partial<SaleRecord["customer"]> = {}): SaleRecord["
   city: "Cluj-Napoca", street: "Str. Exemplu 1", taxId: null, locale: "ro", ...overrides
 });
 const sale = (chargeId: string, overrides: Partial<SaleRecord["customer"]> = {}): SaleRecord => ({
-  chargeId, transactionId: "9001", issuedOn: new Date("2026-10-01T22:30:00Z"), customer: customer(overrides),
+  chargeId, transactionId: "9001", issuedOn: new Date("2026-10-01T22:30:00Z"), currency: "USD", customer: customer(overrides),
   lines: [{ description: "DebateAI Plus, octombrie 2026", netMicros: 20_000_000, taxMicros: 4_200_000, taxRateBasisPoints: 2100 }],
   taxCode: "saas", evidence: { billingCountry: "RO", ipAddress: "203.0.113.10", bankCountry: "RO" }, processor: "netopia"
 });
@@ -94,7 +94,7 @@ describe("P5 — SmartBill invoices against the fake", () => {
   it("reverses a whole invoice once, and issues a partial credit as a negative line", async () => {
     const original = await issuer.issue(sale("d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"));
     const refund = { chargeId: "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4", transactionId: "9001", issuedOn: new Date("2026-10-03T10:00:00Z"),
-      refundTotalMicros: 24_200_000, original: { documentId: original.externalRef, number: original.number },
+      currency: "USD" as const, refundTotalMicros: 24_200_000, original: { documentId: original.externalRef, number: original.number },
       description: "Rambursare DebateAI Plus", processor: "netopia" as const };
     const storno = await issuer.storno({ ...refund, series: original.series, number: original.number });
     expect(storno.number).not.toBe(original.number);
@@ -171,7 +171,7 @@ describe("P5 — FakeInvoiceIssuer (what the route tests rely on)", () => {
     const fakeIssuer = new FakeInvoiceIssuer();
     const first = await fakeIssuer.issue(sale("aa".repeat(16)));
     expect(first).toEqual({ series: "FAKE", number: "0001", externalRef: "FAKE-0001" });
-    const refund = { chargeId: "aa".repeat(16), transactionId: "1", issuedOn: new Date(), refundTotalMicros: 24_200_000,
+    const refund = { chargeId: "aa".repeat(16), transactionId: "1", issuedOn: new Date(), currency: "USD" as const, refundTotalMicros: 24_200_000,
       original: { documentId: first.externalRef, number: first.number }, description: "Rambursare", processor: "netopia" as const };
     await fakeIssuer.storno({ ...refund, series: first.series, number: first.number });
     await expect(fakeIssuer.storno({ ...refund, series: first.series, number: first.number }))

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
-import { computeWindows, type CardPayments, type Payer, type PaymentReport, type SubscriptionState } from "@debateai/billing-core";
+import {
+  computeWindows, type CardPayments, type Payer, type PaymentReport, type PriceCurrency, type SubscriptionState
+} from "@debateai/billing-core";
 import type {
   AcceptanceInput, AcceptanceRepository, BillingJobQueries, BillingRepository, ChargeEventRow, ChargeRow, QuoteRow
 } from "@debateai/db";
@@ -168,7 +170,9 @@ type Verdict =
 
 type Prepared =
   | Readonly<{ kind: "REUSE"; chargeId: string; redirectUrl: string; planId: PlanId }>
-  | Readonly<{ kind: "START"; chargeId: string; customerId: string; totalMicros: number; planId: PlanId; payer: Payer }>;
+  | Readonly<{
+    kind: "START"; chargeId: string; customerId: string; totalMicros: number; currency: PriceCurrency; planId: PlanId; payer: Payer;
+  }>;
 type StartPrepared = Extract<Prepared, { kind: "START" }>;
 
 export class CheckoutService implements CheckoutServicePort {
@@ -254,7 +258,8 @@ export class CheckoutService implements CheckoutServicePort {
       const charge: ChargeRow = Object.freeze({
         chargeId, ownerRef: input.ownerRef, subscriptionId, kind: "INITIAL", attempt: 1, periodStart: month.start,
         periodEnd: month.end, quoteId: quote.quoteId, netMicros: quote.netMicros, taxMicros: quote.taxMicros,
-        totalMicros: quote.totalMicros, currency: "USD", createdAt: input.now,
+        // Spec 2026-10-05 §2.16.4: the charge is in its quote's currency.
+        totalMicros: quote.totalMicros, currency: quote.currency, createdAt: input.now,
         paymentProvider: "netopia", paymentEnvironment: environment
       });
       await this.deps.repository.insertCharge(client, charge);
@@ -265,7 +270,10 @@ export class CheckoutService implements CheckoutServicePort {
       if (await this.deps.repository.useQuote(client, { quoteId: quote.quoteId, usedAt: input.now, chargeId }) === "ALREADY_USED") {
         throw new BillingRefusal(409, "QUOTE_EXPIRED");
       }
-      return { kind: "START", chargeId, customerId: customer.customerId, totalMicros: charge.totalMicros, planId: quote.planId, payer };
+      return {
+        kind: "START", chargeId, customerId: customer.customerId, totalMicros: charge.totalMicros, currency: charge.currency,
+        planId: quote.planId, payer
+      };
     });
 
     const redirectUrl = prepared.kind === "REUSE" ? prepared.redirectUrl : await this.startPayment(prepared, input);
@@ -289,7 +297,7 @@ export class CheckoutService implements CheckoutServicePort {
     }, {
       operation: "checkout", now: input.now,
       start: {
-        orderId: prepared.chargeId, amountMicros: prepared.totalMicros, currency: "USD",
+        orderId: prepared.chargeId, amountMicros: prepared.totalMicros, currency: prepared.currency,
         description: text("ORDER_PLAN", input.locale, { plan: planName(prepared.planId) }), payer: prepared.payer,
         clientId: clientIdOf(prepared.customerId),
         returnUrl: paymentReturnUrl(this.deps.publicAppUrl, "/checkout/return", prepared.chargeId),

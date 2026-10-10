@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   foldSubscription, microsToDecimal, paymentError, upgradeMonthCreditOverrideMicros, upgradeProrationMicros,
-  type HostedPaymentStart, type HostedPaymentStarted
+  type HostedPaymentStart, type HostedPaymentStarted, type PriceCurrency
 } from "@debateai/billing-core";
 import { BillingUpgradePendingErrorSchema, BillingUpgradeResponseSchema } from "@debateai/contract";
 import { BillingRepository, createPool, EntitlementRepository, migrate } from "@debateai/db";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
-import { AdjustableTaxEngine, StubGeo } from "../support/billingFixtures.js";
+import { AdjustableTaxEngine, StubGeo, testRegionalPlans } from "../support/billingFixtures.js";
 import {
   mountSubscriptionRoutes, recordingAudit, seedNetopiaSubscription, subscriptionDeps, testAgreement,
   testCardToken, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
@@ -49,6 +49,8 @@ class ScriptedStarts extends StubCardPayments {
 
 async function start(label: string, options: Readonly<{
   paymentEnvironment?: "sandbox" | "live"; planId?: "PLUS" | "PRO";
+  /** Part C (spec 2026-10-05 §2.16.3): the subscription's currency; with one, the plans are the engine's region rule. */
+  currency?: PriceCurrency;
 }> = {}) {
   const identity = testHttpIdentity(label);
   const clock = { now: new Date() };
@@ -57,10 +59,13 @@ async function start(label: string, options: Readonly<{
   const audit = recordingAudit();
   const seeded = await seedNetopiaSubscription(database.pool, {
     ownerRef: identity.authenticated.ownerRef, planId: options.planId ?? "PLUS", activatedAt: new Date(clock.now.getTime() - 5 * DAY),
-    taxCountry: "RO"
+    taxCountry: "RO",
+    ...(options.currency === undefined ? {} : { currency: options.currency }),
+    ...(options.currency === "RON" ? { netMicros: 100_000_000 } : {})
   });
   const deps = subscriptionDeps(database.pool, {
     payments, geo, audit, clock: () => clock.now, accountEmail: { read: async () => EMAIL },
+    ...(options.currency === undefined ? {} : { plans: testRegionalPlans }),
     ...(options.paymentEnvironment === undefined ? {} : { paymentEnvironment: options.paymentEnvironment })
   });
   const api = await mountSubscriptionRoutes(deps, identity);
@@ -160,6 +165,38 @@ describe("N12 an upgrade on NETOPIA's page (spec §2.10)", () => {
       .toMatchObject({ paymentIp: BUYER_IP, email: EMAIL, firstName: "Test" });
     // Nothing changes before NETOPIA confirms the payment.
     expect((await stateOf(run.seeded.subscriptionId)).planId).toBe("PLUS");
+    await run.api.close();
+  });
+
+  it("a RON subscription upgrades on NETOPIA's page in RON", async () => {
+    const run = await start("c2-upgrade-ron", { currency: "RON" });
+    const quoted = await run.quote("PRO");
+    const response = await run.upgrade("PRO", quoted.quote_ref);
+    expect(response.statusCode, response.body).toBe(200);
+    const chargeRef = BillingUpgradeResponseSchema.parse(response.json()).charge_ref;
+    const quote = (await repository.quote(quoted.quote_ref, run.identity.authenticated.ownerRef))!;
+    expect(quote.currency).toBe("RON");
+    const charge = (await repository.charge(chargeRef))!;
+    expect(charge).toMatchObject({ kind: "UPGRADE", currency: "RON", totalMicros: quote.totalMicros });
+    expect(run.payments.hosted).toEqual([
+      expect.objectContaining({ orderId: chargeRef, currency: "RON", amountMicros: quote.totalMicros })
+    ]);
+    expect(microsToDecimal(quote.totalMicros)).toBe(quoted.total);
+    await run.api.close();
+  });
+
+  it("refuses an upgrade quote in another currency than the subscription's as the writer's bug it would be", async () => {
+    const run = await start("c2-upgrade-mismatch");
+    const quoted = await run.quote("PRO");
+    const usd = (await repository.quote(quoted.quote_ref, run.identity.authenticated.ownerRef))!;
+    const eur = { ...usd, quoteId: randomUUID(), currency: "EUR" as const };
+    await repository.withTransaction((client) => repository.insertQuote(client, eur));
+    await expect(startUpgrade(run.deps, {
+      ownerRef: run.identity.authenticated.ownerRef, userId: run.identity.authenticated.userId, planId: "PRO",
+      quoteRef: eur.quoteId, ip: BUYER_IP, userAgent: "c2", locale: "en", agreement: testAgreement("en")!
+    })).rejects.toMatchObject({ code: "BILLING_CURRENCY_MISMATCH" });
+    expect(await upgradeCharges(run.seeded.subscriptionId)).toEqual([]);
+    expect(run.payments.hosted).toEqual([]);
     await run.api.close();
   });
 

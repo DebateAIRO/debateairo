@@ -181,7 +181,7 @@ export class QuadernoTaxEngine implements TaxEngine {
     const customer = i.customer;
     const created = await this.#send("POST", "/transactions", {
       type: "sale",
-      currency: "USD",
+      currency: i.currency,
       date: isoDate(i.issuedOn),
       customer: {
         // No invented name: a buyer who gave none is sent without one (P8 collects it where the law needs it).
@@ -229,7 +229,7 @@ export class QuadernoTaxEngine implements TaxEngine {
     }
     const created = await this.#send("POST", "/transactions", {
       type: "refund",
-      currency: "USD",
+      currency: i.currency,
       date: isoDate(i.issuedOn),
       // The line's text is the caller's, in the customer's language (P10a, from the catalogue) — never ours.
       items: [{ description: i.description, quantity: 1, amount: Number(microsToDecimal(i.refundTotalMicros)) }],

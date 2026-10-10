@@ -570,13 +570,15 @@ export class RenewalService {
       // Spec 2026-10-05 §2.16.3: a renewal (and each retry) is priced in the subscription's own currency.
       currency: state.currency
     });
-    const charge = Object.freeze({
+    const charge: ChargeRow = Object.freeze({
       chargeId: newChargeId(), ownerRef: state.ownerRef, subscriptionId: state.subscriptionId, kind: "RENEWAL", attempt, periodStart,
       periodEnd: computeWindows(state.periodAnchorAt!, periodStart).month.end, quoteId,
-      netMicros: quote.netMicros, taxMicros: quote.taxMicros, totalMicros: quote.totalMicros, currency: "USD", createdAt: now,
+      netMicros: quote.netMicros, taxMicros: quote.taxMicros, totalMicros: quote.totalMicros,
+      // Spec 2026-10-05 §2.16.4: the charge is in its quote's currency, the subscription's (a dunning retry inherits it).
+      currency: quote.currency, createdAt: now,
       // Spec §2.5.4: every charge of a subscription is paid in the system the subscription was created in.
       paymentProvider: state.paymentProvider, paymentEnvironment: state.paymentEnvironment
-    }) as ChargeRow;
+    });
     return Object.freeze({ quote, charge });
   }
 
@@ -887,7 +889,7 @@ export class RenewalService {
     const quote = charge.quoteId === null ? null : await this.deps.repository.quote(charge.quoteId, charge.ownerRef);
     const locale = stored.profile?.locale ?? "en";
     return Object.freeze({
-      orderId: charge.chargeId, amountMicros: charge.totalMicros, currency: "USD" as const,
+      orderId: charge.chargeId, amountMicros: charge.totalMicros, currency: charge.currency,
       description: netopia.orderText("ORDER_PLAN", locale, { plan: planName(quote?.planId ?? state.planId) }),
       payer, cardToken: openCardToken(this.deps.recordsKey, card), payerIp,
       returnUrl: paymentReturnUrl(this.deps.publicAppUrl, "/checkout/return", charge.chargeId),

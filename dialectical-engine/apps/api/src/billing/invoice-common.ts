@@ -160,6 +160,7 @@ export function saleRecordOf(
     chargeId: paid.charge.chargeId,
     transactionId: paid.paid.providerPaymentId!,
     issuedOn: paid.paid.at,
+    currency: paid.charge.currency,
     customer: Object.freeze({
       name: company?.name ?? buyer.name, email: paid.profile.email, country: buyer.country,
       region, postalCode: buyer.postalCode, city: buyer.city,
@@ -278,6 +279,7 @@ export async function creditNoteContext(
     paid, original,
     refund: Object.freeze({
       chargeId: paid.charge.chargeId, transactionId: refund.transactionId, issuedOn: sale.refunded.at,
+      currency: paid.charge.currency,
       refundTotalMicros: sale.amountMicros, original: { documentId: original.externalRef, number: original.number },
       // RefundRecord.description (D5 Open question 4): the credited line in the buyer's language, the same sentence
       // the invoice carried for the period it credits (SmartBill's P5 still names its negative line itself).

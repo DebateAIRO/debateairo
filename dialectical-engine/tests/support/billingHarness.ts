@@ -121,10 +121,14 @@ export class HarnessPayments implements CardPayments {
   /** Saved-card charges NETOPIA actually made for this subscription (PAID, or PAID with the answer lost). */
   madeFor(subscriptionId: string): number { return this.#made.get(subscriptionId) ?? 0; }
 
-  /** A person paying a hosted payment (a checkout, an upgrade or a card check) on NETOPIA's page. */
+  /**
+   * A person paying a hosted payment (a checkout, an upgrade or a card check) on NETOPIA's page, in the currency the
+   * page was started in (spec 2026-10-05 §2.16.4; the hosted start stores it), so an EUR or RON checkout is paid in its own.
+   */
   pay(chargeId: string, input: Readonly<{ amountMicros: number; cardCountry: string | null }>): PaymentReport {
     const report = stubPaymentReport(chargeId, input.amountMicros === 0 ? "AUTHORIZED" : "PAID", {
-      amountMicros: input.amountMicros, currency: "USD", cardCountry: input.cardCountry, occurredAt: this.clock()
+      amountMicros: input.amountMicros, currency: this.reports.get(chargeId)?.currency ?? "USD", cardCountry: input.cardCountry,
+      occurredAt: this.clock()
     });
     this.reports.set(chargeId, report);
     return report;
