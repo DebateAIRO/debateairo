@@ -46,6 +46,7 @@ import {
 import { channelBinding, mfaFactor } from "../../packages/db/src/schema.js";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { currentDocument } from "@debateai/legal-manifest";
+import type { MailDomainCheck } from "../../apps/api/src/mail-domain-check.js";
 
 type TestAuthRoute = "register" | "verify" | "resend";
 const execFileAsync = promisify(execFile);
@@ -1778,6 +1779,7 @@ function rework7Harness(options: {
   readonly password?: string;
   readonly deferHash?: boolean;
   readonly legalAcceptance?: boolean;
+  readonly mailDomainCheck?: MailDomainCheck;
 } = {}): Rework7Harness {
   const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
   const policy = Object.freeze({
@@ -1933,7 +1935,8 @@ function rework7Harness(options: {
       counters.tokenMint += 1;
       return "r7".padEnd(43, "T");
     },
-    ...(options.legalAcceptance === true ? { legalAcceptance: { recordsKey: Buffer.alloc(32, 0x7d) } } : {})
+    ...(options.legalAcceptance === true ? { legalAcceptance: { recordsKey: Buffer.alloc(32, 0x7d) } } : {}),
+    ...(options.mailDomainCheck === undefined ? {} : { mailDomainCheck: options.mailDomainCheck })
   });
 
   interface Rework7Inspected {
@@ -2047,6 +2050,50 @@ function rework7Harness(options: {
     }
   };
 }
+
+describe("open sign-up mail: the domain question at sign-up (G5)", () => {
+  const input = { phone: "+40722123456", email: "dns@example.test", recoveryEmail: null, password: REWORK7_PASSWORD, adultAffirmed: true };
+  const source = (requestId: string) => ({ ip: "81.196.1.9", userAgent: "test/1", requestId });
+  it("refuses a domain that takes no mail with EMAIL_INVALID after the limiter, before any hash or account", async () => {
+    const asked: string[] = [];
+    const harness = rework7Harness({ mailDomainCheck: async (domain) => { asked.push(domain); return "UNDELIVERABLE"; } });
+    try {
+      await expect(harness.service.register({ ...input, email: "Person@Example.TEST" }, source("dns-refused")))
+        .rejects.toMatchObject({ code: "EMAIL_INVALID", statusCode: 422 });
+      expect(asked).toEqual(["example.test"]);
+      expect(harness.counters.limiterConsume).toBe(1);
+      expect(harness.counters.passwordHash).toBe(0);
+      expect(harness.counters.mutation).toBe(0);
+      expect(harness.createdInputs).toEqual([]);
+    } finally { harness.restore(); }
+  });
+  it("fails open: an UNKNOWN answer (timeout, resolver failure) registers as before", async () => {
+    const harness = rework7Harness({ mailDomainCheck: async () => "UNKNOWN" });
+    try {
+      await harness.service.register(input, source("dns-unknown"));
+      expect(harness.createdInputs).toHaveLength(1);
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+  it("fails open when the check itself throws", async () => {
+    const harness = rework7Harness({ mailDomainCheck: async () => { throw new Error("RESOLVER_BROKEN"); } });
+    try {
+      await harness.service.register(input, source("dns-throws"));
+      expect(harness.createdInputs).toHaveLength(1);
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+  it("asks about the recovery address too", async () => {
+    const asked: string[] = [];
+    const harness = rework7Harness({ mailDomainCheck: async (domain) => { asked.push(domain); return domain === "gone.test" ? "UNDELIVERABLE" : "DELIVERABLE"; } });
+    try {
+      await expect(harness.service.register({ ...input, recoveryEmail: "backup@gone.test" }, source("dns-recovery")))
+        .rejects.toMatchObject({ code: "EMAIL_INVALID" });
+      expect(asked).toEqual(["example.test", "gone.test"]);
+      expect(harness.createdInputs).toEqual([]);
+    } finally { harness.restore(); }
+  });
+});
 
 // Owner ruling 2026-10-09: the phone is optional. Without one, the repository is handed no phone
 // at all (no ciphertext, source, status or time); a given phone is still normalized and encrypted.
@@ -2181,7 +2228,8 @@ describe("T1 rework7 A1 — the structural admission budget is exactly 103", () 
         phone: "+40722123456", recoveryEmail: "r7-invalid-recovery@example.test", adultAffirmed: true
       }, { ip: "2001:db8:7ea::ffff", userAgent: "vitest", requestId: "request:invalid" })
         .then(() => "ADMITTED", (error: unknown) => rework7Code(error));
-      expect(invalidInput).toBe("AUTH_INPUT_INVALID");
+      // Open sign-up mail (2026-10-09): an address refusal has its own stable code, still before admission.
+      expect(invalidInput).toBe("EMAIL_INVALID");
       const invalidSource = await harness.service.register({
         email: "r7-valid@example.test", password: REWORK7_PASSWORD,
         phone: "+40722123456", recoveryEmail: "r7-valid-recovery@example.test", adultAffirmed: true

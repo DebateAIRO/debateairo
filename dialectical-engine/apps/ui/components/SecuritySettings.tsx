@@ -160,7 +160,9 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
         } catch (failure) {
             if (active.current && epoch === generation.current) {
                 setSelected(null); setEmail('');
-                setError(t(catalog, 'settings.email.actionFailed'));
+                // A recovery address the server refused (its domain takes no mail) says so; anything else stays generic.
+                setError(authorization.action === 'CHANGE_RECOVERY_EMAIL' && failure instanceof ContractHttpError && failure.serverCode === 'EMAIL_INVALID'
+                    ? t(authCatalog, 'auth.emailUndeliverable') : t(catalog, 'settings.email.actionFailed'));
             }
         } finally { if (active.current && epoch === generation.current) { flight.current = false; setBusy(false); } }
     }

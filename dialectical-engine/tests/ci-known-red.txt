@@ -187,9 +187,14 @@ tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded number
 # else BY DESIGN (packages/db/src/migration-lineage.ts identifyLineage; tests/integration/auth-dev-lineage.test.ts
 # asserts that refusal).
 #
+# FIXED 2026-10-10 (branch fix/2026-10-10-stale-clock-migration-order): the 2 of the 15 that were not lineage refusals
+# were stale tests, fixed and deleted in that commit — s6-content-encryption-database's pre-0038 case walks the
+# planned order from loadMigrationPlan() instead of the folder, and support-cases' shredded case passes
+# clock: () => shreddedAt. 13 remained below then, all lineage refusals, in 7 files.
+#
 # SHRUNK 2026-10-10 (branch fix/2026-10-10-lineage-refused-tests): those 13 entries are gone, each deleted in the
-# commit that turned its file green; the 2 below remain. None was made green by relaxing the lineage rule
-# (migration-lineage.ts is untouched). Each test now runs the migration's OWN SQL — the digest-checked bytes migrate()
+# commit that turned its file green, so with the FIXED note above no integration entry remains. None was made green
+# by relaxing the lineage rule (migration-lineage.ts is untouched). Each test now runs the migration's OWN SQL — the digest-checked bytes migrate()
 # runs, via tests/support/migrationReplay.ts — on a database migrate() finished, and never edits the ledger. The
 # 0068, 0071 and 0054-support replays and every refusal guard run in a transaction that is rolled back, with the drift
 # each guard refuses set up inside it. TINT1 (0054 revoke), T6 (0032 + 0043 over legacy rows) and the support catalog
@@ -202,22 +207,3 @@ tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded number
 # publish_register_version and import_historical_register_version, which 0065 revoked. migrate() never re-runs a
 # recorded migration, so no real database meets either; the tests keep those replays rolled back, except the catalog
 # repair, which commits both on its own throwaway database and checks nothing those leftovers touch.
-tests/integration/s6-content-encryption-database.test.ts > S6 content encryption on disposable PostgreSQL > migrates a default-off pre-0038 legacy run through the final schema
-#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
-#   tests/ci-integration-all.txt; the same
-#   message file by file on dev@c8cf8e063 the same day).
-#   BILLING_0093_RUNTIME_FUNCTIONS: the test applies migration files in readdir (alphabetical)
-#   order outside migrate(). PR #82 (merge 065708c19) added 0092_internal_funded_allowance and
-#   0093_internal_provider_admission beside dev's 0092/0093, so 0092_internal… now runs before 0093_billing_runtime_role
-#   and 0093's exact-grant check refuses. migrate() runs the planned order and is unaffected. Stale test; fix: walk
-#   the order from loadMigrationPlan() instead of the folder.
-#   blinds: the rest of that one case (a pre-0038 legacy run through the final schema); the other 49 cases of the
-#   file run.
-tests/integration/support-cases.test.ts > SUP-02 cases > returns a shredded case discriminator without unwrapping and preserves ciphertext bytes
-#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
-#   tests/ci-integration-all.txt; the same
-#   message file by file on dev@c8cf8e063 the same day).
-#   readByToken returns null: the test fixes its dates at 2026-09-07 and passes no clock, and the
-#   30-day case-token lifetime (5e05905cc, PR #8) made that token expired from 2026-10-07 12:00 UTC. A calendar time
-#   bomb in the test, not a product change; fix: pass clock: () => shreddedAt.
-#   blinds: the rest of that one case (no unwrap, ciphertext bytes preserved); the other 34 cases run.
