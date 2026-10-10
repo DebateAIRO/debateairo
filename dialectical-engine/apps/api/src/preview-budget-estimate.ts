@@ -77,7 +77,7 @@ export class PreviewDailyLimitRefusal extends TypedDomainError {
 }
 
 /** How long a "not available right now" refusal asks the caller to wait. */
-export const PREVIEW_UNAVAILABLE_RETRY_MS = 60_000;
+const PREVIEW_UNAVAILABLE_RETRY_MS = 60_000;
 /**
  * The existing ask refusal whose localized sentence says a model the debate needs cannot be
  * reached right now, retry later (apps/ui requestFailure MODEL_UNAVAILABLE). Its public message is
@@ -103,7 +103,7 @@ export const PREVIEW_ESTIMATE_OUTPUT_TOKENS_PER_CALL = 1_200n;
 export const PREVIEW_ESTIMATE_MARGIN_NUMERATOR = 115n;
 export const PREVIEW_ESTIMATE_MARGIN_DENOMINATOR = 100n;
 /** More unfinished preview debates than this is itself a fault: refused as unavailable. */
-export const PREVIEW_UNFINISHED_RUNS_MAX = 64;
+const PREVIEW_UNFINISHED_RUNS_MAX = 64;
 
 /** A panel member as admission and the run row hold it. */
 export type PreviewPanelMember = Readonly<{ provider_ref: string; model_id: string }>;

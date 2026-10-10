@@ -2,7 +2,7 @@
  * The private preview's reviewed DeepInfra model rows (contract A §1, 2026-10-10).
  *
  * Plain words: the preview may call exactly these models, each at its own list price, with its
- * own largest answer size ("output bound"), its own thinking switch ("effort") and its own
+ * own largest answer size ("output bound"), its own "effort" thinking switch and its own
  * JSON-answer switch. The root gate holds the same table in Python; a parity test reads
  * tests/unit/fixtures/preview-model-rows.json so the two copies cannot drift. Changing a row is a
  * reviewed code change on both sides, never a configuration edit.
@@ -35,7 +35,7 @@ export const PREVIEW_CONTEXT_WINDOW_TOKENS = 1_048_576 as const;
 /** Request bodies above this are refused before any reservation (contract A §2). */
 export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
 /** Template allowance added to the body's bytes on the input side of a reservation (contract A §3). */
-export const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
+const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 
 function row(input: Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;
