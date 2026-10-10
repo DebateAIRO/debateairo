@@ -279,8 +279,6 @@ export type ProviderTargetGatewayControls = Readonly<{
   thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
   contextWindowTokens?: number;
   supportsJsonObjectResponse?: boolean;
-  /** Contract A §2: a reviewed preview row's output bound; max_tokens is never sent above it. */
-  maxOutputTokens?: number;
 }>;
 
 /** The reviewed DeepInfra row behind an endpoint and model, if any (contract A §1). */
@@ -297,8 +295,7 @@ export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): 
       thinking: Object.freeze({ parameter: target.thinkingParameter, levels: target.thinkingLevels })
     }),
     ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens }),
-    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{}),
-    ...(reviewedDeepInfraRow(target.baseUrl,target.model)===undefined?{}:{maxOutputTokens:reviewedDeepInfraRow(target.baseUrl,target.model)!.outputBound})
+    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{})
   });
 }
 
