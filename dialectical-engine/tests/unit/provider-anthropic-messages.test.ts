@@ -241,6 +241,29 @@ describe("PR B — reading the Anthropic reply", () => {
       .rejects.toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", lastParseStatus: PROVIDER_CONTENT_LENGTH_EXCEEDED });
   });
 
+  // Review fix (PR B): PROVIDER_PACKET_UNSUPPORTED can never escape an attempt. The gateway checks
+  // the first packet on this wire before the loop (nothing sent, nothing ledgered), and a later
+  // packet it cannot say ends the loop as exhaustion. Today the safety frame refuses every such
+  // packet even earlier (a framed packet is system text plus fenced user turns only), as these show.
+  it("a packet the wire cannot say is refused before anything is sent or ledgered", async () => {
+    const { gateway, sent, ledger, artifacts } = gatewayWith(() => reply(message()));
+    await expect(gateway.call(request({ packet: { messages: [...PACKET.messages, { role: "assistant", content: "prefill" }] } })))
+      .rejects.toMatchObject({ code: "PROMPT_FRAME_FOREIGN_TURN" });
+    expect([sent.length, ledger.length, artifacts.length]).toEqual([0, 0, 0]);
+  });
+
+  it("a repair packet the wire cannot say stops the call after the ledgered first attempt", async () => {
+    const { gateway, sent, ledger } = gatewayWith(() => reply(message({ content: [{ type: "text", text: "not json" }] })));
+    const classifyContent = (content: string) => {
+      try { JSON.parse(content); return { parseStatus: "PARSED" as const, parseError: null }; }
+      catch { return { parseStatus: "PARSE_FAILED" as const, parseError: "not json" }; }
+    };
+    const buildRepairPacket = () => ({ ...PACKET, messages: [...PACKET.messages, { role: "assistant" as const, content: "not json" }] });
+    await expect(gateway.call(request({ classifyContent, buildRepairPacket }))).rejects.toBeInstanceOf(Error);
+    expect(sent).toHaveLength(1);
+    expect(ledger).toHaveLength(1);
+  });
+
   it("refuses a reply naming another model: PROVIDER_MODEL_IDENTITY_CHANGED, one call", async () => {
     const { gateway, sent } = gatewayWith(() => reply(message({ model: "claude-haiku-5-5-other" })));
     await expect(gateway.call(request())).rejects.toMatchObject({ code: "PROVIDER_MODEL_IDENTITY_CHANGED" });

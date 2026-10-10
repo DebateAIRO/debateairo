@@ -8,6 +8,7 @@ import {
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
   ANTHROPIC_MESSAGES_PATH,
   PROVIDER_CONTENT_REFUSED,
+  PROVIDER_PACKET_UNSUPPORTED,
   PROVIDER_REPLY_UNSUPPORTED,
   anthropicMessagesRequestBody,
   anthropicMessagesRequestHeaders,
@@ -1628,6 +1629,15 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     let lastOutcome: "TIMED_OUT" | "FAILED" = "FAILED";
     let lastLedgerEntryRef = "PROVIDER_LEDGER_ENTRY_UNRESOLVED";
     let attemptPacket = request.packet;
+    /**
+     * PR B review: a packet the Anthropic wire cannot say (no user turn first, a final assistant
+     * turn, an empty message) is refused HERE, before the loop: nothing is sent, so nothing is
+     * ledgered, exactly as the frame refusal above. A later attempt's packet (a repair) that the
+     * wire cannot say ends the loop below as exhaustion does, never as an escape mid-attempt.
+     */
+    if (this.#anthropic) {
+      anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: 1, thinkingLevel: thinking.sent, messages: attemptPacket.messages });
+    }
     /** W10/2: how many attempts of THIS call were cut off at the bound. */
     let lengthFailures = 0;
     let lastContentRejection: {
@@ -1676,13 +1686,23 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // body byte for byte; with one, the target's own member carries it.
       // PR B: the Anthropic wire builds its own contract body; a packet it
       // cannot say is refused here, before anything is sent or recorded.
-      const body = this.#anthropic
-        ? anthropicMessagesRequestBody({
+      let anthropicBody: string | undefined;
+      if (this.#anthropic) {
+        try {
+          anthropicBody = anthropicMessagesRequestBody({
             model: this.#options.model,
             maxTokens: attemptTokenCeiling,
             thinkingLevel: thinking.sent,
             messages: attemptPacket.messages
-          })
+          });
+        } catch (error) {
+          // Only a later attempt can get here (the first packet was checked before the loop).
+          if (attempt > 1 && error instanceof TypedDomainError && error.code === PROVIDER_PACKET_UNSUPPORTED) break;
+          throw error;
+        }
+      }
+      const body = anthropicBody !== undefined
+        ? anthropicBody
         : JSON.stringify({
         model: this.#options.model,
         max_tokens: attemptTokenCeiling,

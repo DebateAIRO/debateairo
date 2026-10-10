@@ -192,6 +192,17 @@ export function assertPreviewRoleTargets(
   if (config === undefined) return;
   const declared = new Set(targets.map(target => target.providerRef));
   if (roleRefs.length === 0 || roleRefs.some(ref => !declared.has(ref))) refused();
+  assertPreviewRoleGateSockets(config, roleRefs);
+}
+/**
+ * PR B review: a role on a model whose provider gate the config does not name (Claude Haiku with no
+ * `anthropic_budget_socket`) could never be called, so every ask would be refused. Refused at boot.
+ */
+export function assertPreviewRoleGateSockets(config: PreviewTargetRosters, roleRefs: readonly string[]): void {
+  for (const ref of roleRefs) {
+    const provider = previewModelRowForRef(ref)?.provider;
+    if (provider !== undefined && provider !== "deepinfra" && typeof config[PREVIEW_PROVIDER_SOCKET_KEYS[provider]] !== "string") refused();
+  }
 }
 /**
  * The probe's controls for one reviewed target: "high" only where the row has an effort switch,

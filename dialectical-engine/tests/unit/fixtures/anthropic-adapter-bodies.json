@@ -1,6 +1,6 @@
 {
   "schema": "anthropic-adapter-bodies-v1",
-  "about": "Request bodies of the app's Anthropic adapter (packages/providers/src/anthropic-messages.ts). `sent` is the adapter's own output, byte for byte, for the packets in tests/unit/preview-anthropic-gate.test.ts (that test rebuilds every one); `refused` are bodies the adapter never sends. The gate's AnthropicProfile.body_valid and the app's guarded fetch must accept every `sent` body and refuse every `refused` one.",
+  "about": "Request bodies of the app's Anthropic adapter (packages/providers/src/anthropic-messages.ts). `sent` is the adapter's own output, byte for byte, for the packets in tests/unit/preview-anthropic-gate.test.ts (that test rebuilds every one); `refused` are bodies the adapter never sends and the wire contract forbids. The gate's AnthropicProfile.body_valid and the app's guarded fetch must accept every `sent` body and refuse every `refused` one. Read by tests/unit/preview-anthropic-gate.test.ts (adapter and guarded fetch) and tests/unit/preview_budget_authority_anthropic_test.py (the gate).",
   "sent": [
     {
       "name": "system and one user turn",
@@ -47,6 +47,110 @@
     {
       "name": "no effort at the default level (the preview always sends high)",
       "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}]}"
+    },
+    {
+      "name": "the thinking member",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"thinking\":{\"type\":\"adaptive\"}}"
+    },
+    {
+      "name": "tools",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"tools\":[]}"
+    },
+    {
+      "name": "tool_choice",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"tool_choice\":{\"type\":\"auto\"}}"
+    },
+    {
+      "name": "stream",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"stream\":false}"
+    },
+    {
+      "name": "metadata",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"metadata\":{\"user_id\":\"u\"}}"
+    },
+    {
+      "name": "stop_sequences",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"stop_sequences\":[\"x\"]}"
+    },
+    {
+      "name": "temperature",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"temperature\":1}"
+    },
+    {
+      "name": "top_p",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"top_p\":1}"
+    },
+    {
+      "name": "top_k",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"top_k\":1}"
+    },
+    {
+      "name": "a top-level cache_control",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"cache_control\":{\"type\":\"ephemeral\"}}"
+    },
+    {
+      "name": "cache_control inside a message",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "inference_geo",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"inference_geo\":\"us\"}"
+    },
+    {
+      "name": "service_tier",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"service_tier\":\"auto\"}"
+    },
+    {
+      "name": "container",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"container\":\"c\"}"
+    },
+    {
+      "name": "mcp_servers",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"mcp_servers\":[]}"
+    },
+    {
+      "name": "list content",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Q\"}]}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "a system role inside messages",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"system\",\"content\":\"S\"},{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "no messages",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "max_tokens 0",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":0,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "max_tokens above the row's bound",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":32769,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "fractional max_tokens",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":1.5,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "effort low",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"low\"}}"
+    },
+    {
+      "name": "an output_config with a format",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\",\"format\":{\"type\":\"json_schema\"}}}"
+    },
+    {
+      "name": "a system as blocks",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":[{\"type\":\"text\",\"text\":\"S\"}],\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "another model",
+      "body": "{\"model\":\"claude-opus-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "a JSON-mode response_format",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"response_format\":{\"type\":\"json_object\"}}"
     }
   ]
 }

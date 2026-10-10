@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   OpenAICompatibleProviderGateway, PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_MODEL_ROWS, PREVIEW_MODEL_ROWS_BY_PROVIDER,
-  PREVIEW_REVIEWED_PROVIDER_REFS, assertPreviewProviderTargets, createPreviewBudgetRpcPorts, createPreviewGuardedFetch,
+  PREVIEW_REVIEWED_PROVIDER_REFS, assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewBudgetRpcPorts, createPreviewGuardedFetch,
   observeProviderTarget, parsePreviewProviderTestConfig, parseProviderDiscoveryTargets, previewModelRow, previewNanoUsdText,
   previewProbeControls, previewProviderSocket, previewTargetGatewayControls, previewRefsAreReviewedSet, previewReservationNanoUsd, previewTargetJsonRow,
   providerTargetGatewayControls, withPreviewProviderCallPolicy,
@@ -120,6 +120,14 @@ describe("configuration names the Anthropic gate's socket", () => {
     ["a Premium roster of Haiku alone", { ...THREE_MAKERS, premium_model_ids: [HAIKU] }]
   ])("refuses %s", (_name, value) => {
     expect(() => parse(JSON.parse(JSON.stringify(value)))).toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+  });
+  it("boot refuses a register role on Haiku when the config names no Anthropic gate (API and runner)", () => {
+    const declared = targets(PREVIEW_REVIEWED_PROVIDER_REFS);
+    const withoutSocket = parse({ ...BASE, free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO] })!;
+    expect(() => assertPreviewRoleTargets(withoutSocket, declared, ["preview:fixture-a", HAIKU_REF]))
+      .toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+    expect(() => assertPreviewRoleTargets(withoutSocket, declared, ["preview:fixture-a", "preview:fixture-b"])).not.toThrow();
+    expect(() => assertPreviewRoleTargets(parse(THREE_MAKERS)!, declared, ["preview:fixture-a", HAIKU_REF])).not.toThrow();
   });
   it("the UI build flag takes Haiku under the same two-maker rule", () => {
     expect(parsePreviewRosterFlag(JSON.stringify({ free: [GLM, HAIKU], premium: [GLM, DEEPSEEK, HAIKU] })))
@@ -395,6 +403,25 @@ describe("Haiku's gateway, through the guarded fetch, sends the wire contract's 
     const body = JSON.parse(executions.anthropic![0]!.requestBody);
     expect(body).toMatchObject({ model: HAIKU, max_tokens: 32_768, output_config: { effort: "high" } });
     expect(Object.keys(body).every(key => ["model", "max_tokens", "messages", "system", "output_config"].includes(key))).toBe(true);
+  });
+  it("every attempt, length retries included, stays at or below Haiku's 32,768 bound", async () => {
+    const target = targets(PREVIEW_REVIEWED_PROVIDER_REFS).find(candidate => candidate.providerRef === HAIKU_REF)!;
+    const { executions, port } = recordingPorts();
+    const cut = JSON.stringify({ id: "msg_synthetic", type: "message", role: "assistant", model: HAIKU,
+      content: [{ type: "text", text: "{\"cut" }], stop_reason: "max_tokens", usage: { input_tokens: 10, output_tokens: 20 } });
+    const native = new OpenAICompatibleProviderGateway({ endpoint: target.baseUrl, model: target.model, maker: target.maker,
+      ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(parse(THREE_MAKERS)!, target),
+      fetchImplementation: createPreviewGuardedFetch({ anthropic: port("anthropic", () => cut) }),
+      persistRawArtifact: async artifact => artifact.artifactId, appendLedgerEntry: async entry => entry.attemptId,
+      assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined });
+    const classifyContent = (content: string) => {
+      try { JSON.parse(content); return { parseStatus: "PARSED" as const, parseError: null }; }
+      catch { return { parseStatus: "PARSE_FAILED" as const, parseError: "not json" }; }
+    };
+    await expect(native.call({ ...REQUEST, thinkingLevel: "high", classifyContent, bound: { maxAttempts: 4, tokenCeiling: 20_000, deadlineMs: 5_000 } })).rejects.toBeInstanceOf(Error);
+    const sent = executions.anthropic!.map(execution => JSON.parse(execution.requestBody).max_tokens as number);
+    expect(sent).toEqual([20_000, 32_768, 32_768, 32_768]);
+    expect(sent.every(value => value <= 32_768)).toBe(true);
   });
   it("the discovery probe goes through the Anthropic gate with high and the generation floor", async () => {
     const target = targets(PREVIEW_REVIEWED_PROVIDER_REFS).find(candidate => candidate.providerRef === HAIKU_REF)!;

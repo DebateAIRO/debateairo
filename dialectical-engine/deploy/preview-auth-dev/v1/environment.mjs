@@ -20,6 +20,8 @@ const REVIEWED_ROSTER_FLAGS=Object.values(PREVIEW_MODEL_ROSTER_FLAGS);
 export const isReviewedModelRosterFlag=value=>typeof value==='string'&&REVIEWED_ROSTER_FLAGS.includes(value);
 const LEGACY_CONFIG_KEYS='budget_socket,deployment,free_model_ids,requested_thinking_level,scope_id';
 const ROSTER_CONFIG_KEYS='budget_socket,deployment,free_model_ids,premium_model_ids,requested_thinking_level,scope_id';
+// PR B: the roster form may also name the Anthropic gate's socket (the API's parser checks its value).
+const OPTIONAL_SOCKET_KEYS=Object.freeze(['anthropic_budget_socket']);
 /**
  * Whether the UI's public model list (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) offers exactly what the
  * API's preview configuration (PREVIEW_PROVIDER_TEST_CONFIG_JSON) allows: the legacy array only with the
@@ -34,7 +36,8 @@ export function uiRosterMatchesApiConfig(uiFlag,apiConfigJson) {
   if(!api||typeof api!=='object'||Array.isArray(api))return false;
   const keys=Object.keys(api).sort().join(','),same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   if(Array.isArray(ui))return keys===LEGACY_CONFIG_KEYS&&same(api.free_model_ids,ui);
-  return keys===ROSTER_CONFIG_KEYS&&same(api.free_model_ids,ui.free)&&same(api.premium_model_ids,ui.premium);
+  const rosterKeys=Object.keys(api).filter(key=>!OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(',');
+  return rosterKeys===ROSTER_CONFIG_KEYS&&same(api.free_model_ids,ui.free)&&same(api.premium_model_ids,ui.premium);
  }catch{return false;}
 }
 const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY'];
