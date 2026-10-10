@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -97,21 +97,61 @@ describe("data export application", () => {
     } finally { await db.stop(); }
   });
 
-  it("R22 every snapshot JSON list aggregate declares its sequence order", async () => {
+  it("R22 pins each snapshot list's sequence key and direction", async () => {
     const sql = await readFile("migrations/0113_data_export.sql", "utf8");
     const functionSql = sql.split("CREATE OR REPLACE FUNCTION identity.read_data_export_snapshot(")[1]!.split("CREATE OR REPLACE FUNCTION identity.complete_data_export(")[0]!;
-    const starts = [...functionSql.matchAll(/jsonb_agg\(/g)].map((match) => match.index! + match[0].length);
-    expect(starts).toHaveLength(38);
-    const unordered = starts.filter((start) => {
-      let depth = 1, order = false;
-      for (let i = start; i < functionSql.length && depth > 0; i++) {
-        if (depth === 1 && functionSql.startsWith(" ORDER BY ", i)) order = true;
-        if (functionSql[i] === "(") depth++;
-        if (functionSql[i] === ")") depth--;
+    const expected: Record<string, string> = {
+      channels: "r.verified_at,to_jsonb(r)", age_checks: "r.checked_at,to_jsonb(r)", erasure_requests: "r.requested_at,to_jsonb(r)",
+      mfa_factors: "r.created_at,to_jsonb(r)", passkey_credentials: "r.created_at,to_jsonb(r)", sessions: "r.created_at,to_jsonb(r)",
+      social_identities: "r.created_at,to_jsonb(r)", email_change_requests: "r.issued_at,to_jsonb(r)", recovery_email_requests: "r.issued_at,to_jsonb(r)",
+      recovery_requests: "q.at,to_jsonb(q)", runs: "r.as_of,to_jsonb(r)", erasure_tombstones: "r.completed_at,to_jsonb(r)",
+      visibility_events: "r.at_seq,to_jsonb(r)", legal_acceptances: "r.accepted_at,to_jsonb(r)", sensitive_data_consents: "r.consented_at,to_jsonb(r)",
+      customers: "r.created_at,to_jsonb(r)", customer_xmoney: "r.at,to_jsonb(r)", customer_profile_events: "r.at,to_jsonb(r)",
+      quotes: "r.created_at,to_jsonb(r)", subscription_events: "r.at,to_jsonb(r)", entitlement_events: "r.effective_at,to_jsonb(r)",
+      run_charge_scopes: "r.admitted_at,to_jsonb(r)", charges: "r.created_at,to_jsonb(r)", internal_grants: "r.created_at,to_jsonb(r)",
+      withdrawal_owner_settlements: "r.settled_at,to_jsonb(r)", charge_events: "r.at,to_jsonb(r)", quote_uses: "r.used_at,to_jsonb(r)",
+      invoice_intents: "r.requested_at,to_jsonb(r)", invoices: "r.at,to_jsonb(r)", location_evidence: "r.at,to_jsonb(r)",
+      support_sessions: "r.created_at,to_jsonb(r)", support_messages: "r.received_at,to_jsonb(r)", support_cases: "r.created_at,to_jsonb(r)",
+      support_case_events: "r.at,to_jsonb(r)", support_case_messages: "r.at,to_jsonb(r)", support_ratings: "r.at,to_jsonb(r)",
+      support_key_states: "k.kind,k.ref", audit_events: "r.occurred_at,to_jsonb(r)"
+    };
+    const actual: Record<string, string> = {};
+    for (const line of functionSql.split("\n").filter((part) => part.includes("jsonb_agg("))) {
+      const name = /'([a-z_]+)',COALESCE/.exec(line)?.[1];
+      expect(name).toBeDefined();
+      actual[name!] = line.includes(" ORDER BY ") ? line.slice(line.lastIndexOf(" ORDER BY ") + 10).split(") FROM")[0]! : "MISSING";
+    }
+    expect(actual).toEqual(expected);
+  });
+
+  it("R22 orders support messages, case messages and activity by their event time", async () => {
+    const sql = await readFile("migrations/0113_data_export.sql", "utf8");
+    const db = await startTestDatabase();
+    const cases = [
+      { key: "support_messages", table: "support.message", temporary: "dx_order_messages",
+        columns: "message_id text,session_id text,role text,content_ciphertext bytea,outcome text,received_at timestamptz,first_token_at timestamptz,completed_at timestamptz,rating integer",
+        insert: "INSERT INTO dx_order_messages(message_id,received_at) VALUES ('late','2026-10-08T13:00:00Z'),('early','2026-10-08T12:00:00Z')",
+        id: "message_id" },
+      { key: "support_case_messages", table: "support.case_message", temporary: "dx_order_case_messages",
+        columns: "case_message_id text,case_id text,role text,content_ciphertext bytea,at timestamptz",
+        insert: "INSERT INTO dx_order_case_messages(case_message_id,at) VALUES ('late','2026-10-08T13:00:00Z'),('early','2026-10-08T12:00:00Z')",
+        id: "case_message_id" },
+      { key: "audit_events", table: "identity.audit_event", temporary: "dx_order_audit_events",
+        columns: "event_type text,occurred_at timestamptz",
+        insert: "INSERT INTO dx_order_audit_events(event_type,occurred_at) VALUES ('late','2026-10-08T13:00:00Z'),('early','2026-10-08T12:00:00Z')",
+        id: "event_type" }
+    ] as const;
+    try {
+      for (const item of cases) {
+        const line = sql.split("\n").find((part) => part.includes(`'${item.key}',COALESCE`))!;
+        const aggregate = line.match(new RegExp(`COALESCE\\(\\(SELECT (jsonb_agg\\(.*\\)) FROM ${item.table.replaceAll(".", "\\.")} r WHERE `))?.[1];
+        expect(aggregate, item.key).toBeDefined();
+        await db.pool.query(`CREATE TEMP TABLE ${item.temporary}(${item.columns})`);
+        await db.pool.query(item.insert);
+        const value = (await db.pool.query<{ value: Array<Record<string, string>> }>(`SELECT ${aggregate} value FROM ${item.temporary} r`)).rows[0]!.value;
+        expect(value.map((row) => row[item.id]), item.key).toEqual(["early", "late"]);
       }
-      return !order;
-    });
-    expect(unordered).toEqual([]);
+    } finally { await db.stop(); }
   });
   it("V-1 mails the stored archive with one handoff clock value for mail and row", async () => {
     const f = await fixture();
@@ -252,6 +292,59 @@ describe("data export application", () => {
     await f.store.write(orphan, USER, Buffer.from("orphan"));
     await f.app.runOnce();
     expect(await f.store.listIds()).toEqual([]);
+  });
+
+  it("R36 sweeps later expired exports when one archive cannot be unlinked", async () => {
+    const f = await fixture();
+    const bad = f.repository.seedSent({ userId: USER, expiresAt: f.now() });
+    const good = f.repository.seedSent({ userId: OTHER, expiresAt: f.now() });
+    await f.store.write(bad.exportId, USER, Buffer.from("bad archive"));
+    await f.store.write(good.exportId, OTHER, Buffer.from("good archive"));
+    const badArchive = join(f.directory, `${bad.exportId}.zip.enc`);
+    await rm(badArchive);
+    await mkdir(badArchive);
+    await f.app.runOnce();
+    expect(bad.keyDestroyed).toBe(false);
+    expect(good.keyDestroyed).toBe(true);
+    expect(await f.store.listIds()).not.toContain(good.exportId);
+  });
+
+  it("R31 claims a new build when an orphan archive cannot be unlinked", async () => {
+    const f = await fixture();
+    const orphan = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    await mkdir(join(f.directory, `${orphan}.zip.enc`));
+    const pending = f.repository.seedPreparing({ userId: USER, sessionId: SESSION });
+    await f.app.runOnce();
+    expect(pending.status).toBe("SENT");
+    expect(f.mails).toHaveLength(1);
+  });
+
+  it("R31 fails an exhausted claim even when its archive cannot be unlinked", async () => {
+    const f = await fixture();
+    const pending = f.repository.seedPreparing({ userId: USER, sessionId: SESSION, attempt: 3,
+      leaseUntil: new Date(START.getTime() - 1) });
+    await mkdir(f.directory, { recursive: true });
+    await mkdir(join(f.directory, `${pending.exportId}.zip.enc`));
+    await f.app.runOnce();
+    expect(pending).toMatchObject({ status: "FAILED", failureReason: "ATTEMPTS" });
+  });
+
+  it("R31 claims after a database sweep failure", async () => {
+    const f = await fixture();
+    const pending = f.repository.seedPreparing({ userId: USER, sessionId: SESSION });
+    vi.spyOn(f.repository, "sweep").mockRejectedValueOnce(new Error("database unavailable"));
+    await f.app.runOnce();
+    expect(pending.status).toBe("SENT");
+    expect(f.logs).toContain("[DATA_EXPORT_SWEEP_FAILED] ROW_BATCH");
+  });
+
+  it("R31 claims after the orphan listing fails", async () => {
+    const f = await fixture();
+    const pending = f.repository.seedPreparing({ userId: USER, sessionId: SESSION });
+    vi.spyOn(f.store, "listIds").mockRejectedValueOnce(new Error("store unavailable"));
+    await f.app.runOnce();
+    expect(pending.status).toBe("SENT");
+    expect(f.logs).toContain("[DATA_EXPORT_SWEEP_FAILED] ORPHAN_BATCH");
   });
 
   it("V-11 returns identical checked bytes for repeated valid downloads", async () => {
