@@ -2,7 +2,9 @@
  * Spec 2026-10-11 Part 4: with the row ON and two or more makers, admission picks the four roles
  * BEFORE the estimate and hands them to submit; otherwise nothing changes.
  */
+import { createServer, type Server, type Socket } from "node:net";
 import { describe, expect, it, vi } from "vitest";
+import { createPool, isDatabasePoolBusy } from "../../packages/db/src/index.js";
 
 /** Spec Part 5: the estimate is told whether the debate is rotated (Task 5 prices it); recorded here, never priced. */
 const estimate = vi.hoisted(() => ({ inputs: [] as unknown[] }));
@@ -29,7 +31,7 @@ const ASK: AskRequest = { question_line: "Should cities price congestion?", risk
   tier_provenance_ref: "asker:test", composition_budget_tier: "low", depth_params: { depth: 1 }, decision_scope: "rotation admission test",
   as_of: "2026-10-11T00:00:00.000Z", steering_presets: [], plan_tier: "free", steering_annotations: [] };
 
-function settings(input: Readonly<{ counts?: RoleRotationCounts; rotation?: boolean; panel?: readonly DiscoveredPanelMember[]; order?: string[]; failCounts?: boolean }>): RunCreationSettings {
+function settings(input: Readonly<{ counts?: RoleRotationCounts; rotation?: boolean; panel?: readonly DiscoveredPanelMember[]; order?: string[]; failCounts?: boolean; countsError?: unknown }>): RunCreationSettings {
   return {
     strangerSampleRate: 0, registerVersion: 1, batteryVersion: "battery:rotation", settlementWatchHandle: "watch:rotation",
     resolveDiscoveredPanel: async () => input.panel ?? PANEL,
@@ -41,6 +43,7 @@ function settings(input: Readonly<{ counts?: RoleRotationCounts; rotation?: bool
     ...(input.rotation === true ? { roleRotation: { readCounts: async () => {
       input.order?.push("counts");
       if (input.failCounts === true) throw new Error("database gone");
+      if (input.countsError !== undefined) throw input.countsError;
       return input.counts ?? {};
     } } } : {})
   };
@@ -80,7 +83,40 @@ describe("role rotation at admission", () => {
     expect(retryAt.getTime() - before).toBeGreaterThanOrEqual(60_000);
     expect(retryAt.getTime() - before).toBeLessThan(65_000);
   });
+  it("a busy pool reading the counts is rethrown for the API's SERVICE_BUSY 503 (ruling H), never admitted unpinned", async () => {
+    const busy = await busyPoolFailure();
+    expect(isDatabasePoolBusy(busy)).toBe(true);
+    const order: string[] = [];
+    const refused = await evaluateAskAdmission(settings({ rotation: true, countsError: busy, order }), ASK).then(
+      () => { throw new Error("admitted without its counts"); }, (caught: unknown) => caught);
+    expect(refused).toBe(busy);
+    expect(refused).not.toMatchObject({ name: "AskRefusal" });
+    expect(order).toEqual(["counts"]);
+  });
 });
+
+/**
+ * A real busy-pool failure, built as dev's connection-budget tests build it (tests/unit/database-pool-busy.test.ts):
+ * a TCP server that accepts and never answers is a database that never hands out a connection. The busy marker
+ * is only set by the pool itself, so it cannot be faked.
+ */
+async function busyPoolFailure(): Promise<unknown> {
+  const sockets: Socket[] = [];
+  const server: Server = createServer((socket) => { sockets.push(socket); });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (address === null || typeof address === "string") throw new TypeError("TEST_SERVER_ADDRESS");
+  const pool = createPool(`postgresql://nobody@127.0.0.1:${address.port}/none`, { max: 1, connectionTimeoutMillis: 100, name: "test:rotation-busy" });
+  const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  try {
+    return await pool.query("SELECT 1").then(() => { throw new TypeError("EXPECTED_REJECTION"); }, (caught: unknown) => caught);
+  } finally {
+    logged.mockRestore();
+    await pool.end().catch(() => undefined);
+    for (const socket of sockets) socket.destroy();
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
 
 describe("role rotation tells the preview's estimate whether the debate is rotated", () => {
   const GLM = "zai-org/GLM-5.3-Flash";

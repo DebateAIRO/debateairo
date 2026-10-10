@@ -4303,6 +4303,9 @@ export async function evaluateAskAdmission(
     try {
       counts = await settings.roleRotation.readCounts();
     } catch (error) {
+      // Ruling H (connection budget, #129): a busy pool or a full server is the API's one
+      // SERVICE_BUSY 503, as everywhere else; still never admitted with unpinned roles.
+      if (isDatabasePoolBusy(error)) throw error;
       // Never admitted with unpinned roles: the existing "cannot be reached right now" refusal,
       // with its one-minute retry. The operator's line names no question (ids and codes only).
       console.error(JSON.stringify(Object.freeze({
