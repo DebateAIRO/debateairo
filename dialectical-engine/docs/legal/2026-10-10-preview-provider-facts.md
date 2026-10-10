@@ -98,3 +98,24 @@ all three alone.
 - DeepInfra: where it processes, how long it keeps data, zero data retention, transfer basis.
 - Anthropic and Google rows: which jobs (arguments, judging, verdict story) each model is given;
   zero data retention is shown as "No" because no zero-retention agreement is on record.
+
+## Translation check: "when the law requires it" (ja, ko, zh, ga)
+
+AI cross-check done on 2026-10-10 for ja/ko/zh/ga, on the two sentences built around "when the law
+requires it": `legal.providers.retentionAnthropic` and `legal.providers.retentionGoogle`. Each was
+read against the English for meaning, formal legal register, and claims no stronger or weaker than
+the English (Anthropic: longer than 2 years *only* when the law requires it; Google: 55 days, only
+for misuse and when the law requires it).
+
+| Language | Result | Changed |
+| --- | --- | --- |
+| ja | Same meaning; "法律で求められる場合に限り" keeps the "only". "判定された" (judged) for "flag" is a little firmer than the English but accurate for an automated check | Nothing |
+| ko | Same meaning; "법률상 요구되는 경우에만 / 에 한해" keeps the "only" | Google sentence: "막는" (stop, everyday word) replaced by "방지하는" (prevent, the usual legal word) |
+| zh | Same meaning; "仅在法律要求时才会" keeps the "only"; formal register | Nothing |
+| ga | Same meaning; "ach amháin nuair a éilíonn an dlí é" keeps the "only"; lenition and the numeral forms (2 bhliain, 7 mbliana) are right | Nothing |
+
+For the native speaker, one more Irish point outside these two sentences: `legal.providers.sccBasis`
+says "Clásail chaighdeánacha chonarthacha"; the usual EU Irish term may put the adjectives the
+other way round ("clásail chonarthacha chaighdeánacha"). Not changed, as the AI check is not sure.
+
+**Native-speaker check OWED before public launch** for ja, ko, zh and ga.

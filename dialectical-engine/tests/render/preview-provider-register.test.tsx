@@ -187,6 +187,31 @@ describe("Qwen3.8-Flash through DeepInfra (owner, 10 October 2026: Qwen instead 
     expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI)");
   });
 
+  it("the owner's first debate (all five AIs on both plans) names DeepInfra's four and Anthropic's Haiku, each once", async () => {
+    const ALL_FIVE = [GLM, DEEPSEEK, MIMO, QWEN, HAIKU];
+    const { keys, row, pages, LegalProvidersBody } = await build(JSON.stringify({ free: ALL_FIVE, premium: ALL_FIVE }));
+    expect(keys).toEqual(PREVIEW_KEYS_QWEN_VIA_DEEPINFRA);
+    expect(row("deepinfra")?.models).toBe(ALL_DEEPINFRA);
+    expect(row("claude")).toBe(pages.ANTHROPIC_PREVIEW_PROVIDER);
+    // No Gemini id in the list: the checked Google row stays out; the hosted placeholder row is unchanged.
+    expect(row("gemini")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "gemini"));
+    const messages = resolve(process.cwd(), "apps/ui/messages");
+    for (const locale of ["en", "ro", "ja", "ko", "zh", "ga"]) {
+      const catalog = JSON.parse(readFileSync(resolve(messages, locale, "legal.json"), "utf8")) as Record<string, string>;
+      const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} />);
+      expect(html.match(/id="legal-provider-deepinfra"/g), locale).toHaveLength(1);
+      expect(html.match(/id="legal-provider-claude"/g), locale).toHaveLength(1);
+      expect(html, locale).not.toContain('id="legal-provider-qwen"');
+      for (const label of ALL_DEEPINFRA.split(", ")) expect(html.split(label).length - 1, `${locale} ${label}`).toBe(1);
+      expect(html, locale).toContain("Claude Haiku 5.5");
+      expect(html, locale).toContain("Anthropic Ireland, Limited");
+      expect(html, locale).toContain(escaped(catalog["legal.providers.retentionAnthropic"] ?? "missing"));
+      expect(html, locale).toContain(escaped(catalog["legal.providers.sccBasis"] ?? "missing"));
+      expect(html, locale).not.toContain("Gemini 3.8 Flash");
+      expect(html, locale).not.toContain(escaped(catalog["legal.providers.retentionGoogle"] ?? "missing"));
+    }
+  });
+
   it("nothing about the preview's Gemini shows unless a flag names gemini-3.8-flash", async () => {
     const reviewed = [
       JSON.stringify([GLM]),
