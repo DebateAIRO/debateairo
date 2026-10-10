@@ -671,33 +671,94 @@ function logRefusal(kind: "unavailable" | "shortfall", reason: string): void {
  */
 export type PreviewAdmissionLock = Readonly<{ acquire(): Promise<void>; release(): Promise<void> }>;
 export const PREVIEW_ADMISSION_LOCK_NAME = "debateai.preview.admission" as const;
-export function createPreviewAdmissionLock(pool: Pick<Pool, "connect">): PreviewAdmissionLock {
+/**
+ * Review (2026-10-10): waiting asks must not hold pool connections. Each ask used to take a connection
+ * and block in pg_advisory_xact_lock with no timeout, while the holder needed ANOTHER connection from
+ * the same pool (the unfinished debates, then the run): about as many waiting asks as the pool has
+ * connections froze the whole API. Now the asks of this process queue IN PROCESS first (the preview
+ * API is one process), so at most one of them holds a connection for the lock; a wait longer than
+ * PREVIEW_ADMISSION_WAIT_MS gives up. The database lock stays (another process) with a lock_timeout
+ * backstop. Either failure refuses as "not reachable right now" (retry in a minute), never the
+ * daily-limit sentence.
+ */
+const PREVIEW_ADMISSION_WAIT_MS = 30_000;
+const PREVIEW_ADMISSION_LOCK_TIMEOUT = "10s";
+type InProcessTurns = { held: boolean; waiting: Array<() => void> };
+const IN_PROCESS_TURNS = new WeakMap<object, InProcessTurns>();
+/** Waits for this process's turn at `key`; resolves to a release function, or rejects after `waitMs`. */
+function inProcessTurn(key: object, waitMs: number): Promise<() => void> {
+  let turns = IN_PROCESS_TURNS.get(key);
+  if (turns === undefined) { turns = { held: false, waiting: [] }; IN_PROCESS_TURNS.set(key, turns); }
+  const queue = turns;
+  let done = false;
+  const releaseTurn = (): void => {
+    if (done) return;
+    done = true;
+    const next = queue.waiting.shift();
+    if (next === undefined) queue.held = false; else next();
+  };
+  if (!queue.held) {
+    queue.held = true;
+    return Promise.resolve(releaseTurn);
+  }
+  return new Promise((resolve, reject) => {
+    const grant = (): void => { clearTimeout(timer); resolve(releaseTurn); };
+    const timer = setTimeout(() => {
+      const index = queue.waiting.indexOf(grant);
+      if (index >= 0) queue.waiting.splice(index, 1);
+      reject(new TypeError("PREVIEW_ADMISSION_WAIT_EXPIRED"));
+    }, waitMs);
+    queue.waiting.push(grant);
+  });
+}
+export function createPreviewAdmissionLock(pool: Pick<Pool, "connect">,
+  options: Readonly<{ waitMs?: number }> = {}): PreviewAdmissionLock {
   let client: PoolClient | undefined;
+  let releaseTurn: (() => void) | undefined;
   let released = false;
+  const freeTurn = (): void => {
+    const turn = releaseTurn;
+    releaseTurn = undefined;
+    turn?.();
+  };
   const release = async (): Promise<void> => {
     released = true;
     const held = client;
     client = undefined;
-    if (held === undefined) return;
-    let broken: Error | undefined;
-    try { await held.query("COMMIT"); } catch (error) {
-      broken = error instanceof Error ? error : new Error("PREVIEW_ADMISSION_LOCK_RELEASE_FAILED");
+    try {
+      if (held === undefined) return;
+      let broken: Error | undefined;
+      try { await held.query("COMMIT"); } catch (error) {
+        broken = error instanceof Error ? error : new Error("PREVIEW_ADMISSION_LOCK_RELEASE_FAILED");
+      }
+      // A connection whose COMMIT failed is destroyed, never reused with the lock possibly held.
+      held.release(broken);
+    } finally {
+      freeTurn();
     }
-    // A connection whose COMMIT failed is destroyed, never reused with the lock possibly held.
-    held.release(broken);
   };
   return Object.freeze({
     async acquire() {
       if (client !== undefined) return;
       if (released) throw new TypeError("PREVIEW_ADMISSION_LOCK_RELEASED");
-      const connection = await pool.connect();
+      releaseTurn ??= await inProcessTurn(pool, options.waitMs ?? PREVIEW_ADMISSION_WAIT_MS);
+      if (released) { freeTurn(); throw new TypeError("PREVIEW_ADMISSION_LOCK_RELEASED"); }
+      let connection: PoolClient;
+      try {
+        connection = await pool.connect();
+      } catch (error) {
+        freeTurn();
+        throw error;
+      }
       client = connection;
       try {
         await connection.query("BEGIN");
+        await connection.query(`SET LOCAL lock_timeout = '${PREVIEW_ADMISSION_LOCK_TIMEOUT}'`);
         await connection.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [PREVIEW_ADMISSION_LOCK_NAME]);
       } catch (error) {
         client = undefined;
         connection.release(error instanceof Error ? error : new Error("PREVIEW_ADMISSION_LOCK_FAILED"));
+        freeTurn();
         throw error;
       }
     },
