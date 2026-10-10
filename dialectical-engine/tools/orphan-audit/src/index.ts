@@ -642,7 +642,10 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // N26m/N26n (PR-54): the reviewed module after the NETOPIA branch merged dev (its billing exports and #101's
 // applyForward110) and added the forward chain (migrate() runs the superseding verifier, applyForward110, then
 // applyForwardChain; migrations/lineage/README.md).
-const NATIVE_MIGRATE_MODULE_SHA256 = "24794cb070295a356b41c18d2d03c357d789eb3a0655c84147c0b1f169976426";
+// Connection budget (2026-10-10, docs/operations/2026-10-10-database-connection-budget.md): the reviewed
+// module after createPool gained a pool name, a busy marker (isDatabasePoolBusy) and a busy log line, and the
+// support control-plane pool took its size from packages/db/src/pool-budget.ts. migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "4bd57ce4f782977244e9523dafb767e3434ecee6ed2a1797e82f7266c96d3506";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

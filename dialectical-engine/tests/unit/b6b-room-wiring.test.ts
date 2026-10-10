@@ -53,7 +53,8 @@ describe("B6b the API root composes the room", () => {
 
   it("gives the decision a pool of its own, closed with the others", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
-    expect(main).toContain("const roomDecisionPool=boot.hold(createPool(environment.DATABASE_URL,{ max: 4 }));");
+    // Connection budget (2026-10-10): the size moved to packages/db/src/pool-budget.ts, still 4.
+    expect(main).toContain("const roomDecisionPool=boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.roomDecision));");
     expect(main).toContain("legacyAskAdmissionPool,\n    roomDecisionPool,");
   });
 });

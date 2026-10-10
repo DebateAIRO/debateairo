@@ -9297,6 +9297,13 @@ export function captureFailureEnvelope(input: {
 }
 
 /**
+ * How long a debate may wait for a free place on a runner before Hatchet gives
+ * it up. The runner takes 8 at once (RUNNER_CAPACITY.concurrentRuns); Hatchet's own
+ * default is 5 minutes, shorter than one debate. Owner ruling 2026-10-10.
+ */
+export const RUNNER_QUEUE_WAIT_LIMIT = "30m" as const;
+
+/**
  * How long one debate may run before Hatchet gives it up. One task is one whole
  * debate; a task declared without a limit is registered by the SDK with '60s'.
  * Owner ruling 2026-10-10: 60 minutes in every deployment, the preview's value
@@ -9319,6 +9326,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
   return input.client.task({
     name: input.workflowName,
     retries: input.engineRetries,
+    scheduleTimeout: RUNNER_QUEUE_WAIT_LIMIT,
     executionTimeout: input.previewExecutionTimeout ?? RUNNER_EXECUTION_LIMIT,
     // S06 capture binding. It was written in e8d99d33 and destroyed by the
     // conflict resolution in merge 1c9578a2, which took the mainline side of

@@ -63,7 +63,7 @@ describe("Accounts S8 publication architecture", () => {
     expect(main).toContain("authorizationPool");
     // DL7-F7: registered with the boot custody ledger as it is made.
     expect(main).toContain(
-      "const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!))"
+      "const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!, API_DATABASE_POOLS.authorization))"
     );
     expect(main).not.toMatch(
       /const authorizationPool = environment\.PUBLICATION_ENABLED === "true"/

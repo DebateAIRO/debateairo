@@ -44,7 +44,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -284,26 +284,26 @@ await boot.run("publication-secret-domains", async () => assertPublicationSecret
   // as key material — but they are refused here if they alias any key, store or each other by path or inode.
   additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH, ...billingCustodyPaths(environment)]
 }));
-const pool = boot.hold(createPool(environment.DATABASE_URL));
-const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!));
+const pool = boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.runtime));
+const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!, API_DATABASE_POOLS.authorization));
 const publicationCleanupPool = environment.PUBLICATION_ENABLED === "true"
-  ? boot.hold(createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!)) : pool;
+  ? boot.hold(createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!, API_DATABASE_POOLS.publicationCleanup)) : pool;
 // Cleanup remains necessary when new encrypted writes are disabled: an intent
 // left by an earlier enabled process must not abort every erasure cycle under
 // the ordinary runtime principal.
-const contentProvisionPool = boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL));
+const contentProvisionPool = boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL, API_DATABASE_POOLS.contentProvision));
 // Ask admission holds a session advisory lock while the count-changing run
 // commit uses that same backend. Keep both principal paths on explicit pool
 // instances so lock waiters cannot consume ordinary runtime/provision capacity.
-const serverAskAdmissionPool=boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL));
-const legacyAskAdmissionPool=boot.hold(createPool(environment.DATABASE_URL));
+const serverAskAdmissionPool=boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL, API_DATABASE_POOLS.serverAskAdmission));
+const legacyAskAdmissionPool=boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.legacyAskAdmission));
 // Budget spec §2.6 (B6b): the room decision holds the site's day lock while the
 // run is created, so its transaction takes a connection from a pool of its own —
 // a decision waiting for the lock must never hold a connection the decision it
 // waits for needs (packages/budget/src/spend-lock.ts). The runtime principal's
 // URL on purpose: the hold, the wait row and the run's charge scope are
 // debateai_runtime's grants (0083, 0084), never the content-provision role's.
-const roomDecisionPool=boot.hold(createPool(environment.DATABASE_URL,{ max: 4 }));
+const roomDecisionPool=boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.roomDecision));
 await boot.run("ask-admission-pools", async () => {
   if (serverAskAdmissionPool === contentProvisionPool
     || serverAskAdmissionPool === pool
@@ -313,7 +313,7 @@ await boot.run("ask-admission-pools", async () => {
     throw new TypeError("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE");
   }
 });
-const erasurePool = boot.hold(createPool(environment.ERASURE_DATABASE_URL));
+const erasurePool = boot.hold(createPool(environment.ERASURE_DATABASE_URL, API_DATABASE_POOLS.erasure));
 // DL7-F7: the hand-rolled pool cleanup this stage carried is the ledger's job
 // now, and it covers the KEKs the old one never reached.
 await boot.run("database-roles", () => Promise.all([
@@ -1098,14 +1098,14 @@ const triggerAskWake = createSingleFlightErasureReconciler(
 );
 let askWaker: Readonly<{ stop(): void }> | undefined;
 const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
-  ? boot.hold(createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!))
+  ? boot.hold(createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!, API_DATABASE_POOLS.evaluatorDevMenu))
   : undefined;
 const evaluatorDevMenu = evaluatorDevMenuPool !== undefined
   ? new PostgresEvaluatorDevMenuRepository(evaluatorDevMenuPool)
   : undefined;
-const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL));
+const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.support));
 const supportRelayLeasePool = boot.hold(
-  createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 })
+  createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.supportRelayLease)
 );
 const supportKeys = await boot.run("support-keys", () => createSupportKeyPort({
   supportKekPath: environment.SUPPORT_KEK_PATH,

@@ -1,5 +1,5 @@
 import {createHash} from "node:crypto";
-import {migrate} from "@debateai/db";
+import {migrate, SUPPORT_CONTROL_PLANE_POOL} from "@debateai/db";
 import {startTestDatabase} from "../support/testDatabase.js";
 import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
@@ -300,8 +300,12 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     const ordinaryPoolBody = databaseSource.slice(ordinaryStart, ordinaryEnd);
 
     expect(databaseSource).toContain("export function createSupportControlPlanePool(");
+    // Connection budget (2026-10-10): the size and the wait come from the
+    // budget table (packages/db/src/pool-budget.ts), still 2 and 200 ms.
+    expect(SUPPORT_CONTROL_PLANE_POOL).toMatchObject({ max: 2, connectionTimeoutMillis: 200 });
     for (const option of [
-      "max: 2", "connectionTimeoutMillis: 200",
+      "max: SUPPORT_CONTROL_PLANE_POOL.max",
+      "connectionTimeoutMillis: SUPPORT_CONTROL_PLANE_POOL.connectionTimeoutMillis",
       "statement_timeout: 700", "query_timeout: 750"
     ]) expect(databaseSource).toContain(option);
     expect(ordinaryPoolBody).not.toMatch(/SUPPORT|statement_timeout|query_timeout/iu);

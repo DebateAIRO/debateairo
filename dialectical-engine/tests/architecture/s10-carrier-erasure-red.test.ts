@@ -176,7 +176,8 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
     expect(db).toMatch(/constructor\(\s*private readonly pool: Pool,\s*private readonly provisionPool: Pool = pool/);
     expect(environment).toMatch(/CONTENT_PROVISION_DATABASE_URL:\s*z\.string\(\)\.url\(\)/);
     expect(environment).toMatch(/CONTENT_PROVISION_DATABASE_URL_MUST_BE_SEPARATE/);
-    expect(apiMain).toMatch(/createPool\(environment\.CONTENT_PROVISION_DATABASE_URL\)/);
+    // Connection budget (2026-10-10): the pool now names its size row.
+    expect(apiMain).toMatch(/createPool\(environment\.CONTENT_PROVISION_DATABASE_URL, API_DATABASE_POOLS\.contentProvision\)/);
     expect(apiMain).toMatch(/assertContentProvisionDatabaseRole\(pool,contentProvisionPool\)/);
   });
 
