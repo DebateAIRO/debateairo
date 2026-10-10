@@ -24,6 +24,13 @@ const QWEN = "Qwen/Qwen3.8-Flash";
 const ALL_DEEPINFRA = "GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek), MiMo-V2.6-Pro (Xiaomi), Qwen3.8-Flash (Alibaba)";
 /** The multi-model flag the A branch reviews: Free on GLM and DeepSeek, Premium adds MiMo and Qwen. */
 const REVIEWED_QWEN_FLAG = JSON.stringify({ free: [GLM, DEEPSEEK], premium: [GLM, DEEPSEEK, MIMO, QWEN] });
+/**
+ * PR B's reviewed `all-models` value, copied character for character from
+ * deploy/preview-auth-dev/v1/environment.mjs (PREVIEW_MODEL_ROSTER_FLAGS) on
+ * feat/2026-10-10-preview-anthropic-gate: the build inlines it as NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON.
+ */
+const B_ALL_MODELS_FLAG =
+  '{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"]}';
 const NEW_KEYS = [
   "legal.providers.ireland",
   "legal.providers.locationAnthropic",
@@ -54,9 +61,17 @@ async function build(flag: string | undefined) {
 }
 
 const HOSTED_KEYS = ["claude", "gpt", "gemini", "grok", "qwen", "support"];
-const PREVIEW_KEYS = ["claude", "gpt", "gemini", "grok", "qwen", "deepinfra", "support"];
-/** A build that sends Qwen to DeepInfra drops the hosted "runs on our own servers" Qwen row. */
-const PREVIEW_KEYS_QWEN_VIA_DEEPINFRA = ["claude", "gpt", "gemini", "grok", "deepinfra", "support"];
+/**
+ * A preview build names only the companies that receive text on it (owner, 10 October 2026): the hosted
+ * OpenAI and xAI rows never show, and Anthropic and Google show only as the checked preview rows, when
+ * the flag offers their model. The hosted Qwen row ("runs on our own servers") stays unless the build
+ * sends Qwen to DeepInfra.
+ */
+const HOSTED_CLOUD_KEYS = ["claude", "gpt", "gemini", "grok"] as const;
+const GLM_ONLY_KEYS = ["qwen", "deepinfra", "support"];
+const ANTHROPIC_GOOGLE_KEYS = ["claude", "gemini", "qwen", "deepinfra", "support"];
+/** Every DeepInfra model and Haiku (the all-five flag, and what a malformed flag discloses). */
+const ALL_FIVE_KEYS = ["claude", "deepinfra", "support"];
 
 describe("off the preview (flag unset) the Register is the hosted site's, unchanged", () => {
   it("lists the hosted rows and no preview company", async () => {
@@ -72,19 +87,17 @@ describe("off the preview (flag unset) the Register is the hosted site's, unchan
 });
 
 describe("the first preview's list form", () => {
-  it("lists DeepInfra for GLM only, and keeps the hosted Claude and Gemini rows", async () => {
-    const { keys, row, pages } = await build(JSON.stringify([GLM]));
-    expect(keys).toEqual(PREVIEW_KEYS);
+  it("lists DeepInfra for GLM only, and none of the hosted cloud rows", async () => {
+    const { keys, row } = await build(JSON.stringify([GLM]));
+    expect(keys).toEqual(GLM_ONLY_KEYS);
     expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI)");
-    expect(row("claude")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "claude"));
-    expect(row("gemini")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "gemini"));
   });
 });
 
 describe("the per-plan object form", () => {
   it("names the DeepInfra models the plans offer plus the two role models, and swaps in the checked rows", async () => {
     const { keys, row } = await build(JSON.stringify({ free: [GLM, HAIKU], premium: [GLM, GEMINI] }));
-    expect(keys).toEqual(PREVIEW_KEYS);
+    expect(keys).toEqual(ANTHROPIC_GOOGLE_KEYS);
     // DeepSeek is not on either plan but checks every answer and story; MiMo is used nowhere.
     expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek)");
     expect(row("claude")?.models).toBe("Claude Haiku 5.5");
@@ -93,7 +106,7 @@ describe("the per-plan object form", () => {
 
   it("still lists DeepInfra when the plans offer only Anthropic and Google: GLM writes and DeepSeek checks", async () => {
     const { keys, row } = await build(JSON.stringify({ free: [HAIKU, GEMINI], premium: [GEMINI, HAIKU] }));
-    expect(keys).toEqual(PREVIEW_KEYS);
+    expect(keys).toEqual(ANTHROPIC_GOOGLE_KEYS);
     expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek)");
     expect(row("claude")?.models).toBe("Claude Haiku 5.5");
     expect(row("gemini")?.models).toBe("Gemini 3.8 Flash");
@@ -111,7 +124,7 @@ describe("the per-plan object form", () => {
     const { keys, row, LegalProvidersBody } = await build(
       JSON.stringify({ free: [GLM, DEEPSEEK, MIMO, QWEN], premium: [HAIKU, GEMINI] })
     );
-    expect(keys).toEqual(PREVIEW_KEYS_QWEN_VIA_DEEPINFRA);
+    expect(keys).toEqual(["claude", "gemini", "deepinfra", "support"]);
     expect(new Set(keys).size).toBe(keys.length);
     expect(row("deepinfra")?.models).toBe(ALL_DEEPINFRA);
     expect(row("claude")).toMatchObject({
@@ -161,7 +174,7 @@ describe("the per-plan object form", () => {
 describe("Qwen3.8-Flash through DeepInfra (owner, 10 October 2026: Qwen instead of Gemini)", () => {
   it("the reviewed flag names Qwen inside the DeepInfra row, and shows Qwen nowhere else", async () => {
     const { keys, row, LegalProvidersBody } = await build(REVIEWED_QWEN_FLAG);
-    expect(keys).toEqual(PREVIEW_KEYS_QWEN_VIA_DEEPINFRA);
+    expect(keys).toEqual(["deepinfra", "support"]);
     expect(row("deepinfra")?.models).toBe(ALL_DEEPINFRA);
     for (const catalog of [en, ro]) {
       const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} />);
@@ -176,25 +189,23 @@ describe("Qwen3.8-Flash through DeepInfra (owner, 10 October 2026: Qwen instead 
 
   it("a flag without Qwen keeps the hosted Qwen row and leaves Qwen out of the DeepInfra row", async () => {
     const { keys, row, pages } = await build(JSON.stringify({ free: [GLM, DEEPSEEK], premium: [GLM, DEEPSEEK, MIMO] }));
-    expect(keys).toEqual(PREVIEW_KEYS);
+    expect(keys).toEqual(GLM_ONLY_KEYS);
     expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek), MiMo-V2.6-Pro (Xiaomi)");
     expect(row("qwen")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "qwen"));
   });
 
   it("the GLM-only flag keeps the hosted Qwen row and names GLM alone", async () => {
     const { keys, row } = await build(JSON.stringify([GLM]));
-    expect(keys).toEqual(PREVIEW_KEYS);
+    expect(keys).toEqual(GLM_ONLY_KEYS);
     expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI)");
   });
 
   it("the owner's first debate (all five AIs on both plans) names DeepInfra's four and Anthropic's Haiku, each once", async () => {
     const ALL_FIVE = [GLM, DEEPSEEK, MIMO, QWEN, HAIKU];
     const { keys, row, pages, LegalProvidersBody } = await build(JSON.stringify({ free: ALL_FIVE, premium: ALL_FIVE }));
-    expect(keys).toEqual(PREVIEW_KEYS_QWEN_VIA_DEEPINFRA);
+    expect(keys).toEqual(ALL_FIVE_KEYS);
     expect(row("deepinfra")?.models).toBe(ALL_DEEPINFRA);
     expect(row("claude")).toBe(pages.ANTHROPIC_PREVIEW_PROVIDER);
-    // No Gemini id in the list: the checked Google row stays out; the hosted placeholder row is unchanged.
-    expect(row("gemini")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "gemini"));
     const messages = resolve(process.cwd(), "apps/ui/messages");
     for (const locale of ["en", "ro", "ja", "ko", "zh", "ga"]) {
       const catalog = JSON.parse(readFileSync(resolve(messages, locale, "legal.json"), "utf8")) as Record<string, string>;
@@ -208,6 +219,8 @@ describe("Qwen3.8-Flash through DeepInfra (owner, 10 October 2026: Qwen instead 
       expect(html, locale).toContain(escaped(catalog["legal.providers.retentionAnthropic"] ?? "missing"));
       expect(html, locale).toContain(escaped(catalog["legal.providers.sccBasis"] ?? "missing"));
       expect(html, locale).not.toContain("Gemini 3.8 Flash");
+      for (const hosted of ["gpt", "gemini", "grok"]) expect(html, `${locale} ${hosted}`).not.toContain(`id="legal-provider-${hosted}"`);
+      for (const company of ["OpenAI", "Google", "xAI"]) expect(html, `${locale} ${company}`).not.toContain(company);
       expect(html, locale).not.toContain(escaped(catalog["legal.providers.retentionGoogle"] ?? "missing"));
     }
   });
@@ -220,14 +233,57 @@ describe("Qwen3.8-Flash through DeepInfra (owner, 10 October 2026: Qwen instead 
       "not json"
     ];
     for (const flag of reviewed) {
-      const { row, pages, LegalProvidersBody } = await build(flag);
-      expect(row("gemini"), flag).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "gemini"));
+      const { row, LegalProvidersBody } = await build(flag);
+      expect(row("gemini"), flag).toBeUndefined();
       const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} />);
       expect(html, flag).not.toContain("Gemini 3.8 Flash");
       expect(html, flag).not.toContain("legal-notices@google.com");
       expect(html, flag).not.toContain(escaped(en["legal.providers.retentionGoogle"]));
       expect(html, flag).not.toContain(escaped(en["legal.providers.locationGoogle"]));
     }
+  });
+});
+
+describe("a preview build hides the hosted site's cloud rows (owner, 10 October 2026)", () => {
+  const PREVIEW_FLAGS = [
+    JSON.stringify([GLM]),
+    REVIEWED_QWEN_FLAG,
+    JSON.stringify({ free: [GLM, DEEPSEEK], premium: [GLM, DEEPSEEK, MIMO] }),
+    B_ALL_MODELS_FLAG,
+    "not json"
+  ];
+  for (const flag of PREVIEW_FLAGS) {
+    it(`no OpenAI, xAI or hosted Google row on the preview: ${flag}`, async () => {
+      const { keys, pages, LegalProvidersBody } = await build(flag);
+      for (const key of ["gpt", "gemini", "grok"]) expect(keys, `${flag} ${key}`).not.toContain(key);
+      // The hosted Claude row never shows on a preview; only the checked Haiku row may.
+      expect(pages.PROVIDER_REGISTER).not.toContain(pages.MODEL_PROVIDERS.find((entry) => entry.key === "claude"));
+      for (const catalog of [en, ro]) {
+        const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} />);
+        for (const key of ["gpt", "gemini", "grok"]) expect(html, `${flag} ${key}`).not.toContain(`id="legal-provider-${key}"`);
+        for (const company of ["OpenAI", "OpenAI Ireland Limited", "X.AI LLC", "xAI", "Google"]) expect(html, `${flag} ${company}`).not.toContain(company);
+      }
+    });
+  }
+
+  it("the hosted build still shows every hosted cloud row", async () => {
+    const { keys, pages, LegalProvidersBody } = await build(undefined);
+    for (const key of HOSTED_CLOUD_KEYS) expect(keys).toContain(key);
+    const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} />);
+    for (const key of HOSTED_CLOUD_KEYS) expect(html).toContain(`id="legal-provider-${key}"`);
+    for (const company of ["OpenAI Ireland Limited", "Google Cloud EMEA Limited", "X.AI LLC"]) expect(html).toContain(company);
+    expect(pages.PROVIDER_REGISTER.slice(0, -1)).toEqual(pages.MODEL_PROVIDERS);
+  });
+
+  it("PR B's reviewed all-models build value shows the checked Anthropic row and all four DeepInfra models", async () => {
+    const { keys, row, pages, LegalProvidersBody } = await build(B_ALL_MODELS_FLAG);
+    expect(keys).toEqual(ALL_FIVE_KEYS);
+    expect(row("claude")).toBe(pages.ANTHROPIC_PREVIEW_PROVIDER);
+    expect(row("deepinfra")?.models).toBe(ALL_DEEPINFRA);
+    const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} />);
+    expect(html).toContain('id="legal-provider-claude"');
+    expect(html).toContain("Claude Haiku 5.5");
+    expect(html).toContain("Anthropic Ireland, Limited");
   });
 });
 
@@ -250,12 +306,12 @@ describe("a malformed flag discloses every preview provider and never throws", (
   ];
   for (const flag of MALFORMED) {
     it(`flag ${flag}`, async () => {
-      const { keys, row, pages } = await build(flag);
-      expect(keys).toEqual(PREVIEW_KEYS_QWEN_VIA_DEEPINFRA);
+      const { keys, row } = await build(flag);
+      expect(keys).toEqual(ALL_FIVE_KEYS);
       expect(row("deepinfra")?.models).toBe(ALL_DEEPINFRA);
       expect(row("claude")?.models).toBe("Claude Haiku 5.5");
-      // Gemini shows only when a flag names it; a bad flag keeps the hosted Google row as it is.
-      expect(row("gemini")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "gemini"));
+      // Gemini shows only when a flag names it; a bad flag shows no Google row at all.
+      expect(row("gemini")).toBeUndefined();
     });
   }
 });

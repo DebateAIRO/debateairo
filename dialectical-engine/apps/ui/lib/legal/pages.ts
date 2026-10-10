@@ -435,13 +435,15 @@ function previewModelIds(flag: string): ReadonlySet<string> | null {
  * The whole Register, in the order `/providers` shows it. Only the private preview's build sets
  * the public flag the new-debate form reads (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON,
  * `previewPlanRoster`); every other build, the real site included, sets none and gets the
- * hosted-site rows unchanged. A preview build lists DeepInfra just before the support chat's
- * model, naming the DeepInfra models its plans offer plus, on a per-plan build, the two role models
- * (GLM writes, DeepSeek checks); it swaps the Claude and Gemini hosted rows for the checked preview
- * rows when it offers Claude Haiku 5.5 or Gemini 3.8 Flash, and drops the hosted "own servers" Qwen
- * row when it sends Qwen3.8-Flash to DeepInfra, so no maker is shown twice or where it does not run.
- * A flag the new-debate form would refuse lists every DeepInfra model and the Anthropic preview row
- * (never Gemini, which only a flag naming it shows). Never throws.
+ * hosted-site rows unchanged. A preview build lists only the companies that receive text on it
+ * (owner, 10 October 2026): the hosted Anthropic, OpenAI, Google and xAI rows never show there.
+ * It lists DeepInfra just before the support chat's model, naming the DeepInfra models its plans
+ * offer plus, on a per-plan build, the two role models (GLM writes, DeepSeek checks); it shows the
+ * checked Anthropic or Google preview row only when it offers Claude Haiku 5.5 or Gemini 3.8 Flash;
+ * and it drops the hosted "own servers" Qwen row when it sends Qwen3.8-Flash to DeepInfra, so no
+ * maker is shown twice or where it does not run. A flag the new-debate form would refuse lists every
+ * DeepInfra model and the Anthropic preview row (never Gemini, which only a flag naming it shows).
+ * Never throws.
  */
 export function providerRegister(previewFreeModelIdsJson: string | undefined): readonly ProviderRegisterEntry[] {
   if (previewFreeModelIdsJson === undefined) return Object.freeze([...MODEL_PROVIDERS, SUPPORT_PROVIDER]);
@@ -450,13 +452,23 @@ export function providerRegister(previewFreeModelIdsJson: string | undefined): r
   // A per-plan build always uses the role models; the first preview's build (GLM alone) has no others.
   const roleModels = ids !== null && ids.size === 1 && ids.has(LEGACY_PREVIEW_MODEL) ? new Set<string>() : PREVIEW_ROLE_MODELS;
   const deepInfraModels = PREVIEW_DEEPINFRA_MODELS.filter(([id]) => offers(id) || roleModels.has(id)).map(([, label]) => label);
-  const rows = MODEL_PROVIDERS.flatMap((row) => {
-    if (row.key === "claude" && offers(PREVIEW_ANTHROPIC_MODEL)) return [ANTHROPIC_PREVIEW_PROVIDER];
-    // Gemini only when the flag names it: a bad flag must not invent a Google model the preview never offers.
-    if (row.key === "gemini" && ids?.has(PREVIEW_GOOGLE_MODEL) === true) return [GOOGLE_PREVIEW_PROVIDER];
-    // The hosted row says Qwen runs on our own servers; a build that sends Qwen to DeepInfra names it there instead.
-    if (row.key === "qwen" && offers(PREVIEW_DEEPINFRA_QWEN)) return [];
-    return [row];
+  const rows = MODEL_PROVIDERS.flatMap((row): ProviderRegisterEntry[] => {
+    switch (row.key) {
+      // The hosted cloud rows never show on a preview: only a company the build sends text to is named.
+      case "claude":
+        return offers(PREVIEW_ANTHROPIC_MODEL) ? [ANTHROPIC_PREVIEW_PROVIDER] : [];
+      // Gemini only when the flag names it: a bad flag must not invent a Google model the preview never offers.
+      case "gemini":
+        return ids?.has(PREVIEW_GOOGLE_MODEL) === true ? [GOOGLE_PREVIEW_PROVIDER] : [];
+      case "gpt":
+      case "grok":
+        return [];
+      // The hosted row says Qwen runs on our own servers; a build that sends Qwen to DeepInfra names it there instead.
+      case "qwen":
+        return offers(PREVIEW_DEEPINFRA_QWEN) ? [] : [row];
+      default:
+        return [row];
+    }
   });
   return Object.freeze([
     ...rows,

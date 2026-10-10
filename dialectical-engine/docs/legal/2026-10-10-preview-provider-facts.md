@@ -81,6 +81,14 @@ only inside the DeepInfra row, under DeepInfra's terms.
 On a build that sends Qwen to DeepInfra, the page drops the hosted-site Qwen row, which says Qwen
 runs on our own servers in London: on the preview it does not, and showing both would mislead.
 
+## Hosted rows on a preview build
+
+Owner ruling, 10 October 2026: on a preview build the page lists only the companies that receive
+text on that build. The hosted site's Anthropic, OpenAI, Google and xAI rows never show there;
+Anthropic and Google appear only as the checked rows above, when the build offers their model. The
+hosted build (no flag) is unchanged. PR B's reviewed `all-models` value (all five AIs on both plans)
+shows DeepInfra with its four models and the checked Anthropic row.
+
 ## Which jobs each preview provider gets
 
 Read from the multi-model preview register (branch feat/2026-10-10-preview-mm-a-app,
