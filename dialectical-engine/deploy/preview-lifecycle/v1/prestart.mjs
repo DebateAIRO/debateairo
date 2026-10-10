@@ -1,12 +1,15 @@
-// Root ExecStartPre for debateai-preview-api / -ui (systemd `ExecStartPre=+`).
+// Root ExecStartPre for debateai-preview-api / -ui / -runner (systemd `ExecStartPre=+`).
 //
 // Plain words: before every start or restart, re-run the reviewed database check, store its
 // fresh receipt next to a copy of the pinned launch plan, and start only the release the owner
 // pinned. The launcher then re-checks every byte exactly as before; nothing here relaxes it.
 //
-//   prestart.mjs --service api|ui         refresh proof + plan (systemd runs this)
+//   prestart.mjs --service api|ui|runner  refresh proof + plan (systemd runs this)
 //   prestart.mjs pin --from <plan>        pin a NEW reviewed release (operator, once per release)
-//   prestart.mjs dropin --service api|ui  print the release drop-in for the pinned release
+//   prestart.mjs dropin --service api|ui|runner  print the release drop-in for the pinned release
+//
+// The runner may be pinned and given a release drop-in, but it is NOT in debateai-preview.target:
+// it starts only by hand (deploy/preview-auth-dev/v1/debateai-preview-runner.service).
 import { lstat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -18,7 +21,7 @@ import { LAYOUT, atomicWrite, canonicalJson, ensureDirectory, logLine, peerShimA
 
 export const LOCK_SCHEMA = 'preview-lifecycle-release-lock-v1';
 export const RELEASE_DROPIN_NAME = 'zzzzzzzzzz-lifecycle-release.conf';
-const SERVICES = ['api', 'ui'];
+const SERVICES = ['api', 'ui', 'runner'];
 const SOURCE_ROOT = /^\/opt\/debateai-v3-preview\/releases\/auth-dev-(candidate|fallback)-[a-z0-9-]{1,80}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const GIT = /^[a-f0-9]{40}$/;
@@ -37,7 +40,7 @@ const refuse = (code, fields) => { throw new Refusal(code, fields); };
 const layoutOwner = layout => ({ uid: layout.ownerUid ?? 0, gid: layout.ownerGid ?? 0 });
 const artifactsRoot = layout => layout.artifactsRoot ?? '/opt/debateai-v3-preview/artifacts';
 const escape = text => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
-const planPathPattern = layout => new RegExp(`^${escape(artifactsRoot(layout))}/[a-z0-9-]+/(api|ui)-launch\\.json$`);
+const planPathPattern = layout => new RegExp(`^${escape(artifactsRoot(layout))}/[a-z0-9-]+/(api|ui|runner)-launch\\.json$`);
 
 /** Bounded, no-follow, owner/mode-checked read through the reviewed custody reader. */
 async function readProtectedJson(path, { root, mode, maxBytes, layout, code }) {
@@ -55,7 +58,7 @@ function validEntry(entry, service, layout) {
     || !HASH.test(entry.nativePlanSha256) || !SOURCE_ROOT.test(entry.sourceRoot) || !GIT.test(entry.sourceRevision) || !GIT.test(entry.sourceTree)
     || !Number.isSafeInteger(entry.serviceUid) || entry.serviceUid < 1 || !Number.isSafeInteger(entry.serviceGid) || entry.serviceGid < 1
     || !HASH.test(entry.sourceManifestSha256) || !HASH.test(entry.operatorManifestSha256)
-    || (service === 'api' ? entry.uiBuildSha256 !== null : !HASH.test(entry.uiBuildSha256 ?? ''))
+    || (service === 'ui' ? !HASH.test(entry.uiBuildSha256 ?? '') : entry.uiBuildSha256 !== null)
     || entry.publication === null || typeof entry.publication !== 'object' || Object.getPrototypeOf(entry.publication) !== Object.prototype
     || typeof entry.pinnedAt !== 'string' || !Number.isFinite(Date.parse(entry.pinnedAt))) throw new Error('entry');
   validatePublication(entry.publication);
@@ -101,6 +104,9 @@ export async function readLock(layout = LAYOUT) {
 const readNativePlan = layout => readProtectedJson(layout.nativePlanPath, { root: layout.nativePlanRoot, mode: 0o644, maxBytes: 32768, layout, code: 'NATIVE_PLAN_UNREADABLE' });
 const readPlan = (path, layout) => readProtectedJson(path, { root: dirname(path), mode: 0o644, maxBytes: 32768, layout, code: 'BASE_PLAN_UNREADABLE' });
 
+/** The one line native-operator.mjs prints when verify finds a forward step the database lacks (verify-native.ts). */
+const PENDING_FORWARD_STEP_LINE = /^PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: (\d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63})\. Verify never applies a migration; run the native operator with operation apply-and-plan first\.\n$/;
+
 /** Exact argv of the canonical verifier: release native-operator, as postgres, peer packet on FD3. */
 export function nativeVerifyArgv({ layout, nodePath, sourceRoot }) {
   const entry = `${sourceRoot}/dialectical-engine/deploy/preview-auth-dev/v1/native-operator.mjs`;
@@ -112,6 +118,10 @@ export async function runNativeVerify({ layout, nodePath, sourceRoot, run = runB
   if (!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(sourceRoot)) refuse('NATIVE_VERIFY_REFUSED');
   const result = await run(nativeVerifyArgv({ layout, nodePath, sourceRoot }), { cwd: `${sourceRoot}/dialectical-engine`, env: {}, timeoutMs, maxOutputBytes: 262144 });
   if (result.timedOut) refuse('NATIVE_VERIFY_TIMEOUT');
+  // Verify never applies a migration (verify-native.ts). A release whose forward step is not applied yet is refused
+  // with its own reason, so the journal says what to do: the operator runs the native operator's apply-and-plan.
+  const pending = !result.overflow && !result.error && result.code !== 0 ? PENDING_FORWARD_STEP_LINE.exec(String(result.stderr)) : null;
+  if (pending) refuse('NATIVE_VERIFY_PENDING_FORWARD_STEP', { next: 'apply-and-plan', pending: pending[1].split(', ') });
   if (result.overflow || result.error || result.code !== 0 || result.stderr.length > 0) refuse('NATIVE_VERIFY_REFUSED');
   try { return strictJson(result.stdout); } catch { return refuse('NATIVE_VERIFY_REFUSED'); }
 }
@@ -130,6 +140,35 @@ export async function waitForPostgres({ layout = LAYOUT, run = runBounded, now =
     if (now() - startedAt + intervalMs > timeoutMs) refuse('POSTGRES_NOT_READY');
     await sleep(intervalMs);
   }
+}
+
+export const RUNNER_UNIT = 'debateai-preview-runner.service';
+const tokens = value => (value ?? '').split(/\s+/).filter(Boolean).sort().join(' ');
+/**
+ * The runner's confinement lives in its reviewed unit file; an older drop-in (the live host has
+ * 42-provider-sdk-interfaces.conf, 99-provider-high-v1.conf, zzzz-glm-clarification-v1.conf) could
+ * replace ExecStart or widen it. So before any database work the loaded unit must be exactly the
+ * reviewed file plus the one generated release drop-in, with loopback-only IP and the four
+ * reviewed address families, as systemd itself reports them.
+ */
+export async function checkRunnerUnit({ layout = LAYOUT, run = runBounded } = {}) {
+  const result = await run([layout.systemctl, 'show', RUNNER_UNIT, '--property=FragmentPath', '--property=DropInPaths',
+    '--property=IPAddressAllow', '--property=IPAddressDeny', '--property=RestrictAddressFamilies', '--no-pager'], { env: {}, timeoutMs: 5000, maxOutputBytes: 16384 });
+  if (result.timedOut || result.overflow || result.error || result.code !== 0) refuse('RUNNER_UNIT_UNREADABLE');
+  const shown = {};
+  for (const line of String(result.stdout).split('\n').filter(Boolean)) {
+    const at = line.indexOf('=');
+    if (at < 1 || Object.hasOwn(shown, line.slice(0, at))) refuse('RUNNER_UNIT_UNREADABLE');
+    shown[line.slice(0, at)] = line.slice(at + 1);
+  }
+  const unitDir = layout.systemdUnitDir ?? '/etc/systemd/system';
+  const fields = [];
+  if (shown.FragmentPath !== `${unitDir}/${RUNNER_UNIT}`) fields.push('FragmentPath');
+  if (shown.DropInPaths !== `${unitDir}/${RUNNER_UNIT}.d/${RELEASE_DROPIN_NAME}`) fields.push('DropInPaths');
+  if (tokens(shown.IPAddressAllow) !== tokens('127.0.0.0/8 ::1/128')) fields.push('IPAddressAllow');
+  if (tokens(shown.IPAddressDeny) !== tokens('0.0.0.0/0 ::/0')) fields.push('IPAddressDeny');
+  if (tokens(shown.RestrictAddressFamilies) !== tokens('AF_UNIX AF_INET AF_INET6 AF_NETLINK')) fields.push('RestrictAddressFamilies');
+  if (fields.length) refuse('RUNNER_UNIT_REFUSED', fields);
 }
 
 /** Lock -> pinned base plan (hash-checked, schema-checked, field-for-field equal to the lock). */
@@ -156,6 +195,7 @@ export async function runPrestart({ service, layout = LAYOUT, deps = {} }) {
   const validatePlan = deps.validateLaunchPlan ?? reviewedValidateLaunchPlan;
   const startedAt = now();
   const { entry, plan: basePlan, lockSha256 } = await loadPinnedRelease({ service, layout, validateLaunchPlan: validatePlan });
+  if (service === 'runner') await (deps.checkRunnerUnit ?? (() => checkRunnerUnit({ layout })))();
   const nativePlan = await readNativePlan(layout);
   if (nativePlan.sha256 !== entry.nativePlanSha256) refuse('NATIVE_PLAN_HASH_MISMATCH');
   const nativeProblems = checkNativePlan(nativePlan.value, entry);
@@ -238,22 +278,26 @@ export const LIFECYCLE_RESTART = Object.freeze({
 export function renderReleaseDropin({ service, entry, lockSha256, nodePath, prestartPath, layout = LAYOUT }) {
   if (!SERVICES.includes(service) || ![nodePath, prestartPath, entry.sourceRoot, layout.currentDir, layout.env].every(path => UNIT_SAFE.test(path))) refuse('DROPIN_REFUSED');
   const engine = `${entry.sourceRoot}/dialectical-engine`;
+  // The runner keeps its reviewed unit's Restart=no (a crash mid-call halts the spending gate, and an
+  // automatic start would re-dispatch queued debates without a fresh ask): no restart keys for it.
+  const restart = service === 'runner'
+    ? ['# The runner keeps Restart=no from its reviewed unit file; it is started by hand only.', '[Service]']
+    : ['# It also repeats the restart settings of 50-lifecycle.conf: an older drop-in with Restart=no sorts after 50-.',
+      '[Unit]', ...LIFECYCLE_RESTART.unit.map(([key, value]) => `${key}=${value}`),
+      '[Service]', ...LIFECYCLE_RESTART.service.map(([key, value]) => `${key}=${value}`)];
   return [
     `# Generated by: prestart.mjs dropin --service ${service}`,
     `# Release lock sha256 ${lockSha256}; source ${entry.sourceRevision}; register ${entry.publication.registerVersion}.`,
     `# Install as /etc/systemd/system/debateai-preview-${service}.service.d/${RELEASE_DROPIN_NAME}`,
     '# It sorts after zzzzzzzzz-auth-dev-task12-final.conf, so the ExecStart= reset below wins.',
-    '# It also repeats the restart settings of 50-lifecycle.conf: an older drop-in with Restart=no sorts after 50-.',
-    '[Unit]',
-    ...LIFECYCLE_RESTART.unit.map(([key, value]) => `${key}=${value}`),
-    '[Service]',
-    ...LIFECYCLE_RESTART.service.map(([key, value]) => `${key}=${value}`),
+    ...restart,
     `WorkingDirectory=${service === 'ui' ? `${engine}/apps/ui` : engine}`,
     // `+` runs as root but would inherit the service's Environment=/EnvironmentFile= (NODE_OPTIONS,
     // secrets). env -i starts node with PATH only; prestart reads nothing else from the environment.
     `ExecStartPre=+${layout.env} -i ${CLEAN_PATH} ${nodePath} ${prestartPath} --service ${service}`,
     'ExecStart=',
-    `ExecStart=${nodePath} ${engine}/deploy/preview-auth-dev/v1/launch-${service}.mjs --plan ${layout.currentDir}/${service}-launch.json`,
+    // The runner launcher's default is prepare-only; starting it is the explicit --start mode.
+    `ExecStart=${nodePath} ${engine}/deploy/preview-auth-dev/v1/launch-${service}.mjs ${service === 'runner' ? '--start ' : ''}--plan ${layout.currentDir}/${service}-launch.json`,
     ''
   ].join('\n');
 }

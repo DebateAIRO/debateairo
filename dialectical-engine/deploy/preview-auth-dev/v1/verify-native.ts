@@ -109,3 +109,31 @@ export async function assertSelectedApiConnection(environment:Readonly<Record<st
   await assertPublicationIdentity(pool,publication);
  }catch{fail();}finally{await pool.end();}
 }
+
+/**
+ * The runner's twin of the check above: only the selected opaque runner URL, on the exact
+ * preview cluster, as the restricted runner principal, then the same sealed publication identity.
+ * Its ONLY role membership is debateai_runtime (measured 2026-10-09; 0110 grants none), so any
+ * billing, erasure, staff, API, migrator or recovery membership refuses.
+ */
+export async function assertSelectedRunnerConnection(environment:Readonly<Record<string,string>>,publication:RegisterPublicationReceipt) {
+ const pool=new pg.Pool({connectionString:environment.DATABASE_URL,max:1,connectionTimeoutMillis:5000});
+ try{
+  const result=await pool.query(`SELECT current_database()='debateai' AND current_setting('port')='5434'
+   AND current_setting('cluster_name')='debateai-v3-preview-15fccd74' AND current_user='debateai_prod_runner_runtime'
+   AND NOT (r.rolsuper OR r.rolbypassrls OR r.rolcreaterole OR r.rolcreatedb)
+   AND NOT pg_has_role(current_user,'debateai_password_recovery_runtime','MEMBER')
+   AND NOT pg_has_role(current_user,'debateai_prod_api_runtime','MEMBER')
+   AND NOT pg_has_role(current_user,'debateai_prod_migrator','MEMBER')
+   AND (SELECT coalesce(array_agg(g.rolname::text ORDER BY g.rolname),ARRAY[]::text[]) FROM pg_roles g
+     WHERE g.oid<>r.oid AND pg_has_role(current_user,g.oid,'MEMBER'))=ARRAY['debateai_runtime']::text[]
+   AND NOT has_schema_privilege(current_user,'identity','CREATE')
+   AND NOT has_table_privilege(current_user,'identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   AND NOT has_any_column_privilege(current_user,'identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,REFERENCES')
+   AND NOT has_table_privilege(current_user,'public.debateai_schema_migration_forward','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   AND NOT has_any_column_privilege(current_user,'public.debateai_schema_migration_forward','SELECT,INSERT,UPDATE,REFERENCES') allowed
+   FROM pg_roles r WHERE r.rolname=current_user`);
+  if(result.rows.length!==1||result.rows[0]?.allowed!==true)fail();
+  await assertPublicationIdentity(pool,publication);
+ }catch{fail();}finally{await pool.end();}
+}

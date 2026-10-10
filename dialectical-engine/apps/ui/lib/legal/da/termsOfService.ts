@@ -28,7 +28,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kort fortalt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Du skal være fyldt 18 år. DebateAI opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. Dine debatter er private, medmindre du offentliggør dem; hvis du offentliggør dem, kan alle læse dem. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, og bruges ikke til at træne modeller. Anmeld ulovligt indhold på [abuse@dezbatere.ro], uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse." }
+      { kind: "p", text: "Du skal være fyldt 18 år. DebateAI opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. Dine debatter er private, medmindre du offentliggør dem; hvis du offentliggør dem, kan alle læse dem. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, og bruges ikke til at træne modeller. Anmeld ulovligt indhold på support@dezbatere.ro, uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse." }
     ]
   },
   {
@@ -36,24 +36,25 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hvem vi er, og hvordan du kontakter os",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI drives af DebateAIRO S.R.L., et selskab registreret i Rumænien." },
+      { kind: "p", text: "DebateAI drives af DMS Merchandise Shop S.R.L., et selskab registreret i Rumænien." },
       {
         kind: "list",
         items: [
-        "Registreret hjemsted — [street, number, sector, postal code], Bukarest, Rumænien",
-        "Handelsregisternummer — [J40/…/…]",
-        "Entydig registreringskode (CUI) — […] · Moms: [RO… / not VAT-registered]",
-        "Selskabskapital — [RON …]",
-        "Generel kontakt — [hello@dezbatere.ro]",
-        "Juridiske meddelelser — [legal@dezbatere.ro]",
+        "Registreret hjemsted — Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumænien",
+        "Handelsregisternummer — J2022000426271",
+        "Entydig registreringskode (CUI) — 45935221 · Moms: RO45935221",
+        "Selskabskapital — 5.000 RON",
+        "Generel kontakt — support@dezbatere.ro",
+        "Telefon — +40 748 793 490",
+        "Juridiske meddelelser — support@dezbatere.ro",
         "Privatliv og databeskyttelse — privacy@dezbatere.ro",
-        "Anmeldelse af ulovligt indhold — [abuse@dezbatere.ro] — se afsnit 10",
-        "Kontaktpunkt for myndigheder — [dsa@dezbatere.ro] — rumænsk og engelsk",
-        "Påbud om fjernelse af terrorrelateret indhold (forordning (EU) 2021/784) — [dsa@dezbatere.ro] — vores kontaktpunkt for disse påbud; rumænsk og engelsk; se afsnit 10",
+        "Anmeldelse af ulovligt indhold — support@dezbatere.ro — se afsnit 10",
+        "Kontaktpunkt for myndigheder — office@dezbatere.ro — rumænsk og engelsk",
+        "Påbud om fjernelse af terrorrelateret indhold (forordning (EU) 2021/784) — office@dezbatere.ro — vores kontaktpunkt for disse påbud; rumænsk og engelsk; se afsnit 10",
         "Repræsentanter i andre lande — Anført i bilag A for de regioner, hvor vi har udpeget en repræsentant"
         ]
       },
-      { kind: "p", text: "Disse oplysninger vises også permanent på webstedet på [dezbatere.ro/legal]. Du kan altid komme i kontakt med en person og ikke kun vores assistent; afsnit 10 forklarer hvordan." }
+      { kind: "p", text: "Disse oplysninger vises også permanent på webstedet på dezbatere.ro/legal. Du kan altid komme i kontakt med en person og ikke kun vores assistent; afsnit 10 forklarer hvordan." }
     ]
   },
   {
@@ -61,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hvor vi tilbyder DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vi tilbyder DebateAI til personer, der bor i [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener." }
+      { kind: "p", text: "Vi tilbyder DebateAI til personer, der bor i Den Europæiske Union (27 lande) og Det Europæiske Økonomiske Samarbejdsområde (Norge, Island og Liechtenstein), Schweiz, Moldova, USA (undtagen Tennessee), Canada, Australien, New Zealand, Singapore, Japan, Sydkorea og Taiwan. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener." }
     ]
   },
   {
@@ -69,8 +70,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Accept af disse vilkår",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Du accepterer disse vilkår ved at markere feltet \"Jeg har læst og accepterer tjenestevilkårene\" og klikke på Opret konto. Derved indgås en aftale mellem dig og DebateAIRO S.R.L. Vilkårene omfatter reglerne om acceptabel brug i afsnit 7, reglerne om offentliggørelse i afsnit 9, ansvarsbestemmelserne i afsnit 15, bestemmelserne om lovvalg og tvister i afsnit 18 og, hvis du bor i USA, voldgiftsaftalen i bilag A.3. Vi registrerer, hvilken version du accepterede og hvornår, som forklaret i vores privatlivspolitik." },
-      { kind: "p", text: "Vores privatlivspolitik på [dezbatere.ro/privacy] forklarer, hvordan vi behandler personoplysninger. Det er oplysninger, vi skal give dig, ikke en aftale, du accepterer, og intet i disse vilkår gør den til et samtykke til behandling. Vores cookiepolitik på [dezbatere.ro/cookies] og vores register over AI-udbydere på [dezbatere.ro/providers] indgår i disse vilkår ved henvisning." },
+      { kind: "p", text: "Du accepterer disse vilkår ved at markere feltet \"Jeg har læst og accepterer tjenestevilkårene\" og klikke på Opret konto. Derved indgås en aftale mellem dig og DMS Merchandise Shop S.R.L. Vilkårene omfatter reglerne om acceptabel brug i afsnit 7, reglerne om offentliggørelse i afsnit 9, ansvarsbestemmelserne i afsnit 15 og bestemmelserne om lovvalg og tvister i afsnit 18. Vi registrerer, hvilken version du accepterede og hvornår, som forklaret i vores privatlivspolitik." },
+      { kind: "p", text: "Vores privatlivspolitik på dezbatere.ro/privacy forklarer, hvordan vi behandler personoplysninger. Det er oplysninger, vi skal give dig, ikke en aftale, du accepterer, og intet i disse vilkår gør den til et samtykke til behandling. Vores cookiepolitik på dezbatere.ro/cookies og vores register over AI-udbydere på dezbatere.ro/providers indgår i disse vilkår ved henvisning." },
       { kind: "p", text: "Inden du indgår en aftale med os elektronisk, viser brugergrænsefladen dig de relevante trin, giver dig mulighed for at gennemgå og rette det, du har indtastet, før du indsender det, og oplyser dig om de sprog, som aftalen kan indgås på. Disse vilkår findes i en form, du kan gemme og udskrive. Når du køber et betalt abonnement, sender vi dig den version, du accepterede, pr. e-mail. Du kan til enhver tid bede om en kopi. e-mail, og du kan til enhver tid anmode om en kopi. Intet i disse vilkår begrænser rettigheder, som du har efter rumænsk eller EU-retlig forbrugerbeskyttelseslovgivning eller lovgivningen i det land, hvor du bor, og som ikke kan begrænses ved aftale." }
     ]
   },
@@ -133,7 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Vi træner ikke på dit indhold. Vi træner ikke modeller på dit indhold, og vores aftaler med AI-udbydere udelukker, at de bruger dit indhold til at træne eller forbedre deres modeller. [Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.]" },
       { kind: "p", text: "Sådan når dit indhold frem til AI-udbydere. For at gennemføre en debat sender vi tekst til en eller flere eksterne modeludbydere. En udbyder modtager dit spørgsmål, de styrende bemærkninger, du angiver, og udsagn, som motoren sammensætter under debatten — udbyderen ser således tekst, der er afledt af og opbygget omkring det, du skrev, og ikke kun dine oprindelige ord. Udbyderen modtager aldrig din e-mailadresse, dine kontoidentifikatorer, dine sessionsregistreringer eller dine betalingsoplysninger." },
       { kind: "p", text: "Hvad supportchatten sender. Supportassistenten er også en AI-model. Når du skriver til den, sender vi din besked til en ekstern modeludbyder, så modellen kan svare, sammen med de hjælpeartikler, den baserer sit svar på. Før afsendelsen maskerer vi alt, der ligner en adgangskode, en engangskode eller en nøgle. Hvis du beder om at tale med en person, sender vi også samtalen, maskeret på samme måde, til modellen, så den kan skrive et kort resumé til det medlem af vores team, der overtager din sag. Vi vedhæfter ikke din e-mailadresse, dine kontoidentifikatorer eller dine betalingsoplysninger, men modellen modtager alt andet, du skriver i chatten, så skriv ikke noget der, som du ikke ønsker, at den skal læse." },
-      { kind: "p", text: "Hvilke udbydere og hvor. Vores register over AI-udbydere på [dezbatere.ro/providers] er en del af disse vilkår. Det angiver for hver udbyder, vi kan bruge: dennes juridiske enhed og land; hvad udbyderen modtager og hvorfor; hvor behandlingen finder sted; opbevaringsvilkår; om nulopbevaring af data er aktiveret for det slutpunkt, vi bruger; om udbyderen i henhold til vores aftale må bruge input til træning; den overførselsmekanisme, vi baserer os på; og datoen, hvor vi senest kontrollerede hver registrering. Udbydere kan befinde sig uden for dit land og uden for Det Europæiske Økonomiske Samarbejdsområde. Vores privatlivspolitik forklarer beskyttelsesforanstaltningerne." },
+      { kind: "p", text: "Hvilke udbydere og hvor. Vores register over AI-udbydere på dezbatere.ro/providers er en del af disse vilkår. Det angiver for hver udbyder, vi kan bruge: dennes juridiske enhed og land; hvad udbyderen modtager og hvorfor; hvor behandlingen finder sted; opbevaringsvilkår; om nulopbevaring af data er aktiveret for det slutpunkt, vi bruger; om udbyderen i henhold til vores aftale må bruge input til træning; den overførselsmekanisme, vi baserer os på; og datoen, hvor vi senest kontrollerede hver registrering. Udbydere kan befinde sig uden for dit land og uden for Det Europæiske Økonomiske Samarbejdsområde. Vores privatlivspolitik forklarer beskyttelsesforanstaltningerne." },
       { kind: "p", text: "Tre forskellige ting. \"Ikke brugt til at træne modeller\", \"opbevaret i en begrænset periode af hensyn til sikkerhed, forebyggelse af misbrug eller retlige grunde\" og \"nulopbevaring af data — ikke lagret efter behandling\" er forskellige ting. Hvis en udbyder opbevarer prompts i en begrænset periode, angiver registeret hvor længe og hvorfor. Hvis nulopbevaring af data er aktiveret, angiver registeret dette og for hvilke funktioner. Vi oplyser ikke, at indhold ikke opbevares, når det faktisk opbevares." },
       { kind: "p", text: "Output. I forholdet mellem dig og os må du bruge outputtet fra dine egne debatter til ethvert lovligt formål, og vi gør ikke ejendomsret gældende til genereret tekst. Vær opmærksom på, at genereret output i mange jurisdiktioner muligvis ikke kan beskyttes af ophavsret; at lignende output kan blive genereret til andre brugere; at output kan gengive eller ligne tredjepartsmateriale; og at visse kildematerialer, som en AI-udbyder henter, kan være underlagt begrænsninger i genbrug. Du er ansvarlig for at kontrollere dette, før du støtter dig på eller genudgiver output." }
     ]
@@ -157,7 +158,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Anmeldelse af indhold, moderation og klager",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Alle kan anmelde indhold. Du behøver ikke have en konto. Skriv til [abuse@dezbatere.ro], eller brug funktionen Anmeld på en offentliggjort debat. For at vi kan handle, skal du oplyse: hvorfor du mener, at indholdet er ulovligt eller overtræder disse vilkår, tilstrækkeligt detaljeret til, at vi kan forstå påstanden; den nøjagtige placering — den fulde URL og om muligt det relevante tekststykke; dit navn og din e-mailadresse (kræves ikke ved anmeldelser af materiale med seksuelt misbrug af børn); og at du i god tro mener, at din anmeldelse er korrekt og fuldstændig." },
+      { kind: "p", text: "Alle kan anmelde indhold. Du behøver ikke have en konto. Skriv til support@dezbatere.ro, eller brug funktionen Anmeld på en offentliggjort debat. For at vi kan handle, skal du oplyse: hvorfor du mener, at indholdet er ulovligt eller overtræder disse vilkår, tilstrækkeligt detaljeret til, at vi kan forstå påstanden; den nøjagtige placering — den fulde URL og om muligt det relevante tekststykke; dit navn og din e-mailadresse (kræves ikke ved anmeldelser af materiale med seksuelt misbrug af børn); og at du i god tro mener, at din anmeldelse er korrekt og fuldstændig." },
       { kind: "p", text: "Vi bekræfter modtagelsen af enhver anmeldelse uden unødig forsinkelse. Vi behandler anmeldelser rettidigt, omhyggeligt, ikke-vilkårligt og objektivt, meddeler dig vores afgørelse og oplyser, hvordan du kan anfægte den. Hvis vi bruger automatiserede midler til at behandle eller afgøre en anmeldelse, oplyser vi det. Ved en gyldig anmodning reagerer vi på anmeldelser af intime billeder delt uden samtykke inden for 48 timer." },
       { kind: "p", text: "To former for automatiske afgørelser, som holdes adskilt." },
       {
@@ -168,7 +169,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Begrundelse. Når vi fjerner eller begrænser synligheden af dit indhold eller suspenderer eller lukker din konto, giver vi dig en begrundelse: hvad vi gjorde, og hvor vidtgående det er; de faktiske omstændigheder, vi lagde til grund, og om de stammede fra en anmeldelse eller vores egne kontroller; om der blev anvendt automatiserede midler; det retlige eller kontraktlige grundlag; og hvordan du kan anfægte afgørelsen: gennem vores klageordning nedenfor, gennem et udenretsligt tvistbilæggelsesorgan, der er certificeret i henhold til EU's forordning om digitale tjenester, eller ved domstolene." },
-      { kind: "p", text: "Klage over en afgørelse. Hvis du er uenig i en moderationsafgørelse, skal du svare på begrundelsen eller skrive til [appeals@dezbatere.ro] inden for seks måneder. En person, der ikke medvirkede ved den oprindelige afgørelse, gennemgår den, og vi meddeler dig resultatet med en begrundelse. Dette berører ikke din ret til at indbringe sagen for en domstol eller benytte alternativ tvistbilæggelse efter afsnit 18. Klageordningen modtager også klager over, at vi ikke har reageret på en anmeldelse, at indhold fejlagtigt blev fjernet, at en konto fejlagtigt blev begrænset, eller at et automatiseret værktøj fejlagtigt påvirkede dit indhold." },
+      { kind: "p", text: "Klage over en afgørelse. Hvis du er uenig i en moderationsafgørelse, skal du svare på begrundelsen eller skrive til office@dezbatere.ro inden for seks måneder. En person, der ikke medvirkede ved den oprindelige afgørelse, gennemgår den, og vi meddeler dig resultatet med en begrundelse. Dette berører ikke din ret til at indbringe sagen for en domstol eller benytte alternativ tvistbilæggelse efter afsnit 18. Klageordningen modtager også klager over, at vi ikke har reageret på en anmeldelse, at indhold fejlagtigt blev fjernet, at en konto fejlagtigt blev begrænset, eller at et automatiseret værktøj fejlagtigt påvirkede dit indhold." },
       { kind: "p", text: "Udenretslig tvistbilæggelse. Hvis du er i Den Europæiske Union, kan du indbringe en tvist om en af vores moderationsafgørelser for et udenretsligt tvistbilæggelsesorgan, der er certificeret i henhold til artikel 21 i EU's forordning om digitale tjenester (forordning (EU) 2022/2065). Dette omfatter en afgørelse om dit indhold eller din konto samt vores afgørelse om en anmeldelse, du har indgivet. Du vælger organet fra den liste, Europa-Kommissionen offentliggør på digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, og du behøver ikke først at benytte vores klageordning. Vi deltager i god tro og afviser kun at deltage, hvis den samme tvist, om det samme indhold og på samme grundlag, allerede er blevet bilagt. Organets afgørelse er ikke bindende for nogen af os, og du bevarer din ret til at indbringe sagen for domstolene. Organet kan opkræve et mindre gebyr af dig eller slet intet gebyr. Hvis det afgør tvisten til din fordel, betaler vi dets gebyrer og godtgør dine rimelige udgifter; hvis det afgør tvisten til vores fordel, skal du ikke betale vores gebyrer eller udgifter, medmindre organet finder, at du åbenlyst har handlet i ond tro." },
       { kind: "p", text: "Kontakt til et menneske. Vores supportassistent er et AI-system og oplyser dette. Du kan til enhver tid bede om at tale med en person, og enhver supportsamtale tilbyder denne mulighed. Vi bruger ikke automatiserede værktøjer alene til at kommunikere med dig." },
       { kind: "p", text: "Terrorrelateret indhold. Terrorrelateret indhold er ulovligt og er ikke tilladt på DebateAI (afsnit 7). Kompetente myndigheder i Den Europæiske Union kan sende os påbud om fjernelse i henhold til forordning (EU) 2021/784 til kontaktpunktet i afsnit 1. Når vi modtager et sådant påbud, fjerner vi indholdet eller blokerer adgangen til det i alle EU-lande inden for én time. Vi underretter den person, der offentliggjorde indholdet, om, at det er blevet fjernet, og oplyser på anmodning om begrundelsen og om, hvordan påbuddet kan anfægtes, medmindre myndigheden beslutter, at hensynet til den offentlige sikkerhed kræver, at der ikke gives oplysninger i en begrænset periode. Som krævet i forordningen opbevarer vi det fjernede indhold og de relaterede data i seks måneder, så fjernelsen kan efterprøves og, hvis den var forkert, omgøres. Den person, der offentliggjorde indholdet, kan anfægte påbuddet ved domstolene i det land, hvis myndighed udstedte det, og kan også benytte vores klageordning. Ingen myndighed har krævet, at vi træffer specifikke foranstaltninger mod terrorrelateret indhold i henhold til forordningen; hvis en myndighed gør det, vil vi beskrive disse foranstaltninger her, herunder eventuelle automatiserede værktøjer." },
@@ -181,7 +182,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "Fra din side. Du kan til enhver tid lukke din konto under Indstillinger som beskrevet i afsnit 6. Du behøver ikke angive en grund. Lukning af din konto bringer disse vilkår til ophør. De ophører, når lukningen får virkning, efter henstandsperioden på 7 dage; de afsnit, der er anført i slutningen af dette afsnit, består fortsat efter dette tidspunkt." },
-      { kind: "p", text: "Fra vores side. Vi kan suspendere eller lukke din konto eller fjerne eller begrænse dit indhold, hvis: du væsentligt misligholder disse vilkår, navnlig afsnit 7; dit indhold er ulovligt, eller lovgivningen, en domstol eller en myndighed kræver, at vi handler; din brug truer tjenestens sikkerhed, integritet eller tilgængelighed eller andres rettigheder; din konto har været inaktiv i [24 months], og vi har givet dig meddelelse; eller vi ophører med at levere tjenesten eller med at levere den i dit land." },
+      { kind: "p", text: "Fra vores side. Vi kan suspendere eller lukke din konto eller fjerne eller begrænse dit indhold, hvis: du væsentligt misligholder disse vilkår, navnlig afsnit 7; dit indhold er ulovligt, eller lovgivningen, en domstol eller en myndighed kræver, at vi handler; din brug truer tjenestens sikkerhed, integritet eller tilgængelighed eller andres rettigheder; din konto har været inaktiv i 24 måneder, og vi har givet dig meddelelse; eller vi ophører med at levere tjenesten eller med at levere den i dit land." },
       { kind: "p", text: "Medmindre misligholdelsen er alvorlig, lovgivningen kræver øjeblikkelig handling, eller forsinkelse ville medføre skade, oplyser vi dig om problemet og giver dig en rimelig mulighed for at afhjælpe det, før vi suspenderer eller lukker kontoen. Vi giver altid en begrundelse efter afsnit 10, og du kan anfægte afgørelsen." },
       { kind: "p", text: "Hvis vi lukker tjenesten helt eller trækker den tilbage fra dit land, giver vi mindst 30 dages varsel, tilbagebetaler eventuelle forudbetalte beløb for perioden efter lukningen og giver dig først mulighed for at eksportere dine debatter." },
       { kind: "p", text: "Virkningen af lukning. Når en konto lukkes, destruerer vi krypteringsnøglerne til dine kontodata og private debatter, hvilket gør dem permanent ulæselige, sletter din kontoregistrering og, hvis du har valgt det, fjerner dine offentliggjorte debatter fra offentlig adgang som beskrevet i afsnit 9. Visse ting består, og du bør vide hvilke: poster i vores revisions- og sikkerhedslogfiler, som kun kan tilføjes og opbevares for at opfylde vores egne retlige og sikkerhedsmæssige forpligtelser; registreringer, som vi i henhold til lovgivningen skal opbevare, herunder registreringer af accept og samtykke; og, for et lille antal ældre debatter fra før vores krypteringsordning, registreringer, som kun i mere begrænset omfang kan slettes — vi oplyser dig, hvis dette gælder for din konto. Privatlivspolitikken beskriver alt dette i databeskyttelsesretlige termer og forklarer din ret til sletning." },
@@ -194,13 +195,13 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "DebateAI tilbyder et gratis abonnement. Et betalt Premium-abonnement [is / will be] er tilgængeligt og giver adgang til hele modeludvalget samt mulighed for selv at indstille debattens målere." },
+      { kind: "p", text: "DebateAI tilbyder et gratis abonnement. Et betalt Premium-abonnement bliver tilgængeligt og giver adgang til hele modeludvalget samt mulighed for selv at indstille debattens målere." },
       { kind: "p", text: "Før du betaler, viser vi dig direkte over betalingsknappen: abonnementet; den samlede pris inklusive gældende afgifter; faktureringsperioden; at abonnementet fornys automatisk, indtil det opsiges; datoen, hvor en eventuel gratis prøveperiode udløber, og det beløb, du derefter skal betale; samt hvordan du opsiger. Du bekræfter vilkårene om fornyelse ved at markere et særskilt felt. På knappen står der Abonner og betal (på rumænsk Comandă cu obligație de plată). Vi sender dig en bekræftelse på et varigt medium med de samme oplysninger, disse vilkår og fortrydelsesformularen." },
-      { kind: "p", text: "Påmindelser. Vi sender dig en e-mail mindst [5] dage før en gratis prøveperiode overgår til et betalt abonnement; mindst én gang om året for løbende abonnementer; og mellem 30 og 45 dage før enhver fornyelse af en periode på tolv måneder eller mere. Hver påmindelse indeholder prisen, datoen og et link til opsigelse." },
-      { kind: "p", text: "Opsigelse. Du kan til enhver tid opsige under Indstillinger → Abonnement med ét bekræftelsesklik eller via opsigelsessiden på [dezbatere.ro/cancel], som ikke kræver, at du logger ind. Opsigelsen får virkning ved udløbet af den igangværende faktureringsperiode, og du bevarer adgangen indtil da. Vi gør ikke opsigelsen vanskeligere, end det var at abonnere." },
+      { kind: "p", text: "Påmindelser. Vi sender dig en e-mail mindst 5 dage før en gratis prøveperiode overgår til et betalt abonnement; mindst én gang om året for løbende abonnementer; og mellem 30 og 45 dage før enhver fornyelse af en periode på tolv måneder eller mere. Hver påmindelse indeholder prisen, datoen og et link til opsigelse." },
+      { kind: "p", text: "Opsigelse. Du kan til enhver tid opsige under Indstillinger → Abonnement med ét bekræftelsesklik eller via opsigelsessiden på dezbatere.ro/cancel, som ikke kræver, at du logger ind. Opsigelsen får virkning ved udløbet af den igangværende faktureringsperiode, og du bevarer adgangen indtil da. Vi gør ikke opsigelsen vanskeligere, end det var at abonnere." },
       { kind: "p", text: "Prisændringer får først virkning ved en fornyelse. Vi giver mindst 30 dages varsel pr. e-mail med den nye pris og et link til opsigelse. Hvis lovgivningen i dit land kræver dit udtrykkelige samtykke til en prisændring, anmoder vi om det; ellers gælder den nye pris fra næste fornyelse, hvis du ikke foretager dig noget. Bilag A angiver regionale regler." },
-      { kind: "p", text: "Mislykkede betalinger. Hvis en betaling mislykkes, forsøger vi igen i [7] dage og advarer dig pr. e-mail, før vi nedgraderer din konto til det gratis abonnement. Vi sletter ikke dine debatter, fordi en betaling mislykkedes." },
-      { kind: "p", text: "Afgifter og betalingsmodtager. Priserne [include / exclude] moms, GST eller omsætningsafgift, hvilket afhænger af, hvor du bor, og vises, før du betaler. [If a merchant of record is used: Your purchase is processed by [Paddle / …], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.]" },
+      { kind: "p", text: "Mislykkede betalinger. Hvis en betaling mislykkes, forsøger vi igen i 7 dage og advarer dig pr. e-mail, før vi nedgraderer din konto til det gratis abonnement. Vi sletter ikke dine debatter, fordi en betaling mislykkedes." },
+      { kind: "p", text: "Afgifter og betalingsmodtager. Priserne er inklusive moms, GST eller omsætningsafgift, hvilket afhænger af, hvor du bor, og vises, før du betaler. Kortbetalinger behandles af NETOPIA Payments (netopia-payments.com). Sælgeren er DMS Merchandise Shop S.R.L., som udsteder din faktura og forbliver ansvarlig for selve tjenesten og for disse vilkår." },
       { kind: "p", text: "Tilbageførsler. Hvis du bestrider en debitering hos din kortudsteder, kan vi suspendere betalingsfunktionerne, mens tvisten behandles. Vi opkræver ikke gebyrer herfor." },
       { kind: "p", text: "Lovbestemte rettigheder først. Hvis tjenesten ikke er i overensstemmelse med det, vi har lovet, har du ret til at få den bragt i overensstemmelse eller til et forholdsmæssigt afslag eller en tilbagebetaling i henhold til lovgivningen. Derudover gælder [state your discretionary refund policy]. Brugsgrænserne for begge abonnementer offentliggøres i produktet; vi giver meddelelse, før vi skærper dem på en måde, der påvirker dig væsentligt." }
     ]
@@ -210,7 +211,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Din fortrydelsesret",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Hvis du bor i EU, EØS eller Storbritannien, kan du fortryde et betalt abonnement inden for 14 dage efter tegningen uden at angive en grund. Brug siden Fortryd aftale på [dezbatere.ro/withdraw], standardformularen i bekræftelsesmailen, eller skriv til [support@dezbatere.ro]; vi bekræfter modtagelsen på et varigt medium." },
+      { kind: "p", text: "Hvis du bor i EU eller EØS, kan du fortryde et betalt abonnement inden for 14 dage efter tegningen uden at angive en grund. Brug siden Fortryd aftale på dezbatere.ro/withdraw, standardformularen i bekræftelsesmailen, eller skriv til support@dezbatere.ro; vi bekræfter modtagelsen på et varigt medium." },
       { kind: "p", text: "Hvis du bad os om at påbegynde tjenesten med det samme — ved at markere feltet ved betaling — og derefter fortryder, betaler du for den del af tjenesten, der blev leveret frem til den dag, hvor du fortryder, beregnet forholdsmæssigt på grundlag af prisen for faktureringsperioden, og vi tilbagebetaler resten. Du mister ikke fortrydelsesretten ved at bruge tjenesten i løbet af de 14 dage." },
       { kind: "p", text: "Hvis du bor et andet sted, angiver bilag A den fortrydelsesret eller betænkningstid, der eventuelt gælder i din region, og ellers vores tilbagebetalingspolitik. Lovbestemte rettigheder i dit land har altid forrang." }
     ]
@@ -222,7 +223,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Tjenesten. Vi udvikler løbende DebateAI, og rutinemæssige forbedringer, rettelser og ændringer i modeludvalget sker uden varsel. Hvis vi foretager en ændring, der går ud over at holde tjenesten i funktion som beskrevet, gør vi det kun af en af følgende grunde: for at overholde et retligt eller regulatorisk krav; for at reagere på et sikkerheds- eller misbrugsproblem; fordi en modeludbyder ændrer, begrænser eller trækker en model eller funktion tilbage, som vi er afhængige af; for at tilpasse os et teknisk miljø, vi ikke kontrollerer; eller for at tilføje, forbedre eller udfase en funktion på en måde, der ikke medfører omkostninger for dig." },
       { kind: "p", text: "Vi oplyser dig på forhånd på et varigt medium om, hvad der ændres og hvornår. Hvis ændringen har mere end en mindre negativ indvirkning på din adgang til eller brug af tjenesten, kan du uden omkostninger opsige inden for 30 dage efter, at du blev underrettet, eller efter at ændringen fik virkning, alt efter hvilken dato der ligger senest, og vi tilbagebetaler eventuelle forudbetalte beløb for den uudnyttede periode." },
-      { kind: "p", text: "Disse vilkår. Vi kan ændre disse vilkår af samme type grunde. Ved ændringer, der ikke begrænser dine rettigheder, offentliggør vi den nye version med et resumé af ændringerne og sender dig en e-mail mindst 30 dage, før den får virkning; hvis du fortsætter med at bruge DebateAI efter denne dato, betyder det, at du accepterer den, og du kan lukke din konto inden da. Ved ændringer, der begrænser dine rettigheder — herunder prisstigninger på et eksisterende abonnement, lavere grænser, fjernede funktioner, nye anvendelser af dit indhold eller ændringer af ansvar, lovvalg eller tvistbilæggelse — beder vi dig udtrykkeligt acceptere den nye version ved dit næste login, og ændringen gælder kun fremadrettet. Vi foretager aldrig ændringer med tilbagevirkende kraft, og vi bruger aldrig dette afsnit til at ændre kernen i det, du har betalt for, midt i en periode uden at tilbyde dig en udvej. Tidligere versioner forbliver tilgængelige på [dezbatere.ro/terms/versions]." }
+      { kind: "p", text: "Disse vilkår. Vi kan ændre disse vilkår af samme type grunde. Ved ændringer, der ikke begrænser dine rettigheder, offentliggør vi den nye version med et resumé af ændringerne og sender dig en e-mail mindst 30 dage, før den får virkning; hvis du fortsætter med at bruge DebateAI efter denne dato, betyder det, at du accepterer den, og du kan lukke din konto inden da. Ved ændringer, der begrænser dine rettigheder — herunder prisstigninger på et eksisterende abonnement, lavere grænser, fjernede funktioner, nye anvendelser af dit indhold eller ændringer af ansvar, lovvalg eller tvistbilæggelse — beder vi dig udtrykkeligt acceptere den nye version ved dit næste login, og ændringen gælder kun fremadrettet. Vi foretager aldrig ændringer med tilbagevirkende kraft, og vi bruger aldrig dette afsnit til at ændre kernen i det, du har betalt for, midt i en periode uden at tilbyde dig en udvej. Tidligere versioner forbliver tilgængelige på dezbatere.ro/terms/versions." }
     ]
   },
   {
@@ -244,7 +245,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Selve tjenesten — softwaren, motoren, bedømmelsesmetoden, brugergrænsefladen, navnene DebateAI og DebateAIRO samt vores logoer — tilhører os eller vores licensgivere. Disse vilkår giver dig tilladelse til at bruge tjenesten, ikke ejerskab til den." },
       { kind: "p", text: "Du må citere og linke til offentliggjorte debatter med kreditering af DebateAI og et link til den oprindelige side. Massekopiering, systematisk gengivelse af det offentlige korpus og brug af offentliggjorte debatter som træningsdata er ikke tilladt uden vores skriftlige aftale." },
-      { kind: "p", text: "Afsnit 8 omhandler dit indhold og status for genereret output. Hvis du mener, at noget på DebateAI krænker dine immaterielle rettigheder, skal du bruge anmeldelsesmuligheden i afsnit 10. [If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is [name, address, email], registered with the US Copyright Office; we terminate the accounts of repeat infringers.]" }
+      { kind: "p", text: "Afsnit 8 omhandler dit indhold og status for genereret output. Hvis du mener, at noget på DebateAI krænker dine immaterielle rettigheder, skal du bruge anmeldelsesmuligheden i afsnit 10." }
     ]
   },
   {
@@ -252,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Personoplysninger",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Det fremgår af privatlivspolitikken på [dezbatere.ro/privacy], hvordan vi behandler personoplysninger. Den forklarer, hvad vi indsamler, behandlingsgrundlaget for hvert formål, hvor længe vi opbevarer oplysninger, hvem der modtager data, hvilke overførsler der finder sted, og hvordan du udøver dine rettigheder. Tre punkter hører også hjemme her. Afsnit 7 beder dig om ikke at angive andre personers personoplysninger i et spørgsmål; hvis du gør det, er du ansvarlig herfor, og vi kan fjerne indholdet. Hvis en debat, der er offentliggjort på DebateAI, indeholder personoplysninger om dig, kan du bede os om at fjerne den uden at have en konto (afsnit 9). Og vi registrerer din accept af disse vilkår — version, tidspunkt og sessionens tekniske oplysninger — som dokumentation for aftalen, som forklaret i privatlivspolitikken." }
+      { kind: "p", text: "Det fremgår af privatlivspolitikken på dezbatere.ro/privacy, hvordan vi behandler personoplysninger. Den forklarer, hvad vi indsamler, behandlingsgrundlaget for hvert formål, hvor længe vi opbevarer oplysninger, hvem der modtager data, hvilke overførsler der finder sted, og hvordan du udøver dine rettigheder. Tre punkter hører også hjemme her. Afsnit 7 beder dig om ikke at angive andre personers personoplysninger i et spørgsmål; hvis du gør det, er du ansvarlig herfor, og vi kan fjerne indholdet. Hvis en debat, der er offentliggjort på DebateAI, indeholder personoplysninger om dig, kan du bede os om at fjerne den uden at have en konto (afsnit 9). Og vi registrerer din accept af disse vilkår — version, tidspunkt og sessionens tekniske oplysninger — som dokumentation for aftalen, som forklaret i privatlivspolitikken." }
     ]
   },
   {
@@ -261,11 +262,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Lovvalg. Disse vilkår og enhver tvist eller ethvert krav, der udspringer af dem eller deres genstand, herunder krav uden for kontrakt, er underlagt rumænsk ret." },
-      { kind: "p", text: "Din lokale beskyttelse berøres ikke. Hvis du er forbruger, fratager valget af rumænsk ret dig ikke den beskyttelse, der følger af ufravigelige forbrugerbeskyttelsesregler i det land, hvor du har dit sædvanlige opholdssted — eksempelvis regler om urimelige vilkår, fortrydelses- og opsigelsesrettigheder eller garantier — når disse regler finder anvendelse uanset dette lovvalg, herunder i henhold til artikel 6, stk. 2, i forordning (EF) nr. 593/2008, hvis du bor i EU, eller de tilsvarende regler i Storbritannien. Du kan påberåbe dig disse regler ud over rumænsk ret." },
-      { kind: "p", text: "Domstole, hvis du bor i EU, EØS eller Storbritannien. Du kan anlægge sag mod os enten ved domstolene i Rumænien eller ved domstolene i det land, hvor du bor. Vi kan kun anlægge sag mod dig ved domstolene i det land, hvor du bor." },
-      { kind: "p", text: "Forbrugere andre steder. Hvis du bor uden for EU, EØS og Storbritannien, begrænser intet i disse vilkår din ret efter lovgivningen i dit land til at anlægge sag ved landets domstole eller nogen rettighed efter denne lovgivning, der ikke kan fraviges — herunder, hvis du bor i Australien eller New Zealand, dine rettigheder i henhold til forbrugergarantier; hvis du bor i Brasilien, Código de Defesa do Consumidor; og hvis du bor i USA, forbrugerbeskyttelseslovgivningen i din delstat." },
-      { kind: "p", text: "Personer med bopæl i USA. Bilag A.3 indeholder en voldgiftsaftale og et afkald på gruppesøgsmål, der er underlagt Federal Arbitration Act. Den gælder kun for personer med bopæl i USA, og kun i det omfang den kan håndhæves. Den gælder ikke for forbrugere i EU, EØS eller Storbritannien." },
-      { kind: "p", text: "Før du går rettens vej. Kontakt os på [legal@dezbatere.ro]; de fleste forhold kan løses, og vi bestræber os på at svare inden for [5] arbejdsdage. Hvis du er forbruger i Rumænien eller EU, kan du benytte alternativ tvistbilæggelse gennem [the ANPC – named SAL entity, website]; vi [do / do not] forpligter os til at deltage i denne procedure. Klager over moderationsafgørelser følger afsnit 10, som er en særskilt fremgangsmåde." }
+      { kind: "p", text: "Din lokale beskyttelse berøres ikke. Hvis du er forbruger, fratager valget af rumænsk ret dig ikke den beskyttelse, der følger af ufravigelige forbrugerbeskyttelsesregler i det land, hvor du har dit sædvanlige opholdssted — eksempelvis regler om urimelige vilkår, fortrydelses- og opsigelsesrettigheder eller garantier — når disse regler finder anvendelse uanset dette lovvalg, herunder i henhold til artikel 6, stk. 2, i forordning (EF) nr. 593/2008, hvis du bor i EU. Du kan påberåbe dig disse regler ud over rumænsk ret." },
+      { kind: "p", text: "Domstole, hvis du bor i EU eller EØS. Du kan anlægge sag mod os enten ved domstolene i Rumænien eller ved domstolene i det land, hvor du bor. Vi kan kun anlægge sag mod dig ved domstolene i det land, hvor du bor." },
+      { kind: "p", text: "Forbrugere andre steder. Hvis du bor uden for EU og EØS, begrænser intet i disse vilkår din ret efter lovgivningen i dit land til at anlægge sag ved landets domstole eller nogen rettighed efter denne lovgivning, der ikke kan fraviges — herunder, hvis du bor i Australien eller New Zealand, dine rettigheder i henhold til forbrugergarantier; hvis du bor i Brasilien, Código de Defesa do Consumidor; og hvis du bor i USA, forbrugerbeskyttelseslovgivningen i din delstat." },
+      { kind: "p", text: "Før du går rettens vej. Kontakt os på support@dezbatere.ro; de fleste forhold kan løses, og vi bestræber os på at svare inden for 5 arbejdsdage. Hvis du er forbruger i Rumænien eller EU, kan du benytte alternativ tvistbilæggelse gennem www.onoratainstanta.ro; vi forpligter os ikke til at deltage i denne procedure. Klager over moderationsafgørelser følger afsnit 10, som er en særskilt fremgangsmåde." }
     ]
   },
   {
@@ -278,7 +278,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Intet afkald. Hvis vi ikke straks håndhæver et vilkår, mister vi ikke retten til at håndhæve det senere." },
       { kind: "p", text: "Hele aftalen. Disse vilkår udgør sammen med cookiepolitikken og registeret over AI-udbydere hele aftalen mellem os om tjenesten. Forpligtelser, vi påtager os i privatlivspolitikken, er bindende for os. Intet i dette afsnit udelukker ansvar for svigagtig urigtig fremstilling." },
       { kind: "p", text: "Sprog. Disse vilkår offentliggøres på alle de sprog, webstedet tilbyder. Aftalen er indgået på det sprog, du registrerede dig på: sproget i den version, du accepterede, som fremgår af vores registrering af din accept. Hvis du senere accepterer en ny version på et andet sprog, fortsætter aftalen på dette sprog. De øvrige sprogversioner er oversættelser. Hvis lovgivningen i det land, hvor du bor, bestemmer, at en version på dette lands eget sprog har forrang, har denne version forrang. Hvis to sprogversioner er forskellige, anvender vi den betydning, der er mest gunstig for dig." },
-      { kind: "p", text: "Kontakt. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bukarest, Rumænien." }
+      { kind: "p", text: "Kontakt. support@dezbatere.ro · DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumænien." }
     ]
   },
   {
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Bilag A — Regionale vilkår",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Hvert punkt gælder kun, hvis den pågældende region er anført i afsnit 2, og angiver kun afvigelser fra hovedteksten. Hvis et punkt er i modstrid med hovedteksten, gælder punktet for personer i den pågældende region." }
+      { kind: "p", text: "Hvert punkt gælder for personer, der bor i den pågældende region, og angiver kun afvigelser fra hovedteksten. Hvis et punkt er i modstrid med hovedteksten, gælder punktet for personer i den pågældende region." }
     ]
   },
   {
@@ -294,103 +294,70 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Den Europæiske Union og Det Europæiske Økonomiske Samarbejdsområde",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Hovedteksten i disse vilkår er skrevet til dig. Derudover gælder følgende: Du kan anlægge sag ved domstolene i det land, hvor du bor; fortrydelsesretten i afsnit 13 gælder; alternativ tvistbilæggelse er tilgængelig gennem [the ANPC – named entity, website]. Tyskland: Opsigelsesknappen på [dezbatere.ro/cancel] giver dig mulighed for at opsige et abonnement uden at logge ind; abonnementsperioder, fornyelsesperioder og opsigelsesvarsler overholder §309(9) BGB [state them]. Frankrig: Du kan opsige et abonnement online i tre trin på [URL]; [the mediator named at URL] står til rådighed for dig. Italien: Bestemmelserne om ansvar (15), suspension (11), ændringer (14) og lovvalg (18) kræver din specifikke godkendelse, som du giver ved den særskilte bekræftelse ved tilmelding. Nederlandene: Disse vilkår stilles til rådighed i en form, der kan lagres, inden aftalen indgås. Polen: En polsk version findes på [URL]." }
+      { kind: "p", text: "Hovedteksten i disse vilkår er skrevet til dig. Derudover gælder følgende: Du kan anlægge sag ved domstolene i det land, hvor du bor; fortrydelsesretten i afsnit 13 gælder; alternativ tvistbilæggelse er tilgængelig gennem www.onoratainstanta.ro. Tyskland: Opsigelsesknappen på dezbatere.ro/cancel giver dig mulighed for at opsige et abonnement uden at logge ind; abonnementsperioder, fornyelsesperioder og opsigelsesvarsler overholder §309(9) BGB [state them]. Frankrig: Du kan opsige et abonnement online i tre trin på [URL]. Italien: Bestemmelserne om ansvar (15), suspension (11), ændringer (14) og lovvalg (18) kræver din specifikke godkendelse, som du giver ved den særskilte bekræftelse ved tilmelding. Nederlandene: Disse vilkår stilles til rådighed i en form, der kan lagres, inden aftalen indgås. Polen: En polsk version findes på [URL]." }
     ]
   },
   {
     no: "A.2",
-    title: "Storbritannien (kun hvis anført i afsnit 2)",
+    title: "USA",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Vores britiske repræsentant i henhold til artikel 27 i den britiske GDPR er [name, address, email]. Consumer Rights Act 2015 gælder for dig, og intet i disse vilkår begrænser dine rettigheder efter denne lov; når abonnementsreglerne i Digital Markets, Competition and Consumers Act 2024 træder i kraft (forventet i 2027), gælder de for betalingsabonnementer, herunder en betænkningstid efter fornyelser og gratis prøveperioder. Sådan beskytter vi brugere mod ulovligt indhold: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktiv teknologi, vi bruger: [describe, or \"none\"]. Alderskontrol: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Klageproceduren i afsnit 10 modtager klager over ulovligt indhold, fejlagtig fjernelse af dit indhold, begrænsninger af din konto, brugen af automatiserede værktøjer, der påvirker dit indhold, og enhver aldersvurdering, der fejlagtigt blokerer dig. Den er åben for personer, der påvirkes af indhold, og som ikke er brugere. Vores privatlivspolitik, bilag B.2, dækker dine data." }
+      { kind: "p", text: "Tennessee. Vi tilbyder ikke DebateAI til personer, der bor i Tennessee." },
+      { kind: "p", text: "Meddelelser og fjernelse. Intime billeder uden samtykke kan anmeldes på [URL] uden en konto og fjernes inden for 48 timer efter en gyldig anmodning. Klager over ophavsret følger anmeldelsesvejen i afsnit 10." },
+      { kind: "p", text: "Delstatsspecifikt. Californien: Vilkårene om automatisk fornyelse i afsnit 12 gælder; du kan til enhver tid opsige online; vi opbevarer dit samtykke til fornyelsesvilkårene i mindst tre år. New York: Du kan opsige inden for 14 dage efter enhver debitering til en forhøjet pris og modtage en forholdsmæssig tilbagebetaling. Texas og Nebraska: Vi sælger ikke følsomme personoplysninger. Washington: Vores meddelelse om beskyttelse af forbrugersundhedsdata på [URL] gælder for helbredsrelaterede oplysninger. Colorado: Intet i tjenesten træffer afgørelser om dig med væsentlige konsekvenser. Vores privatlivspolitik, bilag B.2, dækker dine data og dine rettigheder efter delstaternes privatlivslove." }
     ]
   },
   {
     no: "A.3",
-    title: "USA (kun hvis anført i afsnit 2)",
+    title: "Canada og Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tennessee. Vi tilbyder ikke DebateAI til personer, der bor i Tennessee." },
-      { kind: "p", text: "Voldgiftsaftale og afkald på gruppesøgsmål. Hvis du bor i USA, aftaler du og DebateAIRO at afgøre enhver tvist, der udspringer af disse vilkår eller tjenesten, ved bindende individuel voldgift administreret af [the American Arbitration Association / JAMS] efter organisationens forbrugerregler i stedet for ved domstolene, dog således at hver af os kan fremsætte et individuelt krav ved en domstol for mindre krav. Du kan fravælge aftalen ved at sende en e-mail til [address] senest 30 dage efter, at du første gang accepterede disse vilkår. Aftalen er underlagt Federal Arbitration Act. Vi betaler gebyrerne for indledning af voldgiftssagen. Der gives afkald på gruppe-, kollektive og repræsentative søgsmål i det omfang, lovgivningen tillader det. Dette afsnit gælder kun fremadrettet og ikke for krav, der opstod, før du accepterede det." },
-      { kind: "p", text: "Meddelelser og fjernelse. Intime billeder uden samtykke kan anmeldes på [URL] uden en konto og fjernes inden for 48 timer efter en gyldig anmodning. Klager over ophavsret sendes til vores udpegede repræsentant, som er anført i afsnit 16." },
-      { kind: "p", text: "Delstatsspecifikt. Californien: Vilkårene om automatisk fornyelse i afsnit 12 gælder; du kan til enhver tid opsige online; vi opbevarer dit samtykke til fornyelsesvilkårene i mindst tre år. New York: Du kan opsige inden for 14 dage efter enhver debitering til en forhøjet pris og modtage en forholdsmæssig tilbagebetaling. Texas og Nebraska: Vi sælger ikke følsomme personoplysninger. Washington: Vores meddelelse om beskyttelse af forbrugersundhedsdata på [URL] gælder for helbredsrelaterede oplysninger. Colorado: Intet i tjenesten træffer afgørelser om dig med væsentlige konsekvenser. Vores privatlivspolitik, bilag B.3, dækker dine data og dine rettigheder efter delstaternes privatlivslove." }
+      { kind: "p", text: "Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Vores privatlivspolitik, bilag B.3, dækker dine data. Quebec: Disse vilkår findes på fransk; vælg fransk med sprogvælgeren; de indstillinger, der holder dine debatter private, er slået til som standard; du kan anmode om afindeksering af personoplysninger om dig." }
     ]
   },
   {
     no: "A.4",
-    title: "Canada og Quebec (kun hvis anført)",
+    title: "Australien og New Zealand",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er [name], privacy@dezbatere.ro. Vores privatlivspolitik, bilag B.4, dækker dine data. Quebec: Disse vilkår findes på fransk; vælg fransk med sprogvælgeren; de indstillinger, der holder dine debatter private, er slået til som standard; du kan anmode om afindeksering af personoplysninger om dig; ingen voldgiftsaftale eller afkald på gruppesøgsmål gælder for dig." }
+      { kind: "p", text: "Vores tjenester er omfattet af garantier, der ikke kan fraviges i henhold til Australian Consumer Law. Ved væsentlige mangler ved tjenesten har du ret til at opsige og få tilbagebetalt den uudnyttede del eller til erstatning for tjenestens reducerede værdi; du har også ret til erstatning for ethvert andet tab eller enhver anden skade, der med rimelighed kunne forudses. Hvis manglen ikke er væsentlig, har du ret til at få problemer med tjenesten afhjulpet inden for rimelig tid og, hvis dette ikke sker, til at opsige og få tilbagebetaling. I det omfang afsnit 64A tillader det, er vores ansvar for brud på en garanti begrænset til at levere tjenesten igen eller betale omkostningerne herved. Der gælder ingen fortrydelsesret for betalingsabonnementet ud over det, afsnit 12 giver dig; anmodninger om tilbagebetaling behandles via support@dezbatere.ro. New Zealand: Consumer Guarantees Act 1993 finder anvendelse, og intet i disse vilkår udelukker den; skadelig digital kommunikation kan anmeldes til os efter afsnit 10 eller til Netsafe." }
     ]
   },
   {
     no: "A.5",
-    title: "Australien og New Zealand (kun hvis anført)",
+    title: "Schweiz",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Vores tjenester er omfattet af garantier, der ikke kan fraviges i henhold til Australian Consumer Law. Ved væsentlige mangler ved tjenesten har du ret til at opsige og få tilbagebetalt den uudnyttede del eller til erstatning for tjenestens reducerede værdi; du har også ret til erstatning for ethvert andet tab eller enhver anden skade, der med rimelighed kunne forudses. Hvis manglen ikke er væsentlig, har du ret til at få problemer med tjenesten afhjulpet inden for rimelig tid og, hvis dette ikke sker, til at opsige og få tilbagebetaling. I det omfang afsnit 64A tillader det, er vores ansvar for brud på en garanti begrænset til at levere tjenesten igen eller betale omkostningerne herved. Der gælder ingen fortrydelsesret for betalingsabonnementet ud over det, afsnit 12 giver dig; vores tilbagebetalingspolitik er […]. New Zealand: Consumer Guarantees Act 1993 finder anvendelse, og intet i disse vilkår udelukker den; skadelig digital kommunikation kan anmeldes til os efter afsnit 10 eller til Netsafe." }
+      { kind: "p", text: "Den schweiziske forbundslov om databeskyttelse gælder for dine data (privatlivspolitikken, bilag B.5). Du kan anlægge sag ved domstolene på det sted i Schweiz, hvor du bor. Der gælder ingen lovbestemt fortrydelsesret for betalingsabonnementet; anmodninger om tilbagebetaling behandles via support@dezbatere.ro." }
     ]
   },
   {
     no: "A.6",
-    title: "Schweiz (kun hvis anført)",
+    title: "Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Den schweiziske forbundslov om databeskyttelse gælder for dine data (privatlivspolitikken, bilag B.6). Du kan anlægge sag ved domstolene på det sted i Schweiz, hvor du bor. Der gælder ingen lovbestemt fortrydelsesret for betalingsabonnementet; vores tilbagebetalingspolitik er […]." }
+      { kind: "p", text: "Du har de samme rettigheder efter disse vilkår som en forbruger i Den Europæiske Union, herunder fortrydelsesretten på 14 dage i afsnit 13. Du kan anlægge sag ved domstolene i Moldova. Moldovas lov nr. 195/2024 om beskyttelse af personoplysninger gælder for dine data (privatlivspolitikken, bilag B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldova (kun hvis anført)",
+    title: "Asien og Stillehavsområdet",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Du har de samme rettigheder efter disse vilkår som en forbruger i Den Europæiske Union, herunder fortrydelsesretten på 14 dage i afsnit 13. Du kan anlægge sag ved domstolene i Moldova. Moldovas lov nr. 195/2024 om beskyttelse af personoplysninger gælder for dine data (privatlivspolitikken, bilag B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukraine (kun hvis anført)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Vi tilbyder DebateAI i Ukraine undtagen i de områder, der ikke kontrolleres af den ukrainske regering. Produktet og disse vilkår findes på ukrainsk. Ukraines lov \"Om beskyttelse af personoplysninger\" gælder for dine data (privatlivspolitikken, bilag B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Israel (kun hvis anført)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Du kan opsige et betalingsabonnement, som Consumer Protection Law, 5741-1981, tillader [state the cancellation terms]. Disse vilkår og vores privatlivspolitik findes på hebraisk. Israels Protection of Privacy Law gælder for dine data (privatlivspolitikken, bilag B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Asien og Stillehavsområdet (kun linjerne for anførte regioner)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapore: Vores databeskyttelsesansvarlige er [name, email]; overførsler er baseret på kontraktmæssig beskyttelse, der kan sammenlignes med PDPA; der gælder ingen lovbestemt betænkningstid for betalingsabonnementet, og vores tilbagebetalingspolitik er […]. Japan: Den lovpligtige meddelelse i henhold til Specified Commercial Transactions Act findes på [URL]; der gælder ingen generel betænkningstid for onlineabonnementer, og vores tilbagebetalingspolitik er […]; vi sender dit indhold til AI-udbydere i USA og Den Europæiske Union, hver i henhold til en kontrakt, der kræver en beskyttelse svarende til Japans Act on the Protection of Personal Information, og på anmodning fortæller vi dig, hvilke foranstaltninger der er tale om. Sydkorea: Samtykker til valgfri behandling og markedsføring indhentes særskilt fra de punkter, der er nødvendige for at drive tjenesten; vores privatlivsansvarlige er [name], privacy@dezbatere.ro; du kan fortryde et betalingsabonnement senest 7 dage efter tegningen med forbehold af E-Commerce Act; vi indhenter dit nye samtykke før enhver tilbagevendende prisstigning eller overgang fra gratis til betalt; tjenesten bruger generativ AI, det fortæller vi dig, før du bruger den, og vi mærker AI-genereret output. Taiwan: Du kan fortryde et betalingsabonnement senest 7 dage efter tegningen i henhold til Consumer Protection Act; Taiwans Personal Data Protection Act gælder for dine data (privatlivspolitikken, bilag B.10). Thailand: Vores repræsentant i Thailand er [name] [if appointed]. Filippinerne: Vores virksomhedsidentifikation og klagemekanisme i henhold til Internet Transactions Act findes på [URL]; klager kan indgives til National Privacy Commission." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Reserveret",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Tyrkiet, Brasilien og Indonesien kræver hver især et bilag på det lokale sprog, en repræsentant eller registrering samt indberetninger. De er ikke udarbejdet her og er ikke omfattet af afsnit 2, før de medtages bevidst. Tjenesten tilbydes ikke i Kina, Vietnam og Rusland." }
+      { kind: "p", text: "Singapore: Vores databeskyttelsesansvarlige er vores direktør, som kan kontaktes på privacy@dezbatere.ro; overførsler er baseret på kontraktmæssig beskyttelse, der kan sammenlignes med PDPA; der gælder ingen lovbestemt betænkningstid for betalingsabonnementet, og anmodninger om tilbagebetaling behandles via support@dezbatere.ro. Japan: Den lovpligtige meddelelse i henhold til Specified Commercial Transactions Act findes på [URL]; der gælder ingen generel betænkningstid for onlineabonnementer, og anmodninger om tilbagebetaling behandles via support@dezbatere.ro; vi sender dit indhold til AI-udbydere i USA og Den Europæiske Union, hver i henhold til en kontrakt, der kræver en beskyttelse svarende til Japans Act on the Protection of Personal Information, og på anmodning fortæller vi dig, hvilke foranstaltninger der er tale om. Sydkorea: Samtykker til valgfri behandling og markedsføring indhentes særskilt fra de punkter, der er nødvendige for at drive tjenesten; vores privatlivsansvarlige er vores direktør, som kan kontaktes på privacy@dezbatere.ro; du kan fortryde et betalingsabonnement senest 7 dage efter tegningen med forbehold af E-Commerce Act; vi indhenter dit nye samtykke før enhver tilbagevendende prisstigning eller overgang fra gratis til betalt; tjenesten bruger generativ AI, det fortæller vi dig, før du bruger den, og vi mærker AI-genereret output. Taiwan: Du kan fortryde et betalingsabonnement senest 7 dage efter tegningen i henhold til Consumer Protection Act; Taiwans Personal Data Protection Act gælder for dine data (privatlivspolitikken, bilag B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "adce38559af8c2573d5ac345b61d466c9995defd2feb35aabd792b64a5cedde5",
-  eyebrow: "TJENESTEVILKÅR · v2.1 · GÆLDENDE FRA [DATE]",
+  version: "2.2",
+  sha256: "93ff3486555587ee7c730600428a60e9ab0d19afc42c5ec7e757db7c8be66d36",
+  eyebrow: "TJENESTEVILKÅR · v2.2 · GÆLDENDE FRA 12. OKTOBER 2026",
   title: "Det, du accepterer",
-  lede: "Aftalen mellem dig og DebateAIRO S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",
-  endMarker: "SLUT PÅ VILKÅRENE · v2.1",
-  contact: "[legal@dezbatere.ro]",
+  lede: "Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",
+  endMarker: "SLUT PÅ VILKÅRENE · v2.2",
+  contact: "support@dezbatere.ro",
   bodyLabel: "Tjenestevilkårenes tekst",
   sectionIdPrefix: "terms-section-",
   titleId: "terms-modal-title",

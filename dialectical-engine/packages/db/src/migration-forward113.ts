@@ -3,12 +3,12 @@ import { readFile } from 'node:fs/promises';
 import type { PoolClient } from 'pg';
 import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-chain.js';
 
-/** The data export as the chain step after NETOPIA's 0111 (mission data-export S01, V-28; migrations/lineage/README.md). */
-const NAME='0112_data_export.sql';
-const VERSION='data-export-forward112-v1';
-const MANIFEST_PATH='lineage/data-export-forward112.json';
-const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0112 adds no billing relation or function, so it names 0111's verifier
-const PREVIOUS='0111_billing_netopia.sql';
+/** The data export as the chain step after the auth DB batch's 0112 (mission data-export S01, V-30; migrations/lineage/README.md). */
+const NAME='0113_data_export.sql';
+const VERSION='data-export-forward113-v1';
+const MANIFEST_PATH='lineage/data-export-forward113.json';
+const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0113 adds no billing relation or function, so it names the verifier in force (0111's, which 0112 keeps)
+const PREVIOUS='0112_auth_db_batch.sql';
 const FUNCTIONS=[
  'identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)',
  'identity.valid_consumer_authorization_internal(jsonb)',
@@ -18,7 +18,7 @@ const FUNCTIONS=[
  'identity.fail_data_export(uuid,uuid,text)','identity.sweep_data_exports()','identity.mark_data_export_key_destroyed(uuid)',
  'identity.live_data_export_ids(uuid[])','identity.open_data_export_link(uuid,text)','identity.record_data_export_download(uuid,uuid,jsonb)'
 ] as const;
-const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD112_${detail}`);};
+const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD113_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 const exactKeys=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
 const digest=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
@@ -48,7 +48,7 @@ async function postconditionEvidence(client:PoolClient):Promise<string>{
  return sha(JSON.stringify({functions,table,role,check}));
 }
 
-export async function loadForward112(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
+export async function loadForward113(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
  const directory=new URL('../../../migrations/',import.meta.url);
  const bytes=await readFile(new URL(MANIFEST_PATH,directory));const raw:unknown=JSON.parse(bytes.toString('utf8'));
  if(!exactKeys(raw,['version','baseRecipeSha256','previous','migration','verifier'])||raw.version!==VERSION||raw.baseRecipeSha256!==anchor.baseRecipeSha256

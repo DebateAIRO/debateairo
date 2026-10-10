@@ -1531,11 +1531,21 @@ export async function runSynthesisLoop<TCandidate>(
 /* ------------------------------------------- V-11: the two prompt contracts */
 
 /**
- * The SYNTHESIZER's required answer form. Moved verbatim out of
- * `apps/runner/src/index.ts`, where it was the system message; it is code's
- * half of the prompt and an instruction edit cannot drop it.
+ * The SYNTHESIZER's contract ids. The answer form is code's half of the prompt
+ * and is sealed by hash in the register row `composerContractHash`: once a form
+ * has shipped, changing it is a NEW contract id, never an edit (the storyteller
+ * v1 -> v2 precedent in `packages/story/src/contracts.ts`). v1 stays below as
+ * shipped history, byte for byte; v2 is what the runner sends.
  */
-export const SYNTHESIZER_ANSWER_FORM =
+export const SYNTHESIZER_V1_CONTRACT_ID = "serve.synthesizer.v1" as const;
+export const SYNTHESIZER_CONTRACT_ID = "serve.synthesizer.v2" as const;
+
+/**
+ * Shipped v1 history. Moved verbatim out of `apps/runner/src/index.ts`, where
+ * it was the system message; its fingerprint is the `composerContractHash`
+ * every register version sealed before v2 carries.
+ */
+export const SYNTHESIZER_V1_ANSWER_FORM =
   "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. "
   + "node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every load-bearing "
   + "claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes a segment cites "
@@ -1543,8 +1553,25 @@ export const SYNTHESIZER_ANSWER_FORM =
   + "order: the first segment states the provisional answer as a hypothesis; the second segment states the research "
   + "plan that would lift it.";
 
+/**
+ * Current form (v2): v1's full contract plus the served-number reference
+ * format. On 2026-10-05 a real answer was refused because its
+ * served_number_refs held values and prose instead of slot ids: v1 never named
+ * the one slot the runner serves (`numberRef: "number:final-strength"` in
+ * `apps/runner/src/index.ts`) nor the identifier grammar the runner's parser
+ * enforces (`machineIdentifierSchema`). Both are stated here exactly.
+ */
+export const SYNTHESIZER_ANSWER_FORM = `${SYNTHESIZER_V1_ANSWER_FORM} `
+  + "segment_id and every node_refs or served_number_refs entry must be an ASCII identifier matching "
+  + "^[A-Za-z0-9][A-Za-z0-9:._-]*$; copy digest node ids exactly and never translate identifiers. "
+  + "served_number_refs identifies typed served-number slots, not the numeric values themselves. "
+  + "The available slot is number:final-strength, referring to code_label.servedStrength. "
+  + "Include that exact ref when the segment asserts that served number. If a segment asserts no served number, use []. "
+  + "Never invent a slot from other digest statistics or code_label.margin, and never put numeric values, "
+  + "percentages, expressions, or citation labels in served_number_refs.";
+
 export const SYNTHESIZER_PROMPT_CONTRACT: PromptContract = Object.freeze({
-  contractId: "serve.synthesizer.v1",
+  contractId: SYNTHESIZER_CONTRACT_ID,
   instruction: SYNTHESIZER_INSTRUCTIONS,
   answerForm: SYNTHESIZER_ANSWER_FORM
 });

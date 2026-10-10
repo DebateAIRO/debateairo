@@ -9,7 +9,9 @@ import {
   type CryptoEnvelope,
   type ReadableUserDekStore
 } from "@debateai/crypto";
+import { isMailAddress } from "@debateai/kernel";
 import { isSingleDeliverableRecipient, type EmailChangeMailSender } from "./mail-channel.js";
+import { mailDomainRefused, type MailDomainCheck } from "./mail-domain-check.js";
 
 // Turn 14 — change email (design doc 14A/14B/14C). The owner, fresh from a
 // CHANGE_EMAIL step-up, names a new address. Nothing about the account changes
@@ -67,8 +69,12 @@ function addressAad(userId: string, field: "user.email_ciphertext" | "user.recov
   return ["identity", field, userId, "run:none", userId, `user-dek:${userId}`, "1"] as const;
 }
 
+/**
+ * The one shared address rule (packages/kernel/src/mail-address.ts) on the address as typed, surrounding spaces
+ * aside, exactly as sign-up asks it; then the account store's own lower-casing.
+ */
 export function normalizedAddress(value: unknown): string {
-  if (typeof value !== "string" || value.length > MAX_ADDRESS_LENGTH) throw new EmailChangeError("EMAIL_INVALID");
+  if (typeof value !== "string" || value.length > MAX_ADDRESS_LENGTH || !isMailAddress(value.trim())) throw new EmailChangeError("EMAIL_INVALID");
   let normalized: string;
   try {
     normalized = normalizeEmailForBlindIndex(value);
@@ -96,6 +102,8 @@ export class EmailChangeService {
     readonly resendCooldownMs?: number;
     readonly now?: () => Date;
     readonly tokenFactory?: () => string;
+    /** Open sign-up mail (G5): refuses a new address whose domain takes no mail; fails open. Absent, nothing is asked. */
+    readonly mailDomainCheck?: MailDomainCheck;
   }) {
     this.tokenTtlMs = dependencies.tokenTtlMs ?? EMAIL_CHANGE_LINK_TTL_MS;
     this.resendCooldownMs = dependencies.resendCooldownMs ?? EMAIL_CHANGE_RESEND_COOLDOWN_MS;
@@ -132,6 +140,7 @@ export class EmailChangeService {
     if (typeof input.grantToken !== "string" || !BEARER.test(input.grantToken)) {
       throw new EmailChangeError("STEP_UP_REQUIRED");
     }
+    if (await mailDomainRefused(this.dependencies.mailDomainCheck, newEmail)) throw new EmailChangeError("EMAIL_INVALID");
     const confirmToken = this.tokenFactory();
     const cancelToken = this.tokenFactory();
     const expiresAt = new Date(this.now().getTime() + this.tokenTtlMs);

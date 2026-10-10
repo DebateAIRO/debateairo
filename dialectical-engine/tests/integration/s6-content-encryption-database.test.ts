@@ -39,6 +39,7 @@ import {
   withOwnerAskAdmissionLease,
   withRunContentLease
 } from "@debateai/db";
+import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { LivenessRepository } from "@debateai/liveness";
 import { WorkItemRepository } from "@debateai/battery";
 import { EvidenceRepository } from "../../packages/evidence/src/index.js";
@@ -1562,10 +1563,14 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     const pre0038 = await startTestDatabase();
     try {
       const directory = new URL("../../migrations/", import.meta.url);
-      const names = (await readdir(directory))
-        .filter((name) => /^\d+.*\.sql$/.test(name) && name < "0038_content_encryption.sql")
-        .sort();
-      for (const name of names) {
+      // The order migrate() plans, not the folder's: by name, PR #82's 0092/0093 sort before dev's 0093, whose
+      // exact-grant check then refuses them.
+      const plan = await loadMigrationPlan();
+      const planned = [...plan.manifest.order, plan.forward108.name, plan.forward110.name,
+        ...plan.forwardChain.map((step) => step.name)];
+      const at0038 = planned.indexOf("0038_content_encryption.sql");
+      expect(at0038).toBeGreaterThan(0);
+      for (const name of planned.slice(0, at0038)) {
         await pre0038.pool.query(await readFile(new URL(name, directory), "utf8"));
       }
 
@@ -1601,9 +1606,7 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
         question_line: questionLine,
         ask_contract: { audience: "pre-0038-legacy" }
       });
-      for (const name of (await readdir(directory))
-        .filter((name) => /^\d+.*\.sql$/.test(name) && name >= "0038_content_encryption.sql")
-        .sort()) {
+      for (const name of planned.slice(at0038)) {
         await pre0038.pool.query(await readFile(new URL(name, directory), "utf8"));
       }
       expect(await repository.readLoadingProjection(runId, {

@@ -10,6 +10,11 @@ export type StaffAlertCode = StaffAlertFailureCode | 'STAFF_ALERT_METADATA_INVAL
 export class StaffAlertError extends Error {
     constructor(readonly code: StaffAlertCode) { super(code); this.name = 'StaffAlertError'; }
 }
+/** Readiness lapsed after the claim and before any send: the claim is given back uncounted (design note
+ * 2026-10-09 item 5, staff.release_alert_delivery). Never escapes the dispatcher. */
+class StaffAlertReadinessLapsed extends Error {
+    constructor() { super('STAFF_ALERT_READINESS_LAPSED'); this.name = 'StaffAlertReadinessLapsed'; }
+}
 /** Independent receiver DTO: no customer UUID, key reference, ciphertext, credential,
  * address or invitation bearer. References identify only staff/operation records. */
 export type StaffIndependentAlertMetadata = Readonly<{
@@ -579,7 +584,7 @@ export class StaffAlertDispatcher {
                     throw new StaffAlertError('PAYLOAD_INVALID');
                 const safe = independentMetadata(value);
                 if (await this.dependencies.readiness() !== 'READY')
-                    throw new StaffAlertError('TRANSPORT_UNAVAILABLE');
+                    throw new StaffAlertReadinessLapsed();
                 active();
                 // Revalidate the persisted claim/key mapping immediately at admission. A
                 // resumed timed-out readiness/key lookup cannot start a later delivery.
@@ -630,8 +635,8 @@ export class StaffAlertDispatcher {
             // Claim just in time; a batch of 100 five-second sends must not carry a
             // single already-expired lease by the time its last event is admitted.
             for (let count = 0; count < limit && !this.stopped; count++) {
-                // Checked before EVERY claim: a lapse after one claim costs that row one attempt
-                // (settled FAILED below; the SQL has no uncounted release) and stops the batch here.
+                // Checked before EVERY claim. A lapse after the claim and before the send releases the
+                // claim without spending its attempt; the next pre-claim check then stops the batch.
                 if (!await this.readyToClaim() || this.stopped)
                     break;
                 const claims = await this.dependencies.repository.claim(1);
@@ -642,6 +647,10 @@ export class StaffAlertDispatcher {
                     await this.bounded(signal => this.deliver(claim, signal));
                 }
                 catch (error) {
+                    if (error instanceof StaffAlertReadinessLapsed) {
+                        await this.dependencies.repository.release(claim);
+                        continue;
+                    }
                     const severed = error instanceof StaffAlertError && error.code === 'SEVERED';
                     const code = severed ? 'SEVERED' : failure(error);
                     this.dependencies.log?.(code);

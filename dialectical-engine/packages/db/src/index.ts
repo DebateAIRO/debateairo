@@ -1106,7 +1106,7 @@ export async function migrate(pool: Pool): Promise<void> {
     await applyForward110(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
     const compatEvidenceBeforeChain = await lineageEvidence(client);
     await applyForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]));
-    // data-export 0112 (V-28): a chain step that moves lineageEvidence (step_up_grant_action_check, valid_consumer_authorization_internal)
+    // data-export 0113 (V-30; the re-seal is V-28's): a chain step that moves lineageEvidence (step_up_grant_action_check, valid_consumer_authorization_internal)
     // re-seals the compatibility row it moved; the check above guards every later run (V-18).
     const compatEvidenceAfterChain = await lineageEvidence(client);
     if (compatEvidenceAfterChain !== compatEvidenceBeforeChain) {

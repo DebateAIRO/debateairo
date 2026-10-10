@@ -4,30 +4,37 @@
 [Unit]
 Description=DebateAI preview: unlock team tools for one hour
 After=debateai-preview-postgresql.service debateai-preview-capture.service debateai-preview-api.service
-# A window that ends FAILED (e.g. EVIDENCE_UNAVAILABLE), a run that could not reset, or a failed
-# reset (ExecStopPost exits non-zero) marks the unit failed, and that emails.
+# A window that ends FAILED (e.g. EVIDENCE_UNAVAILABLE), a run that could not lock again, or a
+# failed reset (ExecStopPost exits non-zero) marks the unit failed, and that emails.
 OnFailure=debateai-preview-alert@%n.service
 
 [Service]
 Type=simple
 # Root runs node through `env -i` with PATH only, like the API/UI prestart: nothing from the
 # service manager's or this unit's environment (NODE_OPTIONS, NODE_PATH, ...) reaches it, so an
-# Environment= line here has no effect. The recovery login connects over the preview's local
-# socket (pg_hba: `local` only). For loopback TLS instead, put PREVIEW_LIFECYCLE_STAFF_DB_HOST=127.0.0.1
-# right after PATH=... in this ExecStart line AND add a matching hostssl line in the server's
-# pg_hba.conf (README step 7).
+# Environment= line here has no effect.
+# Writer: this line names none, so the unlock writes the ready row as debateai_staff_readiness_writer
+# (the auth DB batch step; no password, peer authentication on the preview's local socket). Root
+# never connects as it: each database call is a child started as the dedicated no-login OS user
+# debateai-readiness, the only OS user the preview's pg_ident maps to it (README step 7).
+# Fallback until the server has that step, the user and the pg_ident/pg_hba lines: the drop-in
+# fallback/50-interim-recovery-login.conf, which re-states this line with
+# PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login after PATH=... (the old recovery login
+# with a temporary password). Only with that fallback may PREVIEW_LIFECYCLE_STAFF_DB_HOST=127.0.0.1
+# name loopback TLS instead of the socket, with a matching hostssl line in the server's pg_hba.conf.
 ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs run
-# Runs after ANY exit, including a crash or a kill: the login goes back to PASSWORD NULL
-# VALID UNTIL '-infinity'. Even if this also failed, the login's own expiry is at most 4 minutes away.
+# Runs after ANY exit, including a crash or a kill, whichever writer ran: the recovery login goes
+# (back) to PASSWORD NULL VALID UNTIL '-infinity'. Idempotent; it needs no password. Even if this
+# also failed, a fallback login's own expiry is at most 4 minutes away.
 ExecStopPost=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs reset
 # One hour plus two minutes of margin; systemd sends SIGTERM to a run that overstays.
 RuntimeMaxSec=3720
 KillMode=mixed
 # Room for one database actor call (cap 120 s: it re-verifies the release) in the main process's
-# own close, and again for ExecStopPost's reset, which gets its own TimeoutStopSec.
+# own close (fallback writer), and again for ExecStopPost's reset, which gets its own TimeoutStopSec.
 TimeoutStopSec=150
 Restart=no
-# The process holds the interim login's password in memory: never write it to a core dump.
+# The fallback writer holds the interim login's password in memory: never write a core dump.
 LimitCORE=0
 UMask=0077
 NoNewPrivileges=true

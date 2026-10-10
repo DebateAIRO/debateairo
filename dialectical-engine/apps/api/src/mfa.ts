@@ -9,7 +9,6 @@ import {
   decrypt,
   encodeBase32,
   encrypt,
-  generateRecoveryCode,
   generateRecoveryCodes,
   generateTotpSecret,
   hashRecoveryCode,
@@ -27,7 +26,7 @@ import { clientIpNetworkScope, normalizeClientIp } from "./client-ip.js";
 import { leastEvidenceKey } from "./admission.js";
 
 type MfaRepository = Pick<PostgresIdentityRepository,
-  | "consumeAndReplaceRecoveryCode"
+  | "consumeRecoveryCode"
   | "readRecoveryCodeForUse"
   | "readTotpEnrollment"
   | "recordMfaVerificationFailure"
@@ -342,10 +341,7 @@ export class MfaEnrollmentService implements MfaApplication {
   async consumeRecoveryCode(input: {
     readonly userId: string;
     readonly recoveryCode: string;
-  }, source: AuthSourceContext): Promise<Readonly<{
-    consumed: true;
-    replacementCode: string;
-  }> | Readonly<{ consumed: false }>> {
+  }, source: AuthSourceContext): Promise<Readonly<{ consumed: boolean }>> {
     try {
       const code = normalizeRecoveryCode(input.recoveryCode);
       const record = await this.dependencies.repository.readRecoveryCodeForUse(
@@ -359,22 +355,14 @@ export class MfaEnrollmentService implements MfaApplication {
         || !await verifyRecoveryCode(this.dependencies.argon2, record.codeHash, code)) {
         return Object.freeze({ consumed: false as const });
       }
-      const replacementCode = generateRecoveryCode(record.codeSlot);
-      const replacementHash = await hashRecoveryCode(
-        this.dependencies.argon2,
-        replacementCode,
-        this.dependencies.policy.recoveryCodes.argon2id
-      );
-      const consumed = await this.dependencies.repository.consumeAndReplaceRecoveryCode({
+      // Design note 2026-10-09 item 3: a used code is not refilled.
+      const consumed = await this.dependencies.repository.consumeRecoveryCode({
         userId: input.userId,
         recoveryCodeId: record.recoveryCodeId,
-        replacementHash,
         occurredAt: this.now(),
         source
       });
-      return consumed
-        ? Object.freeze({ consumed: true as const, replacementCode })
-        : Object.freeze({ consumed: false as const });
+      return Object.freeze({ consumed });
     } catch (error) {
       if (error instanceof Error && error.message === "CRYPTO_CANONICAL_VALUE_INVALID") {
         return Object.freeze({ consumed: false as const });

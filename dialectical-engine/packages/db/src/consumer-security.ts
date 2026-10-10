@@ -19,6 +19,9 @@ export class PostgresConsumerSecurityRepository {
     constructor(private readonly pool: Pool, audit: AuditContextHasher) { this.transactions = new ProfileTransactions(pool, audit); }
     async readPasswordState(session: ProfileSession): Promise<string | null> { return (await this.pool.query('SELECT identity.read_consumer_security_password_state($1) value', [session])).rows[0].value; }
     async authMethods(session: ProfileSession, password: ConsumerPasswordPath): Promise<unknown> { return (await this.pool.query('SELECT identity.read_consumer_auth_methods($1) AS value', [{ ...session, ...password }])).rows[0].value; }
+    /** Owner ruling 2026-10-09: the authenticator recovery waiting its 24 hours, as Settings shows it, and its cancel. */
+    async pendingMfaRecovery(session: ProfileSession): Promise<Readonly<{ notBefore: string; waitingAt: string }> | null> { return (await this.pool.query('SELECT identity.mfa_recovery_pending_read($1) AS value', [session])).rows[0].value; }
+    async cancelPendingMfaRecovery(session: ProfileSession, source: AuthSourceContext): Promise<'CANCELLED' | 'INVALID'> { return this.mutate('mfa_recovery_pending_cancel', session, source); }
     async removeAuthMethod(session: ProfileSession, factorId: string, grantHash: string, password: ConsumerPasswordPath, source: AuthSourceContext): Promise<void> { await this.mutate('remove_consumer_auth_method', { ...session, ...password, factorId, grantHash }, source); }
     async regenerateRecoveryCodes(session: ProfileSession, grantHash: string, hashes: readonly string[], source: AuthSourceContext): Promise<void> { await this.mutate('regenerate_consumer_recovery_codes', { ...session, grantHash, hashes }, source); }
     async beginStepUp(input: ConsumerCeremonySeed & ProfileSession & Readonly<{
@@ -44,7 +47,7 @@ export class PostgresConsumerSecurityRepository {
         authorization: Readonly<Record<string, string>>;
         expiresAt: string;
     }> { return this.mutate('complete_consumer_security_step_up', input, source); }
-    private async mutate<T>(name: 'remove_consumer_auth_method' | 'regenerate_consumer_recovery_codes' | 'complete_consumer_security_step_up', input: unknown, source: AuthSourceContext): Promise<T> {
+    private async mutate<T>(name: 'remove_consumer_auth_method' | 'regenerate_consumer_recovery_codes' | 'complete_consumer_security_step_up' | 'mfa_recovery_pending_cancel', input: unknown, source: AuthSourceContext): Promise<T> {
         return this.transactions.audited(source, async (c, context) => (await c.query(`SELECT identity.${name}($1,$2) AS value`, [input, context])).rows[0].value as T);
     }
 }

@@ -114,6 +114,7 @@ apps/api/src/legacy-claim.ts
 apps/api/src/legal.ts
 apps/api/src/mail-attachments.ts
 apps/api/src/mail-channel.ts
+apps/api/src/mail-domain-check.ts
 apps/api/src/mail-mime.ts
 apps/api/src/main.ts
 apps/api/src/mfa.ts
@@ -336,6 +337,8 @@ apps/runner/src/provider-topology.ts
 apps/runner/src/rotate-kek-cli.ts
 apps/runner/src/rotate-kek.ts
 apps/runner/src/run-seats.ts
+apps/runner/src/runner-preview-team-gate.ts
+apps/runner/src/runner-ready.ts
 apps/runner/src/runner-startup-reconciliation.ts
 apps/runner/src/serve-disclosure-cli.ts
 apps/runner/src/story-snapshot.ts
@@ -434,6 +437,7 @@ apps/ui/components/KnownPasswordRecoveryLink.tsx
 apps/ui/components/LanguageSwitcher.tsx
 apps/ui/components/LibraryComposer.tsx
 apps/ui/components/LoginFlow.tsx
+apps/ui/components/MfaRecoveryCatalog.tsx
 apps/ui/components/MfaRecoveryFlow.tsx
 apps/ui/components/ModeToggle.tsx
 apps/ui/components/ModelPresentation.tsx
@@ -584,6 +588,7 @@ apps/ui/lib/i18n/debateViews.test.mjs
 apps/ui/lib/i18n/legal.test.mjs
 apps/ui/lib/i18n/localeChoice.ts
 apps/ui/lib/i18n/locales.ts
+apps/ui/lib/i18n/mfaRecovery.test.mjs
 apps/ui/lib/i18n/misc.test.mjs
 apps/ui/lib/i18n/public.test.mjs
 apps/ui/lib/i18n/questionLocale.ts
@@ -855,11 +860,12 @@ packages/db/src/index.ts
 packages/db/src/internal-allowance.ts
 packages/db/src/legacy-claim.ts
 packages/db/src/legal-acceptance.ts
+packages/db/src/migration-forward-auth-db-batch.ts
 packages/db/src/migration-forward-chain.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
-packages/db/src/migration-forward112.ts
+packages/db/src/migration-forward113.ts
 packages/db/src/migration-lineage.ts
 packages/db/src/obs-schema.ts
 packages/db/src/onboarding-evidence.ts
@@ -902,6 +908,7 @@ packages/kernel/src/argument-language.ts
 packages/kernel/src/date-of-birth.ts
 packages/kernel/src/debate-roles.ts
 packages/kernel/src/index.ts
+packages/kernel/src/mail-address.ts
 packages/kernel/src/manualPhone.ts
 packages/kernel/src/provider-funding.ts
 packages/kernel/src/region.ts

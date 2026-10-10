@@ -203,6 +203,6 @@
   "public.publication.contentCheck.groundIllegal": "ייתכן שהטקסט גם אינו חוקי.",
   "public.publication.contentCheck.automated": "ההחלטה הזו התקבלה באמצעות כלי אוטומטי. אף אדם עדיין לא בחן אותה.",
   "public.publication.contentCheck.stillPrivate": "הדיון שלכם נשאר פרטי וללא שינוי. רק אתם יכולים לראות אותו.",
-  "public.publication.contentCheck.appeal": "כדי לבקש מאדם לבחון את ההחלטה הזו, כתבו אל [appeals@dezbatere.ro] בתוך שישה חודשים.",
+  "public.publication.contentCheck.appeal": "כדי לבקש מאדם לבחון את ההחלטה הזו, כתבו אל office@dezbatere.ro בתוך שישה חודשים.",
   "public.publication.contentCheck.unavailable": "בדיקת התוכן אינה זמינה כרגע, ולכן דבר לא פורסם. הדיון שלכם נשאר פרטי. נסו שוב בעוד כמה דקות."
 }

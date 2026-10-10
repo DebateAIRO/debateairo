@@ -40,3 +40,43 @@ describe('finite public canonical mail selector and opaque handoff',()=>{
  });
 
 });
+// The 24-hour authenticator replacement wait: WAITING goes to every bound email, FINISH only to the proving address.
+const notBefore=new Date('2026-10-07T21:00:00Z');
+function waiting(cancel:boolean){return Buffer.from(renderEmailRecoveryMail({...base,flow:'mfa_recovery',event:'WAITING',notBefore,...(cancel?{cancelToken:'C'.repeat(43)}:{})} as any,options));}
+function finish(){return Buffer.from(renderEmailRecoveryMail({...base,flow:'mfa_recovery',event:'FINISH',finishToken:'F'.repeat(43)} as any,options));}
+const finishLine=`${options.publicAppUrl}/recover-authenticator#finish=${'F'.repeat(43)}`;
+function refused(text:string){expect(()=>mail.selectCanonicalMail(Buffer.from(text),options)).toThrow(/^PREVIEW_MAIL_REFUSED$/);}
+describe('authenticator recovery WAITING and FINISH mails',()=>{
+ it.each([true,false])('preserves complete mfa_recovery/WAITING producer bytes (cancel link: %s)',cancel=>{
+  const message=waiting(cancel);expect(message.toString().includes('/recover-authenticator#cancel=')).toBe(cancel);expect(message.toString()).toContain('nothing is replaced before 2026-10-07T21:00:00.000Z.');
+  const selected=mail.selectCanonicalMail(message,options);expect(selected.family).toBe('external');expect(selected.message.equals(message)).toBe(true);
+ });
+ it('preserves complete mfa_recovery/FINISH producer bytes',()=>{
+  const message=finish();expect(message.toString()).toContain(finishLine);expect(message.toString()).not.toContain('#cancel=');
+  const selected=mail.selectCanonicalMail(message,options);expect(selected.family).toBe('external');expect(selected.message.equals(message)).toBe(true);
+ });
+ it.each([
+  ['changed wording',(t:string)=>t.replace('nothing is replaced before','nothing is replaced after')],
+  ['non-canonical wait time',(t:string)=>t.replace('2026-10-07T21:00:00.000Z','2026-10-07T21:00:00Z')],
+  ['dropped signed-in cancel line',(t:string)=>t.replace('You can also cancel it from any signed-in session: open Settings, then Security.\r\n','')],
+  ['cancel link turned into a finish link',(t:string)=>t.replace('#cancel=','#finish=')],
+  ['duplicated cancel link',(t:string)=>t.replace(`#cancel=${'C'.repeat(43)}`,`#cancel=${'C'.repeat(43)}\r\n${options.publicAppUrl}/recover-authenticator#cancel=${'C'.repeat(43)}`)],
+  ['appended text',(t:string)=>t+'additional text'],
+ ])('refuses a tampered WAITING mail: %s',(_name,tamper)=>{const original=waiting(true).toString();const text=tamper(original);expect(text).not.toBe(original);refused(text);});
+ it.each([
+  ['changed wording',(t:string)=>t.replace('every signed-in session is signed out','some sessions stay signed in')],
+  ['non-canonical expiry time',(t:string)=>t.replace('2026-10-06T22:00:00.000Z','2026-10-06T22:00:00Z')],
+  ['finish link turned into a token link',(t:string)=>t.replace('#finish=','#token=')],
+  ['duplicated finish link',(t:string)=>t.replace(finishLine,`${finishLine}\r\n${finishLine}`)],
+  ['added cancel link',(t:string)=>t.replace(finishLine,`${finishLine}\r\n${options.publicAppUrl}/recover-authenticator#cancel=${'C'.repeat(43)}`)],
+  ['short finish token',(t:string)=>t.replace('F'.repeat(43),'F'.repeat(42))],
+  ['finish link on the backup-email path',(t:string)=>t.replace('/recover-authenticator#finish=','/verify-backup-email#finish=')],
+  ['backup-email family with its own path',(t:string)=>t.replace('<mfa-recovery-','<backup-email-').replace('/recover-authenticator#finish=','/verify-backup-email#finish=')],
+ ])('refuses a tampered FINISH mail: %s',(_name,tamper)=>{const original=finish().toString();const text=tamper(original);expect(text).not.toBe(original);refused(text);});
+ it.each([
+  ['password reset',()=>packet('reset','PROOF').toString().replace('/reset-password#cancel=','/reset-password#finish=')],
+  ['backup email',()=>packet('backup_email','PROOF').toString().replace('/verify-backup-email#token=','/verify-backup-email#finish=')],
+  ['authenticator recovery STARTED',()=>packet('mfa_recovery','STARTED').toString().replace('/recover-authenticator#cancel=','/recover-authenticator#finish=')],
+  ['authenticator recovery PROOF',()=>packet('mfa_recovery','PROOF').toString().replace('/recover-authenticator#cancel=','/recover-authenticator#finish=')],
+ ])('refuses a finish link where the producer never writes one: %s',(_name,make)=>{const text=make();expect(text).toContain('#finish=');refused(text);});
+});

@@ -168,3 +168,42 @@ tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded number
 #   `v3NodeScoreDetails(v3)` moved from the drawer into apps/ui/lib/v3/adapter.ts.
 #   blinds: nothing — the row is that one pin; the drawer's raw-value bans run in "forbids
 #   raw-value JSX on the executable drawer projection".
+
+# JOINED 2026-10-09 (branch feat/2026-10-09-integration-all, off origin/dev@23402d10e): `pnpm run
+# test:integration-all` runs every integration suite (tests/ci-integration-all.txt) through this gate. Measured on
+# clean origin/dev@23402d10e as one vitest process: 220 files, 2,556 tests, 17 failed in 10 files — the same 17 as a
+# file-by-file run of dev@c8cf8e063 the same day. NONE is a product defect (read of the code and history; nothing was
+# changed to make anything pass). The owner ruled the same day to record them here, each with its reason, so the
+# command fails only on a NEW red. 15 are below. The other 2 (preview-auth-dev-startup.test.ts) are NOT listed: that
+# suite starts the real API and UI stage processes and needs a production UI build (apps/ui/.next) that a clean
+# checkout lacks, so its verdict depends on the checkout — listed, it would turn "stale" on any machine with a build.
+# tests/ci-integration-all.txt leaves it out with a `!` line printed on every run, as tests/ci-integration-auth.txt
+# already does. No CI job runs these 10 files today, so these entries change no CI verdict.
+#
+# 13 of the 15 failed with MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE. Each built an older or incomplete migration
+# ledger by hand and called migrate() to upgrade or replay. Since merge 065708c19 (explicit migration lineage, on dev
+# through PR #82, a51171b50, 2026-10-07) migrate() continues only from an empty database, a named cohort
+# (migrations/lineage/auth-dev-20261006.json: auth94, auth103, auth106, dev95) or a complete one, and refuses anything
+# else BY DESIGN (packages/db/src/migration-lineage.ts identifyLineage; tests/integration/auth-dev-lineage.test.ts
+# asserts that refusal).
+#
+# FIXED 2026-10-10 (branch fix/2026-10-10-stale-clock-migration-order): the 2 of the 15 that were not lineage refusals
+# were stale tests, fixed and deleted in that commit — s6-content-encryption-database's pre-0038 case walks the
+# planned order from loadMigrationPlan() instead of the folder, and support-cases' shredded case passes
+# clock: () => shreddedAt. 13 remained below then, all lineage refusals, in 7 files.
+#
+# SHRUNK 2026-10-10 (branch fix/2026-10-10-lineage-refused-tests): those 13 entries are gone, each deleted in the
+# commit that turned its file green, so with the FIXED note above no integration entry remains. None was made green
+# by relaxing the lineage rule (migration-lineage.ts is untouched). Each test now runs the migration's OWN SQL — the digest-checked bytes migrate()
+# runs, via tests/support/migrationReplay.ts — on a database migrate() finished, and never edits the ledger. The
+# 0068, 0071 and 0054-support replays and every refusal guard run in a transaction that is rolled back, with the drift
+# each guard refuses set up inside it. TINT1 (0054 revoke), T6 (0032 + 0043 over legacy rows) and the support catalog
+# repair (0054 + 0055) commit, because their checks need other connections. The "upgrade from an older ledger" part of
+# TINT1, T6, the catalog repair and the two register-history cases is retired with a CHECKED reason
+# (retiredUpgradeReason): migrate() refuses that database's ledger without those names, and every cohort and the
+# complete ledger already record them. Every re-expressed guard and replay check was proved by a mutant of the
+# migration's SQL that turned it red (listed in each commit). Two replays are NOT neutral on the final schema: 0054
+# re-creates the five support_shred_dirty_* markers 0065 retired, and 0055 re-grants debateai_runtime EXECUTE on
+# publish_register_version and import_historical_register_version, which 0065 revoked. migrate() never re-runs a
+# recorded migration, so no real database meets either; the tests keep those replays rolled back, except the catalog
+# repair, which commits both on its own throwaway database and checks nothing those leftovers touch.

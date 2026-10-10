@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.1 · ĮSIGALIOJA [DATE]
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.2 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
 title: Su kuo sutinkate
-lede: Jūsų ir DebateAIRO S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.1
+lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
+endMarker: SĄLYGŲ PABAIGA · v2.2
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,39 +21,40 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.1 · Effective \[date\] · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.2 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
-**In short.** Turite būti ne jaunesni kaip 18 metų. DebateAI kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu \[abuse@dezbatere.ro\], nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
+**In short.** Turite būti ne jaunesni kaip 18 metų. DebateAI kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
 ## 1. Kas mes esame ir kaip su mumis susisiekti
 
-DebateAI valdo Rumunijoje registruota bendrovė **DebateAIRO S.R.L.**
+DebateAI valdo Rumunijoje registruota bendrovė **DMS Merchandise Shop S.R.L.**
 
 |  |  |
 | --- | --- |
-| Registruota buveinė | \[street, number, sector, postal code\], Bukareštas, Rumunija |
-| Prekybos registro numeris | \[J40/…/…\] |
-| Bendrasis registracijos kodas (CUI) | \[…\] · PVM: \[RO… / not VAT-registered\] |
-| Įstatinis kapitalas | \[RON …\] |
-| Bendrieji kontaktai | \[hello@dezbatere.ro\] |
-| Teisiniai pranešimai | \[legal@dezbatere.ro\] |
+| Registruota buveinė | Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumunija |
+| Prekybos registro numeris | J2022000426271 |
+| Bendrasis registracijos kodas (CUI) | 45935221 · PVM: RO45935221 |
+| Įstatinis kapitalas | 5 000 RON |
+| Bendrieji kontaktai | support@dezbatere.ro |
+| Telefonas | +40 748 793 490 |
+| Teisiniai pranešimai | support@dezbatere.ro |
 | Privatumas ir duomenų apsauga | privacy@dezbatere.ro |
-| Pranešimai apie neteisėtą turinį | \[abuse@dezbatere.ro\] — žr. 10 skyrių |
-| Institucijų kontaktinis punktas | \[dsa@dezbatere.ro\] — rumunų ir anglų kalbomis |
-| Nurodymai pašalinti teroristinį turinį (Reglamentas (ES) 2021/784) | \[dsa@dezbatere.ro\] — mūsų kontaktinis punktas šiems nurodymams; rumunų ir anglų kalbomis; žr. 10 skyrių |
+| Pranešimai apie neteisėtą turinį | support@dezbatere.ro — žr. 10 skyrių |
+| Institucijų kontaktinis punktas | office@dezbatere.ro — rumunų ir anglų kalbomis |
+| Nurodymai pašalinti teroristinį turinį (Reglamentas (ES) 2021/784) | office@dezbatere.ro — mūsų kontaktinis punktas šiems nurodymams; rumunų ir anglų kalbomis; žr. 10 skyrių |
 | Atstovai kitose šalyse | Regionuose, kuriuose juos paskyrėme, jie nurodyti A priede |
 
-Šie duomenys taip pat nuolat skelbiami svetainėje adresu \[dezbatere.ro/legal\]. Visada galite susisiekti su žmogumi, ne tik su mūsų asistentu; kaip tai padaryti, paaiškinta 10 skyriuje.
+Šie duomenys taip pat nuolat skelbiami svetainėje adresu dezbatere.ro/legal. Visada galite susisiekti su žmogumi, ne tik su mūsų asistentu; kaip tai padaryti, paaiškinta 10 skyriuje.
 
 ## 2. Kur siūlome DebateAI
 
-DebateAI siūlome žmonėms, gyvenantiems **\[the European Union and the European Economic Area\]** \[and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan\]. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione.
+DebateAI siūlome žmonėms, gyvenantiems Europos Sąjungoje (27 valstybės) ir Europos ekonominėje erdvėje (Norvegijoje, Islandijoje ir Lichtenšteine), Šveicarijoje, Moldovoje, Jungtinėse Amerikos Valstijose (išskyrus Tenesį), Kanadoje, Australijoje, Naujojoje Zelandijoje, Singapūre, Japonijoje, Pietų Korėjoje ir Taivane. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione.
 
 ## 3. Sutikimas su šiomis Sąlygomis
 
-Su šiomis Sąlygomis sutinkate pažymėdami langelį **„Perskaičiau ir sutinku su Paslaugų teikimo sąlygomis“** ir spustelėdami **Sukurti paskyrą**. Taip tarp jūsų ir DebateAIRO S.R.L. sudaroma sutartis. Sąlygos apima 7 skyriuje nustatytas priimtino naudojimo taisykles, 9 skyriuje nustatytas paskelbimo taisykles, 15 skyriaus nuostatas dėl atsakomybės, 18 skyriaus nuostatas dėl taikytinos teisės ir ginčų, o jei gyvenate Jungtinėse Amerikos Valstijose — A priedo A.3 skirsnyje pateiktą arbitražinį susitarimą. Kaip paaiškinta mūsų Privatumo politikoje, registruojame, su kuria versija ir kada sutikote.
+Su šiomis Sąlygomis sutinkate pažymėdami langelį **„Perskaičiau ir sutinku su Paslaugų teikimo sąlygomis“** ir spustelėdami **Sukurti paskyrą**. Taip tarp jūsų ir DMS Merchandise Shop S.R.L. sudaroma sutartis. Sąlygos apima 7 skyriuje nustatytas priimtino naudojimo taisykles, 9 skyriuje nustatytas paskelbimo taisykles, 15 skyriaus nuostatas dėl atsakomybės ir 18 skyriaus nuostatas dėl taikytinos teisės ir ginčų. Kaip paaiškinta mūsų Privatumo politikoje, registruojame, su kuria versija ir kada sutikote.
 
-Mūsų **Privatumo politikoje** adresu \[dezbatere.ro/privacy\] paaiškinta, kaip tvarkome asmens duomenis. Tai informacija, kurią privalome jums pateikti, o ne sutartis, su kuria sutinkate, ir jokia šių Sąlygų nuostata nepaverčia jos sutikimu tvarkyti duomenis. Mūsų **Slapukų politika** adresu \[dezbatere.ro/cookies\] ir **DI paslaugų teikėjų registras** adresu \[dezbatere.ro/providers\] nuorodos būdu yra šių Sąlygų dalis.
+Mūsų **Privatumo politikoje** adresu dezbatere.ro/privacy paaiškinta, kaip tvarkome asmens duomenis. Tai informacija, kurią privalome jums pateikti, o ne sutartis, su kuria sutinkate, ir jokia šių Sąlygų nuostata nepaverčia jos sutikimu tvarkyti duomenis. Mūsų **Slapukų politika** adresu dezbatere.ro/cookies ir **DI paslaugų teikėjų registras** adresu dezbatere.ro/providers nuorodos būdu yra šių Sąlygų dalis.
 
 Prieš jums elektroniniu būdu sudarant sutartį su mumis, sąsajoje parodomi atliekami veiksmai, prieš pateikiant informaciją leidžiama ją peržiūrėti ir ištaisyti bei nurodomos kalbos, kuriomis galima sudaryti sutartį. Šios Sąlygos pateikiamos forma, kurią galite išsaugoti ir atsispausdinti, kai įsigyjate mokamą planą, el. paštu atsiunčiame versiją, su kuria sutikote, o jos kopijos galite paprašyti bet kada. Jokia šių Sąlygų nuostata neapriboja pagal Rumunijos ar ES vartotojų teisę arba jūsų gyvenamosios šalies teisę turimų teisių, kurių negalima apriboti sutartimi.
 
@@ -119,7 +120,7 @@ Jei abejojate, ar kas nors leidžiama, prieš paskelbdami paklauskite mūsų.
 
 **Ką siunčia pagalbos pokalbis.** Pagalbos asistentas taip pat yra DI modelis. Kai jam rašote, jūsų žinutę kartu su pagalbos straipsniais, kuriais jis grindžia atsakymą, siunčiame išoriniam modelių teikėjui, kad modelis galėtų atsakyti. Prieš siųsdami užmaskuojame viską, kas atrodo kaip slaptažodis, vienkartinis kodas ar raktas. Jei paprašote pasikalbėti su žmogumi, modeliui siunčiame ir pokalbį, užmaskuotą tokiu pačiu būdu, kad jis parašytų trumpą santrauką mūsų komandos nariui, perimančiam jūsų atvejį. Nepridedame jūsų el. pašto adreso, paskyros identifikatorių ar mokėjimo duomenų, tačiau modelis gauna visa kita, ką įrašote į pokalbį, todėl nerašykite ten nieko, ko nenorėtumėte, kad jis perskaitytų.
 
-**Kurie paslaugų teikėjai ir kur jie veikia.** Mūsų **DI paslaugų teikėjų registras** adresu \[dezbatere.ro/providers\] yra šių Sąlygų dalis. Jame nurodytas kiekvienas paslaugų teikėjas, kurį galime naudoti: jo juridinis asmuo ir šalis; ką ir kodėl jis gauna; kur tvarko duomenis; jo saugojimo sąlygos; ar mūsų naudojamam prieigos taškui taikomas visiškas duomenų nesaugojimas; ar pagal mūsų sutartį jis gali naudoti įvestis mokymui; perdavimo mechanizmas, kuriuo remiamės; ir data, kada paskutinį kartą patikrinome kiekvieną įrašą. Paslaugų teikėjai gali būti įsisteigę ne jūsų šalyje ir už Europos ekonominės erdvės ribų. Apsaugos priemonės paaiškintos mūsų Privatumo politikoje.
+**Kurie paslaugų teikėjai ir kur jie veikia.** Mūsų **DI paslaugų teikėjų registras** adresu dezbatere.ro/providers yra šių Sąlygų dalis. Jame nurodytas kiekvienas paslaugų teikėjas, kurį galime naudoti: jo juridinis asmuo ir šalis; ką ir kodėl jis gauna; kur tvarko duomenis; jo saugojimo sąlygos; ar mūsų naudojamam prieigos taškui taikomas visiškas duomenų nesaugojimas; ar pagal mūsų sutartį jis gali naudoti įvestis mokymui; perdavimo mechanizmas, kuriuo remiamės; ir data, kada paskutinį kartą patikrinome kiekvieną įrašą. Paslaugų teikėjai gali būti įsisteigę ne jūsų šalyje ir už Europos ekonominės erdvės ribų. Apsaugos priemonės paaiškintos mūsų Privatumo politikoje.
 
 **Trys skirtingi dalykai.** „Nenaudojama modeliams mokyti“, „ribotą laiką saugoma saugumo, piktnaudžiavimo prevencijos ar teisiniais tikslais“ ir „visiškas duomenų nesaugojimas — po tvarkymo neišsaugoma“ reiškia skirtingus dalykus. Kai paslaugų teikėjas raginimus saugo ribotą laiką, Registre nurodyta, kiek laiko ir kodėl. Kai taikomas visiškas duomenų nesaugojimas, Registre nurodyta, kad jis taikomas, ir išvardytos funkcijos, kurioms jis taikomas. Neteigsime, kad turinys nėra saugomas, jei jis saugomas.
 
@@ -143,7 +144,7 @@ Pagal numatytuosius nustatymus debatai yra **privatūs**. Niekas, ką sukuriate,
 
 ## 10. Pranešimai apie turinį, moderavimas ir skundai
 
-**Apie turinį gali pranešti bet kas.** Paskyros turėti nereikia. Rašykite adresu \[abuse@dezbatere.ro\] arba bet kuriuose paskelbtuose debatuose naudokite valdiklį **Pranešti**. Kad galėtume imtis veiksmų, nurodykite: kodėl manote, kad turinys yra neteisėtas arba pažeidžia šias Sąlygas, ir pateikite pakankamai informacijos teiginiui suprasti; tikslią vietą — visą URL ir, jei galite, ištrauką; savo vardą, pavardę ir el. pašto adresą (jų nereikia pranešant apie seksualinės prievartos prieš vaikus medžiagą); ir patvirtinkite, kad sąžiningai manote, jog jūsų pranešimas tikslus ir išsamus.
+**Apie turinį gali pranešti bet kas.** Paskyros turėti nereikia. Rašykite adresu support@dezbatere.ro arba bet kuriuose paskelbtuose debatuose naudokite valdiklį **Pranešti**. Kad galėtume imtis veiksmų, nurodykite: kodėl manote, kad turinys yra neteisėtas arba pažeidžia šias Sąlygas, ir pateikite pakankamai informacijos teiginiui suprasti; tikslią vietą — visą URL ir, jei galite, ištrauką; savo vardą, pavardę ir el. pašto adresą (jų nereikia pranešant apie seksualinės prievartos prieš vaikus medžiagą); ir patvirtinkite, kad sąžiningai manote, jog jūsų pranešimas tikslus ir išsamus.
 
 Apie kiekvieno pranešimo gavimą patvirtiname nepagrįstai nedelsdami. Pranešimus nagrinėjame laiku, rūpestingai, nešališkai ir objektyviai, pranešame jums savo sprendimą ir paaiškiname, kaip jį apskųsti. Jei pranešimui nagrinėti arba sprendimui priimti naudojame automatizuotas priemones, apie tai informuojame. Gavę pagrįstą prašymą, dėl be sutikimo bendrintų intymių atvaizdų imamės veiksmų **per 48 valandas**.
 
@@ -154,7 +155,7 @@ Apie kiekvieno pranešimo gavimą patvirtiname nepagrįstai nedelsdami. Praneši
 
 **Motyvų pareiškimas.** Kai pašaliname jūsų turinį ar apribojame jo matomumą arba sustabdome ar uždarome jūsų paskyrą, pateikiame motyvų pareiškimą: ką padarėme ir kokia yra veiksmo apimtis, kokiais faktais rėmėmės ir ar jie gauti iš pranešimo, ar nustatyti mūsų pačių patikros metu, ar naudotos automatizuotos priemonės, koks yra teisinis ar sutartinis pagrindas ir kaip galite užginčyti sprendimą: pasinaudodami toliau aprašyta skundų teikimo tvarka, kreipdamiesi į pagal ES Skaitmeninių paslaugų aktą sertifikuotą neteisminio ginčų sprendimo įstaigą arba į teismą.
 
-**Skundas dėl sprendimo.** Jei nesutinkate su moderavimo sprendimu, per **šešis mėnesius** atsakykite į motyvų pareiškimą arba rašykite adresu \[appeals@dezbatere.ro\]. Sprendimą peržiūrės priimant pirminį sprendimą nedalyvavęs žmogus, o mes pranešime jums motyvuotą rezultatą. Tai neturi įtakos jūsų teisei kreiptis į teismą ar naudotis alternatyviu ginčų sprendimu pagal 18 skyrių. Pagal skundų teikimo tvarką taip pat galima skųstis dėl to, kad nesiėmėme veiksmų gavę pranešimą, kad turinys buvo pašalintas neteisingai, kad paskyra buvo nepagrįstai apribota arba kad automatizuota priemonė netinkamai paveikė jūsų turinį.
+**Skundas dėl sprendimo.** Jei nesutinkate su moderavimo sprendimu, per **šešis mėnesius** atsakykite į motyvų pareiškimą arba rašykite adresu office@dezbatere.ro. Sprendimą peržiūrės priimant pirminį sprendimą nedalyvavęs žmogus, o mes pranešime jums motyvuotą rezultatą. Tai neturi įtakos jūsų teisei kreiptis į teismą ar naudotis alternatyviu ginčų sprendimu pagal 18 skyrių. Pagal skundų teikimo tvarką taip pat galima skųstis dėl to, kad nesiėmėme veiksmų gavę pranešimą, kad turinys buvo pašalintas neteisingai, kad paskyra buvo nepagrįstai apribota arba kad automatizuota priemonė netinkamai paveikė jūsų turinį.
 
 **Neteisminis ginčų sprendimas.** Jei esate Europos Sąjungoje, ginčą dėl bet kurio mūsų moderavimo sprendimo galite perduoti spręsti neteisminio ginčų sprendimo įstaigai, sertifikuotai pagal ES Skaitmeninių paslaugų akto (Reglamento (ES) 2022/2065) 21 straipsnį. Tai taikoma sprendimui dėl jūsų turinio ar paskyros, taip pat mūsų sprendimui dėl jūsų pateikto pranešimo. Įstaigą pasirenkate iš sąrašo, kurį Europos Komisija skelbia adresu digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, ir prieš tai neprivalote pasinaudoti mūsų skundų teikimo tvarka. Procese dalyvaujame sąžiningai ir atsisakome dalyvauti tik tuo atveju, jei tas pats ginčas dėl to paties turinio ir tuo pačiu pagrindu jau buvo išspręstas. Įstaigos sprendimas nėra privalomas nei jums, nei mums, o jūs išsaugote teisę kreiptis į teismą. Įstaiga gali imti iš jūsų nedidelį mokestį arba jo neimti. Jei įstaiga išsprendžia ginčą jūsų naudai, sumokame jos mokesčius ir atlyginame jūsų pagrįstas išlaidas; jei ji išsprendžia ginčą mūsų naudai, neturite kompensuoti mūsų mokesčių ar išlaidų, nebent įstaiga nustato, kad veikėte akivaizdžiai nesąžiningai.
 
@@ -168,7 +169,7 @@ Apie kiekvieno pranešimo gavimą patvirtiname nepagrįstai nedelsdami. Praneši
 
 **Jūsų iniciatyva.** Kaip aprašyta 6 skyriuje, savo paskyrą galite bet kada uždaryti Nustatymuose. Priežasties nurodyti nereikia. Uždarius paskyrą, šios Sąlygos nustoja galioti. Jos nustoja galioti tada, kai įsigalioja uždarymas, t. y. pasibaigus 7 dienų lengvatiniam laikotarpiui; po to toliau taikomi šio skyriaus pabaigoje nurodyti skyriai.
 
-**Mūsų iniciatyva.** Galime sustabdyti ar uždaryti jūsų paskyrą arba pašalinti ar apriboti jūsų turinį, kai: iš esmės pažeidžiate šias Sąlygas, visų pirma 7 skyrių; jūsų turinys yra neteisėtas arba įstatymai, teismas ar institucija reikalauja imtis veiksmų; jūsų naudojimasis kelia grėsmę paslaugos saugumui, vientisumui ar prieinamumui arba kitų asmenų teisėms; jūsų paskyra buvo neaktyvi \[24 months\] ir jus apie tai įspėjome; arba nustojame teikti paslaugą ar teikti ją jūsų šalyje.
+**Mūsų iniciatyva.** Galime sustabdyti ar uždaryti jūsų paskyrą arba pašalinti ar apriboti jūsų turinį, kai: iš esmės pažeidžiate šias Sąlygas, visų pirma 7 skyrių; jūsų turinys yra neteisėtas arba įstatymai, teismas ar institucija reikalauja imtis veiksmų; jūsų naudojimasis kelia grėsmę paslaugos saugumui, vientisumui ar prieinamumui arba kitų asmenų teisėms; jūsų paskyra buvo neaktyvi 24 mėnesius ir jus apie tai įspėjome; arba nustojame teikti paslaugą ar teikti ją jūsų šalyje.
 
 Išskyrus atvejus, kai pažeidimas yra sunkus, teisės aktai reikalauja imtis veiksmų nedelsiant arba delsimas padarytų žalos, prieš sustabdydami ar uždarydami paskyrą nurodome problemą ir suteikiame pagrįstą galimybę ją ištaisyti. Visada pateikiame motyvų pareiškimą pagal 10 skyrių, o jūs galite užginčyti sprendimą.
 
@@ -182,19 +183,19 @@ Nutraukus sutartį toliau taikomi 8 skyrius (jau paskelbtam turiniui), 15, 16 ir
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI siūlo nemokamą planą. Mokamas planas **Premium** \[is / will be\] prieinamas; jis suteikia prieigą prie viso modelių sąrašo ir leidžia patiems nustatyti debatų parametrus.
+DebateAI siūlo nemokamą planą. Mokamas planas **Premium** bus prieinamas; jis suteikia prieigą prie viso modelių sąrašo ir leidžia patiems nustatyti debatų parametrus.
 
 **Prieš jums mokant** tiesiai virš mokėjimo mygtuko parodome: planą; bendrą kainą su taikomais mokesčiais; atsiskaitymo laikotarpį; tai, kad planas automatiškai atnaujinamas, kol jo neatšaukiate; nemokamo bandomojo laikotarpio pabaigos datą ir po jos mokėtiną sumą; ir kaip atšaukti planą. Atnaujinimo sąlygas patvirtinate pažymėdami atskirą langelį. Ant mygtuko parašyta **Prenumeruoti ir mokėti** (rumunų kalba — *Comandă cu obligație de plată*). Patvariojoje laikmenoje atsiunčiame patvirtinimą su ta pačia informacija, šiomis Sąlygomis ir sutarties atsisakymo forma.
 
-**Priminimai.** El. paštu jums primename bent prieš \[5\] dienas iki nemokamo bandomojo laikotarpio pakeitimo mokamu planu; bent kartą per metus, jei planas tęstinis; ir likus 30–45 dienoms iki dvylikos mėnesių ar ilgesnio laikotarpio atnaujinimo. Kiekviename priminime nurodoma kaina, data ir pateikiama atšaukimo nuoroda.
+**Priminimai.** El. paštu jums primename bent prieš 5 dienas iki nemokamo bandomojo laikotarpio pakeitimo mokamu planu; bent kartą per metus, jei planas tęstinis; ir likus 30–45 dienoms iki dvylikos mėnesių ar ilgesnio laikotarpio atnaujinimo. Kiekviename priminime nurodoma kaina, data ir pateikiama atšaukimo nuoroda.
 
-**Atšaukimas.** Galite bet kada atšaukti pasirinkę **Nustatymai → Prenumerata** ir vienu spustelėjimu patvirtinę arba naudodamiesi atšaukimo puslapiu adresu \[dezbatere.ro/cancel\], prie kurio prisijungti nereikia. Atšaukimas įsigalioja einamojo atsiskaitymo laikotarpio pabaigoje, o iki tol prieiga išlieka. Atšaukimo nepadarysime sudėtingesnio, nei buvo prenumerata.
+**Atšaukimas.** Galite bet kada atšaukti pasirinkę **Nustatymai → Prenumerata** ir vienu spustelėjimu patvirtinę arba naudodamiesi atšaukimo puslapiu adresu dezbatere.ro/cancel, prie kurio prisijungti nereikia. Atšaukimas įsigalioja einamojo atsiskaitymo laikotarpio pabaigoje, o iki tol prieiga išlieka. Atšaukimo nepadarysime sudėtingesnio, nei buvo prenumerata.
 
 **Kainos pakeitimai** įsigalioja tik atnaujinus planą. Apie naują kainą ir atšaukimo nuorodą pranešame el. paštu bent prieš **30 dienų**. Kai pagal jūsų šalies teisę kainai pakeisti būtinas aiškus jūsų sutikimas, jo paprašome; kitais atvejais, jei nieko nedarote, nauja kaina taikoma nuo kito atnaujinimo. Regioninės taisyklės nurodytos A priede.
 
-**Nepavykę mokėjimai.** Jei mokėjimas nepavyksta, \[7\] dienas bandome dar kartą ir prieš pakeisdami paskyrą į nemokamą planą įspėjame jus el. paštu. Debatų dėl nepavykusio mokėjimo neištriname.
+**Nepavykę mokėjimai.** Jei mokėjimas nepavyksta, 7 dienas bandome dar kartą ir prieš pakeisdami paskyrą į nemokamą planą įspėjame jus el. paštu. Debatų dėl nepavykusio mokėjimo neištriname.
 
-**Mokesčiai ir kam mokate.** Į kainas \[include / exclude\] PVM, GST ar pardavimo mokestis, priklausantis nuo jūsų gyvenamosios vietos ir parodomas prieš jums mokant. \[If a merchant of record is used: Your purchase is processed by \[Paddle / …\], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.\]
+**Mokesčiai ir kam mokate.** Į kainas įskaičiuotas PVM, GST ar pardavimo mokestis, priklausantis nuo jūsų gyvenamosios vietos ir parodomas prieš jums mokant. Mokėjimus kortele tvarko NETOPIA Payments (netopia-payments.com). Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas.
 
 **Mokėjimo grąžinimo ginčai.** Jei mokėjimą užginčijate savo kortelės išdavėjui, kol ginčas sprendžiamas, galime sustabdyti mokamas funkcijas. Už tai mokesčių netaikome.
 
@@ -202,7 +203,7 @@ DebateAI siūlo nemokamą planą. Mokamas planas **Premium** \[is / will be\] pr
 
 ## 13. Jūsų teisė atsisakyti sutarties
 
-Jei gyvenate ES, EEE arba Jungtinėje Karalystėje, galite per **14 dienų** nuo mokamos prenumeratos užsakymo nenurodydami priežasties atsisakyti sutarties. Naudokite puslapį **Atsisakyti sutarties** adresu \[dezbatere.ro/withdraw\], patvirtinimo el. laiške pateiktą pavyzdinę formą arba rašykite adresu \[support@dezbatere.ro\]; patvariojoje laikmenoje patvirtinsime, kad prašymą gavome.
+Jei gyvenate ES arba EEE, galite per **14 dienų** nuo mokamos prenumeratos užsakymo nenurodydami priežasties atsisakyti sutarties. Naudokite puslapį **Atsisakyti sutarties** adresu dezbatere.ro/withdraw, patvirtinimo el. laiške pateiktą pavyzdinę formą arba rašykite adresu support@dezbatere.ro; patvariojoje laikmenoje patvirtinsime, kad prašymą gavome.
 
 Jei pažymėdami langelį atsiskaitymo metu paprašėte mūsų pradėti teikti paslaugą iš karto, o vėliau sutarties atsisakote, turite sumokėti už iki sutarties atsisakymo dienos suteiktą paslaugos dalį, apskaičiuotą proporcingai pagal atsiskaitymo laikotarpio kainą, o likusią sumą grąžinsime. **Naudodamiesi paslauga per 14 dienų laikotarpį neprarandate teisės atsisakyti sutarties.**
 
@@ -214,7 +215,7 @@ Jei gyvenate kitur, A priede nurodyta jūsų regione taikoma teisė atsisakyti s
 
 Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitimas turi didesnį nei nedidelį neigiamą poveikį jūsų prieigai prie paslaugos ar naudojimuisi ja, galite nemokamai nutraukti sutartį per **30 dienų** nuo pranešimo gavimo arba pakeitimo įsigaliojimo dienos, atsižvelgiant į tai, kuri data vėlesnė, o mes grąžinsime visas iš anksto už nepanaudotą laikotarpį sumokėtas sumas.
 
-**Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės DebateAI, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu \[dezbatere.ro/terms/versions\].
+**Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės DebateAI, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
 
 ## 15. Atsakomybė
 
@@ -234,25 +235,23 @@ Pati paslauga — programinė įranga, variklis, vertinimo metodas, sąsaja, pav
 
 Galite cituoti paskelbtus debatus ir pateikti nuorodas į juos, nurodydami DebateAI kaip šaltinį ir pateikdami nuorodą į pradinį puslapį. Be rašytinio mūsų sutikimo draudžiama masiškai kopijuoti, sistemingai atgaminti viešą turinio rinkinį ir naudoti paskelbtus debatus kaip mokymo duomenis.
 
-Jūsų turinys ir sugeneruotų rezultatų statusas aptarti 8 skyriuje. Jei manote, kad kas nors DebateAI pažeidžia jūsų intelektinę nuosavybę, naudokite 10 skyriuje nurodytą pranešimų teikimo tvarką. \[If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is \[name, address, email\], registered with the US Copyright Office; we terminate the accounts of repeat infringers.\]
+Jūsų turinys ir sugeneruotų rezultatų statusas aptarti 8 skyriuje. Jei manote, kad kas nors DebateAI pažeidžia jūsų intelektinę nuosavybę, naudokite 10 skyriuje nurodytą pranešimų teikimo tvarką.
 
 ## 17. Asmens duomenys
 
-Kaip tvarkome asmens duomenis, nustatyta **Privatumo politikoje** adresu \[dezbatere.ro/privacy\]. Joje paaiškinta, ką renkame, koks yra kiekvieno tikslo teisinis pagrindas, kiek laiko saugome duomenis, kas juos gauna, kokie perdavimai atliekami ir kaip pasinaudoti savo teisėmis. Čia taip pat svarbūs trys dalykai. 7 skyriuje prašome į klausimą neįtraukti kitų asmenų duomenų; jei juos vis dėlto įtraukiate, už tai atsakote, o mes galime turinį pašalinti. Jei DebateAI paskelbtuose debatuose yra jūsų asmens duomenų, galite prašyti juos pašalinti neturėdami paskyros (9 skyrius). Be to, saugome jūsų sutikimo su šiomis Sąlygomis įrašą — versiją, laiką ir techninius seanso duomenis — kaip sutarties įrodymą, kaip paaiškinta Privatumo politikoje.
+Kaip tvarkome asmens duomenis, nustatyta **Privatumo politikoje** adresu dezbatere.ro/privacy. Joje paaiškinta, ką renkame, koks yra kiekvieno tikslo teisinis pagrindas, kiek laiko saugome duomenis, kas juos gauna, kokie perdavimai atliekami ir kaip pasinaudoti savo teisėmis. Čia taip pat svarbūs trys dalykai. 7 skyriuje prašome į klausimą neįtraukti kitų asmenų duomenų; jei juos vis dėlto įtraukiate, už tai atsakote, o mes galime turinį pašalinti. Jei DebateAI paskelbtuose debatuose yra jūsų asmens duomenų, galite prašyti juos pašalinti neturėdami paskyros (9 skyrius). Be to, saugome jūsų sutikimo su šiomis Sąlygomis įrašą — versiją, laiką ir techninius seanso duomenis — kaip sutarties įrodymą, kaip paaiškinta Privatumo politikoje.
 
 ## 18. Taikytina teisė ir ginčų nagrinėjimo vieta
 
 **Taikytina teisė.** Šioms Sąlygoms ir visiems iš jų ar jų dalyko kylantiems ginčams ar reikalavimams, įskaitant nesutartinius reikalavimus, taikomi Rumunijos įstatymai.
 
-**Tai neturi įtakos jūsų vietos apsaugai.** Jei esate vartotojas, Rumunijos teisės pasirinkimas neatima apsaugos pagal jokias privalomas vartotojų apsaugos taisykles šalyje, kurioje yra jūsų įprastinė gyvenamoji vieta — pavyzdžiui, taisykles dėl nesąžiningų sąlygų, sutarties atsisakymo ir atšaukimo teisių ar garantijų — kai šios taisyklės taikomos nepaisant šio pasirinkimo, įskaitant Reglamento (EB) Nr. 593/2008 6 straipsnio 2 dalį, jei gyvenate ES, arba lygiavertes Jungtinės Karalystės taisykles. Šiomis taisyklėmis galite remtis kartu su Rumunijos teise.
+**Tai neturi įtakos jūsų vietos apsaugai.** Jei esate vartotojas, Rumunijos teisės pasirinkimas neatima apsaugos pagal jokias privalomas vartotojų apsaugos taisykles šalyje, kurioje yra jūsų įprastinė gyvenamoji vieta — pavyzdžiui, taisykles dėl nesąžiningų sąlygų, sutarties atsisakymo ir atšaukimo teisių ar garantijų — kai šios taisyklės taikomos nepaisant šio pasirinkimo, įskaitant Reglamento (EB) Nr. 593/2008 6 straipsnio 2 dalį, jei gyvenate ES. Šiomis taisyklėmis galite remtis kartu su Rumunijos teise.
 
-**Teismai, jei gyvenate ES, EEE arba Jungtinėje Karalystėje.** Bylą prieš mus galite iškelti Rumunijos arba šalies, kurioje gyvenate, teismuose. Bylą prieš jus galime iškelti tik šalies, kurioje gyvenate, teismuose.
+**Teismai, jei gyvenate ES arba EEE.** Bylą prieš mus galite iškelti Rumunijos arba šalies, kurioje gyvenate, teismuose. Bylą prieš jus galime iškelti tik šalies, kurioje gyvenate, teismuose.
 
-**Kitur gyvenantys vartotojai.** Jei gyvenate ne ES, EEE ar Jungtinėje Karalystėje, jokia šių Sąlygų nuostata neriboja pagal jūsų šalies teisę turimos teisės pareikšti ieškinį jos teismuose ar teisės, kurios pagal tos šalies teisę negalima atsisakyti — įskaitant Australijoje ar Naujojoje Zelandijoje gyvenančių asmenų teises pagal vartotojų garantijas, Brazilijoje gyvenančių asmenų teises pagal *Código de Defesa do Consumidor* ir Jungtinėse Amerikos Valstijose gyvenančių asmenų teises pagal jų valstijos vartotojų apsaugos įstatymus.
+**Kitur gyvenantys vartotojai.** Jei gyvenate ne ES ar EEE, jokia šių Sąlygų nuostata neriboja pagal jūsų šalies teisę turimos teisės pareikšti ieškinį jos teismuose ar teisės, kurios pagal tos šalies teisę negalima atsisakyti — įskaitant Australijoje ar Naujojoje Zelandijoje gyvenančių asmenų teises pagal vartotojų garantijas, Brazilijoje gyvenančių asmenų teises pagal *Código de Defesa do Consumidor* ir Jungtinėse Amerikos Valstijose gyvenančių asmenų teises pagal jų valstijos vartotojų apsaugos įstatymus.
 
-**Jungtinių Amerikos Valstijų gyventojai.** A priedo A.3 skirsnyje pateiktas arbitražinis susitarimas ir grupės ieškinio atsisakymas, kuriems taikomas Federalinis arbitražo įstatymas. Jie taikomi tik Jungtinių Amerikos Valstijų gyventojams ir tik tiek, kiek gali būti vykdomi. Jie netaikomi vartotojams ES, EEE ar Jungtinėje Karalystėje.
-
-**Prieš kreipiantis į teismą.** Susisiekite su mumis adresu \[legal@dezbatere.ro\]; daugumą dalykų galima išspręsti ir siekiame atsakyti per \[5\] darbo dienas. Jei esate vartotojas Rumunijoje arba ES, galite naudotis alternatyviu ginčų sprendimu per \[the ANPC – named SAL entity, website\]; mes \[do / do not\] įsipareigojame dalyvauti šioje procedūroje. Skundams dėl moderavimo sprendimų taikoma 10 skyriuje nustatyta atskira tvarka.
+**Prieš kreipiantis į teismą.** Susisiekite su mumis adresu support@dezbatere.ro; daugumą dalykų galima išspręsti ir siekiame atsakyti per 5 darbo dienas. Jei esate vartotojas Rumunijoje arba ES, galite naudotis alternatyviu ginčų sprendimu per www.onoratainstanta.ro; mes neįsipareigojame dalyvauti šioje procedūroje. Skundams dėl moderavimo sprendimų taikoma 10 skyriuje nustatyta atskira tvarka.
 
 ## 19. Kitos sąlygos
 
@@ -266,58 +265,40 @@ Kaip tvarkome asmens duomenis, nustatyta **Privatumo politikoje** adresu \[dezba
 
 **Kalba.** Šios Sąlygos skelbiamos visomis svetainėje siūlomomis kalbomis. Sutartis sudaroma kalba, kuria užsiregistravote, t. y. tos versijos, su kuria sutikote, kalba; ji užfiksuota mūsų sutikimo įraše. Jei vėliau sutinkate su nauja versija kita kalba, sutartis toliau vykdoma ta kalba. Kitų kalbų versijos yra vertimai. Kai šalies, kurioje gyvenate, teisė nustato, kad pirmenybė teikiama tos šalies kalba parengtai versijai, pirmenybė teikiama tai versijai. Jei dvi kalbų versijos skiriasi, taikome jums palankesnį aiškinimą.
 
-**Kontaktai.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukareštas, Rumunija.
+**Kontaktai.** support@dezbatere.ro · DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumunija.
 
 ## Annex A — Regioninės sąlygos
 
-Kiekvienas įrašas taikomas tik tuo atveju, jei jo regionas nurodytas 2 skyriuje, ir jame nurodoma tik tai, kas skiriasi nuo pagrindinės dalies. Jei įrašas prieštarauja pagrindinei daliai, to regiono gyventojams taikomas įrašas.
+Kiekvienas įrašas taikomas žmonėms, gyvenantiems jo regione, ir jame nurodoma tik tai, kas skiriasi nuo pagrindinės dalies. Jei įrašas prieštarauja pagrindinei daliai, to regiono gyventojams taikomas įrašas.
 
 ### A.1 Europos Sąjunga ir Europos ekonominė erdvė
 
-Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą šalies, kurioje gyvenate, teismuose; taikoma 13 skyriuje nustatyta teisė atsisakyti sutarties; alternatyviu ginčų sprendimu galima pasinaudoti per \[the ANPC – named entity, website\]. **Vokietija:** naudodamiesi atšaukimo mygtuku adresu \[dezbatere.ro/cancel\] galite nutraukti prenumeratą neprisijungę; prenumeratos sąlygos, atnaujinimo laikotarpiai ir įspėjimo terminai atitinka BGB §309(9) \[state them\]. **Prancūzija:** galite internetu trimis veiksmais nutraukti prenumeratą adresu \[URL\]; galite kreiptis į \[the mediator named at URL\]. **Italija:** atsakomybės (15), sustabdymo (11), pakeitimų (14) ir taikytinos teisės (18) nuostatoms būtinas konkretus jūsų pritarimas, kurį duodate atskiru patvirtinimu registruodamiesi. **Nyderlandai:** prieš sudarant sutartį šios Sąlygos pateikiamos forma, kurią galima išsaugoti. **Lenkija:** versija lenkų kalba pateikiama adresu \[URL\].
+Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą šalies, kurioje gyvenate, teismuose; taikoma 13 skyriuje nustatyta teisė atsisakyti sutarties; alternatyviu ginčų sprendimu galima pasinaudoti per www.onoratainstanta.ro. **Vokietija:** naudodamiesi atšaukimo mygtuku adresu dezbatere.ro/cancel galite nutraukti prenumeratą neprisijungę; prenumeratos sąlygos, atnaujinimo laikotarpiai ir įspėjimo terminai atitinka BGB §309(9) \[state them\]. **Prancūzija:** galite internetu trimis veiksmais nutraukti prenumeratą adresu \[URL\]. **Italija:** atsakomybės (15), sustabdymo (11), pakeitimų (14) ir taikytinos teisės (18) nuostatoms būtinas konkretus jūsų pritarimas, kurį duodate atskiru patvirtinimu registruodamiesi. **Nyderlandai:** prieš sudarant sutartį šios Sąlygos pateikiamos forma, kurią galima išsaugoti. **Lenkija:** versija lenkų kalba pateikiama adresu \[URL\].
 
-### A.2 Jungtinė Karalystė *(tik jei nurodyta 2 skyriuje)*
-
-Mūsų atstovas Jungtinėje Karalystėje pagal JK GDPR 27 straipsnį yra \[name, address, email\]. Jums taikomas 2015 m. Vartotojų teisių įstatymas, ir jokia šių Sąlygų nuostata neriboja pagal jį turimų teisių; kai įsigalios 2024 m. Skaitmeninių rinkų, konkurencijos ir vartotojų įstatymo prenumeratos taisyklės (tikimasi, kad 2027 m.), jos bus taikomos mokamiems planams, įskaitant apsigalvojimo laikotarpį po atnaujinimo ir nemokamo bandomojo laikotarpio. **Kaip saugome naudotojus nuo neteisėto turinio:** \[terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report\]. **Mūsų naudojama aktyvi technologija:** \[describe, or "none"\]. **Amžiaus patikra:** \[describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023\]. Pagal 10 skyriuje nustatytą skundų teikimo tvarką priimami skundai dėl neteisėto turinio, neteisingo jūsų turinio pašalinimo, paskyros apribojimų, jūsų turiniui poveikį darančių automatizuotų priemonių naudojimo ir neteisingai jus užblokuojančio amžiaus nustatymo. Ja gali naudotis ir ne naudotojai, kuriems turinys padarė poveikį. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.2 skirsnis.
-
-### A.3 Jungtinės Amerikos Valstijos *(tik jei nurodytos 2 skyriuje)*
+### A.2 Jungtinės Amerikos Valstijos
 
 **Tenesis.** DebateAI nesiūlome žmonėms, gyvenantiems Tenesyje.
 
-**Arbitražinis susitarimas ir grupės ieškinio atsisakymas.** Jei gyvenate Jungtinėse Amerikos Valstijose, jūs ir DebateAIRO sutinkate visus iš šių Sąlygų ar paslaugos kylančius ginčus spręsti ne teisme, o privalomu individualiu arbitražu, kurį pagal vartotojų taisykles administruoja \[the American Arbitration Association / JAMS\], išskyrus tai, kad kiekviena šalis gali pareikšti individualų ieškinį nedidelių sumų teisme. **Galite atsisakyti arbitražo** per 30 dienų nuo pirmojo sutikimo su šiomis Sąlygomis išsiųsdami el. laišką adresu \[address\]. Šiam susitarimui taikomas Federalinis arbitražo įstatymas. Mes sumokame arbitražo inicijavimo mokesčius. Grupinių, kolektyvinių ir atstovaujamųjų ieškinių atsisakoma tiek, kiek leidžia teisės aktai. Šis skyrius taikomas tik ateityje ir netaikomas reikalavimams, atsiradusiems prieš jums su juo sutinkant.
+**Pranešimai ir turinio pašalinimas.** Apie be sutikimo bendrinamus intymius atvaizdus galima pranešti adresu \[URL\] neturint paskyros; gavus pagrįstą prašymą jie pašalinami per 48 valandas. Skundai dėl autorių teisių teikiami 10 skyriuje nustatyta pranešimų teikimo tvarka.
 
-**Pranešimai ir turinio pašalinimas.** Apie be sutikimo bendrinamus intymius atvaizdus galima pranešti adresu \[URL\] neturint paskyros; gavus pagrįstą prašymą jie pašalinami per 48 valandas. Skundai dėl autorių teisių siunčiami 16 skyriuje nurodytam mūsų paskirtam atstovui.
+**Konkrečios valstijos.** *Kalifornija:* taikomos 12 skyriuje nustatytos automatinio atnaujinimo sąlygos; bet kada galite atšaukti internetu; jūsų sutikimą su atnaujinimo sąlygomis saugome bent trejus metus. *Niujorkas:* galite per 14 dienų nuo bet kokio nurašymo padidinta kaina atšaukti ir gauti proporcingą pinigų grąžinimą. *Teksasas ir Nebraska:* neparduodame neskelbtinų asmens duomenų. *Vašingtonas:* mūsų Vartotojų sveikatos duomenų privatumo pranešimas adresu \[URL\] taikomas su sveikata susijusiai informacijai. *Koloradas:* paslauga nepriima jums reikšmingų sprendimų. Jūsų duomenims ir jūsų valstijos privatumo teisėms taikomas mūsų Privatumo politikos B priedo B.2 skirsnis.
 
-**Konkrečios valstijos.** *Kalifornija:* taikomos 12 skyriuje nustatytos automatinio atnaujinimo sąlygos; bet kada galite atšaukti internetu; jūsų sutikimą su atnaujinimo sąlygomis saugome bent trejus metus. *Niujorkas:* galite per 14 dienų nuo bet kokio nurašymo padidinta kaina atšaukti ir gauti proporcingą pinigų grąžinimą. *Teksasas ir Nebraska:* neparduodame neskelbtinų asmens duomenų. *Vašingtonas:* mūsų Vartotojų sveikatos duomenų privatumo pranešimas adresu \[URL\] taikomas su sveikata susijusiai informacijai. *Koloradas:* paslauga nepriima jums reikšmingų sprendimų. Jūsų duomenims ir jūsų valstijos privatumo teisėms taikomas mūsų Privatumo politikos B priedo B.3 skirsnis.
+### A.3 Kanada ir Kvebekas
 
-### A.4 Kanada ir Kvebekas *(tik jei nurodyti)*
+Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. **Kvebekas:** šios Sąlygos pateikiamos prancūzų kalba; prancūzų kalbą pasirinkite kalbos perjungikliu; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų.
 
-Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra \[name\], privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.4 skirsnis. **Kvebekas:** šios Sąlygos pateikiamos prancūzų kalba; prancūzų kalbą pasirinkite kalbos perjungikliu; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų; jums netaikomas joks arbitražinis susitarimas ar grupės ieškinio atsisakymas.
+### A.4 Australija ir Naujoji Zelandija
 
-### A.5 Australija ir Naujoji Zelandija *(tik jei nurodytos)*
+**Mūsų paslaugoms taikomos garantijos, kurių negalima atmesti pagal Australijos vartotojų teisę.** Esant dideliems paslaugos trūkumams turite teisę ją atšaukti ir susigrąžinti pinigus už nepanaudotą dalį arba gauti kompensaciją už sumažėjusią vertę; taip pat turite teisę gauti kompensaciją už bet kokius kitus pagrįstai numatomus nuostolius ar žalą. Jei trūkumas nėra didelis, turite teisę reikalauti per pagrįstą laiką pašalinti paslaugos problemas, o to nepadarius — atšaukti paslaugą ir susigrąžinti pinigus. Tiek, kiek leidžiama pagal 64A skyrių, mūsų atsakomybė už garantijos pažeidimą ribojama pakartotiniu paslaugos suteikimu arba jo išlaidų apmokėjimu. Mokamam planui netaikoma jokia papildoma apsigalvojimo teisė, išskyrus jums 12 skyriuje suteiktas teises; prašymai grąžinti pinigus nagrinėjami adresu support@dezbatere.ro. **Naujoji Zelandija:** taikomas 1993 m. Vartotojų garantijų įstatymas, ir jokia šių Sąlygų nuostata jo neatmeta; apie žalingą skaitmeninį bendravimą galite pranešti mums pagal 10 skyrių arba „Netsafe“.
 
-**Mūsų paslaugoms taikomos garantijos, kurių negalima atmesti pagal Australijos vartotojų teisę.** Esant dideliems paslaugos trūkumams turite teisę ją atšaukti ir susigrąžinti pinigus už nepanaudotą dalį arba gauti kompensaciją už sumažėjusią vertę; taip pat turite teisę gauti kompensaciją už bet kokius kitus pagrįstai numatomus nuostolius ar žalą. Jei trūkumas nėra didelis, turite teisę reikalauti per pagrįstą laiką pašalinti paslaugos problemas, o to nepadarius — atšaukti paslaugą ir susigrąžinti pinigus. Tiek, kiek leidžiama pagal 64A skyrių, mūsų atsakomybė už garantijos pažeidimą ribojama pakartotiniu paslaugos suteikimu arba jo išlaidų apmokėjimu. Mokamam planui netaikoma jokia papildoma apsigalvojimo teisė, išskyrus jums 12 skyriuje suteiktas teises; mūsų pinigų grąžinimo politika yra \[…\]. **Naujoji Zelandija:** taikomas 1993 m. Vartotojų garantijų įstatymas, ir jokia šių Sąlygų nuostata jo neatmeta; apie žalingą skaitmeninį bendravimą galite pranešti mums pagal 10 skyrių arba „Netsafe“.
+### A.5 Šveicarija
 
-### A.6 Šveicarija *(tik jei nurodyta)*
+Jūsų duomenims taikomas Šveicarijos federalinis duomenų apsaugos įstatymas (Privatumo politikos B priedo B.5 skirsnis). Galite iškelti bylą tos Šveicarijos vietovės, kurioje gyvenate, teismuose. Mokamam planui netaikoma įstatymų nustatyta teisė atsisakyti sutarties; prašymai grąžinti pinigus nagrinėjami adresu support@dezbatere.ro.
 
-Jūsų duomenims taikomas Šveicarijos federalinis duomenų apsaugos įstatymas (Privatumo politikos B priedo B.6 skirsnis). Galite iškelti bylą tos Šveicarijos vietovės, kurioje gyvenate, teismuose. Mokamam planui netaikoma įstatymų nustatyta teisė atsisakyti sutarties; mūsų pinigų grąžinimo politika yra \[…\].
+### A.6 Moldova
 
-### A.7 Moldova *(tik jei nurodyta)*
+Pagal šias Sąlygas turite tokias pačias teises kaip vartotojas Europos Sąjungoje, įskaitant 13 skyriuje nustatytą 14 dienų teisę atsisakyti sutarties. Galite iškelti bylą Moldovos teismuose. Jūsų duomenims taikomas Moldovos įstatymas Nr. 195/2024 dėl asmens duomenų apsaugos (Privatumo politikos B priedo B.6 skirsnis).
 
-Pagal šias Sąlygas turite tokias pačias teises kaip vartotojas Europos Sąjungoje, įskaitant 13 skyriuje nustatytą 14 dienų teisę atsisakyti sutarties. Galite iškelti bylą Moldovos teismuose. Jūsų duomenims taikomas Moldovos įstatymas Nr. 195/2024 dėl asmens duomenų apsaugos (Privatumo politikos B priedo B.7 skirsnis).
+### A.7 Azijos ir Ramiojo vandenyno regionas
 
-### A.8 Ukraina *(tik jei nurodyta)*
-
-DebateAI siūlome Ukrainoje, išskyrus Ukrainos vyriausybės nekontroliuojamas teritorijas. Produktas ir šios Sąlygos pateikiami ukrainiečių kalba. Jūsų duomenims taikomas Ukrainos įstatymas „Dėl asmens duomenų apsaugos“ (Privatumo politikos B priedo B.8 skirsnis).
-
-### A.9 Izraelis *(tik jei nurodyta)*
-
-Mokamą planą galite atšaukti taip, kaip leidžia Vartotojų apsaugos įstatymas, 5741-1981 \[state the cancellation terms\]. Šios Sąlygos ir mūsų Privatumo politika pateikiamos hebrajų kalba. Jūsų duomenims taikomas Izraelio privatumo apsaugos įstatymas (Privatumo politikos B priedo B.9 skirsnis).
-
-### A.10 Azijos ir Ramiojo vandenyno regionas *(tik nurodytiems regionams skirtos eilutės)*
-
-*Singapūras:* mūsų duomenų apsaugos pareigūnas yra \[name, email\]; perdavimai grindžiami sutartinėmis apsaugos priemonėmis, panašiomis į PDPA; mokamam planui netaikomas įstatymų nustatytas apsigalvojimo laikotarpis, o mūsų pinigų grąžinimo politika yra \[…\]. *Japonija:* įstatymų nustatytas atskleidimas pagal Specialiųjų komercinių sandorių įstatymą pateiktas adresu \[URL\]; internetinėms prenumeratoms netaikomas bendrasis apsigalvojimo laikotarpis, o mūsų pinigų grąžinimo politika yra \[…\]; jūsų turinį siunčiame DI paslaugų teikėjams Jungtinėse Amerikos Valstijose ir Europos Sąjungoje, kiekvienam pagal sutartį, kuria reikalaujama apsaugos, lygiavertės Japonijos Asmeninės informacijos apsaugos įstatymo reikalavimams, o paprašius informuojame, kokios tai priemonės. *Pietų Korėja:* sutikimai dėl neprivalomo duomenų tvarkymo ir rinkodaros gaunami atskirai nuo paslaugai teikti būtinų dalykų; mūsų privatumo pareigūnas yra \[name\], privacy@dezbatere.ro; pagal Elektroninės prekybos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; prieš kiekvieną pasikartojantį kainos padidinimą ar nemokamo plano pakeitimą mokamu iš naujo gauname jūsų sutikimą; paslauga naudoja generatyvųjį DI, apie tai informuojame prieš jums pradedant ja naudotis, o DI sugeneruotą turinį pažymime. *Taivanas:* pagal Vartotojų apsaugos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; jūsų duomenims taikomas Taivano asmens duomenų apsaugos įstatymas (Privatumo politikos B priedo B.10 skirsnis). *Tailandas:* mūsų atstovas Tailande yra \[name\] \[if appointed\]. *Filipinai:* mūsų verslo identifikavimo duomenys ir teisių gynimo mechanizmas pagal Internetinių sandorių įstatymą pateikti adresu \[URL\]; skundus galima pateikti Nacionalinei privatumo komisijai.
-
-### A.11 Rezervuota
-
-Turkijai, Brazilijai ir Indonezijai reikia priedo vietos kalba, atstovo arba registracijos ir dokumentų pateikimo. Šie priedai čia neparengti, o šalys nepatenka į 2 skyriaus taikymo sritį, kol nebus sąmoningai įtrauktos. Kinijoje, Vietname ir Rusijoje paslauga nesiūloma.
+*Singapūras:* mūsų duomenų apsaugos pareigūnas yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro; perdavimai grindžiami sutartinėmis apsaugos priemonėmis, panašiomis į PDPA; mokamam planui netaikomas įstatymų nustatytas apsigalvojimo laikotarpis, o prašymai grąžinti pinigus nagrinėjami adresu support@dezbatere.ro. *Japonija:* įstatymų nustatytas atskleidimas pagal Specialiųjų komercinių sandorių įstatymą pateiktas adresu \[URL\]; internetinėms prenumeratoms netaikomas bendrasis apsigalvojimo laikotarpis, o prašymai grąžinti pinigus nagrinėjami adresu support@dezbatere.ro; jūsų turinį siunčiame DI paslaugų teikėjams Jungtinėse Amerikos Valstijose ir Europos Sąjungoje, kiekvienam pagal sutartį, kuria reikalaujama apsaugos, lygiavertės Japonijos Asmeninės informacijos apsaugos įstatymo reikalavimams, o paprašius informuojame, kokios tai priemonės. *Pietų Korėja:* sutikimai dėl neprivalomo duomenų tvarkymo ir rinkodaros gaunami atskirai nuo paslaugai teikti būtinų dalykų; mūsų privatumo pareigūnas yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro; pagal Elektroninės prekybos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; prieš kiekvieną pasikartojantį kainos padidinimą ar nemokamo plano pakeitimą mokamu iš naujo gauname jūsų sutikimą; paslauga naudoja generatyvųjį DI, apie tai informuojame prieš jums pradedant ja naudotis, o DI sugeneruotą turinį pažymime. *Taivanas:* pagal Vartotojų apsaugos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; jūsų duomenims taikomas Taivano asmens duomenų apsaugos įstatymas (Privatumo politikos B priedo B.7 skirsnis).

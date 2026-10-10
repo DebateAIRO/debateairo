@@ -2,6 +2,7 @@ import type { PostgresRecoveryEmailRepository, ProfileSession, AuthSourceContext
 import { createEmailBlindIndex, decrypt, encrypt, generateVerificationToken, hashToken, type CryptoEnvelope, type ReadableUserDekStore } from "@debateai/crypto";
 import { normalizedAddress } from "./email-change.js";
 import type { RecoveryEmailMailSender } from "./mail-channel.js";
+import { mailDomainRefused, type MailDomainCheck } from "./mail-domain-check.js";
 export class RecoveryEmailError extends Error {
   constructor(readonly code: "EMAIL_INVALID" | "EMAIL_UNCHANGED" | "STEP_UP_REQUIRED" | "LINK_INVALID" | "LINK_EXPIRED") {
     super(code);
@@ -27,6 +28,8 @@ export class RecoveryEmailService {
     readonly mail: RecoveryEmailMailSender;
     readonly now?: () => Date;
     readonly tokenFactory?: () => string;
+    /** Open sign-up mail (G5): refuses a recovery address whose domain takes no mail; fails open. Absent, nothing is asked. */
+    readonly mailDomainCheck?: MailDomainCheck;
   }) {
   }
   async recoveryEmail(session: ProfileSession): Promise<RecoveryEmailSettings | null> {
@@ -51,7 +54,9 @@ export class RecoveryEmailService {
     catch {
       throw new RecoveryEmailError("EMAIL_INVALID");
     }
-    const grantTokenHash = this.grantHash(input.grantToken), token = (this.dependencies.tokenFactory ?? generateVerificationToken)(), expiresAt = new Date((this.dependencies.now?.() ?? new Date()).getTime() + 86400000), dek = await this.dependencies.users.load(session.userId), plain = Buffer.from(email);
+    const grantTokenHash = this.grantHash(input.grantToken);
+    if (await mailDomainRefused(this.dependencies.mailDomainCheck, email)) throw new RecoveryEmailError("EMAIL_INVALID");
+    const token = (this.dependencies.tokenFactory ?? generateVerificationToken)(), expiresAt = new Date((this.dependencies.now?.() ?? new Date()).getTime() + 86400000), dek = await this.dependencies.users.load(session.userId), plain = Buffer.from(email);
     let ciphertext;
     try {
       ciphertext = encrypt(dek, plain, recoveryEmailAad(session.userId));

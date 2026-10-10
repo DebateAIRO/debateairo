@@ -3,18 +3,26 @@
 -- `pnpm db:migrate` (the capability roles below are created by the migrations) and BEFORE
 -- `pnpm db:provision-principals` (README §4):
 --   sudo -u postgres psql -v ON_ERROR_STOP=1 -f hardening.sql
--- Re-runnable. Every setting is DATABASE-level, never per-role: the provisioner clears role
--- settings with `ALTER ROLE ... RESET ALL` and refuses managed principals that carry any
--- (PRODUCTION_DATABASE_PRINCIPAL_DRIFT, audit L5-F6). The JIT migrator overrides the timeout
--- per session through its connection URL (`options=-c statement_timeout=0`, README §4).
+-- Re-runnable, also on a database that predates a later migration: a grant to a role that a later
+-- migration mints sits behind an existence check (a DO block), so the file never stops before the
+-- database defaults and the schema lock at the end. Every setting is DATABASE-level, never
+-- per-role: the provisioner clears role settings with `ALTER ROLE ... RESET ALL` and refuses
+-- managed principals that carry any (PRODUCTION_DATABASE_PRINCIPAL_DRIFT, audit L5-F6). The JIT
+-- migrator overrides the timeout per session through its connection URL
+-- (`options=-c statement_timeout=0`, README §4).
 \set ON_ERROR_STOP on
 
 -- Who may connect at all. PUBLIC keeps CONNECT by default; close it, then open it for exactly the
 -- thirteen capability roles the managed principals inherit from (INHERIT TRUE memberships, P3-01),
 -- the NOINHERIT LOGIN roles the migrations mint themselves (the four obs roles of 0034, the
--- observation agent of 0057 and its threshold operator of 0071), the migrator and the Hatchet owner.
+-- observation agent of 0057 and its threshold operator of 0071, and, guarded below, the staff
+-- readiness writer of the auth DB batch step), the migrator and the Hatchet owner.
 -- tests/architecture/vps-deployment-baseline.test.ts checks this list against the manifest.
 REVOKE CONNECT ON DATABASE debateai FROM PUBLIC;
+-- No temporary tables for anyone by default either: no app or runtime code uses them, and the
+-- auth DB batch step revokes the same. (The provisioner's pg_temp helper runs as the superuser
+-- migrator, which this does not affect.)
+REVOKE TEMPORARY ON DATABASE debateai FROM PUBLIC;
 REVOKE CONNECT ON DATABASE hatchet FROM PUBLIC;
 GRANT CONNECT ON DATABASE hatchet TO debateai_prod_hatchet;
 GRANT CONNECT ON DATABASE debateai TO debateai_prod_migrator;
@@ -35,6 +43,17 @@ GRANT CONNECT ON DATABASE debateai TO
 -- policy as (DL7-F9), so the daemon's own principal cannot.
 GRANT CONNECT ON DATABASE debateai TO debateai_observation_agent;
 GRANT CONNECT ON DATABASE debateai TO debateai_observation_threshold_operator;
+-- The auth DB batch step grants this too: the password-less staff readiness writer, which may
+-- only publish and revoke the staff alert readiness row (peer login on the preview only, from one
+-- dedicated OS user; production's pg_hba admits it nowhere). On a database that predates that
+-- step the role does not exist yet: the guard skips the grant instead of stopping the file here.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'debateai_staff_readiness_writer') THEN
+    GRANT CONNECT ON DATABASE debateai TO debateai_staff_readiness_writer;
+  END IF;
+END
+$$;
 
 -- Database-level defaults (stored with setrole = 0, invisible to the provisioner's drift check).
 -- search_path = pg_catalog: every app statement and migration is schema-qualified (L5 verified,

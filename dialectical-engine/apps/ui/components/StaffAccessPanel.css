@@ -1,0 +1,70 @@
+/* Team access uses the settings paper, ink and status tokens. */
+.staffAccess { min-width: 0; }
+.staffAccess *, .staffAccess *::before, .staffAccess *::after { box-sizing: border-box; }
+.staffAccess .staffHeading { margin-bottom: 24px; }
+.staffAccess .setTitle { font-size: clamp(28px, 5vw, 36px); }
+.staffAccess .setCard { padding: 22px; }
+.staffAccess .setCardHint { font-size: 12px; }
+.staffAccess .staffSectionHead, .staffAccess .staffMemberHeading, .staffAccess .staffMemberFooter { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.staffAccess .staffSectionTitle { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 500; }
+.staffAccess .staffAccessSummary .setCardTitle { font-family: var(--font-display); font-size: 21px; font-weight: 500; }
+.staffAccess .staffBadge { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); border-radius: 999px; padding: 5px 10px; font-size: 10px; font-weight: 700; color: var(--text-2); background: var(--shell); white-space: nowrap; }
+.staffAccess .staffBadge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+.staffAccess .staffBadge[data-state="active"] { color: var(--ok-text); background: var(--ok-bg); border-color: var(--ok-border); }
+.staffAccess .staffBadge[data-state="active"]::before { background: var(--ok-dot); }
+.staffAccess .staffActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.staffAccess .staffSectionHead .staffActions, .staffAccess .staffMemberFooter .staffActions { margin-top: 0; }
+.staffAccess .setBtn { white-space: normal; text-align: center; max-width: 100%; line-height: 1.45; }
+.staffAccess .setBtn:focus-visible, .staffAccess summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.staffAccess .staffPermissions { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 14px 0; }
+.staffAccess .staffPermissions li { font-size: 11px; line-height: 1.4; border-radius: 6px; padding: 5px 8px; background: var(--shell); color: var(--text-2); }
+.staffAccess .staffReadiness { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 14px; font-size: 12px; color: var(--text-2); }
+.staffAccess .staffReadiness > p { margin: 0; }
+.staffAccess .staffDetails { margin-top: 12px; font-size: 11.5px; color: var(--text-2); }
+.staffAccess summary { width: fit-content; max-width: 100%; cursor: pointer; color: var(--ink); font-weight: 600; line-height: 1.6; }
+.staffAccess .staffDetails[open] > summary { margin-bottom: 10px; }
+.staffAccess .staffIdentifier { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 10.5px; line-height: 1.65; }
+.staffAccess .staffReadinessList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 20px; margin: 12px 0 0; }
+.staffAccess .staffReadinessList > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.staffAccess .staffReadinessList dt { font-size: 11px; }
+.staffAccess .staffReadinessList dd { margin: 0; font-weight: 600; }
+.staffAccess .staffMemberList { margin-top: 18px; }
+.staffAccess .staffMember { padding: 20px 0; border-top: 1px solid var(--line); min-width: 0; }
+.staffAccess .staffMember:last-child { padding-bottom: 0; }
+.staffAccess .staffMemberHeading h3 { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.staffAccess .staffMemberHeading > div { min-width: 0; }
+.staffAccess .staffYou { display: inline-block; margin-left: 8px; color: var(--muted); font-size: 11px; font-weight: 500; }
+.staffAccess .staffMemberMeta { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+.staffAccess .staffDelivery { margin: 0; color: var(--muted); font-size: 10.5px; line-height: 1.5; }
+.staffAccess .staffDelivery[data-state="FAILED"] { color: var(--dispute); }
+.staffAccess .staffDelivery[data-state="PENDING"] { color: var(--gold-text); }
+.staffAccess .staffMutation { margin-top: 18px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface-2); padding: 18px; }
+.staffAccess .staffMutation fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.staffAccess .staffMutation legend { padding: 0; margin-bottom: 6px; font-size: 13px; font-weight: 700; }
+.staffAccess .staffTarget { margin: 12px 0; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.staffAccess .staffField { display: flex; flex-direction: column; gap: 7px; margin-top: 16px; min-width: 0; }
+.staffAccess .staffField > label { font-size: 11.5px; color: var(--ink); font-weight: 600; line-height: 1.5; }
+.staffAccess .staffField input { width: 100%; min-width: 0; border: 1px solid var(--line-strong); border-radius: 8px; padding: 10px 12px; color: var(--ink); background: var(--core); font: 12px var(--font-sans); }
+.staffAccess .staffField input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.staffAccess .staffPermissionChoices { display: grid; gap: 10px; margin-top: 18px; }
+.staffAccess .staffCheckbox { display: flex; align-items: flex-start; gap: 9px; color: var(--text-2); font-size: 12px; line-height: 1.55; }
+.staffAccess .staffCheckbox input { flex: 0 0 auto; margin: 3px 0 0; accent-color: var(--ink); width: 14px; height: 14px; }
+.staffAccess .staffConfirm { margin-top: 18px; }
+.staffAccess .staffAuditList { list-style: none; padding: 0; margin: 16px 0 0; }
+.staffAccess .staffAuditList li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 16px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.staffAccess .staffAuditList strong { font-weight: 600; }
+.staffAccess .staffAuditList time { color: var(--muted); font-size: 11px; }
+.staffAccess .staffNotice { margin-top: 18px; padding: 12px 14px; font-size: 12px; line-height: 1.5; color: var(--ok-text); border: 1px solid var(--ok-border); background: var(--ok-bg); border-radius: 9px; }
+.staffAccess .staffAdvanced > summary { color: var(--muted); font-size: 12px; }
+.staffAccess .staffAdvanced[open] > summary { margin-bottom: 10px; }
+.staffAccess .staffSetup { margin-top: 22px; }
+.staffAccess .staffOwnerSetup { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 24px; }
+@media (max-width: 560px) {
+  .staffAccess .setCard { padding: 18px 15px; }
+  .staffAccess .staffReadinessList { grid-template-columns: minmax(0, 1fr); }
+  .staffAccess .staffSectionHead, .staffAccess .staffMemberFooter { align-items: flex-start; }
+  .staffAccess .staffSectionHead > .staffActions, .staffAccess .staffMemberFooter > .staffActions { width: 100%; }
+  .staffAccess .staffMemberFooter .setBtn { flex: 1 1 140px; }
+  .staffAccess .staffMutation { padding: 15px; }
+  .staffAccess .staffAuditList li { grid-template-columns: minmax(0, 1fr); }
+}

@@ -126,11 +126,11 @@ describe("terms of service modal — rendered", () => {
     await render(<TermsOfServiceModal open mode="consent" onClose={vi.fn()} />);
 
     expect(dialog().querySelector(".policyEyebrow")!.textContent).toBe(
-      "TERMS OF SERVICE · v2.1 · EFFECTIVE [DATE]"
+      "TERMS OF SERVICE · v2.2 · EFFECTIVE 12 OCTOBER 2026"
     );
     expect(dialog().querySelector(".policyTitle")!.textContent).toBe("What you agree to");
     expect(dialog().querySelector(".policyLede")!.textContent).toBe(
-      "The contract between you and DebateAIRO S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
+      "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
     );
 
     const closers = [...dialog().querySelectorAll("*")].filter(
@@ -140,12 +140,12 @@ describe("terms of service modal — rendered", () => {
     expect(closers[0]!.textContent).toBe("×");
 
     const contacts = [...dialog().querySelectorAll("*")].filter(
-      (element) => element.textContent === "Questions: [legal@dezbatere.ro]"
+      (element) => element.textContent === "Questions: support@dezbatere.ro"
     );
     expect(contacts.length).toBeGreaterThanOrEqual(1);
 
     const last = dialog().querySelector(".policyBody")!.lastElementChild!;
-    expect(last.textContent).toBe("END OF TERMS · v2.1");
+    expect(last.textContent).toBe("END OF TERMS · v2.2");
 
     const pdf = [...dialog().querySelectorAll("*")].filter(
       (element) => element.textContent?.trim() === "Download PDF"
@@ -169,11 +169,11 @@ describe("terms of service modal — rendered", () => {
     }
   });
 
-  it("renders the thirty-two sections in order, with their paragraphs, bullets and accent tokens", async () => {
+  it("renders the twenty-eight sections in order, with their paragraphs, bullets and accent tokens", async () => {
     await render(<TermsOfServiceModal open mode="consent" onClose={vi.fn()} />);
 
     const sections = [...dialog().querySelectorAll<HTMLElement>('[id^="terms-section-"]')];
-    expect(TERMS_SECTIONS.length).toBe(32);
+    expect(TERMS_SECTIONS.length).toBe(28);
     expect(sections.map((section) => section.id)).toEqual(
       TERMS_SECTIONS.map((section) => `terms-section-${section.no}`)
     );
@@ -202,8 +202,8 @@ describe("terms of service modal — rendered", () => {
       expect(number.dataset.accent).toBe(token);
       expect(number.style.getPropertyValue("--accent")).toBe(`var(${token})`);
     }
-    expect(dialog().querySelectorAll(".policyText").length).toBe(110);
-    expect(dialog().querySelectorAll(".policyItem").length).toBe(13);
+    expect(dialog().querySelectorAll(".policyText").length).toBe(104);
+    expect(dialog().querySelectorAll(".policyItem").length).toBe(14);
   });
 
   it("offers Close and no acknowledgement in read mode", async () => {

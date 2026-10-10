@@ -186,13 +186,13 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
       verifyPassword: verifySpy,
       hashAuditContext: async () => "ab".repeat(32)
     } as unknown as Argon2Executor;
-    const consumeAndReplaceRecoveryCode = vi.fn(async () => true);
+    const consumeRecoveryCode = vi.fn(async () => true);
     const service = new MfaEnrollmentService({
       repository: {
         async readRecoveryCodeForUse(_userId: string, slot: number) {
           return { userId, recoveryCodeId: randomUUID(), codeHash: planted, codeSlot: slot };
         },
-        consumeAndReplaceRecoveryCode
+        consumeRecoveryCode
       } as never,
       dekStore: {
         async store() { throw new Error("unused"); },
@@ -211,7 +211,7 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
       }, SOURCE)).resolves.toEqual({ consumed: false });
       // No worker occupied, no arena allocated, nothing replaced.
       expect(verifySpy).not.toHaveBeenCalled();
-      expect(consumeAndReplaceRecoveryCode).not.toHaveBeenCalled();
+      expect(consumeRecoveryCode).not.toHaveBeenCalled();
       // ...and the operator gets the typed code rather than silence.
       expect(refusals.mock.calls.flat()).toEqual(
         expect.arrayContaining([expect.stringContaining("ARGON2_ENVELOPE_EXCEEDS_POLICY")])
@@ -322,6 +322,8 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
       "apps/api/src/email-mfa-recovery.ts:verifyPassword",
       "apps/api/src/email-mfa-recovery.ts:verifyPassword",
       "apps/api/src/email-mfa-recovery.ts:verifyRecoveryCode",
+      // Owner ruling 2026-10-09: finishing an authenticator recovery after its 24-hour wait re-checks the current password.
+      "apps/api/src/email-mfa-recovery.ts:verifyPassword",
       "apps/api/src/mfa.ts:verifyRecoveryCode",
       "apps/api/src/sessions.ts:verifyPassword",
       "apps/api/src/sessions.ts:verifyRecoveryCode",
@@ -346,7 +348,7 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
         async readRecoveryCodeForUse(_userId: string, slot: number) {
           return { userId, recoveryCodeId: randomUUID(), codeHash: lawful, codeSlot: slot };
         },
-        async consumeAndReplaceRecoveryCode() { return true; }
+        async consumeRecoveryCode() { return true; }
       } as never,
       dekStore: {
         async store() { throw new Error("unused"); },

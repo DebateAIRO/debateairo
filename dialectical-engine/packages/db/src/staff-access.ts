@@ -668,6 +668,8 @@ export interface StaffAlertRepository extends StaffAlertKeyMappings {
     claim(limit: number): Promise<readonly StaffAlertClaim[]>;
     resolveClaim(claim: StaffAlertClaim): Promise<StaffClaimKeyState>;
     settle(claim: StaffAlertClaim, outcome: 'DELIVERED' | 'FAILED' | 'SEVERED', failure: StaffAlertFailureCode | 'SEVERED' | null): Promise<boolean>;
+    /** Gives back a live claim without spending its attempt (no send happened). False when the claim is not live. */
+    release(claim: StaffAlertClaim): Promise<boolean>;
     status(): Promise<Readonly<{
         pending: number;
         acked: number;
@@ -688,6 +690,7 @@ export class PostgresStaffAlertRepository implements StaffAlertRepository {
     claim(limit: number): Promise<readonly StaffAlertClaim[]> { return this.value('SELECT staff.claim_alert_delivery($1) AS value', [limit]); }
     resolveClaim(claim: StaffAlertClaim): Promise<StaffClaimKeyState> { return this.value('SELECT staff.read_alert_key_mapping($1,$2) AS value', [claim.outboxId, claim.claimToken]); }
     settle(claim: StaffAlertClaim, outcome: 'DELIVERED' | 'FAILED' | 'SEVERED', failure: StaffAlertFailureCode | 'SEVERED' | null): Promise<boolean> { return this.value('SELECT staff.settle_alert_delivery($1,$2,$3,$4) AS value', [claim.outboxId, claim.claimToken, outcome, failure]); }
+    release(claim: StaffAlertClaim): Promise<boolean> { return this.value('SELECT staff.release_alert_delivery($1,$2) AS value', [claim.outboxId, claim.claimToken]); }
     status(): ReturnType<StaffAlertRepository['status']> { return this.value('SELECT staff.read_alert_delivery_status() AS value'); }
 }
 export interface StaffIndependentReadinessPublisher {

@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile,rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { buildInventory,verifyInventory } from './source-manifest.mjs';
@@ -8,7 +8,16 @@ export async function buildUiArtifact(source,environment) {
  if(process.platform!=='linux'||process.version!=='v26.8.2'||source.role!=='ui')refuse('PREVIEW_LINUX_BUILD_REQUIRED');
  const cwd=join(source.sourceRoot,'dialectical-engine');
  await new Promise((resolve,reject)=>{const child=spawn('pnpm',['--filter','dialectical-engine-v2ui','build'],{cwd,env:environment,shell:false,stdio:['ignore','inherit','inherit']});child.once('error',()=>reject(new Error('PREVIEW_UI_BUILD_REFUSED')));child.once('close',code=>code===0?resolve():reject(new Error('PREVIEW_UI_BUILD_REFUSED')));});
+ await dropBuildCache(source.sourceRoot);
  return inspectUiBuild(source);
+}
+/**
+ * Next.js's webpack build cache (.next/cache/webpack) is build-time only: the server never reads it,
+ * and its pack files (150-320 MB measured on the preview, 2026-10-10) exceed the custody size limit,
+ * so the complete inventory of .next below would refuse. Remove it before that inventory is taken.
+ */
+export async function dropBuildCache(sourceRoot) {
+ await rm(join(sourceRoot,'dialectical-engine/apps/ui/.next/cache/webpack'),{recursive:true,force:true});
 }
 export async function inspectUiBuild(source) {
  if(process.platform!=='linux'||process.version!=='v26.8.2')refuse('PREVIEW_LINUX_BUILD_REQUIRED');

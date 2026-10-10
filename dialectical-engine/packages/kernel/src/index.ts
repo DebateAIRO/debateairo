@@ -5,6 +5,7 @@ export * from "./date-of-birth.js";
 export type * from "./staff-access.js";
 export type * from "./provider-funding.js";
 export * from "./region.js";
+export * from "./mail-address.js";
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
 

@@ -28,7 +28,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Na kratko",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Stari morate biti najmanj 18 let. DebateAI z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Vaše razprave so zasebne, razen če jih objavite; če jih objavite, jih lahko prebere vsakdo. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na [abuse@dezbatere.ro], ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu." }
+      { kind: "p", text: "Stari morate biti najmanj 18 let. DebateAI z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Vaše razprave so zasebne, razen če jih objavite; če jih objavite, jih lahko prebere vsakdo. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu." }
     ]
   },
   {
@@ -36,24 +36,25 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kdo smo in kako lahko stopite v stik z nami",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Storitev DebateAI upravlja DebateAIRO S.R.L., družba, registrirana v Romuniji." },
+      { kind: "p", text: "Storitev DebateAI upravlja DMS Merchandise Shop S.R.L., družba, registrirana v Romuniji." },
       {
         kind: "list",
         items: [
-        "Registrirani sedež — [street, number, sector, postal code], Bukarešta, Romunija",
-        "Številka v poslovnem registru — [J40/…/…]",
-        "Enotna registrska številka (CUI) — […] · DDV: [RO… / not VAT-registered]",
-        "Osnovni kapital — [RON …]",
-        "Splošni kontakt — [hello@dezbatere.ro]",
-        "Pravna obvestila — [legal@dezbatere.ro]",
+        "Registrirani sedež — Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romunija",
+        "Številka v poslovnem registru — J2022000426271",
+        "Enotna registrska številka (CUI) — 45935221 · DDV: RO45935221",
+        "Osnovni kapital — 5000 RON",
+        "Splošni kontakt — support@dezbatere.ro",
+        "Telefon — +40 748 793 490",
+        "Pravna obvestila — support@dezbatere.ro",
         "Zasebnost in varstvo podatkov — privacy@dezbatere.ro",
-        "Prijava nezakonite vsebine — [abuse@dezbatere.ro] — glejte razdelek 10",
-        "Kontaktna točka za organe — [dsa@dezbatere.ro] — v romunščini in angleščini",
-        "Odredbe o odstranitvi teroristične vsebine (Uredba (EU) 2021/784) — [dsa@dezbatere.ro] — naša kontaktna točka za te odredbe; v romunščini in angleščini; glejte razdelek 10",
+        "Prijava nezakonite vsebine — support@dezbatere.ro — glejte razdelek 10",
+        "Kontaktna točka za organe — office@dezbatere.ro — v romunščini in angleščini",
+        "Odredbe o odstranitvi teroristične vsebine (Uredba (EU) 2021/784) — office@dezbatere.ro — naša kontaktna točka za te odredbe; v romunščini in angleščini; glejte razdelek 10",
         "Predstavniki v drugih državah — Navedeni so v Prilogi A za regije, v katerih smo jih imenovali"
         ]
       },
-      { kind: "p", text: "Ti podatki so trajno prikazani tudi na spletnem mestu [dezbatere.ro/legal]. Vedno lahko stopite v stik z osebo, ne samo z našim pomočnikom; v razdelku 10 je pojasnjeno, kako." }
+      { kind: "p", text: "Ti podatki so trajno prikazani tudi na spletnem mestu dezbatere.ro/legal. Vedno lahko stopite v stik z osebo, ne samo z našim pomočnikom; v razdelku 10 je pojasnjeno, kako." }
     ]
   },
   {
@@ -61,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kje ponujamo DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI ponujamo osebam, ki živijo v [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
+      { kind: "p", text: "DebateAI ponujamo osebam, ki živijo v naslednjih državah in regijah: Evropska unija (27 držav) in Evropski gospodarski prostor (Norveška, Islandija in Lihtenštajn), Švica, Moldavija, Združene države Amerike (razen zvezne države Tennessee), Kanada, Avstralija, Nova Zelandija, Singapur, Japonska, Južna Koreja in Tajvan. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
     ]
   },
   {
@@ -69,8 +70,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Sprejetje teh Pogojev",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Te Pogoje sprejmete tako, da označite polje »Prebral/-a sem in se strinjam s pogoji uporabe.« ter kliknete Ustvari račun. S tem med vami in družbo DebateAIRO S.R.L. nastane pogodba. Pogoji vključujejo pravila dopustne uporabe iz razdelka 7, pravila objavljanja iz razdelka 9, določbe o odgovornosti iz razdelka 15, določbe o pravu, ki se uporablja, in sporih iz razdelka 18 ter, če živite v Združenih državah Amerike, arbitražni sporazum iz Priloge A.3. Hranimo zapis o tem, katero različico ste sprejeli in kdaj, kot je pojasnjeno v našem Pravilniku o zasebnosti." },
-      { kind: "p", text: "Naš Pravilnik o zasebnosti na [dezbatere.ro/privacy] pojasnjuje, kako ravnamo z osebnimi podatki. To so informacije, ki vam jih moramo zagotoviti, in ne pogodba, s katero soglašate, nič v teh Pogojih pa jih ne spremeni v privolitev za obdelavo. Naš Pravilnik o piškotkih na [dezbatere.ro/cookies] in naš Register ponudnikov umetne inteligence na [dezbatere.ro/providers] sta s sklicevanjem vključena v te Pogoje." },
+      { kind: "p", text: "Te Pogoje sprejmete tako, da označite polje »Prebral/-a sem in se strinjam s pogoji uporabe.« ter kliknete Ustvari račun. S tem med vami in družbo DMS Merchandise Shop S.R.L. nastane pogodba. Pogoji vključujejo pravila dopustne uporabe iz razdelka 7, pravila objavljanja iz razdelka 9, določbe o odgovornosti iz razdelka 15 ter določbe o pravu, ki se uporablja, in sporih iz razdelka 18. Hranimo zapis o tem, katero različico ste sprejeli in kdaj, kot je pojasnjeno v našem Pravilniku o zasebnosti." },
+      { kind: "p", text: "Naš Pravilnik o zasebnosti na dezbatere.ro/privacy pojasnjuje, kako ravnamo z osebnimi podatki. To so informacije, ki vam jih moramo zagotoviti, in ne pogodba, s katero soglašate, nič v teh Pogojih pa jih ne spremeni v privolitev za obdelavo. Naš Pravilnik o piškotkih na dezbatere.ro/cookies in naš Register ponudnikov umetne inteligence na dezbatere.ro/providers sta s sklicevanjem vključena v te Pogoje." },
       { kind: "p", text: "Preden z nami elektronsko sklenete katero koli pogodbo, vam vmesnik prikaže potrebne korake, omogoči pregled in popravek vnesenih podatkov pred oddajo ter vas obvesti o jezikih, v katerih je mogoče skleniti pogodbo. Ti Pogoji so na voljo v obliki, ki jo lahko shranite in natisnete. Ob nakupu plačljivega paketa vam sprejeto različico pošljemo po e-pošti. Izvod lahko zahtevate kadar koli. Nič v teh Pogojih ne omejuje pravic, ki jih imate po romunskem pravu ali pravu EU o varstvu potrošnikov oziroma po pravu države, v kateri živite, in ki jih ni mogoče omejiti s pogodbo." }
     ]
   },
@@ -133,7 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Na vaši vsebini ne učimo modelov. Na vaši vsebini ne učimo modelov, naše pogodbe s ponudniki umetne inteligence pa izključujejo uporabo vaše vsebine za učenje ali izboljševanje njihovih modelov. [Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.]" },
       { kind: "p", text: "Kako vaša vsebina doseže ponudnike umetne inteligence. Za izvedbo razprave pošljemo besedilo enemu ali več zunanjim ponudnikom modelov. Ponudnik prejme vaše vprašanje, usmerjevalne opombe, ki jih nastavite, in izjave, ki jih sistem sestavi med razpravo — ponudnik torej vidi besedilo, izpeljano iz tega, kar ste vnesli, in zgrajeno okoli tega, ne samo vaših izvirnih besed. Nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa, zapisov o sejah ali podatkov o plačilu." },
       { kind: "p", text: "Kaj pošlje klepet s podporo. Tudi pomočnik za podporo je model umetne inteligence. Ko mu pišete, vaše sporočilo pošljemo zunanjemu ponudniku modelov, da lahko model odgovori, skupaj s članki pomoči, na katerih temelji njegov odgovor. Pred pošiljanjem zakrijemo vse, kar je videti kot geslo, enkratna koda ali ključ. Če zaprosite za pogovor z osebo, modelu pošljemo tudi pogovor, zakrit na enak način, da napiše kratek povzetek za člana naše ekipe, ki prevzame vaš primer. Ne priložimo vašega e-poštnega naslova, identifikatorjev računa ali podatkov o plačilu, vendar model prejme vse drugo, kar vpišete v klepet, zato tja ne pišite ničesar, česar ne bi želeli, da prebere." },
-      { kind: "p", text: "Kateri ponudniki in kje. Naš Register ponudnikov umetne inteligence na [dezbatere.ro/providers] je del teh Pogojev. Za vsakega ponudnika, ki ga lahko uporabimo, navaja: njegovo pravno osebo in državo; kaj prejme in zakaj; kje obdeluje podatke; njegove pogoje hrambe; ali je za končno točko, ki jo uporabljamo, vključena ničelna hramba podatkov; ali sme po naši pogodbi uporabljati vhodne podatke za učenje; mehanizem prenosa, na katerega se opiramo; in datum zadnjega preverjanja vsakega vnosa. Ponudniki so lahko zunaj vaše države in zunaj Evropskega gospodarskega prostora. Naš Pravilnik o zasebnosti pojasnjuje zaščitne ukrepe." },
+      { kind: "p", text: "Kateri ponudniki in kje. Naš Register ponudnikov umetne inteligence na dezbatere.ro/providers je del teh Pogojev. Za vsakega ponudnika, ki ga lahko uporabimo, navaja: njegovo pravno osebo in državo; kaj prejme in zakaj; kje obdeluje podatke; njegove pogoje hrambe; ali je za končno točko, ki jo uporabljamo, vključena ničelna hramba podatkov; ali sme po naši pogodbi uporabljati vhodne podatke za učenje; mehanizem prenosa, na katerega se opiramo; in datum zadnjega preverjanja vsakega vnosa. Ponudniki so lahko zunaj vaše države in zunaj Evropskega gospodarskega prostora. Naš Pravilnik o zasebnosti pojasnjuje zaščitne ukrepe." },
       { kind: "p", text: "Tri različne stvari. »Ne uporablja se za učenje modelov«, »hrani se omejeno obdobje iz varnostnih razlogov, zaradi preprečevanja zlorab ali iz pravnih razlogov« in »ničelna hramba podatkov — po obdelavi se ne shrani« niso isto. Če ponudnik pozive hrani omejeno obdobje, Register navaja, kako dolgo in zakaj. Če je vključena ničelna hramba podatkov, je to navedeno v Registru skupaj s funkcijami, za katere velja. Ne bomo vam trdili, da se vsebina ne hrani, kadar to ni res." },
       { kind: "p", text: "Rezultati. V razmerju med vami in nami lahko rezultate svojih razprav uporabljate za kateri koli zakonit namen, mi pa ne uveljavljamo lastništva ustvarjenega besedila. Upoštevajte, da ustvarjenega rezultata v številnih pravnih redih morda ni mogoče avtorskopravno zaščititi; da se lahko podoben rezultat ustvari za druge uporabnike; da lahko rezultati reproducirajo gradivo tretjih oseb ali so mu podobni; ter da za nekatera izvorna gradiva, ki jih pridobi ponudnik umetne inteligence, lahko veljajo omejitve ponovne uporabe. Preden se zanesete na rezultate ali jih ponovno objavite, ste odgovorni za preverjanje." }
     ]
@@ -157,7 +158,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Prijava vsebine, moderiranje in pritožbe",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Vsebino lahko prijavi vsakdo. Računa ne potrebujete. Pišite na [abuse@dezbatere.ro] ali uporabite kontrolnik Prijavi pri kateri koli objavljeni razpravi. Da bomo lahko ukrepali, nam sporočite: zakaj menite, da je vsebina nezakonita ali krši te Pogoje, in sicer dovolj podrobno, da bomo razumeli trditev; točno lokacijo — celoten URL in po možnosti odlomek; svoje ime in e-poštni naslov (to ni potrebno pri prijavah gradiva s spolno zlorabo otrok); ter izjavo, da v dobri veri menite, da je vaša prijava točna in popolna." },
+      { kind: "p", text: "Vsebino lahko prijavi vsakdo. Računa ne potrebujete. Pišite na support@dezbatere.ro ali uporabite kontrolnik Prijavi pri kateri koli objavljeni razpravi. Da bomo lahko ukrepali, nam sporočite: zakaj menite, da je vsebina nezakonita ali krši te Pogoje, in sicer dovolj podrobno, da bomo razumeli trditev; točno lokacijo — celoten URL in po možnosti odlomek; svoje ime in e-poštni naslov (to ni potrebno pri prijavah gradiva s spolno zlorabo otrok); ter izjavo, da v dobri veri menite, da je vaša prijava točna in popolna." },
       { kind: "p", text: "Vsako prijavo potrdimo brez nepotrebnega odlašanja. Prijave obravnavamo pravočasno, skrbno, nearbitrarno in objektivno, obvestimo vas o svoji odločitvi ter vam povemo, kako jo lahko izpodbijate. Če za obdelavo prijave ali odločitev o njej uporabljamo avtomatizirana sredstva, to navedemo. Na prijave intimnih posnetkov, objavljenih brez privolitve, ukrepamo v 48 urah od veljavne zahteve." },
       { kind: "p", text: "Dve vrsti avtomatiziranih odločitev, ki ju ločujemo." },
       {
@@ -168,7 +169,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Obrazložitev. Kadar koli odstranimo ali omejimo vidnost vaše vsebine oziroma začasno onemogočimo ali ukinemo vaš račun, vam zagotovimo obrazložitev: kaj smo storili in kakšen je obseg ukrepa, dejstva, na katera smo se oprli, in ali izvirajo iz prijave ali naših preverjanj, ali so bila uporabljena avtomatizirana sredstva, pravna ali pogodbena podlaga ter način izpodbijanja odločitve: prek našega pritožbenega postopka spodaj, prek organa za izvensodno reševanje sporov, certificiranega v skladu z Aktom EU o digitalnih storitvah, ali na sodišču." },
-      { kind: "p", text: "Pritožba zoper odločitev. Če se z odločitvijo o moderiranju ne strinjate, odgovorite na obrazložitev ali v šestih mesecih pišite na [appeals@dezbatere.ro]. Odločitev pregleda oseba, ki pri prvotni odločitvi ni sodelovala, mi pa vas o izidu obvestimo skupaj z razlogi. To ne vpliva na vašo pravico do sodnega postopka ali uporabe alternativnega reševanja sporov po razdelku 18. Pritožbeni postopek sprejema tudi pritožbe, da nismo ukrepali na podlagi prijave, da je bila vsebina neupravičeno odstranjena, da je bil račun neupravičeno omejen ali da je avtomatizirano orodje neupravičeno vplivalo na vašo vsebino." },
+      { kind: "p", text: "Pritožba zoper odločitev. Če se z odločitvijo o moderiranju ne strinjate, odgovorite na obrazložitev ali v šestih mesecih pišite na office@dezbatere.ro. Odločitev pregleda oseba, ki pri prvotni odločitvi ni sodelovala, mi pa vas o izidu obvestimo skupaj z razlogi. To ne vpliva na vašo pravico do sodnega postopka ali uporabe alternativnega reševanja sporov po razdelku 18. Pritožbeni postopek sprejema tudi pritožbe, da nismo ukrepali na podlagi prijave, da je bila vsebina neupravičeno odstranjena, da je bil račun neupravičeno omejen ali da je avtomatizirano orodje neupravičeno vplivalo na vašo vsebino." },
       { kind: "p", text: "Izvensodno reševanje sporov. Če ste v Evropski uniji, lahko spor glede ene od naših odločitev o moderiranju predložite organu za izvensodno reševanje sporov, certificiranemu v skladu s členom 21 Akta EU o digitalnih storitvah (Uredbe (EU) 2022/2065). To velja za odločitev o vaši vsebini ali vašem računu ter za našo odločitev o prijavi, ki ste jo podali. Organ izberete s seznama, ki ga objavlja Evropska komisija na naslovu digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, in vam pred tem ni treba uporabiti našega pritožbenega postopka. V postopku sodelujemo v dobri veri, sodelovanje pa zavrnemo samo, če je bil isti spor glede iste vsebine in iz istih razlogov že rešen. Odločitev organa ne zavezuje ne vas ne nas, pravico do sodnega postopka pa obdržite. Organ vam lahko zaračuna majhno pristojbino ali pa nič. Če odloči v vašo korist, plačamo njegove pristojbine in povrnemo vaše razumne stroške; če odloči v našo korist, ne plačate naših pristojbin ali stroškov, razen če organ ugotovi, da ste ravnali očitno v slabi veri." },
       { kind: "p", text: "Stik z osebo. Naš pomočnik za podporo je sistem umetne inteligence in je kot tak označen. Kadar koli lahko zahtevate pogovor z osebo in vsak pogovor s podporo ponuja to možnost. Pri sporazumevanju z vami se ne zanašamo samo na avtomatizirana orodja." },
       { kind: "p", text: "Teroristična vsebina. Teroristična vsebina je nezakonita in na DebateAI ni dovoljena (razdelek 7). Pristojni organi v Evropski uniji nam lahko pošljejo odredbe o odstranitvi na podlagi Uredbe (EU) 2021/784 na kontaktno točko iz razdelka 1. Ko prejmemo tako odredbo, vsebino odstranimo ali onemogočimo dostop do nje v vseh državah EU v eni uri. Osebo, ki je vsebino objavila, obvestimo, da je bila odstranjena, in na njeno zahtevo tudi zakaj in kako lahko odredbo izpodbija, razen če organ odloči, da moramo zaradi javne varnosti za omejeno obdobje molčati. Kot zahteva Uredba, odstranjeno vsebino in povezane podatke hranimo šest mesecev, da je mogoče odstranitev pregledati in jo, če je bila napačna, razveljaviti. Oseba, ki je vsebino objavila, lahko odredbo izpodbija pred sodišči države, katere organ jo je izdal, in lahko uporabi tudi naš pritožbeni postopek. Noben organ od nas ni zahteval sprejetja posebnih ukrepov zoper teroristično vsebino na podlagi Uredbe; če to stori, bomo te ukrepe opisali tukaj, vključno z morebitnimi avtomatiziranimi orodji." },
@@ -181,7 +182,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "Z vaše strani. Račun lahko kadar koli zaprete v Nastavitvah, kot je opisano v razdelku 6. Razloga ne potrebujete. Z zaprtjem računa ti Pogoji prenehajo veljati. Prenehajo veljati, ko zaprtje začne učinkovati, po izteku 7-dnevnega obdobja odloga; razdelki, navedeni na koncu tega razdelka, ostanejo v veljavi tudi potem." },
-      { kind: "p", text: "Z naše strani. Vaš račun lahko začasno onemogočimo ali zapremo oziroma odstranimo ali omejimo vašo vsebino, kadar: bistveno kršite te Pogoje, zlasti razdelek 7; je vaša vsebina nezakonita ali zakon, sodišče ali organ od nas zahteva ukrepanje; vaša uporaba ogroža varnost, celovitost ali razpoložljivost storitve ali pravice drugih; vaš račun ni bil dejaven [24 months] in smo vas o tem obvestili; ali prenehamo zagotavljati storitev oziroma jo prenehamo zagotavljati v vaši državi." },
+      { kind: "p", text: "Z naše strani. Vaš račun lahko začasno onemogočimo ali zapremo oziroma odstranimo ali omejimo vašo vsebino, kadar: bistveno kršite te Pogoje, zlasti razdelek 7; je vaša vsebina nezakonita ali zakon, sodišče ali organ od nas zahteva ukrepanje; vaša uporaba ogroža varnost, celovitost ali razpoložljivost storitve ali pravice drugih; vaš račun ni bil dejaven 24 mesecev in smo vas o tem obvestili; ali prenehamo zagotavljati storitev oziroma jo prenehamo zagotavljati v vaši državi." },
       { kind: "p", text: "Razen kadar je kršitev resna, zakon zahteva takojšnje ukrepanje ali bi odlašanje povzročilo škodo, vam pojasnimo težavo in damo razumno možnost, da jo odpravite, preden račun začasno onemogočimo ali zapremo. Vedno vam zagotovimo obrazložitev po razdelku 10, odločitev pa lahko izpodbijate." },
       { kind: "p", text: "Če storitev v celoti ukinemo ali jo umaknemo iz vaše države, vas obvestimo najmanj 30 dni vnaprej, vrnemo vse vnaprej plačane zneske za obdobje po ukinitvi in vam pred tem omogočimo izvoz razprav." },
       { kind: "p", text: "Posledice zaprtja. Ko je račun zaprt, uničimo šifrirne ključe za podatke vašega računa in zasebne razprave, zaradi česar postanejo trajno neberljivi, izbrišemo zapis računa ter, če ste to izbrali, odstranimo vaše objavljene razprave iz javnega dostopa, kot je opisano v razdelku 9. Nekatere stvari se ohranijo in vedeti morate, katere: vnosi v naših revizijskih in varnostnih dnevnikih, ki omogočajo samo dodajanje in se hranijo zaradi izpolnjevanja naših pravnih in varnostnih obveznosti; zapisi, ki jih moramo hraniti po zakonu, vključno z zapisi o sprejetju in privolitvah; ter zapisi majhnega števila starejših razprav iz časa pred našo shemo šifriranja, pri katerih je brisanje bolj omejeno — če to velja za vaš račun, vas o tem obvestimo. Pravilnik o zasebnosti vse to opisuje z vidika varstva podatkov in pojasnjuje vašo pravico do izbrisa." },
@@ -194,13 +195,13 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "DebateAI ponuja brezplačen paket. Plačljivi paket Premium [is / will be] na voljo in odklene celoten nabor modelov ter vam omogoči, da sami nastavite parametre razprave." },
+      { kind: "p", text: "DebateAI ponuja brezplačen paket. Na voljo bo plačljivi paket Premium, ki bo odklenil celoten nabor modelov in vam omogočil, da sami nastavite parametre razprave." },
       { kind: "p", text: "Pred plačilom vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše Naroči in plačaj (v romunščini Comandă cu obligație de plată). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop." },
-      { kind: "p", text: "Opomniki. E-poštno sporočilo vam pošljemo najmanj [5] dni pred pretvorbo brezplačnega preskusnega obdobja v plačljivi paket; najmanj enkrat letno pri trajajočih paketih; ter od 30 do 45 dni pred vsakim podaljšanjem za obdobje dvanajstih mesecev ali več. Vsak opomnik vključuje ceno, datum in povezavo za preklic." },
-      { kind: "p", text: "Preklic. Naročnino lahko kadar koli prekličete v meniju Nastavitve → Naročnina z enim potrditvenim klikom ali na strani za preklic na [dezbatere.ro/cancel], za katero se vam ni treba prijaviti. Preklic začne učinkovati ob koncu tekočega obračunskega obdobja, dostop pa obdržite do takrat. Preklica ne bomo otežili bolj, kot je bila otežena sklenitev naročnine." },
+      { kind: "p", text: "Opomniki. E-poštno sporočilo vam pošljemo najmanj 5 dni pred pretvorbo brezplačnega preskusnega obdobja v plačljivi paket; najmanj enkrat letno pri trajajočih paketih; ter od 30 do 45 dni pred vsakim podaljšanjem za obdobje dvanajstih mesecev ali več. Vsak opomnik vključuje ceno, datum in povezavo za preklic." },
+      { kind: "p", text: "Preklic. Naročnino lahko kadar koli prekličete v meniju Nastavitve → Naročnina z enim potrditvenim klikom ali na strani za preklic na dezbatere.ro/cancel, za katero se vam ni treba prijaviti. Preklic začne učinkovati ob koncu tekočega obračunskega obdobja, dostop pa obdržite do takrat. Preklica ne bomo otežili bolj, kot je bila otežena sklenitev naročnine." },
       { kind: "p", text: "Spremembe cen začnejo učinkovati šele ob podaljšanju. Po e-pošti vas obvestimo najmanj 30 dni vnaprej ter vključimo novo ceno in povezavo za preklic. Kadar pravo vaše države zahteva izrecno soglasje k spremembi cene, ga zahtevamo; sicer se nova cena, če ne storite ničesar, uporablja od naslednjega podaljšanja. Regionalna pravila so navedena v Prilogi A." },
-      { kind: "p", text: "Neuspela plačila. Če plačilo ne uspe, ga ponovno poskušamo izvesti [7] dni in vas po e-pošti opozorimo, preden vaš račun prestavimo na brezplačni paket. Vaših razprav zaradi neuspelega plačila ne izbrišemo." },
-      { kind: "p", text: "Davki in prejemnik plačila. Cene [include / exclude] DDV, GST ali prometni davek, kar je odvisno od kraja, kjer živite, in je prikazano pred plačilom. [If a merchant of record is used: Your purchase is processed by [Paddle / …], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.]" },
+      { kind: "p", text: "Neuspela plačila. Če plačilo ne uspe, ga ponovno poskušamo izvesti 7 dni in vas po e-pošti opozorimo, preden vaš račun prestavimo na brezplačni paket. Vaših razprav zaradi neuspelega plačila ne izbrišemo." },
+      { kind: "p", text: "Davki in prejemnik plačila. Cene vključujejo DDV, GST ali prometni davek, kar je odvisno od kraja, kjer živite, in je prikazano pred plačilom. Plačila s kartico obdeluje NETOPIA Payments (netopia-payments.com). Prodajalec je DMS Merchandise Shop S.R.L., ki vam izda račun in ostaja odgovoren za samo storitev in za te Pogoje." },
       { kind: "p", text: "Povratne bremenitve. Če bremenitev izpodbijate pri izdajatelju kartice, lahko plačljive funkcije začasno onemogočimo, dokler spor ni rešen. Za to ne zaračunavamo pristojbin." },
       { kind: "p", text: "Najprej zakonske pravice. Če storitev ni skladna z našimi obljubami, imate pravico zahtevati vzpostavitev skladnosti ali sorazmerno znižanje cene oziroma vračilo, kot določa zakon. Poleg tega velja [state your discretionary refund policy]. Omejitve uporabe za oba paketa so objavljene v izdelku; preden jih zaostrimo tako, da bi to bistveno vplivalo na vas, vas obvestimo." }
     ]
@@ -210,7 +211,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Vaša pravica do odstopa",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Če živite v EU, EGP ali Združenem kraljestvu, lahko od plačljive naročnine odstopite v 14 dneh po sklenitvi brez navedbe razloga. Uporabite stran Odstop od pogodbe na [dezbatere.ro/withdraw], vzorčni obrazec v potrditvenem e-poštnem sporočilu ali pišite na [support@dezbatere.ro]; prejem potrdimo na trajnem nosilcu." },
+      { kind: "p", text: "Če živite v EU ali EGP, lahko od plačljive naročnine odstopite v 14 dneh po sklenitvi brez navedbe razloga. Uporabite stran Odstop od pogodbe na dezbatere.ro/withdraw, vzorčni obrazec v potrditvenem e-poštnem sporočilu ali pišite na support@dezbatere.ro; prejem potrdimo na trajnem nosilcu." },
       { kind: "p", text: "Če ste nas z označitvijo polja ob plačilu prosili, naj storitev začnemo izvajati takoj, in nato odstopite, plačate del storitve, zagotovljen do dneva odstopa, ki se izračuna sorazmerno s ceno za obračunsko obdobje, preostanek pa vam vrnemo. Z uporabo storitve v 14-dnevnem obdobju ne izgubite pravice do odstopa." },
       { kind: "p", text: "Če živite drugje, Priloga A določa pravico do odstopa ali obdobje za premislek, ki velja v vaši regiji, če obstaja, sicer pa naš pravilnik o vračilih. Zakonske pravice v vaši državi imajo vedno prednost." }
     ]
@@ -222,7 +223,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Spremembe storitve. DebateAI nenehno razvijamo, zato običajne izboljšave, popravki in spremembe nabora modelov potekajo brez obvestila. Kadar uvedemo spremembo, ki presega ohranjanje delovanja storitve, kot je opisana, to storimo samo iz enega od naslednjih razlogov: zaradi skladnosti s pravno ali regulativno zahtevo; zaradi odziva na težavo z varnostjo ali zlorabo; ker ponudnik modela spremeni, omeji ali umakne model ali funkcijo, od katere smo odvisni; zaradi prilagoditve tehničnemu okolju, ki ga ne obvladujemo; ali zaradi dodajanja, izboljšanja ali ukinitve funkcije na način, ki vam ne povzroči stroškov." },
       { kind: "p", text: "Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v 30 dneh od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje." },
-      { kind: "p", text: "Spremembe teh Pogojev. Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj 30 dni pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba DebateAI po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na [dezbatere.ro/terms/versions]." }
+      { kind: "p", text: "Spremembe teh Pogojev. Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj 30 dni pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba DebateAI po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions." }
     ]
   },
   {
@@ -244,7 +245,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Sama storitev — programska oprema, sistem, način ocenjevanja, vmesnik, imeni DebateAI in DebateAIRO ter naši logotipi — pripada nam ali našim dajalcem licenc. Ti Pogoji vam dajejo dovoljenje za uporabo storitve, ne pa lastništva nad njo." },
       { kind: "p", text: "Objavljene razprave lahko citirate in nanje dodajate povezave, če navedete DebateAI kot vir in vključite povezavo do izvirne strani. Množično kopiranje, sistematično razmnoževanje javne zbirke in uporaba objavljenih razprav kot podatkov za učenje brez našega pisnega soglasja niso dovoljeni." },
-      { kind: "p", text: "Razdelek 8 ureja vašo vsebino in status ustvarjenih rezultatov. Če menite, da nekaj na DebateAI krši vašo intelektualno lastnino, uporabite način prijave iz razdelka 10. [If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is [name, address, email], registered with the US Copyright Office; we terminate the accounts of repeat infringers.]" }
+      { kind: "p", text: "Razdelek 8 ureja vašo vsebino in status ustvarjenih rezultatov. Če menite, da nekaj na DebateAI krši vašo intelektualno lastnino, uporabite način prijave iz razdelka 10." }
     ]
   },
   {
@@ -252,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Osebni podatki",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Način ravnanja z osebnimi podatki je opisan v Pravilniku o zasebnosti na [dezbatere.ro/privacy]. V njem je pojasnjeno, kaj zbiramo, pravna podlaga za vsak namen, kako dolgo podatke hranimo, kdo jih prejema, kateri prenosi se izvajajo in kako lahko uveljavljate svoje pravice. Sem spadajo tudi tri točke. Razdelek 7 vas poziva, da v vprašanja ne vključujete osebnih podatkov drugih ljudi; če to storite, ste zanje odgovorni in vsebino lahko odstranimo. Če razprava, objavljena na DebateAI, vsebuje vaše osebne podatke, lahko od nas zahtevate, da jo odstranimo, ne da bi imeli račun (razdelek 9). Hranimo tudi zapis o vašem sprejetju teh Pogojev — različico, čas in tehnične podatke seje — kot dokaz pogodbe, kot je pojasnjeno v Pravilniku o zasebnosti." }
+      { kind: "p", text: "Način ravnanja z osebnimi podatki je opisan v Pravilniku o zasebnosti na dezbatere.ro/privacy. V njem je pojasnjeno, kaj zbiramo, pravna podlaga za vsak namen, kako dolgo podatke hranimo, kdo jih prejema, kateri prenosi se izvajajo in kako lahko uveljavljate svoje pravice. Sem spadajo tudi tri točke. Razdelek 7 vas poziva, da v vprašanja ne vključujete osebnih podatkov drugih ljudi; če to storite, ste zanje odgovorni in vsebino lahko odstranimo. Če razprava, objavljena na DebateAI, vsebuje vaše osebne podatke, lahko od nas zahtevate, da jo odstranimo, ne da bi imeli račun (razdelek 9). Hranimo tudi zapis o vašem sprejetju teh Pogojev — različico, čas in tehnične podatke seje — kot dokaz pogodbe, kot je pojasnjeno v Pravilniku o zasebnosti." }
     ]
   },
   {
@@ -261,11 +262,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Pravo, ki se uporablja. Za te Pogoje ter vse spore ali zahtevke, ki izhajajo iz njih ali njihove vsebine, vključno z nepogodbenimi zahtevki, se uporablja pravo Romunije." },
-      { kind: "p", text: "Vaše lokalno varstvo ostaja nespremenjeno. Če ste potrošnik, vam izbira romunskega prava ne odvzema varstva po obveznih pravilih o varstvu potrošnikov v državi vašega običajnega prebivališča — na primer pravilih o nepoštenih pogojih, pravicah do odstopa in preklica ali jamstvih — kadar se ta pravila uporabljajo ne glede na to izbiro, tudi po členu 6(2) Uredbe (ES) št. 593/2008, če živite v EU, ali po enakovrednih pravilih Združenega kraljestva. Na ta pravila se lahko sklicujete poleg romunskega prava." },
-      { kind: "p", text: "Sodišča, če živite v EU, EGP ali Združenem kraljestvu. Postopek proti nam lahko začnete na sodiščih v Romuniji ali na sodiščih države, v kateri živite. Mi lahko postopek proti vam začnemo samo na sodiščih države, v kateri živite." },
-      { kind: "p", text: "Potrošniki drugje. Če živite zunaj EU, EGP in Združenega kraljestva, nič v teh Pogojih ne omejuje pravice, ki jo imate po pravu svoje države, da vložite zahtevek pri njenih sodiščih, ali katere koli pravice po tem pravu, ki se ji ni mogoče odpovedati — vključno s pravicami iz jamstev za potrošnike, če živite v Avstraliji ali Novi Zelandiji; zakonikom Código de Defesa do Consumidor, če živite v Braziliji; in zakoni o varstvu potrošnikov vaše zvezne države, če živite v Združenih državah Amerike." },
-      { kind: "p", text: "Prebivalci Združenih držav Amerike. Priloga A.3 vsebuje arbitražni sporazum in odpoved skupinski tožbi, ki ju ureja zvezni zakon o arbitraži. Velja samo za prebivalce Združenih držav Amerike in samo tam, kjer je izvršljiv. Ne velja za potrošnike v EU, EGP ali Združenem kraljestvu." },
-      { kind: "p", text: "Pred sodnim postopkom. Obrnite se na nas na [legal@dezbatere.ro]; večino težav je mogoče odpraviti, odgovoriti pa si prizadevamo v [5] delovnih dneh. Če ste potrošnik v Romuniji ali EU, lahko uporabite alternativno reševanje sporov prek [the ANPC – named SAL entity, website]; k sodelovanju v tem postopku se [do / do not] zavezujemo. Pritožbe zoper odločitve o moderiranju sledijo razdelku 10, ki je ločen postopek." }
+      { kind: "p", text: "Vaše lokalno varstvo ostaja nespremenjeno. Če ste potrošnik, vam izbira romunskega prava ne odvzema varstva po obveznih pravilih o varstvu potrošnikov v državi vašega običajnega prebivališča — na primer pravilih o nepoštenih pogojih, pravicah do odstopa in preklica ali jamstvih — kadar se ta pravila uporabljajo ne glede na to izbiro, tudi po členu 6(2) Uredbe (ES) št. 593/2008, če živite v EU. Na ta pravila se lahko sklicujete poleg romunskega prava." },
+      { kind: "p", text: "Sodišča, če živite v EU ali EGP. Postopek proti nam lahko začnete na sodiščih v Romuniji ali na sodiščih države, v kateri živite. Mi lahko postopek proti vam začnemo samo na sodiščih države, v kateri živite." },
+      { kind: "p", text: "Potrošniki drugje. Če živite zunaj EU in EGP, nič v teh Pogojih ne omejuje pravice, ki jo imate po pravu svoje države, da vložite zahtevek pri njenih sodiščih, ali katere koli pravice po tem pravu, ki se ji ni mogoče odpovedati — vključno s pravicami iz jamstev za potrošnike, če živite v Avstraliji ali Novi Zelandiji; zakonikom Código de Defesa do Consumidor, če živite v Braziliji; in zakoni o varstvu potrošnikov vaše zvezne države, če živite v Združenih državah Amerike." },
+      { kind: "p", text: "Pred sodnim postopkom. Obrnite se na nas na support@dezbatere.ro; večino težav je mogoče odpraviti, odgovoriti pa si prizadevamo v 5 delovnih dneh. Če ste potrošnik v Romuniji ali EU, lahko uporabite alternativno reševanje sporov prek www.onoratainstanta.ro; k sodelovanju v tem postopku se ne zavezujemo. Pritožbe zoper odločitve o moderiranju sledijo razdelku 10, ki je ločen postopek." }
     ]
   },
   {
@@ -278,7 +278,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Brez odpovedi pravicam. Če pogoja ne uveljavimo takoj, s tem ne izgubimo pravice, da ga uveljavimo pozneje." },
       { kind: "p", text: "Celoten dogovor. Ti Pogoji skupaj s Pravilnikom o piškotkih in Registrom ponudnikov umetne inteligence pomenijo celoten dogovor med nami o storitvi. Zaveze, ki jih sprejmemo v Pravilniku o zasebnosti, so za nas zavezujoče. Nič v tem odstavku ne izključuje odgovornosti za goljufivo zavajanje." },
       { kind: "p", text: "Jezik. Ti Pogoji so objavljeni v vseh jezikih, ki jih ponuja spletno mesto. Pogodba je sklenjena v jeziku, v katerem ste se registrirali: v jeziku različice, ki ste jo sprejeli in ki jo hrani naš zapis o sprejetju. Če pozneje sprejmete novo različico v drugem jeziku, se pogodba nadaljuje v tem jeziku. Druge jezikovne različice so prevodi. Kadar pravo države, v kateri živite, določa, da prevlada različica v njenem lastnem jeziku, prevlada ta različica. Če se dve jezikovni različici razlikujeta, uporabimo pomen, ki je za vas ugodnejši." },
-      { kind: "p", text: "Kontakt. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bukarešta, Romunija." }
+      { kind: "p", text: "Kontakt. support@dezbatere.ro · DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romunija." }
     ]
   },
   {
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Priloga A — Regionalni pogoji",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vsak vnos velja samo, če je njegova regija navedena v razdelku 2, in navaja samo razlike od splošnega dela. Če sta vnos in splošni del v nasprotju, za osebe v tej regiji velja vnos." }
+      { kind: "p", text: "Vsak vnos velja za osebe, ki živijo v njegovi regiji, in navaja samo razlike od splošnega dela. Če sta vnos in splošni del v nasprotju, za osebe v tej regiji velja vnos." }
     ]
   },
   {
@@ -294,103 +294,70 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Evropska unija in Evropski gospodarski prostor",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Splošni del teh Pogojev je napisan za vas. Poleg tega velja: postopek lahko začnete na sodiščih države, v kateri živite; velja pravica do odstopa iz razdelka 13; alternativno reševanje sporov je na voljo prek [the ANPC – named entity, website]. Nemčija: gumb za preklic na [dezbatere.ro/cancel] vam omogoča, da naročnino prekinete brez prijave; trajanje naročnine, obdobja podaljšanja in odpovedni roki so skladni s členom 309(9) BGB [state them]. Francija: naročnino lahko v treh korakih prek spleta prekinete na [URL]; na voljo vam je [the mediator named at URL]. Italija: določbe o odgovornosti (15), začasni onemogočitvi (11), spremembah (14) in pravu, ki se uporablja (18), zahtevajo vašo posebno odobritev, ki jo podate z ločeno potrditvijo ob registraciji. Nizozemska: ti Pogoji so vam pred sklenitvijo zagotovljeni v obliki, ki jo je mogoče shraniti. Poljska: poljska različica je na [URL]." }
+      { kind: "p", text: "Splošni del teh Pogojev je napisan za vas. Poleg tega velja: postopek lahko začnete na sodiščih države, v kateri živite; velja pravica do odstopa iz razdelka 13; alternativno reševanje sporov je na voljo prek www.onoratainstanta.ro. Nemčija: gumb za preklic na dezbatere.ro/cancel vam omogoča, da naročnino prekinete brez prijave; trajanje naročnine, obdobja podaljšanja in odpovedni roki so skladni s členom 309(9) BGB [state them]. Francija: naročnino lahko v treh korakih prek spleta prekinete na [URL]. Italija: določbe o odgovornosti (15), začasni onemogočitvi (11), spremembah (14) in pravu, ki se uporablja (18), zahtevajo vašo posebno odobritev, ki jo podate z ločeno potrditvijo ob registraciji. Nizozemska: ti Pogoji so vam pred sklenitvijo zagotovljeni v obliki, ki jo je mogoče shraniti. Poljska: poljska različica je na [URL]." }
     ]
   },
   {
     no: "A.2",
-    title: "Združeno kraljestvo (samo če je navedeno v razdelku 2)",
+    title: "Združene države Amerike",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Naš predstavnik v Združenem kraljestvu po členu 27 UK GDPR je [name, address, email]. Za vas velja zakon Consumer Rights Act 2015 in nič v teh Pogojih ne omejuje vaših pravic po njem; ko začnejo veljati pravila o naročninah iz zakona Digital Markets, Competition and Consumers Act 2024 (pričakovano leta 2027), bodo veljala za plačljive pakete, vključno z obdobjem za premislek po podaljšanjih in brezplačnih preskusnih obdobjih. Kako uporabnike varujemo pred nezakonito vsebino: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktivna tehnologija, ki jo uporabljamo: [describe, or \"none\"]. Preverjanje starosti: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Pritožbeni postopek iz razdelka 10 sprejema pritožbe glede nezakonite vsebine, neupravičene odstranitve vaše vsebine, omejitev vašega računa, uporabe avtomatiziranih orodij, ki vplivajo na vašo vsebino, in vsake ocene starosti, ki vas neupravičeno blokira. Na voljo je osebam, na katere vpliva vsebina in ki niso uporabniki. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.2." }
+      { kind: "p", text: "Tennessee. DebateAI ne ponujamo osebam, ki živijo v Tennesseeju." },
+      { kind: "p", text: "Obvestila in odstranitve. Intimne posnetke brez privolitve je mogoče brez računa prijaviti na [URL], odstranijo pa se v 48 urah od veljavne zahteve. Pritožbe glede avtorskih pravic vložite po postopku iz razdelka 10." },
+      { kind: "p", text: "Posebnosti zveznih držav. Kalifornija: veljajo pogoji samodejnega podaljšanja iz razdelka 12; prek spleta lahko kadar koli prekličete; vašo privolitev v pogoje podaljšanja hranimo najmanj tri leta. New York: v 14 dneh od vsake bremenitve po zvišani ceni lahko prekličete in prejmete sorazmerno vračilo. Teksas in Nebraska: občutljivih osebnih podatkov ne prodajamo. Washington: za zdravstvene podatke velja naše Obvestilo o zasebnosti zdravstvenih podatkov potrošnikov na [URL]. Kolorado: nič v storitvi ne sprejema odločitev z znatnimi posledicami za vas. Vaše podatke in vaše pravice glede zasebnosti po zakonodaji vaše zvezne države ureja naš Pravilnik o zasebnosti, Priloga B.2." }
     ]
   },
   {
     no: "A.3",
-    title: "Združene države Amerike (samo če so navedene v razdelku 2)",
+    title: "Kanada in Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tennessee. DebateAI ne ponujamo osebam, ki živijo v Tennesseeju." },
-      { kind: "p", text: "Arbitražni sporazum in odpoved skupinski tožbi. Če živite v Združenih državah Amerike, se vi in DebateAIRO strinjate, da boste vsak spor, ki izhaja iz teh Pogojev ali storitve, namesto na sodišču reševali z zavezujočo posamično arbitražo, ki jo vodi [the American Arbitration Association / JAMS] po svojih pravilih za potrošnike, pri čemer lahko vsak od naju vloži posamični zahtevek pri sodišču za spore majhne vrednosti. Sodelovanje lahko zavrnete tako, da v 30 dneh od prvega sprejetja teh Pogojev pošljete e-poštno sporočilo na [address]. Ta sporazum ureja zvezni zakon o arbitraži. Plačamo pristojbine za vložitev arbitražnega postopka. Skupinske, kolektivne in zastopniške tožbe so izključene v obsegu, ki ga dovoljuje zakon. Ta razdelek velja samo za naprej in ne velja za zahtevke, ki so nastali, preden ste ga sprejeli." },
-      { kind: "p", text: "Obvestila in odstranitve. Intimne posnetke brez privolitve je mogoče brez računa prijaviti na [URL], odstranijo pa se v 48 urah od veljavne zahteve. Pritožbe glede avtorskih pravic se naslovijo na našega imenovanega zastopnika iz razdelka 16." },
-      { kind: "p", text: "Posebnosti zveznih držav. Kalifornija: veljajo pogoji samodejnega podaljšanja iz razdelka 12; prek spleta lahko kadar koli prekličete; vašo privolitev v pogoje podaljšanja hranimo najmanj tri leta. New York: v 14 dneh od vsake bremenitve po zvišani ceni lahko prekličete in prejmete sorazmerno vračilo. Teksas in Nebraska: občutljivih osebnih podatkov ne prodajamo. Washington: za zdravstvene podatke velja naše Obvestilo o zasebnosti zdravstvenih podatkov potrošnikov na [URL]. Kolorado: nič v storitvi ne sprejema odločitev z znatnimi posledicami za vas. Vaše podatke in vaše pravice glede zasebnosti po zakonodaji vaše zvezne države ureja naš Pravilnik o zasebnosti, Priloga B.3." }
+      { kind: "p", text: "Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.3. Quebec: ti Pogoji so na voljo v francoščini; francoščino izberite v izbirniku jezika; nastavitve, ki ohranjajo zasebnost vaših razprav, so privzeto vključene; zahtevate lahko odstranitev osebnih podatkov o sebi iz rezultatov iskanja." }
     ]
   },
   {
     no: "A.4",
-    title: "Kanada in Quebec (samo če sta navedena)",
+    title: "Avstralija in Nova Zelandija",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je [name], privacy@dezbatere.ro. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.4. Quebec: ti Pogoji so na voljo v francoščini; francoščino izberite v izbirniku jezika; nastavitve, ki ohranjajo zasebnost vaših razprav, so privzeto vključene; zahtevate lahko odstranitev osebnih podatkov o sebi iz rezultatov iskanja; za vas ne velja noben arbitražni sporazum ali odpoved skupinski tožbi." }
+      { kind: "p", text: "Za naše storitve veljajo jamstva, ki jih po avstralskem pravu varstva potrošnikov ni mogoče izključiti. Pri večjih napakah storitve imate pravico do preklica in vračila za neizkoriščeni del ali do nadomestila za zmanjšano vrednost; prav tako imate pravico do nadomestila za vse druge razumno predvidljive izgube ali škodo. Če napaka ni večja, imate pravico, da se težave s storitvijo odpravijo v razumnem času, če se to ne zgodi, pa do preklica in vračila. V obsegu, ki ga dovoljuje člen 64A, je naša odgovornost za kršitev jamstva omejena na ponovno zagotovitev storitve ali plačilo stroškov ponovne zagotovitve. Za plačljivi paket poleg tega, kar vam zagotavlja razdelek 12, ne velja pravica do obdobja za premislek; zahtevki za vračilo se obravnavajo na naslovu support@dezbatere.ro. Nova Zelandija: velja zakon Consumer Guarantees Act 1993 in nič v teh Pogojih ga ne izključuje; škodljive digitalne komunikacije lahko prijavite nam po razdelku 10 ali organizaciji Netsafe." }
     ]
   },
   {
     no: "A.5",
-    title: "Avstralija in Nova Zelandija (samo če sta navedeni)",
+    title: "Švica",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Za naše storitve veljajo jamstva, ki jih po avstralskem pravu varstva potrošnikov ni mogoče izključiti. Pri večjih napakah storitve imate pravico do preklica in vračila za neizkoriščeni del ali do nadomestila za zmanjšano vrednost; prav tako imate pravico do nadomestila za vse druge razumno predvidljive izgube ali škodo. Če napaka ni večja, imate pravico, da se težave s storitvijo odpravijo v razumnem času, če se to ne zgodi, pa do preklica in vračila. V obsegu, ki ga dovoljuje člen 64A, je naša odgovornost za kršitev jamstva omejena na ponovno zagotovitev storitve ali plačilo stroškov ponovne zagotovitve. Za plačljivi paket poleg tega, kar vam zagotavlja razdelek 12, ne velja pravica do obdobja za premislek; naš pravilnik o vračilih je […]. Nova Zelandija: velja zakon Consumer Guarantees Act 1993 in nič v teh Pogojih ga ne izključuje; škodljive digitalne komunikacije lahko prijavite nam po razdelku 10 ali organizaciji Netsafe." }
+      { kind: "p", text: "Za vaše podatke velja švicarski zvezni zakon o varstvu podatkov (Pravilnik o zasebnosti, Priloga B.5). Postopek lahko sprožite pred sodišči v kraju v Švici, kjer živite. Za plačljivi paket ne velja zakonska pravica do odstopa; zahtevki za vračilo se obravnavajo na naslovu support@dezbatere.ro." }
     ]
   },
   {
     no: "A.6",
-    title: "Švica (samo če je navedena)",
+    title: "Moldavija",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Za vaše podatke velja švicarski zvezni zakon o varstvu podatkov (Pravilnik o zasebnosti, Priloga B.6). Postopek lahko sprožite pred sodišči v kraju v Švici, kjer živite. Za plačljivi paket ne velja zakonska pravica do odstopa; naš pravilnik o vračilih je […]." }
+      { kind: "p", text: "Po teh Pogojih imate enake pravice kot potrošnik v Evropski uniji, vključno s 14-dnevno pravico do odstopa iz razdelka 13. Postopek lahko sprožite pred sodišči v Moldaviji. Za vaše podatke velja moldavski zakon št. 195/2024 o varstvu osebnih podatkov (Pravilnik o zasebnosti, Priloga B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldavija (samo če je navedena)",
+    title: "Azijsko-pacifiška regija",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Po teh Pogojih imate enake pravice kot potrošnik v Evropski uniji, vključno s 14-dnevno pravico do odstopa iz razdelka 13. Postopek lahko sprožite pred sodišči v Moldaviji. Za vaše podatke velja moldavski zakon št. 195/2024 o varstvu osebnih podatkov (Pravilnik o zasebnosti, Priloga B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukrajina (samo če je navedena)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "DebateAI ponujamo v Ukrajini, razen na območjih, ki jih ukrajinska vlada ne nadzoruje. Izdelek in ti Pogoji so na voljo v ukrajinščini. Za vaše podatke velja zakon Ukrajine »O varstvu osebnih podatkov« (Pravilnik o zasebnosti, Priloga B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Izrael (samo če je naveden)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Plačljivi paket lahko prekličete, kot to dovoljuje izraelski zakon o varstvu potrošnikov 5741-1981 [state the cancellation terms]. Ti Pogoji in naš Pravilnik o zasebnosti so na voljo v hebrejščini. Za vaše podatke velja izraelski zakon o varstvu zasebnosti (Pravilnik o zasebnosti, Priloga B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Azijsko-pacifiška regija (samo vrstice za navedene regije)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapur: naša pooblaščena oseba za varstvo podatkov je [name, email]; prenosi temeljijo na pogodbenih zaščitnih ukrepih, primerljivih s PDPA; za plačljivi paket ne velja zakonsko obdobje za premislek, naš pravilnik o vračilih pa je […]. Japonska: zakonsko razkritje po zakonu Specified Commercial Transactions Act je na [URL]; za spletne naročnine ne velja splošno obdobje za premislek, naš pravilnik o vračilih pa je […]; vašo vsebino pošiljamo ponudnikom umetne inteligence v Združenih državah Amerike in Evropski uniji, vsakemu na podlagi pogodbe, ki zahteva zaščito, enakovredno japonskemu zakonu Act on the Protection of Personal Information, na zahtevo pa vam povemo, kateri so ti ukrepi. Južna Koreja: privolitve za neobvezno obdelavo in trženje se zbirajo ločeno od postavk, potrebnih za izvajanje storitve; naša oseba, odgovorna za zasebnost, je [name], privacy@dezbatere.ro; od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine ob upoštevanju zakona E-Commerce Act; pred vsakim ponavljajočim se zvišanjem cene ali prehodom z brezplačnega na plačljivi paket pridobimo vašo novo privolitev; storitev uporablja generativno umetno inteligenco, o čemer vas obvestimo, preden jo začnete uporabljati, rezultate, ki jih ustvari umetna inteligenca, pa označimo. Tajvan: od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine po zakonu Consumer Protection Act; za vaše podatke velja tajvanski zakon Personal Data Protection Act (Pravilnik o zasebnosti, Priloga B.10). Tajska: naš predstavnik na Tajskem je [name] [if appointed]. Filipini: naši poslovni identifikacijski podatki in mehanizem pravnega varstva po zakonu Internet Transactions Act so na [URL]; pritožbe se lahko vložijo pri nacionalni komisiji za zasebnost." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Pridržano",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Turčija, Brazilija in Indonezija zahtevajo prilogo v lokalnem jeziku, predstavnika ali registracijo ter vložitve. Določbe zanje tukaj niso pripravljene, te države pa niso vključene v razdelek 2, dokler jih izrecno ne dodamo. Storitve ne ponujamo na Kitajskem, v Vietnamu ali Rusiji." }
+      { kind: "p", text: "Singapur: naša pooblaščena oseba za varstvo podatkov je naš direktor, ki je dosegljiv na privacy@dezbatere.ro; prenosi temeljijo na pogodbenih zaščitnih ukrepih, primerljivih s PDPA; za plačljivi paket ne velja zakonsko obdobje za premislek, zahtevki za vračilo pa se obravnavajo na naslovu support@dezbatere.ro. Japonska: zakonsko razkritje po zakonu Specified Commercial Transactions Act je na [URL]; za spletne naročnine ne velja splošno obdobje za premislek, zahtevki za vračilo pa se obravnavajo na naslovu support@dezbatere.ro; vašo vsebino pošiljamo ponudnikom umetne inteligence v Združenih državah Amerike in Evropski uniji, vsakemu na podlagi pogodbe, ki zahteva zaščito, enakovredno japonskemu zakonu Act on the Protection of Personal Information, na zahtevo pa vam povemo, kateri so ti ukrepi. Južna Koreja: privolitve za neobvezno obdelavo in trženje se zbirajo ločeno od postavk, potrebnih za izvajanje storitve; naša oseba, odgovorna za zasebnost, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro; od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine ob upoštevanju zakona E-Commerce Act; pred vsakim ponavljajočim se zvišanjem cene ali prehodom z brezplačnega na plačljivi paket pridobimo vašo novo privolitev; storitev uporablja generativno umetno inteligenco, o čemer vas obvestimo, preden jo začnete uporabljati, rezultate, ki jih ustvari umetna inteligenca, pa označimo. Tajvan: od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine po zakonu Consumer Protection Act; za vaše podatke velja tajvanski zakon Personal Data Protection Act (Pravilnik o zasebnosti, Priloga B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "1cd216c10904c06be8da825b6c270e38ebe2fc9ecdfb32d789dd8a3ab2f2c434",
-  eyebrow: "POGOJI UPORABE · v2.1 · VELJAVNI OD [DATE]",
+  version: "2.2",
+  sha256: "b4691d8c9cdb6cc90d35837114bf10178c1ffe0f78d2ec1e9301a73e91832e04",
+  eyebrow: "POGOJI UPORABE · v2.2 · VELJAVNI OD 12. OKTOBRA 2026",
   title: "S čim soglašate",
-  lede: "Pogodba med vami in družbo DebateAIRO S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
-  endMarker: "KONEC POGOJEV · v2.1",
-  contact: "[legal@dezbatere.ro]",
+  lede: "Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
+  endMarker: "KONEC POGOJEV · v2.2",
+  contact: "support@dezbatere.ro",
   bodyLabel: "Besedilo Pogojev uporabe",
   sectionIdPrefix: "terms-section-",
   titleId: "terms-modal-title",

@@ -1,16 +1,16 @@
--- 0112 — the account data export (mission data-export S01). The forward step after dev's 0111 (NETOPIA): its manifest
--- lineage/data-export-forward112.json binds these bytes (migrations/lineage/README.md). It replaces two 0107 functions,
+-- 0113 — the account data export (mission data-export S01). The forward step after dev's 0112 (auth DB batch): its manifest
+-- lineage/data-export-forward113.json binds these bytes (migrations/lineage/README.md). It replaces two 0107 functions,
 -- so it first refuses unless each still holds the body 0107 gave it (the chain runs a step's SQL once; replays read its receipt).
-DO $dx112_requires$
+DO $dx113_requires$
 BEGIN
   IF encode(sha256(convert_to((SELECT prosrc FROM pg_proc WHERE oid=to_regprocedure('identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)')),'UTF8')),'hex')
        IS DISTINCT FROM '728977e0a52dc1820f26fe07dca72a99775f4295039cf7a4ad04bda1a9935c3b'
     OR encode(sha256(convert_to((SELECT prosrc FROM pg_proc WHERE oid=to_regprocedure('identity.valid_consumer_authorization_internal(jsonb)')),'UTF8')),'hex')
        IS DISTINCT FROM 'cb189f5f59917b30668216415f89226f65377a4237856dfeb363a8fb50f8352b' THEN
-    RAISE EXCEPTION 'DATA_EXPORT_0112_REQUIRES_0107_BODIES';
+    RAISE EXCEPTION 'DATA_EXPORT_0113_REQUIRES_0107_BODIES';
   END IF;
 END
-$dx112_requires$;
+$dx113_requires$;
 
 -- Private, replay-safe account export queue. Function grants are closed below.
 CREATE TABLE IF NOT EXISTS identity.data_export (

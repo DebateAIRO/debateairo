@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.1 · EFFECTIVE [DATE]
+eyebrow: TERMS OF SERVICE · v2.2 · EFFECTIVE 12 OCTOBER 2026
 title: What you agree to
-lede: The contract between you and DebateAIRO S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.1
+lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
+endMarker: END OF TERMS · v2.2
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,39 +21,40 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.1 · Effective \[date\] · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.2 · Effective 12 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
-**In short.** You must be 18 or over. DebateAI builds arguments with AI models and everything it generates may be wrong — it is not advice. Your debates are private unless you publish them; if you publish, anyone can read them. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at \[abuse@dezbatere.ro\] whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
+**In short.** You must be 18 or over. DebateAI builds arguments with AI models and everything it generates may be wrong — it is not advice. Your debates are private unless you publish them; if you publish, anyone can read them. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
 ## 1. Who we are and how to reach us
 
-DebateAI is operated by **DebateAIRO S.R.L.**, a company registered in Romania.
+DebateAI is operated by **DMS Merchandise Shop S.R.L.**, a company registered in Romania.
 
 |  |  |
 | --- | --- |
-| Registered office | \[street, number, sector, postal code\], Bucharest, Romania |
-| Trade Register number | \[J40/…/…\] |
-| Sole registration code (CUI) | \[…\] · VAT: \[RO… / not VAT-registered\] |
-| Share capital | \[RON …\] |
-| General contact | \[hello@dezbatere.ro\] |
-| Legal notices | \[legal@dezbatere.ro\] |
+| Registered office | Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romania |
+| Trade Register number | J2022000426271 |
+| Sole registration code (CUI) | 45935221 · VAT: RO45935221 |
+| Share capital | RON 5,000 |
+| General contact | support@dezbatere.ro |
+| Telephone | +40 748 793 490 |
+| Legal notices | support@dezbatere.ro |
 | Privacy and data protection | privacy@dezbatere.ro |
-| Reporting illegal content | \[abuse@dezbatere.ro\] — see section 10 |
-| Point of contact for authorities | \[dsa@dezbatere.ro\] — Romanian and English |
-| Removal orders for terrorist content (EU Regulation 2021/784) | \[dsa@dezbatere.ro\] — our contact point for these orders; Romanian and English; see section 10 |
+| Reporting illegal content | support@dezbatere.ro — see section 10 |
+| Point of contact for authorities | office@dezbatere.ro — Romanian and English |
+| Removal orders for terrorist content (EU Regulation 2021/784) | office@dezbatere.ro — our contact point for these orders; Romanian and English; see section 10 |
 | Representatives in other countries | Listed in Annex A for the regions where we have appointed one |
 
-These details are also shown permanently on the site at \[dezbatere.ro/legal\]. You can always reach a person, not only our assistant; section 10 explains how.
+These details are also shown permanently on the site at dezbatere.ro/legal. You can always reach a person, not only our assistant; section 10 explains how.
 
 ## 2. Where we offer DebateAI
 
-We offer DebateAI to people who live in **\[the European Union and the European Economic Area\]** \[and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan\]. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve.
+We offer DebateAI to people who live in the European Union (27 countries) and the European Economic Area (Norway, Iceland and Liechtenstein), Switzerland, Moldova, the United States (except Tennessee), Canada, Australia, New Zealand, Singapore, Japan, South Korea and Taiwan. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve.
 
 ## 3. Accepting these Terms
 
-You accept these Terms by ticking the box marked **"I have read and agree to the Terms of Service"** and clicking **Create account**. That creates a contract between you and DebateAIRO S.R.L. The Terms include the acceptable-use rules in section 7, the publication rules in section 9, the liability provisions in section 15, the governing-law and dispute provisions in section 18 and, if you live in the United States, the arbitration agreement in Annex A.3. We keep a record of the version you accepted and when, as our Privacy Policy explains.
+You accept these Terms by ticking the box marked **"I have read and agree to the Terms of Service"** and clicking **Create account**. That creates a contract between you and DMS Merchandise Shop S.R.L. The Terms include the acceptable-use rules in section 7, the publication rules in section 9, the liability provisions in section 15 and the governing-law and dispute provisions in section 18. We keep a record of the version you accepted and when, as our Privacy Policy explains.
 
-Our **Privacy Policy** at \[dezbatere.ro/privacy\] explains how we handle personal data. It is information we owe you, not a contract you agree to, and nothing in these Terms turns it into consent for processing. Our **Cookie Policy** at \[dezbatere.ro/cookies\] and our **AI Provider Register** at \[dezbatere.ro/providers\] are part of these Terms by reference.
+Our **Privacy Policy** at dezbatere.ro/privacy explains how we handle personal data. It is information we owe you, not a contract you agree to, and nothing in these Terms turns it into consent for processing. Our **Cookie Policy** at dezbatere.ro/cookies and our **AI Provider Register** at dezbatere.ro/providers are part of these Terms by reference.
 
 Before you conclude any contract with us electronically, the interface shows you the steps involved, lets you review and correct what you have entered before you submit it, and tells you the languages in which the contract can be concluded. These Terms are available in a form you can save and print; when you buy a paid plan, we email you the version you accepted; and you can request a copy at any time. Nothing in these Terms limits rights you have under Romanian or EU consumer law, or the law of the country where you live, that cannot be limited by contract.
 
@@ -119,7 +120,7 @@ If you are unsure whether something is allowed, ask us before you post it.
 
 **What the support chat sends.** The support assistant is also an AI model. When you write to it, we send your message to an external model provider so the model can answer, together with the help articles it bases its answer on. Before sending, we mask anything that looks like a password, a one-time code or a key. If you ask to speak to a person, we also send the conversation, masked the same way, to the model so it can write a short summary for the member of our team who takes your case. We do not attach your email address, your account identifiers or your payment details, but the model receives anything else you type in the chat, so do not write there anything you would not want it to read.
 
-**Which providers, and where.** Our **AI Provider Register** at \[dezbatere.ro/providers\] is part of these Terms. It lists each provider we may use: its legal entity and country; what it receives and why; where it processes; its retention terms; whether zero-data-retention is active for the endpoint we use; whether it may use inputs for training under our contract; the transfer mechanism we rely on; and the date we last verified each entry. Providers may be located outside your country and outside the European Economic Area. Our Privacy Policy explains the safeguards.
+**Which providers, and where.** Our **AI Provider Register** at dezbatere.ro/providers is part of these Terms. It lists each provider we may use: its legal entity and country; what it receives and why; where it processes; its retention terms; whether zero-data-retention is active for the endpoint we use; whether it may use inputs for training under our contract; the transfer mechanism we rely on; and the date we last verified each entry. Providers may be located outside your country and outside the European Economic Area. Our Privacy Policy explains the safeguards.
 
 **Three different things.** "Not used to train models", "retained for a limited period for security, abuse prevention or legal reasons", and "zero data retention — not persisted after processing" are different. Where a provider retains prompts for a limited period, the Register says how long and why. Where zero-data-retention is active, the Register says so, and for which features. We will not tell you content is unretained when it is not.
 
@@ -143,7 +144,7 @@ Debates are **private by default**. Nothing you create is visible to anyone else
 
 ## 10. Reporting content, moderation and complaints
 
-**Anyone can report content.** You do not need an account. Write to \[abuse@dezbatere.ro\] or use the **Report** control on any published debate. So that we can act, tell us: why you believe the content is illegal or breaches these Terms, in enough detail to understand the claim; the exact location — the full URL and, if you can, the passage; your name and email address (not required for reports of child sexual abuse material); and that you believe in good faith that your report is accurate and complete.
+**Anyone can report content.** You do not need an account. Write to support@dezbatere.ro or use the **Report** control on any published debate. So that we can act, tell us: why you believe the content is illegal or breaches these Terms, in enough detail to understand the claim; the exact location — the full URL and, if you can, the passage; your name and email address (not required for reports of child sexual abuse material); and that you believe in good faith that your report is accurate and complete.
 
 We acknowledge every report without undue delay. We handle reports in a timely, diligent, non-arbitrary and objective way, tell you our decision, and tell you how to challenge it. Where we use automated means to process or decide a report, we say so. Reports of intimate imagery shared without consent are acted on **within 48 hours** of a valid request.
 
@@ -154,7 +155,7 @@ We acknowledge every report without undue delay. We handle reports in a timely, 
 
 **Statement of reasons.** Whenever we remove or restrict the visibility of your content, or suspend or terminate your account, we give you a statement of reasons: what we did and how far it reaches, the facts we relied on and whether they came from a report or our own checks, whether automated means were used, the legal or contractual ground, and how you can challenge the decision: through our complaints route below, through an out-of-court dispute settlement body certified under the EU Digital Services Act, or in court.
 
-**Complaining about a decision.** If you disagree with a moderation decision, reply to the statement of reasons or write to \[appeals@dezbatere.ro\] within **six months**. A person who was not involved in the original decision reviews it, and we tell you the outcome with reasons. This does not affect your right to go to court or to use alternative dispute resolution under section 18. The complaints route also accepts complaints that we have failed to act on a report, that content was wrongly removed, that an account was wrongly restricted, or that an automated tool wrongly affected your content.
+**Complaining about a decision.** If you disagree with a moderation decision, reply to the statement of reasons or write to office@dezbatere.ro within **six months**. A person who was not involved in the original decision reviews it, and we tell you the outcome with reasons. This does not affect your right to go to court or to use alternative dispute resolution under section 18. The complaints route also accepts complaints that we have failed to act on a report, that content was wrongly removed, that an account was wrongly restricted, or that an automated tool wrongly affected your content.
 
 **Out-of-court dispute settlement.** If you are in the European Union, you may take a dispute about one of our moderation decisions to an out-of-court dispute settlement body certified under Article 21 of the EU Digital Services Act (Regulation (EU) 2022/2065). This covers a decision about your content or your account, and our decision on a report you made. You choose the body from the list the European Commission publishes at digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, and you do not have to use our complaints route first. We take part in good faith, and we decline only if the same dispute, about the same content and on the same grounds, has already been settled. The body's decision does not bind either of us, and you keep your right to go to court. The body may charge you a small fee or nothing. If it decides in your favour, we pay its fees and repay your reasonable expenses; if it decides in ours, you do not pay our fees or expenses unless the body finds that you acted manifestly in bad faith.
 
@@ -168,7 +169,7 @@ We acknowledge every report without undue delay. We handle reports in a timely, 
 
 **By you.** Close your account at any time from Settings, as section 6 describes. You do not need a reason. Closing your account ends these Terms. They end when the closure takes effect, after the 7-day grace period; the sections listed at the end of this section continue to apply after that.
 
-**By us.** We may suspend or close your account, or remove or restrict your content, where: you materially breach these Terms, in particular section 7; your content is illegal, or the law or a court or authority requires us to act; your use threatens the security, integrity or availability of the service or the rights of others; your account has been inactive for \[24 months\] and we have given you notice; or we stop providing the service, or stop providing it in your country.
+**By us.** We may suspend or close your account, or remove or restrict your content, where: you materially breach these Terms, in particular section 7; your content is illegal, or the law or a court or authority requires us to act; your use threatens the security, integrity or availability of the service or the rights of others; your account has been inactive for 24 months and we have given you notice; or we stop providing the service, or stop providing it in your country.
 
 Except where the breach is serious, the law requires immediate action, or delay would cause harm, we tell you what the problem is and give you a reasonable opportunity to fix it before we suspend or close the account. We always give a statement of reasons under section 10, and you can challenge the decision.
 
@@ -182,19 +183,19 @@ Sections 8 (as to content already published), 15, 16 and 18 survive termination.
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI offers a free plan. A paid **Premium** plan \[is / will be\] available, which unlocks the full model roster and lets you set the debate gauges yourself.
+DebateAI offers a free plan. A paid **Premium** plan will be available, which unlocks the full model roster and lets you set the debate gauges yourself.
 
 **Before you pay** we show you, directly above the payment button: the plan; the total price including applicable tax; the billing period; that the plan renews automatically until cancelled; the date any free trial ends and what you will then be charged; and how to cancel. You confirm the renewal terms by ticking a separate box. The button reads **Subscribe and pay** (in Romanian, *Comandă cu obligație de plată*). We send you a confirmation on a durable medium containing the same information, these Terms, and the withdrawal form.
 
-**Reminders.** We email you at least \[5\] days before a free trial converts to a paid plan; at least once a year for continuing plans; and between 30 and 45 days before any renewal of a term of twelve months or more. Every reminder includes the price, the date, and a cancellation link.
+**Reminders.** We email you at least 5 days before a free trial converts to a paid plan; at least once a year for continuing plans; and between 30 and 45 days before any renewal of a term of twelve months or more. Every reminder includes the price, the date, and a cancellation link.
 
-**Cancelling.** Cancel at any time from **Settings → Subscription** with one confirmation click, or through the cancellation page at \[dezbatere.ro/cancel\], which does not require you to log in. Cancellation takes effect at the end of the current billing period, and you keep access until then. We will not make cancelling harder than subscribing was.
+**Cancelling.** Cancel at any time from **Settings → Subscription** with one confirmation click, or through the cancellation page at dezbatere.ro/cancel, which does not require you to log in. Cancellation takes effect at the end of the current billing period, and you keep access until then. We will not make cancelling harder than subscribing was.
 
 **Price changes** take effect only at a renewal. We give at least **30 days' notice** by email with the new price and a cancellation link. Where the law of your country requires your express consent to a price change, we ask for it; otherwise, if you do nothing, the new price applies from the next renewal. Annex A notes regional rules.
 
-**Failed payments.** If a payment fails we retry for \[7\] days and warn you by email before downgrading your account to the free plan. We do not delete your debates because a payment failed.
+**Failed payments.** If a payment fails we retry for 7 days and warn you by email before downgrading your account to the free plan. We do not delete your debates because a payment failed.
 
-**Taxes, and who you pay.** Prices \[include / exclude\] VAT, GST or sales tax, which depends on where you live and is shown before you pay. \[If a merchant of record is used: Your purchase is processed by \[Paddle / …\], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.\]
+**Taxes, and who you pay.** Prices include VAT, GST or sales tax, which depends on where you live and is shown before you pay. Card payments are processed by NETOPIA Payments (netopia-payments.com). The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms.
 
 **Chargebacks.** If you dispute a charge with your card issuer, we may suspend paid features while the dispute is resolved. We do not charge fees for this.
 
@@ -202,7 +203,7 @@ DebateAI offers a free plan. A paid **Premium** plan \[is / will be\] available,
 
 ## 13. Your right of withdrawal
 
-If you live in the EU, the EEA or the UK, you may withdraw from a paid subscription within **14 days** of subscribing, without giving a reason. Use the **Withdraw from contract** page at \[dezbatere.ro/withdraw\], the model form in the confirmation email, or write to \[support@dezbatere.ro\]; we confirm receipt on a durable medium.
+If you live in the EU or the EEA, you may withdraw from a paid subscription within **14 days** of subscribing, without giving a reason. Use the **Withdraw from contract** page at dezbatere.ro/withdraw, the model form in the confirmation email, or write to support@dezbatere.ro; we confirm receipt on a durable medium.
 
 If you asked us to start the service immediately — by ticking the box at checkout — and then withdraw, you pay for the part of the service provided up to the day you withdraw, calculated pro rata on the price for the billing period, and we refund the rest. **You do not lose the right of withdrawal by using the service during the 14 days.**
 
@@ -214,7 +215,7 @@ If you live elsewhere, Annex A states the withdrawal or cooling-off right that a
 
 We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within **30 days** of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period.
 
-**To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use DebateAI after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at \[dezbatere.ro/terms/versions\].
+**To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use DebateAI after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
 
 ## 15. Liability
 
@@ -234,25 +235,23 @@ The service itself — the software, the engine, the scoring method, the interfa
 
 You may quote and link to published debates with attribution to DebateAI and a link to the original page. Bulk copying, systematic reproduction of the public corpus, and use of published debates as training data are not permitted without our written agreement.
 
-Section 8 covers your content and the status of generated outputs. If you believe something on DebateAI infringes your intellectual property, use the reporting route in section 10. \[If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is \[name, address, email\], registered with the US Copyright Office; we terminate the accounts of repeat infringers.\]
+Section 8 covers your content and the status of generated outputs. If you believe something on DebateAI infringes your intellectual property, use the reporting route in section 10.
 
 ## 17. Personal data
 
-How we handle personal data is set out in the **Privacy Policy** at \[dezbatere.ro/privacy\]. It explains what we collect, the legal basis for each purpose, how long we keep things, who receives data, the transfers involved, and how to exercise your rights. Three points belong here as well. Section 7 asks you not to put other people's personal data into a question; if you do, you are responsible for that, and we may remove the content. If a debate published on DebateAI contains personal data about you, you can ask us to remove it without holding an account (section 9). And we keep a record of your acceptance of these Terms — version, time, and the technical details of the session — as evidence of the contract, as the Privacy Policy explains.
+How we handle personal data is set out in the **Privacy Policy** at dezbatere.ro/privacy. It explains what we collect, the legal basis for each purpose, how long we keep things, who receives data, the transfers involved, and how to exercise your rights. Three points belong here as well. Section 7 asks you not to put other people's personal data into a question; if you do, you are responsible for that, and we may remove the content. If a debate published on DebateAI contains personal data about you, you can ask us to remove it without holding an account (section 9). And we keep a record of your acceptance of these Terms — version, time, and the technical details of the session — as evidence of the contract, as the Privacy Policy explains.
 
 ## 18. Governing law and where disputes are heard
 
 **Governing law.** These Terms, and any dispute or claim arising out of them or their subject matter, including non-contractual claims, are governed by the laws of Romania.
 
-**Your local protections are not affected.** If you are a consumer, choosing Romanian law does not take away the protection of any mandatory consumer-protection rules of the country where you habitually reside — for example rules on unfair terms, withdrawal and cancellation rights, or guarantees — where those rules apply regardless of this choice, including under Article 6(2) of Regulation (EC) No 593/2008 if you live in the EU, or the equivalent rules of the United Kingdom. You may rely on those rules in addition to Romanian law.
+**Your local protections are not affected.** If you are a consumer, choosing Romanian law does not take away the protection of any mandatory consumer-protection rules of the country where you habitually reside — for example rules on unfair terms, withdrawal and cancellation rights, or guarantees — where those rules apply regardless of this choice, including under Article 6(2) of Regulation (EC) No 593/2008 if you live in the EU. You may rely on those rules in addition to Romanian law.
 
-**Courts, if you live in the EU, EEA or UK.** You may bring proceedings against us either in the courts of Romania or in the courts of the country where you live. We may bring proceedings against you only in the courts of the country where you live.
+**Courts, if you live in the EU or the EEA.** You may bring proceedings against us either in the courts of Romania or in the courts of the country where you live. We may bring proceedings against you only in the courts of the country where you live.
 
-**Consumers elsewhere.** If you live outside the EU, EEA and UK, nothing in these Terms limits any right you have under the law of your country to bring a claim in its courts, or any right under that law that cannot be waived — including, if you live in Australia or New Zealand, your consumer-guarantee rights; if you live in Brazil, the Código de Defesa do Consumidor; and if you live in the United States, the consumer-protection laws of your state.
+**Consumers elsewhere.** If you live outside the EU and the EEA, nothing in these Terms limits any right you have under the law of your country to bring a claim in its courts, or any right under that law that cannot be waived — including, if you live in Australia or New Zealand, your consumer-guarantee rights; if you live in Brazil, the Código de Defesa do Consumidor; and if you live in the United States, the consumer-protection laws of your state.
 
-**Residents of the United States.** Annex A.3 contains an arbitration agreement and class-action waiver governed by the Federal Arbitration Act. It applies only to residents of the United States and only where enforceable. It does not apply to consumers in the EU, EEA or UK.
-
-**Before going to court.** Contact us at \[legal@dezbatere.ro\]; most things are fixable, and we aim to reply within \[5\] working days. If you are a consumer in Romania or the EU, you may use alternative dispute resolution through \[the ANPC – named SAL entity, website\]; we \[do / do not\] commit to participate in that procedure. Complaints about moderation decisions follow section 10, which is a separate route.
+**Before going to court.** Contact us at support@dezbatere.ro; most things are fixable, and we aim to reply within 5 working days. If you are a consumer in Romania or the EU, you may use alternative dispute resolution through www.onoratainstanta.ro; we do not commit to participate in that procedure. Complaints about moderation decisions follow section 10, which is a separate route.
 
 ## 19. Other terms
 
@@ -266,58 +265,40 @@ How we handle personal data is set out in the **Privacy Policy** at \[dezbatere.
 
 **Language.** These Terms are published in every language the site offers. The contract is in the language you signed up in: the language of the version you accepted, which our acceptance record keeps. If you later accept a new version in another language, the contract continues in that language. The other language versions are translations. Where the law of the country where you live says that a version in its own language prevails, that version prevails. If two language versions differ, we apply the meaning that is more favourable to you.
 
-**Contact.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bucharest, Romania.
+**Contact.** support@dezbatere.ro · DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romania.
 
 ## Annex A — Regional terms
 
-Each entry applies only if its region is listed in section 2, and only states what differs from the body. Where an entry and the body conflict, the entry applies to people in that region.
+Each entry applies to people who live in its region and only states what differs from the body. Where an entry and the body conflict, the entry applies to people in that region.
 
 ### A.1 European Union and European Economic Area
 
-The body of these Terms is written for you. In addition: you may bring proceedings in the courts of the country where you live; the withdrawal right in section 13 applies; alternative dispute resolution is available through \[the ANPC – named entity, website\]. **Germany:** the cancellation button at \[dezbatere.ro/cancel\] lets you end a subscription without logging in; subscription terms, renewal periods and notice periods comply with §309(9) BGB \[state them\]. **France:** you may end a subscription online in three steps at \[URL\]; \[the mediator named at URL\] is available to you. **Italy:** the clauses on liability (15), suspension (11), changes (14) and governing law (18) require your specific approval, which you give by the separate confirmation at sign-up. **Netherlands:** these Terms are provided in a storable form before conclusion. **Poland:** a Polish version is at \[URL\].
+The body of these Terms is written for you. In addition: you may bring proceedings in the courts of the country where you live; the withdrawal right in section 13 applies; alternative dispute resolution is available through www.onoratainstanta.ro. **Germany:** the cancellation button at dezbatere.ro/cancel lets you end a subscription without logging in; subscription terms, renewal periods and notice periods comply with §309(9) BGB \[state them\]. **France:** you may end a subscription online in three steps at \[URL\]. **Italy:** the clauses on liability (15), suspension (11), changes (14) and governing law (18) require your specific approval, which you give by the separate confirmation at sign-up. **Netherlands:** these Terms are provided in a storable form before conclusion. **Poland:** a Polish version is at \[URL\].
 
-### A.2 United Kingdom *(only if listed in section 2)*
-
-Our UK representative under Article 27 UK GDPR is \[name, address, email\]. The Consumer Rights Act 2015 applies to you and nothing in these Terms limits your rights under it; when the subscription rules of the Digital Markets, Competition and Consumers Act 2024 come into force (expected in 2027), they apply to paid plans, including a cooling-off period after renewals and after free trials. **How we protect users from illegal content:** \[terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report\]. **Proactive technology we use:** \[describe, or "none"\]. **Age assurance:** \[describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023\]. The complaints procedure in section 10 accepts complaints about illegal content, wrongful removal of your content, restrictions on your account, the use of automated tools affecting your content, and any age assessment that wrongly blocks you. It is open to people affected by content who are not users. Our Privacy Policy, Annex B.2, covers your data.
-
-### A.3 United States *(only if listed in section 2)*
+### A.2 United States
 
 **Tennessee.** We do not offer DebateAI to people who live in Tennessee.
 
-**Arbitration agreement and class-action waiver.** If you live in the United States, you and DebateAIRO agree to resolve any dispute arising out of these Terms or the service by binding individual arbitration administered by \[the American Arbitration Association / JAMS\] under its consumer rules, rather than in court, except that either of us may bring an individual claim in small-claims court. **You may opt out** by emailing \[address\] within 30 days of first accepting these Terms. This agreement is governed by the Federal Arbitration Act. We pay the arbitration filing fees. Class, collective and representative actions are waived to the extent the law allows. This section applies prospectively only and does not apply to claims that arose before you accepted it.
+**Notices and takedowns.** Non-consensual intimate imagery may be reported at \[URL\] without an account and is removed within 48 hours of a valid request. Copyright complaints go through the reporting route in section 10.
 
-**Notices and takedowns.** Non-consensual intimate imagery may be reported at \[URL\] without an account and is removed within 48 hours of a valid request. Copyright complaints go to our designated agent named in section 16.
+**State-specific.** *California:* the automatic-renewal terms in section 12 apply; you may cancel online at any time; we retain your consent to renewal terms for at least three years. *New York:* you may cancel within 14 days of any charge at an increased price and receive a pro-rata refund. *Texas and Nebraska:* we do not sell sensitive personal data. *Washington:* our Consumer Health Data Privacy Notice at \[URL\] applies to health-related information. *Colorado:* nothing in the service makes consequential decisions about you. Our Privacy Policy, Annex B.2, covers your data and your state privacy rights.
 
-**State-specific.** *California:* the automatic-renewal terms in section 12 apply; you may cancel online at any time; we retain your consent to renewal terms for at least three years. *New York:* you may cancel within 14 days of any charge at an increased price and receive a pro-rata refund. *Texas and Nebraska:* we do not sell sensitive personal data. *Washington:* our Consumer Health Data Privacy Notice at \[URL\] applies to health-related information. *Colorado:* nothing in the service makes consequential decisions about you. Our Privacy Policy, Annex B.3, covers your data and your state privacy rights.
+### A.3 Canada and Quebec
 
-### A.4 Canada and Quebec *(only if listed)*
+Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. **Quebec:** these Terms are available in French; choose French with the language switcher; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you.
 
-Our privacy officer, and in Quebec the person in charge of the protection of personal information, is \[name\], privacy@dezbatere.ro. Our Privacy Policy, Annex B.4, covers your data. **Quebec:** these Terms are available in French; choose French with the language switcher; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you; no arbitration agreement or class-action waiver applies to you.
+### A.4 Australia and New Zealand
 
-### A.5 Australia and New Zealand *(only if listed)*
+**Our services come with guarantees that cannot be excluded under the Australian Consumer Law.** For major failures with the service you are entitled to cancel and to a refund for the unused portion, or to compensation for its reduced value; you are also entitled to compensation for any other reasonably foreseeable loss or damage. If the failure does not amount to a major failure, you are entitled to have problems with the service rectified in a reasonable time and, if this is not done, to cancel and obtain a refund. To the extent section 64A permits, our liability for breach of a guarantee is limited to supplying the service again or paying the cost of doing so. No cooling-off right applies to the paid plan beyond what section 12 gives you; refund requests are handled at support@dezbatere.ro. **New Zealand:** the Consumer Guarantees Act 1993 applies and nothing in these Terms excludes it; harmful digital communications may be reported to us under section 10 or to Netsafe.
 
-**Our services come with guarantees that cannot be excluded under the Australian Consumer Law.** For major failures with the service you are entitled to cancel and to a refund for the unused portion, or to compensation for its reduced value; you are also entitled to compensation for any other reasonably foreseeable loss or damage. If the failure does not amount to a major failure, you are entitled to have problems with the service rectified in a reasonable time and, if this is not done, to cancel and obtain a refund. To the extent section 64A permits, our liability for breach of a guarantee is limited to supplying the service again or paying the cost of doing so. No cooling-off right applies to the paid plan beyond what section 12 gives you; our refund policy is \[…\]. **New Zealand:** the Consumer Guarantees Act 1993 applies and nothing in these Terms excludes it; harmful digital communications may be reported to us under section 10 or to Netsafe.
+### A.5 Switzerland
 
-### A.6 Switzerland *(only if listed)*
+The Swiss Federal Act on Data Protection applies to your data (Privacy Policy, Annex B.5). You may bring proceedings in the courts of the place in Switzerland where you live. No statutory withdrawal right applies to the paid plan; refund requests are handled at support@dezbatere.ro.
 
-The Swiss Federal Act on Data Protection applies to your data (Privacy Policy, Annex B.6). You may bring proceedings in the courts of the place in Switzerland where you live. No statutory withdrawal right applies to the paid plan; our refund policy is \[…\].
+### A.6 Moldova
 
-### A.7 Moldova *(only if listed)*
+You have the same rights under these Terms as a consumer in the European Union, including the 14-day withdrawal right in section 13. You may bring proceedings in the courts of Moldova. Moldova's Law No. 195/2024 on personal data protection applies to your data (Privacy Policy, Annex B.6).
 
-You have the same rights under these Terms as a consumer in the European Union, including the 14-day withdrawal right in section 13. You may bring proceedings in the courts of Moldova. Moldova's Law No. 195/2024 on personal data protection applies to your data (Privacy Policy, Annex B.7).
+### A.7 Asia-Pacific
 
-### A.8 Ukraine *(only if listed)*
-
-We offer DebateAI in Ukraine except in the areas not controlled by the Ukrainian government. The product and these Terms are available in Ukrainian. The Law of Ukraine "On Personal Data Protection" applies to your data (Privacy Policy, Annex B.8).
-
-### A.9 Israel *(only if listed)*
-
-You may cancel a paid plan as the Consumer Protection Law, 5741-1981, allows \[state the cancellation terms\]. These Terms and our Privacy Policy are available in Hebrew. Israel's Protection of Privacy Law applies to your data (Privacy Policy, Annex B.9).
-
-### A.10 Asia-Pacific *(only the lines for regions listed)*
-
-*Singapore:* our Data Protection Officer is \[name, email\]; transfers rest on contractual protections comparable to the PDPA; no statutory cooling-off applies to the paid plan and our refund policy is \[…\]. *Japan:* the statutory disclosure under the Specified Commercial Transactions Act is at \[URL\]; no general cooling-off applies to online subscriptions, and our refund policy is \[…\]; we send your content to AI providers in the United States and the European Union, each under a contract that requires protection equivalent to Japan's Act on the Protection of Personal Information, and on request we tell you what those measures are. *South Korea:* consents to optional processing and marketing are collected separately from the items needed to run the service; our privacy officer is \[name\], privacy@dezbatere.ro; you may withdraw from a paid plan within 7 days of subscribing subject to the E-Commerce Act; we obtain your fresh consent before any recurring price increase or free-to-paid conversion; the service uses generative AI, we tell you so before you use it, and we label AI-generated output. *Taiwan:* you may withdraw from a paid plan within 7 days of subscribing, under the Consumer Protection Act; Taiwan's Personal Data Protection Act applies to your data (Privacy Policy, Annex B.10). *Thailand:* our representative in Thailand is \[name\] \[if appointed\]. *Philippines:* our business identification and redress mechanism under the Internet Transactions Act are at \[URL\]; complaints may be lodged with the National Privacy Commission.
-
-### A.11 Reserved
-
-Turkey, Brazil and Indonesia each require a local-language annex, a representative or registration, and filings. They are not drafted here and are outside section 2 until entered deliberately. China, Vietnam and Russia are not offered.
+*Singapore:* our Data Protection Officer is our director, reachable at privacy@dezbatere.ro; transfers rest on contractual protections comparable to the PDPA; no statutory cooling-off applies to the paid plan, and refund requests are handled at support@dezbatere.ro. *Japan:* the statutory disclosure under the Specified Commercial Transactions Act is at \[URL\]; no general cooling-off applies to online subscriptions, and refund requests are handled at support@dezbatere.ro; we send your content to AI providers in the United States and the European Union, each under a contract that requires protection equivalent to Japan's Act on the Protection of Personal Information, and on request we tell you what those measures are. *South Korea:* consents to optional processing and marketing are collected separately from the items needed to run the service; our privacy officer is our director, reachable at privacy@dezbatere.ro; you may withdraw from a paid plan within 7 days of subscribing subject to the E-Commerce Act; we obtain your fresh consent before any recurring price increase or free-to-paid conversion; the service uses generative AI, we tell you so before you use it, and we label AI-generated output. *Taiwan:* you may withdraw from a paid plan within 7 days of subscribing, under the Consumer Protection Act; Taiwan's Personal Data Protection Act applies to your data (Privacy Policy, Annex B.7).

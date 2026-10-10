@@ -201,6 +201,6 @@
   "public.publication.contentCheck.groundIllegal": "这些文本也可能违法。",
   "public.publication.contentCheck.automated": "此决定由自动化工具作出，尚未经人工复核。",
   "public.publication.contentCheck.stillPrivate": "您的辩论仍为私密状态，内容没有改变，只有您可以查看。",
-  "public.publication.contentCheck.appeal": "如需申请人工复核此决定，请在六个月内致信 [appeals@dezbatere.ro]。",
+  "public.publication.contentCheck.appeal": "如需申请人工复核此决定，请在六个月内致信 office@dezbatere.ro。",
   "public.publication.contentCheck.unavailable": "内容检查目前不可用，因此没有发布任何内容。您的辩论仍为私密状态，请几分钟后重试。"
 }

@@ -23,6 +23,7 @@ import {
   SupportShredService,
   type SupportShredPort
 } from "../../apps/api/src/support/shred.js";
+import { migrationSql, replayMigrationRolledBack } from "../support/migrationReplay.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -142,10 +143,14 @@ async function seedShredTarget(input: Readonly<{
   }
 }
 
+// Each case starts from 0054's OWN end state, rolled back with everything else: 0065 retired 0054's
+// five statement-level support_shred_dirty_* markers, so a replay over the final schema first puts
+// them back (as the committed migrate() replay this test used before merge 065708c19 did).
 async function expectReplayFailure(sql: string, code: RegExp): Promise<void> {
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
+    await client.query(migrationSource);
     await client.query(sql);
     await expect(client.query(migrationSource)).rejects.toThrow(code);
     await client.query("ROLLBACK");
@@ -177,7 +182,7 @@ async function beginSupportAt(
 }
 
 beforeAll(async () => {
-  migrationSource = await readFile("migrations/0054_support_keys_audit.sql", "utf8");
+  migrationSource = await migrationSql("0054_support_keys_audit.sql");
   database = await startTestDatabase();
   await migrate(database.pool);
 }, 120_000);
@@ -846,10 +851,9 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
   });
 
   it("replays after 0055 is already recorded and rejects hostile catalog lookalikes", async () => {
-    await database.pool.query(
-      "DELETE FROM public.debateai_schema_migration WHERE name='0054_support_keys_audit.sql'"
-    );
-    await expect(migrate(database.pool)).resolves.toBeUndefined();
+    // 0054's own SQL again, over a database whose ledger already records 0055, rolled back
+    // (migrate() refuses a ledger with 0054's row removed, by design: tests/support/migrationReplay.ts).
+    expect(await replayMigrationRolledBack(database.pool, "0054_support_keys_audit.sql")).toBe("APPLIED");
     expect((await database.pool.query<{ name: string }>(`
       SELECT name FROM public.debateai_schema_migration
       WHERE name IN ('0054_support_keys_audit.sql','0055_register_support_publication.sql')

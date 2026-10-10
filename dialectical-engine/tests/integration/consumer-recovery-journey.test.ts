@@ -40,6 +40,8 @@ async function account() {
     const evidence = new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(runtime, audit), sessions.consumerProducer(), recordsKey), passkeys = new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(runtime, audit), sessions.consumerProducer(), { publicAppUrl: origin });
     return { userId, ownerRef, channelId, code, email, source, old, delivered, recovery, evidence, passkeys, sessions, users };
 }
+/** Design note 2026-10-09 item 3: a used code is no longer refilled, so a restart needs another saved code. */
+async function secondCode(a: Awaited<ReturnType<typeof account>>) { const code = generateRecoveryCode(2); await db.pool.query('INSERT INTO identity.recovery_code(recovery_code_id,user_id,code_slot,code_hash,created_at) VALUES($1,$2,2,$3,now())', [randomUUID(), a.userId, await hashRecoveryCode(argon2, code, mfaPolicy.recoveryCodes.argon2id)]); return code; }
 async function proof(a: Awaited<ReturnType<typeof account>>, code = a.code) { const send = await a.recovery.prepareStart({ email: a.email }, a.source); await send?.(); expect(a.delivered.at(-1)?.recipient).toBe(a.email); return a.recovery.prove({ token: a.delivered.at(-1)!.token, recovery_code: code, method: 'passkey' }, a.source); }
 async function accept(a: Awaited<ReturnType<typeof account>>, cap: string) { const status = await a.evidence.status('RECOVERY', { recovery_capability: cap, locale: 'en' }, a.source); await a.evidence.complete('RECOVERY', { recovery_capability: cap, locale: 'en', terms: currentDocument('TERMS', 'en'), privacy: currentDocument('PRIVACY', 'en'), terms_accepted: true, privacy_acknowledged: true, adult_affirmed: true, ...(status.age_confirmation_required ? { date_of_birth: '1990-01-01' } : {}) }, a.source); }
 describe('real consumer recovery crypto and replacement journeys', () => {
@@ -47,7 +49,7 @@ describe('real consumer recovery crypto and replacement journeys', () => {
         const a = await account(), p = await proof(a);
         expect(p.status).toBe('RECOVERY_ENROLL_ONLY');
         expect(p).not.toHaveProperty('session');
-        expect(p.replacement_recovery_code).not.toBe(a.code);
+        expect(p).not.toHaveProperty('replacement_recovery_code');
         const login = await a.passkeys.beginPasskeyLogin({}, a.source);
         await expect(a.passkeys.completePasskeyLogin({ challenge_handle: login.challenge_handle, credential: a.old.assertion(login.options.challenge) }, a.source)).rejects.toThrow();
         await expect(a.recovery.prove({ token: a.delivered[0]!.token, recovery_code: a.code, method: 'passkey' }, a.source)).rejects.toThrow();
@@ -85,15 +87,16 @@ describe('real consumer recovery crypto and replacement journeys', () => {
         expect(result.status).toBe('authenticated');
         expect((await db.pool.query("SELECT count(*)::int n FROM identity.mfa_factor WHERE user_id=$1 AND state='active'", [a.userId])).rows[0].n).toBe(1);
     });
-    it('restarts after capability expiry using a fresh mailed token plus the one-time replacement of the last old code', async () => {
-        const a = await account(), p = await proof(a);
+    it('restarts after capability expiry using a fresh mailed token plus another saved code, never a refilled one', async () => {
+        const a = await account(), p = await proof(a), another = await secondCode(a);
+        expect((await db.pool.query('SELECT count(*)::int n FROM identity.recovery_code WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL', [a.userId])).rows[0].n).toBe(1);
         await db.pool.query("UPDATE identity.consumer_recovery_gate SET cap_expires_at=clock_timestamp()-interval '1 second' WHERE user_id=$1", [a.userId]);
         await db.pool.query("UPDATE identity.consumer_recovery_reservation SET reserved_at=reserved_at-interval '61 seconds' WHERE user_id=$1", [a.userId]);
         await expect(a.recovery.beginEnrollment({ recovery_capability: p.recovery_capability, method: 'passkey' }, a.source)).rejects.toThrow();
-        const next = await proof(a, p.replacement_recovery_code);
+        const next = await proof(a, another);
         expect(next.recovery_capability).not.toBe(p.recovery_capability);
-        expect(next.replacement_recovery_code).not.toBe(p.replacement_recovery_code);
-        expect((await db.pool.query('SELECT count(*)::int n FROM identity.recovery_code WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL', [a.userId])).rows[0].n).toBe(1);
+        expect(next).not.toHaveProperty('replacement_recovery_code');
+        expect((await db.pool.query('SELECT count(*)::int n FROM identity.recovery_code WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL', [a.userId])).rows[0].n).toBe(0);
     });
     it('composes actual P2 request persistence and independent consumer token delivery behind the same generic start', async () => {
         const a = await account();
@@ -136,8 +139,8 @@ describe('real consumer recovery crypto and replacement journeys', () => {
         const login = await a.sessions.beginLogin({ email: a.email, password: 'Strong fixture password 123!' }, a.source);
         const result = await a.sessions.completeLogin({ challengeToken: login.challengeToken, code: codes.codes[0]! }, a.source);
         expect(result.status).toBe('authenticated');
-        expect(result.replacementRecoveryCode).toBeTruthy();
-        expect(result.replacementRecoveryCode).not.toBe(codes.codes[0]);
+        expect(result).not.toHaveProperty('replacementRecoveryCode');
+        expect((await db.pool.query('SELECT count(*)::int n FROM identity.recovery_code WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL', [a.userId])).rows[0].n).toBe(9);
     });
     it('rolls back replacement, cap consumption, gate clearing and session creation when immutable audit append fails', async () => {
         const a = await account(), p = await proof(a);
@@ -258,7 +261,7 @@ describe('real consumer recovery crypto and replacement journeys', () => {
             expect((await db.pool.query('SELECT active FROM identity.consumer_recovery_gate WHERE user_id=$1',[a.userId])).rows[0].active).toBe(true);
             expect((await db.pool.query('SELECT count(*)::int n FROM identity.consumer_recovery_reservation WHERE user_id=$1',[a.userId])).rows[0].n).toBe(1);
             await expect(a.evidence.status('RECOVERY',{recovery_capability:p.recovery_capability,locale:'en'},a.source)).rejects.toThrow();
-            const next=await proof(a,p.replacement_recovery_code);expect(next.recovery_capability).not.toBe(p.recovery_capability);
+            const next=await proof(a,await secondCode(a));expect(next.recovery_capability).not.toBe(p.recovery_capability);
             expect((await db.pool.query('SELECT count(*)::int n FROM identity.consumer_recovery_reservation WHERE user_id=$1',[a.userId])).rows[0].n).toBe(2);
             await db.pool.query('DELETE FROM identity."user" WHERE user_id=$1',[a.userId]);
             for(const table of ['consumer_recovery_gate','consumer_recovery_token','consumer_recovery_reservation','consumer_recovery_enrollment','consumer_security_notice','consumer_passkey_credential','mfa_factor'])expect((await db.pool.query('SELECT count(*)::int n FROM identity.'+table+' WHERE user_id=$1',[a.userId])).rows[0].n).toBe(0);

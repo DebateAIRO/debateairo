@@ -201,6 +201,6 @@
   "public.publication.contentCheck.groundIllegal": "Văn bản cũng có thể vi phạm pháp luật.",
   "public.publication.contentCheck.automated": "Quyết định này do một công cụ tự động đưa ra. Chưa có người nào xem xét quyết định này.",
   "public.publication.contentCheck.stillPrivate": "Cuộc tranh luận của bạn vẫn ở chế độ riêng tư và không thay đổi. Chỉ bạn mới có thể xem.",
-  "public.publication.contentCheck.appeal": "Để yêu cầu một người xem xét lại quyết định này, hãy viết đến [appeals@dezbatere.ro] trong vòng sáu tháng.",
+  "public.publication.contentCheck.appeal": "Để yêu cầu một người xem xét lại quyết định này, hãy viết đến office@dezbatere.ro trong vòng sáu tháng.",
   "public.publication.contentCheck.unavailable": "Hiện không thể kiểm tra nội dung, nên chưa có gì được xuất bản. Cuộc tranh luận của bạn vẫn ở chế độ riêng tư. Hãy thử lại sau vài phút."
 }

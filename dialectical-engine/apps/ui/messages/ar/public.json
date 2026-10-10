@@ -206,6 +206,6 @@
   "public.publication.contentCheck.groundIllegal": "قد يكون النص مخالفًا للقانون أيضًا.",
   "public.publication.contentCheck.automated": "اتخذت أداة آلية هذا القرار. لم يراجعه أي شخص بعد.",
   "public.publication.contentCheck.stillPrivate": "يبقى نقاشك خاصًا ودون تغيير. أنت وحدك تستطيع رؤيته.",
-  "public.publication.contentCheck.appeal": "لطلب مراجعة هذا القرار من شخص، اكتب إلى [appeals@dezbatere.ro] خلال ستة أشهر.",
+  "public.publication.contentCheck.appeal": "لطلب مراجعة هذا القرار من شخص، اكتب إلى office@dezbatere.ro خلال ستة أشهر.",
   "public.publication.contentCheck.unavailable": "مراجعة المحتوى غير متاحة حاليًا، لذا لم يُنشر أي شيء. يبقى نقاشك خاصًا. حاول مجددًا بعد بضع دقائق."
 }

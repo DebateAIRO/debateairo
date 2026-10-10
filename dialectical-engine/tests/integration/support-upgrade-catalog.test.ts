@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { afterAll,beforeAll,describe,expect,it } from "vitest";
 import { migrate,PostgresSupportSessionRepository } from "../../packages/db/src/index.js";
+import { applyMigrationSql,retiredUpgradeReason } from "../support/migrationReplay.js";
 import { startTestDatabase,type TestDatabase } from "../support/testDatabase.js";
+
+const REPAIRING_MIGRATIONS = [
+  "0054_support_keys_audit.sql","0055_register_support_publication.sql"
+] as const;
 
 type ShapeRow = Readonly<{
   kind: string;
@@ -78,12 +83,9 @@ beforeAll(async () => {
   await migrate(upgraded.pool);
 
   // Reproduce a catalog where the historical/base 0050 was ledgered before the
-  // telemetry and complete abuse-event shape were added to its source bytes.
+  // telemetry and complete abuse-event shape were added to its source bytes. The
+  // ledger stays complete: the test runs the repairing migrations' own SQL itself.
   await upgraded.pool.query(`
-    DELETE FROM public.debateai_schema_migration
-    WHERE name IN (
-      '0054_support_keys_audit.sql','0055_register_support_publication.sql'
-    );
     DROP INDEX IF EXISTS support.support_abuse_event_session_class_idx;
     DROP INDEX IF EXISTS support.support_abuse_event_ip_class_at_idx;
     ALTER TABLE support.message
@@ -111,7 +113,14 @@ describe("support migration upgrade convergence", () => {
       "SELECT name FROM public.debateai_schema_migration WHERE name='0050_support_foundation.sql'"
     )).rows).toEqual([{ name: "0050_support_foundation.sql" }]);
 
-    await migrate(upgraded.pool);
+    // Until merge 065708c19 this test removed the 0054 and 0055 ledger rows and let migrate()
+    // run them again. migrate() now refuses that ledger, and every ledger it does continue from
+    // already records both, so no database reaches the repair through migrate() any more. The
+    // repair itself still ships: 0054's and 0055's own SQL, in the plan's order, committed.
+    expect(await retiredUpgradeReason(upgraded.pool, REPAIRING_MIGRATIONS)).toEqual({
+      refusal: "MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE", unrecorded: []
+    });
+    await applyMigrationSql(upgraded.pool, REPAIRING_MIGRATIONS);
     const expected = await supportTelemetryShape(fresh);
     expect(expected.map(({ name }) => name)).toEqual([
       "cost_usd","degraded_reason","input_tokens","model_called","output_tokens",
@@ -123,8 +132,9 @@ describe("support migration upgrade convergence", () => {
     await expectV2CaseInsertEnforcement(fresh);
     await expectV2CaseInsertEnforcement(upgraded);
 
-    await expect(migrate(upgraded.pool)).resolves.toBeUndefined();
+    await expect(applyMigrationSql(upgraded.pool, REPAIRING_MIGRATIONS)).resolves.toBeUndefined();
     expect(await supportTelemetryShape(upgraded)).toEqual(expected);
     await expectV2CaseInsertEnforcement(upgraded);
+    await expect(migrate(upgraded.pool)).resolves.toBeUndefined();
   });
 });

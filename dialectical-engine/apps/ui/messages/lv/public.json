@@ -203,6 +203,6 @@
   "public.publication.contentCheck.groundIllegal": "Teksts var būt arī nelikumīgs.",
   "public.publication.contentCheck.automated": "Šo lēmumu pieņēma automātisks rīks. Neviens cilvēks to vēl nav pārskatījis.",
   "public.publication.contentCheck.stillPrivate": "Jūsu diskusija paliek privāta un nemainīta. To varat redzēt tikai jūs.",
-  "public.publication.contentCheck.appeal": "Lai lūgtu cilvēkam pārskatīt šo lēmumu, sešu mēnešu laikā rakstiet uz [appeals@dezbatere.ro].",
+  "public.publication.contentCheck.appeal": "Lai lūgtu cilvēkam pārskatīt šo lēmumu, sešu mēnešu laikā rakstiet uz office@dezbatere.ro.",
   "public.publication.contentCheck.unavailable": "Satura pārbaude pašlaik nav pieejama, tāpēc nekas netika publicēts. Jūsu diskusija paliek privāta. Mēģiniet vēlreiz pēc dažām minūtēm."
 }

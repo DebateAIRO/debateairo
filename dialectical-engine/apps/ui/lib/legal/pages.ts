@@ -73,22 +73,22 @@ export type Company = Readonly<{
  * draft company table (`apps/ui/legal/en/terms-of-service.md` §1).
  */
 export const COMPANY: Company = Object.freeze({
-  legalName: "DebateAIRO S.R.L.",
+  legalName: "DMS Merchandise Shop S.R.L.",
   tradingNames: Object.freeze(["DebateAI", "Dialectical Engine"]),
-  registeredOffice: "[…], București, România",
-  tradeRegisterNo: "[J40/…/…]",
-  cui: "[…]",
-  // The company is VAT-registered (owner, 29 September 2026); the RO VAT code stays bracketed until the owner fills it.
-  vat: Object.freeze({ kind: "registered", number: "[RO…]" }),
-  shareCapital: "[RON …]",
-  representative: "[…]",
-  phone: "[+40 …]",
+  registeredOffice: "Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, județul Neamț, România",
+  tradeRegisterNo: "J2022000426271",
+  cui: "45935221",
+  // The company is VAT-registered (owner, 29 September 2026; ANAF: VAT-registered since 1 February 2023).
+  vat: Object.freeze({ kind: "registered", number: "RO45935221" }),
+  shareCapital: "5.000 RON",
+  representative: "Dedita Ionut Ciprian",
+  phone: "+40 748 793 490",
   emails: Object.freeze({
-    general: "[hello@dezbatere.ro]",
-    legal: "[legal@dezbatere.ro]",
+    general: "support@dezbatere.ro",
+    legal: "support@dezbatere.ro",
     privacy: "privacy@dezbatere.ro",
-    reports: "[abuse@dezbatere.ro]",
-    authorities: "[dsa@dezbatere.ro]"
+    reports: "support@dezbatere.ro",
+    authorities: "office@dezbatere.ro"
   }),
   languages: Object.freeze<LocaleCode[]>(["ro", "en"])
 });
@@ -97,10 +97,11 @@ export const COMPANY: Company = Object.freeze({
 export const isUnverified = (value: string): boolean => value.includes("[");
 
 /**
- * The Romanian consumer authority's (ANPC) alternative dispute resolution service. The EU online
- * dispute resolution platform closed on 20 July 2025 and is deliberately not linked.
+ * The alternative dispute resolution route Terms section 18 and Annex A.1 name (owner's worksheet,
+ * 9 October 2026). The EU online dispute resolution platform closed on 20 July 2025 and is
+ * deliberately not linked.
  */
-export const ANPC_ADR_URL = "https://reclamatiisal.anpc.ro";
+export const ADR_URL = "https://www.onoratainstanta.ro";
 
 /**
  * One stored item /cookies and the storage card list: its name as the code writes it, and the
@@ -322,11 +323,13 @@ export type TermsVersion = Readonly<{
 }>;
 
 /**
- * Every published version of the terms, newest first. The earlier row links to the exact text
- * that was current before the 2.1 revision.
+ * Every published version of the terms, newest first. Each earlier row links to the exact text
+ * that was current before the next revision.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.1", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.2", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.1", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/34bab40dea5ccdcaba5dc167106e8b6d9bdc08c676f82a2c84e68fd9809c8b0c" },
   { version: "2.0", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/0d1bc079eb2d5b054c1cfc7c0430f234ca5391bd6e6824ecc8958a294f6eaa0e" }
 ]);

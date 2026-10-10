@@ -19,12 +19,13 @@ import {
   type Argon2Executor,
   type UserDekStore
 } from "@debateai/crypto";
-import { AGE_RULE_VERSION, MIN_AGE, isDeclaredRegion, type DeclaredRegion } from "@debateai/kernel";
+import { AGE_RULE_VERSION, MIN_AGE, isDeclaredRegion, isMailAddress, type DeclaredRegion } from "@debateai/kernel";
 import type { RegisterLegalDocuments } from "@debateai/contract";
 import { LocaleCodeSchema } from "@debateai/contract/locale";
 import { resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } from "./legal.js";
 import { normalizeManualPhone } from "./phone-profile.js";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";
+import { mailDomainRefused, type MailDomainCheck } from "./mail-domain-check.js";
 
 export const REGISTRATION_PUBLIC_RESPONSE = Object.freeze({
   message: "If this address can be registered, verification instructions will arrive. Check your spam folder."
@@ -38,7 +39,11 @@ export interface RegisterInput {
   readonly email: string;
   readonly password: string;
   readonly recoveryEmail?: string | null;
-  readonly phone: string;
+  /**
+   * Optional (owner ruling 2026-10-09): absent, null or blank stores no phone; any other value must
+   * parse. Blank is "none" because the byte-pinned S04 register mount hands "" when no phone was sent.
+   */
+  readonly phone?: string | null;
   /**
    * True only when the API's age gate found a date of birth of at least MIN_AGE; the
    * date itself never reaches this service. Registration records that result.
@@ -142,15 +147,18 @@ export class AuthFlowError extends Error {
     | "MFA_TOTP_REPLAYED"
     | "MFA_RECOVERY_CONFIRMATION_INVALID"
     | "MFA_RATE_LIMITED"
-    | "LEGAL_DOCUMENT_STALE",
+    | "LEGAL_DOCUMENT_STALE"
+    /** Open sign-up mail (2026-10-09): the one address rule, or a domain that takes no mail. Same code as email change. */
+    | "EMAIL_INVALID",
     options?: ErrorOptions
   ) {
     super(code, options);
     this.name = "AuthFlowError";
   }
 
-  get statusCode(): 400 | 401 | 409 | 429 | 503 {
+  get statusCode(): 400 | 401 | 409 | 422 | 429 | 503 {
     return this.code === "AUTH_CREDENTIALS_INVALID" ? 401
+      : this.code === "EMAIL_INVALID" ? 422
       : this.code === "AUTH_RATE_LIMITED" || this.code === "MFA_RATE_LIMITED" ? 429
       : this.code === "MFA_FIRST_STEP_UNAVAILABLE" || this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED"
         || this.code === "LEGAL_DOCUMENT_STALE" ? 409
@@ -481,15 +489,18 @@ type IdentityRepository = Pick<PostgresIdentityRepository,
   | "recordRateLimitRefusal"
 >;
 
+/**
+ * The one shared address rule (packages/kernel/src/mail-address.ts), the same one every mail sender asks just
+ * before the sendmail hand-off: an account can never hold an address its own verification mail would refuse.
+ */
 function validEmail(value: unknown): value is string {
-  return typeof value === "string" && value.length <= 320 && !value.startsWith("-")
-    && /^[^\s@]+@[^\s@]+$/.test(value);
+  return isMailAddress(value);
 }
 
 interface PendingRegistration {
   readonly email: string;
   readonly recoveryEmail: string | null;
-  readonly phone: string;
+  readonly phone: string | null;
   readonly emailBlindIndex: Buffer;
   readonly passwordHash: string | null;
   readonly social?: SocialSignupAuthority;
@@ -682,8 +693,10 @@ export class RegistrationService implements RegistrationApplication {
 
   private validateRegistration(input: RegisterInput | SocialRegisterInput, rawSource: RegistrationSource, social = false) {
     const maximumPasswordLength = this.dependencies.policy.password.maximumLength;
-    if (!validEmail(input.email) || ("recoveryEmail" in input && input.recoveryEmail != null && !validEmail(input.recoveryEmail))
-      || (!social && (!("password" in input) || typeof input.password !== "string"
+    if (!validEmail(input.email) || ("recoveryEmail" in input && input.recoveryEmail != null && !validEmail(input.recoveryEmail))) {
+      throw new AuthFlowError("EMAIL_INVALID");
+    }
+    if ((!social && (!("password" in input) || typeof input.password !== "string"
       || input.password.length < this.dependencies.policy.password.minimumLength
       // V-14: the ruled maximum, in the same unit as the minimum. The route
       // keeps its own 1024-byte request-shape bound ahead of this; a
@@ -692,9 +705,13 @@ export class RegistrationService implements RegistrationApplication {
       || input.adultAffirmed !== true) {
       throw new AuthFlowError("AUTH_INPUT_INVALID");
     }
-    let phone: string;
-    try { phone = normalizeManualPhone(input.phone); }
-    catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+    let phone: string | null = null;
+    if (typeof input.phone === "string" && input.phone.trim() !== "") {
+      try { phone = normalizeManualPhone(input.phone); }
+      catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+    } else if (input.phone !== undefined && input.phone !== null && typeof input.phone !== "string") {
+      throw new AuthFlowError("AUTH_INPUT_INVALID");
+    }
     // Age gate (R3-3): the source's country — the edge's, else the country gate's lookup — is
     // recorded with the result, never decisive.
     const countryCode = typeof rawSource.countryCode === "string" && /^[A-Z]{2}$/.test(rawSource.countryCode)
@@ -725,7 +742,7 @@ export class RegistrationService implements RegistrationApplication {
         // The existing 103-registration slot spans proof, provisioning, clamp and handoff: no async stage before it.
         releaseStructural = this.acquireRegistrationAdmission(randomUUID());
       } else {
-        if (!validEmail(input.email)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+        if (!validEmail(input.email)) throw new AuthFlowError("EMAIL_INVALID");
         source = sourceContext(rawSource);
       }
       const now = this.clock();
@@ -787,6 +804,13 @@ export class RegistrationService implements RegistrationApplication {
      * that predates the acceptance record and registers exactly as before.
      */
     readonly legalAcceptance?: Readonly<{ recordsKey: Buffer }>;
+    /**
+     * Open sign-up mail (owner decision G5, 2026-10-09): "does this domain take mail at all?", asked once per
+     * password sign-up after the limiter has charged the request, so it can never be used to make this server
+     * query DNS for free. UNDELIVERABLE refuses with EMAIL_INVALID; a timeout or resolver failure lets the address
+     * through (fail open). Absent, no DNS question is asked (tests, and compositions that predate it).
+     */
+    readonly mailDomainCheck?: MailDomainCheck;
   }) {
     this.clock = dependencies.clock ?? (() => new Date());
     this.sleep = dependencies.sleep ?? (async (milliseconds) => {
@@ -1492,7 +1516,7 @@ export class RegistrationService implements RegistrationApplication {
       const dek = generateDek();
       const emailPlaintext = Buffer.from(input.email, "utf8");
       const recoveryPlaintext = input.recoveryEmail === null ? null : Buffer.from(input.recoveryEmail, "utf8");
-      const phonePlaintext = Buffer.from(input.phone, "utf8");
+      const phonePlaintext = input.phone === null ? null : Buffer.from(input.phone, "utf8");
       try {
         const keyId = `user-dek:${userId}`;
         const emailCiphertext = encrypt(dek, emailPlaintext, [
@@ -1501,7 +1525,8 @@ export class RegistrationService implements RegistrationApplication {
         const recoveryEmailCiphertext = recoveryPlaintext === null ? null : encrypt(dek, recoveryPlaintext, [
           "identity", "user.recovery_email_ciphertext", userId, "run:none", userId, keyId, "1"
         ]);
-        const phoneCiphertext = encrypt(dek, phonePlaintext, [
+        // No phone given: no ciphertext, source, status or time is stored (the profile stays empty).
+        const phoneCiphertext = phonePlaintext === null ? null : encrypt(dek, phonePlaintext, [
           "identity", "user.phone_ciphertext", userId, "run:none", userId, keyId, "1"
         ]);
         const acceptances = input.documents === null || this.dependencies.legalAcceptance === undefined
@@ -1517,9 +1542,9 @@ export class RegistrationService implements RegistrationApplication {
           emailCiphertext,
           recoveryEmailCiphertext,
           phoneCiphertext,
-          phoneSource: "manual" as const,
-          phoneVerificationStatus: "unverified" as const,
-          phoneUpdatedAt: input.requestedAt,
+          phoneSource: phoneCiphertext === null ? null : "manual" as const,
+          phoneVerificationStatus: phoneCiphertext === null ? null : "unverified" as const,
+          phoneUpdatedAt: phoneCiphertext === null ? null : input.requestedAt,
           passwordHash: input.passwordHash,
           pseudonym,
           adultAffirmedAt: input.requestedAt,
@@ -1563,7 +1588,7 @@ export class RegistrationService implements RegistrationApplication {
       } finally {
         emailPlaintext.fill(0);
         recoveryPlaintext?.fill(0);
-        phonePlaintext.fill(0);
+        phonePlaintext?.fill(0);
         dek.fill(0);
       }
     }
@@ -1674,6 +1699,14 @@ export class RegistrationService implements RegistrationApplication {
             source,
             persistAfter: clampResponse()
           });
+        }
+        // Open sign-up mail (G5): after the limiter, before any hashing or mail capacity. The answer depends on
+        // the domain alone, never on whether an account exists. A slow resolver (up to 2 s) lengthens this
+        // response beyond the clamp; that time says only how fast DNS answered for the domain, nothing about accounts.
+        if (social === undefined) {
+          for (const address of recoveryEmail === null ? [email] : [email, recoveryEmail]) {
+            if (await mailDomainRefused(this.dependencies.mailDomainCheck, address)) throw new AuthFlowError("EMAIL_INVALID");
+          }
         }
 
         let passwordHash: string | null = null;
@@ -1861,7 +1894,7 @@ export class RegistrationService implements RegistrationApplication {
     let releaseMailDispatch: MailDispatchRelease | undefined;
     const granted = admission === undefined ? undefined : this.takeSourceAdmission(admission);
     try {
-      if (!validEmail(input.email)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+      if (!validEmail(input.email)) throw new AuthFlowError("EMAIL_INVALID");
       const source = sourceContext(rawSource);
       if (admission !== undefined) this.assertSourceAdmission("resend", source, granted);
       const email = normalizeEmailForBlindIndex(input.email);

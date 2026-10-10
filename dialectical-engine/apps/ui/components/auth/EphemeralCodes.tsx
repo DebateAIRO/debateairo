@@ -1,11 +1,10 @@
 "use client";
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
-/** Codes are owned by the mounted caller only. Saving is optional; no type-back or storage. */
-export function EphemeralCodes({ codes, catalog, kind = 'replacement' }: {
+/** A freshly generated set of recovery codes, owned by the mounted caller only. Saving is optional; no type-back or
+ * storage. Since 2026-10-09 a used code is never refilled, so there is no single "replacement" code to show any more. */
+export function EphemeralCodes({ codes, catalog }: {
     codes: readonly string[];
     catalog: MessageCatalog;
-    /** 'new': a freshly generated set (Settings). 'replacement': the one code that replaced a used one. */
-    kind?: 'new' | 'replacement';
 }) {
     const content = codes.join('\n');
     function download() {
@@ -16,5 +15,5 @@ export function EphemeralCodes({ codes, catalog, kind = 'replacement' }: {
         link.click();
         URL.revokeObjectURL(url);
     }
-    return <aside className="authCodes"><p>{kind === 'new' ? t(catalog, "auth.codes.newNotice") : t(catalog, "auth.login.replacementCodeNotice")}</p><pre className="authRecoveryCode">{content}</pre><div className="authCodesActions"><button type="button" className="authSecondary" onClick={() => void navigator.clipboard.writeText(content)}>{t(catalog, "auth.codes.copy")}</button><button type="button" className="authSecondary" onClick={download}>{t(catalog, "auth.codes.download")}</button></div></aside>;
+    return <aside className="authCodes"><p>{t(catalog, "auth.codes.newNotice")}</p><pre className="authRecoveryCode">{content}</pre><div className="authCodesActions"><button type="button" className="authSecondary" onClick={() => void navigator.clipboard.writeText(content)}>{t(catalog, "auth.codes.copy")}</button><button type="button" className="authSecondary" onClick={download}>{t(catalog, "auth.codes.download")}</button></div></aside>;
 }

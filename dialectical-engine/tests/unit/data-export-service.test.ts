@@ -73,7 +73,7 @@ afterEach(async () => {
 
 describe("data export application", () => {
   it("R27 orders visibility history by event sequence regardless of insertion order", async () => {
-    const sql = await readFile("migrations/0112_data_export.sql", "utf8");
+    const sql = await readFile("migrations/0113_data_export.sql", "utf8");
     const line = sql.split("\n").find((part) => part.includes("'visibility_events',COALESCE"))!;
     const aggregate = line.match(/COALESCE\(\(SELECT .*\),'\[\]'::jsonb\)/)?.[0]!;
     const run = "11111111-1111-4111-8111-111111111111", owner = "22222222-2222-4222-8222-222222222222";
@@ -98,7 +98,7 @@ describe("data export application", () => {
   });
 
   it("R22 every snapshot JSON list aggregate declares its sequence order", async () => {
-    const sql = await readFile("migrations/0112_data_export.sql", "utf8");
+    const sql = await readFile("migrations/0113_data_export.sql", "utf8");
     const functionSql = sql.split("CREATE OR REPLACE FUNCTION identity.read_data_export_snapshot(")[1]!.split("CREATE OR REPLACE FUNCTION identity.complete_data_export(")[0]!;
     const starts = [...functionSql.matchAll(/jsonb_agg\(/g)].map((match) => match.index! + match[0].length);
     expect(starts).toHaveLength(38);

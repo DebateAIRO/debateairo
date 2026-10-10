@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.1 · ÚČINNÉ OD [DATE]
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.2 · ÚČINNÉ OD 12. OKTÓBRA 2026
 title: S čím súhlasíte
-lede: Zmluva medzi vami a DebateAIRO S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.1
+lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
+endMarker: KONIEC PODMIENOK · v2.2
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,39 +21,40 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.1 · Effective \[date\] · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.2 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
-**In short.** Musíte mať aspoň 18 rokov. DebateAI vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. Vaše debaty sú súkromné, pokiaľ ich nezverejníte; ak ich zverejníte, môže ich čítať ktokoľvek. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na \[abuse@dezbatere.ro\] bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
+**In short.** Musíte mať aspoň 18 rokov. DebateAI vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. Vaše debaty sú súkromné, pokiaľ ich nezverejníte; ak ich zverejníte, môže ich čítať ktokoľvek. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
 ## 1. Kto sme a ako nás kontaktovať
 
-Službu DebateAI prevádzkuje **DebateAIRO S.R.L.**, spoločnosť registrovaná v Rumunsku.
+Službu DebateAI prevádzkuje **DMS Merchandise Shop S.R.L.**, spoločnosť registrovaná v Rumunsku.
 
 |  |  |
 | --- | --- |
-| Sídlo | \[street, number, sector, postal code\], Bukurešť, Rumunsko |
-| Číslo v obchodnom registri | \[J40/…/…\] |
-| Jednotné registračné číslo (CUI) | \[…\] · DPH: \[RO… / not VAT-registered\] |
-| Základné imanie | \[RON …\] |
-| Všeobecný kontakt | \[hello@dezbatere.ro\] |
-| Právne oznámenia | \[legal@dezbatere.ro\] |
+| Sídlo | Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumunsko |
+| Číslo v obchodnom registri | J2022000426271 |
+| Jednotné registračné číslo (CUI) | 45935221 · DPH: RO45935221 |
+| Základné imanie | 5 000 RON |
+| Všeobecný kontakt | support@dezbatere.ro |
+| Telefón | +40 748 793 490 |
+| Právne oznámenia | support@dezbatere.ro |
 | Súkromie a ochrana osobných údajov | privacy@dezbatere.ro |
-| Hlásenie nezákonného obsahu | \[abuse@dezbatere.ro\] — pozri časť 10 |
-| Kontaktné miesto pre orgány verejnej moci | \[dsa@dezbatere.ro\] — rumunčina a angličtina |
-| Príkazy na odstránenie teroristického obsahu (nariadenie (EÚ) 2021/784) | \[dsa@dezbatere.ro\] — naše kontaktné miesto pre tieto príkazy; rumunčina a angličtina; pozri časť 10 |
+| Hlásenie nezákonného obsahu | support@dezbatere.ro — pozri časť 10 |
+| Kontaktné miesto pre orgány verejnej moci | office@dezbatere.ro — rumunčina a angličtina |
+| Príkazy na odstránenie teroristického obsahu (nariadenie (EÚ) 2021/784) | office@dezbatere.ro — naše kontaktné miesto pre tieto príkazy; rumunčina a angličtina; pozri časť 10 |
 | Zástupcovia v iných krajinách | Uvedení v prílohe A pre regióny, v ktorých sme zástupcu vymenovali |
 
-Tieto údaje sú tiež trvalo uvedené na webovej lokalite \[dezbatere.ro/legal\]. Vždy môžete kontaktovať človeka, nielen nášho asistenta; postup vysvetľuje časť 10.
+Tieto údaje sú tiež trvalo uvedené na webovej lokalite dezbatere.ro/legal. Vždy môžete kontaktovať človeka, nielen nášho asistenta; postup vysvetľuje časť 10.
 
 ## 2. Kde službu DebateAI ponúkame
 
-Službu DebateAI ponúkame osobám, ktoré žijú v **\[the European Union and the European Economic Area\]** \[and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan\]. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme.
+Službu DebateAI ponúkame osobám, ktoré žijú v týchto krajinách a regiónoch: Európska únia (27 krajín) a Európsky hospodársky priestor (Nórsko, Island a Lichtenštajnsko), Švajčiarsko, Moldavsko, Spojené štáty (okrem Tennessee), Kanada, Austrália, Nový Zéland, Singapur, Japonsko, Južná Kórea a Taiwan. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme.
 
 ## 3. Prijatie týchto Podmienok
 
-Tieto Podmienky prijímate začiarknutím políčka **„Prečítal(-a) som si a súhlasím s Podmienkami poskytovania služby.“** a kliknutím na **Vytvoriť účet**. Tým medzi vami a DebateAIRO S.R.L. vzniká zmluva. Podmienky zahŕňajú pravidlá prijateľného používania v časti 7, pravidlá zverejňovania v časti 9, ustanovenia o zodpovednosti v časti 15, ustanovenia o rozhodnom práve a riešení sporov v časti 18 a, ak žijete v Spojených štátoch, rozhodcovskú zmluvu v prílohe A.3. V súlade s našimi Zásadami ochrany osobných údajov uchovávame záznam o tom, ktorú verziu ste prijali a kedy.
+Tieto Podmienky prijímate začiarknutím políčka **„Prečítal(-a) som si a súhlasím s Podmienkami poskytovania služby.“** a kliknutím na **Vytvoriť účet**. Tým medzi vami a DMS Merchandise Shop S.R.L. vzniká zmluva. Podmienky zahŕňajú pravidlá prijateľného používania v časti 7, pravidlá zverejňovania v časti 9, ustanovenia o zodpovednosti v časti 15 a ustanovenia o rozhodnom práve a riešení sporov v časti 18. V súlade s našimi Zásadami ochrany osobných údajov uchovávame záznam o tom, ktorú verziu ste prijali a kedy.
 
-Naše **Zásady ochrany osobných údajov** na adrese \[dezbatere.ro/privacy\] vysvetľujú, ako nakladáme s osobnými údajmi. Ide o informácie, ktoré sme povinní vám poskytnúť, nie o zmluvu, s ktorou súhlasíte, a nič v týchto Podmienkach z nich nerobí súhlas so spracúvaním. Naše **Zásady používania súborov cookie** na adrese \[dezbatere.ro/cookies\] a náš **Register poskytovateľov umelej inteligencie** na adrese \[dezbatere.ro/providers\] sú do týchto Podmienok začlenené odkazom.
+Naše **Zásady ochrany osobných údajov** na adrese dezbatere.ro/privacy vysvetľujú, ako nakladáme s osobnými údajmi. Ide o informácie, ktoré sme povinní vám poskytnúť, nie o zmluvu, s ktorou súhlasíte, a nič v týchto Podmienkach z nich nerobí súhlas so spracúvaním. Naše **Zásady používania súborov cookie** na adrese dezbatere.ro/cookies a náš **Register poskytovateľov umelej inteligencie** na adrese dezbatere.ro/providers sú do týchto Podmienok začlenené odkazom.
 
 Predtým, ako s nami elektronicky uzavriete zmluvu, vám rozhranie zobrazí jednotlivé kroky, umožní vám pred odoslaním skontrolovať a opraviť zadané údaje a oznámi vám jazyky, v ktorých možno zmluvu uzavrieť. Tieto Podmienky sú dostupné vo forme, ktorú môžete uložiť a vytlačiť. Pri kúpe plateného programu vám prijatú verziu zašleme e-mailom. O jej kópiu môžete požiadať kedykoľvek. Nič v týchto Podmienkach neobmedzuje práva, ktoré máte podľa rumunského spotrebiteľského práva či spotrebiteľského práva Európskej únie alebo práva krajiny, v ktorej žijete, ak ich nemožno zmluvne obmedziť.
 
@@ -119,7 +120,7 @@ Ak si nie ste istí, či je niečo dovolené, opýtajte sa nás pred zverejnení
 
 **Čo posiela chat podpory.** Asistent podpory je tiež model umelej inteligencie. Keď mu napíšete, pošleme vašu správu externému poskytovateľovi modelov, aby model mohol odpovedať, spolu s článkami pomocníka, na ktorých zakladá svoju odpoveď. Pred odoslaním zamaskujeme všetko, čo vyzerá ako heslo, jednorazový kód alebo kľúč. Ak požiadate o rozhovor s človekom, pošleme modelu aj konverzáciu, zamaskovanú rovnakým spôsobom, aby napísal krátke zhrnutie pre člena nášho tímu, ktorý váš prípad prevezme. Neprikladáme vašu e-mailovú adresu, identifikátory účtu ani platobné údaje, model však dostane všetko ostatné, čo do chatu napíšete, preto tam nepíšte nič, čo by ste nechceli, aby si prečítal.
 
-**Ktorí poskytovatelia a kde.** Náš **Register poskytovateľov umelej inteligencie** na adrese \[dezbatere.ro/providers\] je súčasťou týchto Podmienok. Uvádza každého poskytovateľa, ktorého môžeme použiť: jeho právnickú osobu a krajinu; čo prijíma a prečo; kde údaje spracúva; jeho podmienky uchovávania; či je pre koncový bod, ktorý používame, aktívne nulové uchovávanie údajov; či smie podľa našej zmluvy používať vstupy na trénovanie; mechanizmus prenosu, o ktorý sa opierame; a dátum posledného overenia každej položky. Poskytovatelia sa môžu nachádzať mimo vašej krajiny a mimo Európskeho hospodárskeho priestoru. Naše Zásady ochrany osobných údajov vysvetľujú príslušné záruky.
+**Ktorí poskytovatelia a kde.** Náš **Register poskytovateľov umelej inteligencie** na adrese dezbatere.ro/providers je súčasťou týchto Podmienok. Uvádza každého poskytovateľa, ktorého môžeme použiť: jeho právnickú osobu a krajinu; čo prijíma a prečo; kde údaje spracúva; jeho podmienky uchovávania; či je pre koncový bod, ktorý používame, aktívne nulové uchovávanie údajov; či smie podľa našej zmluvy používať vstupy na trénovanie; mechanizmus prenosu, o ktorý sa opierame; a dátum posledného overenia každej položky. Poskytovatelia sa môžu nachádzať mimo vašej krajiny a mimo Európskeho hospodárskeho priestoru. Naše Zásady ochrany osobných údajov vysvetľujú príslušné záruky.
 
 **Tri rozdielne veci.** „Nepoužíva sa na trénovanie modelov“, „uchováva sa obmedzený čas z bezpečnostných dôvodov, na účely predchádzania zneužitiu alebo z právnych dôvodov“ a „nulové uchovávanie údajov — po spracovaní sa neukladajú“ sú rozdielne skutočnosti. Ak poskytovateľ uchováva zadania obmedzený čas, Register uvádza, ako dlho a prečo. Ak je aktívne nulové uchovávanie údajov, Register túto skutočnosť uvádza spolu s funkciami, na ktoré sa vzťahuje. Nebudeme tvrdiť, že obsah nie je uchovávaný, ak to nie je pravda.
 
@@ -143,7 +144,7 @@ Debaty sú **v predvolenom nastavení súkromné**. Nič z toho, čo vytvoríte,
 
 ## 10. Hlásenie obsahu, moderovanie a sťažnosti
 
-**Obsah môže nahlásiť ktokoľvek.** Účet nepotrebujete. Napíšte na \[abuse@dezbatere.ro\] alebo použite ovládací prvok **Nahlásiť** pri ktorejkoľvek zverejnenej debate. Aby sme mohli konať, oznámte nám: prečo sa domnievate, že je obsah nezákonný alebo porušuje tieto Podmienky, a to dostatočne podrobne, aby sme tvrdenie pochopili; presné umiestnenie — úplnú adresu URL a podľa možnosti príslušnú pasáž; svoje meno a e-mailovú adresu (nevyžaduje sa pri hlásení materiálu zobrazujúceho sexuálne zneužívanie detí); a vyhlásenie, že sa v dobrej viere domnievate, že je vaše hlásenie presné a úplné.
+**Obsah môže nahlásiť ktokoľvek.** Účet nepotrebujete. Napíšte na support@dezbatere.ro alebo použite ovládací prvok **Nahlásiť** pri ktorejkoľvek zverejnenej debate. Aby sme mohli konať, oznámte nám: prečo sa domnievate, že je obsah nezákonný alebo porušuje tieto Podmienky, a to dostatočne podrobne, aby sme tvrdenie pochopili; presné umiestnenie — úplnú adresu URL a podľa možnosti príslušnú pasáž; svoje meno a e-mailovú adresu (nevyžaduje sa pri hlásení materiálu zobrazujúceho sexuálne zneužívanie detí); a vyhlásenie, že sa v dobrej viere domnievate, že je vaše hlásenie presné a úplné.
 
 Každé hlásenie potvrdíme bez zbytočného odkladu. Hlásenia vybavujeme včas, starostlivo, objektívne a bez svojvôle, oznámime vám svoje rozhodnutie a spôsob, ako ho napadnúť. Ak na vybavenie hlásenia alebo rozhodnutie o ňom použijeme automatizované prostriedky, informujeme vás o tom. Hlásenia intímnych snímok zdieľaných bez súhlasu vybavíme **do 48 hodín** od platnej žiadosti.
 
@@ -154,7 +155,7 @@ Každé hlásenie potvrdíme bez zbytočného odkladu. Hlásenia vybavujeme vča
 
 **Odôvodnenie.** Vždy, keď odstránime váš obsah alebo obmedzíme jeho viditeľnosť či pozastavíme alebo odstránime váš účet, poskytneme vám odôvodnenie: čo sme urobili a v akom rozsahu, z akých skutočností sme vychádzali a či pochádzali z hlásenia alebo z našich vlastných kontrol, či boli použité automatizované prostriedky, aký bol právny alebo zmluvný dôvod a ako môžete rozhodnutie napadnúť: prostredníctvom nášho postupu vybavovania sťažností nižšie, prostredníctvom orgánu mimosúdneho riešenia sporov certifikovaného podľa aktu EÚ o digitálnych službách alebo na súde.
 
-**Sťažnosť proti rozhodnutiu.** Ak nesúhlasíte s moderátorským rozhodnutím, odpovedzte na odôvodnenie alebo napíšte na \[appeals@dezbatere.ro\] do **šiestich mesiacov**. Rozhodnutie preskúma osoba, ktorá sa na pôvodnom rozhodnutí nepodieľala, a výsledok vám oznámime s odôvodnením. Tým nie je dotknuté vaše právo obrátiť sa na súd alebo využiť alternatívne riešenie sporov podľa časti 18. Postup vybavovania sťažností prijíma aj sťažnosti na to, že sme hlásenie nevybavili, že bol obsah odstránený nesprávne, že bol účet nesprávne obmedzený alebo že automatizovaný nástroj nesprávne ovplyvnil váš obsah.
+**Sťažnosť proti rozhodnutiu.** Ak nesúhlasíte s moderátorským rozhodnutím, odpovedzte na odôvodnenie alebo napíšte na office@dezbatere.ro do **šiestich mesiacov**. Rozhodnutie preskúma osoba, ktorá sa na pôvodnom rozhodnutí nepodieľala, a výsledok vám oznámime s odôvodnením. Tým nie je dotknuté vaše právo obrátiť sa na súd alebo využiť alternatívne riešenie sporov podľa časti 18. Postup vybavovania sťažností prijíma aj sťažnosti na to, že sme hlásenie nevybavili, že bol obsah odstránený nesprávne, že bol účet nesprávne obmedzený alebo že automatizovaný nástroj nesprávne ovplyvnil váš obsah.
 
 **Mimosúdne riešenie sporov.** Ak sa nachádzate v Európskej únii, spor týkajúci sa niektorého z našich moderátorských rozhodnutí môžete predložiť orgánu mimosúdneho riešenia sporov certifikovanému podľa článku 21 aktu EÚ o digitálnych službách (nariadenie (EÚ) 2022/2065). Vzťahuje sa to na rozhodnutie o vašom obsahu alebo vašom účte, ako aj na naše rozhodnutie o hlásení, ktoré ste podali. Orgán si vyberiete zo zoznamu, ktorý zverejňuje Európska komisia na adrese digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, a nemusíte najprv využiť náš postup vybavovania sťažností. Na riešení sporu sa zúčastňujeme v dobrej viere a účasť odmietneme iba vtedy, ak sa už vyriešil ten istý spor týkajúci sa toho istého obsahu a založený na rovnakých dôvodoch. Rozhodnutie orgánu nie je záväzné pre žiadnu zo strán a právo obrátiť sa na súd vám zostáva zachované. Orgán vám môže účtovať nízky poplatok alebo žiadny. Ak rozhodne vo váš prospech, uhradíme jeho poplatky a nahradíme vaše primerané výdavky; ak rozhodne v náš prospech, neplatíte naše poplatky ani výdavky, pokiaľ orgán nezistí, že ste konali zjavne v zlej viere.
 
@@ -168,7 +169,7 @@ Každé hlásenie potvrdíme bez zbytočného odkladu. Hlásenia vybavujeme vča
 
 **Z vašej strany.** Svoj účet môžete kedykoľvek odstrániť v Nastaveniach, ako opisuje časť 6. Nemusíte uvádzať dôvod. Odstránením účtu tieto Podmienky zanikajú. Zanikajú vo chvíli, keď odstránenie nadobudne účinnosť, po uplynutí sedemdňovej ochrannej lehoty; časti uvedené na konci tejto časti zostávajú v platnosti aj potom.
 
-**Z našej strany.** Váš účet môžeme pozastaviť alebo odstrániť či váš obsah odstrániť alebo obmedziť, ak: podstatne porušíte tieto Podmienky, najmä časť 7; je váš obsah nezákonný alebo nám zákon, súd či orgán ukladá konať; vaše používanie ohrozuje bezpečnosť, integritu alebo dostupnosť služby či práva iných osôb; váš účet nebol aktívny počas \[24 months\] a upozornili sme vás; alebo prestaneme službu poskytovať či ju prestaneme poskytovať vo vašej krajine.
+**Z našej strany.** Váš účet môžeme pozastaviť alebo odstrániť či váš obsah odstrániť alebo obmedziť, ak: podstatne porušíte tieto Podmienky, najmä časť 7; je váš obsah nezákonný alebo nám zákon, súd či orgán ukladá konať; vaše používanie ohrozuje bezpečnosť, integritu alebo dostupnosť služby či práva iných osôb; váš účet nebol aktívny počas 24 mesiacov a upozornili sme vás; alebo prestaneme službu poskytovať či ju prestaneme poskytovať vo vašej krajine.
 
 S výnimkou prípadov, keď je porušenie závažné, zákon vyžaduje okamžité konanie alebo by omeškanie spôsobilo ujmu, vám oznámime, v čom problém spočíva, a pred pozastavením alebo odstránením účtu vám poskytneme primeranú príležitosť na nápravu. Vždy poskytneme odôvodnenie podľa časti 10 a rozhodnutie môžete napadnúť.
 
@@ -182,19 +183,19 @@ Ak službu úplne ukončíme alebo ju prestaneme poskytovať vo vašej krajine, 
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI ponúka bezplatný program. Platený program **Premium** \[is / will be\] k dispozícii, sprístupňuje úplný výber modelov a umožňuje vám samostatne nastavovať parametre debaty.
+DebateAI ponúka bezplatný program. Bude k dispozícii platený program **Premium**, ktorý sprístupní úplný výber modelov a umožní vám samostatne nastavovať parametre debaty.
 
 **Pred zaplatením** vám priamo nad platobným tlačidlom zobrazíme: program; celkovú cenu vrátane príslušnej dane; fakturačné obdobie; skutočnosť, že sa program automaticky obnovuje až do zrušenia; dátum skončenia prípadného bezplatného skúšobného obdobia a sumu, ktorá vám potom bude účtovaná; a spôsob zrušenia. Podmienky obnovenia potvrdíte začiarknutím samostatného políčka. Tlačidlo je označené slovami **Predplatiť a zaplatiť** (v rumunčine *Comandă cu obligație de plată*). Na trvanlivom médiu vám zašleme potvrdenie obsahujúce rovnaké informácie, tieto Podmienky a formulár na odstúpenie.
 
-**Pripomenutia.** E-mail vám zašleme najmenej \[5\] dní pred prechodom bezplatného skúšobného obdobia na platený program; najmenej raz ročne pri pokračujúcich programoch; a 30 až 45 dní pred obnovením akéhokoľvek obdobia v dĺžke dvanástich mesiacov alebo viac. Každé pripomenutie obsahuje cenu, dátum a odkaz na zrušenie.
+**Pripomenutia.** E-mail vám zašleme najmenej 5 dní pred prechodom bezplatného skúšobného obdobia na platený program; najmenej raz ročne pri pokračujúcich programoch; a 30 až 45 dní pred obnovením akéhokoľvek obdobia v dĺžke dvanástich mesiacov alebo viac. Každé pripomenutie obsahuje cenu, dátum a odkaz na zrušenie.
 
-**Zrušenie.** Program môžete kedykoľvek zrušiť v ponuke **Nastavenia → Predplatné** jedným potvrdzovacím kliknutím alebo prostredníctvom stránky na zrušenie na adrese \[dezbatere.ro/cancel\], ktorá nevyžaduje prihlásenie. Zrušenie nadobúda účinnosť na konci aktuálneho fakturačného obdobia a dovtedy vám prístup zostáva. Zrušenie predplatného nebude náročnejšie než jeho uzavretie.
+**Zrušenie.** Program môžete kedykoľvek zrušiť v ponuke **Nastavenia → Predplatné** jedným potvrdzovacím kliknutím alebo prostredníctvom stránky na zrušenie na adrese dezbatere.ro/cancel, ktorá nevyžaduje prihlásenie. Zrušenie nadobúda účinnosť na konci aktuálneho fakturačného obdobia a dovtedy vám prístup zostáva. Zrušenie predplatného nebude náročnejšie než jeho uzavretie.
 
 **Zmeny cien** nadobúdajú účinnosť až pri obnovení. Najmenej **30 dní vopred** vás upozorníme e-mailom, ktorý obsahuje novú cenu a odkaz na zrušenie. Ak právo vašej krajiny vyžaduje váš výslovný súhlas so zmenou ceny, požiadame vás oň; inak sa v prípade vašej nečinnosti nová cena uplatní od nasledujúceho obnovenia. Regionálne pravidlá uvádza príloha A.
 
-**Neúspešné platby.** Ak platba zlyhá, budeme ju opakovať počas \[7\] dní a pred prevedením účtu na bezplatný program vás upozorníme e-mailom. Pre neúspešnú platbu vaše debaty nemažeme.
+**Neúspešné platby.** Ak platba zlyhá, budeme ju opakovať počas 7 dní a pred prevedením účtu na bezplatný program vás upozorníme e-mailom. Pre neúspešnú platbu vaše debaty nemažeme.
 
-**Dane a komu platíte.** Ceny \[include / exclude\] DPH, GST alebo daň z predaja v závislosti od miesta vášho bydliska, čo sa zobrazí pred zaplatením. \[If a merchant of record is used: Your purchase is processed by \[Paddle / …\], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.\]
+**Dane a komu platíte.** Ceny zahŕňajú DPH, GST alebo daň z predaja v závislosti od miesta vášho bydliska, čo sa zobrazí pred zaplatením. Platby kartou spracúva NETOPIA Payments (netopia-payments.com). Predávajúcim je DMS Merchandise Shop S.R.L., ktorá vystavuje vašu faktúru a zostáva zodpovedná za samotnú službu a za tieto Podmienky.
 
 **Spätné zúčtovanie.** Ak platbu napadnete u vydavateľa karty, môžeme platené funkcie počas riešenia sporu pozastaviť. Neúčtujeme za to žiadne poplatky.
 
@@ -202,7 +203,7 @@ DebateAI ponúka bezplatný program. Platený program **Premium** \[is / will be
 
 ## 13. Vaše právo na odstúpenie
 
-Ak žijete v EÚ, EHP alebo Spojenom kráľovstve, môžete od plateného predplatného odstúpiť do **14 dní** od jeho uzavretia bez uvedenia dôvodu. Použite stránku **Odstúpiť od zmluvy** na adrese \[dezbatere.ro/withdraw\], vzorový formulár v potvrdzovacom e-maile alebo napíšte na \[support@dezbatere.ro\]; prijatie potvrdíme na trvanlivom médiu.
+Ak žijete v EÚ alebo EHP, môžete od plateného predplatného odstúpiť do **14 dní** od jeho uzavretia bez uvedenia dôvodu. Použite stránku **Odstúpiť od zmluvy** na adrese dezbatere.ro/withdraw, vzorový formulár v potvrdzovacom e-maile alebo napíšte na support@dezbatere.ro; prijatie potvrdíme na trvanlivom médiu.
 
 Ak ste nás začiarknutím políčka pri nákupe požiadali, aby sme službu začali poskytovať ihneď, a následne odstúpite, zaplatíte časť služby poskytnutú do dňa odstúpenia, vypočítanú pomerne z ceny za fakturačné obdobie, a zvyšnú sumu vám vrátime. **Používaním služby počas 14 dní právo na odstúpenie nestrácate.**
 
@@ -214,7 +215,7 @@ Ak žijete inde, príloha A uvádza právo na odstúpenie alebo lehotu na rozmys
 
 O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má zmena viac než nepodstatný nepriaznivý vplyv na váš prístup k službe alebo jej používanie, môžete zmluvu bezplatne ukončiť do **30 dní** odo dňa, keď ste boli informovaní, alebo odo dňa nadobudnutia účinnosti zmeny, podľa toho, ktorý deň nastane neskôr, a vrátime vám prípadnú predplatenú sumu za nevyužité obdobie.
 
-**Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní DebateAI po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese \[dezbatere.ro/terms/versions\].
+**Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní DebateAI po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
 
 ## 15. Zodpovednosť
 
@@ -234,25 +235,23 @@ Samotná služba — softvér, systém, metóda hodnotenia, rozhranie, názvy De
 
 Zverejnené debaty môžete citovať a odkazovať na ne s uvedením DebateAI a odkazu na pôvodnú stránku. Hromadné kopírovanie, systematické rozmnožovanie verejného súboru debát a použitie zverejnených debát ako trénovacích údajov nie sú bez našej písomnej dohody dovolené.
 
-Časť 8 upravuje váš obsah a postavenie vygenerovaných výstupov. Ak sa domnievate, že niečo na DebateAI porušuje vaše práva duševného vlastníctva, použite postup hlásenia uvedený v časti 10. \[If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is \[name, address, email\], registered with the US Copyright Office; we terminate the accounts of repeat infringers.\]
+Časť 8 upravuje váš obsah a postavenie vygenerovaných výstupov. Ak sa domnievate, že niečo na DebateAI porušuje vaše práva duševného vlastníctva, použite postup hlásenia uvedený v časti 10.
 
 ## 17. Osobné údaje
 
-Spôsob, akým nakladáme s osobnými údajmi, stanovujú **Zásady ochrany osobných údajov** na adrese \[dezbatere.ro/privacy\]. Vysvetľujú, čo zhromažďujeme, právny základ každého účelu, dobu uchovávania, príjemcov údajov, súvisiace prenosy a spôsob uplatnenia vašich práv. Tri body patria aj sem. Časť 7 vás žiada, aby ste do otázky nevkladali osobné údaje iných osôb; ak tak urobíte, zodpovedáte za ne a my môžeme obsah odstrániť. Ak debata zverejnená na DebateAI obsahuje vaše osobné údaje, môžete nás požiadať o ich odstránenie bez toho, aby ste mali účet (časť 9). A uchovávame záznam o vašom prijatí týchto Podmienok — verziu, čas a technické údaje relácie — ako dôkaz zmluvy, ako vysvetľujú Zásady ochrany osobných údajov.
+Spôsob, akým nakladáme s osobnými údajmi, stanovujú **Zásady ochrany osobných údajov** na adrese dezbatere.ro/privacy. Vysvetľujú, čo zhromažďujeme, právny základ každého účelu, dobu uchovávania, príjemcov údajov, súvisiace prenosy a spôsob uplatnenia vašich práv. Tri body patria aj sem. Časť 7 vás žiada, aby ste do otázky nevkladali osobné údaje iných osôb; ak tak urobíte, zodpovedáte za ne a my môžeme obsah odstrániť. Ak debata zverejnená na DebateAI obsahuje vaše osobné údaje, môžete nás požiadať o ich odstránenie bez toho, aby ste mali účet (časť 9). A uchovávame záznam o vašom prijatí týchto Podmienok — verziu, čas a technické údaje relácie — ako dôkaz zmluvy, ako vysvetľujú Zásady ochrany osobných údajov.
 
 ## 18. Rozhodné právo a príslušnosť súdov
 
 **Rozhodné právo.** Tieto Podmienky a všetky spory alebo nároky vyplývajúce z nich alebo z ich predmetu vrátane mimozmluvných nárokov sa riadia rumunským právom.
 
-**Vaša miestna ochrana nie je dotknutá.** Ak ste spotrebiteľom, voľba rumunského práva vás nezbavuje ochrany podľa kogentných pravidiel ochrany spotrebiteľa krajiny vášho obvyklého pobytu — napríklad pravidiel týkajúcich sa nekalých podmienok, práva na odstúpenie a zrušenie alebo záruk — ak sa tieto pravidlá uplatňujú bez ohľadu na túto voľbu, a to vrátane článku 6 ods. 2 nariadenia (ES) č. 593/2008, ak žijete v EÚ, alebo rovnocenných pravidiel Spojeného kráľovstva. Popri rumunskom práve sa môžete dovolávať aj týchto pravidiel.
+**Vaša miestna ochrana nie je dotknutá.** Ak ste spotrebiteľom, voľba rumunského práva vás nezbavuje ochrany podľa kogentných pravidiel ochrany spotrebiteľa krajiny vášho obvyklého pobytu — napríklad pravidiel týkajúcich sa nekalých podmienok, práva na odstúpenie a zrušenie alebo záruk — ak sa tieto pravidlá uplatňujú bez ohľadu na túto voľbu, a to vrátane článku 6 ods. 2 nariadenia (ES) č. 593/2008, ak žijete v EÚ. Popri rumunskom práve sa môžete dovolávať aj týchto pravidiel.
 
-**Súdy, ak žijete v EÚ, EHP alebo Spojenom kráľovstve.** Konanie proti nám môžete začať buď na súdoch v Rumunsku, alebo na súdoch krajiny, v ktorej žijete. My môžeme začať konanie proti vám iba na súdoch krajiny, v ktorej žijete.
+**Súdy, ak žijete v EÚ alebo EHP.** Konanie proti nám môžete začať buď na súdoch v Rumunsku, alebo na súdoch krajiny, v ktorej žijete. My môžeme začať konanie proti vám iba na súdoch krajiny, v ktorej žijete.
 
-**Spotrebitelia inde.** Ak žijete mimo EÚ, EHP a Spojeného kráľovstva, nič v týchto Podmienkach neobmedzuje vaše právo podľa práva vašej krajiny podať žalobu na jej súdoch ani žiadne právo podľa tohto práva, ktorého sa nemožno vzdať — vrátane práv zo spotrebiteľských záruk, ak žijete v Austrálii alebo na Novom Zélande; práv podľa Código de Defesa do Consumidor, ak žijete v Brazílii; a práv podľa zákonov vášho štátu na ochranu spotrebiteľa, ak žijete v Spojených štátoch.
+**Spotrebitelia inde.** Ak žijete mimo EÚ a EHP, nič v týchto Podmienkach neobmedzuje vaše právo podľa práva vašej krajiny podať žalobu na jej súdoch ani žiadne právo podľa tohto práva, ktorého sa nemožno vzdať — vrátane práv zo spotrebiteľských záruk, ak žijete v Austrálii alebo na Novom Zélande; práv podľa Código de Defesa do Consumidor, ak žijete v Brazílii; a práv podľa zákonov vášho štátu na ochranu spotrebiteľa, ak žijete v Spojených štátoch.
 
-**Obyvatelia Spojených štátov.** Príloha A.3 obsahuje rozhodcovskú zmluvu a vzdanie sa práva na hromadnú žalobu, ktoré sa riadia Federal Arbitration Act. Vzťahuje sa iba na obyvateľov Spojených štátov a iba v rozsahu, v akom je vymáhateľná. Nevzťahuje sa na spotrebiteľov v EÚ, EHP ani Spojenom kráľovstve.
-
-**Pred podaním žaloby.** Kontaktujte nás na \[legal@dezbatere.ro\]; väčšinu vecí možno napraviť a snažíme sa odpovedať do \[5\] pracovných dní. Ak ste spotrebiteľom v Rumunsku alebo EÚ, môžete využiť alternatívne riešenie sporov prostredníctvom \[the ANPC – named SAL entity, website\]; k účasti na tomto postupe sa \[do / do not\] zaväzujeme. Sťažnosti na moderátorské rozhodnutia sa riadia časťou 10, čo je samostatný postup.
+**Pred podaním žaloby.** Kontaktujte nás na support@dezbatere.ro; väčšinu vecí možno napraviť a snažíme sa odpovedať do 5 pracovných dní. Ak ste spotrebiteľom v Rumunsku alebo EÚ, môžete využiť alternatívne riešenie sporov prostredníctvom www.onoratainstanta.ro; k účasti na tomto postupe sa nezaväzujeme. Sťažnosti na moderátorské rozhodnutia sa riadia časťou 10, čo je samostatný postup.
 
 ## 19. Ostatné ustanovenia
 
@@ -266,58 +265,40 @@ Spôsob, akým nakladáme s osobnými údajmi, stanovujú **Zásady ochrany osob
 
 **Jazyk.** Tieto Podmienky sú zverejnené v každom jazyku, ktorý stránka ponúka. Jazykom zmluvy je jazyk, v ktorom ste sa zaregistrovali: jazyk verzie, ktorú ste prijali a ktorý eviduje náš záznam o prijatí. Ak neskôr prijmete novú verziu v inom jazyku, zmluva pokračuje v tomto jazyku. Ostatné jazykové verzie sú preklady. Ak právo krajiny, v ktorej žijete, stanovuje, že má prednosť verzia v jej vlastnom jazyku, má prednosť táto verzia. Ak sa dve jazykové verzie líšia, uplatníme výklad, ktorý je pre vás výhodnejší.
 
-**Kontakt.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukurešť, Rumunsko.
+**Kontakt.** support@dezbatere.ro · DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumunsko.
 
 ## Annex A — Regionálne podmienky
 
-Každá položka sa uplatní iba vtedy, ak je jej región uvedený v časti 2, a stanovuje iba odchýlky od hlavnej časti. Ak je položka v rozpore s hlavnou časťou, na osoby v danom regióne sa uplatní táto položka.
+Každá položka sa uplatňuje na osoby, ktoré žijú v jej regióne, a stanovuje iba odchýlky od hlavnej časti. Ak je položka v rozpore s hlavnou časťou, na osoby v danom regióne sa uplatní táto položka.
 
 ### A.1 Európska únia a Európsky hospodársky priestor
 
-Hlavná časť týchto Podmienok je určená pre vás. Ďalej platí: konanie môžete začať na súdoch krajiny, v ktorej žijete; uplatní sa právo na odstúpenie podľa časti 13; alternatívne riešenie sporov je dostupné prostredníctvom \[the ANPC – named entity, website\]. **Nemecko:** tlačidlo na zrušenie na adrese \[dezbatere.ro/cancel\] vám umožňuje ukončiť predplatné bez prihlásenia; podmienky predplatného, obdobia obnovenia a výpovedné lehoty sú v súlade s § 309 bod 9 BGB \[state them\]. **Francúzsko:** predplatné môžete ukončiť online v troch krokoch na adrese \[URL\]; je vám k dispozícii \[the mediator named at URL\]. **Taliansko:** ustanovenia o zodpovednosti (15), pozastavení (11), zmenách (14) a rozhodnom práve (18) vyžadujú váš osobitný súhlas, ktorý udeľujete samostatným potvrdením pri registrácii. **Holandsko:** tieto Podmienky sa pred uzavretím poskytujú v podobe, ktorú možno uložiť. **Poľsko:** poľská verzia je na adrese \[URL\].
+Hlavná časť týchto Podmienok je určená pre vás. Ďalej platí: konanie môžete začať na súdoch krajiny, v ktorej žijete; uplatní sa právo na odstúpenie podľa časti 13; alternatívne riešenie sporov je dostupné prostredníctvom www.onoratainstanta.ro. **Nemecko:** tlačidlo na zrušenie na adrese dezbatere.ro/cancel vám umožňuje ukončiť predplatné bez prihlásenia; podmienky predplatného, obdobia obnovenia a výpovedné lehoty sú v súlade s § 309 bod 9 BGB \[state them\]. **Francúzsko:** predplatné môžete ukončiť online v troch krokoch na adrese \[URL\]. **Taliansko:** ustanovenia o zodpovednosti (15), pozastavení (11), zmenách (14) a rozhodnom práve (18) vyžadujú váš osobitný súhlas, ktorý udeľujete samostatným potvrdením pri registrácii. **Holandsko:** tieto Podmienky sa pred uzavretím poskytujú v podobe, ktorú možno uložiť. **Poľsko:** poľská verzia je na adrese \[URL\].
 
-### A.2 Spojené kráľovstvo *(iba ak je uvedené v časti 2)*
-
-Naším zástupcom v Spojenom kráľovstve podľa článku 27 UK GDPR je \[name, address, email\]. Vzťahuje sa na vás Consumer Rights Act 2015 a nič v týchto Podmienkach neobmedzuje vaše práva podľa neho; keď nadobudnú účinnosť pravidlá predplatného podľa Digital Markets, Competition and Consumers Act 2024 (očakáva sa to v roku 2027), uplatnia sa na platené programy vrátane lehoty na rozmyslenie po obnovení a po bezplatných skúšobných obdobiach. **Ako chránime používateľov pred nezákonným obsahom:** \[terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report\]. **Proaktívna technológia, ktorú používame:** \[describe, or "none"\]. **Overenie veku:** \[describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023\]. Postup vybavovania sťažností podľa časti 10 prijíma sťažnosti na nezákonný obsah, neoprávnené odstránenie vášho obsahu, obmedzenia vášho účtu, použitie automatizovaných nástrojov ovplyvňujúcich váš obsah a akékoľvek posúdenie veku, ktoré vás nesprávne zablokuje. Je dostupný aj osobám dotknutým obsahom, ktoré nie sú používateľmi. Vaše údaje upravuje príloha B.2 našich Zásady ochrany osobných údajov.
-
-### A.3 Spojené štáty *(iba ak sú uvedené v časti 2)*
+### A.2 Spojené štáty
 
 **Tennessee.** DebateAI neponúkame osobám, ktoré žijú v Tennessee.
 
-**Rozhodcovská zmluva a vzdanie sa práva na hromadnú žalobu.** Ak žijete v Spojených štátoch, vy a DebateAIRO súhlasíte s riešením všetkých sporov vyplývajúcich z týchto Podmienok alebo služby záväzným individuálnym rozhodcovským konaním vedeným \[the American Arbitration Association / JAMS\] podľa jej spotrebiteľských pravidiel namiesto súdu; každý z nás však môže uplatniť individuálny nárok na súde pre drobné nároky. **Rozhodcovskú zmluvu môžete odmietnuť** zaslaním e-mailu na \[address\] do 30 dní od prvého prijatia týchto Podmienok. Táto dohoda sa riadi Federal Arbitration Act. Hradíme poplatky za začatie rozhodcovského konania. Vy aj DebateAIRO sa v rozsahu povolenom zákonom vzdávate práva na hromadné, kolektívne a zastupiteľské žaloby. Táto časť sa uplatňuje iba do budúcnosti a nevzťahuje sa na nároky, ktoré vznikli pred jej prijatím.
+**Oznámenia a odstraňovanie.** Intímne snímky zdieľané bez súhlasu možno bez účtu nahlásiť na adrese \[URL\] a budú odstránené do 48 hodín od platnej žiadosti. Sťažnosti týkajúce sa autorských práv sa podávajú postupom podľa časti 10.
 
-**Oznámenia a odstraňovanie.** Intímne snímky zdieľané bez súhlasu možno bez účtu nahlásiť na adrese \[URL\] a budú odstránené do 48 hodín od platnej žiadosti. Sťažnosti týkajúce sa autorských práv sa zasielajú nášmu určenému zástupcovi uvedenému v časti 16.
+**Ustanovenia pre jednotlivé štáty.** *Kalifornia:* uplatnia sa podmienky automatického obnovovania podľa časti 12; predplatné môžete kedykoľvek zrušiť online; váš súhlas s podmienkami obnovovania uchovávame najmenej tri roky. *New York:* do 14 dní od akejkoľvek platby so zvýšenou cenou môžete predplatné zrušiť a získať pomerné vrátenie peňazí. *Texas a Nebraska:* citlivé osobné údaje nepredávame. *Washington:* na informácie súvisiace so zdravím sa vzťahuje naše Oznámenie o ochrane údajov o zdraví spotrebiteľov na adrese \[URL\]. *Colorado:* nič v službe o vás neprijíma rozhodnutia so závažnými dôsledkami. Vaše údaje a vaše práva na ochranu súkromia podľa práva vášho štátu upravuje príloha B.2 našich Zásad ochrany osobných údajov.
 
-**Ustanovenia pre jednotlivé štáty.** *Kalifornia:* uplatnia sa podmienky automatického obnovovania podľa časti 12; predplatné môžete kedykoľvek zrušiť online; váš súhlas s podmienkami obnovovania uchovávame najmenej tri roky. *New York:* do 14 dní od akejkoľvek platby so zvýšenou cenou môžete predplatné zrušiť a získať pomerné vrátenie peňazí. *Texas a Nebraska:* citlivé osobné údaje nepredávame. *Washington:* na informácie súvisiace so zdravím sa vzťahuje naše Oznámenie o ochrane údajov o zdraví spotrebiteľov na adrese \[URL\]. *Colorado:* nič v službe o vás neprijíma rozhodnutia so závažnými dôsledkami. Vaše údaje a vaše práva na ochranu súkromia podľa práva vášho štátu upravuje príloha B.3 našich Zásady ochrany osobných údajov.
+### A.3 Kanada a Quebec
 
-### A.4 Kanada a Quebec *(iba ak sú uvedené)*
+Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Vaše údaje upravuje príloha B.3 našich Zásad ochrany osobných údajov. **Quebec:** tieto Podmienky sú dostupné vo francúzštine; francúzštinu si zvolíte v prepínači jazykov; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania.
 
-Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je \[name\], privacy@dezbatere.ro. Vaše údaje upravuje príloha B.4 našich Zásady ochrany osobných údajov. **Quebec:** tieto Podmienky sú dostupné vo francúzštine; francúzštinu si zvolíte v prepínači jazykov; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania; nevzťahuje sa na vás žiadna rozhodcovská zmluva ani vzdanie sa práva na hromadnú žalobu.
+### A.4 Austrália a Nový Zéland
 
-### A.5 Austrália a Nový Zéland *(iba ak sú uvedené)*
+**Na naše služby sa vzťahujú záruky, ktoré nemožno podľa Australian Consumer Law vylúčiť.** Pri závažných nedostatkoch služby máte právo zmluvu zrušiť a získať vrátenie peňazí za nevyužitú časť alebo náhradu za zníženú hodnotu služby; máte tiež právo na náhradu akejkoľvek inej primerane predvídateľnej straty alebo škody. Ak nedostatok nie je závažný, máte právo na odstránenie problémov so službou v primeranom čase, a ak sa tak nestane, na zrušenie zmluvy a vrátenie peňazí. V rozsahu, v akom to umožňuje § 64A Australian Consumer Law, je naša zodpovednosť za porušenie záruky obmedzená na opätovné poskytnutie služby alebo úhradu nákladov na jej opätovné poskytnutie. Na platený program sa nad rámec časti 12 nevzťahuje žiadna lehota na rozmyslenie; žiadosti o vrátenie peňazí vybavujeme na adrese support@dezbatere.ro. **Nový Zéland:** uplatňuje sa Consumer Guarantees Act 1993 a nič v týchto Podmienkach ho nevylučuje; škodlivú digitálnu komunikáciu môžete nahlásiť nám podľa časti 10 alebo organizácii Netsafe.
 
-**Na naše služby sa vzťahujú záruky, ktoré nemožno podľa Australian Consumer Law vylúčiť.** Pri závažných nedostatkoch služby máte právo zmluvu zrušiť a získať vrátenie peňazí za nevyužitú časť alebo náhradu za zníženú hodnotu služby; máte tiež právo na náhradu akejkoľvek inej primerane predvídateľnej straty alebo škody. Ak nedostatok nie je závažný, máte právo na odstránenie problémov so službou v primeranom čase, a ak sa tak nestane, na zrušenie zmluvy a vrátenie peňazí. V rozsahu, v akom to umožňuje § 64A Australian Consumer Law, je naša zodpovednosť za porušenie záruky obmedzená na opätovné poskytnutie služby alebo úhradu nákladov na jej opätovné poskytnutie. Na platený program sa nad rámec časti 12 nevzťahuje žiadna lehota na rozmyslenie; naše pravidlá vrátenia peňazí sú \[…\]. **Nový Zéland:** uplatňuje sa Consumer Guarantees Act 1993 a nič v týchto Podmienkach ho nevylučuje; škodlivú digitálnu komunikáciu môžete nahlásiť nám podľa časti 10 alebo organizácii Netsafe.
+### A.5 Švajčiarsko
 
-### A.6 Švajčiarsko *(iba ak je uvedené)*
+Na vaše údaje sa vzťahuje švajčiarsky spolkový zákon o ochrane údajov (Zásady ochrany osobných údajov, príloha B.5). Žalobu môžete podať na súde v mieste vo Švajčiarsku, kde žijete. Na platený program sa nevzťahuje žiadne zákonné právo na odstúpenie; žiadosti o vrátenie peňazí vybavujeme na adrese support@dezbatere.ro.
 
-Na vaše údaje sa vzťahuje švajčiarsky spolkový zákon o ochrane údajov (Zásady ochrany osobných údajov, príloha B.6). Žalobu môžete podať na súde v mieste vo Švajčiarsku, kde žijete. Na platený program sa nevzťahuje žiadne zákonné právo na odstúpenie; naše pravidlá vrátenia peňazí sú \[…\].
+### A.6 Moldavsko
 
-### A.7 Moldavsko *(iba ak je uvedené)*
+Podľa týchto Podmienok máte rovnaké práva ako spotrebiteľ v Európskej únii vrátane 14-dňového práva na odstúpenie podľa časti 13. Žalobu môžete podať na súdoch Moldavska. Na vaše údaje sa vzťahuje moldavský zákon č. 195/2024 o ochrane osobných údajov (Zásady ochrany osobných údajov, príloha B.6).
 
-Podľa týchto Podmienok máte rovnaké práva ako spotrebiteľ v Európskej únii vrátane 14-dňového práva na odstúpenie podľa časti 13. Žalobu môžete podať na súdoch Moldavska. Na vaše údaje sa vzťahuje moldavský zákon č. 195/2024 o ochrane osobných údajov (Zásady ochrany osobných údajov, príloha B.7).
+### A.7 Ázia a Tichomorie
 
-### A.8 Ukrajina *(iba ak je uvedená)*
-
-DebateAI ponúkame na Ukrajine okrem oblastí, ktoré nekontroluje ukrajinská vláda. Produkt a tieto Podmienky sú dostupné v ukrajinčine. Na vaše údaje sa vzťahuje zákon Ukrajiny „O ochrane osobných údajov“ (Zásady ochrany osobných údajov, príloha B.8).
-
-### A.9 Izrael *(iba ak je uvedený)*
-
-Platený program môžete zrušiť v rozsahu, ktorý umožňuje zákon o ochrane spotrebiteľa 5741-1981 \[state the cancellation terms\]. Tieto Podmienky a naše Zásady ochrany osobných údajov sú dostupné v hebrejčine. Na vaše údaje sa vzťahuje izraelský zákon o ochrane súkromia (Zásady ochrany osobných údajov, príloha B.9).
-
-### A.10 Ázia a Tichomorie *(iba riadky pre uvedené regióny)*
-
-*Singapur:* našou zodpovednou osobou pre ochranu osobných údajov je \[name, email\]; prenosy sa opierajú o zmluvnú ochranu porovnateľnú s PDPA; na platený program sa nevzťahuje zákonná lehota na rozmyslenie a naše pravidlá vrátenia peňazí sú \[…\]. *Japonsko:* zákonné informácie podľa Specified Commercial Transactions Act sú na adrese \[URL\]; na online predplatné sa nevzťahuje všeobecná lehota na rozmyslenie a naše pravidlá vrátenia peňazí sú \[…\]; váš obsah posielame poskytovateľom umelej inteligencie v Spojených štátoch a Európskej únii, každému na základe zmluvy, ktorá vyžaduje ochranu rovnocennú japonskému Act on the Protection of Personal Information, a na požiadanie vám povieme, aké sú tieto opatrenia. *Južná Kórea:* súhlasy s voliteľným spracúvaním a marketingom sa získavajú oddelene od položiek potrebných na prevádzku služby; našou zodpovednou osobou pre ochranu osobných údajov je \[name\], privacy@dezbatere.ro; od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia v súlade s E-Commerce Act; pred každým zvýšením ceny opakujúcej sa platby alebo prechodom z bezplatnej na platenú službu získame váš nový súhlas; služba využíva generatívnu umelú inteligenciu, upozorníme vás na to skôr, ako ju začnete používať, a výstupy vytvorené umelou inteligenciou označujeme. *Taiwan:* od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia podľa Consumer Protection Act; na vaše údaje sa vzťahuje taiwanský Personal Data Protection Act (Zásady ochrany osobných údajov, príloha B.10). *Thajsko:* naším zástupcom v Thajsku je \[name\] \[if appointed\]. *Filipíny:* naše identifikačné údaje podniku a mechanizmus nápravy podľa Internet Transactions Act sú na adrese \[URL\]; sťažnosti možno podať Národnej komisii pre ochranu súkromia.
-
-### A.11 Vyhradené
-
-Turecko, Brazília a Indonézia vyžadujú prílohu v miestnom jazyku, zástupcu alebo registráciu a podania. Nie sú tu vypracované a nespadajú do časti 2, kým nebudú výslovne doplnené. V Číne, Vietname a Rusku službu neponúkame.
+*Singapur:* našou zodpovednou osobou pre ochranu osobných údajov je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro; prenosy sa opierajú o zmluvnú ochranu porovnateľnú s PDPA; na platený program sa nevzťahuje zákonná lehota na rozmyslenie a žiadosti o vrátenie peňazí vybavujeme na adrese support@dezbatere.ro. *Japonsko:* zákonné informácie podľa Specified Commercial Transactions Act sú na adrese \[URL\]; na online predplatné sa nevzťahuje všeobecná lehota na rozmyslenie a žiadosti o vrátenie peňazí vybavujeme na adrese support@dezbatere.ro; váš obsah posielame poskytovateľom umelej inteligencie v Spojených štátoch a Európskej únii, každému na základe zmluvy, ktorá vyžaduje ochranu rovnocennú japonskému Act on the Protection of Personal Information, a na požiadanie vám povieme, aké sú tieto opatrenia. *Južná Kórea:* súhlasy s voliteľným spracúvaním a marketingom sa získavajú oddelene od položiek potrebných na prevádzku služby; našou zodpovednou osobou pre ochranu osobných údajov je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro; od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia v súlade s E-Commerce Act; pred každým zvýšením ceny opakujúcej sa platby alebo prechodom z bezplatnej na platenú službu získame váš nový súhlas; služba využíva generatívnu umelú inteligenciu, upozorníme vás na to skôr, ako ju začnete používať, a výstupy vytvorené umelou inteligenciou označujeme. *Taiwan:* od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia podľa Consumer Protection Act; na vaše údaje sa vzťahuje taiwanský Personal Data Protection Act (Zásady ochrany osobných údajov, príloha B.7).

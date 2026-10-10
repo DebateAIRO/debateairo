@@ -202,6 +202,6 @@
   "public.publication.contentCheck.groundIllegal": "A szöveg jogellenes is lehet.",
   "public.publication.contentCheck.automated": "Ezt a döntést egy automatizált eszköz hozta. Ember még nem vizsgálta felül.",
   "public.publication.contentCheck.stillPrivate": "A vitája privát és változatlan marad. Csak Ön láthatja.",
-  "public.publication.contentCheck.appeal": "Ha szeretné, hogy egy ember felülvizsgálja ezt a döntést, hat hónapon belül írjon az [appeals@dezbatere.ro] címre.",
+  "public.publication.contentCheck.appeal": "Ha szeretné, hogy egy ember felülvizsgálja ezt a döntést, hat hónapon belül írjon az office@dezbatere.ro címre.",
   "public.publication.contentCheck.unavailable": "A tartalomellenőrzés jelenleg nem érhető el, ezért semmit sem tettünk közzé. A vitája privát marad. Próbálja újra néhány perc múlva."
 }

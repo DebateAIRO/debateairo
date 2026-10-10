@@ -1018,7 +1018,9 @@ async function runPlateauDetectorChild(
     [
       "--import", "tsx", childPath,
       database.connectionString, childSecretRoot, String(retainMibPerWave),
-      `r${retainMibPerWave}-${randomUUID()}`
+      // Short enough that every address stays inside the RFC 5321 64-character local part the shared address
+      // rule enforces (open sign-up mail, 2026-10-09): "s3d-rss-refusal-recovery-" + this label + "-" + index.
+      `r${retainMibPerWave}-${randomUUID().slice(0, 8)}`
     ],
     { cwd: root, stdio: ["ignore", "pipe", "pipe"] }
   );
@@ -1259,6 +1261,23 @@ setTimeout(() => undefined, 500);
     expect(state.rows[0]!.state).toBe("pending_mfa");
   });
 
+  // Owner ruling 2026-10-09: the phone is optional at sign-up. The auth DB batch forward step lets
+  // identity.create_pending_account_base_internal (0096, renamed in 0101) accept an all-NULL phone and
+  // store no phone columns; a given phone keeps its checks. The table itself allows "no phone" since 0095.
+  it("registers an account without a phone and stores no phone profile", async () => {
+    const flow = buildService();
+    const email = "no-phone@example.test";
+    const response = await flow.service.register({ email, password: "correct horse battery staple", recoveryEmail: null, adultAffirmed: true }, source);
+    await (flow.service as RegistrationService & { drainMailDispatches?: () => Promise<void> }).drainMailDispatches?.();
+    expect(response).toEqual(REGISTRATION_PUBLIC_RESPONSE);
+    const rows = await database.pool.query<{ state: string; phone_ciphertext: unknown; phone_source: string | null; phone_verification_status: string | null; phone_updated_at: Date | null }>(
+      `SELECT state,phone_ciphertext,phone_source,phone_verification_status,phone_updated_at FROM identity."user" WHERE email_blind_index=$1`,
+      [createEmailBlindIndex(blindIndexKey, email)]
+    );
+    expect(rows.rows).toEqual([{ state: "pending_verification", phone_ciphertext: null, phone_source: null, phone_verification_status: null, phone_updated_at: null }]);
+    expect((flow.mail as MemoryMailSender).messages).toHaveLength(1);
+  });
+
   it("resolves a verification rate-limit identity through the actual runtime role", async () => {
     const flow = buildService();
     const registered = await registerAccount(flow.service, `runtime-verify-${randomUUID()}`);
@@ -1334,7 +1353,8 @@ setTimeout(() => undefined, 500);
       const state=(await database.pool.query(`SELECT u.state AS user_state,f.state AS factor_state FROM identity."user" u JOIN identity.mfa_factor f USING(user_id) WHERE user_id=$1`,[registered.user.user_id])).rows[0];
       expect(state).toEqual({user_state:"active",factor_state:"active"});
       const lifecycle=(await database.pool.query("SELECT count(*)::int total,count(*) FILTER(WHERE consumed_at IS NULL AND revoked_at IS NULL)::int active,count(consumed_at)::int consumed,count(revoked_at)::int revoked FROM identity.recovery_code WHERE user_id=$1",[registered.user.user_id])).rows[0];
-      expect(lifecycle).toEqual({total:21,active:10,consumed:1,revoked:10});
+      // Design note 2026-10-09 item 3: the used code is not refilled.
+      expect(lifecycle).toEqual({total:20,active:9,consumed:1,revoked:10});
       const observable=[...errors.mock.calls,...logs.mock.calls].flat().join(' ');expect(observable).not.toContain(begun.secret);for(const code of [...unseen,...recovery])expect(observable).not.toContain(code);
     } finally {errors.mockRestore();logs.mockRestore();await api.close();}
   },120000);
@@ -3210,7 +3230,7 @@ setTimeout(() => undefined, 500);
     const registration = flow.service.register({
       email,
       password: "correct horse battery staple",
-      phone: "+40722123456", recoveryEmail: `s3d-permit-before-store-recovery-${randomUUID()}@example.test`,
+      phone: "+40722123456", recoveryEmail: `s3d-pbs-recovery-${randomUUID()}@example.test`, // RFC 5321: local part <= 64
       adultAffirmed: true
     }, {
       ip: "2001:db8:4d:10::1",
@@ -5368,6 +5388,8 @@ setTimeout(() => undefined, 500);
     }
   }, 30_000);
 
+  // Open sign-up mail (2026-10-09): a leading dash is a refusal of the ADDRESS, so it answers the address's own
+  // stable code, EMAIL_INVALID, through the shared rule (packages/kernel/src/mail-address.ts).
   it("S3 rework4 fold-in rejects leading-dash mail recipients before persistence", async () => {
     const flow = buildService();
     await expect(flow.service.register({
@@ -5375,7 +5397,7 @@ setTimeout(() => undefined, 500);
       password: "correct horse battery staple",
       phone: "+40722123456", recoveryEmail: "safe-recovery@example.test",
       adultAffirmed: true
-    }, source)).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
+    }, source)).rejects.toMatchObject({ code: "EMAIL_INVALID" });
     const leaked = await database.pool.query(`
       SELECT 1 FROM identity."user" WHERE email_blind_index=$1
     `, [createEmailBlindIndex(blindIndexKey, "-option@example.test")]);

@@ -202,6 +202,6 @@
   "public.publication.contentCheck.groundIllegal": "Текстът може също да е незаконен.",
   "public.publication.contentCheck.automated": "Това решение е взето от автоматизиран инструмент. Все още не е прегледано от човек.",
   "public.publication.contentCheck.stillPrivate": "Дебатът ви остава частен и непроменен. Само вие можете да го виждате.",
-  "public.publication.contentCheck.appeal": "За да поискате човек да прегледа това решение, пишете на [appeals@dezbatere.ro] в срок от шест месеца.",
+  "public.publication.contentCheck.appeal": "За да поискате човек да прегледа това решение, пишете на office@dezbatere.ro в срок от шест месеца.",
   "public.publication.contentCheck.unavailable": "Проверката на съдържанието в момента не е достъпна, затова нищо не бе публикувано. Дебатът ви остава частен. Опитайте отново след няколко минути."
 }

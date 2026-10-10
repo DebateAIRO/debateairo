@@ -155,7 +155,7 @@ export class SocialAuthService implements SocialAuthApplication {
             const authority = await this.authority(p.continuation_token, source);
             if (!await this.repository.signup(authority))
                 throw new SocialAuthError('SOCIAL_PROOF_INVALID');
-            const result = await this.dependencies.registration.registerSocial({ email: p.email, phone: p.phone, adultAffirmed: true }, source, authority, admission);
+            const result = await this.dependencies.registration.registerSocial({ email: p.email, phone: p.phone ?? null, adultAffirmed: true }, source, authority, admission);
             const retained = this.prefill.get(authority.proofHash);
             if (retained)
                 clearTimeout(retained.timeout);

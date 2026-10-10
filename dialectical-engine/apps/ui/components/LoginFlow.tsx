@@ -7,7 +7,6 @@ import { ContractHttpError, type ContractClient, type LoginContinuationResponse,
 import { AuthShell } from '@/components/AuthShell';
 import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
 import { InlineFieldMessage, useFormAnnouncer } from '@/components/auth/InlineFieldMessage';
-import { EphemeralCodes } from '@/components/auth/EphemeralCodes';
 import { VerificationResend } from '@/components/auth/VerificationResend';
 import type { TurnstilePublicConfig } from '@/lib/turnstile';
 import { ageConfirmationHref, ageConfirmationRequired } from '@/lib/ageConfirmation';
@@ -15,8 +14,7 @@ import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode, sixDigitCodeToSend } from '@/lib/sixDigitCode';
-import { emailShape } from '@/lib/authFormValidation';
-import { setRecoveryAcknowledgementPending } from '@/lib/authNavigationGuard';
+import { signInEmailShape } from '@/lib/authFormValidation';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { safeReturnPath } from '@/lib/returnPath';
 import authEnglish from '@/messages/en/auth.json';
@@ -43,7 +41,6 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     const attempt = useRef(createCodeAttempt());
     const [continuation, setContinuation] = useState<LoginContinuationResponse | null>(null);
     const [method, setMethod] = useState<'totp' | 'recovery_code'>('totp');
-    const [replacement, setReplacement] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [email, setEmail] = useState('');
@@ -91,12 +88,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         setContinuation(null);
         setPassword('');
         setCode('');
-        if (result.replacement_recovery_code) {
-            setRecoveryAcknowledgementPending(true);
-            setReplacement(result.replacement_recovery_code);
-        }
-        else
-            void onAuthenticated();
+        // 2026-10-09: a used recovery code is never refilled, so there is no replacement code to show first.
+        void onAuthenticated();
     }
     useEffect(() => {
         if (refocusCode)
@@ -150,7 +143,6 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         })();
         return () => {
             cancelConditional();
-            setRecoveryAcknowledgementPending(false);
         };
     }, [browser, client]);
     async function passkey() {
@@ -201,7 +193,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         const secret = String(data.get('password') ?? '');
         setEmail(address);
         setPassword(secret);
-        const addressError = emailShape(address) ? null : t(catalog, "auth.invalidEmail");
+        const addressError = signInEmailShape(address) ? null : t(catalog, "auth.invalidEmail");
         const secretError = secret ? null : t(catalog, "auth.password.required");
         setEmailError(addressError);
         setPasswordError(secretError);
@@ -284,7 +276,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     const offered = continuation?.available_methods ?? [];
     if (resending)
         return <VerificationResend catalog={catalog} client={client} turnstile={turnstile} onBack={() => setResending(false)}/>;
-    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={replacement ? t(catalog, "auth.login.replacementTitle") : continuation ? t(catalog, "auth.login.twoStepVerification") : t(catalog, "auth.login.backToGraph")} description={t(catalog, "auth.login.securityPolicy")} footer={!replacement && !dispatched.current ? <>
+    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={continuation ? t(catalog, "auth.login.twoStepVerification") : t(catalog, "auth.login.backToGraph")} description={t(catalog, "auth.login.securityPolicy")} footer={!dispatched.current ? <>
  {/* One way in for every recovery route, each with one plain sentence (auth UI repair, 2026-10-09). */}
  <details className="authHelp">
  <summary>{t(catalog, "auth.login.cantSignIn")}</summary>
@@ -297,11 +289,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
  {continuation ? null : <p>{t(catalog, "auth.login.noAccountYet")} <Link href={signUpHref}>{t(catalog, "auth.login.createOne")}</Link></p>}
  </> : null}>
  {error ? <div className="authAlert" role="alert">{error}</div> : null}
- {replacement ? <div><EphemeralCodes codes={[replacement]} catalog={catalog}/><button type="button" className="authPrimary" onClick={() => {
-                setRecoveryAcknowledgementPending(false);
-                setReplacement(null);
-                void onAuthenticated();
-            }}>{t(catalog, "auth.continue")}</button></div> : continuation ? <div>
+ {continuation ? <div>
  {offered.includes('passkey') ? <div className="authAltMethods"><button type="button" className="authSecondary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.signIn")}</button></div> : null}
  {offered.includes('totp') || offered.includes('recovery_code') ? <form className="authForm authMfaForm" noValidate method="post" action="/login" onSubmit={e => {
                     e.preventDefault();

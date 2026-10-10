@@ -90,7 +90,7 @@ describe("privacy policy modal — rendered", () => {
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     expect(dialog.querySelector(".policyEyebrow")!.textContent).toBe(
-      "PRIVACY POLICY · v3.2 · EFFECTIVE [DATE]"
+      "PRIVACY POLICY · v3.3 · EFFECTIVE 12 OCTOBER 2026"
     );
     expect(dialog.querySelector(".policyTitle")!.textContent).toBe("What we store, and why");
     expect(dialog.querySelector(".policyLede")!.textContent).toBe(
@@ -125,22 +125,22 @@ describe("privacy policy modal — rendered", () => {
     }
   });
 
-  // S02-S37 — every section of the v3.2 draft, in order: the summary, fourteen numbered
-  // sections, the annex and its nine parts, each with number, title, paragraphs, bullets and
+  // S02-S37 — every section of the v3.3 draft, in order: the summary, fourteen numbered
+  // sections, the annex and its seven parts, each with number, title, paragraphs, bullets and
   // accent.
-  it("renders the twenty-seven sections in order, with their paragraphs, bullets and accent tokens", async () => {
+  it("renders the twenty-three sections in order, with their paragraphs, bullets and accent tokens", async () => {
     await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     const sections = [...dialog.querySelectorAll<HTMLElement>('[id^="policy-section-"]')];
-    expect(POLICY_SECTIONS.length).toBe(27);
+    expect(POLICY_SECTIONS.length).toBe(23);
     expect(sections.map((section) => section.id)).toEqual(
       POLICY_SECTIONS.map((section) => `policy-section-${section.no}`)
     );
     expect(sections[0]!.id).toBe("policy-section-00");
     expect(sections[1]!.id).toBe("policy-section-01");
     expect(sections[15]!.id).toBe("policy-section-B");
-    expect(sections[26]!.id).toBe("policy-section-B.11");
+    expect(sections[22]!.id).toBe("policy-section-B.7");
 
     expect(sections.map((section) => section.querySelector(".policySectionTitle")!.textContent)).toEqual(
       POLICY_SECTIONS.map((section) => section.title)
@@ -180,7 +180,7 @@ describe("privacy policy modal — rendered", () => {
         ),
       0
     );
-    expect(expectedParagraphs).toBe(51);
+    expect(expectedParagraphs).toBe(47);
     expect(expectedBullets).toBe(66);
     expect(dialog.querySelectorAll(".policyText").length).toBe(expectedParagraphs);
     expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
@@ -205,7 +205,7 @@ describe("privacy policy modal — rendered", () => {
 
     const scrollRegion = dialog.querySelector(".policyBody")!;
     const last = scrollRegion.lastElementChild!;
-    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.2");
+    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.3");
 
     // The honesty rule: this repository generates no policy PDF, so no control claims one.
     const pdf = [...dialog.querySelectorAll("*")].filter(

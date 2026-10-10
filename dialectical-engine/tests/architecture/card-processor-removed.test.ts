@@ -81,7 +81,7 @@ const CODE_LINES: Readonly<Record<string, RegExp>> = Object.freeze({
   // data-export S01 (V-28): the archive's billing section (SPEC-v4 §5.1 E1, E2) reads the stored table and columns
   // 0085 named after it and 0111 keeps: billing.customer_<name>, its <name>_customer_id, subscription_event's <name>_order_id.
   ...Object.fromEntries([
-    "apps/api/src/data-export/snapshot.ts", "apps/api/src/data-export/types.ts", "migrations/0112_data_export.sql",
+    "apps/api/src/data-export/snapshot.ts", "apps/api/src/data-export/types.ts", "migrations/0113_data_export.sql",
     "tests/fixtures/data-export/raw-a.json", "tests/fixtures/data-export/snapshot-a.ts", "tests/integration/data-export-e2e.test.ts",
     "tests/unit/data-export-archive.test.ts", "tests/unit/data-export-service.test.ts"
   ].map((path) => [`dialectical-engine/${path}`, new RegExp(`customer_${NAME}|${NAME}_customer_id|${NAME}_order_id`, "u")]))

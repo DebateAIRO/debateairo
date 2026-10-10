@@ -28,7 +28,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Röviden",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Önnek legalább 18 évesnek kell lennie. A DebateAI mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a [abuse@dezbatere.ro] címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik." }
+      { kind: "p", text: "Önnek legalább 18 évesnek kell lennie. A DebateAI mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik." }
     ]
   },
   {
@@ -36,24 +36,25 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kik vagyunk, és hogyan léphet velünk kapcsolatba",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "A DebateAI üzemeltetője a Romániában bejegyzett DebateAIRO S.R.L. társaság." },
+      { kind: "p", text: "A DebateAI üzemeltetője a Romániában bejegyzett DMS Merchandise Shop S.R.L. társaság." },
       {
         kind: "list",
         items: [
-        "Bejegyzett székhely — [street, number, sector, postal code], Bukarest, Románia",
-        "Cégjegyzékszám — [J40/…/…]",
-        "Egyedi nyilvántartási kód (CUI) — […] · héa: [RO… / not VAT-registered]",
-        "Jegyzett tőke — [RON …]",
-        "Általános kapcsolattartás — [hello@dezbatere.ro]",
-        "Jogi értesítések — [legal@dezbatere.ro]",
+        "Bejegyzett székhely — Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Románia",
+        "Cégjegyzékszám — J2022000426271",
+        "Egyedi nyilvántartási kód (CUI) — 45935221 · héa: RO45935221",
+        "Jegyzett tőke — 5000 RON",
+        "Általános kapcsolattartás — support@dezbatere.ro",
+        "Telefon — +40 748 793 490",
+        "Jogi értesítések — support@dezbatere.ro",
         "Adatvédelem — privacy@dezbatere.ro",
-        "Jogellenes tartalom bejelentése — [abuse@dezbatere.ro] — lásd a 10. szakaszt",
-        "Hatósági kapcsolattartó pont — [dsa@dezbatere.ro] — román és angol nyelven",
-        "Terrorista tartalom eltávolítására irányuló végzések (az (EU) 2021/784 rendelet) — [dsa@dezbatere.ro] — kapcsolattartó pontunk ezekhez a végzésekhez; román és angol nyelven; lásd a 10. szakaszt",
+        "Jogellenes tartalom bejelentése — support@dezbatere.ro — lásd a 10. szakaszt",
+        "Hatósági kapcsolattartó pont — office@dezbatere.ro — román és angol nyelven",
+        "Terrorista tartalom eltávolítására irányuló végzések (az (EU) 2021/784 rendelet) — office@dezbatere.ro — kapcsolattartó pontunk ezekhez a végzésekhez; román és angol nyelven; lásd a 10. szakaszt",
         "Más országokban működő képviselők — Az A. melléklet sorolja fel azon régiók tekintetében, ahol képviselőt jelöltünk ki"
         ]
       },
-      { kind: "p", text: "Ezek az adatok folyamatosan elérhetők a webhelyen is: [dezbatere.ro/legal]. Mindig kapcsolatba léphet egy személlyel, nem csupán az asszisztensünkkel; ennek módját a 10. szakasz ismerteti." }
+      { kind: "p", text: "Ezek az adatok folyamatosan elérhetők a webhelyen is: dezbatere.ro/legal. Mindig kapcsolatba léphet egy személlyel, nem csupán az asszisztensünkkel; ennek módját a 10. szakasz ismerteti." }
     ]
   },
   {
@@ -61,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hol kínáljuk a DebateAI szolgáltatást",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "A DebateAI szolgáltatást a [the European Union and the European Economic Area] területén [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] élő személyeknek kínáljuk. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
+      { kind: "p", text: "A DebateAI szolgáltatást az alábbi országokban és régiókban élő személyeknek kínáljuk: Európai Unió (27 ország) és Európai Gazdasági Térség (Norvégia, Izland és Liechtenstein), Svájc, Moldova, Egyesült Államok (Tennessee állam kivételével), Kanada, Ausztrália, Új-Zéland, Szingapúr, Japán, Dél-Korea és Tajvan. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
     ]
   },
   {
@@ -69,8 +70,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "E Feltételek elfogadása",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Ön az „Elolvastam és elfogadom a Szolgáltatási feltételeket” jelölőnégyzet bejelölésével és a Fiók létrehozása gombra kattintással fogadja el e Feltételeket. Ezzel szerződés jön létre Ön és a DebateAIRO S.R.L. között. A Feltételek magukban foglalják a 7. szakasz elfogadható használatra vonatkozó szabályait, a 9. szakasz közzétételi szabályait, a 15. szakasz felelősségi rendelkezéseit, a 18. szakasz irányadó jogra és vitarendezésre vonatkozó rendelkezéseit, továbbá, ha Ön az Egyesült Államokban él, az A.3 melléklet szerinti választottbírósági megállapodást. Adatvédelmi szabályzatunkban foglaltak szerint nyilvántartjuk, hogy Ön melyik változatot és mikor fogadta el." },
-      { kind: "p", text: "A [dezbatere.ro/privacy] címen elérhető Adatvédelmi szabályzatunk ismerteti, hogyan kezeljük a személyes adatokat. Ez az Önnek nyújtandó tájékoztatás, nem pedig az Ön által elfogadandó szerződés, és e Feltételek egyetlen rendelkezése sem teszi azt az adatkezeléshez adott hozzájárulássá. A [dezbatere.ro/cookies] címen elérhető Sütiszabályzatunk, valamint a [dezbatere.ro/providers] címen elérhető MI-szolgáltatói nyilvántartásunk hivatkozás útján e Feltételek részét képezi." },
+      { kind: "p", text: "Ön az „Elolvastam és elfogadom a Szolgáltatási feltételeket” jelölőnégyzet bejelölésével és a Fiók létrehozása gombra kattintással fogadja el e Feltételeket. Ezzel szerződés jön létre Ön és a DMS Merchandise Shop S.R.L. között. A Feltételek magukban foglalják a 7. szakasz elfogadható használatra vonatkozó szabályait, a 9. szakasz közzétételi szabályait, a 15. szakasz felelősségi rendelkezéseit, valamint a 18. szakasz irányadó jogra és vitarendezésre vonatkozó rendelkezéseit. Adatvédelmi szabályzatunkban foglaltak szerint nyilvántartjuk, hogy Ön melyik változatot és mikor fogadta el." },
+      { kind: "p", text: "A dezbatere.ro/privacy címen elérhető Adatvédelmi szabályzatunk ismerteti, hogyan kezeljük a személyes adatokat. Ez az Önnek nyújtandó tájékoztatás, nem pedig az Ön által elfogadandó szerződés, és e Feltételek egyetlen rendelkezése sem teszi azt az adatkezeléshez adott hozzájárulássá. A dezbatere.ro/cookies címen elérhető Sütiszabályzatunk, valamint a dezbatere.ro/providers címen elérhető MI-szolgáltatói nyilvántartásunk hivatkozás útján e Feltételek részét képezi." },
       { kind: "p", text: "Mielőtt Ön elektronikus úton szerződést köt velünk, a felület bemutatja az ehhez szükséges lépéseket, lehetővé teszi, hogy a beküldés előtt áttekintse és kijavítsa a megadott adatokat, valamint közli, hogy a szerződés milyen nyelveken köthető meg. E Feltételeket menthető és nyomtatható formában tesszük elérhetővé, fizetős csomag vásárlásakor az Ön által elfogadott változatot e-mailben elküldjük, és Ön bármikor másolatot kérhet. E Feltételek egyetlen rendelkezése sem korlátozza az Önt a román vagy uniós fogyasztóvédelmi jog, illetve a lakóhelye szerinti ország joga alapján megillető, szerződéssel nem korlátozható jogokat." }
     ]
   },
@@ -133,7 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Nem tanítjuk be az Ön tartalmán a modelleket. Nem tanítunk be modelleket az Ön tartalmán, és az MI-szolgáltatókkal kötött szerződéseink kizárják, hogy az Ön tartalmát saját modelljeik betanítására vagy továbbfejlesztésére használják. [Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.]" },
       { kind: "p", text: "Hogyan jut el az Ön tartalma az MI-szolgáltatókhoz. Egy vita futtatásához szöveget küldünk egy vagy több külső modellszolgáltatónak. A szolgáltató megkapja az Ön kérdését, az Ön által beállított irányító megjegyzéseket és a motor által a vita során összeállított állításokat — így nem csupán az Ön eredeti szavait látja, hanem az Ön által beírt szövegből származó és aköré épített szöveget is. Az Ön e-mail-címét, fiókazonosítóit, munkamenet-nyilvántartásait vagy fizetési adatait soha nem kapja meg." },
       { kind: "p", text: "Mit küld a támogatási csevegés. A támogatási asszisztens szintén MI-modell. Amikor Ön ír neki, üzenetét elküldjük egy külső modellszolgáltatónak, hogy a modell válaszolni tudjon, azokkal a súgócikkekkel együtt, amelyekre a válaszát alapozza. Küldés előtt elfedünk mindent, ami jelszónak, egyszer használatos kódnak vagy kulcsnak tűnik. Ha Ön azt kéri, hogy személlyel beszélhessen, a beszélgetést is — ugyanígy elfedve — elküldjük a modellnek, hogy rövid összefoglalót írjon csapatunk azon tagjának, aki átveszi az Ön ügyét. Az Ön e-mail-címét, fiókazonosítóit vagy fizetési adatait nem csatoljuk, de a modell minden mást megkap, amit Ön a csevegésbe beír, ezért ne írjon oda semmit, amit nem szeretne, hogy elolvasson." },
-      { kind: "p", text: "Mely szolgáltatók és hol. A [dezbatere.ro/providers] címen elérhető MI-szolgáltatói nyilvántartásunk e Feltételek részét képezi. Felsorolja az általunk igénybe vehető valamennyi szolgáltatót: jogi személyét és országát; azt, hogy mit kap meg és milyen célból; hol végzi az adatkezelést; megőrzési feltételeit; hogy az általunk használt végponton aktív-e a nulla adatmegőrzés; hogy szerződésünk alapján felhasználhatja-e a bemeneteket betanításra; az általunk alkalmazott adattovábbítási mechanizmust; valamint az egyes bejegyzések legutóbbi ellenőrzésének időpontját. A szolgáltatók az Ön országán és az Európai Gazdasági Térségen kívül is működhetnek. A garanciákat Adatvédelmi szabályzatunk ismerteti." },
+      { kind: "p", text: "Mely szolgáltatók és hol. A dezbatere.ro/providers címen elérhető MI-szolgáltatói nyilvántartásunk e Feltételek részét képezi. Felsorolja az általunk igénybe vehető valamennyi szolgáltatót: jogi személyét és országát; azt, hogy mit kap meg és milyen célból; hol végzi az adatkezelést; megőrzési feltételeit; hogy az általunk használt végponton aktív-e a nulla adatmegőrzés; hogy szerződésünk alapján felhasználhatja-e a bemeneteket betanításra; az általunk alkalmazott adattovábbítási mechanizmust; valamint az egyes bejegyzések legutóbbi ellenőrzésének időpontját. A szolgáltatók az Ön országán és az Európai Gazdasági Térségen kívül is működhetnek. A garanciákat Adatvédelmi szabályzatunk ismerteti." },
       { kind: "p", text: "Három különböző dolog. A „nem használják modellek betanítására”, a „biztonsági, visszaélés-megelőzési vagy jogi okból korlátozott ideig megőrzik” és a „nulla adatmegőrzés — a feldolgozást követően nem tárolják tartósan” eltérő fogalmak. Ha egy szolgáltató korlátozott ideig megőrzi a promptokat, a Nyilvántartás megadja, hogy mennyi ideig és miért. Ha aktív a nulla adatmegőrzés, a Nyilvántartás ezt, valamint az érintett funkciókat is feltünteti. Nem állítjuk, hogy egy tartalmat nem őriznek meg, ha ez nem igaz." },
       { kind: "p", text: "Kimenetek. Az Ön és közöttünk fennálló jogviszonyban saját vitáinak kimenetét bármely jogszerű célra felhasználhatja, mi pedig nem tartunk igényt a létrehozott szöveg tulajdonjogára. Vegye figyelembe, hogy a létrehozott kimenet számos joghatóságban nem részesülhet szerzői jogi védelemben; más felhasználók számára hasonló kimenet jöhet létre; a kimenetek harmadik felek anyagait többszörözhetik vagy azokhoz hasonlíthatnak; továbbá az MI-szolgáltató által lekért egyes forrásanyagokra újrafelhasználási korlátozások vonatkozhatnak. Ön felel azért, hogy a kimenetekre való támaszkodás vagy azok újbóli közzététele előtt ellenőrzést végezzen." }
     ]
@@ -157,7 +158,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Tartalom bejelentése, moderálás és panaszok",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Bárki bejelenthet tartalmat. Ehhez nincs szükség fiókra. Írjon a [abuse@dezbatere.ro] címre, vagy használja bármely közzétett vitánál a Bejelentés vezérlőt. Ahhoz, hogy intézkedhessünk, közölje velünk: kellő részletességgel, miért véli úgy, hogy a tartalom jogellenes vagy sérti e Feltételeket; a pontos helyet — a teljes URL-t, és ha lehetséges, az érintett szövegrészt; nevét és e-mail-címét (a gyermekek szexuális bántalmazását ábrázoló anyag bejelentésénél ez nem szükséges); továbbá azt, hogy jóhiszeműen úgy véli, bejelentése pontos és teljes." },
+      { kind: "p", text: "Bárki bejelenthet tartalmat. Ehhez nincs szükség fiókra. Írjon a support@dezbatere.ro címre, vagy használja bármely közzétett vitánál a Bejelentés vezérlőt. Ahhoz, hogy intézkedhessünk, közölje velünk: kellő részletességgel, miért véli úgy, hogy a tartalom jogellenes vagy sérti e Feltételeket; a pontos helyet — a teljes URL-t, és ha lehetséges, az érintett szövegrészt; nevét és e-mail-címét (a gyermekek szexuális bántalmazását ábrázoló anyag bejelentésénél ez nem szükséges); továbbá azt, hogy jóhiszeműen úgy véli, bejelentése pontos és teljes." },
       { kind: "p", text: "Minden bejelentést indokolatlan késedelem nélkül visszaigazolunk. A bejelentéseket időben, gondosan, önkényességtől mentesen és tárgyilagosan kezeljük, közöljük Önnel döntésünket, és tájékoztatjuk annak megtámadási módjáról. Ha egy bejelentés feldolgozásához vagy eldöntéséhez automatizált eszközöket használunk, ezt közöljük. A hozzájárulás nélkül megosztott intim képfelvételekre vonatkozó bejelentések esetén az érvényes kérelemtől számított 48 órán belül intézkedünk." },
       { kind: "p", text: "Az automatizált döntések két, egymástól elkülönített típusa." },
       {
@@ -168,7 +169,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Indokolás. Valahányszor eltávolítjuk az Ön tartalmát vagy korlátozzuk annak láthatóságát, illetve felfüggesztjük vagy megszüntetjük a fiókját, indokolást adunk: mit tettünk és az milyen körre terjed ki, milyen tényekre támaszkodtunk és azok bejelentésből vagy saját ellenőrzéseinkből származtak-e, alkalmaztunk-e automatizált eszközt, mi a jogi vagy szerződéses jogalap, és hogyan támadhatja meg a döntést: az alább ismertetett panaszkezelési utunkon, a digitális szolgáltatásokról szóló uniós rendelet alapján tanúsított peren kívüli vitarendezési testület útján, vagy bírósági úton." },
-      { kind: "p", text: "Döntéssel kapcsolatos panasz. Ha nem ért egyet egy moderálási döntéssel, hat hónapon belül válaszoljon az indokolásra, vagy írjon a [appeals@dezbatere.ro] címre. Az ügyet egy, az eredeti döntésben részt nem vevő személy vizsgálja felül, az eredményt pedig indokolással együtt közöljük Önnel. Ez nem érinti az Ön jogát arra, hogy bírósághoz forduljon, vagy igénybe vegye a 18. szakasz szerinti alternatív vitarendezést. A panaszkezelési út azon panaszokra is kiterjed, amelyek szerint nem intézkedtünk egy bejelentés alapján, jogtalanul távolítottunk el tartalmat, jogtalanul korlátoztunk fiókot, vagy valamely automatizált eszköz tévesen érintette az Ön tartalmát." },
+      { kind: "p", text: "Döntéssel kapcsolatos panasz. Ha nem ért egyet egy moderálási döntéssel, hat hónapon belül válaszoljon az indokolásra, vagy írjon a office@dezbatere.ro címre. Az ügyet egy, az eredeti döntésben részt nem vevő személy vizsgálja felül, az eredményt pedig indokolással együtt közöljük Önnel. Ez nem érinti az Ön jogát arra, hogy bírósághoz forduljon, vagy igénybe vegye a 18. szakasz szerinti alternatív vitarendezést. A panaszkezelési út azon panaszokra is kiterjed, amelyek szerint nem intézkedtünk egy bejelentés alapján, jogtalanul távolítottunk el tartalmat, jogtalanul korlátoztunk fiókot, vagy valamely automatizált eszköz tévesen érintette az Ön tartalmát." },
       { kind: "p", text: "Peren kívüli vitarendezés. Ha Ön az Európai Unióban tartózkodik, egy moderálási döntésünkkel kapcsolatos jogvitát a digitális szolgáltatásokról szóló uniós rendelet (az (EU) 2022/2065 rendelet) 21. cikke alapján tanúsított peren kívüli vitarendezési testület elé viheti. Ez kiterjed az Ön tartalmára vagy fiókjára vonatkozó döntésre, valamint az Ön által tett bejelentésről szóló döntésünkre is. Ön választja ki a testületet az Európai Bizottság által a digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement címen közzétett listáról, és nem kell előbb a panaszkezelési utunkat igénybe vennie. Jóhiszeműen részt veszünk az eljárásban, és csak akkor tagadjuk meg a részvételt, ha ugyanazt a jogvitát – ugyanarról a tartalomról és ugyanazon okokból – már rendezték. A testület döntése nem köti sem Önt, sem minket, és Ön megtartja a bírósághoz fordulás jogát. A testület csekély díjat számíthat fel Önnek, vagy díjmentesen járhat el. Ha az Ön javára dönt, mi viseljük a díjait, és megtérítjük az Ön észszerű költségeit; ha a mi javunkra dönt, Önnek nem kell megtérítenie a díjainkat vagy költségeinket, kivéve, ha a testület megállapítja, hogy Ön nyilvánvalóan rosszhiszeműen járt el." },
       { kind: "p", text: "Kapcsolatfelvétel egy személlyel. Támogatási asszisztensünk egy MI-rendszer, és ezt fel is tünteti. Ön bármikor kérheti, hogy személlyel beszéljen, és minden támogatási beszélgetés felajánlja ezt a lehetőséget. Az Önnel való kommunikációban nem támaszkodunk kizárólag automatizált eszközökre." },
       { kind: "p", text: "Terrorista tartalom. A terrorista tartalom jogellenes, és nem megengedett a DebateAI szolgáltatásban (7. szakasz). Az Európai Unió illetékes hatóságai az (EU) 2021/784 rendelet alapján eltávolítási végzéseket küldhetnek nekünk az 1. szakaszban megjelölt kapcsolattartó pontra. Ha ilyet kapunk, egy órán belül eltávolítjuk a tartalmat, vagy minden uniós országban hozzáférhetetlenné tesszük. Tájékoztatjuk a tartalmat közzétevő személyt arról, hogy azt eltávolítottuk, és kérésére arról is, miért és hogyan támadhatja meg a végzést, kivéve, ha a hatóság úgy dönt, hogy közbiztonsági okokból korlátozott ideig nem adható tájékoztatás. A rendelet előírásainak megfelelően az eltávolított tartalmat és a kapcsolódó adatokat hat hónapig megőrizzük, hogy az eltávolítás felülvizsgálható, és ha téves volt, visszavonható legyen. A tartalmat közzétevő személy megtámadhatja a végzést a végzést kibocsátó hatóság országának bíróságain, és igénybe veheti a panaszkezelési utunkat is. Egyetlen hatóság sem kötelezett bennünket konkrét intézkedések meghozatalára terrorista tartalommal szemben a rendelet alapján; ha ez megtörténik, itt ismertetjük ezeket az intézkedéseket, ideértve az esetleges automatizált eszközöket is." },
@@ -181,7 +182,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "Az Ön részéről. A 6. szakaszban foglaltak szerint bármikor megszüntetheti fiókját a Beállítások menüpontban. Ehhez nem kell indokot megadnia. Fiókja megszüntetésével e Feltételek is megszűnnek, mégpedig a megszüntetés hatálybalépésekor, a 7 napos türelmi idő elteltével; az e szakasz végén felsorolt szakaszok ezt követően is hatályban maradnak." },
-      { kind: "p", text: "A mi részünkről. Felfüggeszthetjük vagy megszüntethetjük az Ön fiókját, illetve eltávolíthatjuk vagy korlátozhatjuk tartalmát, ha: Ön lényegesen megsérti e Feltételeket, különösen a 7. szakaszt; tartalma jogellenes, vagy jogszabály, bíróság vagy hatóság intézkedést ír elő számunkra; a használat veszélyezteti a szolgáltatás biztonságát, integritását vagy rendelkezésre állását, illetve mások jogait; fiókja [24 months] óta inaktív, és erről előzetesen értesítettük; vagy megszüntetjük a szolgáltatás nyújtását, illetve annak nyújtását az Ön országában." },
+      { kind: "p", text: "A mi részünkről. Felfüggeszthetjük vagy megszüntethetjük az Ön fiókját, illetve eltávolíthatjuk vagy korlátozhatjuk tartalmát, ha: Ön lényegesen megsérti e Feltételeket, különösen a 7. szakaszt; tartalma jogellenes, vagy jogszabály, bíróság vagy hatóság intézkedést ír elő számunkra; a használat veszélyezteti a szolgáltatás biztonságát, integritását vagy rendelkezésre állását, illetve mások jogait; fiókja 24 hónapja inaktív, és erről előzetesen értesítettük; vagy megszüntetjük a szolgáltatás nyújtását, illetve annak nyújtását az Ön országában." },
       { kind: "p", text: "Kivéve, ha a szerződésszegés súlyos, a jog azonnali intézkedést ír elő, vagy a késedelem kárt okozna, a fiók felfüggesztése vagy megszüntetése előtt közöljük Önnel a problémát, és észszerű lehetőséget biztosítunk annak orvoslására. A 10. szakasz szerint mindig indokolást adunk, és Ön megtámadhatja a döntést." },
       { kind: "p", text: "Ha a szolgáltatást teljes egészében megszüntetjük, vagy kivonjuk az Ön országából, legalább 30 nappal korábban értesítjük, visszatérítjük a megszüntetés utáni időszakra előre kifizetett összeget, és ezt megelőzően lehetőséget biztosítunk vitái exportálására." },
       { kind: "p", text: "A megszüntetés következményei. Egy fiók megszüntetésekor megsemmisítjük az Ön fiókadataihoz és bizalmas vitáihoz tartozó titkosítási kulcsokat, amitől azok véglegesen olvashatatlanná válnak, töröljük a fióknyilvántartást, és, ha ezt választotta, a 9. szakaszban foglaltak szerint eltávolítjuk a nyilvános hozzáférésből az Ön közzétett vitáit. Bizonyos elemek fennmaradnak, és fontos tudnia, melyek ezek: a csak hozzáfűzhető audit- és biztonsági naplóink bejegyzései, amelyeket saját jogi és biztonsági kötelezettségeink teljesítése céljából őrzünk meg; a jogszabály alapján megőrzendő nyilvántartások, ideértve az elfogadásról és a hozzájárulásról szóló nyilvántartásokat; továbbá néhány, titkosítási rendszerünk bevezetése előtti régebbi vita esetében azok a nyilvántartások, amelyek törölhetősége korlátozottabb — értesítjük, ha ez az Ön fiókjára vonatkozik. Adatvédelmi szabályzatunk mindezt adatvédelmi szempontból ismerteti, és tájékoztatást ad az Ön törléshez való jogáról." },
@@ -194,13 +195,13 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "A DebateAI ingyenes csomagot kínál. Egy fizetős Prémium csomag [is / will be] elérhető, amely hozzáférést biztosít a modellek teljes választékához, és lehetővé teszi, hogy Ön állítsa be a vita mérőit." },
+      { kind: "p", text: "A DebateAI ingyenes csomagot kínál. Egy fizetős Prémium csomag lesz elérhető, amely hozzáférést biztosít a modellek teljes választékához, és lehetővé teszi, hogy Ön állítsa be a vita mérőit." },
       { kind: "p", text: "Fizetés előtt közvetlenül a fizetési gomb felett megjelenítjük Önnek: a csomagot; az alkalmazandó adóval növelt teljes árat; a számlázási időszakot; azt, hogy a csomag lemondásig automatikusan megújul; az esetleges ingyenes próbaidőszak végét és az azt követően felszámítandó összeget; valamint a lemondás módját. A megújítási feltételeket külön jelölőnégyzet bejelölésével erősíti meg. A gomb felirata Előfizetés és fizetés (románul Comandă cu obligație de plată). Ugyanezeket az információkat, e Feltételeket és az elállási nyomtatványt tartalmazó visszaigazolást tartós adathordozón küldjük meg Önnek." },
-      { kind: "p", text: "Emlékeztetők. E-mailben emlékeztetjük Önt legalább [5] nappal azelőtt, hogy egy ingyenes próbaidőszak fizetős csomaggá alakul; folyamatos csomagok esetén évente legalább egyszer; továbbá a legalább tizenkét hónapos időszak minden megújítása előtt 30–45 nappal. Minden emlékeztető tartalmazza az árat, a dátumot és a lemondási hivatkozást." },
-      { kind: "p", text: "Lemondás. Bármikor lemondhatja előfizetését a Beállítások → Előfizetés menüpontban egyetlen megerősítő kattintással, vagy a [dezbatere.ro/cancel] címen elérhető lemondási oldalon, amelyhez nem kell bejelentkeznie. A lemondás az aktuális számlázási időszak végén lép hatályba, addig pedig megmarad a hozzáférése. A lemondást nem tesszük nehezebbé az előfizetésnél." },
+      { kind: "p", text: "Emlékeztetők. E-mailben emlékeztetjük Önt legalább 5 nappal azelőtt, hogy egy ingyenes próbaidőszak fizetős csomaggá alakul; folyamatos csomagok esetén évente legalább egyszer; továbbá a legalább tizenkét hónapos időszak minden megújítása előtt 30–45 nappal. Minden emlékeztető tartalmazza az árat, a dátumot és a lemondási hivatkozást." },
+      { kind: "p", text: "Lemondás. Bármikor lemondhatja előfizetését a Beállítások → Előfizetés menüpontban egyetlen megerősítő kattintással, vagy a dezbatere.ro/cancel címen elérhető lemondási oldalon, amelyhez nem kell bejelentkeznie. A lemondás az aktuális számlázási időszak végén lép hatályba, addig pedig megmarad a hozzáférése. A lemondást nem tesszük nehezebbé az előfizetésnél." },
       { kind: "p", text: "Az árváltozások kizárólag megújításkor lépnek hatályba. Legalább 30 nappal korábban e-mailben értesítjük Önt az új árról, és lemondási hivatkozást biztosítunk. Ha az Ön országának joga kifejezett hozzájárulását követeli meg egy árváltozáshoz, azt kérjük Öntől; egyébként, ha nem tesz semmit, az új ár a következő megújítástól alkalmazandó. A regionális szabályokat az A. melléklet ismerteti." },
-      { kind: "p", text: "Sikertelen fizetések. Ha egy fizetés sikertelen, [7] napig újra megkíséreljük, és e-mailben figyelmeztetjük Önt, mielőtt fiókját ingyenes csomagra állítanánk vissza. Sikertelen fizetés miatt nem töröljük vitáit." },
-      { kind: "p", text: "Adók és a fizetés kedvezményezettje. Az árak [include / exclude] a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. [If a merchant of record is used: Your purchase is processed by [Paddle / …], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.]" },
+      { kind: "p", text: "Sikertelen fizetések. Ha egy fizetés sikertelen, 7 napig újra megkíséreljük, és e-mailben figyelmeztetjük Önt, mielőtt fiókját ingyenes csomagra állítanánk vissza. Sikertelen fizetés miatt nem töröljük vitáit." },
+      { kind: "p", text: "Adók és a fizetés kedvezményezettje. Az árak tartalmazzák a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. A kártyás fizetéseket a NETOPIA Payments (netopia-payments.com) dolgozza fel. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért." },
       { kind: "p", text: "Visszaterhelések. Ha Ön vitat egy terhelést a kártyakibocsátójánál, a vita rendezéséig felfüggeszthetjük a fizetős funkciókat. Ezért nem számítunk fel díjat." },
       { kind: "p", text: "A törvényes jogok elsőbbsége. Ha a szolgáltatás nem felel meg vállalásainknak, Ön jogosult a szerződésszerű állapot helyreállítására, illetve a jogszabályban meghatározott arányos árleszállításra vagy visszatérítésre. Ezen túlmenően [state your discretionary refund policy]. Mindkét csomag használati korlátait közzétesszük a termékben; előzetesen értesítjük Önt, mielőtt az Ön számára lényeges módon szigorítanánk azokat." }
     ]
@@ -210,7 +211,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Az Ön elállási joga",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Ha Ön az EU-ban, az EGT-ben vagy az Egyesült Királyságban él, a fizetős előfizetéstől annak megkötésétől számított 14 napon belül indokolás nélkül elállhat. Használja a [dezbatere.ro/withdraw] címen található Elállás a szerződéstől oldalt, a visszaigazoló e-mailben található formanyomtatványt, vagy írjon a [support@dezbatere.ro] címre; a kézhezvételt tartós adathordozón igazoljuk vissza." },
+      { kind: "p", text: "Ha Ön az EU-ban vagy az EGT-ben él, a fizetős előfizetéstől annak megkötésétől számított 14 napon belül indokolás nélkül elállhat. Használja a dezbatere.ro/withdraw címen található Elállás a szerződéstől oldalt, a visszaigazoló e-mailben található formanyomtatványt, vagy írjon a support@dezbatere.ro címre; a kézhezvételt tartós adathordozón igazoljuk vissza." },
       { kind: "p", text: "Ha Ön — a fizetési oldalon található jelölőnégyzet bejelölésével — azt kérte, hogy a szolgáltatást azonnal kezdjük meg, majd eláll, az elállás napjáig nyújtott szolgáltatásnak a számlázási időszakra vonatkozó árból időarányosan kiszámított részét köteles megfizetni, a fennmaradó összeget pedig visszatérítjük. Ön nem veszíti el elállási jogát azzal, hogy a 14 nap alatt használja a szolgáltatást." },
       { kind: "p", text: "Ha Ön máshol él, az A. melléklet határozza meg a régiójában esetlegesen alkalmazandó elállási vagy türelmi jogot, egyébként pedig visszatérítési szabályzatunk alkalmazandó. Az Ön országában biztosított törvényes jogok mindig elsőbbséget élveznek." }
     ]
@@ -222,7 +223,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "A szolgáltatás módosítása. A DebateAI szolgáltatást folyamatosan fejlesztjük, és a szokásos fejlesztések, javítások és a modellválaszték módosításai előzetes értesítés nélkül történnek. Ha olyan változtatást hajtunk végre, amely túlmutat a szolgáltatás leírás szerinti működésének fenntartásán, azt kizárólag az alábbi okok valamelyikéből tesszük: jogi vagy szabályozási követelmény teljesítése; biztonsági vagy visszaélési probléma kezelése; mert egy modellszolgáltató módosítja, korlátozza vagy megszünteti valamely általunk igénybe vett modell vagy funkció biztosítását; az általunk nem ellenőrzött műszaki környezethez való alkalmazkodás; vagy valamely funkció Önnek többletköltséget nem okozó hozzáadása, fejlesztése vagy kivezetése." },
       { kind: "p", text: "Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha a módosítás az Ön szolgáltatáshoz való hozzáférésére vagy annak használatára kisebbnél nagyobb hátrányos hatást gyakorol, Ön az értesítéstől vagy a módosítás hatálybalépésétől számított 30 napon belül — a kettő közül a későbbi időpontig — díjmentesen megszüntetheti a szerződést, mi pedig visszatérítjük a fel nem használt időszakra előre kifizetett összeget." },
-      { kind: "p", text: "E Feltételek módosítása. E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább 30 nappal a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a DebateAI szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: [dezbatere.ro/terms/versions]." }
+      { kind: "p", text: "E Feltételek módosítása. E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább 30 nappal a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a DebateAI szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions." }
     ]
   },
   {
@@ -244,7 +245,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Maga a szolgáltatás — a szoftver, a motor, a pontozási módszer, a felület, a DebateAI és a DebateAIRO név, valamint logóink — a mi vagy licencadóink tulajdonát képezi. E Feltételek engedélyt adnak Önnek a szolgáltatás használatára, tulajdonjogot azonban nem." },
       { kind: "p", text: "Ön a DebateAI megjelölésével és az eredeti oldalra mutató hivatkozással idézheti és hivatkozhatja a közzétett vitákat. Írásbeli megállapodásunk nélkül tilos a nyilvános korpusz tömeges másolása és rendszeres többszörözése, valamint a közzétett viták betanítási adatként való felhasználása." },
-      { kind: "p", text: "A 8. szakasz szabályozza az Ön tartalmát és a létrehozott kimenetek jogállását. Ha úgy véli, hogy a DebateAI valamely tartalma sérti szellemi tulajdonát, használja a 10. szakasz szerinti bejelentési lehetőséget. [If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is [name, address, email], registered with the US Copyright Office; we terminate the accounts of repeat infringers.]" }
+      { kind: "p", text: "A 8. szakasz szabályozza az Ön tartalmát és a létrehozott kimenetek jogállását. Ha úgy véli, hogy a DebateAI valamely tartalma sérti szellemi tulajdonát, használja a 10. szakasz szerinti bejelentési lehetőséget." }
     ]
   },
   {
@@ -252,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Személyes adatok",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "A személyes adatok kezelésének módját a [dezbatere.ro/privacy] címen elérhető Adatvédelmi szabályzat határozza meg. Ismerteti, milyen adatokat gyűjtünk, az egyes célok jogalapját, az adatok megőrzési idejét, az adatok címzettjeit, az érintett adattovábbításokat és az Ön jogai gyakorlásának módját. Három kérdés ide is tartozik. A 7. szakasz arra kéri Önt, hogy ne adja meg más személyek személyes adatait egy kérdésben; ha mégis megteszi, azért Ön felel, mi pedig eltávolíthatjuk a tartalmat. Ha egy DebateAI felületén közzétett vita Önre vonatkozó személyes adatot tartalmaz, fiók nélkül is kérheti annak eltávolítását (9. szakasz). Ezenkívül a szerződés bizonyítékaként nyilvántartjuk, hogy Ön elfogadta e Feltételeket — a változatot, az időpontot és a munkamenet technikai adatait —, amint azt az Adatvédelmi szabályzat ismerteti." }
+      { kind: "p", text: "A személyes adatok kezelésének módját a dezbatere.ro/privacy címen elérhető Adatvédelmi szabályzat határozza meg. Ismerteti, milyen adatokat gyűjtünk, az egyes célok jogalapját, az adatok megőrzési idejét, az adatok címzettjeit, az érintett adattovábbításokat és az Ön jogai gyakorlásának módját. Három kérdés ide is tartozik. A 7. szakasz arra kéri Önt, hogy ne adja meg más személyek személyes adatait egy kérdésben; ha mégis megteszi, azért Ön felel, mi pedig eltávolíthatjuk a tartalmat. Ha egy DebateAI felületén közzétett vita Önre vonatkozó személyes adatot tartalmaz, fiók nélkül is kérheti annak eltávolítását (9. szakasz). Ezenkívül a szerződés bizonyítékaként nyilvántartjuk, hogy Ön elfogadta e Feltételeket — a változatot, az időpontot és a munkamenet technikai adatait —, amint azt az Adatvédelmi szabályzat ismerteti." }
     ]
   },
   {
@@ -261,11 +262,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Irányadó jog. E Feltételekre, valamint az azokból vagy tárgyukból eredő bármely jogvitára vagy igényre — ideértve a szerződésen kívüli igényeket is — Románia joga irányadó." },
-      { kind: "p", text: "Az Ön helyi védelme nem sérül. Ha Ön fogyasztó, a román jog választása nem fosztja meg szokásos tartózkodási helye szerinti ország kötelező fogyasztóvédelmi szabályainak védelmétől — például a tisztességtelen feltételekre, az elállási és felmondási jogokra vagy a garanciákra vonatkozó szabályoktól —, amennyiben e szabályok e jogválasztástól függetlenül alkalmazandók, ideértve, ha Ön az EU-ban él, az 593/2008/EK rendelet 6. cikkének (2) bekezdését, illetve az Egyesült Királyság egyenértékű szabályait. E szabályokra a román jog mellett is hivatkozhat." },
-      { kind: "p", text: "Bíróságok, ha Ön az EU-ban, az EGT-ben vagy az Egyesült Királyságban él. Ön velünk szemben Románia bíróságai vagy a lakóhelye szerinti ország bíróságai előtt indíthat eljárást. Mi kizárólag az Ön lakóhelye szerinti ország bíróságai előtt indíthatunk eljárást Önnel szemben." },
-      { kind: "p", text: "Máshol élő fogyasztók. Ha Ön az EU-n, az EGT-n és az Egyesült Királyságon kívül él, e Feltételek egyetlen rendelkezése sem korlátozza az Ön országának joga alapján fennálló jogát arra, hogy annak bíróságai előtt igényt érvényesítsen, sem bármely, e jog alapján le nem mondható jogát — ideértve, ha Ön Ausztráliában vagy Új-Zélandon él, a fogyasztói garanciákhoz fűződő jogait; ha Brazíliában él, a Código de Defesa do Consumidor rendelkezéseit; ha pedig az Egyesült Államokban él, az állama fogyasztóvédelmi jogszabályait." },
-      { kind: "p", text: "Az Egyesült Államok lakosai. Az A.3 melléklet a szövetségi választottbíráskodási törvény hatálya alá tartozó választottbírósági megállapodást és csoportos keresetről való lemondást tartalmaz. Kizárólag az Egyesült Államok lakosaira és csak végrehajthatósága körében alkalmazandó. Nem alkalmazandó az EU, az EGT vagy az Egyesült Királyság fogyasztóira." },
-      { kind: "p", text: "Bírósághoz fordulás előtt. Lépjen velünk kapcsolatba a [legal@dezbatere.ro] címen; a legtöbb probléma orvosolható, és célunk, hogy [5] munkanapon belül válaszoljunk. Ha Ön romániai vagy uniós fogyasztó, igénybe veheti a [the ANPC – named SAL entity, website] útján elérhető alternatív vitarendezést; [do / do not] vállaljuk az eljárásban való részvételt. A moderálási döntésekre vonatkozó panaszokra a 10. szakasz szerinti külön eljárás alkalmazandó." }
+      { kind: "p", text: "Az Ön helyi védelme nem sérül. Ha Ön fogyasztó, a román jog választása nem fosztja meg szokásos tartózkodási helye szerinti ország kötelező fogyasztóvédelmi szabályainak védelmétől — például a tisztességtelen feltételekre, az elállási és felmondási jogokra vagy a garanciákra vonatkozó szabályoktól —, amennyiben e szabályok e jogválasztástól függetlenül alkalmazandók, ideértve, ha Ön az EU-ban él, az 593/2008/EK rendelet 6. cikkének (2) bekezdését. E szabályokra a román jog mellett is hivatkozhat." },
+      { kind: "p", text: "Bíróságok, ha Ön az EU-ban vagy az EGT-ben él. Ön velünk szemben Románia bíróságai vagy a lakóhelye szerinti ország bíróságai előtt indíthat eljárást. Mi kizárólag az Ön lakóhelye szerinti ország bíróságai előtt indíthatunk eljárást Önnel szemben." },
+      { kind: "p", text: "Máshol élő fogyasztók. Ha Ön az EU-n és az EGT-n kívül él, e Feltételek egyetlen rendelkezése sem korlátozza az Ön országának joga alapján fennálló jogát arra, hogy annak bíróságai előtt igényt érvényesítsen, sem bármely, e jog alapján le nem mondható jogát — ideértve, ha Ön Ausztráliában vagy Új-Zélandon él, a fogyasztói garanciákhoz fűződő jogait; ha Brazíliában él, a Código de Defesa do Consumidor rendelkezéseit; ha pedig az Egyesült Államokban él, az állama fogyasztóvédelmi jogszabályait." },
+      { kind: "p", text: "Bírósághoz fordulás előtt. Lépjen velünk kapcsolatba a support@dezbatere.ro címen; a legtöbb probléma orvosolható, és célunk, hogy 5 munkanapon belül válaszoljunk. Ha Ön romániai vagy uniós fogyasztó, igénybe veheti a www.onoratainstanta.ro útján elérhető alternatív vitarendezést; nem vállaljuk az eljárásban való részvételt. A moderálási döntésekre vonatkozó panaszokra a 10. szakasz szerinti külön eljárás alkalmazandó." }
     ]
   },
   {
@@ -278,7 +278,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Jogfenntartás. Ha valamely feltételt nem érvényesítünk azonnal, nem veszítjük el a későbbi érvényesítés jogát." },
       { kind: "p", text: "Teljes megállapodás. E Feltételek a Sütiszabályzattal és az MI-szolgáltatói nyilvántartással együtt alkotják a szolgáltatásra vonatkozó teljes megállapodást közöttünk. Az Adatvédelmi szabályzatban tett kötelezettségvállalásaink köteleznek bennünket. E bekezdés egyetlen rendelkezése sem zárja ki a csalárd megtévesztésért fennálló felelősséget." },
       { kind: "p", text: "Nyelv. E Feltételeket a webhely által kínált valamennyi nyelven közzétesszük. A szerződés nyelve az, amelyen Ön regisztrált: az Ön által elfogadott változat nyelve, amelyet az elfogadásról vezetett nyilvántartásunk rögzít. Ha Ön később egy másik nyelvű új változatot fogad el, a szerződés nyelve ettől kezdve ez a nyelv. A többi nyelvi változat fordítás. Ha az Ön lakóhelye szerinti ország joga úgy rendelkezik, hogy az adott ország nyelvén készült változat az irányadó, akkor az a változat az irányadó. Ha két nyelvi változat eltér egymástól, az Önre kedvezőbb értelmezést alkalmazzuk." },
-      { kind: "p", text: "Kapcsolat. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bukarest, Románia." }
+      { kind: "p", text: "Kapcsolat. support@dezbatere.ro · DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Románia." }
     ]
   },
   {
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "A. melléklet — Regionális feltételek",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Minden bejegyzés kizárólag akkor alkalmazandó, ha az adott régió szerepel a 2. szakaszban, és csak a törzsszövegtől való eltéréseket határozza meg. Ha egy bejegyzés és a törzsszöveg ellentétes egymással, az adott régióban élő személyekre a bejegyzés alkalmazandó." }
+      { kind: "p", text: "Minden bejegyzés az adott régióban élő személyekre alkalmazandó, és csak a törzsszövegtől való eltéréseket határozza meg. Ha egy bejegyzés és a törzsszöveg ellentétes egymással, az adott régióban élő személyekre a bejegyzés alkalmazandó." }
     ]
   },
   {
@@ -294,103 +294,70 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Európai Unió és Európai Gazdasági Térség",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye szerinti ország bíróságai előtt indíthat eljárást; a 13. szakasz szerinti elállási jog alkalmazandó; alternatív vitarendezés a [the ANPC – named entity, website] útján érhető el. Németország: a [dezbatere.ro/cancel] címen található lemondási gombbal bejelentkezés nélkül megszüntetheti előfizetését; az előfizetési feltételek, a megújítási időszakok és a felmondási idők megfelelnek a BGB 309. § (9) bekezdésének [state them]. Franciaország: előfizetését három lépésben, online megszüntetheti a [URL] címen; a [the mediator named at URL] az Ön rendelkezésére áll. Olaszország: a felelősségre (15), a felfüggesztésre (11), a módosításokra (14) és az irányadó jogra (18) vonatkozó rendelkezésekhez az Ön külön jóváhagyása szükséges, amelyet regisztrációkor külön megerősítéssel ad meg. Hollandia: e Feltételeket a szerződéskötés előtt tárolható formában bocsátjuk rendelkezésre. Lengyelország: lengyel nyelvű változat a [URL] címen érhető el." }
+      { kind: "p", text: "E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye szerinti ország bíróságai előtt indíthat eljárást; a 13. szakasz szerinti elállási jog alkalmazandó; alternatív vitarendezés a www.onoratainstanta.ro útján érhető el. Németország: a dezbatere.ro/cancel címen található lemondási gombbal bejelentkezés nélkül megszüntetheti előfizetését; az előfizetési feltételek, a megújítási időszakok és a felmondási idők megfelelnek a BGB 309. § (9) bekezdésének [state them]. Franciaország: előfizetését három lépésben, online megszüntetheti a [URL] címen. Olaszország: a felelősségre (15), a felfüggesztésre (11), a módosításokra (14) és az irányadó jogra (18) vonatkozó rendelkezésekhez az Ön külön jóváhagyása szükséges, amelyet regisztrációkor külön megerősítéssel ad meg. Hollandia: e Feltételeket a szerződéskötés előtt tárolható formában bocsátjuk rendelkezésre. Lengyelország: lengyel nyelvű változat a [URL] címen érhető el." }
     ]
   },
   {
     no: "A.2",
-    title: "Egyesült Királyság (csak akkor, ha szerepel a 2. szakaszban)",
+    title: "Egyesült Államok",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Az Egyesült Királyság GDPR-rendeletének 27. cikke szerinti egyesült királysági képviselőnk: [name, address, email]. Önre alkalmazandó a fogyasztói jogokról szóló 2015. évi törvény, és e Feltételek egyetlen rendelkezése sem korlátozza az abból eredő jogait; a digitális piacokról, a versenyről és a fogyasztókról szóló 2024. évi törvény előfizetési szabályai hatálybalépésüktől (várhatóan 2027-től) alkalmazandók a fizetős csomagokra, ideértve a megújítások és az ingyenes próbaidőszakok utáni türelmi időt. Hogyan védjük a felhasználókat a jogellenes tartalomtól: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Az általunk használt proaktív technológia: [describe, or \"none\"]. Életkor-ellenőrzés: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. A 10. szakasz szerinti panaszkezelési eljárás fogadja a jogellenes tartalomra, az Ön tartalmának jogtalan eltávolítására, fiókjának korlátozására, az Ön tartalmát érintő automatizált eszközök használatára, valamint az Önt tévesen kizáró életkor-megállapításra vonatkozó panaszokat. Az eljárás a tartalom által érintett azon személyek számára is nyitva áll, akik nem felhasználók. Adatait Adatvédelmi szabályzatunk B.2 pontja szabályozza." }
+      { kind: "p", text: "Tennessee. A DebateAI szolgáltatást nem kínáljuk a Tennessee államban élő személyeknek." },
+      { kind: "p", text: "Értesítések és eltávolítások. A hozzájárulás nélkül megosztott intim képfelvételeket fiók nélkül be lehet jelenteni a [URL] címen, és érvényes kérelem esetén 48 órán belül eltávolítjuk azokat. A szerzői jogi panaszokat a 10. szakaszban ismertetett bejelentési úton kell benyújtani." },
+      { kind: "p", text: "Államspecifikus rendelkezések. Kalifornia: a 12. szakasz automatikus megújítási feltételei alkalmazandók; Ön bármikor lemondhatja előfizetését online; a megújítási feltételekhez adott hozzájárulását legalább három évig megőrizzük. New York: bármely emelt összegű terheléstől számított 14 napon belül lemondhatja előfizetését, és időarányos visszatérítést kaphat. Texas és Nebraska: érzékeny személyes adatokat nem értékesítünk. Washington: az egészséggel kapcsolatos adatokra a [URL] címen elérhető Fogyasztói egészségügyi adatokra vonatkozó adatvédelmi tájékoztatónk alkalmazandó. Colorado: a szolgáltatás semmilyen, Önre nézve jelentős következménnyel járó döntést nem hoz. Adatait és az állama szerinti adatvédelmi jogait Adatvédelmi szabályzatunk B.2 pontja szabályozza." }
     ]
   },
   {
     no: "A.3",
-    title: "Egyesült Államok (csak akkor, ha szerepel a 2. szakaszban)",
+    title: "Kanada és Québec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tennessee. A DebateAI szolgáltatást nem kínáljuk a Tennessee államban élő személyeknek." },
-      { kind: "p", text: "Választottbírósági megállapodás és lemondás a csoportos keresetről. Ha Ön az Egyesült Államokban él, Ön és a DebateAIRO megállapodnak abban, hogy az e Feltételekből vagy a szolgáltatásból eredő jogvitákat bírósági eljárás helyett a [the American Arbitration Association / JAMS] által a fogyasztói szabályai szerint kezelt, kötelező erejű egyéni választottbírósági eljárásban rendezik, azzal, hogy bármelyik fél egyéni igényt érvényesíthet a kis értékű követelések bírósága előtt. Ön kizárhatja az alkalmazást, ha e Feltételek első elfogadásától számított 30 napon belül e-mailt küld a [address] címre. E megállapodásra a szövetségi választottbíráskodási törvény irányadó. A választottbírósági eljárás benyújtási díjait mi fizetjük. A jogszabályok által megengedett mértékben a felek lemondanak a csoportos, kollektív és képviseleti eljárásokról. E szakasz kizárólag a jövőre nézve alkalmazandó, és nem vonatkozik az Ön általi elfogadás előtt keletkezett igényekre." },
-      { kind: "p", text: "Értesítések és eltávolítások. A hozzájárulás nélkül megosztott intim képfelvételeket fiók nélkül be lehet jelenteni a [URL] címen, és érvényes kérelem esetén 48 órán belül eltávolítjuk azokat. A szerzői jogi panaszokat a 16. szakaszban megnevezett kijelölt megbízottunkhoz kell benyújtani." },
-      { kind: "p", text: "Államspecifikus rendelkezések. Kalifornia: a 12. szakasz automatikus megújítási feltételei alkalmazandók; Ön bármikor lemondhatja előfizetését online; a megújítási feltételekhez adott hozzájárulását legalább három évig megőrizzük. New York: bármely emelt összegű terheléstől számított 14 napon belül lemondhatja előfizetését, és időarányos visszatérítést kaphat. Texas és Nebraska: érzékeny személyes adatokat nem értékesítünk. Washington: az egészséggel kapcsolatos adatokra a [URL] címen elérhető Fogyasztói egészségügyi adatokra vonatkozó adatvédelmi tájékoztatónk alkalmazandó. Colorado: a szolgáltatás semmilyen, Önre nézve jelentős következménnyel járó döntést nem hoz. Adatait és az állama szerinti adatvédelmi jogait Adatvédelmi szabályzatunk B.3 pontja szabályozza." }
+      { kind: "p", text: "Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Adatait Adatvédelmi szabályzatunk B.3 pontja szabályozza. Québec: e Feltételek francia nyelven is elérhetők; a franciát a nyelvválasztóban választhatja ki; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását." }
     ]
   },
   {
     no: "A.4",
-    title: "Kanada és Québec (csak akkor, ha szerepel)",
+    title: "Ausztrália és Új-Zéland",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: [name], privacy@dezbatere.ro. Adatait Adatvédelmi szabályzatunk B.4 pontja szabályozza. Québec: e Feltételek francia nyelven is elérhetők; a franciát a nyelvválasztóban választhatja ki; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását; Önre nem vonatkozik választottbírósági megállapodás vagy a csoportos keresetről való lemondás." }
+      { kind: "p", text: "Szolgáltatásainkra az ausztrál fogyasztóvédelmi jog alapján ki nem zárható garanciák vonatkoznak. A szolgáltatás súlyos hibája esetén Ön jogosult a szerződés megszüntetésére és a fel nem használt rész visszatérítésére vagy a csökkent érték megtérítésére; továbbá jogosult minden más, észszerűen előrelátható veszteség vagy kár megtérítésére. Ha a hiba nem minősül súlyosnak, Ön jogosult arra, hogy a szolgáltatás hibáit észszerű időn belül kijavítsuk, ha pedig ez nem történik meg, megszüntetheti a szerződést és visszatérítést kaphat. A 64A. szakasz által megengedett mértékben a garancia megsértéséért fennálló felelősségünk a szolgáltatás újbóli nyújtására vagy ennek költsége megfizetésére korlátozódik. A fizetős csomagra a 12. szakaszban biztosítottakon túl nem vonatkozik türelmi elállási jog; a visszatérítési kérelmeket a support@dezbatere.ro címen kezeljük. Új-Zéland: az 1993. évi fogyasztói garanciákról szóló törvény alkalmazandó, és e Feltételek egyetlen rendelkezése sem zárja ki azt; a káros digitális kommunikációt a 10. szakasz alapján nekünk vagy a Netsafe szervezetnek lehet bejelenteni." }
     ]
   },
   {
     no: "A.5",
-    title: "Ausztrália és Új-Zéland (csak akkor, ha szerepel)",
+    title: "Svájc",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Szolgáltatásainkra az ausztrál fogyasztóvédelmi jog alapján ki nem zárható garanciák vonatkoznak. A szolgáltatás súlyos hibája esetén Ön jogosult a szerződés megszüntetésére és a fel nem használt rész visszatérítésére vagy a csökkent érték megtérítésére; továbbá jogosult minden más, észszerűen előrelátható veszteség vagy kár megtérítésére. Ha a hiba nem minősül súlyosnak, Ön jogosult arra, hogy a szolgáltatás hibáit észszerű időn belül kijavítsuk, ha pedig ez nem történik meg, megszüntetheti a szerződést és visszatérítést kaphat. A 64A. szakasz által megengedett mértékben a garancia megsértéséért fennálló felelősségünk a szolgáltatás újbóli nyújtására vagy ennek költsége megfizetésére korlátozódik. A fizetős csomagra a 12. szakaszban biztosítottakon túl nem vonatkozik türelmi elállási jog; visszatérítési szabályzatunk: […]. Új-Zéland: az 1993. évi fogyasztói garanciákról szóló törvény alkalmazandó, és e Feltételek egyetlen rendelkezése sem zárja ki azt; a káros digitális kommunikációt a 10. szakasz alapján nekünk vagy a Netsafe szervezetnek lehet bejelenteni." }
+      { kind: "p", text: "Adataira a svájci szövetségi adatvédelmi törvény alkalmazandó (Adatvédelmi szabályzat, B.5 pont). Svájcban a lakóhelye szerinti bíróság előtt indíthat eljárást. A fizetős csomagra nem vonatkozik törvényes elállási jog; a visszatérítési kérelmeket a support@dezbatere.ro címen kezeljük." }
     ]
   },
   {
     no: "A.6",
-    title: "Svájc (csak akkor, ha szerepel)",
+    title: "Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Adataira a svájci szövetségi adatvédelmi törvény alkalmazandó (Adatvédelmi szabályzat, B.6 pont). Svájcban a lakóhelye szerinti bíróság előtt indíthat eljárást. A fizetős csomagra nem vonatkozik törvényes elállási jog; visszatérítési szabályzatunk: […]." }
+      { kind: "p", text: "E Feltételek alapján Önt ugyanazok a jogok illetik meg, mint egy európai uniós fogyasztót, ideértve a 13. szakasz szerinti 14 napos elállási jogot. Moldova bíróságai előtt indíthat eljárást. Adataira Moldova személyes adatok védelméről szóló 195/2024. számú törvénye alkalmazandó (Adatvédelmi szabályzat, B.6 pont)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldova (csak akkor, ha szerepel)",
+    title: "Ázsia és a csendes-óceáni térség",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "E Feltételek alapján Önt ugyanazok a jogok illetik meg, mint egy európai uniós fogyasztót, ideértve a 13. szakasz szerinti 14 napos elállási jogot. Moldova bíróságai előtt indíthat eljárást. Adataira Moldova személyes adatok védelméről szóló 195/2024. számú törvénye alkalmazandó (Adatvédelmi szabályzat, B.7 pont)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukrajna (csak akkor, ha szerepel)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "A DebateAI szolgáltatást Ukrajnában kínáljuk, kivéve azokat a területeket, amelyek nem állnak az ukrán kormány ellenőrzése alatt. A termék és e Feltételek ukrán nyelven is elérhetők. Adataira Ukrajna „A személyes adatok védelméről” szóló törvénye alkalmazandó (Adatvédelmi szabályzat, B.8 pont)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Izrael (csak akkor, ha szerepel)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Fizetős csomagját a fogyasztóvédelemről szóló 5741-1981. számú izraeli törvény szerint mondhatja le [state the cancellation terms]. E Feltételek és Adatvédelmi szabályzatunk héber nyelven is elérhetők. Adataira Izrael magánszféra védelméről szóló törvénye alkalmazandó (Adatvédelmi szabályzat, B.9 pont)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Ázsia és a csendes-óceáni térség (csak a felsorolt régiókra vonatkozó sorok)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Szingapúr: adatvédelmi tisztviselőnk: [name, email]; az adattovábbítások a PDPA rendelkezéseihez hasonló szerződéses garanciákon alapulnak; a fizetős csomagra nem vonatkozik törvényes türelmi elállási jog, visszatérítési szabályzatunk pedig: […]. Japán: a meghatározott kereskedelmi ügyletekről szóló törvény szerinti kötelező tájékoztatás a [URL] címen érhető el; az online előfizetésekre nem vonatkozik általános türelmi elállási jog, visszatérítési szabályzatunk pedig: […]; tartalmát az Egyesült Államokban és az Európai Unióban működő MI-szolgáltatóknak küldjük el, mindegyiknek olyan szerződés alapján, amely a japán személyesinformáció-védelmi törvénnyel egyenértékű védelmet ír elő, és kérésre tájékoztatjuk ezekről az intézkedésekről. Dél-Korea: az opcionális adatkezeléshez és marketinghez adott hozzájárulásokat a szolgáltatás működtetéséhez szükséges tételektől elkülönítve gyűjtjük; adatvédelmi tisztviselőnk: [name], privacy@dezbatere.ro; az elektronikus kereskedelemről szóló törvényre figyelemmel az előfizetéstől számított 7 napon belül elállhat a fizetős csomagtól; minden ismétlődő áremelés vagy ingyenesről fizetősre váltás előtt újból beszerezzük hozzájárulását; a szolgáltatás generatív MI-t használ, erről a használat előtt tájékoztatjuk, és megjelöljük az MI által létrehozott kimeneteket. Tajvan: a fogyasztóvédelmi törvény alapján az előfizetéstől számított 7 napon belül elállhat a fizetős csomagtól; adataira Tajvan személyes adatok védelméről szóló törvénye alkalmazandó (Adatvédelmi szabályzat, B.10 pont). Thaiföld: thaiföldi képviselőnk: [name] [if appointed]. Fülöp-szigetek: az internetes ügyletekről szóló törvény szerinti üzleti azonosító adataink és jogorvoslati mechanizmusunk a [URL] címen érhetők el; panasz a Nemzeti Adatvédelmi Bizottsághoz nyújtható be." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Fenntartva",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Törökország, Brazília és Indonézia mindegyike helyi nyelvű mellékletet, képviselőt vagy nyilvántartásba vételt és bejelentéseket követel meg. Ezeket itt nem dolgoztuk ki, és mindaddig nem tartoznak a 2. szakasz hatálya alá, amíg kifejezetten fel nem vesszük őket. Kínában, Vietnamban és Oroszországban nem kínáljuk a szolgáltatást." }
+      { kind: "p", text: "Szingapúr: adatvédelmi tisztviselőnk az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen; az adattovábbítások a PDPA rendelkezéseihez hasonló szerződéses garanciákon alapulnak; a fizetős csomagra nem vonatkozik törvényes türelmi elállási jog, a visszatérítési kérelmeket pedig a support@dezbatere.ro címen kezeljük. Japán: a meghatározott kereskedelmi ügyletekről szóló törvény szerinti kötelező tájékoztatás a [URL] címen érhető el; az online előfizetésekre nem vonatkozik általános türelmi elállási jog, a visszatérítési kérelmeket pedig a support@dezbatere.ro címen kezeljük; tartalmát az Egyesült Államokban és az Európai Unióban működő MI-szolgáltatóknak küldjük el, mindegyiknek olyan szerződés alapján, amely a japán személyesinformáció-védelmi törvénnyel egyenértékű védelmet ír elő, és kérésre tájékoztatjuk ezekről az intézkedésekről. Dél-Korea: az opcionális adatkezeléshez és marketinghez adott hozzájárulásokat a szolgáltatás működtetéséhez szükséges tételektől elkülönítve gyűjtjük; adatvédelmi tisztviselőnk az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen; az elektronikus kereskedelemről szóló törvényre figyelemmel az előfizetéstől számított 7 napon belül elállhat a fizetős csomagtól; minden ismétlődő áremelés vagy ingyenesről fizetősre váltás előtt újból beszerezzük hozzájárulását; a szolgáltatás generatív MI-t használ, erről a használat előtt tájékoztatjuk, és megjelöljük az MI által létrehozott kimeneteket. Tajvan: a fogyasztóvédelmi törvény alapján az előfizetéstől számított 7 napon belül elállhat a fizetős csomagtól; adataira Tajvan személyes adatok védelméről szóló törvénye alkalmazandó (Adatvédelmi szabályzat, B.7 pont)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "083bd3cbaf58dd42e2f40189ac3f1cfe5a42936fa58d907cdd71ff6fcd1b3823",
-  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.1 · HATÁLYOS [DATE]",
+  version: "2.2",
+  sha256: "f57d46b594ecec8343bed37a993e9a227fab8cf77622920efed0f6e7a18473ec",
+  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.2 · HATÁLYOS 2026. OKTÓBER 12.",
   title: "Amit Ön elfogad",
-  lede: "Az Ön és a DebateAIRO S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",
-  endMarker: "A FELTÉTELEK VÉGE · v2.1",
-  contact: "[legal@dezbatere.ro]",
+  lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",
+  endMarker: "A FELTÉTELEK VÉGE · v2.2",
+  contact: "support@dezbatere.ro",
   bodyLabel: "A Szolgáltatási feltételek szövege",
   sectionIdPrefix: "terms-section-",
   titleId: "terms-modal-title",

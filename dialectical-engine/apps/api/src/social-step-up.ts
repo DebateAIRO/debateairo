@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { generateAuthenticationOptions } from '@simplewebauthn/server';
 import { CompleteSocialStepUpRequestSchema, SocialStepUpStatusRequestSchema, SocialStepUpStatusResponseSchema, PasskeyAuthenticationOptionsResponseSchema, StepUpResponseSchema, type SocialStepUpStatusResponse, type PasskeyAuthenticationOptionsResponse, type StepUpResponse } from '@debateai/contract';
-import { decrypt, matchTotpStep, hashToken, normalizeRecoveryCode, recoveryCodeSlot, verifyRecoveryCode, generateRecoveryCode, hashRecoveryCode, type Argon2Executor, type ReadableUserDekStore } from '@debateai/crypto';
+import { decrypt, matchTotpStep, hashToken, normalizeRecoveryCode, recoveryCodeSlot, verifyRecoveryCode, type Argon2Executor, type ReadableUserDekStore } from '@debateai/crypto';
 import type { AuthSourceContext, PostgresSocialIdentityRepository } from '@debateai/db';
 import type { MfaPolicy } from '@debateai/register';
 import { consumerSecuritySession, parseConsumerSecurityInput } from './consumer-security.js';
@@ -71,7 +71,6 @@ export class SocialStepUpService implements SocialStepUpApplication {
         const lookup = { ...authority, ...('credential' in p ? { credentialId: p.credential.id } : {}), ...(normalized ? { recoverySlot: recoveryCodeSlot(normalized) } : {}) };
         const r = await this.repository.readStepUp(lookup);
         let proof: Record<string, unknown>;
-        let replacement: string | undefined;
         if ('credential' in p) {
             if (!r.credentialId || !r.userHandle || r.counter === null || r.deviceType === null || r.backedUp === null || !r.publicKey || !r.challengeHash || r.handleHash !== socialHash('step-up-passkey', p.challenge_handle) || r.origin !== this.origin || r.rpId !== this.rpId)
                 throw new SocialAuthError('SOCIAL_PROOF_INVALID');
@@ -81,8 +80,8 @@ export class SocialStepUpService implements SocialStepUpApplication {
         else if (normalized) {
             if (r.codeSlot === null || !r.recoveryCodeId || !r.codeHash || !storedArgon2EnvelopeNotOverPolicy(r.codeHash, this.dependencies.mfaPolicy.recoveryCodes.argon2id, 'recovery-code') || !await verifyRecoveryCode(this.dependencies.argon2, r.codeHash, normalized))
                 throw new SocialAuthError('SOCIAL_PROOF_INVALID');
-            replacement = generateRecoveryCode(r.codeSlot);
-            proof = { method: 'recovery_code', recoverySlot: r.codeSlot, recoveryCodeId: r.recoveryCodeId, codeHash: r.codeHash, replacementHash: await hashRecoveryCode(this.dependencies.argon2, replacement, this.dependencies.mfaPolicy.recoveryCodes.argon2id) };
+            // Design note 2026-10-09 item 3: the used code is consumed and never refilled.
+            proof = { method: 'recovery_code', recoverySlot: r.codeSlot, recoveryCodeId: r.recoveryCodeId, codeHash: r.codeHash };
         }
         else {
             if (!r.factorId || !r.secretCiphertext)
@@ -103,6 +102,6 @@ export class SocialStepUpService implements SocialStepUpApplication {
         }
         const material = this.sessions.prepare(source), grant = random();
         const result = await this.repository.completeStepUp({ ...lookup, ...proof, replacementTokenHash: material.sessionTokenHash, replacementCsrfHash: material.csrfTokenHash, grantHash: hashToken('step-up-grant', grant) }, source);
-        return { sessionToken: material.sessionToken, response: StepUpResponseSchema.parse({ status: 'step_up_complete', csrf_token: material.csrfToken, step_up_grant: { ...result.authorization, token: grant, expires_at: new Date(result.expiresAt).toISOString() }, ...(replacement ? { replacement_recovery_code: replacement } : {}) }) };
+        return { sessionToken: material.sessionToken, response: StepUpResponseSchema.parse({ status: 'step_up_complete', csrf_token: material.csrfToken, step_up_grant: { ...result.authorization, token: grant, expires_at: new Date(result.expiresAt).toISOString() } }) };
     }
 }

@@ -202,6 +202,6 @@
   "public.publication.contentCheck.groundIllegal": "Der Text könnte auch rechtswidrig sein.",
   "public.publication.contentCheck.automated": "Diese Entscheidung wurde von einem automatischen Werkzeug getroffen. Sie wurde noch von keiner Person geprüft.",
   "public.publication.contentCheck.stillPrivate": "Ihre Debatte bleibt privat und unverändert. Nur Sie können sie sehen.",
-  "public.publication.contentCheck.appeal": "Um eine Überprüfung dieser Entscheidung durch eine Person zu beantragen, schreiben Sie innerhalb von sechs Monaten an [appeals@dezbatere.ro].",
+  "public.publication.contentCheck.appeal": "Um eine Überprüfung dieser Entscheidung durch eine Person zu beantragen, schreiben Sie innerhalb von sechs Monaten an office@dezbatere.ro.",
   "public.publication.contentCheck.unavailable": "Die Inhaltsprüfung ist derzeit nicht verfügbar. Deshalb wurde nichts veröffentlicht. Ihre Debatte bleibt privat. Versuchen Sie es in einigen Minuten erneut."
 }

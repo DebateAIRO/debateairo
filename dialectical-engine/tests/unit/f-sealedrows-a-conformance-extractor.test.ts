@@ -94,8 +94,10 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
     const development = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((r) => [r.rowKey, r.value]));
     expect(acceptance.judgeContractHash)
       .toBe("e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365");
+    // serve.synthesizer.v2 (2026-10-09) superseded the v1 composer seal
+    // d96e7cc9…c866 (register versions sealed before it keep that value).
     expect(acceptance.composerContractHash)
-      .toBe("d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866");
+      .toBe("340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70");
     // Both deployments seal the same values, or one of them is seeding a prompt
     // the other never sends.
     expect(development.judgeContractHash).toBe(acceptance.judgeContractHash);

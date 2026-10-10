@@ -84,10 +84,10 @@ describe("P21 the pages the card processor requires, on the colleague's legal pa
     expect(text).not.toMatch(/[€$£]|\bEUR\b|\bUSD\b|\blei\b/);
   });
 
-  it("/legal shows the VAT registration the owner confirmed, its number still bracketed (R3-4)", async () => {
+  it("/legal shows the VAT registration the owner confirmed, with its RO VAT code (R3-4)", async () => {
     const document = await page(LegalNoticePage);
     const vat = [...document.querySelectorAll(".legalFactTable tr")].find((row) => row.querySelector("th")?.textContent === "VAT");
-    expect(vat?.querySelector("td")?.textContent).toBe("[RO…]");
+    expect(vat?.querySelector("td")?.textContent).toBe("RO45935221");
   });
 
   it("/withdraw explains the right, sends the person to sign in and to Settings, and names the email route (Q-9)", async () => {

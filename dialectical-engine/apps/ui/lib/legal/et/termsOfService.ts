@@ -28,7 +28,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Lühidalt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Peate olema vähemalt 18-aastane. DebateAI koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil [abuse@dezbatere.ro], olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse." }
+      { kind: "p", text: "Peate olema vähemalt 18-aastane. DebateAI koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse." }
     ]
   },
   {
@@ -36,24 +36,25 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kes me oleme ja kuidas meiega ühendust võtta",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI-d käitab Rumeenias registreeritud äriühing DebateAIRO S.R.L.." },
+      { kind: "p", text: "DebateAI-d käitab Rumeenias registreeritud äriühing DMS Merchandise Shop S.R.L.." },
       {
         kind: "list",
         items: [
-        "Registrijärgne asukoht — [street, number, sector, postal code], Bukarest, Rumeenia",
-        "Äriregistri number — [J40/…/…]",
-        "Registrikood (CUI) — […] · Käibemaks: [RO… / not VAT-registered]",
-        "Osakapital — [RON …]",
-        "Üldine kontakt — [hello@dezbatere.ro]",
-        "Õiguslikud teated — [legal@dezbatere.ro]",
+        "Registrijärgne asukoht — Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumeenia",
+        "Äriregistri number — J2022000426271",
+        "Registrikood (CUI) — 45935221 · Käibemaks: RO45935221",
+        "Osakapital — 5000 RON",
+        "Üldine kontakt — support@dezbatere.ro",
+        "Telefon — +40 748 793 490",
+        "Õiguslikud teated — support@dezbatere.ro",
         "Privaatsus ja andmekaitse — privacy@dezbatere.ro",
-        "Ebaseaduslikust sisust teatamine — [abuse@dezbatere.ro] — vt jaotis 10",
-        "Ametiasutuste kontaktpunkt — [dsa@dezbatere.ro] — rumeenia ja inglise keeles",
-        "Terroristliku sisu eemaldamiskorraldused (määrus (EL) 2021/784) — [dsa@dezbatere.ro] — meie kontaktpunkt selliste korralduste jaoks; rumeenia ja inglise keeles; vt jaotis 10",
+        "Ebaseaduslikust sisust teatamine — support@dezbatere.ro — vt jaotis 10",
+        "Ametiasutuste kontaktpunkt — office@dezbatere.ro — rumeenia ja inglise keeles",
+        "Terroristliku sisu eemaldamiskorraldused (määrus (EL) 2021/784) — office@dezbatere.ro — meie kontaktpunkt selliste korralduste jaoks; rumeenia ja inglise keeles; vt jaotis 10",
         "Esindajad teistes riikides — Loetletud lisas A nende piirkondade kohta, kus oleme esindaja määranud"
         ]
       },
-      { kind: "p", text: "Need andmed on püsivalt esitatud ka veebisaidil [dezbatere.ro/legal]. Teil on alati võimalik võtta ühendust inimesega, mitte ainult meie assistendiga; jaotises 10 selgitatakse, kuidas seda teha." }
+      { kind: "p", text: "Need andmed on püsivalt esitatud ka veebisaidil dezbatere.ro/legal. Teil on alati võimalik võtta ühendust inimesega, mitte ainult meie assistendiga; jaotises 10 selgitatakse, kuidas seda teha." }
     ]
   },
   {
@@ -61,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kus me DebateAI-d pakume",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Pakume DebateAI-d inimestele, kes elavad [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
+      { kind: "p", text: "Pakume DebateAI-d inimestele, kes elavad Euroopa Liidus (27 riiki) ja Euroopa Majanduspiirkonnas (Norra, Island ja Liechtenstein), Šveitsis, Moldovas, Ameerika Ühendriikides (välja arvatud Tennessee), Kanadas, Austraalias, Uus-Meremaal, Singapuris, Jaapanis, Lõuna-Koreas ja Taiwanil. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
     ]
   },
   {
@@ -69,8 +70,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Nende Tingimustega nõustumine",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Nõustute nende Tingimustega, märkides ruudu „Olen tutvunud teenusetingimustega ja nõustun nendega“ ning klõpsates nuppu Looge konto. Sellega tekib teie ja DebateAIRO S.R.L.-i vahel leping. Tingimused hõlmavad jaotises 7 esitatud lubatud kasutuse reegleid, jaotises 9 esitatud avaldamisreegleid, jaotises 15 esitatud vastutussätteid, jaotises 18 esitatud kohaldatava õiguse ja vaidluste lahendamise sätteid ning juhul, kui elate Ameerika Ühendriikides, lisas A.3 esitatud vahekohtukokkulepet. Säilitame andmed selle kohta, millise versiooniga ja millal nõustusite, nagu on selgitatud meie Privaatsuspoliitikas." },
-      { kind: "p", text: "Meie Privaatsuspoliitikas aadressil [dezbatere.ro/privacy] selgitatakse, kuidas me isikuandmeid töötleme. See on teave, mille oleme kohustatud teile esitama, mitte leping, millega te nõustute, ning miski neis Tingimustes ei muuda seda töötlemiseks antavaks nõusolekuks. Meie Küpsisepoliitika aadressil [dezbatere.ro/cookies] ja tehisintellekti pakkujate register aadressil [dezbatere.ro/providers] on viite kaudu nende Tingimuste osa." },
+      { kind: "p", text: "Nõustute nende Tingimustega, märkides ruudu „Olen tutvunud teenusetingimustega ja nõustun nendega“ ning klõpsates nuppu Looge konto. Sellega tekib teie ja DMS Merchandise Shop S.R.L.-i vahel leping. Tingimused hõlmavad jaotises 7 esitatud lubatud kasutuse reegleid, jaotises 9 esitatud avaldamisreegleid, jaotises 15 esitatud vastutussätteid ning jaotises 18 esitatud kohaldatava õiguse ja vaidluste lahendamise sätteid. Säilitame andmed selle kohta, millise versiooniga ja millal nõustusite, nagu on selgitatud meie Privaatsuspoliitikas." },
+      { kind: "p", text: "Meie Privaatsuspoliitikas aadressil dezbatere.ro/privacy selgitatakse, kuidas me isikuandmeid töötleme. See on teave, mille oleme kohustatud teile esitama, mitte leping, millega te nõustute, ning miski neis Tingimustes ei muuda seda töötlemiseks antavaks nõusolekuks. Meie Küpsisepoliitika aadressil dezbatere.ro/cookies ja tehisintellekti pakkujate register aadressil dezbatere.ro/providers on viite kaudu nende Tingimuste osa." },
       { kind: "p", text: "Enne meiega elektrooniliselt lepingu sõlmimist näidatakse kasutajaliideses vajalikke samme, võimaldatakse teil sisestatu enne esitamist üle vaadata ja parandada ning antakse teada keeled, milles saab lepingu sõlmida. Need Tingimused on saadaval salvestataval ja prinditaval kujul. Tasulise paketi ostmisel saadame teile e-posti teel versiooni, millega nõustusite. Koopiat saate taotleda igal ajal. Miski neis Tingimustes ei piira teie õigusi, mis tulenevad Rumeenia või ELi tarbijaõigusest või teie elukohariigi õigusest ja mida ei saa lepinguga piirata." }
     ]
   },
@@ -133,7 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Me ei kasuta teie sisu mudelite treenimiseks. Me ei kasuta teie sisu mudelite treenimiseks ning meie lepingud tehisintellekti pakkujatega välistavad teie sisu kasutamise nende mudelite treenimiseks või täiustamiseks. [Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.]" },
       { kind: "p", text: "Kuidas teie sisu jõuab tehisintellekti pakkujateni. Väitluse läbiviimiseks saadame teksti ühele või mitmele välisele mudelipakkujale. Pakkuja saab teie küsimuse, teie määratud suunavad annotatsioonid ja väitluse käigus mootori koostatud väited — seega näeb pakkuja teie sisestatud tekstist tuletatud ja selle ümber loodud teksti, mitte ainult teie algseid sõnu. Pakkuja ei saa kunagi teie e-posti aadressi, konto tunnuseid, seansikirjeid ega makseandmeid." },
       { kind: "p", text: "Mida kasutajatoe vestlus saadab. Kasutajatoe assistent on samuti tehisintellekti mudel. Kui te talle kirjutate, saadame teie sõnumi koos abiartiklitega, millel tema vastus põhineb, välisele mudelipakkujale, et mudel saaks vastata. Enne saatmist maskeerime kõik, mis näeb välja nagu parool, ühekordne kood või võti. Kui palute inimesega rääkida, saadame mudelile ka vestluse, samamoodi maskeerituna, et see kirjutaks lühikese kokkuvõtte meie meeskonna liikmele, kes teie juhtumi üle võtab. Me ei lisa teie e-posti aadressi, konto tunnuseid ega makseandmeid, kuid mudel saab kõik muu, mida vestlusesse kirjutate, seega ärge kirjutage sinna midagi, mida te ei soovi, et mudel loeks." },
-      { kind: "p", text: "Millised pakkujad ja kus. Meie tehisintellekti pakkujate register aadressil [dezbatere.ro/providers] on nende Tingimuste osa. Selles on iga võimaliku pakkuja kohta märgitud tema juriidiline isik ja riik; mida ja miks ta saab; kus ta andmeid töötleb; tema säilitamistingimused; kas meie kasutatavas otspunktis rakendatakse andmete säilitamata jätmist; kas ta võib meie lepingu alusel kasutada sisendeid treenimiseks; edastusmehhanism, millele tugineme; ning iga kirje viimase kontrollimise kuupäev. Pakkujad võivad asuda väljaspool teie riiki ja Euroopa Majanduspiirkonda. Meie Privaatsuspoliitikas selgitatakse kaitsemeetmeid." },
+      { kind: "p", text: "Millised pakkujad ja kus. Meie tehisintellekti pakkujate register aadressil dezbatere.ro/providers on nende Tingimuste osa. Selles on iga võimaliku pakkuja kohta märgitud tema juriidiline isik ja riik; mida ja miks ta saab; kus ta andmeid töötleb; tema säilitamistingimused; kas meie kasutatavas otspunktis rakendatakse andmete säilitamata jätmist; kas ta võib meie lepingu alusel kasutada sisendeid treenimiseks; edastusmehhanism, millele tugineme; ning iga kirje viimase kontrollimise kuupäev. Pakkujad võivad asuda väljaspool teie riiki ja Euroopa Majanduspiirkonda. Meie Privaatsuspoliitikas selgitatakse kaitsemeetmeid." },
       { kind: "p", text: "Kolm eri asja. „Ei kasutata mudelite treenimiseks“, „säilitatakse piiratud aja jooksul turvalisuse, kuritarvitamise ennetamise või õiguslikel põhjustel“ ja „andmeid ei säilitata — neid ei talletata pärast töötlemist“ on eri asjad. Kui pakkuja säilitab viipasid piiratud aja, märgitakse registris, kui kaua ja miks. Kui rakendatakse andmete säilitamata jätmist, märgitakse registris nii see kui ka funktsioonid, mille suhtes see kehtib. Me ei väida, et sisu ei säilitata, kui seda tegelikult säilitatakse." },
       { kind: "p", text: "Väljundid. Teie ja meie vahelises suhtes võite oma väitluste väljundit kasutada mis tahes seaduslikul eesmärgil ning me ei pretendeeri loodud teksti omandiõigusele. Võtke arvesse, et loodud väljund ei pruugi paljudes jurisdiktsioonides olla autoriõigusega kaitstav; et sarnast väljundit võidakse luua teistele kasutajatele; et väljundid võivad reprodutseerida või meenutada kolmandate isikute materjali; ning et mõnele tehisintellekti pakkuja hangitud lähtematerjalile võivad kehtida taaskasutuse piirangud. Vastutate kontrollimise eest enne väljunditele tuginemist või nende uuesti avaldamist." }
     ]
@@ -157,7 +158,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Sisust teatamine, modereerimine ja kaebused",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Sisust võib teatada igaüks. Kontot ei ole vaja. Kirjutage aadressil [abuse@dezbatere.ro] või kasutage mis tahes avaldatud väitluse juhtelementi Teatage. Et saaksime tegutseda, öelge meile: miks on sisu teie arvates ebaseaduslik või rikub neid Tingimusi, piisavalt üksikasjalikult, et saaksime väitest aru; täpne asukoht — täielik URL ja võimaluse korral vastav lõik; teie nimi ja e-posti aadress (ei ole nõutav laste seksuaalset väärkohtlemist kujutavast materjalist teatamisel); ning kinnitus, et usute heas usus oma teate õigsusesse ja täielikkusse." },
+      { kind: "p", text: "Sisust võib teatada igaüks. Kontot ei ole vaja. Kirjutage aadressil support@dezbatere.ro või kasutage mis tahes avaldatud väitluse juhtelementi Teatage. Et saaksime tegutseda, öelge meile: miks on sisu teie arvates ebaseaduslik või rikub neid Tingimusi, piisavalt üksikasjalikult, et saaksime väitest aru; täpne asukoht — täielik URL ja võimaluse korral vastav lõik; teie nimi ja e-posti aadress (ei ole nõutav laste seksuaalset väärkohtlemist kujutavast materjalist teatamisel); ning kinnitus, et usute heas usus oma teate õigsusesse ja täielikkusse." },
       { kind: "p", text: "Kinnitame iga teate kättesaamist põhjendamatu viivituseta. Käsitleme teateid aegsasti, hoolikalt, mittemeelevaldselt ja objektiivselt, teatame teile oma otsuse ning selgitame, kuidas seda vaidlustada. Kui kasutame teate töötlemiseks või selle üle otsustamiseks automatiseeritud vahendeid, anname sellest teada. Nõusolekuta jagatud intiimkujutiste teadete alusel tegutsetakse 48 tunni jooksul pärast kehtiva taotluse saamist." },
       { kind: "p", text: "Kaks liiki automatiseeritud otsuseid, mida hoitakse lahus." },
       {
@@ -168,7 +169,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Põhjendus. Kui eemaldame teie sisu või piirame selle nähtavust või peatame või lõpetame teie konto, esitame teile põhjenduse: mida tegime ja millises ulatuses, asjaolud, millele tuginesime, ja kas need pärinesid teatest või meie enda kontrollist, kas kasutati automatiseeritud vahendeid, õiguslik või lepinguline alus ning viis, kuidas saate otsuse vaidlustada: allpool kirjeldatud kaebuste esitamise kanali kaudu, ELi digiteenuste määruse alusel sertifitseeritud vaidluste kohtuvälise lahendamise organi kaudu või kohtus." },
-      { kind: "p", text: "Otsuse peale kaebamine. Kui te ei nõustu modereerimisotsusega, vastake põhjendusele või kirjutage kuue kuu jooksul aadressil [appeals@dezbatere.ro]. Otsuse vaatab läbi isik, kes ei osalenud algse otsuse tegemises, ning teatame teile põhjendatud tulemuse. See ei mõjuta teie õigust pöörduda kohtusse või kasutada jaotise 18 kohast alternatiivset vaidluste lahendamist. Kaebuste esitamise kanalisse võib esitada ka kaebusi selle kohta, et me ei ole teate alusel tegutsenud, et sisu eemaldati alusetult, et kontot piirati alusetult või et automatiseeritud tööriist mõjutas teie sisu ekslikult." },
+      { kind: "p", text: "Otsuse peale kaebamine. Kui te ei nõustu modereerimisotsusega, vastake põhjendusele või kirjutage kuue kuu jooksul aadressil office@dezbatere.ro. Otsuse vaatab läbi isik, kes ei osalenud algse otsuse tegemises, ning teatame teile põhjendatud tulemuse. See ei mõjuta teie õigust pöörduda kohtusse või kasutada jaotise 18 kohast alternatiivset vaidluste lahendamist. Kaebuste esitamise kanalisse võib esitada ka kaebusi selle kohta, et me ei ole teate alusel tegutsenud, et sisu eemaldati alusetult, et kontot piirati alusetult või et automatiseeritud tööriist mõjutas teie sisu ekslikult." },
       { kind: "p", text: "Vaidluste kohtuväline lahendamine. Kui viibite Euroopa Liidus, võite viia vaidluse ühe meie modereerimisotsuse üle ELi digiteenuste määruse (määrus (EL) 2022/2065) artikli 21 alusel sertifitseeritud vaidluste kohtuvälise lahendamise organi ette. See hõlmab teie sisu või kontot käsitlevat otsust ning meie otsust teie esitatud teate kohta. Valite organi Euroopa Komisjoni aadressil digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement avaldatud loetelust ja te ei pea enne kasutama meie kaebuste esitamise kanalit. Osaleme menetluses heas usus ning keeldume osalemisest ainult siis, kui sama sisu ja samu aluseid käsitlev sama vaidlus on juba lahendatud. Organi otsus ei ole meist kummalegi siduv ning teile jääb õigus pöörduda kohtusse. Organ võib võtta teilt väikese tasu või lahendada vaidluse teile tasuta. Kui organ otsustab teie kasuks, tasume organi tasud ja hüvitame teie mõistlikud kulud; kui organ otsustab meie kasuks, ei pea te meie tasusid ega kulusid tasuma, välja arvatud juhul, kui organ leiab, et tegutsesite selgelt pahauskselt." },
       { kind: "p", text: "Inimesega ühenduse võtmine. Meie kasutajatoe assistent on tehisintellektisüsteem ja annab sellest teada. Võite igal ajal paluda inimesega rääkida ning see võimalus on olemas igas kasutajatoe vestluses. Me ei kasuta teiega suhtlemiseks ainult automatiseeritud tööriistu." },
       { kind: "p", text: "Terroristlik sisu. Terroristlik sisu on ebaseaduslik ja seda ei ole DebateAI-s lubatud (jaotis 7). Euroopa Liidu pädevad asutused võivad saata meile eemaldamiskorraldusi määruse (EL) 2021/784 alusel jaotises 1 nimetatud kontaktpunktile. Sellise korralduse saamisel eemaldame sisu või blokeerime juurdepääsu sellele kõigis ELi riikides ühe tunni jooksul. Teavitame sisu avaldanud isikut selle eemaldamisest ning tema soovi korral ka sellest, miks see eemaldati ja kuidas korraldust vaidlustada, välja arvatud juhul, kui asutus otsustab, et avaliku julgeoleku huvides tuleb teabe avaldamisest piiratud ajaks loobuda. Nagu määrus nõuab, säilitame eemaldatud sisu ja sellega seotud andmed kuus kuud, et eemaldamist saaks kontrollida ja selle ekslikkuse korral tühistada. Sisu avaldanud isik võib korraldust vaidlustada selle riigi kohtutes, mille asutus korralduse tegi, ning võib samuti kasutada meie kaebuste esitamise kanalit. Ükski asutus ei ole nõudnud meilt määruse alusel konkreetsete meetmete võtmist terroristliku sisu vastu; kui nii juhtub, kirjeldame neid meetmeid siin, sealhulgas mis tahes automatiseeritud tööriistu." },
@@ -181,7 +182,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "Teie algatusel. Sulgege konto igal ajal seadetes, nagu on kirjeldatud jaotises 6. Põhjendust ei ole vaja. Konto sulgemine lõpetab need Tingimused. Need lõpevad, kui sulgemine jõustub, pärast 7-päevast ajapikendust; selle jaotise lõpus loetletud jaotised jäävad pärast seda kehtima." },
-      { kind: "p", text: "Meie algatusel. Võime teie konto peatada või sulgeda või teie sisu eemaldada või piirata, kui: rikute oluliselt neid Tingimusi, eelkõige jaotist 7; teie sisu on ebaseaduslik või seadus, kohus või ametiasutus nõuab meilt tegutsemist; teiepoolne kasutus ohustab teenuse turvalisust, terviklust või kättesaadavust või teiste õigusi; teie konto ei ole olnud aktiivne [24 months] ja oleme teid sellest teavitanud; või lõpetame teenuse pakkumise või selle pakkumise teie riigis." },
+      { kind: "p", text: "Meie algatusel. Võime teie konto peatada või sulgeda või teie sisu eemaldada või piirata, kui: rikute oluliselt neid Tingimusi, eelkõige jaotist 7; teie sisu on ebaseaduslik või seadus, kohus või ametiasutus nõuab meilt tegutsemist; teiepoolne kasutus ohustab teenuse turvalisust, terviklust või kättesaadavust või teiste õigusi; teie konto ei ole olnud aktiivne 24 kuud ja oleme teid sellest teavitanud; või lõpetame teenuse pakkumise või selle pakkumise teie riigis." },
       { kind: "p", text: "Kui rikkumine ei ole tõsine, seadus ei nõua viivitamatut tegutsemist ega viivitus ei tekitaks kahju, selgitame teile probleemi ja anname enne konto peatamist või sulgemist mõistliku võimaluse see kõrvaldada. Esitame alati jaotise 10 kohase põhjenduse ning saate otsuse vaidlustada." },
       { kind: "p", text: "Kui sulgeme teenuse täielikult või lõpetame selle pakkumise teie riigis, teatame sellest vähemalt 30 päeva ette, tagastame pärast sulgemist jääva ajavahemiku eest ette makstud summa ja anname teile esmalt võimaluse oma väitlused eksportida." },
       { kind: "p", text: "Mida sulgemine teeb. Konto sulgemisel hävitame teie kontoandmete ja privaatsete väitluste krüpteerimisvõtmed, mistõttu muutuvad need jäädavalt loetamatuks, kustutame teie kontokirje ning eemaldame teie valiku korral teie avaldatud väitlused avalikust juurdepääsust jaotises 9 kirjeldatud viisil. Teatud andmed säilivad ja peaksite teadma, millised: meie auditi- ja turbelogide kirjed, mis on ainult lisatavad ja mida säilitatakse meie enda õiguslike ja turvakohustuste täitmiseks; kirjed, mida oleme seaduse järgi kohustatud säilitama, sealhulgas nõustumis- ja nõusolekukirjed; ning väikese arvu vanemate, meie krüpteerimisskeemile eelnenud väitluste puhul kirjed, mille kustutamise võimalus on piiratum — anname teile teada, kui see kehtib teie konto kohta. Privaatsuspoliitikas kirjeldatakse seda kõike andmekaitse seisukohast ja selgitatakse teie õigust andmete kustutamisele." },
@@ -194,13 +195,13 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "DebateAI pakub tasuta paketti. Tasuline Premium-pakett [is / will be] saadaval ning annab juurdepääsu mudelite täielikule valikule ja võimaldab teil väitluse seadeid ise määrata." },
+      { kind: "p", text: "DebateAI pakub tasuta paketti. Tulevikus on saadaval tasuline Premium-pakett, mis annab juurdepääsu mudelite täielikule valikule ja võimaldab teil väitluse seadeid ise määrata." },
       { kind: "p", text: "Enne maksmist näitame otse maksenupu kohal: paketti; koguhinda koos kohalduvate maksudega; arveldusperioodi; asjaolu, et pakett uueneb automaatselt kuni tühistamiseni; tasuta prooviperioodi lõppkuupäeva ja pärast seda võetavat tasu; ning tühistamise viisi. Kinnitate uuendamistingimused eraldi ruudu märkimisega. Nupul on kiri Tellige ja makske (rumeenia keeles Comandă cu obligație de plată). Saadame teile püsival andmekandjal kinnituse, mis sisaldab sama teavet, neid Tingimusi ja taganemisvormi." },
-      { kind: "p", text: "Meeldetuletused. Saadame teile e-kirja vähemalt [5] päeva enne tasuta prooviperioodi muutumist tasuliseks paketiks; jätkuvate pakettide puhul vähemalt kord aastas; ning 30–45 päeva enne vähemalt kaheteistkuulise tähtaja uuendamist. Igas meeldetuletuses on hind, kuupäev ja tühistamislink." },
-      { kind: "p", text: "Tühistamine. Tühistage igal ajal menüüs Seaded → Tellimus ühe kinnitava klõpsuga või tühistamislehel aadressil [dezbatere.ro/cancel], kuhu sisenemiseks ei ole vaja sisse logida. Tühistamine jõustub jooksva arveldusperioodi lõpus ja juurdepääs säilib selle ajani. Me ei muuda tühistamist keerulisemaks kui tellimist." },
+      { kind: "p", text: "Meeldetuletused. Saadame teile e-kirja vähemalt 5 päeva enne tasuta prooviperioodi muutumist tasuliseks paketiks; jätkuvate pakettide puhul vähemalt kord aastas; ning 30–45 päeva enne vähemalt kaheteistkuulise tähtaja uuendamist. Igas meeldetuletuses on hind, kuupäev ja tühistamislink." },
+      { kind: "p", text: "Tühistamine. Tühistage igal ajal menüüs Seaded → Tellimus ühe kinnitava klõpsuga või tühistamislehel aadressil dezbatere.ro/cancel, kuhu sisenemiseks ei ole vaja sisse logida. Tühistamine jõustub jooksva arveldusperioodi lõpus ja juurdepääs säilib selle ajani. Me ei muuda tühistamist keerulisemaks kui tellimist." },
       { kind: "p", text: "Hinnamuudatused jõustuvad ainult uuendamisel. Teatame uuest hinnast vähemalt 30 päeva ette e-posti teel ja lisame tühistamislingi. Kui teie riigi õigus nõuab hinnamuudatuseks teie sõnaselget nõusolekut, küsime seda; vastasel juhul kohaldatakse uuel uuendamisel uut hinda, kui te midagi ei tee. Lisas A on märgitud piirkondlikud reeglid." },
-      { kind: "p", text: "Ebaõnnestunud maksed. Kui makse ebaõnnestub, proovime seda [7] päeva jooksul uuesti ning hoiatame teid e-posti teel enne konto tasuta paketile üleviimist. Me ei kustuta teie väitlusi makse ebaõnnestumise tõttu." },
-      { kind: "p", text: "Maksud ja makse saaja. Hinnad [include / exclude] käibemaksu, GST-d või müügimaksu, mis sõltub teie elukohast ja mida näidatakse enne maksmist. [If a merchant of record is used: Your purchase is processed by [Paddle / …], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.]" },
+      { kind: "p", text: "Ebaõnnestunud maksed. Kui makse ebaõnnestub, proovime seda 7 päeva jooksul uuesti ning hoiatame teid e-posti teel enne konto tasuta paketile üleviimist. Me ei kustuta teie väitlusi makse ebaõnnestumise tõttu." },
+      { kind: "p", text: "Maksud ja makse saaja. Hinnad sisaldavad käibemaksu, GST-d või müügimaksu, mis sõltub teie elukohast ja mida näidatakse enne maksmist. Kaardimakseid töötleb NETOPIA Payments (netopia-payments.com). Müüja on DMS Merchandise Shop S.R.L., kes väljastab teie arve ja vastutab jätkuvalt teenuse enda ja käesolevate Tingimuste eest." },
       { kind: "p", text: "Makse tagasinõuded. Kui vaidlustate tasu oma kaardi väljaandja juures, võime tasulised funktsioonid vaidluse lahendamiseni peatada. Me ei võta selle eest tasu." },
       { kind: "p", text: "Seadusest tulenevad õigused on esikohal. Kui teenus ei vasta meie lubatule, on teil õigus nõuda selle vastavusse viimist või seaduses ette nähtud proportsionaalset hinnaalandust või tagasimakset. Peale selle [state your discretionary refund policy]. Mõlema paketi kasutuslimiidid avaldatakse tootes; teatame ette nende karmistamisest viisil, mis teid oluliselt mõjutab." }
     ]
@@ -210,7 +211,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Teie taganemisõigus",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Kui elate ELis, EMPs või Ühendkuningriigis, võite tasulisest tellimusest 14 päeva jooksul pärast tellimist põhjust esitamata taganeda. Kasutage lehte Lepingust taganemine aadressil [dezbatere.ro/withdraw], kinnituskirjas olevat näidisvormi või kirjutage aadressil [support@dezbatere.ro]; kinnitame kättesaamist püsival andmekandjal." },
+      { kind: "p", text: "Kui elate ELis või EMPs, võite tasulisest tellimusest 14 päeva jooksul pärast tellimist põhjust esitamata taganeda. Kasutage lehte Lepingust taganemine aadressil dezbatere.ro/withdraw, kinnituskirjas olevat näidisvormi või kirjutage aadressil support@dezbatere.ro; kinnitame kättesaamist püsival andmekandjal." },
       { kind: "p", text: "Kui palusite meil teenuse osutamist kohe alustada — märkides kassas vastava ruudu — ja seejärel taganete, maksate kuni taganemispäevani osutatud teenuse osa eest, mis arvutatakse proportsionaalselt arveldusperioodi hinnast, ning me tagastame ülejäänud summa. Te ei kaota taganemisõigust, kui kasutate teenust 14 päeva jooksul." },
       { kind: "p", text: "Kui elate mujal, on lisas A märgitud teie piirkonnas kohaldatav taganemis- või järelemõtlemisõigus, kui see on olemas, ning muul juhul meie tagasimaksepoliitika. Teie riigi seadusest tulenevad õigused on alati esikohal." }
     ]
@@ -222,7 +223,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Teenuse muudatused. Arendame DebateAI-d pidevalt ning tavapärased täiustused, parandused ja mudelivaliku muudatused toimuvad ette teatamata. Kui teeme muudatuse, mis läheb teenuse kirjeldatud viisil toimivana hoidmisest kaugemale, teeme seda ainult ühel järgmistest põhjustest: õigus- või regulatiivse nõude täitmiseks; turva- või kuritarvitamisprobleemile reageerimiseks; seetõttu, et mudelipakkuja muudab, piirab või kõrvaldab mudeli või funktsiooni, millest sõltume; kohanemiseks tehnilise keskkonnaga, mida me ei kontrolli; või funktsiooni lisamiseks, täiustamiseks või kasutuselt kõrvaldamiseks viisil, mis ei tekita teile lisakulu." },
       { kind: "p", text: "Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada 30 päeva jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa." },
-      { kind: "p", text: "Nende Tingimuste muudatused. Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt 30 päeva enne selle jõustumist; DebateAI kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil [dezbatere.ro/terms/versions]." }
+      { kind: "p", text: "Nende Tingimuste muudatused. Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt 30 päeva enne selle jõustumist; DebateAI kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions." }
     ]
   },
   {
@@ -244,7 +245,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Teenus ise — tarkvara, mootor, hindamismeetod, kasutajaliides, nimed DebateAI ja DebateAIRO ning meie logod — kuulub meile või meie litsentsiandjatele. Need Tingimused annavad teile loa teenust kasutada, mitte selle omandiõigust." },
       { kind: "p", text: "Võite avaldatud väitlusi tsiteerida ja linkida, viidates DebateAI-le ja lisades lingi algsele lehele. Avaliku korpuse massiline kopeerimine, süstemaatiline reprodutseerimine ja avaldatud väitluste kasutamine treeningandmetena ei ole meie kirjaliku nõusolekuta lubatud." },
-      { kind: "p", text: "Jaotises 8 käsitletakse teie sisu ja loodud väljundite staatust. Kui arvate, et miski DebateAI-s rikub teie intellektuaalomandiõigusi, kasutage jaotises 10 kirjeldatud teatamiskanalit. [If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is [name, address, email], registered with the US Copyright Office; we terminate the accounts of repeat infringers.]" }
+      { kind: "p", text: "Jaotises 8 käsitletakse teie sisu ja loodud väljundite staatust. Kui arvate, et miski DebateAI-s rikub teie intellektuaalomandiõigusi, kasutage jaotises 10 kirjeldatud teatamiskanalit." }
     ]
   },
   {
@@ -252,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Isikuandmed",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Isikuandmete töötlemist kirjeldatakse Privaatsuspoliitikas aadressil [dezbatere.ro/privacy]. Selles selgitatakse, mida me kogume, iga eesmärgi õiguslikku alust, andmete säilitamise aega, andmete vastuvõtjaid, asjaomaseid edastamisi ning seda, kuidas oma õigusi kasutada. Lisaks rõhutame siin kolme asja. Jaotises 7 palutakse teil mitte lisada küsimusse teiste inimeste isikuandmeid; kui te seda siiski teete, vastutate nende eest ja me võime sisu eemaldada. Kui DebateAI-s avaldatud väitlus sisaldab teie isikuandmeid, võite konto olemasolust olenemata paluda meil need eemaldada (jaotis 9). Samuti säilitame andmed selle kohta, et nõustusite nende Tingimustega — versioon, aeg ja seansi tehnilised üksikasjad — lepingu tõendina, nagu on selgitatud Privaatsuspoliitikas." }
+      { kind: "p", text: "Isikuandmete töötlemist kirjeldatakse Privaatsuspoliitikas aadressil dezbatere.ro/privacy. Selles selgitatakse, mida me kogume, iga eesmärgi õiguslikku alust, andmete säilitamise aega, andmete vastuvõtjaid, asjaomaseid edastamisi ning seda, kuidas oma õigusi kasutada. Lisaks rõhutame siin kolme asja. Jaotises 7 palutakse teil mitte lisada küsimusse teiste inimeste isikuandmeid; kui te seda siiski teete, vastutate nende eest ja me võime sisu eemaldada. Kui DebateAI-s avaldatud väitlus sisaldab teie isikuandmeid, võite konto olemasolust olenemata paluda meil need eemaldada (jaotis 9). Samuti säilitame andmed selle kohta, et nõustusite nende Tingimustega — versioon, aeg ja seansi tehnilised üksikasjad — lepingu tõendina, nagu on selgitatud Privaatsuspoliitikas." }
     ]
   },
   {
@@ -261,11 +262,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Kohaldatav õigus. Neid Tingimusi ning nendest või nende esemest tulenevaid vaidlusi ja nõudeid, sealhulgas lepinguväliseid nõudeid, reguleerib Rumeenia õigus." },
-      { kind: "p", text: "Teie kohalik kaitse ei muutu. Kui olete tarbija, ei jäta Rumeenia õiguse valik teid ilma teie hariliku viibimiskoha riigi tarbijakaitse kohustuslike normide kaitsest — näiteks ebaõiglasi tingimusi, taganemis- ja tühistamisõigusi või garantiisid käsitlevatest normidest — kui neid norme kohaldatakse sellest valikust olenemata, sealhulgas määruse (EÜ) nr 593/2008 artikli 6 lõike 2 alusel, kui elate ELis, või Ühendkuningriigi samaväärsete normide alusel. Võite neile normidele tugineda lisaks Rumeenia õigusele." },
-      { kind: "p", text: "Kohtud, kui elate ELis, EMPs või Ühendkuningriigis. Võite esitada meie vastu hagi kas Rumeenia või oma elukohariigi kohtule. Me võime esitada teie vastu hagi ainult teie elukohariigi kohtule." },
-      { kind: "p", text: "Mujal elavad tarbijad. Kui elate väljaspool ELi, EMPd ja Ühendkuningriiki, ei piira miski neis Tingimustes teie riigi õigusest tulenevat õigust esitada nõue selle riigi kohtule ega õigust, millest selle õiguse alusel ei saa loobuda — sealhulgas Austraalias või Uus-Meremaal elades teie tarbijagarantii õigusi; Brasiilias elades Código de Defesa do Consumidori kohaseid õigusi; ja Ameerika Ühendriikides elades teie osariigi tarbijakaitseõiguse kohaseid õigusi." },
-      { kind: "p", text: "Ameerika Ühendriikide elanikud. Lisa A.3 sisaldab föderaalse vahekohtuseadusega reguleeritavat vahekohtukokkulepet ja kollektiivhagi esitamisest loobumist. Seda kohaldatakse ainult Ameerika Ühendriikide elanikele ja ainult niivõrd, kuivõrd see on täitmisele pööratav. Seda ei kohaldata ELi, EMP või Ühendkuningriigi tarbijatele." },
-      { kind: "p", text: "Enne kohtusse pöördumist. Võtke meiega ühendust aadressil [legal@dezbatere.ro]; enamik probleeme on lahendatavad ja meie eesmärk on vastata [5] tööpäeva jooksul. Kui olete tarbija Rumeenias või ELis, võite kasutada alternatiivset vaidluste lahendamist asutuse [the ANPC – named SAL entity, website] kaudu; me [do / do not] kohustume selles menetluses osalema. Modereerimisotsuste kohta esitatavaid kaebusi käsitletakse eraldi kanalis jaotise 10 kohaselt." }
+      { kind: "p", text: "Teie kohalik kaitse ei muutu. Kui olete tarbija, ei jäta Rumeenia õiguse valik teid ilma teie hariliku viibimiskoha riigi tarbijakaitse kohustuslike normide kaitsest — näiteks ebaõiglasi tingimusi, taganemis- ja tühistamisõigusi või garantiisid käsitlevatest normidest — kui neid norme kohaldatakse sellest valikust olenemata, sealhulgas määruse (EÜ) nr 593/2008 artikli 6 lõike 2 alusel, kui elate ELis. Võite neile normidele tugineda lisaks Rumeenia õigusele." },
+      { kind: "p", text: "Kohtud, kui elate ELis või EMPs. Võite esitada meie vastu hagi kas Rumeenia või oma elukohariigi kohtule. Me võime esitada teie vastu hagi ainult teie elukohariigi kohtule." },
+      { kind: "p", text: "Mujal elavad tarbijad. Kui elate väljaspool ELi ja EMPd, ei piira miski neis Tingimustes teie riigi õigusest tulenevat õigust esitada nõue selle riigi kohtule ega õigust, millest selle õiguse alusel ei saa loobuda — sealhulgas Austraalias või Uus-Meremaal elades teie tarbijagarantii õigusi; Brasiilias elades Código de Defesa do Consumidori kohaseid õigusi; ja Ameerika Ühendriikides elades teie osariigi tarbijakaitseõiguse kohaseid õigusi." },
+      { kind: "p", text: "Enne kohtusse pöördumist. Võtke meiega ühendust aadressil support@dezbatere.ro; enamik probleeme on lahendatavad ja meie eesmärk on vastata 5 tööpäeva jooksul. Kui olete tarbija Rumeenias või ELis, võite kasutada alternatiivset vaidluste lahendamist veebisaidi www.onoratainstanta.ro kaudu; me ei kohustu selles menetluses osalema. Modereerimisotsuste kohta esitatavaid kaebusi käsitletakse eraldi kanalis jaotise 10 kohaselt." }
     ]
   },
   {
@@ -278,7 +278,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Õigustest loobumise puudumine. Kui me ei jõusta tingimust kohe, ei kaota me õigust seda hiljem jõustada." },
       { kind: "p", text: "Kogu leping. Need Tingimused koos Küpsisepoliitika ja tehisintellekti pakkujate registriga moodustavad kogu meievahelise teenust käsitleva lepingu. Meie Privaatsuspoliitikas võetud kohustused on meile siduvad. Miski selles lõikes ei välista vastutust petturliku valeandmete esitamise eest." },
       { kind: "p", text: "Keel. Need Tingimused avaldatakse kõigis keeltes, mida veebisait pakub. Leping on sõlmitud keeles, milles registreerusite: selle versiooni keeles, millega nõustusite, ning see keel on kirjas andmetes, mida säilitame teie nõustumise kohta. Kui nõustute hiljem uue versiooniga teises keeles, jätkub leping selles keeles. Teised keeleversioonid on tõlked. Kui teie elukohariigi õigus näeb ette, et selle riigi keeles koostatud versioon on ülimuslik, on ülimuslik see versioon. Kui kaks keeleversiooni erinevad, kohaldame tõlgendust, mis on teile soodsam." },
-      { kind: "p", text: "Kontakt. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bukarest, Rumeenia." }
+      { kind: "p", text: "Kontakt. support@dezbatere.ro · DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumeenia." }
     ]
   },
   {
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Lisa A — Piirkondlikud tingimused",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Iga kirjet kohaldatakse ainult juhul, kui vastav piirkond on loetletud jaotises 2, ning selles sätestatakse üksnes erinevused põhiosast. Kui kirje ja põhiosa on vastuolus, kohaldatakse selle piirkonna inimestele kirjet." }
+      { kind: "p", text: "Iga kirjet kohaldatakse inimestele, kes elavad vastavas piirkonnas, ning selles sätestatakse üksnes erinevused põhiosast. Kui kirje ja põhiosa on vastuolus, kohaldatakse selle piirkonna inimestele kirjet." }
     ]
   },
   {
@@ -294,103 +294,70 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Euroopa Liit ja Euroopa Majanduspiirkond",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; alternatiivne vaidluste lahendamine on kättesaadav asutuse [the ANPC – named entity, website] kaudu. Saksamaa: tühistamisnupp aadressil [dezbatere.ro/cancel] võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9 [state them]. Prantsusmaa: saate tellimuse veebis kolme sammuga lõpetada aadressil [URL]; teile on kättesaadav [the mediator named at URL]. Itaalia: vastutuse (15), peatamise (11), muudatuste (14) ja kohaldatava õiguse (18) klauslid nõuavad teie eraldi heakskiitu, mille annate registreerumisel eraldi kinnitusega. Madalmaad: need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. Poola: poolakeelne versioon asub aadressil [URL]." }
+      { kind: "p", text: "Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; alternatiivne vaidluste lahendamine on kättesaadav veebisaidi www.onoratainstanta.ro kaudu. Saksamaa: tühistamisnupp aadressil dezbatere.ro/cancel võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9 [state them]. Prantsusmaa: saate tellimuse veebis kolme sammuga lõpetada aadressil [URL]. Itaalia: vastutuse (15), peatamise (11), muudatuste (14) ja kohaldatava õiguse (18) klauslid nõuavad teie eraldi heakskiitu, mille annate registreerumisel eraldi kinnitusega. Madalmaad: need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. Poola: poolakeelne versioon asub aadressil [URL]." }
     ]
   },
   {
     no: "A.2",
-    title: "Ühendkuningriik (ainult kui loetletud jaotises 2)",
+    title: "Ameerika Ühendriigid",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Meie Ühendkuningriigi esindaja Ühendkuningriigi GDPR-i artikli 27 alusel on [name, address, email]. Teile kohaldatakse 2015. aasta tarbijaõiguste seadust ja miski neis Tingimustes ei piira sellest tulenevaid õigusi; kui 2024. aasta digitaalturgude, konkurentsi ja tarbijate seaduse tellimisreeglid jõustuvad (eeldatavasti 2027. aastal), kohaldatakse neid tasulistele pakettidele, sealhulgas uuendamise ja tasuta prooviperioodi järel kehtivat järelemõtlemisaega. Kuidas kaitseme kasutajaid ebaseadusliku sisu eest: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Meie kasutatav ennetav tehnoloogia: [describe, or \"none\"]. Vanuse kontroll: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Jaotise 10 kohases kaebuste menetluses saab esitada kaebusi ebaseadusliku sisu, teie sisu alusetu eemaldamise, teie konto piirangute, teie sisu mõjutavate automatiseeritud tööriistade kasutamise ja teid alusetult blokeeriva vanuse hindamise kohta. Seda saavad kasutada ka sisust mõjutatud inimesed, kes ei ole kasutajad. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.2." }
+      { kind: "p", text: "Tennessee. Me ei paku DebateAI-d inimestele, kes elavad Tennessees." },
+      { kind: "p", text: "Teated ja sisu eemaldamine. Nõusolekuta jagatud intiimkujutistest võib ilma kontota teatada aadressil [URL] ning need eemaldatakse 48 tunni jooksul pärast kehtiva taotluse saamist. Autoriõiguse rikkumise kaebused esitatakse jaotises 10 kirjeldatud teatamiskanali kaudu." },
+      { kind: "p", text: "Osariigipõhised sätted. California: kohaldatakse jaotise 12 automaatse uuendamise tingimusi; võite igal ajal veebis tühistada; säilitame teie nõusoleku uuendamistingimustega vähemalt kolm aastat. New York: võite 14 päeva jooksul pärast kõrgema hinnaga tasu võtmist tühistada ja saada proportsionaalse tagasimakse. Texas ja Nebraska: me ei müü tundlikke isikuandmeid. Washington: meie tarbija terviseandmete privaatsusteade aadressil [URL] kehtib tervisega seotud teabe kohta. Colorado: miski teenuses ei tee teie kohta oluliste tagajärgedega otsuseid. Teie andmeid ja teie osariigi seadustest tulenevaid privaatsusõigusi käsitleb meie Privaatsuspoliitika lisa B.2." }
     ]
   },
   {
     no: "A.3",
-    title: "Ameerika Ühendriigid (ainult kui loetletud jaotises 2)",
+    title: "Kanada ja Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tennessee. Me ei paku DebateAI-d inimestele, kes elavad Tennessees." },
-      { kind: "p", text: "Vahekohtukokkulepe ja kollektiivhagi esitamisest loobumine. Kui elate Ameerika Ühendriikides, nõustute teie ja DebateAIRO lahendama kõik nendest Tingimustest või teenusest tulenevad vaidlused kohtu asemel siduvas individuaalses vahekohtumenetluses, mida korraldab [the American Arbitration Association / JAMS] oma tarbijareeglite alusel, välja arvatud see, et kumbki meist võib esitada individuaalse nõude väiksemate nõuete kohtule. Võite loobuda, saates 30 päeva jooksul pärast nende Tingimustega esmakordset nõustumist e-kirja aadressile [address]. Kokkulepet reguleerib föderaalne vahekohtuseadus. Meie tasume vahekohtumenetluse algatamise tasud. Kollektiiv-, ühis- ja esindushagidest loobutakse seadusega lubatud ulatuses. Seda jaotist kohaldatakse ainult edasiulatuvalt ja see ei kehti nõuetele, mis tekkisid enne sellega nõustumist." },
-      { kind: "p", text: "Teated ja sisu eemaldamine. Nõusolekuta jagatud intiimkujutistest võib ilma kontota teatada aadressil [URL] ning need eemaldatakse 48 tunni jooksul pärast kehtiva taotluse saamist. Autoriõiguse rikkumise kaebused esitatakse jaotises 16 nimetatud määratud esindajale." },
-      { kind: "p", text: "Osariigipõhised sätted. California: kohaldatakse jaotise 12 automaatse uuendamise tingimusi; võite igal ajal veebis tühistada; säilitame teie nõusoleku uuendamistingimustega vähemalt kolm aastat. New York: võite 14 päeva jooksul pärast kõrgema hinnaga tasu võtmist tühistada ja saada proportsionaalse tagasimakse. Texas ja Nebraska: me ei müü tundlikke isikuandmeid. Washington: meie tarbija terviseandmete privaatsusteade aadressil [URL] kehtib tervisega seotud teabe kohta. Colorado: miski teenuses ei tee teie kohta oluliste tagajärgedega otsuseid. Teie andmeid ja teie osariigi seadustest tulenevaid privaatsusõigusi käsitleb meie Privaatsuspoliitika lisa B.3." }
+      { kind: "p", text: "Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.3. Quebec: need Tingimused on kättesaadavad prantsuse keeles; valige keelevalijast prantsuse keel; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist." }
     ]
   },
   {
     no: "A.4",
-    title: "Kanada ja Quebec (ainult kui loetletud)",
+    title: "Austraalia ja Uus-Meremaa",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on [name], privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.4. Quebec: need Tingimused on kättesaadavad prantsuse keeles; valige keelevalijast prantsuse keel; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist; teile ei kohaldata vahekohtukokkulepet ega kollektiivhagi esitamisest loobumist." }
+      { kind: "p", text: "Meie teenustele kehtivad garantiid, mida ei saa Austraalia tarbijaõiguse alusel välistada. Teenuse olulise puuduse korral on teil õigus leping tühistada ja saada kasutamata osa eest tagasimakse või hüvitis selle vähenenud väärtuse eest; samuti on teil õigus hüvitisele mis tahes muu mõistlikult ettenähtava kahju eest. Kui puudus ei ole oluline, on teil õigus nõuda teenuse puuduste kõrvaldamist mõistliku aja jooksul ning kui seda ei tehta, leping tühistada ja saada tagasimakse. Jaotisega 64A lubatud ulatuses piirdub meie vastutus garantii rikkumise eest teenuse uuesti osutamise või selle kulude tasumisega. Tasulisele paketile ei kehti peale jaotises 12 antu järelemõtlemisõigust; tagasimaksetaotlusi käsitletakse aadressil support@dezbatere.ro. Uus-Meremaa: kohaldatakse 1993. aasta tarbijagarantiide seadust ja miski neis Tingimustes ei välista seda; kahjulikust digitaalsest suhtlusest võib teatada meile jaotise 10 alusel või Netsafe'ile." }
     ]
   },
   {
     no: "A.5",
-    title: "Austraalia ja Uus-Meremaa (ainult kui loetletud)",
+    title: "Šveits",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Meie teenustele kehtivad garantiid, mida ei saa Austraalia tarbijaõiguse alusel välistada. Teenuse olulise puuduse korral on teil õigus leping tühistada ja saada kasutamata osa eest tagasimakse või hüvitis selle vähenenud väärtuse eest; samuti on teil õigus hüvitisele mis tahes muu mõistlikult ettenähtava kahju eest. Kui puudus ei ole oluline, on teil õigus nõuda teenuse puuduste kõrvaldamist mõistliku aja jooksul ning kui seda ei tehta, leping tühistada ja saada tagasimakse. Jaotisega 64A lubatud ulatuses piirdub meie vastutus garantii rikkumise eest teenuse uuesti osutamise või selle kulude tasumisega. Tasulisele paketile ei kehti peale jaotises 12 antu järelemõtlemisõigust; meie tagasimaksepoliitika on […]. Uus-Meremaa: kohaldatakse 1993. aasta tarbijagarantiide seadust ja miski neis Tingimustes ei välista seda; kahjulikust digitaalsest suhtlusest võib teatada meile jaotise 10 alusel või Netsafe'ile." }
+      { kind: "p", text: "Teie andmetele kohaldatakse Šveitsi föderaalset andmekaitseseadust (Privaatsuspoliitika, lisa B.5). Võite pöörduda kohtusse selle Šveitsi paiga kohtus, kus elate. Tasulisele paketile ei kohaldata seadusest tulenevat taganemisõigust; tagasimaksetaotlusi käsitletakse aadressil support@dezbatere.ro." }
     ]
   },
   {
     no: "A.6",
-    title: "Šveits (ainult kui loetletud)",
+    title: "Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Teie andmetele kohaldatakse Šveitsi föderaalset andmekaitseseadust (Privaatsuspoliitika, lisa B.6). Võite pöörduda kohtusse selle Šveitsi paiga kohtus, kus elate. Tasulisele paketile ei kohaldata seadusest tulenevat taganemisõigust; meie tagasimaksepoliitika on […]." }
+      { kind: "p", text: "Teil on nende Tingimuste alusel samad õigused nagu tarbijal Euroopa Liidus, sealhulgas jaotises 13 sätestatud 14-päevane taganemisõigus. Võite pöörduda Moldova kohtutesse. Teie andmetele kohaldatakse Moldova isikuandmete kaitse seadust nr 195/2024 (Privaatsuspoliitika, lisa B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldova (ainult kui loetletud)",
+    title: "Aasia ja Vaikse ookeani piirkond",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Teil on nende Tingimuste alusel samad õigused nagu tarbijal Euroopa Liidus, sealhulgas jaotises 13 sätestatud 14-päevane taganemisõigus. Võite pöörduda Moldova kohtutesse. Teie andmetele kohaldatakse Moldova isikuandmete kaitse seadust nr 195/2024 (Privaatsuspoliitika, lisa B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukraina (ainult kui loetletud)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Pakume DebateAI-d Ukrainas, välja arvatud aladel, mis ei ole Ukraina valitsuse kontrolli all. Toode ja need Tingimused on kättesaadavad ukraina keeles. Teie andmetele kohaldatakse Ukraina seadust „Isikuandmete kaitse kohta“ (Privaatsuspoliitika, lisa B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Iisrael (ainult kui loetletud)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Võite tasulise paketi tühistada tarbijakaitseseaduse 5741-1981 lubatud viisil [state the cancellation terms]. Need Tingimused ja meie Privaatsuspoliitika on kättesaadavad heebrea keeles. Teie andmetele kohaldatakse Iisraeli eraelu kaitse seadust (Privaatsuspoliitika, lisa B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Aasia ja Vaikse ookeani piirkond (ainult loetletud piirkondade read)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapur: meie andmekaitsespetsialist on [name, email]; andmete edastamine põhineb PDPA-ga võrreldavat kaitset pakkuvatel lepingulistel kaitsemeetmetel; tasulisele paketile ei kohaldata seadusest tulenevat järelemõtlemisõigust ja meie tagasimaksepoliitika on […]. Jaapan: kaubanduslike eritehingute seaduse kohane seadusjärgne teave asub aadressil [URL]; internetitellimustele ei kohaldata üldist järelemõtlemisõigust ja meie tagasimaksepoliitika on […]; saadame teie sisu tehisintellekti pakkujatele Ameerika Ühendriikides ja Euroopa Liidus, igaühele lepingu alusel, mis nõuab Jaapani isikuandmete kaitse seadusega samaväärset kaitset, ning teie taotlusel teatame, millised need meetmed on. Lõuna-Korea: vabatahtliku töötlemise ja turunduse nõusolekud kogutakse teenuse osutamiseks vajalikest nõusolekutest eraldi; meie privaatsusametnik on [name], privacy@dezbatere.ro; võite tasulisest paketist e-kaubanduse seaduse kohaselt 7 päeva jooksul pärast tellimist taganeda; enne korduva hinnatõusu või tasuta paketilt tasulisele üleminekut küsime teie uut nõusolekut; teenus kasutab generatiivset tehisintellekti, teatame teile sellest enne, kui seda kasutate, ning märgistame tehisintellekti loodud väljundid. Taiwan: võite tasulisest paketist tarbijakaitseseaduse alusel 7 päeva jooksul pärast tellimist taganeda; teie andmetele kohaldatakse Taiwani isikuandmete kaitse seadust (Privaatsuspoliitika, lisa B.10). Tai: meie esindaja Tais on [name] [if appointed]. Filipiinid: meie äriidentifitseerimise andmed ja internetitehingute seaduse kohane õiguskaitsemehhanism asuvad aadressil [URL]; kaebusi võib esitada National Privacy Commissionile." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Reserveeritud",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Türgi, Brasiilia ja Indoneesia nõuavad igaüks kohalikus keeles lisa, esindajat või registreerimist ja dokumentide esitamist. Neid ei ole siin kavandatud ning need jäävad jaotise 2 kohaldamisalast välja, kuni need lisatakse teadlikult. Hiinas, Vietnamis ja Venemaal teenust ei pakuta." }
+      { kind: "p", text: "Singapur: meie andmekaitsespetsialist on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro; andmete edastamine põhineb PDPA-ga võrreldavat kaitset pakkuvatel lepingulistel kaitsemeetmetel; tasulisele paketile ei kohaldata seadusest tulenevat järelemõtlemisõigust ja tagasimaksetaotlusi käsitletakse aadressil support@dezbatere.ro. Jaapan: kaubanduslike eritehingute seaduse kohane seadusjärgne teave asub aadressil [URL]; internetitellimustele ei kohaldata üldist järelemõtlemisõigust ja tagasimaksetaotlusi käsitletakse aadressil support@dezbatere.ro; saadame teie sisu tehisintellekti pakkujatele Ameerika Ühendriikides ja Euroopa Liidus, igaühele lepingu alusel, mis nõuab Jaapani isikuandmete kaitse seadusega samaväärset kaitset, ning teie taotlusel teatame, millised need meetmed on. Lõuna-Korea: vabatahtliku töötlemise ja turunduse nõusolekud kogutakse teenuse osutamiseks vajalikest nõusolekutest eraldi; meie privaatsusametnik on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro; võite tasulisest paketist e-kaubanduse seaduse kohaselt 7 päeva jooksul pärast tellimist taganeda; enne korduva hinnatõusu või tasuta paketilt tasulisele üleminekut küsime teie uut nõusolekut; teenus kasutab generatiivset tehisintellekti, teatame teile sellest enne, kui seda kasutate, ning märgistame tehisintellekti loodud väljundid. Taiwan: võite tasulisest paketist tarbijakaitseseaduse alusel 7 päeva jooksul pärast tellimist taganeda; teie andmetele kohaldatakse Taiwani isikuandmete kaitse seadust (Privaatsuspoliitika, lisa B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "da14580868e164b4bc07f644dd67c5e05b0e7652fdee985b878b8456c7f6e942",
-  eyebrow: "TEENUSETINGIMUSED · v2.1 · KEHTIB ALATES [DATE]",
+  version: "2.2",
+  sha256: "977f25da4951a6dff673278e77263790b2d6cb33a356085c451bc901f831bec0",
+  eyebrow: "TEENUSETINGIMUSED · v2.2 · KEHTIB ALATES 12. OKTOOBRIST 2026",
   title: "Millega te nõustute",
-  lede: "Teie ja DebateAIRO S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
-  endMarker: "TINGIMUSTE LÕPP · v2.1",
-  contact: "[legal@dezbatere.ro]",
+  lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
+  endMarker: "TINGIMUSTE LÕPP · v2.2",
+  contact: "support@dezbatere.ro",
   bodyLabel: "Teenusetingimuste tekst",
   sectionIdPrefix: "terms-section-",
   titleId: "terms-modal-title",

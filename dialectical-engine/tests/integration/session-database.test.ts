@@ -337,6 +337,27 @@ describe("S5 sessions on real PostgreSQL", () => {
     expect(Number(afterReplay.rows[0]!.count)).toBe(1);
   });
 
+  // Design note 2026-10-09 item 3: using a recovery code consumes it, refills nothing and tells every verified email.
+  it("consumes a recovery code without refilling its slot and queues a RECOVERY_CODE_USED notice", async () => {
+    const identity = await fixtureUser(`no-refill-${randomUUID()}`);
+    const channelId = randomUUID(), recoveryCodeId = randomUUID();
+    await database.pool.query(`INSERT INTO identity.channel_binding(channel_binding_id,user_id,channel_type,address_ciphertext,state,created_at,verified_at) VALUES($1,$2,'email','{}'::jsonb,'verified',now(),now())`, [channelId, identity.userId]);
+    await database.pool.query(`INSERT INTO identity.recovery_code(recovery_code_id,user_id,code_hash,created_at,code_slot) VALUES($1,$2,$3,now(),1)`, [recoveryCodeId, identity.userId, hash("n")]);
+    const client = await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      await client.query("SELECT identity.begin_runtime_audit_attempt()");
+      const consumed = await client.query(`SELECT identity.consume_recovery_code_with_audit($1,$2,NULL,clock_timestamp(),$3::jsonb) AS valid`,
+        [identity.userId, recoveryCodeId, JSON.stringify({ ipArgon2id: `argon2id-audit:v1:${"ab".repeat(32)}`, userAgentArgon2id: `argon2id-audit:v1:${"cd".repeat(32)}` })]);
+      expect(consumed.rows[0].valid).toBe(true);
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    expect((await database.pool.query(`SELECT count(*)::int AS total,count(consumed_at)::int AS used FROM identity.recovery_code WHERE user_id=$1`, [identity.userId])).rows[0]).toEqual({ total: 1, used: 1 });
+    expect((await database.pool.query(`SELECT channel_binding_id,event_kind FROM identity.consumer_security_notice WHERE user_id=$1`, [identity.userId])).rows)
+      .toEqual([{ channel_binding_id: channelId, event_kind: "RECOVERY_CODE_USED" }]);
+  });
+
   it("revalidates the password snapshot under lock for TOTP and recovery completion", async () => {
     const identity = await fixtureUser("password-snapshot-lock");
     const repository = new PostgresSessionRepository(database.pool, fakeAuditHasher);
@@ -381,8 +402,7 @@ describe("S5 sessions on real PostgreSQL", () => {
     } as const;
     await expect(repository.completeTotpLogin({ ...sessionInput, acceptedStep: 11 })).resolves.toBe(false);
     await expect(repository.completeRecoveryLogin({
-      ...sessionInput, recoveryCodeId,
-      replacementHash: hashVerificationToken("locked-recovery-replacement-material")
+      ...sessionInput, recoveryCodeId
     })).resolves.toBe(false);
 
     const sessions = await database.pool.query<{ count: string }>(
@@ -444,7 +464,6 @@ describe("S5 sessions on real PostgreSQL", () => {
     await expect(repository.completeRecoveryLogin({
       ...common,
       recoveryCodeId,
-      replacementHash: hashVerificationToken(`replacement-${randomUUID()}`),
       sessionId: randomUUID(),
       sessionTokenHash: hashToken("session", `recovery-session-${randomUUID()}`),
       csrfTokenHash: hashToken("csrf", `recovery-csrf-${randomUUID()}`)
@@ -1041,8 +1060,9 @@ describe("S5 sessions on real PostgreSQL", () => {
         JOIN identity.recovery_code AS recovery ON recovery.recovery_code_id=$2
         WHERE factor.mfa_factor_id=$3
       `,[identity.userId,recoveryCodeId,identity.factorId]);
+      // Design note 2026-10-09 item 3: a used recovery code is no longer refilled in its slot.
       expect(state.rows[0]).toMatchObject({
-        last_accepted_step: "11",replacement_count: "1"
+        last_accepted_step: "11",replacement_count: "0"
       });
       expect(state.rows[0]?.consumed_at).toBeInstanceOf(Date);
     };

@@ -1,0 +1,309 @@
+{
+  "description": "Synthetic browser interception fixtures only. Mount the real StaffAccessPanel and provide these API DTOs; do not send fixture credentials or actions to a live endpoint. Pending means notification delivery; memberships use only ACTIVE, REVOKED or DISABLED. Use the Owner scenario at 390px for mobile checks.",
+  "webauthnOptions": {
+    "challenge_handle": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "options": {
+      "challenge": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rpId": "localhost",
+      "timeout": 300000,
+      "userVerification": "required",
+      "allowCredentials": [
+        {
+          "id": "aA",
+          "type": "public-key"
+        }
+      ]
+    }
+  },
+  "serializedCredential": {
+    "id": "aA",
+    "rawId": "aA",
+    "type": "public-key",
+    "response": {
+      "clientDataJSON": "aA",
+      "authenticatorData": "aA",
+      "signature": "aA",
+      "userHandle": null
+    },
+    "clientExtensionResults": {}
+  },
+  "scenarios": {
+    "owner": {
+      "enrollment": {
+        "user_id": "11111111-1111-4111-8111-111111111111",
+        "readiness": {
+          "account_active": true,
+          "email_verified": true,
+          "totp_active": true,
+          "security_hold": false,
+          "verified_credential_count": 2,
+          "owner_credential_requirement_met": true,
+          "delegated_credential_requirement_met": true
+        }
+      },
+      "elevation": {
+        "staff_id": "11111111-1111-4111-8111-111111111111",
+        "capabilities": [
+          "TEAM_READ",
+          "TEAM_INVITE",
+          "TEAM_GRANT",
+          "TEAM_DISABLE",
+          "AUDIT_READ",
+          "EMERGENCY_DISABLE"
+        ],
+        "grant_revision": 0,
+        "expires_at": "2099-01-01T00:00:00.000Z"
+      },
+      "team": {
+        "members": [
+          {
+            "staff_id": "11111111-1111-4111-8111-111111111111",
+            "pseudonym": "team_operator",
+            "status": "ACTIVE",
+            "capabilities": [
+              "TEAM_READ",
+              "TEAM_INVITE",
+              "TEAM_GRANT",
+              "TEAM_DISABLE",
+              "AUDIT_READ",
+              "EMERGENCY_DISABLE"
+            ],
+            "grant_revision": 1,
+            "credential_count": 2,
+            "last_privilege_at": null,
+            "delivery_state": "DELIVERED"
+          },
+          {
+            "staff_id": "22222222-2222-4222-8222-222222222222",
+            "pseudonym": "community_moderator",
+            "status": "ACTIVE",
+            "capabilities": [
+              "TEAM_READ",
+              "AUDIT_READ"
+            ],
+            "grant_revision": 1,
+            "credential_count": 2,
+            "last_privilege_at": null,
+            "delivery_state": "PENDING"
+          },
+          {
+            "staff_id": "33333333-3333-4333-8333-333333333333",
+            "pseudonym": "former_moderator",
+            "status": "DISABLED",
+            "capabilities": [
+              "TEAM_READ"
+            ],
+            "grant_revision": 1,
+            "credential_count": 2,
+            "last_privilege_at": null,
+            "delivery_state": "FAILED"
+          }
+        ],
+        "next_cursor": "fixture_next_page",
+        "order": "CREATED_AT_ID_ASC"
+      },
+      "audit": {
+        "events": [
+          {
+            "event_id": "44444444-4444-4444-8444-444444444444",
+            "actor_staff_id": "11111111-1111-4111-8111-111111111111",
+            "subject_staff_id": "22222222-2222-4222-8222-222222222222",
+            "event": "GRANTS_CHANGED",
+            "recorded_at": "2026-10-04T08:30:00.000Z",
+            "reason": {
+              "code": "GRANT_CHANGE"
+            },
+            "delivery_state": "DELIVERED"
+          },
+          {
+            "event_id": "55555555-5555-4555-8555-555555555555",
+            "actor_staff_id": "11111111-1111-4111-8111-111111111111",
+            "subject_staff_id": "22222222-2222-4222-8222-222222222222",
+            "event": "INVITATION_ISSUED",
+            "recorded_at": "2026-10-04T08:00:00.000Z",
+            "reason": {
+              "code": "TEAM_ONBOARDING"
+            },
+            "delivery_state": "PENDING"
+          }
+        ],
+        "next_cursor": "fixture_audit_page",
+        "order": "RECORDED_AT_ID_ASC"
+      }
+    },
+    "delegated": {
+      "enrollment": {
+        "user_id": "11111111-1111-4111-8111-111111111111",
+        "readiness": {
+          "account_active": true,
+          "email_verified": true,
+          "totp_active": true,
+          "security_hold": false,
+          "verified_credential_count": 2,
+          "owner_credential_requirement_met": true,
+          "delegated_credential_requirement_met": true
+        }
+      },
+      "elevation": {
+        "staff_id": "11111111-1111-4111-8111-111111111111",
+        "capabilities": [
+          "TEAM_READ",
+          "AUDIT_READ"
+        ],
+        "grant_revision": 0,
+        "expires_at": "2099-01-01T00:00:00.000Z"
+      },
+      "team": {
+        "members": [
+          {
+            "staff_id": "11111111-1111-4111-8111-111111111111",
+            "pseudonym": "team_operator",
+            "status": "ACTIVE",
+            "capabilities": [
+              "TEAM_READ",
+              "AUDIT_READ"
+            ],
+            "grant_revision": 1,
+            "credential_count": 2,
+            "last_privilege_at": null,
+            "delivery_state": "DELIVERED"
+          },
+          {
+            "staff_id": "22222222-2222-4222-8222-222222222222",
+            "pseudonym": "community_moderator",
+            "status": "ACTIVE",
+            "capabilities": [
+              "TEAM_READ",
+              "AUDIT_READ"
+            ],
+            "grant_revision": 1,
+            "credential_count": 2,
+            "last_privilege_at": null,
+            "delivery_state": "PENDING"
+          },
+          {
+            "staff_id": "33333333-3333-4333-8333-333333333333",
+            "pseudonym": "former_moderator",
+            "status": "DISABLED",
+            "capabilities": [
+              "TEAM_READ"
+            ],
+            "grant_revision": 1,
+            "credential_count": 2,
+            "last_privilege_at": null,
+            "delivery_state": "FAILED"
+          }
+        ],
+        "next_cursor": "fixture_next_page",
+        "order": "CREATED_AT_ID_ASC"
+      },
+      "audit": {
+        "events": [
+          {
+            "event_id": "44444444-4444-4444-8444-444444444444",
+            "actor_staff_id": "11111111-1111-4111-8111-111111111111",
+            "subject_staff_id": "22222222-2222-4222-8222-222222222222",
+            "event": "GRANTS_CHANGED",
+            "recorded_at": "2026-10-04T08:30:00.000Z",
+            "reason": {
+              "code": "GRANT_CHANGE"
+            },
+            "delivery_state": "DELIVERED"
+          },
+          {
+            "event_id": "55555555-5555-4555-8555-555555555555",
+            "actor_staff_id": "11111111-1111-4111-8111-111111111111",
+            "subject_staff_id": "22222222-2222-4222-8222-222222222222",
+            "event": "INVITATION_ISSUED",
+            "recorded_at": "2026-10-04T08:00:00.000Z",
+            "reason": {
+              "code": "TEAM_ONBOARDING"
+            },
+            "delivery_state": "PENDING"
+          }
+        ],
+        "next_cursor": "fixture_audit_page",
+        "order": "RECORDED_AT_ID_ASC"
+      }
+    },
+    "locked": {
+      "enrollment": {
+        "user_id": "11111111-1111-4111-8111-111111111111",
+        "readiness": {
+          "account_active": true,
+          "email_verified": true,
+          "totp_active": true,
+          "security_hold": false,
+          "verified_credential_count": 2,
+          "owner_credential_requirement_met": true,
+          "delegated_credential_requirement_met": true
+        }
+      }
+    },
+    "ordinaryDenied": {
+      "enrollment": {
+        "user_id": "11111111-1111-4111-8111-111111111111",
+        "readiness": {
+          "account_active": true,
+          "email_verified": true,
+          "totp_active": true,
+          "security_hold": false,
+          "verified_credential_count": 2,
+          "owner_credential_requirement_met": true,
+          "delegated_credential_requirement_met": true
+        }
+      },
+      "elevationError": {
+        "status": 403,
+        "body": {
+          "error": "STAFF_REQUEST_REFUSED"
+        }
+      }
+    },
+    "notReady": {
+      "enrollment": {
+        "user_id": "11111111-1111-4111-8111-111111111111",
+        "readiness": {
+          "account_active": true,
+          "email_verified": true,
+          "totp_active": false,
+          "security_hold": false,
+          "verified_credential_count": 0,
+          "owner_credential_requirement_met": false,
+          "delegated_credential_requirement_met": false
+        }
+      }
+    },
+    "unavailable": {
+      "enrollment": {
+        "user_id": "11111111-1111-4111-8111-111111111111",
+        "readiness": {
+          "account_active": true,
+          "email_verified": true,
+          "totp_active": true,
+          "security_hold": false,
+          "verified_credential_count": 2,
+          "owner_credential_requirement_met": true,
+          "delegated_credential_requirement_met": true
+        }
+      },
+      "elevationError": {
+        "status": 503,
+        "body": {
+          "error": "STAFF_DEPENDENCY_UNAVAILABLE"
+        }
+      }
+    },
+    "mobile": {
+      "useScenario": "owner",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    "romanian": {
+      "useScenario": "owner",
+      "locale": "ro"
+    }
+  }
+}

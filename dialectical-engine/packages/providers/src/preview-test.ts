@@ -70,6 +70,27 @@ export function previewTeamAdmits(
   if (config === undefined) return true;
   return userId !== undefined && teamUserIds !== undefined && teamUserIds.includes(userId);
 }
+/**
+ * Step 1 — THE ONE READ BEHIND THE TEAM RULE FOR RUNS ALREADY IN THE SYSTEM, shared by the
+ * API's waker (`#previewTeamRuns`) and the runner's start-up gate so both apply the same rule.
+ * $1 = run ids (uuid[]), $2 = team identity user ids (uuid[]). Returns the ids of the runs a
+ * team member owns: the owner is the run's latest ownership event, else its `owner:` asker id
+ * (core.run_waiting_v's rule); a legacy asker's run has none and is never the team's.
+ */
+export const PREVIEW_TEAM_RUNS_SQL = `SELECT run.run_id::text AS run_id
+       FROM core.run AS run
+       LEFT JOIN LATERAL (
+         SELECT event.owner_ref
+         FROM core.run_ownership_event AS event
+         WHERE event.run_id = run.run_id
+         ORDER BY event.at_seq DESC
+         LIMIT 1
+       ) AS latest ON true
+       JOIN identity."user" AS account
+         ON account.user_id = ANY($2::uuid[])
+        AND (account.owner_ref = latest.owner_ref
+          OR (latest.owner_ref IS NULL AND run.asker_id = 'owner:' || account.owner_ref::text))
+       WHERE run.run_id = ANY($1::uuid[])` as const;
 export function previewPlanTierRosters<T extends Readonly<{ free: readonly string[]; premium: readonly string[] }>>(
   config: PreviewProviderTestConfig | undefined, defaults: T
 ): Readonly<{ free: readonly string[]; premium: readonly string[] }> {

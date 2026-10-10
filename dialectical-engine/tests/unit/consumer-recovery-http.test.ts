@@ -6,7 +6,7 @@ const origin = 'https://app.example.test', cap = 'r'.repeat(43), csrf = 'c'.repe
 describe('recovery HTTP authority boundary', () => {
     it('proof and evidence endpoints issue no normal cookie; only verified replacement uses normal cookie projection', async () => {
         const api = buildApi({ application: {} as AskApplication, allowedOrigin: origin, sessions: { authenticate: async () => null, verifyCsrf: () => false } as unknown as SessionApplication,
-            consumerRecovery: { prove: async () => ({ status: 'RECOVERY_ENROLL_ONLY', available_methods: ['passkey', 'totp'], totp_unavailable_reason: null, recovery_capability: cap, replacement_recovery_code: '01-EXAMPLE-SAVED-CODE', expires_at: '2026-10-05T12:00:00.000Z' }), beginEnrollment: async () => { throw new Error('unused'); }, completeEnrollment: async () => ({ status: 'authenticated', sessionToken, csrfToken: csrf, session }) },
+            consumerRecovery: { prove: async () => ({ status: 'RECOVERY_ENROLL_ONLY', available_methods: ['passkey', 'totp'], totp_unavailable_reason: null, recovery_capability: cap, expires_at: '2026-10-05T12:00:00.000Z' }), beginEnrollment: async () => { throw new Error('unused'); }, completeEnrollment: async () => ({ status: 'authenticated', sessionToken, csrfToken: csrf, session }) },
             onboardingEvidence: { status: async () => { throw new Error('unused'); }, complete: async () => { } } });
         try {
             const proof = await api.inject({ method: 'POST', url: '/v1/auth/recovery/prove', headers: { origin }, payload: { token: 'a'.repeat(43), recovery_code: '01-code', method: 'passkey' } });

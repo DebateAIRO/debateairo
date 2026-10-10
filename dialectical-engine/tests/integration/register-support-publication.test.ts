@@ -1,7 +1,7 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, readdir, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { readFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import type { Pool, PoolClient } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -25,6 +25,7 @@ import {
   DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256,
   LEGACY_REGISTER_V1_SNAPSHOT_SHA256
 } from "../support/registerFixtures.js";
+import { replayMigrationRolledBack, retiredUpgradeReason } from "../support/migrationReplay.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -72,36 +73,27 @@ const completeSupportPatch = (enabled: boolean): SupportPatch[] =>
     value_json_text: key === "support_enabled" ? String(enabled) : value
   }));
 
-async function applyMigrationsBeforeSupportPublication(pool: Pool): Promise<void> {
-  const names = (await readdir("migrations"))
-    .filter((name) => /^\d+.*[.]sql$/u.test(name) && name < "0055_register_support_publication.sql")
-    .sort();
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query("SELECT pg_advisory_xact_lock(hashtextextended('debateai:schema-migrations', 0))");
-    await client.query(`
-      CREATE TABLE public.debateai_schema_migration (
-        name text PRIMARY KEY CHECK (length(btrim(name)) > 0),
-        applied_at timestamptz NOT NULL
-      )
-    `);
-    for (const name of names) {
-      await client.query(await readFile(`migrations/${name}`, "utf8"));
-      await client.query(
-        "INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())",
-        [name]
-      );
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
-  }
+const SUPPORT_PUBLICATION_MIGRATION = "0055_register_support_publication.sql";
+
+// Until merge 065708c19 the two legacy cases below built a database below 0055 and let migrate()
+// apply 0055 over its register history. migrate() now refuses a ledger without 0055
+// (UNKNOWN_MIXED_LINEAGE, by design) and every ledger it continues from already records 0055, so
+// no database meets 0055 for the first time with history any more. The databases 0055 did upgrade
+// still hold that history, so both cases write it onto the migrated database and run 0055's own
+// SQL over it (tests/support/migrationReplay.ts) — rolled back, not committed: 0055's closing
+// grants would hand debateai_runtime EXECUTE on publish_register_version and
+// import_historical_register_version again, which 0065 revoked.
+async function expectSupportPublicationUpgradeRetired(): Promise<void> {
+  expect(await retiredUpgradeReason(database.pool, [SUPPORT_PUBLICATION_MIGRATION])).toEqual({
+    refusal: "MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE", unrecorded: []
+  });
 }
 
+/**
+ * Writes a register version the way the code before 0055 did: plain rows, no publication metadata.
+ * 0055's insert guards and every later trigger did not exist then, so they are off for this one
+ * transaction (session_replication_role = replica; the test connects as a superuser).
+ */
 async function insertPre0055History(
   pool: Pool,
   version: "1" | "4" | "5",
@@ -110,6 +102,7 @@ async function insertPre0055History(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    await client.query("SET LOCAL session_replication_role = replica");
     await client.query(
       "INSERT INTO register.register_version(register_version,row_count,sealed) VALUES($1,$2,true)",
       [version, rows.length]
@@ -129,8 +122,10 @@ async function insertPre0055History(
   }
 }
 
-async function readHistoricalBytes(pool: Pool): Promise<readonly Record<string, unknown>[]> {
-  const result = await pool.query(`
+async function readHistoricalBytes(
+  queryable: Pick<PoolClient, "query">
+): Promise<readonly Record<string, unknown>[]> {
+  const result = await queryable.query(`
     SELECT version.register_version::text AS register_version,
       version.row_count,version.sealed,row.row_key,
       encode(convert_to(row.value_json::text,'UTF8'),'hex') AS value_json_hex,
@@ -310,15 +305,19 @@ afterEach(async () => {
 
 describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
   it("preserves legacy algorithm version 5 while allocating and replaying the new development receipt", async () => {
-    await database.stop();
-    database = await startTestDatabase();
-    await applyMigrationsBeforeSupportPublication(database.pool);
+    await expectSupportPublicationUpgradeRetired();
     const bootstrap = await loadBootstrapRegister();
     await insertPre0055History(database.pool, "1", buildBootstrapRegisterPublicationRows(bootstrap));
     const rows = await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, TEST_DEVELOPMENT_PROVIDER_PANEL);
     await insertPre0055History(database.pool, "5", rows);
     const before = (await database.pool.query("SELECT * FROM register.register_row WHERE register_version=5 ORDER BY row_key")).rows;
-    await migrate(database.pool);
+    // 0055 floors the allocator one above the highest version present. That floor is a setval, and
+    // PostgreSQL never rolls a sequence change back, so it outlives the rolled-back replay — as it
+    // stayed on every database 0055 upgraded.
+    expect(await replayMigrationRolledBack(database.pool, SUPPORT_PUBLICATION_MIGRATION)).toBe("APPLIED");
+    expect((await database.pool.query(
+      "SELECT last_value::text,is_called FROM register.register_version_id_seq"
+    )).rows).toEqual([{ last_value: "6", is_called: false }]);
     const repositoryRoot = await mkdtemp(join(tmpdir(), "dev-register-upgrade-"));
     try {
       await mkdir(join(repositoryRoot, ".local/dev-auth"), { recursive: true, mode: 0o700 });
@@ -351,11 +350,8 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
     } finally { await rm(repositoryRoot, { recursive: true, force: true }); }
   });
 
-  it("upgrades exact historical v1/v4 bytes, initializes production off, ignores generic versions, and rolls back forward", async () => {
-    await database.stop();
-    database = await startTestDatabase();
-    await applyMigrationsBeforeSupportPublication(database.pool);
-
+  it("keeps exact historical v1/v4 bytes through 0055, initializes production off, ignores generic versions, and rolls back forward", async () => {
+    await expectSupportPublicationUpgradeRetired();
     const bootstrap = await loadBootstrapRegister();
     const v1Rows = buildBootstrapRegisterPublicationRows(bootstrap);
     const v4Rows = await readLegacyDevelopmentV4Rows();
@@ -366,38 +362,42 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
     await insertPre0055History(database.pool, "4", v4Rows);
     const historicalBefore = await readHistoricalBytes(database.pool);
 
-    await migrate(database.pool);
-
+    // 0055's own SQL over that history, checked before the rollback.
+    expect(await replayMigrationRolledBack(database.pool, SUPPORT_PUBLICATION_MIGRATION, {
+      after: async (client) => {
+        expect(await readHistoricalBytes(client)).toEqual(historicalBefore);
+        expect((await client.query(`
+          SELECT register_version::text,
+            register._snapshot_sha256(register_version) AS snapshot_sha256
+          FROM register.register_version WHERE register_version IN (1,4)
+          ORDER BY register_version
+        `)).rows).toEqual([
+          { register_version: "1", snapshot_sha256: LEGACY_REGISTER_V1_SNAPSHOT_SHA256 },
+          { register_version: "4", snapshot_sha256: DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 }
+        ]);
+        expect((await client.query(`
+          SELECT register_version::text,base_register_version,publication_id,
+            request_sha256,snapshot_sha256,publication_kind,recorded_at
+          FROM register.register_version WHERE register_version IN (1,4)
+          ORDER BY register_version
+        `)).rows).toEqual([
+          { register_version: "1", base_register_version: null, publication_id: null,
+            request_sha256: null, snapshot_sha256: null, publication_kind: null, recorded_at: null },
+          { register_version: "4", base_register_version: null, publication_id: null,
+            request_sha256: null, snapshot_sha256: null, publication_kind: null, recorded_at: null }
+        ]);
+        expect((await client.query(
+          "SELECT count(*)::int AS count FROM register.register_version WHERE publication_kind='SUPPORT_CONFIGURATION'"
+        )).rows).toEqual([{ count: 0 }]);
+        expect((await client.query(
+          "SELECT count(*)::int AS count FROM register.register_row WHERE row_key='supportActivation'"
+        )).rows).toEqual([{ count: 0 }]);
+        expect((await client.query(
+          "SELECT * FROM register.read_support_configuration_status()"
+        )).rows).toEqual([]);
+      }
+    })).toBe("APPLIED");
     expect(await readHistoricalBytes(database.pool)).toEqual(historicalBefore);
-    expect((await database.pool.query(`
-      SELECT register_version::text,
-        register._snapshot_sha256(register_version) AS snapshot_sha256
-      FROM register.register_version WHERE register_version IN (1,4)
-      ORDER BY register_version
-    `)).rows).toEqual([
-      { register_version: "1", snapshot_sha256: LEGACY_REGISTER_V1_SNAPSHOT_SHA256 },
-      { register_version: "4", snapshot_sha256: DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 }
-    ]);
-    expect((await database.pool.query(`
-      SELECT register_version::text,base_register_version,publication_id,
-        request_sha256,snapshot_sha256,publication_kind,recorded_at
-      FROM register.register_version WHERE register_version IN (1,4)
-      ORDER BY register_version
-    `)).rows).toEqual([
-      { register_version: "1", base_register_version: null, publication_id: null,
-        request_sha256: null, snapshot_sha256: null, publication_kind: null, recorded_at: null },
-      { register_version: "4", base_register_version: null, publication_id: null,
-        request_sha256: null, snapshot_sha256: null, publication_kind: null, recorded_at: null }
-    ]);
-    expect((await database.pool.query(
-      "SELECT count(*)::int AS count FROM register.register_version WHERE publication_kind='SUPPORT_CONFIGURATION'"
-    )).rows).toEqual([{ count: 0 }]);
-    expect((await database.pool.query(
-      "SELECT count(*)::int AS count FROM register.register_row WHERE row_key='supportActivation'"
-    )).rows).toEqual([{ count: 0 }]);
-    expect((await database.pool.query(
-      "SELECT * FROM register.read_support_configuration_status()"
-    )).rows).toEqual([]);
 
     const deployedRegisterVersion = "4";
     await database.pool.query(

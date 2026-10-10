@@ -7,8 +7,11 @@ import {
 } from "@debateai/judgement";
 import {
   EVALUATOR_INSTRUCTIONS,
+  SYNTHESIZER_CONTRACT_ID,
   SYNTHESIZER_INSTRUCTIONS,
-  SYNTHESIZER_PROMPT_CONTRACT
+  SYNTHESIZER_PROMPT_CONTRACT,
+  SYNTHESIZER_V1_ANSWER_FORM,
+  SYNTHESIZER_V1_CONTRACT_ID
 } from "@debateai/serve";
 import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
 import {
@@ -204,7 +207,7 @@ describe("REVIEW ITEM 4 — the panel prompt, reordered but not reworded", () =>
   });
 });
 
-describe("REVIEW ITEM 4 — the serve prompts, byte-identical to base", () => {
+describe("REVIEW ITEM 4 — the serve prompts, exact shipped texts", () => {
   /**
    * ROUND 3: these two had NO exact-string pin anywhere. `prompt-surface-guard`
    * held regex fragments of the synthesizer's duties and the composer-hash test
@@ -231,14 +234,31 @@ describe("REVIEW ITEM 4 — the serve prompts, byte-identical to base", () => {
     expect(EVALUATOR_PROMPT_CONTRACT.instruction).toBe(EVALUATOR_INSTRUCTIONS);
   });
 
-  it("the synthesizer's answer form is the runner's base system string", () => {
+  const SYNTHESIZER_V1_FORM =
+    "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} "
+    + "entries. node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every "
+    + "load-bearing claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes "
+    + "a segment cites rest on reasoning alone, with no measured or looked-up evidence behind them, return at "
+    + "least two segments in order: the first segment states the provisional answer as a hypothesis; the second "
+    + "segment states the research plan that would lift it.";
+
+  it("keeps the shipped v1 synthesizer answer form as history — the runner's base system string", () => {
+    expect(SYNTHESIZER_V1_CONTRACT_ID).toBe("serve.synthesizer.v1");
+    expect(SYNTHESIZER_V1_ANSWER_FORM).toBe(SYNTHESIZER_V1_FORM);
+  });
+
+  it("supersedes v1 with serve.synthesizer.v2: v1's form plus the served-number reference format", () => {
+    expect(SYNTHESIZER_CONTRACT_ID).toBe("serve.synthesizer.v2");
+    expect(SYNTHESIZER_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v2");
     expect(SYNTHESIZER_PROMPT_CONTRACT.answerForm).toBe(
-      "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} "
-      + "entries. node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every "
-      + "load-bearing claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes "
-      + "a segment cites rest on reasoning alone, with no measured or looked-up evidence behind them, return at "
-      + "least two segments in order: the first segment states the provisional answer as a hypothesis; the second "
-      + "segment states the research plan that would lift it."
+      SYNTHESIZER_V1_FORM + " "
+      + "segment_id and every node_refs or served_number_refs entry must be an ASCII identifier matching "
+      + "^[A-Za-z0-9][A-Za-z0-9:._-]*$; copy digest node ids exactly and never translate identifiers. "
+      + "served_number_refs identifies typed served-number slots, not the numeric values themselves. "
+      + "The available slot is number:final-strength, referring to code_label.servedStrength. "
+      + "Include that exact ref when the segment asserts that served number. If a segment asserts no served number, use []. "
+      + "Never invent a slot from other digest statistics or code_label.margin, and never put numeric values, "
+      + "percentages, expressions, or citation labels in served_number_refs."
     );
   });
 

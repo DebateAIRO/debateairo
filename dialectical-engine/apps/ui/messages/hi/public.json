@@ -202,6 +202,6 @@
   "public.publication.contentCheck.groundIllegal": "यह पाठ गैरकानूनी भी हो सकता है।",
   "public.publication.contentCheck.automated": "यह निर्णय एक स्वचालित उपकरण ने लिया है। अभी तक किसी व्यक्ति ने इसकी समीक्षा नहीं की है।",
   "public.publication.contentCheck.stillPrivate": "आपकी बहस निजी और अपरिवर्तित रहती है। केवल आप इसे देख सकते हैं।",
-  "public.publication.contentCheck.appeal": "किसी व्यक्ति से इस निर्णय की समीक्षा करवाने के लिए छह महीने के भीतर [appeals@dezbatere.ro] पर लिखें।",
+  "public.publication.contentCheck.appeal": "किसी व्यक्ति से इस निर्णय की समीक्षा करवाने के लिए छह महीने के भीतर office@dezbatere.ro पर लिखें।",
   "public.publication.contentCheck.unavailable": "सामग्री की जाँच अभी उपलब्ध नहीं है, इसलिए कुछ भी प्रकाशित नहीं हुआ। आपकी बहस निजी रहती है। कुछ मिनट बाद फिर कोशिश करें।"
 }

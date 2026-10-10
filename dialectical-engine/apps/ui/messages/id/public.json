@@ -201,6 +201,6 @@
   "public.publication.contentCheck.groundIllegal": "Teks tersebut mungkin juga melanggar hukum.",
   "public.publication.contentCheck.automated": "Keputusan ini dibuat oleh alat otomatis. Belum ada manusia yang meninjaunya.",
   "public.publication.contentCheck.stillPrivate": "Debat Anda tetap privat dan tidak berubah. Hanya Anda yang dapat melihatnya.",
-  "public.publication.contentCheck.appeal": "Untuk meminta seseorang meninjau keputusan ini, kirim pesan ke [appeals@dezbatere.ro] dalam waktu enam bulan.",
+  "public.publication.contentCheck.appeal": "Untuk meminta seseorang meninjau keputusan ini, kirim pesan ke office@dezbatere.ro dalam waktu enam bulan.",
   "public.publication.contentCheck.unavailable": "Pemeriksaan konten sedang tidak tersedia, sehingga tidak ada yang diterbitkan. Debat Anda tetap privat. Coba lagi dalam beberapa menit."
 }

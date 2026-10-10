@@ -36,11 +36,13 @@ describe('consumer token plus saved-code recovery', () => {
         const start = await audited('SELECT identity.start_consumer_recovery($1,$2,$3) AS value', [a.index, tokenHash]);
         expect(start.userId).toBe(a.userId);
         expect(await audited('SELECT identity.start_consumer_recovery($1,$2,$3) AS value', [a.index, hash()])).toBeNull();
-        const capHash = hash(), input = { tokenHash, codeId: a.codeId, codeHash, replacementHash: codeHash + 'A', capHash, method: 'passkey' };
+        // Design note 2026-10-09 item 3: no replacement code is sent, none is stored, and every verified email is told.
+        const capHash = hash(), input = { tokenHash, codeId: a.codeId, codeHash, capHash, method: 'passkey' };
         const result = await audited('SELECT identity.prove_consumer_recovery($1,$2) AS value', [input]);
         expect(result.expiresAt).toBeTruthy();
         expect((await database.pool.query('SELECT count(*)::int n FROM identity.session WHERE user_id=$1', [a.userId])).rows[0].n).toBe(0);
-        expect((await database.pool.query('SELECT count(*)::int n FROM identity.recovery_code WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL', [a.userId])).rows[0].n).toBe(1);
+        expect((await database.pool.query('SELECT count(*)::int n FROM identity.recovery_code WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL', [a.userId])).rows[0].n).toBe(0);
+        expect((await database.pool.query("SELECT event_kind FROM identity.consumer_security_notice WHERE user_id=$1 AND event_kind IN ('RECOVERY_PROVED','RECOVERY_CODE_USED') ORDER BY event_kind", [a.userId])).rows.map(r => r.event_kind)).toEqual(['RECOVERY_CODE_USED', 'RECOVERY_PROVED']);
         await expect(audited('SELECT identity.prove_consumer_recovery($1,$2) AS value', [input])).rejects.toThrow();
     });
     it('requires current channel and forbids raw capability-table access', async () => {

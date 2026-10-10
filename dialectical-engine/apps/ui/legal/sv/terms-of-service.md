@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.1 · GÄLLER FRÅN [DATE]
+eyebrow: ANVÄNDARVILLKOR · v2.2 · GÄLLER FRÅN 12 OKTOBER 2026
 title: Vad du godkänner
-lede: Avtalet mellan dig och DebateAIRO S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.1
+lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
+endMarker: SLUT PÅ VILLKOREN · v2.2
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,39 +21,40 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.1 · Effective \[date\] · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.2 · Effective 12 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
-**In short.** Du måste ha fyllt 18 år. DebateAI bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till \[abuse@dezbatere.ro\], oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
+**In short.** Du måste ha fyllt 18 år. DebateAI bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
 ## 1. Vilka vi är och hur du kontaktar oss
 
-DebateAI drivs av **DebateAIRO S.R.L.**, ett bolag registrerat i Rumänien.
+DebateAI drivs av **DMS Merchandise Shop S.R.L.**, ett bolag registrerat i Rumänien.
 
 |  |  |
 | --- | --- |
-| Registrerat säte | \[street, number, sector, postal code\], Bukarest, Rumänien |
-| Registreringsnummer i handelsregistret | \[J40/…/…\] |
-| Unikt registreringsnummer (CUI) | \[…\] · Moms: \[RO… / not VAT-registered\] |
-| Aktiekapital | \[RON …\] |
-| Allmän kontakt | \[hello@dezbatere.ro\] |
-| Rättsliga meddelanden | \[legal@dezbatere.ro\] |
+| Registrerat säte | Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumänien |
+| Registreringsnummer i handelsregistret | J2022000426271 |
+| Unikt registreringsnummer (CUI) | 45935221 · Moms: RO45935221 |
+| Aktiekapital | 5 000 RON |
+| Allmän kontakt | support@dezbatere.ro |
+| Telefon | +40 748 793 490 |
+| Rättsliga meddelanden | support@dezbatere.ro |
 | Integritet och dataskydd | privacy@dezbatere.ro |
-| Rapportering av olagligt innehåll | \[abuse@dezbatere.ro\] — se avsnitt 10 |
-| Kontaktpunkt för myndigheter | \[dsa@dezbatere.ro\] — rumänska och engelska |
-| Avlägsnandeorder för terrorisminnehåll (förordning (EU) 2021/784) | \[dsa@dezbatere.ro\] — vår kontaktpunkt för sådana order; rumänska och engelska; se avsnitt 10 |
+| Rapportering av olagligt innehåll | support@dezbatere.ro — se avsnitt 10 |
+| Kontaktpunkt för myndigheter | office@dezbatere.ro — rumänska och engelska |
+| Avlägsnandeorder för terrorisminnehåll (förordning (EU) 2021/784) | office@dezbatere.ro — vår kontaktpunkt för sådana order; rumänska och engelska; se avsnitt 10 |
 | Företrädare i andra länder | Anges i bilaga A för de regioner där vi har utsett en företrädare |
 
-Dessa uppgifter visas även permanent på webbplatsen på \[dezbatere.ro/legal\]. Du kan alltid nå en person, inte bara vår assistent; avsnitt 10 förklarar hur.
+Dessa uppgifter visas även permanent på webbplatsen på dezbatere.ro/legal. Du kan alltid nå en person, inte bara vår assistent; avsnitt 10 förklarar hur.
 
 ## 2. Var vi erbjuder DebateAI
 
-Vi erbjuder DebateAI till personer som bor i **\[the European Union and the European Economic Area\]** \[and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan\]. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten.
+Vi erbjuder DebateAI till personer som bor i Europeiska unionen (27 länder) och Europeiska ekonomiska samarbetsområdet (Norge, Island och Liechtenstein), Schweiz, Moldavien, USA (förutom Tennessee), Kanada, Australien, Nya Zeeland, Singapore, Japan, Sydkorea och Taiwan. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten.
 
 ## 3. Godkännande av dessa villkor
 
-Du godkänner dessa villkor genom att markera rutan **”Jag har läst och godkänner användarvillkoren”** och klicka på **Skapa konto**. Därigenom ingås ett avtal mellan dig och DebateAIRO S.R.L. Villkoren omfattar reglerna för tillåten användning i avsnitt 7, reglerna för publicering i avsnitt 9, ansvarsbestämmelserna i avsnitt 15, bestämmelserna om tillämplig lag och tvister i avsnitt 18 och, om du bor i USA, skiljeavtalet i bilaga A.3. Vi sparar uppgift om vilken version du godkände och när, i enlighet med vår integritetspolicy.
+Du godkänner dessa villkor genom att markera rutan **”Jag har läst och godkänner användarvillkoren”** och klicka på **Skapa konto**. Därigenom ingås ett avtal mellan dig och DMS Merchandise Shop S.R.L. Villkoren omfattar reglerna för tillåten användning i avsnitt 7, reglerna för publicering i avsnitt 9, ansvarsbestämmelserna i avsnitt 15 och bestämmelserna om tillämplig lag och tvister i avsnitt 18. Vi sparar uppgift om vilken version du godkände och när, i enlighet med vår integritetspolicy.
 
-Vår **integritetspolicy** på \[dezbatere.ro/privacy\] förklarar hur vi behandlar personuppgifter. Det är information som vi är skyldiga att ge dig, inte ett avtal som du godkänner, och ingenting i dessa villkor gör den till ett samtycke till behandling. Vår **cookiepolicy** på \[dezbatere.ro/cookies\] och vårt **register över AI-leverantörer** på \[dezbatere.ro/providers\] införlivas i dessa villkor genom hänvisning.
+Vår **integritetspolicy** på dezbatere.ro/privacy förklarar hur vi behandlar personuppgifter. Det är information som vi är skyldiga att ge dig, inte ett avtal som du godkänner, och ingenting i dessa villkor gör den till ett samtycke till behandling. Vår **cookiepolicy** på dezbatere.ro/cookies och vårt **register över AI-leverantörer** på dezbatere.ro/providers införlivas i dessa villkor genom hänvisning.
 
 Innan du ingår ett avtal med oss elektroniskt visar gränssnittet vilka steg som ingår, låter dig granska och korrigera det du har angett innan du skickar in det och upplyser dig om på vilka språk avtalet kan ingås. Dessa villkor tillhandahålls i ett format som du kan spara och skriva ut. När du köper ett betalabonnemang skickar vi dig den version du godkände via e-post. Du kan också när som helst begära en kopia. Ingenting i dessa villkor begränsar rättigheter som du har enligt rumänsk konsumenträtt, EU:s konsumenträtt eller lagen i det land där du bor och som inte får begränsas genom avtal.
 
@@ -119,7 +120,7 @@ Om du är osäker på om något är tillåtet ska du fråga oss innan du publice
 
 **Vad supportchatten skickar.** Supportassistenten är också en AI-modell. När du skriver till den skickar vi ditt meddelande till en extern modelleverantör så att modellen kan svara, tillsammans med de hjälpartiklar som den grundar sitt svar på. Innan vi skickar maskerar vi allt som ser ut som ett lösenord, en engångskod eller en nyckel. Om du ber att få tala med en person skickar vi även samtalet, maskerat på samma sätt, till modellen så att den kan skriva en kort sammanfattning till den medlem i vårt team som tar över ditt ärende. Vi bifogar inte din e-postadress, dina kontoidentifierare eller dina betalningsuppgifter, men modellen tar emot allt annat du skriver i chatten, så skriv inte något där som du inte vill att den ska läsa.
 
-**Vilka leverantörer och var.** Vårt **register över AI-leverantörer** på \[dezbatere.ro/providers\] är en del av dessa villkor. Där anges varje leverantör som vi kan använda: dess juridiska person och land; vad den tar emot och varför; var den behandlar uppgifter; dess lagringsvillkor; huruvida nollagring av uppgifter är aktiv för den slutpunkt som vi använder; huruvida den enligt vårt avtal får använda indata för träning; vilken överföringsmekanism vi förlitar oss på; samt datumet då vi senast kontrollerade varje post. Leverantörer kan vara etablerade utanför ditt land och utanför Europeiska ekonomiska samarbetsområdet. Vår integritetspolicy förklarar skyddsåtgärderna.
+**Vilka leverantörer och var.** Vårt **register över AI-leverantörer** på dezbatere.ro/providers är en del av dessa villkor. Där anges varje leverantör som vi kan använda: dess juridiska person och land; vad den tar emot och varför; var den behandlar uppgifter; dess lagringsvillkor; huruvida nollagring av uppgifter är aktiv för den slutpunkt som vi använder; huruvida den enligt vårt avtal får använda indata för träning; vilken överföringsmekanism vi förlitar oss på; samt datumet då vi senast kontrollerade varje post. Leverantörer kan vara etablerade utanför ditt land och utanför Europeiska ekonomiska samarbetsområdet. Vår integritetspolicy förklarar skyddsåtgärderna.
 
 **Tre olika saker.** ”Används inte för att träna modeller”, ”lagras under en begränsad tid av säkerhetsskäl, för att förhindra missbruk eller av rättsliga skäl” och ”nollagring av uppgifter — bevaras inte efter behandlingen” är tre olika saker. Om en leverantör behåller promptar under en begränsad tid anger registret hur länge och varför. Om nollagring av uppgifter är aktiv anger registret detta och för vilka funktioner. Vi kommer inte att uppge att innehåll inte lagras när så inte är fallet.
 
@@ -143,7 +144,7 @@ Debatter är **privata som standard**. Ingenting som du skapar är synligt för 
 
 ## 10. Rapportering av innehåll, moderering och klagomål
 
-**Vem som helst kan rapportera innehåll.** Du behöver inget konto. Skriv till \[abuse@dezbatere.ro\] eller använd knappen **Rapportera** i en publicerad debatt. För att vi ska kunna agera ska du ange: varför du anser att innehållet är olagligt eller bryter mot dessa villkor, med tillräcklig detaljnivå för att vi ska förstå påståendet; den exakta platsen — den fullständiga webbadressen och, om möjligt, avsnittet; ditt namn och din e-postadress (krävs inte för rapporter om material med sexuella övergrepp mot barn); samt att du i god tro anser att din rapport är riktig och fullständig.
+**Vem som helst kan rapportera innehåll.** Du behöver inget konto. Skriv till support@dezbatere.ro eller använd knappen **Rapportera** i en publicerad debatt. För att vi ska kunna agera ska du ange: varför du anser att innehållet är olagligt eller bryter mot dessa villkor, med tillräcklig detaljnivå för att vi ska förstå påståendet; den exakta platsen — den fullständiga webbadressen och, om möjligt, avsnittet; ditt namn och din e-postadress (krävs inte för rapporter om material med sexuella övergrepp mot barn); samt att du i god tro anser att din rapport är riktig och fullständig.
 
 Vi bekräftar mottagandet av varje rapport utan onödigt dröjsmål. Vi hanterar rapporter skyndsamt, omsorgsfullt, icke-godtyckligt och objektivt, meddelar dig vårt beslut och talar om hur du kan bestrida det. Om vi använder automatiserade metoder för att behandla eller avgöra en rapport upplyser vi om det. Vi agerar på rapporter om intima bilder som delats utan samtycke **inom 48 timmar** från en giltig begäran.
 
@@ -154,7 +155,7 @@ Vi bekräftar mottagandet av varje rapport utan onödigt dröjsmål. Vi hanterar
 
 **Motivering.** När vi tar bort eller begränsar synligheten för ditt innehåll eller stänger av eller avslutar ditt konto ger vi dig en motivering: vilken åtgärd vi vidtog och dess räckvidd, vilka omständigheter vi grundade oss på och om de kom från en rapport eller våra egna kontroller, huruvida automatiserade metoder användes, den rättsliga eller avtalsmässiga grunden samt hur du kan bestrida beslutet: genom vår klagomålsväg nedan, genom ett organ för tvistlösning utanför domstol som är certifierat enligt EU:s förordning om digitala tjänster, eller i domstol.
 
-**Klagomål på ett beslut.** Om du inte håller med om ett modereringsbeslut ska du svara på motiveringen eller skriva till \[appeals@dezbatere.ro\] inom **sex månader**. En person som inte deltog i det ursprungliga beslutet granskar det, och vi meddelar dig resultatet med en motivering. Detta påverkar inte din rätt att vända dig till domstol eller använda alternativ tvistlösning enligt avsnitt 18. Klagomålsvägen tar även emot klagomål om att vi inte har agerat på en rapport, att innehåll felaktigt har tagits bort, att ett konto felaktigt har begränsats eller att ett automatiserat verktyg felaktigt har påverkat ditt innehåll.
+**Klagomål på ett beslut.** Om du inte håller med om ett modereringsbeslut ska du svara på motiveringen eller skriva till office@dezbatere.ro inom **sex månader**. En person som inte deltog i det ursprungliga beslutet granskar det, och vi meddelar dig resultatet med en motivering. Detta påverkar inte din rätt att vända dig till domstol eller använda alternativ tvistlösning enligt avsnitt 18. Klagomålsvägen tar även emot klagomål om att vi inte har agerat på en rapport, att innehåll felaktigt har tagits bort, att ett konto felaktigt har begränsats eller att ett automatiserat verktyg felaktigt har påverkat ditt innehåll.
 
 **Tvistlösning utanför domstol.** Om du befinner dig i Europeiska unionen får du föra en tvist om ett av våra modereringsbeslut till ett organ för tvistlösning utanför domstol som är certifierat enligt artikel 21 i EU:s förordning om digitala tjänster (förordning (EU) 2022/2065). Detta omfattar ett beslut om ditt innehåll eller ditt konto, samt vårt beslut om en rapport som du har gjort. Du väljer organet från den förteckning som Europeiska kommissionen offentliggör på digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, och du behöver inte först använda vår klagomålsväg. Vi deltar i god tro och avböjer endast att delta om samma tvist, om samma innehåll och på samma grunder, redan har avgjorts. Organets beslut är inte bindande för någon av oss, och du behåller din rätt att vända dig till domstol. Organet får ta ut en liten avgift av dig, eller ingen avgift alls. Om det avgör tvisten till din fördel betalar vi dess avgifter och ersätter dina rimliga kostnader; om det avgör tvisten till vår fördel behöver du inte betala våra avgifter eller kostnader, såvida inte organet finner att du uppenbart har agerat i ond tro.
 
@@ -168,7 +169,7 @@ Vi bekräftar mottagandet av varje rapport utan onödigt dröjsmål. Vi hanterar
 
 **Av dig.** Avsluta ditt konto när som helst under Inställningar, på det sätt som beskrivs i avsnitt 6. Du behöver inte ange något skäl. Om du avslutar ditt konto upphör dessa villkor att gälla. De upphör när avslutandet träder i kraft, efter fristen på 7 dagar; de avsnitt som anges i slutet av detta avsnitt fortsätter att gälla därefter.
 
-**Av oss.** Vi kan stänga av eller avsluta ditt konto eller ta bort eller begränsa ditt innehåll om: du väsentligt bryter mot dessa villkor, i synnerhet avsnitt 7; ditt innehåll är olagligt eller lagen, en domstol eller en myndighet kräver att vi agerar; din användning hotar tjänstens säkerhet, integritet eller tillgänglighet eller andras rättigheter; ditt konto har varit inaktivt i \[24 months\] och vi har underrättat dig; eller vi upphör att tillhandahålla tjänsten eller att tillhandahålla den i ditt land.
+**Av oss.** Vi kan stänga av eller avsluta ditt konto eller ta bort eller begränsa ditt innehåll om: du väsentligt bryter mot dessa villkor, i synnerhet avsnitt 7; ditt innehåll är olagligt eller lagen, en domstol eller en myndighet kräver att vi agerar; din användning hotar tjänstens säkerhet, integritet eller tillgänglighet eller andras rättigheter; ditt konto har varit inaktivt i 24 månader och vi har underrättat dig; eller vi upphör att tillhandahålla tjänsten eller att tillhandahålla den i ditt land.
 
 Om överträdelsen inte är allvarlig, lagen inte kräver omedelbara åtgärder och ett dröjsmål inte skulle orsaka skada, upplyser vi dig om problemet och ger dig en rimlig möjlighet att åtgärda det innan vi stänger av eller avslutar kontot. Vi ger alltid en motivering enligt avsnitt 10, och du kan bestrida beslutet.
 
@@ -182,19 +183,19 @@ Avsnitten 8 (i fråga om innehåll som redan har publicerats), 15, 16 och 18 for
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Premium**-abonnemang \[is / will be\] tillgängligt, vilket ger tillgång till hela modellutbudet och låter dig själv ställa in debattens parametrar.
+DebateAI erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Premium**-abonnemang kommer att bli tillgängligt, vilket ger tillgång till hela modellutbudet och låter dig själv ställa in debattens parametrar.
 
 **Innan du betalar** visar vi, direkt ovanför betalningsknappen: abonnemanget; totalpriset inklusive tillämplig skatt; faktureringsperioden; att abonnemanget förnyas automatiskt tills det sägs upp; vilket datum en eventuell kostnadsfri provperiod upphör och vilket belopp du därefter debiteras; samt hur du säger upp abonnemanget. Du bekräftar förnyelsevillkoren genom att markera en separat ruta. På knappen står **Teckna abonnemang och betala** (på rumänska *Comandă cu obligație de plată*). Vi skickar dig en bekräftelse på ett varaktigt medium med samma information, dessa villkor och ångerblanketten.
 
-**Påminnelser.** Vi skickar e-post till dig minst \[5\] dagar innan en kostnadsfri provperiod övergår till ett betalabonnemang; minst en gång om året för löpande abonnemang; och mellan 30 och 45 dagar före varje förnyelse av en avtalstid på tolv månader eller mer. Varje påminnelse innehåller priset, datumet och en länk för uppsägning.
+**Påminnelser.** Vi skickar e-post till dig minst 5 dagar innan en kostnadsfri provperiod övergår till ett betalabonnemang; minst en gång om året för löpande abonnemang; och mellan 30 och 45 dagar före varje förnyelse av en avtalstid på tolv månader eller mer. Varje påminnelse innehåller priset, datumet och en länk för uppsägning.
 
-**Uppsägning.** Säg upp när som helst under **Inställningar → Abonnemang** med ett enda bekräftelseklick eller via uppsägningssidan på \[dezbatere.ro/cancel\], som inte kräver att du loggar in. Uppsägningen träder i kraft vid slutet av den pågående faktureringsperioden, och du behåller åtkomsten fram till dess. Vi kommer inte att göra det svårare att säga upp än det var att teckna abonnemanget.
+**Uppsägning.** Säg upp när som helst under **Inställningar → Abonnemang** med ett enda bekräftelseklick eller via uppsägningssidan på dezbatere.ro/cancel, som inte kräver att du loggar in. Uppsägningen träder i kraft vid slutet av den pågående faktureringsperioden, och du behåller åtkomsten fram till dess. Vi kommer inte att göra det svårare att säga upp än det var att teckna abonnemanget.
 
 **Prisändringar** träder i kraft först vid en förnyelse. Vi underrättar dig minst **30 dagar i förväg** via e-post och anger det nya priset samt en länk för uppsägning. Om lagen i ditt land kräver ditt uttryckliga samtycke till en prisändring begär vi det; i annat fall gäller det nya priset från nästa förnyelse om du inte gör något. Regionala regler anges i bilaga A.
 
-**Misslyckade betalningar.** Om en betalning misslyckas försöker vi igen under \[7\] dagar och varnar dig via e-post innan vi nedgraderar ditt konto till det kostnadsfria abonnemanget. Vi raderar inte dina debatter på grund av en misslyckad betalning.
+**Misslyckade betalningar.** Om en betalning misslyckas försöker vi igen under 7 dagar och varnar dig via e-post innan vi nedgraderar ditt konto till det kostnadsfria abonnemanget. Vi raderar inte dina debatter på grund av en misslyckad betalning.
 
-**Skatter och vem du betalar till.** Priserna \[include / exclude\] moms, GST eller omsättningsskatt, vilket beror på var du bor och visas innan du betalar. \[If a merchant of record is used: Your purchase is processed by \[Paddle / …\], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.\]
+**Skatter och vem du betalar till.** Priserna inkluderar moms, GST eller omsättningsskatt, vilket beror på var du bor och visas innan du betalar. Kortbetalningar hanteras av NETOPIA Payments (netopia-payments.com). Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor.
 
 **Kortreklamationer.** Om du bestrider en debitering hos din kortutgivare kan vi stänga av avgiftsbelagda funktioner medan tvisten handläggs. Vi tar inte ut någon avgift för detta.
 
@@ -202,7 +203,7 @@ DebateAI erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Premium**-ab
 
 ## 13. Din ångerrätt
 
-Om du bor i EU, EES eller Storbritannien får du frånträda ett betalabonnemang inom **14 dagar** från tecknandet utan att ange något skäl. Använd sidan **Frånträd avtal** på \[dezbatere.ro/withdraw\], standardblanketten i bekräftelsemeddelandet eller skriv till \[support@dezbatere.ro\]; vi bekräftar mottagandet på ett varaktigt medium.
+Om du bor i EU eller EES får du frånträda ett betalabonnemang inom **14 dagar** från tecknandet utan att ange något skäl. Använd sidan **Frånträd avtal** på dezbatere.ro/withdraw, standardblanketten i bekräftelsemeddelandet eller skriv till support@dezbatere.ro; vi bekräftar mottagandet på ett varaktigt medium.
 
 Om du bad oss att börja tillhandahålla tjänsten omedelbart — genom att markera rutan i kassan — och därefter frånträder avtalet betalar du för den del av tjänsten som tillhandahölls fram till den dag då du frånträder, beräknad proportionellt utifrån priset för faktureringsperioden, och vi återbetalar resten. **Du förlorar inte ångerrätten genom att använda tjänsten under de 14 dagarna.**
 
@@ -214,7 +215,7 @@ Om du bor någon annanstans anger bilaga A den ånger- eller betänketid som gä
 
 Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och när. Om ändringen har mer än en mindre negativ inverkan på din åtkomst till eller användning av tjänsten får du säga upp avtalet utan kostnad inom **30 dagar** från det att du underrättades eller från det att ändringen trädde i kraft, beroende på vilket som inträffar senare, och vi återbetalar eventuellt förskottsbetalt belopp för den oanvända perioden.
 
-**Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda DebateAI efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på \[dezbatere.ro/terms/versions\].
+**Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda DebateAI efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
 
 ## 15. Ansvar
 
@@ -234,25 +235,23 @@ Själva tjänsten — programvaran, motorn, poängsättningsmetoden, gränssnitt
 
 Du får citera och länka till publicerade debatter med angivande av DebateAI och en länk till originalsidan. Masskopiering, systematisk återgivning av det offentliga materialet och användning av publicerade debatter som träningsdata är inte tillåtna utan vårt skriftliga medgivande.
 
-Avsnitt 8 reglerar ditt innehåll och statusen för genererade resultat. Om du anser att något på DebateAI gör intrång i dina immateriella rättigheter ska du använda rapporteringsvägen i avsnitt 10. \[If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is \[name, address, email\], registered with the US Copyright Office; we terminate the accounts of repeat infringers.\]
+Avsnitt 8 reglerar ditt innehåll och statusen för genererade resultat. Om du anser att något på DebateAI gör intrång i dina immateriella rättigheter ska du använda rapporteringsvägen i avsnitt 10.
 
 ## 17. Personuppgifter
 
-Hur vi behandlar personuppgifter anges i **integritetspolicyn** på \[dezbatere.ro/privacy\]. Den förklarar vad vi samlar in, den rättsliga grunden för varje ändamål, hur länge vi behåller uppgifter, vilka som tar emot uppgifter, vilka överföringar som sker och hur du utövar dina rättigheter. Tre punkter hör även hemma här. Enligt avsnitt 7 ska du inte ange andra personers personuppgifter i en fråga; om du ändå gör det ansvarar du för detta, och vi kan ta bort innehållet. Om en debatt som publicerats på DebateAI innehåller personuppgifter om dig kan du begära att vi tar bort dem utan att ha ett konto (avsnitt 9). Vi bevarar dessutom en uppgift om ditt godkännande av dessa villkor — version, tidpunkt och sessionens tekniska uppgifter — som bevis för avtalet, i enlighet med integritetspolicyn.
+Hur vi behandlar personuppgifter anges i **integritetspolicyn** på dezbatere.ro/privacy. Den förklarar vad vi samlar in, den rättsliga grunden för varje ändamål, hur länge vi behåller uppgifter, vilka som tar emot uppgifter, vilka överföringar som sker och hur du utövar dina rättigheter. Tre punkter hör även hemma här. Enligt avsnitt 7 ska du inte ange andra personers personuppgifter i en fråga; om du ändå gör det ansvarar du för detta, och vi kan ta bort innehållet. Om en debatt som publicerats på DebateAI innehåller personuppgifter om dig kan du begära att vi tar bort dem utan att ha ett konto (avsnitt 9). Vi bevarar dessutom en uppgift om ditt godkännande av dessa villkor — version, tidpunkt och sessionens tekniska uppgifter — som bevis för avtalet, i enlighet med integritetspolicyn.
 
 ## 18. Tillämplig lag och forum för tvister
 
 **Tillämplig lag.** Dessa villkor samt varje tvist eller anspråk som uppkommer med anledning av dem eller deras innehåll, inbegripet utomobligatoriska anspråk, regleras av rumänsk lag.
 
-**Ditt lokala skydd påverkas inte.** Om du är konsument innebär valet av rumänsk lag inte att du fråntas skyddet enligt tvingande konsumentskyddsregler i det land där du har din vanliga vistelseort — exempelvis regler om oskäliga villkor, ånger- och uppsägningsrätt eller garantier — om dessa regler gäller oberoende av lagvalet, däribland enligt artikel 6.2 i Europaparlamentets och rådets förordning (EG) nr 593/2008 om du bor i EU, eller motsvarande regler i Storbritannien. Du får åberopa dessa regler utöver rumänsk lag.
+**Ditt lokala skydd påverkas inte.** Om du är konsument innebär valet av rumänsk lag inte att du fråntas skyddet enligt tvingande konsumentskyddsregler i det land där du har din vanliga vistelseort — exempelvis regler om oskäliga villkor, ånger- och uppsägningsrätt eller garantier — om dessa regler gäller oberoende av lagvalet, däribland enligt artikel 6.2 i Europaparlamentets och rådets förordning (EG) nr 593/2008 om du bor i EU. Du får åberopa dessa regler utöver rumänsk lag.
 
-**Domstolar, om du bor i EU, EES eller Storbritannien.** Du får väcka talan mot oss antingen vid domstolarna i Rumänien eller vid domstolarna i det land där du bor. Vi får väcka talan mot dig endast vid domstolarna i det land där du bor.
+**Domstolar, om du bor i EU eller EES.** Du får väcka talan mot oss antingen vid domstolarna i Rumänien eller vid domstolarna i det land där du bor. Vi får väcka talan mot dig endast vid domstolarna i det land där du bor.
 
-**Konsumenter på andra platser.** Om du bor utanför EU, EES och Storbritannien begränsar ingenting i dessa villkor någon rätt som du enligt lagen i ditt land har att väcka talan vid dess domstolar eller någon rätt enligt den lagen som inte kan avtalas bort — däribland, om du bor i Australien eller Nya Zeeland, dina rättigheter enligt konsumentgarantier; om du bor i Brasilien, Código de Defesa do Consumidor; och om du bor i USA, konsumentskyddslagstiftningen i din delstat.
+**Konsumenter på andra platser.** Om du bor utanför EU och EES begränsar ingenting i dessa villkor någon rätt som du enligt lagen i ditt land har att väcka talan vid dess domstolar eller någon rätt enligt den lagen som inte kan avtalas bort — däribland, om du bor i Australien eller Nya Zeeland, dina rättigheter enligt konsumentgarantier; om du bor i Brasilien, Código de Defesa do Consumidor; och om du bor i USA, konsumentskyddslagstiftningen i din delstat.
 
-**Personer bosatta i USA.** Bilaga A.3 innehåller ett skiljeavtal och ett avstående från grupptalan som regleras av Federal Arbitration Act. Det gäller endast personer bosatta i USA och endast i den mån det kan göras gällande. Det gäller inte konsumenter i EU, EES eller Storbritannien.
-
-**Innan du vänder dig till domstol.** Kontakta oss på \[legal@dezbatere.ro\]; det mesta går att lösa, och vi strävar efter att svara inom \[5\] arbetsdagar. Om du är konsument i Rumänien eller EU får du använda alternativ tvistlösning genom \[the ANPC – named SAL entity, website\]; vi \[do / do not\] förbinder oss att delta i det förfarandet. Klagomål på modereringsbeslut följer avsnitt 10, vilket är en separat väg.
+**Innan du vänder dig till domstol.** Kontakta oss på support@dezbatere.ro; det mesta går att lösa, och vi strävar efter att svara inom 5 arbetsdagar. Om du är konsument i Rumänien eller EU får du använda alternativ tvistlösning genom www.onoratainstanta.ro; vi förbinder oss inte att delta i det förfarandet. Klagomål på modereringsbeslut följer avsnitt 10, vilket är en separat väg.
 
 ## 19. Övriga villkor
 
@@ -266,58 +265,40 @@ Hur vi behandlar personuppgifter anges i **integritetspolicyn** på \[dezbatere.
 
 **Språk.** Dessa villkor publiceras på alla språk som webbplatsen erbjuder. Avtalet har ingåtts på det språk du registrerade dig på: språket i den version du godkände, vilket framgår av den uppgift om ditt godkännande som vi bevarar. Om du senare godkänner en ny version på ett annat språk fortsätter avtalet på det språket. De övriga språkversionerna är översättningar. Om lagen i det land där du bor föreskriver att en version på landets eget språk har företräde, har den versionen företräde. Om två språkversioner skiljer sig åt tillämpar vi den innebörd som är mest fördelaktig för dig.
 
-**Kontakt.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukarest, Rumänien.
+**Kontakt.** support@dezbatere.ro · DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumänien.
 
 ## Annex A — Regionala villkor
 
-Varje post gäller endast om dess region anges i avsnitt 2 och anger endast vad som skiljer sig från huvuddelen. Om en post strider mot huvuddelen gäller posten för personer i den regionen.
+Varje post gäller för personer som bor i den region som posten avser och anger endast vad som skiljer sig från huvuddelen. Om en post strider mot huvuddelen gäller posten för personer i den regionen.
 
 ### A.1 Europeiska unionen och Europeiska ekonomiska samarbetsområdet
 
-Huvuddelen av dessa villkor är skriven för dig. Därutöver gäller följande: du får väcka talan vid domstolarna i det land där du bor; ångerrätten i avsnitt 13 gäller; alternativ tvistlösning är tillgänglig genom \[the ANPC – named entity, website\]. **Tyskland:** uppsägningsknappen på \[dezbatere.ro/cancel\] låter dig säga upp ett abonnemang utan att logga in; abonnemangsvillkor, förnyelseperioder och uppsägningstider följer §309(9) BGB \[state them\]. **Frankrike:** du får säga upp ett abonnemang online i tre steg på \[URL\]; \[the mediator named at URL\] är tillgänglig för dig. **Italien:** bestämmelserna om ansvar (15), avstängning (11), ändringar (14) och tillämplig lag (18) kräver ditt särskilda godkännande, vilket du lämnar genom den separata bekräftelsen vid registrering. **Nederländerna:** dessa villkor tillhandahålls i ett lagringsbart format innan avtalet ingås. **Polen:** en polsk version finns på \[URL\].
+Huvuddelen av dessa villkor är skriven för dig. Därutöver gäller följande: du får väcka talan vid domstolarna i det land där du bor; ångerrätten i avsnitt 13 gäller; alternativ tvistlösning är tillgänglig genom www.onoratainstanta.ro. **Tyskland:** uppsägningsknappen på dezbatere.ro/cancel låter dig säga upp ett abonnemang utan att logga in; abonnemangsvillkor, förnyelseperioder och uppsägningstider följer §309(9) BGB \[state them\]. **Frankrike:** du får säga upp ett abonnemang online i tre steg på \[URL\]. **Italien:** bestämmelserna om ansvar (15), avstängning (11), ändringar (14) och tillämplig lag (18) kräver ditt särskilda godkännande, vilket du lämnar genom den separata bekräftelsen vid registrering. **Nederländerna:** dessa villkor tillhandahålls i ett lagringsbart format innan avtalet ingås. **Polen:** en polsk version finns på \[URL\].
 
-### A.2 Storbritannien *(endast om landet anges i avsnitt 2)*
-
-Vår företrädare i Storbritannien enligt artikel 27 i UK GDPR är \[name, address, email\]. Consumer Rights Act 2015 gäller för dig, och ingenting i dessa villkor begränsar dina rättigheter enligt den; när abonnemangsreglerna i Digital Markets, Competition and Consumers Act 2024 träder i kraft (väntas ske 2027) gäller de för betalabonnemang, däribland en betänketid efter förnyelser och efter kostnadsfria provperioder. **Så skyddar vi användare mot olagligt innehåll:** \[terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report\]. **Proaktiv teknik som vi använder:** \[describe, or "none"\]. **Ålderskontroll:** \[describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023\]. Klagomålsförfarandet i avsnitt 10 tar emot klagomål om olagligt innehåll, felaktigt avlägsnande av ditt innehåll, begränsningar av ditt konto, användning av automatiserade verktyg som påverkar ditt innehåll samt varje åldersbedömning som felaktigt blockerar dig. Förfarandet är öppet för personer som påverkas av innehåll men inte är användare. Vår integritetspolicy, bilaga B.2, beskriver hur vi behandlar dina uppgifter.
-
-### A.3 USA *(endast om landet anges i avsnitt 2)*
+### A.2 USA
 
 **Tennessee.** Vi erbjuder inte DebateAI till personer som bor i Tennessee.
 
-**Skiljeavtal och avstående från grupptalan.** Om du bor i USA samtycker du och DebateAIRO till att varje tvist som uppkommer med anledning av dessa villkor eller tjänsten ska avgöras genom bindande individuellt skiljeförfarande som administreras av \[the American Arbitration Association / JAMS\] enligt dess konsumentregler, i stället för i domstol, med undantag för att var och en av oss får väcka ett individuellt anspråk vid domstol för mindre tvistemål. **Du får välja att stå utanför** genom att skicka e-post till \[address\] inom 30 dagar från det att du först godkände dessa villkor. Detta avtal regleras av Federal Arbitration Act. Vi betalar ansökningsavgifterna för skiljeförfarandet. Du och DebateAIRO avstår, i den utsträckning lagen tillåter, från grupptalan, kollektiv talan och representativ talan. Detta avsnitt gäller endast framåt i tiden och gäller inte anspråk som uppkom innan du godkände det.
+**Meddelanden och borttaganden.** Intima bilder utan samtycke kan rapporteras på \[URL\] utan konto och tas bort inom 48 timmar från en giltig begäran. Upphovsrättsliga klagomål följer rapporteringsvägen i avsnitt 10.
 
-**Meddelanden och borttaganden.** Intima bilder utan samtycke kan rapporteras på \[URL\] utan konto och tas bort inom 48 timmar från en giltig begäran. Upphovsrättsliga klagomål skickas till vårt utsedda ombud som anges i avsnitt 16.
+**Delstatsspecifikt.** *Kalifornien:* villkoren om automatisk förnyelse i avsnitt 12 gäller; du får säga upp online när som helst; vi bevarar ditt samtycke till förnyelsevillkoren i minst tre år. *New York:* du får säga upp inom 14 dagar från en debitering till ett höjt pris och få en proportionell återbetalning. *Texas och Nebraska:* vi säljer inte känsliga personuppgifter. *Washington:* vårt integritetsmeddelande om konsumenthälsouppgifter på \[URL\] gäller för hälsorelaterade uppgifter. *Colorado:* ingenting i tjänsten fattar beslut med betydande följder om dig. Vår integritetspolicy, bilaga B.2, beskriver hur vi behandlar dina uppgifter och vilka integritetsrättigheter du har enligt lagen i din delstat.
 
-**Delstatsspecifikt.** *Kalifornien:* villkoren om automatisk förnyelse i avsnitt 12 gäller; du får säga upp online när som helst; vi bevarar ditt samtycke till förnyelsevillkoren i minst tre år. *New York:* du får säga upp inom 14 dagar från en debitering till ett höjt pris och få en proportionell återbetalning. *Texas och Nebraska:* vi säljer inte känsliga personuppgifter. *Washington:* vårt integritetsmeddelande om konsumenthälsouppgifter på \[URL\] gäller för hälsorelaterade uppgifter. *Colorado:* ingenting i tjänsten fattar beslut med betydande följder om dig. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter och vilka integritetsrättigheter du har enligt lagen i din delstat.
+### A.3 Kanada och Quebec
 
-### A.4 Kanada och Quebec *(endast om de anges)*
+Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är vår verkställande direktör, nåbar på privacy@dezbatere.ro. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter. **Quebec:** dessa villkor finns på franska; välj franska i språkväljaren; inställningarna som håller dina debatter privata är aktiverade som standard; du får begära att personuppgifter om dig avindexeras.
 
-Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är \[name\], privacy@dezbatere.ro. Vår integritetspolicy, bilaga B.4, beskriver hur vi behandlar dina uppgifter. **Quebec:** dessa villkor finns på franska; välj franska i språkväljaren; inställningarna som håller dina debatter privata är aktiverade som standard; du får begära att personuppgifter om dig avindexeras; inget skiljeavtal och inget avstående från grupptalan gäller för dig.
+### A.4 Australien och Nya Zeeland
 
-### A.5 Australien och Nya Zeeland *(endast om de anges)*
+**Våra tjänster omfattas av garantier som inte kan uteslutas enligt Australian Consumer Law.** Vid allvarliga fel i tjänsten har du rätt att säga upp avtalet och få återbetalning för den oanvända delen eller ersättning för tjänstens minskade värde; du har även rätt till ersättning för annan rimligen förutsebar förlust eller skada. Om felet inte utgör ett allvarligt fel har du rätt att få problemen med tjänsten avhjälpta inom rimlig tid och, om detta inte sker, att säga upp avtalet och få återbetalning. I den utsträckning avsnitt 64A tillåter är vårt ansvar för brott mot en garanti begränsat till att tillhandahålla tjänsten på nytt eller betala kostnaden för detta. Ingen betänketid gäller för betalabonnemanget utöver vad avsnitt 12 ger dig; återbetalningsbegäranden hanteras via support@dezbatere.ro. **Nya Zeeland:** Consumer Guarantees Act 1993 gäller, och ingenting i dessa villkor utesluter den; skadlig digital kommunikation kan rapporteras till oss enligt avsnitt 10 eller till Netsafe.
 
-**Våra tjänster omfattas av garantier som inte kan uteslutas enligt Australian Consumer Law.** Vid allvarliga fel i tjänsten har du rätt att säga upp avtalet och få återbetalning för den oanvända delen eller ersättning för tjänstens minskade värde; du har även rätt till ersättning för annan rimligen förutsebar förlust eller skada. Om felet inte utgör ett allvarligt fel har du rätt att få problemen med tjänsten avhjälpta inom rimlig tid och, om detta inte sker, att säga upp avtalet och få återbetalning. I den utsträckning avsnitt 64A tillåter är vårt ansvar för brott mot en garanti begränsat till att tillhandahålla tjänsten på nytt eller betala kostnaden för detta. Ingen betänketid gäller för betalabonnemanget utöver vad avsnitt 12 ger dig; vår återbetalningspolicy är \[…\]. **Nya Zeeland:** Consumer Guarantees Act 1993 gäller, och ingenting i dessa villkor utesluter den; skadlig digital kommunikation kan rapporteras till oss enligt avsnitt 10 eller till Netsafe.
+### A.5 Schweiz
 
-### A.6 Schweiz *(endast om landet anges)*
+Schweiz federala dataskyddslag gäller för dina uppgifter (integritetspolicyn, bilaga B.5). Du får väcka talan vid domstolarna på den ort i Schweiz där du bor. Ingen lagstadgad ångerrätt gäller för betalabonnemanget; återbetalningsbegäranden hanteras via support@dezbatere.ro.
 
-Schweiz federala dataskyddslag gäller för dina uppgifter (integritetspolicyn, bilaga B.6). Du får väcka talan vid domstolarna på den ort i Schweiz där du bor. Ingen lagstadgad ångerrätt gäller för betalabonnemanget; vår återbetalningspolicy är \[…\].
+### A.6 Moldavien
 
-### A.7 Moldavien *(endast om landet anges)*
+Enligt dessa villkor har du samma rättigheter som en konsument i Europeiska unionen, däribland ångerrätten på 14 dagar i avsnitt 13. Du får väcka talan vid domstolarna i Moldavien. Moldaviens lag nr 195/2024 om skydd av personuppgifter gäller för dina uppgifter (integritetspolicyn, bilaga B.6).
 
-Enligt dessa villkor har du samma rättigheter som en konsument i Europeiska unionen, däribland ångerrätten på 14 dagar i avsnitt 13. Du får väcka talan vid domstolarna i Moldavien. Moldaviens lag nr 195/2024 om skydd av personuppgifter gäller för dina uppgifter (integritetspolicyn, bilaga B.7).
+### A.7 Asien och Stillahavsområdet
 
-### A.8 Ukraina *(endast om landet anges)*
-
-Vi erbjuder DebateAI i Ukraina utom i de områden som inte kontrolleras av den ukrainska regeringen. Produkten och dessa villkor finns på ukrainska. Ukrainas lag ”Om skydd av personuppgifter” gäller för dina uppgifter (integritetspolicyn, bilaga B.8).
-
-### A.9 Israel *(endast om landet anges)*
-
-Du får säga upp ett betalabonnemang i den utsträckning Consumer Protection Law, 5741-1981, tillåter \[state the cancellation terms\]. Dessa villkor och vår integritetspolicy finns på hebreiska. Israels Protection of Privacy Law gäller för dina uppgifter (integritetspolicyn, bilaga B.9).
-
-### A.10 Asien och Stillahavsområdet *(endast raderna för angivna regioner)*
-
-*Singapore:* vårt dataskyddsombud är \[name, email\]; överföringar grundas på avtalsmässiga skydd som är jämförbara med PDPA; ingen lagstadgad betänketid gäller för betalabonnemanget och vår återbetalningspolicy är \[…\]. *Japan:* den lagstadgade informationen enligt Specified Commercial Transactions Act finns på \[URL\]; ingen allmän betänketid gäller för onlineabonnemang och vår återbetalningspolicy är \[…\]; vi skickar ditt innehåll till AI-leverantörer i USA och Europeiska unionen, var och en enligt ett avtal som kräver ett skydd likvärdigt med Japans Act on the Protection of Personal Information, och på begäran berättar vi vilka dessa åtgärder är. *Sydkorea:* samtycken till valfri behandling och marknadsföring inhämtas separat från de uppgifter som behövs för att driva tjänsten; vår integritetsansvariga är \[name\], privacy@dezbatere.ro; du får frånträda ett betalabonnemang inom 7 dagar från tecknandet i enlighet med E-Commerce Act; vi inhämtar ditt nya samtycke före varje återkommande prishöjning eller övergång från kostnadsfritt abonnemang till betalabonnemang; tjänsten använder generativ AI, vi talar om det för dig innan du använder den och vi märker AI-genererade resultat. *Taiwan:* du får frånträda ett betalabonnemang inom 7 dagar från tecknandet enligt Consumer Protection Act; Taiwans Personal Data Protection Act gäller för dina uppgifter (integritetspolicyn, bilaga B.10). *Thailand:* vår företrädare i Thailand är \[name\] \[if appointed\]. *Filippinerna:* vår företagsidentifiering och mekanism för gottgörelse enligt Internet Transactions Act finns på \[URL\]; klagomål kan lämnas in till National Privacy Commission.
-
-### A.11 Reserverat
-
-Turkiet, Brasilien och Indonesien kräver var för sig en bilaga på det lokala språket, en företrädare eller registrering samt myndighetsinlagor. Dessa har inte utarbetats här och ligger utanför avsnitt 2 tills de avsiktligt förs in. Tjänsten erbjuds inte i Kina, Vietnam eller Ryssland.
+*Singapore:* vårt dataskyddsombud är vår verkställande direktör, nåbar på privacy@dezbatere.ro; överföringar grundas på avtalsmässiga skydd som är jämförbara med PDPA; ingen lagstadgad betänketid gäller för betalabonnemanget och återbetalningsbegäranden hanteras via support@dezbatere.ro. *Japan:* den lagstadgade informationen enligt Specified Commercial Transactions Act finns på \[URL\]; ingen allmän betänketid gäller för onlineabonnemang och återbetalningsbegäranden hanteras via support@dezbatere.ro; vi skickar ditt innehåll till AI-leverantörer i USA och Europeiska unionen, var och en enligt ett avtal som kräver ett skydd likvärdigt med Japans Act on the Protection of Personal Information, och på begäran berättar vi vilka dessa åtgärder är. *Sydkorea:* samtycken till valfri behandling och marknadsföring inhämtas separat från de uppgifter som behövs för att driva tjänsten; vår integritetsansvariga är vår verkställande direktör, nåbar på privacy@dezbatere.ro; du får frånträda ett betalabonnemang inom 7 dagar från tecknandet i enlighet med E-Commerce Act; vi inhämtar ditt nya samtycke före varje återkommande prishöjning eller övergång från kostnadsfritt abonnemang till betalabonnemang; tjänsten använder generativ AI, vi talar om det för dig innan du använder den och vi märker AI-genererade resultat. *Taiwan:* du får frånträda ett betalabonnemang inom 7 dagar från tecknandet enligt Consumer Protection Act; Taiwans Personal Data Protection Act gäller för dina uppgifter (integritetspolicyn, bilaga B.7).

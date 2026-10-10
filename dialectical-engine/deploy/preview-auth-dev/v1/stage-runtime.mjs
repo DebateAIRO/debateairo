@@ -77,11 +77,11 @@ function validateFullFixture(f,artifact,environment,publication){
  check(new Set(ids).size===12,'FULL_ACCOUNTS');
 }
 async function stageTurnstileMock(){
- const root=await realpath(await mkdtemp(join(tmpdir(),'ps-'))),path=join(root,'t.sock');await chmod(root,0o700);let calls=0;
+ const root=await realpath(await mkdtemp(join(tmpdir(),'ps-'))),path=join(root,'t.sock');await chmod(root,0o700);const asked=[];
  const server=createServer(async(req,res)=>{
   const chunks=[];let size=0;for await(const raw of req){size+=raw.length;if(size>4096){req.destroy();return;}chunks.push(raw);}
   if(req.method!=='POST'||req.url!=='/siteverify'){res.writeHead(404).end();return;}
-  let input;try{input=JSON.parse(Buffer.concat(chunks).toString());}catch{res.writeHead(400).end();return;}calls++;
+  let input;try{input=JSON.parse(Buffer.concat(chunks).toString());}catch{res.writeHead(400).end();return;}asked.push(String(input?.token));
   const value={success:true,hostname:'v3-preview.dezbatere.ro',action:input.action,challenge_ts:new Date().toISOString()};
   if(input.token==='stage-expired')value.challenge_ts=new Date(Date.now()-301000).toISOString();
   else if(input.token==='stage-host')value.hostname='other.test';
@@ -94,7 +94,7 @@ async function stageTurnstileMock(){
  });
  try{await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(path,resolve);});await chmod(path,0o600);}
  catch(error){await rm(root,{recursive:true,force:true});throw error;}
- return {path,calls:()=>calls,async close(){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(root,{recursive:true,force:true});}};
+ return {path,asked:()=>[...asked],async close(){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(root,{recursive:true,force:true});}};
 }
 /** Pending is only an observation of the fixed capture producer's atomic publication. */
 export async function captureInventory(root,{allowPublishing=false}={}){
@@ -167,15 +167,26 @@ async function fullStageCases({apiRoot,uiRoot,apiBase,uiBase,captureRoot,environ
   await request('/v1/session',undefined,401,{cookie});await request('/v1/account/backup-email',undefined,401,{cookie});
   await request(prefix,body,403,{cookie});await request(prefix,body,403,{cookie,[header]:'x'.repeat(43)});await request(prefix,body,403,{cookie,[header]:csrf(cookie,header==='x-mfa-recovery-csrf-token'?'__Host-debateai-mfa-recovery-csrf':'__Host-debateai-password-reset-csrf'),origin:'https://other.test'});
  }
- // Use the existing independent route budgets: three resend refusals and four signup refusals.
- // Both routes retain original source admission, and every synthetic proof is refused.
+ // Use the existing independent route budgets: three resend refusals and six signup requests.
+ // Both routes retain original source admission. Since PR #98 (apps/api/src/turnstile.ts) only a PASSED proof stays held:
+ // a refused proof is released, so its replay is verified again and refused again; a passed proof's replay is refused
+ // without reaching the socket.
  const unknown=`unknown-${artifact}@example.test`,resend={email:unknown,locale:'en',ui_locale:'en',time_zone:null},signup={...resend,password:'Synthetic refused signup 123!',phone:'+40 722 123 456',date_of_birth:'1990-01-01',country:'RO',terms:legal.currentDocument('TERMS','en'),privacy:legal.currentDocument('PRIVACY','en')};
  for(const [token,status,route]of [['stage-expired',400,'resend'],['stage-host',400,'resend'],['stage-action',400,'resend'],['stage-replay',400,'signup'],['stage-malformed',503,'signup'],['stage-unavailable',503,'signup']]){
   const response=await request(route==='resend'?'/v1/auth/resend-verification':'/v1/auth/register',{...(route==='resend'?resend:signup),turnstile_token:token},status,{},true);
   check(response.body.error===(status===400?'TURNSTILE_REJECTED':'TURNSTILE_UNAVAILABLE'),'TURNSTILE_OUTCOME');
  }
- const used=mock.calls();await request('/v1/auth/register',{...signup,turnstile_token:'stage-expired'},400,{},true);check(mock.calls()===used&&used===6,'TURNSTILE_REPLAY');
- check(await captured(captureRoot,unknown,'Subject:')===null,'TURNSTILE_NO_MAIL');proofs['turnstile-mock-refusals']=passed({cases:7,socketCalls:used,noMail:true,genuineCloudflare:false});
+ const refusals=['stage-expired','stage-host','stage-action','stage-replay','stage-malformed','stage-unavailable'];
+ check(JSON.stringify(mock.asked())===JSON.stringify(refusals),'TURNSTILE_SOCKET');
+ const refusedReplay=await request('/v1/auth/register',{...signup,turnstile_token:'stage-expired'},400,{},true);
+ check(refusedReplay.body.error==='TURNSTILE_REJECTED'&&JSON.stringify(mock.asked())===JSON.stringify([...refusals,'stage-expired']),'TURNSTILE_REFUSED_REPLAY');
+ check(await captured(captureRoot,unknown,'Subject:')===null,'TURNSTILE_NO_MAIL');
+ const passedSignup={...signup,email:`passed-${artifact}@example.test`,turnstile_token:'stage-passed'};
+ await request('/v1/auth/register',passedSignup,202,{},true);
+ check(JSON.stringify(mock.asked())===JSON.stringify([...refusals,'stage-expired','stage-passed']),'TURNSTILE_PASSED');
+ const passedReplay=await request('/v1/auth/register',passedSignup,400,{},true);
+ check(passedReplay.body.error==='TURNSTILE_REJECTED'&&JSON.stringify(mock.asked())===JSON.stringify([...refusals,'stage-expired','stage-passed']),'TURNSTILE_REPLAY');
+ proofs['turnstile-mock-refusals']=passed({cases:9,socketCalls:mock.asked().length,refusedReplayVerifiedAgain:true,passedReplayReachedSocket:false,noMail:true,genuineCloudflare:false});
  // Current recovery remains available to post107 methods; the legacy cohort is immutable.
  const api=new pg.Client({connectionString:environment.DATABASE_URL,connectionTimeoutMillis:5000}),auth=new pg.Client({connectionString:environment.AUTHORIZATION_DATABASE_URL,connectionTimeoutMillis:5000}),blind=await readFile(environment.BLIND_INDEX_KEY_PATH);
  try{
@@ -206,15 +217,20 @@ async function fullStageCases({apiRoot,uiRoot,apiBase,uiBase,captureRoot,environ
   await request('/v1/auth/mfa-recovery/totp/verify',{code:totp(nextSecret,-1)},200,headers);
   const codes=await request('/v1/auth/mfa-recovery/codes/generate',{},200,headers);check(codes.body.recovery_codes.length>0,'RECOVERY_CODES');
   await request('/v1/auth/mfa-recovery/codes/confirm',{code:codes.body.recovery_codes[0]},200,headers);
-  check((await request('/v1/auth/mfa-recovery/complete',{},200,headers)).body.status==='completed','MFA_COMPLETE');
-  await request('/v1/session',undefined,401,{cookie:oldCookie});
-  const fresh=await login(a,nextSecret);const normalHeaders={cookie:fresh,'x-csrf-token':csrf(fresh,'__Host-debateai-csrf')};
+  // Owner ruling 2026-10-09 (auth DB batch): email link + password recovery waits 24 hours before it replaces anything.
+  // The stage cannot wait a day, so it proves the wait started and that nothing was replaced: the old session and the
+  // old authenticator keep working (finishing after the wait is proved against a real database in
+  // tests/integration/mfa-recovery-database.test.ts).
+  const waiting=(await request('/v1/auth/mfa-recovery/complete',{},200,headers)).body;
+  check(waiting.status==='waiting'&&Date.parse(waiting.not_before)-Date.now()>23.9*3600_000,'MFA_COMPLETE');
+  await request('/v1/session',undefined,200,{cookie:oldCookie});
+  const fresh=await login(a,oldSecret);const normalHeaders={cookie:fresh,'x-csrf-token':csrf(fresh,'__Host-debateai-csrf')};
   check((await request('/v1/account/backup-email',undefined,200,normalHeaders)).body.status==='pending','BACKUP_PENDING');
-  await request('/v1/account/backup-email/verify/start',{password:a.password,code:totp(nextSecret,1)},202,normalHeaders);
+  await request('/v1/account/backup-email/verify/start',{password:a.password,code:totp(oldSecret,1)},202,normalHeaders);
   const backup=await waitMail(captureRoot,a.backupEmail,'/verify-backup-email#token=');
   check((await request('/v1/account/backup-email/verify/confirm',{token:mailToken(backup,'/verify-backup-email')})).body.status==='verified','BACKUP_VERIFIED');
   const unchanged=await captured(captureRoot,a.backupEmail,'Subject: DebateAI authenticator recovery started');check(unchanged?.sha256===notice.sha256&&!unchanged.text.includes('#cancel='),'OLD_NOTICE_IMMUTABLE');
-  proofs['legacy-primary-recovery']=passed({passwordPreserved:true,oldSessionDenied:true,freshLogin:true,completed:true});proofs['pending-backup-notice-no-cancel']=passed({noticeSha256:notice.sha256,laterVerified:true,unchanged:true});
+  proofs['legacy-primary-recovery']=passed({passwordPreserved:true,waitingHours:24,oldSessionKept:true,oldAuthenticatorKept:true,freshLogin:true,completed:false});proofs['pending-backup-notice-no-cancel']=passed({noticeSha256:notice.sha256,laterVerified:true,unchanged:true});
  }finally{oldSecret.fill(0);nextSecret?.fill(0);}
  const reset=accounts.reset,secret=Buffer.from(reset.totpSecret,'base64');
  try{

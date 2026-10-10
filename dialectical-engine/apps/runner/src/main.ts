@@ -54,6 +54,8 @@ import {
 } from "./provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
+import { postgresRunnerPreviewTeamGateStore, refusePreviewOutsiderWork } from "./runner-preview-team-gate.js";
+import { announceRunnerReady } from "./runner-ready.js";
 
 const environment = loadRunnerEnvironment();
 const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
@@ -499,6 +501,15 @@ const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
   ...(previewConfig === undefined ? {} : { previewExecutionTimeout: "3600s" as const }),
   failures: new WorkItemRepository(pool),
   workflowName: environment.HATCHET_WORKFLOW_NAME, engineRetries: environment.HATCHET_ENGINE_RETRIES });
+// Step 1 (GAP-RUNNER): on the private preview, every open job no team member owns is recorded
+// FAILED (RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY) BEFORE this worker exists, so neither the start-up
+// re-dispatch below nor an older job-system dispatch can run it. Off the preview: no read.
+await refusePreviewOutsiderWork({
+  previewConfigured: previewConfig !== undefined,
+  teamUserIds: environment.PREVIEW_TEAM_USER_IDS,
+  ...postgresRunnerPreviewTeamGateStore(pool),
+  log: (line) => console.warn(JSON.stringify(line))
+});
 const worker = await hatchet.worker(environment.HATCHET_WORKER_NAME);
 await worker.registerWorkflows([task]);
 const started = worker.start();
@@ -518,12 +529,10 @@ const startupReconciliation = await reconcileRunnerStartupWork({
     }
   }
 });
-if (process.send !== undefined) {
-  process.send(Object.freeze({
-    kind: "DEBATEAI_RUNNER_READY",
-    worker: environment.HATCHET_WORKER_NAME,
-    registerVersion: String(environment.REGISTER_VERSION),
-    startupDispatched: startupReconciliation.dispatched
-  }));
-}
+announceRunnerReady({
+  kind: "DEBATEAI_RUNNER_READY",
+  worker: environment.HATCHET_WORKER_NAME,
+  registerVersion: String(environment.REGISTER_VERSION),
+  startupDispatched: startupReconciliation.dispatched
+});
 await started;

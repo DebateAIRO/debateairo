@@ -220,13 +220,13 @@ describe("S4 MFA enrolment service", () => {
           userId, recoveryCodeId: code.id, codeHash: code.hash, codeSlot: slot
         };
       },
-      async consumeAndReplaceRecoveryCode(input: { recoveryCodeId: string; replacementHash: string }) {
+      // Design note 2026-10-09 item 3: consuming a code never refills its slot.
+      async consumeRecoveryCode(input: { recoveryCodeId: string }) {
+        expect(Object.keys(input)).not.toContain("replacementHash");
         const found = [...recovery.entries()].find(([, code]) =>
           code.id === input.recoveryCodeId && !code.consumed);
         if (found === undefined) return false;
-        const [slot, old] = found;
-        old.consumed = true;
-        recovery.set(slot, { id: `recovery-${++nextRecoveryId}`, hash: input.replacementHash, consumed: false });
+        found[1].consumed = true;
         return true;
       }
     };
@@ -275,7 +275,8 @@ describe("S4 MFA enrolment service", () => {
     const first = await service.consumeRecoveryCode({
       userId, recoveryCode: generated.recoveryCodes[1]!
     }, source);
-    expect(first).toMatchObject({ consumed: true });
+    expect(first).toEqual({ consumed: true });
+    expect([...recovery.values()].filter((value) => !value.consumed)).toHaveLength(9);
     await expect(service.consumeRecoveryCode({
       userId, recoveryCode: generated.recoveryCodes[1]!
     }, source)).resolves.toEqual({ consumed: false });

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -9,10 +9,11 @@ import {
   type Pool
 } from "../../packages/db/src/index.js";
 import { provisionDevelopmentDatabasePrincipals } from "../../apps/runner/src/dev-database-principals.js";
+import { applyMigrationSql, retiredUpgradeReason } from "../support/migrationReplay.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * TINT1 (codex r1 B1) — the UPGRADE transition for the PUBLIC-EXECUTE revoke.
+ * TINT1 (codex r1 B1) — the forward migration that closes the PUBLIC-EXECUTE exposure.
  *
  * THE DEFECT. `0040_account_erasure.sql:6273` swept
  * `REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA core FROM PUBLIC` — ONCE, at that
@@ -25,29 +26,34 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * LOGIN test with it.
  *
  * WHY THE REPAIR CANNOT LIVE IN `0052`. The production migrator keys its ledger
- * on the file NAME and skips any name already recorded
- * (`packages/db/src/index.ts:730-732`). A database that already applied `0052` —
- * which is every database carrying T5 — would never re-execute that file, so an
- * amendment to it is INERT exactly where the exposure lives. The revoke is
- * therefore a NEW forward migration, and this fixture proves it on the only
- * database state that discriminates: one whose ledger ALREADY RECORDS `0052`.
+ * on the file NAME and skips any name already recorded, so a database that had
+ * already applied `0052` would never re-execute an amended `0052`. The revoke is
+ * therefore a NEW forward migration, `0054`. Since merge 065708c19 the sealed
+ * lineage recipe (`migrations/lineage/auth-dev-20261006.json`) also pins every
+ * source's digest, so an amended `0052` would now stop `migrate()` outright.
+ *
+ * WHAT CHANGED ON 2026-10-10, AND WHY. Until then this fixture built a database
+ * whose ledger stopped at `0052` and let the REAL `migrate()` continue from it.
+ * Since merge 065708c19 (explicit migration lineage, on dev through PR #82)
+ * `migrate()` continues only from an empty ledger, a named cohort or a complete
+ * ledger, and refuses that one with UNKNOWN_MIXED_LINEAGE — by design
+ * (tests/integration/auth-dev-lineage.test.ts). Every ledger it does continue
+ * from already records `0054`, so the upgrade this fixture used to drive cannot
+ * happen to any database any more; the first case below asserts both facts
+ * instead of leaving them in this comment. What still ships, and is still
+ * proven here, is `0054` itself: on a database `migrate()` finished, with the
+ * exposure the landed `0052` left restored, `0054`'s own SQL (the exact bytes
+ * `migrate()` runs) closes it, is idempotent, and removes nothing else.
  *
  * WHAT MAKES THIS FIXTURE DISCRIMINATING, and why it is not a re-implementation:
- *   - the continuation is the REAL `migrate()`, not a local copy of it, so the
- *     name-keyed skip that makes an amendment inert is the code under test;
  *   - the verdict is the REAL `assertContentProvisionDatabaseRole` against the
  *     REAL eleven SCRAM LOGIN principals, so the assertion is the same attestation
  *     that failed in b7 — not a paraphrase of its counting SQL. Nothing here
- *     hardcodes the ruled function count; the attestation stays its own author.
- *
- * `0054` and not `0053`: T6's lane holds `0053_t06_review_outcome_disclosure.sql`
- * (commit `b479f7e`, unlanded at this base). Codex's static review correctly saw
- * `0053` as the next free number from `7433be7` alone; the fleet's next free
- * number is `0054`.
+ *     hardcodes the ruled function count; the attestation stays its own author;
+ *   - the exposure is stated, not inherited (see seedTheDeployedExposure), so the
+ *     attestation is shown FAILING before `0054` runs and passing after.
  */
 
-const MIGRATIONS = new URL("../../migrations/", import.meta.url);
-const THROUGH = "0052_t5_reviewer_measured_edges.sql";
 const REVOKE = "0054_tint1_reject_edge_mutation_public_revoke.sql";
 const GUARD = "core.reject_edge_mutation_except_measurement()";
 const ISOLATION_FAILURE = "CONTENT_PROVISION_DATABASE_ROLE_MUST_BE_ISOLATED";
@@ -65,103 +71,27 @@ afterEach(async () => {
   secretRoot = undefined;
 });
 
-async function migrationNames(): Promise<readonly string[]> {
-  return (await readdir(MIGRATIONS)).filter((name) => /^\d+.*\.sql$/.test(name)).sort();
-}
-
 /**
- * Builds the database state that B1 is about: every migration THROUGH `through`
- * applied AND recorded, exactly as the production migrator records them. The
- * ledger rows are the point — they are what makes the migrator skip those files
- * forever after.
- */
-async function applyThrough(target: TestDatabase, through: string): Promise<void> {
-  const names = await migrationNames();
-  const cutoff = names.indexOf(through);
-  if (cutoff === -1) throw new Error(`TINT1_TEST_FIXTURE: unknown migration ${through}`);
-  const client = await target.pool.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS public.debateai_schema_migration (
-        name text PRIMARY KEY CHECK (length(btrim(name)) > 0),
-        applied_at timestamptz NOT NULL
-      )
-    `);
-    for (const name of names.slice(0, cutoff + 1)) {
-      await client.query(await readFile(new URL(name, MIGRATIONS), "utf8"));
-      await client.query(
-        "INSERT INTO public.debateai_schema_migration (name, applied_at) VALUES ($1, statement_timestamp())",
-        [name]
-      );
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-/** Runs one migration's SQL and nothing else — no ledger row. Used to re-run 0054. */
-async function applySqlOnly(target: TestDatabase, name: string): Promise<void> {
-  await target.pool.query(await readFile(new URL(name, MIGRATIONS), "utf8"));
-}
-
-/**
- * States the premise of B1 explicitly: a database that ran a `0052` which did
- * NOT revoke. PostgreSQL grants EXECUTE on every newly created function to
- * PUBLIC, so this is precisely the privilege state the LANDED `0052` left
- * behind — and every deployed database carrying T5 is in it.
+ * States the premise of B1 explicitly: the privilege a `0052` that did NOT
+ * revoke left behind. PostgreSQL grants EXECUTE on every newly created function
+ * to PUBLIC, so this is precisely the state of every database that ran the
+ * landed `0052` before `0054` existed.
  *
- * It is stated here rather than inherited from the working tree on purpose. The
- * defect B1 names lives in a DEPLOYED database, whose privileges were fixed by
- * the bytes it ran months ago; editing `0052` in the tree cannot reach back and
- * change them. Deriving the premise from the tree's current `0052` would make
- * this arm silently stop testing the upgrade the moment someone amended that
- * file — which is the very repair B1 rejects.
+ * It is stated here rather than inherited from the working tree on purpose: a
+ * fresh `migrate()` runs `0054` too, so without this line nothing would be left
+ * for `0054` to close, and the cases below would pass against a `0054` that
+ * revoked nothing.
  */
 async function seedTheDeployedExposure(target: TestDatabase): Promise<void> {
   await target.pool.query(`GRANT EXECUTE ON FUNCTION ${GUARD} TO PUBLIC`);
 }
 
-/**
- * The capability roles whose CREATE lands ABOVE the `THROUGH` cutoff (0055 below; 0093 in the body).
- *
- * `assertCapabilityRoles` (`apps/runner/src/dev-database-principals.ts:405-413`)
- * requires every capability role in `DEVELOPMENT_DATABASE_PRINCIPALS` to exist
- * before it provisions the LOGIN principals. Two support capability roles are in
- * that table, and only one of them is reachable from this arm's premise:
- *
- *   - `debateai_support` — `migrations/0050_support_foundation.sql:10`,
- *     `CREATE ROLE debateai_support NOLOGIN NOINHERIT`. `0050_support_*` sorts
- *     BELOW `0052_t5_reviewer_measured_edges.sql`, so `applyThrough` already ran
- *     it and this fixture must not touch it.
- *   - `debateai_support_config_operator` — `migrations/0055_register_support_publication.sql:19`,
- *     `CREATE ROLE debateai_support_config_operator NOLOGIN NOINHERIT`. `0055`
- *     sorts ABOVE the cutoff, so the 0052-recorded state this arm exists to stand
- *     on cannot have it, and the provisioner throws
- *     `DEV_DATABASE_CAPABILITY_ROLES_INVALID` before the attestation is ever reached.
- *
- * It is created here with exactly 0055's attributes and NOTHING else: no grant, no
- * membership in either direction, no privilege on `GUARD`. That is the least
- * privilege 0055 itself enforces — `:21-31` raises `SUPPORT_CONFIG_ROLE_INVALID`
- * on LOGIN/INHERIT/SUPERUSER/CREATEROLE/CREATEDB/REPLICATION/BYPASSRLS, `:32-41`
- * on any membership, `:42-55` on `debateai_runtime`/`debateai_replay`/`debateai_support`
- * being a member of it — so nothing about the privilege state this arm measures moves.
- *
- * A bare CREATE, not `IF NOT EXISTS`, on purpose: if `0055` ever sorts below the
- * cutoff, this line fails loudly instead of silently pinning nothing.
- */
-async function createPostCutoffCapabilityRole(target: TestDatabase): Promise<void> {
-  await target.pool.query("CREATE ROLE debateai_support_config_operator NOLOGIN NOINHERIT");
-  // Go-live row 41: `migrations/0093_billing_runtime_role.sql` creates `debateai_billing_runtime`
-  // (NOLOGIN, a member of `debateai_runtime`), the development runtime login's capability role since
-  // then; 0093 sorts above the cutoff too. Created with exactly 0093's shape and no privilege of its
-  // own, so it reaches nothing the runtime role does not, and nothing on `GUARD`.
-  await target.pool.query("CREATE ROLE debateai_billing_runtime NOLOGIN");
-  await target.pool.query("GRANT debateai_runtime TO debateai_billing_runtime");
+/** A database `migrate()` finished, with the exposure the landed `0052` left restored. */
+async function migratedWithTheDeployedExposure(): Promise<TestDatabase> {
+  const target = await startTestDatabase();
+  await migrate(target.pool);
+  await seedTheDeployedExposure(target);
+  return target;
 }
 
 /** The eleven SCRAM LOGIN principals, provisioned the way DEV-03 provisions them. */
@@ -209,60 +139,40 @@ async function provisionExecutableCoreFunctions(target: TestDatabase): Promise<n
   return Number(result.rows[0]!.count);
 }
 
-async function ledgerRecords(target: TestDatabase, name: string): Promise<boolean> {
-  const result = await target.pool.query(
-    "SELECT 1 FROM public.debateai_schema_migration WHERE name=$1", [name]
-  );
-  return result.rowCount === 1;
-}
+describe("TINT1 · the forward revoke closes the exposure every database that ran 0052 before it held", () => {
+  it("finds the isolation attestation failing under that exposure, and 0054's own SQL closing it", async () => {
+    database = await migratedWithTheDeployedExposure();
 
-describe("TINT1 · the forward revoke reaches a database that ALREADY applied 0052", () => {
-  it("finds the isolation attestation failing on the 0052-recorded state, and the production migrator closing it", async () => {
-    database = await startTestDatabase();
-    await applyThrough(database, THROUGH);
-    await seedTheDeployedExposure(database);
-    await createPostCutoffCapabilityRole(database);
+    // WHY THE UPGRADE ARM IS RETIRED, checked: migrate() refuses a ledger that
+    // records 0052 but not 0054, and every ledger it continues from records 0054.
+    expect(await retiredUpgradeReason(database.pool, [REVOKE])).toEqual({
+      refusal: "MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE", unrecorded: []
+    });
     const credentials = await provisionPrincipals(database);
 
-    // THE PREMISE. This ledger already records 0052, so the production migrator
-    // will never re-run that file: an amendment to it could not execute here.
-    expect(await ledgerRecords(database, THROUGH)).toBe(true);
-
-    // THE DEFECT, LIVE — mechanism and verdict, on the upgrade state.
+    // THE DEFECT, LIVE — mechanism and verdict.
     expect(await publicMayExecuteGuard(database)).toBe(true);
     const exposedFunctionCount = await provisionExecutableCoreFunctions(database);
     await expect(attestContentProvisionIsolation(credentials))
       .rejects.toThrow(ISOLATION_FAILURE);
 
-    // THE REPAIR: the production migrator itself, continuing from that ledger.
-    await migrate(database.pool);
+    // THE REPAIR: 0054's own SQL, the bytes migrate() runs, committed.
+    await applyMigrationSql(database.pool, [REVOKE]);
 
     // CLOSED. PUBLIC loses EXECUTE, exactly one core function leaves the
     // provision role's reach, and the attestation that threw now accepts.
-    //
-    // These come BEFORE the ledger check on purpose. A tree carrying no forward
-    // revoke makes the migrator apply nothing, and the failure must then be a
-    // VALUE — the privilege still held, the seventh function still reachable,
-    // the attestation still throwing — not "a file is missing". A fixture that
-    // tripped on the filename first would report the same RED for a typo in the
-    // migration's name as for a repair that never reached the database.
     expect(await publicMayExecuteGuard(database)).toBe(false);
     expect(await provisionExecutableCoreFunctions(database)).toBe(exposedFunctionCount - 1);
     await expect(attestContentProvisionIsolation(credentials)).resolves.toBeUndefined();
-
-    // Corroboration, last: the migrator recorded the forward migration it ran.
-    expect(await ledgerRecords(database, REVOKE)).toBe(true);
   }, 240_000);
 
   it("is idempotent: re-running 0054's own SQL neither throws nor restores the grant", async () => {
-    database = await startTestDatabase();
-    await applyThrough(database, THROUGH);
-    await seedTheDeployedExposure(database);
-    await migrate(database.pool);
+    database = await migratedWithTheDeployedExposure();
+    await applyMigrationSql(database.pool, [REVOKE]);
 
-    // Re-run the migration's SQL directly. No ledger row is written, so nothing
-    // masks a throw: if the statement is not idempotent, this line fails.
-    await expect(applySqlOnly(database, REVOKE)).resolves.toBeUndefined();
+    // Run it again over its own end state. No ledger row is involved, so
+    // nothing masks a throw: if the statement is not idempotent, this line fails.
+    await expect(applyMigrationSql(database.pool, [REVOKE])).resolves.toBeUndefined();
 
     expect(await publicMayExecuteGuard(database)).toBe(false);
     const credentials = await provisionPrincipals(database);
@@ -270,10 +180,8 @@ describe("TINT1 · the forward revoke reaches a database that ALREADY applied 00
   }, 240_000);
 
   it("removes a privilege and nothing else: the guard function and its trigger both survive", async () => {
-    database = await startTestDatabase();
-    await applyThrough(database, THROUGH);
-    await seedTheDeployedExposure(database);
-    await migrate(database.pool);
+    database = await migratedWithTheDeployedExposure();
+    await applyMigrationSql(database.pool, [REVOKE]);
 
     // A "repair" that dropped the function (CASCADE would take the trigger with
     // it) would also satisfy the revoke assertions above. It must not. This is
@@ -289,5 +197,6 @@ describe("TINT1 · the forward revoke reaches a database that ALREADY applied 00
             AND tgname='reject_mutation_except_measurement') AS triggers
     `);
     expect(surviving.rows[0]).toEqual({ functions: "1", triggers: "1" });
+    expect(await publicMayExecuteGuard(database)).toBe(false);
   }, 240_000);
 });

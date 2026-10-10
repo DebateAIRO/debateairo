@@ -642,9 +642,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // N26m/N26n (PR-54): the reviewed module after the NETOPIA branch merged dev (its billing exports and #101's
 // applyForward110) and added the forward chain (migrate() runs the superseding verifier, applyForward110, then
 // applyForwardChain; migrations/lineage/README.md).
-// data-export S01 (V-28): dev's module plus the export's repository exports and the compatibility re-seal after
-// applyForwardChain (0112 moves lineageEvidence; V-18).
-const NATIVE_MIGRATE_MODULE_SHA256 = "00b1e841d496b836f4d5ab14fce2e3069d963d85a26fa05e9829a652d58704fe";
+// data-export S01 (V-28, renumbered by V-30): dev's module plus the export's repository exports and the compatibility
+// re-seal after applyForwardChain (0113 moves lineageEvidence; V-18).
+const NATIVE_MIGRATE_MODULE_SHA256 = "b8b75bb4043ce32cbb4ad62ae38ce629e9ab889275ef93564c89ba3f137a294b";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

@@ -37,7 +37,9 @@ it('keeps every new table/helper private and separates API signup from authoriza
         const r = (await database.pool.query("SELECT prosecdef,proconfig,proowner=(SELECT proowner FROM pg_proc WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure) owner,has_function_privilege('social_test_runtime',oid,'EXECUTE') allowed,has_function_privilege('debateai_runtime',oid,'EXECUTE') app_allowed FROM pg_proc WHERE oid=$1::regprocedure", ['identity.' + signature])).rows[0];
         expect(r).toMatchObject({ prosecdef: true, owner: true, allowed: signature!=='create_social_account(jsonb,jsonb)', app_allowed: false });
         if(signature==='create_social_account(jsonb,jsonb)')expect((await database.pool.query("SELECT has_function_privilege('debateai_billing_runtime',$1,'EXECUTE') allowed",['identity.'+signature])).rows[0].allowed).toBe(true);
-        expect(r.proconfig).toContain('search_path=pg_catalog');
+        // The auth DB batch step re-pins the functions it replaces to search pg_temp last (create_social_account keeps
+        // exactly pg_catalog: the sealed effective-capability verifier pins it).
+        expect(r.proconfig).toContain(['complete_social_login(jsonb,jsonb)','complete_social_step_up(jsonb,jsonb)'].includes(signature) ? 'search_path=pg_catalog, pg_temp' : 'search_path=pg_catalog');
     }
     for (const signature of ['guard_social_parent()', 'require_social_password_origin()', 'social_first_step_current_internal(uuid,jsonb,text)', 'login_first_step_current_internal(uuid,jsonb,text)', 'lock_consumer_enrollment_internal(text,text,text,text,jsonb)', 'consumer_social_path_internal(uuid,uuid,text,text,boolean,jsonb)', 'append_social_audit_internal(uuid,text,jsonb)'])
         expect((await database.pool.query("SELECT has_function_privilege('social_test_runtime',$1,'EXECUTE') allowed", ['identity.' + signature])).rows[0].allowed).toBe(false);

@@ -36,7 +36,19 @@ describe("manual phone public signup boundary", () => {
     }
   );
 
-  it.each([undefined, "0722 123 456", "+40 722 123 456 ext. 9"])("rejects missing or invalid phone before signup: %s", async phone => {
+  // Owner ruling 2026-10-09: the phone is optional. The byte-pinned S04 register mount hands the
+  // service "" for "no phone", which stores none (tests/unit/registration.test.ts, P1).
+  it("forwards a sign-up without a phone", async () => {
+    const { api, inputs } = harness();
+    try {
+      const { phone: _phone, ...withoutPhone } = body;
+      const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: withoutPhone });
+      expect(response.statusCode).toBe(202);
+      expect(inputs).toEqual([{ email: body.email, password: body.password, phone: "", recoveryEmail: null, adultAffirmed: true }]);
+    } finally { await api.close(); }
+  });
+
+  it.each(["   ", "0722 123 456", "+40 722 123 456 ext. 9"])("rejects a blank or invalid phone before signup: %s", async phone => {
     const { api, inputs } = harness();
     try {
       const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: { ...body, phone } });

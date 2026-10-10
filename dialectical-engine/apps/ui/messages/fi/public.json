@@ -202,6 +202,6 @@
   "public.publication.contentCheck.groundIllegal": "Teksti saattaa myös olla lainvastainen.",
   "public.publication.contentCheck.automated": "Tämän päätöksen teki automaattinen työkalu. Kukaan ihminen ei ole vielä tarkistanut sitä.",
   "public.publication.contentCheck.stillPrivate": "Keskustelusi pysyy yksityisenä ja muuttumattomana. Vain sinä näet sen.",
-  "public.publication.contentCheck.appeal": "Voit pyytää ihmistä tarkistamaan tämän päätöksen kirjoittamalla osoitteeseen [appeals@dezbatere.ro] kuuden kuukauden kuluessa.",
+  "public.publication.contentCheck.appeal": "Voit pyytää ihmistä tarkistamaan tämän päätöksen kirjoittamalla osoitteeseen office@dezbatere.ro kuuden kuukauden kuluessa.",
   "public.publication.contentCheck.unavailable": "Sisällön tarkistus ei ole juuri nyt käytettävissä, joten mitään ei julkaistu. Keskustelusi pysyy yksityisenä. Yritä uudelleen muutaman minuutin kuluttua."
 }

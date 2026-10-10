@@ -287,7 +287,8 @@ it('captures every Task4 new/replaced definer, unchanged secret-column floor and
         expect(f.public, f.signature).toBe(false);
         expect(f.recovery, f.signature).toBe(false);
         expect(f.prosecdef).toBe(true);
-        expect(f.proconfig).toEqual(['search_path=pg_catalog']);
+        // The auth DB batch step replaced complete_recovery_login_with_audit and pins pg_temp last.
+        expect(f.proconfig, f.signature).toEqual(f.proname === 'complete_recovery_login_with_audit' ? ['search_path=pg_catalog, pg_temp'] : ['search_path=pg_catalog']);
     }
     for (const name of ['read_authentication', 'read_current_context', 'read_action_proof'])
         expect(functions.find(f => f.proname === name)).toMatchObject({ owner: 'debateai_staff_security_owner', runtime: true });

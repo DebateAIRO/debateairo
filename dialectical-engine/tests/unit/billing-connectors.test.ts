@@ -60,6 +60,7 @@ const files = {
 };
 const filledCui: SellerCompany = Object.freeze({
   ...SELLER_COMPANY, cui: "12345678", registeredOffice: "Str. Exemplu 1, București, România",
+  vat: Object.freeze({ kind: "registered", number: "[RO…]" } as const),
   emails: Object.freeze({ ...SELLER_COMPANY.emails, general: "hello@dezbatere.ro" })
 });
 const company: SellerCompany = Object.freeze({
@@ -195,10 +196,14 @@ describe("N8 — BillingConnectors", () => {
     const load = (facts: SellerCompany) => () => loadBillingConnectors({
       environment: group(root), company: facts, recordsKey: Buffer.alloc(32), trustedKeyOwners: OWN
     });
-    expect(load({ ...company, registeredOffice: SELLER_COMPANY.registeredOffice })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice");
-    expect(load({ ...company, emails: SELLER_COMPANY.emails })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:emails.general");
+    // Every footer and the model withdrawal form's "To:" line print the legal name, the registered office and the
+    // general address (packages/mail-templates/src/render.ts).
+    expect(load({ ...company, registeredOffice: "[…], București, România" })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice");
+    expect(load({ ...company, emails: Object.freeze({ ...company.emails, general: "[hello@dezbatere.ro]" }) }))
+      .toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:emails.general");
     expect(load({ ...company, legalName: "[…] S.R.L." })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:legalName");
-    expect(load(SELLER_COMPANY)).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:cui");
+    // The CUI is named first.
+    expect(load({ ...company, cui: "[…]", legalName: "[…] S.R.L." })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:cui");
   });
 
   it("builds SmartBill's code in the form X1 row 16 names, from the CUI and the RO VAT code (never a reshaped CUI)", () => {

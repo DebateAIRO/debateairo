@@ -15,7 +15,7 @@ const DOCUMENTS = Object.freeze({
 const FIXED_TOKENS = Object.freeze([
   "ico.org.uk",
   "Art. ",
-  "DebateAIRO S.R.L.",
+  "DMS Merchandise Shop S.R.L.",
   "ANSPDCP",
   "GDPR (EU) 2016/679",
   "de_session",
@@ -28,7 +28,8 @@ const FIXED_TOKENS = Object.freeze([
 ]);
 
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-const DEZBATERE_PATH = /\bdezbatere\.ro\/[A-Za-z0-9._~/%…-]+/g;
+// A path never ends in "." — a period after it closes the sentence (the drafts no longer bracket the URLs).
+const DEZBATERE_PATH = /\bdezbatere\.ro\/[A-Za-z0-9._~/%…-]*[A-Za-z0-9_~/%…-]/g;
 
 function allStrings(value, strings = []) {
   if (typeof value === "string") strings.push(value);
