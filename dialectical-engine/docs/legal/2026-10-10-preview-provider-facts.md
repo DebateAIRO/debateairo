@@ -16,7 +16,7 @@ These notes are not legal advice; the owner (and counsel, before the public site
 | Company we contract with | Anthropic Ireland, Limited (for a customer in the EEA, Switzerland or the UK; Anthropic PBC elsewhere) | https://www.anthropic.com/legal/commercial-terms (effective 17 June 2025) |
 | Home country | Ireland (Dublin) | https://www.anthropic.com/legal/privacy (effective 10 September 2026) |
 | Where it processes | The United States, Europe, Asia or Australia (Anthropic picks the route); stored in the United States | https://privacy.claude.com/en/articles/7996890-where-are-your-servers-located-do-you-host-your-models-on-eu-servers |
-| How long it keeps data | Deleted within 30 days; up to 2 years if flagged by its safety checks; longer only when the law requires | https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data |
+| How long it keeps data | Deleted within 30 days; up to 2 years if flagged by its safety checks; longer only when the law requires; the safety-check results (trust and safety classification scores) up to 7 years | https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data |
 | Zero data retention | No: available only on Anthropic's approval of a request, and the preview has none on record | https://privacy.claude.com/en/articles/8956058-i-have-a-zero-data-retention-agreement-with-anthropic-what-products-does-it-apply-to |
 | May it train on your data? | No ("Anthropic may not train models on Customer Content from Services") | https://www.anthropic.com/legal/commercial-terms, section B |
 | Transfer basis | EU standard contractual clauses (Modules 2 and 3); the DPA does not rely on the EU–US Data Privacy Framework | https://www.anthropic.com/legal/data-processing-addendum (effective 24 February 2025) |
@@ -26,10 +26,10 @@ These notes are not legal advice; the owner (and counsel, before the public site
 
 | Fact | Value on the page | Source (read 2026-10-10) |
 | --- | --- | --- |
-| Company we contract with | Google Cloud EMEA Limited (Gemini API Paid Services, billing address in EMEA except France, Italy and Poland) | https://cloud.google.com/terms/google-entity, linked from the Gemini API terms' definition of "Google" for Paid Services |
+| Company we contract with | Google Cloud EMEA Limited (Ireland) — **to confirm by the owner**: the page maps "Gemini API Paid Services" with a billing address in EMEA (except France, Italy and Poland) to this entity, so it holds only if the preview's Cloud Billing account has a Romanian billing address and no other agreement with Google says otherwise. Shown on the page because the mapping itself was read | https://cloud.google.com/terms/google-entity, linked from the Gemini API terms' definition of "Google" for Paid Services |
 | Home country | Ireland (70 Sir John Rogerson's Quay, Dublin 2) | https://cloud.google.com/terms/google-entity |
 | Where it processes | Any country where Google or its agents have facilities | https://ai.google.dev/gemini-api/terms (last updated 2026-04-28), Paid Services |
-| How long it keeps data | Prompts, context and responses kept 55 days, only to detect and prevent misuse | https://ai.google.dev/gemini-api/docs/usage-policies |
+| How long it keeps data | Prompts, context and responses kept 55 days, only to detect and prevent misuse and when the law requires (the terms add safety and security of the service and required legal or regulatory disclosures) | https://ai.google.dev/gemini-api/docs/usage-policies; https://ai.google.dev/gemini-api/terms |
 | Zero data retention | No: Google says guaranteed zero data retention needs Vertex AI, not this API | https://ai.google.dev/gemini-api/docs/zdr |
 | May it train on your data? | No: on Paid Services Google "doesn't use your prompts … or responses to improve our products" | https://ai.google.dev/gemini-api/terms |
 | Transfer basis | [to confirm] — Google's processor terms say Google uses a Data Transfer Solution such as the EU–US Data Privacy Framework, else standard contractual clauses; the official DPF list (dataprivacyframework.gov) needs JavaScript and could not be read, so the page keeps the bracketed "DPF or SCCs — to confirm" line | https://business.safety.google/processorterms/ (section 7, European transfers), linked from the Gemini API terms |
@@ -57,6 +57,17 @@ policy@deepinfra.com; location, retention, zero retention and transfer basis bra
 The retention and location findings are candidates for filling those two bracketed facts; the
 2026-10-05 review deliberately left them for operational and contract checks, so this change does
 not fill them.
+
+## Which jobs each preview provider gets
+
+Read from the multi-model preview register (branch feat/2026-10-10-preview-mm-a-app,
+`deploy/preview-auth-dev/v1/publish-register-v2.ts` and `packages/register/src/story-policy.ts`):
+every panel member writes and judges arguments; the answer writer and the storyteller is GLM
+(`preview:fixture-a`); the answer checker and the story checker is DeepSeek
+(`preview:deepseek-v4-1-flash`). So on a per-plan build DeepInfra always receives text for GLM and
+DeepSeek, even when the plans list only Anthropic and Google, and the page names them. The DeepInfra
+row's jobs (arguments, judging, verdict story) are confirmed. On the first preview's build GLM does
+all three alone.
 
 ## Still "[to confirm]"
 

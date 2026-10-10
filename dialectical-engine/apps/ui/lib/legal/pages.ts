@@ -289,16 +289,29 @@ const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: strin
 ] as const);
 const PREVIEW_ANTHROPIC_MODEL = "claude-haiku-5-5";
 const PREVIEW_GOOGLE_MODEL = "gemini-3.8-flash";
-const PREVIEW_MODEL_IDS: ReadonlySet<string> = new Set([
-  ...PREVIEW_DEEPINFRA_MODELS.map(([id]) => id),
-  PREVIEW_ANTHROPIC_MODEL,
-  PREVIEW_GOOGLE_MODEL
+/** Every preview model id and its maker, as the new-debate form's roster reader knows them. */
+const PREVIEW_MODEL_MAKERS: ReadonlyMap<string, string> = new Map([
+  ["zai-org/GLM-5.3-Flash", "Z.AI"],
+  ["deepseek-ai/DeepSeek-V4.1-Flash", "DeepSeek"],
+  ["XiaomiMiMo/MiMo-V2.6-Pro", "Xiaomi"],
+  [PREVIEW_ANTHROPIC_MODEL, "Anthropic"],
+  [PREVIEW_GOOGLE_MODEL, "Google"]
 ]);
+const LEGACY_PREVIEW_MODEL = "zai-org/GLM-5.3-Flash";
+/**
+ * The multi-model preview register (feat/2026-10-10-preview-mm-a-app, publish-register-v2.ts) gives
+ * the fixed roles to DeepInfra models whatever the panel: GLM writes the answer and the verdict
+ * story, DeepSeek checks both. So a per-plan build always sends text to DeepInfra for these two,
+ * even when its plans list only Anthropic and Google. (The first preview's build runs GLM alone.)
+ */
+const PREVIEW_ROLE_MODELS: ReadonlySet<string> = new Set(["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"]);
 
 /**
  * Serving company for the private preview's open-weight models; terms reviewed 5 October 2026 and
  * rechecked 10 October 2026. Listed only by a preview build (`providerRegister`), which names in
- * `models` exactly the DeepInfra models that build offers.
+ * `models` the DeepInfra models that build uses. Its jobs are confirmed: every panel member writes
+ * and judges arguments, GLM writes the answer and the verdict story, DeepSeek checks both (the
+ * first preview's GLM alone does all three).
  */
 export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -366,12 +379,24 @@ export const GOOGLE_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   checkedOn: "2026-10-10"
 });
 
+/** A non-empty list of known preview ids with no repeats, or undefined. */
+function previewRoster(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  if (!value.every((id) => typeof id === "string" && PREVIEW_MODEL_MAKERS.has(id))) return undefined;
+  if (new Set(value).size !== value.length) return undefined;
+  return value as string[];
+}
+
+const makersOf = (roster: readonly string[]): Set<string> => new Set(roster.map((id) => PREVIEW_MODEL_MAKERS.get(id) ?? id));
+
 /**
- * The model ids a preview build offers, read from its public flag in either form: the first
- * preview's list (`["zai-org/GLM-5.3-Flash"]`) or the per-plan object (`{"free":[…],"premium":[…]}`),
- * whose lists are merged. `null` means "list every preview provider": the flag is malformed, empty,
- * or names a model this Register cannot place. The new-debate form refuses a bad flag loudly; a
- * legal page discloses rather than hides, and never throws (the root layout imports this module).
+ * The model ids a preview build offers, read from its public flag exactly as strictly as the
+ * new-debate form's roster reader (`parsePreviewRosterFlag`): the first preview's list
+ * `["zai-org/GLM-5.3-Flash"]`, or a plain object with exactly the keys "free" and "premium", each a
+ * non-empty list of known ids with no repeats, and, when the two lists together name two or more
+ * makers, each naming at least two makers. Anything else, which the form refuses loudly, returns
+ * null: "list every preview provider". A legal page discloses rather than hides, and never throws
+ * (the root layout imports this module).
  */
 function previewModelIds(flag: string): ReadonlySet<string> | null {
   let decoded: unknown;
@@ -380,41 +405,37 @@ function previewModelIds(flag: string): ReadonlySet<string> | null {
   } catch {
     return null;
   }
-  const lists: unknown[] = [];
   if (Array.isArray(decoded)) {
-    lists.push(decoded);
-  } else if (typeof decoded === "object" && decoded !== null) {
-    const { free, premium } = decoded as { free?: unknown; premium?: unknown };
-    if (free === undefined && premium === undefined) return null;
-    for (const list of [free, premium]) if (list !== undefined) lists.push(list);
-  } else {
-    return null;
+    return decoded.length === 1 && decoded[0] === LEGACY_PREVIEW_MODEL ? new Set([LEGACY_PREVIEW_MODEL]) : null;
   }
-  const ids = new Set<string>();
-  for (const list of lists) {
-    if (!Array.isArray(list)) return null;
-    for (const id of list) {
-      if (typeof id !== "string" || !PREVIEW_MODEL_IDS.has(id)) return null;
-      ids.add(id);
-    }
-  }
-  return ids.size === 0 ? null : ids;
+  if (decoded === null || typeof decoded !== "object" || Object.getPrototypeOf(decoded) !== Object.prototype) return null;
+  const keys = Object.keys(decoded).sort();
+  if (keys.length !== 2 || keys[0] !== "free" || keys[1] !== "premium") return null;
+  const record = decoded as Record<string, unknown>;
+  const free = previewRoster(record.free);
+  const premium = previewRoster(record.premium);
+  if (free === undefined || premium === undefined) return null;
+  if (makersOf([...free, ...premium]).size >= 2 && (makersOf(free).size < 2 || makersOf(premium).size < 2)) return null;
+  return new Set([...free, ...premium]);
 }
 
 /**
  * The whole Register, in the order `/providers` shows it. Only the private preview's build sets
  * the public flag the new-debate form reads (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON,
  * `previewPlanRoster`); every other build, the real site included, sets none and gets the
- * hosted-site rows unchanged. A preview build lists DeepInfra (just before the support chat's
- * model) when it offers a DeepInfra model, naming only those models, and swaps the Claude and
- * Gemini placeholder rows for the checked preview rows when it offers Claude Haiku 5.5 or Gemini
- * 3.8 Flash. Never throws.
+ * hosted-site rows unchanged. A preview build lists DeepInfra just before the support chat's
+ * model, naming the DeepInfra models its plans offer plus, on a per-plan build, the two role models
+ * (GLM writes, DeepSeek checks); it swaps the Claude and Gemini placeholder rows for the checked
+ * preview rows when it offers Claude Haiku 5.5 or Gemini 3.8 Flash. A flag the new-debate form would
+ * refuse lists every preview provider. Never throws.
  */
 export function providerRegister(previewFreeModelIdsJson: string | undefined): readonly ProviderRegisterEntry[] {
   if (previewFreeModelIdsJson === undefined) return Object.freeze([...MODEL_PROVIDERS, SUPPORT_PROVIDER]);
   const ids = previewModelIds(previewFreeModelIdsJson);
   const offers = (id: string): boolean => ids === null || ids.has(id);
-  const deepInfraModels = PREVIEW_DEEPINFRA_MODELS.filter(([id]) => offers(id)).map(([, label]) => label);
+  // A per-plan build always uses the role models; the first preview's build (GLM alone) has no others.
+  const roleModels = ids !== null && ids.size === 1 && ids.has(LEGACY_PREVIEW_MODEL) ? new Set<string>() : PREVIEW_ROLE_MODELS;
+  const deepInfraModels = PREVIEW_DEEPINFRA_MODELS.filter(([id]) => offers(id) || roleModels.has(id)).map(([, label]) => label);
   const rows = MODEL_PROVIDERS.map((row) => {
     if (row.key === "claude" && offers(PREVIEW_ANTHROPIC_MODEL)) return ANTHROPIC_PREVIEW_PROVIDER;
     if (row.key === "gemini" && offers(PREVIEW_GOOGLE_MODEL)) return GOOGLE_PREVIEW_PROVIDER;

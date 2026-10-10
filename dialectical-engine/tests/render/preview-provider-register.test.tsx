@@ -74,12 +74,29 @@ describe("the first preview's list form", () => {
 });
 
 describe("the per-plan object form", () => {
-  it("merges both plans and names only the DeepInfra models the build offers", async () => {
-    const { keys, row } = await build(JSON.stringify({ free: [GLM], premium: [DEEPSEEK, GLM] }));
+  it("names the DeepInfra models the plans offer plus the two role models, and swaps in the checked rows", async () => {
+    const { keys, row } = await build(JSON.stringify({ free: [GLM, HAIKU], premium: [GLM, GEMINI] }));
+    expect(keys).toEqual(PREVIEW_KEYS);
+    // DeepSeek is not on either plan but checks every answer and story; MiMo is used nowhere.
+    expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek)");
+    expect(row("claude")?.checkedOn).toBe("2026-10-10");
+    expect(row("gemini")?.checkedOn).toBe("2026-10-10");
+  });
+
+  it("still lists DeepInfra when the plans offer only Anthropic and Google: GLM writes and DeepSeek checks", async () => {
+    const { keys, row } = await build(JSON.stringify({ free: [HAIKU, GEMINI], premium: [GEMINI, HAIKU] }));
     expect(keys).toEqual(PREVIEW_KEYS);
     expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek)");
-    expect(row("claude")?.checkedOn).toBeNull();
-    expect(row("gemini")?.checkedOn).toBeNull();
+    expect(row("claude")?.entity).toBe("Anthropic Ireland, Limited");
+    expect(row("gemini")?.entity).toBe("Google Cloud EMEA Limited");
+  });
+
+  it("gives DeepInfra its confirmed jobs: arguments, judging and the verdict story", async () => {
+    for (const flag of [JSON.stringify([GLM]), JSON.stringify({ free: [HAIKU, GEMINI], premium: [HAIKU, GEMINI] }), "not json"]) {
+      const { row } = await build(flag);
+      expect(row("deepinfra")?.purposes, flag).toEqual(["arguments", "judging", "story"]);
+      expect(row("deepinfra")?.purposesConfirmed, flag).toBe(true);
+    }
   });
 
   it("with all five models, shows every maker once and the checked Anthropic and Google rows", async () => {
@@ -131,16 +148,26 @@ describe("the per-plan object form", () => {
     }
   });
 
-  it("with only Anthropic, lists no DeepInfra row", async () => {
-    const { keys, row } = await build(JSON.stringify({ free: [], premium: [HAIKU] }));
-    expect(keys).toEqual(HOSTED_KEYS);
-    expect(row("claude")?.entity).toBe("Anthropic Ireland, Limited");
-    expect(row("gemini")?.entity).toBe("[Google …]");
-  });
 });
 
 describe("a malformed flag discloses every preview provider and never throws", () => {
-  for (const flag of ["not json", "null", "42", "\"x\"", "{}", "[]", "[1]", "{\"free\":\"x\"}", "{\"free\":[],\"premium\":[]}", "[\"other/model\"]", JSON.stringify({ free: [GLM, "other/model"] })]) {
+  const MALFORMED = [
+    "not json", "null", "42", "\"x\"", "{}", "[]", "[1]", "{\"free\":\"x\"}",
+    "[\"other/model\"]",
+    // The first preview's list is GLM alone, once.
+    JSON.stringify([GLM, GLM]), JSON.stringify([DEEPSEEK]), JSON.stringify([GLM, DEEPSEEK]),
+    // A missing plan, an empty plan, extra keys, a repeated id, an unknown id.
+    JSON.stringify({ free: [HAIKU] }), JSON.stringify({ premium: [GLM, HAIKU] }),
+    JSON.stringify({ free: [], premium: [] }), JSON.stringify({ free: [], premium: [GLM, HAIKU] }),
+    JSON.stringify({ free: [GLM, HAIKU], premium: [GLM, HAIKU], extra: [] }),
+    "{\"__proto__\":[],\"free\":[\"zai-org/GLM-5.3-Flash\",\"claude-haiku-5-5\"],\"premium\":[\"zai-org/GLM-5.3-Flash\",\"claude-haiku-5-5\"]}",
+    JSON.stringify({ free: [GLM, GLM, HAIKU], premium: [GLM, HAIKU] }),
+    JSON.stringify({ free: [GLM, "other/model"], premium: [GLM, HAIKU] }),
+    JSON.stringify({ free: [GLM, 1], premium: [GLM, HAIKU] }),
+    // Two or more makers overall, but one plan names only one maker (the form refuses this too).
+    JSON.stringify({ free: [GLM], premium: [DEEPSEEK, GLM] }), JSON.stringify({ free: [HAIKU], premium: [HAIKU, GEMINI] })
+  ];
+  for (const flag of MALFORMED) {
     it(`flag ${flag}`, async () => {
       const { keys, row } = await build(flag);
       expect(keys).toEqual(PREVIEW_KEYS);
@@ -163,6 +190,9 @@ describe("the new Register words exist in all 35 languages", () => {
         expect(catalog[key]?.trim(), `${locale} ${key}`).not.toBe("");
         expect(catalog[key], `${locale} ${key}`).not.toContain("[");
       }
+      // The numbers are facts: 30 days, 7 years for safety-check results, 55 days at Google.
+      expect(catalog["legal.providers.retentionAnthropic"], locale).toMatch(/30[^0-9][\s\S]*7[^0-9]|30[^0-9][\s\S]*7$/);
+      expect(catalog["legal.providers.retentionGoogle"], locale).toContain("55");
       if (locale !== "en") {
         // Facts other than the brand names are translated, not copied from English.
         expect(catalog["legal.providers.retentionGoogle"], locale).not.toBe(en["legal.providers.retentionGoogle"]);
