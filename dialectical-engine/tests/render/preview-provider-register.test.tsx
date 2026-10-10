@@ -53,23 +53,25 @@ const HOSTED_KEYS = ["claude", "gpt", "gemini", "grok", "qwen", "support"];
 const PREVIEW_KEYS = ["claude", "gpt", "gemini", "grok", "qwen", "deepinfra", "support"];
 
 describe("off the preview (flag unset) the Register is the hosted site's, unchanged", () => {
-  it("lists the placeholder rows and no preview company", async () => {
+  it("lists the hosted rows and no preview company", async () => {
     const { keys, row, pages } = await build(undefined);
     expect(keys).toEqual(HOSTED_KEYS);
-    expect(row("claude")).toBe(pages.MODEL_PROVIDERS[0]);
-    expect(row("claude")?.entity).toBe("[Anthropic …]");
-    expect(row("gemini")?.entity).toBe("[Google …]");
-    expect(row("gemini")?.checkedOn).toBeNull();
+    // The hosted rows' companies were confirmed by the owner on 10 October 2026 (dev's 239789903); what tells
+    // them apart from the preview's checked rows is the model family they name.
+    expect(row("claude")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "claude"));
+    expect(row("gemini")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "gemini"));
+    expect(row("claude")?.models).toBe("Claude");
+    expect(row("gemini")?.models).toBe("Gemini");
   });
 });
 
 describe("the first preview's list form", () => {
-  it("lists DeepInfra for GLM only, and keeps the Claude and Gemini placeholders", async () => {
-    const { keys, row } = await build(JSON.stringify([GLM]));
+  it("lists DeepInfra for GLM only, and keeps the hosted Claude and Gemini rows", async () => {
+    const { keys, row, pages } = await build(JSON.stringify([GLM]));
     expect(keys).toEqual(PREVIEW_KEYS);
     expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI)");
-    expect(row("claude")?.entity).toBe("[Anthropic …]");
-    expect(row("gemini")?.entity).toBe("[Google …]");
+    expect(row("claude")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "claude"));
+    expect(row("gemini")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "gemini"));
   });
 });
 
@@ -79,16 +81,16 @@ describe("the per-plan object form", () => {
     expect(keys).toEqual(PREVIEW_KEYS);
     // DeepSeek is not on either plan but checks every answer and story; MiMo is used nowhere.
     expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek)");
-    expect(row("claude")?.checkedOn).toBe("2026-10-10");
-    expect(row("gemini")?.checkedOn).toBe("2026-10-10");
+    expect(row("claude")?.models).toBe("Claude Haiku 5.5");
+    expect(row("gemini")?.models).toBe("Gemini 3.8 Flash");
   });
 
   it("still lists DeepInfra when the plans offer only Anthropic and Google: GLM writes and DeepSeek checks", async () => {
     const { keys, row } = await build(JSON.stringify({ free: [HAIKU, GEMINI], premium: [GEMINI, HAIKU] }));
     expect(keys).toEqual(PREVIEW_KEYS);
     expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek)");
-    expect(row("claude")?.entity).toBe("Anthropic Ireland, Limited");
-    expect(row("gemini")?.entity).toBe("Google Cloud EMEA Limited");
+    expect(row("claude")?.models).toBe("Claude Haiku 5.5");
+    expect(row("gemini")?.models).toBe("Gemini 3.8 Flash");
   });
 
   it("gives DeepInfra its confirmed jobs: arguments, judging and the verdict story", async () => {
@@ -142,8 +144,8 @@ describe("the per-plan object form", () => {
       expect(html).toContain('href="mailto:privacy@anthropic.com"');
       expect(html).toContain("Google Cloud EMEA Limited");
       expect(html).toContain('href="mailto:legal-notices@google.com"');
-      expect(html).not.toContain("[Anthropic …]");
-      expect(html).not.toContain("[Google …]");
+      expect(html).toContain("Claude Haiku 5.5");
+      expect(html).toContain("Gemini 3.8 Flash");
       for (const key of NEW_KEYS) expect(html).toContain(escaped(catalog[key as keyof typeof catalog]));
     }
   });
@@ -172,8 +174,8 @@ describe("a malformed flag discloses every preview provider and never throws", (
       const { keys, row } = await build(flag);
       expect(keys).toEqual(PREVIEW_KEYS);
       expect(row("deepinfra")?.models).toBe(ALL_DEEPINFRA);
-      expect(row("claude")?.entity).toBe("Anthropic Ireland, Limited");
-      expect(row("gemini")?.entity).toBe("Google Cloud EMEA Limited");
+      expect(row("claude")?.models).toBe("Claude Haiku 5.5");
+      expect(row("gemini")?.models).toBe("Gemini 3.8 Flash");
     });
   }
 });
