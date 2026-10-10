@@ -22,6 +22,14 @@ import type { PromptPacket } from "./index.js";
  */
 
 export const ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND = "anthropic-messages-http" as const;
+/**
+ * The ONE base URL this wire may be pointed at (review fix, 2026-10-10): the
+ * kind and the host are tied both ways, so an Anthropic key can never be sent
+ * over another wire, nor this wire's body to another host.
+ */
+export const ANTHROPIC_MESSAGES_BASE_URL = "https://api.anthropic.com/v1" as const;
+export const ANTHROPIC_API_HOST = "api.anthropic.com" as const;
+
 /** The API version header the contract fixes. */
 export const ANTHROPIC_API_VERSION = "2023-06-01" as const;
 /** Appended to the target's base URL (`https://api.anthropic.com/v1`). */
@@ -40,12 +48,15 @@ export const ANTHROPIC_EFFORT_LEVELS = Object.freeze(["high"] as const);
  */
 const ANTHROPIC_PROBE_DEFAULT_MAX_TOKENS = 512;
 
-/** The vendor declined to answer (`stop_reason: "refusal"`). Billed, not retried. */
-export const PROVIDER_REFUSED = "PROVIDER_REFUSED" as const;
+/**
+ * The vendor declined to answer (`stop_reason: "refusal"`). Billed, not retried.
+ * The same name the Gemini adapter uses for its safety blocks (lead, 2026-10-10).
+ */
+export const PROVIDER_CONTENT_REFUSED = "PROVIDER_CONTENT_REFUSED" as const;
 /**
  * The reply carried something this engine never asked for and cannot use: a
- * tool call, a server tool, a paused turn, an unknown block or stop reason.
- * Billed, not retried.
+ * tool call, a server tool, a paused turn, a context-window stop, an unknown
+ * block or stop reason. Billed, not retried.
  */
 export const PROVIDER_REPLY_UNSUPPORTED = "PROVIDER_REPLY_UNSUPPORTED" as const;
 /**
@@ -148,16 +159,38 @@ export function anthropicMessagesRequestHeaders(credential: string | undefined):
 }
 
 /**
- * The credential must be the bare key. A value that still carries an HTTP auth
- * scheme ("Bearer …") is a file written for the other adapter; sending it would
- * fail at the vendor on every call, so it is refused where it is configured.
- * The refusal names nothing of the value.
+ * The credential must be the bare key: one run of printable ASCII with no space.
+ * A value that still carries an HTTP auth scheme ("Bearer …") is a file written
+ * for the other adapter; sending it would fail at the vendor on every call, so
+ * it is refused where it is configured. The refusal names nothing of the value.
  */
+const BARE_KEY = /^[\x21-\x7e]+$/u;
+
 export function assertAnthropicCredentialShape(credential: string | undefined): void {
   if (credential === undefined) return;
-  if (typeof credential !== "string" || credential === "" || /\s/u.test(credential)) {
+  if (typeof credential !== "string" || !BARE_KEY.test(credential)) {
     throw new TypeError("PROVIDER_GATEWAY_CREDENTIAL_INVALID");
   }
+}
+
+/**
+ * Review fix, 2026-10-10 — THE KIND AND THE HOST, TIED BOTH WAYS. `native` says
+ * whether the target or gateway speaks this wire; `baseUrl` is its normalised
+ * base URL. Returns false when the pair is not lawful:
+ *  · this wire on anything but exactly `ANTHROPIC_MESSAGES_BASE_URL`;
+ *  · any other wire on the Anthropic API host.
+ */
+export function isAnthropicHostPairing(native: boolean, baseUrl: string): boolean {
+  let host: string;
+  try {
+    host = new URL(baseUrl).hostname.toLowerCase().replace(/\.$/u, "");
+  } catch {
+    // Not a URL: never this wire's base URL, and not the Anthropic host either.
+    return !native;
+  }
+  return native
+    ? baseUrl.replace(/\/+$/u, "") === ANTHROPIC_MESSAGES_BASE_URL
+    : host !== ANTHROPIC_API_HOST;
 }
 
 /**
@@ -211,9 +244,21 @@ export function anthropicUsageAsEngineUsage(usage: unknown): unknown {
   };
 }
 
-/** Stop reasons that end a usable answer, and the ones that mean it was cut off. */
+/**
+ * Stop reasons that end a usable answer, and the one that means it was cut off
+ * at `max_tokens`. A context-window stop is NOT a truncation: a retry under a
+ * raised `max_tokens` cannot fit a prompt that already filled the window, so it
+ * is a plain unusable reply (review fix, 2026-10-10).
+ */
 const COMPLETE_STOP_REASONS: ReadonlySet<string> = new Set(["end_turn", "stop_sequence"]);
-const TRUNCATED_STOP_REASONS: ReadonlySet<string> = new Set(["max_tokens", "model_context_window_exceeded"]);
+const TRUNCATED_STOP_REASONS: ReadonlySet<string> = new Set(["max_tokens"]);
+/**
+ * A `message` reply was billed. When it carries no usage at all, the counts are
+ * passed on as unreadable rather than absent, so the charge falls back to this
+ * attempt's projected maximum and the strict parse names PROVIDER_USAGE_INVALID —
+ * never a billed reply charged as zero (review fix, 2026-10-10).
+ */
+const UNREPORTED_BILLED_USAGE = Object.freeze({ prompt_tokens: -1, completion_tokens: -1 });
 const IGNORED_BLOCK_TYPES: ReadonlySet<string> = new Set(["thinking", "redacted_thinking"]);
 
 export type AnthropicMessagesReply = Readonly<{
@@ -233,12 +278,13 @@ export type AnthropicMessagesReply = Readonly<{
  * `redacted_thinking` blocks are ignored; any other block (a tool call above
  * all) is PROVIDER_REPLY_UNSUPPORTED. `max_tokens` becomes the engine's
  * `length` finish reason, so a cut-off answer takes the same truncation path as
- * an OpenAI-compatible one; `refusal` is PROVIDER_REFUSED. The model id is
- * passed through untouched for the loop's identity check.
+ * an OpenAI-compatible one; `refusal` is PROVIDER_CONTENT_REFUSED. The model id
+ * is passed through untouched for the loop's identity check.
  */
 export function readAnthropicMessagesReply(decoded: unknown): AnthropicMessagesReply {
   if (!isRecord(decoded)) return Object.freeze({ normalized: decoded, failure: null });
-  const usage = anthropicUsageAsEngineUsage(decoded.usage);
+  const usage = anthropicUsageAsEngineUsage(decoded.usage)
+    ?? (decoded.type === "message" ? { ...UNREPORTED_BILLED_USAGE } : undefined);
   const base = {
     ...(decoded.id === undefined ? {} : { id: decoded.id }),
     ...(decoded.model === undefined ? {} : { model: decoded.model }),
@@ -262,7 +308,7 @@ export function readAnthropicMessagesReply(decoded: unknown): AnthropicMessagesR
   const failure = unsupportedBlock
     ? new TypedDomainError(PROVIDER_REPLY_UNSUPPORTED, "The reply carried a content block this engine never asked for")
     : stopReason === "refusal"
-      ? new TypedDomainError(PROVIDER_REFUSED, "The provider declined to answer")
+      ? new TypedDomainError(PROVIDER_CONTENT_REFUSED, "The provider declined to answer")
       : stopReason === null || (!truncated && !COMPLETE_STOP_REASONS.has(stopReason))
         ? new TypedDomainError(PROVIDER_REPLY_UNSUPPORTED, "The reply ended for a reason this engine cannot use")
         : null;

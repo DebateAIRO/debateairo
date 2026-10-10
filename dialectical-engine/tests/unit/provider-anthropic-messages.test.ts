@@ -7,7 +7,7 @@ import {
   OpenAICompatibleProviderGateway,
   PROVIDER_CONTENT_LENGTH_EXCEEDED,
   PROVIDER_PACKET_UNSUPPORTED,
-  PROVIDER_REFUSED,
+  PROVIDER_CONTENT_REFUSED,
   PROVIDER_REPLY_UNSUPPORTED,
   ProviderCallFailedError,
   anthropicMessagesRequestBody,
@@ -19,6 +19,7 @@ import {
   type PromptPacket,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
+import { chargeMicrosForUsage, chargeableUsage } from "@debateai/budget";
 import { readDeploymentMakerCapability } from "../../packages/critique/src/index.js";
 import {
   buildConfiguredProviderSetDeploymentRow,
@@ -205,7 +206,8 @@ describe("PR B — reading the Anthropic reply", () => {
     ["a server_tool_use block", message({ content: [{ type: "server_tool_use", id: "s", name: "web_search", input: {} }, { type: "text", text: "x" }] }), PROVIDER_REPLY_UNSUPPORTED],
     ["a pause_turn stop", message({ stop_reason: "pause_turn" }), PROVIDER_REPLY_UNSUPPORTED],
     ["an unknown stop reason", message({ stop_reason: "something_new" }), PROVIDER_REPLY_UNSUPPORTED],
-    ["a refusal", message({ content: [], stop_reason: "refusal" }), PROVIDER_REFUSED]
+    ["a context-window stop (not a truncation: no raised retry)", message({ stop_reason: "model_context_window_exceeded" }), PROVIDER_REPLY_UNSUPPORTED],
+    ["a refusal", message({ content: [], stop_reason: "refusal" }), PROVIDER_CONTENT_REFUSED]
   ] as const) {
     it(`fails ${label} once — charged, ledgered FAILED, never retried`, async () => {
       const { gateway, sent, ledger, artifacts } = gatewayWith(() => reply(body));
@@ -284,6 +286,107 @@ describe("PR B — usage in the engine's shape", () => {
   });
 });
 
+describe("PR B — a billed reply with no usage is never charged as zero", () => {
+  const PRICE = { inputMicrosPerMillionTokens: 500_000, outputMicrosPerMillionTokens: 2_500_000 };
+  const observed: Array<{ usage: unknown; projection: { requestBytes: number; completionTokenCeiling: number } }> = [];
+  const seam = {
+    assertCallAllowed: () => undefined,
+    recordCall: (call: { usage: unknown; projection: { requestBytes: number; completionTokenCeiling: number } }) => { observed.push(call); },
+    assertUsageReported: () => undefined
+  };
+
+  for (const [label, usage] of [["absent", undefined], ["null", null]] as const) {
+    it(`a refusal whose usage is ${label} is charged the projected maximum, exactly, then refused as PROVIDER_USAGE_INVALID`, async () => {
+      observed.length = 0;
+      const body = message({ content: [], stop_reason: "refusal" });
+      if (usage === undefined) delete body.usage; else body.usage = usage;
+      const { gateway, sent, ledger } = gatewayWith(() => reply(body));
+      await expect(gateway.call(request({ costEnvelope: seam }))).rejects.toMatchObject({ code: "PROVIDER_USAGE_INVALID" });
+      expect(sent).toHaveLength(1);
+      expect(ledger.map((row) => row.outcome)).toEqual(["FAILED"]);
+      expect(observed).toHaveLength(1);
+      const requestBytes = Buffer.byteLength(sent[0]!.body, "utf8");
+      expect(observed[0]!.projection).toStrictEqual({ requestBytes, completionTokenCeiling: TOKEN_CEILING });
+      const charged = chargeableUsage(observed[0]!.usage, observed[0]!.projection);
+      expect(charged).toStrictEqual({ promptTokens: Math.ceil(requestBytes / 2), completionTokens: TOKEN_CEILING });
+      expect(chargeMicrosForUsage(PRICE, charged!)).toBe(
+        Math.ceil(Math.ceil(requestBytes / 2) * 500_000 / 1_000_000) + Math.ceil(TOKEN_CEILING * 2_500_000 / 1_000_000)
+      );
+    });
+  }
+
+  it("a usable reply with no usage is charged the projection too; a vendor error page is charged nothing", async () => {
+    observed.length = 0;
+    const body = message();
+    delete body.usage;
+    const { gateway } = gatewayWith(() => reply(body));
+    await expect(gateway.call(request({ costEnvelope: seam }))).rejects.toMatchObject({ code: "PROVIDER_USAGE_INVALID" });
+    expect(chargeableUsage(observed[0]!.usage, observed[0]!.projection)).not.toBeNull();
+    observed.length = 0;
+    const failing = gatewayWith(() => vendorError(529, "overloaded_error"));
+    await expect(failing.gateway.call(request({ costEnvelope: seam }))).rejects.toBeInstanceOf(ProviderCallFailedError);
+    expect(observed.map((call) => chargeableUsage(call.usage, call.projection))).toEqual([null, null, null]);
+  });
+
+  it("a refusal WITH usage is charged its own counts before it is raised", async () => {
+    observed.length = 0;
+    const { gateway } = gatewayWith(() => reply(message({ content: [], stop_reason: "refusal" })));
+    const failure = await gateway.call(request({ costEnvelope: seam })).catch((error: unknown) => error);
+    expect((failure as ProviderCallFailedError).cause).toMatchObject({ code: PROVIDER_CONTENT_REFUSED });
+    expect(chargeableUsage(observed[0]!.usage, observed[0]!.projection)).toStrictEqual({ promptTokens: 10, completionTokens: 5 });
+  });
+});
+
+describe("PR B — the key never leaves the request headers", () => {
+  const KEY = "sk-ant-fixture-SECRET-0123456789";
+  const scenarios: ReadonlyArray<readonly [string, (attempt: number) => Response, Readonly<Record<string, unknown>>]> = [
+    ["an accepted reply", () => reply(message()), {}],
+    ["a refusal", () => reply(message({ content: [], stop_reason: "refusal" })), {}],
+    ["a tool call", () => reply(message({ content: [{ type: "tool_use", id: "t", name: "x", input: {} }] })), {}],
+    ["a 401", () => vendorError(401, "authentication_error"), {}],
+    ["a 529", () => vendorError(529, "overloaded_error"), {}],
+    ["a body that is not JSON", () => reply("not json"), {}],
+    ["another model", () => reply(message({ model: "claude-other" })), {}],
+    ["malformed usage", () => reply(message({ usage: { input_tokens: "x" } })), {}],
+    ["a packet it cannot say", () => reply(message()), { packet: { messages: [...PACKET.messages, { role: "assistant", content: "p" }] } }]
+  ];
+  for (const [label, respond, extra] of scenarios) {
+    it(`is in no error, artifact, ledger row or usage record on ${label}`, async () => {
+      const { gateway, sent, ledger, artifacts } = gatewayWith(respond, { authorizationHeader: KEY });
+      const charges: unknown[] = [];
+      const outcome = await gateway.call(request({
+        ...extra,
+        costEnvelope: {
+          assertCallAllowed: () => undefined,
+          recordCall: (call: unknown) => { charges.push(call); },
+          assertUsageReported: () => undefined
+        }
+      })).then((value) => value, (error: unknown) => error);
+      const error = outcome instanceof Error ? outcome : null;
+      const recorded = JSON.stringify({ outcome, artifacts, ledger, charges })
+        + (error === null ? "" : `${String(error)} ${error.stack ?? ""} ${String((error as { cause?: unknown }).cause)}`);
+      expect(recorded).not.toContain(KEY);
+      expect(recorded).not.toContain("SECRET");
+      // Control: the key WAS on the wire, in the one header meant for it.
+      for (const call of sent) expect(call.headers["x-api-key"]).toBe(KEY);
+    });
+  }
+
+  it("a refused credential is named by code only", () => {
+    const thrown = (() => {
+      try {
+        new AnthropicMessagesProviderGateway({
+          endpoint: BASE_URL, model: MODEL, maker: "Anthropic", authorizationHeader: `Bearer ${KEY}`,
+          persistRawArtifact: async () => "a", appendLedgerEntry: async () => "l", assertNoOpenWriteTransaction: () => undefined
+        });
+      } catch (error) { return error as Error; }
+      return null;
+    })();
+    expect(thrown?.message).toBe("PROVIDER_GATEWAY_CREDENTIAL_INVALID");
+    expect(`${String(thrown)} ${thrown?.stack ?? ""}`).not.toContain("SECRET");
+  });
+});
+
 describe("PR B — vendor errors take the shared transport path", () => {
   for (const [status, type] of [[400, "invalid_request_error"], [401, "authentication_error"], [429, "rate_limit_error"], [529, "overloaded_error"]] as const) {
     it(`HTTP ${status} ${type} is PROVIDER_HTTP_STATUS_${status}, within the call bound`, async () => {
@@ -316,9 +419,26 @@ describe("PR B — construction refuses what would fail on every call", () => {
       .toThrowError(new TypeError("PROVIDER_GATEWAY_THINKING_INVALID"));
     expect(() => new AnthropicMessagesProviderGateway({ ...base, thinking: { parameter: "reasoning_effort", levels: ["low", "high"] } }))
       .toThrowError(new TypeError("PROVIDER_GATEWAY_THINKING_INVALID"));
+    for (const credential of ["", "key with space", "key\twith-tab", "k\u00e9y", "key\n"]) {
+      expect(() => new AnthropicMessagesProviderGateway({ ...base, authorizationHeader: credential }))
+        .toThrowError(new TypeError("PROVIDER_GATEWAY_CREDENTIAL_INVALID"));
+    }
     expect(() => new OpenAICompatibleProviderGateway({ ...base, adapterKind: "other" as never }))
-      .toThrowError(new TypeError("PROVIDER_GATEWAY_ADAPTER_INVALID"));
+      .toThrowError(new TypeError("PROVIDER_ADAPTER_KIND_UNKNOWN"));
     expect(() => new AnthropicMessagesProviderGateway({ ...base, authorizationHeader: "fixture-key", ...HIGH })).not.toThrow();
+  });
+
+  it("ties the wire to the host both ways", () => {
+    for (const endpoint of ["https://proxy.example/v1", "https://api.anthropic.com/v2/v1", "http://api.anthropic.com/v1"]) {
+      expect(() => new AnthropicMessagesProviderGateway({ ...base, endpoint }))
+        .toThrowError(new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH"));
+    }
+    for (const endpoint of [BASE_URL, "https://API.anthropic.com./v1"]) {
+      expect(() => new OpenAICompatibleProviderGateway({ ...base, endpoint }))
+        .toThrowError(new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH"));
+    }
+    // Control: the OpenAI wire on any other host is untouched.
+    expect(() => new OpenAICompatibleProviderGateway({ ...base, endpoint: "https://api.deepinfra.com/v1/openai" })).not.toThrow();
   });
 
   it("is registered as a built-in adapter", () => {
@@ -341,13 +461,30 @@ describe("PR B — the target and the register pick the wire", () => {
       thinking: { parameter: "reasoning_effort", levels: ["high"] },
       adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND
     });
+    const elsewhere = JSON.stringify([{ provider_ref: "vendor:anthropic", base_url: "https://api.deepinfra.com/v1/openai", model: MODEL }]);
     for (const configured of [
       { providerRef: "vendor:anthropic", maker: "Anthropic" },
       { providerRef: "vendor:anthropic", maker: "Anthropic", adapterKind: "openai-compatible-http" }
     ]) {
-      const plain = parseProviderDiscoveryTargets(targetJson(), [configured])[0]!;
+      const plain = parseProviderDiscoveryTargets(elsewhere, [configured])[0]!;
       expect(Object.hasOwn(plain, "adapterKind")).toBe(false);
       expect(providerTargetGatewayControls(plain)).toStrictEqual({});
+    }
+  });
+
+  it("refuses a kind no shipped adapter serves, and a wire on the wrong host", () => {
+    expect(() => parseProviderDiscoveryTargets(targetJson(), [{ providerRef: "vendor:anthropic", maker: "Anthropic", adapterKind: "provider-plugin" }]))
+      .toThrowError(new TypeError("PROVIDER_ADAPTER_KIND_UNKNOWN"));
+    expect(() => parseProviderDiscoveryTargets(JSON.stringify([{ provider_ref: "vendor:anthropic", base_url: "https://proxy.example/v1", model: MODEL }]),
+      [{ providerRef: "vendor:anthropic", maker: "Anthropic", adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND }]))
+      .toThrowError(new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH"));
+    for (const configured of [
+      { providerRef: "vendor:anthropic", maker: "Anthropic" },
+      { providerRef: "vendor:anthropic", maker: "Anthropic", adapterKind: "openai-compatible-http" },
+      { providerRef: "vendor:anthropic", maker: "Anthropic", adapterKind: "vllm-openai-compatible-http" }
+    ]) {
+      expect(() => parseProviderDiscoveryTargets(targetJson(), [configured]))
+        .toThrowError(new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH"));
     }
   });
 
@@ -362,7 +499,8 @@ describe("PR B — the target and the register pick the wire", () => {
     }
     // Control: the same declaration on an OpenAI-compatible target is still lawful.
     expect(() => parseProviderDiscoveryTargets(
-      targetJson({ thinking_parameter: "reasoning_effort", thinking_levels: ["low", "high"] }),
+      JSON.stringify([{ provider_ref: "vendor:anthropic", base_url: "https://api.deepinfra.com/v1/openai", model: MODEL,
+        thinking_parameter: "reasoning_effort", thinking_levels: ["low", "high"] }]),
       [{ providerRef: "vendor:anthropic", maker: "Anthropic" }]
     )).not.toThrow();
   });
@@ -386,6 +524,19 @@ describe("PR B — the target and the register pick the wire", () => {
       { providerRef: "vendor:anthropic", maker: "Anthropic", adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND }
     ]);
     expect(capability.deploymentMakerCapability).toBe(true);
+  });
+
+  it("the reader passes a kind no shipped adapter serves, so the target parser refuses it by name", async () => {
+    const sealed = buildConfiguredProviderSetSealedRow({
+      requiredDistinctMakers: 1,
+      providers: [{ providerRef: "vendor:odd", adapterKind: "provider-plugin", maker: "Odd" }]
+    }, "fixture-source-ref");
+    const capability = await readDeploymentMakerCapability(registerPool(sealed.value), 1);
+    expect(capability.configuredProviders).toStrictEqual([{ providerRef: "vendor:odd", maker: "Odd", adapterKind: "provider-plugin" }]);
+    expect(() => parseProviderDiscoveryTargets(
+      JSON.stringify([{ provider_ref: "vendor:odd", base_url: "https://odd.example/v1", model: "m" }]),
+      capability.configuredProviders
+    )).toThrowError(new TypeError("PROVIDER_ADAPTER_KIND_UNKNOWN"));
   });
 
   it("an old sealed row still reads as exactly two members per provider", async () => {

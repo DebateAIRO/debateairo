@@ -7,11 +7,12 @@ import { scanPromptTripwires } from "./prompt-tripwire.js";
 import {
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
   ANTHROPIC_MESSAGES_PATH,
-  PROVIDER_REFUSED,
+  PROVIDER_CONTENT_REFUSED,
   PROVIDER_REPLY_UNSUPPORTED,
   anthropicMessagesRequestBody,
   anthropicMessagesRequestHeaders,
   assertAnthropicCredentialShape,
+  isAnthropicHostPairing,
   isAnthropicThinkingControl,
   readAnthropicMessagesReply
 } from "./anthropic-messages.js";
@@ -397,9 +398,10 @@ function normalizedProviderBaseUrl(value: unknown): string {
 export function parseProviderDiscoveryTargets(
   source: string,
   /**
-   * `adapterKind` is the register row's. Only `anthropic-messages-http` changes
-   * anything: it marks the target native. Any other kind (or none) keeps the
-   * OpenAI-compatible wire, exactly as before PR B.
+   * `adapterKind` is the register row's. `anthropic-messages-http` marks the
+   * target native; an OpenAI-compatible kind (or none) keeps the OpenAI wire,
+   * exactly as before PR B; any other kind is refused rather than silently sent
+   * over the OpenAI wire (review fix, 2026-10-10).
    */
   configuredProviders: readonly Readonly<{ providerRef: string; maker: string; adapterKind?: string }>[]
 ): readonly ProviderDiscoveryTarget[] {
@@ -425,6 +427,10 @@ export function parseProviderDiscoveryTargets(
     const maker = requiredProviderTargetText(configured.maker, "CONFIGURED_PROVIDER_INVALID");
     if (configuredByRef.has(providerRef)) throw new TypeError("CONFIGURED_PROVIDER_DUPLICATE");
     configuredByRef.set(providerRef, maker);
+    if (configured.adapterKind !== undefined
+      && !BUILT_IN_PROVIDER_ADAPTERS.some((adapter) => adapter.adapterKind === configured.adapterKind)) {
+      throw new TypeError("PROVIDER_ADAPTER_KIND_UNKNOWN");
+    }
     if (configured.adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) nativeRefs.add(providerRef);
   }
   const targetsByRef = new Map<string, ProviderDiscoveryTarget>();
@@ -485,6 +491,12 @@ export function parseProviderDiscoveryTargets(
     const maker = configuredByRef.get(providerRef);
     if (maker === undefined) throw new TypeError("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH");
     const native = nativeRefs.has(providerRef);
+    const baseUrl = normalizedProviderBaseUrl(row.base_url);
+    // Review fix: the wire and the host are tied both ways, so a vendor key is
+    // never sent over the wrong wire and this wire's body never to another host.
+    if (!isAnthropicHostPairing(native, baseUrl)) {
+      throw new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH");
+    }
     // PR B: the Anthropic wire carries a level as `output_config.effort`, and
     // only the levels its contract lists; anything else is an operator's
     // declaration the vendor (or the preview gate) would refuse on every call.
@@ -519,7 +531,7 @@ export function parseProviderDiscoveryTargets(
     targetsByRef.set(providerRef, Object.freeze({
       providerRef,
       maker,
-      baseUrl: normalizedProviderBaseUrl(row.base_url),
+      baseUrl,
       model: requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID"),
       ...(authorizationHeader === undefined ? {} : { authorizationHeader }),
       ...(authorizationFile === undefined ? {} : { authorizationFile }),
@@ -1523,10 +1535,14 @@ function assertJsonObjectResponseCapability(options:OpenAICompatibleGatewayOptio
  * key would each fail at the vendor on every call, so each is refused here.
  */
 function assertGatewayWire(options: OpenAICompatibleGatewayOptions): boolean {
-  if (options.adapterKind === undefined) return false;
-  if (options.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) {
-    throw new TypeError("PROVIDER_GATEWAY_ADAPTER_INVALID");
+  if (options.adapterKind !== undefined && options.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) {
+    throw new TypeError("PROVIDER_ADAPTER_KIND_UNKNOWN");
   }
+  const native = options.adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND;
+  if (!isAnthropicHostPairing(native, options.endpoint)) {
+    throw new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH");
+  }
+  if (!native) return false;
   if (!isAnthropicThinkingControl(options.thinking)) {
     throw new TypeError("PROVIDER_GATEWAY_THINKING_INVALID");
   }
@@ -1906,9 +1922,6 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           );
         }
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
-        // PR B: a refusal or an unusable reply, raised only now — after the
-        // artifact and the charge, because the vendor billed it either way.
-        if (nativeReply?.failure) throw nativeReply.failure;
         /**
          * Model scorecard §2.2: the identity check's mirror for the level. A
          * relay that ran a requested level at another one produced an answer
@@ -1961,6 +1974,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           providerRef: request.providerRef,
           usage: reportedUsage
         });
+        /**
+         * PR B: a refusal or an unusable reply (a tool call), raised only now —
+         * after the artifact, the charge, the bounded-response check and the
+         * hosted usage requirement — so its usage is always recorded and judged
+         * first, exactly as a usable reply's is (review fix, 2026-10-10). The
+         * model-identity check stays below, after these as before.
+         */
+        if (nativeReply?.failure) throw nativeReply.failure;
         // W10/1: a refusal that arrived with `finish_reason: "length"` is a
         // TRUNCATION, and it is named as one. The classifier's own verdict
         // (PARSE_FAILED on a half-written object) describes the symptom; the
@@ -2174,7 +2195,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          * failed member today.
          */
         if (error instanceof TypedDomainError
-          && (error.code === PROVIDER_REFUSED || error.code === PROVIDER_REPLY_UNSUPPORTED)) break;
+          && (error.code === PROVIDER_CONTENT_REFUSED || error.code === PROVIDER_REPLY_UNSUPPORTED)) break;
       }
       // L4-F2: an oversized packet is deterministic — resending it would burn the ceiling for
       // an identical refusal, so the loop stops on the attempt that refused it.
@@ -2273,10 +2294,11 @@ export * from "./preview-test.js";
 export {
   ANTHROPIC_API_VERSION,
   ANTHROPIC_EFFORT_LEVELS,
+  ANTHROPIC_MESSAGES_BASE_URL,
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
   ANTHROPIC_MESSAGES_PATH,
+  PROVIDER_CONTENT_REFUSED,
   PROVIDER_PACKET_UNSUPPORTED,
-  PROVIDER_REFUSED,
   PROVIDER_REPLY_UNSUPPORTED,
   anthropicMessagesRequestBody,
   anthropicUsageAsEngineUsage,
