@@ -834,12 +834,15 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             # The upstream timeout is what remains after the slot wait and the reservation lock.
             send = dispatch or helper.HttpsTransport(timeout=max(1.0, CALL_DEADLINE_SECONDS - (time.monotonic() - accepted)),
                                                      profile=profile, path=profile.path_for(row))
-            status, response = send(outgoing, key)
-            response = helper.redact(response if isinstance(response, dict) else {}, key, profile.redaction_patterns)
+            status, raw_response = send(outgoing, key)
+            raw_response = raw_response if isinstance(raw_response, dict) else {}
             # Owner ruling 5 (2026-10-10): a refusal the profile proves unbilled (DeepInfra: a 429
-            # with an error and no usage, choices or cost anywhere) counts as not sent. A hook that
-            # fails lands in the uncertain branch below, as any doubt does.
-            if profile.unbilled_refusal(status, response):
+            # with an error and no usage, choices or cost anywhere) counts as not sent. It is judged
+            # on the RAW reply: redaction drops whole subtrees (headers, secrets), which could hide a
+            # billing field. A hook that fails lands in the uncertain branch below, as any doubt does.
+            unbilled = profile.unbilled_refusal(status, raw_response)
+            response = helper.redact(raw_response, key, profile.redaction_patterns)
+            if unbilled:
                 raise UnbilledRefusal()
         except (helper.RequestNotSent, UnbilledRefusal) as unsent:
             try:
@@ -952,6 +955,9 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
         go_current, allowed = False, frozenset()
     limits = control['limits']
     serving = slots is None or (not slots.tripped and slots.limit == limits['max_concurrent_calls'])
+    # A probe id in flight (running, or left by a probe that died) makes the next reservation wait
+    # or halt (interrupted_probe): say the window is shut, so no debate starts into that.
+    serving = serving and not any(entry_id.startswith(PROBE_ENTRY_PREFIX) for entry_id in control['in_flight'])
     budget, spend = Decimal(limits['daily_budget_usd']), day_spend(ledger)
     profile = profile_of(control['provider'])
     if profile is None or not all(model in profile.rows for model in control['enabled_models']):
