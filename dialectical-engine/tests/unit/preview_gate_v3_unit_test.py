@@ -228,19 +228,21 @@ class UnitFileTests(unittest.TestCase):
 
     def test_readme_names_the_same_paths_and_the_proposed_go(self):
         readme = (V3 / 'README.md').read_text()
-        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"4.00"', '1000',
+        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"10.00"', '2000',
                      'max_concurrent_calls', GLM, DEEPSEEK, MIMO, QWEN, ' probe ', 'preview:qwen-3-8-flash',
                      'TEAM_TOTAL_BUDGET_EXCEEDED', 'unbilled_release_ceiling', 'PROBE_FENCE_REQUIRED',
                      # The two round-2 documentation findings: the midnight overlap, and a predecessor
                      # hash that is written down only.
-                     '**Midnight overlap.**', '10 x $0.2276 = $2.28', 'It never checks it against v2',
-                     # 10 at once fits the $4.00 pot with all four switched on (MiMo's worst case).
-                     '$0.2276352 (MiMo) | $2.276352 | yes'):
+                     '**Midnight overlap.**', '10 x $0.0857 = $0.86', 'It never checks it against v2',
+                     # 10 at once fits the $10.00 pot with all four switched on (MiMo's worst case),
+                     # owner ruling 2026-10-10 (pots and per-call caps).
+                     '$0.08574976 (MiMo) | $0.8574976 | yes', '(128 KiB)', '32,768'):
             self.assertIn(name, readme)
-        self.assertNotIn('"3.50"', readme)
+        for old in ('"3.50"', '"4.00"', '256 KiB', '163,840', '$0.2276'):  # Figures before the ruling.
+            self.assertNotIn(old, readme)
         go_line = [line for line in readme.splitlines() if line.startswith('jq -n') and 'go-v3' in line]
         self.assertEqual(len(go_line), 1)
-        self.assertIn('daily_budget_usd:"4.00",max_paid_posts_per_day:1000,max_concurrent_calls:10,', go_line[0])
+        self.assertIn('daily_budget_usd:"10.00",max_paid_posts_per_day:2000,max_concurrent_calls:10,', go_line[0])
         self.assertIn('enabled_models:["%s"]' % GLM, go_line[0])  # GLM only at first.
 
     def test_readme_one_session_order_ends_with_all_four_on_before_the_first_debate(self):
@@ -251,7 +253,7 @@ class UnitFileTests(unittest.TestCase):
                  "The website's list, last", "Only then the owner's first debate, with all five AIs"]
         positions = [session.index(step) for step in order]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn('$4.00 + $1.00 = $5.00', session)
+        self.assertIn('$10.00 + $2.00 = $12.00', session)
         self.assertIn('enabled_models:["%s","%s","%s","%s"]' % (GLM, DEEPSEEK, MIMO, QWEN), readme)
 
     def test_the_readme_probe_runs_inside_the_fence_the_probe_checks(self):

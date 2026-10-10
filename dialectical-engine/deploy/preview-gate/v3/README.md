@@ -29,10 +29,10 @@ What is new in v3:
 
 | Model | Maker | Price the gate charges (per million tokens, in / out) | Longest answer allowed (tokens) | Thinking | JSON mode | Most one call can set aside |
 |---|---|---|---|---|---|---|
-| `zai-org/GLM-5.3-Flash` | Z.AI | $0.15 / $0.50 | 163,840 | "high" | allowed | $0.1216 |
-| `deepseek-ai/DeepSeek-V4.1-Flash` | DeepSeek | $0.20 / $0.60 | 131,072 | "high" | not allowed | $0.1315 |
-| `XiaomiMiMo/MiMo-V2.6-Pro` | Xiaomi | $0.43 / $0.87 | 131,072 | none sent | not allowed | $0.2276 |
-| `Qwen/Qwen3.8-Flash` | Alibaba | $0.113 / $0.382 | 131,072 | none sent | not allowed | $0.0799 |
+| `zai-org/GLM-5.3-Flash` | Z.AI | $0.15 / $0.50 | 32,768 | "high" | allowed | $0.0364 |
+| `deepseek-ai/DeepSeek-V4.1-Flash` | DeepSeek | $0.20 / $0.60 | 32,768 | "high" | not allowed | $0.0463 |
+| `XiaomiMiMo/MiMo-V2.6-Pro` | Xiaomi | $0.43 / $0.87 | 32,768 | none sent | not allowed | $0.0857 |
+| `Qwen/Qwen3.8-Flash` | Alibaba | $0.113 / $0.382 | 32,768 | none sent | not allowed | $0.0276 |
 
 - The prices are DeepInfra's list prices. GLM and DeepSeek are on promotion today (50% and 30%
   off), so the gate counts more than the real bill. That is the careful side. Qwen3.8-Flash (not
@@ -40,34 +40,39 @@ What is new in v3:
   promotion.
 - "Thinking" tokens are charged as answer tokens. If the answer does not prove that they are
   already inside its answer count, the gate charges them on top. That is the careful side too.
-- "Most one call can set aside" is for the largest question the gate accepts (256 KiB). No
+- "Most one call can set aside" is for the largest question the gate accepts (128 KiB). No
   model may ever set aside more than $0.25 for one call; a test checks every row.
+- Two limits per call, the same for every model (owner ruling, 2026-10-10): an answer may be at
+  most 32,768 tokens long, and a question (the whole request) at most 128 KiB. The gate refuses
+  anything larger before it sets money aside. There is room to spare: today no call the app makes
+  asks for more than 24,000 answer tokens (a debate turn 8,192, a health check 8,192, the story
+  writer 12,000 and 24,000 on its retry), and the largest real request seen was about 51 KB.
 - Whether DeepSeek, MiMo and Qwen accept these settings, and whether they name themselves exactly
   in their answers, is not yet measured. The `probe` measures it with one paid call each, before
   they are switched on.
 - A price change is a reviewed code change (the gate, the app and their shared test file),
   never an edit of the GO.
 
-### Money: DeepInfra's share of the $5 team total
+### Money: DeepInfra's share of the $12 team total
 
-The owner's team limit stays $5 a day. It is split into one pot per provider, each with its own
-gate. For now there are two: DeepInfra and Anthropic. Google is parked. The split (owner ruling,
-2026-10-10):
+The owner's team limit is $12 a day (owner ruling, 2026-10-10). It is split into one pot per
+provider, each with its own gate. For now there are two: DeepInfra and Anthropic. Google is
+parked. The split (owner ruling, 2026-10-10):
 
 | Gate | Pot per day | Calls per day | Calls at once | Status |
 |---|---|---|---|---|
-| DeepInfra (this gate) | $4.00 | 1,000 | 10 | this README |
-| Anthropic (Claude Haiku) | $1.00 | 400 | 2 | its own gate |
+| DeepInfra (this gate) | $10.00 | 2,000 | 10 | this README |
+| Anthropic (Claude Haiku) | $2.00 | 400 | 2 | its own gate |
 | Google | none | - | - | parked; the split is set again if it comes back |
-| **Total** | **$5.00** | | | |
+| **Total** | **$12.00** | | | |
 
-Until the Anthropic gate is open, the preview spends at most $4.00 a day.
+Until the Anthropic gate is open, the preview spends at most $10.00 a day.
 
-The gate itself keeps the $5 total:
-- One GO may never ask for more than $5.00 a day.
+The gate itself keeps the $12 total:
+- One GO may never ask for more than $10.00 a day.
 - `activate` adds this GO's pot to the pots in the other gates' GO files (Anthropic's and
   Google's, at their fixed places in `/etc/debateai-v3-preview/`) and refuses when the sum is
-  above $5.00 (`TEAM_TOTAL_BUDGET_EXCEEDED`). A gate that is not installed (no GO file) counts as
+  above $12.00 (`TEAM_TOTAL_BUDGET_EXCEEDED`). A gate that is not installed (no GO file) counts as
   $0. A GO file that is there but cannot be read, is not root's, can be written by others, or is
   not a proper GO refuses (`TEAM_TOTAL_UNVERIFIABLE`): the gate never guesses the total.
 - `activate` can see the other GO files because root runs it in a shell. The running gates
@@ -79,12 +84,12 @@ Each pot is checked once more when it is opened: 10 calls at the same time (the 
 allow), each setting aside the largest worst case of the switched-on models, must fit in the pot.
 `activate` refuses a GO that does not pass (`CONCURRENCY_EXCEEDS_BUDGET`). The sums for this GO:
 
-| Switched on | Largest worst case | x 10 calls at once | Fits in $4.00? |
+| Switched on | Largest worst case | x 10 calls at once | Fits in $10.00? |
 |---|---|---|---|
-| GLM only (the first `activate`) | $0.1215488 (GLM) | $1.215488 | yes |
-| All four | $0.2276352 (MiMo) | $2.276352 | yes ($1.72 to spare) |
+| GLM only (the first `activate`) | $0.036352 (GLM) | $0.36352 | yes |
+| All four | $0.08574976 (MiMo) | $0.8574976 | yes ($9.14 to spare) |
 
-The smallest pot that passes with all four switched on is $2.28.
+The smallest pot that passes with all four switched on is $0.86.
 
 ## Decisions you should know about
 
@@ -108,7 +113,7 @@ The smallest pot that passes with all four switched on is $2.28.
 - **A new state folder and a fresh pot.** v3 keeps its records in its own folder, in a new format
   that v2 cannot read and that cannot read v2's. v2's records are kept and never opened again.
   - On the day of the switch-over, what v2 already spent that day is not counted in the v3 pot.
-    So that day the real total can reach v2's spend plus $4.00. Switching over early in the
+    So that day the real total can reach v2's spend plus $10.00. Switching over early in the
     Bucharest day keeps that small. `status` of v2 (step 0) shows that day's spend.
   - The GO can record which v2 state this pot follows (`predecessor_ledger_sha256`, step 4). The
     gate only writes that value down (`init` prints it). It never checks it against v2's files, so
@@ -117,7 +122,7 @@ The smallest pot that passes with all four switched on is $2.28.
   started. A call that starts just before midnight is paid just after it, while the new day's pot
   is already open. So within one calendar day the real bill can go above the pot by up to
   10 calls (the number that may run at once) x the largest amount one call may set aside: at most
-  10 x $0.2276 = $2.28 with all four models switched on. The probe adds one more call to that.
+  10 x $0.0857 = $0.86 with all four models switched on. The probe adds one more call to that.
   That is by design: the pot limits what is set aside per Bucharest day, not the calendar day's
   bill.
 - **The gate code binds the model list.** The list lives in `preview_budget_helper.py`, whose
@@ -166,7 +171,7 @@ The smallest pot that passes with all four switched on is $2.28.
   after all:
   - Each one stays in the day's record with $0 charged, its status (429), the reason and the
     time, so it can be checked against DeepInfra's billing page. `status` shows today's number
-    (`today_unbilled_releases`). They do not count toward the 1,000 calls a day.
+    (`today_unbilled_releases`). They do not count toward the 2,000 calls a day.
   - At most 20 a day. The 20th on one Bucharest day halts the gate
     (`unbilled_release_ceiling`). A normal answer in between does not reset that count; only the
     next Bucharest day starts again at 0.
@@ -258,13 +263,13 @@ stat -c '%a %U:%G %h %s' /var/lib/debateai-v3-preview/provider-deepinfra-authori
 |---|---|---|
 | `schema` | `preview-provider-budget-go-v3` | A v2 GO is refused; there is no silent upgrade. |
 | `provider` | `deepinfra` | This gate's provider. `anthropic` and `google` are refused until their gates exist. |
-| `enabled_models` | `["zai-org/GLM-5.3-Flash"]` | GLM only at first. The other three are added after their probe (see below). |
+| `enabled_models` | `["zai-org/GLM-5.3-Flash"]` | GLM only at first. The other three are added after their probe (see below); the GO the owner approved (2026-10-10) ends the deploy session with all four switched on. |
 | `scope_id` | `preview-deepinfra-v3-20261010` | A new name for the new pot (use the switch-over date). The app's configuration must carry the same `scope_id`. |
 | `target_host` | `vps-a156d797` | The server's host name (measured for v2). The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as in v2. No one else may ask. |
-| `daily_budget_usd` | `"4.00"` | DeepInfra's share of the $5 team total (owner ruling, 2026-10-10; Anthropic has $1.00). A string with two decimals; at most `"5.00"`, and `activate` checks the sum with the other gates' GOs. |
-| `max_paid_posts_per_day` | `1000` | A second fuse on the number of paid calls (owner ruling). Refusals kept as unbilled ($0) do not count. |
-| `max_concurrent_calls` | `10` | Owner ruling ("10 at once"); 10 is the most a v3 GO may ask (v2 stays at most 8). 10 x $0.2276 (MiMo) = $2.28 fits in $4.00. |
+| `daily_budget_usd` | `"10.00"` | DeepInfra's share of the $12 team total (owner ruling, 2026-10-10; Anthropic has $2.00). A string with two decimals; at most `"10.00"`, and `activate` checks the sum with the other gates' GOs. |
+| `max_paid_posts_per_day` | `2000` | A second fuse on the number of paid calls (owner ruling, 2026-10-10). Refusals kept as unbilled ($0) do not count. |
+| `max_concurrent_calls` | `10` | Owner ruling ("10 at once"); 10 is the most a v3 GO may ask (v2 stays at most 8). 10 x $0.0857 (MiMo) = $0.86 fits in $10.00. |
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
 | `predecessor_ledger_sha256` | v2 state hash | Optional. Records which v2 state this pot follows. Written down only; never checked. |
 
@@ -275,7 +280,7 @@ G=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
 PRED=$(sha256sum /var/lib/debateai-v3-preview/provider-team-authority-v2/team-control.json | cut -d' ' -f1)
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" --arg p "$PRED" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"deepinfra",enabled_models:["zai-org/GLM-5.3-Flash"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"4.00",max_paid_posts_per_day:1000,max_concurrent_calls:10,open_days:31,predecessor_ledger_sha256:$p}' > /root/preview-archive/provider-deepinfra-go-v3.json
+jq -n --arg b "$BR" --arg h "$HE" --arg p "$PRED" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"deepinfra",enabled_models:["zai-org/GLM-5.3-Flash"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"10.00",max_paid_posts_per_day:2000,max_concurrent_calls:10,open_days:31,predecessor_ledger_sha256:$p}' > /root/preview-archive/provider-deepinfra-go-v3.json
 install -o root -g root -m 0600 /root/preview-archive/provider-deepinfra-go-v3.json /etc/debateai-v3-preview/provider-deepinfra-go-v3.json
 jq -c . /etc/debateai-v3-preview/provider-deepinfra-go-v3.json
 ```
@@ -292,11 +297,11 @@ What to expect:
 - `init` prints one line with `"state": "initialized"`, `"provider": "deepinfra"` and the
   switched-on models.
 - `activate` prints a summary with `"state": "active"`, `"window_open": true`,
-  `"daily_budget_usd": "4.00"` and `"today_by_model": {}`.
+  `"daily_budget_usd": "10.00"` and `"today_by_model": {}`.
 - A refusal is one line `{"status": "refused", "error": "<CODE>"}`. For example,
   `HELPER_CUSTODY_INVALID` (file owners or modes), `ROOT_GO_INVALID` (a GO field or hash, a pot
-  above $5.00, or a v2 GO), `CONCURRENCY_EXCEEDS_BUDGET` (the pot is too small for 10 worst-case
-  calls), `TEAM_TOTAL_BUDGET_EXCEEDED` (with the other gates' pots it would be above $5.00),
+  above $10.00, or a v2 GO), `CONCURRENCY_EXCEEDS_BUDGET` (the pot is too small for 10 worst-case
+  calls), `TEAM_TOTAL_BUDGET_EXCEEDED` (with the other gates' pots it would be above $12.00),
   `TEAM_TOTAL_UNVERIFIABLE` (another gate's GO file is there but cannot be trusted; check its owner,
   mode and contents) or `ACTIVATION_REFUSED` (wrong host or state).
 
@@ -458,8 +463,8 @@ the step that makes it safe.
 3. **Switch all four on: a new GO, then `stop` and `activate`** ("Switching on DeepSeek, MiMo and
    Qwen", step 2). `activate` must show all four in `enabled_models`, and the start check run by
    hand must print `"status": "ok"` with all four. No restart: `max_concurrent_calls` stays 10.
-4. **The Anthropic gate**, by its own README: Claude Haiku, $1.00 a day, 400 calls, 2 at once. Its
-   `activate` adds this gate's pot: $4.00 + $1.00 = $5.00, exactly the team total. One cent more on
+4. **The Anthropic gate**, by its own README: Claude Haiku, $2.00 a day, 400 calls, 2 at once. Its
+   `activate` adds this gate's pot: $10.00 + $2.00 = $12.00, exactly the team total. One cent more on
    either side is refused (`TEAM_TOTAL_BUDGET_EXCEEDED`).
 5. **The new register version, only now.** It names the reviewed model references (now with
    `preview:qwen-3-8-flash`), and its answer checker is a model of a different maker from the one
@@ -585,5 +590,5 @@ ss -xlp | grep deepinfra-budget-v3
   prints one line. For DeepSeek, MiMo and Qwen it answers the open questions: thinking setting
   accepted, exact model name in the answer, usage reported.
 - Run without `systemd-run`, the probe refuses with `PROBE_FENCE_REQUIRED`.
-- `activate` reads the Anthropic GO (once that gate exists) and refuses a total above $5.00.
+- `activate` reads the Anthropic GO (once that gate exists) and refuses a total above $12.00.
 - The halt email names the v3 `activate` command (one `stop` gives one email).

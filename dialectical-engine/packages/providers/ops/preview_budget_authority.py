@@ -71,9 +71,10 @@ the vendor, so there is nothing it could bill.) The caller sees PROVIDER_NOT_REA
 PROVIDER_REFUSED_UNBILLED for these two (nothing billed, hold released); every other refusal
 outside the three pot codes is the opaque PREVIEW_TEST_AUTHORITY_STOPPED.
 
-Team total (owner, 2026-10-10): one GO's daily_budget_usd is at most TEAM_TOTAL_BUDGET_USD, and
-activate (root, in a shell, so outside every unit's sandbox) also adds the daily_budget_usd of the
-other provider gates' GO files (GATE_PATHS) and refuses when the sum is over it.
+Team total (owner, 2026-10-10): one GO's daily_budget_usd is at most MAX_GO_BUDGET_USD ($10.00, the
+DeepInfra pot), and activate (root, in a shell, so outside every unit's sandbox) also adds the
+daily_budget_usd of the other provider gates' GO files (GATE_PATHS) and refuses when the sum is
+over TEAM_TOTAL_BUDGET_USD ($12.00: DeepInfra $10.00 + Anthropic $2.00).
 
 Probe fence: a probe refuses (PROBE_FENCE_REQUIRED) unless it runs inside the fenced transient
 unit the README gives (check_probe_fence), so a bare run never reads the key without the network
@@ -113,7 +114,7 @@ CONTROL_SCHEMA = 'preview-provider-budget-control-v3'
 DAY_SCHEMA = 'preview-provider-budget-day-v3'
 RESERVATION_OVERHEAD_BYTES = 2048  # Bytes the provider may add around the request (the app reserves the same).
 # Outer bounds on what a profile may declare as its own per-call cap and request size (DeepInfra:
-# $0.25 and 256 KiB). A unit test pins every reviewed row under its profile's cap.
+# $0.25 and 128 KiB, owner ruling 2026-10-10). A unit test pins every reviewed row under its profile's cap.
 MAX_PROFILE_CALL_CAP_USD = Decimal('1.00')
 MAX_PROFILE_REQUEST_BYTES = 1024 * 1024
 MAX_PRICE_USD_PER_M = Decimal('10.00')  # A price above this is a typo, not a preview model.
@@ -168,7 +169,10 @@ PROBE_EXCERPT_CHARS = 80
 # the entry stays on the day's record, and counts toward UNBILLED_RELEASES_PER_DAY.
 ENTRY_STATES = ('pending', 'settled', 'uncertain', 'released_unbilled')
 UNBILLED_RELEASES_PER_DAY = 20  # Per gate and Bucharest day; never reset by a settled reply.
-TEAM_TOTAL_BUDGET_USD = Decimal('5.00')  # The owner's daily team total over every provider gate's pot.
+# Owner ruling 2026-10-10: one GO may ask for at most $10.00 a day (the DeepInfra pot), and the
+# daily team total over every provider gate's pot is $12.00 (DeepInfra $10.00 + Anthropic $2.00).
+MAX_GO_BUDGET_USD = Decimal('10.00')
+TEAM_TOTAL_BUDGET_USD = Decimal('12.00')  # Checked only by activate's sum over every gate's GO.
 TEAM_GO_BYTES = 64 * 1024
 # Every provider gate on the preview host, by GO provider: (private folder, GO file). Reviewed:
 # activate sums the other gates' GOs from here, and the probe fence checks every other gate's
@@ -378,7 +382,7 @@ def valid_go(go):
         and isinstance(go['target_host'], str) and re.fullmatch(r'[A-Za-z0-9.-]{1,128}', go['target_host'])
         and isinstance(uids, list) and uids and all(type(uid) is int and uid >= 0 for uid in uids)
         and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
-        and Decimal('0.01') <= Decimal(budget) <= TEAM_TOTAL_BUDGET_USD
+        and Decimal('0.01') <= Decimal(budget) <= MAX_GO_BUDGET_USD
         and _int_in(go['max_paid_posts_per_day'], 1, 5000) and _int_in(go['max_concurrent_calls'], 1, MAX_CONCURRENT_CALLS)
         and _int_in(go['open_days'], 1, 31)
         and isinstance(predecessor, str) and re.fullmatch(r'[0-9a-f]{64}', predecessor))
@@ -608,7 +612,7 @@ def other_gate_budget(path, provider, owner_uid=0):
     budget = go.get('daily_budget_usd') if isinstance(go, dict) else None
     if not (isinstance(go, dict) and go.get('schema') == GO_SCHEMA and go.get('provider') == provider
             and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
-            and Decimal('0.01') <= Decimal(budget) <= TEAM_TOTAL_BUDGET_USD):
+            and Decimal('0.01') <= Decimal(budget) <= MAX_GO_BUDGET_USD):
         raise SafetyError('TEAM_TOTAL_UNVERIFIABLE')
     return Decimal(budget)
 
