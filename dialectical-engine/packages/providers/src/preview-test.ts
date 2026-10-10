@@ -5,7 +5,7 @@ import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel"
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import {
-  PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_GOOGLE_GENERATE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
+  PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_GOOGLE_GENERATE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
   previewModelRow, previewModelRowForRef, previewNanoUsdText, previewRefsAreReviewedSet, previewReservationNanoUsd,
   previewRostersHonourMakerRule, type PreviewModelRow, type PreviewProviderName
 } from "./preview-models.js";
@@ -41,6 +41,8 @@ export const PREVIEW_GLM_TARGET = Object.freeze({
  *   model ids; when the two lists together name two or more makers, EACH names two or more.
  * Parsed, both forms carry both lists.
  *
+ * PR B: the six-key form may also carry `anthropic_budget_socket`, the Anthropic gate's socket (same
+ * folder and pattern, never the DeepInfra socket). A roster naming an Anthropic model requires it.
  * PR C: the six-key form may also carry `google_budget_socket`, the Google gate's socket (same
  * folder and pattern, never the DeepInfra socket). A roster naming a Google model requires it.
  * `budget_socket` stays the DeepInfra gate's. Every gate is asked with the one `scope_id`.
@@ -52,11 +54,12 @@ export interface PreviewProviderTestConfig {
   readonly requested_thinking_level: "high";
   readonly budget_socket: string;
   readonly scope_id: string;
+  readonly anthropic_budget_socket?: string;
   readonly google_budget_socket?: string;
 }
 /** Each non-DeepInfra provider's optional socket key (a later provider adds its own key here). */
-export const PREVIEW_PROVIDER_SOCKET_KEYS: Readonly<Record<Exclude<PreviewProviderName, "deepinfra">, "google_budget_socket">> =
-  Object.freeze({ google: "google_budget_socket" });
+export const PREVIEW_PROVIDER_SOCKET_KEYS: Readonly<Record<Exclude<PreviewProviderName, "deepinfra">, "anthropic_budget_socket" | "google_budget_socket">> =
+  Object.freeze({ anthropic: "anthropic_budget_socket", google: "google_budget_socket" });
 const PREVIEW_SOCKET_PATTERN = /^\/run\/debateai-v3-preview\/[a-z0-9-]+\.sock$/u;
 /** The gate socket a provider's calls go through under this config, or undefined when it has none. */
 export function previewProviderSocket(config: PreviewProviderTestConfig, provider: PreviewProviderName): string | undefined {
@@ -197,6 +200,17 @@ export function assertPreviewRoleTargets(
   if (config === undefined) return;
   const declared = new Set(targets.map(target => target.providerRef));
   if (roleRefs.length === 0 || roleRefs.some(ref => !declared.has(ref))) refused();
+  assertPreviewRoleGateSockets(config, roleRefs);
+}
+/**
+ * PR B review: a role on a model whose provider gate the config does not name (Claude Haiku with no
+ * `anthropic_budget_socket`) could never be called, so every ask would be refused. Refused at boot.
+ */
+export function assertPreviewRoleGateSockets(config: PreviewTargetRosters, roleRefs: readonly string[]): void {
+  for (const ref of roleRefs) {
+    const provider = previewModelRowForRef(ref)?.provider;
+    if (provider !== undefined && provider !== "deepinfra" && typeof config[PREVIEW_PROVIDER_SOCKET_KEYS[provider]] !== "string") refused();
+  }
 }
 /**
  * The probe's controls for one reviewed target: "high" only where the row has an effort switch,
@@ -251,8 +265,9 @@ export function withPreviewProviderCallPolicy(gateway: ProviderGateway, config: 
         : "The private preview connection is configured for high only");
     }
     const bound = previewCallBound(request.bound, config);
-    const { thinkingLevel: _requested, ...rest } = request;
-    return gateway.call({ ...rest, ...(reviewed.effort === null ? {} : { thinkingLevel: config.requested_thinking_level }),
+    // One explicit level replaces whatever the request carried: the configured level on an effort
+    // row; DEFAULT_ONLY on a row without one, which the gateway treats exactly as "no level".
+    return gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
       bound: previewStoryRepairAllowed(request) ? Object.freeze({ ...bound, maxAttempts: 2 }) : bound });
   } });
 }
@@ -284,6 +299,29 @@ function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
     && (reviewed.effort === null || body.reasoning_effort === reviewed.effort)
     && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
     && Array.isArray(body.messages);
+}
+/**
+ * PR B, the wire contract's Anthropic body, exactly as the Anthropic gate checks it: `model`,
+ * `max_tokens` (1..the row's bound), `messages` (each exactly {role, content: non-empty text},
+ * roles alternating user/assistant, first and last a user turn, as the adapter builds them), an
+ * optional non-empty `system` text, and `output_config` {"effort": "high"} exactly when the row
+ * has an effort switch. Nothing else, anywhere.
+ */
+function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
+  if (reviewed.provider !== "anthropic") return false;
+  const required = ["model", "max_tokens", "messages", ...(reviewed.effort === null ? [] : ["output_config"])];
+  const optional = Object.hasOwn(body, "system") ? 1 : 0;
+  const messages = body.messages;
+  const effort = body.output_config;
+  return Object.keys(body).length === required.length + optional
+    && required.every(key => Object.hasOwn(body, key))
+    && (optional === 0 || (typeof body.system === "string" && body.system.length > 0))
+    && (reviewed.effort === null || (isPlainObject(effort) && Object.keys(effort).length === 1 && effort.effort === reviewed.effort))
+    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
+    && Array.isArray(messages) && messages.length % 2 === 1
+    && messages.every((message, index) => isPlainObject(message) && Object.keys(message).length === 2
+      && message.role === (index % 2 === 0 ? "user" : "assistant")
+      && typeof message.content === "string" && message.content.length > 0);
 }
 /** No key ever leaves the app for a gate: a key header on the guarded fetch is refused. */
 function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
@@ -320,7 +358,8 @@ export type PreviewGuardedFetchOptions = Readonly<{ clock?: () => Date }>;
 /**
  * Contract A §2/§3, PR B/C: the one fetch the preview's provider calls and probes go through. It
  * routes by the EXACT call URL to that provider's gate (DeepInfra chat completions to the DeepInfra
- * gate, the Google row's generateContent URL to the Google gate), so a call can only ever reach its
+ * gate, Anthropic Messages to the Anthropic gate, the Google row's generateContent URL to the Google
+ * gate), so a call can only ever reach its
  * own provider's socket; any other URL (a `?key=` query included) is refused. It sends only a body
  * that gate accepts for a reviewed row of THAT provider (exact keys, the row's effort and JSON
  * switches, 1 <= max_tokens <= the row's bound, at most 256 KiB), never a key header, and reserves
@@ -334,7 +373,7 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
     if (init?.signal?.aborted) throw new DOMException("Private preview call canceled", "TimeoutError");
     const url = String(input);
     const provider: PreviewProviderName | undefined = url === `${PREVIEW_DEEPINFRA_BASE_URL}/chat/completions` ? "deepinfra"
-      : url === PREVIEW_GOOGLE_GENERATE_URL ? "google" : undefined;
+      : url === PREVIEW_ANTHROPIC_MESSAGES_URL ? "anthropic" : url === PREVIEW_GOOGLE_GENERATE_URL ? "google" : undefined;
     // A Google native body is never longer than its frame, so its own limit is the frame's (checked again on the frame).
     if (provider === undefined || init?.method !== "POST" || typeof init.body !== "string"
       || Buffer.byteLength(init.body, "utf8") > (provider === "google" ? PREVIEW_GOOGLE_REQUEST_BODY_MAX_BYTES : PREVIEW_REQUEST_BODY_MAX_BYTES)
@@ -343,7 +382,7 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
     if (!isPlainObject(decoded)) return refused();
     if (provider === "google") return previewGoogleCall(byProvider.google, init!, decoded, clock());
     const reviewed: PreviewModelRow = previewModelRow(decoded.model) ?? refused();
-    if (!deepInfraBodyAccepted(decoded, reviewed)) refused();
+    if (!(provider === "deepinfra" ? deepInfraBodyAccepted(decoded, reviewed) : anthropicBodyAccepted(decoded, reviewed))) refused();
     const port = byProvider[provider];
     if (port === undefined) {
       // A configured provider without its gate: nothing is reserved or sent.
@@ -425,8 +464,9 @@ export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig, so
   } });
 }
 /**
- * PR B/C: one RPC port per gate this config names (DeepInfra on `budget_socket`, Google on
- * `google_budget_socket` when set). The guarded fetch routes each call to its own provider's port.
+ * PR B/C: one RPC port per gate this config names (DeepInfra on `budget_socket`, Anthropic on
+ * `anthropic_budget_socket`, Google on `google_budget_socket`, each when set). The guarded fetch
+ * routes each call to its own provider's port.
  */
 export function createPreviewBudgetRpcPorts(config: PreviewProviderTestConfig): PreviewBudgetPorts {
   const ports: Partial<Record<PreviewProviderName, PreviewBudgetPort>> = {};

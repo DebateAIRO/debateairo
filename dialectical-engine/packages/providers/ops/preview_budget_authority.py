@@ -841,6 +841,10 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         if cancelled is not None and cancelled():
             raise SafetyError('CALLER_CANCELED_BEFORE_DISPATCH')
         key = (key_loader or helper.read_key)(private)
+        # A key of another shape (another provider's key put in this gate's folder) is never sent.
+        key_pattern = getattr(profile, 'key_pattern', None)
+        if key_pattern is not None and not (isinstance(key, str) and re.fullmatch(key_pattern, key)):
+            raise SafetyError('KEY_SHAPE_INVALID')
         if slots.tripped:
             raise SafetyError('AUTHORITY_STOPPED')
         entry_id, day = reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now, probe, prices)

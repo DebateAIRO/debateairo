@@ -66,9 +66,31 @@ const NOTICES = Object.freeze({
 });
 /** `<kind>-<code>` -> { kind, code, unit } for the four notice kinds; anything else null. */
 export function parseNotice(text) {
-  const match = typeof text === 'string' ? NOTICE.exec(text) : null;
+  const match = typeof text === 'string' ? (NOTICE.exec(text) ?? ANTHROPIC_NOTICE.exec(text)) : null;
   return match ? { kind: match[1], code: match[2], unit: `debateai-preview-notice@${text}.service` } : null;
 }
+
+// The Anthropic spending gate (deploy/preview-gate/v3/README-anthropic.md, PR B): its own two
+// notices, kept apart from the DeepInfra and Google ones above so each gate's email names its own
+// unit and its own re-open command.
+const ANTHROPIC_NOTICE = /^(anthropic-halted|anthropic-addresses)-([a-z0-9_]{1,64})$/;
+const ANTHROPIC_FOLDER = '/opt/debateai-v3-preview/operator/anthropic-budget-v1';
+const ANTHROPIC_UNIT = 'debateai-preview-anthropic-budget.service';
+const ANTHROPIC_ADDRESS_UNIT = 'debateai-preview-anthropic-addresses.service';
+const ANTHROPIC_NOTICES = Object.freeze({
+  'anthropic-halted': code => ({
+    subject: `Preview: Anthropic spending gate stopped: ${code}`,
+    lead: `The preview's Anthropic spending gate stopped taking paid Claude calls. Reason code: ${code}. Debates that use Claude do not start until it is re-opened; other models are not affected. Check the reason first (deploy/preview-gate/v3/README-anthropic.md, "Re-open after a halt"; status shows today's spend and every halt). Then re-open it with the one command below.`,
+    command: `/usr/bin/python3 -I ${ANTHROPIC_FOLDER}/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 --go /etc/debateai-v3-preview/provider-anthropic-go-v1.json`,
+    lookAt: ANTHROPIC_UNIT, journal: null
+  }),
+  'anthropic-addresses': code => ({
+    subject: `Preview: Anthropic gate addresses are outside its allowed range (${code})`,
+    lead: 'The hourly address check of the Anthropic spending gate failed. Usually api.anthropic.com now answers with an address outside the published range the gate may reach (160.79.104.0/23), so Claude calls fail as not sent until this is fixed; the journal lines below say which case it is (ANTHROPIC_ADDRESSES_OUTSIDE_RANGE, or DNS trouble). This email blanks addresses. The range is written in the reviewed code, so there is no update command: run the check below to see the current answer, compare it with Anthropic\'s published list (platform.claude.com/docs/en/api/ip-addresses), and if the range really changed, the new range is a reviewed code change (README-anthropic.md, "Addresses").',
+    command: `/usr/bin/python3 -I ${ANTHROPIC_FOLDER}/anthropic_addresses.py check`,
+    lookAt: ANTHROPIC_ADDRESS_UNIT, journal: ANTHROPIC_ADDRESS_UNIT
+  })
+});
 
 class AlertRefusal extends Error { constructor(code, fields) { super(code); this.code = code; if (fields) this.fields = fields; } }
 const refuse = (code, fields) => { throw new AlertRefusal(code, fields); };
@@ -324,7 +346,7 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {}, test = false,
   try {
     if (typeof unit !== 'string' || !UNIT.test(unit)) refuse('UNIT_REFUSED');
     if (notice !== null && (parseNotice(`${notice.kind}-${notice.code}`)?.unit !== unit)) refuse('NOTICE_REFUSED');
-    const failure = notice !== null ? { kind: 'notice', send: true, restarts: null, notice: NOTICES[notice.kind](notice.code) }
+    const failure = notice !== null ? { kind: 'notice', send: true, restarts: null, notice: (NOTICES[notice.kind] ?? ANTHROPIC_NOTICES[notice.kind])(notice.code) }
       : test ? { kind: 'test', send: true, restarts: null }
       : classifyFailure(await Promise.resolve().then(() => (deps.readUnitState ?? (name => readUnitState(name, { layout })))(unit)).catch(() => null));
     if (!failure.send) return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SKIPPED', unit, state: failure.kind, restarts: failure.restarts });

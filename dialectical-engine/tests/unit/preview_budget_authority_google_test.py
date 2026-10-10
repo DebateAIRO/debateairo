@@ -10,6 +10,7 @@ import hashlib
 import http.client
 import io
 import json
+import re
 import sys
 import unittest
 from datetime import datetime, timedelta
@@ -160,10 +161,11 @@ class RowTests(GoogleTest):
         self.assertEqual(GOOGLE.auth_headers('k'), {'x-goog-api-key': 'k'})
         self.assertEqual(GOOGLE.ceiling_prices(row), (Decimal('1.50'), Decimal('7.50')))
         self.assertIs(bridge.profile_of('google'), GOOGLE)
-        self.assertEqual(GOOGLE.key_pattern, r'^AIza[0-9A-Za-z_-]{35}$')
-        self.assertRegex(FAKE_KEY, GOOGLE.key_pattern)
-        for wrong in (FAKE_KEY[:-1], FAKE_KEY + 'x', 'sk-ant-' + 'x' * 32, FAKE_KEY.replace('AIza', 'AIzb'), ' ' + FAKE_KEY):
-            self.assertNotRegex(wrong, GOOGLE.key_pattern)
+        self.assertEqual(GOOGLE.key_pattern, r'AIza[0-9A-Za-z_-]{35}')
+        self.assertTrue(re.fullmatch(GOOGLE.key_pattern, FAKE_KEY))  # The core's own check (KEY_SHAPE_INVALID).
+        for wrong in (FAKE_KEY[:-1], FAKE_KEY + 'x', 'sk-ant-' + 'x' * 32, FAKE_KEY.replace('AIza', 'AIzb'), ' ' + FAKE_KEY,
+                      FAKE_KEY + '\n'):
+            self.assertIsNone(re.fullmatch(GOOGLE.key_pattern, wrong))
         self.assertLessEqual(GOOGLE.per_call_cap_usd, bridge.MAX_PROFILE_CALL_CAP_USD)
 
     def test_parity_fixture_the_app_also_asserts(self):

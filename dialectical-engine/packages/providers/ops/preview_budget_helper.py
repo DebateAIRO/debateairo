@@ -273,6 +273,9 @@ class DeepInfraProfile:
       per_call_cap_usd (Decimal)         no row may reserve more than this for one full-size request
       max_request_bytes (int)            the largest request body accepted (and priced)
       redaction_patterns (tuple of str)  regexes for the vendor's key shapes, blanked in replies
+      key_pattern (str, optional)        the shape this vendor's key must have (re.fullmatch); the
+                                         gate refuses any other key before a reservation, so a
+                                         key of another provider in this gate's folder is never sent
       rows {model: ModelRow}             the reviewed models
       path_for(row) -> str               the POST path (checked: no '?', starts with '/')
       auth_headers(key) -> dict          the header(s) carrying the key
@@ -293,6 +296,8 @@ class DeepInfraProfile:
     per_call_cap_usd = Decimal('0.25')
     max_request_bytes = 256 * 1024
     redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
+    # No fixed shape either, but never another provider's key (Anthropic sk-ant-, Google AIza).
+    key_pattern = r'(?!sk-ant-|AIza)[!-~]{16,512}'
     rows = {row.model: row for row in (
         ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 163840, 'high', True),
         ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 131072, 'high', False),
@@ -374,9 +379,227 @@ class DeepInfraProfile:
         return error if isinstance(error, str) else None
 
 
-# The providers this gate can serve. A provider name without a reviewed profile here (Anthropic,
-# until its profile is added) is refused.
-PROFILES = {profile.name: profile for profile in (DeepInfraProfile(),)}
+# Anthropic's list prices (USD per million tokens) for the reviewed row, in two steps by the size
+# of the prompt (platform.claude.com/docs/en/about-claude/pricing, read 2026-10-10). The prompt
+# total counts every input token: plain input, cache writes and cache reads.
+PriceStep = namedtuple('PriceStep', 'name prompt_tokens_up_to input_usd_per_m cache_write_5m_usd_per_m '
+                                    'cache_write_1h_usd_per_m cache_read_usd_per_m output_usd_per_m')
+ANTHROPIC_USAGE_KEYS = frozenset({'input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens',
+                                  'cache_creation', 'server_tool_use', 'service_tier', 'inference_geo'})
+ANTHROPIC_CACHE_SPLIT_KEYS = frozenset({'ephemeral_5m_input_tokens', 'ephemeral_1h_input_tokens'})
+# The only content blocks a reply the gate settles may carry: text, and thinking it never shows.
+ANTHROPIC_CONTENT_BLOCKS = frozenset({'text', 'thinking', 'redacted_thinking'})
+# Top-level reply members that mean work the token usage may not cover (a code container, context
+# editing): the usage is then invalid. Any other top-level key naming usage or tokens is too.
+ANTHROPIC_UNPRICED_REPLY_KEYS = frozenset({'container', 'context_management'})
+
+
+def names_any_key_suffixed(value, suffix):
+    """Whether any object at any depth of a parsed JSON value has a key ending with suffix."""
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            if any(isinstance(key, str) and key.endswith(suffix) for key in item):
+                return True
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            stack.extend(item)
+    return False
+
+
+class AnthropicProfile:
+    """api.anthropic.com, Messages API (POST /v1/messages), x-api-key plus anthropic-version.
+    One reviewed row (Claude Haiku 5.5), 2026-10-10. The profile API is DeepInfraProfile's.
+
+    Reservation: the row's prices are the dearest the request can meet: the upper step's
+    5-minute cache-write price for every input token (0.625) and its output price (2.50), so a
+    full 256 KiB request reserves (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704, under the
+    $0.25 cap. Settlement: the real step (prompt total <= 100,000 tokens: the lower one), each
+    kind of input token at its own price. Anthropic reports no cost, so the guard charge is that
+    list-price charge. Any usage field this profile does not know, any server-tool use, another
+    service tier or region, or a tool block makes the usage invalid: uncertain, and the gate halts.
+    A cache write reported without its 5-minute/1-hour split is charged at the 1-hour
+    price (the dearer one). A reply with a container, context editing, usage or token counts
+    outside `usage`, or a content block other than text or thinking is invalid too.
+    """
+    name = 'anthropic'
+    host = 'api.anthropic.com'
+    path = '/v1/messages'
+    api_version = '2023-06-01'
+    per_call_cap_usd = Decimal('0.25')
+    max_request_bytes = 256 * 1024
+    redaction_patterns = (r'sk-ant-[A-Za-z0-9_-]+',)
+    key_pattern = r'sk-ant-[A-Za-z0-9_-]+'
+    rows = {row.model: row for row in (
+        ModelRow('claude-haiku-5-5', 'Anthropic', Decimal('0.625'), Decimal('2.50'), 32768, 'high', False),)}
+    settlement_steps = (
+        PriceStep('up_to_100k', 100000, Decimal('0.10'), Decimal('0.125'), Decimal('0.20'), Decimal('0.01'), Decimal('0.50')),
+        PriceStep('over_100k', None, Decimal('0.50'), Decimal('0.625'), Decimal('1.00'), Decimal('0.05'), Decimal('2.50')))
+    # Request fields beyond these are refused (no thinking, tools, stream, sampling, cache_control...).
+    BODY_FIELDS = frozenset({'model', 'max_tokens', 'messages', 'system', 'output_config'})
+
+    def path_for(self, row):
+        return self.path
+
+    def auth_headers(self, key):
+        return {'x-api-key': key, 'anthropic-version': self.api_version}
+
+    def reservation_prices(self, row, moment):
+        """Anthropic's list prices do not change with the date; the row holds the upper step's
+        dearest input price and its output price, so the reservation covers either step."""
+        return row.input_usd_per_m, row.output_usd_per_m
+
+    def ceiling_prices(self, row):
+        return row.input_usd_per_m, row.output_usd_per_m
+
+    def requested_model(self, body):
+        return body.get('model') if isinstance(body, dict) else None
+
+    def body_valid(self, body, row):
+        """Exactly model, max_tokens and messages, an optional system string, and output_config
+        {"effort": "high"} iff the row says so (then required). Nothing else anywhere
+        (contract-BC-wire, Anthropic). It mirrors what the app's adapter (anthropic-messages.ts) can
+        send, no more: non-empty text content, roles alternating user/assistant starting AND ending
+        with a user turn (the adapter joins same-role turns and refuses a final assistant turn), and
+        a non-empty system text when present (the adapter joins non-empty system messages)."""
+        if not isinstance(body, dict) or body.get('model') != row.model:
+            return False
+        required = {'model', 'max_tokens', 'messages'} | ({'output_config'} if row.effort else set())
+        allowed = required | {'system'}
+        if not required <= set(body) <= allowed:
+            return False
+        if row.effort:
+            config = body['output_config']
+            if not (isinstance(config, dict) and set(config) == {'effort'} and isinstance(config['effort'], str)
+                    and config['effort'] == row.effort):
+                return False
+        if 'system' in body and not (isinstance(body['system'], str) and body['system']):
+            return False
+        messages = body['messages']
+        return (type(body['max_tokens']) is int and 1 <= body['max_tokens'] <= row.output_bound
+                and isinstance(messages, list) and len(messages) % 2 == 1
+                and all(isinstance(m, dict) and set(m) == {'role', 'content'}
+                        and m['role'] == ('user' if index % 2 == 0 else 'assistant')
+                        and isinstance(m['content'], str) and m['content'] for index, m in enumerate(messages)))
+
+    def request_bytes(self, body):
+        return canonical(body)
+
+    def usage_counts(self, response):
+        """(input, cache creation, cache read, 1-hour part of the creation, output) from a reply
+        whose usage this profile fully understands, else None (uncertain)."""
+        if not isinstance(response, dict) or response.get('type') != 'message':
+            return None
+        # A container, context editing, or usage/token counts outside `usage` may bill beyond it.
+        if any(key in ANTHROPIC_UNPRICED_REPLY_KEYS or key != 'usage' and ('usage' in key or 'tokens' in key)
+               for key in response):
+            return None
+        content = response.get('content')
+        if not isinstance(content, list) or not all(isinstance(block, dict) for block in content):
+            return None
+        # Only text and thinking: any tool activity (client or server side), a container upload or
+        # any block this profile does not know may bill beyond the tokens.
+        if not all(block.get('type') in ANTHROPIC_CONTENT_BLOCKS for block in content):
+            return None
+        usage = response.get('usage')
+        if not isinstance(usage, dict) or not set(usage) <= ANTHROPIC_USAGE_KEYS:
+            return None
+        input_tokens, output_tokens = usage.get('input_tokens'), usage.get('output_tokens')
+        creation, read = usage.get('cache_creation_input_tokens'), usage.get('cache_read_input_tokens')
+        if not (integer(input_tokens) and integer(output_tokens)):
+            return None
+        if not all(value is None or integer(value) for value in (creation, read)):
+            return None
+        creation, read = creation or 0, read or 0
+        tools = usage.get('server_tool_use')
+        if tools is not None and not (isinstance(tools, dict) and all(type(v) is int and v == 0 for v in tools.values())):
+            return None
+        if usage.get('service_tier') not in (None, 'standard') or usage.get('inference_geo') not in (None, 'global'):
+            return None
+        # A cache write reported without its 5-minute/1-hour split is charged at the dearer 1-hour
+        # price (the gate never asks for caching; a write it cannot place is priced on the safe side).
+        hour = creation
+        split = usage.get('cache_creation')
+        if split is not None:
+            if not (isinstance(split, dict) and set(split) == ANTHROPIC_CACHE_SPLIT_KEYS
+                    and all(integer(value) for value in split.values())
+                    and split['ephemeral_5m_input_tokens'] + split['ephemeral_1h_input_tokens'] == creation):
+                return None
+            hour = split['ephemeral_1h_input_tokens']
+        return input_tokens, creation, read, hour, output_tokens
+
+    def step_for(self, prompt_total):
+        lower, upper = self.settlement_steps
+        return lower if prompt_total <= lower.prompt_tokens_up_to else upper
+
+    def account(self, response, row, moment):
+        counts = self.usage_counts(response)
+        if counts is None:
+            return {'input_usd_per_m': None, 'output_usd_per_m': None, 'prompt_tokens': None, 'completion_tokens': None,
+                    'total_tokens': None, 'cached_tokens': None, 'reasoning_tokens': None, 'usage_valid': False,
+                    'configured_price_cost_usd': None, 'provider_estimated_cost_usd': None, 'guard_charge_usd': None,
+                    'cost_basis': 'unknown; full reservation retained'}
+        input_tokens, creation, read, hour, output_tokens = counts
+        prompt = input_tokens + creation + read
+        step = self.step_for(prompt)
+        charge = (Decimal(input_tokens) * step.input_usd_per_m + Decimal(creation - hour) * step.cache_write_5m_usd_per_m
+                  + Decimal(hour) * step.cache_write_1h_usd_per_m + Decimal(read) * step.cache_read_usd_per_m
+                  + Decimal(output_tokens) * step.output_usd_per_m) / Decimal(1000000)
+        text = format(charge, 'f')
+        return {'input_usd_per_m': str(step.input_usd_per_m), 'output_usd_per_m': str(step.output_usd_per_m),
+                'prompt_tokens': prompt, 'completion_tokens': output_tokens, 'total_tokens': prompt + output_tokens,
+                'cached_tokens': read, 'reasoning_tokens': None, 'usage_valid': True,
+                'configured_price_cost_usd': text, 'provider_estimated_cost_usd': None, 'guard_charge_usd': text,
+                'cost_basis': 'Anthropic list prices at the prompt-size step; no provider-reported cost',
+                'price_step': step.name, 'input_tokens': input_tokens, 'cache_creation_input_tokens': creation,
+                'cache_read_input_tokens': read, 'cache_write_5m_tokens': creation - hour, 'cache_write_1h_tokens': hour,
+                'cache_write_5m_usd_per_m': str(step.cache_write_5m_usd_per_m),
+                'cache_write_1h_usd_per_m': str(step.cache_write_1h_usd_per_m),
+                'cache_read_usd_per_m': str(step.cache_read_usd_per_m)}
+
+    def reply_model(self, response):
+        return response.get('model')
+
+    def unbilled_refusal(self, status, response):
+        """True only for Anthropic's own "slow down" answers (owner ruling 5, 2026-10-10): HTTP 429
+        or 529, a body of exactly type "error", error (and an optional request_id string), an
+        error type of rate_limit_error or overloaded_error, and no usage, content or model key, no
+        other billed key (BILLED_KEYS) and no tokens_* or *_tokens key at any depth. The core passes the RAW
+        reply (before redaction drops any subtree). Anything else is accounted (and halts) as before."""
+        if status not in (429, 529) or not isinstance(response, dict):
+            return False
+        if set(response) not in ({'type', 'error'}, {'type', 'error', 'request_id'}):
+            return False
+        error = response['error']
+        return (response['type'] == 'error' and isinstance(error, dict)
+                and error.get('type') in ('rate_limit_error', 'overloaded_error')
+                and isinstance(response.get('request_id', ''), str)
+                and not names_any_key(response, BILLED_KEYS + ('content', 'model'))
+                and not names_any_key_prefixed(response, 'tokens_')
+                and not names_any_key_suffixed(response, '_tokens'))
+
+    def probe_body(self, row):
+        body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
+                'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}]}
+        if row.effort:
+            body['output_config'] = {'effort': row.effort}
+        return body
+
+    def reply_text(self, response):
+        """Every text block's text, joined in order; else a provider error's message."""
+        content = response.get('content')
+        if isinstance(content, list):
+            texts = [block['text'] for block in content
+                     if isinstance(block, dict) and block.get('type') == 'text' and isinstance(block.get('text'), str)]
+            if texts:
+                return ''.join(texts)
+        error = response.get('error')
+        return error.get('message') if isinstance(error, dict) and isinstance(error.get('message'), str) else None
+
+
+# The providers this gate can serve (Google's profile is added below, after its class).
+PROFILES = {profile.name: profile for profile in (DeepInfraProfile(), AnthropicProfile())}
 
 
 def _is_text_part_list(parts):
@@ -503,9 +726,9 @@ class GoogleProfile:
     # frame adds 40 bytes for this model id. A smaller limit could refuse a call mid-debate.
     max_request_bytes = 256 * 1024 + 64
     redaction_patterns = (r'AIza[0-9A-Za-z_-]{35}',)
-    # The shape a Google API key has. A key-reading core that knows this hook refuses a key file of
-    # any other shape (for example another provider's key put here by mistake).
-    key_pattern = r'^AIza[0-9A-Za-z_-]{35}$'
+    # The shape a Google API key has (re.fullmatch): the core refuses a key file of any other shape
+    # (KEY_SHAPE_INVALID), for example another provider's key put here by mistake.
+    key_pattern = r'AIza[0-9A-Za-z_-]{35}'
     rows = {row.model: row for row in (
         # The row's own prices are the ceiling (the last dated step); calls use google_careful_prices.
         ModelRow('gemini-3.8-flash', 'Google', Decimal('1.50'), Decimal('7.50'), 16384, 'high', False),)}

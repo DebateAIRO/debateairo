@@ -983,7 +983,9 @@ class ProfileTests(GateTest):
                 gate.call('op-2', value=body())  # A DeepInfra row is not this profile's row.
 
     def test_reserved_provider_names_have_no_profile_yet(self):
-        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'google'})
+        # Anthropic's profile arrived with PR B, Google's with PR C (their own tests:
+        # preview_budget_authority_anthropic_test.py, preview_budget_authority_google_test.py).
+        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'anthropic', 'google'})
 
 
 if __name__ == '__main__':

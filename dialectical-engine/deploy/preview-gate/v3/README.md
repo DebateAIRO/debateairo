@@ -51,7 +51,7 @@ provider, each with its own gate. Proposed shares:
 | Gate | Pot per day | Calls per day | Status |
 |---|---|---|---|
 | DeepInfra (this gate) | $3.00 | 1,200 | this README |
-| Anthropic (Claude Haiku) | $1.00 | 400 | later, its own gate |
+| Anthropic (Claude Haiku) | $1.00 | 400 | its own gate: README-anthropic.md |
 | Google (Gemini Flash) | $1.00 | 400 | later, its own gate |
 | **Total** | **$5.00** | **2,000** | |
 

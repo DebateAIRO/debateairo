@@ -34,6 +34,11 @@ class WatchError(Exception):
     """A fixed public code."""
 
 
+# PR B: the Anthropic gate's halt watcher passes --notice anthropic-halted, so its email carries
+# the Anthropic gate's own re-open command (README-anthropic.md).
+NOTICE_KINDS = NOTICE_KINDS + ('anthropic-halted',)
+
+
 def read_status(private, run=subprocess.run):
     try:
         # Short: status holds the gate's shared lock, which must never outlast the gate's 10 s wait.

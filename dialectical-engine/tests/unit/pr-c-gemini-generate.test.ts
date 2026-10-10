@@ -473,7 +473,7 @@ describe("PR C — review round (lead, 2026-10-10)", () => {
       [{ providerRef: "google:gemini", maker: "Google", ...(adapterKind === undefined ? {} : { adapterKind }) }]
     );
     expect(() => parse({ ...GEMINI_ROW, base_url: "https://api.deepinfra.com/v1/openai" }, "provider-plugin"))
-      .toThrow("PROVIDER_DISCOVERY_TARGET_ADAPTER_UNSUPPORTED");
+      .toThrow("PROVIDER_ADAPTER_KIND_UNKNOWN"); // PR B's register-row check, which runs first now.
     for (const baseUrl of ["https://generativelanguage.googleapis.com/v1", "https://generativelanguage.googleapis.com/v1beta/openai/v1"]) {
       expect(() => parse({ ...GEMINI_ROW, base_url: baseUrl }, "openai-compatible-http")).toThrow("PROVIDER_DISCOVERY_TARGET_ADAPTER_MISMATCH");
       expect(() => parse({ ...GEMINI_ROW, base_url: baseUrl })).toThrow("PROVIDER_DISCOVERY_TARGET_ADAPTER_MISMATCH");

@@ -582,7 +582,7 @@ describe('spending-gate notices', () => {
     const googleHalted = 'debateai-preview-notice@google-halted-charge_overrun.service';
     expect(alert.parseAlertArgs(['--notice', 'google-halted-charge_overrun'])).toEqual({ unit: googleHalted, test: false, notice: { kind: 'google-halted', code: 'charge_overrun', unit: googleHalted } });
     expect(alert.parseAlertArgs(['--notice', 'google-addresses-mismatch'])).toMatchObject({ notice: { kind: 'google-addresses', code: 'mismatch' } });
-    expect(alert.parseAlertArgs(['--notice', 'anthropic-halted-x'])).toBeNull();
+    expect(alert.parseAlertArgs(['--notice', 'other-halted-x'])).toBeNull();
     const layout = server();
     const h = harness(layout, { ...notMe, readJournal: async () => { throw new Error('a halt notice reads no journal'); } });
     await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'google-halted-charge_overrun']), layout, deps: h.deps });
@@ -600,5 +600,30 @@ describe('spending-gate notices', () => {
     expect(update).toContain('Subject: Preview: Google gate address list needs an update (mismatch)');
     expect(update).not.toContain('142.250.1.1');
     expect(update).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/google-budget-v1/google_addresses.py update --dropin /etc/systemd/system/debateai-preview-google-budget.service.d/50-google-addresses.conf && systemctl restart debateai-preview-google-budget');
+  });
+
+  it('the Anthropic gate has its own two notices, each naming its own unit and command (PR B)', async () => {
+    const halted = 'debateai-preview-notice@anthropic-halted-uncertain_charge.service';
+    expect(alert.parseAlertArgs(['--notice', 'anthropic-halted-uncertain_charge'])).toEqual({ unit: halted, test: false, notice: { kind: 'anthropic-halted', code: 'uncertain_charge', unit: halted } });
+    expect(alert.parseAlertArgs(['--notice', 'anthropic-addresses-mismatch'])).toMatchObject({ notice: { kind: 'anthropic-addresses', code: 'mismatch' } });
+    expect(alert.parseAlertArgs(['--notice', 'anthropic-halted-Bad'])).toBeNull();
+    const layout = server();
+    const h = harness(layout, { ...notMe, readJournal: async () => { throw new Error('a halt notice reads no journal'); } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'anthropic-halted-uncertain_charge']), layout, deps: h.deps });
+    const mail = h.sent[0]!;
+    expect(mail).toContain('Subject: Preview: Anthropic spending gate stopped: uncertain_charge');
+    expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 --go /etc/debateai-v3-preview/provider-anthropic-go-v1.json');
+    expect(mail).toContain('systemctl status debateai-preview-anthropic-budget.service');
+    expect(mail).not.toContain('deepinfra');
+    expect(mail).not.toMatch(/\$|usd/i);
+    const asked: string[] = [];
+    const second = server();
+    const g = harness(second, { ...notMe, readJournal: async (name: string) => { asked.push(name); return ['{"status": "refused", "error": "ANTHROPIC_ADDRESSES_OUTSIDE_RANGE", "outside": ["203.0.113.9"]}']; } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'anthropic-addresses-mismatch']), layout: second, deps: g.deps });
+    expect(asked).toEqual(['debateai-preview-anthropic-addresses.service']);
+    const update = g.sent[0]!;
+    expect(update).toContain('Subject: Preview: Anthropic gate addresses are outside its allowed range (mismatch)');
+    expect(update).not.toContain('203.0.113.9');
+    expect(update).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/anthropic_addresses.py check');
   });
 });

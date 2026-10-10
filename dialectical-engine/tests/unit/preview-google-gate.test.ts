@@ -79,7 +79,8 @@ const post = (fetcher: typeof fetch, url: string, body: string, headers: Record<
   fetcher(url, { method: "POST", headers, body });
 const configured = (providerRef: string) => { const row = previewModelRowForRef(providerRef)!;
   return { providerRef, maker: row.maker, adapterKind: row.adapterKind }; };
-const GOOGLE_REFS = [...PREVIEW_REVIEWED_PROVIDER_REFS];
+/** The DeepInfra refs followed by Google's (a lawful reviewed set without Anthropic's). */
+const GOOGLE_REFS = PREVIEW_REVIEWED_PROVIDER_REFS.filter(ref => previewModelRowForRef(ref)!.provider !== "anthropic");
 const DEEPINFRA_REFS = GOOGLE_REFS.filter(ref => previewModelRowForRef(ref)!.provider === "deepinfra");
 function targets(refs: readonly string[], change: (row: Record<string, unknown>) => void = () => undefined): readonly ProviderDiscoveryTarget[] {
   const rows = refs.map(ref => ({ ...previewTargetJsonRow(ref) } as Record<string, unknown>));
@@ -328,6 +329,9 @@ describe("declared targets: the reviewed sets", () => {
     expect(DEEPINFRA_REFS).toEqual(["preview:fixture-a", "preview:fixture-b", "preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro"]);
     expect(() => assertPreviewProviderTargets(parse({ ...WITH_GOOGLE, premium_model_ids: [GLM, DEEPSEEK, MIMO] }), targets(DEEPINFRA_REFS))).not.toThrow();
     expect(() => assertPreviewProviderTargets(parse(WITH_GOOGLE), targets(GOOGLE_REFS))).not.toThrow();
+    // Stacked on PR B: the full reviewed set (DeepInfra, Anthropic, Google, in that order) is accepted too.
+    expect(PREVIEW_REVIEWED_PROVIDER_REFS.at(-1)).toBe(PREVIEW_GOOGLE_PROVIDER_REF);
+    expect(() => assertPreviewProviderTargets(parse(WITH_GOOGLE), targets(PREVIEW_REVIEWED_PROVIDER_REFS))).not.toThrow();
     expect(previewTargetJsonRow(PREVIEW_GOOGLE_PROVIDER_REF)).toEqual({ provider_ref: PREVIEW_GOOGLE_PROVIDER_REF, base_url: GOOGLE_GEMINI_BASE_URL,
       model: GEMINI, input_price_micros_per_million: 1_500_000, output_price_micros_per_million: 7_500_000,
       thinking_parameter: "reasoning_effort", thinking_levels: ["high"], context_window_tokens: 1_048_576 });

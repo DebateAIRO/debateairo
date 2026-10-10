@@ -113,6 +113,7 @@ apps/api/src/password-reset-routes.ts
 apps/api/src/password-reset.ts
 apps/api/src/person-room-picker.ts
 apps/api/src/phone-profile.ts
+apps/api/src/preview-budget-estimate.ts
 apps/api/src/provider-discovery.ts
 apps/api/src/publication-check/check.ts
 apps/api/src/publication-check/judge-transport.ts
@@ -939,10 +940,13 @@ packages/payments-netopia/src/secret-token.ts
 packages/payments-netopia/src/status.ts
 packages/payments-netopia/src/time.ts
 packages/propagation/src/index.ts
+packages/providers/src/anthropic-messages.ts
 packages/providers/src/content-rule.ts
 packages/providers/src/gemini-generate.ts
 packages/providers/src/index.ts
 packages/providers/src/preview-google.ts
+packages/providers/src/preview-models.ts
+packages/providers/src/preview-remaining.ts
 packages/providers/src/preview-test.ts
 packages/providers/src/prompt-frame.ts
 packages/providers/src/prompt-tripwire.ts

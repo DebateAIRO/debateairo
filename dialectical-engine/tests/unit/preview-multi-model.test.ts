@@ -36,7 +36,7 @@ const fixtureFile = JSON.parse(readFileSync(new URL("./fixtures/preview-model-ro
   schema: string; provider: string; reservation: { overhead_bytes: number; worst_case_request_bytes: number; per_call_cap_usd: string };
   rows: FixtureRow[] };
 const fixtureRows = fixtureFile.rows;
-/** PR C: this file's parity checks are DeepInfra's rows; Google's have their own file and test. */
+/** PR B and C: this file's parity checks are DeepInfra's rows; Anthropic's and Google's have their own files and tests. */
 const PREVIEW_MODEL_ROWS = PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra;
 /** The register's configured provider for a reviewed ref (its row's maker and adapter kind). */
 const configured = (providerRef: string) => { const row = previewModelRow(previewTargetJsonRow(providerRef).model)!;

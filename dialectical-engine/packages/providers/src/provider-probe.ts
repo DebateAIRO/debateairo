@@ -8,6 +8,13 @@ import {
 } from "./gemini-generate.js";
 import { PREVIEW_MAX_OUTPUT_BOUND, previewModelRow } from "./preview-models.js";
 import type { ProviderDiscoveryTarget } from "./index.js";
+import {
+  ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  anthropicMessagesProbeAnswer,
+  anthropicMessagesProbeRequest
+} from "./anthropic-messages.js";
+
+const PROBE_PROMPT = "DR-181 discovery health probe. Reply exactly: OK";
 
 /**
  * DR-181/DR-182 — the ONE provider health probe.
@@ -81,7 +88,7 @@ async function observeOpenAICompatibleAnswer(input: ProbeInput): Promise<void> {
         ...(input.thinkingLevel===undefined?{}:{[input.target.thinkingParameter!]:input.thinkingLevel}),
         messages: [{
           role: "user",
-          content: "DR-181 discovery health probe. Reply exactly: OK"
+          content: PROBE_PROMPT
         }]
       })
     }
@@ -105,13 +112,41 @@ async function observeOpenAICompatibleAnswer(input: ProbeInput): Promise<void> {
 }
 
 /**
+ * Multi-model preview, PR B: the Anthropic probe on its own wire — the same
+ * question, the same "OK" and model-echo test, its own body.
+ */
+async function observeAnthropicAnswer(input: ProbeInput): Promise<void> {
+  const request = anthropicMessagesProbeRequest({
+    model: input.target.model,
+    maxTokens: input.tokenCeiling,
+    thinkingLevel: input.thinkingLevel,
+    credential: input.target.authorizationHeader,
+    prompt: PROBE_PROMPT
+  });
+  const response = await input.fetchImplementation(`${input.target.baseUrl}${request.path}`, {
+    method: "POST",
+    headers: request.headers,
+    signal: AbortSignal.timeout(input.timeoutMs),
+    body: request.body
+  });
+  const raw = await response.text();
+  if (!response.ok || Buffer.byteLength(raw, "utf8") > MAX_PROBE_RESPONSE_BYTES) {
+    throw new TypeError("PROVIDER_PROBE_UNAVAILABLE");
+  }
+  const answer = anthropicMessagesProbeAnswer(JSON.parse(raw));
+  if (answer === null || answer.model !== input.target.model || answer.text !== "OK") {
+    throw new TypeError("PROVIDER_PROBE_RESPONSE_INVALID");
+  }
+}
+
+/**
  * PR C — the Gemini probe: the same question on the native wire, the key in
  * `x-goog-api-key`, never a query. Healthy only on a clean STOP whose text is
  * exactly "OK" and whose `modelVersion` is exactly the pinned id.
  */
 async function observeGeminiAnswer(input: ProbeInput): Promise<void> {
   const body = geminiGenerateContentBody({
-    messages: [{ role: "user", content: "DR-181 discovery health probe. Reply exactly: OK" }],
+    messages: [{ role: "user", content: PROBE_PROMPT }],
     maxOutputTokens: input.tokenCeiling ?? GEMINI_PROBE_DEFAULT_TOKEN_CEILING,
     ...(input.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel })
   });
@@ -165,11 +200,12 @@ export async function observeProviderTarget(input: Readonly<{
   try {
     if(input.tokenCeiling!==undefined&&(!Number.isSafeInteger(input.tokenCeiling)||input.tokenCeiling<1||input.tokenCeiling>(previewModelRow(input.target.model)?.outputBound??PREVIEW_MAX_OUTPUT_BOUND)))throw new TypeError("PROVIDER_PROBE_TOKEN_CEILING_INVALID");
     if(input.thinkingLevel!==undefined&&(!THINKING_LEVEL_TOKEN.test(input.thinkingLevel)||input.target.thinkingParameter===undefined||!input.target.thinkingLevels?.includes(input.thinkingLevel)))throw new TypeError("PROVIDER_PROBE_THINKING_INVALID");
-    // PR C: one probe per wire, picked by the target's adapter kind (absent =
+    // PR B and C: one probe per wire, picked by the target's adapter kind (absent =
     // OpenAI-compatible). Each asks for exactly "OK" and checks the echoed model.
     const adapterKind = input.target.adapterKind ?? OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND;
     if (adapterKind === OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND) await observeOpenAICompatibleAnswer(input);
     else if (adapterKind === GOOGLE_GEMINI_HTTP_ADAPTER_KIND) await observeGeminiAnswer(input);
+    else if (adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) await observeAnthropicAnswer(input);
     else throw new TypeError("PROVIDER_PROBE_ADAPTER_UNSUPPORTED");
     state = Object.freeze({
       probeEvidenceRef,

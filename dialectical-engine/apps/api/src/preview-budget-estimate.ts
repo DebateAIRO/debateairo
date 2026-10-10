@@ -15,10 +15,11 @@
  *   refusal, retry in about a minute.
  * Either way the debate is not started at all.
  *
- * One gate per provider (PR C): the DeepInfra gate on the config's `budget_socket`, the Google
- * gate on `google_budget_socket`. Each row maps to its gate by `previewGateKeyOf` (the row's
- * provider), and every gate a debate's panel or role models use is asked; a gate the config does
- * not name has no port, so a debate needing it is refused before it starts.
+ * One gate per provider (PR B and C): the DeepInfra gate on the config's `budget_socket`, the
+ * Anthropic gate on `anthropic_budget_socket`, the Google gate on `google_budget_socket`. Each row
+ * maps to its gate by `previewGateKeyOf` (the row's provider); every gate a debate's panel or role
+ * models use is asked, and unfinished debates are held on each gate they use. A gate the config
+ * does not name has no port, so a debate needing it is refused (as unavailable) before it starts.
  */
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -52,10 +53,14 @@ function bucharestParts(instant: Date): Readonly<Record<"year" | "month" | "day"
     .filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)]));
   return parts as Record<"year" | "month" | "day" | "hour" | "minute" | "second", number>;
 }
+const BUCHAREST_WINTER_OFFSET_HOURS = 2;
+const BUCHAREST_SUMMER_OFFSET_HOURS = 3;
+const BUCHAREST_UTC_OFFSET_HOURS: readonly number[] = Object.freeze([BUCHAREST_WINTER_OFFSET_HOURS, BUCHAREST_SUMMER_OFFSET_HOURS]);
 export function nextBucharestMidnight(now: Date): Date {
   if (!Number.isFinite(now.getTime())) throw new TypeError("PREVIEW_CLOCK_INVALID");
   const today = bucharestParts(now);
-  for (const offsetHours of [2, 3]) {
+  // Bucharest is UTC+2 in winter and UTC+3 in summer: tomorrow's local midnight is one of the two.
+  for (const offsetHours of BUCHAREST_UTC_OFFSET_HOURS) {
     const candidate = new Date(Date.UTC(today.year, today.month - 1, today.day + 1) - offsetHours * 3_600_000);
     const local = bucharestParts(candidate);
     if (local.hour === 0 && local.minute === 0 && local.second === 0 && candidate.getTime() > now.getTime()) return candidate;
@@ -77,7 +82,7 @@ export class PreviewDailyLimitRefusal extends TypedDomainError {
 }
 
 /** How long a "not available right now" refusal asks the caller to wait. */
-export const PREVIEW_UNAVAILABLE_RETRY_MS = 60_000;
+const PREVIEW_UNAVAILABLE_RETRY_MS = 60_000;
 /**
  * The existing ask refusal whose localized sentence says a model the debate needs cannot be
  * reached right now, retry later (apps/ui requestFailure MODEL_UNAVAILABLE). Its public message is
@@ -103,7 +108,7 @@ export const PREVIEW_ESTIMATE_OUTPUT_TOKENS_PER_CALL = 1_200n;
 export const PREVIEW_ESTIMATE_MARGIN_NUMERATOR = 115n;
 export const PREVIEW_ESTIMATE_MARGIN_DENOMINATOR = 100n;
 /** More unfinished preview debates than this is itself a fault: refused as unavailable. */
-export const PREVIEW_UNFINISHED_RUNS_MAX = 64;
+const PREVIEW_UNFINISHED_RUNS_MAX = 64;
 
 /** A panel member as admission and the run row hold it. */
 export type PreviewPanelMember = Readonly<{ provider_ref: string; model_id: string }>;
@@ -228,8 +233,8 @@ export function estimatePreviewGateNeeds(input: Readonly<{
 /**
  * Pure: what an UNFINISHED earlier debate is still held for, per gate: its whole estimate again
  * (over-counting what it already spent, which the gate's remaining figure also reflects; that is
- * the careful side). A model off the reviewed rows (an older run) is priced at the dearest row on
- * the DeepInfra gate, the only gate today.
+ * the careful side). A model off the reviewed rows (an older run, from before any other provider's
+ * gate existed) is priced at the dearest DeepInfra row, on the DeepInfra gate.
  */
 export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: Pick<PreviewBudgetGateSettings,
   "roleModelIds" | "roleProviderRefs" | "storyCalls" | "maxCooldownHoldsPerRun">): readonly PreviewGateNeed[] {
@@ -342,7 +347,7 @@ export async function assertPreviewBudgetAdmits(
   }
 }
 
-/** One read-only /remaining port per gate the config names: DeepInfra's always, Google's when set. */
+/** One read-only /remaining port per gate the config names: DeepInfra's always, Anthropic's and Google's when set. */
 export function previewRemainingPorts(
   config: PreviewProviderTestConfig
 ): PreviewBudgetGateSettings["remaining"] {

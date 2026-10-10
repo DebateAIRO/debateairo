@@ -22,9 +22,9 @@
 // which refuses unless the operator also states `deepseekEnabledOnGate: true` (the gate's GO switches
 // DeepSeek on; the app refuses an ask whose role model the gate has not switched on). The base may be the
 // sealed two-GLM pair (or its historical shapes) or a version this kit already published.
-// PR C (2026-10-10): the source set also carries Google's reviewed ref (preview:gemini-3-8-flash,
-// maker Google, adapter kind google-gemini-http). A base may be any reviewed set: DeepInfra's
-// refs plus any other reviewed providers' refs, in register order.
+// PR B and C (2026-10-10): the source set also carries Anthropic's reviewed ref (preview:claude-haiku-5-5,
+// maker Anthropic, adapter kind anthropic-messages-http) and Google's (preview:gemini-3-8-flash, maker
+// Google, adapter kind google-gemini-http). A base may be any reviewed set: DeepInfra's refs plus any other reviewed providers' refs, in register order.
 // The delta now carries the old and new canonical values, so the owner reviews values, not hashes;
 // deltaSha256 binds that exact document and the approval binds deltaSha256.
 import { createHash } from 'node:crypto';
@@ -106,6 +106,7 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
   if(runtime.nodeVersion!=='v26.8.2'||runtime.pnpmVersion!=='11.20.0'||!/^([0-9a-f]{40})$/.test(runtime.sourceRevision)
     ||!/^([0-9a-f]{40})$/.test(runtime.sourceTree)||!/^([0-9a-f]{64})$/.test(runtime.operatorSha256)
     ||!Number.isFinite(Date.parse(runtime.observedAt))||bootstrap.values.pnpmVersion!==runtime.pnpmVersion||bootstrap.values.postgresMajorVersion!=='18')fail();
+  // PR B: each ref carries its row's adapter kind (Claude Haiku: the native Anthropic Messages adapter).
   // PR C: each ref carries its row's adapter kind (gemini-3.8-flash: the native Gemini adapter).
   const configuredProviders=PREVIEW_REVIEWED_PROVIDER_REFS.map(providerRef=>({providerRef,adapterKind:previewModelRowForRef(providerRef)!.adapterKind,maker:previewModelRowForRef(providerRef)!.maker}));
   const targetsJson=JSON.stringify(PREVIEW_REVIEWED_PROVIDER_REFS.map(previewTargetJsonRow));

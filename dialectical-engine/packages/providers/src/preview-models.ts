@@ -2,21 +2,21 @@
  * The private preview's reviewed DeepInfra model rows (contract A §1, 2026-10-10).
  *
  * Plain words: the preview may call exactly these models, each at its own list price, with its
- * own largest answer size ("output bound"), its own thinking switch ("effort") and its own
+ * own largest answer size ("output bound"), its own "effort" thinking switch and its own
  * JSON-answer switch. The root gate holds the same table in Python; a parity test reads
  * tests/unit/fixtures/preview-model-rows.json so the two copies cannot drift. Changing a row is a
  * reviewed code change on both sides, never a configuration edit.
  *
- * Multi-model preview, PR C: the rows are kept per provider (`PREVIEW_MODEL_ROWS_BY_PROVIDER`), one
- * root gate per provider; each provider's rows have their own parity file
- * (tests/unit/fixtures/preview-model-rows.json for DeepInfra, preview-google-row.json for Google,
- * whose dated prices live in preview-google.ts). A later provider is one more key there and one
- * more parity file.
+ * Multi-model preview, PR B and PR C: the rows are kept per provider (`PREVIEW_MODEL_ROWS_BY_PROVIDER`),
+ * one root gate per provider; each provider's rows have their own parity file
+ * (tests/unit/fixtures/preview-model-rows.json for DeepInfra, preview-model-rows-anthropic.json for
+ * Anthropic, preview-google-row.json for Google, whose dated prices live in preview-google.ts). A
+ * later provider is one more key there and one more parity file.
  *
  * No imports on purpose: index.ts, preview-test.ts and provider-probe.ts all read these rows.
  */
 /** The providers the preview has a reviewed root gate for. */
-export type PreviewProviderName = "deepinfra" | "google";
+export type PreviewProviderName = "deepinfra" | "anthropic" | "google";
 
 export type PreviewModelRow = Readonly<{
   /** The provider (and so the root gate) this row's calls go through. */
@@ -24,16 +24,17 @@ export type PreviewModelRow = Readonly<{
   /** The target's base URL (`base_url`), exactly. */
   baseUrl: string;
   /** The register's adapter kind for this row's provider ref. */
-  adapterKind: "openai-compatible-http" | "google-gemini-http";
+  adapterKind: "openai-compatible-http" | "anthropic-messages-http" | "google-gemini-http";
   /** The context window the target declares (`context_window_tokens`). */
   contextWindowTokens: number;
   model: string;
   maker: string;
   /**
    * Vendor list price in USD per million tokens, as the decimal string the gate reads: the price
-   * every call reserves at and the estimate uses. For a vendor with dated prices (Google) it is the
-   * ceiling (the last dated step): the engine's own envelope and the start-of-debate estimate use it,
-   * while each Google call reserves at its dated price (preview-google.ts).
+   * every call reserves at and the estimate uses. For a vendor with price steps (Anthropic) it is
+   * the dearest per-token price of the upper step; the gate settles at the real step. For a vendor
+   * with dated prices (Google) it is the ceiling (the last dated step): the engine's own envelope uses
+   * it, while each Google call reserves, and the estimate prices, at its dated price (preview-google.ts).
    */
   inputUsdPerM: string;
   outputUsdPerM: string;
@@ -47,7 +48,8 @@ export type PreviewModelRow = Readonly<{
   outputBound: number;
   /**
    * "high": the body carries exactly the provider's effort member with "high" (DeepInfra
-   * `reasoning_effort`, Google `generationConfig.thinkingConfig.thinkingLevel`); null: the body never carries it.
+   * `reasoning_effort`, Anthropic `output_config.effort`, Google
+   * `generationConfig.thinkingConfig.thinkingLevel`); null: the body never carries it.
    */
   effort: "high" | null;
   /** Whether response_format {"type":"json_object"} may be sent. */
@@ -57,6 +59,11 @@ export type PreviewModelRow = Readonly<{
 /** The DeepInfra connection's base URL and window, shared by every DeepInfra row. */
 export const PREVIEW_DEEPINFRA_BASE_URL = "https://api.deepinfra.com/v1/openai" as const;
 export const PREVIEW_CONTEXT_WINDOW_TOKENS = 1_048_576 as const;
+/** The Anthropic Messages connection's base URL (the adapter's one lawful base) and its exact call URL. */
+export const PREVIEW_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1" as const;
+export const PREVIEW_ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages" as const;
+/** Claude Haiku 5.5's window (1M tokens). */
+export const PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS = 1_000_000 as const;
 /**
  * The Gemini API connection's base URL (the adapter's one lawful base; the same string as
  * GOOGLE_GEMINI_BASE_URL in index.ts, a test pins the two equal) and the Google row's exact call URL:
@@ -78,6 +85,8 @@ type RowInput = Readonly<{
 const PROVIDER_CONNECTIONS = Object.freeze({
   deepinfra: Object.freeze({ provider: "deepinfra", baseUrl: PREVIEW_DEEPINFRA_BASE_URL,
     adapterKind: "openai-compatible-http", contextWindowTokens: PREVIEW_CONTEXT_WINDOW_TOKENS }),
+  anthropic: Object.freeze({ provider: "anthropic", baseUrl: PREVIEW_ANTHROPIC_BASE_URL,
+    adapterKind: "anthropic-messages-http", contextWindowTokens: PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS }),
   google: Object.freeze({ provider: "google", baseUrl: PREVIEW_GOOGLE_BASE_URL,
     adapterKind: "google-gemini-http", contextWindowTokens: PREVIEW_GOOGLE_CONTEXT_WINDOW_TOKENS })
 } as const);
@@ -113,8 +122,15 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
     row("deepinfra", { model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
       outputBound: 131_072, effort: null, jsonObject: false })
   ]),
+  // PR B (lead, 2026-10-10). Reserve and estimate at the dearest per-input-token price of the upper
+  // step (5-minute cache write $0.625) and the upper output price ($2.50): a 256 KiB call holds at
+  // most $0.24704. The gate settles at the real step (list prices, read 2026-10-10).
+  anthropic: Object.freeze([
+    row("anthropic", { model: "claude-haiku-5-5", maker: "Anthropic", inputUsdPerM: "0.625", outputUsdPerM: "2.50",
+      outputBound: 32_768, effort: "high", jsonObject: false })
+  ]),
   // PR C (lead, 2026-10-10). The row's prices are the CEILING, the last dated step ($1.50 / $7.50):
-  // the engine's envelope and the estimate use them. Each call reserves at its dated price
+  // the engine's envelope uses them. Each call reserves, and the estimate prices, at its dated price
   // (preview-google.ts, $0.75 / $3.75 until the step), which the gate settles at.
   google: Object.freeze([
     row("google", { model: "gemini-3.8-flash", maker: "Google", inputUsdPerM: "1.50", outputUsdPerM: "7.50",
@@ -148,6 +164,7 @@ export const PREVIEW_PROVIDER_REF_MODELS: Readonly<Record<string, string>> = Obj
   "preview:fixture-b": "zai-org/GLM-5.3-Flash",
   "preview:deepseek-v4-1-flash": "deepseek-ai/DeepSeek-V4.1-Flash",
   "preview:mimo-v2-6-pro": "XiaomiMiMo/MiMo-V2.6-Pro",
+  "preview:claude-haiku-5-5": "claude-haiku-5-5",
   "preview:gemini-3-8-flash": "gemini-3.8-flash"
 });
 /** The reviewed provider set, in register order. */

@@ -43,6 +43,14 @@ describe('the website\'s model list: one reviewed value per stage of the switch-
   ['the two-list value with lists in another order',MULTI_FLAG,apiConfig({free_model_ids:[DEEPSEEK,GLM],premium_model_ids:[GLM,DEEPSEEK,MIMO]}),false],
   ['the two-list value with free and premium swapped',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK,MIMO],premium_model_ids:[GLM,DEEPSEEK]}),false],
   ['a config with an extra key',LEGACY_FLAG,apiConfig({free_model_ids:[GLM],extra:true}),false],
+  // PR B: the six-key config may also name the Anthropic gate's socket; the website lists must still match.
+  ['the two-list value with the six-key config plus the Anthropic socket',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO],anthropic_budget_socket:'/run/debateai-v3-preview/anthropic-budget-v1.sock'}),true],
+  ['the legacy array with the legacy config plus the Anthropic socket',LEGACY_FLAG,apiConfig({free_model_ids:[GLM],anthropic_budget_socket:'/run/debateai-v3-preview/anthropic-budget-v1.sock'}),false],
+  ['the two-list value with the six-key config plus the Google socket',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO],google_budget_socket:'/run/debateai-v3-preview/google-budget-v1.sock'}),true],
+  ['the two-list value with the six-key config plus both other sockets',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO],anthropic_budget_socket:'/run/debateai-v3-preview/anthropic-budget-v1.sock',google_budget_socket:'/run/debateai-v3-preview/google-budget-v1.sock'}),true],
+  ['the legacy array with the legacy config plus the Google socket',LEGACY_FLAG,apiConfig({free_model_ids:[GLM],google_budget_socket:'/run/debateai-v3-preview/google-budget-v1.sock'}),false],
+  ['the two-list value with an API roster naming Gemini the website does not offer',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO,'gemini-3.8-flash'],google_budget_socket:'/run/debateai-v3-preview/google-budget-v1.sock'}),false],
+  ['the two-list value with an API roster naming Haiku the website does not offer',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO,'claude-haiku-5-5'],anthropic_budget_socket:'/run/debateai-v3-preview/anthropic-budget-v1.sock'}),false],
   ['no API config',LEGACY_FLAG,undefined,false],
   ['an API config that is not JSON',LEGACY_FLAG,'{',false],
   ['an unreviewed website list that matches the config',JSON.stringify([GLM,DEEPSEEK]),apiConfig({free_model_ids:[GLM,DEEPSEEK]}),false]
