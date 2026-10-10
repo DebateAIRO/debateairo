@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Unde oferim DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Oferim DebateAI persoanelor care locuiesc în [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim." }
+      { kind: "p", text: "Oferim DebateAI persoanelor care locuiesc în Uniunea Europeană (27 de state) și în Spațiul Economic European (Norvegia, Islanda și Liechtenstein), în Elveția, Moldova, Statele Unite (cu excepția statului Tennessee), Canada, Australia, Noua Zeelandă, Singapore, Japonia, Coreea de Sud și Taiwan. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Acceptarea acestor Termeni",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Acceptați acești Termeni bifând caseta cu textul „Am citit și sunt de acord cu Termenii serviciului” și făcând clic pe Creați contul. Astfel se încheie un contract între dumneavoastră și DebateAIRO S.R.L. Termenii includ regulile de utilizare acceptabilă din secțiunea 7, regulile de publicare din secțiunea 9, dispozițiile privind răspunderea din secțiunea 15, dispozițiile privind legea aplicabilă și litigiile din secțiunea 18 și, dacă locuiți în Statele Unite, acordul de arbitraj din Anexa A.3. Păstrăm o evidență a versiunii pe care ați acceptat-o și a momentului acceptării, astfel cum explică Politica noastră de confidențialitate." },
+      { kind: "p", text: "Acceptați acești Termeni bifând caseta cu textul „Am citit și sunt de acord cu Termenii serviciului” și făcând clic pe Creați contul. Astfel se încheie un contract între dumneavoastră și DebateAIRO S.R.L. Termenii includ regulile de utilizare acceptabilă din secțiunea 7, regulile de publicare din secțiunea 9, dispozițiile privind răspunderea din secțiunea 15, dispozițiile privind legea aplicabilă și litigiile din secțiunea 18 și, dacă locuiți în Statele Unite, acordul de arbitraj din Anexa A.2. Păstrăm o evidență a versiunii pe care ați acceptat-o și a momentului acceptării, astfel cum explică Politica noastră de confidențialitate." },
       { kind: "p", text: "Politica noastră de confidențialitate de la [dezbatere.ro/privacy] explică modul în care prelucrăm datele cu caracter personal. Aceasta reprezintă informațiile pe care suntem obligați să vi le furnizăm, nu un contract pe care îl acceptați, iar nicio dispoziție din acești Termeni nu o transformă într-un consimțământ pentru prelucrare. Politica noastră privind modulele cookie de la [dezbatere.ro/cookies] și Registrul furnizorilor de IA de la [dezbatere.ro/providers] sunt încorporate în acești Termeni prin trimitere." },
       { kind: "p", text: "Înainte de a încheia cu noi orice contract prin mijloace electronice, interfața vă prezintă etapele necesare, vă permite să verificați și să corectați ceea ce ați introdus înainte de transmitere și vă informează cu privire la limbile în care poate fi încheiat contractul. Acești Termeni sunt disponibili într-o formă pe care o puteți salva și tipări. Când cumpărați un plan cu plată, vă trimitem prin e-mail versiunea pe care ați acceptat-o. Puteți solicita oricând o copie. Nicio dispoziție din acești Termeni nu limitează drepturile conferite de legislația română sau a UE privind protecția consumatorilor ori de legislația țării în care locuiți, care nu pot fi limitate prin contract." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dreptul dumneavoastră de retragere",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dacă locuiți în UE, SEE sau Regatul Unit, vă puteți retrage dintr-un abonament cu plată în termen de 14 zile de la abonare, fără a invoca un motiv. Utilizați pagina Retragere din contract de la [dezbatere.ro/withdraw], formularul-tip din e-mailul de confirmare sau scrieți la [support@dezbatere.ro]; confirmăm primirea pe un suport durabil." },
+      { kind: "p", text: "Dacă locuiți în UE sau în SEE, vă puteți retrage dintr-un abonament cu plată în termen de 14 zile de la abonare, fără a invoca un motiv. Utilizați pagina Retragere din contract de la [dezbatere.ro/withdraw], formularul-tip din e-mailul de confirmare sau scrieți la [support@dezbatere.ro]; confirmăm primirea pe un suport durabil." },
       { kind: "p", text: "Dacă ne-ați solicitat să începem furnizarea serviciului imediat — bifând caseta la finalizarea comenzii — și apoi vă retrageți, plătiți pentru partea din serviciu furnizată până în ziua retragerii, calculată proporțional cu prețul perioadei de facturare, iar noi rambursăm restul. Nu pierdeți dreptul de retragere prin utilizarea serviciului în perioada de 14 zile." },
       { kind: "p", text: "Dacă locuiți în altă parte, Anexa A precizează dreptul de retragere sau perioada de reflecție aplicabilă în regiunea dumneavoastră, dacă există, iar în celelalte cazuri, politica noastră de rambursare. Drepturile legale din țara dumneavoastră au întotdeauna prioritate." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Legea aplicabilă. Acești Termeni și orice litigiu sau pretenție care decurge din aceștia ori din obiectul lor, inclusiv pretențiile necontractuale, sunt guvernate de legile României." },
-      { kind: "p", text: "Protecțiile locale de care beneficiați nu sunt afectate. Dacă sunteți consumator, alegerea legii române nu vă privează de protecția conferită de normele imperative privind protecția consumatorilor din țara în care aveți reședința obișnuită — de exemplu, normele privind clauzele abuzive, drepturile de retragere și anulare sau garanțiile — atunci când acele norme se aplică indiferent de această alegere, inclusiv în temeiul articolului 6 alineatul (2) din Regulamentul (CE) nr. 593/2008 dacă locuiți în UE sau al normelor echivalente din Regatul Unit. Puteți invoca acele norme pe lângă legea română." },
-      { kind: "p", text: "Instanțele, dacă locuiți în UE, SEE sau Regatul Unit. Puteți introduce o acțiune împotriva noastră fie în fața instanțelor din România, fie în fața instanțelor din țara în care locuiți. Noi putem introduce o acțiune împotriva dumneavoastră numai în fața instanțelor din țara în care locuiți." },
-      { kind: "p", text: "Consumatorii din alte regiuni. Dacă locuiți în afara UE, SEE și Regatului Unit, nicio dispoziție din acești Termeni nu limitează vreun drept conferit de legislația țării dumneavoastră de a formula o pretenție în fața instanțelor acesteia ori vreun drept prevăzut de legislația respectivă la care nu se poate renunța — inclusiv, dacă locuiți în Australia sau Noua Zeelandă, drepturile dumneavoastră privind garanțiile pentru consumatori; dacă locuiți în Brazilia, Código de Defesa do Consumidor; iar dacă locuiți în Statele Unite, legislația statului dumneavoastră privind protecția consumatorilor." },
-      { kind: "p", text: "Rezidenții Statelor Unite. Anexa A.3 conține un acord de arbitraj și o renunțare la acțiunile colective guvernate de Legea federală privind arbitrajul. Se aplică numai rezidenților Statelor Unite și numai în măsura în care poate fi pus în executare. Nu se aplică consumatorilor din UE, SEE sau Regatul Unit." },
+      { kind: "p", text: "Protecțiile locale de care beneficiați nu sunt afectate. Dacă sunteți consumator, alegerea legii române nu vă privează de protecția conferită de normele imperative privind protecția consumatorilor din țara în care aveți reședința obișnuită — de exemplu, normele privind clauzele abuzive, drepturile de retragere și anulare sau garanțiile — atunci când acele norme se aplică indiferent de această alegere, inclusiv în temeiul articolului 6 alineatul (2) din Regulamentul (CE) nr. 593/2008 dacă locuiți în UE. Puteți invoca acele norme pe lângă legea română." },
+      { kind: "p", text: "Instanțele, dacă locuiți în UE sau în SEE. Puteți introduce o acțiune împotriva noastră fie în fața instanțelor din România, fie în fața instanțelor din țara în care locuiți. Noi putem introduce o acțiune împotriva dumneavoastră numai în fața instanțelor din țara în care locuiți." },
+      { kind: "p", text: "Consumatorii din alte regiuni. Dacă locuiți în afara UE și a SEE, nicio dispoziție din acești Termeni nu limitează vreun drept conferit de legislația țării dumneavoastră de a formula o pretenție în fața instanțelor acesteia ori vreun drept prevăzut de legislația respectivă la care nu se poate renunța — inclusiv, dacă locuiți în Australia sau Noua Zeelandă, drepturile dumneavoastră privind garanțiile pentru consumatori; dacă locuiți în Brazilia, Código de Defesa do Consumidor; iar dacă locuiți în Statele Unite, legislația statului dumneavoastră privind protecția consumatorilor." },
+      { kind: "p", text: "Rezidenții Statelor Unite. Anexa A.2 conține un acord de arbitraj și o renunțare la acțiunile colective guvernate de Legea federală privind arbitrajul. Se aplică numai rezidenților Statelor Unite și numai în măsura în care poate fi pus în executare. Nu se aplică consumatorilor din UE sau din SEE." },
       { kind: "p", text: "Înainte de a vă adresa instanței. Contactați-ne la [legal@dezbatere.ro]; majoritatea problemelor pot fi remediate, iar obiectivul nostru este să răspundem în termen de [5] zile lucrătoare. Dacă sunteți consumator în România sau în UE, puteți recurge la soluționarea alternativă a litigiilor prin [the ANPC – named SAL entity, website]; ne angajăm [do / do not] să participăm la procedura respectivă. Reclamațiile referitoare la deciziile de moderare urmează procedura din secțiunea 10, care este o cale separată." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Anexa A — Termeni regionali",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Fiecare intrare se aplică numai dacă regiunea sa este enumerată în secțiunea 2 și precizează numai diferențele față de corpul documentului. În cazul unui conflict între o intrare și corpul documentului, intrarea se aplică persoanelor din regiunea respectivă." }
+      { kind: "p", text: "Fiecare intrare se aplică persoanelor care locuiesc în regiunea respectivă și precizează numai diferențele față de corpul documentului. În cazul unui conflict între o intrare și corpul documentului, intrarea se aplică persoanelor din regiunea respectivă." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Regatul Unit (numai dacă este enumerat în secțiunea 2)",
+    title: "Statele Unite",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Reprezentantul nostru în Regatul Unit în temeiul articolului 27 din GDPR din Regatul Unit este [name, address, email]. Legea privind drepturile consumatorilor din 2015 vi se aplică, iar nicio dispoziție din acești Termeni nu vă limitează drepturile conferite de aceasta; atunci când normele privind abonamentele din Legea privind piețele digitale, concurența și consumatorii din 2024 vor intra în vigoare (se preconizează că în 2027), acestea se vor aplica planurilor cu plată, inclusiv o perioadă de reflecție după reînnoiri și după perioadele de încercare gratuită. Cum protejăm utilizatorii împotriva conținutului ilegal: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Tehnologia proactivă pe care o utilizăm: [describe, or \"none\"]. Asigurarea vârstei: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Procedura de reclamații din secțiunea 10 acceptă reclamații privind conținutul ilegal, eliminarea eronată a conținutului dumneavoastră, restricționarea contului, utilizarea instrumentelor automate care vă afectează conținutul și orice evaluare a vârstei care vă blochează în mod eronat. Procedura este deschisă persoanelor afectate de conținut care nu sunt utilizatori. Politica noastră de confidențialitate, Anexa B.2, se referă la datele dumneavoastră." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "Statele Unite (numai dacă sunt enumerate în secțiunea 2)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. Nu oferim DebateAI persoanelor care locuiesc în Tennessee." },
       { kind: "p", text: "Acord de arbitraj și renunțare la acțiunile colective. Dacă locuiți în Statele Unite, dumneavoastră și DebateAIRO conveniți să soluționați orice litigiu care decurge din acești Termeni sau din serviciu prin arbitraj individual obligatoriu administrat de [the American Arbitration Association / JAMS] în conformitate cu regulile sale pentru consumatori, și nu în instanță, cu excepția faptului că oricare dintre noi poate formula o cerere individuală în fața instanței pentru cereri cu valoare redusă. Puteți renunța la arbitraj trimițând un e-mail la [address] în termen de 30 de zile de la prima acceptare a acestor Termeni. Acest acord este guvernat de Legea federală privind arbitrajul. Noi achităm taxele de înregistrare a arbitrajului. Se renunță la acțiunile colective și reprezentative, în măsura permisă de lege. Această secțiune se aplică numai pentru viitor și nu se aplică pretențiilor născute înainte de acceptarea sa." },
       { kind: "p", text: "Notificări și eliminări. Imaginile intime distribuite fără consimțământ pot fi raportate la [URL] fără un cont și sunt eliminate în termen de 48 de ore de la o cerere valabilă. Reclamațiile privind drepturile de autor sunt adresate agentului nostru desemnat menționat în secțiunea 16." },
-      { kind: "p", text: "Dispoziții specifice statelor. California: se aplică condițiile de reînnoire automată din secțiunea 12; puteți anula online în orice moment; păstrăm consimțământul dumneavoastră cu privire la condițiile de reînnoire timp de cel puțin trei ani. New York: puteți anula în termen de 14 zile de la orice debitare la un preț majorat și puteți primi o rambursare proporțională. Texas și Nebraska: nu vindem date cu caracter personal sensibile. Washington: Informarea noastră privind confidențialitatea datelor de sănătate ale consumatorilor de la [URL] se aplică informațiilor referitoare la sănătate. Colorado: nicio componentă a serviciului nu ia decizii cu efecte semnificative cu privire la dumneavoastră. Politica noastră de confidențialitate, Anexa B.3, se referă la datele dumneavoastră și la drepturile privind confidențialitatea conferite de legislația statului dumneavoastră." }
+      { kind: "p", text: "Dispoziții specifice statelor. California: se aplică condițiile de reînnoire automată din secțiunea 12; puteți anula online în orice moment; păstrăm consimțământul dumneavoastră cu privire la condițiile de reînnoire timp de cel puțin trei ani. New York: puteți anula în termen de 14 zile de la orice debitare la un preț majorat și puteți primi o rambursare proporțională. Texas și Nebraska: nu vindem date cu caracter personal sensibile. Washington: Informarea noastră privind confidențialitatea datelor de sănătate ale consumatorilor de la [URL] se aplică informațiilor referitoare la sănătate. Colorado: nicio componentă a serviciului nu ia decizii cu efecte semnificative cu privire la dumneavoastră. Politica noastră de confidențialitate, Anexa B.2, se referă la datele dumneavoastră și la drepturile privind confidențialitatea conferite de legislația statului dumneavoastră." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Canada și Quebec",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Responsabilul nostru cu protecția vieții private, iar în Quebec persoana responsabilă cu protecția informațiilor cu caracter personal, este [name], privacy@dezbatere.ro. Politica noastră de confidențialitate, Anexa B.3, se referă la datele dumneavoastră. Quebec: acești Termeni sunt disponibili în limba franceză; alegeți limba franceză din selectorul de limbă; setările care vă mențin dezbaterile private sunt activate în mod implicit; puteți solicita dezindexarea informațiilor cu caracter personal despre dumneavoastră; nu vi se aplică niciun acord de arbitraj și nicio renunțare la acțiunile colective." }
     ]
   },
   {
     no: "A.4",
-    title: "Canada și Quebec (numai dacă sunt enumerate)",
+    title: "Australia și Noua Zeelandă",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Responsabilul nostru cu protecția vieții private, iar în Quebec persoana responsabilă cu protecția informațiilor cu caracter personal, este [name], privacy@dezbatere.ro. Politica noastră de confidențialitate, Anexa B.4, se referă la datele dumneavoastră. Quebec: acești Termeni sunt disponibili în limba franceză; alegeți limba franceză din selectorul de limbă; setările care vă mențin dezbaterile private sunt activate în mod implicit; puteți solicita dezindexarea informațiilor cu caracter personal despre dumneavoastră; nu vi se aplică niciun acord de arbitraj și nicio renunțare la acțiunile colective." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Australia și Noua Zeelandă (numai dacă sunt enumerate)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Serviciile noastre sunt însoțite de garanții care nu pot fi excluse în temeiul legislației australiene privind consumatorii. În cazul unor deficiențe majore ale serviciului, aveți dreptul să anulați și să primiți rambursarea pentru partea neutilizată sau o despăgubire pentru valoarea redusă a serviciului; aveți, de asemenea, dreptul la despăgubiri pentru orice alte pierderi sau prejudicii previzibile în mod rezonabil. Dacă deficiența nu este majoră, aveți dreptul ca problemele serviciului să fie remediate într-un termen rezonabil și, dacă nu sunt remediate, să anulați și să obțineți o rambursare. În măsura permisă de secțiunea 64A, răspunderea noastră pentru încălcarea unei garanții este limitată la furnizarea din nou a serviciului sau la plata costurilor aferente. Planului cu plată nu i se aplică niciun drept la o perioadă de reflecție în plus față de ceea ce vă acordă secțiunea 12; politica noastră de rambursare este […]. Noua Zeelandă: Legea privind garanțiile consumatorilor din 1993 se aplică și nicio dispoziție din acești Termeni nu o exclude; comunicările digitale prejudiciabile ne pot fi raportate în temeiul secțiunii 10 sau pot fi raportate către Netsafe." }
     ]
   },
   {
+    no: "A.5",
+    title: "Elveția",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "Datelor dumneavoastră li se aplică Legea federală elvețiană privind protecția datelor (Politica de confidențialitate, Anexa B.5). Puteți introduce acțiuni în fața instanțelor din localitatea din Elveția în care locuiți. Planului cu plată nu i se aplică niciun drept legal de retragere; politica noastră de rambursare este […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Elveția (numai dacă este enumerată)",
+    title: "Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Datelor dumneavoastră li se aplică Legea federală elvețiană privind protecția datelor (Politica de confidențialitate, Anexa B.6). Puteți introduce acțiuni în fața instanțelor din localitatea din Elveția în care locuiți. Planului cu plată nu i se aplică niciun drept legal de retragere; politica noastră de rambursare este […]." }
+      { kind: "p", text: "În temeiul acestor Termeni aveți aceleași drepturi ca un consumator din Uniunea Europeană, inclusiv dreptul de retragere de 14 zile din secțiunea 13. Puteți introduce acțiuni în fața instanțelor din Republica Moldova. Datelor dumneavoastră li se aplică Legea nr. 195/2024 privind protecția datelor cu caracter personal a Republicii Moldova (Politica de confidențialitate, Anexa B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldova (numai dacă este enumerată)",
+    title: "Asia-Pacific",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "În temeiul acestor Termeni aveți aceleași drepturi ca un consumator din Uniunea Europeană, inclusiv dreptul de retragere de 14 zile din secțiunea 13. Puteți introduce acțiuni în fața instanțelor din Republica Moldova. Datelor dumneavoastră li se aplică Legea nr. 195/2024 privind protecția datelor cu caracter personal a Republicii Moldova (Politica de confidențialitate, Anexa B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ucraina (numai dacă este enumerată)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Oferim DebateAI în Ucraina, cu excepția zonelor care nu sunt controlate de guvernul ucrainean. Produsul și acești Termeni sunt disponibili în limba ucraineană. Datelor dumneavoastră li se aplică Legea Ucrainei „Privind protecția datelor cu caracter personal” (Politica de confidențialitate, Anexa B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Israel (numai dacă este enumerat)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Puteți anula un plan cu plată în condițiile permise de Legea privind protecția consumatorilor, 5741-1981 [state the cancellation terms]. Acești Termeni și Politica noastră de confidențialitate sunt disponibili în limba ebraică. Datelor dumneavoastră li se aplică Legea israeliană privind protecția vieții private (Politica de confidențialitate, Anexa B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Asia-Pacific (numai rândurile pentru regiunile enumerate)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapore: responsabilul nostru cu protecția datelor este [name, email]; transferurile se bazează pe garanții contractuale comparabile cu PDPA; planului cu plată nu i se aplică nicio perioadă legală de reflecție, iar politica noastră de rambursare este […]. Japonia: informarea legală în temeiul Legii privind tranzacțiile comerciale specificate este disponibilă la [URL]; abonamentelor online nu li se aplică o perioadă generală de reflecție, iar politica noastră de rambursare este […]; trimitem conținutul dumneavoastră furnizorilor de IA din Statele Unite și din Uniunea Europeană, fiecare în temeiul unui contract care impune o protecție echivalentă cu Legea japoneză privind protecția informațiilor cu caracter personal, iar la cerere vă comunicăm care sunt aceste măsuri. Coreea de Sud: consimțămintele pentru prelucrarea opțională și marketing sunt colectate separat de elementele necesare operării serviciului; responsabilul nostru cu protecția vieții private este [name], privacy@dezbatere.ro; vă puteți retrage dintr-un plan cu plată în termen de 7 zile de la abonare, sub rezerva Legii privind comerțul electronic; vă obținem un nou consimțământ înaintea oricărei majorări recurente a prețului sau conversii de la un plan gratuit la unul cu plată; serviciul folosește inteligență artificială generativă, vă informăm despre aceasta înainte să îl utilizați și etichetăm rezultatele generate de inteligența artificială. Taiwan: vă puteți retrage dintr-un plan cu plată în termen de 7 zile de la abonare, în temeiul Legii privind protecția consumatorilor; datelor dumneavoastră li se aplică Legea taiwaneză privind protecția datelor cu caracter personal (Politica de confidențialitate, Anexa B.10). Thailanda: reprezentantul nostru în Thailanda este [name] [if appointed]. Filipine: datele noastre de identificare comercială și mecanismul de remediere prevăzut de Legea privind tranzacțiile pe internet sunt disponibile la [URL]; reclamațiile pot fi depuse la Comisia Națională pentru Protecția Vieții Private." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Rezervat",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Turcia, Brazilia și Indonezia necesită fiecare o anexă în limba locală, un reprezentant sau o înregistrare și depunerea unor documente. Acestea nu sunt redactate aici și rămân în afara secțiunii 2 până când sunt introduse în mod deliberat. Serviciul nu este oferit în China, Vietnam și Rusia." }
+      { kind: "p", text: "Singapore: responsabilul nostru cu protecția datelor este [name, email]; transferurile se bazează pe garanții contractuale comparabile cu PDPA; planului cu plată nu i se aplică nicio perioadă legală de reflecție, iar politica noastră de rambursare este […]. Japonia: informarea legală în temeiul Legii privind tranzacțiile comerciale specificate este disponibilă la [URL]; abonamentelor online nu li se aplică o perioadă generală de reflecție, iar politica noastră de rambursare este […]; trimitem conținutul dumneavoastră furnizorilor de IA din Statele Unite și din Uniunea Europeană, fiecare în temeiul unui contract care impune o protecție echivalentă cu Legea japoneză privind protecția informațiilor cu caracter personal, iar la cerere vă comunicăm care sunt aceste măsuri. Coreea de Sud: consimțămintele pentru prelucrarea opțională și marketing sunt colectate separat de elementele necesare operării serviciului; responsabilul nostru cu protecția vieții private este [name], privacy@dezbatere.ro; vă puteți retrage dintr-un plan cu plată în termen de 7 zile de la abonare, sub rezerva Legii privind comerțul electronic; vă obținem un nou consimțământ înaintea oricărei majorări recurente a prețului sau conversii de la un plan gratuit la unul cu plată; serviciul folosește inteligență artificială generativă, vă informăm despre aceasta înainte să îl utilizați și etichetăm rezultatele generate de inteligența artificială. Taiwan: vă puteți retrage dintr-un plan cu plată în termen de 7 zile de la abonare, în temeiul Legii privind protecția consumatorilor; datelor dumneavoastră li se aplică Legea taiwaneză privind protecția datelor cu caracter personal (Politica de confidențialitate, Anexa B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "7bc2ef44dd3ab627ace07ba1f9ee91ea4f476e4f694cd5696a959bd02e00675b",
-  eyebrow: "TERMENII SERVICIULUI · v2.1 · ÎN VIGOARE DE LA [DATE]",
+  version: "2.2",
+  sha256: "10576f9694477ebc7fab1d0f9e3b093e38a0d8462f1d149e22123d2f1fa30308",
+  eyebrow: "TERMENII SERVICIULUI · v2.2 · ÎN VIGOARE DE LA [DATE]",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DebateAIRO S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",
-  endMarker: "SFÂRȘITUL TERMENILOR · v2.1",
+  endMarker: "SFÂRȘITUL TERMENILOR · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Textul Termenilor serviciului",
   sectionIdPrefix: "terms-section-",
