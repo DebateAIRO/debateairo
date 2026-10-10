@@ -1298,6 +1298,9 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/account/auth-methods", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/account/auth-methods/remove", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/account/recovery-codes/regenerate", auth:"user",resource:"session-self",action:"consumer-security" },
+  // Owner ruling 2026-10-09: an authenticator recovery waiting its 24 hours, read and cancelled from Settings → Security.
+  { route: "GET /v1/account/mfa-recovery", auth:"user",resource:"session-self",action:"consumer-security" },
+  { route: "POST /v1/account/mfa-recovery/cancel", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/auth/passkeys/step-up/options", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/auth/passkeys/step-up/complete", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
@@ -1373,7 +1376,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
   { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
   { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
-  { route: "POST /v1/billing/xmoney/notify", auth: "public", resource: "billing", action: "notify" },
+  // N9 (spec 2026-10-05 §2.7.1): NETOPIA's signed message; no session, no CSRF, verified by its own signature.
+  { route: "POST /v1/billing/netopia/notify", auth: "public", resource: "billing", action: "notify" },
   // P12: the subscriber's own subscription. Every mutation carries the CSRF pair like any user route.
   { route: "GET /v1/billing/subscription", auth: "user", resource: "billing", action: "read-subscription" },
   { route: "GET /v1/billing/invoices", auth: "user", resource: "billing", action: "list-invoices" },
@@ -1385,7 +1389,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
   // P12d: the step-up grant rides in the body, like DELETE /v1/account's.
   { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
-  // P12e (A12): the card change's signed authorization order; the CSRF pair like any user mutation.
+  // P12e / N13 (spec §2.11): the card page's details and NETOPIA's 0 check.
+  { route: "GET /v1/billing/subscription/card", auth: "user", resource: "billing", action: "read-card-details" },
   { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
   // P13: cancel without signing in (Terms §12). First-party Origin only; never a session.
   { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },
@@ -1893,8 +1898,8 @@ function csrfCookie(value: string, maxAgeSeconds: number): string {
 
 /** All verified consumer methods share this sole public bearer/cookie projection. */
 function completeAuthenticatedResponse(reply:FastifyReply,result:LoginResult):FastifyReply {
-  const response=AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session,
-    ...(result.replacementRecoveryCode===undefined?{}:{replacement_recovery_code:result.replacementRecoveryCode})});
+  // Design note 2026-10-09 item 3: a used recovery code is never refilled, so no replacement code is returned.
+  const response=AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session});
   reply.header("set-cookie",[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.csrfToken,SESSION_IDLE_MAX_AGE_SECONDS),...(exactCookie(reply.request.headers.cookie,SOCIAL_BROWSER_COOKIE)===null?[]:[`${SOCIAL_BROWSER_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`])]);
   return reply.send(response);
 }
@@ -2373,16 +2378,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!parsed.success || !passwordWithinRequestBound(parsed.data)) throw new AuthFlowError("AUTH_INPUT_INVALID");
     if (signup) {
       const body = request.body as Record<string, unknown>;
-      try { body.phone = normalizeManualPhone(body.phone); } catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+      // The phone is optional (owner ruling 2026-10-09); a given one must still parse.
+      if (body.phone !== undefined) {
+        try { body.phone = normalizeManualPhone(body.phone); } catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+      }
     }
     mailDisplays.set(request, Object.freeze({ locale: parsed.data.ui_locale, timeZone: parsed.data.time_zone }));
     const body = request.body as Record<string, unknown>;
     const admission = await options.registration?.admitSource?.(socialSignup
-      ? {route:"social",source:sourceFor(request),input:{email:parsed.data.email,phone:typeof body.phone === "string" ? body.phone : "",adultAffirmed:body.adult_affirmed===true}}
+      ? {route:"social",source:sourceFor(request),input:{email:parsed.data.email,phone:typeof body.phone === "string" ? body.phone : null,adultAffirmed:body.adult_affirmed===true}}
       : path === "/v1/auth/register"
       ? { route: "register", source: sourceFor(request), input: {
           email: typeof body.email === "string" ? body.email : "", password: typeof body.password === "string" ? body.password : "",
-          phone: typeof body.phone === "string" ? body.phone : "", recoveryEmail: null, adultAffirmed: body.adult_affirmed === true
+          phone: typeof body.phone === "string" ? body.phone : null, recoveryEmail: null, adultAffirmed: body.adult_affirmed === true
         } }
       : { route: "resend", source: sourceFor(request), input: { email: parsed.data.email } });
     if (admission !== undefined) sourceAdmissions.set(request, admission);
@@ -2520,7 +2528,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   void api.register(async apple=>{
     // Replace the inherited billing-only parser in this callback's encapsulated scope.
-    // The parent still refuses form bodies on all routes except the xMoney notification.
+    // The parent registers no form-body parser (its one extra parser is NETOPIA's notify route's), so form bodies
+    // stay refused everywhere else.
     if (apple.hasContentTypeParser('application/x-www-form-urlencoded')) apple.removeContentTypeParser('application/x-www-form-urlencoded');
     apple.addContentTypeParser('application/x-www-form-urlencoded',{parseAs:'string',bodyLimit:8192},(_request,body,done)=>{
       try {const form=new URLSearchParams(body as string);const value:Record<string,string>={};for(const [key,member] of form){if(Object.hasOwn(value,key)||!['state','code','error','error_description','user'].includes(key))throw new SocialAuthError('SOCIAL_PROOF_INVALID');value[key]=member;}done(null,value);}catch{done(new SocialAuthError('SOCIAL_PROOF_INVALID'));}
@@ -2570,6 +2579,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const security=options.consumerSecurity;
     api.get('/v1/account/auth-methods',routePolicy('GET /v1/account/auth-methods'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/auth-methods',sourceFor(request).ip))return reply;return reply.send(await security.authMethods(request.authenticatedSession!));});
     api.post('/v1/account/auth-methods/remove',credentialRoutePolicy('POST /v1/account/auth-methods/remove'),async(request,reply)=>{await security.removeAuthMethod(request.body,request.authenticatedSession!,sourceFor(request));return reply.status(204).send();});
+    api.get('/v1/account/mfa-recovery',routePolicy('GET /v1/account/mfa-recovery'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/mfa-recovery',sourceFor(request).ip))return reply;return reply.send(await security.pendingMfaRecovery(request.authenticatedSession!));});
+    api.post('/v1/account/mfa-recovery/cancel',credentialRoutePolicy('POST /v1/account/mfa-recovery/cancel'),async(request,reply)=>reply.send(await security.cancelPendingMfaRecovery(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/account/recovery-codes/regenerate',credentialRoutePolicy('POST /v1/account/recovery-codes/regenerate'),async(request,reply)=>reply.send(await security.regenerateRecoveryCodes(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/auth/passkeys/step-up/complete',{...credentialRoutePolicy('POST /v1/auth/passkeys/step-up/complete'),bodyLimit:32768},async(request,reply)=>{

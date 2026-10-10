@@ -1,47 +1,66 @@
 // apps/api/src/billing/connectors.ts
-import { timingSafeEqual } from "node:crypto";
-import { readCustodyAuthorizationHeader, readCustodyTextSecretBytes } from "@debateai/crypto";
-import { isUnverifiedCompanyFact, type InvoiceIssuer, type SellerCompany, type TaxEngine } from "@debateai/billing-core";
-import type { BillingEnvironmentGroup } from "@debateai/register";
+import { closeSync, constants, fstatSync, openSync, readFileSync, type Stats } from "node:fs";
+import { readCustodyAuthorizationHeader } from "@debateai/crypto";
 import {
-  XMoneyClient,
-  aesKeyFromPrivateKey,
-  xmoneyEnvironmentOf,
-  type XMoneyEnvironment
-} from "@debateai/payments-xmoney";
+  isUnverifiedCompanyFact,
+  type CardPayments,
+  type InvoiceIssuer,
+  type PaymentEnvironment,
+  type SellerCompany,
+  type TaxEngine
+} from "@debateai/billing-core";
+import { TypedDomainError } from "@debateai/kernel";
+import {
+  NETOPIA_ENVIRONMENT_KEYS,
+  type AdmissionPolicy,
+  type BillingEnvironmentGroup,
+  type NetopiaEnvironmentGroup,
+  type NetopiaEnvironmentKey
+} from "@debateai/register";
+import {
+  createNetopiaPayments,
+  isNetopiaPosSignature,
+  loadTrustedKeys,
+  netopiaEnvironmentOf,
+  type NoticeTrust
+} from "@debateai/payments-netopia";
 import { QuadernoTaxEngine } from "@debateai/tax-quaderno";
 import { SmartBillInvoiceIssuer } from "@debateai/invoice-smartbill";
 
-export type BillingConnectors = Readonly<{
-  xmoney: XMoneyClient;
-  /** A22 / R-35: derived from XMONEY_API_BASE_URL; the checkout reply's sdk_environment and the customer link's environment. */
-  xmoneyEnvironment: XMoneyEnvironment;
-  tax: TaxEngine;
-  /** P5's SmartBill issuer: `creditPartial` and `pdf` present, `lookup` absent (R-24). */
-  invoiceRo: InvoiceIssuer;
-  /** L1's records key (the same Buffer main.ts holds); billing seals profiles, quotes and evidence with it. */
+/**
+ * NETOPIA (spec 2026-10-05 §2.3, §2.17.1): what the provider-only mode builds (ruling C-9), and the first members of
+ * every BillingConnectors. `payments` is the port (main.ts wraps it in TimeShiftedCardPayments under a sandbox clock);
+ * `noticeTrust` is what NETOPIA's message is verified with (our POS signature and the trusted keys read at boot).
+ */
+export type NetopiaConnectors = Readonly<{
+  payments: CardPayments;
+  noticeTrust: NoticeTrust;
+  /** Follows NETOPIA_API_BASE_URL (§2.4.1): which NETOPIA system this deployment's payments are made in. */
+  paymentEnvironment: PaymentEnvironment;
+  /** L1's records key (the same Buffer main.ts holds); the notice intake seals what it stores with it. */
   recordsKey: Buffer;
-  /** A23: bytes, held by boot.hold and zeroed at shutdown; the HMAC key for signOrderPayload and the AES key source. */
-  xmoneyPrivateKey: Buffer;
-  xmoneyPublicKey: string;
-  siteId: string;
-  ownerReportEmail: string;
   /**
    * R-7: PUBLIC_APP_URL reduced to its origin (no path, no trailing slash), so `${publicAppUrl}/cancel` and
-   * `new URL(path, publicAppUrl)` name the same page — xMoney's backUrl, the /settings/card return and the cancel links.
+   * `new URL(path, publicAppUrl)` name the same page — the return and notify addresses and the emailed links.
    */
   publicAppUrl: string;
 }>;
 
-type Closable = { end(): Promise<void> };
+export type BillingConnectors = NetopiaConnectors & Readonly<{
+  tax: TaxEngine;
+  /** P5's SmartBill issuer: `creditPartial` and `pdf` present, `lookup` absent (R-24). */
+  invoiceRo: InvoiceIssuer;
+  ownerReportEmail: string;
+}>;
 
 /** The configured billing custody files, for assertPublicationSecretDomains' path-aliasing check. */
 export function billingCustodyPaths(environment: Readonly<{
-  XMONEY_PRIVATE_KEY_PATH?: string | undefined; QUADERNO_API_KEY_PATH?: string | undefined;
-  SMARTBILL_CREDENTIALS_PATH?: string | undefined; OWNER_REPORT_EMAIL_PATH?: string | undefined;
+  NETOPIA_API_KEY_PATH?: string | undefined; NETOPIA_IPN_KEYS_PATH?: string | undefined;
+  QUADERNO_API_KEY_PATH?: string | undefined; SMARTBILL_CREDENTIALS_PATH?: string | undefined;
+  OWNER_REPORT_EMAIL_PATH?: string | undefined;
 }>): string[] {
   return [
-    environment.XMONEY_PRIVATE_KEY_PATH, environment.QUADERNO_API_KEY_PATH,
+    environment.NETOPIA_API_KEY_PATH, environment.NETOPIA_IPN_KEYS_PATH, environment.QUADERNO_API_KEY_PATH,
     environment.SMARTBILL_CREDENTIALS_PATH, environment.OWNER_REPORT_EMAIL_PATH
   ].filter((path): path is string => path !== undefined);
 }
@@ -106,27 +125,20 @@ export function assertMailedCompanyFacts(company: SellerCompany): void {
   }
 }
 
-/** The public key goes to every browser; if it were the private key, anyone could sign orders and read notices. */
-function refuseTheSecretAsPublic(publicKey: string, privateKey: Buffer): void {
-  const candidate = Buffer.from(publicKey, "latin1");
-  if (candidate.byteLength === privateKey.byteLength && timingSafeEqual(candidate, privateKey)) {
-    throw new TypeError("BILLING_CONFIGURATION_INVALID:XMONEY_PUBLIC_KEY");
-  }
-}
-
 /**
- * Going from stage to live (P1b `openRecordCounts("stage")`): a live boot is refused while any stage subscription or
- * charge is still open — the live renewal pass never rebills a stage order, so such a subscription would otherwise
- * stay ACTIVE for ever — and (P2-I4) while any outbox job of a stage charge is still queued: the live outbox would
- * claim it and run it against live xMoney, SmartBill or Quaderno (each handler also refuses it, DEAD
- * OTHER_XMONEY_SYSTEM). The runbook's switch-on step cancels or withdraws every sandbox subscription first.
+ * Going live (spec 2026-10-05 §2.5.4): a live boot is refused while anything of another payment system is still
+ * open — a subscription or charge of the previous card processor, or a NETOPIA sandbox one after the same-host
+ * switch — and while any outbox job of such a charge is still queued: the live outbox would claim it and run it
+ * against live SmartBill or Quaderno (each handler also refuses it, DEAD OTHER_PAYMENT_SYSTEM). The runbook's
+ * switch-on step closes them first.
+ * The counts are content-free (`BillingRepository.openOtherSystemRecordCounts`).
  */
-export function assertStageRecordsClosed(
+export function assertOtherSystemRecordsClosed(
   counts: Readonly<{ subscriptions: number; charges: number; jobs: number }>
 ): void {
   if (counts.subscriptions > 0 || counts.charges > 0 || counts.jobs > 0) {
     throw new TypeError(
-      `BILLING_STAGE_RECORDS_OPEN:subscriptions=${counts.subscriptions}:charges=${counts.charges}:jobs=${counts.jobs}`
+      `BILLING_OTHER_SYSTEM_RECORDS_OPEN:subscriptions=${counts.subscriptions}:charges=${counts.charges}:jobs=${counts.jobs}`
     );
   }
 }
@@ -144,37 +156,169 @@ export function assertNoRecordsDatedAhead(counts: Readonly<{ rows: number; jobs:
   }
 }
 
+/** Which billing exists (spec 2026-10-05 §2.7.3, ruling C-9). Local mode never bills (§2.2 rule 9). */
+export type BillingMode = "OFF" | "PROVIDER_ONLY" | "ON";
+
+type NetopiaSource = Readonly<Partial<Record<NetopiaEnvironmentKey, string | undefined>>>;
+const isSet = (value: string | undefined): boolean => value !== undefined && value.trim() !== "";
+
+export function billingModeOf(input: Readonly<{
+  hosted: boolean; billingEnabled: boolean; environment: NetopiaSource;
+}>): BillingMode {
+  if (!input.hosted) return "OFF";
+  if (input.billingEnabled) return "ON";
+  return NETOPIA_ENVIRONMENT_KEYS.every((key) => isSet(input.environment[key])) ? "PROVIDER_ONLY" : "OFF";
+}
+
 /**
- * Builds every billing connector from the custody files. Called under boot.runSync, so a refusal
- * closes the boot ledger (DL7-F7). SmartBill's code is built from the company's facts first, before any
- * secret is read (smartBillCompanyCif; main.ts passes SELLER_COMPANY, tests and the development fakes
- * pass the mirror filled with their fake's code), and the facts every email prints must be filled in too
- * (assertMailedCompanyFacts, P2-M35). The private key
- * (L1's text-secret loader, A23) is handed to `hold` the moment it exists; Quaderno's key, SmartBill's
- * `user:token` and the owner's address are text credentials read like provider keys
- * (`readCustodyAuthorizationHeader`).
+ * The provider-only mode serves NETOPIA's notify address, and a message that fails verification charges the
+ * source-keyed billingNotify budget (spec §2.7.1) before it is quarantined for 14 days. A register version that does
+ * not seal that scope would leave such messages unlimited, so this boot is refused with the code billing on uses
+ * (main.ts's billing-runtime stage), by name (final review protocol-3).
+ */
+export function assertProviderOnlyNotifySealed(admission: Pick<AdmissionPolicy, "billingNotify">): void {
+  if (admission.billingNotify === null) {
+    throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
+      "NETOPIA's notify address is served in the provider-only mode, so the register must seal the billingNotify admission scope");
+  }
+}
+
+/** With billing off: the first NETOPIA key left out of a group that is set in part, for one boot line; else null. */
+export function incompleteNetopiaKey(environment: NetopiaSource): NetopiaEnvironmentKey | null {
+  const set = NETOPIA_ENVIRONMENT_KEYS.filter((key) => isSet(environment[key]));
+  if (set.length === 0 || set.length === NETOPIA_ENVIRONMENT_KEYS.length) return null;
+  return NETOPIA_ENVIRONMENT_KEYS.find((key) => !isSet(environment[key])) ?? null;
+}
+
+/**
+ * Who may own NETOPIA's trusted-key file (spec §2.17.1, SR-28): root, and never the API's own user, because a trust
+ * list the API user could write would let anyone who controls that user forge NETOPIA's messages. `apiUid` -1 names no
+ * user (the development fakes and the tests, whose file is their own).
+ */
+export type TrustedKeyFileOwners = Readonly<{ ownerUid: number; apiUid: number }>;
+export type TrustedKeyFileProblem =
+  | "ABSENT" | "NOT_A_FILE" | "TOO_LARGE" | "WRITABLE_BY_API_USER" | "NOT_ROOT_OWNED" | "GROUP_OR_OTHER_WRITABLE";
+
+/** A trust list is a few PEM blocks; anything near this size is not one. */
+const TRUSTED_KEYS_MAX_BYTES = 65_536;
+
+export function productionTrustedKeyOwners(): TrustedKeyFileOwners {
+  return Object.freeze({ ownerUid: 0, apiUid: typeof process.getuid === "function" ? process.getuid() : -1 });
+}
+
+export function trustedKeyFileProblem(
+  stat: Pick<Stats, "uid" | "mode" | "size"> & Readonly<{ isFile(): boolean }>, owners: TrustedKeyFileOwners
+): TrustedKeyFileProblem | null {
+  if (!stat.isFile()) return "NOT_A_FILE";
+  if (stat.size > TRUSTED_KEYS_MAX_BYTES) return "TOO_LARGE";
+  if (stat.uid === owners.apiUid) return "WRITABLE_BY_API_USER";
+  if (stat.uid !== owners.ownerUid) return "NOT_ROOT_OWNED";
+  if ((stat.mode & 0o022) !== 0) return "GROUP_OR_OTHER_WRITABLE";
+  return null;
+}
+
+/**
+ * Reads the trusted-key file through one descriptor opened without following a link, judging the very file it reads
+ * (no check-then-open race). BILLING_IPN_KEYS_FILE_UNSAFE:<problem> names what is wrong, never the content.
+ */
+export function readTrustedKeyFile(path: string, owners: TrustedKeyFileOwners): string {
+  let descriptor: number;
+  try {
+    descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") throw new TypeError("BILLING_IPN_KEYS_FILE_UNSAFE:ABSENT");
+    if (code === "ELOOP" || code === "EMLINK") throw new TypeError("BILLING_IPN_KEYS_FILE_UNSAFE:NOT_A_FILE");
+    throw error;
+  }
+  try {
+    const problem = trustedKeyFileProblem(fstatSync(descriptor), owners);
+    if (problem !== null) throw new TypeError(`BILLING_IPN_KEYS_FILE_UNSAFE:${problem}`);
+    return readFileSync(descriptor, "utf8");
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
+function netopiaInvalid(key: NetopiaEnvironmentKey): never {
+  throw new TypeError(`BILLING_CONFIGURATION_INVALID:${key}`);
+}
+
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["127.0.0.1", "[::1]", "localhost"]);
+
+/** The development fakes' base (apps/runner/src/dev-billing-fakes.ts): plain http on a loopback address only. */
+function isLoopbackHttp(baseUrl: string): boolean {
+  try {
+    const url = new URL(baseUrl);
+    return url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * NETOPIA's connector (spec §2.4.1, §2.17.1). The base and the POS signature are checked first, before any file is
+ * read; then the trusted-key file (root's, §2.17.1) and the API key (a custody text file, read as a string and held
+ * for the process's life, `readCustodyAuthorizationHeader`'s precedent). `trustedKeyOwners` and `allowLoopbackBase`
+ * exist for the development fakes and the tests; main.ts passes neither.
+ */
+export function loadNetopiaConnectors(input: Readonly<{
+  environment: NetopiaEnvironmentGroup;
+  recordsKey: Buffer;
+  fetch?: typeof fetch;
+  trustedKeyOwners?: TrustedKeyFileOwners;
+  allowLoopbackBase?: true;
+}>): NetopiaConnectors {
+  const environment = input.environment;
+  const known = netopiaEnvironmentOf(environment.netopiaApiBaseUrl);
+  const paymentEnvironment: PaymentEnvironment = known
+    ?? (input.allowLoopbackBase === true && isLoopbackHttp(environment.netopiaApiBaseUrl)
+      ? "sandbox" : netopiaInvalid("NETOPIA_API_BASE_URL"));
+  if (!isNetopiaPosSignature(environment.netopiaPosSignature)) netopiaInvalid("NETOPIA_POS_SIGNATURE");
+  const pem = readTrustedKeyFile(environment.netopiaIpnKeysPath, input.trustedKeyOwners ?? productionTrustedKeyOwners());
+  const keys = loadTrustedKeys(pem);
+  const apiKey = readCustodyAuthorizationHeader(environment.netopiaApiKeyPath);
+  const payments = createNetopiaPayments(
+    { baseUrl: environment.netopiaApiBaseUrl, apiKey, posSignature: environment.netopiaPosSignature },
+    input.fetch === undefined ? {} : { fetch: input.fetch }
+  );
+  return Object.freeze({
+    payments,
+    noticeTrust: Object.freeze({ posSignature: environment.netopiaPosSignature, keys }),
+    paymentEnvironment,
+    recordsKey: input.recordsKey,
+    publicAppUrl: environment.publicAppUrl
+  });
+}
+
+/**
+ * Builds every billing connector from the custody files. Called under boot.runSync, so a refusal closes the boot
+ * ledger (DL7-F7). SmartBill's code is built from the company's facts first, before any secret is read
+ * (smartBillCompanyCif; main.ts passes SELLER_COMPANY, tests and the development fakes pass the mirror filled with
+ * their fake's code), and the facts every email prints must be filled in too (assertMailedCompanyFacts, P2-M35). Then
+ * NETOPIA's connector (loadNetopiaConnectors), and Quaderno's key, SmartBill's `user:token` and the owner's address,
+ * read as text credentials (`readCustodyAuthorizationHeader`).
  */
 export function loadBillingConnectors(input: Readonly<{
   environment: BillingEnvironmentGroup;
   company: SellerCompany;
   recordsKey: Buffer;
-  hold: (resource: Closable) => unknown;
   fetch?: typeof fetch;
+  trustedKeyOwners?: TrustedKeyFileOwners;
+  allowLoopbackBase?: true;
 }>): BillingConnectors {
   const environment = input.environment;
   const companyCif = smartBillCompanyCif(input.company);
   assertMailedCompanyFacts(input.company);
-  const xmoneyPrivateKey = readCustodyTextSecretBytes(environment.xmoneyPrivateKeyPath);
-  input.hold({ end: async () => { xmoneyPrivateKey.fill(0); } });
-  aesKeyFromPrivateKey(xmoneyPrivateKey).fill(0);
-  refuseTheSecretAsPublic(environment.xmoneyPublicKey, xmoneyPrivateKey);
   const fetchOption = input.fetch === undefined ? {} : { fetch: input.fetch };
+  const netopia = loadNetopiaConnectors({
+    environment, recordsKey: input.recordsKey, ...fetchOption,
+    ...(input.trustedKeyOwners === undefined ? {} : { trustedKeyOwners: input.trustedKeyOwners }),
+    ...(input.allowLoopbackBase === undefined ? {} : { allowLoopbackBase: input.allowLoopbackBase })
+  });
   const smartbill = smartBillCredentials(readCustodyAuthorizationHeader(environment.smartbillCredentialsPath));
   return Object.freeze({
-    xmoney: new XMoneyClient({
-      baseUrl: environment.xmoneyApiBaseUrl, privateKey: xmoneyPrivateKey, siteId: environment.xmoneySiteId, ...fetchOption
-    }),
-    xmoneyEnvironment: xmoneyEnvironmentOf(environment.xmoneyApiBaseUrl),
+    ...netopia,
     tax: new QuadernoTaxEngine({
       baseUrl: environment.quadernoApiBaseUrl,
       apiKey: readCustodyAuthorizationHeader(environment.quadernoApiKeyPath),
@@ -184,11 +328,6 @@ export function loadBillingConnectors(input: Readonly<{
       baseUrl: environment.smartbillApiBaseUrl, username: smartbill.username, token: smartbill.token,
       companyCif, series: environment.smartbillSeries, ...fetchOption
     }),
-    recordsKey: input.recordsKey,
-    xmoneyPrivateKey,
-    xmoneyPublicKey: environment.xmoneyPublicKey,
-    siteId: environment.xmoneySiteId,
-    ownerReportEmail: ownerAddress(readCustodyAuthorizationHeader(environment.ownerReportEmailPath)),
-    publicAppUrl: environment.publicAppUrl
+    ownerReportEmail: ownerAddress(readCustodyAuthorizationHeader(environment.ownerReportEmailPath))
   });
 }

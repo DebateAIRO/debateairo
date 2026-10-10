@@ -147,6 +147,7 @@ process start: restart both units after either change.
 | `/etc/debateai/hatchet.pgpass` | `0600` | `root:root` | the `debateai_prod_hatchet` role's password, read once by `bootstrap.sql` (§4) |
 | `/etc/debateai/api/` | `0700` | `debateai-api` | `kek.bin`, `corpus-kek.bin`, `blind-index-key.bin`, `audit-source-ip-salt.bin`, `support-kek.bin` (the support chat's master key — the file name is checked and must be exactly this), `records-key.bin` (the records key, §9) |
 | `/etc/debateai/api/providers/` | `0700` | `debateai-api` | the API's own copy of each vendor credential (V-9, §11) |
+| `/etc/debateai/api/billing/` | `0700` | `debateai-api` | billing's key files, written only by the guided setup (§14.2): `netopia-api-key`, `quaderno-api-key`, `smartbill-credentials` and `owner-report-email` (`0600`, `debateai-api`), and NETOPIA's public key `netopia-ipn-keys.pem` (`0644`, owned by root). The setup refuses (`BILLING_SETUP_UNSAFE_FOLDER`) unless `/etc/debateai/api`, and this folder if it exists, are real folders, not links, owned by `debateai-api` |
 | `/etc/debateai/runner/` | `0700` | `debateai-runner` | `kek.bin` (the runner's own copy of the same bytes — a master-key rotation must replace this file too, §3 "Changing a master key") |
 | `/etc/debateai/runner/providers/` | `0700` | `debateai-runner` | the runner's own copy of each vendor credential (V-9, §11) |
 | `/etc/debateai/api-previous/`, `/etc/debateai/runner-previous/` | `0700` | `debateai-api`, `debateai-runner` | the previous master keys, **only during a changeover** (§3 "Changing a master key"); absent in the steady state |
@@ -550,6 +551,8 @@ install -m 0644 deploy/postgres/postgresql.hardening.conf \
   /etc/postgresql/18/main/conf.d/hardening.conf
 install -m 0640 -o postgres -g postgres deploy/postgres/pg_hba.conf.template \
   /etc/postgresql/18/main/pg_hba.conf
+install -m 0640 -o postgres -g postgres deploy/postgres/pg_ident.conf.template \
+  /etc/postgresql/18/main/pg_ident.conf
 install -d -m 0700 -o postgres -g postgres /etc/debateai/postgres-tls
 # server.crt SAN must include IP:127.0.0.1 and IP:::1; server.key is 0600 postgres:postgres
 systemctl restart postgresql
@@ -573,6 +576,21 @@ What the two config files pin, and why:
   `postgres` OS user (that is how backups run), `hostssl` on `127.0.0.1/32` and `::1/128`, and
   `host all all 0.0.0.0/0 reject` + `::/0 reject` **last**. First match wins, so order is
   load-bearing. `hatchet` is reachable only by `debateai_prod_hatchet` (audit L7-F2).
+- **No line for the staff readiness writer, and no ident map.** The auth DB batch step creates
+  `debateai_staff_readiness_writer` (no password, may only publish and withdraw the staff alert
+  readiness row). Only the private preview's team-unlock helper uses it, and the preview admits
+  it by peer from one dedicated no-login OS user (`debateai-readiness`) with lines it writes
+  itself (`deploy/preview-lifecycle/v1/README.md` step 7). This VPS has no such helper, so its
+  `pg_hba.conf` names that login nowhere (it exists but cannot log in) and `pg_ident.conf` is
+  installed with **no maps at all**. Nothing to create here: no `debateai-readiness` user, no
+  readiness line. Never map `root` to any role: peer only sees a uid, and a process running as
+  uid 0 that reaches the socket (for example a root process in the Hatchet container, which
+  bind-mounts `/var/run/postgresql`) would count as root. To confirm on the VPS, this must print
+  `0` and `0`:
+
+  ```sh
+  sudo -u postgres psql -XAt -c "SELECT count(*) FROM pg_hba_file_rules WHERE 'debateai_staff_readiness_writer' = ANY(user_name)" -c "SELECT count(*) FROM pg_ident_file_mappings"
+  ```
 - So there are exactly **two ways in**, and every client URL must say which: the unix socket
   (`@localhost/debateai?host=/var/run/postgresql`, what every service uses), or TLS on loopback
   (`@127.0.0.1/debateai?sslmode=verify-full&sslrootcert=/etc/debateai/postgres-tls/ca.crt`). A
@@ -914,6 +932,25 @@ If the 0093 steps above have already run on this host, the API's login already h
 `pnpm db:migrate` is the only step needed, and the API keeps working throughout: the privileges reach its role the
 moment the migration commits. If both migrations are pending, one pass through the 0093 steps covers both. The check is the same: one `retention.purged` line at the API's first purge
 check, and a test sign-up that succeeds. **Rolling back** the code needs nothing, for the same reason as 0093.
+
+### Upgrading to the answer-writer prompt v2 release (serve.synthesizer.v2)
+
+This release supersedes the answer writer's sealed prompt `serve.synthesizer.v1` with `serve.synthesizer.v2`, which
+also tells the model the exact name of the one served-number slot (`number:final-strength`) and the identifier form
+the runner accepts. Its fingerprint is the code-owned row `composerContractHash`, so it moves. No migration.
+
+- **Publish a new hosted register version** from the new checkout with `pnpm register:publish-hosted` and the same
+  `/etc/debateai/register/hosted-register.json` (§11), pin it in both `EnvironmentFile`s and restart both units.
+  Until then the runner sends the v2 prompt but records answer-writing calls under the v1 fingerprint the pinned
+  version carries. Do this before any later `pnpm hosted:publish-provider-set`, for the reason given in the
+  publication-check section above.
+- **Restart once, with no debate writing its answer.** The fingerprint is also the key under which the runner
+  finds a debate's earlier answer-writing attempts. A debate that is writing its answer when the new version is
+  pinned no longer sees those attempts: it may ask its writer again (extra paid calls) and its writer-seat
+  continuity starts over. So put the checkout in place, publish, pin, and restart both units in one step, at a
+  moment when `unfinished` from the command in the verdict-story section above is 0 (or accept that rare repeat).
+- Versions already sealed keep the v1 fingerprint; nothing is edited. **Rolling back** the code means pinning the
+  register version the older code was running on again.
 
 ### Upgrading an existing host (paid plans Part 1a)
 
@@ -1814,7 +1851,7 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units; the daily ceiling is below the per-run one plus the answer's overrun; or `serve_reserve_basis_points` is not a whole number from 0 to 9999, or `serve_overrun_basis_points` not one from 0 to 10000; or the budget rule's three members are not all present or all absent, or one is out of range (`admission_close_basis_points` from 5000 to 10000, `finish_up_to_basis_points` from 10000 to 20000, `waiting_line_per_person` from 1 to 10) |
 | `STORY_DAILY_CEILING_INSUFFICIENT` | the daily ceiling holds one debate but not its verdict story too (the story's code-owned cap and margin, 0.06 USD); raise `daily_ceiling_micros` |
 | `RUN_CEILING_BELOW_ONE_CALL` | with the budget rule's three members in `costEnvelopePolicy`, the arguing ceiling cannot pay for the opening position's call at the cheapest price among one plan's models, priced on `providerTargets` (the start-up check, "The boot check" under the cost envelopes above); raise `per_run_ceiling_micros` or lower `serve_reserve_basis_points` |
-| `BILLING_PLANS_INVALID` / `BILLING_POLICY_INVALID` | a billing row in the file is not the register's shape: prices in whole cents, plans FREE, PLUS, PRO, MAX in price order; the policy is strict (no `xmoney_environment`, no owner address) |
+| `BILLING_PLANS_INVALID` / `BILLING_POLICY_INVALID` | a billing row in the file is not the register's shape: prices in whole cents, plans FREE, PLUS, PRO, MAX in price order; the policy is strict (no payment environment, no owner address: the environment follows `NETOPIA_API_BASE_URL`) |
 | `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` | billing is switched on without the three budget members in `costEnvelopePolicy`, or without plans |
 | `ASK_ROOM_ADMISSION_UNSEALED` | the file seals the band (the budget rule's three members in `costEnvelopePolicy`) without `askRoomReads`, the room read's budget. Refused by the plan (a dry run included), by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ASK_ROOM_ADMISSION_UNSEALED`, and when the API starts. Add `askRoomReads` to the same file (go-live line 13, "Publishing them" under the cost envelopes above) |
 | `PUBLICATION_CHECK_POLICY_INVALID` | the file's optional `publicationCheckPolicy` is not `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 60000, or the member is `null` |
@@ -2126,83 +2163,87 @@ Billing is **off** until you publish a `billingPolicy` version with `enabled: tr
 - Settings shows no subscription card;
 - the site keeps its site-wide daily limit only.
 
-Local mode never has billing at all. Spec: `docs/superpowers/specs/2026-09-29-paid-plans-and-payments-design.md`.
+Local mode never has billing at all. Spec: `docs/superpowers/specs/2026-09-29-paid-plans-and-payments-design.md`, with
+the card payments of `docs/superpowers/specs/2026-10-05-netopia-payments-design.md` (NETOPIA Payments).
 
 ### 14.1 What you need before you start
 
-- An approved xMoney merchant account. In the xMoney dashboard, under Sites, find the site's id, its private key
-  and its public key.
+- A NETOPIA Payments merchant account with a point of sale (POS) for the site, in the sandbox first. In NETOPIA's admin
+  you find the POS signature (five groups of four characters) and you create the API key. NETOPIA also gives you the
+  public key that proves its payment messages are genuine; it publishes one in its own shop plugins too.
+- Recurring payments switched on for that account by NETOPIA (the monthly renewals charge the saved card).
 - A Quaderno account and its API key (Business plan).
 - A SmartBill account on the Platinum plan, with its API user and token.
 - The company details, filled in (§14.7).
-- The official Visa and Mastercard artwork files (§14.7).
-- Nobody but you ever sees a key. You paste each key into its file yourself, and no agent reads it.
+- The official NETOPIA, Visa and Mastercard artwork files (§14.7).
+- Nobody but you ever sees a key. You type each key at the guided setup's hidden prompt yourself, and no agent reads it.
 
-### 14.2 The key files and the API settings
+### 14.2 The guided setup and the check command
 
-Every secret is a file the API reads as its own user, mode `0600`, in a `0700` directory (§3 "The key-file
-contract"). Create the directory once:
-
-```sh
-install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api/billing
-```
-
-Each file holds **one line** and nothing else:
-
-| File | The one line |
-|---|---|
-| `xmoney-private-key` | the site's private key, as the xMoney dashboard shows it |
-| `quaderno-api-key` | the Quaderno API key |
-| `smartbill-credentials` | `user:token`: the SmartBill API user, a colon, the token |
-| `owner-report-email` | the address the quarterly tax summary goes to |
-
-Run the four lines below as root, **one block at a time**: each asks for its value at a prompt, so the value never
-appears on screen, on a command line, in shell history or in an editor's temporary copy. Paste one, answer its
-prompt, then paste the next (a waiting prompt would take the next pasted line as its answer). Each file is created
-`0600` and owned by `debateai-api`. The single newline the prompt adds is accepted by `readCustodyAuthorizationHeader`
-and by `readCustodyTextSecretBytes` (which trims, A23). A file that already exists is never replaced: to change a key,
-remove its file on purpose, run its line again, then restart `debateai-api`. The address is not a secret, so its
-prompt shows what you type, and a typo is caught at once.
+All billing settings and key files are entered with one guided command, run as root. It asks for each value one at a
+time, in plain words, and says where to find it. It has four sections, `netopia`, `quaderno`, `smartbill` and
+`owner-email`; run them all at once, or one by name.
 
 ```sh
-test ! -e /etc/debateai/api/billing/xmoney-private-key && (umask 0177 && systemd-ask-password 'xMoney private key' > /etc/debateai/api/billing/xmoney-private-key) && chown debateai-api:debateai-api /etc/debateai/api/billing/xmoney-private-key
+bash /opt/debateai/dialectical-engine/deploy/vps/billing-setup.sh
 ```
+
+What it asks, and what it does with each answer:
+
+- **NETOPIA:** test (sandbox) or live, which sets `NETOPIA_API_BASE_URL` to `https://secure-sandbox.netopia-payments.com`
+  or `https://secure.netopia-payments.com/api`; the POS signature (`NETOPIA_POS_SIGNATURE`); the API key, at a hidden
+  prompt, into `/etc/debateai/api/billing/netopia-api-key` (`NETOPIA_API_KEY_PATH`); and NETOPIA's public key, into
+  `/etc/debateai/api/billing/netopia-ipn-keys.pem` (`NETOPIA_IPN_KEYS_PATH`). For the public key, paste the block or
+  blocks NETOPIA gave you (an empty line ends the paste), or choose the key NETOPIA publishes in its shop plugins, which
+  this kit carries as `deploy/vps/netopia/published-ipn-key.pem`. The script prints the fingerprint of every key it
+  writes; the published key's begins with `eeba3b06`. Check that fingerprint with NETOPIA before you choose it: a wrong
+  key means no payment message is ever accepted.
+- **Quaderno:** its API address (`QUADERNO_API_BASE_URL`, the sandbox address while testing) and the API key, at a
+  hidden prompt, into `/etc/debateai/api/billing/quaderno-api-key` (`QUADERNO_API_KEY_PATH`).
+- **SmartBill:** its API address (`SMARTBILL_API_BASE_URL`, as `docs/architecture/smartbill-api-facts.md` records it),
+  the invoice series agreed with the accountant (`SMARTBILL_SERIES`), then the API user (the email address you sign in
+  to SmartBill with, shown as you type) and, at a hidden prompt, the API token. The setup saves the two as one line,
+  `user:token` (the user, a colon, the token), into `/etc/debateai/api/billing/smartbill-credentials`
+  (`SMARTBILL_CREDENTIALS_PATH`).
+- **The owner's address:** where the quarterly tax summary and every owner email go, into
+  `/etc/debateai/api/billing/owner-report-email` (`OWNER_REPORT_EMAIL_PATH`). It is not a secret, so you see what you type.
+
+A key never appears on screen, on a command line, in shell history or in an editor's temporary copy. Each key file is
+one line, mode `0600`, owned by `debateai-api`, in the `0700` folder `/etc/debateai/api/billing` (§3 "The key-file
+contract"). The public-key file is different on purpose: it is owned by root, mode `0644`, and the API's own user can
+never write it, because whoever could change it could forge payment messages. The plain values go into one block of
+`/etc/debateai/api.env`, between the lines `# >>> billing settings (billing-setup.sh) >>>` and
+`# <<< billing settings <<<`. The script replaces only that block, keeps a dated copy of the file before it changes
+it, and turns any line outside the block that sets the same setting into a comment with a note, because systemd would
+use the later one. Before its first question it refuses with `BILLING_SETUP_UNSAFE_FOLDER` unless `/etc/debateai/api`,
+and `/etc/debateai/api/billing` if it exists, is a real folder (not a link) owned by `debateai-api`, as §3 lays them
+out. Put them back as §3 says; a link there can be planted by the API's own user, so first find out how it got there.
+A key file that exists is never replaced unless you ask for its section by name with `--replace`:
 
 ```sh
-test ! -e /etc/debateai/api/billing/quaderno-api-key && (umask 0177 && systemd-ask-password 'Quaderno API key' > /etc/debateai/api/billing/quaderno-api-key) && chown debateai-api:debateai-api /etc/debateai/api/billing/quaderno-api-key
+bash /opt/debateai/dialectical-engine/deploy/vps/billing-setup.sh --replace netopia
 ```
+
+The setup ends by running the check command. Run it yourself at any time, as the API's own user with the API's
+settings, billing on or off:
 
 ```sh
-test ! -e /etc/debateai/api/billing/smartbill-credentials && (umask 0177 && systemd-ask-password 'SmartBill user:token' > /etc/debateai/api/billing/smartbill-credentials) && chown debateai-api:debateai-api /etc/debateai/api/billing/smartbill-credentials
+systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:check
 ```
+
+It prints one line per item, a tick or a cross and a plain sentence: every billing setting present and well formed,
+and whether it means the sandbox or live; every key file there, one line, with the right mode and owner; the public-key
+file owned by root, every key in it readable and long enough, its fingerprint, and whether it is NETOPIA's published
+key; whether NETOPIA accepts the API key (one status read of an order that does not exist: nothing is charged); whether
+the notify address reaches the API's notify route without a redirect (§14.5: it posts one empty, unsigned message, which
+the route answers "try again" and the API's journal logs as `billing.notice.unverified` with `NOTICE_HEADER_MISSING`;
+a `404` means the API does not serve the route yet); the published register version's billing members (§14.4); and
+whether the company details are still in square brackets (§14.7). It never prints a key. Restart the API after any
+change:
 
 ```sh
-test ! -e /etc/debateai/api/billing/owner-report-email && (umask 0177 && systemd-ask-password --echo=yes 'Owner report email address' > /etc/debateai/api/billing/owner-report-email) && chown debateai-api:debateai-api /etc/debateai/api/billing/owner-report-email
+systemctl restart debateai-api
 ```
-
-The `umask` runs in a subshell, so your own shell session's mask stays as it was. Check the directory — the two
-`find` lines printing nothing is the pass:
-
-```sh
-stat -c '%a %U %G %n' /etc/debateai/api/billing/*
-find /etc/debateai/api/billing -type f ! -perm 0600 -print
-find /etc/debateai/api/billing ! -user debateai-api -print
-```
-
-Add these lines to `/etc/debateai/api.env`. Their shapes are in `deploy/vps/env/api.env.example`:
-
-| Variable | Value |
-|---|---|
-| `XMONEY_PRIVATE_KEY_PATH` | `/etc/debateai/api/billing/xmoney-private-key` |
-| `XMONEY_PUBLIC_KEY` | the site's public key (not a secret) |
-| `XMONEY_SITE_ID` | the site id (not a secret) |
-| `XMONEY_API_BASE_URL` | `https://api-stage.xmoney.com` for the sandbox, `https://api.xmoney.com` for live. This also decides whether the card form is the sandbox one or the live one. |
-| `QUADERNO_API_KEY_PATH` | `/etc/debateai/api/billing/quaderno-api-key` |
-| `QUADERNO_API_BASE_URL` | the API address your Quaderno account shows (its sandbox address while testing) |
-| `SMARTBILL_CREDENTIALS_PATH` | `/etc/debateai/api/billing/smartbill-credentials` |
-| `SMARTBILL_API_BASE_URL` | SmartBill's API address, as X1's facts file records it |
-| `SMARTBILL_SERIES` | the invoice series agreed with the accountant |
-| `OWNER_REPORT_EMAIL_PATH` | `/etc/debateai/api/billing/owner-report-email` |
 
 The company's tax codes are not `api.env` settings. In `COMPANY` (`apps/ui/lib/legal/pages.ts`), fill `cui` with the
 CUI as digits only, never with `RO`, and `vat` with `{ kind: "registered", number: "RO…" }`, the RO VAT code (`RO`
@@ -2218,31 +2259,41 @@ Three more settings billing relies on are **already** in `api.env`, because the 
 them since the Terms records and the country gate arrived. Check them; do not add them twice:
 
 - `RECORDS_KEY_PATH`: the records key from §3. It keeps acceptance, billing and location evidence readable for 10
-  years, so the nightly backup escrows it as the sixth secret in the same envelope as the other five (§9). The
-  restore drill proves it with the line `RESTORE_DRILL_RECORDS_KEY bytes=32`; confirm that line once, as §9's owner
-  step says, before billing goes on. The API refuses to start without the key, and with
+  years, and it seals every saved card, so the nightly backup escrows it as the sixth secret in the same envelope as
+  the other five (§9). The restore drill proves it with the line `RESTORE_DRILL_RECORDS_KEY bytes=32`; confirm that line
+  once, as §9's owner step says, before billing goes on. The API refuses to start without the key, and with
   `RECORDS_KEY_PATH_MUST_BE_SEPARATE` if it points at another key's file.
 - `GEOIP_COUNTRY_DB_PATH` and `TOR_EXIT_LIST_PATH`: the two country files of §14.3. A hosted API refuses to start
   without them (`GEOIP_PATHS_REQUIRED`).
 
-Billing needs no address setting of its own. xMoney's return link (`/checkout/return`) and every emailed link
-(`/cancel`, `/terms`, `/settings`, `/settings/card`, `/pricing`) are built from `PUBLIC_APP_URL`, the site address
-`api.env` already carries for the sign-up emails.
+Billing needs no address setting of its own. NETOPIA's return address (`/checkout/return`), its notify address
+(§14.5) and every emailed link (`/cancel`, `/terms`, `/settings`, `/settings/card`, `/pricing`) are built from
+`PUBLIC_APP_URL`, the site address `api.env` already carries for the sign-up emails.
 
-When billing is on, the API refuses to start if any of the ten billing lines in the table is missing. It prints
-`BILLING_CONFIGURATION_INCOMPLETE:` followed by the variable's name. The same code with no name means the published
-register version lacks `countryPolicy` (§14.8). It also refuses with
-`BILLING_REQUIRES_ENVELOPE_MEMBERS` if the published `costEnvelopePolicy` lacks the three budget members:
-`admission_close_basis_points`, `finish_up_to_basis_points` and `waiting_line_per_person`.
+What the API does at start with these settings:
 
-The website needs one setting too. In `/etc/debateai/ui.env`, add `XMONEY_SDK_ORIGIN`:
-`https://secure-stage.xmoney.com` for the sandbox, `https://secure.xmoney.com` for live. It must match
-`XMONEY_API_BASE_URL`. Only the three card pages (`/checkout`, `/checkout/return` and `/settings/card`) load
-xMoney's form; every other page keeps its old security policy. Then restart both services:
-
-```sh
-systemctl restart debateai-api debateai-ui
-```
+- Billing on: it refuses to start if any billing setting is missing, and prints `BILLING_CONFIGURATION_INCOMPLETE:`
+  followed by the setting's name. The same code with no name means the published register version lacks
+  `countryPolicy` (§14.8). It also refuses with `BILLING_REQUIRES_ENVELOPE_MEMBERS` if the published
+  `costEnvelopePolicy` lacks the three budget members: `admission_close_basis_points`, `finish_up_to_basis_points` and
+  `waiting_line_per_person`.
+- A NETOPIA address that is not one of NETOPIA's four is refused with
+  `BILLING_CONFIGURATION_INVALID:NETOPIA_API_BASE_URL`, and a POS signature that is not five groups of four letters and
+  digits with `BILLING_CONFIGURATION_INVALID:NETOPIA_POS_SIGNATURE`.
+- A public-key file that is not owned by root, or that the API's user or anyone but root can write, is refused with
+  `BILLING_IPN_KEYS_FILE_UNSAFE`; one whose keys cannot be read, or are shorter than 2,048 bits, with
+  `NETOPIA_IPN_KEYS_INVALID`. Run the NETOPIA section of the setup again (with `--replace netopia`).
+- Billing off, with all four NETOPIA settings present: the API starts in the **provider-only mode**. It serves only
+  NETOPIA's notify address, for the sandbox tool and the small live test of §14.9, and every other payment message is
+  stored and answered without any effect. The one other thing that runs is the daily cleanup of what those messages
+  leave: a test order's saved card is revoked once it is a day old and deleted a day later, and NETOPIA's raw
+  messages and the quarantine are deleted after 14 days (at each start, then once a day). Like billing on, it
+  refuses to start with `BILLING_ADMISSION_UNSEALED` if the published register version does not seal the
+  `billing_notify` admission scope. With only some of the four, it writes
+  `"event":"billing.provider_only.incomplete"` (§14.8) and serves nothing of NETOPIA.
+- A setting of the previous card processor still in `api.env` is ignored, and the API writes
+  `"event":"billing.setting.retired"` naming it (never its value): delete that line. The website does the same for the
+  previous card form's setting left in `/etc/debateai/ui.env` (`"event":"ui.setting.retired"`): delete that line too.
 
 ### 14.3 The country files
 
@@ -2291,47 +2342,34 @@ below is the same: edit the file, dry-run, publish, pin, restart. A published ve
 reaches only new subscriptions; existing subscribers keep their price until a price-change command with the 30 days'
 notice of Terms §12 exists (it is not built yet).
 
-### 14.5 Tell xMoney where to send payment notices
+### 14.5 NETOPIA's message
 
-In the xMoney dashboard, go to **Sites → Payment Page** and set the notification URL to
-`https://dezbatere.ro/api/v1/billing/xmoney/notify` (use your site's own address when it is not dezbatere.ro). The
-notice travels the normal `/api/*` path through Caddy, so Caddy needs no change.
+After each payment NETOPIA posts a signed message to the site. NETOPIA needs no notification setting in its admin: the
+address travels with every payment, built from `PUBLIC_APP_URL` as `https://dezbatere.ro/api/v1/billing/netopia/notify`
+(your site's own address when it is not dezbatere.ro). The message travels the normal `/api/*` path through Caddy, so
+Caddy needs no change. NETOPIA does not follow a redirect, so `PUBLIC_APP_URL` must be the site's exact public address
+(the right scheme, no `www.` the site redirects away from); the check command tests it (§14.2).
 
-**What the notice address answers.** It answers `200` with the body `OK` once it has stored the notice, and also to
-one it cannot decrypt, so xMoney stops resending garbage. There are two exceptions, both so that xMoney sends a real
-notice again (after about 1 minute, 5 minutes, 1 hour and 24 hours) instead of the person waiting up to a day for the
-daily reconciliation:
+**How the site trusts it.** The site accepts a message only when it is signed by a key in
+`/etc/debateai/api/billing/netopia-ipn-keys.pem`, names this site's POS signature, and matches its own bytes. A message
+that passes is stored (with the card the payment saved, if any) before the answer goes back, and its payment is then
+checked against NETOPIA's current status, so the order in which messages arrive never matters.
 
-- `429` when one address sends more notices than its admission budget allows (the `billing_notify` row);
-- `500` when the database could not store the notice.
+**What the address answers.**
 
-A run of `500` answers in xMoney's dashboard means the site's database is failing, not xMoney. A notice that never
-arrives is still found by the daily reconciliation.
+- `200` with `{"errorType":0,"errorCode":0,"errorMessage":"OK"}` once it has stored a message that passed, and again
+  for the same message sent twice;
+- `503` (try again) for a message that did not pass, and when the database could not store it; NETOPIA then sends it
+  again later;
+- `429` when one address sends more messages that do not pass than its budget allows (the `billing_notify` row).
 
-**The card pages' permissions.** Every page sends `Permissions-Policy: …, payment=(), …` (set in
-`apps/ui/next.config.mjs`). X0's recording shows whether xMoney's form needs the Payment Request API. If it does
-not, nothing changes. If it does, a code change (go-live line 20 and its note, item 6) makes the three card pages
-(`/checkout`, `/checkout/return`, `/settings/card`) send `payment=(self "https://secure.xmoney.com")` on live (the
-value of `XMONEY_SDK_ORIGIN`), and every other page keeps `payment=()`; that change ships like any other release.
-The website's middleware sets this on each request from `XMONEY_SDK_ORIGIN` in `ui.env` once that change is in
-(today it sets only the security policy), so moving that setting from the sandbox to live then takes a restart.
-No rebuild is needed for it, and there is nothing else to configure. Go-live
-line 20 checks it.
-
-**The card pages and 3-D Secure pop-ups.** Caddy sends `Cross-Origin-Opener-Policy: same-origin` on every page.
-X0's sandbox recording shows whether the bank's security check opens a pop-up window. If it does, add one path
-matcher to the site block in `/etc/caddy/Caddyfile`:
-
-- a matcher named `cardForm`, for the paths `/checkout`, `/checkout/return` and `/settings/card`;
-- a `header` line that sets `Cross-Origin-Opener-Policy same-origin-allow-popups` for `@cardForm` only.
-
-Then reload Caddy:
-
-```sh
-systemctl reload caddy
-```
-
-Every other page keeps `same-origin`.
+A message that does not pass is never answered OK, because NETOPIA sends a saved card only once: if the public key were
+wrong, an OK would lose every card of that time. Instead, when the message could be NETOPIA's, it is kept for 14 days
+in a quarantine, and every kept message is checked again at every start of the API, so a corrected key (the setup's
+`--replace netopia`, then a restart) recovers it. With billing on, a message that names one of our open payments
+emails you at once (O4, at most one an hour) with the reason, the time and the charge reference; check the key with the
+check command. The owner summary (`pnpm billing:tax-summary`, **The tax summary** in §14.8) counts the kept messages by
+the day they arrived, and every message that does not pass writes the journal line `billing.notice.unverified` (§14.8).
 
 ### 14.6 Switching a country's payments on
 
@@ -2371,10 +2409,31 @@ the company's name (`legalName`), its registered office (`registeredOffice`) and
 (`emails.general`), so until each is filled the API refuses with `BILLING_COMPANY_FACTS_UNVERIFIED:legalName`,
 `BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice` or `BILLING_COMPANY_FACTS_UNVERIFIED:emails.general`.
 
-**The card marks.** Put the official Visa and Mastercard artwork at `apps/ui/public/payment-marks/visa.svg` and
-`apps/ui/public/payment-marks/mastercard.svg`. The footer shows a mark only when its file is there. The website reads
+**The card marks and NETOPIA's mark.** Put the official Visa and Mastercard artwork at
+`apps/ui/public/payment-marks/visa.svg` and `apps/ui/public/payment-marks/mastercard.svg`. The footer shows a mark only
+when its file is there. The website reads
 the list of files in that folder only when it starts, so after copying the files in, restart it with
 `systemctl restart debateai-ui`. Until then the footer shows them as broken images. No rebuild is needed.
+
+NETOPIA's shop approval also asks for NETOPIA's own mark beside the card marks, in the footer and on the checkout.
+Keep its official artwork at `apps/ui/public/payment-marks/netopia.svg` with the other two. The footer and the checkout
+(under its Continue button) show NETOPIA's mark first, then Visa and Mastercard, each only when its file is there, so
+put all three files in place, and restart the website as above, before NETOPIA checks the site (go-live rows 17 and
+N-23).
+
+**What NETOPIA checks on the site before it approves the shop.** NETOPIA looks at the live site (or at the test
+server, if it agrees: go-live row N-26) before it lets the POS take real payments. Make sure each of these is there and
+true:
+
+- NETOPIA's mark and the Visa and Mastercard marks (above), and the sentence on the checkout that payment happens on
+  NETOPIA Payments' secure page;
+- the consumer-protection link the law asks for: ANPC's dispute resolution page (SAL), which the legal notice
+  (`/legal`) links today. The EU's online dispute platform (SOL) closed on 20 July 2025, so the site deliberately does
+  not link it. If NETOPIA asks for the ANPC links in the footer, that is a code change too;
+- the Terms (prices, the monthly renewal, the 14-day withdrawal), the Privacy Policy naming NETOPIA Payments, and the
+  cancellation rules, each reachable from every page;
+- the company details on the legal notice (above);
+- proof that you own the domain, as NETOPIA asks for it.
 
 **The Terms archive.** Every published Terms and Privacy version is kept, by its fingerprint, under
 `apps/ui/legal/archive/` (one folder per language). `pnpm run generate:legal` adds the file for each new version.
@@ -2386,23 +2445,30 @@ version the person accepted from there, even after the Terms change. The site li
 
 **Switching billing on.** Before this, make sure:
 
-- the go-live checklist's budget and billing rows are proven (rows 13–54);
+- every row of the go-live checklist from 13 to 73 is proven (its last column holds the proof), the void rows (20, 40
+  and 46) excepted. Some proofs can be read only after the switch-on: they are proven right after it, and their Proof
+  cells are filled then. These are parts of four rows' "How to prove it" cells: row 17, the footer of `/pricing` on the
+  live site; row 18, the API's start with billing on; row 19, the first real payment's message; row 23, the check run
+  again after the publish;
+- among them, NETOPIA's written approval of the shop for AI subscriptions, with recurring payments switched on (go-live
+  row 14);
+- the small live test, with billing off, passed on this host (§14.9, "The small live test, with billing off"; go-live
+  row 69);
 - the sandbox run of §14.9 passed, on its own throwaway server, never on this host.
 
-**Going from xMoney's sandbox to live on the same host.** Skip this if this host never ran with
-`XMONEY_API_BASE_URL=https://api-stage.xmoney.com`.
+**Going from NETOPIA's sandbox to live on the same host.** Skip this if this host never ran with the sandbox address
+`https://secure-sandbox.netopia-payments.com` (or `https://secure.sandbox.netopia-payments.com`).
 **Never take this path on a host that has ever run with `BILLING_STAGE_CLOCK_OFFSET_DAYS`** (the sandbox run of §14.9
 sets it, which is why that run has a server of its own). Such a host holds billing rows and queued jobs dated up to a
 month ahead, and once it pointed at live those jobs would wait and then run against the live services. Destroy that
-server instead (§14.9, step 7), and go live on a host whose billing clock never moved. The API refuses to start
+server instead (§14.9, step 8), and go live on a host whose billing clock never moved. The API refuses to start
 pointed at live while any billing row or open billing job is dated more than one day ahead, and prints
 `BILLING_RECORDS_DATED_AHEAD` with two counts (`rows=` and `jobs=`). That is only a safety net: a month after such a
 run nothing is ahead any more, so the check cannot replace this rule.
 
-The path is for a host that used xMoney's sandbox on the real clock only, for example a quick look at the card form
-before go-live. The sandbox and live are two separate xMoney systems, and the live
-site never renews a sandbox plan, so a sandbox plan left open would stay active for ever. So, while the host still
-points at the sandbox:
+The path is for a host that used NETOPIA's sandbox on the real clock only, for example a quick look at the checkout
+before go-live. The sandbox and live are two separate NETOPIA systems, and the live site never renews a sandbox plan,
+so a sandbox plan left open would stay active for ever. So, while the host still points at the sandbox:
 
 1. Sign in as each sandbox test account and cancel its plan in Settings (or withdraw it, within 14 days). A cancelled
    plan whose month has not ended yet is fine: it is never renewed.
@@ -2411,84 +2477,97 @@ points at the sandbox:
    (see "A withdrawal sent by email or on the model form" below).
    After the switch the command refuses a sandbox plan (`NOT_SUBSCRIBED`), and the summary would list it for ever.
 2. Wait until every sandbox charge has an outcome, and every refund, invoice and credit note a sandbox charge queued
-   has run. The payment checks run every few minutes; a charge still waiting the next day is settled by the daily
-   reconciliation.
+   has run. The payment checks run every few minutes, and the status reads of §14.8's journal table find a charge
+   whose message never came.
    An invoice or credit note that keeps failing is tried again after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours, and then given up.
    A payment check is given up after at most about 31 hours.
-   A refund that xMoney's sandbox could not be reached for, or that it refused the sandbox key for, is never given up: it is tried again every 12 hours.
-   The API's journal shows the line `billing.xmoney.credentials_refused` each time the key is refused.
-   Such a refund closes only once the sandbox key and xMoney's sandbox work, so leave the sandbox key in place until the switch is done.
+   A refund handed to you in the sandbox (O2_REFUND_DUE) stays open until you record it: refund it in the sandbox admin and record it, as **A refund handed to you** below says, before the switch.
 3. Check that all three of these print 0:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_subscriptions FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE jsonb_extract_path_text(c.data, 'xmoney_environment') = 'stage' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED', 'CANCEL_REQUESTED')"
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_subscriptions FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE jsonb_extract_path_text(c.data, 'payment_environment') = 'sandbox' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED', 'CANCEL_REQUESTED')"
 ```
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_charges FROM billing.charge c WHERE c.xmoney_environment = 'stage' AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v s WHERE s.subscription_id = c.subscription_id AND s.kind IN ('ENDED', 'WITHDRAWN'))"
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_charges FROM billing.charge c WHERE c.payment_environment = 'sandbox' AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v s WHERE s.subscription_id = c.subscription_id AND s.kind IN ('ENDED', 'WITHDRAWN'))"
 ```
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_jobs FROM billing.outbox j WHERE j.done_at IS NULL AND j.dead_at IS NULL AND EXISTS (SELECT 1 FROM billing.charge c WHERE c.xmoney_environment = 'stage' AND (c.charge_id = jsonb_extract_path_text(j.payload, 'charge_id') OR (j.kind IN ('QUADERNO_RECORD_SALE', 'SMARTBILL_INVOICE') AND c.charge_id = j.ref)))"
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_jobs FROM billing.outbox j WHERE j.done_at IS NULL AND j.dead_at IS NULL AND EXISTS (SELECT 1 FROM billing.charge c WHERE c.payment_environment = 'sandbox' AND (c.charge_id = jsonb_extract_path_text(j.payload, 'charge_id') OR c.charge_id = j.ref))"
 ```
 
 The third counts the sandbox jobs still queued: the refunds, invoices and credit notes of sandbox charges, and the
 payment checks that name a sandbox charge. Once the host points at live, the live site would take such a job. It
 would end it without calling any service
-(the site refuses a refund, invoice, credit note or payment check of the other xMoney system),
+(the site refuses a refund, invoice, credit note or payment check of another payment system),
 but the start-up check below still refuses to start while any is left, so the switch is never made with sandbox work
 waiting.
 
-4. Only then move every billing setting and key from the sandbox to live, in one sitting. The sandbox and live are
-   two xMoney sites with their own id and keys, and Quaderno's sandbox has its own key:
-   - In `api.env` (§14.2): `XMONEY_API_BASE_URL` to `https://api.xmoney.com`; `XMONEY_SITE_ID` and
-     `XMONEY_PUBLIC_KEY` to the live site's id and public key (the live xMoney dashboard, under Sites);
-     `QUADERNO_API_BASE_URL` to your Quaderno account's live address; and `SMARTBILL_API_BASE_URL` to SmartBill's own
-     address (a host that copied §14.9's settings has `https://smartbill.invalid` there).
-   - In `ui.env`: `XMONEY_SDK_ORIGIN` to `https://secure.xmoney.com`.
-   - The key files: remove `xmoney-private-key` and `quaderno-api-key` on purpose (the two lines below), then run
-     their two lines of §14.2 again and paste the live site's private key and the live Quaderno key at the prompts.
-     A key file that exists is never replaced, so this is the only way in. If `smartbill-credentials` holds a dummy
-     line rather than your SmartBill user and token, replace it the same way.
-   Then restart both services. Pointed at live beside Quaderno's sandbox or a `.invalid` SmartBill address, the API
-   refuses to start with `BILLING_LIVE_SANDBOX_INVOICER_REFUSED`. With a sandbox key left in place, every checkout is
-   refused (`billing.xmoney.credentials_refused` in the journal) or every price quote fails.
-   Finally, set the notification URL in the **live** xMoney dashboard, as §14.5 says. The sandbox dashboard's setting
-   does not carry over, and without it every first payment waits for the daily money check, up to a day, before its
-   plan is active.
+4. Only then move every billing setting and key from the sandbox to live, in one sitting, with the guided setup: its
+   NETOPIA section with `--replace netopia` (choose live, then the live POS signature, the live API key and NETOPIA's
+   live public key), and its Quaderno section with `--replace quaderno` (Quaderno's live address and live key). If the
+   SmartBill line holds a dummy (a host that copied §14.9's settings has `https://smartbill.invalid` there), run the
+   SmartBill section with `--replace smartbill` too. Each run of the setup ends with the check command. After the
+   NETOPIA run alone, one line shows an expected cross, `BILLING_LIVE_SANDBOX_INVOICER_REFUSED` (Quaderno is still the
+   sandbox), until the Quaderno run, and the SmartBill run when it is needed; after the last run every line must show a
+   tick, apart from the one cross that **Read the settings back before switching on** allows. Pointed at live beside
+   Quaderno's sandbox or a `.invalid` SmartBill address, the API refuses to start with
+   `BILLING_LIVE_SANDBOX_INVOICER_REFUSED`. With a sandbox key left in place, every checkout is refused
+   (`billing.payment.credentials_refused` in the journal) or every price quote fails.
 
 ```sh
-rm /etc/debateai/api/billing/xmoney-private-key
+bash /opt/debateai/dialectical-engine/deploy/vps/billing-setup.sh --replace netopia
 ```
 
 ```sh
-rm /etc/debateai/api/billing/quaderno-api-key
+bash /opt/debateai/dialectical-engine/deploy/vps/billing-setup.sh --replace quaderno
+```
+
+Only when the SmartBill line holds a dummy:
+
+```sh
+bash /opt/debateai/dialectical-engine/deploy/vps/billing-setup.sh --replace smartbill
+```
+
+```sh
+systemctl restart debateai-api
 ```
 
 The API checks this itself at start-up: pointed at live while a sandbox plan, charge or queued job is still open, it
-refuses to start and prints `BILLING_STAGE_RECORDS_OPEN` with the three counts. The first query can count a cancelled
-plan that had a later event (a card change, say) as open; the start-up check has the last word. If it refuses, put
-the sandbox address back, restart, close what is left, and try again.
+refuses to start and prints `BILLING_OTHER_SYSTEM_RECORDS_OPEN` with the three counts. The first query can count a
+cancelled plan that had a later event (a card change, say) as open; the start-up check has the last word. If it
+refuses, put the sandbox values back (`--replace netopia` again), restart, close what is left, and try again.
+
+It also refuses the other way round: pointed at the sandbox, with billing on, while a live plan has not ended, it
+prints the same code, with the number of live plans after `subscriptions=`. Never cancel or end those plans to get
+past it: they are live customers. Put the live values back (the NETOPIA section with `--replace netopia`, choosing
+live, and the Quaderno and SmartBill sections too if you changed them), restart, and run the sandbox only on its own
+server (§14.9).
 
 The sandbox plans and charges stay in the database, but they never count as sales:
 the quarterly tax summary and its email read only live charges.
 
 **Read the settings back before switching on.** On every host, the same-host path or not, read back the billing
-lines and the key files' dates on the day (go-live row 23). The site id and the public key must be the live site's,
-as the live xMoney dashboard shows them, and the addresses the live ones above. Each key file must have been written
-for live: after the host's last use of the sandbox, if it ever had one. The two `grep` lines print the lines; the
-`stat` line prints each key file's last change, never its content:
+lines and the key files' dates on the day (go-live row 23). The NETOPIA address must be a live one
+(`https://secure.netopia-payments.com/api` or `https://secure.mobilpay.ro/pay`), the POS signature the live POS's, as
+NETOPIA's live admin shows it, and the invoicers' addresses the live ones. Each key file must have been written for
+live: after the host's last use of the sandbox, if it ever had one. The `grep` line prints the setting lines; the
+`stat` line prints each key file's last change, owner and mode, never its content; the check command must show a tick
+on every line, with one exception. Until the version that switches billing on is published, the one cross allowed is
+the `countryPolicy` line ("has no countryPolicy row"), when that member arrives with that version (below). Then run
+the check command again right after that publish, once its `REGISTER_VERSION=` line is in `api.env` (the check reads
+the version `api.env` names): every line must then show a tick.
 
 ```sh
-grep -E '^(XMONEY_API_BASE_URL|XMONEY_SITE_ID|XMONEY_PUBLIC_KEY|QUADERNO_API_BASE_URL|SMARTBILL_API_BASE_URL)=' /etc/debateai/api.env
+grep -E '^(NETOPIA_API_BASE_URL|NETOPIA_POS_SIGNATURE|QUADERNO_API_BASE_URL|SMARTBILL_API_BASE_URL)=' /etc/debateai/api.env
 ```
 
 ```sh
-grep -E '^XMONEY_SDK_ORIGIN=' /etc/debateai/ui.env
+stat -c '%y %U %a %n' /etc/debateai/api/billing/netopia-api-key /etc/debateai/api/billing/netopia-ipn-keys.pem /etc/debateai/api/billing/quaderno-api-key /etc/debateai/api/billing/smartbill-credentials
 ```
 
 ```sh
-stat -c '%y %n' /etc/debateai/api/billing/xmoney-private-key /etc/debateai/api/billing/quaderno-api-key /etc/debateai/api/billing/smartbill-credentials
+systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:check
 ```
 
 **No paid question may be waiting when billing goes on.** Before you publish the version that switches billing on,
@@ -2543,11 +2622,15 @@ envelopes) is asked by both services. While a model scorecard is in force, the r
 over every configured model, because the runner never reads `billingPolicy`; with billing on, the API's start-up and
 the publish price Free on the Free plan's models only. So they can refuse a version that the runner starts with.
 
-After the first live payment, check that its notice reached the site (go-live row 19). The newest row must say
-`live`; no row means the live dashboard's notification URL is missing or wrong (§14.5):
+After the first live payment, check that its message reached the site (go-live row 19). The query lists the newest
+messages that named one of our own live charges and were applied (outcome `APPLIED`, which is written only with
+billing on); `charge_ref` is our charge reference. The newest row must be that payment's, dated when it was made. The
+small live test's messages name tool orders, never one of our charges, so they never show here. No row, or only rows
+older than that payment, means its message did not reach the site: check `PUBLIC_APP_URL` and the public key with the
+check command (§14.5):
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT received_at, status, xmoney_environment FROM billing.xmoney_notice WHERE xmoney_environment = 'live' ORDER BY received_at DESC LIMIT 1"
+sudo -u postgres psql -d debateai -c "SELECT n.received_at, n.order_id AS charge_ref, n.provider_status, n.payment_environment, o.outcome FROM billing.payment_notice n JOIN billing.charge c ON c.charge_id = n.order_id JOIN billing.payment_notice_outcome o ON o.notice_id = n.notice_id WHERE c.payment_environment = 'live' AND o.outcome = 'APPLIED' ORDER BY n.received_at DESC LIMIT 5"
 ```
 
 **Stopping sales, and switching billing off.** These are two different things. Almost always, you want the first.
@@ -2556,14 +2639,14 @@ sudo -u postgres psql -d debateai -c "SELECT received_at, status, xmoney_environ
 included. Each such row needs a valid reason, such as `TAX_NOT_READY` or `NOT_OFFERED`. Leave every `signup` as it is,
 and publish as in §14.4. Nobody can start a new plan then. Everything that looks after existing subscribers keeps
 running: renewals, the price-change and yearly emails (M3, M4), cancel in Settings, the emailed cancel link,
-withdrawal, xMoney's payment notices, refunds and the daily reconciliation. In plain words, one thing stops for them
+withdrawal, NETOPIA's payment messages, refunds and the status reads. In plain words, one thing stops for them
 too: upgrades and card changes are refused. So a subscriber whose card is failing cannot replace it, and after the
 payment retries their plan ends and they move to Free.
 
 *To switch billing off* (`billingPolicy.enabled: false`): **Switching billing off once plans are live is not
 supported.** That is the owner's ruling of 3 October 2026 (P2-M41: unsupported, with a warning). Nothing in the code
 refuses it, so this runbook is the only guard. Do it only with no live plan and no open billing job. On the same day,
-check that all three of these print 0:
+check that all four of these print 0:
 
 ```sh
 sudo -u postgres psql -d debateai -c "SELECT count(*) AS live_subscriptions FROM billing.subscription_latest_v WHERE kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')"
@@ -2577,19 +2660,31 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_billing_jobs FROM 
 sudo -u postgres psql -d debateai -c "SELECT count(*) AS unsettled_owner_withdrawals FROM billing.subscription_event w WHERE w.kind = 'WITHDRAWN' AND jsonb_extract_path_text(w.data, 'refund_by_owner') = 'true' AND NOT EXISTS (SELECT 1 FROM billing.withdrawal_owner_settlement s WHERE s.subscription_id = w.subscription_id)"
 ```
 
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_owner_refunds FROM billing.charge_event r WHERE r.kind = 'REFUND_REQUESTED' AND r.payment_provider = 'netopia' AND r.amount_micros > 0 AND COALESCE((SELECT sum(d.amount_micros) FROM billing.charge_event d WHERE d.charge_id = r.charge_id AND d.kind = 'REFUNDED' AND COALESCE(d.refunds_transaction_id, d.provider_payment_id) = r.provider_payment_id), 0) < r.amount_micros AND r.payment_environment = 'live'"
+```
+
 The first counts every subscription that is not over yet: created, active (a pending cancel included), past due and
-suspended. The second counts the refunds, invoices, credit notes, emails and payment checks still waiting. The third
+suspended. The second counts the refunds, invoices, credit notes, emails and payment checks still waiting. A refund
+handed to you leaves that list once its O2_REFUND_DUE email is sent (**A refund handed to you**, below). The third
 counts the withdrawals handed to you that you have not settled yet with `pnpm billing:withdraw --refund` (below): the
 first count leaves them out, because a withdrawn plan is over, but their refund is still owed, and the jobs your
-settlement writes would never run with billing off. Only when all three are 0, publish the version with
-`enabled: false`. If any of them is not 0, do not switch billing off: stop new sales instead (above), and check again
-later.
+settlement writes would never run with billing off. The fourth counts the refunds handed to you that are not recorded
+yet: a refund the site asked for on a NETOPIA payment whose recorded refunds do not add up to it yet. A refund a
+dispute holds counts too, because it is owed again if the dispute ends for us. The fourth counts only what is owed to
+real people. A sandbox refund is test money, and after the same-host move to live the live site refuses to record one
+(`BILLING_REFUND_DONE_OTHER_PAYMENT_SYSTEM`), so the query leaves it out. A held refund whose dispute you recorded
+lost is never owed (nothing is left to refund). A lost dispute writes nothing that closes it, so the refund stays in
+this count for good. From then on, billing cannot be switched off this way: stop new sales instead. With billing off,
+no reminder (O2_REFUND_REMINDER) and no status read would come for any of them. Only when all four are 0, publish the
+version with `enabled: false`. If any of them is not 0, do not switch billing off: stop new sales instead (above), and
+check again later.
 
-Why they must be 0: with billing off, every billing route answers 404, including xMoney's payment notices, cancel,
+Why they must be 0: with billing off, every billing route answers 404, including NETOPIA's payment messages, cancel,
 the emailed cancel link and withdraw (a 14-day legal right), and no billing job runs. When billing comes back on, every
 subscription whose period ended in between is charged at once, once for each missed period. A refund or a chargeback
-made at xMoney while billing is off is recorded only if billing comes back on within 120 days, and a payment only
-within 30 days. After that, you record it by hand.
+NETOPIA reports while billing is off is found by the status reads only within 120 days of its payment, and a payment
+only within 30 days. After that, you record it by hand.
 
 **The tax summary.** The owner's quarterly summary is also emailed on the 5th day after each quarter ends. It is
 built from our own charge records and shows, for each country or state:
@@ -2607,11 +2702,10 @@ being on a command line. Change `2026-Q4` to the quarter you want:
 systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:tax-summary --quarter 2026-Q4
 ```
 
-**Disputes (chargebacks).** A disputed payment pauses the paid features. xMoney sends no signal when a dispute ends,
-so when xMoney tells you the outcome, record it with `pnpm billing:dispute`, giving the charge reference (find it
-with the command below: the list shows the xMoney transaction id of the payment the dispute is about; a dispute that
-xMoney reports as its own transaction is recorded under the payment it names, so match that payment's id, not the
-dispute's own id) with `--charge` and the outcome with
+**Disputes (chargebacks).** A disputed payment pauses the paid features. NETOPIA reports a dispute as a status of the
+payment itself, and says nothing the site can rely on when a dispute ends, so when NETOPIA tells you the outcome,
+record it with `pnpm billing:dispute`, giving the charge reference (find it with the command below: the list shows
+NETOPIA's payment number of the payment the dispute is about) with `--charge` and the outcome with
 `--outcome won` or `--outcome lost`:
 
 - `won` gives the plan back; a plan its person cancelled while it was paused comes back only until its period end,
@@ -2619,20 +2713,21 @@ dispute's own id) with `--charge` and the outcome with
 - `lost` ends it.
 
 The command below lists the chargebacks not recorded as won, each with its charge reference, the kind of charge,
-xMoney's transaction id, its `error_code`, when it arrived, and the subscription's state now. A charge-back counts as
-won only by a `CHARGEBACK_RESOLVED` on its own transaction. It is not a list of open disputes: a lost dispute writes
+NETOPIA's payment number, its `error_code`, when it arrived, and the subscription's state now. A charge-back counts as
+won only by a `CHARGEBACK_RESOLVED` on its own payment. It is not a list of open disputes: a lost dispute writes
 no charge event, so it stays on the list. The state tells you which are still waiting (`SUSPENDED`) and which have
 ended (`ENDED`: either recorded as lost, or ended by the period-end sweep, when a won outcome can still be recorded).
 `CANCEL_REQUESTED` (the person cancelled while the plan was paused) is still waiting for its outcome: record it as
 you would a `SUSPENDED` one. The command:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT e.charge_id, c.kind AS charge_kind, e.xmoney_transaction_id, e.error_code, e.at, s.kind AS subscription_now FROM billing.charge_event e JOIN billing.charge c ON c.charge_id = e.charge_id JOIN billing.subscription_latest_v s ON s.subscription_id = c.subscription_id WHERE e.kind = 'CHARGEBACK' AND NOT EXISTS (SELECT 1 FROM billing.charge_event r WHERE r.charge_id = e.charge_id AND r.kind = 'CHARGEBACK_RESOLVED' AND r.xmoney_transaction_id = e.xmoney_transaction_id) ORDER BY e.at"
+sudo -u postgres psql -d debateai -c "SELECT e.charge_id, c.kind AS charge_kind, e.provider_payment_id, e.error_code, e.at, s.kind AS subscription_now FROM billing.charge_event e JOIN billing.charge c ON c.charge_id = e.charge_id JOIN billing.subscription_latest_v s ON s.subscription_id = c.subscription_id WHERE e.kind = 'CHARGEBACK' AND NOT EXISTS (SELECT 1 FROM billing.charge_event r WHERE r.charge_id = e.charge_id AND r.kind = 'CHARGEBACK_RESOLVED' AND r.provider_payment_id = e.provider_payment_id) ORDER BY e.at"
 ```
 
-An `error_code` of `DUPLICATE_PAYMENT` marks the charge-back of a second payment of the same order, which never paused
-the plan; an empty one is the plan's own payment. When one charge lists both, the command settles the plan's own
-charge-back first, so give the outcome of that dispute first, then run it again for the second payment's.
+An `error_code` of `DUPLICATE_PAYMENT` marks the charge-back of a payment that bought nothing (a second or refused
+payment of the same person, a card check, or a payment the site never saw paid), which never paused the plan; an
+empty one is the plan's own payment. When one charge lists both, the command settles the plan's own charge-back
+first, so give the outcome of that dispute first, then run it again for the other payment's.
 
 Then record the outcome. The command asks for the two values at the prompt, so nothing has to be edited inside it:
 
@@ -2647,7 +2742,12 @@ It prints one line saying what it did. Two answers need a word:
   charged back, so the paid features stay paused until that dispute's outcome is recorded too.
 - `BILLING_DISPUTE_AMBIGUOUS` (a refusal): you recorded `won`, the plan is no longer paused, and the charge still lists
   more than one open charge-back, so the command cannot tell which one you mean. Nothing is written. Check both
-  disputes in the xMoney dashboard and report the case: it is settled by hand, not by running the command again.
+  disputes in NETOPIA's admin and report the case: it is settled by hand, not by running the command again.
+
+NETOPIA's status 10 ("chargeback accepted") pauses the plan as a new dispute does and emails you (O3 `OWNER_REVIEW`),
+but never ends it by itself: NETOPIA has not confirmed what it means. Record `lost` (or `won`) once NETOPIA tells you.
+Status 16 records that the payment was defended (pausing the plan first if no dispute was recorded for it yet), and
+changes nothing else.
 
 **A withdrawal sent by email or on the model form.** The Terms (§13) let a person in the EU, the EEA or the UK
 withdraw within 14 days by the model form attached to their confirmation email, or by any clear statement, sent to
@@ -2683,11 +2783,11 @@ live until the deletion runs (at the earliest seven full days after it was sched
 does the 14-day withdrawal. Settings still shows Withdraw, and the command above takes the statement as usual, so run
 it the same day the statement arrives. Once the deletion has run, billing has ended the plan: the command prints
 `NOT_SUBSCRIBED` and writes nothing. If a statement arrived in time but was not recorded before that, settle it by
-hand: work out what is due exactly as described below, refund it in the xMoney dashboard, and keep the statement with
+hand: work out what is due exactly as described below, refund it in NETOPIA's admin, and keep the statement with
 the payment records. The site sends no confirmation (M8) and issues no credit note for it, so confirm it in your reply
 to the person's statement and ask the accountant about the credit note.
 
-If it prints that a refund made in the xMoney dashboard already touched one of the payments, nothing is refunded
+If it prints that a refund made in NETOPIA's admin already touched one of the payments, nothing is refunded
 automatically. Work out what is still due, then settle it within 14 days of the withdrawal, in this order. Until you
 do, the quarterly summary lists the withdrawal as `WITHDRAWAL_BY_OWNER`. You also get an email at once (O2_WITHDRAWAL,
 "A withdrawal needs you to settle its refund by hand") with the owner reference, the reason code
@@ -2700,7 +2800,7 @@ time it arrived, as you recorded it. Each payment made up to that moment gives b
 larger of two shares). A payment made after it (its `SUCCEEDED` row in `billing.charge_event` is dated after that
 moment, for example an upgrade paid after the statement was sent) takes no share: it gives back all it still holds.
 - **Its amount** is what it still holds: what it paid, less what was already refunded on it. For the payment the
-  dashboard refund touched, the amount already refunded is the amount the xMoney dashboard shows as refunded.
+  refund in NETOPIA's admin touched, the amount already refunded is the amount NETOPIA's admin shows as refunded.
 - **The first share** is the part of that payment's own days already used at the moment of the withdrawal. The first
   payment's days run from the start of the period. An upgrade's days run from the moment its price was quoted, shortly
   before it was paid (the upgrade charge's `period_start` in `billing.charge`), not from the payment. Both run to the
@@ -2713,116 +2813,176 @@ moment, for example an upgrade paid after the statement was sent) takes no share
 Add the shared payments' amounts unrounded, round the sum down to the cent once, and add in full what each payment
 made after that moment still holds. That is what is due; the two steps below settle it.
 
-1. **First, in the xMoney dashboard,** refund the part due on the payment the dashboard refund touched. The command
+1. **First, in NETOPIA's admin,** refund the part due on the payment the refund in NETOPIA's admin touched. The command
    cannot take money back from that payment: it refuses it and writes nothing.
 2. **Then run the command** with two amounts: the amount the site refunds on the other payments (`--refund`, `0.00`
-   when nothing is due there), and the amount you just refunded in the dashboard for this withdrawal (`--dashboard`,
-   `0.00` when none). The site records both, and the person's confirmation email (M8) names their sum.
+   when nothing is due there), and the amount you just refunded in NETOPIA's admin for this withdrawal (`--dashboard`,
+   `0.00` when none). The site records both, and the person's confirmation email (M8) names their sum. While
+   NETOPIA's refund call is not in use, the part the site refunds (`--refund`) comes to you too, as O2_REFUND_DUE:
+   make it as **A refund handed to you**, below, says.
 
 ```sh
-# Paste the owner reference and press Enter; then the amount the site refunds (for example 12.10, or 0.00) and press Enter; then the amount you refunded in the xMoney dashboard (for example 5.00, or 0.00) and press Enter.
+# Paste the owner reference and press Enter; then the amount the site refunds (for example 12.10, or 0.00) and press Enter; then the amount you refunded in NETOPIA's admin (for example 5.00, or 0.00) and press Enter.
 read -r OWNER_REF && read -r REFUND && read -r DASHBOARD && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner "$OWNER_REF" --refund "$REFUND" --dashboard "$DASHBOARD"
 ```
 
 A withdrawal is settled once. Running the command a second time for the same withdrawal is refused.
 
-**A refund that could not be completed.** If xMoney refuses a refund the site asked for, or its outcome stays
-unknown after every retry, you get an email at once (O2, "A refund could not be completed and needs your
-attention") with the charge reference, the amount, the reason code and what the refund was for (the refund reason,
-for example `WITHDRAWAL`). No more tries are made by themselves: look the charge up in the xMoney dashboard and
-settle the refund there by hand. The owner summary lists it until then. For a withdrawal's refund the email also says
-the date the law requires it to be made by (14 days after the person withdrew).
-Look at that payment in the xMoney dashboard first. If it already shows a refund of the amount the email names, an
-earlier attempt went through: never refund it again. The site's daily check records it as this refund, and the
-person's confirmation (M8) follows by itself. If it shows no such refund, refund exactly the amount the email names,
-on that payment, in one refund: once xMoney reports it, the site records it as this refund, and M8 follows by itself
-(after the last refund, when the withdrawal refunds two payments). The site records the amount it asked for, so any
-extra refunded over it is in no record. A smaller refund, or one split into several, is not recorded at all: its
-payment check ends as `REFUND_UNRECORDED`, and the owner summary lists it under that code. Then neither M8 nor a
-credit note follows, so you confirm the refund to the person yourself and give its amount to the accountant.
-Three reason codes are exceptions: nothing was sent to xMoney, and there is no refund to make on this host.
-`REFUND_NOT_REQUESTED`: that refund job matches no refund request our records hold for the payment.
-`REFUND_CHARGE_MISSING`: the job names a charge we do not have. For either, do not refund it, and do not treat its
-amount as owed. Something able to write to the billing database queued it, so tell whoever runs the server; they
-check that charge's own refund requests (a request that was never refunded is still owed). The email says the same
-for both, and the owner summary lists both as `REFUND_NOT_REQUESTED`.
-The reason code `OTHER_XMONEY_SYSTEM` means the payment was taken in the other xMoney system (sandbox or live) than
-the one this host uses: nothing was sent and nothing is owed on this host. Its email has no refund reason and no
-deadline paragraph, and the owner summary lists it as `REFUND_OTHER_SYSTEM`. If it was a real customer's payment in
-the other system, refund it in that system's dashboard; a sandbox test payment needs nothing.
+**A refund handed to you.** NETOPIA has not yet confirmed its refund call for our account, so every refund the site
+owes (a withdrawal, a card from a blocked country, a second payment, an upgrade that can no longer be given) is made by
+you in NETOPIA's admin. The site emails you at once (O2_REFUND_DUE, "A refund to make in NETOPIA's admin") with
+the reason, our charge reference, NETOPIA's payment number, the exact amount and currency, whether it is the whole
+payment, for a withdrawal the date the law requires it by (14 days after the person withdrew), and the command that
+records it (needed for a part of a payment): run as given, it only shows what it would record; run again with
+`--confirm` added at the end, it records. Look at that payment in NETOPIA's admin first. If it already shows a
+refund of that amount, an earlier refund went through: never refund it again. If it shows a dispute (a chargeback) on
+that payment, do not refund it: the site holds that refund while the dispute lasts and has emailed you once (O3
+`REFUND_HELD_BY_CHARGEBACK`). If the dispute ends for us, record that with `pnpm billing:dispute --outcome won`, and the
+refund comes back into the reminder; if it ends for the person, nothing is left to refund. If you had already refunded
+it before the dispute, record that refund with `pnpm billing:refund-done … --despite-chargeback`.
+If not, refund exactly the amount the email names, on that payment, in one refund. A whole refund is recorded by the
+site itself as soon as NETOPIA reports it: the person's email (M8 or M11) and the credit note follow by themselves.
+A part of a payment is recorded only when you run the command from the email with `--confirm` added at the end,
+because NETOPIA has not said whether it reports the amount of a partial refund.
+The command shows first what it will record and what the person will read, and records nothing:
 
-**When xMoney or the tax service is down at a renewal.** The plan stays active,
+```sh
+# Paste the charge reference from the email and press Enter; then the amount you refunded, exactly as the email names it (for example 12.10), and press Enter.
+read -r CHARGE_REF && read -r AMOUNT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:refund-done --charge "$CHARGE_REF" --amount "$AMOUNT"
+```
+
+Then run it again with `--confirm` to record it:
+
+```sh
+# Paste the charge reference from the email and press Enter; then the amount you refunded, exactly as the email names it (for example 12.10), and press Enter.
+read -r CHARGE_REF && read -r AMOUNT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:refund-done --charge "$CHARGE_REF" --amount "$AMOUNT" --confirm
+```
+
+It prints what it recorded. A smaller amount than the email names records that part and keeps the rest open. A
+refusal is one code and nothing is written: `BILLING_REFUND_DONE_USAGE` (run it again as shown),
+`BILLING_REFUND_DONE_CHARGE_NOT_FOUND` (paste the reference again exactly as the email names it),
+`BILLING_REFUND_DONE_OTHER_PAYMENT_SYSTEM` (the charge was paid in another payment system than this host's: nothing to
+record here), `BILLING_REFUND_DONE_NO_OPEN_REQUEST` (no refund is open on that charge: it is already recorded),
+`BILLING_REFUND_DONE_EXCEEDS_REQUEST` (the amount is more than the refund still open: check the email and the admin),
+`BILLING_REFUND_DONE_HELD_BY_CHARGEBACK` (the payment is under a dispute, so the site holds that refund, as above; only
+if you made the refund before the dispute arrived, run the command again with `--despite-chargeback` after
+`--confirm`), `BILLING_REFUND_DONE_REGISTER_UNRESOLVED` (the register version `api.env` names has no billing policy:
+check `REGISTER_VERSION`, §14.4), `BILLING_REFUND_DONE_FAILED` (the command could not finish; run it again later, and
+if it repeats tell whoever runs the server). Until a refund is recorded, the daily owner job emails you a reminder
+(O2_REFUND_REMINDER) on the day it becomes due, then every third day, and every day from three days before a
+withdrawal's deadline.
+
+A refund for another reason code needs no refund on this host. `REFUND_NOT_REQUESTED`: that refund job matches no
+refund request our records hold for the payment. `REFUND_CHARGE_MISSING`: the job names a charge we do not have. For
+either, do not refund it, and do not treat its amount as owed. Something able to write to the billing database queued
+it, so tell whoever runs the server; they check that charge's own refund requests (a request that was never refunded
+is still owed). The email says the same for both, and the owner summary lists both as `REFUND_NOT_REQUESTED`.
+The reason code `OTHER_PAYMENT_SYSTEM` means the payment was taken in another payment system than the one this host
+uses (NETOPIA's other environment, or the previous card processor): nothing was sent and nothing is owed on this host.
+Its email has no refund reason and no deadline paragraph, and the owner summary lists it as `REFUND_OTHER_SYSTEM`. If
+it was a real customer's payment in the other system, refund it in that system's admin; a sandbox test payment needs
+nothing.
+
+**When NETOPIA or the tax service is down at a renewal.** The plan stays active,
 and the renewal is retried quietly for up to 3 days (72 hours from the end of the paid month). Nobody is charged
 without a fresh price, and no "payment failed" email goes out. Only if there is still no answer after 3 days does the
 normal failed-payment path start: retries on days 1, 3 and 7, each with its email, and then the Free plan.
 
+**A renewal whose answer was lost.** If NETOPIA's answer to a renewal's charge never arrives, the site never charges
+the card again blind: it reads that order's status at NETOPIA an hour later, and hourly after that, until the order is
+paid, refused, or unknown to NETOPIA at the end of its window (3 days for a renewal, 24 hours for a retry). An order
+NETOPIA confirms it holds is never closed as failed: the plan stays held and you are emailed (O3
+`RENEWAL_OUTCOME_OPEN`); look it up in NETOPIA's admin.
+
 **What billing writes to the API's journal** (`journalctl -u debateai-api`). The renewal pass runs every minute, the
-money check against xMoney every 10 minutes (its full check once a day, and once at each start of the API), and the
-job queue (payment checks, refunds, invoices, credit notes and emails) every 5 seconds. A marker in square brackets
-carries no detail; a line with `"event"` names what happened in its other fields, and never a person, an email address
-or an amount. Each line below asks you to look, or to act, at least sometimes; a row says so when its line also comes
-in normal running. The billing lines this table leaves out record normal events (they are listed after it). The
+status reads against NETOPIA every 10 minutes (each payment is read at its own times, by the spec's §2.14), the
+saved-card upkeep once a day, and the job queue (payment checks, refunds, invoices, credit notes and emails) every 5
+seconds. A marker in square brackets carries no detail; a line with `"event"` names what happened in its other
+fields, and never a person, an email address or an amount. Each line below asks you to look, or to act, at least
+sometimes; a row says so when its line also comes in normal running. The billing lines this table leaves out record normal events (they are listed after it). The
 signals that matter:
 
 | Signal | What it means | What to do |
 |---|---|---|
-| `"event":"billing.renewal.report"`, with `failed`, `taxRefused` and `codes` | One line for a minute's pass that had trouble. `failed` counts the renewals (or the pass's own steps) that failed, and `codes` lists their distinct codes, for example `TAX_SERVICE_UNAVAILABLE` while the tax service is down, which the 3 days above cover (an xMoney outage at the rebill is not counted here: it writes `"event":"billing.renewal.unknown"` instead). `taxRefused` counts renewals the tax service refused to price (a wrong or revoked Quaderno key, or a request it rejects): those are not an outage, so nobody is charged, no retry email goes out, and each such renewal also writes `"event":"billing.renewal.tax_refused"` once per period with Quaderno's code. | `failed` during a known outage: nothing. The same code minute after minute with no outage: read the API's other lines from the same minutes, and report the code. Any `taxRefused`: check the Quaderno key file and the Quaderno account at once; fix the key, restart `debateai-api`, and the next pass prices those renewals again. |
+| `"event":"billing.renewal.report"`, with `failed`, `taxRefused` and `codes` | One line for a minute's pass that had trouble. `failed` counts the renewals (or the pass's own steps) that failed, and `codes` lists their distinct codes, for example `TAX_SERVICE_UNAVAILABLE` while the tax service is down, which the 3 days above cover (a NETOPIA outage at the renewal's charge is not counted here: it writes `"event":"billing.renewal.unknown"` instead). `taxRefused` counts renewals the tax service refused to price (a wrong or revoked Quaderno key, or a request it rejects): those are not an outage, so nobody is charged, no retry email goes out, and each such renewal also writes `"event":"billing.renewal.tax_refused"` once per period with Quaderno's code. | `failed` during a known outage: nothing. The same code minute after minute with no outage: read the API's other lines from the same minutes, and report the code. Any `taxRefused`: check the Quaderno key file and the Quaderno account at once; fix the key, restart `debateai-api`, and the next pass prices those renewals again. |
 | `[BILLING_RENEWAL_PENDING]` (a bare marker) | The renewal pass catches each of its three steps and reports their failures in the `billing.renewal.report` line, so in practice this marker means the billing upkeep stopped before it finished, most often because the database did not answer. The upkeep is the period-end sweep, the payment retries and the reminders, which the renewal timer runs at most every 10 minutes. It carries no diagnostic. Its next try is the next upkeep, 10 minutes later. | One: nothing. Again at each upkeep, usually with a `billing.renewal.report` line every minute: the database is failing. Check it and the API's other lines from the same minutes; once the database answers, the next pass catches up by itself. |
 | `"event":"billing.renewal.tax_refused"`, with `code` `TAX_SERVICE_REFUSED` and `reason` | The tax service (Quaderno) refused to price one subscription's renewal: a wrong or revoked Quaderno key (`reason` `QUADERNO_HTTP_401` or `QUADERNO_HTTP_403`), or a request it rejects. One line per subscription and period (again after a restart of the API). That is not an outage: nobody is charged, no "payment failed" email goes out, and the renewal is priced again every minute. An active plan is kept, as in an outage, for up to 3 days past its due time; after that the person is on Free until it prices again. The owner summary lists it as `RENEWAL_BLOCKED`. | At once: check the Quaderno key file and the Quaderno account; fix the key and restart `debateai-api`, and the next pass prices those renewals again (as for `taxRefused` in the `billing.renewal.report` row). |
-| `"event":"billing.renewal.unknown"`, with `attempt` and `code` | A renewal's charge (`attempt` 1) or a payment retry's (2 and up) got no clear answer from xMoney. `code` `REBILL_NOT_SENT`: xMoney did not answer, or limited our calls, so nothing was charged. `REBILL_CREDENTIALS_REFUSED`: xMoney refused our key (with a `billing.xmoney.credentials_refused` line). `REBILL_OUTCOME_UNKNOWN`, or `SUBMIT_INTERRUPTED` (the call was cut off, for example by a restart): the card may have been charged. Before it calls xMoney again, the site looks there for a payment of that charge, so one that went through is never charged a second time. The renewal itself keeps the plan meanwhile, for up to 3 days past its due time; a payment retry runs on the plan's grace. | During a known xMoney outage, or a single line: nothing; the site catches up by itself. `REBILL_CREDENTIALS_REFUSED`: the `billing.xmoney.credentials_refused` row, below. The same code for hours with no known outage: report it. When the time runs out with no answer, a `billing.renewal.stuck` line follows. |
-| `"event":"billing.renewal.pending"`, with `code` | Something outside the plan holds up its renewal, so the plan is kept for up to 3 days past its due time, with no email: the tax service is down (`TAX_SERVICE_UNAVAILABLE`), xMoney did not answer or refused our key, or lost a charge's answer (`REBILL_NOT_SENT`, `REBILL_CREDENTIALS_REFUSED`, `REBILL_OUTCOME_UNKNOWN`, `SUBMIT_INTERRUPTED`), the tax service refused the price (`TAX_SERVICE_REFUSED`), an upgrade of the same month is still waiting for its payment (`UPGRADE_UNSETTLED`), or xMoney answered the renewal's charge but its payment check has not settled it yet: the payment is still in 3-D Secure or in progress, or xMoney could not be read (`PAYMENT_NOT_VERIFIED`). One line per plan and period. | Nothing on its own: **When xMoney or the tax service is down at a renewal**, above, says what follows. `PAYMENT_NOT_VERIFIED`: its payment check settles it, and a renewal charge still without an outcome 30 days after it was made is counted by `billing.reconcile.expired`. `TAX_SERVICE_REFUSED`: the `billing.renewal.tax_refused` row. Many lines with no known outage: read the API's other lines from the same minutes, and report the codes. |
-| `"event":"billing.renewal.stuck"`, with `attempt` and `code` | A renewal's charge (or a payment retry's) was given up and closed as failed (`NO_TRANSACTION`): it never reached xMoney (`REBILL_NOT_SENT`, which a refused key also leads to), or its outcome stayed unknown (`REBILL_OUTCOME_UNKNOWN`), past its time (the renewal: 3 days past its due time; a payment retry: 24 hours). The normal failed-payment path starts: the plan is past due, the person gets the payment emails, and after the last retry the plan moves to Free. Only with `REBILL_OUTCOME_UNKNOWN` does the owner summary list it, as `RENEWAL_STUCK`, because the card may have been charged. A `REBILL_NOT_SENT` one charged nothing and is not listed there. | `REBILL_OUTCOME_UNKNOWN`: check in the xMoney dashboard whether the card was charged for that renewal, and if it was, report it with the charge reference the summary's `RENEWAL_STUCK` line names. `REBILL_NOT_SENT`: nothing was charged; read the lines before it (an xMoney outage, or `billing.xmoney.credentials_refused`) and fix what they say. |
-| `"event":"billing.payment.failed"`, with `chargeKind` and `code` | A charge was closed as failed. `chargeKind` names it: `INITIAL` (a checkout), `RENEWAL` (a renewal or a payment retry), `UPGRADE` or `CARD_CHECK` (a card change). From a payment check: `PAYMENT_DECLINED` (the card was declined) or `VOIDED` (xMoney voided or cancelled a payment that had not gone through). From a renewal or a payment retry, when the site charged the card: `PAYMENT_DECLINED` (xMoney declined the card); `REBILL_REFUSED`: xMoney refused the renewal request itself, not the card (it answered with an error that is not a decline, a refused key, a timeout or a rate limit); or `NO_TRANSACTION`, which follows a `billing.renewal.stuck` line, or closes a renewal charge none of whose calls reached xMoney once its plan is no longer to be charged (cancelled, ended, or already moved on). A declined checkout changes nothing, and the person may try again; a failed renewal starts the normal failed-payment path (the plan is past due, the payment retries with their emails, then Free). | A decline: nothing; the person is told, and for a renewal the payment retries follow. `REBILL_REFUSED` on more than one renewal: report it at once, with the code. xMoney refuses the request as the site sends it, so the request has to change in the code, and until it is fixed every renewal falls into the failed-payment path. `NO_TRANSACTION`: the `billing.renewal.stuck` row; with no `billing.renewal.stuck` line just before it, no call reached xMoney, nothing was charged, and nothing is needed. |
+| `"event":"billing.renewal.unknown"`, with `attempt` and `code` | A renewal's charge (`attempt` 1) or a payment retry's (2 and up) got no clear answer from NETOPIA. `CHARGE_NOT_SENT`: NETOPIA did not answer, or limited our calls, so nothing was charged. `CHARGE_CREDENTIALS_REFUSED`: NETOPIA refused our key (with a `billing.payment.credentials_refused` line). `CHARGE_CONFIGURATION_REFUSED`: NETOPIA refused the request for a setting of our account; nothing was charged, and you get O3 at once. `CHARGE_OUTCOME_UNKNOWN`, `CHARGE_ORDER_EXISTS` (NETOPIA said it already holds that order, but gave no payment with it), or `SUBMIT_INTERRUPTED` (the call was cut off, for example by a restart): the card may have been charged. The site reads that order's status at NETOPIA before anything else, so one that went through is never charged a second time. The renewal itself keeps the plan meanwhile, for up to 3 days past its due time; a payment retry runs on the plan's grace. | During a known NETOPIA outage, or a single line: nothing; the site catches up by itself. `CHARGE_CREDENTIALS_REFUSED`: the `billing.payment.credentials_refused` row, below. `CHARGE_CONFIGURATION_REFUSED`: read the O3 and fix the setting in NETOPIA's admin with NETOPIA. The same code for hours with no known outage: report it. |
+| `"event":"billing.renewal.pending"`, with `code` | Something outside the plan holds up its renewal, so the plan is kept for up to 3 days past its due time, with no email: the tax service is down (`TAX_SERVICE_UNAVAILABLE`), NETOPIA did not answer, refused our key or a setting, or lost a charge's answer (`CHARGE_NOT_SENT`, `CHARGE_CREDENTIALS_REFUSED`, `CHARGE_CONFIGURATION_REFUSED`, `CHARGE_OUTCOME_UNKNOWN`, `CHARGE_ORDER_EXISTS`, `SUBMIT_INTERRUPTED`), the tax service refused the price (`TAX_SERVICE_REFUSED`), an upgrade of the same month is still waiting for its payment (`UPGRADE_UNSETTLED`), or NETOPIA answered the renewal's charge but its payment check has not settled it yet: the payment is still in 3-D Secure or in progress, or NETOPIA could not be read (`PAYMENT_NOT_VERIFIED`). One line per plan and period. | Nothing on its own: **When NETOPIA or the tax service is down at a renewal**, above, says what follows. `PAYMENT_NOT_VERIFIED`: its payment check settles it, and a renewal charge still without an outcome 30 days after it was made is counted by `billing.reconcile.expired`. `TAX_SERVICE_REFUSED`: the `billing.renewal.tax_refused` row. Many lines with no known outage: read the API's other lines from the same minutes, and report the codes. |
+| `"event":"billing.renewal.stuck"`, with `attempt` and `code` | A renewal's charge (or a payment retry's) was given up and closed as failed (`NO_TRANSACTION`) past its time (the renewal: 3 days past its due time; a payment retry: 24 hours): it never reached NETOPIA (`CHARGE_NOT_SENT`: NETOPIA did not answer for the whole time), its answer was lost and NETOPIA knew no such order at the end (`CHARGE_OUTCOME_UNKNOWN`), or NETOPIA had answered its charge but knew no such order at its deadline (`PAYMENT_NOT_FOUND`). The normal failed-payment path starts: the plan is past due, the person gets the payment emails, and after the last retry the plan moves to Free. An order NETOPIA confirms it holds is never closed this way (`billing.renewal.outcome_open`), and neither is a charge NETOPIA refused for our key or a setting of our account. Only with `CHARGE_OUTCOME_UNKNOWN` does the owner summary list it, as `RENEWAL_STUCK`. A `CHARGE_NOT_SENT` one charged nothing and is not listed there. | `CHARGE_OUTCOME_UNKNOWN`: check in NETOPIA's admin that no payment of that order exists, and report what you find with the charge reference the summary's `RENEWAL_STUCK` line names. `PAYMENT_NOT_FOUND`: check in NETOPIA's admin for a renewal payment of that time, and report what you find with the time of the line. `CHARGE_NOT_SENT`: nothing was charged; read the lines before it (a NETOPIA outage) and fix what they say. |
+| `"event":"billing.renewal.outcome_open"`, with `attempt` | A renewal's charge (or a retry's) is still open at the end of its window, and it is not closed: NETOPIA holds that order (still pending, or confirmed without its payment), its status could not be read, or NETOPIA refused the charge for our key or a setting of our account. The plan stays held, the order is read (or the charge tried) again every hour, and you got O3 `RENEWAL_OUTCOME_OPEN` once for that charge. It also comes once when a due payment retry finds an earlier attempt of the same month still pending at NETOPIA. | Look the order up in NETOPIA's admin by the charge reference the O3 names, and report what you find. A key or settings refusal: fix it as its own O3 (`CHARGE_CREDENTIALS_REFUSED` or `CHARGE_CONFIGURATION_REFUSED`) said, and the hourly tries go on. |
+| `"event":"billing.renewal.retry_held"`, with `code` | A payment retry was not made this pass: an earlier attempt of the same month was found paid (`EARLIER_ATTEMPT_PAID`), NETOPIA still reports it pending or authorised (`EARLIER_ATTEMPT_PENDING`: the retry waits until NETOPIA reports a final status for that order), or its status could not be read (`EARLIER_ATTEMPT_UNREADABLE`). The site never charges a month twice. | `EARLIER_ATTEMPT_PAID`: nothing; the month is settled. `EARLIER_ATTEMPT_PENDING`: do what the O3 `RENEWAL_OUTCOME_OPEN` email for that charge says. `EARLIER_ATTEMPT_UNREADABLE` again and again: the `billing.reconcile.status_failed` row. |
+| `"event":"billing.renewal.refunded_before_seen"`, with `attempt`, and `voided` when NETOPIA reported the payment cancelled | NETOPIA reports a renewal's payment (or a payment retry's) refunded before the site saw it paid: a refund made in NETOPIA's admin before any of the site's reads saw the payment. The site records the money as NETOPIA shows it (paid, then refunded) and takes the refund as you giving that month back. With `voided`, NETOPIA reported the renewal's payment cancelled (status 4) before it was ever seen paid: the money never moved (the charge is closed `VOIDED`), and since NETOPIA cannot yet tell your cancellation in its admin from any other, the site takes it the same way, never as a failed payment to retry: the plan ends now, the account is on Free, the person gets no email from the site and is never charged for that month again. When the plan was no longer renewing that month (it had already ended, a dispute had paused it, or another payment had renewed it), nothing about the plan changes, and the O3 says so. You got O3 `RENEWAL_REFUNDED_BEFORE_SEEN` once for that charge. | Do what the O3 `RENEWAL_REFUNDED_BEFORE_SEEN` for that charge says. If it says the plan has ended, tell the person yourself; if they should keep it, they can subscribe again. If it says no plan changed, look at the plan and the payment in NETOPIA's admin before telling the person anything. |
+| `"event":"billing.payment.failed"`, with `chargeKind` and `code` | A charge was closed as failed. `chargeKind` names it: `INITIAL` (a checkout), `RENEWAL` (a renewal or a payment retry), `UPGRADE` or `CARD_CHECK` (a card change). From a payment check: `PAYMENT_DECLINED` (the card was declined), `PAYMENT_FAILED`, `PAYMENT_EXPIRED` (the payment page expired unpaid), `VOIDED` (NETOPIA cancelled a payment that had not gone through) or `CARD_NOT_SAVED` (a card change whose payment saved no card, for example a wallet). From a renewal or a payment retry: `PAYMENT_DECLINED` (the bank declined the saved card), `AUTHENTICATION_REQUIRED` (the bank asked for its 3-D Secure check, which nobody can answer for a monthly payment), `PAYMENT_FAILED`, `PAYMENT_EXPIRED` or `VOIDED` (as NETOPIA reported the charge; a renewal's `VOIDED` never starts the failed-payment path: the `billing.renewal.refunded_before_seen` row, with `voided`), `CARD_NOT_SAVED` (the plan had no usable saved card or billing details, so nothing was sent), or `NO_TRANSACTION`, which follows a `billing.renewal.stuck` line, or closes a renewal charge none of whose calls reached NETOPIA once its plan is no longer to be charged (cancelled, ended, or already moved on). A request NETOPIA refuses for our own setup is never closed as failed: it is the `billing.renewal.unknown` row's `CHARGE_CONFIGURATION_REFUSED`. A declined checkout changes nothing, and the person may try again on NETOPIA's page; a failed renewal starts the normal failed-payment path (the plan is past due, the payment retries with their emails, then Free). | A decline: nothing; the person is told, and for a renewal the payment retries follow. `CARD_NOT_SAVED` on a renewal: nothing; the person gets the payment emails and can change the card in Settings. `NO_TRANSACTION`: the `billing.renewal.stuck` row; with no `billing.renewal.stuck` line just before it, no call reached NETOPIA, nothing was charged, and nothing is needed. The same code on many renewals at once: report it at once, with the code. |
 | `"event":"billing.renewal.dunning_unpriced"`, with `attempt` and `code` | A renewal (`attempt` 1) or a payment retry could not be priced, so that attempt was counted as failed with nothing charged. `TAX_SERVICE_UNAVAILABLE`: the tax service stayed down 3 days past the renewal's due time, or at a payment retry. `RETRY_TOTAL_CHANGED`: a retry was priced again at a total the person was never told about (a tax change). The person gets the payment emails, and after the last retry day the plan moves to Free. The owner summary lists it as `DUNNING_UNPRICED`, or `ENDED_UNPRICED` once the plan has ended. | `TAX_SERVICE_UNAVAILABLE`: check Quaderno's status page and your Quaderno account; the next retry prices again once it answers. `RETRY_TOTAL_CHANGED`: nothing to fix; the person can subscribe again at the new price. Any other code: report it. |
 | `"event":"billing.renewal.price_missing"` (no other field) | A subscription due for renewal has no recorded net price, so it is not charged at a guessed one. The renewal is tried again every minute, with this line each time (and `BILLING_RECURRING_PRICE_MISSING` among the `billing.renewal.report` codes); nobody is charged, and the plan is not renewed, while it lasts. | Report it at once: that subscription's records are incomplete, and only the developer can find it and repair them. |
-| `"event":"billing.renewal.history_invalid"`, with `count` and `code` | `count` subscriptions whose records do not add up (`BILLING_SUBSCRIPTION_EVENTS_INVALID`), so the renewal pass skips them: they are neither charged nor renewed. One line for each minute's pass while any is left. The owner summary lists each as `SUBSCRIPTION_HISTORY_INVALID`. | Print the summary (**The tax summary**, above), check in the xMoney dashboard what each such subscriber was charged, and report it to the developer. |
+| `"event":"billing.renewal.history_invalid"`, with `count` and `code` | `count` subscriptions whose records do not add up (`BILLING_SUBSCRIPTION_EVENTS_INVALID`), so the renewal pass skips them: they are neither charged nor renewed. One line for each minute's pass while any is left. The owner summary lists each as `SUBSCRIPTION_HISTORY_INVALID`. | Print the summary (**The tax summary**, above), check in NETOPIA's admin what each such subscriber was charged, and report it to the developer. |
 | `"event":"billing.renewal.owner_stopped"` (no other field) | A charge was due (a renewal, a payment retry, or a second try at one) for an account whose deletion is scheduled or done, or which the age check froze, so it was not made. Scheduling a deletion already stops the renewal; this line is the second guard, and it can come in normal running. | Nothing: nobody was charged. If it comes with `[BILLING_ERASURE_SWEEP_PENDING]` or `[BILLING_ERASURE_STOP_PENDING]`, follow those rows. |
 | `"event":"billing.maintenance.report"`, with `failed` and `codes` | One line for an upkeep pass (the period-end sweep, the payment retries and the reminders, at most every 10 minutes) in which some plans could not be looked after: `failed` counts them, and `codes` lists their distinct codes. The others were looked after, and the failed ones are tried again at the next pass. | One: nothing. The same code pass after pass: check the database and the API's other lines from the same minutes, and report the code. |
-| `"event":"billing.reconcile.listing_failed"`, with `listing` and `code` | The daily money check asks xMoney for three lists, each on its own: `creation` (payments made in the last 3 to 30 days), `charge-back` (disputes in the last 120 days) and `refund` (refunds in the last 120 days). The one named in `listing` could not be read. The other two and the rest of the check still ran; this one is asked again on its own every hour, with this line each time it still fails, until it is read. While it fails: without `creation`, no checkout older than 24 hours is closed as abandoned (they wait), and a checkout that was paid but whose payment notice was lost is not found; without `charge-back`, a card dispute is found only through the payment's own notice; without `refund`, a refund made in the xMoney dashboard is found only through its notice. `code` says why: `XMONEY_UNAVAILABLE` (xMoney did not answer, or limited our calls), `XMONEY_CREDENTIALS_REFUSED` (our key, see `billing.xmoney.credentials_refused` below), `XMONEY_REFUSED` (xMoney refused the request itself) or `XMONEY_RESPONSE_INVALID` (an answer the site cannot read). | During a known xMoney outage: nothing; the hourly retry catches up, and nothing inside the windows above is lost. `XMONEY_REFUSED` or `XMONEY_RESPONSE_INVALID` hour after hour: xMoney does not accept that list as the site asks for it (most likely `charge-back`, the one X0 must confirm). Report the listing and the code at once: the request has to change in the code. Until then, look in the xMoney dashboard yourself for what that list would have found (new disputes, dashboard refunds, or payments that gave nobody a plan). Any other code (for example `UNKNOWN`, written for a failure that carries no declared code), or any code that repeats hour after hour with no known xMoney outage: report the listing and the code. |
-| `[BILLING_RECONCILIATION_PENDING]` (a bare marker) | The money check stopped before it finished. A list xMoney refuses never causes it (that is `billing.reconcile.listing_failed`); it means the database did not answer, or a step outside the per-charge handling failed. The quick part of the check (finding the transaction of a renewal or an upgrade whose answer was lost) still ran on that tick. The full check is tried again an hour later, the quick part 10 minutes later. | One: nothing. Every hour (or every 10 minutes): check the database and the API's other lines from the same minutes, and report it if the database is fine; once it works again, the next check catches up by itself. |
-| `"event":"billing.reconcile.errors"`, with `pass`, `count` and `codes` | The money check could not handle `count` charges in one of its loops (`pass`: `FREQUENT`, `DAILY` or `CHECKOUT`), for example a subscription whose records do not add up, or a lock that timed out. It skipped them and went on with every other charge; they are tried again at the next check. | One: nothing. The same codes check after check: print the summary (a subscription whose records do not add up is listed as `SUBSCRIPTION_HISTORY_INVALID`) and report the pass and the codes. |
-| `"event":"billing.reconcile.no_transaction"`, with `kind` | A charge was closed as failed (`NO_TRANSACTION`) because xMoney holds no payment for it: a checkout (`INITIAL`) or a card change (`CARD_CHECK`) that nobody paid within 24 hours, which is how the daily money check closes an abandoned checkout in normal running, or an upgrade (`UPGRADE`) whose charge never reached xMoney. Nothing was charged, and nothing changes for the person: a plan that was not paid for never starts, and an upgrade not paid for leaves the plan as it was. | Nothing: an abandoned checkout is normal. Many `UPGRADE` lines, or a person who says they paid: look the payment up in the xMoney dashboard, and report what you find. |
-| `"event":"billing.reconcile.expired"`, with `count` | Once a day, the money check counts the upgrade and renewal charges still without an outcome 30 days after they were made; it no longer looks them up at xMoney. The owner summary lists each as `PAYMENT_UNSETTLED`. | Print the summary, look each such charge up in the xMoney dashboard (was the card charged?), and report what you find. |
-| `"event":"billing.reconcile.rows_rejected"`, with `count` and `pass` | xMoney sent `count` rows in one money check that the site cannot read, and the check skipped them (`pass` `LISTING`: the daily lists; `ADOPTION`: the look for a payment whose answer was lost). A payment, a refund or a dispute in such a row is not seen by that check. | Report it at once with the pass and the count: xMoney's answers may have changed shape. Until it is fixed, look in the xMoney dashboard for what the check would have found (new disputes, dashboard refunds, or payments that gave nobody a plan). |
-| `"event":"billing.xmoney.row_rejected"`, with `operation`, `count` and `code` | The same, for xMoney rows read outside the money check (`operation` `checkout`, `renewal` or `refund`: a look for a payment or a refund that may already have been made); `code` is `XMONEY_ROW_REJECTED`. | As for `billing.reconcile.rows_rejected`: report it at once, with the operation and the count. |
+| `[BILLING_RECONCILIATION_PENDING]` (a bare marker) | The money check stopped before it finished. A status read that fails never causes it (that is `billing.reconcile.status_failed`); it means the database did not answer, or a step outside the per-charge handling failed. The status reads are tried again on the next tick, 10 minutes later, and the daily counts an hour later. | One: nothing. Every hour (or every 10 minutes): check the database and the API's other lines from the same minutes, and report it if the database is fine; once it works again, the next check catches up by itself. |
+| `"event":"billing.reconcile.errors"`, with `pass`, `count` and `codes` | The money check could not handle `count` charges in one of its loops (`pass`: `STATUS`, the NETOPIA status check), for example a subscription whose records do not add up, or a lock that timed out. It skipped them and went on with every other charge; they are read again at their next scheduled time at the latest. | One: nothing. The same codes check after check: print the summary (a subscription whose records do not add up is listed as `SUBSCRIPTION_HISTORY_INVALID`) and report the pass and the codes. |
+| `"event":"billing.reconcile.expired"`, with `count` | Once a day, the money check counts the upgrade and renewal charges still without an outcome 30 days after they were made; it no longer reads them at NETOPIA. The owner summary lists each as `PAYMENT_UNSETTLED`. | Print the summary, look each such charge up in NETOPIA's admin (was the card charged?), and report what you find. |
+| `"event":"billing.reconcile.status_failed"`, with `code` | One status read at NETOPIA failed (`code` says why, for example `PAYMENT_PROVIDER_UNAVAILABLE`: NETOPIA did not answer; `PAYMENT_CREDENTIALS_REFUSED`: our key, with a `billing.payment.credentials_refused` line; `PAYMENT_RESPONSE_INVALID`: an answer the site cannot read); the pass went on with the others, and that payment is read again at its next time. A status that could not be read never closes a charge. | One: nothing. `PAYMENT_CREDENTIALS_REFUSED`: the `billing.payment.credentials_refused` row. The same code pass after pass with no known NETOPIA outage: run the check command (§14.2), and report the code. |
 | `[BILLING_OUTBOX_PENDING]` (a bare marker) | A round of the job queue stopped before it finished, almost always because the database did not answer. A single job that fails never raises it: that job is tried again on its own schedule. Queued jobs wait meanwhile and run once the queue works again. | One: nothing. Again and again: check the database and the API's other lines from the same minutes. |
 | `[BILLING_ERASURE_SWEEP_PENDING]` (a bare marker) | The sweep that ends the paid plan of an account whose deletion has gone through (or that the age check froze) failed for at least one account. It runs in front of the money check every 10 minutes, the money check still runs, and every such account is tried again on the next sweep. The cause is the database, or one subscription whose history the site cannot read (then the marker repeats every 10 minutes, and the owner summary lists that subscription among the payments to check). | One: nothing. Every 10 minutes while the database is fine: report it, because a deleted account's plan is not being ended. |
 | `[BILLING_ERASURE_STOP_PENDING]` (a bare marker) | Someone scheduled their account's deletion, but stopping their plan's renewal at that moment failed, most often because the database did not answer. The deletion is scheduled anyway, and the sweep in front of the money check stops the renewal on its next run, within 10 minutes. | One: nothing. Again and again, or together with `[BILLING_ERASURE_SWEEP_PENDING]`: check the database, and follow that row. |
-| `[BILLING_OWNER_JOBS_PENDING]` (a bare marker) | The quarterly tax summary email (O1) could not be queued, usually because the database did not answer. It is checked once a day and at each start, so the next try is a day later. | One: nothing. On several days in a row, or when O1 has not arrived by the 6th day after a quarter ends: check the database, and print the summary yourself (**The tax summary**, above). |
-| `"event":"billing.outbox.dead"`, with `kind`, `code` and `attempts` | A job stopped after its last try (or at once, for a code that no retry can change). For an invoice or credit note (`QUADERNO_RECORD_SALE`, `QUADERNO_RECORD_REFUND`, `SMARTBILL_INVOICE`, `SMARTBILL_STORNO`) or an `EMAIL`, you also get the email O3 with the steps, except when the email that died is O3 itself. A refund (`XMONEY_REFUND`) does not send O3. Its email O2 does not come from this line: the refund itself sends O2 at each dead end it decides (xMoney refused the refund, its outcome stayed unknown, its charge cannot be found, no request backs it, and the like). O2 is not sent when the refund job's own content cannot be read (`REFUND_PAYLOAD_INVALID`), nor when the job queue stops a refund whose every one of its six tries failed (the code is then the failure's own, usually `OUTBOX_HANDLER_FAILED`). The owner summary (**The tax summary**, above) lists every dead refund job whatever its code, as long as no refund of that payment is recorded. The codes `REFUND_NOT_REQUESTED` and `REFUND_CHARGE_MISSING` (refund jobs) and `CREDIT_NOTE_REFUND_MISSING` (a credit-note job) mean our records do not back the job: no refund request is recorded for that payment, the job names a charge we do not have, or no refund is recorded for that sale, and nothing was sent to xMoney or to the invoicer. `OTHER_XMONEY_SYSTEM` is a job of the other xMoney system (sandbox or live) than this host's (`billing.outbox.other_system`, below). | An invoice, a credit note or an email: **An invoice, a credit note or an email that was never sent**, below. A refund, with or without O2: **A refund that could not be completed**, above. `REFUND_NOT_REQUESTED`, `REFUND_CHARGE_MISSING` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note; there is nothing to issue or re-queue. Tell whoever runs the server, because something able to write to the billing database queued it. `OTHER_XMONEY_SYSTEM`, whatever the kind (a `RENEWAL_NOTICE` too): nothing to do on this host. `OWNER_TAX_SUMMARY`: print the summary yourself (**The tax summary**, above). `RENEWAL_NOTICE` with any other code: nothing is charged at a changed amount without its notice; the renewal sends the notice itself when it is due. `VERIFY_PAYMENT`: the daily money check queues the payment check again while the payment is in its lists. Any of these repeating, or any other code: report the kind and the code. |
+| `[BILLING_OWNER_JOBS_PENDING]` (a bare marker) | The daily owner job failed at one of its steps, often because the database did not answer. Its steps are: queuing the quarterly tax summary email (O1), the daily refund reminders, the saved-card sweep (it deletes saved cards the site no longer needs), and the two purges (of revoked cards, and of NETOPIA's raw messages and the quarantine). In the provider-only mode (billing off) the job runs only the card sweep and the two purges. Each step is tried even when another one fails. The job runs once a day and at each start, so the next try is a day later. | One: nothing. When O1 has not arrived by the 6th day after a quarter ends: print the summary yourself (**The tax summary**, above). On several days in a row: check the database, then look in the owner summary for a `SUBSCRIPTION_HISTORY_INVALID` item. A subscription whose records do not add up stops the card sweep for its own cards every day, so follow what that item says. |
+| `"event":"billing.outbox.dead"`, with `kind`, `code` and `attempts` | A job stopped after its last try (or at once, for a code that no retry can change). For an invoice or credit note (`QUADERNO_RECORD_SALE`, `QUADERNO_RECORD_REFUND`, `SMARTBILL_INVOICE`, `SMARTBILL_STORNO`) or an `EMAIL`, you also get the email O3 with the steps, except when the email that died is O3 itself. A refund (`PAYMENT_REFUND`) does not send O3. Its email O2 does not come from this line: the refund itself sends O2 at each dead end it decides (the refund is handed to you, its charge cannot be found, no request backs it, and the like). O2 is not sent when the refund job's own content cannot be read (`REFUND_PAYLOAD_INVALID`), nor when the job queue stops a refund whose every one of its six tries failed (the code is then the failure's own, usually `OUTBOX_HANDLER_FAILED`). The owner summary (**The tax summary**, above) lists every dead refund job whatever its code, as long as no refund of that payment is recorded. The codes `REFUND_NOT_REQUESTED` and `REFUND_CHARGE_MISSING` (refund jobs) and `CREDIT_NOTE_REFUND_MISSING` (a credit-note job) mean our records do not back the job: no refund request is recorded for that payment, the job names a charge we do not have, or no refund is recorded for that sale, and nothing was sent to NETOPIA or to the invoicer. `OTHER_PAYMENT_SYSTEM` is a job of another payment system (NETOPIA's sandbox or live, or the previous card processor) than this host's (`billing.outbox.other_system`, below). | An invoice, a credit note or an email: **An invoice, a credit note or an email that was never sent**, below. A refund, with or without O2: **A refund handed to you**, above. `REFUND_NOT_REQUESTED`, `REFUND_CHARGE_MISSING` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note; there is nothing to issue or re-queue. Tell whoever runs the server, because something able to write to the billing database queued it. `OTHER_PAYMENT_SYSTEM`, whatever the kind (a `RENEWAL_NOTICE` too): nothing to do on this host. `OWNER_TAX_SUMMARY`: print the summary yourself (**The tax summary**, above). `RENEWAL_NOTICE` with any other code: nothing is charged at a changed amount without its notice; the renewal sends the notice itself when it is due. `VERIFY_PAYMENT`: the status reads queue the payment check again while the payment is still within its reading times. Any of these repeating, or any other code: report the kind and the code. |
 | `"event":"billing.outbox.alert_failed"`, with `kind` and `code` | A job died (the `billing.outbox.dead` line just before it) but the owner's email about it, O3, could not be queued, usually because the database did not answer. The job stays dead, and the owner summary still lists it. | Print the summary now (**The tax summary**, above) to see the line, and settle it as **An invoice, a credit note or an email that was never sent** says. If it repeats, check the database. |
 | `"event":"billing.outbox.settle_failed"`, with `kind`, `outcome` and `attempts` | A job ran, but its result could not be saved (usually the database connection was lost). The job runs again after 5 minutes, so an email may arrive twice. | One: nothing. Many, or the same kind again and again: check the database, and report it if the database is fine. |
-| `"event":"billing.outbox.other_system"`, with `kind` and `code` `OTHER_XMONEY_SYSTEM` | A queued job belongs to the other xMoney system (sandbox or live) than the one this host uses, so it was stopped before any call or price quote: a refund, an invoice, a credit note or a payment check whose payment was taken in the other system, or a renewal notice (`RENEWAL_NOTICE`) of a plan of the other system. Normally this happens only on a host that went from the sandbox to live (above). A `billing.outbox.dead` line with the same code follows. For a refund you also get O2, saying nothing was sent and nothing is owed on this host, and the owner summary lists it as `REFUND_OTHER_SYSTEM`. | Nothing to do on this host, whatever the kind. For a refund: if it was a real customer's payment in the other system, refund it in that system's dashboard; a sandbox test payment needs nothing. |
-| `"event":"billing.refund.refused"`, with `reason` | xMoney refused a refund the site asked for (`reason` says what it was for, for example `WITHDRAWAL`). The refund job stops (a `billing.outbox.dead` line with `XMONEY_REFUSED` follows), and you get O2 at once. The money is still owed. | **A refund that could not be completed**, above: settle it in the xMoney dashboard, by its deadline for a withdrawal. |
-| `"event":"billing.refund.outcome_unknown"`, with `reason` | A partial refund whose earlier attempt may already have moved the money (its call was cut off, or got no clear answer), while xMoney does not show it as made. The site never sends it twice: the job stops (`REFUND_OUTCOME_UNKNOWN`), and you get O2 at once. | **A refund that could not be completed**, above: look at that payment in the xMoney dashboard first, and refund only if no such refund is there. |
-| `"event":"billing.refund.unrecorded"`, with `reason` `PROVIDER_REFUND` | xMoney reported another refund on a payment that already has a refund recorded or asked for (for example one made in the xMoney dashboard). Our records cannot hold it, so it is in no figure of the tax summary, and no credit note and no email follow for it. The owner summary lists it as `REFUND_UNRECORDED`, by the refund's xMoney transaction id. | Read its amount on that transaction in the xMoney dashboard, take it off that country's net sales and tax by hand, confirm the refund to the person yourself, and give its amount to the accountant for the credit note. A refund transaction of a payment whose dashboard-refund credit note is recorded is already in the figures: do not take it off again. |
-| `"event":"billing.refund.dead"`, with `count` | Once a day, the money check counts the refund jobs that stopped for good with no refund recorded since, whatever their code. Not every one is owed: `REFUND_NOT_REQUESTED` and `REFUND_CHARGE_MISSING` (no request of ours backs the job, or it names a charge we do not have) and `OTHER_XMONEY_SYSTEM` (a payment of the other xMoney system) owe nothing on this host; `REFUND_PAYLOAD_INVALID` (a job whose payload cannot be read, so nothing was sent) is listed with the first two, without the reason the job claims, and whoever runs the server checks that charge's own refund requests (one never refunded is still owed); `REFUND_OUTCOME_UNKNOWN` is checked in the dashboard first; every other code is still owed. The owner summary lists each one under "Payments to check by hand in xMoney", by the summary's own names: `REFUND_REFUSED` (still owed), `REFUND_OUTCOME_UNKNOWN`, `REFUND_NOT_REQUESTED` (which covers `REFUND_CHARGE_MISSING` and `REFUND_PAYLOAD_INVALID` too) and `REFUND_OTHER_SYSTEM`. | Print the summary (**The tax summary**, above) and settle each line as its name says, and as **A refund that could not be completed**, above, describes. |
-| `"event":"billing.xmoney.credentials_refused"`, with `operation` | xMoney refused our key (`operation` says on what: `checkout`, `verify`, `rebill`, `refund` or `list`). xMoney processed nothing, so nothing is counted as failed straight away, and the work is tried again, but not for ever. A renewal whose rebill is refused this way is kept, as in an xMoney outage, for up to 3 days past its due time (a payment retry: 24 hours). After that it is closed as failed (`NO_TRANSACTION`, with a `"event":"billing.renewal.stuck"` line), and the failed-payment path starts, with its emails. A refund keeps being tried; a payment check stops after its last try (`billing.outbox.dead`, above). New checkouts fail while it lasts. | At once: check the key file `XMONEY_PRIVATE_KEY_PATH` names and the xMoney account (a revoked or replaced key, or a sandbox key beside the live address, or the reverse, §14.2). Fix it and restart `debateai-api`; the open work then goes on by itself. Fixing the key within that time (3 days past a renewal's due time, 24 hours after a payment retry's call) keeps every renewal. |
+| `"event":"billing.outbox.other_system"`, with `kind` and `code` `OTHER_PAYMENT_SYSTEM` | A queued job belongs to another payment system (NETOPIA's sandbox or live, or the previous card processor) than the one this host uses, so it was stopped before any call or price quote: a refund, an invoice, a credit note or a payment check whose payment was taken in the other system, or a renewal notice (`RENEWAL_NOTICE`) of a plan of the other system, or is a job kind only the previous card processor queued. Normally this happens only on a host that went from the sandbox to live (above), or with a job the previous card processor left. A `billing.outbox.dead` line with the same code follows. For a refund you also get O2, saying nothing was sent and nothing is owed on this host, and the owner summary lists it as `REFUND_OTHER_SYSTEM`. | Nothing to do on this host, whatever the kind. For a refund: if it was a real customer's payment in the other system, refund it in that system's admin; a sandbox test payment needs nothing. |
+| `"event":"billing.refund.refused"`, with `reason` | NETOPIA refused a refund the site asked for (`reason` says what it was for, for example `WITHDRAWAL`). This comes only once NETOPIA's refund call is in use; until then every refund is handed to you. The refund job stops (a `billing.outbox.dead` line with `PAYMENT_CONFIGURATION_REFUSED` follows), and you get O2 at once. The money is still owed. | **A refund handed to you**, above: settle it in NETOPIA's admin, by its deadline for a withdrawal. |
+| `"event":"billing.refund.outcome_unknown"`, with `reason` | A partial refund whose earlier attempt may already have moved the money (its call was cut off, or got no clear answer), while NETOPIA does not show it as made (only once NETOPIA's refund call is in use). The site never sends it twice: the job stops (`REFUND_OUTCOME_UNKNOWN`), and you get O2 at once. | **A refund handed to you**, above: look at that payment in NETOPIA's admin first, and refund only if no such refund is there. |
+| `"event":"billing.refund.dead"`, with `count` | Once a day, the money check counts the refund jobs that stopped for good with no refund recorded since, whatever their code. Not every one is owed: `REFUND_NOT_REQUESTED` and `REFUND_CHARGE_MISSING` (no request of ours backs the job, or it names a charge we do not have) and `OTHER_PAYMENT_SYSTEM` (a payment of another payment system) owe nothing on this host; `REFUND_PAYLOAD_INVALID` (a job whose payload cannot be read, so nothing was sent) is listed with the first two, without the reason the job claims, and whoever runs the server checks that charge's own refund requests (one never refunded is still owed); `REFUND_OUTCOME_UNKNOWN` is checked in NETOPIA's admin first; every other code is still owed. The owner summary lists each one under "Payments to check by hand in NETOPIA's admin", by the summary's own names: `REFUND_REFUSED` (still owed), `REFUND_OUTCOME_UNKNOWN`, `REFUND_NOT_REQUESTED` (which covers `REFUND_CHARGE_MISSING` and `REFUND_PAYLOAD_INVALID` too) and `REFUND_OTHER_SYSTEM`. | Print the summary (**The tax summary**, above) and settle each line as its name says, and as **A refund handed to you**, above, describes. |
+| `"event":"billing.refund.owner_due"`, with `reason` | A refund was handed to you (O2_REFUND_DUE), as every refund is until NETOPIA confirms its refund call. | **A refund handed to you**, above. |
+| `"event":"billing.refund.seen_partial"`, with `reason` | NETOPIA reported a refund on a payment whose open refund is only a part of it, so the site does not record it from the status. | Record it with `pnpm billing:refund-done` (**A refund handed to you**, above), once you have made exactly the refund the email names. |
+| `"event":"billing.refund.held_by_chargeback"`, with `reason` | A dispute (a chargeback) arrived on a NETOPIA payment for which a refund to the person was still open, or a refund to the person was asked for on a NETOPIA payment already under a dispute (`reason` says what the refund was for). The person's bank is taking the money back, so the site holds that refund while the dispute lasts: it leaves the O2_REFUND_REMINDER emails, and `pnpm billing:refund-done` refuses it (`BILLING_REFUND_DONE_HELD_BY_CHARGEBACK`). You got O3 `REFUND_HELD_BY_CHARGEBACK` once for that payment. | Do not refund it in NETOPIA's admin. If the dispute ends for us, record that with `pnpm billing:dispute --outcome won`, and the refund comes back into the reminder; if it ends for the person, nothing is left to refund. If you had already refunded it before the dispute, record that refund with `pnpm billing:refund-done … --despite-chargeback`: run it as **A refund handed to you**, above, shows (`systemd-run` with the API's `EnvironmentFile`), with `--despite-chargeback` after `--confirm`. |
+| `"event":"billing.payment.credentials_refused"`, with `operation` | NETOPIA refused our API key (`operation` says on what: `checkout`, `upgrade`, `card_check`, `verify`, `reconcile`, `charge`, `status` or `refund`). NETOPIA processed nothing, so nothing is counted as failed straight away, and the work is tried again, but not for ever. A renewal whose charge is refused this way is kept, as in a NETOPIA outage, for up to 3 days past its due time (a payment retry: 24 hours), and you get O3 at once. New checkouts fail while it lasts. | At once: run the check command (§14.2); it says whether NETOPIA accepts the key. A revoked or replaced key, or a sandbox key beside the live address (or the reverse): run the setup's NETOPIA section with `--replace netopia` and restart `debateai-api`; the open work then goes on by itself. Fixing the key within that time (3 days past a renewal's due time, 24 hours after a payment retry's call) keeps every renewal. |
+| `"event":"billing.payment.answer_rejected"`, with `operation` | NETOPIA answered in a shape the site cannot read (`operation` says on what), so the site took no decision from it and tries again on the call's own schedule. | Report it at once with the operation: NETOPIA's answers may have changed shape. |
+| `"event":"billing.notice.unverified"`, with `reason` | A message arrived at NETOPIA's notify address that did not pass (§14.5): `NOTICE_HEADER_MISSING`, `NOTICE_ALG_REFUSED`, `NOTICE_SIGNATURE_INVALID`, `NOTICE_ISSUER_INVALID`, `NOTICE_AUDIENCE_INVALID` or `NOTICE_BODY_HASH_INVALID`. It was answered `503` (try again) and, when it could be NETOPIA's, kept in the quarantine for 14 days. Anyone can post to that address, so a stray line now and then means nothing; each run of the check command (§14.2) writes one with `NOTICE_HEADER_MISSING`. Messages over the intake's budget show only as `api.admission.refused` for the route `POST /v1/billing/netopia/notify`, at most once a minute per reason; NETOPIA sends them again, so a later copy is quarantined when the flood passes. | A stray line: nothing. With an O4 email, or many lines with `NOTICE_SIGNATURE_INVALID` or `NOTICE_AUDIENCE_INVALID`: run the check command (§14.2); a wrong public key or POS signature is fixed with the setup's `--replace netopia`, then restart `debateai-api`: the quarantine is checked again at that start. |
+| `"event":"billing.notice.recheck"`, with `quarantined`, `verified` and `failed`, or `code` | At its start the API checked the quarantined messages of the last 14 days again with its current keys; `verified` counts those that now pass and were stored as if they had just arrived. A `code` instead means the check itself failed. | `verified` above 0 after a key fix: nothing more; their payments are checked now. `failed` above 0 or a `code`: restart once more; if it repeats, report it. |
+| `"event":"billing.notice.store_failed"` (no other field) | A message that passed could not be stored, almost always because the database did not answer. It was answered `503`, so NETOPIA sends it again. | One: nothing. Again and again: check the database. |
+| `"event":"billing.notice.parse_failed"` (no other field) | A message that passed could not be read: it is stored as it came, and you get O3. Its payment is still found by the status reads. | Report it at once: NETOPIA's message may have changed shape. |
+| `"event":"billing.notice.unknown_order"` (no other field) | A message that passed names an order the site does not know (neither a charge nor a test order). It is stored with no effect. | A single line: nothing. Several: report them; NETOPIA may be sending another shop's messages to this address. |
+| `"event":"billing.payment.status_unexpected"`, with `status` | NETOPIA reported a status whose meaning it has not confirmed (for example `17`). Nothing is recorded on the charge; you get O3 naming the status (with a `billing.payment.owner_review` line). | Look the payment up in NETOPIA's admin and decide with the existing commands (`billing:dispute`, a refund); report the status. |
+| `"event":"billing.payment.owner_review"`, with `state` | A payment was handed to you, and you got O3. `state` names NETOPIA's state. For `UNCLEAR`, nothing was recorded on the charge. For `CHARGEBACK_LOST` (status 10, "chargeback accepted"), the site has recorded the dispute; unless the payment bought nothing, an active or past-due plan is paused (`SUSPENDED`) and the person gets an email (M10). Nothing ends by itself. | Do what the O3 says: look the payment up in NETOPIA's admin; record a dispute's outcome with `pnpm billing:dispute`. |
+| `"event":"billing.setting.retired"`, with `key` | At its start the API found a setting of the previous card processor in `api.env` (`key` names it; its value is never printed). The API ignores it and starts normally. | Delete that line from `/etc/debateai/api.env`, and the key file it named if there is one, then restart `debateai-api` at a quiet moment. |
 | `"event":"billing.quote.refused"`, with `code` `TAX_SERVICE_REFUSED` and `reason` | The tax service (Quaderno) refused to price a purchase. That is not an outage: most often the Quaderno key is wrong or revoked (`reason` `QUADERNO_HTTP_401` or `QUADERNO_HTTP_403`), or Quaderno rejects the request (`QUADERNO_HTTP_422`). The person is told to try again in a minute, and nothing is charged. The same event with `code` `TAX_SERVICE_UNAVAILABLE` is an outage of the tax service; with any other code it is one person's own refusal (for example `ALREADY_SUBSCRIBED` or `TAX_ID_INVALID`). | `TAX_SERVICE_REFUSED`: every purchase fails until it is fixed. Check the Quaderno key file and the Quaderno account at once; fix the key and restart `debateai-api`. `TAX_SERVICE_UNAVAILABLE`: nothing, unless it lasts; then check Quaderno's status page. |
-| `"event":"billing.invoice.unknown"`, with `issuer`, `kind` and `code` | A legal document the site could not settle itself. `INVOICE_UNKNOWN`: SmartBill did not say whether it issued a Romanian invoice or credit note, and cannot be asked afterwards, so it may exist. `CREDIT_NOTE_MANUAL`: a credit note the site cannot issue itself (a second refund of one sale, or a refund made in the xMoney dashboard whose amount the site does not know). The owner summary lists it under "Invoices and credit notes to check by hand". | `INVOICE_UNKNOWN`: look in SmartBill the same day, because a Romanian document must reach e-Factura in time (your accountant knows the deadline). If it was issued, record it with `pnpm billing:invoice --record`; if not, re-queue it with `--requeue --confirm-not-issued` (**An invoice, a credit note or an email that was never sent**, below). `CREDIT_NOTE_MANUAL`: issue it by hand in SmartBill or Quaderno and record it with `--record`; for a `DASHBOARD_REFUND` line, record it with `--record` and the amount you refunded, `--amount` (**An invoice, a credit note or an email that was never sent**, below). |
-| `"event":"billing.payment.mismatch"`, with `code` or `chargeKind` | A payment check found a payment that does not belong to the charge it was matched with, so nothing was recorded and nothing moved. `code` `CUSTOMER_MISMATCH`: the payment was made by another xMoney customer than the one our checkout created; the card **is** charged, and nothing refunds it. `code` `ORDER_REF_MISMATCH`: xMoney's order names another charge than the notice did. A line with `chargeKind` instead: the payment's amount or currency differs from the charge's. | Find the payment: the notices whose check ended this way are listed by the command below (a check the daily money check queued has no notice; look in the xMoney dashboard for a payment that gave nobody a plan). Look the payment up in the xMoney dashboard and, if no plan was given for it, refund it there by hand. Report every such line. `CUSTOMER_MISMATCH` on every first payment means xMoney makes embedded payments from another customer than X0 showed: stop sales (**Stopping sales, and switching billing off**, above) and report it at once. |
-| `"event":"billing.notice.undecryptable"` (no other field) | Something posted a payment notice to the notice address that this host's xMoney private key cannot decrypt. The address answers `200` anyway (§14.5), so xMoney does not send it again, and nothing is stored. Anyone can post to that address, so a stray line now and then means nothing. A real notice that cannot be decrypted means the private key does not belong to the xMoney site whose dashboard sends the notices here (a sandbox key beside the live dashboard, the reverse, or a replaced key); its payment then waits for the daily money check, up to a day, before its plan is active. | A stray line, with no purchase at that moment: nothing. One at each purchase, or at every notice: check the key file `XMONEY_PRIVATE_KEY_PATH` names, and which xMoney dashboard's notification URL points at this site (§14.5); fix it and restart `debateai-api`. |
-| `"event":"billing.chargeback"`, with `chargeKind` | xMoney reported a card dispute (a chargeback) on a payment. An active or past-due plan is paused (`SUSPENDED`): its paid features stop, and the person gets an email (M10). With `code` `DUPLICATE_PAYMENT`, the dispute is on a second payment of the same order, which never pauses the plan. xMoney sends no signal when a dispute ends. | When xMoney tells you the outcome, record it with `pnpm billing:dispute` (**Disputes (chargebacks)**, above). |
-| `"event":"billing.withdrawal.owner_review"`, with `source` | A withdrawal was recorded and the plan ended, but its refund cannot be worked out from our records (a refund made in the xMoney dashboard, or an earlier refund request, already touched one of the payments), so nothing was refunded. You get O2_WITHDRAWAL at once, and the owner summary lists it as `WITHDRAWAL_BY_OWNER` until you settle it. | Within 14 days of the withdrawal, work out what is due and settle it as **A withdrawal sent by email or on the model form**, above, says. |
+| `"event":"billing.invoice.unknown"`, with `issuer`, `kind` and `code` | A legal document the site could not settle itself. `INVOICE_UNKNOWN`: SmartBill did not say whether it issued a Romanian invoice or credit note, and cannot be asked afterwards, so it may exist. `CREDIT_NOTE_MANUAL`: a credit note the site cannot issue itself (a second refund of one sale, or a refund made in NETOPIA's admin whose amount the site does not know). The owner summary lists it under "Invoices and credit notes to check by hand". | `INVOICE_UNKNOWN`: look in SmartBill the same day, because a Romanian document must reach e-Factura in time (your accountant knows the deadline). If it was issued, record it with `pnpm billing:invoice --record`; if not, re-queue it with `--requeue --confirm-not-issued` (**An invoice, a credit note or an email that was never sent**, below). `CREDIT_NOTE_MANUAL`: issue it by hand in SmartBill or Quaderno and record it with `--record`; for a `DASHBOARD_REFUND` line, record it with `--record` and the amount you refunded, `--amount` (**An invoice, a credit note or an email that was never sent**, below). |
+| `"event":"billing.payment.mismatch"`, with `code` or `chargeKind` | A payment check found a payment that does not match its charge, so nothing was recorded and nothing moved: `PAYMENT_AMOUNT_MISMATCH` (the amount or the currency NETOPIA reports differs from the charge's) or `PAYMENT_CUSTOMER_MISMATCH` (NETOPIA echoes another client id than our customer's). The card **is** charged, and nothing refunds it by itself. The check ends there (a `billing.outbox.dead` line with the same code) and you get O3. | Look the payment up in NETOPIA's admin by the charge reference the O3 names (it is NETOPIA's order id) and, if no plan was given for it, refund it there by hand. Report every such line: a mismatch on every first payment means NETOPIA reports amounts differently than the site reads them; stop sales (**Stopping sales, and switching billing off**, above) and report it at once. |
+| `"event":"billing.chargeback"`, with `chargeKind` | NETOPIA reported a card dispute (status 9, 10 or 16) on a payment. An active or past-due plan is paused (`SUSPENDED`): its paid features stop, and the person gets an email (M10). With `code` `DUPLICATE_PAYMENT`, the dispute is on a payment that bought nothing (a second or refused payment of the same person, a card check, or a payment the site never saw paid), which never pauses the plan. NETOPIA sends no signal the site relies on when a dispute ends. | When NETOPIA tells you the outcome, record it with `pnpm billing:dispute` (**Disputes (chargebacks)**, above). |
+| `"event":"billing.withdrawal.owner_review"`, with `source` | A withdrawal was recorded and the plan ended, but its refund cannot be worked out from our records (a refund made in NETOPIA's admin, or an earlier refund request, already touched one of the payments), so nothing was refunded. You get O2_WITHDRAWAL at once, and the owner summary lists it as `WITHDRAWAL_BY_OWNER` until you settle it. | Within 14 days of the withdrawal, work out what is due and settle it as **A withdrawal sent by email or on the model form**, above, says. |
+| `"event":"billing.card.reminder"`, with `line` | Ten days before a renewal, a plan had no usable saved card, and the person was emailed M12 (`line` `EXPIRING`: the card expires first; `MISSING`: no card was kept from the last payment). | Nothing: the person changes the card in Settings. Many `MISSING` lines after first payments: report it; NETOPIA may not be sending the saved card (go-live row N-4). |
 | `"event":"billing.cancel_link.failed"`, with `code` | Someone asked on `/cancel` for an emailed cancel link, and finding their plan or queuing the email failed, most often because the database did not answer. The page had already said a link is on its way, so the person gets no email (M9). | One: nothing; the person can ask again. Several, or the same code again and again: check the database and the API's other lines from the same minutes, and report the code. |
 | `"event":"billing.mail.attachment_missing"`, with `kind` `ACCEPTED_TERMS` and `code` | A confirmation email (M1) went out without the Terms version the person accepted attached. `MAIL_TERMS_NOT_ARCHIVED`: that version's file is missing from the Terms archive (`apps/ui/legal/archive/`, §14.7); `MAIL_TERMS_NOT_RECORDED`: the site holds no record of which version the person accepted. | Report it the same day: the person is owed the Terms they accepted, so whoever runs the server finds the version and the account's address, and you send it to them. `MAIL_TERMS_NOT_ARCHIVED` also means the archive on this host lacks a version someone accepted (§14.7: never delete a file there): report that too, so the file is put back from the repository before the next confirmation email. |
+| `"event":"billing.provider_only.incomplete"`, with `missing` | Written once at each start of the API on the hosted site while billing is off: some of NETOPIA's four settings (`NETOPIA_API_BASE_URL`, `NETOPIA_POS_SIGNATURE`, `NETOPIA_API_KEY_PATH`, `NETOPIA_IPN_KEYS_PATH`) are in `api.env`, but not all four. `missing` names the first one left out, never a value. Nothing of NETOPIA is set up: the site does not answer NETOPIA's payment messages, so the owner's test orders get no confirmation. | Put the missing line in `api.env` (the guided setup writes all four together), or delete all four lines if NETOPIA is not meant to be set up yet, then restart the API. |
+| `"event":"billing.payment.order_reused"`, with `orderId` | NETOPIA answered a renewal's first charge as an order it already knew (its error 56). That should never happen for a new charge. The answer was recorded as that order's payment and its normal check decides it; you get O3 `ORDER_REUSED`. | Look the order (`orderId`, our charge reference) up in NETOPIA's admin and make sure the card was charged only once; report it. |
+| `"event":"billing.payment.start_failed"`, with `operation` and `code` | NETOPIA's payment page could not be opened (`operation` says for what: `checkout`, `upgrade` or `card_check`). Nothing was charged and nothing changed; the person was told the payment page could not be opened and may try again (except for `PAYMENT_PAYER_INCOMPLETE`, where the person is asked for the missing billing details instead). `code`: `PAYMENT_PROVIDER_UNAVAILABLE` (NETOPIA did not answer), `PAYMENT_CONFIGURATION_REFUSED` (NETOPIA refused our own setup; you get O3 `CHARGE_CONFIGURATION_REFUSED`, at most once an hour), `PAYMENT_CREDENTIALS_REFUSED` (NETOPIA refused our API key; with a `billing.payment.credentials_refused` line and O3 `CHARGE_CREDENTIALS_REFUSED`), `PAYMENT_OUTCOME_UNKNOWN` (the request may have reached NETOPIA; no page was kept, so nobody can pay it, and the person's next try closes it), `PAYMENT_PAYER_INCOMPLETE` (the billing details lack a name, a phone or a street; the person is asked for them) or `PAYMENT_RESPONSE_INVALID` (NETOPIA's answer could not be read). | One line: nothing. `PAYMENT_CONFIGURATION_REFUSED` or `PAYMENT_CREDENTIALS_REFUSED`: do what the O3 says. The same code again and again: run the check command (§14.2) and report it with the code. |
 
-The payment notices whose check ended as a mismatch, newest first. Act only on rows of this host's xMoney system (`live` on the live host, `stage` on the sandbox host):
+The payment checks that ended as a mismatch, newest first. Act only on rows of this host's environment (`live` on the
+live host, `sandbox` on the sandbox server):
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT n.received_at, n.xmoney_environment, n.transaction_id, n.order_id, n.status FROM billing.xmoney_notice n JOIN billing.xmoney_notice_outcome o ON o.notice_id = n.notice_id WHERE o.outcome = 'MISMATCH' ORDER BY n.received_at DESC LIMIT 20"
+sudo -u postgres psql -d debateai -c "SELECT j.dead_at, c.payment_environment, j.ref AS charge_id, j.last_error_code FROM billing.outbox j JOIN billing.charge c ON c.charge_id = j.ref WHERE j.kind = 'VERIFY_PAYMENT' AND j.last_error_code IN ('PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_CUSTOMER_MISMATCH') ORDER BY j.dead_at DESC LIMIT 20"
 ```
 
 **Every other billing line records a normal event and needs nothing from you:** `billing.checkout.started` (a
-checkout began), `billing.payment.verified` (a payment went through), `billing.payment.duplicate` (a second
-payment of an order already paid, refunded in full by itself), `billing.refund` (a refund was made),
+checkout began), `billing.payment.verified` (a payment went through), `billing.refund` (a refund was made), `billing.refund.recorded_by_owner` (you recorded a NETOPIA refund with
+`pnpm billing:refund-done`),
 `billing.country.refused` (a purchase the country rules refused), `billing.cancel` and `billing.cancel.revoked` (a
 cancel, and its undo), `billing.downgrade.scheduled`, `billing.upgrade.requested`, `billing.withdrawal` and
 `billing.withdrawal.settled` (a withdrawal recorded, and one you settled), `billing.card.change.started`,
 `billing.card.refused` (a new card from a blocked country), `billing.card.change.deferred` (a card change that waited
-for a renewal's outcome; nothing changed), `billing.cancel_link.sent`, `billing.reconcile.adopted` (the money check
-found the payment of a charge whose answer was lost), `billing.erasure.stopped` and `billing.age_frozen.stopped` (the
-plan of a deleted or age-frozen account ended), and `billing.tax_summary.queued` (the quarterly summary was queued).
+for a renewal's outcome; nothing changed), `billing.card.not_adopted` (a card check NETOPIA accepted whose saved card
+could not become the plan's card; nothing changed and the person is asked to try again), `billing.cancel_link.sent`, `billing.erasure.stopped` and `billing.age_frozen.stopped` (the
+plan of a deleted or age-frozen account ended), `billing.card.saved` (a saved card that arrived after its payment
+was decided became the plan's card), `billing.card.revoked` (saved cards the site no longer needs were deleted, with
+the reason and the count: replaced, their plan ended, never used, another system's, a test order's, or an account
+erasure), `billing.card.purged` (the daily delete of revoked cards a day after their revocation, and of NETOPIA's raw
+messages and the quarantine after 14 days), `billing.renewal.recovered_earlier` (an earlier attempt of a month NETOPIA now
+reports paid was sent to its check instead of a new retry), `billing.charge.closed` (an unpaid payment page, such as an
+upgrade the person left, was closed; a payment that still arrives for it is still applied, or refunded in full
+(`UPGRADE_CLOSED`) through the refund path), and `billing.tax_summary.queued` (the quarterly summary was queued).
 
 **e-Factura.** SmartBill sends each Romanian invoice to ANAF itself, through a setting in your SmartBill account. The
 site does not read the e-Factura status back, so check it in SmartBill or in ANAF's SPV, as your accountant advises.
@@ -2844,8 +3004,8 @@ It prints one line naming the document it recorded. A document the site never is
 (`EFACTURA_DOCUMENT_UNKNOWN`) and nothing is written.
 
 **An invoice, a credit note or an email that was never sent.** When a job that issues an invoice or a credit note,
-or that sends an email, stops after its last try, the site emails you at once (O3, "A legal document or a required
-email was not sent and needs your attention"), and the owner summary lists it until it is settled: invoices and
+or that sends an email, stops after its last try, the site emails you at once (O3, "Billing needs your attention (…)",
+the brackets holding the code the job stopped with), and the owner summary lists it until it is settled: invoices and
 credit notes under "Invoices and credit notes to check by hand", emails under "Emails that never went out". Below
 each list the summary says what to do for each kind of line, and the email says it for its job. Typical causes: a wrong or revoked Quaderno key (`TAX_SERVICE_REFUSED`), Quaderno or
 SmartBill not answering for more than about 15 hours (`TAX_SERVICE_UNAVAILABLE`, `INVOICE_SERVICE_UNAVAILABLE`), or
@@ -2860,7 +3020,7 @@ For an invoice or a credit note, settle the line with `pnpm billing:invoice`, gi
   it and, for an invoice, emails the customer the receipt (M2); a SmartBill document also joins the e-Factura list.
   A SmartBill receipt recorded this way names the invoice number but does not attach the PDF (a number typed by hand
   is never used to fetch a document for a customer); it tells the customer to write to you for a copy.
-- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only: a refund made in the xMoney dashboard that xMoney
+- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only: a refund made in NETOPIA's admin that NETOPIA
   reported on the payment itself, so the site does not know its amount and queued no credit note. Issue the credit
   note by hand in SmartBill (a Romanian sale) or Quaderno, then record it with `--kind CREDIT_NOTE`, its document as
   above, and the amount you refunded in dollars and cents (for example `12.10`). The amount can be at most what the
@@ -2868,7 +3028,7 @@ For an invoice or a credit note, settle the line with `pnpm billing:invoice`, gi
   quarter's tax summary subtracts the refund at that amount instead of listing it as "amount unknown". A charge has
   one credit note at most: if it already has one, the command refuses (`BILLING_INVOICE_ALREADY_RECORDED`), and that
   refund goes to your accountant. A refund transaction of a payment whose dashboard-refund credit note is recorded is
-  already in the figures: do not take it off again. A `REFUNDED_BEFORE_START` line (a payment xMoney refunded before its plan started) needs no command: no invoice or credit note is owed, and `--record` refuses such a charge (`BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN`, or `BILLING_INVOICE_ORIGINAL_MISSING` with `--amount`); take that sale and its refund out of its quarter's figures by hand.
+  already in the figures: do not take it off again. A `REFUNDED_BEFORE_START` line (a payment refunded in NETOPIA's admin before its plan started) needs no command: no invoice or credit note is owed, and `--record` refuses such a charge (`BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN`, or `BILLING_INVOICE_ORIGINAL_MISSING` with `--amount`); take that sale and its refund out of its quarter's figures by hand.
 - `--requeue` to let the site try the job again once the cause is fixed (the Quaderno key replaced, Quaderno or
   SmartBill answering again). A SmartBill job also needs `--confirm-not-issued`: add it only after you have checked
   in SmartBill that the document was NOT issued, because SmartBill would issue a second one. A Quaderno job needs no
@@ -2887,7 +3047,7 @@ read -r CHARGE_REF && read -r KIND && read -r DOCUMENT && systemd-run --pipe --w
 To record a dashboard refund's credit note with its amount (`DASHBOARD_REFUND` lines only):
 
 ```sh
-# Paste the charge reference as the summary prints it and press Enter; paste the credit note (for example DBAI-0042, or the Quaderno document id) and press Enter; then type the amount you refunded in the xMoney dashboard, in dollars and cents (for example 12.10), and press Enter.
+# Paste the charge reference as the summary prints it and press Enter; paste the credit note (for example DBAI-0042, or the Quaderno document id) and press Enter; then type the amount you refunded in NETOPIA's admin, in dollars and cents (for example 12.10), and press Enter.
 read -r CHARGE_REF && read -r DOCUMENT && read -r AMOUNT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind CREDIT_NOTE --record "$DOCUMENT" --amount "$AMOUNT"
 ```
 
@@ -2912,16 +3072,17 @@ A refusal is one code and nothing is written. What each code means, and what to 
   than INVOICE or CREDIT_NOTE, both `--record` and `--requeue`, or neither, or an `--amount` that is not dollars and
   cents above zero, such as `12.10`, or that comes without `--record` and `--kind CREDIT_NOTE`). Run it again as shown.
 - `BILLING_INVOICE_CHARGE_UNKNOWN`: no charge has that reference. Paste it again exactly as the summary prints it.
-- `BILLING_INVOICE_OTHER_XMONEY_SYSTEM`: the charge was paid in the other xMoney system (sandbox or live) than the one
-  this host's `XMONEY_API_BASE_URL` names. It owes no document here: nothing to do on this host.
-- `BILLING_INVOICE_CHARGE_NOT_PAID`: our records hold no payment for that charge, so no document is owed. If the
-  xMoney dashboard shows it paid, tell whoever runs the server.
+- `BILLING_INVOICE_OTHER_PAYMENT_SYSTEM`: the charge was paid in another payment system than the one this host's
+  `NETOPIA_API_BASE_URL` names (NETOPIA's sandbox or live, or the previous card processor). It owes no document here:
+  nothing to do on this host.
+- `BILLING_INVOICE_CHARGE_NOT_PAID`: our records hold no payment for that charge, so no document is owed. If
+  NETOPIA's admin shows it paid, tell whoever runs the server.
 - `BILLING_INVOICE_ALREADY_RECORDED`: the charge already has that document. Nothing more to do. A charge has one
   credit note at most, so a credit note for a further refund of the same charge (for example a dashboard refund after
   one already credited) goes to your accountant.
 - `BILLING_INVOICE_JOB_OPEN`: the job is already queued. Wait for it; if it fails again, it is listed and emailed again.
 - `BILLING_INVOICE_NOTHING_LISTED`: no dead job of that kind is listed for that charge. Check the charge and the kind
-  against the summary's line. A `DASHBOARD_REFUND` line (a refund made in the xMoney dashboard, amount unknown) has no
+  against the summary's line. A `DASHBOARD_REFUND` line (a refund made in NETOPIA's admin, amount unknown) has no
   job to re-queue: issue its credit note by hand and record it with `--record` and `--amount` (above).
 - `BILLING_INVOICE_NOTHING_TO_ISSUE`: our records do not back the job (no refund is recorded for the sale, the job is
   malformed, or no payment is recorded), so there is no document to make. Tell whoever runs the server.
@@ -2933,13 +3094,13 @@ A refusal is one code and nothing is written. What each code means, and what to 
   example `DBAI-0042`), Quaderno its document id.
 - `BILLING_INVOICE_DOCUMENT_TAKEN`: that document is already recorded for another charge. Check the number in SmartBill
   or Quaderno and type the right one.
-- `BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN`: the credit note is for a refund made in the xMoney dashboard whose amount
+- `BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN`: the credit note is for a refund made in NETOPIA's admin whose amount
   our records do not hold. Run the command again with `--amount` and the amount you refunded (above).
 - `BILLING_INVOICE_NO_DASHBOARD_REFUND`: `--amount` is only for a `DASHBOARD_REFUND` line, and that charge holds no
-  refund made in the xMoney dashboard of unknown amount. For any other credit note leave `--amount` out: the site
+  refund made in NETOPIA's admin of unknown amount. For any other credit note leave `--amount` out: the site
   credits the refund it recorded.
 - `BILLING_INVOICE_AMOUNT_ABOVE_PAYMENT`: the amount is more than the payment held (the "up to" figure the tax summary
-  gives for that charge). Check the refund in the xMoney dashboard and type its amount again.
+  gives for that charge). Check the refund in NETOPIA's admin and type its amount again.
 - `BILLING_INVOICE_DATA_MISSING`: a paid charge without its quote or customer. Tell whoever runs the server.
 - `BILLING_INVOICE_FAILED`, or any other code: the command could not finish (for example, the database did not
   answer) and wrote nothing. Run it again later; if it repeats, tell whoever runs the server and give the code.
@@ -2955,20 +3116,20 @@ whoever runs the server for the account's address and report the code.
 Do this on a **separate, throwaway server** before switching billing on for real, never on the production host
 (the owner's ruling of 2 October 2026). The run moves the billing clock a month ahead, and a host that ever ran with
 that line must never go live (§14.8). Build the server from this kit like a new host, with its own database and no
-real accounts, and destroy it at the end (step 7). It needs its own:
+real accounts, and destroy it at the end (step 8). It needs its own:
 
 - **Domain and `PUBLIC_APP_URL`**: for example a `sandbox.` name of your domain pointing at it, with its own Caddy
-  site (§6). xMoney's return link and every emailed link are built from `PUBLIC_APP_URL` (§14.2), so the sandbox's
-  links lead to the sandbox server, never to the live site.
-- **Notice address in xMoney's sandbox dashboard**: in the stage dashboard (Sites → Payment Page), set the
-  notification URL to the sandbox domain followed by `/api/v1/billing/xmoney/notify` (§14.5). The live dashboard is
-  set only when the live site goes on (§14.8).
-- **Sandbox keys**: the stage site's id, public key and private key (the stage dashboard, under Sites) and the
-  Quaderno sandbox key, in the files and lines of §14.2.
+  site (§6). NETOPIA's return and notify addresses and every emailed link are built from `PUBLIC_APP_URL` (§14.2), so
+  the sandbox's payments and links lead to the sandbox server, never to the live site.
+- **Sandbox values, through the guided setup** (§14.2): NETOPIA's sandbox POS signature, sandbox API key and sandbox
+  public key, and Quaderno's sandbox address and key.
 - **Dummy SmartBill line**: the API still reads `smartbill-credentials`, and it refuses a line that is not an
-  email-like user, a colon and a token. Type a dummy line of that shape at §14.2's prompt, for example
-  `sandbox@example.invalid:not-a-token`. With the `.invalid` address below nothing is ever sent, so your real SmartBill
-  token never sits on a throwaway server.
+  email-like user, a colon and a token. At the setup's SmartBill questions, type the address `https://smartbill.invalid`,
+  then `sandbox@example.invalid` as the API user and `not-a-token` at the hidden token prompt: the file then holds the
+  dummy line `sandbox@example.invalid:not-a-token`. SmartBill has no sandbox: every invoice it issues is a real,
+  numbered fiscal document, and e-Factura sends it to ANAF. The `.invalid` name is reserved and never resolves, so an
+  accidental Romanian purchase fails harmlessly and issues nothing, and your real SmartBill token never sits on a
+  throwaway server.
 - **Register version with `countryPolicy`**: publish (§14.4) a version that carries `billingPolicy` with
   `enabled: true` and the `countryPolicy` member, from `deploy/vps/register/country-policy.example.json`. Without the
   member the publish seals the version and refuses it
@@ -2976,38 +3137,28 @@ real accounts, and destroy it at the end (step 7). It needs its own:
   Whether §5's four conditions for that member ("Country data") must hold on a throwaway server that only you use is
   your call; they do hold for the live site.
 
-In `api.env` set:
+The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if a sandbox NETOPIA address sits beside anything
+but Quaderno's sandbox and a `.invalid` SmartBill address. Fill in the company's CUI first (§14.7): the sandbox server
+builds the SmartBill connection too, so it also refuses to start with `BILLING_COMPANY_FACTS_UNVERIFIED:cui` while the
+CUI is still in square brackets, and likewise while the company's name, registered office or general email address is
+(`BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice`, for example), because the sandbox emails print them too. Run the
+check command (§14.2) before step 1: every line must show a tick. Write down what you see at each step; go-live row 15
+needs your notes.
 
-- `XMONEY_API_BASE_URL` to `https://api-stage.xmoney.com`;
-- `QUADERNO_API_BASE_URL` to your Quaderno account's sandbox address (its host ends in `.sandbox-quadernoapp.com`);
-- `SMARTBILL_API_BASE_URL=https://smartbill.invalid`. SmartBill has no sandbox: every invoice it issues is a real,
-  numbered fiscal document, and e-Factura sends it to ANAF. The `.invalid` name is reserved and never resolves, so an
-  accidental Romanian purchase fails harmlessly and issues nothing.
-
-The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if the stage API sits beside anything but
-Quaderno's sandbox and a `.invalid` SmartBill address. Fill in the company's CUI first (§14.7): the sandbox server
-builds the SmartBill connection too, so it also refuses to start with `BILLING_COMPANY_FACTS_UNVERIFIED:cui` while the CUI is
-still in square brackets, and likewise while the company's name, registered office or general email address is
-(`BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice`, for example), because the sandbox emails print them too. In `ui.env`, set `XMONEY_SDK_ORIGIN` to `https://secure-stage.xmoney.com`. Write down what
-you see at each step; go-live row 15 needs your notes.
-
-**Before step 1: read the journal of the first start with billing on.** At each start the API runs the daily money
-check at once, so its first start against xMoney's sandbox shows whether xMoney accepts the three lists the check
-asks for (X0 records the `charge-back` one too). Two minutes after that start, run the command below. For the
-API's current start only, it prints the lines that say a list failed or our key was refused, and billing's bracketed
-markers. It should print nothing:
+**Before step 1: read the journal of the first start with billing on.** Two minutes after that start, run the command
+below. For the API's current start only, it prints the lines that say NETOPIA refused our key, a message did not pass,
+or a status read failed, and billing's bracketed markers. It should print nothing except one
+`billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run of the check command since that start. That
+line is the check's own unsigned message (§14.2) and needs nothing:
 
 ```sh
-journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E 'listing_failed|credentials_refused|BILLING_[A-Z_]+_PENDING'
+journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E 'credentials_refused|notice\.unverified|status_failed|BILLING_[A-Z_]+_PENDING'
 ```
 
-A `billing.reconcile.listing_failed` line with `"listing":"charge-back"` (or another list) and `XMONEY_REFUSED`
-means xMoney does not accept that list as the site asks for it: stop here, write the line down, and report it, because
-billing must not go on for real until the request is changed. Any other line it prints: look it up in the journal table of
-§14.8 and do what it says before going on. This filter prints nothing else: billing's other lines (a job that died, a
-payment mismatch, a notice the key cannot open, and the rest of the table) never reach it. To read every billing line of
-that start, run the command below as well, and look each line up in the same table; a line the table leaves out is in
-its sentence "Every other billing line records a normal event", and needs nothing:
+Any other line it prints: look it up in the journal table of §14.8 and do what it says before going on. This filter
+prints nothing else. To read every billing line of that start, run the command below as well, and look each line up in
+the same table; a line the table leaves out is in its sentence "Every other billing line records a normal event", and
+needs nothing:
 
 ```sh
 journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E '"event":"billing\.|\[BILLING_'
@@ -3020,29 +3171,33 @@ the SmartBill contract tests, never in this run.
 
 **The stage clock only ever goes up.** Step 2 sets `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, and it stays at 31 through
 steps 3, 4 and 5 (to see a second renewal, raise it to 62; never lower it or remove it during the run). While it is
-set, the billing jobs record moved times, the API asks xMoney in real time (it translates both ways), Quaderno's
+set, the billing jobs record moved times, NETOPIA's reported times are moved forward by the same days, Quaderno's
 sandbox invoices carry the moved dates (harmless in a sandbox), and debates are still admitted, and their spend
 recorded, on the real clock, so the new plan's debate limits, its usage bars and a withdrawal's credit-used share are
 not part of this run (the fake stack in step 6 proves the bars and the share). The owner commands
-(`billing:withdraw`, `billing:dispute`, `billing:tax-summary`, `billing:efactura-status`, `billing:invoice`) also
-run on the real clock, so do not run them on this host while the line is set. The line never comes out: at the
-end the whole server is destroyed, its database with it (step 7).
-A host must never go live holding rows written on a moved clock; a live start refuses while any is still dated ahead
-(`BILLING_RECORDS_DATED_AHEAD`, §14.8).
+(`billing:withdraw`, `billing:dispute`, `billing:tax-summary`, `billing:efactura-status`, `billing:invoice`,
+`billing:refund-done`) run on the real clock, so do not run them on this host while the line is set, except
+`billing:refund-done` in step 4. The line never comes out: at the end the whole server is destroyed, its database with
+it (step 8). A host must never go live holding rows written on a moved clock; a live start refuses while any is still
+dated ahead (`BILLING_RECORDS_DATED_AHEAD`, §14.8).
 
-1. **Pay.** Sign up from the pricing page, choose Plus, pick Germany as your country, confirm it, and pay with
-   xMoney's test card 4111 1111 1111 1111 (expiry 12/26, any CVV).
-   - Expect: the plan is active within seconds, and the confirmation (M1) and receipt (M2) emails arrive.
+1. **Pay.** Sign up from the pricing page, choose Plus, pick Germany as your country, confirm it, fill in the billing
+   details, and press **Continue to payment**. On NETOPIA's sandbox page pay with the test card 9900 0048 1022 5098
+   (any future expiry, CVV 111).
+   - Expect: you come back to the site, the plan is active within seconds, and the confirmation (M1) and receipt (M2)
+     emails arrive. Settings shows the saved card.
    - Then, on a second test account (Germany again: this account already has Plus, so a second checkout on it is
-     refused with `ALREADY_SUBSCRIBED`), pay for Plus with the 3-D Secure card 5555 5555 5555 5599 (12/34, CVV 123,
-     code 00000) and note whether the bank's check opened a pop-up window (§14.5).
+     refused with `ALREADY_SUBSCRIBED`), pay for Plus with the 3-D Secure test card 9900 0091 8421 4768 and write down
+     how the bank's check looked.
 2. **Renew.** Move the billing clock forward by a month.
    - Open `api.env` and add the line `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, then restart the API. Keep the line.
-   - Two minutes after the restart, run the journal command from **Before step 1** again; it should print nothing.
-     (Its second command, which reads every billing line, now shows the renewal's own lines too.)
-   - Within two minutes, a renewal charge appears in the xMoney stage dashboard and a second receipt email arrives.
+   - Two minutes after the restart, run the journal command from **Before step 1** again; it should print nothing
+     except one `billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run of the check command since
+     the restart. (Its second command, which reads every billing line, now shows the renewal's own lines too.)
+   - Within two minutes, a payment with the saved card appears in NETOPIA's sandbox admin and a second receipt email
+     arrives.
    - The API refuses to start with `BILLING_STAGE_CLOCK_LIVE_REFUSED` if the offset is set while
-     `XMONEY_API_BASE_URL` is not the stage API.
+     `NETOPIA_API_BASE_URL` is a live address.
 
 ```sh
 sudoedit /etc/debateai/api.env
@@ -3052,33 +3207,33 @@ sudoedit /etc/debateai/api.env
 systemctl restart debateai-api
 ```
 
-3. **A failing card, at the card check.** In Settings, use Update card with the failing test card
-   5168 4948 9505 5780.
-   - Expect xMoney to refuse it at the card check itself: the page says the card couldn't be checked, and the old
-     card stays saved. Write down what you saw (an X0 finding).
-   - A saved card therefore never fails at a renewal in the sandbox. The three "we couldn't take the payment" emails
-     (M5a–c) and the move to Free (M6) are proven by the fake stack in step 6, not here.
+3. **Change the card.** In Settings, use Update card: correct a billing detail, press **Check my new card**, and pay
+   the 0.00 check on NETOPIA's page with the test card 9900 0048 1022 5098.
+   - Expect: Settings shows the new card, and no money is taken or held. Write down whether NETOPIA showed 0.00 and
+     whether the card was saved (go-live row N-11).
+   - The "we couldn't take the payment" emails (M5a–c) and the move to Free (M6) are proven by the fake stack in step 6.
 4. **Withdraw.** On a fresh test account (Germany again), pay for Plus, then in Settings press Withdraw within 14 days
    and confirm with your password and authenticator code.
-   - Expect a partial refund in the xMoney stage dashboard, the refund email (M8), and the Free plan.
+   - Expect the acknowledgement email (M8_RECEIVED), the Free plan, and your own email O2_REFUND_DUE with the amount.
+   - Refund exactly that amount on that payment in NETOPIA's sandbox admin, then record it with `pnpm billing:refund-done`
+     (**A refund handed to you**, §14.8). Expect the refund email (M8).
 5. **Cancel through the emailed link.** On another test account (Germany again), pay for Plus first: a cancel link is
    sent only for a plan that is paid and not cancelled yet. Then open `/cancel` signed out and enter the account's
    email.
    - Open the link in the email (M9) and press the button.
    - Expect the cancellation email (M7), and Settings saying when the plan ends.
 6. **What the sandbox cannot show.** The fake stack proves the rest: a failing card through the retries to Free, a
-   card from a blocked country refunded in full and its checkout ended, a rebill whose answer was lost adopted without
-   a second charge, the Romanian invoice (its line at 21 % and its PDF attached to the receipt), the amount a renewal
-   charges (the plan's price plus tax worked out again on the day) and the amount a withdrawal refunds, both checked at
-   the fake xMoney, an upgrade (the part-month price difference charged, and the new plan's extra debate credit for the
-   rest of the month), an account deletion (the renewal stopped at once, the paid plan kept until the deletion runs,
-   then ended), a payment whose notice never arrived found and settled by the daily money check, the quarter's summary
-   email to you and the email you get at once when an invoice job fails,
-   and a card dispute found by the daily money check: the plan paused once, with one email, counted
-   once in the quarter summary, and given back by `billing:dispute --outcome won`. Run both commands below from the
-   repository's `dialectical-engine` folder on your own computer, not on the host (each starts its own database and
-   fakes, and never touches the stage keys). Start the second only after the first has finished, because each starts
-   its own database:
+   card from a blocked country refunded in full and its checkout ended, a renewal whose answer was lost settled by its
+   status read without a second charge, the Romanian invoice (its line at 21 % and its PDF attached to the receipt), the
+   amount a renewal charges (the plan's price plus tax worked out again on the day) and the amount a withdrawal refunds,
+   both checked at the fake NETOPIA, an upgrade paid on NETOPIA's page (the part-month price difference charged, and the
+   new plan's extra debate credit for the rest of the month), an account deletion (the renewal stopped at once, the
+   paid plan kept until the deletion runs, then ended), a payment whose message never arrived found by its status read,
+   the quarter's summary email to you and the email you get at once when an invoice job fails,
+   and a card dispute: the plan paused once, with one email, counted once in the quarter summary, and given back by
+   `billing:dispute --outcome won`. Run both commands below from the repository's `dialectical-engine` folder on your
+   own computer, not on the host (each starts its own database and fakes, and never touches the sandbox keys). Start
+   the second only after the first has finished, because each starts its own database:
 
 ```sh
 pnpm exec vitest run tests/integration/billing-whole-flow.test.ts
@@ -3102,8 +3257,134 @@ No charge may be left with an unknown outcome. This lists each charge that has a
 sudo -u postgres psql -d debateai -c "SELECT c.charge_id, c.kind, c.created_at FROM billing.charge c WHERE EXISTS (SELECT 1 FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) ORDER BY c.created_at"
 ```
 
-7. **Destroy the sandbox server.** Once your notes are written and both fake-stack runs have passed, delete the server
-   and its disks at your hosting provider, remove the sandbox domain's DNS record, and clear the notification URL in
-   xMoney's stage dashboard. If you set up its nightly backup (§9), it must have had its own storage: delete that
-   too. Never copy its database, a backup of it or its `api.env` to the live host, and never point the sandbox
-   server at live: go live on the production host, as §14.8 says.
+7. **NETOPIA's own test of our flow.** NETOPIA asked to test our checkout before it approves the shop. Give NETOPIA the
+   sandbox server's address and a test account, let them pay and renew as in steps 1–4, and write down what they
+   report. Then record the facts the build still assumes, with the sandbox tool (spec §2.20.3), into a private folder
+   on the server. Make the folder once:
+
+```sh
+install -d -m 0700 -o debateai-api -g debateai-api /var/tmp/netopia-capture
+```
+
+   Then run its subcommands one by one as the API's user, starting with its own check:
+
+```sh
+systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox check
+```
+
+   Start a payment of 1.00. It prints the tool order's id (`NETOPIA_SANDBOX_ORDER=`) and a payment address
+   (`NETOPIA_SANDBOX_PAY=`): write the id down, open the address and pay with the test card 9900 0048 1022 5098.
+
+```sh
+systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox start --capture-dir /var/tmp/netopia-capture --amount 1.00
+```
+
+   Once it is paid, read that order's status twice, with NETOPIA's payment number and without it:
+
+```sh
+# Paste the tool order's id the start printed and press Enter.
+read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox status --capture-dir /var/tmp/netopia-capture --order "$ORDER"
+```
+
+```sh
+# Paste the tool order's id the start printed and press Enter.
+read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox status --capture-dir /var/tmp/netopia-capture --order "$ORDER" --no-ntp-id
+```
+
+   Read the status of an order NETOPIA does not know. It may print a refusal code and end with an error when NETOPIA's
+   answer differs from what the build expects; the capture is written all the same, and that answer is what it is for:
+
+```sh
+systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox status --capture-dir /var/tmp/netopia-capture --unknown-order
+```
+
+   Start the 0.00 card check. It prints its own tool order's id and payment address: write the id down, open the
+   address and pay with the same test card.
+
+```sh
+systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox zero --capture-dir /var/tmp/netopia-capture
+```
+
+   Charge 1.00 to the card the first payment saved. It prints the charge's own tool order's id: write that down too.
+
+```sh
+# Paste the id of the first payment's tool order (the one start printed) and press Enter.
+read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox charge --capture-dir /var/tmp/netopia-capture --from-order "$ORDER"
+```
+
+   Once NETOPIA's messages for the three orders have arrived, and within 14 days (the raw messages are deleted after
+   that), store each order's messages: run this once for each of the three ids (the payment's, the card check's and
+   the charge's):
+
+```sh
+# Paste one of the three tool order ids and press Enter.
+read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox fixture --capture-dir /var/tmp/netopia-capture --order "$ORDER"
+```
+
+   Copy the capture folder to your own computer and keep it private. There, from the repository's `dialectical-engine`
+   folder, turn it into fixtures:
+
+```sh
+# Paste the path of the copied capture folder and press Enter; then the day you recorded, as YYYY-MM-DD (for example 2026-10-20), and press Enter.
+read -r CAPTURE_DIR && read -r RECORDED_ON && pnpm exec tsx tools/billing/scrub-netopia-fixture.ts --capture-dir "$CAPTURE_DIR" --out tests/fixtures/netopia --recorded-on "$RECORDED_ON"
+```
+
+   Read the fixtures it wrote, then run the recorded suite:
+
+```sh
+pnpm exec vitest run tests/unit/payments-netopia-recorded-fixtures.test.ts
+```
+
+   Commit the scrubbed fixtures only when that suite is green (go-live row for the recording). A red run means: do not
+   commit, keep the raw folder private, and hand it to a developer session.
+8. **Destroy the sandbox server.** Once your notes are written and both fake-stack runs have passed, delete the server
+   and its disks at your hosting provider and remove the sandbox domain's DNS record. If you set up its nightly backup
+   (§9), it must have had its own storage: delete that too. Never copy its database, a backup of it or its `api.env` to
+   the live host, and never point the sandbox server at live: go live on the production host, as §14.8 says.
+
+**The small live test, with billing off.** NETOPIA says monthly payments can only be tested with a real card on live.
+Do it on the production host once NETOPIA has switched on recurring payments, before billing goes on (§1.6 item 6 of
+the spec). Run the guided setup's NETOPIA section with the **live** values; with billing off the API then starts in the
+provider-only mode (§14.2): it serves only NETOPIA's notify address, and runs only the daily cleanup. Make the private
+folder as in step 7, and put your own billing details (first and last name, email, phone, country, region, city, postal
+code, street) as one JSON object in `/var/tmp/netopia-capture/payer.json`, with the fields `firstName`, `lastName`,
+`email`, `phone`, `country`, `region`, `city`, `postalCode` and `street`:
+
+```sh
+install -m 0600 -o debateai-api -g debateai-api /dev/null /var/tmp/netopia-capture/payer.json
+```
+
+```sh
+sudoedit /var/tmp/netopia-capture/payer.json
+```
+
+Then pay 1.00 with your own card on NETOPIA's live page. The tool refuses any live payment without both
+`--live --i-understand-this-charges-my-card`:
+
+```sh
+systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox start --capture-dir /var/tmp/netopia-capture --amount 1.00 --payer /var/tmp/netopia-capture/payer.json --live --i-understand-this-charges-my-card
+```
+
+Open the payment address it prints and pay. Then charge 1.00 to the card that payment saved, giving the tool order's
+id it printed and the internet address you paid from:
+
+```sh
+# Paste the tool order's id the start printed and press Enter; then the internet address you paid from and press Enter.
+read -r ORDER && read -r PAYER_IP && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox charge --capture-dir /var/tmp/netopia-capture --from-order "$ORDER" --payer /var/tmp/netopia-capture/payer.json --payer-ip "$PAYER_IP" --live --i-understand-this-charges-my-card
+```
+
+Refund both payments in NETOPIA's live admin, and check that the site stored both messages:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT n.received_at, n.provider_status, o.outcome FROM billing.payment_notice n JOIN billing.payment_notice_outcome o ON o.notice_id = n.notice_id WHERE n.payment_environment = 'live' AND o.outcome <> 'DUPLICATE' ORDER BY n.received_at DESC LIMIT 10"
+```
+
+Every row must say `TOOL_ORDER`. A message NETOPIA sent again adds a `DUPLICATE` row, which the query leaves out.
+Write down what you saw for the go-live list. The card this test saved is revoked by
+the daily cleanup once it is a day old (so make the charge above on the day you pay), and deleted a day after that.
+Then delete the live capture folder: it
+holds your own details, and nothing in it is committed:
+
+```sh
+rm -r /var/tmp/netopia-capture
+```

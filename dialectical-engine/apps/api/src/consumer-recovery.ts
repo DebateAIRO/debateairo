@@ -2,7 +2,7 @@ import { parseConsumerSecurityInput, consumerPasswordUsable } from "./consumer-s
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { generateRegistrationOptions } from '@simplewebauthn/server';
 import { ConsumerRecoveryProveRequestSchema, RecoveryEnrollmentBeginRequestSchema, RecoveryEnrollmentCompleteRequestSchema, RecoveryEnrollmentOptionsResponseSchema, type ConsumerRecoveryProofResponse, type RecoveryEnrollmentOptionsResponse } from '@debateai/contract';
-import { createEmailBlindIndex, normalizeEmailForBlindIndex, hashToken, normalizeRecoveryCode, recoveryCodeSlot, verifyRecoveryCode, generateRecoveryCode, hashRecoveryCode, decrypt, encrypt, generateTotpSecret, encodeBase32, matchTotpStep, totpProvisioningUri, type Argon2Executor, type ReadableUserDekStore } from '@debateai/crypto';
+import { createEmailBlindIndex, normalizeEmailForBlindIndex, hashToken, normalizeRecoveryCode, recoveryCodeSlot, verifyRecoveryCode, decrypt, encrypt, generateTotpSecret, encodeBase32, matchTotpStep, totpProvisioningUri, type Argon2Executor, type ReadableUserDekStore } from '@debateai/crypto';
 import { currentDocument, legalManifestLocales } from '@debateai/legal-manifest';
 import { AGE_RULE_VERSION, MIN_AGE } from '@debateai/kernel';
 import type { PostgresConsumerRecoveryRepository, AuthSourceContext, ConsumerLegalPair } from '@debateai/db';
@@ -88,10 +88,11 @@ export class ConsumerRecoveryService implements ConsumerRecoveryApplication {
         const tokenHash = hashToken('consumer-recovery-channel', p.token), record = await this.repository.readProof(tokenHash, recoveryCodeSlot(code));
         if (record === null || !storedArgon2EnvelopeNotOverPolicy(record.codeHash, this.d.mfaPolicy.recoveryCodes.argon2id, 'recovery-code') || !await verifyRecoveryCode(this.d.argon2, record.codeHash, code))
             throw new AuthFlowError('AUTH_CREDENTIALS_INVALID');
-        const replacement = generateRecoveryCode(record.slot), replacementHash = await hashRecoveryCode(this.d.argon2, replacement, this.d.mfaPolicy.recoveryCodes.argon2id), cap = random();
-        const committed = await this.repository.prove({ tokenHash, codeId: record.codeId, codeHash: record.codeHash, replacementHash, capHash: hashToken('consumer-recovery-enroll', cap), method: p.method }, source);
+        // Design note 2026-10-09 item 3: the used code is consumed and never refilled.
+        const cap = random();
+        const committed = await this.repository.prove({ tokenHash, codeId: record.codeId, codeHash: record.codeHash, capHash: hashToken('consumer-recovery-enroll', cap), method: p.method }, source);
         const passwordUsable = consumerPasswordUsable(record.passwordHash, this.d.authPolicy);
-        return { status: 'RECOVERY_ENROLL_ONLY', available_methods: passwordUsable ? ['passkey', 'totp'] : ['passkey'], totp_unavailable_reason: passwordUsable ? null : 'PASSWORD_UNAVAILABLE', recovery_capability: cap, replacement_recovery_code: replacement, expires_at: new Date(committed.expiresAt).toISOString() };
+        return { status: 'RECOVERY_ENROLL_ONLY', available_methods: passwordUsable ? ['passkey', 'totp'] : ['passkey'], totp_unavailable_reason: passwordUsable ? null : 'PASSWORD_UNAVAILABLE', recovery_capability: cap, expires_at: new Date(committed.expiresAt).toISOString() };
     }
     async beginEnrollment(input: unknown, source: AuthSourceContext): Promise<RecoveryEnrollmentOptionsResponse> {
         const p = parseConsumerSecurityInput(RecoveryEnrollmentBeginRequestSchema, input);

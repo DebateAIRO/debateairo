@@ -4,6 +4,7 @@ import { migrate } from "@debateai/db";
 import type { PoolClient } from "pg";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
+import { AUTH_DB_BATCH_MIGRATION } from "../../packages/db/src/migration-forward-auth-db-batch.js";
 import { auditMigrationReplaySafety } from "../../tools/orphan-audit/src/index.js";
 
 // DB1 of the 2026-09-01 security-hardening mission pins
@@ -598,7 +599,9 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     const plan = await loadMigrationPlan();
     const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
     expect(plan.manifest.order).toHaveLength(128);
-    expect(files).toEqual([...plan.manifest.order, plan.forward108.name, plan.forward110.name].sort());
+    // PR-54, PR-58: dev's 0110, then the forward chain after it (0111, NETOPIA), each declared by its own manifests
+    // (migrations/lineage/README.md).
+    expect(files).toEqual([...plan.manifest.order, plan.forward108.name, plan.forward110.name, ...plan.forwardChain.map((step) => step.name)].sort());
     for (const name of ["0104_password_only_reset.sql", "0105_backup_email_verification.sql", "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"]) {
       expect(auditMigrationReplaySafety(`migrations/${name}`, plan.sources.get(name)!.sql, { plan, migrateSource })).toEqual([]);
     }
@@ -616,5 +619,8 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     expect(ordered.at(-1)).toBe("0107_auth_dev_integration.sql");
     expect(plan.forward108.name).toBe("0108_preview_recovery_verified_bindings.sql");
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
+    // The chain in merge order (migrations/lineage/README.md, "renumber"): NETOPIA, then the auth DB batch, last.
+    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql"]);
+    expect(plan.forwardChain.at(-1)!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });
 });

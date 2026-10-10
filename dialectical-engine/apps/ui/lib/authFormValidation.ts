@@ -14,11 +14,14 @@ export function validateSignup(input: {
     const errors: SignupFieldErrors = {};
     if (!emailShape(input.email))
         errors.email = 'auth.invalidEmail';
-    try {
-        normalizeManualPhone(input.phone);
-    }
-    catch {
-        errors.phone = 'auth.phone.invalid';
+    // Optional (owner ruling 2026-10-09): an empty field is fine; a typed number must parse.
+    if (input.phone.trim() !== '') {
+        try {
+            normalizeManualPhone(input.phone);
+        }
+        catch {
+            errors.phone = 'auth.phone.invalid';
+        }
     }
     if (input.password !== undefined && (input.password.length < 8 || input.password.length > 1024))
         errors.password = 'auth.signUp.passwordInvalid';

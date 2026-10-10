@@ -143,6 +143,12 @@ const externalRecoveryRoles = [
   "debateai_password_reset_owner", "debateai_password_reset_runtime"
 ] as const;
 
+// The auth DB batch step (design note 2026-10-09 item 4): the password-less staff readiness writer. A LOGIN admitted
+// only on the private preview, by peer authentication on its local socket from the dedicated no-login OS user
+// debateai-readiness (deploy/preview-lifecycle/v1/README.md step 7); production's pg_hba names it nowhere. So it is
+// not a SCRAM principal of the P3-01 provisioner manifest.
+const peerReadinessRoles = ["debateai_staff_readiness_writer"] as const;
+
 // V-29 removed the one exception (the observation agent's pg_monitor login): no
 // principal may hold any predefined pg_* role.
 function exactForbidden(effectiveMemberships: readonly string[]): readonly string[] {
@@ -447,6 +453,10 @@ describe("P3-01 production database-principal manifest", () => {
         // billing.outbox, and billing.withdrawal_owner_settlement, on which 0088 grants
         // SELECT, INSERT; since 0093 each to debateai_billing_runtime); no privilege is added.
         { component: "apps/api:billing-withdraw-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_WITHDRAW_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:withdraw" },
+        // N14 (spec §2.12.2): the owner's refund-done command (`pnpm billing:refund-done`) runs as the API, with the
+        // API's own EnvironmentFile, under systemd-run, and writes only billing rows that principal already writes
+        // (billing.charge_event and billing.outbox, since 0093 granted to debateai_billing_runtime); no privilege is added.
+        { component: "apps/api:billing-refund-done-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_REFUND_DONE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:refund-done" },
         // Paid plans, Task P16b: the owner's tax summary (`pnpm billing:tax-summary`)
         // runs as the API under systemd-run on a READ-ONLY one-connection pool
         // (billing rows and the register's taxAuthorities row); it writes nothing.
@@ -463,6 +473,14 @@ describe("P3-01 production database-principal manifest", () => {
         // SELECT, INSERT, and billing.outbox, on which 0087 grants SELECT, INSERT;
         // since 0093 both to debateai_billing_runtime); no privilege is added.
         { component: "apps/api:billing-invoice-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_INVOICE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:invoice" },
+        // NETOPIA spec 2026-10-05 §2.17.3 (N21): the owner's check command (`pnpm billing:check`) runs as the API under
+        // systemd-run on a READ-ONLY one-connection pool and reads only the register's billing rows; it writes nothing.
+        { component: "apps/api:billing-check-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_CHECK_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:check" },
+        // NETOPIA spec 2026-10-05 §2.20.3 (N22): the owner's NETOPIA recording (`pnpm billing:netopia-sandbox`) runs as the
+        // API, with the API's own EnvironmentFile, under systemd-run; it inserts only billing.tool_order and reads
+        // billing.card_token, card_token_revocation, payment_notice and payment_notice_raw, all granted by 0111 to
+        // debateai_billing_runtime; no privilege is added.
+        { component: "tools/billing:netopia-sandbox", environmentKey: "DATABASE_URL", purpose: "BILLING_NETOPIA_RECORDING_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:netopia-sandbox" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "SERVER_ASK_ADMISSION_POOL", binding: "WIRED" },
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },
@@ -731,7 +749,7 @@ describe("P3-01 production database-principal manifest", () => {
         .map(({ roleName }) => roleName)
         .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent|debateai_observation_threshold_operator|debateai_prod_staff_recovery)$/u.test(roleName))
     ].sort();
-    expect(sourceCreatedRoles).toEqual([...manifestMigrationRoles,...externalRecoveryRoles].sort());
+    expect(sourceCreatedRoles).toEqual([...manifestMigrationRoles,...externalRecoveryRoles,...peerReadinessRoles].sort());
     expect(manifest.retiredCapabilityRoles).toEqual([{roleName:"debateai_password_recovery_runtime",login:false,inherit:false,directMemberships:[],status:"RETIRED_BY_0104",reason:expect.any(String)}]);
 
     const sourceDatabaseKeys = [...new Set([
@@ -756,7 +774,10 @@ describe("P3-01 production database-principal manifest", () => {
     const appSourceRoots = [
       "apps/api/src",
       "apps/runner/src",
-      "apps/scheduler/src"
+      "apps/scheduler/src",
+      // The owner's billing tools that open the API's own pool (N22's NETOPIA recording). Only this folder: the other
+      // tools/ folders (acceptance-bundle, orphan-audit) hold node_modules.
+      "tools/billing"
     ];
     const appSourcePaths = (await Promise.all(appSourceRoots.map(async (root) =>
       (await readdir(root, { recursive: true }))

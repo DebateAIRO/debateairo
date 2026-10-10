@@ -25,10 +25,18 @@ function harness(result: "passed" | "rejected" | "unavailable" | null = "passed"
 
 describe("mandatory proof at the public identity boundary", () => {
   // Removing the canonical parse or gate would reach registration (and its lookup/KDF/mail).
-  it.each(["turnstile_token", "locale", "ui_locale", "time_zone", "phone", "terms", "privacy", "country"])("rejects missing canonical signup field %s before identity", async key => {
+  it.each(["turnstile_token", "locale", "ui_locale", "time_zone", "terms", "privacy", "country"])("rejects missing canonical signup field %s before identity", async key => {
     const { api, work, proofs } = harness(); const payload: Record<string, unknown> = { ...signup }; delete payload[key];
     try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload });
       expect(response.statusCode).toBe(400); expect(work).toEqual([]); expect(proofs).toEqual([]);
+    } finally { await api.close(); }
+  });
+  // Owner ruling 2026-10-09: the phone is optional, so a sign-up without one still passes the proof gate.
+  it("accepts a sign-up without a phone, still behind the proof", async () => {
+    const { api, work, proofs } = harness(); const { phone: _phone, ...payload } = signup;
+    try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload });
+      expect(response.statusCode).toBe(202); expect(proofs).toHaveLength(1); expect(work).toHaveLength(1);
+      expect((work[0] as { input: { phone: unknown } }).input.phone).toBe("");
     } finally { await api.close(); }
   });
   it.each(["ZZ", "R0", null])("rejects invalid country before proof or identity: %s", async country => {

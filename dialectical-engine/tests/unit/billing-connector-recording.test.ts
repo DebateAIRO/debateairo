@@ -155,9 +155,15 @@ describe("P4 — the connector recorder and its scrubber", () => {
         customer: { first_name: "Test Company Ltd", email: "person@example.test", country: "DE", street_line_1: "1 Test Street",
           tax_id: "DE-VALID-42", kind: "company" },
         evidence: { billing_country: "DE", bank_country: "DE" },
-        items: [{ quantity: 1, amount: 20, tax: { country: "DE", rate: 0, tax_code: "saas" } }]
+        items: [{ quantity: 1, amount: 20, tax: { country: "DE", rate: 0, tax_code: "saas" } }],
+        // Spec §2.8 step 5: the recording asks Quaderno whether it accepts "netopia".
+        processor: "netopia", payment: { processor: "netopia" }
       });
+      expect(fake.sales.map((recorded) => recorded.processor)).toEqual(["netopia", "netopia"]);
       expect(fake.refunds.map((recorded) => recorded.processor_id)).toEqual(["1790000000000", "1790000000001"]);
+      for (const recorded of fake.refunds) {
+        expect(recorded).toMatchObject({ processor: "netopia", payment: { processor: "netopia" } });
+      }
       expect(QUADERNO_REVERSE_CHARGE_CHECK).toContain("Reverse charge");
     } finally {
       await fake.stop();

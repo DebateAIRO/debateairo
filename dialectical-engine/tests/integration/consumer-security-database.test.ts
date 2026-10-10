@@ -107,7 +107,8 @@ describe('consumer security execute-only authority', () => {
         for (const signature of ['guard_consumer_security_parent()', 'append_consumer_security_audit_internal(uuid,text,jsonb)', 'enqueue_consumer_security_notice_internal(uuid,text)', 'consumer_viable_path_internal(uuid,uuid,text,boolean)', 'consumer_method_removable_internal(uuid,uuid,text,boolean)', 'consume_consumer_security_grant_internal(jsonb,text,uuid,text)', 'valid_consumer_authorization_internal(jsonb)', 'insert_consumer_grant_internal(uuid,uuid,text,jsonb,timestamptz)', 'consumer_recovery_eligible_internal(uuid)', 'recovery_cap_internal(text)', 'onboarding_subject_internal(jsonb)', 'onboarding_legal_current_internal(uuid,jsonb)', 'consumer_method_notice_trigger()', 'cancel_consumer_notices_before_erasure()', 'bind_consumer_grant_generation()']) {
             const r = (await database.pool.query("SELECT p.prosecdef,p.proconfig,p.proowner=(SELECT proowner FROM pg_proc WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure) owner,has_function_privilege('security_test_runtime',p.oid,'EXECUTE') allowed FROM pg_proc p WHERE p.oid=$1::regprocedure", ['identity.' + signature])).rows[0];
             expect(r).toMatchObject({ prosecdef: true, owner: true, allowed: false });
-            expect(r.proconfig).toContain('search_path=pg_catalog');
+            // The auth DB batch step re-pins the functions it replaces to search pg_temp last.
+            expect(r.proconfig).toContain(signature === 'append_consumer_security_audit_internal(uuid,text,jsonb)' ? 'search_path=pg_catalog, pg_temp' : 'search_path=pg_catalog');
         }
         expect((await database.pool.query("SELECT has_function_privilege('security_test_runtime','staff.consumer_security_affiliated(uuid)','EXECUTE') allowed")).rows[0].allowed).toBe(false);
     });

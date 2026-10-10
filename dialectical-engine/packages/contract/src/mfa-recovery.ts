@@ -9,7 +9,11 @@ const digits = z.object({ code: z.string().regex(/^[0-9]{6}$/) }).strict();
 /** `turnstile_token` (action "mfa-recovery") is required by the server only while TURNSTILE_RECOVERY_REQUIRED is on. */
 export const MfaRecoveryStartRequestSchema = z.object({ email: z.string().min(1).max(320), destination: z.enum(["primary", "backup"]), turnstile_token: TurnstileTokenSchema.optional() }).strict();
 export const MfaRecoveryExchangeRequestSchema = z.object({ token: bearer, password: z.string().min(1).max(1024) }).strict();
-export const MfaRecoveryStateSchema = z.object({ status: z.enum(["factor_required", "totp_required", "codes_required", "ack_required", "ready", "completed", "cancelled", "refused"]), expires_at: date }).strict();
+export const MfaRecoveryStateSchema = z.object({ status: z.enum(["factor_required", "totp_required", "codes_required", "ack_required", "ready", "waiting", "completed", "cancelled", "refused"]), expires_at: date, not_before: date.optional() }).strict();
+// Owner ruling 2026-10-09: completing starts a 24-hour wait; the emailed finish link plus the current password finishes it.
+export const MfaRecoveryWaitingSchema = z.object({ status: z.literal("waiting"), not_before: date }).strict();
+export const MfaRecoveryFinishStatusSchema = z.discriminatedUnion("status", [MfaRecoveryWaitingSchema, z.object({ status: z.literal("ready_to_finish"), expires_at: date }).strict()]);
+export const MfaRecoveryFinishRequestSchema = z.object({ token: bearer, password: z.string().min(1).max(1024) }).strict();
 export const MfaRecoveryExchangeSchema = MfaRecoveryStateSchema.extend({ status: z.literal("factor_required") });
 export const MfaRecoveryFactorSchema = z.object({ status: z.literal("totp_required"), secret: z.string().regex(/^[A-Z2-7]{32}$/), otpauth_uri: z.string().startsWith("otpauth://totp/").max(8192), account_label: z.string().min(1).max(512) }).strict();
 export const MfaRecoveryCodesSchema = z.object({ status: z.literal("ack_required"), recovery_codes: z.array(z.string().min(16).max(96)).length(10) }).strict();
@@ -26,9 +30,11 @@ export const mfaRecoveryEndpointContracts = endpoints([
   ["POST /v1/auth/mfa-recovery/totp/verify", digits, result("codes_required"), 200],
   ["POST /v1/auth/mfa-recovery/codes/generate", empty, MfaRecoveryCodesSchema, 200],
   ["POST /v1/auth/mfa-recovery/codes/confirm", z.object({ code: z.string().min(1).max(128) }).strict(), result("ready"), 200],
-  ["POST /v1/auth/mfa-recovery/complete", empty, result("completed"), 200],
+  ["POST /v1/auth/mfa-recovery/complete", empty, MfaRecoveryWaitingSchema, 200],
   ["POST /v1/auth/mfa-recovery/cancel", link, result("cancelled"), 200],
-  ["POST /v1/auth/mfa-recovery/cancel-current", empty, result("cancelled"), 200]
+  ["POST /v1/auth/mfa-recovery/cancel-current", empty, result("cancelled"), 200],
+  ["POST /v1/auth/mfa-recovery/finish/status", link, MfaRecoveryFinishStatusSchema, 200],
+  ["POST /v1/auth/mfa-recovery/finish", MfaRecoveryFinishRequestSchema, result("completed"), 200]
 ]);
 export const backupEmailEndpointContracts = endpoints([
   ["GET /v1/account/backup-email", null, BackupEmailStateSchema, 200],
@@ -65,14 +71,15 @@ function transport(fetcher: typeof fetch, base: string, prefix: string, csrf: ()
 }
 export function createMfaRecoveryClient(fetcher: typeof fetch = fetch, base = "/api", csrf = () => cookie("__Host-debateai-mfa-recovery-csrf")) {
   const request = transport(fetcher, base, "/v1/auth/mfa-recovery/", csrf, "x-mfa-recovery-csrf-token");
-  return { start: (email: string, destination: "primary" | "backup", turnstileToken?: string) => request("start", generic, { email, destination, ...(turnstileToken === undefined ? {} : { turnstile_token: turnstileToken }) }, false, 202), exchange: (token: string, password: string) => request("exchange", MfaRecoveryExchangeSchema, { token, password }, false), status: () => request("status", MfaRecoveryStateSchema), beginFactor: () => request("totp/begin", MfaRecoveryFactorSchema, {}), verifyFactor: (code: string) => request("totp/verify", result("codes_required"), { code }), generateCodes: () => request("codes/generate", MfaRecoveryCodesSchema, {}), acknowledge: (code: string) => request("codes/confirm", result("ready"), { code }), complete: () => request("complete", result("completed"), {}), cancel: (token: string) => request("cancel", result("cancelled"), { token }, false), cancelCurrent: () => request("cancel-current", result("cancelled"), {}) };
+  return { start: (email: string, destination: "primary" | "backup", turnstileToken?: string) => request("start", generic, { email, destination, ...(turnstileToken === undefined ? {} : { turnstile_token: turnstileToken }) }, false, 202), exchange: (token: string, password: string) => request("exchange", MfaRecoveryExchangeSchema, { token, password }, false), status: () => request("status", MfaRecoveryStateSchema), beginFactor: () => request("totp/begin", MfaRecoveryFactorSchema, {}), verifyFactor: (code: string) => request("totp/verify", result("codes_required"), { code }), generateCodes: () => request("codes/generate", MfaRecoveryCodesSchema, {}), acknowledge: (code: string) => request("codes/confirm", result("ready"), { code }), complete: () => request("complete", MfaRecoveryWaitingSchema, {}), finishStatus: (token: string) => request("finish/status", MfaRecoveryFinishStatusSchema, { token }, false), finish: (token: string, password: string) => request("finish", result("completed"), { token, password }, false), cancel: (token: string) => request("cancel", result("cancelled"), { token }, false), cancelCurrent: () => request("cancel-current", result("cancelled"), {}) };
 }
 export function createBackupEmailClient(fetcher: typeof fetch = fetch, base = "/api", csrf = () => cookie("__Host-debateai-csrf")) {
   const request = transport(fetcher, base, "/v1/account/backup-email", csrf, "x-csrf-token");
   return { status: () => request("", BackupEmailStateSchema), startVerification: (password: string, code: string) => request("/verify/start", generic, { password, code }, true, 202), confirm: (token: string) => request("/verify/confirm", result("verified"), { token }, false) };
 }
 export type MfaRecoveryState = z.infer<typeof MfaRecoveryStateSchema>;
+export type MfaRecoveryFinishStatus = z.infer<typeof MfaRecoveryFinishStatusSchema>;
 export type MfaRecoveryClient = ReturnType<typeof createMfaRecoveryClient>;
 export type BackupEmailClient = ReturnType<typeof createBackupEmailClient>;
 
-export const mfaRecoveryContractSchemas=Object.freeze({MfaRecoveryStartRequestSchema,MfaRecoveryExchangeRequestSchema,MfaRecoveryStateSchema,MfaRecoveryExchangeSchema,MfaRecoveryFactorSchema,MfaRecoveryCodesSchema,BackupEmailStateSchema,BackupEmailVerificationRequestSchema});
+export const mfaRecoveryContractSchemas=Object.freeze({MfaRecoveryStartRequestSchema,MfaRecoveryExchangeRequestSchema,MfaRecoveryStateSchema,MfaRecoveryExchangeSchema,MfaRecoveryWaitingSchema,MfaRecoveryFinishStatusSchema,MfaRecoveryFinishRequestSchema,MfaRecoveryFactorSchema,MfaRecoveryCodesSchema,BackupEmailStateSchema,BackupEmailVerificationRequestSchema});

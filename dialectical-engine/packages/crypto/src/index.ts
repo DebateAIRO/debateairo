@@ -943,8 +943,8 @@ export function readCustodyAuthorizationHeader(path: string): string {
 const MAX_TEXT_SECRET_BYTES = 4_096;
 
 /**
- * A23 (paid plans) — a TEXT secret read as BYTES. The xMoney private key is both the HMAC key and
- * the source of the AES key, so it must be a zeroable Buffer, never a JavaScript string. Same
+ * A23 (paid plans) — a TEXT secret read as BYTES (A23's origin), held and zeroed by its caller, so
+ * it must be a zeroable Buffer, never a JavaScript string. Same
  * custody contract as every key file (O_NOFOLLOW, facts from the descriptor, custodyAccepts,
  * exactly-sized allocUnsafeSlow buffers). One printable line: an optional trailing LF, CRLF or lone
  * CR is dropped, surrounding spaces and tabs are trimmed, and anything else outside 0x20-0x7e refuses.
@@ -1703,12 +1703,15 @@ export function generateVerificationToken(): string {
 export type TokenKind = "session" | "csrf" | "login-challenge" | "step-up-grant"
   | "verification" | "support-session" | "support-case"
   | "email-change-confirm" | "email-change-cancel" | "recovery-email-confirm" | "consumer-recovery-channel" | "consumer-recovery-enroll"
-  | "password-reset-link" | "password-reset-cancel" | "password-reset-session" | "password-reset-csrf" | "backup-email-link" | "mfa-recovery-link" | "mfa-recovery-cancel" | "mfa-recovery-session" | "mfa-recovery-csrf";
+  | "password-reset-link" | "password-reset-cancel" | "password-reset-session" | "password-reset-csrf" | "backup-email-link" | "mfa-recovery-link" | "mfa-recovery-cancel" | "mfa-recovery-session" | "mfa-recovery-csrf"
+  // Owner ruling 2026-10-09: the emailed link that finishes an authenticator recovery after its 24-hour wait.
+  | "mfa-recovery-finish";
 
 const TOKEN_KINDS: ReadonlySet<string> = new Set<TokenKind>([
   "session", "csrf", "login-challenge", "step-up-grant", "verification",
   "support-session", "support-case", "email-change-confirm", "email-change-cancel", "recovery-email-confirm", "consumer-recovery-channel", "consumer-recovery-enroll",
-  "password-reset-link", "password-reset-cancel", "password-reset-session", "password-reset-csrf", "backup-email-link", "mfa-recovery-link", "mfa-recovery-cancel", "mfa-recovery-session", "mfa-recovery-csrf"
+  "password-reset-link", "password-reset-cancel", "password-reset-session", "password-reset-csrf", "backup-email-link", "mfa-recovery-link", "mfa-recovery-cancel", "mfa-recovery-session", "mfa-recovery-csrf",
+  "mfa-recovery-finish"
 ]);
 
 /**

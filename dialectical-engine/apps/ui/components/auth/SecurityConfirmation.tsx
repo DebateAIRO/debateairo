@@ -9,7 +9,6 @@ import { readSixDigitCode } from '@/lib/sixDigitCode';
 import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { safeReturnPath } from '@/lib/returnPath';
-import { EphemeralCodes } from './EphemeralCodes';
 export type SecurityConfirmationClient = Partial<Pick<ContractClient, 'authMethods' | 'beginPasskeyStepUp' | 'completePasskeyStepUp' | 'stepUp' | 'beginSocialStepUp'>>;
 export interface SecurityConfirmationProps {
     authorization: StepUpAuthorizationRequest;
@@ -44,8 +43,6 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     const [error, setError] = useState<string | null>(null);
     // Set when the session behind this check has ended: the sign-in link that brings the person back here.
     const [signInAgain, setSignInAgain] = useState<string | null>(null);
-    const [backup, setBackup] = useState<string | null>(null);
-    const [held, setHeld] = useState<ConfirmedSecurityAction | null>(null);
     const [passwordMode, setPasswordMode] = useState(false);
     const announcer = useFormAnnouncer();
     useEffect(() => {
@@ -74,12 +71,8 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
         setPassword('');
         setCode('');
         window.dispatchEvent(new Event('debateai:staff-session-ended'));
-        if (result.replacement_recovery_code) {
-            setBackup(result.replacement_recovery_code);
-            setHeld(result);
-        }
-        else
-            await onConfirmed(result);
+        // 2026-10-09: a used recovery code is never refilled, so nothing is held back to show a replacement code first.
+        await onConfirmed(result);
     }
     async function passkey() {
         if (flight.current || disabled)
@@ -186,11 +179,9 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     }
     return <section className="authSecurityConfirmation" aria-label={t(catalog, "auth.security.title")}>
  {error ? <p className="authFieldError" role="alert">{error}{signInAgain ? <> <a href={signInAgain}>{t(catalog, "auth.signUp.logIn")}</a></> : null}</p> : null}
- {backup ? <EphemeralCodes codes={[backup]} catalog={catalog}/> : null}
- {held || initialProof ? <button type="button" className="setBtn setBtnPrimary" disabled={busy || disabled} onClick={async () => {
-                const result = held ?? initialProof!;
+ {initialProof ? <button type="button" className="setBtn setBtnPrimary" disabled={busy || disabled} onClick={async () => {
+                const result = initialProof!;
                 if (!matchingSecurityGrant(result, authorization)) {
-                    setHeld(null);
                     setError(t(catalog, "auth.security.unavailable"));
                     return;
                 }
@@ -200,8 +191,6 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                 flight.current = true;
                 setBusy(true);
                 try {
-                    setBackup(null);
-                    setHeld(null);
                     window.dispatchEvent(new Event("debateai:staff-session-ended"));
                     await onConfirmed(result);
                 }
@@ -257,8 +246,6 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                 setSignInAgain(null);
                 setPassword('');
                 setCode('');
-                setBackup(null);
-                setHeld(null);
                 onCancel();
             }}>{t(catalog, "auth.security.cancel")}</button> : null}
  </section>;
