@@ -207,6 +207,8 @@ export type PreviewUnfinishedRun = Readonly<{
   basis: Readonly<Record<string, unknown>>; panel: readonly PreviewPanelMember[]; phase?: "DEBATE" | "STORY";
   /** Its ask's story size; absent: held at the largest. */
   storyTier?: PreviewStoryTier;
+  /** Spec 2026-10-11: admitted with a rotation pin (its four roles are panel members). */
+  rotated?: boolean;
 }>;
 
 /**
@@ -474,6 +476,24 @@ function dearestPanelMemberPerGate(panelModels: readonly string[]): readonly Rea
   return Object.freeze([...dearest.values()].map((entry) => Object.freeze(entry)));
 }
 
+/** The three kinds of role a rotated debate places on a panel member (spec 2026-10-11, Part 5). */
+type PreviewRotatedRoleKind = "ANSWER" | "STORYTELLER" | "STORY_CHECKER";
+
+/**
+ * Spec 2026-10-11 Part 5: of one gate's panel models, the one whose call of this role kind costs the
+ * most at `pricer` (DEBATE for the answer roles; STORYTELLER + STORYTELLER_RETRY for the storyteller;
+ * STORY_CHECKER for the story checker). The first in panel order wins a tie.
+ */
+function dearestByPricer(pricer: PreviewCallPricer, rowOf: (model: string) => PreviewModelRow) {
+  const cost = (model: string, role: PreviewRotatedRoleKind): bigint => {
+    const row = rowOf(model);
+    return role === "ANSWER" ? pricer(row, "DEBATE")
+      : role === "STORYTELLER" ? pricer(row, "STORYTELLER") + pricer(row, "STORYTELLER_RETRY") : pricer(row, "STORY_CHECKER");
+  };
+  return (models: readonly string[], role: PreviewRotatedRoleKind): string =>
+    models.reduce((best, model) => cost(model, role) > cost(best, role) ? model : best);
+}
+
 /** One part of a debate's calls: `numerator / denominator` calls of one kind by one model. */
 export type PreviewCallShare = Readonly<{ model: string; type: PreviewCallType; numerator: bigint }>;
 export type PreviewCallShares = Readonly<{ denominator: bigint; shares: readonly PreviewCallShare[] }>;
@@ -490,6 +510,9 @@ export type PreviewCallShares = Readonly<{ denominator: bigint; shares: readonly
  *   (`roleModelOfRef`), and this ask's own health checks on the models of `askProbeModelIds`;
  * - one unbilled retry per debate call (same split) and per story check.
  * `storyOnly` keeps only the story's part (a debate whose answer is served and story not yet written).
+ * `rotated` (spec 2026-10-11, Part 5): the four roles are panel members, so each role's calls go on
+ * every gate that has a panel member, at that gate's `dearestFor` member, and no off-panel role ref
+ * is health-checked; without it, today's split exactly.
  * Fractions are kept exact: every numerator is over the one `denominator`.
  */
 export function previewCallShares(input: Readonly<{
@@ -503,10 +526,16 @@ export function previewCallShares(input: Readonly<{
   roleModelOfRef?: (ref: string) => string;
   storyOnly?: boolean;
   debateCallCount?: PreviewDebateCallCount;
+  /** Spec 2026-10-11 Part 5: a rotated debate; its four roles are panel members, priced per gate at `dearestFor`. */
+  rotated?: boolean;
+  dearestFor?: (models: readonly string[], role: PreviewRotatedRoleKind) => string;
 }>): PreviewCallShares {
+  const rotated = input.rotated === true;
+  if (rotated && input.dearestFor === undefined) throw new TypeError("PREVIEW_ROTATION_PRICER_MISSING");
   const askProbeModelIds = input.askProbeModelIds ?? [];
-  const expected = previewExpectedCalls({ ...input, askProbeTargets: askProbeModelIds.length });
-  if (input.storyRounds > 0 && (input.roleModels.storyteller === null || input.roleModels.storyChecker === null)) {
+  const expected = previewExpectedCalls({ ...input, roleProviderRefs: rotated ? [] : input.roleProviderRefs,
+    askProbeTargets: askProbeModelIds.length });
+  if (!rotated && input.storyRounds > 0 && (input.roleModels.storyteller === null || input.roleModels.storyChecker === null)) {
     throw new TypeError("PREVIEW_STORY_ROLE_MISSING");
   }
   const sites = debateSitesByRole(input.basis);
@@ -516,6 +545,14 @@ export function previewCallShares(input: Readonly<{
   const siteCount = BigInt(sites === null ? 1 : sites.total);
   const denominator = members * siteCount;
   const debate = BigInt(expected.debate);
+  // A rotated debate: each gate's panel models, in panel order (a model off the reviewed rows is its own gate).
+  const panelGates = new Map<string, string[]>();
+  for (const model of panelModels) {
+    const gate = previewGateKeyOf(model) ?? `model:${model}`;
+    panelGates.set(gate, [...(panelGates.get(gate) ?? []), model]);
+  }
+  const perGate = (role: PreviewRotatedRoleKind): readonly string[] =>
+    [...panelGates.values()].map((models) => input.dearestFor!(models, role));
   const shares: PreviewCallShare[] = [];
   const add = (model: string, type: PreviewCallType, numerator: bigint): void => {
     if (numerator > 0n) shares.push(Object.freeze({ model, type, numerator }));
@@ -541,21 +578,36 @@ export function previewCallShares(input: Readonly<{
       for (const { model, gateMembers } of dearestPanelMemberPerGate(panelModels)) {
         addDebate(model, BigInt(sites.reviewer) * debate * (gateMembers >= 2 ? members : members - 1n));
       }
-      addDebate(input.roleModels.answerWriter, BigInt(sites.answerWriter) * debate * members);
-      addDebate(input.roleModels.answerChecker, BigInt(sites.answerChecker) * debate * members);
+      if (rotated) {
+        // The careful side: every gate carries the writer's and checker's sites at its dearest member (spec Part 5).
+        for (const model of perGate("ANSWER")) {
+          addDebate(model, BigInt(sites.answerWriter) * debate * members);
+          addDebate(model, BigInt(sites.answerChecker) * debate * members);
+        }
+      } else {
+        addDebate(input.roleModels.answerWriter, BigInt(sites.answerWriter) * debate * members);
+        addDebate(input.roleModels.answerChecker, BigInt(sites.answerChecker) * debate * members);
+      }
     }
     const pickups = BigInt(previewPickups(input.basis, input.maxCooldownHoldsPerRun)) * denominator;
     const modelOfRef = input.roleModelOfRef ?? ((ref: string) => previewModelRowForRef(ref)?.model ?? `unreviewed-ref:${ref}`);
     for (const member of input.panel) add(member.model_id, "PROBE", pickups);
-    for (const ref of offPanelRoleRefs(input.panel, input.roleProviderRefs)) add(modelOfRef(ref), "PROBE", pickups);
+    // A rotated debate's roles are panel members, already health-checked above.
+    if (!rotated) for (const ref of offPanelRoleRefs(input.panel, input.roleProviderRefs)) add(modelOfRef(ref), "PROBE", pickups);
     for (const model of askProbeModelIds) add(model, "PROBE", denominator);
   }
   const rounds = BigInt(input.storyRounds) * denominator;
   if (rounds > 0n) {
-    add(input.roleModels.storyteller!, "STORYTELLER", rounds);
-    add(input.roleModels.storyteller!, "STORYTELLER_RETRY", rounds);
-    add(input.roleModels.storyChecker!, "STORY_CHECKER", rounds);
-    add(input.roleModels.storyChecker!, "UNBILLED_RETRY", rounds);
+    const tellers = rotated ? perGate("STORYTELLER") : [input.roleModels.storyteller!];
+    const checkers = rotated ? perGate("STORY_CHECKER") : [input.roleModels.storyChecker!];
+    for (const model of tellers) {
+      add(model, "STORYTELLER", rounds);
+      add(model, "STORYTELLER_RETRY", rounds);
+    }
+    for (const model of checkers) {
+      add(model, "STORY_CHECKER", rounds);
+      add(model, "UNBILLED_RETRY", rounds);
+    }
   }
   return Object.freeze({ denominator, shares: Object.freeze(shares) });
 }
@@ -611,13 +663,16 @@ export type PreviewEstimateSettings = Readonly<{
 
 /**
  * Pure: what a NEW debate needs of each gate, at `pricer` and `debateCallCount` (defaults: the active
- * mode, with no measured usage). Throws for a model the preview does not review.
+ * mode, with no measured usage). Throws for a model the preview does not review. `rotated` (spec
+ * 2026-10-11, Part 5): the roles are panel members, priced on each gate at its dearest member, and the
+ * register's role models are not on any gate's model list.
  */
 export function estimatePreviewGateNeeds(input: PreviewEstimateSettings & Readonly<{
   basis: Readonly<Record<string, unknown>>;
   panel: readonly PreviewPanelMember[];
   pricer?: PreviewCallPricer;
   debateCallCount?: PreviewDebateCallCount;
+  rotated?: boolean;
 }>): readonly PreviewGateNeed[] {
   if (input.panel.length === 0) throw new TypeError("PREVIEW_PANEL_EMPTY");
   const reviewedRow = (model: string): PreviewModelRow => {
@@ -625,13 +680,15 @@ export function estimatePreviewGateNeeds(input: PreviewEstimateSettings & Readon
     if (row === undefined || previewGateKeyOf(model) === undefined) throw new TypeError("PREVIEW_MODEL_UNREVIEWED");
     return row;
   };
+  const rotated = input.rotated === true;
   const byGate = new Map<PreviewGateKey, string[]>();
-  for (const model of new Set([...input.panel.map((member) => member.model_id), ...roleModelList(input.roleModels)])) {
+  for (const model of new Set([...input.panel.map((member) => member.model_id), ...(rotated ? [] : roleModelList(input.roleModels))])) {
     const gate = previewGateKeyOf(reviewedRow(model).model)!;
     byGate.set(gate, [...(byGate.get(gate) ?? []), model]);
   }
   const pricer = input.pricer ?? previewEstimatePricer({ measured: [], callOutputTokens: input.callOutputTokens });
-  return gateNeeds(byGate, previewCallShares(input), reviewedRow, pricer);
+  return gateNeeds(byGate, previewCallShares(rotated ? { ...input, dearestFor: dearestByPricer(pricer, reviewedRow) } : input),
+    reviewedRow, pricer);
 }
 
 /**
@@ -646,13 +703,16 @@ export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: 
   debateCallCount: PreviewDebateCallCount = previewDebateCallCount()): readonly PreviewGateNeed[] {
   const dearestRow = PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.reduce((best, row) => pricer(row, "DEBATE") > pricer(best, "DEBATE") ? row : best);
   const rowOf = (model: string): PreviewModelRow => previewModelRow(model) ?? dearestRow;
+  // Spec 2026-10-11 Part 5: a rotated debate is held with the rotated pricing (its roles are panel members).
+  const rotated = run.rotated === true;
   const byGate = new Map<PreviewGateKey, string[]>();
-  for (const model of new Set([...run.panel.map((member) => member.model_id), ...roleModelList(settings.roleModels)])) {
+  for (const model of new Set([...run.panel.map((member) => member.model_id), ...(rotated ? [] : roleModelList(settings.roleModels))])) {
     const gate = previewGateKeyOf(rowOf(model).model) ?? "deepinfra";
     byGate.set(gate, [...(byGate.get(gate) ?? []), model]);
   }
   const calls = previewCallShares({ ...settings, askProbeModelIds: [], basis: run.basis, panel: run.panel,
-    roleModelOfRef: (ref) => previewModelRowForRef(ref)?.model ?? dearestRow.model, storyOnly: run.phase === "STORY", debateCallCount });
+    roleModelOfRef: (ref) => previewModelRowForRef(ref)?.model ?? dearestRow.model, storyOnly: run.phase === "STORY", debateCallCount,
+    ...(rotated ? { rotated: true, dearestFor: dearestByPricer(pricer, rowOf) } : {}) });
   return gateNeeds(byGate, calls, rowOf, pricer);
 }
 
@@ -813,7 +873,9 @@ export function createPreviewAdmissionLock(pool: Pick<Pool, "connect">,
  */
 export async function assertPreviewBudgetAdmits(
   gate: PreviewBudgetGateSettings | undefined,
-  input: Readonly<{ basis: Readonly<Record<string, unknown>>; panel: readonly PreviewPanelMember[]; storyTier?: PreviewStoryTier }>,
+  input: Readonly<{ basis: Readonly<Record<string, unknown>>; panel: readonly PreviewPanelMember[]; storyTier?: PreviewStoryTier;
+    /** Spec 2026-10-11 Part 5: the debate has a rotation pick (its roles are panel members). */
+    rotated?: boolean }>,
   clock: () => Date = () => new Date(),
   lock?: PreviewAdmissionLock
 ): Promise<void> {
@@ -841,7 +903,8 @@ export async function assertPreviewBudgetAdmits(
     const pricerFor = (storyTier: PreviewStoryTier | undefined) =>
       previewEstimatePricer({ measured, callOutputTokens: gate!.callOutputTokens, storyTier: storyTier ?? PREVIEW_STORY_TIER_FALLBACK });
     const debateCallCount = previewDebateCallCount();
-    needs = estimatePreviewGateNeeds({ basis: input.basis, panel: input.panel, ...gate!, pricer: pricerFor(input.storyTier), debateCallCount });
+    needs = estimatePreviewGateNeeds({ basis: input.basis, panel: input.panel, ...gate!, pricer: pricerFor(input.storyTier), debateCallCount,
+      ...(input.rotated === true ? { rotated: true } : {}) });
     const unfinished = await gate!.readUnfinishedRuns();
     if (unfinished.length > PREVIEW_UNFINISHED_RUNS_MAX) throw new TypeError("PREVIEW_UNFINISHED_RUNS_TOO_MANY");
     held = new Map();
@@ -875,9 +938,11 @@ export async function assertPreviewBudgetAdmits(
  * - STORY ($1, true when the register has a story): no live job, an answer served, no story row
  *   yet, and a model call finished within the last $2 seconds (the story runs after the job is DONE).
  * A debate between its start and its first job is never seen here: the admission lock is held until
- * that job is queued. Plain columns only; never content.
+ * that job is queued. `rotated` (spec 2026-10-11): the run has a role rotation pin. Plain columns only;
+ * never content.
  */
 export const PREVIEW_UNFINISHED_RUNS_SQL = `SELECT run.envelope_basis, run.discovered_panel, run.composition_budget_tier,
+              EXISTS (SELECT 1 FROM core.run_role_rotation AS rotation WHERE rotation.run_id = run.run_id) AS rotated,
               CASE WHEN EXISTS (SELECT 1 FROM core.work_item AS work
                                 WHERE work.run_id = run.run_id AND work.state IN ('READY', 'CLAIMED'))
                    THEN 'DEBATE' ELSE 'STORY' END AS phase
@@ -894,14 +959,17 @@ export const PREVIEW_UNFINISHED_RUNS_SQL = `SELECT run.envelope_basis, run.disco
                                 AND entry.finished_at > clock_timestamp() - make_interval(secs => $2::integer))))
        LIMIT ${String(PREVIEW_UNFINISHED_RUNS_MAX + 1)}` as const;
 
-function unfinishedRunFrom(row: Readonly<{ envelope_basis: unknown; discovered_panel: unknown; phase?: unknown; composition_budget_tier?: unknown }>): PreviewUnfinishedRun {
+function unfinishedRunFrom(row: Readonly<{
+  envelope_basis: unknown; discovered_panel: unknown; phase?: unknown; composition_budget_tier?: unknown; rotated?: unknown;
+}>): PreviewUnfinishedRun {
   const basis = row.envelope_basis;
   const panel = row.discovered_panel;
   if (typeof basis !== "object" || basis === null || Array.isArray(basis) || !Array.isArray(panel)
     || panel.some((member) => typeof member !== "object" || member === null
       || typeof (member as Record<string, unknown>).provider_ref !== "string"
       || typeof (member as Record<string, unknown>).model_id !== "string")
-    || (row.phase !== "DEBATE" && row.phase !== "STORY")) {
+    || (row.phase !== "DEBATE" && row.phase !== "STORY")
+    || (row.rotated !== undefined && typeof row.rotated !== "boolean")) {
     throw new TypeError("PREVIEW_UNFINISHED_RUN_UNREADABLE");
   }
   return Object.freeze({
@@ -909,7 +977,8 @@ function unfinishedRunFrom(row: Readonly<{ envelope_basis: unknown; discovered_p
     panel: Object.freeze((panel as Array<Record<string, string>>).map((member) =>
       Object.freeze({ provider_ref: member.provider_ref!, model_id: member.model_id! }))),
     phase: row.phase,
-    storyTier: previewStoryTierOf(row.composition_budget_tier)
+    storyTier: previewStoryTierOf(row.composition_budget_tier),
+    rotated: row.rotated === true
   });
 }
 
@@ -1040,7 +1109,7 @@ export async function readPreviewBudgetGateSettings(
     askProbeModelIds: Object.freeze([...askProbeModelIds]),
     maxCooldownHoldsPerRun: structural.maxCooldownHoldsPerRun,
     readUnfinishedRuns: async () => {
-      const result = await pool.query<{ envelope_basis: unknown; discovered_panel: unknown; phase: unknown; composition_budget_tier: unknown }>(
+      const result = await pool.query<{ envelope_basis: unknown; discovered_panel: unknown; phase: unknown; composition_budget_tier: unknown; rotated: unknown }>(
         PREVIEW_UNFINISHED_RUNS_SQL, [storyRounds > 0, PREVIEW_STORY_HOLD_WINDOW_SECONDS]);
       return Object.freeze(result.rows.map(unfinishedRunFrom));
     },
