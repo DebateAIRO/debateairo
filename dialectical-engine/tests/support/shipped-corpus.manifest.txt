@@ -324,6 +324,8 @@ apps/runner/src/provider-topology.ts
 apps/runner/src/rotate-kek-cli.ts
 apps/runner/src/rotate-kek.ts
 apps/runner/src/run-seats.ts
+apps/runner/src/runner-preview-team-gate.ts
+apps/runner/src/runner-ready.ts
 apps/runner/src/runner-startup-reconciliation.ts
 apps/runner/src/serve-disclosure-cli.ts
 apps/runner/src/story-snapshot.ts

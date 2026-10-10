@@ -87,7 +87,9 @@ describe('release lock', () => {
 
   it.each([
     ['unknown top-level key', (l: any) => { l.extra = 1; }],
-    ['unknown service', (l: any) => { l.services.runner = l.services.api; }],
+    ['unknown service', (l: any) => { l.services.worker = l.services.api; }],
+    ['ui build on runner', (l: any) => { l.services.runner = { ...l.services.api, basePlan: { ...l.services.api.basePlan, path: l.services.api.basePlan.path.replace('api-launch', 'runner-launch') }, uiBuildSha256: digest }; }],
+    ['runner under another service name', (l: any) => { l.services.api.basePlan.path = l.services.api.basePlan.path.replace('api-launch', 'runner-launch'); }],
     ['unknown entry key', (l: any) => { l.services.api.note = 'x'; }],
     ['short sha', (l: any) => { l.services.api.sourceManifestSha256 = 'abc'; }],
     ['ui build on api', (l: any) => { l.services.api.uiBuildSha256 = digest; }],
@@ -326,5 +328,79 @@ describe('release drop-in', () => {
     for (const [, text] of files) for (const line of text.split('\n')) { const at = line.indexOf('='); if (at > 0 && !line.startsWith('#')) effective[line.slice(0, at)] = line.slice(at + 1); }
     expect(files.at(-1)![0]).toBe(prestart.RELEASE_DROPIN_NAME);
     expect(effective).toMatchObject({ Restart: 'on-failure', RestartMode: 'direct', RestartSec: '30', TimeoutStartSec: '300', StartLimitIntervalSec: '900', StartLimitBurst: '4' });
+  });
+});
+
+// GAP-RUNNER (2026-10-09): the runner is pinned and refreshed exactly like the API, starts only in
+// its explicit --start mode, and still stays out of debateai-preview.target (units test).
+describe('runner release', () => {
+  const runnerPlan = () => ({ ...basePlan('api'), service: 'runner', serviceUid: 992, serviceGid: 975,
+    environment: { ...basePlan('api').environment, path: '/etc/debateai-v3-preview/auth-dev-v1/runner.env', gid: 975 } });
+  it('pins, refreshes and renders the runner with a --start launcher line', async () => {
+    const s = server();
+    s.write(s.planPath('runner'), runnerPlan());
+    await pinned(s);
+    await prestart.pinRelease({ planPath: s.planPath('runner'), layout: s.layout, deps: { validateLaunchPlan: plans.validateLaunchPlan }, now: () => 0 });
+    const lock = JSON.parse(readFileSync(s.layout.lockPath, 'utf8'));
+    expect(Object.keys(lock.services).sort()).toEqual(['api', 'runner', 'ui']);
+    expect(lock.services.runner).toMatchObject({ serviceUid: 992, serviceGid: 975, uiBuildSha256: null, sourceRevision: revision });
+    let unitChecks = 0;
+    const { calls, deps: d } = deps(s, { checkRunnerUnit: async () => { unitChecks++; } });
+    const result = await prestart.runPrestart({ service: 'runner', layout: s.layout, deps: d });
+    expect(calls).toEqual([root]);
+    expect(unitChecks).toBe(1);
+    expect(readdirSync(s.layout.currentDir).sort()).toEqual(['runner-launch.json', 'runner-native.json']);
+    expect(result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY', service: 'runner' });
+    const text = prestart.renderReleaseDropin({ service: 'runner', entry: lock.services.runner, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
+    const lines = text.split('\n').filter((line: string) => !line.startsWith('#') && line);
+    expect(lines).toEqual(['[Service]', `WorkingDirectory=${root}/dialectical-engine`, 'ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/node/bin/node /opt/op/prestart.mjs --service runner', 'ExecStart=',
+      `ExecStart=/opt/node/bin/node ${root}/dialectical-engine/deploy/preview-auth-dev/v1/launch-runner.mjs --start --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/runner-launch.json`]);
+  });
+
+  it('refuses a runner whose release is not the native plan\'s source revision before any database work', async () => {
+    const s = server();
+    s.write(s.planPath('runner'), { ...runnerPlan(), sourceRevision: 'c'.repeat(40) });
+    await expect(prestart.pinRelease({ planPath: s.planPath('runner'), layout: s.layout, deps: { validateLaunchPlan: plans.validateLaunchPlan }, now: () => 0 })).rejects.toMatchObject({ code: 'NATIVE_PLAN_MISMATCH', fields: ['sourceRevision'] });
+  });
+});
+
+describe('runner unit check (before any database work)', () => {
+  const good = ['FragmentPath=/etc/systemd/system/debateai-preview-runner.service', 'DropInPaths=/etc/systemd/system/debateai-preview-runner.service.d/zzzzzzzzzz-lifecycle-release.conf',
+    'IPAddressAllow=127.0.0.0/8 ::1/128', 'IPAddressDeny=::/0 0.0.0.0/0', 'RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX'];
+  const shown = (lines: string[], code = 0) => async (argv: string[], options: { env: Record<string, string> }) => {
+    expect(argv).toEqual(['/usr/bin/systemctl', 'show', 'debateai-preview-runner.service', '--property=FragmentPath', '--property=DropInPaths', '--property=IPAddressAllow', '--property=IPAddressDeny', '--property=RestrictAddressFamilies', '--no-pager']);
+    expect(options.env).toEqual({});
+    return { code, timedOut: false, overflow: false, stdout: Buffer.from(lines.join('\n') + '\n'), stderr: Buffer.alloc(0) };
+  };
+  it('accepts exactly the reviewed unit plus the one release drop-in (live systemd 259 output format)', async () => {
+    await expect(prestart.checkRunnerUnit({ layout: common.LAYOUT, run: shown(good) })).resolves.toBeUndefined();
+  });
+  it.each([
+    ['an old drop-in left beside the release one', 1, 'DropInPaths=/etc/systemd/system/debateai-preview-runner.service.d/42-provider-sdk-interfaces.conf /etc/systemd/system/debateai-preview-runner.service.d/zzzzzzzzzz-lifecycle-release.conf', 'DropInPaths'],
+    ['no release drop-in', 1, 'DropInPaths=', 'DropInPaths'],
+    ['a runtime override fragment', 0, 'FragmentPath=/run/systemd/system/debateai-preview-runner.service', 'FragmentPath'],
+    ['Internet allowed', 2, 'IPAddressAllow=any', 'IPAddressAllow'],
+    ['no IP deny', 3, 'IPAddressDeny=', 'IPAddressDeny'],
+    ['a widened address family', 4, 'RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX AF_PACKET', 'RestrictAddressFamilies']
+  ] as const)('refuses %s', async (_name, index, line, field) => {
+    const lines = [...good]; lines[index] = line;
+    await expect(prestart.checkRunnerUnit({ layout: common.LAYOUT, run: shown(lines) })).rejects.toMatchObject({ code: 'RUNNER_UNIT_REFUSED', fields: [field] });
+  });
+  it('refuses an unreadable or ambiguous answer', async () => {
+    await expect(prestart.checkRunnerUnit({ layout: common.LAYOUT, run: shown(good, 1) })).rejects.toMatchObject({ code: 'RUNNER_UNIT_UNREADABLE' });
+    await expect(prestart.checkRunnerUnit({ layout: common.LAYOUT, run: shown([...good, good[1]!]) })).rejects.toMatchObject({ code: 'RUNNER_UNIT_UNREADABLE' });
+  });
+  it('runs before the native plan is read for the runner, and never for api or ui', async () => {
+    const s = server();
+    s.write(s.planPath('runner'), { ...basePlan('api'), service: 'runner', serviceUid: 992, serviceGid: 975, environment: { ...basePlan('api').environment, path: '/etc/debateai-v3-preview/auth-dev-v1/runner.env', gid: 975 } });
+    await pinned(s);
+    await prestart.pinRelease({ planPath: s.planPath('runner'), layout: s.layout, deps: { validateLaunchPlan: plans.validateLaunchPlan }, now: () => 0 });
+    let checks = 0;
+    const refusing = deps(s, { checkRunnerUnit: async () => { checks++; throw Object.assign(new Error('x'), { code: 'RUNNER_UNIT_REFUSED' }); } });
+    await expect(prestart.runPrestart({ service: 'runner', layout: s.layout, deps: refusing.deps })).rejects.toMatchObject({ code: 'RUNNER_UNIT_REFUSED' });
+    expect(refusing.calls).toEqual([]);
+    const api = deps(s, { checkRunnerUnit: async () => { checks++; } });
+    await prestart.runPrestart({ service: 'api', layout: s.layout, deps: api.deps });
+    expect(checks).toBe(1);
   });
 });
