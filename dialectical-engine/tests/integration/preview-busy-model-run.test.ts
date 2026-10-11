@@ -23,14 +23,9 @@
 // with the storyteller's one repair turn (story bound maxAttempts 2) as the only fallback. The doubles below answer
 // bare JSON, so this file proves the plumbing, not that a real model answers bare JSON without JSON mode.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { createServer, type Server } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery";
 import { RunRepository, insertRunRoleRotation, migrate, type DiscoveredPanelMember } from "@debateai/db";
-import { argumentLanguageDirective } from "@debateai/kernel";
 import {
   assertPreviewProviderTargets,
   assertPreviewRoleTargets,
@@ -64,8 +59,6 @@ import { createPostgresProviderGateway, WalkingSkeletonRunner, type WalkingSkele
 import { pickRotatedRoles, roleRotationSeed, rotationPinFields, type RotatedRoles } from "@debateai/scorecard";
 import { ServeRepository } from "@debateai/serve";
 import {
-  STORY_CHECKER_CONTRACT_ID,
-  STORYTELLER_CONTRACT_ID,
   StoryRepository,
   StoryWriter,
   loadStoryPack,
@@ -73,8 +66,7 @@ import {
 } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS, DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
-import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
-import { reviewArtifact, withRequestDerivedBearings } from "../support/reviewBearings.js";
+import { startPreviewGateStubs } from "../support/preview-gate-stubs.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
@@ -126,171 +118,31 @@ const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:preview-busy-model-run" });
 
 let database: TestDatabase;
-const servers: Server[] = [];
-const directories: string[] = [];
+const stubClosers: (() => Promise<void>)[] = [];
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
 }, 600_000);
 afterEach(async () => {
-  await Promise.all(servers.splice(0).map((server) => new Promise<void>((done) => server.close(() => done()))));
-  await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  await Promise.all(stubClosers.splice(0).map((close) => close()));
 });
 afterAll(async () => database?.stop());
 
-/* ------------------------------------------------------------------ the doubles' answers */
-
-const judgement = (statement: string): string => JSON.stringify({
-  statement, way_of_knowing: "REASONING", locator: null, restatement_text: statement, restatement_status: "PASS",
-  value_laden: false, claim_type: "unknown",
-  steelman: { summary: statement, fidelity: 0.72 },
-  critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
-  evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] },
-  fallacy: { severity: 0.28, fatalFlags: [] }
-});
-/** A panel member's assessment at fidelity 0 (tau 0): it never displaces an author's voice (tests/integration/database.test.ts). */
-const PANEL_ASSESSMENT = JSON.stringify({
-  steelman: { summary: "Panel member assessment.", fidelity: 0 },
-  critic: { summary: "Panel member counter.", counterargumentStrength: 1, basis: "PLAUSIBLE_COUNTER" },
-  evidence: { quality: 0, relevance: 0 }, context: { fit: 0, ambiguityFlags: [] }, fallacy: { severity: 1, fatalFlags: [] }
-});
-const COMPOSITION = JSON.stringify({ segments: [
-  { segment_id: "segment:verdict", text: "Congestion pricing on central roads is worth trying.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
-  { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
-] });
-const EVALUATOR_SATISFIED = JSON.stringify({ satisfied: true, objection: null, criteria: {
-  fairness_to_losers: true, statement_label_agreement: true, no_overstatement: true, restatement: true, citation_tracing: true
-} });
-const STORY_CHECKER_SATISFIED = JSON.stringify({ satisfied: true, objection: null, criteria: {
-  faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: true,
-  citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
-} });
-/** A story with one path per position of a four-debater debate (P1-P4: the story's models never see a node id). */
-const fourPositionStory = (): string => {
-  const paragraph = (text: string) => ({ text, node_refs: ["P1"] });
-  return JSON.stringify({
-    shape_id: PACK.defaultShape,
-    short: {
-      headline: "Four positions were argued, and they held up.",
-      summary: "You asked whether to price congestion; four answers were weighed against their strongest objections.",
-      confidence: "Fairly sure, until a sourced objection turns up.",
-      paths: [1, 2, 3, 4].map((index) => ({
-        position_ref: `P${String(index)}`, fate: "HELD_UP", line: "This position held up.", node_refs: [`P${String(index)}`]
-      })),
-      change: paragraph("A stronger, sourced objection would change the answer.")
-    },
-    why: { reasons: [paragraph("The first position held up against its strongest objection.")] },
-    long: { sections: ["What you are deciding", "The verdict", "What would change it"].map((title) => ({
-      title, paragraphs: [paragraph(`${title}, in the debate's own terms.`)]
-    })) },
-    reviewer_note: null
-  });
-};
-
 /* ------------------------------------------------------------------ the gates */
 
-type RequestKind = "PROBE" | "STORYTELLER" | "STORY_CHECKER" | "PANEL" | "REVIEW" | "JUDGE" | "EVALUATOR" | "COMPOSE";
-type GateRequest = Readonly<{ provider: "deepinfra" | "anthropic"; model: string; kind: RequestKind | "UNKNOWN"; body: Readonly<Record<string, unknown>> }>;
-
-/** The argument-language directive names the machine keys below, so it is removed before routing (as database.test.ts). */
-const LANGUAGE_DIRECTIVE = new RegExp(argumentLanguageDirective("\u0000")
-  .replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\u0000", "[^.]+?"), "gu");
-const PROBE_QUESTION = "Reply exactly: OK";
-
 /**
- * The OpenAI-shaped body the frame reader reads: an Anthropic Messages body carries the system text beside its
- * turns, so it is put back in front of them (the adapter only lifted it out).
- */
-function chatBody(provider: "deepinfra" | "anthropic", body: Readonly<Record<string, unknown>>): string {
-  if (provider === "deepinfra") return JSON.stringify(body);
-  const turns = Array.isArray(body.messages) ? body.messages : [];
-  return JSON.stringify({ messages: typeof body.system === "string" ? [{ role: "system", content: body.system }, ...turns] : turns });
-}
-
-/** Which contract a request is for: the probe by its question, the story by its contract id, the debate by structural keys. */
-function classify(chat: string): RequestKind | "UNKNOWN" {
-  const messages = wirePacket(chat).messages;
-  if (messages.length === 1 && messages[0]!.role === "user" && messages[0]!.content.includes(PROBE_QUESTION)) return "PROBE";
-  const contractId = readFramedMaterial(wirePacket(chat)).contractId;
-  if (contractId === STORYTELLER_CONTRACT_ID) return "STORYTELLER";
-  if (contractId === STORY_CHECKER_CONTRACT_ID) return "STORY_CHECKER";
-  const instruction = (messages[0]?.content ?? "").replace(LANGUAGE_DIRECTIVE, "");
-  // The panel's assessment is the judge's schema WITHOUT restatement_text (tests/unit/t03-judge-panel.test.ts).
-  if (instruction.includes("fatalFlags") && !instruction.includes("restatement_text")) return "PANEL";
-  if (instruction.includes("edge_bearings")) return "REVIEW";
-  if (instruction.includes("restatement_text")) return "JUDGE";
-  if (instruction.includes("fairness_to_losers")) return "EVALUATOR";
-  if (instruction.includes("served_number_refs")) return "COMPOSE";
-  return "UNKNOWN";
-}
-
-/** The vendor's own reply shape: an OpenAI chat completion (DeepInfra) or a Messages reply (Anthropic), with usage. */
-function vendorReply(provider: "deepinfra" | "anthropic", model: string, content: string, id: string): string {
-  return provider === "anthropic"
-    ? JSON.stringify({ id: `msg_${id}`, type: "message", role: "assistant", model, content: [{ type: "text", text: content }],
-      stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 100, output_tokens: 50 } })
-    : JSON.stringify({ id, model, choices: [{ message: { role: "assistant", content }, finish_reason: "stop" }],
-      usage: { prompt_tokens: 100, completion_tokens: 50 } });
-}
-
-/**
- * Both preview gates over real unix sockets, speaking the gate's RPC protocol. Every request that reaches a gate is
- * recorded. A GLM request is answered as a billed vendor 500 (and fails the test by the record); a probe takes the
- * next step of its model's script (OK once spent); every other request is answered by its contract.
+ * Both preview gates over real unix sockets (tests/support/preview-gate-stubs.ts), speaking the gate's RPC protocol.
+ * Every request that reaches a gate is recorded. A GLM request is answered as a billed vendor 500 (and fails the test
+ * by the record); a probe takes the next step of its model's script (OK once spent); every other request is answered
+ * by its contract.
  */
 async function startGates(probeScripts: Readonly<Record<string, readonly ("OK" | "UNBILLED")[]>>) {
-  const requests: GateRequest[] = [];
-  const queues = new Map<string, ("OK" | "UNBILLED")[]>(Object.entries(probeScripts).map(([model, steps]) => [model, [...steps]]));
-  let served = 0;
-  const answerFor = (kind: RequestKind | "UNKNOWN", chat: string): string | null => {
-    served += 1;
-    switch (kind) {
-      case "PROBE": return "OK";
-      case "STORYTELLER": return fourPositionStory();
-      case "STORY_CHECKER": return STORY_CHECKER_SATISFIED;
-      case "PANEL": return PANEL_ASSESSMENT;
-      case "REVIEW": return withRequestDerivedBearings(reviewArtifact("agree", [`Review ${String(served)} agrees.`]), chat);
-      case "JUDGE": return judgement(`Busy-model debate point ${String(served)}.`);
-      case "EVALUATOR": return EVALUATOR_SATISFIED;
-      case "COMPOSE": return COMPOSITION;
-      default: return null;
-    }
-  };
-  const socketFor = async (provider: "deepinfra" | "anthropic"): Promise<string> => {
-    const directory = await mkdtemp(join(tmpdir(), "pbr-"));
-    directories.push(directory);
-    const socket = join(directory, "gate.sock");
-    const server = createServer((request, response) => {
-      const chunks: Buffer[] = [];
-      request.on("data", (chunk: Buffer) => chunks.push(chunk));
-      request.on("end", () => {
-        const execution = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { requestBody: string };
-        const body = JSON.parse(execution.requestBody) as Record<string, unknown>;
-        const model = String(body.model);
-        const chat = chatBody(provider, body);
-        let kind: RequestKind | "UNKNOWN";
-        try { kind = classify(chat); } catch { kind = "UNKNOWN"; }
-        requests.push(Object.freeze({ provider, model, kind, body }));
-        const reply = (status: number, vendorBody: string) => response.writeHead(200, { "content-type": "application/json" })
-          .end(JSON.stringify({ status, body: vendorBody }));
-        if (model === GLM) { reply(500, JSON.stringify({ error: { message: "GLM must never be called in this test" } })); return; }
-        if (kind === "PROBE" && queues.get(model)?.shift() === "UNBILLED") {
-          response.writeHead(409, { "content-type": "application/json" }).end(JSON.stringify({ error: "PROVIDER_REFUSED_UNBILLED" }));
-          return;
-        }
-        const content = answerFor(kind, chat);
-        if (content === null) { reply(500, JSON.stringify({ error: { message: "unexpected test request" } })); return; }
-        reply(200, vendorReply(provider, model, content, `busy-model-${String(served)}`));
-      });
-    });
-    servers.push(server);
-    await new Promise<void>((done) => server.listen(socket, done));
-    return socket;
-  };
-  const deepinfra = createPreviewBudgetRpcPort(PREVIEW, await socketFor("deepinfra"));
-  const anthropic = createPreviewBudgetRpcPort(PREVIEW, await socketFor("anthropic"));
-  return { requests, guardedFetch: createPreviewGuardedFetch({ deepinfra, anthropic }) };
+  const stubs = await startPreviewGateStubs({ storyDefaultShape: PACK.defaultShape, probeScripts, refuseModels: [GLM] });
+  stubClosers.push(stubs.close);
+  const deepinfra = createPreviewBudgetRpcPort(PREVIEW, stubs.sockets.deepinfra);
+  const anthropic = createPreviewBudgetRpcPort(PREVIEW, stubs.sockets.anthropic);
+  return { requests: stubs.requests, guardedFetch: createPreviewGuardedFetch({ deepinfra, anthropic }) };
 }
 
 /* ------------------------------------------------------------------ the runner, composed as main.ts */

@@ -120,7 +120,7 @@ export function bindWayOfKnowingDowngrade(
   });
 }
 
-const judgeArtifactSchema = z.object({
+export const judgeArtifactSchema = z.object({
   statement: z.string().trim().min(1),
   way_of_knowing: z.enum(JUDGE_WAYS_OF_KNOWING),
   locator: z.string().trim().min(1).nullable(),
@@ -140,7 +140,7 @@ const judgeArtifactSchema = z.object({
  * result that a second call could top up. `null` is the per-edge
  * cannot-assess, which leaves that edge UNKNOWN.
  */
-function nodeReviewArtifactSchema(edgeCount: number) {
+export function nodeReviewArtifactSchema(edgeCount: number) {
   return z.object({
     outcome: z.enum(REVIEW_OUTCOMES),
     reasons: z.array(z.string().trim().min(1)).min(1),
