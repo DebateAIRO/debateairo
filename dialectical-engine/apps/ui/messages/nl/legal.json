@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Tot 30 minuten",
   "legal.cookies.mfaRecovery.life": "Tot 299 seconden",
   "legal.cookies.social.life": "Tot 5 minuten",
-  "legal.cookies.phoneDraft.life": "15 minuten of tot eerder wissen"
+  "legal.cookies.phoneDraft.life": "15 minuten of tot eerder wissen",
+  "legal.cookies.exportPending.purpose": "Bewaart de per e-mail ontvangen exportlink in dit tabblad om in te loggen en opnieuw te proberen.",
+  "legal.cookies.exportLinkOutcome.purpose": "Onthoudt welk bericht over de downloadlink in dit tabblad moet worden getoond.",
+  "legal.cookies.exportPending.life": "Tot het tabblad sluit, u zich afmeldt, een nieuwe link opent, de eerste download slaagt of een ongeldige link of verkeerd account wordt vastgesteld",
+  "legal.cookies.exportLinkOutcome.life": "Tot het tabblad sluit, u zich afmeldt of een nieuwe link opent"
 }

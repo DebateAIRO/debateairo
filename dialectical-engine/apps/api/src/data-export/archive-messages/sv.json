@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Dina uppgifter hos Dialectical Engine",
+  "archive.generated": "Förberett {time} för {pseudonym}.",
+  "archive.accountHeading": "Konto",
+  "archive.email": "E-post",
+  "archive.memberSince": "Medlem sedan",
+  "archive.debatesHeading": "Dina debatter ({count})",
+  "archive.question": "Fråga",
+  "archive.verdict": "Utslag",
+  "archive.verdictSupported": "Har stöd",
+  "archive.verdictContested": "Omstritt",
+  "archive.verdictUnsupported": "Saknar stöd",
+  "archive.story": "Debatten i korthet",
+  "archive.arguments": "Argument",
+  "archive.visibilityPublic": "Publicerad",
+  "archive.visibilityPrivate": "Privat",
+  "archive.unreadable": "Innehållet i den här debatten går inte längre att läsa eftersom dess nyckel har förstörts.",
+  "archive.noDebates": "Du har inga debatter.",
+  "archive.filesNote": "JSON-filerna i den här ZIP-filen innehåller samma uppgifter i maskinläsbart format; de finns listade i README.txt."
+}

@@ -32,6 +32,8 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   refundAmount: "12.10",
   renewDate: "2026-10-29",
   chargeDate: "2026-10-29T10:00:00.000Z",
+  requested: "2026-10-08T10:00:00.000Z",
+  expires: "2026-10-09T10:02:00.000Z",
   retryDate: "2026-10-30",
   accessEndDate: "2026-10-29",
   cancelPageUrl: "https://dezbatere.ro/cancel",
@@ -41,6 +43,7 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   pricingUrl: "https://dezbatere.ro/pricing",
   settingsUrl: "https://dezbatere.ro/settings",
   cancelLinkUrl: `https://dezbatere.ro/cancel#token=${"A".repeat(43)}`,
+  downloadUrl: `https://dezbatere.ro/export#${"A".repeat(43)}`,
   withdrawalDays: "14",
   canUndo: "true",
   paused: "true",
@@ -110,7 +113,7 @@ const NOTHING: ReadonlySet<MailAttachmentFact> = new Set();
 const EVERYTHING: ReadonlySet<MailAttachmentFact> = new Set(MAIL_ATTACHMENT_FACTS);
 
 describe("P17 renderMail", () => {
-  it("renders every template in every locale, with and without its attachments and on both sides of each param condition, with no placeholder left and no remote resource", () => {
+  it("renders every template in every locale with localized export expiry joins, no placeholder and no remote resource", () => {
     for (const id of MAIL_TEMPLATE_IDS) {
       for (const locale of MAIL_LOCALES) {
         for (const params of [paramsFor(id), variantFor(id)]) {
@@ -127,6 +130,21 @@ describe("P17 renderMail", () => {
           }
         }
       }
+    }
+    const expiryByLocale = {
+      en: "October 10, 2026, 15:43 UTC",
+      ar: "10 أكتوبر 2026 في 15:43 UTC",
+      ja: "2026年10月10日 15:43 UTC",
+      zh: "2026年10月10日 15:43 UTC",
+      ko: "2026년 10월 10일 15:43 UTC"
+    } as const;
+    for (const [locale, expiry] of Object.entries(expiryByLocale)) {
+      const mail = renderMail("DATA_EXPORT", locale, {
+        requested: "2026-10-09T15:43:12.000Z",
+        expires: "2026-10-10T15:43:12.000Z",
+        downloadUrl: SAMPLE.downloadUrl!
+      });
+      expect.soft(mail.text, locale).toContain(expiry);
     }
   });
 

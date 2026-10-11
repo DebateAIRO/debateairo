@@ -148,12 +148,12 @@ Ktorékoľvek z týchto práv môžete bezplatne uplatniť napísaním na **priv
 
 | Právo | Čo tu znamená |
 | --- | --- |
-| **Prístup** (Art. 15) | Kópia osobných údajov, ktoré o vás uchovávame, a tieto informácie. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.] |
+| **Prístup** (Art. 15) | Kópia osobných údajov, ktoré o vás uchovávame, a tieto informácie. V Nastaveniach vyberte Exportovať údaje: pripravíme súbor ZIP so súbormi JSON a jednou stránkou, ktorú otvoríte v ľubovoľnom prehliadači, a e-mailom vám pošleme odkaz na stiahnutie platný 24 hodín len vtedy, keď ste prihlásení do svojho účtu. |
 | **Oprava** (Art. 16) | V Nastaveniach môžete opraviť svoj e-mail alebo e-mail na obnovenie. Váš pseudonym nemožno zmeniť z dôvodov uvedených v podmienkach; účet môžete odstrániť a otvoriť si nový |
 | **Vymazanie** (Art. 17) | Súkromnú debatu môžete kedykoľvek odstrániť na jej stránke. Účet môžete odstrániť v Nastaveniach; časť 7 presne vysvetľuje účinky. Môžete nás požiadať o odstránenie zverejnenej debaty obsahujúcej vaše údaje bez ohľadu na to, či ste jej autorom |
 | **Obmedzenie** (Art. 18) | Môžete nás požiadať, aby sme prestali spracúvať konkrétne údaje, kým sa nevyrieši spor o ne |
 | **Námietka** (Art. 21) | Môžete namietať proti spracúvaniu založenému na oprávnených záujmoch — bezpečnostnému a auditnému spracúvaniu podľa časti 4 — a my ho zastavíme, ak nepreukážeme závažné dôvody. Proti marketingu môžete namietať kedykoľvek a my ho zastavíme |
-| **Prenosnosť** (Art. 20) | Vaše debaty a údaje účtu v bežne používanom, strojovo čitateľnom formáte. [Pending: same export as Access.] Neosobný obsah, ktorý ste vytvorili, napríklad vaše otázky, vám na požiadanie vrátime po skončení zmluvy |
+| **Prenosnosť** (Art. 20) | Vaše debaty a údaje účtu v bežne používanom, strojovo čitateľnom formáte. Použite Exportovať údaje v Nastaveniach: súbor ZIP obsahuje vaše údaje v strojovo čitateľných súboroch JSON a jednu čitateľnú stránku; odkaz zaslaný e-mailom platí 24 hodín len vtedy, keď ste prihlásení do svojho účtu. Neosobný obsah, ktorý ste vytvorili, napríklad vaše otázky, vám na požiadanie vrátime po skončení zmluvy |
 | **Odvolanie súhlasu** (Art. 7(3)) | Marketingový súhlas môžete odvolať v ktoromkoľvek e-maile alebo v Nastaveniach; súhlas s citlivými údajmi odvoláte odstránením účtu v Nastaveniach (také údaje tiež nemusíte uviesť alebo môžete odstrániť debatu, ktorá ich obsahuje). Odvolanie nemá vplyv na spracúvanie, ktoré sa už uskutočnilo |
 | **Sťažnosť** | Rumunskému dozornému orgánu **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukurešť, <anspdcp@dataprotection.ro>, alebo orgánu v krajine, v ktorej žijete. Uprednostňujeme, aby ste sa najskôr obrátili na nás |
 
@@ -174,7 +174,7 @@ Dialectical Engine je určená dospelým. Pri registrácii potvrdzujete, že má
 ## 13. Súbory cookie
 
 
-Dialectical Engine používa 18 položiek, pričom všetky sú nevyhnutne potrebné pre službu, o ktorú ste požiadali, a všetky nastavuje výlučne Dialectical Engine: 13 súborov cookie a 5 záznamov v úložisku vášho prehliadača. Nenastavujeme analytické, reklamné ani sledovacie súbory cookie. **Zásady používania súborov cookie** na dezbatere.ro/cookies ich uvádzajú spolu s tým, na čo každá položka slúži a kto ju dostáva, a zmenia sa skôr, než sa pridá čokoľvek ďalšie.
+Dialectical Engine používa 20 položiek, pričom všetky sú nevyhnutne potrebné pre službu, o ktorú ste požiadali, a všetky nastavuje výlučne Dialectical Engine: 13 súborov cookie a 7 záznamov v úložisku vášho prehliadača. Nenastavujeme analytické, reklamné ani sledovacie súbory cookie. **Zásady používania súborov cookie** na dezbatere.ro/cookies ich uvádzajú spolu s tým, na čo každá položka slúži a kto ju dostáva, a zmenia sa skôr, než sa pridá čokoľvek ďalšie.
 
 | Názov | Typ | Účel | Platnosť |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine používa 18 položiek, pričom všetky sú nevyhnutne potreb
 | `debateai.languageOffer.dismissed` | Úložisko relácie | Pamätá si pre túto kartu, že ste odmietli ponuku zobraziť debatu v inom jazyku. | Do zatvorenia karty |
 | `debateai.support.conversation.v2` | Úložisko relácie | Drží vašu konverzáciu s chatom pomoci na obrazovke, kým je karta otvorená. Vymaže sa, keď sa na tejto karte ktokoľvek prihlási alebo odhlási. | Do zatvorenia karty |
 | `debateai.phone-completion-draft.v1` | Úložisko relácie | Nedokončená otázka počas telefonického kroku; odstránená pri zmene relácie, odhlásení alebo zmene vlastníka | 15 minút alebo do skoršieho vymazania |
+| `debateai.exportPending` | Úložisko relácie | Uchováva odkaz na export z e-mailu na tejto karte na prihlásenie a opakovaný pokus. | Do zatvorenia karty, odhlásenia, nového odkazu, prvého úspešného stiahnutia alebo výsledku neplatného odkazu či nesprávneho účtu |
+| `debateai.exportLinkOutcome` | Úložisko relácie | Pamätá si, ktoré hlásenie o odkaze na stiahnutie sa má na tejto karte zobraziť. | Do zatvorenia karty, odhlásenia alebo nového odkazu |
 
 Žiadna iná strana prostredníctvom Dialectical Engine nezhromažďuje informácie o vašich online aktivitách v priebehu času a naprieč webovými stránkami.
 

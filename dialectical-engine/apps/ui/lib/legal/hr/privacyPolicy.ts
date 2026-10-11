@@ -183,12 +183,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Pristup (Art. 15) — Primjerak osobnih podataka koje imamo o vama i ove informacije. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Pristup (Art. 15) — Primjerak osobnih podataka koje imamo o vama i ove informacije. U Postavkama odaberite Izvezi podatke: pripremamo ZIP datoteku s JSON datotekama i jednom stranicom koju možete otvoriti u bilo kojem pregledniku te vam e-poštom šaljemo poveznicu za preuzimanje koja vrijedi 24 sata i radi samo dok ste prijavljeni na svoj račun.",
         "Ispravak (Art. 16) — Ispravite adresu e-pošte ili adresu e-pošte za oporavak u Postavkama. Vaš pseudonim nije moguće promijeniti iz razloga navedenih u Uvjetima; možete zatvoriti račun i izraditi novi",
         "Brisanje (Art. 17) — Izbrišite privatnu raspravu u bilo kojem trenutku sa stranice rasprave. Zatvorite račun u Postavkama; odjeljak 7 točno objašnjava što se time čini. Zatražite da uklonimo objavljenu raspravu koja sadržava vaše podatke bez obzira na to jeste li autor",
         "Ograničenje (Art. 18) — Zatražite da prestanemo obrađivati određene podatke dok se ne riješi spor o njima",
         "Prigovor (Art. 21) — Uložite prigovor na obradu koja se temelji na legitimnim interesima — sigurnosnu i revizijsku obradu iz odjeljka 4 — i prestat ćemo osim ako možemo dokazati uvjerljive razloge. Uložite prigovor na marketing u bilo kojem trenutku i prestat ćemo",
-        "Prenosivost (Art. 20) — Vaše rasprave i podaci o računu u uobičajenom, strojno čitljivom formatu. [Pending: same export as Access.] Neosobni sadržaj koji ste stvorili, kao što su vaša pitanja, vraća vam se na zahtjev nakon prestanka ugovora",
+        "Prenosivost (Art. 20) — Vaše rasprave i podaci o računu u uobičajenom, strojno čitljivom formatu. Upotrijebite Izvezi podatke u Postavkama: ZIP sadrži vaše podatke u strojno čitljivim JSON datotekama i jednu čitljivu stranicu; poveznica poslana e-poštom vrijedi 24 sata i radi samo dok ste prijavljeni na svoj račun. Neosobni sadržaj koji ste stvorili, kao što su vaša pitanja, vraća vam se na zahtjev nakon prestanka ugovora",
         "Povlačenje privole (Art. 7(3)) — Povucite privolu za marketing iz bilo koje poruke e-pošte ili u Postavkama; povucite privolu za osjetljive podatke zatvaranjem računa u Postavkama (takve podatke možete i izostaviti ili izbrisati raspravu koja ih sadržava). Povlačenje ne utječe na obradu koja je već provedena",
         "Pritužba — Rumunjskom nadzornom tijelu, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukurešt, anspdcp@dataprotection.ro, ili tijelu u državi u kojoj živite. Radije bismo da nam se prvo obratite"
         ]
@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kolačići",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine koristi 18 stavki, sve strogo nužne za uslugu koju ste zatražili i sve ih postavlja isključivo Dialectical Engine: 13 kolačića i 5 zapisa u pohrani vašeg preglednika. Ne postavljamo analitičke, oglasne ni prateće kolačiće. Pravila o kolačićima na dezbatere.ro/cookies navode ih uz opis onoga što svaka stavka radi i tko je prima te će se promijeniti prije nego što se doda bilo što drugo." },
+      { kind: "p", text: "Dialectical Engine koristi 20 stavki, sve strogo nužne za uslugu koju ste zatražili i sve ih postavlja isključivo Dialectical Engine: 13 kolačića i 7 zapisa u pohrani vašeg preglednika. Ne postavljamo analitičke, oglasne ni prateće kolačiće. Pravila o kolačićima na dezbatere.ro/cookies navode ih uz opis onoga što svaka stavka radi i tko je prima te će se promijeniti prije nego što se doda bilo što drugo." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokalna pohrana — Upotrebljavate li svijetli ili tamni način prikaza. — Dok ga ne izbrišete",
         "debateai.languageOffer.dismissed — Pohrana sesije — Pamti, za ovu karticu, da ste odbili ponudu da se rasprava prikaže na drugom jeziku. — Dok ne zatvorite karticu",
         "debateai.support.conversation.v2 — Pohrana sesije — Drži vaš razgovor s pomoći na zaslonu dok je kartica otvorena. Briše se kada se bilo tko prijavi ili odjavi u ovoj kartici. — Dok ne zatvorite karticu",
-        "debateai.phone-completion-draft.v1 — Pohrana sesije — Nedovršeno pitanje tijekom koraka s telefonom; briše se pri promjeni sesije, odjavi ili promjeni vlasnika — 15 minuta ili do ranijeg brisanja"
+        "debateai.phone-completion-draft.v1 — Pohrana sesije — Nedovršeno pitanje tijekom koraka s telefonom; briše se pri promjeni sesije, odjavi ili promjeni vlasnika — 15 minuta ili do ranijeg brisanja",
+        "debateai.exportPending — Pohrana sesije — Čuva poveznicu za izvoz poslanu e-poštom u ovoj kartici za prijavu i ponovni pokušaj. — Do zatvaranja kartice, odjave, nove poveznice, prvog uspješnog preuzimanja ili ishoda nevaljane poveznice ili pogrešnog računa",
+        "debateai.exportLinkOutcome — Pohrana sesije — Pamti koju poruku o poveznici za preuzimanje treba prikazati u ovoj kartici. — Do zatvaranja kartice, odjave ili nove poveznice"
         ]
       },
       { kind: "p", text: "Nijedna druga strana putem Dialectical Engine-ja ne prikuplja informacije o vašim internetskim aktivnostima tijekom vremena i na različitim web-mjestima." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "06a18b4bf39c16fe8110f603b6bd0390bc03224c6bd6e658320ec318c89d591c",
+  sha256: "61a79b823b3c5df23d5ab3c0d336b55ed16e047eed31651ac3d1ec6f821dee2f",
   eyebrow: "PRAVILA O PRIVATNOSTI · v3.3 · NA SNAZI OD 12. LISTOPADA 2026.",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",

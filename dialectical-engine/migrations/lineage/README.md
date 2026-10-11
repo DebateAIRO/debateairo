@@ -9,8 +9,8 @@ right after 0108. 0110 keeps the sealed verifier in force (it runs it after its 
 base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
-first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third and role rotation (0114,
-below) the fourth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
+below) the fourth and the data export (0115, V-41) the fifth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,

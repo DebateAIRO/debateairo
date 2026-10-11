@@ -33,10 +33,10 @@ ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
 UMask=0077
-# The three custody trees the API creates directories in at runtime (L2 out-of-scope: the DEK
+# The custody trees the API creates directories in at runtime (L2 out-of-scope: the DEK
 # store and the publication key store are written by @debateai/crypto). Everything else on the
 # box — including /opt and /etc/debateai — stays read-only under ProtectSystem=strict.
-ReadWritePaths=/var/lib/debateai/api/user-deks /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys
+ReadWritePaths=/var/lib/debateai/api/user-deks /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys /var/lib/debateai/data-exports
 
 # --- process and kernel ---
 NoNewPrivileges=true

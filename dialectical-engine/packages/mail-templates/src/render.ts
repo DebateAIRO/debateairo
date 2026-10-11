@@ -159,6 +159,20 @@ function formatParam(
       if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(value) || !Number.isFinite(at.getTime())) throw invalid(name);
       return { kind: "text", value: new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(at) };
     }
+    case "datetime": {
+      const at = new Date(value);
+      if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(value) || !Number.isFinite(at.getTime())) throw invalid(name);
+      if (locale !== "en" && locale !== "ro") {
+        // CLDR supplies the join and any words around the time (for example Arabic "في" and Hindi "बजे").
+        return { kind: "text", value: new Intl.DateTimeFormat(locale, {
+          dateStyle: "long", timeStyle: "short", hourCycle: "h23", timeZone: "UTC"
+        }).format(at) };
+      }
+      // Q5 pins the English comma; the existing Romanian export mail contract also pins that form.
+      const date = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(at);
+      const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" }).format(at);
+      return { kind: "text", value: `${date}, ${time}` };
+    }
     case "url":
       // A canonical serialisation holds no whitespace, so this is the rule's whole check.
       if (mailLinkOf(value) !== value) throw invalid(name);

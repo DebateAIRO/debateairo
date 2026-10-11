@@ -183,12 +183,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Acceso (Art. 15) — Una copia de los datos personales que conservamos sobre usted y esta información. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Acceso (Art. 15) — Una copia de los datos personales que conservamos sobre usted y esta información. En Configuración, elija Exportar datos: preparamos un archivo ZIP con archivos JSON y una página que puede abrir en cualquier navegador, y le enviamos por correo electrónico un enlace de descarga que funciona durante 24 horas y solo mientras haya iniciado sesión en su cuenta.",
         "Rectificación (Art. 16) — Corrija su correo electrónico o el de recuperación desde Configuración. Su seudónimo no puede modificarse por los motivos indicados en los Términos; puede cerrar la cuenta y abrir otra",
         "Supresión (Art. 17) — Elimine un debate privado en cualquier momento desde la página del debate. Cierre su cuenta desde Configuración; la sección 7 explica exactamente qué efecto tiene. Pídanos que retiremos un debate publicado que contenga sus datos, sea usted o no su autor",
         "Limitación (Art. 18) — Pídanos que dejemos de tratar determinados datos mientras se resuelve una controversia al respecto",
         "Oposición (Art. 21) — Opóngase al tratamiento basado en intereses legítimos —el tratamiento de seguridad y auditoría de la sección 4— y lo detendremos, salvo que podamos demostrar motivos imperiosos. Puede oponerse a la mercadotecnia en cualquier momento y la detendremos",
-        "Portabilidad (Art. 20) — Sus debates y los datos de su cuenta en un formato de uso común y lectura mecánica. [Pending: same export as Access.] El contenido no personal que haya creado, como sus preguntas, se le devuelve previa solicitud cuando finaliza el contrato",
+        "Portabilidad (Art. 20) — Sus debates y los datos de su cuenta en un formato de uso común y lectura mecánica. Use Exportar datos en Configuración: el ZIP contiene sus datos en archivos JSON legibles por máquina y una página legible; el enlace enviado por correo electrónico funciona durante 24 horas y solo mientras haya iniciado sesión en su cuenta. El contenido no personal que haya creado, como sus preguntas, se le devuelve previa solicitud cuando finaliza el contrato",
         "Retirada del consentimiento (Art. 7(3)) — Retire el consentimiento para la mercadotecnia desde cualquier correo electrónico o desde Configuración; retire el consentimiento relativo a datos sensibles cerrando su cuenta desde Configuración (también puede omitirlos o eliminar un debate que los contenga). La retirada no afecta al tratamiento ya realizado",
         "Reclamación — Ante la autoridad de control rumana, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucarest, anspdcp@dataprotection.ro, o ante la autoridad del país donde vive. Preferimos que se dirija primero a nosotros"
         ]
@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine utiliza 18 elementos, todos estrictamente necesarios para el servicio que ha solicitado y todos establecidos únicamente por Dialectical Engine: 13 cookies y 5 entradas en el almacenamiento de su navegador. No instalamos cookies analíticas, publicitarias ni de seguimiento. La Política de cookies, disponible en dezbatere.ro/cookies, los enumera indicando qué hace cada uno y quién lo recibe, y se modificará antes de añadir cualquier otra cosa." },
+      { kind: "p", text: "Dialectical Engine utiliza 20 elementos, todos estrictamente necesarios para el servicio que ha solicitado y todos establecidos únicamente por Dialectical Engine: 13 cookies y 7 entradas en el almacenamiento de su navegador. No instalamos cookies analíticas, publicitarias ni de seguimiento. La Política de cookies, disponible en dezbatere.ro/cookies, los enumera indicando qué hace cada uno y quién lo recibe, y se modificará antes de añadir cualquier otra cosa." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Almacenamiento local — Si utiliza el modo de visualización claro u oscuro. — Hasta que lo borre",
         "debateai.languageOffer.dismissed — Almacenamiento de sesión — Recuerda, para esta pestaña, que rechazó la oferta de mostrar un debate en otro idioma. — Hasta que cierre la pestaña",
         "debateai.support.conversation.v2 — Almacenamiento de sesión — Mantiene en pantalla su conversación con el chat de ayuda mientras la pestaña siga abierta. Se borra cuando alguien inicia o cierra sesión en esta pestaña. — Hasta que cierre la pestaña",
-        "debateai.phone-completion-draft.v1 — Almacenamiento de sesión — Pregunta sin terminar durante el paso del teléfono; borrada al cambiar sesión, cerrar sesión o cambiar titular — 15 minutos o hasta que se borre"
+        "debateai.phone-completion-draft.v1 — Almacenamiento de sesión — Pregunta sin terminar durante el paso del teléfono; borrada al cambiar sesión, cerrar sesión o cambiar titular — 15 minutos o hasta que se borre",
+        "debateai.exportPending — Almacenamiento de sesión — Conserva en esta pestaña el enlace de exportación enviado por correo para iniciar sesión y volver a intentarlo. — Hasta cerrar la pestaña, cerrar sesión, abrir un enlace nuevo, completar la primera descarga o recibir un resultado de enlace no válido o cuenta incorrecta",
+        "debateai.exportLinkOutcome — Almacenamiento de sesión — Recuerda qué mensaje sobre el enlace de descarga debe mostrarse en esta pestaña. — Hasta cerrar la pestaña, cerrar sesión o abrir un enlace nuevo"
         ]
       },
       { kind: "p", text: "Ningún tercero recopila, a través de Dialectical Engine, información sobre sus actividades en línea a lo largo del tiempo y en distintos sitios web." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "42dd4a3b5a25d8b858cabeb68b088c32f613be5ba9cb36f112809268454ada6a",
+  sha256: "9d3868fa6bfacf0325fca734c0c53b9f1e78eea08bca7a39c4c32b16312e5551",
   eyebrow: "POLÍTICA DE PRIVACIDAD · v3.3 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026",
   title: "Qué almacenamos y por qué",
   lede: "Sus derechos y nuestras obligaciones conforme al RGPD – GDPR (EU) 2016/679, en lenguaje claro. Catorce secciones y el anexo B — desplácese hasta el final.",

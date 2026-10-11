@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "最多30分钟",
   "legal.cookies.mfaRecovery.life": "最多299秒",
   "legal.cookies.social.life": "最多5分钟",
-  "legal.cookies.phoneDraft.life": "15分钟或提前清除"
+  "legal.cookies.phoneDraft.life": "15分钟或提前清除",
+  "legal.cookies.exportPending.purpose": "在此标签页保存邮件中的导出链接，以便登录和重试。",
+  "legal.cookies.exportLinkOutcome.purpose": "记住此标签页应显示哪条下载链接提示。",
+  "legal.cookies.exportPending.life": "直到关闭标签页、退出登录、打开新链接、首次成功下载，或得到链接无效或账户不符的结果",
+  "legal.cookies.exportLinkOutcome.life": "直到关闭标签页、退出登录或打开新链接"
 }

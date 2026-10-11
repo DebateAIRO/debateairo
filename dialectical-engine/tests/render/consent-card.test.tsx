@@ -29,7 +29,7 @@ const globalsSource = (): string =>
 const EYEBROW = "WHAT WE STORE";
 const TITLE = "Cookies and browser storage";
 const LEDE =
-  "18 items, each needed for the service to work. Nothing here is optional, and nothing is shared with anyone else.";
+  "20 items, each needed for the service to work. Nothing here is optional, and nothing is shared with anyone else.";
 const FOOTER = ["Privacy notice", "Cookie policy", "Close"];
 
 /** PLAN §2 Key map, en, EXACT (SPEC-v2 R09): kind and lifetime per INV item, in INV order. */
@@ -49,6 +49,8 @@ const EN_KIND = [
   "Cookie (HttpOnly)",
   "Local storage",
   "Local storage",
+  "Session storage",
+  "Session storage",
   "Session storage",
   "Session storage",
   "Session storage"
@@ -71,11 +73,13 @@ const EN_LIFE = [
   "Until you clear it",
   "Until you close the tab",
   "Until you close the tab",
-  "15 minutes or until earlier clearing"
+  "15 minutes or until earlier clearing",
+  "Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result",
+  "Until tab close, sign-out, or a new link"
 ];
 const DURATION = /\b\d+\s*(days?|years?|months?|hours?|minutes?|seconds?)\b/gi;
 
-/** The catalogue the card is served: consent plus the 24 inventory strings of legal (D-28). */
+/** The catalogue the card is served: consent plus inventory strings of legal (D-28). */
 const CARD_CATALOG: MessageCatalog = {
   ...consentEnglish,
   ...inventoryCopy(legalEnglish as MessageCatalog)
@@ -188,7 +192,7 @@ const footerControls = (): HTMLElement[] => [
   ...document.querySelectorAll<HTMLElement>(".consentCardFooter button, .consentCardFooter a[href]")
 ];
 
-describe("S01 the cookie card (10b): a read-only list of the eight items", () => {
+describe("S01 the cookie card (10b): a read-only list of the twenty items", () => {
   it("renders one row per LEGAL_INVENTORY item, in order: the name, and kind and lifetime equal to the English /cookies strings, and a purpose", () => {
     // PROPERTY (R02, R18 card side): one row per LISTED item in INV order; the row's name is the
     // INV name, its kind and lifetime are the English /cookies strings of that item (R09, EXACT),
@@ -196,7 +200,7 @@ describe("S01 the cookie card (10b): a read-only list of the eight items", () =>
     mountCard();
     const rows = [...document.querySelectorAll<HTMLElement>(".consentCatRow")];
     expect(rows.length, "one row per LEGAL_INVENTORY item").toBe(LEGAL_INVENTORY.length);
-    expect(LEGAL_INVENTORY.length, "eight items").toBe(18);
+    expect(LEGAL_INVENTORY.length, "twenty items").toBe(20);
     rows.forEach((row, index) => {
       const item = LEGAL_INVENTORY[index]!;
       const legal = legalEnglish as MessageCatalog;
@@ -342,8 +346,8 @@ describe("S01 the cookie card (10b): a read-only list of the eight items", () =>
     expect(consentSource().includes(".focus("), "CookieConsent.tsx moves focus itself").toBe(false);
   });
 
-  it("shows every item's name once and no duration outside the eight lifetimes", () => {
-    // PROPERTY (R11, card side): the card's code texts are exactly the eight INV names, each
+  it("shows every item's name once and no duration outside the twenty lifetimes", () => {
+    // PROPERTY (R11, card side): the card's code texts are exactly the twenty INV names, each
     // once, and every duration string it renders is an INV lifetime that carries a number.
     const card = mountCard();
     const names = [...card.querySelectorAll("code")].map((code) => code.textContent);

@@ -183,12 +183,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "访问权 (Art. 15) — 获取我们所持有的关于您的个人数据副本以及本项信息。[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "访问权 (Art. 15) — 获取我们所持有的关于您的个人数据副本以及本项信息。在设置中选择“导出数据”：我们会准备一个 ZIP 文件，其中包含 JSON 文件和一个可在任何浏览器中打开的页面，并通过电子邮件向您发送下载链接；该链接有效期为 24 小时，且仅在您登录账户时可用。",
         "更正权 (Art. 16) — 在“设置”中更正您的电子邮箱或恢复邮箱。基于《条款》所述原因，您的化名不可更改；您可关闭账户并开立新账户",
         "删除权 (Art. 17) — 随时在辩论页面删除私密辩论。在“设置”中关闭账户；第 7 节准确说明其效果。无论您是否为作者，均可要求我们移除含有您数据的已发布辩论",
         "限制处理权 (Art. 18) — 要求我们在有关特定数据的争议解决之前停止处理该数据",
         "反对权 (Art. 21) — 反对基于合法利益的处理，即第 4 节所述安全与审计处理；除非我们能证明存在压倒性理由，否则会停止处理。您可随时反对营销，我们会停止营销",
-        "数据可携权 (Art. 20) — 以通用、机器可读的格式取得您的辩论和账户数据。[Pending: same export as Access.] 合同终止时，您创作的非个人内容（例如您的问题）可应要求返还给您",
+        "数据可携权 (Art. 20) — 以通用、机器可读的格式取得您的辩论和账户数据。使用设置中的“导出数据”：ZIP 文件包含以机器可读的 JSON 文件保存的您的数据，以及一个便于阅读的页面；邮件中的链接有效期为 24 小时，且仅在您登录账户时可用。 合同终止时，您创作的非个人内容（例如您的问题）可应要求返还给您",
         "撤回同意 (Art. 7(3)) — 通过任何营销电子邮件或“设置”撤回营销同意；通过在“设置”中关闭账户撤回对敏感数据的同意（您也可以不提供此类数据，或删除包含此类数据的辩论）。撤回不影响已经发生的处理",
         "投诉 — 向罗马尼亚监管机构 ANSPDCP 投诉，地址为 B-dul G-ral Gheorghe Magheru 28–30, Bucharest，邮箱为 anspdcp@dataprotection.ro；也可向您居住国家的主管机构投诉。我们希望您先联系我们"
         ]
@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine 使用18个项目，全部为您所请求的服务严格必要，且全部仅由 Dialectical Engine 设置：13个 cookie 和您浏览器存储中的5个条目。我们不设置分析、广告或跟踪 cookie。dezbatere.ro/cookies 的 Cookie 政策会列出这些项目，并说明每一项的作用及其接收方，且会在添加任何其他内容之前作出修改。" },
+      { kind: "p", text: "Dialectical Engine 使用20个项目，全部为您所请求的服务严格必要，且全部仅由 Dialectical Engine 设置：13个 cookie 和您浏览器存储中的7个条目。我们不设置分析、广告或跟踪 cookie。dezbatere.ro/cookies 的 Cookie 政策会列出这些项目，并说明每一项的作用及其接收方，且会在添加任何其他内容之前作出修改。" },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — 本地存储 — 记录您使用浅色模式还是深色模式。 — 直至您将其清除",
         "debateai.languageOffer.dismissed — 会话存储 — 在此标签页中记录您已拒绝以其他语言显示辩论的提议。 — 直至您关闭标签页",
         "debateai.support.conversation.v2 — 会话存储 — 在标签页保持打开期间，让您与帮助聊天的对话留在屏幕上。只要有人在此标签页中登录或退出登录，对话就会被清除。 — 直至您关闭标签页",
-        "debateai.phone-completion-draft.v1 — 会话存储 — 电话步骤中未完成的问题；会话变更、退出登录或所有者变更时清除 — 15分钟或提前清除"
+        "debateai.phone-completion-draft.v1 — 会话存储 — 电话步骤中未完成的问题；会话变更、退出登录或所有者变更时清除 — 15分钟或提前清除",
+        "debateai.exportPending — 会话存储 — 在此标签页保存邮件中的导出链接，以便登录和重试。 — 直到关闭标签页、退出登录、打开新链接、首次成功下载，或得到链接无效或账户不符的结果",
+        "debateai.exportLinkOutcome — 会话存储 — 记住此标签页应显示哪条下载链接提示。 — 直到关闭标签页、退出登录或打开新链接"
         ]
       },
       { kind: "p", text: "没有任何其他方通过 Dialectical Engine 收集有关您长期以及跨网站的在线活动的信息。" },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "8c2ba44c3f1d33849aea90cdad41dcee2ad1a0d1833b53e236bf3ecb2dcf8785",
+  sha256: "6a83424a70d36ecf9f4caa3fe15b592f094fc6517ffd570ebaaf9fe00908f25c",
   eyebrow: "隐私政策 · v3.3 · 生效日期 2026 年 10 月 12 日",
   title: "我们存储哪些内容及其原因",
   lede: "以通俗语言说明您依据 GDPR (EU) 2016/679 享有的权利及我们承担的义务。共十四节及附件 B — 请滚动至末尾。",

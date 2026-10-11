@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Až 30 minut",
   "legal.cookies.mfaRecovery.life": "Až 299 sekund",
   "legal.cookies.social.life": "Až 5 minut",
-  "legal.cookies.phoneDraft.life": "15 minut nebo do dřívějšího vymazání"
+  "legal.cookies.phoneDraft.life": "15 minut nebo do dřívějšího vymazání",
+  "legal.cookies.exportPending.purpose": "Uchovává odkaz pro export zaslaný e-mailem na této kartě pro přihlášení a opakovaný pokus.",
+  "legal.cookies.exportLinkOutcome.purpose": "Pamatuje si, která zpráva o odkazu ke stažení se má na této kartě zobrazit.",
+  "legal.cookies.exportPending.life": "Do zavření karty, odhlášení, otevření nového odkazu, prvního úspěšného stažení nebo výsledku neplatného odkazu či jiného účtu",
+  "legal.cookies.exportLinkOutcome.life": "Do zavření karty, odhlášení nebo otevření nového odkazu"
 }

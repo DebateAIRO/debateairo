@@ -91,6 +91,17 @@ apps/api/src/consumer-security.ts
 apps/api/src/consumer-webauthn-verifier.ts
 apps/api/src/consumer-webauthn.ts
 apps/api/src/country-gate.ts
+apps/api/src/data-export/archive-catalog.ts
+apps/api/src/data-export/archive.ts
+apps/api/src/data-export/html-page.ts
+apps/api/src/data-export/mail.ts
+apps/api/src/data-export/owner-view-adapter.ts
+apps/api/src/data-export/readme.ts
+apps/api/src/data-export/service.ts
+apps/api/src/data-export/snapshot.ts
+apps/api/src/data-export/store.ts
+apps/api/src/data-export/types.ts
+apps/api/src/data-export/zip.ts
 apps/api/src/disclosures.ts
 apps/api/src/email-change.ts
 apps/api/src/email-mfa-mail.ts
@@ -108,6 +119,7 @@ apps/api/src/mail-mime.ts
 apps/api/src/main.ts
 apps/api/src/mfa.ts
 apps/api/src/onboarding-evidence.ts
+apps/api/src/owner-read.ts
 apps/api/src/password-reset-mail.ts
 apps/api/src/password-reset-routes.ts
 apps/api/src/password-reset.ts
@@ -358,6 +370,7 @@ apps/ui/app/debate/[id]/page.tsx
 apps/ui/app/debate/[id]/report/route.ts
 apps/ui/app/enroll-mfa/layout.tsx
 apps/ui/app/enroll-mfa/page.tsx
+apps/ui/app/export/page.tsx
 apps/ui/app/help/page.tsx
 apps/ui/app/layout.tsx
 apps/ui/app/legal/page.tsx
@@ -406,6 +419,7 @@ apps/ui/components/BackupEmailVerification.tsx
 apps/ui/components/CanvasViewport.tsx
 apps/ui/components/ChallengePopover.tsx
 apps/ui/components/CrisisSupport.tsx
+apps/ui/components/DataExportCard.tsx
 apps/ui/components/DateOfBirthField.tsx
 apps/ui/components/DebateCanvas.tsx
 apps/ui/components/DebateMap.tsx
@@ -417,6 +431,7 @@ apps/ui/components/DebateWorkspaceDrawer.tsx
 apps/ui/components/DebatesBuffer.tsx
 apps/ui/components/EmailSettings.tsx
 apps/ui/components/EvaluatorDevMenu.tsx
+apps/ui/components/ExportDownloadClient.tsx
 apps/ui/components/FloorAnswer.tsx
 apps/ui/components/GuideModal.tsx
 apps/ui/components/InvestigationDrawer.tsx
@@ -552,6 +567,7 @@ apps/ui/lib/consumerWebAuthn.ts
 apps/ui/lib/contentSecurityPolicy.test.mjs
 apps/ui/lib/crisisLineDirectory.ts
 apps/ui/lib/crisisLines.ts
+apps/ui/lib/dataExportPending.ts
 apps/ui/lib/debateHeaderOverflow.ts
 apps/ui/lib/debatePresentation.ts
 apps/ui/lib/debateTreeUtils.ts
@@ -838,6 +854,7 @@ packages/db/src/consumer-auth.ts
 packages/db/src/consumer-recovery.ts
 packages/db/src/consumer-security-mail.ts
 packages/db/src/consumer-security.ts
+packages/db/src/data-export.ts
 packages/db/src/email-change.ts
 packages/db/src/email-mfa-recovery.ts
 packages/db/src/identity.ts
@@ -852,6 +869,7 @@ packages/db/src/migration-forward0114.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
+packages/db/src/migration-forward115.ts
 packages/db/src/migration-lineage.ts
 packages/db/src/obs-schema.ts
 packages/db/src/onboarding-evidence.ts

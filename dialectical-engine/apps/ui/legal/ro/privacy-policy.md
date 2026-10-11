@@ -148,12 +148,12 @@ Puteți exercita gratuit oricare dintre aceste drepturi scriind la **privacy@dez
 
 | Drept | Ce înseamnă aici |
 | --- | --- |
-| **Acces** (Art. 15) | O copie a datelor cu caracter personal pe care le deținem despre dumneavoastră și aceste informații. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Acces** (Art. 15) | O copie a datelor cu caracter personal pe care le deținem despre dumneavoastră și aceste informații. În Setări, alegeți Exportați datele: pregătim un fișier ZIP cu fișiere JSON și o pagină pe care o puteți deschide în orice browser, apoi vă trimitem prin e-mail un link de descărcare valabil 24 de ore și care funcționează numai cât timp sunteți autentificat în cont. |
 | **Rectificare** (Art. 16) | Corectați adresa de e-mail sau adresa de recuperare din Setări. Pseudonimul nu poate fi schimbat, din motivele indicate în Termeni; puteți închide contul și deschide unul nou |
 | **Ștergere** (Art. 17) | Ștergeți oricând o dezbatere privată de pe pagina dezbaterii. Închideți contul din Setări; secțiunea 7 explică exact efectele. Solicitați-ne să eliminăm o dezbatere publicată care conține datele dumneavoastră, indiferent dacă sunteți sau nu autorul |
 | **Restricționare** (Art. 18) | Solicitați-ne să oprim prelucrarea anumitor date până la soluționarea unei contestații privind aceste date |
 | **Opoziție** (Art. 21) | Opuneți-vă prelucrării întemeiate pe interese legitime — prelucrarea pentru securitate și audit din secțiunea 4 — iar noi o oprim dacă nu putem demonstra motive imperioase. Vă puteți opune oricând marketingului, iar noi îl oprim |
-| **Portabilitate** (Art. 20) | Dezbaterile și datele contului într-un format utilizat în mod curent și care poate fi citit automat. \[Pending: same export as Access.\] Conținutul fără caracter personal pe care l-ați creat, precum întrebările, vă este restituit la cerere la încetarea contractului |
+| **Portabilitate** (Art. 20) | Dezbaterile și datele contului într-un format utilizat în mod curent și care poate fi citit automat. Folosiți Exportați datele din Setări: fișierul ZIP conține datele dumneavoastră în fișiere JSON care pot fi citite automat și o pagină ușor de citit; linkul trimis prin e-mail este valabil 24 de ore și funcționează numai cât timp sunteți autentificat în cont. Conținutul fără caracter personal pe care l-ați creat, precum întrebările, vă este restituit la cerere la încetarea contractului |
 | **Retragerea consimțământului** (Art. 7(3)) | Retrageți consimțământul pentru marketing din orice e-mail sau din Setări; retrageți consimțământul privind datele sensibile închizându-vă contul din Setări (puteți și omite asemenea date sau șterge o dezbatere care le conține). Retragerea nu afectează prelucrarea care a avut deja loc |
 | **Depunerea unei plângeri** | La autoritatea română de supraveghere, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, București, <anspdcp@dataprotection.ro>, sau la autoritatea din țara în care locuiți. Am prefera să ne contactați mai întâi |
 
@@ -174,7 +174,7 @@ Dialectical Engine este destinat adulților. La înregistrare confirmați că av
 ## 13. Module cookie
 
 
-Dialectical Engine folosește 18 elemente, toate strict necesare pentru serviciul pe care l-ați solicitat și toate setate numai de Dialectical Engine: 13 module cookie și 5 intrări în spațiul de stocare al browserului dumneavoastră. Nu setăm module cookie analitice, publicitare sau de urmărire. **Politica privind modulele cookie** de la dezbatere.ro/cookies le enumeră, arătând ce face fiecare și cine îl primește, și va fi modificată înainte de adăugarea oricărui alt element.
+Dialectical Engine folosește 20 elemente, toate strict necesare pentru serviciul pe care l-ați solicitat și toate setate numai de Dialectical Engine: 13 module cookie și 7 intrări în spațiul de stocare al browserului dumneavoastră. Nu setăm module cookie analitice, publicitare sau de urmărire. **Politica privind modulele cookie** de la dezbatere.ro/cookies le enumeră, arătând ce face fiecare și cine îl primește, și va fi modificată înainte de adăugarea oricărui alt element.
 
 | Denumire | Tip | Scop | Durată |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine folosește 18 elemente, toate strict necesare pentru serviciu
 | `debateai.languageOffer.dismissed` | Stocare de sesiune | Reține, pentru această filă, că ați refuzat propunerea de a afișa o dezbatere în altă limbă. | Până când închideți fila |
 | `debateai.support.conversation.v2` | Stocare de sesiune | Păstrează pe ecran conversația dvs. din chatul de ajutor cât timp fila rămâne deschisă. Se șterge când cineva se autentifică sau se deconectează în această filă. | Până când închideți fila |
 | `debateai.phone-completion-draft.v1` | Stocare de sesiune | Întrebare neterminată în timpul completării telefonului; se șterge la schimbarea sesiunii, deconectare sau schimbarea titularului | 15 minute sau până la ștergere |
+| `debateai.exportPending` | Stocare de sesiune | Păstrează în această filă linkul de export primit prin e-mail pentru autentificare și reîncercare. | Până la închiderea filei, deconectare, un link nou, prima descărcare reușită sau un rezultat de link invalid ori cont greșit |
+| `debateai.exportLinkOutcome` | Stocare de sesiune | Reține ce mesaj despre linkul de descărcare trebuie afișat în această filă. | Până la închiderea filei, deconectare sau un link nou |
 
 Nicio altă parte nu colectează, prin intermediul Dialectical Engine, informații despre activitățile dumneavoastră online de-a lungul timpului și pe diferite site-uri web.
 

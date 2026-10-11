@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Do 30 minuta",
   "legal.cookies.mfaRecovery.life": "Do 299 sekundi",
   "legal.cookies.social.life": "Do 5 minuta",
-  "legal.cookies.phoneDraft.life": "15 minuta ili do ranijeg brisanja"
+  "legal.cookies.phoneDraft.life": "15 minuta ili do ranijeg brisanja",
+  "legal.cookies.exportPending.purpose": "Čuva poveznicu za izvoz poslanu e-poštom u ovoj kartici za prijavu i ponovni pokušaj.",
+  "legal.cookies.exportLinkOutcome.purpose": "Pamti koju poruku o poveznici za preuzimanje treba prikazati u ovoj kartici.",
+  "legal.cookies.exportPending.life": "Do zatvaranja kartice, odjave, nove poveznice, prvog uspješnog preuzimanja ili ishoda nevaljane poveznice ili pogrešnog računa",
+  "legal.cookies.exportLinkOutcome.life": "Do zatvaranja kartice, odjave ili nove poveznice"
 }
