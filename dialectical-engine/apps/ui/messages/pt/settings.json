@@ -71,7 +71,7 @@
   "settings.export.download.title": "Exportação dos seus dados",
   "settings.export.download.starting": "A transferência está a começar. Se não começar, use o botão.",
   "settings.export.download.button": "Transferir ZIP",
-  "settings.export.download.invalid": "Esta ligação de transferência expirou ou foi substituída. Peça uma nova exportação nas Definições.",
+  "settings.export.download.invalid": "Esta ligação de transferência expirou ou foi substituída.",
   "settings.export.download.reopenFromEmail": "Abra novamente a ligação de transferência no seu e-mail. Continuará a funcionar até expirar.",
   "settings.export.download.wrongAccount": "Esta ligação de transferência pertence a outra conta. Termine sessão e inicie sessão na conta que pediu a exportação.",
   "settings.export.download.backToSettings": "Voltar às Definições",

@@ -56,7 +56,7 @@ function button(text: string): HTMLButtonElement {
   return result;
 }
 async function click(text: string) { await act(async () => { button(text).click(); }); }
-afterEach(async () => { if (root) await act(async () => root!.unmount()); root = null; host?.remove(); host = null; vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(async () => { if (root) await act(async () => root!.unmount()); root = null; host?.remove(); host = null; vi.useRealTimers(); vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
 it("U-1 places a plain export card after Privacy and before Delete account", () => {
   const html = renderToStaticMarkup(<SettingsPageClient />);
@@ -89,6 +89,47 @@ it("U-4 opens EXPORT_DATA confirmation and Cancel returns to idle without a requ
   expect(stub.requestDataExport).not.toHaveBeenCalled();
   await click("Cancel"); expect(host?.querySelector(".authSecurityConfirmation")).toBeNull();
   expect(button(settings["settings.export.request"]).disabled).toBe(false);
+});
+it("V-36 opens the existing confirmation from the expired-link Settings entry without requesting", async () => {
+  window.history.replaceState(null, "", "/settings?request-export=1");
+  const stub = client(); await mount(<DataExportCard catalog={settings} locale="en" client={stub as never} />);
+  expect(host?.querySelector(".authSecurityConfirmation")).not.toBeNull();
+  expect(stub.authMethods).toHaveBeenCalled();
+  const firstMethodReads = stub.authMethods.mock.calls.length;
+  expect(stub.requestDataExport).not.toHaveBeenCalled();
+  expect(window.location.pathname + window.location.search).toBe("/settings");
+  await click("Cancel");
+  expect(host?.querySelector(".authSecurityConfirmation")).toBeNull();
+  await click(settings["settings.export.request"]); await flush();
+  expect(host?.querySelector(".authSecurityConfirmation")).not.toBeNull();
+  expect(stub.authMethods.mock.calls.length).toBeGreaterThan(firstMethodReads);
+  expect(stub.requestDataExport).not.toHaveBeenCalled();
+});
+it("V-36 Settings entry uses the same no-method Security branch", async () => {
+  window.history.replaceState(null, "", "/settings?request-export=1");
+  const stub = client(); stub.authMethods.mockResolvedValue(methods([]) as never);
+  await mount(<DataExportCard catalog={settings} locale="en" client={stub as never} />);
+  expect(host?.textContent).toContain(settings["settings.export.noMethod"]);
+  expect(host?.querySelector('a[href="/settings/security"]')).not.toBeNull();
+  expect(host?.querySelector(".authSecurityConfirmation")).toBeNull();
+  expect(stub.requestDataExport).not.toHaveBeenCalled();
+});
+it("V-36 opens confirmation for SENT but respects PREPARING with no panel", async () => {
+  window.history.replaceState(null, "", "/settings?request-export=1");
+  const sent = client(SENT); await mount(<DataExportCard catalog={settings} locale="en" client={sent as never} />);
+  expect(host?.querySelector(".authSecurityConfirmation")).not.toBeNull();
+  expect(sent.requestDataExport).not.toHaveBeenCalled();
+  await click("Cancel");
+  expect(host?.textContent).toContain(settings["settings.export.sent"].split("{")[0]);
+  expect(sent.requestDataExport).not.toHaveBeenCalled();
+  await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+  window.history.replaceState(null, "", "/settings?request-export=1");
+  const preparing = client(PREPARING); await mount(<DataExportCard catalog={settings} locale="en" client={preparing as never} />);
+  expect(host?.textContent).toContain(settings["settings.export.preparing"].split("{")[0]);
+  expect(host?.querySelector(".authSecurityConfirmation")).toBeNull();
+  expect(preparing.authMethods).not.toHaveBeenCalled();
+  expect(preparing.requestDataExport).not.toHaveBeenCalled();
+  expect(window.location.pathname + window.location.search).toBe("/settings");
 });
 it("U-5 failed password and passkey proofs show only the card line", async () => {
   for (const method of ["password_totp", "passkey"]) {

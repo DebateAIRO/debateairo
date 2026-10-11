@@ -71,7 +71,7 @@
   "settings.export.download.title": "Uw gegevensexport",
   "settings.export.download.starting": "Uw download wordt gestart. Gebruik de knop als dat niet gebeurt.",
   "settings.export.download.button": "ZIP downloaden",
-  "settings.export.download.invalid": "Deze downloadlink is verlopen of vervangen. Vraag een nieuwe export aan via Instellingen.",
+  "settings.export.download.invalid": "Deze downloadlink is verlopen of vervangen.",
   "settings.export.download.reopenFromEmail": "Open de downloadlink uit uw e-mail opnieuw. Die blijft werken totdat hij verloopt.",
   "settings.export.download.wrongAccount": "Deze downloadlink hoort bij een ander account. Meld u af en aan bij het account dat de export heeft aangevraagd.",
   "settings.export.download.backToSettings": "Terug naar Instellingen",

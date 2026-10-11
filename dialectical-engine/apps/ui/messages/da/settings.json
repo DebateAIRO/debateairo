@@ -71,7 +71,7 @@
   "settings.export.download.title": "Din dataeksport",
   "settings.export.download.starting": "Din download starter. Brug knappen, hvis den ikke starter.",
   "settings.export.download.button": "Hent ZIP-filen",
-  "settings.export.download.invalid": "Dette downloadlink er udløbet eller blevet erstattet. Anmod om en ny eksport under Indstillinger.",
+  "settings.export.download.invalid": "Dette downloadlink er udløbet eller blevet erstattet.",
   "settings.export.download.reopenFromEmail": "Åbn downloadlinket fra din e-mail igen. Det virker, indtil det udløber.",
   "settings.export.download.wrongAccount": "Dette downloadlink tilhører en anden konto. Log ud, og log ind på den konto, der anmodede om eksporten.",
   "settings.export.download.backToSettings": "Tilbage til Indstillinger",

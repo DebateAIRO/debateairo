@@ -71,7 +71,7 @@
   "settings.export.download.title": "データのエクスポート",
   "settings.export.download.starting": "ダウンロードを開始しています。始まらない場合はボタンを押してください。",
   "settings.export.download.button": "ZIP をダウンロード",
-  "settings.export.download.invalid": "このダウンロードリンクは期限切れか、新しいリンクに置き換えられました。設定から新しいエクスポートをリクエストしてください。",
+  "settings.export.download.invalid": "このダウンロードリンクは期限切れか、新しいリンクに置き換えられました。",
   "settings.export.download.reopenFromEmail": "メールに記載されたダウンロードリンクをもう一度開いてください。有効期限までは引き続き利用できます。",
   "settings.export.download.wrongAccount": "このダウンロードリンクは別のアカウントのものです。サインアウトして、エクスポートをリクエストしたアカウントにサインインしてください。",
   "settings.export.download.backToSettings": "設定に戻る",

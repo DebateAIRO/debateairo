@@ -93,14 +93,30 @@ it("D-4 clears a wrong-account token and omits Back to Settings", async () => {
   expect(host?.textContent).toContain(settings["settings.export.download.wrongAccount"]);
   expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBeNull();
   expect(host?.querySelector('a[href="/settings"]')).toBeNull();
+  expect(host?.textContent).not.toContain(settings["settings.export.requestAgain"]);
+  await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+  await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  expect(host?.textContent).toContain(settings["settings.export.download.wrongAccount"]);
+  expect(host?.textContent).not.toContain(settings["settings.export.download.reopenFromEmail"]);
+  expect(host?.textContent).not.toContain(settings["settings.export.requestAgain"]);
+  expect(client.downloadDataExport).toHaveBeenCalledTimes(1);
 });
-it("D-5 clears an invalid token and links back to Settings", async () => {
+it("D-5 keeps the L4 refusal after reload and offers a confirmed new request", async () => {
   sessionStorage.setItem(PENDING_EXPORT_KEY, token);
   const client = stub(); client.downloadDataExport.mockRejectedValue(new ContractHttpError("HTTP_ERROR", 404, "invalid", "EXPORT_LINK_INVALID"));
   await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
   expect(host?.textContent).toContain(settings["settings.export.download.invalid"]);
   expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBeNull();
-  expect(host?.querySelector('a.setBtn[href="/settings"]')).not.toBeNull();
+  const request = button(settings["settings.export.requestAgain"]);
+  expect(request.closest("form")?.getAttribute("action")).toBe("/settings");
+  expect(request.getAttribute("name")).toBe("request-export");
+  expect(request.getAttribute("value")).toBe("1");
+  await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+  await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  expect(host?.textContent).toContain(settings["settings.export.download.invalid"]);
+  expect(host?.textContent).not.toContain(settings["settings.export.download.reopenFromEmail"]);
+  expect(button(settings["settings.export.requestAgain"])).toBeTruthy();
+  expect(client.downloadDataExport).toHaveBeenCalledTimes(1);
 });
 it("D-6 keeps a held link and provides Back to Settings", async () => {
   sessionStorage.setItem(PENDING_EXPORT_KEY, token);
@@ -109,6 +125,12 @@ it("D-6 keeps a held link and provides Back to Settings", async () => {
   expect(host?.textContent).toContain(settings["settings.export.held"]);
   expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBe(token);
   expect(host?.querySelector('a.setBtn[href="/settings"]')).not.toBeNull();
+  expect(host?.textContent).not.toContain(settings["settings.export.requestAgain"]);
+  await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+  await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  expect(host?.textContent).toContain(settings["settings.export.held"]);
+  expect(client.downloadDataExport).toHaveBeenCalledTimes(2);
+  expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBe(token);
 });
 it("D-7 allows the exact export return path", () => {
   expect(safeReturnPath("/export")).toBe("/export");
@@ -144,15 +166,35 @@ it("D-10 keeps an unavailable link, shows a status and no download control", asy
   expect(host?.textContent).toContain(settings["settings.export.download.title"]);
   expect(host?.querySelector('[role="status"]')?.textContent).toContain(settings["settings.export.unavailable"]);
   expect(host?.querySelector('a.setBtn[href="/settings"]')).not.toBeNull();
+  expect(host?.textContent).not.toContain(settings["settings.export.requestAgain"]);
   expect(host?.querySelector("a[download]")).toBeNull();
   expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBe(token);
+  await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+  await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  expect(host?.textContent).toContain(settings["settings.export.unavailable"]);
+  expect(client.downloadDataExport).toHaveBeenCalledTimes(2);
+  expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBe(token);
 });
-it("D-11 tells a tokenless reload to reopen the emailed link without downloading", async () => {
+it("D-11 does not claim a bare export visit has a working email link", async () => {
   const client = stub(); await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
-  expect(host?.textContent).toContain("Open the download link from your email again. It still works until it expires.");
+  expect(host?.textContent).not.toContain(settings["settings.export.download.reopenFromEmail"]);
   expect(host?.textContent).not.toContain(settings["settings.export.download.invalid"]);
   expect(host?.querySelector('a.setBtn[href="/settings"]')).not.toBeNull();
   expect(client.downloadDataExport).not.toHaveBeenCalled();
+});
+
+it("V-33 reload after a successful download keeps the reopen line without a request button", async () => {
+  sessionStorage.setItem(PENDING_EXPORT_KEY, token);
+  const client = stub(); const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:export-fixture") });
+  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+  await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+  await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  expect(host?.textContent).toContain(settings["settings.export.download.reopenFromEmail"]);
+  expect(host?.textContent).not.toContain(settings["settings.export.requestAgain"]);
+  expect(client.downloadDataExport).toHaveBeenCalledTimes(1);
+  click.mockRestore();
 });
 
 it("D-12 accepts a new emailed fragment on the already open export page", async () => {

@@ -71,7 +71,7 @@
   "settings.export.download.title": "Bản xuất dữ liệu của bạn",
   "settings.export.download.starting": "Quá trình tải xuống đang bắt đầu. Nếu không tự bắt đầu, hãy dùng nút này.",
   "settings.export.download.button": "Tải ZIP xuống",
-  "settings.export.download.invalid": "Liên kết tải xuống này đã hết hạn hoặc bị thay thế. Hãy yêu cầu bản xuất mới từ Cài đặt.",
+  "settings.export.download.invalid": "Liên kết tải xuống này đã hết hạn hoặc bị thay thế.",
   "settings.export.download.reopenFromEmail": "Hãy mở lại liên kết tải xuống trong email của bạn. Liên kết vẫn hoạt động cho đến khi hết hạn.",
   "settings.export.download.wrongAccount": "Liên kết tải xuống này thuộc về một tài khoản khác. Hãy đăng xuất rồi đăng nhập vào tài khoản đã yêu cầu xuất dữ liệu.",
   "settings.export.download.backToSettings": "Quay lại Cài đặt",

@@ -71,7 +71,7 @@
   "settings.export.download.title": "Export vašich údajov",
   "settings.export.download.starting": "Sťahovanie sa začína. Ak sa nespustí, použite tlačidlo.",
   "settings.export.download.button": "Stiahnuť ZIP",
-  "settings.export.download.invalid": "Platnosť tohto odkazu na stiahnutie vypršala alebo bol nahradený. Požiadajte v Nastaveniach o nový export.",
+  "settings.export.download.invalid": "Platnosť tohto odkazu na stiahnutie vypršala alebo bol nahradený.",
   "settings.export.download.reopenFromEmail": "Znova otvorte odkaz na stiahnutie z e-mailu. Bude fungovať až do uplynutia platnosti.",
   "settings.export.download.wrongAccount": "Tento odkaz na stiahnutie patrí inému účtu. Odhláste sa a prihláste do účtu, ktorý požiadal o export.",
   "settings.export.download.backToSettings": "Späť do Nastavení",

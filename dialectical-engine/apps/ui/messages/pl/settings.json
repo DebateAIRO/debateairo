@@ -71,7 +71,7 @@
   "settings.export.download.title": "Eksport Twoich danych",
   "settings.export.download.starting": "Pobieranie się rozpoczyna. Jeśli nie ruszy, użyj przycisku.",
   "settings.export.download.button": "Pobierz ZIP",
-  "settings.export.download.invalid": "Ten link do pobrania wygasł lub został zastąpiony. Poproś o nowy eksport w Ustawieniach.",
+  "settings.export.download.invalid": "Ten link do pobrania wygasł lub został zastąpiony.",
   "settings.export.download.reopenFromEmail": "Otwórz ponownie link do pobrania z wiadomości e-mail. Będzie działał do chwili wygaśnięcia.",
   "settings.export.download.wrongAccount": "Ten link do pobrania należy do innego konta. Wyloguj się i zaloguj na konto, z którego poproszono o eksport.",
   "settings.export.download.backToSettings": "Wróć do Ustawień",
