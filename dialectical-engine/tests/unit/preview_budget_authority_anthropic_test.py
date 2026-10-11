@@ -368,11 +368,25 @@ class SettlementTests(AnthropicTest):
                              service_tier='standard', inference_geo='global')
         nulls = message(2000, 100, cache_creation_input_tokens=None, cache_read_input_tokens=None, cache_creation=None,
                         server_tool_use=None, service_tier=None, inference_geo=None)
+        # Anthropic's Messages reference (read 2026-10-11) adds usage.output_tokens_details.thinking_tokens: a
+        # read-only split of output_tokens, which stays the inclusive billed total. Haiku 5.5 thinks by default,
+        # so every real reply carries it (the first live probe halted on it).
+        thinking = {**message(2000, 100, cache_creation_input_tokens=0, cache_read_input_tokens=0,
+                              cache_creation={'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0},
+                              server_tool_use={'web_search_requests': 0, 'web_fetch_requests': 0},
+                              service_tier='standard', inference_geo='global',
+                              output_tokens_details={'thinking_tokens': 60}),
+                    'stop_details': None, 'diagnostics': None}
+        thinking_null = message(2000, 100, output_tokens_details=None)
+        thinking_all = message(2000, 100, output_tokens_details={'thinking_tokens': 100})
         for name, reply, expected, step, hour in (('lower', lower, Decimal('0.000815'), 'up_to_100k', 2000),
                                                   ('upper', upper, Decimal('0.05475'), 'over_100k', 2000),
                                                   ('no_split', no_split, Decimal('0.00089'), 'up_to_100k', 3000),
                                                   ('documented_zeros', documented, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
-                                                  ('nulls', nulls, cost(LOWER, 2000, output=100), 'up_to_100k', 0)):
+                                                  ('nulls', nulls, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
+                                                  ('documented_thinking_split', thinking, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
+                                                  ('thinking_split_null', thinking_null, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
+                                                  ('thinking_equals_output', thinking_all, cost(LOWER, 2000, output=100), 'up_to_100k', 0)):
             with self.subTest(name):
                 _, entry = self.settle(reply)
                 accounting = entry['accounting']
@@ -425,6 +439,12 @@ class SettlementTests(AnthropicTest):
             'input_float': {'input_tokens': Decimal('1000.0')},
             'input_bool': {'input_tokens': True},
             'input_negative': {'input_tokens': -1},
+            'output_details_not_a_dict': {'output_tokens_details': 60},
+            'output_details_unknown_key': {'output_tokens_details': {'thinking_tokens': 0, 'tool_tokens': 0}},
+            'output_details_negative': {'output_tokens_details': {'thinking_tokens': -1}},
+            'output_details_float': {'output_tokens_details': {'thinking_tokens': Decimal('1.0')}},
+            'output_details_bool': {'output_tokens_details': {'thinking_tokens': True}},
+            'output_details_above_output': {'output_tokens_details': {'thinking_tokens': 501}},
             'output_missing': None,
         }
         replies = {name: {**good, 'usage': {k: v for k, v in usage.items() if k != 'output_tokens'}} if extra is None
