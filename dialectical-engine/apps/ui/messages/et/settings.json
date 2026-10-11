@@ -72,6 +72,8 @@
   "settings.export.download.starting": "Allalaadimine algab. Kui see ei alga, kasutage nuppu.",
   "settings.export.download.button": "Laadi ZIP alla",
   "settings.export.download.invalid": "See allalaadimislink on aegunud või asendatud.",
+  "settings.export.download.incomplete": "See link on puudulik. Avage see uuesti oma e-kirjast.",
+  "settings.export.download.noLink": "Avage allalaadimislink oma e-kirjast.",
   "settings.export.download.reopenFromEmail": "Avage allalaadimislink oma e-kirjast uuesti. See töötab kuni kehtivuse lõppemiseni.",
   "settings.export.download.wrongAccount": "See allalaadimislink kuulub teisele kontole. Logige välja ja seejärel sisse kontosse, millelt eksporti taotleti.",
   "settings.export.download.backToSettings": "Tagasi seadetesse",

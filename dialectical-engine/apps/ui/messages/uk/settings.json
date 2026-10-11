@@ -72,6 +72,8 @@
   "settings.export.download.starting": "Завантаження починається. Якщо воно не почнеться, скористайтеся кнопкою.",
   "settings.export.download.button": "Завантажити ZIP",
   "settings.export.download.invalid": "Термін дії цього посилання минув або його замінено.",
+  "settings.export.download.incomplete": "Це посилання неповне. Знову відкрийте його з електронного листа.",
+  "settings.export.download.noLink": "Відкрийте посилання для завантаження зі свого електронного листа.",
   "settings.export.download.reopenFromEmail": "Знову відкрийте посилання для завантаження зі свого електронного листа. Воно працюватиме до закінчення терміну дії.",
   "settings.export.download.wrongAccount": "Це посилання для завантаження належить іншому обліковому запису. Вийдіть і ввійдіть в обліковий запис, із якого було запрошено експорт.",
   "settings.export.download.backToSettings": "Назад до налаштувань",

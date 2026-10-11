@@ -72,6 +72,8 @@
   "settings.export.download.starting": "Il download sta iniziando. Se non parte, usa il pulsante.",
   "settings.export.download.button": "Scarica ZIP",
   "settings.export.download.invalid": "Questo link per il download è scaduto o è stato sostituito.",
+  "settings.export.download.incomplete": "Questo link è incompleto. Aprilo di nuovo dalla tua email.",
+  "settings.export.download.noLink": "Apri il link per il download nella tua email.",
   "settings.export.download.reopenFromEmail": "Apri di nuovo il link per il download nella tua email. Funzionerà fino alla scadenza.",
   "settings.export.download.wrongAccount": "Questo link per il download appartiene a un altro account. Esci e accedi all’account che ha richiesto l’esportazione.",
   "settings.export.download.backToSettings": "Torna alle Impostazioni",

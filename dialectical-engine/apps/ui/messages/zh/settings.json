@@ -72,6 +72,8 @@
   "settings.export.download.starting": "即将开始下载。如果没有自动开始，请点击按钮。",
   "settings.export.download.button": "下载 ZIP",
   "settings.export.download.invalid": "此下载链接已过期或被替换。",
+  "settings.export.download.incomplete": "此链接不完整。请从电子邮件中重新打开。",
+  "settings.export.download.noLink": "请打开电子邮件中的下载链接。",
   "settings.export.download.reopenFromEmail": "请再次打开电子邮件中的下载链接。链接在过期前仍可使用。",
   "settings.export.download.wrongAccount": "此下载链接属于另一个账户。请退出登录，然后登录请求导出的账户。",
   "settings.export.download.backToSettings": "返回设置",

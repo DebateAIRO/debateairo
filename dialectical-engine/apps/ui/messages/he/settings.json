@@ -72,6 +72,8 @@
   "settings.export.download.starting": "ההורדה מתחילה. אם היא לא מתחילה, יש להשתמש בכפתור.",
   "settings.export.download.button": "הורדת ZIP",
   "settings.export.download.invalid": "תוקף קישור ההורדה הזה פג או שהוא הוחלף.",
+  "settings.export.download.incomplete": "הקישור הזה אינו שלם. פתחו אותו שוב מהדוא״ל שלכם.",
+  "settings.export.download.noLink": "פתחו את קישור ההורדה מהדוא״ל שלכם.",
   "settings.export.download.reopenFromEmail": "פתחו שוב את קישור ההורדה מהדוא״ל שלכם. הוא ימשיך לפעול עד שתוקפו יפוג.",
   "settings.export.download.wrongAccount": "קישור ההורדה הזה שייך לחשבון אחר. יש להתנתק ולהתחבר לחשבון שביקש את הייצוא.",
   "settings.export.download.backToSettings": "חזרה להגדרות",

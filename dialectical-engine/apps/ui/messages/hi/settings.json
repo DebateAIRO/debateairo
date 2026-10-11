@@ -72,6 +72,8 @@
   "settings.export.download.starting": "डाउनलोड शुरू हो रहा है। अगर शुरू न हो तो बटन का उपयोग करें।",
   "settings.export.download.button": "ZIP डाउनलोड करें",
   "settings.export.download.invalid": "यह डाउनलोड लिंक समाप्त हो गया है या बदल दिया गया है।",
+  "settings.export.download.incomplete": "यह लिंक अधूरा है। इसे अपने ईमेल से फिर से खोलें।",
+  "settings.export.download.noLink": "अपने ईमेल से डाउनलोड लिंक खोलें।",
   "settings.export.download.reopenFromEmail": "अपने ईमेल से डाउनलोड लिंक फिर से खोलें। इसकी समय-सीमा समाप्त होने तक यह काम करेगा।",
   "settings.export.download.wrongAccount": "यह डाउनलोड लिंक किसी दूसरे खाते का है। साइन-आउट करके उस खाते में साइन-इन करें जिसने निर्यात माँगा था।",
   "settings.export.download.backToSettings": "सेटिंग्स पर वापस जाएँ",

@@ -72,6 +72,8 @@
   "settings.export.download.starting": "La descarga está comenzando. Si no se inicia, utilice el botón.",
   "settings.export.download.button": "Descargar ZIP",
   "settings.export.download.invalid": "Este enlace de descarga ha caducado o se ha sustituido.",
+  "settings.export.download.incomplete": "Este enlace está incompleto. Ábralo de nuevo desde su correo electrónico.",
+  "settings.export.download.noLink": "Abra el enlace de descarga desde su correo electrónico.",
   "settings.export.download.reopenFromEmail": "Vuelva a abrir el enlace de descarga de su correo electrónico. Seguirá funcionando hasta que caduque.",
   "settings.export.download.wrongAccount": "Este enlace de descarga pertenece a otra cuenta. Cierre sesión e inicie sesión en la cuenta que solicitó la exportación.",
   "settings.export.download.backToSettings": "Volver a Configuración",

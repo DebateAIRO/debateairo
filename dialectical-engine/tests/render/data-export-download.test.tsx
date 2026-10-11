@@ -118,6 +118,59 @@ it("D-5 keeps the L4 refusal after reload and offers a confirmed new request", a
   expect(button(settings["settings.export.requestAgain"])).toBeTruthy();
   expect(client.downloadDataExport).toHaveBeenCalledTimes(1);
 });
+for (const [name, fragment] of [
+  ["cut-off token", "t".repeat(42)],
+  ["short fragment", "abc"],
+  ["stray character", "t".repeat(42) + "!"],
+] as const) {
+  it(`V-37 ${name} shows an incomplete-link message without replacing the emailed link`, async () => {
+    window.history.replaceState(null, "", `/export#${fragment}`);
+    const client = stub(); await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+    expect(host?.textContent).toContain("This link is incomplete. Open it again from your email.");
+    expect(host?.textContent).not.toContain(settings["settings.export.download.invalid"]);
+    expect(host?.textContent).not.toContain(settings["settings.export.requestAgain"]);
+    expect(host?.querySelector('a.setBtn[href="/settings"]')).not.toBeNull();
+    expect(client.downloadDataExport).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe("");
+    if (name === "short fragment") {
+      await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+      await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+      expect(host?.textContent).toContain("This link is incomplete. Open it again from your email.");
+    }
+  });
+}
+it("V-37 a malformed fragment pasted on the open page shows the incomplete-link message", async () => {
+  const client = stub(); await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  await act(async () => {
+    window.history.replaceState(null, "", "/export#abc");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  });
+  expect(host?.textContent).toContain("This link is incomplete. Open it again from your email.");
+  expect(host?.textContent).not.toContain(settings["settings.export.requestAgain"]);
+  expect(client.downloadDataExport).not.toHaveBeenCalled();
+});
+it("V-37 a damaged saved token uses the incomplete-link message", async () => {
+  sessionStorage.setItem(PENDING_EXPORT_KEY, "t".repeat(42));
+  const client = stub(); await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  expect(host?.textContent).toContain("This link is incomplete. Open it again from your email.");
+  expect(host?.textContent).not.toContain(settings["settings.export.requestAgain"]);
+  expect(client.downloadDataExport).not.toHaveBeenCalled();
+  expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBeNull();
+});
+it("N3 sign-out forgets a refused link outcome before the next bare export visit", async () => {
+  sessionStorage.setItem(PENDING_EXPORT_KEY, token);
+  const client = stub(); client.downloadDataExport.mockRejectedValue(new ContractHttpError("HTTP_ERROR", 404, "invalid", "EXPORT_LINK_INVALID"));
+  await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  expect(host?.textContent).toContain(settings["settings.export.download.invalid"]);
+  await endSession({ logout: vi.fn(async () => {}) }, { redirectTo: null });
+  await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+  await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  expect(host?.textContent).toContain("Open the download link from your email.");
+  expect(host?.textContent).not.toContain(settings["settings.export.download.invalid"]);
+  expect(host?.textContent).not.toContain(settings["settings.export.download.reopenFromEmail"]);
+  expect(host?.textContent).not.toContain(settings["settings.export.requestAgain"]);
+  expect(client.downloadDataExport).toHaveBeenCalledTimes(1);
+});
 it("D-6 keeps a held link and provides Back to Settings", async () => {
   sessionStorage.setItem(PENDING_EXPORT_KEY, token);
   const client = stub(); client.downloadDataExport.mockRejectedValue(new ContractHttpError("HTTP_ERROR", 423, "held", "EXPORT_ACCOUNT_HELD"));
@@ -175,8 +228,9 @@ it("D-10 keeps an unavailable link, shows a status and no download control", asy
   expect(client.downloadDataExport).toHaveBeenCalledTimes(2);
   expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBe(token);
 });
-it("D-11 does not claim a bare export visit has a working email link", async () => {
+it("D-11 tells a bare export visitor to open the emailed link without asserting it works", async () => {
   const client = stub(); await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  expect(host?.textContent).toContain("Open the download link from your email.");
   expect(host?.textContent).not.toContain(settings["settings.export.download.reopenFromEmail"]);
   expect(host?.textContent).not.toContain(settings["settings.export.download.invalid"]);
   expect(host?.querySelector('a.setBtn[href="/settings"]')).not.toBeNull();

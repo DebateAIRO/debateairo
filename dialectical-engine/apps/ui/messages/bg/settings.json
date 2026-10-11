@@ -72,6 +72,8 @@
   "settings.export.download.starting": "Изтеглянето започва. Ако не започне, използвайте бутона.",
   "settings.export.download.button": "Изтегляне на ZIP",
   "settings.export.download.invalid": "Тази връзка за изтегляне е изтекла или е заменена.",
+  "settings.export.download.incomplete": "Тази връзка е непълна. Отворете я отново от имейла си.",
+  "settings.export.download.noLink": "Отворете връзката за изтегляне от имейла си.",
   "settings.export.download.reopenFromEmail": "Отворете отново връзката за изтегляне от имейла си. Тя ще работи до изтичане на срока ѝ.",
   "settings.export.download.wrongAccount": "Тази връзка за изтегляне принадлежи на друг профил. Излезте и влезте в профила, от който е заявен експортът.",
   "settings.export.download.backToSettings": "Към Настройки",
