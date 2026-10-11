@@ -255,6 +255,15 @@ function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
  */
 const PREVIEW_UNBILLED_RETRY_COOLDOWN_MS = 60_000;
 /**
+ * Spec 2026-10-11 busy model §2: the same one wait before the probe's one resend (provider-probe.ts),
+ * so a probe and a debate call wait the same 60 seconds. `sleep` is injectable for tests.
+ */
+export function waitBeforePreviewUnbilledResend(
+  sleep: (milliseconds: number) => Promise<void> = (milliseconds) => new Promise<void>((resolve) => { setTimeout(resolve, milliseconds); })
+): Promise<void> {
+  return sleep(PREVIEW_UNBILLED_RETRY_COOLDOWN_MS);
+}
+/**
  * A gate refusal for a call that provably cost nothing: the vendor was never reached, refused unbilled,
  * or the gate itself had too many calls in flight. A ProviderUnbilledRefusal, so the gateway records the
  * attempt as REFUSED and no attempt count includes it (spec 2026-10-11 §1.2 (d)).

@@ -3896,7 +3896,12 @@ export interface RunCreationSettings {
   readonly billing?: AskBilling;
   /** Budget spec §2.7 (B7b): the line the waker drains. main.ts supplies the room itself. */
   readonly waitingLine?: AskWaitingLinePort;
-  readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
+  /**
+   * `busyModelIds` (preview only, spec 2026-10-11 busy model §3/§3a): the models whose probe this round
+   * was a gate-proven unbilled refusal, none of them in the panel (`createProviderDiscoveryResolver`'s
+   * preview round, which never resends at ask time).
+   */
+  readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[] & Readonly<{ busyModelIds?: readonly string[] }>>;
   readonly resolveEnvelopeBasis: (input: {
     readonly depthParams: Readonly<Record<string, unknown>>;
     readonly riskTier: RiskTier;
@@ -4204,6 +4209,39 @@ async function admitWithScorecard(input: Readonly<{
   return Object.freeze({ ...planned, ifStartsNow: await admitPicked(pickAt(nowAt)) });
 }
 
+/**
+ * Spec 2026-10-11 busy model §3: on the preview, a roster model missing from the panel sits out instead
+ * of refusing the ask when ALL of these hold; otherwise the ask refuses exactly as before.
+ *  · every missing model was busy: its probe this round was a gate-proven unbilled refusal (§3a: one
+ *    probe per model, no resend at ask time; a billed failure, a wrong model, or a target the gate
+ *    does not serve still refuses);
+ *  · the remaining panel passes the existing maker admission AND keeps at least two makers, which
+ *    rotation needs;
+ *  · a role rotation pin will be written (the register row is ON). The pin is picked from the admitted
+ *    panel, so no role is ever pinned to the sat-out model and the runner never calls or probes it in
+ *    that debate. Without a pin the sealed answer roles stay in force, and a sealed role naming the
+ *    busy model would refuse at claim (J24), so the ask keeps today's refusal.
+ * The run's frozen panel is then the members that answered; the estimate prices exactly that panel.
+ */
+function busyModelsSitOut(
+  settings: RunCreationSettings,
+  previewConfig: PreviewProviderTestConfig | undefined,
+  missing: readonly string[],
+  busyModelIds: readonly string[] | undefined,
+  remaining: readonly DiscoveredPanelMember[],
+  riskTier: RiskTier
+): boolean {
+  if (previewConfig === undefined || settings.roleRotation === undefined || busyModelIds === undefined) return false;
+  if (!missing.every((modelId) => busyModelIds.includes(modelId))) return false;
+  if (new Set(remaining.map((member) => member.maker)).size < 2) return false;
+  try {
+    assertMakerAdmission(riskTier, makerAvailabilityFor(remaining));
+  } catch {
+    return false;
+  }
+  return true;
+}
+
 /** Role rotation: how long a refused ask whose counts could not be read is asked to wait (spec: one minute). */
 const ROLE_ROTATION_UNAVAILABLE_RETRY_MS = 60_000;
 
@@ -4266,7 +4304,7 @@ export async function evaluateAskAdmission(
   const missing = roster.filter((modelId) =>
     !filteredPanel.some((member) => member.model_id === modelId)
   );
-  if (missing.length > 0) {
+  if (missing.length > 0 && !busyModelsSitOut(settings, previewConfig, missing, discoveredPanel.busyModelIds, filteredPanel, risk.effectiveRiskTier)) {
     markAskRefusal(new TypedDomainError(
       "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
       `The ${ask.plan_tier} plan needs ${missing.join(", ")}, and ${

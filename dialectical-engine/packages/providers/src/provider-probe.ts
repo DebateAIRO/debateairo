@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { THINKING_LEVEL_TOKEN } from "./index.js";
 import { PREVIEW_MAX_OUTPUT_BOUND, previewModelRow } from "./preview-models.js";
 import type { ProviderDiscoveryTarget } from "./index.js";
+import { PreviewUnbilledRefusal, waitBeforePreviewUnbilledResend } from "./preview-test.js";
 import {
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
   anthropicMessagesProbeAnswer,
@@ -48,6 +49,15 @@ export type ProviderProbeRecorder = Readonly<{
 }>;
 
 const MAX_PROBE_RESPONSE_BYTES = 64 * 1024;
+
+/**
+ * Spec 2026-10-11 busy model §2: the failure code of a probe the preview gate PROVED was never billed
+ * (a `PreviewUnbilledRefusal`: the vendor refused unbilled, was never reached, or the gate had too many
+ * calls in flight). Owner ruling R1: an unbilled refusal is not an attempt, so it keeps its own code
+ * instead of PROVIDER_PROBE_FAILED, and the preview's one 60-second resend may follow it. The column
+ * is free text: no migration. Off the preview no fetch throws that refusal, so nothing else changes.
+ */
+export const PROVIDER_PROBE_UNBILLED_REFUSAL = "PROVIDER_PROBE_UNBILLED_REFUSAL";
 
 /**
  * The network probe ONLY — it observes and returns, and persists nothing.
@@ -160,14 +170,15 @@ export async function observeProviderTarget(input: Readonly<{
       failureCode: null,
       probedAt
     });
-  } catch {
+  } catch (error) {
     state = Object.freeze({
       probeEvidenceRef,
       providerRef: input.target.providerRef,
       maker: input.target.maker,
       state: "ABSENT" as const,
       modelId: null,
-      failureCode: "PROVIDER_PROBE_FAILED",
+      // Spec 2026-10-11 busy model §2: a gate-proven unbilled refusal keeps its own code.
+      failureCode: error instanceof PreviewUnbilledRefusal ? PROVIDER_PROBE_UNBILLED_REFUSAL : "PROVIDER_PROBE_FAILED",
       probedAt
     });
   }
@@ -192,4 +203,50 @@ export async function probeTarget(input: Readonly<{
   const state = await observeProviderTarget(observation);
   await probes.record(state);
   return state;
+}
+
+/**
+ * Spec 2026-10-11 busy model §2 — the PREVIEW's claim-time probe of one target (amendment §3a: never at
+ * ask time; the API's discovery round sends one probe per model and a refused model sits out): one
+ * observation, and ONE more after the preview's 60-second wait when (and only when) the first
+ * was a gate-proven unbilled refusal. The same rule as a debate call (owner ruling 5 / R4). The sealed
+ * `panelDiscoveryPolicy.probe_max_attempts: 1` is read, never edited: an unbilled refusal is not an
+ * attempt (R1). A billed failure, or an answer, gets no resend.
+ *
+ * It observes only; it returns every observation in order (one or two). The target is "busy" exactly
+ * when every returned observation is that refusal.
+ */
+export async function observePreviewProviderTarget(input: Parameters<typeof observeProviderTarget>[0] & Readonly<{
+  sleep?: (milliseconds: number) => Promise<void>;
+}>): Promise<readonly ProviderProbeObservation[]> {
+  const { sleep, ...observation } = input;
+  const first = await observeProviderTarget(observation);
+  if (first.failureCode !== PROVIDER_PROBE_UNBILLED_REFUSAL) return Object.freeze([first]);
+  await waitBeforePreviewUnbilledResend(sleep);
+  return Object.freeze([first, await observeProviderTarget(observation)]);
+}
+
+/**
+ * Spec 2026-10-11 busy model §2, the runner's claim-time probe (apps/runner/src/main.ts, both claim
+ * probes): on the preview the one resend after an unbilled refusal, and the claim keeps the LAST
+ * observation (the runner records it); off the preview one probe, exactly as before.
+ */
+export async function observeClaimTimeTarget(input: Parameters<typeof observePreviewProviderTarget>[0] & Readonly<{
+  preview: boolean;
+}>): Promise<ProviderProbeObservation> {
+  const { preview, ...probe } = input;
+  if (!preview) {
+    const { sleep: _sleep, ...single } = probe;
+    return observeProviderTarget(single);
+  }
+  const observations = await observePreviewProviderTarget(probe);
+  return observations[observations.length - 1]!;
+}
+
+/**
+ * Spec 2026-10-11 busy model §3: every probe of the target this round was a gate-proven unbilled refusal
+ * (at ask time, §3a, the round has exactly one probe per model).
+ */
+export function previewProbeRoundBusy(observations: readonly ProviderProbeObservation[]): boolean {
+  return observations.length > 0 && observations.every((entry) => entry.failureCode === PROVIDER_PROBE_UNBILLED_REFUSAL);
 }
