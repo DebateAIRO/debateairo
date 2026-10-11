@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine juża 18-il element, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn Dialectical Engine: 13-il cookie u 5 entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-Politika dwar il-Cookies fuq dezbatere.ro/cookies telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra." },
+      { kind: "p", text: "Dialectical Engine juża 20-il element, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn Dialectical Engine: 13-il cookie u 7 entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-Politika dwar il-Cookies fuq dezbatere.ro/cookies telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Ħażna lokali — Jekk tużax il-modalità ċara jew dik skura. — Sakemm tħassarha",
         "debateai.languageOffer.dismissed — Ħażna tas-sessjoni — Jiftakar, għal din it-tab, li rrifjutajt l-offerta li jintwera dibattitu b’lingwa oħra. — Sakemm tagħlaq it-tab",
         "debateai.support.conversation.v2 — Ħażna tas-sessjoni — Iżomm il-konversazzjoni tiegħek mal-chat tal-għajnuna fuq l-iskrin sakemm it-tab tibqa’ miftuħa. Titħassar meta xi ħadd jidħol jew joħroġ mill-kont f’din it-tab. — Sakemm tagħlaq it-tab",
-        "debateai.phone-completion-draft.v1 — Ħażna tas-sessjoni — Mistoqsija mhux lesta waqt il-pass tat-telefon; titħassar meta tinbidel is-sessjoni, toħroġ jew jinbidel is-sid — 15-il minuta jew sakemm jitħassar qabel"
+        "debateai.phone-completion-draft.v1 — Ħażna tas-sessjoni — Mistoqsija mhux lesta waqt il-pass tat-telefon; titħassar meta tinbidel is-sessjoni, toħroġ jew jinbidel is-sid — 15-il minuta jew sakemm jitħassar qabel",
+        "debateai.exportPending — Ħażna tas-sessjoni — Iżomm il-link tal-esportazzjoni mibgħut bl-email f’din it-tab biex tidħol u terġa’ tipprova. — Sakemm tingħalaq it-tab, toħroġ, jinfetaħ link ġdid, jirnexxi l-ewwel tniżżil jew jirriżulta link invalidu jew kont ħażin",
+        "debateai.exportLinkOutcome — Ħażna tas-sessjoni — Jiftakar liema messaġġ dwar il-link tat-tniżżil għandu jintwera f’din it-tab. — Sakemm tingħalaq it-tab, toħroġ jew jinfetaħ link ġdid"
         ]
       },
       { kind: "p", text: "L-ebda parti oħra ma tiġbor, permezz ta’ Dialectical Engine, informazzjoni dwar l-attivitajiet tiegħek online matul iż-żmien u fuq diversi siti web." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "0c97b526117035cae5cd4d447e2e6c02c4186f779642f668ca52ab62f7e63455",
+  sha256: "e61e8f276fca56c4f112bc93ca167efa2a0d14cdbe32805e0f5535fb3b4d1dab",
   eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.3 · EFFETTIVA 12 TA’ OTTUBRU 2026",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",

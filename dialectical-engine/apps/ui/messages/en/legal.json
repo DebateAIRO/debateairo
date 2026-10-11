@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Up to 30 minutes",
   "legal.cookies.mfaRecovery.life": "Up to 299 seconds",
   "legal.cookies.social.life": "Up to 5 minutes",
-  "legal.cookies.phoneDraft.life": "15 minutes or until earlier clearing"
+  "legal.cookies.phoneDraft.life": "15 minutes or until earlier clearing",
+  "legal.cookies.exportPending.purpose": "Keeps the emailed export link in this tab for sign-in and retry.",
+  "legal.cookies.exportLinkOutcome.purpose": "Remembers which download-link message to show in this tab.",
+  "legal.cookies.exportPending.life": "Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result",
+  "legal.cookies.exportLinkOutcome.life": "Until tab close, sign-out, or a new link"
 }

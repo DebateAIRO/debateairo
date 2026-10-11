@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kuki",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine menggunakan 18 item, semuanya mutlak diperlukan untuk layanan yang Anda minta dan semuanya hanya dipasang oleh Dialectical Engine: 13 kuki dan 5 entri di penyimpanan browser Anda. Kami tidak memasang kuki analitik, iklan, atau pelacakan. Kebijakan Kuki di dezbatere.ro/cookies mencantumkannya beserta fungsi masing-masing dan pihak yang menerimanya, dan akan berubah sebelum apa pun ditambahkan." },
+      { kind: "p", text: "Dialectical Engine menggunakan 20 item, semuanya mutlak diperlukan untuk layanan yang Anda minta dan semuanya hanya dipasang oleh Dialectical Engine: 13 kuki dan 7 entri di penyimpanan browser Anda. Kami tidak memasang kuki analitik, iklan, atau pelacakan. Kebijakan Kuki di dezbatere.ro/cookies mencantumkannya beserta fungsi masing-masing dan pihak yang menerimanya, dan akan berubah sebelum apa pun ditambahkan." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Penyimpanan lokal — Apakah Anda menggunakan mode terang atau mode gelap. — Sampai Anda menghapusnya",
         "debateai.languageOffer.dismissed — Penyimpanan sesi — Mengingat, untuk tab ini, bahwa Anda menolak tawaran untuk menampilkan debat dalam bahasa lain. — Sampai Anda menutup tab",
         "debateai.support.conversation.v2 — Penyimpanan sesi — Menjaga percakapan obrolan bantuan Anda tetap di layar selama tab masih terbuka. Percakapan dihapus saat seseorang masuk atau keluar di tab ini. — Sampai Anda menutup tab",
-        "debateai.phone-completion-draft.v1 — Penyimpanan sesi — Pertanyaan belum selesai pada langkah telepon; dihapus saat sesi berubah, keluar, atau pemilik berubah — 15 menit atau sampai lebih awal dihapus"
+        "debateai.phone-completion-draft.v1 — Penyimpanan sesi — Pertanyaan belum selesai pada langkah telepon; dihapus saat sesi berubah, keluar, atau pemilik berubah — 15 menit atau sampai lebih awal dihapus",
+        "debateai.exportPending — Penyimpanan sesi — Menyimpan tautan ekspor dari email di tab ini untuk masuk dan mencoba lagi. — Hingga tab ditutup, keluar, tautan baru dibuka, unduhan pertama berhasil, atau hasil tautan tidak valid maupun akun yang salah",
+        "debateai.exportLinkOutcome — Penyimpanan sesi — Mengingat pesan tautan unduhan yang perlu ditampilkan di tab ini. — Hingga tab ditutup, keluar, atau tautan baru dibuka"
         ]
       },
       { kind: "p", text: "Tidak ada pihak lain yang mengumpulkan informasi tentang aktivitas online Anda dari waktu ke waktu dan di berbagai situs web melalui Dialectical Engine." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "2552637568233d18ab52a594d2fa7ff253ca59bfc66719e407c4ee1ae53b8fc4",
+  sha256: "66bb4eda3e22eb85d8a837f740481bf4b34f5d84502bd1ac4b0844f9a71380a3",
   eyebrow: "KEBIJAKAN PRIVASI · v3.3 · BERLAKU 12 OKTOBER 2026",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",

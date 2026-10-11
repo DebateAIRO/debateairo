@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine använder 18 objekt, som alla är strikt nödvändiga för den tjänst du har bett om och som alla placeras endast av Dialectical Engine: 13 cookies och 5 poster i din webbläsares lagring. Vi placerar inga cookies för analys, reklam eller spårning. Cookiepolicyn på dezbatere.ro/cookies listar dem med vad vart och ett gör och vem som tar emot det, och kommer att ändras innan något annat läggs till." },
+      { kind: "p", text: "Dialectical Engine använder 20 objekt, som alla är strikt nödvändiga för den tjänst du har bett om och som alla placeras endast av Dialectical Engine: 13 cookies och 7 poster i din webbläsares lagring. Vi placerar inga cookies för analys, reklam eller spårning. Cookiepolicyn på dezbatere.ro/cookies listar dem med vad vart och ett gör och vem som tar emot det, och kommer att ändras innan något annat läggs till." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokal lagring — Om du använder ljust eller mörkt läge. — Tills du rensar det",
         "debateai.languageOffer.dismissed — Sessionslagring — Kommer ihåg, för den här fliken, att du tackade nej till att visa en debatt på ett annat språk. — Tills du stänger fliken",
         "debateai.support.conversation.v2 — Sessionslagring — Håller ditt samtal med hjälpchatten på skärmen så länge fliken är öppen. Det raderas när någon loggar in eller ut i den här fliken. — Tills du stänger fliken",
-        "debateai.phone-completion-draft.v1 — Sessionslagring — Ofärdig fråga under telefonsteget; raderas vid sessionsbyte, utloggning eller ägarbyte — 15 minuter eller tills tidigare radering"
+        "debateai.phone-completion-draft.v1 — Sessionslagring — Ofärdig fråga under telefonsteget; raderas vid sessionsbyte, utloggning eller ägarbyte — 15 minuter eller tills tidigare radering",
+        "debateai.exportPending — Sessionslagring — Sparar exportlänken från e-postmeddelandet i den här fliken för inloggning och nya försök. — Tills fliken stängs, du loggar ut, en ny länk öppnas, den första nedladdningen lyckas eller länken bedöms ogiltig eller tillhör fel konto",
+        "debateai.exportLinkOutcome — Sessionslagring — Minns vilket meddelande om nedladdningslänken som ska visas i den här fliken. — Tills fliken stängs, du loggar ut eller en ny länk öppnas"
         ]
       },
       { kind: "p", text: "Ingen annan part samlar via Dialectical Engine in information om dina aktiviteter på nätet över tid och på olika webbplatser." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "f57b596ad731425bf76c2fa2c3cad7a92cc5cb3e2a337eb037ffb21b3cef763b",
+  sha256: "6caca921c51e7307cb40f95b2f5a3a5abcaa4094c5cbfd9eac3590da2c21981e",
   eyebrow: "INTEGRITETSPOLICY · v3.3 · GÄLLER FRÅN 12 OKTOBER 2026",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",

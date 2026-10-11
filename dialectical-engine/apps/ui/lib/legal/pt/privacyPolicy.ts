@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "O Dialectical Engine utiliza 18 elementos, todos estritamente necessários para o serviço que pediu e todos definidos apenas pelo Dialectical Engine: 13 cookies e 5 entradas no armazenamento do seu navegador. Não instalamos cookies de análise, publicidade ou rastreio. A Política de Cookies em dezbatere.ro/cookies enumera-os, indicando o que cada um faz e quem o recebe, e será alterada antes de ser adicionada qualquer outra coisa." },
+      { kind: "p", text: "O Dialectical Engine utiliza 20 elementos, todos estritamente necessários para o serviço que pediu e todos definidos apenas pelo Dialectical Engine: 13 cookies e 7 entradas no armazenamento do seu navegador. Não instalamos cookies de análise, publicidade ou rastreio. A Política de Cookies em dezbatere.ro/cookies enumera-os, indicando o que cada um faz e quem o recebe, e será alterada antes de ser adicionada qualquer outra coisa." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Armazenamento local — Se utiliza o modo de apresentação claro ou escuro. — Até o apagar",
         "debateai.languageOffer.dismissed — Armazenamento de sessão — Lembra-se, para este separador, de que recusou a proposta de mostrar um debate noutra língua. — Até fechar o separador",
         "debateai.support.conversation.v2 — Armazenamento de sessão — Mantém a sua conversa com o chat de ajuda no ecrã enquanto o separador estiver aberto. É apagada quando alguém inicia ou termina sessão neste separador. — Até fechar o separador",
-        "debateai.phone-completion-draft.v1 — Armazenamento de sessão — Pergunta inacabada durante o passo do telefone; apagada ao mudar a sessão, sair ou mudar o titular — 15 minutos ou até ser apagado"
+        "debateai.phone-completion-draft.v1 — Armazenamento de sessão — Pergunta inacabada durante o passo do telefone; apagada ao mudar a sessão, sair ou mudar o titular — 15 minutos ou até ser apagado",
+        "debateai.exportPending — Armazenamento de sessão — Guarda nesta aba a ligação de exportação recebida por email para iniciar sessão e tentar novamente. — Até fechar a aba, terminar sessão, abrir uma nova ligação, concluir a primeira transferência ou obter um resultado de ligação inválida ou conta errada",
+        "debateai.exportLinkOutcome — Armazenamento de sessão — Memoriza a mensagem da ligação de transferência a apresentar nesta aba. — Até fechar a aba, terminar sessão ou abrir uma nova ligação"
         ]
       },
       { kind: "p", text: "Nenhuma outra parte recolhe, através do Dialectical Engine, informações sobre as suas atividades online ao longo do tempo e em diferentes sítios web." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "f4c9c9d79debbe732b168628867975ed4ebbfb91607a2a1df475610f3e3015e3",
+  sha256: "85f4d584681ec590e49301f70cd2e19392d1e2a32b09e606fd12d7dcae7c96ce",
   eyebrow: "POLÍTICA DE PRIVACIDADE · v3.3 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026",
   title: "O que armazenamos e porquê",
   lede: "Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.",

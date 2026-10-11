@@ -174,7 +174,7 @@ Dialectical Engine este destinat adulților. La înregistrare confirmați că av
 ## 13. Module cookie
 
 
-Dialectical Engine folosește 18 elemente, toate strict necesare pentru serviciul pe care l-ați solicitat și toate setate numai de Dialectical Engine: 13 module cookie și 5 intrări în spațiul de stocare al browserului dumneavoastră. Nu setăm module cookie analitice, publicitare sau de urmărire. **Politica privind modulele cookie** de la dezbatere.ro/cookies le enumeră, arătând ce face fiecare și cine îl primește, și va fi modificată înainte de adăugarea oricărui alt element.
+Dialectical Engine folosește 20 elemente, toate strict necesare pentru serviciul pe care l-ați solicitat și toate setate numai de Dialectical Engine: 13 module cookie și 7 intrări în spațiul de stocare al browserului dumneavoastră. Nu setăm module cookie analitice, publicitare sau de urmărire. **Politica privind modulele cookie** de la dezbatere.ro/cookies le enumeră, arătând ce face fiecare și cine îl primește, și va fi modificată înainte de adăugarea oricărui alt element.
 
 | Denumire | Tip | Scop | Durată |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine folosește 18 elemente, toate strict necesare pentru serviciu
 | `debateai.languageOffer.dismissed` | Stocare de sesiune | Reține, pentru această filă, că ați refuzat propunerea de a afișa o dezbatere în altă limbă. | Până când închideți fila |
 | `debateai.support.conversation.v2` | Stocare de sesiune | Păstrează pe ecran conversația dvs. din chatul de ajutor cât timp fila rămâne deschisă. Se șterge când cineva se autentifică sau se deconectează în această filă. | Până când închideți fila |
 | `debateai.phone-completion-draft.v1` | Stocare de sesiune | Întrebare neterminată în timpul completării telefonului; se șterge la schimbarea sesiunii, deconectare sau schimbarea titularului | 15 minute sau până la ștergere |
+| `debateai.exportPending` | Stocare de sesiune | Păstrează în această filă linkul de export primit prin e-mail pentru autentificare și reîncercare. | Până la închiderea filei, deconectare, un link nou, prima descărcare reușită sau un rezultat de link invalid ori cont greșit |
+| `debateai.exportLinkOutcome` | Stocare de sesiune | Reține ce mesaj despre linkul de descărcare trebuie afișat în această filă. | Până la închiderea filei, deconectare sau un link nou |
 
 Nicio altă parte nu colectează, prin intermediul Dialectical Engine, informații despre activitățile dumneavoastră online de-a lungul timpului și pe diferite site-uri web.
 

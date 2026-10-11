@@ -174,7 +174,7 @@ A Dialectical Engine felnőtteknek készült. Regisztrációkor megerősíti, ho
 ## 13. Sütik
 
 
-A Dialectical Engine 18 elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a Dialectical Engine helyezi el: 13 sütit és 5 bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A dezbatere.ro/cookies címen található **Sütiszabályzat** felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog.
+A Dialectical Engine 20 elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a Dialectical Engine helyezi el: 13 sütit és 7 bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A dezbatere.ro/cookies címen található **Sütiszabályzat** felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog.
 
 | Név | Típus | Cél | Élettartam |
 |---|---|---|---|
@@ -196,6 +196,8 @@ A Dialectical Engine 18 elemet használ, amelyek mind feltétlenül szükségese
 | `debateai.languageOffer.dismissed` | Munkamenet-tárhely | Megjegyzi ennél a lapnál, hogy Ön elutasította az ajánlatot, hogy egy vitát más nyelven mutassunk meg. | Amíg be nem zárja a lapot |
 | `debateai.support.conversation.v2` | Munkamenet-tárhely | A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik. | Amíg be nem zárja a lapot |
 | `debateai.phone-completion-draft.v1` | Munkamenet-tárhely | Befejezetlen kérdés a telefonos lépés alatt; munkamenetváltáskor, kijelentkezéskor vagy tulajdonosváltáskor törlődik | 15 perc vagy a korábbi törlésig |
+| `debateai.exportPending` | Munkamenet-tárhely | Ebben a lapon megőrzi az e-mailben kapott exporthivatkozást a bejelentkezéshez és az újrapróbálkozáshoz. | A lap bezárásáig, kijelentkezésig, új hivatkozásig, az első sikeres letöltésig vagy érvénytelen hivatkozásra vagy téves fiókra vonatkozó eredményig |
+| `debateai.exportLinkOutcome` | Munkamenet-tárhely | Megjegyzi, melyik letöltési hivatkozással kapcsolatos üzenetet kell megjeleníteni ezen a lapon. | A lap bezárásáig, kijelentkezésig vagy új hivatkozásig |
 
 Semmilyen más fél nem gyűjt a Dialectical Engine-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően.
 

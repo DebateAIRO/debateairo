@@ -174,7 +174,7 @@ Dialectical Engine je namenjen odraslim. Ob registraciji potrdite, da ste stari 
 ## 13. Piškotki
 
 
-Dialectical Engine uporablja 18 elementov, ki so vsi nujno potrebni za storitev, ki ste jo zahtevali, in jih vse nastavlja izključno Dialectical Engine: 13 piškotkov in 5 vnosov v shrambi vašega brskalnika. Ne nastavljamo analitičnih, oglaševalskih ali sledilnih piškotkov. **Pravilnik o piškotkih** na dezbatere.ro/cookies jih navaja skupaj s tem, kaj vsak od njih počne in kdo ga prejme, in bo spremenjen, preden bo dodano karkoli drugega.
+Dialectical Engine uporablja 20 elementov, ki so vsi nujno potrebni za storitev, ki ste jo zahtevali, in jih vse nastavlja izključno Dialectical Engine: 13 piškotkov in 7 vnosov v shrambi vašega brskalnika. Ne nastavljamo analitičnih, oglaševalskih ali sledilnih piškotkov. **Pravilnik o piškotkih** na dezbatere.ro/cookies jih navaja skupaj s tem, kaj vsak od njih počne in kdo ga prejme, in bo spremenjen, preden bo dodano karkoli drugega.
 
 | Ime | Vrsta | Namen | Trajanje |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine uporablja 18 elementov, ki so vsi nujno potrebni za storitev,
 | `debateai.languageOffer.dismissed` | Shramba seje | Za ta zavihek si zapomni, da ste zavrnili ponudbo, da se razprava prikaže v drugem jeziku. | Dokler ne zaprete zavihka |
 | `debateai.support.conversation.v2` | Shramba seje | Ohranja vaš pogovor s klepetom za pomoč na zaslonu, dokler je zavihek odprt. Izbriše se, ko se v tem zavihku kdor koli prijavi ali odjavi. | Dokler ne zaprete zavihka |
 | `debateai.phone-completion-draft.v1` | Shramba seje | Nedokončano vprašanje med telefonskim korakom; izbriše se ob spremembi seje, odjavi ali spremembi lastnika | 15 minut ali do predhodnega brisanja |
+| `debateai.exportPending` | Shramba seje | V tem zavihku hrani povezavo za izvoz iz e-pošte za prijavo in ponovni poskus. | Do zaprtja zavihka, odjave, nove povezave, prvega uspešnega prenosa ali izida neveljavne povezave oziroma napačnega računa |
+| `debateai.exportLinkOutcome` | Shramba seje | Zapomni si, katero sporočilo o povezavi za prenos prikazati v tem zavihku. | Do zaprtja zavihka, odjave ali nove povezave |
 
 Nobena druga stran prek Dialectical Engine ne zbira informacij o vaših spletnih dejavnostih skozi čas in na različnih spletnih mestih.
 

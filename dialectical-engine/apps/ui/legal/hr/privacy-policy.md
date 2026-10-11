@@ -174,7 +174,7 @@ Dialectical Engine namijenjen je odraslima. Pri registraciji potvrđujete da ima
 ## 13. Kolačići
 
 
-Dialectical Engine koristi 18 stavki, sve strogo nužne za uslugu koju ste zatražili i sve ih postavlja isključivo Dialectical Engine: 13 kolačića i 5 zapisa u pohrani vašeg preglednika. Ne postavljamo analitičke, oglasne ni prateće kolačiće. **Pravila o kolačićima** na dezbatere.ro/cookies navode ih uz opis onoga što svaka stavka radi i tko je prima te će se promijeniti prije nego što se doda bilo što drugo.
+Dialectical Engine koristi 20 stavki, sve strogo nužne za uslugu koju ste zatražili i sve ih postavlja isključivo Dialectical Engine: 13 kolačića i 7 zapisa u pohrani vašeg preglednika. Ne postavljamo analitičke, oglasne ni prateće kolačiće. **Pravila o kolačićima** na dezbatere.ro/cookies navode ih uz opis onoga što svaka stavka radi i tko je prima te će se promijeniti prije nego što se doda bilo što drugo.
 
 | Naziv | Vrsta | Svrha | Trajanje |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine koristi 18 stavki, sve strogo nužne za uslugu koju ste zatra
 | `debateai.languageOffer.dismissed` | Pohrana sesije | Pamti, za ovu karticu, da ste odbili ponudu da se rasprava prikaže na drugom jeziku. | Dok ne zatvorite karticu |
 | `debateai.support.conversation.v2` | Pohrana sesije | Drži vaš razgovor s pomoći na zaslonu dok je kartica otvorena. Briše se kada se bilo tko prijavi ili odjavi u ovoj kartici. | Dok ne zatvorite karticu |
 | `debateai.phone-completion-draft.v1` | Pohrana sesije | Nedovršeno pitanje tijekom koraka s telefonom; briše se pri promjeni sesije, odjavi ili promjeni vlasnika | 15 minuta ili do ranijeg brisanja |
+| `debateai.exportPending` | Pohrana sesije | Čuva poveznicu za izvoz poslanu e-poštom u ovoj kartici za prijavu i ponovni pokušaj. | Do zatvaranja kartice, odjave, nove poveznice, prvog uspješnog preuzimanja ili ishoda nevaljane poveznice ili pogrešnog računa |
+| `debateai.exportLinkOutcome` | Pohrana sesije | Pamti koju poruku o poveznici za preuzimanje treba prikazati u ovoj kartici. | Do zatvaranja kartice, odjave ili nove poveznice |
 
 Nijedna druga strana putem Dialectical Engine-ja ne prikuplja informacije o vašim internetskim aktivnostima tijekom vremena i na različitim web-mjestima.
 

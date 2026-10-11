@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Sütik",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "A Dialectical Engine 18 elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a Dialectical Engine helyezi el: 13 sütit és 5 bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A dezbatere.ro/cookies címen található Sütiszabályzat felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog." },
+      { kind: "p", text: "A Dialectical Engine 20 elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a Dialectical Engine helyezi el: 13 sütit és 7 bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A dezbatere.ro/cookies címen található Sütiszabályzat felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Helyi tárhely — Megjegyzi, hogy a világos vagy a sötét módot használja. — Amíg Ön nem törli",
         "debateai.languageOffer.dismissed — Munkamenet-tárhely — Megjegyzi ennél a lapnál, hogy Ön elutasította az ajánlatot, hogy egy vitát más nyelven mutassunk meg. — Amíg be nem zárja a lapot",
         "debateai.support.conversation.v2 — Munkamenet-tárhely — A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik. — Amíg be nem zárja a lapot",
-        "debateai.phone-completion-draft.v1 — Munkamenet-tárhely — Befejezetlen kérdés a telefonos lépés alatt; munkamenetváltáskor, kijelentkezéskor vagy tulajdonosváltáskor törlődik — 15 perc vagy a korábbi törlésig"
+        "debateai.phone-completion-draft.v1 — Munkamenet-tárhely — Befejezetlen kérdés a telefonos lépés alatt; munkamenetváltáskor, kijelentkezéskor vagy tulajdonosváltáskor törlődik — 15 perc vagy a korábbi törlésig",
+        "debateai.exportPending — Munkamenet-tárhely — Ebben a lapon megőrzi az e-mailben kapott exporthivatkozást a bejelentkezéshez és az újrapróbálkozáshoz. — A lap bezárásáig, kijelentkezésig, új hivatkozásig, az első sikeres letöltésig vagy érvénytelen hivatkozásra vagy téves fiókra vonatkozó eredményig",
+        "debateai.exportLinkOutcome — Munkamenet-tárhely — Megjegyzi, melyik letöltési hivatkozással kapcsolatos üzenetet kell megjeleníteni ezen a lapon. — A lap bezárásáig, kijelentkezésig vagy új hivatkozásig"
         ]
       },
       { kind: "p", text: "Semmilyen más fél nem gyűjt a Dialectical Engine-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "1a1af37bf03c0be573dea5eff58a7dbae8208a674a33777370ec51cebf83dde6",
+  sha256: "b4949426335b1046cf76232a71f7a5a5f6566d3e44734e09ef501a201e5940c3",
   eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.3 · HATÁLYOS 2026. OKTÓBER 12.",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",

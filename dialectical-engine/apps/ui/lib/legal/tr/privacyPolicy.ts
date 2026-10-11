@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Çerezler",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine, tamamı talep ettiğiniz hizmet için kesinlikle gerekli olan ve tamamı yalnızca Dialectical Engine tarafından yerleştirilen 18 öğe kullanır: 13 çerez ve tarayıcınızın depolama alanında 5 kayıt. Analitik, reklam veya izleme çerezi yerleştirmeyiz. dezbatere.ro/cookies adresindeki Çerez Politikası bunları, her birinin ne yaptığı ve kimin aldığıyla birlikte listeler ve başka herhangi bir şey eklenmeden önce değiştirilecektir." },
+      { kind: "p", text: "Dialectical Engine, tamamı talep ettiğiniz hizmet için kesinlikle gerekli olan ve tamamı yalnızca Dialectical Engine tarafından yerleştirilen 20 öğe kullanır: 13 çerez ve tarayıcınızın depolama alanında 7 kayıt. Analitik, reklam veya izleme çerezi yerleştirmeyiz. dezbatere.ro/cookies adresindeki Çerez Politikası bunları, her birinin ne yaptığı ve kimin aldığıyla birlikte listeler ve başka herhangi bir şey eklenmeden önce değiştirilecektir." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Yerel depolama — Açık ve koyu görünümden hangisini kullandığınız. — Siz temizleyene kadar",
         "debateai.languageOffer.dismissed — Oturum depolaması — Bu sekme için bir tartışmayı başka bir dilde gösterme önerisini reddettiğinizi hatırlar. — Sekmeyi kapatana kadar",
         "debateai.support.conversation.v2 — Oturum depolaması — Sekme açık kaldığı sürece yardım sohbetindeki konuşmanızı ekranda tutar. Bu sekmede biri oturum açtığında veya kapattığında silinir. — Sekmeyi kapatana kadar",
-        "debateai.phone-completion-draft.v1 — Oturum depolaması — Telefon adımında tamamlanmamış soru; oturum değişikliği, çıkış veya sahip değişikliğiyle silinir — 15 dakika veya daha erken silinene kadar"
+        "debateai.phone-completion-draft.v1 — Oturum depolaması — Telefon adımında tamamlanmamış soru; oturum değişikliği, çıkış veya sahip değişikliğiyle silinir — 15 dakika veya daha erken silinene kadar",
+        "debateai.exportPending — Oturum depolaması — E-postayla gelen dışa aktarma bağlantısını oturum açma ve yeniden deneme için bu sekmede tutar. — Sekme kapanana, oturum kapatılana, yeni bağlantı açılana, ilk başarılı indirme yapılana veya geçersiz bağlantı ya da yanlış hesap sonucu alınana kadar",
+        "debateai.exportLinkOutcome — Oturum depolaması — Bu sekmede hangi indirme bağlantısı iletisinin gösterileceğini hatırlar. — Sekme kapanana, oturum kapatılana veya yeni bağlantı açılana kadar"
         ]
       },
       { kind: "p", text: "Başka hiçbir taraf, Dialectical Engine aracılığıyla zaman içinde ve farklı web siteleri genelinde çevrimiçi etkinlikleriniz hakkında bilgi toplamaz." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "76914baabc2e4c69f43c37bb7db4ce3b704b7294ab9051a1cf151934b44ce6b8",
+  sha256: "c44b6244e4bb71e6b8b5c1868d0d7306d8278166855bb1afeaaed2d6339d5c9f",
   eyebrow: "GİZLİLİK POLİTİKASI · v3.3 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",

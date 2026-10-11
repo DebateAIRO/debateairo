@@ -174,7 +174,7 @@ Dialectical Engine yetişkinler içindir. Kayıt olurken 18 yaşında veya daha 
 ## 13. Çerezler
 
 
-Dialectical Engine, tamamı talep ettiğiniz hizmet için kesinlikle gerekli olan ve tamamı yalnızca Dialectical Engine tarafından yerleştirilen 18 öğe kullanır: 13 çerez ve tarayıcınızın depolama alanında 5 kayıt. Analitik, reklam veya izleme çerezi yerleştirmeyiz. dezbatere.ro/cookies adresindeki **Çerez Politikası** bunları, her birinin ne yaptığı ve kimin aldığıyla birlikte listeler ve başka herhangi bir şey eklenmeden önce değiştirilecektir.
+Dialectical Engine, tamamı talep ettiğiniz hizmet için kesinlikle gerekli olan ve tamamı yalnızca Dialectical Engine tarafından yerleştirilen 20 öğe kullanır: 13 çerez ve tarayıcınızın depolama alanında 7 kayıt. Analitik, reklam veya izleme çerezi yerleştirmeyiz. dezbatere.ro/cookies adresindeki **Çerez Politikası** bunları, her birinin ne yaptığı ve kimin aldığıyla birlikte listeler ve başka herhangi bir şey eklenmeden önce değiştirilecektir.
 
 | Ad | Tür | Amaç | Süre |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine, tamamı talep ettiğiniz hizmet için kesinlikle gerekli ola
 | `debateai.languageOffer.dismissed` | Oturum depolaması | Bu sekme için bir tartışmayı başka bir dilde gösterme önerisini reddettiğinizi hatırlar. | Sekmeyi kapatana kadar |
 | `debateai.support.conversation.v2` | Oturum depolaması | Sekme açık kaldığı sürece yardım sohbetindeki konuşmanızı ekranda tutar. Bu sekmede biri oturum açtığında veya kapattığında silinir. | Sekmeyi kapatana kadar |
 | `debateai.phone-completion-draft.v1` | Oturum depolaması | Telefon adımında tamamlanmamış soru; oturum değişikliği, çıkış veya sahip değişikliğiyle silinir | 15 dakika veya daha erken silinene kadar |
+| `debateai.exportPending` | Oturum depolaması | E-postayla gelen dışa aktarma bağlantısını oturum açma ve yeniden deneme için bu sekmede tutar. | Sekme kapanana, oturum kapatılana, yeni bağlantı açılana, ilk başarılı indirme yapılana veya geçersiz bağlantı ya da yanlış hesap sonucu alınana kadar |
+| `debateai.exportLinkOutcome` | Oturum depolaması | Bu sekmede hangi indirme bağlantısı iletisinin gösterileceğini hatırlar. | Sekme kapanana, oturum kapatılana veya yeni bağlantı açılana kadar |
 
 Başka hiçbir taraf, Dialectical Engine aracılığıyla zaman içinde ve farklı web siteleri genelinde çevrimiçi etkinlikleriniz hakkında bilgi toplamaz.
 

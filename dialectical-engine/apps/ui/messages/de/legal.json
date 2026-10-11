@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Bis zu 30 Minuten",
   "legal.cookies.mfaRecovery.life": "Bis zu 299 Sekunden",
   "legal.cookies.social.life": "Bis zu 5 Minuten",
-  "legal.cookies.phoneDraft.life": "15 Minuten oder bis zur früheren Löschung"
+  "legal.cookies.phoneDraft.life": "15 Minuten oder bis zur früheren Löschung",
+  "legal.cookies.exportPending.purpose": "Bewahrt den per E-Mail gesendeten Exportlink in diesem Tab für Anmeldung und erneute Versuche auf.",
+  "legal.cookies.exportLinkOutcome.purpose": "Merkt sich, welche Meldung zum Downloadlink in diesem Tab angezeigt werden soll.",
+  "legal.cookies.exportPending.life": "Bis zum Schließen des Tabs, zur Abmeldung, zu einem neuen Link, zum ersten erfolgreichen Download oder zu einem Ergebnis für einen ungültigen Link oder ein falsches Konto",
+  "legal.cookies.exportLinkOutcome.life": "Bis zum Schließen des Tabs, zur Abmeldung oder zu einem neuen Link"
 }

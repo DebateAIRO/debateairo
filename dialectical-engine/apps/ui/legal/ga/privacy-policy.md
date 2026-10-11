@@ -174,7 +174,7 @@ Is do dhaoine fásta é Dialectical Engine. Deimhníonn tú go bhfuil tú 18 mbl
 ## 13. Fianáin
 
 
-Úsáideann Dialectical Engine 18 mír, agus tá géarghá le gach ceann acu don tseirbhís a d'iarr tú agus ní shocraíonn ach Dialectical Engine iad: 13 fhianán agus 5 iontráil i stóras do bhrabhsálaí. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad sa **Bheartas Fianán** ag dezbatere.ro/cookies, mar aon leis an méid a dhéanann gach ceann acu agus cé a fhaigheann é, agus athrófar é sula gcuirfear aon rud eile leis.
+Úsáideann Dialectical Engine 20 mír, agus tá géarghá le gach ceann acu don tseirbhís a d'iarr tú agus ní shocraíonn ach Dialectical Engine iad: 13 fhianán agus 7 iontráil i stóras do bhrabhsálaí. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad sa **Bheartas Fianán** ag dezbatere.ro/cookies, mar aon leis an méid a dhéanann gach ceann acu agus cé a fhaigheann é, agus athrófar é sula gcuirfear aon rud eile leis.
 
 | Ainm | Cineál | Cuspóir | Tréimhse |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Is do dhaoine fásta é Dialectical Engine. Deimhníonn tú go bhfuil tú 18 mbl
 | `debateai.languageOffer.dismissed` | Stóras seisiúin | Cuimhníonn sé, don chluaisín seo, gur dhiúltaigh tú don tairiscint díospóireacht a thaispeáint i dteanga eile. | Go dtí go ndúnann tú an cluaisín |
 | `debateai.support.conversation.v2` | Stóras seisiúin | Coinníonn sé do chomhrá leis an gcabhair ar an scáileán fad a fhanann an cluaisín oscailte. Scriostar é nuair a shíníonn duine ar bith isteach nó amach sa chluaisín seo. | Go dtí go ndúnann tú an cluaisín |
 | `debateai.phone-completion-draft.v1` | Stóras seisiúin | Ceist neamhchríochnaithe le linn chéim an ghutháin; glantar í ag athrú seisiúin, síniú amach nó athrú úinéara | 15 nóiméad nó go dtí glanadh níos luaithe |
+| `debateai.exportPending` | Stóras seisiúin | Coinníonn sé an nasc easpórtála a seoladh ar ríomhphost sa chluaisín seo chun síniú isteach agus triail eile a dhéanamh. | Go ndúnfar an cluaisín, go síneofar amach, go n-osclófar nasc nua, go n-éireoidh leis an gcéad íoslódáil nó go bhfaighfear toradh naisc neamhbhailí nó cuntais mhícheart |
+| `debateai.exportLinkOutcome` | Stóras seisiúin | Cuimhníonn sé cén teachtaireacht faoin nasc íoslódála atá le taispeáint sa chluaisín seo. | Go ndúnfar an cluaisín, go síneofar amach nó go n-osclófar nasc nua |
 
 Ní bhailíonn aon pháirtí eile faisnéis faoi do ghníomhaíochtaí ar líne le himeacht ama agus thar shuímh ghréasáin éagsúla trí Dialectical Engine.
 

@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Suas le 30 nóiméad",
   "legal.cookies.mfaRecovery.life": "Suas le 299 soicind",
   "legal.cookies.social.life": "Suas le 5 nóiméad",
-  "legal.cookies.phoneDraft.life": "15 nóiméad nó go dtí glanadh níos luaithe"
+  "legal.cookies.phoneDraft.life": "15 nóiméad nó go dtí glanadh níos luaithe",
+  "legal.cookies.exportPending.purpose": "Coinníonn sé an nasc easpórtála a seoladh ar ríomhphost sa chluaisín seo chun síniú isteach agus triail eile a dhéanamh.",
+  "legal.cookies.exportLinkOutcome.purpose": "Cuimhníonn sé cén teachtaireacht faoin nasc íoslódála atá le taispeáint sa chluaisín seo.",
+  "legal.cookies.exportPending.life": "Go ndúnfar an cluaisín, go síneofar amach, go n-osclófar nasc nua, go n-éireoidh leis an gcéad íoslódáil nó go bhfaighfear toradh naisc neamhbhailí nó cuntais mhícheart",
+  "legal.cookies.exportLinkOutcome.life": "Go ndúnfar an cluaisín, go síneofar amach nó go n-osclófar nasc nua"
 }

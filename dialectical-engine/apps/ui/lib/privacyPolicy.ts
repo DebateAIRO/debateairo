@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine uses 18 items, all strictly necessary for the service you asked for and all set only by Dialectical Engine: 13 cookies and 5 entries in your browser's storage. We set no analytics, advertising or tracking cookies. The Cookie Policy at dezbatere.ro/cookies lists them with what each one does and who receives it, and will change before anything else is added." },
+      { kind: "p", text: "Dialectical Engine uses 20 items, all strictly necessary for the service you asked for and all set only by Dialectical Engine: 13 cookies and 7 entries in your browser's storage. We set no analytics, advertising or tracking cookies. The Cookie Policy at dezbatere.ro/cookies lists them with what each one does and who receives it, and will change before anything else is added." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Local storage — Whether you use the light or the dark display. — Until you clear it",
         "debateai.languageOffer.dismissed — Session storage — Remembers, for this tab, that you declined the offer to show a debate in another language. — Until you close the tab",
         "debateai.support.conversation.v2 — Session storage — Keeps your help-chat conversation on screen while the tab stays open. It is erased when someone signs in or signs out in this tab. — Until you close the tab",
-        "debateai.phone-completion-draft.v1 — Session storage — Unfinished question during phone completion; cleared on session, sign-out or owner changes — 15 minutes or until earlier clearing"
+        "debateai.phone-completion-draft.v1 — Session storage — Unfinished question during phone completion; cleared on session, sign-out or owner changes — 15 minutes or until earlier clearing",
+        "debateai.exportPending — Session storage — Keeps the emailed export link in this tab for sign-in and retry. — Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result",
+        "debateai.exportLinkOutcome — Session storage — Remembers which download-link message to show in this tab. — Until tab close, sign-out, or a new link"
         ]
       },
       { kind: "p", text: "No other party collects information about your online activities over time and across websites through Dialectical Engine." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "b76cebfdab6e175df95ddabe65cbe470ce9c6f50dd70bf20a70737377dde5570",
+  sha256: "ea4e8ac761c5caa9ea4a0c98f04cf3d2841b498c6bfc266176d700378d087032",
   eyebrow: "PRIVACY POLICY · v3.3 · EFFECTIVE 12 OCTOBER 2026",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",

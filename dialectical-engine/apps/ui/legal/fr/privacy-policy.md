@@ -174,7 +174,7 @@ Dialectical Engine est réservé aux adultes. Vous confirmez avoir 18 ans ou plu
 ## 13. Cookies
 
 
-Dialectical Engine utilise 18 éléments, tous strictement nécessaires au service que vous avez demandé et tous déposés uniquement par Dialectical Engine : 13 cookies et 5 entrées dans le stockage de votre navigateur. Nous ne déposons aucun cookie d'analyse, de publicité ou de suivi. La **Politique relative aux cookies** disponible à l'adresse dezbatere.ro/cookies les énumère en indiquant le rôle de chacun et qui le reçoit, et sera modifiée avant tout autre ajout.
+Dialectical Engine utilise 20 éléments, tous strictement nécessaires au service que vous avez demandé et tous déposés uniquement par Dialectical Engine : 13 cookies et 7 entrées dans le stockage de votre navigateur. Nous ne déposons aucun cookie d'analyse, de publicité ou de suivi. La **Politique relative aux cookies** disponible à l'adresse dezbatere.ro/cookies les énumère en indiquant le rôle de chacun et qui le reçoit, et sera modifiée avant tout autre ajout.
 
 | Nom | Type | Finalité | Durée |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine utilise 18 éléments, tous strictement nécessaires au servi
 | `debateai.languageOffer.dismissed` | Stockage de session | Retient, pour cet onglet, que vous avez décliné la proposition d’afficher un débat dans une autre langue. | Jusqu’à la fermeture de l’onglet |
 | `debateai.support.conversation.v2` | Stockage de session | Garde votre conversation avec l’aide à l’écran tant que l’onglet reste ouvert. Elle est effacée quand quelqu’un se connecte ou se déconnecte dans cet onglet. | Jusqu’à la fermeture de l’onglet |
 | `debateai.phone-completion-draft.v1` | Stockage de session | Question inachevée pendant l’étape du téléphone ; effacée lors d’un changement de session, d’une déconnexion ou d’un changement de propriétaire | 15 minutes ou jusqu’à l’effacement |
+| `debateai.exportPending` | Stockage de session | Conserve dans cet onglet le lien d’exportation reçu par e-mail pour la connexion et une nouvelle tentative. | Jusqu’à la fermeture de l’onglet, la déconnexion, un nouveau lien, le premier téléchargement réussi ou un résultat de lien invalide ou de mauvais compte |
+| `debateai.exportLinkOutcome` | Stockage de session | Mémorise le message concernant le lien de téléchargement à afficher dans cet onglet. | Jusqu’à la fermeture de l’onglet, la déconnexion ou un nouveau lien |
 
 Aucun autre tiers ne collecte, par l'intermédiaire de Dialectical Engine, d'informations sur vos activités en ligne au fil du temps et sur différents sites web.
 

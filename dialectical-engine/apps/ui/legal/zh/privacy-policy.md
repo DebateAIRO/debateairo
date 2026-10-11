@@ -174,7 +174,7 @@ Dialectical Engine 面向成年人。注册时，您须确认自己年满 18 周
 ## 13. Cookie
 
 
-Dialectical Engine 使用18个项目，全部为您所请求的服务严格必要，且全部仅由 Dialectical Engine 设置：13个 cookie 和您浏览器存储中的5个条目。我们不设置分析、广告或跟踪 cookie。dezbatere.ro/cookies 的 **Cookie 政策**会列出这些项目，并说明每一项的作用及其接收方，且会在添加任何其他内容之前作出修改。
+Dialectical Engine 使用20个项目，全部为您所请求的服务严格必要，且全部仅由 Dialectical Engine 设置：13个 cookie 和您浏览器存储中的7个条目。我们不设置分析、广告或跟踪 cookie。dezbatere.ro/cookies 的 **Cookie 政策**会列出这些项目，并说明每一项的作用及其接收方，且会在添加任何其他内容之前作出修改。
 
 | 名称 | 类型 | 用途 | 有效期 |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine 使用18个项目，全部为您所请求的服务严格必�
 | `debateai.languageOffer.dismissed` | 会话存储 | 在此标签页中记录您已拒绝以其他语言显示辩论的提议。 | 直至您关闭标签页 |
 | `debateai.support.conversation.v2` | 会话存储 | 在标签页保持打开期间，让您与帮助聊天的对话留在屏幕上。只要有人在此标签页中登录或退出登录，对话就会被清除。 | 直至您关闭标签页 |
 | `debateai.phone-completion-draft.v1` | 会话存储 | 电话步骤中未完成的问题；会话变更、退出登录或所有者变更时清除 | 15分钟或提前清除 |
+| `debateai.exportPending` | 会话存储 | 在此标签页保存邮件中的导出链接，以便登录和重试。 | 直到关闭标签页、退出登录、打开新链接、首次成功下载，或得到链接无效或账户不符的结果 |
+| `debateai.exportLinkOutcome` | 会话存储 | 记住此标签页应显示哪条下载链接提示。 | 直到关闭标签页、退出登录或打开新链接 |
 
 没有任何其他方通过 Dialectical Engine 收集有关您长期以及跨网站的在线活动的信息。
 

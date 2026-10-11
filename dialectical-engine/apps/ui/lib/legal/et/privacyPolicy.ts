@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Küpsised",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine kasutab 18 üksust, mis kõik on teie tellitud teenuse jaoks rangelt vajalikud ja mida kõiki paigaldab ainult Dialectical Engine: 13 küpsist ja 5 kirjet teie brauseri salvestusruumis. Me ei paigalda analüüsi-, reklaami- ega jälgimisküpsiseid. Küpsisepoliitikas aadressil dezbatere.ro/cookies on need loetletud koos sellega, mida igaüks teeb ja kes selle saab, ning seda muudetakse enne, kui midagi muud lisatakse." },
+      { kind: "p", text: "Dialectical Engine kasutab 20 üksust, mis kõik on teie tellitud teenuse jaoks rangelt vajalikud ja mida kõiki paigaldab ainult Dialectical Engine: 13 küpsist ja 7 kirjet teie brauseri salvestusruumis. Me ei paigalda analüüsi-, reklaami- ega jälgimisküpsiseid. Küpsisepoliitikas aadressil dezbatere.ro/cookies on need loetletud koos sellega, mida igaüks teeb ja kes selle saab, ning seda muudetakse enne, kui midagi muud lisatakse." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Kohalik salvestusruum — Kas kasutate heledat või tumedat kuvarežiimi. — Kuni te selle kustutate",
         "debateai.languageOffer.dismissed — Seansi salvestusruum — Jätab selle vahekaardi jaoks meelde, et loobusite pakkumisest näidata väitlust teises keeles. — Kuni te vahekaardi sulgete",
         "debateai.support.conversation.v2 — Seansi salvestusruum — Hoiab teie abivestluse ekraanil, kuni vahekaart on avatud. See kustutatakse, kui keegi selles vahekaardis sisse või välja logib. — Kuni te vahekaardi sulgete",
-        "debateai.phone-completion-draft.v1 — Seansi salvestusruum — Lõpetamata küsimus telefonisammu ajal; kustutatakse seansi vahetusel, väljalogimisel või omaniku vahetusel — 15 minutit või varasema kustutamiseni"
+        "debateai.phone-completion-draft.v1 — Seansi salvestusruum — Lõpetamata küsimus telefonisammu ajal; kustutatakse seansi vahetusel, väljalogimisel või omaniku vahetusel — 15 minutit või varasema kustutamiseni",
+        "debateai.exportPending — Seansi salvestusruum — Hoiab e-kirjaga saadetud ekspordilinki sellel vahekaardil sisselogimiseks ja uuesti proovimiseks. — Kuni vahekaardi sulgemise, väljalogimise, uue lingi, esimese õnnestunud allalaadimise või vigase lingi või vale konto tulemuseni",
+        "debateai.exportLinkOutcome — Seansi salvestusruum — Jätab meelde, millist allalaadimislingi teadet sellel vahekaardil näidata. — Kuni vahekaardi sulgemise, väljalogimise või uue lingini"
         ]
       },
       { kind: "p", text: "Ükski teine osapool ei kogu Dialectical Engine kaudu teavet teie võrgutegevuse kohta aja jooksul ja eri veebisaitidel." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "949b6adc289a4d7eeeca6310792833506159bccc2e7c0c2301a1f7a30ea07a81",
+  sha256: "9b5e6bbec3c8e3c119f457cfd4d4c06abf254a461a1f7f80ac5ba033e42dc0bd",
   eyebrow: "PRIVAATSUSPOLIITIKA · v3.3 · KEHTIB ALATES 12. OKTOOBRIST 2026",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",

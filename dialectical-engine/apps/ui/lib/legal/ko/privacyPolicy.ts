@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "쿠키",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine는 18개 항목을 사용하며, 모두 귀하가 요청한 서비스에 엄격히 필요하고 모두 Dialectical Engine만 설정합니다. 쿠키 13개와 귀하의 브라우저 저장소에 있는 항목 5개입니다. 분석, 광고 또는 추적용 쿠키는 설정하지 않습니다. dezbatere.ro/cookies의 쿠키 정책에는 이 항목들이 각각의 역할 및 수신자와 함께 기재되어 있으며, 다른 무엇이든 추가하기 전에 변경됩니다." },
+      { kind: "p", text: "Dialectical Engine는 20개 항목을 사용하며, 모두 귀하가 요청한 서비스에 엄격히 필요하고 모두 Dialectical Engine만 설정합니다. 쿠키 13개와 귀하의 브라우저 저장소에 있는 항목 7개입니다. 분석, 광고 또는 추적용 쿠키는 설정하지 않습니다. dezbatere.ro/cookies의 쿠키 정책에는 이 항목들이 각각의 역할 및 수신자와 함께 기재되어 있으며, 다른 무엇이든 추가하기 전에 변경됩니다." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — 로컬 스토리지 — 라이트 모드와 다크 모드 중 어느 쪽을 사용하는지 기억합니다. — 직접 삭제할 때까지",
         "debateai.languageOffer.dismissed — 세션 스토리지 — 이 탭에서 토론을 다른 언어로 보여 주겠다는 제안을 거절하셨다는 사실을 기억합니다. — 탭을 닫을 때까지",
         "debateai.support.conversation.v2 — 세션 스토리지 — 탭이 열려 있는 동안 도움말 채팅 대화를 화면에 유지합니다. 이 탭에서 누군가 로그인하거나 로그아웃하면 삭제됩니다. — 탭을 닫을 때까지",
-        "debateai.phone-completion-draft.v1 — 세션 스토리지 — 전화 단계의 미완료 질문; 세션 변경, 로그아웃 또는 소유자 변경 시 삭제 — 15분 또는 그전에 삭제할 때까지"
+        "debateai.phone-completion-draft.v1 — 세션 스토리지 — 전화 단계의 미완료 질문; 세션 변경, 로그아웃 또는 소유자 변경 시 삭제 — 15분 또는 그전에 삭제할 때까지",
+        "debateai.exportPending — 세션 스토리지 — 로그인하거나 다시 시도할 수 있도록 이메일로 받은 내보내기 링크를 이 탭에 보관합니다. — 탭을 닫거나 로그아웃하거나 새 링크를 열거나 첫 다운로드가 성공하거나 링크가 유효하지 않거나 계정이 다르다는 결과가 나올 때까지",
+        "debateai.exportLinkOutcome — 세션 스토리지 — 이 탭에 표시할 다운로드 링크 메시지를 기억합니다. — 탭을 닫거나 로그아웃하거나 새 링크를 열 때까지"
         ]
       },
       { kind: "p", text: "Dialectical Engine를 통해 다른 어떤 당사자도 시간 경과에 따라 여러 웹사이트에 걸쳐 귀하의 온라인 활동에 관한 정보를 수집하지 않습니다." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "6bdd597a22116b17efee635d36ddba8a07b033c78283a04671575e208febc81d",
+  sha256: "7e7ee2284462182214b641f432c5260f3df6c21a160a92ea9a3c1a878ac209a2",
   eyebrow: "개인정보 처리방침 · v3.3 · 시행일 2026년 10월 12일",
   title: "당사가 저장하는 정보와 그 이유",
   lede: "GDPR (EU) 2016/679에 따른 귀하의 권리와 당사의 의무를 알기 쉽게 설명합니다. 총 14개 조항과 부속서 B — 끝까지 스크롤하십시오.",

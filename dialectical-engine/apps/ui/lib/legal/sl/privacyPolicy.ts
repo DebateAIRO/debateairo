@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Piškotki",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine uporablja 18 elementov, ki so vsi nujno potrebni za storitev, ki ste jo zahtevali, in jih vse nastavlja izključno Dialectical Engine: 13 piškotkov in 5 vnosov v shrambi vašega brskalnika. Ne nastavljamo analitičnih, oglaševalskih ali sledilnih piškotkov. Pravilnik o piškotkih na dezbatere.ro/cookies jih navaja skupaj s tem, kaj vsak od njih počne in kdo ga prejme, in bo spremenjen, preden bo dodano karkoli drugega." },
+      { kind: "p", text: "Dialectical Engine uporablja 20 elementov, ki so vsi nujno potrebni za storitev, ki ste jo zahtevali, in jih vse nastavlja izključno Dialectical Engine: 13 piškotkov in 7 vnosov v shrambi vašega brskalnika. Ne nastavljamo analitičnih, oglaševalskih ali sledilnih piškotkov. Pravilnik o piškotkih na dezbatere.ro/cookies jih navaja skupaj s tem, kaj vsak od njih počne in kdo ga prejme, in bo spremenjen, preden bo dodano karkoli drugega." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokalna shramba — Ali uporabljate svetli ali temni način prikaza. — Dokler ga ne izbrišete",
         "debateai.languageOffer.dismissed — Shramba seje — Za ta zavihek si zapomni, da ste zavrnili ponudbo, da se razprava prikaže v drugem jeziku. — Dokler ne zaprete zavihka",
         "debateai.support.conversation.v2 — Shramba seje — Ohranja vaš pogovor s klepetom za pomoč na zaslonu, dokler je zavihek odprt. Izbriše se, ko se v tem zavihku kdor koli prijavi ali odjavi. — Dokler ne zaprete zavihka",
-        "debateai.phone-completion-draft.v1 — Shramba seje — Nedokončano vprašanje med telefonskim korakom; izbriše se ob spremembi seje, odjavi ali spremembi lastnika — 15 minut ali do predhodnega brisanja"
+        "debateai.phone-completion-draft.v1 — Shramba seje — Nedokončano vprašanje med telefonskim korakom; izbriše se ob spremembi seje, odjavi ali spremembi lastnika — 15 minut ali do predhodnega brisanja",
+        "debateai.exportPending — Shramba seje — V tem zavihku hrani povezavo za izvoz iz e-pošte za prijavo in ponovni poskus. — Do zaprtja zavihka, odjave, nove povezave, prvega uspešnega prenosa ali izida neveljavne povezave oziroma napačnega računa",
+        "debateai.exportLinkOutcome — Shramba seje — Zapomni si, katero sporočilo o povezavi za prenos prikazati v tem zavihku. — Do zaprtja zavihka, odjave ali nove povezave"
         ]
       },
       { kind: "p", text: "Nobena druga stran prek Dialectical Engine ne zbira informacij o vaših spletnih dejavnostih skozi čas in na različnih spletnih mestih." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "6aed4c4dfc6982f87ef0bb4aa02770f7c0b10921b54b7bb392922e5f23ef7b9b",
+  sha256: "bbac10ded4b247c41449ff2963f6aa79599e9ceb3fccea51cf58c75e5e401b79",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.3 · VELJA OD 12. OKTOBRA 2026",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",

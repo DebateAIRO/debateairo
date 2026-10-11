@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Sīkdatnes",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine izmanto 18 elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai Dialectical Engine: 13 sīkdatnes un 5 ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. Sīkdatņu politikā vietnē dezbatere.ro/cookies tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits." },
+      { kind: "p", text: "Dialectical Engine izmanto 20 elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai Dialectical Engine: 13 sīkdatnes un 7 ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. Sīkdatņu politikā vietnē dezbatere.ro/cookies tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokālā krātuve — Vai izmantojat gaišo vai tumšo režīmu. — Līdz jūs to notīrāt",
         "debateai.languageOffer.dismissed — Sesijas krātuve — Atceras šai cilnei, ka atteicāties no piedāvājuma rādīt debates citā valodā. — Līdz jūs aizverat cilni",
         "debateai.support.conversation.v2 — Sesijas krātuve — Saglabā jūsu palīdzības tērzēšanas sarunu ekrānā, kamēr cilne ir atvērta. Tā tiek izdzēsta, kad šajā cilnē kāds pierakstās vai izrakstās. — Līdz jūs aizverat cilni",
-        "debateai.phone-completion-draft.v1 — Sesijas krātuve — Nepabeigts jautājums tālruņa soļa laikā; dzēsts pie sesijas maiņas, izrakstīšanās vai īpašnieka maiņas — 15 minūtes vai līdz agrākai dzēšanai"
+        "debateai.phone-completion-draft.v1 — Sesijas krātuve — Nepabeigts jautājums tālruņa soļa laikā; dzēsts pie sesijas maiņas, izrakstīšanās vai īpašnieka maiņas — 15 minūtes vai līdz agrākai dzēšanai",
+        "debateai.exportPending — Sesijas krātuve — Saglabā e-pastā saņemto eksporta saiti šajā cilnē, lai varētu pierakstīties un mēģināt vēlreiz. — Līdz cilnes aizvēršanai, izrakstīšanai, jaunai saitei, pirmajai veiksmīgajai lejupielādei vai nederīgas saites vai nepareiza konta rezultātam",
+        "debateai.exportLinkOutcome — Sesijas krātuve — Atceras, kurš lejupielādes saites ziņojums jārāda šajā cilnē. — Līdz cilnes aizvēršanai, izrakstīšanai vai jaunai saitei"
         ]
       },
       { kind: "p", text: "Neviena cita puse ar Dialectical Engine starpniecību nevāc informāciju par jūsu darbībām tiešsaistē laika gaitā un dažādās tīmekļa vietnēs." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "a0a029d30490622e1d1a57db33a30c258c55f61b9de1d209f159a1694412796f",
+  sha256: "c016c7ad6771377a52df3da6207fde2682a441b8139eacab04d8c2dceb64f407",
   eyebrow: "PRIVĀTUMA POLITIKA · v3.3 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",

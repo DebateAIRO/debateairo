@@ -174,7 +174,7 @@ Dialectical Engine ir paredzēts pieaugušajiem. Reģistrējoties jūs apstiprin
 ## 13. Sīkdatnes
 
 
-Dialectical Engine izmanto 18 elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai Dialectical Engine: 13 sīkdatnes un 5 ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. **Sīkdatņu politikā** vietnē dezbatere.ro/cookies tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits.
+Dialectical Engine izmanto 20 elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai Dialectical Engine: 13 sīkdatnes un 7 ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. **Sīkdatņu politikā** vietnē dezbatere.ro/cookies tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits.
 
 | Nosaukums | Veids | Nolūks | Ilgums |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine izmanto 18 elementus, kas visi ir absolūti nepieciešami jū
 | `debateai.languageOffer.dismissed` | Sesijas krātuve | Atceras šai cilnei, ka atteicāties no piedāvājuma rādīt debates citā valodā. | Līdz jūs aizverat cilni |
 | `debateai.support.conversation.v2` | Sesijas krātuve | Saglabā jūsu palīdzības tērzēšanas sarunu ekrānā, kamēr cilne ir atvērta. Tā tiek izdzēsta, kad šajā cilnē kāds pierakstās vai izrakstās. | Līdz jūs aizverat cilni |
 | `debateai.phone-completion-draft.v1` | Sesijas krātuve | Nepabeigts jautājums tālruņa soļa laikā; dzēsts pie sesijas maiņas, izrakstīšanās vai īpašnieka maiņas | 15 minūtes vai līdz agrākai dzēšanai |
+| `debateai.exportPending` | Sesijas krātuve | Saglabā e-pastā saņemto eksporta saiti šajā cilnē, lai varētu pierakstīties un mēģināt vēlreiz. | Līdz cilnes aizvēršanai, izrakstīšanai, jaunai saitei, pirmajai veiksmīgajai lejupielādei vai nederīgas saites vai nepareiza konta rezultātam |
+| `debateai.exportLinkOutcome` | Sesijas krātuve | Atceras, kurš lejupielādes saites ziņojums jārāda šajā cilnē. | Līdz cilnes aizvēršanai, izrakstīšanai vai jaunai saitei |
 
 Neviena cita puse ar Dialectical Engine starpniecību nevāc informāciju par jūsu darbībām tiešsaistē laika gaitā un dažādās tīmekļa vietnēs.
 

@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Até 30 minutos",
   "legal.cookies.mfaRecovery.life": "Até 299 segundos",
   "legal.cookies.social.life": "Até 5 minutos",
-  "legal.cookies.phoneDraft.life": "15 minutos ou até ser apagado"
+  "legal.cookies.phoneDraft.life": "15 minutos ou até ser apagado",
+  "legal.cookies.exportPending.purpose": "Guarda nesta aba a ligação de exportação recebida por email para iniciar sessão e tentar novamente.",
+  "legal.cookies.exportLinkOutcome.purpose": "Memoriza a mensagem da ligação de transferência a apresentar nesta aba.",
+  "legal.cookies.exportPending.life": "Até fechar a aba, terminar sessão, abrir uma nova ligação, concluir a primeira transferência ou obter um resultado de ligação inválida ou conta errada",
+  "legal.cookies.exportLinkOutcome.life": "Até fechar a aba, terminar sessão ou abrir uma nova ligação"
 }

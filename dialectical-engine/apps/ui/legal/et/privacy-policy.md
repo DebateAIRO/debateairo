@@ -174,7 +174,7 @@ Dialectical Engine on mõeldud täiskasvanutele. Registreerumisel kinnitate, et 
 ## 13. Küpsised
 
 
-Dialectical Engine kasutab 18 üksust, mis kõik on teie tellitud teenuse jaoks rangelt vajalikud ja mida kõiki paigaldab ainult Dialectical Engine: 13 küpsist ja 5 kirjet teie brauseri salvestusruumis. Me ei paigalda analüüsi-, reklaami- ega jälgimisküpsiseid. **Küpsisepoliitikas** aadressil dezbatere.ro/cookies on need loetletud koos sellega, mida igaüks teeb ja kes selle saab, ning seda muudetakse enne, kui midagi muud lisatakse.
+Dialectical Engine kasutab 20 üksust, mis kõik on teie tellitud teenuse jaoks rangelt vajalikud ja mida kõiki paigaldab ainult Dialectical Engine: 13 küpsist ja 7 kirjet teie brauseri salvestusruumis. Me ei paigalda analüüsi-, reklaami- ega jälgimisküpsiseid. **Küpsisepoliitikas** aadressil dezbatere.ro/cookies on need loetletud koos sellega, mida igaüks teeb ja kes selle saab, ning seda muudetakse enne, kui midagi muud lisatakse.
 
 | Nimi | Liik | Eesmärk | Kestus |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine kasutab 18 üksust, mis kõik on teie tellitud teenuse jaoks 
 | `debateai.languageOffer.dismissed` | Seansi salvestusruum | Jätab selle vahekaardi jaoks meelde, et loobusite pakkumisest näidata väitlust teises keeles. | Kuni te vahekaardi sulgete |
 | `debateai.support.conversation.v2` | Seansi salvestusruum | Hoiab teie abivestluse ekraanil, kuni vahekaart on avatud. See kustutatakse, kui keegi selles vahekaardis sisse või välja logib. | Kuni te vahekaardi sulgete |
 | `debateai.phone-completion-draft.v1` | Seansi salvestusruum | Lõpetamata küsimus telefonisammu ajal; kustutatakse seansi vahetusel, väljalogimisel või omaniku vahetusel | 15 minutit või varasema kustutamiseni |
+| `debateai.exportPending` | Seansi salvestusruum | Hoiab e-kirjaga saadetud ekspordilinki sellel vahekaardil sisselogimiseks ja uuesti proovimiseks. | Kuni vahekaardi sulgemise, väljalogimise, uue lingi, esimese õnnestunud allalaadimise või vigase lingi või vale konto tulemuseni |
+| `debateai.exportLinkOutcome` | Seansi salvestusruum | Jätab meelde, millist allalaadimislingi teadet sellel vahekaardil näidata. | Kuni vahekaardi sulgemise, väljalogimise või uue lingini |
 
 Ükski teine osapool ei kogu Dialectical Engine kaudu teavet teie võrgutegevuse kohta aja jooksul ja eri veebisaitidel.
 

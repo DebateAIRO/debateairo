@@ -174,7 +174,7 @@ Dialectical Engine è destinato agli adulti. Al momento della registrazione conf
 ## 13. Cookie
 
 
-Dialectical Engine utilizza 18 elementi, tutti strettamente necessari per il servizio che hai richiesto e tutti impostati esclusivamente da Dialectical Engine: 13 cookie e 5 voci nella memoria del tuo browser. Non impostiamo cookie analitici, pubblicitari o di tracciamento. L'**Informativa sui cookie** disponibile su dezbatere.ro/cookies li elenca indicando a cosa serve ciascuno e chi lo riceve, e sarà modificata prima di qualsiasi altra aggiunta.
+Dialectical Engine utilizza 20 elementi, tutti strettamente necessari per il servizio che hai richiesto e tutti impostati esclusivamente da Dialectical Engine: 13 cookie e 7 voci nella memoria del tuo browser. Non impostiamo cookie analitici, pubblicitari o di tracciamento. L'**Informativa sui cookie** disponibile su dezbatere.ro/cookies li elenca indicando a cosa serve ciascuno e chi lo riceve, e sarà modificata prima di qualsiasi altra aggiunta.
 
 | Nome | Tipo | Finalità | Durata |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine utilizza 18 elementi, tutti strettamente necessari per il ser
 | `debateai.languageOffer.dismissed` | Archiviazione di sessione | Ricorda, per questa scheda, che hai rifiutato la proposta di mostrare un dibattito in un’altra lingua. | Finché non chiudi la scheda |
 | `debateai.support.conversation.v2` | Archiviazione di sessione | Mantiene sullo schermo la tua conversazione con la chat di assistenza finché la scheda resta aperta. Viene cancellata quando qualcuno accede o esce in questa scheda. | Finché non chiudi la scheda |
 | `debateai.phone-completion-draft.v1` | Archiviazione di sessione | Domanda incompleta durante il passaggio telefonico; eliminata al cambio di sessione, alla disconnessione o al cambio di titolare | 15 minuti o fino all’eliminazione |
+| `debateai.exportPending` | Archiviazione di sessione | Conserva in questa scheda il link di esportazione ricevuto via email per accedere e riprovare. | Fino alla chiusura della scheda, alla disconnessione, a un nuovo link, al primo download riuscito o a un esito di link non valido o account errato |
+| `debateai.exportLinkOutcome` | Archiviazione di sessione | Ricorda quale messaggio sul link di download mostrare in questa scheda. | Fino alla chiusura della scheda, alla disconnessione o a un nuovo link |
 
 Nessun'altra parte raccoglie, tramite Dialectical Engine, informazioni sulle tue attività online nel tempo e su siti web diversi.
 

@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine bruger 18 elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af Dialectical Engine: 13 cookies og 5 poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. Cookiepolitikken på dezbatere.ro/cookies angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes." },
+      { kind: "p", text: "Dialectical Engine bruger 20 elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af Dialectical Engine: 13 cookies og 7 poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. Cookiepolitikken på dezbatere.ro/cookies angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokal lagring — Om du bruger lys eller mørk tilstand. — Indtil du sletter det",
         "debateai.languageOffer.dismissed — Sessionslagring — Husker for denne fane, at du har takket nej til at se en debat på et andet sprog. — Indtil du lukker fanen",
         "debateai.support.conversation.v2 — Sessionslagring — Holder din samtale med hjælpechatten på skærmen, så længe fanen er åben. Den slettes, når nogen logger ind eller ud i denne fane. — Indtil du lukker fanen",
-        "debateai.phone-completion-draft.v1 — Sessionslagring — Ufærdigt spørgsmål under telefontrinnet; slettes ved sessionsskift, logout eller ejerskift — 15 minutter eller indtil tidligere sletning"
+        "debateai.phone-completion-draft.v1 — Sessionslagring — Ufærdigt spørgsmål under telefontrinnet; slettes ved sessionsskift, logout eller ejerskift — 15 minutter eller indtil tidligere sletning",
+        "debateai.exportPending — Sessionslagring — Gemmer eksportlinket fra e-mailen i denne fane til login og nye forsøg. — Indtil fanen lukkes, du logger ud, et nyt link åbnes, den første vellykkede download eller et resultat om ugyldigt link eller forkert konto",
+        "debateai.exportLinkOutcome — Sessionslagring — Husker, hvilken besked om downloadlinket der skal vises i denne fane. — Indtil fanen lukkes, du logger ud, eller et nyt link åbnes"
         ]
       },
       { kind: "p", text: "Ingen anden part indsamler via Dialectical Engine oplysninger om dine onlineaktiviteter over tid og på tværs af websteder." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "37ddeaba2db0fd7190962aae147aa0b783a5259f400307f04cbdc50856fc81b2",
+  sha256: "4faf6ea6d76bc29fad4f59b060c2e23e10e8b2cacff8eb03f69f874b88658fe2",
   eyebrow: "PRIVATLIVSPOLITIK · v3.3 · GÆLDENDE FRA 12. OKTOBER 2026",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",

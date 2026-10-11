@@ -174,7 +174,7 @@ A Dialectical Engine destina-se a adultos. Confirma que tem pelo menos 18 anos a
 ## 13. Cookies
 
 
-O Dialectical Engine utiliza 18 elementos, todos estritamente necessários para o serviço que pediu e todos definidos apenas pelo Dialectical Engine: 13 cookies e 5 entradas no armazenamento do seu navegador. Não instalamos cookies de análise, publicidade ou rastreio. A **Política de Cookies** em dezbatere.ro/cookies enumera-os, indicando o que cada um faz e quem o recebe, e será alterada antes de ser adicionada qualquer outra coisa.
+O Dialectical Engine utiliza 20 elementos, todos estritamente necessários para o serviço que pediu e todos definidos apenas pelo Dialectical Engine: 13 cookies e 7 entradas no armazenamento do seu navegador. Não instalamos cookies de análise, publicidade ou rastreio. A **Política de Cookies** em dezbatere.ro/cookies enumera-os, indicando o que cada um faz e quem o recebe, e será alterada antes de ser adicionada qualquer outra coisa.
 
 | Nome | Tipo | Finalidade | Duração |
 |---|---|---|---|
@@ -196,6 +196,8 @@ O Dialectical Engine utiliza 18 elementos, todos estritamente necessários para 
 | `debateai.languageOffer.dismissed` | Armazenamento de sessão | Lembra-se, para este separador, de que recusou a proposta de mostrar um debate noutra língua. | Até fechar o separador |
 | `debateai.support.conversation.v2` | Armazenamento de sessão | Mantém a sua conversa com o chat de ajuda no ecrã enquanto o separador estiver aberto. É apagada quando alguém inicia ou termina sessão neste separador. | Até fechar o separador |
 | `debateai.phone-completion-draft.v1` | Armazenamento de sessão | Pergunta inacabada durante o passo do telefone; apagada ao mudar a sessão, sair ou mudar o titular | 15 minutos ou até ser apagado |
+| `debateai.exportPending` | Armazenamento de sessão | Guarda nesta aba a ligação de exportação recebida por email para iniciar sessão e tentar novamente. | Até fechar a aba, terminar sessão, abrir uma nova ligação, concluir a primeira transferência ou obter um resultado de ligação inválida ou conta errada |
+| `debateai.exportLinkOutcome` | Armazenamento de sessão | Memoriza a mensagem da ligação de transferência a apresentar nesta aba. | Até fechar a aba, terminar sessão ou abrir uma nova ligação |
 
 Nenhuma outra parte recolhe, através do Dialectical Engine, informações sobre as suas atividades online ao longo do tempo e em diferentes sítios web.
 

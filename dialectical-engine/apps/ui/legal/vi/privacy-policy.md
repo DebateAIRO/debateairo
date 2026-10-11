@@ -174,7 +174,7 @@ Dialectical Engine dành cho người trưởng thành. Khi đăng ký, bạn x�
 ## 13. Cookie
 
 
-Dialectical Engine sử dụng 18 mục, tất cả đều thực sự cần thiết cho dịch vụ bạn đã yêu cầu và tất cả chỉ do Dialectical Engine đặt: 13 cookie và 5 mục nhập trong bộ nhớ trình duyệt của bạn. Chúng tôi không đặt cookie phân tích, quảng cáo hoặc theo dõi. **Chính sách Cookie** tại dezbatere.ro/cookies liệt kê chúng cùng với chức năng của từng mục và bên nhận mục đó, và sẽ được thay đổi trước khi bất kỳ thứ gì khác được thêm vào.
+Dialectical Engine sử dụng 20 mục, tất cả đều thực sự cần thiết cho dịch vụ bạn đã yêu cầu và tất cả chỉ do Dialectical Engine đặt: 13 cookie và 7 mục nhập trong bộ nhớ trình duyệt của bạn. Chúng tôi không đặt cookie phân tích, quảng cáo hoặc theo dõi. **Chính sách Cookie** tại dezbatere.ro/cookies liệt kê chúng cùng với chức năng của từng mục và bên nhận mục đó, và sẽ được thay đổi trước khi bất kỳ thứ gì khác được thêm vào.
 
 | Tên | Loại | Mục đích | Thời hạn |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine sử dụng 18 mục, tất cả đều thực sự cần thi
 | `debateai.languageOffer.dismissed` | Bộ nhớ phiên | Ghi nhớ, cho thẻ này, rằng bạn đã từ chối đề nghị hiển thị một cuộc tranh luận bằng ngôn ngữ khác. | Cho đến khi bạn đóng thẻ |
 | `debateai.support.conversation.v2` | Bộ nhớ phiên | Giữ cuộc trò chuyện trợ giúp của bạn trên màn hình khi thẻ vẫn mở. Cuộc trò chuyện bị xóa khi có người đăng nhập hoặc đăng xuất trong thẻ này. | Cho đến khi bạn đóng thẻ |
 | `debateai.phone-completion-draft.v1` | Bộ nhớ phiên | Câu hỏi chưa hoàn tất ở bước điện thoại; xóa khi đổi phiên, đăng xuất hoặc đổi chủ sở hữu | 15 phút hoặc đến khi bị xóa sớm hơn |
+| `debateai.exportPending` | Bộ nhớ phiên | Giữ liên kết xuất dữ liệu trong email ở thẻ này để đăng nhập và thử lại. | Cho đến khi đóng thẻ, đăng xuất, mở liên kết mới, tải xuống thành công lần đầu hoặc nhận kết quả liên kết không hợp lệ hay sai tài khoản |
+| `debateai.exportLinkOutcome` | Bộ nhớ phiên | Ghi nhớ thông báo về liên kết tải xuống cần hiển thị trong thẻ này. | Cho đến khi đóng thẻ, đăng xuất hoặc mở liên kết mới |
 
 Không có bên nào khác thu thập, thông qua Dialectical Engine, thông tin về các hoạt động trực tuyến của bạn theo thời gian và trên nhiều trang web khác nhau.
 

@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Slapukai",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine naudoja 18 elementų – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik Dialectical Engine: 13 slapukų ir 5 įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. Slapukų politikoje adresu dezbatere.ro/cookies jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita." },
+      { kind: "p", text: "Dialectical Engine naudoja 20 elementų – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik Dialectical Engine: 13 slapukų ir 7 įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. Slapukų politikoje adresu dezbatere.ro/cookies jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Vietinė saugykla — Ar naudojate šviesųjį, ar tamsųjį režimą. — Kol jo neišvalysite",
         "debateai.languageOffer.dismissed — Seanso saugykla — Įsimena šiam skirtukui, kad atsisakėte pasiūlymo parodyti debatus kita kalba. — Kol uždarysite skirtuką",
         "debateai.support.conversation.v2 — Seanso saugykla — Laiko jūsų pokalbį su pagalbos pokalbių langu ekrane, kol skirtukas atidarytas. Jis ištrinamas, kai šiame skirtuke kas nors prisijungia arba atsijungia. — Kol uždarysite skirtuką",
-        "debateai.phone-completion-draft.v1 — Seanso saugykla — Nebaigtas klausimas telefono veiksmo metu; pašalinamas pasikeitus sesijai, atsijungus ar pasikeitus savininkui — 15 minučių arba iki ankstesnio pašalinimo"
+        "debateai.phone-completion-draft.v1 — Seanso saugykla — Nebaigtas klausimas telefono veiksmo metu; pašalinamas pasikeitus sesijai, atsijungus ar pasikeitus savininkui — 15 minučių arba iki ankstesnio pašalinimo",
+        "debateai.exportPending — Seanso saugykla — Šiame skirtuke saugo el. paštu atsiųstą eksporto nuorodą prisijungimui ir pakartotiniam bandymui. — Iki skirtuko uždarymo, atsijungimo, naujos nuorodos, pirmo sėkmingo atsisiuntimo arba netinkamos nuorodos ar kitos paskyros rezultato",
+        "debateai.exportLinkOutcome — Seanso saugykla — Prisimena, kurį atsisiuntimo nuorodos pranešimą rodyti šiame skirtuke. — Iki skirtuko uždarymo, atsijungimo arba naujos nuorodos"
         ]
       },
       { kind: "p", text: "Jokia kita šalis per Dialectical Engine nerenka informacijos apie jūsų veiklą internete laikui bėgant ir įvairiose svetainėse." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "3b7c640da9716f231da38e05547da0a94fb2cf379acf6030f9b19f162c42c6a8",
+  sha256: "fbe92278b01e5af0d0a4bee5c7a13440398989bfe987f073dadba0dc9378220f",
   eyebrow: "PRIVATUMO POLITIKA · v3.3 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",
