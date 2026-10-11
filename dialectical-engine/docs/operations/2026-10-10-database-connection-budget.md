@@ -71,7 +71,7 @@ gap, or to grow), put PgBouncer in front (section 4) or raise `max_connections` 
 
 ## 2. What happens when a pool runs dry
 
-* The caller waits at most its wait limit (5 s, or 10 s on the ask path), then gets a typed failure that is marked
+* The caller waits at most its wait limit (5 s, 10 s on the ask path, or 15 s for the data export worker), then gets a typed failure that is marked
   *busy* (`isDatabasePoolBusy`, `packages/db/src/index.ts`). The pool is not damaged; the next caller tries again.
   Before, the caller waited forever. Postgres's own "too many clients" refusal (SQLSTATE 53300) counts as busy too.
 * The API answers a busy failure with HTTP 503, body `{"error":"SERVICE_BUSY"}`, header `Retry-After: 2`. The site's
