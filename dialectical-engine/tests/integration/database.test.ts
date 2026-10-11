@@ -81,6 +81,7 @@ import {
   FIRST_POSITION_CALL_SITE_KEY,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
+  reviewerTurnOrder,
   rotateSeats,
   rotatedSeatSelection,
   runnerTerminalFailureReason,
@@ -2631,15 +2632,19 @@ describe("apps/runner — legal command lifecycle", () => {
       const reviewersFor = (author: string): readonly string[] => reviews.rows
         .filter((row) => row.author_maker === author)
         .map((row) => row.reviewer_maker);
-      expect(reviewersFor("Rotation maker A")).toEqual([
-        "Rotation maker B", "Rotation maker C", "Rotation maker B", "Rotation maker C", "Rotation maker B"
-      ]);
-      expect(reviewersFor("Rotation maker B")).toEqual([
-        "Rotation maker A", "Rotation maker C", "Rotation maker A", "Rotation maker C", "Rotation maker A"
-      ]);
-      expect(reviewersFor("Rotation maker C")).toEqual([
-        "Rotation maker A", "Rotation maker B", "Rotation maker A", "Rotation maker B", "Rotation maker A"
-      ]);
+      // Owner ruling 2026-10-10 (PR #131): the turn goes round THIS debate's seeded circle, not panel order. An
+      // author's first review goes to the maker after it round the circle; each later one moves on from the latest
+      // PERSISTED reviewer, which with three makers alternates the other two. A runner that ignored the latest
+      // reviewer would give every author its first pick five times.
+      const makers = ["Rotation maker A", "Rotation maker B", "Rotation maker C"] as const;
+      const circle = reviewerTurnOrder(runId, makers);
+      expect([...circle].sort()).toEqual([...makers]);
+      for (const author of makers) {
+        const at = circle.indexOf(author);
+        const first = circle[(at + 1) % 3]!;
+        const second = circle[(at + 2) % 3]!;
+        expect(reviewersFor(author)).toEqual([first, second, first, second, first]);
+      }
     } finally {
       await makerC.stop();
       await makerB.stop();
@@ -9053,13 +9058,16 @@ function refuseBodyOrdinals(ordinals: readonly number[]) {
   });
 }
 
-/** B9c: a money seam that refuses the BODY calls whose call site `refuse` names — the one its gateway was last handed. */
-function refuseBodyCallSites(refuse: (callSiteKey: string) => boolean) {
+/**
+ * B9c: a money seam that refuses the BODY calls whose call site `refuse` names — the one its gateway was last handed.
+ * `refuse` is also told the run, for a choice that depends on the debate (its seeded reviewer circle).
+ */
+function refuseBodyCallSites(refuse: (callSiteKey: string, runId: string) => boolean) {
   let lastCallSiteKey = "";
   return Object.freeze({
     observe: (request: ProviderCallRequest) => { lastCallSiteKey = request.callSiteKey; },
-    build: (_runId: string, phase: CostEnvelopePhase): ProviderCostEnvelopeSeam => {
-      const refused = phase === "BODY" && refuse(lastCallSiteKey);
+    build: (runId: string, phase: CostEnvelopePhase): ProviderCostEnvelopeSeam => {
+      const refused = phase === "BODY" && refuse(lastCallSiteKey, runId);
       const site = lastCallSiteKey;
       return {
         assertCallAllowed: () => {
@@ -9222,7 +9230,7 @@ function b9OnlyTheCheaperMakerPays() {
 async function runB9ThreeMakers(input: Readonly<{
   label: string;
   responses: Readonly<Record<"a" | "b" | "c", readonly ProviderDoubleResponse[]>>;
-  refuse: Readonly<Record<"a" | "b" | "c", (callSiteKey: string) => boolean>>;
+  refuse: Readonly<Record<"a" | "b" | "c", (callSiteKey: string, runId: string) => boolean>>;
   onCall?: (maker: "a" | "b" | "c", request: ProviderCallRequest) => void;
 }>): Promise<Readonly<{ runId: string; result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> }>> {
   const doubles = {
@@ -9588,7 +9596,18 @@ describe("B9c — a cheaper maker while arguing, the first call's try, the owner
 
   it("keeps a review off the node's ACTUAL author even when that author is the cheapest maker (M=3)", async () => {
     const EXPANSION = /^JUDGE:(defender|critic):/u;
-    let reviewsAskedOfA = 0;
+    // Owner ruling 2026-10-10 (PR #131): reviewers go round each debate's own seeded circle. The moved root is C's
+    // first node, so its review is planned on the maker right after C round THIS debate's circle — A in some debates,
+    // B in others — and that is the planned maker's first review of the run: A never reviews its own root, and when
+    // B follows C, A's root goes to C. So whichever maker is planned there is refused for money on that first review,
+    // and the review must move to the other one, never to C.
+    const plannedOnMoved = (runId: string): "a" | "b" => {
+      const circle = reviewerTurnOrder(runId, ["Maker A", "Maker B", "Maker C"]);
+      return circle[(circle.indexOf("Maker C") + 1) % 3] === "Maker A" ? "a" : "b";
+    };
+    const reviewsAsked = { a: 0, b: 0 };
+    const refusedFirstReview = (maker: "a" | "b", key: string, runId: string): boolean =>
+      key.startsWith("JUDGE:review:") && plannedOnMoved(runId) === maker && (reviewsAsked[maker] += 1) === 1;
     const { runId, result } = await runB9ThreeMakers({
       label: "b9c-review-actual-author",
       responses: {
@@ -9596,12 +9615,13 @@ describe("B9c — a cheaper maker while arguing, the first call's try, the owner
           reviewDouble("agree", "B9c A review 2"), resil01Composition, evaluatorSatisfied()],
         b: [reviewDouble("agree", "B9c B review 1"), reviewDouble("agree", "B9c B review 2"),
           reviewDouble("agree", "B9c B review 3"), judgementDouble("B9c Maker B spare")],
-        c: [judgementDouble("B9c Maker C root 1"), judgementDouble("B9c Maker C root 2"), reviewDouble("agree", "B9c C spare review")]
+        c: [judgementDouble("B9c Maker C root 1"), judgementDouble("B9c Maker C root 2"), reviewDouble("agree", "B9c C review 1")]
       },
       refuse: {
-        a: (key) => EXPANSION.test(key) || (key.startsWith("JUDGE:review:") && (reviewsAskedOfA += 1) === 1),
+        a: (key, runId) => EXPANSION.test(key) || refusedFirstReview("a", key, runId),
         // B can pay neither its own root nor any panel seat: its seats are left out, as failed seats are.
-        b: (key) => key === "JUDGE:root:secondary" || EXPANSION.test(key) || key.startsWith("PANEL:"),
+        b: (key, runId) => key === "JUDGE:root:secondary" || EXPANSION.test(key) || key.startsWith("PANEL:")
+          || refusedFirstReview("b", key, runId),
         c: (key) => EXPANSION.test(key)
       }
     });
@@ -9611,11 +9631,12 @@ describe("B9c — a cheaper maker while arguing, the first call's try, the owner
     const roots = await b9RootAuthors(runId);
     expect(roots.map((root) => root.provider_ref)).toEqual([PRIMARY_REF, THIRD_REF, THIRD_REF]);
     const moved = roots[1]!;
-    // A, the planned reviewer of C's node, could not pay either; the review went to B, never to C.
-    expect(await b9Callers(runId, `JUDGE:review:${moved.node_id}`)).toEqual([SECONDARY_REF]);
+    // The planned reviewer of C's node could not pay either; the review went to the other maker, never to C.
+    const [planned, standIn] = plannedOnMoved(runId) === "a" ? [PRIMARY_REF, SECONDARY_REF] : [SECONDARY_REF, PRIMARY_REF];
+    expect(await b9Callers(runId, `JUDGE:review:${moved.node_id}`)).toEqual([standIn]);
     expect(await b9Substitutions(runId)).toEqual([
       { callSiteKey: "JUDGE:root:secondary", plannedProviderRef: SECONDARY_REF, usedProviderRef: THIRD_REF, reason: "RUN_ARGUING" },
-      { callSiteKey: `JUDGE:review:${moved.node_id}`, plannedProviderRef: PRIMARY_REF, usedProviderRef: SECONDARY_REF, reason: "RUN_ARGUING" }
+      { callSiteKey: `JUDGE:review:${moved.node_id}`, plannedProviderRef: planned, usedProviderRef: standIn, reason: "RUN_ARGUING" }
     ]);
     // B's refused seats were left out, noted as refused for money and never as a vendor's fault.
     const notes = await b9PanelNotes(runId);
