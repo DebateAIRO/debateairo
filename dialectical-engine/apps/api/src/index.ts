@@ -3914,8 +3914,9 @@ export interface RunCreationSettings {
   /** Budget spec §2.7 (B7b): the line the waker drains. main.ts supplies the room itself. */
   readonly waitingLine?: AskWaitingLinePort;
   /**
-   * `busyModelIds` (preview only, spec 2026-10-11 busy model §3): the models every probe of which this
-   * round was a gate-proven unbilled refusal (`createProviderDiscoveryResolver`'s preview round).
+   * `busyModelIds` (preview only, spec 2026-10-11 busy model §3/§3a): the models whose probe this round
+   * was a gate-proven unbilled refusal, none of them in the panel (`createProviderDiscoveryResolver`'s
+   * preview round, which never resends at ask time).
    */
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[] & Readonly<{ busyModelIds?: readonly string[] }>>;
   readonly resolveEnvelopeBasis: (input: {
@@ -4228,8 +4229,9 @@ async function admitWithScorecard(input: Readonly<{
 /**
  * Spec 2026-10-11 busy model §3: on the preview, a roster model missing from the panel sits out instead
  * of refusing the ask when ALL of these hold; otherwise the ask refuses exactly as before.
- *  · every missing model was busy: every probe of it this round was a gate-proven unbilled refusal (a
- *    billed failure, a wrong model, or a target the gate does not serve still refuses);
+ *  · every missing model was busy: its probe this round was a gate-proven unbilled refusal (§3a: one
+ *    probe per model, no resend at ask time; a billed failure, a wrong model, or a target the gate
+ *    does not serve still refuses);
  *  · the remaining panel passes the existing maker admission AND keeps at least two makers, which
  *    rotation needs;
  *  · a role rotation pin will be written (the register row is ON). The pin is picked from the admitted

@@ -30,7 +30,8 @@ debate. The owner's standing rules apply: a debate is never hard-stopped; unbill
 1. **One probe per model per discovery round.**
    - Targets with the same (baseUrl, model, adapter kind, probe controls) are probed once.
    - That one observation is written as one `core.provider_probe` row per ref, each with its own `probe_id`.
-2. **One 60-second resend on a gate-proven unbilled refusal at ask time and at claim time.**
+2. **One 60-second resend on a gate-proven unbilled refusal at ask time and at claim time.** (Ask time superseded
+   by §3a: no resend at ask time; claim time unchanged.)
    - Applies to the API discovery probe and to the runner's claim probe (`apps/runner/src/main.ts:426-446`,
      `observeProviderTarget`).
    - Uses the same rule as debate calls (owner ruling 5 / R4).
@@ -50,6 +51,29 @@ debate. The owner's standing rules apply: a debate is never hard-stopped; unbill
      (`CLAIM_PANEL_REVISED`, `CRITIQUE-UNAVAILABLE`).
    - A model missing for any other reason (billed failure, wrong model, not served by the gate) still refuses the ask
      exactly as today.
+3a. **Amendment, 2026-10-11 review: no resend at ask time; a busy model sits out.** (Orchestrator ruling after
+   the independent review. It replaces the ask-time half of §2 and ask-path tests (ii)/(iii) below.)
+   - At ask time on the preview, a model whose probe this round got a gate-proven unbilled refusal
+     (`PreviewUnbilledRefusal` → `PROVIDER_PROBE_UNBILLED_REFUSAL`) sits out that debate, under the same conditions
+     as §3: preview config, role rotation ON, and at least 2 makers left passing `assertMakerAdmission`.
+   - There is NO 60-second resend at ask time: the ask-time round sends exactly one POST per model.
+   - Why:
+     - (A) A model admitted only on the resend could be pinned as the answer writer and then die at claim
+       (J24 `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM`, because `standInFor` returns null when the sealed writer is
+       that model).
+     - (B) Synchronized resends push the DeepInfra gate's unsent-in-a-row counter toward its halt at 5, and every
+       unbilled refusal also counts toward its 20/day halt.
+   - Kept: one probe per model per round; the refusal row recorded as ABSENT `PROVIDER_PROBE_UNBILLED_REFUSAL`
+     (one row per ref); the claim-time one resend (`observeClaimTimeTarget`) unchanged; billed failures and every
+     other absence refuse the ask exactly as before; hosted and local unchanged.
+   - Busy is per MODEL: a model is busy when any probe of its group this round was an unbilled refusal. Freshness
+     is per ref, so a ref of a busy model may still hold a fresh HEALTHY record that skipped probing; the busy model
+     is left out of the panel anyway, so the busy list and the admitted panel always agree (no busy model is ever in
+     the admitted panel).
+   - Tests: ask path (ii) is now GLM [409] → admitted with FOUR, no wait, exactly one GLM POST, one ABSENT
+     `PROVIDER_PROBE_UNBILLED_REFUSAL` row per GLM ref; a new case gives fixture-a a fresh HEALTHY record while this
+     round's GLM probe (via fixture-b) is refused unbilled → GLM is not in the admitted panel. (iii) without rotation
+     → refused; (iv) billed → refused, no resend; (v) hosted unchanged.
 4. **Estimate.** Unchanged in method. It prices the panel the ask actually admits; prove it by test.
 5. **Disclosure.**
    - If the code already has a reader-visible way to say "AI X was unavailable and sat out", use it for the

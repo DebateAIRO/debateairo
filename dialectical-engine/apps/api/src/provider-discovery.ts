@@ -4,7 +4,7 @@ import type {
 } from "@debateai/db";
 import { randomUUID } from "node:crypto";
 import {
-  observePreviewProviderTarget,
+  observeProviderTarget,
   previewProbeRoundBusy,
   probeTarget,
   providerTargetPrice,
@@ -26,8 +26,9 @@ export {
 
 /**
  * What one discovery round found: the healthy members, and (preview only, spec 2026-10-11 busy model
- * §3) the models every probe of which this round was a gate-proven unbilled refusal. The busy list is
- * a non-enumerable property, so the panel itself reads, compares and serializes exactly as before.
+ * §3/§3a) the models whose probe this round was a gate-proven unbilled refusal; no busy model is in the
+ * panel. The busy list is a non-enumerable property, so the panel itself reads, compares and serializes
+ * exactly as before.
  */
 export type DiscoveredProviderPanel = readonly DiscoveredPanelMember[] & Readonly<{ busyModelIds?: readonly string[] }>;
 
@@ -87,10 +88,11 @@ export function createProviderDiscoveryResolver(input: Readonly<{
    * Spec 2026-10-11 busy model §1-§3, the PREVIEW only (main.ts passes it with the preview config; hosted
    * and local leave it out and probe exactly as before): each (baseUrl, model, adapter kind, probe
    * controls) is probed ONCE per round, its observation written as one row per ref, each with its own
-   * probe id; a gate-proven unbilled refusal gets the one 60-second resend; and the round reports the
-   * models that stayed busy. `sleep` is the wait, injectable for tests.
+   * probe id; and the round reports its busy models (a gate-proven unbilled refusal). Amendment §3a
+   * (2026-10-11 review): NO resend at ask time, so the round sends exactly one request per model, and a
+   * busy model is left out of the panel even where another of its refs has a fresh HEALTHY record.
    */
-  previewRound?: Readonly<{ sleep?: (milliseconds: number) => Promise<void> }>;
+  previewRound?: true;
 }>): () => Promise<DiscoveredProviderPanel> {
   if (!Number.isInteger(input.probeFreshnessMs) || input.probeFreshnessMs < 1) {
     throw new TypeError("PROVIDER_PROBE_FRESHNESS_INVALID");
@@ -141,20 +143,20 @@ export function createProviderDiscoveryResolver(input: Readonly<{
       const target = group[0]!;
       const controls = input.probeControlsFor?.(target)
         ?? { thinkingLevel: input.thinkingLevel, tokenCeiling: input.probeTokenCeiling };
-      // §2: the refusal is written before the one resend, so the rows read in the order they happened.
-      const observations = await observePreviewProviderTarget({
+      // Amendment §3a (2026-10-11 review): ONE observation, never a resend at ask time. A model admitted only
+      // on a resend could be pinned as the answer writer and then die at claim (J24), and synchronized
+      // resends push the gate toward its unsent-in-a-row and daily unbilled-refusal halts.
+      const observation = await observeProviderTarget({
         target,
         timeoutMs: input.probeTimeoutMs,
         ...(controls.thinkingLevel === undefined ? {} : { thinkingLevel: controls.thinkingLevel }),
         ...(controls.tokenCeiling === undefined ? {} : { tokenCeiling: controls.tokenCeiling }),
         fetchImplementation,
-        clock,
-        ...(previewRound?.sleep === undefined ? {} : { sleep: previewRound.sleep }),
-        onUnbilled: async (first) => { await recordAll(first, group); }
+        clock
       });
-      const final = await recordAll(observations[observations.length - 1]!, group);
-      group.forEach((member, index) => byRef.set(member.providerRef, final[index]!));
-      if (previewProbeRoundBusy(observations)) busyModelIds.push(target.model);
+      const rows = await recordAll(observation, group);
+      group.forEach((member, index) => byRef.set(member.providerRef, rows[index]!));
+      if (previewProbeRoundBusy([observation])) busyModelIds.push(target.model);
     }));
     return Object.freeze({ byRef, busyModelIds: Object.freeze([...new Set(busyModelIds)]) });
   };
@@ -166,7 +168,10 @@ export function createProviderDiscoveryResolver(input: Readonly<{
       const stale = input.targets.filter((target) => !isFreshMatchingRecord(latestByRef.get(target.providerRef), target, now, input.probeFreshnessMs));
       const round = await resolvePreviewObservations(stale);
       const records = input.targets.map((target) => round.byRef.get(target.providerRef) ?? latestByRef.get(target.providerRef)!);
-      const panel = panelOf(records);
+      // §3a: busy is per MODEL. A ref of a busy model whose own record is fresh and HEALTHY (freshness is
+      // per ref) was not probed this round, but the model's probe this round was refused: it sits out too,
+      // so the busy list and the panel always agree.
+      const panel = panelOf(records).filter((member) => !round.busyModelIds.includes(member.model_id));
       // §3: non-enumerable, so the panel compares and serializes as a plain array.
       Object.defineProperty(panel, "busyModelIds", { value: round.busyModelIds, enumerable: false });
       return Object.freeze(panel);

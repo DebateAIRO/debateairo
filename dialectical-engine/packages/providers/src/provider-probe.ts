@@ -206,24 +206,22 @@ export async function probeTarget(input: Readonly<{
 }
 
 /**
- * Spec 2026-10-11 busy model §2 — the PREVIEW's probe of one target, at ask time and at claim time: one
+ * Spec 2026-10-11 busy model §2 — the PREVIEW's claim-time probe of one target (amendment §3a: never at
+ * ask time; the API's discovery round sends one probe per model and a refused model sits out): one
  * observation, and ONE more after the preview's 60-second wait when (and only when) the first
  * was a gate-proven unbilled refusal. The same rule as a debate call (owner ruling 5 / R4). The sealed
  * `panelDiscoveryPolicy.probe_max_attempts: 1` is read, never edited: an unbilled refusal is not an
  * attempt (R1). A billed failure, or an answer, gets no resend.
  *
- * It observes only; it returns every observation in order (one or two), and `onUnbilled` sees the
- * first before the wait, so a caller that persists (the API) writes the refusal before the resend.
- * The target is "busy" for this round exactly when every returned observation is that refusal.
+ * It observes only; it returns every observation in order (one or two). The target is "busy" exactly
+ * when every returned observation is that refusal.
  */
 export async function observePreviewProviderTarget(input: Parameters<typeof observeProviderTarget>[0] & Readonly<{
   sleep?: (milliseconds: number) => Promise<void>;
-  onUnbilled?: (first: ProviderProbeObservation) => Promise<void>;
 }>): Promise<readonly ProviderProbeObservation[]> {
-  const { sleep, onUnbilled, ...observation } = input;
+  const { sleep, ...observation } = input;
   const first = await observeProviderTarget(observation);
   if (first.failureCode !== PROVIDER_PROBE_UNBILLED_REFUSAL) return Object.freeze([first]);
-  await onUnbilled?.(first);
   await waitBeforePreviewUnbilledResend(sleep);
   return Object.freeze([first, await observeProviderTarget(observation)]);
 }
@@ -236,7 +234,7 @@ export async function observePreviewProviderTarget(input: Parameters<typeof obse
 export async function observeClaimTimeTarget(input: Parameters<typeof observePreviewProviderTarget>[0] & Readonly<{
   preview: boolean;
 }>): Promise<ProviderProbeObservation> {
-  const { preview, onUnbilled: _onUnbilled, ...probe } = input;
+  const { preview, ...probe } = input;
   if (!preview) {
     const { sleep: _sleep, ...single } = probe;
     return observeProviderTarget(single);
@@ -245,7 +243,10 @@ export async function observeClaimTimeTarget(input: Parameters<typeof observePre
   return observations[observations.length - 1]!;
 }
 
-/** Spec 2026-10-11 busy model §3: every probe of the target this round was a gate-proven unbilled refusal. */
+/**
+ * Spec 2026-10-11 busy model §3: every probe of the target this round was a gate-proven unbilled refusal
+ * (at ask time, §3a, the round has exactly one probe per model).
+ */
 export function previewProbeRoundBusy(observations: readonly ProviderProbeObservation[]): boolean {
   return observations.length > 0 && observations.every((entry) => entry.failureCode === PROVIDER_PROBE_UNBILLED_REFUSAL);
 }

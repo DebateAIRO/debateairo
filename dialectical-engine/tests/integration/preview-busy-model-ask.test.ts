@@ -2,14 +2,17 @@
 // docs/superpowers/specs/2026-10-11-preview-busy-model-design.md, "Must be proven by tests", ask path (i)-(v)).
 // On 2026-10-11 the owner's five-AI ask was refused (ASK_PLAN_TIER_MODEL_UNAVAILABLE): DeepInfra answered 429 to
 // GLM-5.3-Flash, the gate turned it into PROVIDER_REFUSED_UNBILLED, discovery probed GLM twice at once (two reviewed
-// refs) and never resent, and admission refused the whole ask for the one missing model.
+// refs), and admission refused the whole ask for the one missing model.
+// Amendment §3a (2026-10-11 review): at ask time there is NO 60-second resend any more. A model whose probe this round
+// was a gate-proven unbilled refusal sits out the debate (rotation on, two makers left), after exactly one POST.
 // Everything here is the shipped path: the six reviewed targets, the guarded fetch over the REAL gate RPC ports
 // (createPreviewBudgetRpcPort over unix-socket stubs, so the 409 mapping is the shipped one), the discovery resolver
 // with the preview round main.ts passes, the real probe repository on a migrated embedded PostgreSQL (the failure
 // code column is free text: no migration), the real rotation counts, and evaluateAskAdmission with the five-model
-// preview config. Only the 60-second wait is injected. Integration suites are skipped by the CI gate: run this file
-// by hand before merging.
+// preview config. Nothing is injected but the clock. Integration suites are skipped by the CI gate: run this file by
+// hand before merging.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -40,7 +43,7 @@ const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
 const QWEN = "Qwen/Qwen3.8-Flash";
 const HAIKU = "claude-haiku-5-5";
 const FIVE = Object.freeze([GLM, DEEPSEEK, MIMO, QWEN, HAIKU]);
-/** Owner ruling 5 / R4: the one wait before the one resend of a gate-proven unbilled refusal. */
+/** Owner ruling 5 / R4: the wait before a resend of an unbilled refusal; the ask path (§3a) must never take it. */
 const UNBILLED_RESEND_MS = 60_000;
 /** Spec §2: the first observation's own code (free text in core.provider_probe). */
 const UNBILLED_CODE = "PROVIDER_PROBE_UNBILLED_REFUSAL";
@@ -143,16 +146,15 @@ function budgetGate(enabled: readonly string[]): PreviewBudgetGateSettings {
   }) as PreviewBudgetGateSettings;
 }
 
-type Round = Readonly<{ sent: string[]; sleeps: number[]; startedAt: Date; settings: RunCreationSettings }>;
+type Round = Readonly<{ sent: string[]; startedAt: Date; startedMs: number; settings: RunCreationSettings }>;
 
 /**
  * The ask path exactly as main.ts composes it on the preview (or, with `hosted`, without the preview round and
  * config, as hosted and local compose it). `glm` is GLM's gate script; every other model answers OK.
  */
 async function askRound(input: Readonly<{ glm: readonly GateStep[]; hosted?: boolean; enabled?: readonly string[];
-  rotation?: boolean }>): Promise<Round> {
+  rotation?: boolean; probeFreshnessMs?: number }>): Promise<Round> {
   const sent: string[] = [];
-  const sleeps: number[] = [];
   const config = PREVIEW as PreviewProviderTestConfig;
   const deepinfraSocket = await gateSocket("deepinfra", { [GLM]: input.glm }, sent);
   const anthropicSocket = await gateSocket("anthropic", {}, sent);
@@ -165,13 +167,13 @@ async function askRound(input: Readonly<{ glm: readonly GateStep[]; hosted?: boo
     configuredProviders: CONFIGURED,
     targets: TARGETS,
     probes: new ProviderProbeRepository(database.pool),
-    // Every round probes afresh: the rows an earlier test wrote are never reused.
-    probeFreshnessMs: 1,
+    // Every round probes afresh (unless a test asks otherwise): the rows an earlier test wrote are never reused.
+    probeFreshnessMs: input.probeFreshnessMs ?? 1,
     probeTimeoutMs: 10_000,
     probeControlsFor: previewProbeControls,
     fetchImplementation,
     clock,
-    ...(input.hosted === true ? {} : { previewRound: { sleep: async (milliseconds: number) => { sleeps.push(milliseconds); } } })
+    ...(input.hosted === true ? {} : { previewRound: true as const })
   });
   const settings: RunCreationSettings = {
     ...(input.hosted === true ? {} : { previewProviderTestConfig: config, previewBudgetGate: budgetGate(input.enabled ?? FIVE) }),
@@ -182,7 +184,7 @@ async function askRound(input: Readonly<{ glm: readonly GateStep[]; hosted?: boo
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({ effectiveRiskTier, tierSource, tierProvenanceRef }),
     ...(input.rotation === false ? {} : { roleRotation: { readCounts: () => readRoleRotationCounts(database.pool) } })
   } as RunCreationSettings;
-  return { sent, sleeps, startedAt, settings };
+  return { sent, startedAt, startedMs: performance.now(), settings };
 }
 
 /** This round's probe rows for one ref, in the order they were written. */
@@ -195,6 +197,9 @@ async function probeRows(providerRef: string, since: Date) {
 
 const refused = (promise: Promise<unknown>) => promise.then(() => { throw new Error("the ask was admitted"); }, (caught: unknown) => caught);
 const count = (sent: readonly string[], model: string) => sent.filter((entry) => entry === model).length;
+/** §3a: the ask path never waits the resend's 60 seconds (one POST per model already proves it never resends). */
+const noResendWait = (round: Round) => expect(performance.now() - round.startedMs).toBeLessThan(UNBILLED_RESEND_MS);
+const FOUR = FIVE.filter((model) => model !== GLM);
 
 describe("the preview ask with a busy model (spec 2026-10-11 busy model)", () => {
   it("(i) probes each model once per round: one GLM POST for its two reviewed refs, one row per ref with its own id", async () => {
@@ -208,48 +213,52 @@ describe("the preview ask with a busy model (spec 2026-10-11 busy model)", () =>
     expect(a).toEqual([expect.objectContaining({ state: "HEALTHY", model_id: GLM, failure_code: null })]);
     expect(b).toEqual([expect.objectContaining({ state: "HEALTHY", model_id: GLM, failure_code: null })]);
     expect(a[0]!.probe_id).not.toBe(b[0]!.probe_id);
-    expect(round.sleeps).toEqual([]);
+    noResendWait(round);
   });
 
-  it("(ii) GLM [409, OK]: one 60 s wait, an ABSENT unbilled row then a HEALTHY row, admitted with all five", async () => {
-    const round = await askRound({ glm: ["UNBILLED", "OK"] });
+  it("(ii) GLM [409]: GLM sits out with no resend; admitted with the four that answered, in the panel, the pin and the estimate", async () => {
+    // The gate would answer GLM's second request (OK), so only the absence of a resend keeps GLM out. The gate has GLM
+    // switched OFF: the estimate refuses any debate that would price a GLM call (a model not enabled is "not available
+    // right now"), so this admission proves the estimate priced only the four.
+    const round = await askRound({ glm: ["UNBILLED", "OK"], enabled: FOUR });
     const admitted = await evaluateAskAdmission(round.settings, ASK);
-    expect(admitted.discoveredPanel.map((member) => member.model_id)).toEqual(FIVE);
-    expect(round.sleeps).toEqual([UNBILLED_RESEND_MS]);
-    expect(count(round.sent, GLM)).toBe(2);
-    for (const ref of ["preview:fixture-a", "preview:fixture-b"]) {
-      expect(await probeRows(ref, round.startedAt)).toEqual([
-        expect.objectContaining({ state: "ABSENT", model_id: null, failure_code: UNBILLED_CODE }),
-        expect.objectContaining({ state: "HEALTHY", model_id: GLM, failure_code: null })
-      ]);
-    }
-    // The pin lists its eligible models in position order (the opener first), so compared as a set.
-    expect([...admitted.roleRotation!.eligibleModelIds].sort()).toEqual([...FIVE].sort());
-  });
-
-  it("(iii) GLM [409, 409]: GLM sits out; admitted with the four that answered, in the panel, the pin and the estimate", async () => {
-    // The gate has GLM switched OFF: the estimate refuses any debate that would price a GLM call (a model not
-    // enabled is "not available right now"), so this admission proves the estimate priced only the four.
-    const round = await askRound({ glm: ["UNBILLED", "UNBILLED"], enabled: FIVE.filter((model) => model !== GLM) });
-    const admitted = await evaluateAskAdmission(round.settings, ASK);
-    const four = FIVE.filter((model) => model !== GLM);
-    expect(admitted.discoveredPanel.map((member) => member.model_id)).toEqual(four);
+    expect(admitted.discoveredPanel.map((member) => member.model_id)).toEqual(FOUR);
     expect(new Set(admitted.discoveredPanel.map((member) => member.maker)).size).toBe(4);
     const pin = admitted.roleRotation!;
-    expect([...pin.eligibleModelIds].sort()).toEqual([...four].sort());
+    // The pin lists its eligible models in position order (the opener first), so compared as a set.
+    expect([...pin.eligibleModelIds].sort()).toEqual([...FOUR].sort());
     for (const role of [pin.answerWriter, pin.answerChecker, pin.storyteller, pin.storyChecker]) expect(role.modelId).not.toBe(GLM);
     expect(admitted.envelopeBasis).toMatchObject({ panel_size: 4 });
-    expect(round.sleeps).toEqual([UNBILLED_RESEND_MS]);
-    // One probe and one resend for GLM, never more (the gate halts after too many unbilled refusals).
-    expect(count(round.sent, GLM)).toBe(2);
-    expect(await probeRows("preview:fixture-a", round.startedAt)).toEqual([
-      expect.objectContaining({ state: "ABSENT", failure_code: UNBILLED_CODE }),
-      expect.objectContaining({ state: "ABSENT", failure_code: UNBILLED_CODE })
+    // Exactly one GLM POST for its two refs, and no 60-second wait (§3a; the gate halts after too many unbilled refusals).
+    expect(count(round.sent, GLM)).toBe(1);
+    for (const model of FOUR) expect(count(round.sent, model)).toBe(1);
+    noResendWait(round);
+    for (const ref of ["preview:fixture-a", "preview:fixture-b"]) {
+      expect(await probeRows(ref, round.startedAt)).toEqual([
+        expect.objectContaining({ state: "ABSENT", model_id: null, failure_code: UNBILLED_CODE })
+      ]);
+    }
+  });
+
+  it("(ii) a fresh HEALTHY record of one GLM ref does not admit GLM when this round's GLM probe was refused unbilled", async () => {
+    // Every earlier row is an hour old; fixture-a alone has a HEALTHY record seconds old, so with ten minutes of
+    // freshness it is not probed, and fixture-b (stale) is. Busy is per MODEL: the panel must not hold GLM.
+    clockMs += 3_600_000;
+    await new ProviderProbeRepository(database.pool).record({ probeEvidenceRef: randomUUID(), providerRef: "preview:fixture-a",
+      maker: configured("preview:fixture-a").maker, state: "HEALTHY", modelId: GLM, failureCode: null, probedAt: clock() });
+    const round = await askRound({ glm: ["UNBILLED", "OK"], enabled: FOUR, probeFreshnessMs: 600_000 });
+    const admitted = await evaluateAskAdmission(round.settings, ASK);
+    expect(admitted.discoveredPanel.map((member) => member.model_id)).toEqual(FOUR);
+    expect([...admitted.roleRotation!.eligibleModelIds].sort()).toEqual([...FOUR].sort());
+    expect(count(round.sent, GLM)).toBe(1);
+    noResendWait(round);
+    expect(await probeRows("preview:fixture-b", round.startedAt)).toEqual([
+      expect.objectContaining({ state: "ABSENT", model_id: null, failure_code: UNBILLED_CODE })
     ]);
   });
 
   it("(iii) without a rotation pin the busy model does not sit out: the sealed GLM writer would refuse at claim (J24)", async () => {
-    const round = await askRound({ glm: ["UNBILLED", "UNBILLED"], rotation: false });
+    const round = await askRound({ glm: ["UNBILLED"], rotation: false });
     expect(await refused(evaluateAskAdmission(round.settings, ASK)))
       .toMatchObject({ name: "AskRefusal", code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE" });
   });
@@ -258,18 +267,11 @@ describe("the preview ask with a busy model (spec 2026-10-11 busy model)", () =>
     const round = await askRound({ glm: ["BILLED_500"] });
     expect(await refused(evaluateAskAdmission(round.settings, ASK)))
       .toMatchObject({ name: "AskRefusal", code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE" });
-    expect(round.sleeps).toEqual([]);
+    noResendWait(round);
     expect(count(round.sent, GLM)).toBe(1);
     expect(await probeRows("preview:fixture-a", round.startedAt)).toEqual([
       expect.objectContaining({ state: "ABSENT", failure_code: "PROVIDER_PROBE_FAILED" })
     ]);
-  });
-
-  it("(iv) GLM [409, then a billed failure]: not busy, so the ask is refused as today", async () => {
-    const round = await askRound({ glm: ["UNBILLED", "BILLED_500"] });
-    expect(await refused(evaluateAskAdmission(round.settings, ASK)))
-      .toMatchObject({ name: "AskRefusal", code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE" });
-    expect(round.sleeps).toEqual([UNBILLED_RESEND_MS]);
   });
 
   it("(v) hosted and local are unchanged: every target probed on its own, once, no wait, no busy list, the ask refused", async () => {
@@ -279,7 +281,7 @@ describe("the preview ask with a busy model (spec 2026-10-11 busy model)", () =>
     expect(panel.busyModelIds).toBeUndefined();
     // Both GLM refs, each probed once: the round is today's.
     expect(count(round.sent, GLM)).toBe(2);
-    expect(round.sleeps).toEqual([]);
+    noResendWait(round);
     // Off the preview the roster is the contract's (premium: three models, three makers). Even handed a busy list
     // for the one missing model, with rotation on and two makers left, hosted refuses exactly as today.
     const member = (providerRef: string, maker: string, modelId: string) => Object.freeze({ provider_ref: providerRef, maker,
