@@ -12,7 +12,7 @@ const SUFFIXES = [
   "requestAgain", "supersedes", "failed", "inProgress", "rateLimited",
   "erasing", "held", "emailRequired", "notAuthorized", "sessionExpired",
   "unavailable", "statusUnavailable", "noMethod", "download.title",
-  "download.starting", "download.button", "download.invalid", "download.reopenFromEmail",
+  "download.starting", "download.button", "download.invalid", "download.incomplete", "download.noLink", "download.reopenFromEmail",
   "download.wrongAccount", "download.backToSettings",
 ] as const;
 const KEYS = SUFFIXES.map((suffix) => `settings.export.${suffix}`);
@@ -27,9 +27,9 @@ function placeholders(value: string): string[] {
 }
 
 describe("data export settings copy (K-UI)", () => {
-  it("KU-1: all 27 keys are present and non-empty in all 35 locales", () => {
+  it("KU-1: all 29 keys are present and non-empty in all 35 locales", () => {
     expect(LOCALES).toHaveLength(35);
-    expect(KEYS).toHaveLength(27);
+    expect(KEYS).toHaveLength(29);
     for (const locale of LOCALES) {
       const messages = catalog(locale);
       for (const key of KEYS) {
@@ -61,7 +61,7 @@ describe("data export settings copy (K-UI)", () => {
     }
   });
 
-  it("KU-4: each locale has exactly the 27 export keys", () => {
+  it("KU-4: each locale has exactly the 29 export keys", () => {
     for (const locale of LOCALES) {
       expect(Object.keys(catalog(locale)).filter((key) => key.startsWith("settings.export.")).sort(), locale)
         .toEqual([...KEYS].sort());

@@ -72,6 +72,8 @@
   "settings.export.download.starting": "Скачивание начинается. Если оно не начнётся, нажмите кнопку.",
   "settings.export.download.button": "Скачать ZIP",
   "settings.export.download.invalid": "Срок действия этой ссылки истёк, или она была заменена.",
+  "settings.export.download.incomplete": "Эта ссылка неполная. Снова откройте её из письма.",
+  "settings.export.download.noLink": "Откройте ссылку для скачивания из письма.",
   "settings.export.download.reopenFromEmail": "Снова откройте ссылку для скачивания из письма. Она будет работать до истечения срока действия.",
   "settings.export.download.wrongAccount": "Эта ссылка для скачивания относится к другой учётной записи. Выйдите и войдите в учётную запись, из которой был запрошен экспорт.",
   "settings.export.download.backToSettings": "Назад к настройкам",

@@ -1,6 +1,6 @@
 export const PENDING_EXPORT_KEY = "debateai.exportPending";
 export const EXPORT_LINK_OUTCOME_KEY = "debateai.exportLinkOutcome";
-export type ExportLinkOutcome = "downloaded" | "invalid" | "wrongAccount";
+export type ExportLinkOutcome = "downloaded" | "invalid" | "incomplete" | "wrongAccount";
 
 export function stashPendingExport(token: string): void {
   try {
@@ -27,6 +27,6 @@ export function rememberExportLinkOutcome(outcome: ExportLinkOutcome): void {
 export function readExportLinkOutcome(): ExportLinkOutcome | null {
   try {
     const outcome = window.sessionStorage.getItem(EXPORT_LINK_OUTCOME_KEY);
-    return outcome === "downloaded" || outcome === "invalid" || outcome === "wrongAccount" ? outcome : null;
+    return outcome === "downloaded" || outcome === "invalid" || outcome === "incomplete" || outcome === "wrongAccount" ? outcome : null;
   } catch { return null; }
 }

@@ -72,6 +72,8 @@
   "settings.export.download.starting": "Preuzimanje počinje. Ako se ne pokrene, upotrijebite gumb.",
   "settings.export.download.button": "Preuzmi ZIP",
   "settings.export.download.invalid": "Ova poveznica za preuzimanje istekla je ili je zamijenjena.",
+  "settings.export.download.incomplete": "Ova poveznica nije potpuna. Ponovno je otvorite iz svoje e-pošte.",
+  "settings.export.download.noLink": "Otvorite poveznicu za preuzimanje iz svoje e-pošte.",
   "settings.export.download.reopenFromEmail": "Ponovno otvorite poveznicu za preuzimanje iz svoje e-pošte. Radit će do isteka valjanosti.",
   "settings.export.download.wrongAccount": "Ova poveznica za preuzimanje pripada drugom računu. Odjavite se i prijavite na račun koji je zatražio izvoz.",
   "settings.export.download.backToSettings": "Natrag na Postavke",

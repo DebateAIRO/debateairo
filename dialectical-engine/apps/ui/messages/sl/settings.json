@@ -72,6 +72,8 @@
   "settings.export.download.starting": "Prenos se začenja. Če se ne začne, uporabite gumb.",
   "settings.export.download.button": "Prenesi ZIP",
   "settings.export.download.invalid": "Ta povezava za prenos je potekla ali je bila zamenjana.",
+  "settings.export.download.incomplete": "Ta povezava je nepopolna. Znova jo odprite iz e-pošte.",
+  "settings.export.download.noLink": "Odprite povezavo za prenos v e-pošti.",
   "settings.export.download.reopenFromEmail": "Znova odprite povezavo za prenos v e-pošti. Delovala bo do poteka veljavnosti.",
   "settings.export.download.wrongAccount": "Ta povezava za prenos pripada drugemu računu. Odjavite se in prijavite v račun, ki je zahteval izvoz.",
   "settings.export.download.backToSettings": "Nazaj v Nastavitve",

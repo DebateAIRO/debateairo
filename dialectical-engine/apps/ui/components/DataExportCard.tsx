@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ContractHttpError, type ContractClient, type DataExportStatus } from "@debateai/contract";
 import { contractClient } from "@/lib/api";
 import { useSelectedAuthCatalog } from "@/components/AuthShell";
@@ -41,6 +41,8 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
   const [noMethod, setNoMethod] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const cardRef = useRef<HTMLElement>(null);
+  const focusFromLink = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -53,11 +55,13 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
     return () => { active = false; window.clearInterval(timer); };
   }, [client]);
 
-  async function beginConfirmation(): Promise<void> {
+  async function beginConfirmation(fromLink = false): Promise<void> {
+    focusFromLink.current = fromLink;
     setMessage(null);
     try {
       const methods = await client.authMethods();
       if (methods.available_step_up_methods.length === 0) {
+        focusFromLink.current = false;
         setNoMethod(true);
         setConfirming(false);
       } else {
@@ -65,6 +69,7 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
         setConfirming(true);
       }
     } catch {
+      focusFromLink.current = false;
       setMessage(t(catalog, "settings.export.unavailable"));
     }
   }
@@ -76,9 +81,26 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
     url.searchParams.delete("request-export");
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     if (!statusUnavailable && status && (status.status === "NONE" || status.status === "FAILED" || status.status === "SENT")) {
-      void beginConfirmation();
+      void beginConfirmation(true);
     }
   }, [status, statusUnavailable]);
+
+  useEffect(() => {
+    if (!confirming || !focusFromLink.current || !cardRef.current) return;
+    const card = cardRef.current;
+    card.scrollIntoView?.({ block: "center" });
+    const focusFirstChoice = () => {
+      const choice = card.querySelector<HTMLButtonElement>(".authSecurityConfirmation .authSecurityActions button");
+      if (!choice) return false;
+      choice.focus({ preventScroll: true });
+      focusFromLink.current = false;
+      return true;
+    };
+    if (focusFirstChoice()) return;
+    const observer = new MutationObserver(() => { if (focusFirstChoice()) observer.disconnect(); });
+    observer.observe(card, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [confirming]);
 
   async function request(grantToken: string): Promise<void> {
     setConfirming(false);
@@ -97,7 +119,7 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
   }
 
   return (
-    <section className="setCard" aria-labelledby="export-heading">
+    <section className="setCard" aria-labelledby="export-heading" ref={cardRef}>
       <h2 className="setCardTitle" id="export-heading">{t(catalog, "settings.export.title")}</h2>
       <p className="setCardHint">{t(catalog, "settings.export.hint")}</p>
       {status === null && !statusUnavailable ? <p className="setStatus" role="status">{t(catalog, "settings.export.checking")}</p> : null}

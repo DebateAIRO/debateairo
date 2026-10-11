@@ -6,7 +6,7 @@ import { clearPendingExport, readExportLinkOutcome, readPendingExport, rememberE
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 type Download = { bytes: ArrayBuffer; filename: string };
-type View = "checking" | "starting" | "noLink" | "reopenFromEmail" | "invalid" | "wrongAccount" | "held" | "unavailable";
+type View = "checking" | "starting" | "noLink" | "incomplete" | "reopenFromEmail" | "invalid" | "wrongAccount" | "held" | "unavailable";
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
 function startDownload(file: Download): void {
@@ -34,13 +34,17 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
       if (fragment) {
         window.history.replaceState(null, "", "/export");
         if (TOKEN.test(fragment)) stashPendingExport(fragment);
-        else clearPendingExport();
       }
       const token = TOKEN.test(fragment) ? fragment : fragment ? null : readPendingExport();
       if (!token || !TOKEN.test(token)) {
-        if (fragment || token) clearPendingExport();
-        const outcome = fragment || token ? null : readExportLinkOutcome();
-        setView(outcome === "downloaded" ? "reopenFromEmail" : outcome ?? "noLink");
+        if (fragment || token) {
+          clearPendingExport();
+          rememberExportLinkOutcome("incomplete");
+          setView("incomplete");
+        } else {
+          const outcome = readExportLinkOutcome();
+          setView(outcome === "downloaded" ? "reopenFromEmail" : outcome ?? "noLink");
+        }
         return;
       }
       void client.downloadDataExport(token).then((download) => {
@@ -75,6 +79,8 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
   }, [client]);
 
   const message = view === "starting" ? t(catalog, "settings.export.download.starting")
+    : view === "noLink" ? t(catalog, "settings.export.download.noLink")
+    : view === "incomplete" ? t(catalog, "settings.export.download.incomplete")
     : view === "reopenFromEmail" ? t(catalog, "settings.export.download.reopenFromEmail")
     : view === "invalid" ? t(catalog, "settings.export.download.invalid")
     : view === "wrongAccount" ? t(catalog, "settings.export.download.wrongAccount")
@@ -86,7 +92,7 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
       {message ? <p className="setCardHint exportMessage" role="status">{message}</p> : null}
       {view === "starting" && file ? <div className="setCardRow"><button type="button" className="setBtn setBtnPrimary" onClick={() => startDownload(file)}>{t(catalog, "settings.export.download.button")}</button></div> : null}
       {view === "invalid" ? <form action="/settings" method="get" className="setCardRow"><button type="submit" className="setBtn" name="request-export" value="1">{t(catalog, "settings.export.requestAgain")}</button></form> : null}
-      {(view === "noLink" || view === "reopenFromEmail" || view === "held" || view === "unavailable") ? <div className="setCardRow"><a className="setBtn" href="/settings">{t(catalog, "settings.export.download.backToSettings")}</a></div> : null}
+      {(view === "noLink" || view === "incomplete" || view === "reopenFromEmail" || view === "held" || view === "unavailable") ? <div className="setCardRow"><a className="setBtn" href="/settings">{t(catalog, "settings.export.download.backToSettings")}</a></div> : null}
     </section>
   </div></main>;
 }

@@ -72,6 +72,8 @@
   "settings.export.download.starting": "Votre téléchargement démarre. S’il ne commence pas, utilisez le bouton.",
   "settings.export.download.button": "Télécharger le ZIP",
   "settings.export.download.invalid": "Ce lien de téléchargement a expiré ou a été remplacé.",
+  "settings.export.download.incomplete": "Ce lien est incomplet. Ouvrez-le à nouveau depuis votre e-mail.",
+  "settings.export.download.noLink": "Ouvrez le lien de téléchargement reçu par e-mail.",
   "settings.export.download.reopenFromEmail": "Ouvrez à nouveau le lien de téléchargement reçu par e-mail. Il fonctionnera jusqu’à son expiration.",
   "settings.export.download.wrongAccount": "Ce lien de téléchargement appartient à un autre compte. Déconnectez-vous et connectez-vous au compte qui a demandé l’exportation.",
   "settings.export.download.backToSettings": "Retour aux Paramètres",

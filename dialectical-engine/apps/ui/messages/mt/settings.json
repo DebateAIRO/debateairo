@@ -72,6 +72,8 @@
   "settings.export.download.starting": "It-tniżżil tiegħek qed jibda. Jekk ma jibdiex, uża l-buttuna.",
   "settings.export.download.button": "Niżżel ZIP",
   "settings.export.download.invalid": "Din il-ħolqa tat-tniżżil skadiet jew ġiet sostitwita.",
+  "settings.export.download.incomplete": "Din il-ħolqa mhix kompluta. Erġa’ iftaħha mill-email tiegħek.",
+  "settings.export.download.noLink": "Iftaħ il-ħolqa tat-tniżżil mill-email tiegħek.",
   "settings.export.download.reopenFromEmail": "Erġa’ iftaħ il-ħolqa tat-tniżżil mill-email tiegħek. Tibqa’ taħdem sakemm tiskadi.",
   "settings.export.download.wrongAccount": "Din il-ħolqa tat-tniżżil tappartjeni għal kont ieħor. Oħroġ u idħol fil-kont li talab l-esportazzjoni.",
   "settings.export.download.backToSettings": "Lura għall-Issettjar",

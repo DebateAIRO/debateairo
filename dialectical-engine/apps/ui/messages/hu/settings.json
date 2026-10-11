@@ -72,6 +72,8 @@
   "settings.export.download.starting": "A letöltés indul. Ha nem kezdődik el, használja a gombot.",
   "settings.export.download.button": "ZIP letöltése",
   "settings.export.download.invalid": "A letöltési hivatkozás lejárt vagy lecserélték.",
+  "settings.export.download.incomplete": "Ez a hivatkozás hiányos. Nyissa meg újra az e-mailjéből.",
+  "settings.export.download.noLink": "Nyissa meg az e-mailben kapott letöltési hivatkozást.",
   "settings.export.download.reopenFromEmail": "Nyissa meg újra az e-mailben kapott letöltési hivatkozást. A lejáratáig működni fog.",
   "settings.export.download.wrongAccount": "Ez a letöltési hivatkozás egy másik fiókhoz tartozik. Jelentkezzen ki, majd be az exportot kérő fiókba.",
   "settings.export.download.backToSettings": "Vissza a Beállításokhoz",

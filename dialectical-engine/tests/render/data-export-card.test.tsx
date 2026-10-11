@@ -131,6 +131,28 @@ it("V-36 opens confirmation for SENT but respects PREPARING with no panel", asyn
   expect(preparing.requestDataExport).not.toHaveBeenCalled();
   expect(window.location.pathname + window.location.search).toBe("/settings");
 });
+it("V-38 scrolls and focuses the first choice only for the expired-link entry", async () => {
+  const originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+  const scroll = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scroll });
+  try {
+    window.history.replaceState(null, "", "/settings?request-export=1");
+    const stub = client(); await mount(<DataExportCard catalog={settings} locale="en" client={stub as never} />);
+    expect(host?.querySelector(".authSecurityConfirmation")).not.toBeNull();
+    expect(scroll).toHaveBeenCalledOnce();
+    expect(scroll.mock.instances[0]).toBe(host?.querySelector('section[aria-labelledby="export-heading"]'));
+    expect(document.activeElement).toBe(button("Password"));
+    expect(stub.requestDataExport).not.toHaveBeenCalled();
+    await click("Cancel");
+    await click(settings["settings.export.request"]); await flush();
+    expect(host?.querySelector(".authSecurityConfirmation")).not.toBeNull();
+    expect(scroll).toHaveBeenCalledOnce();
+    expect(document.activeElement).not.toBe(button("Password"));
+  } finally {
+    if (originalScroll) Object.defineProperty(HTMLElement.prototype, "scrollIntoView", originalScroll);
+    else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+  }
+});
 it("U-5 failed password and passkey proofs show only the card line", async () => {
   for (const method of ["password_totp", "passkey"]) {
     const stub = client(); stub.authMethods.mockResolvedValue(methods([method]) as never);
