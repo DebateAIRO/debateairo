@@ -4976,9 +4976,13 @@ export class WalkingSkeletonRunner {
         workItemId: claimed.workItemId,
         reason: `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:${role}`
       });
+      // Task 12: on a rotated run the role's ref is the debate's PIN (unless a sealed stand-in replaced it), so the
+      // message says which: a pinned ref is never called sealed.
+      const refKind = rotationPin !== null && roleRef === (role === "SYNTHESIZER" ? rotationPin.answerWriter : rotationPin.answerChecker).providerRef
+        ? "pinned" : "sealed";
       throw new TypedDomainError(
         "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM",
-        `J24: the sealed ${role} role ref ${roleRef} was ${absent === undefined ? "not claim-eligible" : `absent at claim (${absent.failureCode})`}; the run refuses rather than serving from a provider the sealed row did not name`
+        `J24: the ${refKind} ${role} role ref ${roleRef} was ${absent === undefined ? "not claim-eligible" : `absent at claim (${absent.failureCode})`}; the run refuses rather than serving from a provider ${refKind === "pinned" ? "the debate's pin" : "the sealed row"} did not name`
       );
     }
     // A15: the same refusal for an assigned run's synthesis seats — neither the

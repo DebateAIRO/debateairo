@@ -163,7 +163,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(step!.previousManifestSha256).toBe(partC!.manifestSha256);
     expect(step!.previousVerifierSha256).toBe(partC!.verifierSha256);
     expect(step!.verifierSql).toBe((await bytesOf("lineage/verify-effective-capabilities-111.sql")).toString("utf8"));
-    // Its checks are its postcondition (the pin table's columns, the story column and the nine CHECKs, compared on
+    // Its checks are its postcondition (the pin table's columns, the story column, the disclosure's per-role reasons and the twelve CHECKs, compared on
     // every replay); it has no supplemental verifier of its own.
     expect(step!.replayVerifierSql).toBeUndefined();
   });

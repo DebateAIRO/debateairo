@@ -192,4 +192,17 @@ describe("T9 production entry point wiring", () => {
     const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
     expect(main).toContain("previewSealedRoleFallbackCovered(roleRef, panel)");
   });
+
+  /**
+   * Task 12 item 7: on a rotated run the J24 refusal names a PINNED ref as pinned, never as sealed (only a ref that
+   * is not the role's pin, i.e. today's register ref or its stand-in, is called sealed).
+   */
+  it("the J24 refusal calls a pinned ref pinned, not sealed (Task 12)", async () => {
+    const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    const refusal = source.indexOf("reason: `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:${role}`");
+    const j24 = source.slice(source.lastIndexOf("for (const role of sealedRefRoles) {", refusal), source.indexOf("// A15: the same refusal", refusal));
+    expect(j24).toContain("const refKind = rotationPin !== null && roleRef === (role === \"SYNTHESIZER\" ? rotationPin.answerWriter : rotationPin.answerChecker).providerRef");
+    expect(j24).toContain("`J24: the ${refKind} ${role} role ref ${roleRef} was ");
+    expect(j24).not.toContain("`J24: the sealed ${role} role ref ${roleRef} was ");
+  });
 });
