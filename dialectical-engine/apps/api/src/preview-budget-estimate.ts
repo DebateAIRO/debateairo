@@ -416,6 +416,11 @@ function offPanelRoleRefs(panel: readonly PreviewPanelMember[], roleProviderRefs
  * - unbilledRetries: owner ruling 5's one retry of a call the gate proved unbilled, at most one per
  *   one-attempt call (every debate call and every story check). It is counted against the gate's
  *   calls; it costs no money (the gate released that call's hold).
+ *
+ * Not counted, by owner ruling R3 (2026-10-11, "keep each step once"): the runner's final retry after
+ * a cooldown at the author and reviewer steps. Since the preview retry fix (option B) that paid try can
+ * happen on the preview too (the preview keeps the sealed lifetime bound and one POST per call); it is
+ * left to the 15% margin, like a re-claim's repeat attempts. These numbers did not change.
  */
 export function previewExpectedCalls(input: Readonly<{
   basis: Readonly<Record<string, unknown>>;
