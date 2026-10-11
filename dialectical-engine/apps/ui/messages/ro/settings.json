@@ -71,7 +71,7 @@
   "settings.export.download.title": "Exportul datelor dumneavoastră",
   "settings.export.download.starting": "Descărcarea începe. Dacă nu pornește, folosiți butonul.",
   "settings.export.download.button": "Descărcați ZIP",
-  "settings.export.download.invalid": "Acest link de descărcare a expirat sau a fost înlocuit. Solicitați un export nou din Setări.",
+  "settings.export.download.invalid": "Acest link de descărcare a expirat sau a fost înlocuit.",
   "settings.export.download.reopenFromEmail": "Deschideți din nou linkul de descărcare din e-mail. Va funcționa până la expirare.",
   "settings.export.download.wrongAccount": "Acest link de descărcare aparține altui cont. Deconectați-vă și autentificați-vă în contul care a solicitat exportul.",
   "settings.export.download.backToSettings": "Înapoi la Setări",

@@ -71,7 +71,7 @@
   "settings.export.download.title": "Ekspor data Anda",
   "settings.export.download.starting": "Unduhan Anda sedang dimulai. Jika tidak dimulai, gunakan tombol.",
   "settings.export.download.button": "Unduh ZIP",
-  "settings.export.download.invalid": "Tautan unduhan ini telah kedaluwarsa atau diganti. Minta ekspor baru dari Pengaturan.",
+  "settings.export.download.invalid": "Tautan unduhan ini telah kedaluwarsa atau diganti.",
   "settings.export.download.reopenFromEmail": "Buka kembali tautan unduhan dari email Anda. Tautan itu tetap berfungsi hingga kedaluwarsa.",
   "settings.export.download.wrongAccount": "Tautan unduhan ini milik akun lain. Keluar, lalu masuk ke akun yang meminta ekspor.",
   "settings.export.download.backToSettings": "Kembali ke Pengaturan",

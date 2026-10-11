@@ -71,7 +71,7 @@
   "settings.export.download.title": "Easpórtáil do chuid sonraí",
   "settings.export.download.starting": "Tá d’íoslódáil ag tosú. Mura dtosaíonn sí, úsáid an cnaipe.",
   "settings.export.download.button": "Íoslódáil ZIP",
-  "settings.export.download.invalid": "Tá an nasc íoslódála seo imithe in éag nó curtha ina ionad. Iarr easpórtáil nua sna Socruithe.",
+  "settings.export.download.invalid": "Tá an nasc íoslódála seo imithe in éag nó curtha ina ionad.",
   "settings.export.download.reopenFromEmail": "Oscail an nasc íoslódála ó do ríomhphost arís. Oibreoidh sé go dtí go rachaidh sé in éag.",
   "settings.export.download.wrongAccount": "Is le cuntas eile an nasc íoslódála seo. Sínigh amach agus sínigh isteach sa chuntas a d’iarr an easpórtáil.",
   "settings.export.download.backToSettings": "Ar ais chuig na Socruithe",

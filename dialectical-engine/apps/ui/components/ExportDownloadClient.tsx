@@ -2,11 +2,11 @@
 import { useEffect, useState } from "react";
 import { ContractHttpError, type ContractClient } from "@debateai/contract";
 import { contractClient } from "@/lib/api";
-import { clearPendingExport, readPendingExport, stashPendingExport } from "@/lib/dataExportPending";
+import { clearPendingExport, readExportLinkOutcome, readPendingExport, rememberExportLinkOutcome, stashPendingExport } from "@/lib/dataExportPending";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 type Download = { bytes: ArrayBuffer; filename: string };
-type View = "checking" | "starting" | "reopenFromEmail" | "invalid" | "wrongAccount" | "held" | "unavailable";
+type View = "checking" | "starting" | "noLink" | "reopenFromEmail" | "invalid" | "wrongAccount" | "held" | "unavailable";
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
 function startDownload(file: Download): void {
@@ -38,8 +38,9 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
       }
       const token = TOKEN.test(fragment) ? fragment : fragment ? null : readPendingExport();
       if (!token || !TOKEN.test(token)) {
-        clearPendingExport();
-        setView(fragment ? "invalid" : "reopenFromEmail");
+        if (fragment || token) clearPendingExport();
+        const outcome = fragment || token ? null : readExportLinkOutcome();
+        setView(outcome === "downloaded" ? "reopenFromEmail" : outcome ?? "noLink");
         return;
       }
       void client.downloadDataExport(token).then((download) => {
@@ -49,6 +50,7 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
         setView("starting");
         startDownload(ready);
         clearPendingExport();
+        rememberExportLinkOutcome("downloaded");
       }, (failure: unknown) => {
         if (!active || currentRequest !== requestId) return;
         if (failure instanceof ContractHttpError && (failure.code === "SESSION_REQUIRED" || failure.serverCode === "COOKIE_SESSION_REQUIRED" || failure.serverCode === "SESSION_REQUIRED")) {
@@ -56,9 +58,9 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
           return;
         }
         if (failure instanceof ContractHttpError && failure.serverCode === "EXPORT_WRONG_ACCOUNT") {
-          clearPendingExport(); setView("wrongAccount");
+          clearPendingExport(); rememberExportLinkOutcome("wrongAccount"); setView("wrongAccount");
         } else if (failure instanceof ContractHttpError && failure.serverCode === "EXPORT_LINK_INVALID") {
-          clearPendingExport(); setView("invalid");
+          clearPendingExport(); rememberExportLinkOutcome("invalid"); setView("invalid");
         } else if (failure instanceof ContractHttpError && failure.serverCode === "EXPORT_ACCOUNT_HELD") {
           setView("held");
         } else {
@@ -83,7 +85,8 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
     <section className="setCard">
       {message ? <p className="setCardHint exportMessage" role="status">{message}</p> : null}
       {view === "starting" && file ? <div className="setCardRow"><button type="button" className="setBtn setBtnPrimary" onClick={() => startDownload(file)}>{t(catalog, "settings.export.download.button")}</button></div> : null}
-      {(view === "reopenFromEmail" || view === "invalid" || view === "held" || view === "unavailable") ? <div className="setCardRow"><a className="setBtn" href="/settings">{t(catalog, "settings.export.download.backToSettings")}</a></div> : null}
+      {view === "invalid" ? <form action="/settings" method="get" className="setCardRow"><button type="submit" className="setBtn" name="request-export" value="1">{t(catalog, "settings.export.requestAgain")}</button></form> : null}
+      {(view === "noLink" || view === "reopenFromEmail" || view === "held" || view === "unavailable") ? <div className="setCardRow"><a className="setBtn" href="/settings">{t(catalog, "settings.export.download.backToSettings")}</a></div> : null}
     </section>
   </div></main>;
 }

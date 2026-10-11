@@ -71,7 +71,7 @@
   "settings.export.download.title": "Tietojesi vienti",
   "settings.export.download.starting": "Lataus alkaa. Jos se ei käynnisty, käytä painiketta.",
   "settings.export.download.button": "Lataa ZIP",
-  "settings.export.download.invalid": "Tämä latauslinkki on vanhentunut tai korvattu. Pyydä uusi vienti Asetuksissa.",
+  "settings.export.download.invalid": "Tämä latauslinkki on vanhentunut tai korvattu.",
   "settings.export.download.reopenFromEmail": "Avaa latauslinkki sähköpostistasi uudelleen. Se toimii voimassaolon päättymiseen asti.",
   "settings.export.download.wrongAccount": "Tämä latauslinkki kuuluu toiselle tilille. Kirjaudu ulos ja sitten siihen tiliin, jolta vientiä pyydettiin.",
   "settings.export.download.backToSettings": "Takaisin Asetuksiin",

@@ -71,7 +71,7 @@
   "settings.export.download.title": "Jūsu datu eksports",
   "settings.export.download.starting": "Lejupielāde sākas. Ja tā nesākas, izmantojiet pogu.",
   "settings.export.download.button": "Lejupielādēt ZIP",
-  "settings.export.download.invalid": "Šīs lejupielādes saites derīgums ir beidzies vai tā ir aizstāta. Iestatījumos pieprasiet jaunu eksportu.",
+  "settings.export.download.invalid": "Šīs lejupielādes saites derīgums ir beidzies vai tā ir aizstāta.",
   "settings.export.download.reopenFromEmail": "Vēlreiz atveriet lejupielādes saiti savā e-pastā. Tā darbosies līdz derīguma termiņa beigām.",
   "settings.export.download.wrongAccount": "Šī lejupielādes saite pieder citam kontam. Izrakstieties un pierakstieties kontā, kas pieprasīja eksportu.",
   "settings.export.download.backToSettings": "Atpakaļ uz iestatījumiem",

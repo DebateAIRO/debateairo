@@ -69,6 +69,17 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
     }
   }
 
+  useEffect(() => {
+    if (status === null && !statusUnavailable) return;
+    const url = new URL(window.location.href);
+    if (url.pathname !== "/settings" || url.searchParams.get("request-export") !== "1") return;
+    url.searchParams.delete("request-export");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    if (!statusUnavailable && status && (status.status === "NONE" || status.status === "FAILED" || status.status === "SENT")) {
+      void beginConfirmation();
+    }
+  }, [status, statusUnavailable]);
+
   async function request(grantToken: string): Promise<void> {
     setConfirming(false);
     setRequesting(true);

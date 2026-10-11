@@ -71,7 +71,7 @@
   "settings.export.download.title": "Din dataexport",
   "settings.export.download.starting": "Nedladdningen startar. Använd knappen om den inte börjar.",
   "settings.export.download.button": "Ladda ned ZIP",
-  "settings.export.download.invalid": "Den här nedladdningslänken har gått ut eller ersatts. Begär en ny export under Inställningar.",
+  "settings.export.download.invalid": "Den här nedladdningslänken har gått ut eller ersatts.",
   "settings.export.download.reopenFromEmail": "Öppna nedladdningslänken i ditt mejl igen. Den fungerar tills den går ut.",
   "settings.export.download.wrongAccount": "Den här nedladdningslänken hör till ett annat konto. Logga ut och logga in på kontot som begärde exporten.",
   "settings.export.download.backToSettings": "Tillbaka till Inställningar",
