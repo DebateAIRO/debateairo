@@ -22,8 +22,12 @@ Two modes:
 - **formats**: every model is asked to do every job a few times (write a position, attack one, answer a cross
   exchange, sit on a panel, review a node, write the answer, check the answer, tell the story, check the story). The
   prompts come from the real prompt builders, with our own practice material (one English and one Romanian question;
-  one statement carries an obvious fallacy so the judges' "fatal flags" are used). Each reply is checked by the
-  job's own format check. It is fast to read: which model fails which job, and the exact problem.
+  one statement carries an obvious fallacy so the judges' "fatal flags" are used). Each job is given the same kind
+  of material the real debate gives it: the answer writer may cite every argued point, not only the winning one; the
+  story covers two positions; the answer checker and the story read a written answer; the reviewer is asked about
+  no link, one link and two links in turn. Each reply is checked by the job's own format check. It is fast to read:
+  which model fails which job, and the exact problem. The models take turns, one job each, with Claude Haiku
+  between the DeepInfra models, so one busy model does not hold the others back.
 - **debate**: one whole practice debate (depth 1 by default, 2 allowed). It goes through the real ask path (health
   check of each model, start-of-debate estimate against what each gate says is left, role rotation, admission) and
   then the real runner, on the live register's exact settings. At the end: served answer, story, and every call's
@@ -44,8 +48,8 @@ The last line on the screen and the exit code say:
 |---|---|---|
 | 0 | PASS | Everything worked. The upload may go ahead. |
 | 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes. Owner decides. |
-| 20 | FAIL | A reply had the wrong format, a call failed, the debate did not finish, no answer or no story, or a gate stopped. Do not upload. `failures` in report.json is the diagnosis. |
-| 30 | NOT_PROVEN | It worked, but a model sat out as busy, so it was not tested. Run again later, or owner decides. |
+| 20 | FAIL | A reply had the wrong format, a call failed, the debate did not finish, no answer or no story, or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
+| 30 | NOT_PROVEN | It worked, but a model was busy (its call was refused as "too busy", not billed) and sat out the rest, or a gate was paused because too many calls were refused as busy, so some model was not tested to the end. Run again later, or owner decides. |
 | 40 | HARNESS_ERROR | The practice could not run (a start check refused, or the tool broke). Nothing about the release is known. |
 
 ## Safety rules built in
@@ -56,9 +60,17 @@ The last line on the screen and the exit code say:
   today" answer says active and open.
 - The settings file may hold only non-secret settings from an allow-list; a database address, a team list or
   anything key-shaped refuses.
-- After 3 "too busy" (unbilled) refusals in a row on one gate, or after any other refusal from a gate, the practice
-  never sends to that gate again (the gate itself halts after 5 in a row). Ctrl-C once: no new calls are sent, the
+- A busy model: when a model's call is refused as "too busy" and its one resend is refused too (not billed), that
+  model is marked busy and its remaining jobs are skipped (`SKIPPED_MODEL_BUSY`; formats mode). The other models,
+  on the same gate too, go on. In debate mode the runner makes a busy model sit out by itself. Either way the verdict
+  for that model is NOT_PROVEN, not FAIL. The gate's own "too many calls at once" refusal never marks a model busy.
+- The safety net on each gate: the practice never sends to a gate again after 4 "too busy" refusals in a row on it
+  (any answer resets the count, as the gate's own does; the gate itself halts at 5 in a row), or once the day's
+  count of them (root's `status` at the start plus those seen in the practice) reaches 12 (the gate halts at 20 and
+  the live site needs the room), or after any other refusal from the gate. Ctrl-C once: no new calls are sent, the
   call in flight finishes; Ctrl-C twice quits at once (avoid: a call killed mid-flight can halt the gate).
+- The app cannot yet tell "the vendor refused, not billed" from "the gate could not reach the vendor": both are
+  counted as "too busy" here, which can only stop sooner.
 - Calls go one at a time, with a 2-second gap between jobs in formats mode.
 
 ## Money and time (rough)

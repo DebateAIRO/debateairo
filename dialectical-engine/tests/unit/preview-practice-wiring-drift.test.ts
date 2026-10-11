@@ -5,6 +5,23 @@
 // A control proves the reader sees a missing key.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { buildDigestFollowingServeNodes, classifyComposedContent } from "@debateai/runner";
+import { buildSynthesisDigest, idShapedTokensIn } from "@debateai/serve";
+import { buildStoryMaterial, classifyStoryContent, loadStoryPack, resolveStoryPackDir } from "@debateai/story";
+import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
+import {
+  PRACTICE_COMPOSITION_BUDGET_HIGH,
+  practiceCandidateStatement,
+  practiceCannedStory,
+  practiceComposedPostCheck,
+  practiceDebateGraph,
+  practiceDigestNodes,
+  practiceReviewEdges,
+  practiceServedNodes,
+  practiceStoryPolicy,
+  practiceStorySnapshot
+} from "../../tools/preview-practice/practice-lanes.js";
+import { PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
 
 const read = (relative: string) => readFileSync(new URL(`../../${relative}`, import.meta.url), "utf8");
 
@@ -136,5 +153,136 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     expect(objectAfter(RUNNER_MAIN, anchor).has("bodyCostFallback")).toBe(true);
     expect(objectAfter(API_MAIN, "new PostgresAskApplication(pool, dispatcher, {").has("resolveRisk")).toBe(true);
     expect(objectKeys("{ resolveRisk(a: string, b: string) { return { c: a }; } }")).toEqual(new Set(["resolveRisk"]));
+  });
+});
+
+/*
+ * The formats mode's jobs must see the context the runner gives the same job in production. On 2026-10-11 the
+ * writer's citation check was handed only the served root (`servedNodes: [{ nodeId: "position:a" }]`), while the
+ * runner lets a draft cite every argued point (buildDigestFollowingServeNodes): Haiku's correct drafts citing the
+ * surviving objection were refused (COMPOSED_REF_NOT_IN_DIGEST@segments.1.node_refs.0), a false fail. These pins keep
+ * the lanes on the runner's own builders and rules.
+ */
+describe("preview practice lanes: the jobs see the runner's context", () => {
+  const RUNNER = withoutComments(read("apps/runner/src/index.ts"));
+  const LANES = withoutComments(read("tools/preview-practice/practice-lanes.ts"));
+  const q = PRACTICE_QUESTIONS[0]!;
+  const graph = practiceDebateGraph(q);
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+  const digest = (() => {
+    const outcome = buildSynthesisDigest({ nodes: practiceDigestNodes(graph), servedRootNodeId: graph.servedRootNodeId,
+      budgetBound: PRACTICE_COMPOSITION_BUDGET_HIGH });
+    if (outcome.kind !== "DIGEST") throw new Error("no digest");
+    return outcome.digest;
+  })();
+  const objection = graph.authored.find((node) => !graph.positionNodeIds.has(node.nodeId))!;
+  const draft = (refs: readonly string[], ids = ["segment:verdict", "segment:objection"]) => JSON.stringify({ segments: [
+    { segment_id: ids[0], text: "Free central buses are worth trying.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+    { segment_id: ids[1], text: "The cost objection stays open.", node_refs: refs, served_number_refs: [] }
+  ] });
+  const exemptTokens = idShapedTokensIn([q.questionLine, ...graph.authored.map((node) => node.statement)]);
+
+  it("the runner builds the writer's citable set with buildDigestFollowingServeNodes and hands that set to its classifier", () => {
+    expect(RUNNER).toMatch(/const servedNodes = buildDigestFollowingServeNodes\(\{\s*authored: authoredNodeList,\s*servedRootNodeId: servedRoot\.nodeId\s*\}\)/u);
+    expect(RUNNER).toMatch(/classifyContent: \(content\) => classifyComposedContent\(content, \{\s*digest: request\.digest,\s*servedNodes,/u);
+    // The practice takes the same function, never a hand-written set.
+    expect(LANES).toContain("buildDigestFollowingServeNodes({");
+    expect(LANES).not.toMatch(/servedNodes: \[/u);
+  });
+
+  it("the practice's citable set is every argued point, the served root alone load-bearing (as the runner's)", () => {
+    const served = practiceServedNodes(graph);
+    expect(served.map((node) => node.nodeId).sort()).toEqual(graph.authored.map((node) => node.nodeId).sort());
+    expect(served.filter((node) => node.loadBearing).map((node) => node.nodeId)).toEqual([graph.servedRootNodeId]);
+  });
+
+  it("the writer's check accepts a draft citing the surviving objection; the old root-only set refused it", () => {
+    const content = draft([objection.nodeId]);
+    expect(classifyComposedContent(content, { digest, servedNodes: practiceServedNodes(graph), exemptTokens }))
+      .toMatchObject({ parseStatus: "PARSED" });
+    const old = classifyComposedContent(content, { digest, servedNodes: [{ nodeId: graph.servedRootNodeId }], exemptTokens });
+    expect(old.parseStatus).toBe("SCHEMA_FAILED");
+    expect(old.parseError).toContain("COMPOSED_REF_NOT_IN_DIGEST");
+    expect(practiceComposedPostCheck(content, { digest, servedRootNodeId: graph.servedRootNodeId, servedNodes: practiceServedNodes(graph) }))
+      .toBeNull();
+  });
+
+  it("node ids are UUIDs as in production, so a draft that repeats one in its prose is refused as there", () => {
+    for (const node of digest.nodes) expect(node.nodeId).toMatch(UUID);
+    const naming = JSON.stringify({ segments: [{ segment_id: "segment:verdict", text: `Point ${objection.nodeId} stays open.`,
+      node_refs: ["primary"], served_number_refs: [] }] });
+    const classified = classifyComposedContent(naming, { digest, servedNodes: practiceServedNodes(graph), exemptTokens });
+    expect(classified.parseStatus).toBe("SCHEMA_FAILED");
+    expect(classified.parseError).toContain("COMPOSED_TEXT_NAMES_A_NODE");
+  });
+
+  it("the runner's reading after the format check: reserved and repeated segment ids end the writer's run (the practice too)", () => {
+    expect(RUNNER).toContain('if (segment.segment_id === "memory:disclosure") {');
+    expect(RUNNER).toContain('if (new Set(segments.map((segment) => segment.segmentId)).size !== segments.length) {');
+    expect(RUNNER).toMatch(/assertedNodeRefs: Object\.freeze\(segment\.node_refs\.map\(\(ref\) => composedNodeIdOf\(\{/u);
+    const context = { digest, servedRootNodeId: graph.servedRootNodeId, servedNodes: practiceServedNodes(graph) };
+    expect(practiceComposedPostCheck(draft([], ["memory:disclosure", "segment:objection"]), context)).toBe("COMPOSITION_CONTRACT_ERROR");
+    expect(practiceComposedPostCheck(draft([], ["segment:same", "segment:same"]), context)).toBe("COMPOSITION_CONTRACT_ERROR");
+  });
+
+  it("a surviving objection carries an attack arrow (the runner's rule), and two maker positions exist", () => {
+    for (const node of practiceDigestNodes(graph).filter((entry) => entry.isSurvivingObjection)) {
+      expect(node.polarityRelations.some((relation) => relation.polarity === "attack")).toBe(true);
+    }
+    expect(RUNNER).toMatch(/isSurvivingObjection: strengthByNodeId\.has\(node\.nodeId\)\s*&& materialised\.arrows\.some\(\(arrow\) => arrow\.sourceNodeId === node\.nodeId && arrow\.polarity === "attack"\)/u);
+    expect(graph.positionNodeIds.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("the digest's byte budget is the sealed high tier's composition bundle budget", async () => {
+    const row = (await buildDevelopmentRunnerRegisterRows()).find((entry) => entry.rowKey === "compositionBundleBudget");
+    expect((row?.value as { high?: number } | undefined)?.high).toBe(PRACTICE_COMPOSITION_BUDGET_HIGH);
+  });
+
+  it("the checker reads a written draft joined as serve joins it, never a bare position", () => {
+    expect(read("packages/serve/src/index.ts")).toContain('readCandidateStatement: (candidate) => candidate.map((segment) => segment.text).join("\\n")');
+    expect(practiceCandidateStatement(q).split("\n")).toHaveLength(2);
+    expect(practiceCandidateStatement(q)).not.toBe(q.position);
+  });
+
+  it("the checker's verdict is read with the runner's own mapping (evaluatorVerdictOf)", () => {
+    const mapping = (source: string, anchor: string) => {
+      const at = source.indexOf(anchor);
+      expect(at).toBeGreaterThanOrEqual(0);
+      const criteria = source.indexOf("criteria: Object.freeze(", at);
+      return group(source, source.indexOf("(", criteria)).replace(/\s+/gu, " ");
+    };
+    expect(mapping(LANES, "export function practiceEvaluatorVerdictOf"))
+      .toBe(mapping(RUNNER, "const evaluatorVerdictOf = (content: string): EvaluatorVerdict =>"));
+    expect(RUNNER).toMatch(/const evaluatorVerdictOf = \(content: string\): EvaluatorVerdict => \{\s*const parsed = parseEvaluatorOutput\(content\);\s*return assertEvaluatorVerdict\(/u);
+    expect(LANES).toMatch(/const parsed = parseEvaluatorOutput\(content\);\s*assertEvaluatorVerdict\(/u);
+  });
+
+  it("the story snapshot comes from the runner's own builder, and the story must give each position its own path", () => {
+    expect(LANES).toContain('import { buildStoryRunSnapshot } from "../../apps/runner/src/story-snapshot.js";');
+    expect(LANES).not.toMatch(/judgeArtifactRefs: new Map/u);
+    const pack = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
+    const snapshot = practiceStorySnapshot({ question: q, runId: "11111111-0000-4000-8000-000000000001",
+      workItemId: "11111111-0000-4000-8000-000000000002" });
+    expect("resolveProvider" in snapshot || "stepLease" in snapshot || "costFallback" in snapshot).toBe(false);
+    const built = buildStoryMaterial({ snapshot: snapshot as never, enrichment: new Map(),
+      budgetBytes: practiceStoryPolicy().materialBudget.high, shapeIds: new Set(pack.shapes.map((shape) => shape.id)) });
+    if (built.kind !== "OK") throw new Error("material too large");
+    expect(built.index.positionIds.size).toBe(2);
+    const canned = practiceCannedStory(pack, q);
+    expect(classifyStoryContent(canned, built.index)).toMatchObject({ parseStatus: "PARSED" });
+    const onePath = JSON.parse(canned) as { short: { paths: unknown[] } };
+    onePath.short.paths = onePath.short.paths.slice(0, 1);
+    const refused = classifyStoryContent(JSON.stringify(onePath), built.index);
+    expect(refused.parseStatus).not.toBe("PARSED");
+    expect(refused.parseError).toContain("STORY_POSITION_COVERAGE");
+  });
+
+  it("the review job is asked with no edge (a root), two (a cross-root response) and one (an expansion point)", () => {
+    expect(new Set([1, 2, 3].map((sample) => practiceReviewEdges(q, sample).length))).toEqual(new Set([0, 1, 2]));
+    expect(practiceReviewEdges(q, 2).map((edge) => edge.polarity).sort()).toEqual(["attack", "support"]);
+  });
+
+  it("control: the root-only set is what the pins refuse", () => {
+    expect("servedNodes: [{ nodeId: \"position:a\" }]").toMatch(/servedNodes: \[/u);
   });
 });

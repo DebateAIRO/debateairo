@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import type { PracticeDebateResult } from "./practice-debate.js";
 import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
-import type { PracticeGateName, PracticeGateObserver, PracticeGateSummary } from "./practice-gate-observer.js";
+import { practiceStopIsBusyPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
 import { latencySummary, practiceVerdict, type PracticeVerdictResult } from "./practice-verdict.js";
 
 export const PRACTICE_REPORT_SCHEMA = "preview-practice-report-v1" as const;
@@ -87,8 +87,20 @@ function gateHalted(observer: PracticeGateObserver, after: Readonly<Record<Pract
   return refused || notActive;
 }
 
+/** The brake stopped a gate for a refusal, a vendor error or an unreadable answer (not the operator, not busy refusals). */
 function gateStopped(observer: PracticeGateObserver): boolean {
-  return GATES.some((gate) => observer.stopped(gate) !== null && !/^OPERATOR_/u.test(observer.stopped(gate)!.reason));
+  return GATES.some((gate) => {
+    const stop = observer.stopped(gate);
+    return stop !== null && !/^OPERATOR_/u.test(stop.reason) && !practiceStopIsBusyPause(stop);
+  });
+}
+
+/** The gates the brake paused for busy refusals only, as `gate:reason`. */
+function gateBusyPauses(observer: PracticeGateObserver): readonly string[] {
+  return GATES.flatMap((gate) => {
+    const stop = observer.stopped(gate);
+    return practiceStopIsBusyPause(stop) ? [`${gate}:${stop!.reason}`] : [];
+  });
 }
 
 export type PracticeReport = Readonly<Record<string, unknown> & { verdict: PracticeVerdictResult["verdict"]; exitCode: number; reasons: readonly string[] }>;
@@ -108,8 +120,8 @@ export function formatsReport(input: Readonly<{
     attempt.parseStatus === "PARSE_FAILED" || attempt.parseStatus === "SCHEMA_FAILED" || attempt.parseStatus === "UNPARSED").length
     + (sample.status === "POST_CHECK_FAILED" ? 1 : 0), 0);
   const failedCalls = samples.filter((sample) => sample.status === "CALL_FAILED").length;
-  const exercised = new Set(samples.filter((sample) => sample.status !== "SKIPPED_GATE_STOPPED" && sample.status !== "UNBILLED_REFUSED")
-    .map((sample) => sample.model));
+  const exercised = new Set(samples.filter((sample) => sample.status !== "SKIPPED_GATE_STOPPED" && sample.status !== "UNBILLED_REFUSED"
+    && sample.status !== "SKIPPED_MODEL_BUSY").map((sample) => sample.model));
   const verdict = practiceVerdict({
     harnessError: null,
     completed: !input.interrupted,
@@ -119,9 +131,11 @@ export function formatsReport(input: Readonly<{
     failedCalls,
     gateHalted: gateHalted(input.observer, { deepinfra: input.remaining.deepinfra.after, anthropic: input.remaining.anthropic.after }),
     gateStopped: gateStopped(input.observer),
+    gateBusyPauses: gateBusyPauses(input.observer),
     notExercisedModels: input.result.models.filter((model) => !exercised.has(model)),
+    busyModels: input.result.busyModels,
     unbilledRefusals: GATES.reduce((sum, gate) => sum + input.observer.summary(gate).unbilled, 0),
-    p90ByModel: p90ByModel(samples.filter((sample) => sample.status !== "SKIPPED_GATE_STOPPED")
+    p90ByModel: p90ByModel(samples.filter((sample) => sample.status !== "SKIPPED_GATE_STOPPED" && sample.status !== "SKIPPED_MODEL_BUSY")
       .map((sample) => ({ model: sample.model, latencies: sample.attempts.map((attempt) => attempt.latencyMs) })))
   });
   const byModelAndLane = input.result.models.flatMap((model) => input.result.lanes.map((lane) => {
@@ -138,7 +152,7 @@ export function formatsReport(input: Readonly<{
     schema: PRACTICE_REPORT_SCHEMA, mode: "formats", ...verdict,
     startedAt: input.startedAt.toISOString(), finishedAt: input.finishedAt.toISOString(),
     wallSeconds: Math.round((input.finishedAt.getTime() - input.startedAt.getTime()) / 1000),
-    models: input.result.models, lanes: input.result.lanes,
+    models: input.result.models, lanes: input.result.lanes, busyModels: input.result.busyModels,
     byModelAndLane,
     gates: Object.fromEntries(GATES.map((gate) => [gate, gateBlock(input.observer, gate, input.remaining[gate])])),
     totals: Object.freeze({
@@ -159,6 +173,10 @@ export function debateReport(input: Readonly<{
   finishedAt: Date;
 }>): PracticeReport {
   const r = input.result;
+  // The members the runner made sit out for being busy during the debate (their last call ended refused, not billed),
+  // beside those that sat out at the ask: not exercised to the end, so NOT_PROVEN, never FAIL on their own.
+  const satOutAtAsk = new Set(r.admission.satOut.map((entry) => entry.model));
+  const busyDuringRun = input.observer.modelsEndingUnbilled().filter((model) => !satOutAtAsk.has(model));
   const verdict = practiceVerdict({
     harnessError: null,
     completed: r.admission.admitted && r.run.workItemOutcome === "COMPLETED",
@@ -168,7 +186,9 @@ export function debateReport(input: Readonly<{
     failedCalls: r.failedCalls,
     gateHalted: gateHalted(input.observer, { deepinfra: r.remaining.deepinfra.after, anthropic: r.remaining.anthropic.after }),
     gateStopped: gateStopped(input.observer),
+    gateBusyPauses: gateBusyPauses(input.observer),
     notExercisedModels: r.admission.satOut.map((entry) => entry.model),
+    busyModels: busyDuringRun,
     unbilledRefusals: GATES.reduce((sum, gate) => sum + input.observer.summary(gate).unbilled, 0),
     p90ByModel: Object.fromEntries(Object.entries(r.byModelAndSite.reduce<Record<string, number>>((acc, row) => {
       if (row.latencyMs.p90 !== null) acc[row.model] = Math.max(acc[row.model] ?? 0, row.latencyMs.p90);
@@ -184,6 +204,7 @@ export function debateReport(input: Readonly<{
     register: r.register,
     ask: Object.freeze({ questionId: r.questionId, depth: r.depth, planTier: "premium" }),
     admission: r.admission,
+    busyDuringRun,
     run: r.run,
     probes: r.probes,
     byModelAndSite: r.byModelAndSite,

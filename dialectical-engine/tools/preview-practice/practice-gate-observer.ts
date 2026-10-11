@@ -7,10 +7,21 @@
  * took, whether the vendor answered, whether the gate refused the call as "too busy, not billed", and the token
  * counts the vendor reported. It keeps no request or reply text.
  *
- * It is also the brake. The live site shares each gate's halt counters (five unbilled refusals in a row halt the
- * gate). After THREE unbilled refusals in a row on one gate, or after any gate answer that is neither a vendor
- * answer nor an unbilled refusal (the gate refused or halted), the practice never sends to that gate again: every
- * later call fails at once, before the socket is opened.
+ * It is also the brake, a safety net behind the per-model rule (formats: a model whose call ends refused as busy is
+ * skipped for the rest of the practice; debate: the runner makes it sit out). The live site shares each gate's halt
+ * counters: five refusals "not reached" or "refused, not billed" in a row halt the gate (a settled reply resets that
+ * run), and the twentieth "refused, not billed" of one Bucharest day halts it too. So the practice never sends to a
+ * gate again
+ *  - after FOUR such refusals in a row on it (any vendor answer resets the run, as the gate's does), or
+ *  - once the day's count (root's `status` at the start, plus those seen in this practice) reaches TWELVE, so the
+ *    next one would pass twelve and the live site keeps room under the gate's twenty, or
+ *  - after any gate answer that is neither a vendor answer nor an unbilled refusal (the gate refused or halted).
+ * Every later call to that gate fails at once, before the socket is opened. The gate's own "too many calls in flight"
+ * refusal is refused before the gate reserves anything and moves neither of its counters, so it moves neither here.
+ *
+ * What the app's port tells apart (packages/providers/src/preview-test.ts previewAuthorityRefusal): the gate's own
+ * "too many calls in flight" (CONCURRENCY_LIMIT_REACHED) has its own message; PROVIDER_REFUSED_UNBILLED and
+ * PROVIDER_NOT_REACHED reach the app as the same refusal. Both are counted here, which can only stop sooner.
  */
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -22,8 +33,10 @@ import {
 
 export type PracticeGateName = "deepinfra" | "anthropic";
 
-/** The default brake: one below the gate's own five-in-a-row halt, with room for the live site. */
-const PRACTICE_MAX_CONSECUTIVE_UNBILLED = 3;
+/** The brake in a row: one below the gate's own five-in-a-row halt. */
+export const PRACTICE_MAX_CONSECUTIVE_UNBILLED = 4;
+/** The brake for the day: the gate halts at its twentieth unbilled release of a day; the live site keeps the rest. */
+export const PRACTICE_BRAKE_UNBILLED_TODAY = 12;
 /** The code every call carries once a gate's brake is on. Nothing was sent. */
 export const PRACTICE_GATE_STOPPED = "PRACTICE_GATE_STOPPED" as const;
 
@@ -65,6 +78,14 @@ export type PracticeWireEvent = Readonly<{
 
 export type PracticeGateStop = Readonly<{ gate: PracticeGateName; reason: string; atSeq: number }>;
 
+/**
+ * A stop for busy refusals only (in a row, or the day's room), as opposed to a gate that refused, halted or could not
+ * be read. A busy pause proves nothing wrong with the release: the models behind it were not exercised (NOT_PROVEN).
+ */
+export function practiceStopIsBusyPause(stop: PracticeGateStop | null): boolean {
+  return stop !== null && /^UNBILLED_/u.test(stop.reason);
+}
+
 export type PracticeGateSummary = Readonly<{
   calls: number;
   vendorOk: number;
@@ -75,6 +96,10 @@ export type PracticeGateSummary = Readonly<{
   transportFailed: number;
   stoppedLocally: number;
   maxConsecutiveUnbilled: number;
+  /** Root's `status` count of the day's unbilled releases at the start (null when not given). */
+  unbilledTodayAtStart: number | null;
+  /** The busy refusals seen in this practice that the gate's day count may include (not the in-flight limit). */
+  unbilledCounted: number;
   stop: PracticeGateStop | null;
 }>;
 
@@ -114,21 +139,59 @@ export function vendorUsage(gate: PracticeGateName, vendorBody: string): Readonl
 
 export class PracticeGateObserver {
   readonly #maxConsecutiveUnbilled: number;
+  readonly #maxUnbilledToday: number;
+  readonly #atStart: Readonly<Partial<Record<PracticeGateName, number>>>;
   readonly #now: () => number;
   readonly #events: PracticeWireEvent[] = [];
   readonly #consecutive = new Map<PracticeGateName, number>();
   readonly #maxConsecutive = new Map<PracticeGateName, number>();
+  readonly #counted = new Map<PracticeGateName, number>();
   readonly #stops = new Map<PracticeGateName, PracticeGateStop>();
   #seq = 0;
 
-  constructor(options: Readonly<{ maxConsecutiveUnbilled?: number; now?: () => number }> = {}) {
+  constructor(options: Readonly<{
+    maxConsecutiveUnbilled?: number;
+    maxUnbilledToday?: number;
+    /** Root's `status` count of each gate's unbilled releases today, read at the start. */
+    unbilledTodayAtStart?: Readonly<Partial<Record<PracticeGateName, number>>>;
+    now?: () => number;
+  }> = {}) {
     const limit = options.maxConsecutiveUnbilled ?? PRACTICE_MAX_CONSECUTIVE_UNBILLED;
     if (!Number.isSafeInteger(limit) || limit < 1) throw new TypeError("PRACTICE_BRAKE_LIMIT_INVALID");
+    const day = options.maxUnbilledToday ?? PRACTICE_BRAKE_UNBILLED_TODAY;
+    if (!Number.isSafeInteger(day) || day < 1) throw new TypeError("PRACTICE_BRAKE_LIMIT_INVALID");
+    const atStart = options.unbilledTodayAtStart ?? {};
+    if (Object.values(atStart).some((value) => !Number.isSafeInteger(value) || value! < 0)) throw new TypeError("PRACTICE_BRAKE_LIMIT_INVALID");
     this.#maxConsecutiveUnbilled = limit;
+    this.#maxUnbilledToday = day;
+    this.#atStart = Object.freeze({ ...atStart });
     this.#now = options.now ?? (() => performance.now());
+    for (const gate of ["deepinfra", "anthropic"] as const) this.#checkDay(gate);
   }
 
   get events(): readonly PracticeWireEvent[] { return this.#events; }
+
+  /** The gate's day count as far as the practice knows it: root's count at the start plus the refusals seen since. */
+  #dayCount(gate: PracticeGateName): number {
+    return (this.#atStart[gate] ?? 0) + (this.#counted.get(gate) ?? 0);
+  }
+
+  /** Stops the gate once one more busy refusal would pass the day's cap. */
+  #checkDay(gate: PracticeGateName): void {
+    const count = this.#dayCount(gate);
+    if (count >= this.#maxUnbilledToday) this.stop(gate, `UNBILLED_TODAY_${String(count)}`);
+  }
+
+  /**
+   * The models whose LAST call through the gates ended refused as busy (unbilled, any kind): in a finished debate,
+   * exactly the members the runner made sit out for being busy (apps/runner/src/run-sit-out.ts reads the same
+   * refusal), so they were not exercised to the end.
+   */
+  modelsEndingUnbilled(): readonly string[] {
+    const last = new Map<string, PracticeWireEvent>();
+    for (const event of this.#events) if (event.outcome !== "STOPPED") last.set(event.model, event);
+    return Object.freeze([...last.values()].filter((event) => event.outcome === "UNBILLED").map((event) => event.model).sort());
+  }
 
   stopped(gate: PracticeGateName): PracticeGateStop | null { return this.#stops.get(gate) ?? null; }
 
@@ -150,6 +213,8 @@ export class PracticeGateObserver {
       transportFailed: of("TRANSPORT_FAILED"),
       stoppedLocally: of("STOPPED"),
       maxConsecutiveUnbilled: this.#maxConsecutive.get(gate) ?? 0,
+      unbilledTodayAtStart: this.#atStart[gate] ?? null,
+      unbilledCounted: this.#counted.get(gate) ?? 0,
       stop: this.stopped(gate)
     });
   }
@@ -160,10 +225,14 @@ export class PracticeGateObserver {
     const gate = event.gate;
     if (event.outcome === "STOPPED") return;
     if (event.outcome === "UNBILLED") {
+      // The gate's own in-flight limit refuses before it reserves anything: neither of its counters moves.
+      if (event.concurrencyLimit) return;
       const run = (this.#consecutive.get(gate) ?? 0) + 1;
       this.#consecutive.set(gate, run);
       this.#maxConsecutive.set(gate, Math.max(run, this.#maxConsecutive.get(gate) ?? 0));
+      this.#counted.set(gate, (this.#counted.get(gate) ?? 0) + 1);
       if (run >= this.#maxConsecutiveUnbilled) this.stop(gate, `UNBILLED_IN_A_ROW_${String(run)}`);
+      this.#checkDay(gate);
       return;
     }
     this.#consecutive.set(gate, 0);

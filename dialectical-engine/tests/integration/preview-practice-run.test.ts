@@ -24,10 +24,13 @@ import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_RO
 import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, publishPreviewRegisterV2, readSealedSnapshot } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
 import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { runPractice } from "../../tools/preview-practice/practice.js";
+import { practiceDebateGraph } from "../../tools/preview-practice/practice-lanes.js";
+import { PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
 import { startPreviewGateStubs, type GateOverride, type GateRequest } from "../support/preview-gate-stubs.js";
 import { startTestDatabase } from "../support/testDatabase.js";
 
 const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
+const GLM = "zai-org/GLM-5.3-Flash";
 const FIVE = ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", MIMO, "Qwen/Qwen3.8-Flash", "claude-haiku-5-5"];
 const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
 const OBSERVATION = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
@@ -136,6 +139,49 @@ describe("preview practice: formats mode", () => {
     expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
     expect(stubs.requests.filter((request) => request.kind === "STORYTELLER")).toHaveLength(5);
     expect(stubs.requests.filter((request) => request.kind === "STORY_CHECKER")).toHaveLength(5);
+  }, 300_000);
+
+  it("GLM refused as busy every time: GLM SKIPPED_MODEL_BUSY after its first job, the other four all exercised: NOT_PROVEN (exit 30)", async () => {
+    const { stubs, env, common, quiet } = await scenario((request) => request.model === GLM ? { unbilled: true } : null);
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
+    const report = outcome.report as unknown as {
+      verdict: string; reasons: string[]; busyModels: string[];
+      byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[];
+      gates: Record<string, { observed: { stop: unknown; unbilled: number } }>;
+    };
+    expect(report.verdict).toBe("NOT_PROVEN");
+    expect(outcome.exitCode).toBe(30);
+    expect(report.reasons).toContain(`MODEL_BUSY:${GLM}`);
+    expect(report.reasons.some((reason) => reason.startsWith("FORMAT_FAILED") || reason.startsWith("CALL_FAILED")
+      || reason.startsWith("GATE_"))).toBe(false);
+    expect(report.busyModels).toEqual([GLM]);
+    const glm = report.byModelAndLane.filter((row) => row.model === GLM);
+    expect(glm[0]!.statuses).toEqual({ UNBILLED_REFUSED: 1 });
+    for (const row of glm.slice(1)) expect(row.statuses).toEqual({ SKIPPED_MODEL_BUSY: 1 });
+    // The other three DeepInfra models and Haiku did every job.
+    for (const row of report.byModelAndLane.filter((entry) => entry.model !== GLM)) expect(row.statuses).toEqual({ PARSED: 1 });
+    for (const model of FIVE.filter((entry) => entry !== GLM)) {
+      expect(stubs.requests.filter((request) => request.model === model && request.answer === "OK").length).toBeGreaterThanOrEqual(9);
+    }
+    // GLM was asked once and resent once, never again; the DeepInfra gate was never stopped.
+    expect(stubs.requests.filter((request) => request.model === GLM).map((request) => request.answer)).toEqual(["UNBILLED", "UNBILLED"]);
+    expect(report.gates.deepinfra!.observed.stop).toBeNull();
+  }, 300_000);
+
+  it("the answer-writer's draft citing the surviving objection is accepted (the old root-only citable set refused it): PASS", async () => {
+    const graph = practiceDebateGraph(PRACTICE_QUESTIONS[0]!);
+    const objection = graph.authored.find((node) => !graph.positionNodeIds.has(node.nodeId))!.nodeId;
+    const citesObjection = JSON.stringify({ segments: [
+      { segment_id: "segment:verdict", text: "Free central buses are worth trying.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+      { segment_id: "segment:objection", text: "The cost objection stays open.", node_refs: [objection], served_number_refs: [] }
+    ] });
+    const { stubs, env, common, quiet } = await scenario((request) => request.kind === "COMPOSE" ? { content: citesObjection } : null);
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0", "--lanes", "SYNTHESIZER"], env, quiet);
+    const report = outcome.report as unknown as { verdict: string; reasons: string[];
+      byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[] };
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(report.byModelAndLane.map((row) => row.statuses)).toEqual(FIVE.map(() => ({ PARSED: 1 })));
+    expect(stubs.requests.filter((request) => request.kind === "COMPOSE")).toHaveLength(5);
   }, 300_000);
 });
 

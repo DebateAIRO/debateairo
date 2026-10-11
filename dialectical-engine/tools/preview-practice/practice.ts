@@ -135,8 +135,11 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     directory = assertOutsideRepository(args.flags.get("--out") ?? defaultReportDirectory(mode, startedAt), repositoryRoot());
     const sockets = practiceSocketsFromEnvironment(env);
     const settings = readPracticeSettings(required(args, "--settings"));
+    const unbilledTodayAtStart: Record<PracticeGateName, number> = { deepinfra: 0, anthropic: 0 };
     for (const gate of ["deepinfra", "anthropic"] as const) {
-      assertGateStatusAllowsPractice(gate, readGateStatus(gate, required(args, `--gate-status-${gate}`)));
+      const status = readGateStatus(gate, required(args, `--gate-status-${gate}`));
+      assertGateStatusAllowsPractice(gate, status);
+      unbilledTodayAtStart[gate] = status.todayUnbilled;
     }
     const register = mode === "debate" ? (() => {
       let text: string;
@@ -146,7 +149,8 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       }
       return parsePracticeRegisterExport(text);
     })() : null;
-    observer = new PracticeGateObserver();
+    // The brake counts the day's unbilled refusals from root's count at the start (practice-gate-observer.ts).
+    observer = new PracticeGateObserver({ unbilledTodayAtStart });
     let stopRequested = false;
     const stop = () => {
       stopRequested = true;

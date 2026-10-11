@@ -7,7 +7,8 @@
  *  - PASS_WITH_WARNINGS (exit 10): it worked, but some calls were refused as "too busy" before they recovered, or a
  *    model was slow (its 90th-percentile call took more than two minutes).
  *  - FAIL (exit 20): something a person would have seen went wrong.
- *  - NOT_PROVEN (exit 30): it worked, but a model sat out as busy, so that model was not tested.
+ *  - NOT_PROVEN (exit 30): it worked, but a model sat out as busy (or a gate was paused because too many calls were
+ *    refused as busy), so that model was not tested to the end.
  *  - HARNESS_ERROR (exit 40): the practice itself could not run (a start check refused, or the tool broke). No verdict
  *    about the release.
  * When several apply, the first in this order wins: HARNESS_ERROR, FAIL, NOT_PROVEN, PASS_WITH_WARNINGS, PASS.
@@ -38,10 +39,20 @@ export type PracticeVerdictInput = Readonly<{
   failedCalls: number;
   /** A gate's state after the practice is not active, or a gate refused or halted during it. */
   gateHalted: boolean;
-  /** The practice's own brake stopped a gate (three unbilled refusals in a row, or a gate refusal). */
+  /** The practice's own brake stopped a gate for a gate refusal, a vendor error or an unreadable answer. */
   gateStopped: boolean;
+  /**
+   * Gates the practice's brake paused for busy refusals only (four in a row, or the day's room used up): nothing
+   * failed, the models behind them were not exercised. Optional: none when absent.
+   */
+  gateBusyPauses?: readonly string[];
   /** Models that sat out (busy at ask time) or were never exercised (formats: a gate stopped before them). */
   notExercisedModels: readonly string[];
+  /**
+   * Models whose call ended refused as busy, so the rest of their jobs were skipped (formats) or they sat out the rest
+   * of the debate (debate). Not a failure: NOT_PROVEN for that model. Optional: none when absent.
+   */
+  busyModels?: readonly string[];
   /** Unbilled ("too busy") refusals seen during a practice that otherwise went through. */
   unbilledRefusals: number;
   /** Each model's 90th-percentile latency in ms. */
@@ -68,7 +79,12 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
   if (input.failedCalls > 0) fail.push(`CALL_FAILED:${String(input.failedCalls)}`);
   if (input.gateHalted) fail.push("GATE_HALTED");
   if (input.gateStopped) fail.push("GATE_STOPPED_BY_PRACTICE");
-  const notProven = [...input.notExercisedModels].sort().map((model) => `MODEL_NOT_EXERCISED:${model}`);
+  const busy = [...new Set(input.busyModels ?? [])].sort();
+  const notProven = [
+    ...busy.map((model) => `MODEL_BUSY:${model}`),
+    ...[...new Set(input.notExercisedModels)].filter((model) => !busy.includes(model)).sort().map((model) => `MODEL_NOT_EXERCISED:${model}`),
+    ...[...(input.gateBusyPauses ?? [])].sort().map((pause) => `GATE_PAUSED_BUSY:${pause}`)
+  ];
   const warn: string[] = [];
   if (input.unbilledRefusals > 0) warn.push(`UNBILLED_REFUSALS:${String(input.unbilledRefusals)}`);
   for (const [model, p90] of Object.entries(input.p90ByModel).sort(([a], [b]) => a.localeCompare(b))) {
