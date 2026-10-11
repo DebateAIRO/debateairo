@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "MIJN ACCOUNT VERWIJDEREN",
   "settings.erasure.authorizing": "Autoriseren…",
   "settings.erasure.schedule": "Verwijdering plannen",
+  "settings.erasure.endsContract": "Als u uw account sluit, eindigt ook uw overeenkomst met ons.",
   "settings.sessions.operationFailed": "Sessiehandeling mislukt",
   "settings.sessions.signedIn": "Aangemeld op {date}",
   "settings.sessions.title": "Actieve sessies",

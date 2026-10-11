@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "احذف حسابي",
   "settings.erasure.authorizing": "جارٍ منح التصريح…",
   "settings.erasure.schedule": "جدولة الحذف",
+  "settings.erasure.endsContract": "إغلاق حسابك يُنهي عقدك معنا.",
   "settings.sessions.operationFailed": "فشلت عملية الجلسة",
   "settings.sessions.signedIn": "تم تسجيل الدخول في {date}",
   "settings.sessions.title": "الجلسات النشطة",

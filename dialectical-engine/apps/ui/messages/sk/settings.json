@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "ODSTRÁNIŤ MÔJ ÚČET",
   "settings.erasure.authorizing": "Autorizuje sa…",
   "settings.erasure.schedule": "Naplánovať odstránenie",
+  "settings.erasure.endsContract": "Zrušením účtu ukončíte aj zmluvu, ktorú máte s nami.",
   "settings.sessions.operationFailed": "Operácia s reláciou zlyhala",
   "settings.sessions.signedIn": "Prihlásenie {date}",
   "settings.sessions.title": "Aktívne relácie",

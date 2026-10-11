@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "DELETE MY ACCOUNT",
   "settings.erasure.authorizing": "Authorizing…",
   "settings.erasure.schedule": "Schedule deletion",
+  "settings.erasure.endsContract": "Closing your account ends your contract with us.",
   "settings.sessions.operationFailed": "Session operation failed",
   "settings.sessions.signedIn": "Signed in {date}",
   "settings.sessions.title": "Active sessions",

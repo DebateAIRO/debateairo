@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "删除我的账户",
   "settings.erasure.authorizing": "正在授权…",
   "settings.erasure.schedule": "安排删除",
+  "settings.erasure.endsContract": "关闭您的账户也将终止您与我们之间的合同。",
   "settings.sessions.operationFailed": "会话操作失败",
   "settings.sessions.signedIn": "登录时间：{date}",
   "settings.sessions.title": "活跃会话",

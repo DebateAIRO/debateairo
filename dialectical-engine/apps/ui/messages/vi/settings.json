@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "XÓA TÀI KHOẢN CỦA TÔI",
   "settings.erasure.authorizing": "Đang xác thực…",
   "settings.erasure.schedule": "Lên lịch xóa",
+  "settings.erasure.endsContract": "Đóng tài khoản của bạn cũng chấm dứt hợp đồng của bạn với chúng tôi.",
   "settings.sessions.operationFailed": "Thao tác phiên thất bại",
   "settings.sessions.signedIn": "Đăng nhập lúc {date}",
   "settings.sessions.title": "Phiên đang hoạt động",

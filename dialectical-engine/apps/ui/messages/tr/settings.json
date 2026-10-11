@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "HESABIMI SİL",
   "settings.erasure.authorizing": "Yetkilendiriliyor…",
   "settings.erasure.schedule": "Silmeyi planla",
+  "settings.erasure.endsContract": "Hesabınızı kapatmak, bizimle olan sözleşmenizi de sona erdirir.",
   "settings.sessions.operationFailed": "Oturum işlemi başarısız oldu",
   "settings.sessions.signedIn": "Oturum açma: {date}",
   "settings.sessions.title": "Etkin oturumlar",

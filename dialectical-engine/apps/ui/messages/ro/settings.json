@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "ȘTERGEȚI CONTUL MEU",
   "settings.erasure.authorizing": "Se autorizează…",
   "settings.erasure.schedule": "Programați ștergerea",
+  "settings.erasure.endsContract": "Închiderea contului încheie și contractul nostru cu dumneavoastră.",
   "settings.sessions.operationFailed": "Operațiunea asupra sesiunii a eșuat",
   "settings.sessions.signedIn": "Autentificat la {date}",
   "settings.sessions.title": "Sesiuni active",

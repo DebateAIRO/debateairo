@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "DZĒST MANU KONTU",
   "settings.erasure.authorizing": "Autorizē…",
   "settings.erasure.schedule": "Ieplānot dzēšanu",
+  "settings.erasure.endsContract": "Slēdzot kontu, izbeidzas arī jūsu līgums ar mums.",
   "settings.sessions.operationFailed": "Sesijas darbība neizdevās",
   "settings.sessions.signedIn": "Pierakstīšanās: {date}",
   "settings.sessions.title": "Aktīvās sesijas",

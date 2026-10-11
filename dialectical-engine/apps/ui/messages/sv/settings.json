@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "RADERA MITT KONTO",
   "settings.erasure.authorizing": "Kontrollerar behörighet…",
   "settings.erasure.schedule": "Schemalägg radering",
+  "settings.erasure.endsContract": "När du stänger ditt konto avslutas även ditt avtal med oss.",
   "settings.sessions.operationFailed": "Sessionsåtgärden misslyckades",
   "settings.sessions.signedIn": "Inloggad {date}",
   "settings.sessions.title": "Aktiva sessioner",

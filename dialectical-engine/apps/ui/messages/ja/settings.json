@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "アカウントを削除",
   "settings.erasure.authorizing": "承認中…",
   "settings.erasure.schedule": "削除を予約",
+  "settings.erasure.endsContract": "アカウントを閉じると、当社との契約も終了します。",
   "settings.sessions.operationFailed": "セッション操作に失敗しました",
   "settings.sessions.signedIn": "サインイン日時：{date}",
   "settings.sessions.title": "有効なセッション",

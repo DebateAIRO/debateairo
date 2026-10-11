@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "KUSTUTAGE MINU KONTO",
   "settings.erasure.authorizing": "Autoriseerimine…",
   "settings.erasure.schedule": "Ajastage kustutamine",
+  "settings.erasure.endsContract": "Konto sulgemisega lõpeb ka teie leping meiega.",
   "settings.sessions.operationFailed": "Seansitoiming nurjus",
   "settings.sessions.signedIn": "Sisse logitud {date}",
   "settings.sessions.title": "Aktiivsed seansid",

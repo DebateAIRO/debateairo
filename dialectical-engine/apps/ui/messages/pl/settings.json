@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "USUŃ MOJE KONTO",
   "settings.erasure.authorizing": "Autoryzowanie…",
   "settings.erasure.schedule": "Zaplanuj usunięcie",
+  "settings.erasure.endsContract": "Zamknięcie konta kończy także Twoją umowę z nami.",
   "settings.sessions.operationFailed": "Operacja na sesji nie powiodła się",
   "settings.sessions.signedIn": "Zalogowano {date}",
   "settings.sessions.title": "Aktywne sesje",

@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "ΔΙΑΓΡΑΨΤΕ ΤΟΝ ΛΟΓΑΡΙΑΣΜΟ ΜΟΥ",
   "settings.erasure.authorizing": "Έγκριση…",
   "settings.erasure.schedule": "Προγραμματισμός διαγραφής",
+  "settings.erasure.endsContract": "Το κλείσιμο του λογαριασμού σας τερματίζει και τη σύμβασή σας μαζί μας.",
   "settings.sessions.operationFailed": "Η ενέργεια συνεδρίας απέτυχε",
   "settings.sessions.signedIn": "Σύνδεση στις {date}",
   "settings.sessions.title": "Ενεργές συνεδρίες",

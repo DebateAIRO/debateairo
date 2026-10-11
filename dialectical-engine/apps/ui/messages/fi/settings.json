@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "POISTA TILINI",
   "settings.erasure.authorizing": "Valtuutetaan…",
   "settings.erasure.schedule": "Ajasta poisto",
+  "settings.erasure.endsContract": "Tilin sulkeminen päättää myös sopimuksesi kanssamme.",
   "settings.sessions.operationFailed": "Istuntotoiminto epäonnistui",
   "settings.sessions.signedIn": "Kirjauduttu {date}",
   "settings.sessions.title": "Aktiiviset istunnot",

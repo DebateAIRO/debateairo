@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "MEIN KONTO LÖSCHEN",
   "settings.erasure.authorizing": "Wird autorisiert…",
   "settings.erasure.schedule": "Löschung planen",
+  "settings.erasure.endsContract": "Wenn Sie Ihr Konto schließen, endet auch Ihr Vertrag mit uns.",
   "settings.sessions.operationFailed": "Sitzungsaktion fehlgeschlagen",
   "settings.sessions.signedIn": "Angemeldet am {date}",
   "settings.sessions.title": "Aktive Sitzungen",

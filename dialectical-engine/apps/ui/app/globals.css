@@ -2492,6 +2492,8 @@ a:focus-visible {
 
 .authAlert {
   margin-top: 30px;
+  /* The passkey button or form that follows an error must not touch it. */
+  margin-bottom: 16px;
   border-color: var(--con-border);
   background: var(--con-bg);
   color: var(--con-text);

@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "ВИДАЛИТИ МІЙ ОБЛІКОВИЙ ЗАПИС",
   "settings.erasure.authorizing": "Авторизація…",
   "settings.erasure.schedule": "Запланувати видалення",
+  "settings.erasure.endsContract": "Закриття облікового запису припиняє і ваш договір з нами.",
   "settings.sessions.operationFailed": "Не вдалося виконати дію із сеансом",
   "settings.sessions.signedIn": "Вхід виконано {date}",
   "settings.sessions.title": "Активні сеанси",
