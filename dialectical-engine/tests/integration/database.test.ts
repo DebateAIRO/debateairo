@@ -28,8 +28,10 @@ import {
   RunCostSubstitutionRepository,
   RunRepository,
   ServeDisclosureRepository,
+  insertRunRoleRotation,
   migrate,
   readCallPrompt,
+  type RunRoleRotationInput,
   type StoredServeDisclosure
 } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
@@ -9860,9 +9862,17 @@ async function pinRoleAssignment(runId: string, assignment: ReturnType<typeof pi
   );
 }
 
+/** Role rotation (spec 2026-10-11 Part 6): a rotation pin as admission writes it, without its run. */
+type RunRoleRotationInputWithoutRun = Omit<RunRoleRotationInput, "runId">;
+
 async function executeSeatScenario(input: {
   readonly label: string;
-  readonly assignment: ReturnType<typeof pinnedAssignment>;
+  /** Absent: no scorecard assignment is pinned (a legacy run, or a rotated one). */
+  readonly assignment?: ReturnType<typeof pinnedAssignment>;
+  /** Role rotation: the four roles admission picked, pinned beside the run before its work is queued. */
+  readonly rotation?: RunRoleRotationInputWithoutRun;
+  /** Role rotation: the frozen panel's size (default 2: the primary and the secondary debate). */
+  readonly panelSize?: number;
   readonly primary: readonly ProviderDoubleResponse[];
   readonly secondary: readonly ProviderDoubleResponse[];
   readonly third: readonly ProviderDoubleResponse[];
@@ -9914,8 +9924,9 @@ async function executeSeatScenario(input: {
   }));
   try {
     const question = `${input.label}-${randomUUID()}`;
-    const runId = await createRun(question, 100, 2, 1, `asker:${question}`, undefined, input.language ?? null);
-    await pinRoleAssignment(runId, input.assignment);
+    const runId = await createRun(question, 100, input.panelSize ?? 2, 1, `asker:${question}`, undefined, input.language ?? null);
+    if (input.assignment !== undefined) await pinRoleAssignment(runId, input.assignment);
+    if (input.rotation !== undefined) await insertRunRoleRotation(database.pool, { runId, ...input.rotation });
     const workItemId = await new WorkItemRepository(database.pool).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `${input.label}:${runId}`
     });
@@ -11924,6 +11935,420 @@ describe("P4-D · control: a legacy run's story keeps the register's refs", () =
       { call_site_key: "STORY:STORYTELLER:1", actor_ref: PRIMARY_REF, candidate_id: null },
       { call_site_key: "STORY:CHECKER:1", actor_ref: PRIMARY_REF, candidate_id: null }
     ]);
+  });
+});
+
+/**
+ * Role rotation (spec 2026-10-11 Part 6) — a debate admission rotated carries a pin beside its run: the
+ * answer's writer and checker and the story's teller and checker. The runner swaps the two sealed answer
+ * refs for the pinned ones for that run only, and hands the story the pinned pair; everything else is
+ * today's legacy path. The three seat routes all debate here (`panelSize: 3`, the fixture panel's three
+ * refs), because admission picks only among the debate's own panel. The sealed refs of `runnerSettings()`
+ * name the primary for both answer roles, so a rotated answer on the secondary and the third is the pin's.
+ * Every route is handed spare judgements and reviews (the doubles serve by kind), so the legacy book's
+ * three-debater run never runs dry; only the routes a row names may write or check the answer.
+ */
+describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come from its pin", () => {
+  const pick = (route: SeatRoute) => ({
+    providerRef: SEAT_ROUTES[route].providerRef, modelId: SEAT_ROUTES[route].model, maker: SEAT_ROUTES[route].maker
+  });
+  const ROTATION: RunRoleRotationInputWithoutRun = Object.freeze({
+    rule: "LEAST_SHARE_SEEDED_TIE_V1" as const,
+    answerWriter: pick("secondary"), answerChecker: pick("third"), storyteller: pick("third"), storyChecker: pick("primary"),
+    eligibleModelIds: Object.freeze([SEAT_ROUTES.primary.model, SEAT_ROUTES.secondary.model, SEAT_ROUTES.third.model])
+  });
+  /** A three-debater debate's doubles: spares of every kind on every route; the writer drafts, the checker checks. */
+  const rotationDoubles = (label: string, writer: SeatRoute, checker: SeatRoute) => {
+    const route = (name: SeatRoute) => [
+      ...Array.from({ length: 16 }, (_, index) => judgementDouble(`${name} ${label} node ${index + 1}`, 0.5)),
+      ...Array.from({ length: 16 }, (_, index) => reviewDouble("agree", `${name} ${label} review ${index + 1}`)),
+      ...(name === writer ? [resil01Composition] : []),
+      ...(name === checker ? [evaluatorSatisfied()] : [])
+    ];
+    return { primary: route("primary"), secondary: route("secondary"), third: route("third") };
+  };
+  /** The seat harness's story with one path per position of a debate with `count` debaters (P1-Pcount). */
+  const positionStory = (count: number): string => {
+    const story = JSON.parse(seatHarnessStory()) as { short: { paths: unknown[] } };
+    story.short.paths = Array.from({ length: count }, (_, offset) => offset + 1).map((index) => ({
+      position_ref: `P${String(index)}`, fate: "HELD_UP", line: "This position held up.", node_refs: [`P${String(index)}`]
+    }));
+    return JSON.stringify(story);
+  };
+  const threePositionStory = (): string => positionStory(3);
+  /** A claim-time probe: each of `refs` is ABSENT, every other member HEALTHY with its pinned model (T9/J24's probe). */
+  const absentFor = (...refs: string[]): NonNullable<WalkingSkeletonSettings["claimTimeProbe"]> => async (member) =>
+    refs.includes(member.provider_ref)
+      ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
+      : { state: "HEALTHY", modelId: member.model_id, failureCode: null };
+  /** The sealed refs of every scenario below: the primary holds both answer roles (`runnerSettings`). */
+  const SEALED_REF = SEAT_ROUTES.primary.providerRef;
+  const j24Events = async (runId: string) => (await database.pool.query<{ value_json: Record<string, unknown> }>(
+    `SELECT value_json FROM core.run_progress_event
+      WHERE run_id=$1 AND kind='ledger.could_not_do' AND value_json->>'state'='SYNTHESIS_ROLE_PROVIDER_ABSENT'`,
+    [runId]
+  )).rows.map((row) => row.value_json);
+  /** Task 11's money rule, recorded: which sealed refs the runner asked about, with the debate's frozen panel. */
+  const coverage = (answer: boolean) => {
+    const asked: Array<Readonly<{ roleRef: string; panel: readonly string[] }>> = [];
+    const answerRoleFallbackCovered: NonNullable<WalkingSkeletonSettings["answerRoleFallbackCovered"]> = (input) => {
+      asked.push({ roleRef: input.roleRef, panel: input.panel.map((member) => member.provider_ref) });
+      return answer;
+    };
+    return { asked, answerRoleFallbackCovered };
+  };
+  const PANEL_REFS = [SEAT_ROUTES.primary.providerRef, SEAT_ROUTES.secondary.providerRef, SEAT_ROUTES.third.providerRef];
+  const workItemOf = async (runId: string) => (await database.pool.query<{ state: string; terminal_reason: string | null }>(
+    "SELECT state, terminal_reason FROM core.work_item WHERE run_id=$1", [runId]
+  )).rows;
+
+  it("the secondary writes the answer and the third checks it, recorded as planned (no false fallback)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-answer", rotation: ROTATION, panelSize: 3, ...rotationDoubles("rotation-answer", "secondary", "third")
+    });
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: SEAT_ROUTES.secondary.providerRef, checker: SEAT_ROUTES.third.providerRef,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.secondary.providerRef,
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef,
+      writerServedRef: SEAT_ROUTES.secondary.providerRef,
+      checkerServedRef: SEAT_ROUTES.third.providerRef,
+      writerFallback: false,
+      checkerFallback: false,
+      fallbackReason: null,
+      checkerSameAsWriter: false
+    });
+    // The legacy book: bare keys (no seat marker), no candidate, and the sealed primary never wrote or checked.
+    expect(scenario.calls.filter((call) => call.call_site_key.includes(":seat:"))).toEqual([]);
+    expect(scenario.calls.filter((call) => call.candidate_id !== null)).toEqual([]);
+    expect(scenario.calls.filter((call) => /^(?:COMPOSER|POST_COMPOSE_R9):/u.test(call.call_site_key))
+      .map((call) => [call.call_site_key, call.actor_ref])).toEqual([
+      ["COMPOSER:SYNTHESIZER:INITIAL:1", SEAT_ROUTES.secondary.providerRef],
+      ["POST_COMPOSE_R9:EVALUATOR:1", SEAT_ROUTES.third.providerRef]
+    ]);
+  });
+
+  it("the story is written by the pinned storyteller and checked by the pinned story checker", async () => {
+    // The register's story refs name the secondary, a claim-eligible debater with no story answers: a story
+    // sent there instead of to the pin would be handed a debate double and fail loudly.
+    const story = seatStoryWriter(SEAT_ROUTES.secondary.providerRef);
+    const answers = Object.freeze({ storyteller: threePositionStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-story", rotation: ROTATION, panelSize: 3, ...rotationDoubles("rotation-story", "secondary", "third"),
+      settings: { story: story.writer },
+      storyAnswers: { third: answers, primary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY", failureCode: null,
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.third.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef })
+    })]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("STORY:"))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.third.providerRef],
+      ["STORY:CHECKER:1", "OK", SEAT_ROUTES.primary.providerRef]
+    ]);
+  });
+
+  /**
+   * Task 12 ("always an answer"): a pinned story member not claim-eligible hands its role to another claim-eligible
+   * member of the run's stored panel, in panel order — the storyteller to one of another maker than the pinned story
+   * checker, the story checker to one of another maker than the storyteller serving; only when there is none, to the
+   * register's story ref if that is a panel ref; else today's STORY_ROLE_UNAVAILABLE. The lineage names who served.
+   */
+  it("a pinned story checker not claim-eligible: the next claim-eligible panel member of another maker checks the story", async () => {
+    // The primary, the pinned story checker, is absent at claim; the answer's pinned pair is not touched. The register's
+    // story refs name the absent primary too, so a story handed to the register's ref would fail STORY_ROLE_UNAVAILABLE.
+    const story = seatStoryWriter(SEAT_ROUTES.primary.providerRef);
+    const answers = Object.freeze({ storyteller: seatHarnessStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-story-checker-stand-in", rotation: ROTATION, panelSize: 3,
+      ...rotationDoubles("rotation-story-checker-stand-in", "secondary", "third"),
+      settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.primary.providerRef) },
+      storyAnswers: { third: answers, secondary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(await servedRoundMakers(answerIdOf(scenario))).toEqual([expect.objectContaining({
+      writer: SEAT_ROUTES.secondary.providerRef, checker: SEAT_ROUTES.third.providerRef
+    })]);
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY", failureCode: null,
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.third.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.secondary.providerRef })
+    })]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("STORY:"))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.third.providerRef],
+      ["STORY:CHECKER:1", "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+  });
+
+  it("a pinned storyteller not claim-eligible: the next claim-eligible panel member writes the story, and the pinned checker still checks", async () => {
+    // The third, the pinned storyteller, is absent. In panel order the primary comes first and is not of the pinned
+    // story checker's (the secondary's) maker: it writes; the secondary still checks. The register's ref is the absent third.
+    const rotation = { ...ROTATION, answerWriter: pick("secondary"), answerChecker: pick("primary"), storyteller: pick("third"), storyChecker: pick("secondary") };
+    const story = seatStoryWriter(SEAT_ROUTES.third.providerRef);
+    const answers = Object.freeze({ storyteller: seatHarnessStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-storyteller-stand-in", rotation, panelSize: 3,
+      ...rotationDoubles("rotation-storyteller-stand-in", "secondary", "primary"),
+      settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef) },
+      storyAnswers: { primary: answers, secondary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY", failureCode: null,
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.secondary.providerRef })
+    })]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("STORY:"))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.primary.providerRef],
+      ["STORY:CHECKER:1", "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+  });
+
+  /** A two-member panel (primary, secondary) whose pinned checkers are both the secondary, absent at claim. */
+  const TWO_MAKER_ROTATION: RunRoleRotationInputWithoutRun = Object.freeze({
+    ...ROTATION,
+    answerWriter: pick("primary"), answerChecker: pick("secondary"), storyteller: pick("primary"), storyChecker: pick("secondary"),
+    eligibleModelIds: Object.freeze([SEAT_ROUTES.primary.model, SEAT_ROUTES.secondary.model])
+  });
+
+  it("no claim-eligible panel member of another maker: the register's story ref checks the story when it is a panel ref", async () => {
+    // The secondary is absent: the answer's checker stands in as the sealed primary (a panel ref), and no other maker
+    // is left for the story checker, so the register's story ref (the primary, a claim-eligible panel ref) checks.
+    const story = seatStoryWriter(SEAT_ROUTES.primary.providerRef);
+    const answers = Object.freeze({ storyteller: positionStory(1), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-story-register-ref", rotation: TWO_MAKER_ROTATION, panelSize: 2,
+      ...rotationDoubles("rotation-story-register-ref", "primary", "primary"),
+      settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef) },
+      storyAnswers: { primary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY", failureCode: null,
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef })
+    })]);
+  });
+
+  it("no claim-eligible panel member of another maker and a register story ref off the panel: today's STORY_ROLE_UNAVAILABLE", async () => {
+    // The register's story refs name the twin route: configured, healthy, of the primary's model, but not on the panel.
+    const story = seatStoryWriter(SEAT_TWIN.providerRef);
+    const answers = Object.freeze({ storyteller: seatHarnessStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-story-unavailable", rotation: TWO_MAKER_ROTATION, panelSize: 2, twin: true,
+      ...rotationDoubles("rotation-story-unavailable", "primary", "primary"),
+      settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef) },
+      storyAnswers: { primary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(story.records).toEqual([expect.objectContaining({ outcome: "FAILED", failureCode: "STORY_ROLE_UNAVAILABLE" })]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("STORY:"))).toEqual([]);
+  });
+
+  /**
+   * Task 11 (orchestrator ruling 2026-10-11, "always an answer"): a pinned answer member not claim-eligible hands its
+   * role to the SEALED register ref (today's unpinned role, today's probe and J24), when the debate's estimate covers
+   * that ref's model. The disclosure keeps the pin as planned and names the reason ROLE_UNAVAILABLE for that role.
+   */
+  it("a pinned writer absent at claim: the sealed writer serves, disclosed as a fallback for ROLE_UNAVAILABLE", async () => {
+    const covered = coverage(true);
+    const scenario = await executeSeatScenario({
+      label: "rotation-writer-stand-in", rotation: ROTATION, panelSize: 3,
+      ...rotationDoubles("rotation-writer-stand-in", "primary", "third"),
+      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef), answerRoleFallbackCovered: covered.answerRoleFallbackCovered }
+    });
+    expect(scenario.error).toBeNull();
+    expect(covered.asked).toEqual([{ roleRef: SEALED_REF, panel: PANEL_REFS }]);
+    const answerId = answerIdOf(scenario);
+    expect(await servedRoundMakers(answerId)).toEqual([expect.objectContaining({
+      writer: SEALED_REF, checker: SEAT_ROUTES.third.providerRef
+    })]);
+    const row = await disclosureRowOf(answerId);
+    expect(row).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.secondary.providerRef, writerServedRef: SEALED_REF,
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef, checkerServedRef: SEAT_ROUTES.third.providerRef,
+      writerFallback: true, checkerFallback: false,
+      writerFallbackReason: "ROLE_UNAVAILABLE", fallbackReason: null, checkerSameAsWriter: false
+    });
+    expect(row).not.toHaveProperty("checkerFallbackReason");
+    expect(await j24Events(scenario.runId)).toEqual([]);
+  });
+
+  it("a pinned checker absent at claim: the sealed checker serves, disclosed as a fallback for ROLE_UNAVAILABLE", async () => {
+    const probed: string[] = [];
+    const scenario = await executeSeatScenario({
+      label: "rotation-checker-stand-in", rotation: ROTATION, panelSize: 3,
+      ...rotationDoubles("rotation-checker-stand-in", "secondary", "primary"),
+      settings: {
+        claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef),
+        // Task 12: the stand-in is a panel ref, already health-checked with the panel: no off-panel probe.
+        claimTimeSynthesisRoleProbe: async (providerRef) => {
+          probed.push(providerRef);
+          return { state: "HEALTHY", modelId: SEAT_ROUTES.primary.model, failureCode: null };
+        }
+      }
+    });
+    expect(scenario.error).toBeNull();
+    expect(probed).toEqual([]);
+    const answerId = answerIdOf(scenario);
+    expect(await servedRoundMakers(answerId)).toEqual([expect.objectContaining({
+      writer: SEAT_ROUTES.secondary.providerRef, checker: SEALED_REF
+    })]);
+    const row = await disclosureRowOf(answerId);
+    expect(row).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.secondary.providerRef, writerServedRef: SEAT_ROUTES.secondary.providerRef,
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef, checkerServedRef: SEALED_REF,
+      writerFallback: false, checkerFallback: true,
+      checkerFallbackReason: "ROLE_UNAVAILABLE", fallbackReason: null
+    });
+    expect(row).not.toHaveProperty("writerFallbackReason");
+  });
+
+  it("a sealed checker off the panel never stands in, even with its model on the panel: no off-panel probe, today's J24", async () => {
+    // Task 12: the sealed checker is the twin route, whose MODEL is the primary's (on the frozen panel) but whose REF is
+    // not on the panel. A stand-in must be a panel ref, so the estimate never meets a health check it did not count.
+    const probed: string[] = [];
+    const covered = coverage(true);
+    const scenario = await executeSeatScenario({
+      label: "rotation-off-panel-stand-in", rotation: ROTATION, panelSize: 3, twin: true,
+      ...rotationDoubles("rotation-off-panel-stand-in", "secondary", "primary"),
+      settings: {
+        claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef),
+        answerRoleFallbackCovered: covered.answerRoleFallbackCovered,
+        synthesisRolePolicy: { ...runnerSettings().synthesisRolePolicy, evaluatorRoleRef: SEAT_TWIN.providerRef, identicalRoleRefs: false },
+        claimTimeSynthesisRoleProbe: async (providerRef) => {
+          probed.push(providerRef);
+          return { state: "HEALTHY", modelId: SEAT_TWIN.model, failureCode: null };
+        }
+      }
+    });
+    expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+    expect(probed).toEqual([]);
+    expect(covered.asked).toEqual([]);
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId))
+      .toEqual([{ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:EVALUATOR" }]);
+    expect(await j24Events(scenario.runId)).toEqual([{
+      state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+      call_site_key: `EVALUATOR:${SEAT_ROUTES.third.providerRef}`,
+      role_ref: SEAT_ROUTES.third.providerRef,
+      role: "EVALUATOR",
+      absent_failure_code: "CLAIM_PROVIDER_ABSENT"
+    }]);
+  });
+
+  it("a pinned writer absent and the sealed writer absent too: today's J24 refusal, naming the sealed ref", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-both-absent", rotation: ROTATION, panelSize: 3, ...rotationDoubles("rotation-both-absent", "primary", "third"),
+      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef, SEALED_REF) }
+    });
+    expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId))
+      .toEqual([{ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:SYNTHESIZER" }]);
+    expect(await j24Events(scenario.runId)).toEqual([{
+      state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+      call_site_key: `SYNTHESIZER:${SEALED_REF}`,
+      role_ref: SEALED_REF,
+      role: "SYNTHESIZER",
+      absent_failure_code: "CLAIM_PROVIDER_ABSENT"
+    }]);
+  });
+
+  it("a pinned writer absent at claim whose sealed writer the estimate does not cover refuses with J24, terminally, with today's event", async () => {
+    const covered = coverage(false);
+    const scenario = await executeSeatScenario({
+      label: "rotation-absent", rotation: ROTATION, panelSize: 3, ...rotationDoubles("rotation-absent", "secondary", "third"),
+      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef), answerRoleFallbackCovered: covered.answerRoleFallbackCovered }
+    });
+    expect(covered.asked).toEqual([{ roleRef: SEALED_REF, panel: PANEL_REFS }]);
+    expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId))
+      .toEqual([{ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:SYNTHESIZER" }]);
+    const events = await database.pool.query<{ value_json: Record<string, unknown> }>(
+      `SELECT value_json FROM core.run_progress_event
+        WHERE run_id=$1 AND kind='ledger.could_not_do' AND value_json->>'state'='SYNTHESIS_ROLE_PROVIDER_ABSENT'`,
+      [scenario.runId]
+    );
+    expect(events.rows.map((row) => row.value_json)).toEqual([{
+      state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+      call_site_key: `SYNTHESIZER:${SEAT_ROUTES.secondary.providerRef}`,
+      role_ref: SEAT_ROUTES.secondary.providerRef,
+      role: "SYNTHESIZER",
+      absent_failure_code: "CLAIM_PROVIDER_ABSENT"
+    }]);
+  });
+
+  it("a run with both a scorecard assignment and a rotation pin is refused (RUN_ROLE_ROTATION_INVALID), terminally, before any call", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-both", assignment: runnerUpAssignment(), rotation: ROTATION, panelSize: 3,
+      ...rotationDoubles("rotation-both", "secondary", "third")
+    });
+    expect(scenario.error).toMatchObject({ code: "RUN_ROLE_ROTATION_INVALID" });
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId)).toEqual([{ state: "FAILED", terminal_reason: "RUN_ROLE_ROTATION_INVALID" }]);
+  });
+
+  it("a pin naming a route outside the debate's panel is refused (RUN_ROLE_ROTATION_INVALID), terminally", async () => {
+    // The twin route (the primary's maker) is not in the frozen panel: admission could never have picked it.
+    const twin = { providerRef: SEAT_TWIN.providerRef, modelId: SEAT_TWIN.model, maker: SEAT_TWIN.maker };
+    const scenario = await executeSeatScenario({
+      label: "rotation-off-panel", rotation: { ...ROTATION, answerChecker: twin }, panelSize: 3, twin: true,
+      ...rotationDoubles("rotation-off-panel", "secondary", "primary")
+    });
+    expect(scenario.error).toMatchObject({ code: "RUN_ROLE_ROTATION_INVALID" });
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId)).toEqual([{ state: "FAILED", terminal_reason: "RUN_ROLE_ROTATION_INVALID" }]);
+  });
+
+  it("an unreadable pin is refused (RUN_ROLE_ROTATION_INVALID), terminally, before any call", async () => {
+    // A maker of only a tab passes 0114's btrim CHECK and fails the reader's stricter trim: the row exists, unreadable.
+    const scenario = await executeSeatScenario({
+      label: "rotation-unreadable", panelSize: 3, ...rotationDoubles("rotation-unreadable", "primary", "primary"),
+      beforeExecute: async ({ runId }) => {
+        const picks = [ROTATION.answerWriter, ROTATION.answerChecker, ROTATION.storyteller, { ...ROTATION.storyChecker, maker: "\t" }]
+          .flatMap((role) => [role.providerRef, role.modelId, role.maker]);
+        await database.pool.query(
+          `INSERT INTO core.run_role_rotation (run_id, rule,
+             writer_provider_ref, writer_model_id, writer_maker, checker_provider_ref, checker_model_id, checker_maker,
+             storyteller_provider_ref, storyteller_model_id, storyteller_maker,
+             story_checker_provider_ref, story_checker_model_id, story_checker_maker, eligible_model_ids)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::text[])`,
+          [runId, ROTATION.rule, ...picks, [...ROTATION.eligibleModelIds]]
+        );
+      }
+    });
+    expect(scenario.error).toMatchObject({ code: "RUN_ROLE_ROTATION_INVALID" });
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId)).toEqual([{ state: "FAILED", terminal_reason: "RUN_ROLE_ROTATION_INVALID" }]);
+  });
+
+  it("a run without a pin is today's run (the sealed refs serve)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-none", panelSize: 3, ...rotationDoubles("rotation-none", "primary", "primary")
+    });
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    const sealed = runnerSettings().synthesisRolePolicy;
+    expect(await servedRoundMakers(answerId)).toEqual([expect.objectContaining({
+      writer: sealed.synthesizerRoleRef, checker: sealed.evaluatorRoleRef
+    })]);
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      writerPlannedRef: sealed.synthesizerRoleRef, checkerPlannedRef: sealed.evaluatorRoleRef,
+      writerFallback: false, checkerFallback: false
+    });
   });
 });
 

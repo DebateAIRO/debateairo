@@ -54,6 +54,15 @@ export const SERVE_DISCLOSURE_SERVE_STOPS = Object.freeze([
 ] as const);
 export type ServeDisclosureServeStop = typeof SERVE_DISCLOSURE_SERVE_STOPS[number];
 
+/**
+ * Why a role's served model differs from its planned one (migration 0114, Task 11): MONEY, a cheaper model chosen to
+ * stay within the debate's budget; ROLE_UNAVAILABLE, a rotated debate's pinned model was not available when the
+ * debate started, so the register's model for that role stood in. Only MONEY is ever said to the asker as
+ * "lower-cost".
+ */
+export const SERVE_DISCLOSURE_FALLBACK_REASONS = Object.freeze(["MONEY", "ROLE_UNAVAILABLE"] as const);
+export type ServeDisclosureFallbackReason = typeof SERVE_DISCLOSURE_FALLBACK_REASONS[number];
+
 export const SERVE_DISCLOSURE_FLOOR_STATES = Object.freeze(["SUPPORTED", "CONTESTED", "UNSUPPORTED"] as const);
 export type ServeDisclosureFloorState = typeof SERVE_DISCLOSURE_FLOOR_STATES[number];
 
@@ -68,7 +77,15 @@ export interface ServeDisclosureRecord {
   readonly checkerServedRef: string | null;
   readonly writerFallback: boolean;
   readonly checkerFallback: boolean;
+  /** Money was used: some role fell back for MONEY (0076's meaning, kept by 0114). */
   readonly fallbackReason: "MONEY" | null;
+  /**
+   * Migration 0114 (Task 11): each role's own reason, present on a row that names reasons per role — then on every
+   * fallback, and only on a fallback. Absent on every row without them (every row before 0114, every run that is not
+   * rotated): a fallback there is the money fallback. Read a role's reason with `serveDisclosureFallbackReasonOf`.
+   */
+  readonly writerFallbackReason?: ServeDisclosureFallbackReason;
+  readonly checkerFallbackReason?: ServeDisclosureFallbackReason;
   readonly checkerSameAsWriter: boolean;
   readonly bodyStop: ServeDisclosureBodyStop | null;
   readonly pointsWithoutReview: number | null;
@@ -173,7 +190,20 @@ function isCount(value: unknown, limit: number): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= limit;
 }
 
-/** The broken rule, or null. The same rules migration 0076 writes as CHECKs. */
+/**
+ * A role's fallback reason, or null when that role served as planned: its own reason when the row names one, else
+ * MONEY (a row without per-role reasons: every row before 0114 and every run that is not rotated).
+ */
+export function serveDisclosureFallbackReasonOf(
+  record: Pick<ServeDisclosureRecord, "writerFallback" | "checkerFallback" | "writerFallbackReason" | "checkerFallbackReason">,
+  role: "writer" | "checker"
+): ServeDisclosureFallbackReason | null {
+  const fallback = role === "writer" ? record.writerFallback : record.checkerFallback;
+  if (!fallback) return null;
+  return (role === "writer" ? record.writerFallbackReason : record.checkerFallbackReason) ?? "MONEY";
+}
+
+/** The broken rule, or null. The same rules migrations 0076 and 0114 write as CHECKs. */
 function recordViolation(record: ServeDisclosureRecord): string | null {
   if (!UUID_TEXT.test(record.answerId)) return "answer_id";
   if (!UUID_TEXT.test(record.runId)) return "run_id";
@@ -192,8 +222,17 @@ function recordViolation(record: ServeDisclosureRecord): string | null {
     return "checker_fallback is the served checker differing from the planned one";
   }
   if (record.fallbackReason !== null && record.fallbackReason !== "MONEY") return "fallback_reason";
-  if ((record.fallbackReason !== null) !== (record.writerFallback || record.checkerFallback)) {
-    return "a fallback, and only a fallback, names its reason";
+  const reasons = SERVE_DISCLOSURE_FALLBACK_REASONS as readonly string[];
+  if (record.writerFallbackReason !== undefined && !reasons.includes(record.writerFallbackReason)) return "writer_fallback_reason";
+  if (record.checkerFallbackReason !== undefined && !reasons.includes(record.checkerFallbackReason)) return "checker_fallback_reason";
+  if ((record.writerFallbackReason !== undefined || record.checkerFallbackReason !== undefined)
+    && ((record.writerFallbackReason !== undefined) !== record.writerFallback
+      || (record.checkerFallbackReason !== undefined) !== record.checkerFallback)) {
+    return "a row that names a reason per role names one for each fallback, and only for a fallback";
+  }
+  if ((record.fallbackReason !== null) !== (serveDisclosureFallbackReasonOf(record, "writer") === "MONEY"
+    || serveDisclosureFallbackReasonOf(record, "checker") === "MONEY")) {
+    return "a money fallback, and only a money fallback, names fallback_reason";
   }
   if (record.checkerSameAsWriter !== (record.writerServedRef !== null && record.checkerServedRef === record.writerServedRef)) {
     return "checker_same_as_writer is the served checker being the served writer";
@@ -235,6 +274,8 @@ interface ServeDisclosureRow {
   readonly writer_fallback: boolean;
   readonly checker_fallback: boolean;
   readonly fallback_reason: "MONEY" | null;
+  readonly writer_fallback_reason: ServeDisclosureFallbackReason | null;
+  readonly checker_fallback_reason: ServeDisclosureFallbackReason | null;
   readonly checker_same_as_writer: boolean;
   readonly body_stop: ServeDisclosureBodyStop | null;
   readonly points_without_review: number | null;
@@ -278,6 +319,7 @@ const SELECT_ROW = `SELECT disclosure.answer_id::text AS answer_id, disclosure.a
               disclosure.writer_planned_ref, disclosure.checker_planned_ref,
               disclosure.writer_served_ref, disclosure.checker_served_ref,
               disclosure.writer_fallback, disclosure.checker_fallback, disclosure.fallback_reason,
+              disclosure.writer_fallback_reason, disclosure.checker_fallback_reason,
               disclosure.checker_same_as_writer, disclosure.body_stop, disclosure.points_without_review,
               disclosure.serve_stop, disclosure.digest_rung, disclosure.digest_points_omitted,
               disclosure.floor_verdict_state, disclosure.floor_leading_node_id::text AS floor_leading_node_id,
@@ -298,6 +340,9 @@ function storedFrom(row: ServeDisclosureRow): StoredServeDisclosure {
     writerFallback: row.writer_fallback,
     checkerFallback: row.checker_fallback,
     fallbackReason: row.fallback_reason,
+    // Present only when stored: a row without per-role reasons reads exactly as it always did.
+    ...(row.writer_fallback_reason === null ? {} : { writerFallbackReason: row.writer_fallback_reason }),
+    ...(row.checker_fallback_reason === null ? {} : { checkerFallbackReason: row.checker_fallback_reason }),
     checkerSameAsWriter: row.checker_same_as_writer,
     bodyStop: row.body_stop,
     pointsWithoutReview: row.points_without_review,
@@ -387,15 +432,16 @@ export class ServeDisclosureRepository {
          writer_planned_ref, checker_planned_ref, writer_served_ref, checker_served_ref,
          writer_fallback, checker_fallback, fallback_reason, checker_same_as_writer,
          body_stop, points_without_review, serve_stop, digest_rung, digest_points_omitted,
-         floor_verdict_state, floor_leading_node_id, floor_reason
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+         floor_verdict_state, floor_leading_node_id, floor_reason, writer_fallback_reason, checker_fallback_reason
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
        ON CONFLICT (answer_id, answer_version) DO NOTHING`,
       [
         record.answerId, record.answerVersion, record.runId,
         record.writerPlannedRef, record.checkerPlannedRef, record.writerServedRef, record.checkerServedRef,
         record.writerFallback, record.checkerFallback, record.fallbackReason, record.checkerSameAsWriter,
         record.bodyStop, record.pointsWithoutReview, record.serveStop, record.digestRung, record.digestPointsOmitted,
-        record.floorVerdictState, record.floorLeadingNodeId, record.floorReason
+        record.floorVerdictState, record.floorLeadingNodeId, record.floorReason,
+        record.writerFallbackReason ?? null, record.checkerFallbackReason ?? null
       ]
     );
     return inserted.rowCount === 1 ? "INSERTED" : "ALREADY_PRESENT";

@@ -737,6 +737,46 @@ describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify
     for (const operation of ['verify', 'apply-and-plan']) expect(() => operator.validateNativePlan({ ...t.plan, operation, checkerChoice: choice })).toThrow();
   });
 
+  it('plan --role-rotation off: the plan carries the choice, publish carries it on, and on is the default', async () => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-rotation-off.json');
+    const plan = read(await run(t.nativePlan('plan', ['--role-rotation', 'off']).with(-1, out), t.s.layout));
+    expect(plan).toEqual({ ...t.plan, roleRotation: 'off' });
+    expect(operator.validateNativePlan(plan)).toEqual(plan);
+    const proposal = t.writeProposal(t.proposalOf());
+    const publish = read(await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], out), t.s.layout, deps));
+    expect(publish.roleRotation).toBe('off');
+    expect(operator.validateNativePlan(publish)).toEqual(publish);
+    // --role-rotation on is the default: no field at all, the plan is the one without the flag.
+    const on = read(await run(t.nativePlan('plan', ['--role-rotation', 'on']).with(-1, join(t.s.art, 'native-plan-rotation-on.json')), t.s.layout));
+    expect(on).toEqual(t.plan);
+    // It combines with the DeepSeek checker choice.
+    const both = read(await run(t.nativePlan('plan', ['--checker', 'deepseek', '--deepseek-enabled-on-gate', 'yes', '--role-rotation', 'off']).with(-1, join(t.s.art, 'native-plan-both.json')), t.s.layout));
+    expect(both).toEqual({ ...t.plan, checkerChoice: { checker: 'deepseek', deepseekEnabledOnGate: true }, roleRotation: 'off' });
+    expect(operator.validateNativePlan(both)).toEqual(both);
+  });
+
+  it.each([
+    ['an unknown value', 'plan', ['--role-rotation', 'no']],
+    ['upper case', 'plan', ['--role-rotation', 'OFF']],
+    ['a switch on verify', 'verify', ['--role-rotation', 'off']],
+    ['a switch on apply-and-plan', 'apply-and-plan', ['--role-rotation', 'off']]
+  ])('refuses the role rotation switch with %s and writes nothing', async (_name, operation, extra) => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-refused.json');
+    await expect(run(t.nativePlan(operation, extra).with(-1, out), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    expect(existsSync(out)).toBe(false);
+  });
+
+  it('the native plan check accepts the role rotation choice only as \'off\', and only on plan and publish', async () => {
+    const t = await staged();
+    expect(operator.validateNativePlan({ ...t.plan, roleRotation: 'off' })).toBeTruthy();
+    for (const bad of ['on', 'OFF', false, true, null, { roleRotation: 'off' }]) {
+      expect(() => operator.validateNativePlan({ ...t.plan, roleRotation: bad })).toThrow();
+    }
+    for (const operation of ['verify', 'apply-and-plan']) expect(() => operator.validateNativePlan({ ...t.plan, operation, roleRotation: 'off' })).toThrow();
+  });
+
   it('launch-plan --publication: the new publication replaces the old one and the proof must bind to it', async () => {
     const t = await staged();
     const published = t.s.write(join(t.s.art, 'native-publish.json'), JSON.stringify(attestation({ publication: t.newPublication })));

@@ -71,6 +71,7 @@ export function storedStoryRecord(overrides: Partial<StoredStory> = {}): StoredS
     verdictBasis: STORY_TEST_BASIS,
     pointNumbers: { "node:position": "P1", "node:defeater": "P2" },
     languageTag: "en",
+    storytellerRepairs: 0,
     createdAt: new Date("2026-09-26T10:04:00.000Z"),
     ...overrides
   };

@@ -4,6 +4,7 @@ import type { MigrationPlan } from './migration-lineage.js';
 import { loadForward111 } from './migration-forward111.js';
 import { loadForwardAuthDbBatch } from './migration-forward-auth-db-batch.js';
 import { loadForward0113 } from './migration-forward0113.js';
+import { loadForward0114 } from './migration-forward0114.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -30,9 +31,9 @@ type StepLoader=(anchor:ForwardStepAnchor)=>Promise<ForwardStepPlan>;
 
 /**
  * The chain, in order: 0111 (NETOPIA), then the auth DB batch (0112), then Part C's prices (0113, spec 2026-10-05
- * §2.16.6). A new step appends its loader here (README).
+ * §2.16.6), then role rotation (0114, spec 2026-10-11 Part 3). A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114]);
 
 const STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD_CHAIN_${detail}`);};

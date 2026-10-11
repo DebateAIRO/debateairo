@@ -10,7 +10,7 @@ import {
   createPreviewGuardedFetch, observeProviderTarget, parsePreviewProviderTestConfig, parseProviderDiscoveryTargets,
   previewModelRow, previewNanoUsdText, previewPlanTierRosters, previewProbeControls, previewReservationNanoUsd,
   previewTargetJsonRow, providerTargetGatewayControls, withPreviewProviderCallPolicy, previewTargetGatewayControls,
-  assertPreviewRoleTargets, PREVIEW_REQUEST_BODY_MAX_BYTES,
+  assertPreviewRoleTargets, PREVIEW_REQUEST_BODY_MAX_BYTES, previewSealedRoleFallbackCovered, PREVIEW_PROVIDER_REF_MODELS,
   type PreviewBudgetExecution, type ProviderCallRequest, type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
@@ -327,6 +327,37 @@ describe("every register role is a declared target on the preview (boot check)",
     expect(() => assertPreviewRoleTargets(parse(LEGACY), targets(["preview:fixture-a", "preview:fixture-b"]), ["preview:fixture-a", "preview:deepseek-v4-1-flash"]))
       .toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
     expect(() => assertPreviewRoleTargets(parse(MULTI), declared, [])).toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+  });
+});
+
+describe("role rotation, Task 11/12: a sealed answer role may stand in for an unavailable pinned member only when it is a panel ref", () => {
+  // A rotated debate's estimate prices only its panel's members, each on its own gate, admission found every one of
+  // them switched on there, and their routes were health-checked at claim (spec 2026-10-11 Part 5). Task 12: a stand-in
+  // must be one of those panel REFS, not merely a panel model, so it never needs an off-panel health check the
+  // estimate did not count.
+  const member = (provider_ref: string) => ({ provider_ref, model_id: PREVIEW_PROVIDER_REF_MODELS[provider_ref]! });
+  const panel = (...refs: string[]) => refs.map(member);
+  it("covers a sealed ref that is itself one of the panel's refs", () => {
+    expect(previewSealedRoleFallbackCovered("preview:fixture-a", panel("preview:fixture-a", "preview:deepseek-v4-1-flash"))).toBe(true);
+    expect(previewSealedRoleFallbackCovered("preview:fixture-b", panel("preview:deepseek-v4-1-flash", "preview:fixture-b"))).toBe(true);
+    expect(previewSealedRoleFallbackCovered("preview:deepseek-v4-1-flash",
+      panel("preview:fixture-a", "preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro", "preview:qwen-3-8-flash"))).toBe(true);
+  });
+  it("does not cover a sealed ref whose model is on the panel through another ref (fixture-b is GLM, the panel has fixture-a)", () => {
+    expect(previewSealedRoleFallbackCovered("preview:fixture-b", panel("preview:fixture-a", "preview:deepseek-v4-1-flash"))).toBe(false);
+    expect(previewSealedRoleFallbackCovered("preview:fixture-a", panel("preview:deepseek-v4-1-flash", "preview:fixture-b"))).toBe(false);
+  });
+  it("does not cover a model off the panel (never priced or found switched on), even on a gate the panel uses", () => {
+    expect(previewSealedRoleFallbackCovered("preview:fixture-a", panel("preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro"))).toBe(false);
+    expect(previewSealedRoleFallbackCovered("preview:claude-haiku-5-5", panel("preview:fixture-a", "preview:deepseek-v4-1-flash"))).toBe(false);
+  });
+  it("does not cover a ref the preview never reviewed, even when the panel names it", () => {
+    expect(previewSealedRoleFallbackCovered("provider:unreviewed",
+      [{ provider_ref: "provider:unreviewed", model_id: GLM }, member("preview:deepseek-v4-1-flash")])).toBe(false);
+  });
+  it("does not cover a panel ref whose recorded model is not the ref's reviewed model", () => {
+    expect(previewSealedRoleFallbackCovered("preview:fixture-a",
+      [{ provider_ref: "preview:fixture-a", model_id: DEEPSEEK }, member("preview:mimo-v2-6-pro")])).toBe(false);
   });
 });
 

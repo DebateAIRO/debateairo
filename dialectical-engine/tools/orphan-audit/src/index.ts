@@ -645,7 +645,14 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Connection budget (2026-10-10, docs/operations/2026-10-10-database-connection-budget.md): the reviewed
 // module after createPool gained a pool name, a busy marker (isDatabasePoolBusy) and a busy log line, and the
 // support control-plane pool took its size from packages/db/src/pool-budget.ts. migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "4bd57ce4f782977244e9523dafb767e3434ecee6ed2a1797e82f7266c96d3506";
+// Role rotation (spec 2026-10-11, Part 3): the reviewed module after it gained the 0114 pin's access
+// (insertRunRoleRotation, readRunRoleRotation, readRoleRotationCounts), merged with the connection budget above.
+// migrate() is byte-identical.
+// Role rotation, Task 11: the reviewed module after it exported the serve disclosure's per-role fallback reason
+// (SERVE_DISCLOSURE_FALLBACK_REASONS, serveDisclosureFallbackReasonOf). migrate() is byte-identical.
+// Role rotation, Task 12 item 5: the reviewed module after readRoleRotationCounts moved into a short transaction
+// with SET LOCAL statement_timeout = '5s' on a dedicated connection. migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "512c08e40eb461aedee4a0570611fa426f16a435cca651164d2fafd0049aa5e4";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

@@ -199,6 +199,23 @@ export function previewModelRowForRef(providerRef: unknown): PreviewModelRow | u
     ? previewModelRow(PREVIEW_PROVIDER_REF_MODELS[providerRef]) : undefined;
 }
 
+/**
+ * Role rotation, Task 11 (orchestrator ruling 2026-10-11): on the preview, may the sealed answer-role ref `roleRef`
+ * stand in for a rotated debate's pinned member that is unavailable at claim? Only when the debate's estimate already
+ * covers it: a rotated debate's estimate prices only its panel's members, each on its own gate at that gate's dearest
+ * panel member, and admission refused the debate unless every one of them was switched on at its gate (spec
+ * 2026-10-11 Part 5). Task 12: the ref must itself be one of the panel's REFS, recorded with its reviewed model — a
+ * second ref of a panel model (fixture-b beside fixture-a, both GLM) is a route the panel never health-checked and
+ * the estimate never counted, so it is not covered. A ref the preview never reviewed is never covered.
+ */
+export function previewSealedRoleFallbackCovered(
+  roleRef: string,
+  panel: readonly Readonly<{ provider_ref: string; model_id: string }>[]
+): boolean {
+  const reviewed = previewModelRowForRef(roleRef);
+  return reviewed !== undefined && panel.some((member) => member.provider_ref === roleRef && member.model_id === reviewed.model);
+}
+
 /** The discovery target JSON row (PROVIDER_DISCOVERY_TARGETS_JSON element) a reviewed ref must be declared as. */
 export function previewTargetJsonRow(providerRef: string): Readonly<Record<string, unknown>> {
   const reviewed = previewModelRowForRef(providerRef);

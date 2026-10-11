@@ -1089,3 +1089,102 @@ describe("what one debate is estimated at with today's register (realistic worst
     }
   });
 });
+
+describe("a rotated debate: each role on every gate, at that gate's dearest panel member (spec 2026-10-11, Part 5)", () => {
+  const HAIKU = "claude-haiku-5-5";
+  const member = (provider_ref: string, model_id: string) => ({ provider_ref, model_id });
+  const FREE = [member("preview:fixture-a", GLM), member("preview:deepseek-v4-1-flash", DEEPSEEK)];
+  const PREMIUM = [...FREE, member("preview:mimo-v2-6-pro", MIMO), member("preview:qwen-3-8-flash", QWEN)];
+  const ALL_FIVE = [...PREMIUM, member("preview:claude-haiku-5-5", HAIKU)];
+  const roleModels = Object.freeze({ answerWriter: GLM, answerChecker: DEEPSEEK, storyteller: GLM, storyChecker: GLM });
+  const roleProviderRefs = ["preview:fixture-a", "preview:deepseek-v4-1-flash", "preview:fixture-b"];
+  const basisFor = (panelSize: number, depth: number) => computeStructuralCeilingBasis({ panelSize, depth, judgeMaxAttempts: 3, organMaxAttempts: 3,
+    maxRecompose: 2, maxCooldownHoldsPerRun: 2, finalRetryAttempts: 1, branchingFactor: 2, compositionSegmentCap: 2, fixedOrgansPerComposition: 4,
+    reviewerCallsPerNode: 1, synthesizerMaxRounds: 3, evaluatorMaxRounds: 3, maxDepth: 5 }) as unknown as Readonly<Record<string, unknown>>;
+  const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
+    budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture", free_model_ids: [GLM, DEEPSEEK],
+    premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN] }))!;
+  const sent = previewCallOutputTokens(config, { debate: [2048, 2048, 2048, 2048, 2048], story: { storyteller: 12_000, checker: 2048 } });
+  const HOLD = 10n * MIMO_LARGEST;
+  const ANTHROPIC_HOLD = 2n * (264_192n * 500n + 32_768n * 2500n);
+  const needs = (panel: readonly { provider_ref: string; model_id: string }[], depth: number, rotated: boolean) =>
+    estimatePreviewGateNeeds({ basis: basisFor(panel.length, depth), panel, roleModels, roleProviderRefs, storyRounds: 2, callOutputTokens: sent,
+      askProbeModelIds: [...ASK_PROBE_MODELS, ...(panel.some((entry) => entry.model_id === HAIKU) ? [HAIKU] : [])], maxCooldownHoldsPerRun: 2, rotated });
+
+  it("puts the answer roles on the dearest DEBATE member and the story roles on the dearest story member of each gate", () => {
+    const shares = previewCallShares({ basis: basisFor(5, 1), panel: ALL_FIVE, roleModels, roleProviderRefs, storyRounds: 2,
+      maxCooldownHoldsPerRun: 2, rotated: true,
+      dearestFor: (models, role) => models.includes(MIMO) ? MIMO : models.includes(HAIKU) ? HAIKU : models[0]! });
+    const calls = callsBy(shares);
+    expect(calls[`${MIMO} STORYTELLER`]).toBe(2);
+    expect(calls[`${HAIKU} STORYTELLER`]).toBe(2);
+    expect(calls[`${MIMO} STORY_CHECKER`]).toBe(2);
+    expect(calls[`${HAIKU} STORY_CHECKER`]).toBe(2);
+    expect(calls[`${GLM} STORYTELLER`]).toBeUndefined();
+    // No off-panel role refs: fixture-b is never health-checked for a rotated debate.
+    expect(shares.shares.filter((share) => share.type === "PROBE" && share.model === GLM).length).toBe(1);
+  });
+
+  it("names only the panel's models on each gate (the register's role models are not called)", () => {
+    const [deepinfra] = needs(FREE, 1, true);
+    expect([...deepinfra!.modelIds].sort()).toEqual([DEEPSEEK, GLM].sort());
+  });
+
+  it("leaves the register's off-panel role models off the gate's list only when rotated", () => {
+    const offPanelRoles = Object.freeze({ answerWriter: GLM, answerChecker: MIMO, storyteller: QWEN, storyChecker: MIMO });
+    const modelIds = (rotated: boolean) => [...estimatePreviewGateNeeds({ basis: basisFor(2, 1), panel: FREE, roleModels: offPanelRoles,
+      roleProviderRefs: ["preview:fixture-a", "preview:mimo-v2-6-pro", "preview:qwen-3-8-flash"], storyRounds: 2, callOutputTokens: sent,
+      askProbeModelIds: ASK_PROBE_MODELS, maxCooldownHoldsPerRun: 2, rotated })[0]!.modelIds].sort();
+    expect(modelIds(true)).toEqual([DEEPSEEK, GLM].sort());
+    expect(modelIds(false)).toEqual([DEEPSEEK, GLM, MIMO, QWEN].sort());
+  });
+
+  it("admission passes rotated on: a register role model the gate does not serve no longer refuses a rotated ask", async () => {
+    const counters = { probes: 0, remaining: 0 };
+    const gate = Object.freeze({ ...gateWith(counters, async () => remainingWith()), roleModels: { ...ROLE_MODELS, answerChecker: MIMO } });
+    await expect(assertPreviewBudgetAdmits(gate, { basis: basis(2), panel: PANEL })).rejects.toBeInstanceOf(PreviewGateUnavailableRefusal);
+    await expect(assertPreviewBudgetAdmits(gate, { basis: basis(2), panel: PANEL, rotated: true })).resolves.toBeUndefined();
+  });
+
+  it("re-pins the depth 1-3 room table; every combination still fits DeepInfra's $10.00 / 2,000 and Anthropic's $2.00 / 600", () => {
+    const usd = (nano: bigint) => Math.round(Number(nano) / 1e7) / 100;
+    const table = [1, 2, 3].map((depth) => {
+      const five = needs(ALL_FIVE, depth, true);
+      return [needs(FREE, depth, true)[0]!, needs(PREMIUM, depth, true)[0]!, five[0]!, five[1]!].map((need, column) => {
+        const anthropic = column === 3;
+        return [usd(need.callsNanoUsd + (anthropic ? ANTHROPIC_HOLD : HOLD)), need.callsWithMargin + (anthropic ? 2 : 10)];
+      });
+    });
+    // Rows: depth 1, 2, 3; columns: free, premium, all five (DeepInfra), all five (Anthropic); each [dollars, calls].
+    // Computed 2026-10-11 by the spec's scratch run of the same rule (spec Part 5).
+    expect(table).toEqual([
+      [[1.98, 106], [3.56, 338], [4.27, 465], [1.07, 177]],
+      [[2.22, 161], [4.59, 522], [5.56, 695], [1.33, 260]],
+      [[2.71, 272], [6.66, 890], [8.15, 1155], [1.85, 426]]
+    ]);
+    for (const [free, premium, fiveDeepinfra, fiveAnthropic] of table) {
+      for (const [dollars, calls] of [free!, premium!, fiveDeepinfra!]) { expect(dollars).toBeLessThanOrEqual(10); expect(calls).toBeLessThanOrEqual(2000); }
+      expect(fiveAnthropic![0]).toBeLessThanOrEqual(2);
+      expect(fiveAnthropic![1]).toBeLessThanOrEqual(600);
+    }
+  });
+
+  it("a non-rotated debate is priced exactly as before", () => {
+    expect(needs(PREMIUM, 2, false)).toEqual(estimatePreviewGateNeeds({ basis: basisFor(4, 2), panel: PREMIUM, roleModels, roleProviderRefs,
+      storyRounds: 2, callOutputTokens: sent, askProbeModelIds: ASK_PROBE_MODELS, maxCooldownHoldsPerRun: 2 }));
+  });
+
+  it("an unfinished rotated debate is held with the rotated pricing, not the boot roles", () => {
+    const settings = { roleModels, roleProviderRefs, storyRounds: 2, callOutputTokens: sent, maxCooldownHoldsPerRun: 2 };
+    const rotated = estimateUnfinishedRunHolds({ basis: basisFor(4, 2), panel: PREMIUM, phase: "DEBATE", rotated: true }, settings);
+    const fixed = estimateUnfinishedRunHolds({ basis: basisFor(4, 2), panel: PREMIUM, phase: "DEBATE" }, settings);
+    // Roles on MiMo (dearer than the boot roles' GLM and DeepSeek), and no health checks of the off-panel fixture-b.
+    expect(rotated[0]!.callsNanoUsd).toBeGreaterThan(fixed[0]!.callsNanoUsd);
+    expect(rotated[0]!.callsWithMargin).toBeLessThan(fixed[0]!.callsWithMargin);
+  });
+
+  it("the unfinished-runs query reports whether each run is rotated", () => {
+    expect(PREVIEW_UNFINISHED_RUNS_SQL).toContain("core.run_role_rotation");
+    expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/AS rotated/u);
+  });
+});

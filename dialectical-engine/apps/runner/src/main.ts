@@ -39,7 +39,7 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewRunnerPolicy, withPreviewProviderCallPolicy, previewProbeControls, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewRunnerPolicy, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -485,6 +485,14 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     });
     return { state: observation.state, modelId: observation.modelId, failureCode: observation.failureCode };
   },
+  // Role rotation, Task 11: a sealed answer role stands in for an unavailable pinned member only when the debate's
+  // estimate covers it. On the preview the rotated estimate prices only the panel's members; off the preview the
+  // estimate prices the sealed roles as for any debate (no setting: always covered). Everywhere (Task 12) the runner
+  // also requires the stand-in to be one of the debate's panel refs.
+  ...(previewConfig === undefined ? {} : {
+    answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ provider_ref: string; model_id: string }>[] }>) =>
+      previewSealedRoleFallbackCovered(roleRef, panel)
+  }),
   holdRecorder: {
     countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),
     record: (event) => runRepository.recordRunLifecycleEvent({
