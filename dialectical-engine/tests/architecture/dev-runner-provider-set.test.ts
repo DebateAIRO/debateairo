@@ -75,7 +75,10 @@ describe("production runner provider topology", () => {
       // the persisting `probeTarget` writes one re-probe as two append-only rows
       // under two evidence refs. Only a source assertion can pin this: the
       // behavioural arm composes its own probe and so cannot see what main.ts does.
-      "observeProviderTarget(",
+      // Spec 2026-10-11 busy model §2: both claim probes go through main.ts's one
+      // `observeClaimTarget`, which composes the observe-only `observeClaimTimeTarget`
+      // (observeProviderTarget, plus the preview's one resend after an unbilled refusal).
+      "observeClaimTimeTarget(",
       "holdRecorder:"
     ]) expect(source).toContain(setting);
     // codex r2 B1: a `not.toContain("probeTarget({")` token guard does NOT reach the
@@ -90,7 +93,7 @@ describe("production runner provider topology", () => {
       .split("\n")
       .find((line) => line.includes("@debateai/providers") && line.startsWith("import"));
     expect(providersImport).toBeDefined();
-    expect(providersImport).toContain("observeProviderTarget");
+    expect(providersImport).toContain("observeClaimTimeTarget");
     expect(providersImport).not.toContain("probeTarget");
     // (2) the composed probe must hand NO recorder to the probe call. The runner
     //     owns persistence; a `probes:` member here is the double write, whatever
@@ -100,7 +103,11 @@ describe("production runner provider topology", () => {
       source.indexOf("holdRecorder:")
     );
     expect(claimTimeProbeBlock).not.toContain("probes:");
-    expect(claimTimeProbeBlock).toContain("observeProviderTarget(");
+    expect(claimTimeProbeBlock).toContain("observeClaimTarget(");
+    // (3) the one helper both claim probes call hands no recorder either.
+    const claimHelper = source.slice(source.indexOf("function observeClaimTarget("), source.indexOf("const runner = new WalkingSkeletonRunner("));
+    expect(claimHelper).toContain("observeClaimTimeTarget(");
+    expect(claimHelper).not.toContain("probes:");
   });
 
   /**
@@ -172,8 +179,8 @@ describe("production runner provider topology", () => {
 
     /**
      * Keys an object literal contributes AT ITS OWN TOP LEVEL. Depth counts every
-     * bracket family, so `clock:` inside `observeProviderTarget({ ... })` — which sits
-     * at depth 2 within the settings literal — is NOT a composed setting. A spread at
+     * bracket family, so `failureCode:` inside the claim probe's returned object — which
+     * sits at depth 2 or more within the settings literal — is NOT a composed setting. A spread at
      * depth 1 is resolved by collecting the keys of each object literal inside it, so
      * the conditional `...(x === undefined ? {} : { critique: x })` contributes
      * `critique`.
@@ -261,13 +268,16 @@ describe("production runner provider topology", () => {
     const composed = [...new Set(literalKeys(blankedMain, settingsSpan![0], settingsSpan![1]))];
 
     // ---- the scan must PROVE its own depth and spread rules -------------------
-    // Depth: `clock:` really is present inside the settings literal, nested one level
-    // down inside `observeProviderTarget({ ... })`. A depth-blind scan reports it as
-    // composed, and then adding `readonly clock?: () => Date;` to the interface would
-    // be silently "accounted for" while nothing composes it. That is the exact hole
-    // this gate exists to prevent, and it shipped in the first version.
-    expect(mainSource).toContain("clock: () => new Date()");
-    expect(composed).not.toContain("clock");
+    // Depth: `failureCode:` really is present inside the settings literal, nested one
+    // level down inside the claim probe's returned object. A depth-blind scan reports
+    // it as composed, and then adding `readonly failureCode?: string;` to the interface
+    // would be silently "accounted for" while nothing composes it. That is the exact
+    // hole this gate exists to prevent, and it shipped in the first version. (It was
+    // `clock:` inside `observeProviderTarget({ ... })` until spec 2026-10-11 busy model
+    // §2 moved that call into main.ts's `observeClaimTarget`, outside the literal.)
+    const settingsLiteral = blankedMain.slice(settingsSpan![0], settingsSpan![1]);
+    expect(settingsLiteral).toContain("failureCode:");
+    expect(composed).not.toContain("failureCode");
     // Spread: `critique` is contributed ONLY by a conditional top-level spread, so a
     // scan that ignores spreads would wrongly report a composed member as unwired.
     expect(mainSource).toContain("{ critique: providerTopology.critique }");

@@ -511,7 +511,9 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   probes,
   probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
   probeTimeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
-  ...(previewConfig === undefined ? {} : { probeControlsFor: previewProbeControls, fetchImplementation: previewFetch! })
+  // Spec 2026-10-11 busy model §1-§3: on the preview, one probe per model, the one resend after an
+  // unbilled refusal, and the round's busy models (which may sit out an ask; evaluateAskAdmission).
+  ...(previewConfig === undefined ? {} : { probeControlsFor: previewProbeControls, fetchImplementation: previewFetch!, previewRound: {} })
 });
 /**
  * Budget spec 2026-09-28 §2.4–§2.7 and the paid-plans spec §2.4 (B6b): THE ROOM.

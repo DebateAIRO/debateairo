@@ -2364,8 +2364,12 @@ export {
 // DR-181/DR-182's provider health probe (moved here by ruling J21 so the API and
 // the runner share ONE implementation). See ./provider-probe.ts.
 export {
+  observeClaimTimeTarget,
+  observePreviewProviderTarget,
   observeProviderTarget,
+  previewProbeRoundBusy,
   probeTarget,
+  PROVIDER_PROBE_UNBILLED_REFUSAL,
   type ProviderProbeObservation,
   type ProviderProbeRecorder
 } from "./provider-probe.js";

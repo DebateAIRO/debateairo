@@ -2,7 +2,15 @@ import type {
   DiscoveredPanelMember,
   ProviderProbeRecord
 } from "@debateai/db";
-import { probeTarget, providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
+import { randomUUID } from "node:crypto";
+import {
+  observePreviewProviderTarget,
+  previewProbeRoundBusy,
+  probeTarget,
+  providerTargetPrice,
+  type ProviderDiscoveryTarget,
+  type ProviderProbeObservation
+} from "@debateai/providers";
 import type { ProviderTargetPrice } from "@debateai/budget";
 export {
   assertDeploymentProviderTargets,
@@ -15,6 +23,13 @@ export {
   parseProviderDiscoveryTargets,
   resolveProviderTargetCredentials
 } from "@debateai/providers";
+
+/**
+ * What one discovery round found: the healthy members, and (preview only, spec 2026-10-11 busy model
+ * §3) the models every probe of which this round was a gate-proven unbilled refusal. The busy list is
+ * a non-enumerable property, so the panel itself reads, compares and serializes exactly as before.
+ */
+export type DiscoveredProviderPanel = readonly DiscoveredPanelMember[] & Readonly<{ busyModelIds?: readonly string[] }>;
 
 export type ProviderDiscoveryProbeStore = Readonly<{
   readLatest(providerRefs: readonly string[]): Promise<readonly ProviderProbeRecord[]>;
@@ -38,6 +53,21 @@ function isFreshMatchingRecord(
     && record.failureCode === null;
 }
 
+/** The healthy members of one round's records, in target order. */
+function panelOf(records: readonly ProviderProbeObservation[]): DiscoveredPanelMember[] {
+  return records.flatMap((record) => (
+    record.state === "HEALTHY" && record.modelId !== null
+      ? [Object.freeze({
+          provider_ref: record.providerRef,
+          maker: record.maker,
+          model_id: record.modelId,
+          probe_evidence_ref: record.probeEvidenceRef,
+          probed_at: record.probedAt.toISOString()
+        })]
+      : []
+  ));
+}
+
 export function createProviderDiscoveryResolver(input: Readonly<{
   configuredProviders: readonly Readonly<{ providerRef: string; maker: string }>[];
   targets: readonly ProviderDiscoveryTarget[];
@@ -53,7 +83,15 @@ export function createProviderDiscoveryResolver(input: Readonly<{
   probeControlsFor?: (target: ProviderDiscoveryTarget) => Readonly<{ thinkingLevel?: string; tokenCeiling?: number }>;
   fetchImplementation?: typeof fetch;
   clock?: () => Date;
-}>): () => Promise<readonly DiscoveredPanelMember[]> {
+  /**
+   * Spec 2026-10-11 busy model §1-§3, the PREVIEW only (main.ts passes it with the preview config; hosted
+   * and local leave it out and probe exactly as before): each (baseUrl, model, adapter kind, probe
+   * controls) is probed ONCE per round, its observation written as one row per ref, each with its own
+   * probe id; a gate-proven unbilled refusal gets the one 60-second resend; and the round reports the
+   * models that stayed busy. `sleep` is the wait, injectable for tests.
+   */
+  previewRound?: Readonly<{ sleep?: (milliseconds: number) => Promise<void> }>;
+}>): () => Promise<DiscoveredProviderPanel> {
   if (!Number.isInteger(input.probeFreshnessMs) || input.probeFreshnessMs < 1) {
     throw new TypeError("PROVIDER_PROBE_FRESHNESS_INVALID");
   }
@@ -68,10 +106,71 @@ export function createProviderDiscoveryResolver(input: Readonly<{
   }
   const fetchImplementation = input.fetchImplementation ?? fetch;
   const clock = input.clock ?? (() => new Date());
-  const resolve = async (): Promise<readonly DiscoveredPanelMember[]> => {
+  const previewRound = input.previewRound;
+  /**
+   * Spec 2026-10-11 busy model §1: the preview's round. GLM is reviewed under two refs
+   * (`preview:fixture-a`, `preview:fixture-b`), and probing both at the same moment sent the busy model
+   * two requests where one answers the question. Stale targets that would send the same request are
+   * probed once; the observation is recorded once per ref, under that ref's own probe id and maker.
+   */
+  const resolvePreviewObservations = async (
+    stale: readonly ProviderDiscoveryTarget[]
+  ): Promise<Readonly<{ byRef: ReadonlyMap<string, ProviderProbeRecord>; busyModelIds: readonly string[] }>> => {
+    const groups = new Map<string, ProviderDiscoveryTarget[]>();
+    for (const target of stale) {
+      const controls = input.probeControlsFor?.(target)
+        ?? { thinkingLevel: input.thinkingLevel, tokenCeiling: input.probeTokenCeiling };
+      const key = JSON.stringify([target.baseUrl, target.model, target.adapterKind ?? null,
+        controls.thinkingLevel ?? null, controls.tokenCeiling ?? null]);
+      groups.set(key, [...(groups.get(key) ?? []), target]);
+    }
+    const asRef = (observation: ProviderProbeObservation, target: ProviderDiscoveryTarget): ProviderProbeRecord => Object.freeze({
+      ...observation,
+      probeEvidenceRef: randomUUID(),
+      providerRef: target.providerRef,
+      maker: target.maker
+    });
+    const recordAll = async (observation: ProviderProbeObservation, group: readonly ProviderDiscoveryTarget[]) => {
+      const rows = group.map((target) => asRef(observation, target));
+      for (const row of rows) await input.probes.record(row);
+      return rows;
+    };
+    const byRef = new Map<string, ProviderProbeRecord>();
+    const busyModelIds: string[] = [];
+    await Promise.all([...groups.values()].map(async (group) => {
+      const target = group[0]!;
+      const controls = input.probeControlsFor?.(target)
+        ?? { thinkingLevel: input.thinkingLevel, tokenCeiling: input.probeTokenCeiling };
+      // §2: the refusal is written before the one resend, so the rows read in the order they happened.
+      const observations = await observePreviewProviderTarget({
+        target,
+        timeoutMs: input.probeTimeoutMs,
+        ...(controls.thinkingLevel === undefined ? {} : { thinkingLevel: controls.thinkingLevel }),
+        ...(controls.tokenCeiling === undefined ? {} : { tokenCeiling: controls.tokenCeiling }),
+        fetchImplementation,
+        clock,
+        ...(previewRound?.sleep === undefined ? {} : { sleep: previewRound.sleep }),
+        onUnbilled: async (first) => { await recordAll(first, group); }
+      });
+      const final = await recordAll(observations[observations.length - 1]!, group);
+      group.forEach((member, index) => byRef.set(member.providerRef, final[index]!));
+      if (previewProbeRoundBusy(observations)) busyModelIds.push(target.model);
+    }));
+    return Object.freeze({ byRef, busyModelIds: Object.freeze([...new Set(busyModelIds)]) });
+  };
+  const resolve = async (): Promise<DiscoveredProviderPanel> => {
     const now = clock();
     const latest = await input.probes.readLatest(expectedRefs);
     const latestByRef = new Map(latest.map((record) => [record.providerRef, record] as const));
+    if (previewRound !== undefined) {
+      const stale = input.targets.filter((target) => !isFreshMatchingRecord(latestByRef.get(target.providerRef), target, now, input.probeFreshnessMs));
+      const round = await resolvePreviewObservations(stale);
+      const records = input.targets.map((target) => round.byRef.get(target.providerRef) ?? latestByRef.get(target.providerRef)!);
+      const panel = panelOf(records);
+      // §3: non-enumerable, so the panel compares and serializes as a plain array.
+      Object.defineProperty(panel, "busyModelIds", { value: round.busyModelIds, enumerable: false });
+      return Object.freeze(panel);
+    }
     const observations = await Promise.all(input.targets.map(async (target) => {
       const record = latestByRef.get(target.providerRef);
       if (isFreshMatchingRecord(record, target, now, input.probeFreshnessMs)) return record;
@@ -96,23 +195,13 @@ export function createProviderDiscoveryResolver(input: Readonly<{
             clock
           });
     }));
-    return Object.freeze(observations.flatMap((record) => (
-      record.state === "HEALTHY" && record.modelId !== null
-        ? [Object.freeze({
-            provider_ref: record.providerRef,
-            maker: record.maker,
-            model_id: record.modelId,
-            probe_evidence_ref: record.probeEvidenceRef,
-            probed_at: record.probedAt.toISOString()
-          })]
-        : []
-    )));
+    return Object.freeze(panelOf(observations));
   };
-  let inFlight: Promise<readonly DiscoveredPanelMember[]> | undefined;
+  let inFlight: Promise<DiscoveredProviderPanel> | undefined;
   return () => {
     if (inFlight !== undefined) return inFlight;
     const current = resolve();
-    let shared!: Promise<readonly DiscoveredPanelMember[]>;
+    let shared!: Promise<DiscoveredProviderPanel>;
     shared = current.finally(() => {
       if (inFlight === shared) inFlight = undefined;
     });

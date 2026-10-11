@@ -39,7 +39,7 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewRunnerPolicy, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewRunnerPolicy, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -380,6 +380,21 @@ const storyWriter = new StoryWriter({
   },
   log: storyLog
 });
+/**
+ * The claim-time probe of one target (both claim probes below). Spec 2026-10-11 busy model §2: on the
+ * preview, a gate-proven unbilled refusal gets the one 60-second resend, as at ask time, and the claim
+ * keeps the LAST observation (the runner records it). Off the preview: one probe, exactly as before.
+ */
+function observeClaimTarget(target: (typeof providerTargets)[number]) {
+  return observeClaimTimeTarget({
+    preview: previewConfig !== undefined,
+    target,
+    timeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
+    ...(previewConfig === undefined ? {} : previewProbeControls(target)),
+    fetchImplementation: previewFetch,
+    clock: () => new Date()
+  });
+}
 const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
   workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
   judgeBound: policy.bounds.JUDGE,
@@ -431,13 +446,7 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     // OBSERVE only. The runner persists the claim-time verdict itself in both
     // arms (DR-182), so a persisting probe here would write the same re-probe
     // twice under two evidence refs — codex r1 B1.
-    const observation = await observeProviderTarget({
-      target,
-      timeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
-      ...(previewConfig === undefined ? {} : previewProbeControls(target)),
-      fetchImplementation: previewFetch,
-      clock: () => new Date()
-    });
+    const observation = await observeClaimTarget(target);
     return {
       state: observation.state,
       modelId: observation.modelId,
@@ -478,11 +487,7 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     }
     // The same target probe validates the configured model identity. The runner
     // persists this observation separately from the selected debate panel.
-    const observation = await observeProviderTarget({
-      target, timeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
-      ...(previewConfig === undefined ? {} : previewProbeControls(target)),
-      fetchImplementation: previewFetch, clock: () => new Date()
-    });
+    const observation = await observeClaimTarget(target);
     return { state: observation.state, modelId: observation.modelId, failureCode: observation.failureCode };
   },
   // Role rotation, Task 11: a sealed answer role stands in for an unavailable pinned member only when the debate's
