@@ -368,11 +368,25 @@ class SettlementTests(AnthropicTest):
                              service_tier='standard', inference_geo='global')
         nulls = message(2000, 100, cache_creation_input_tokens=None, cache_read_input_tokens=None, cache_creation=None,
                         server_tool_use=None, service_tier=None, inference_geo=None)
+        # Anthropic's Messages reference (read 2026-10-11) adds usage.output_tokens_details.thinking_tokens: a
+        # read-only split of output_tokens, which stays the inclusive billed total. Haiku 5.5 thinks by default,
+        # so every real reply carries it (the first live probe halted on it).
+        thinking = {**message(2000, 100, cache_creation_input_tokens=0, cache_read_input_tokens=0,
+                              cache_creation={'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0},
+                              server_tool_use={'web_search_requests': 0, 'web_fetch_requests': 0},
+                              service_tier='standard', inference_geo='global',
+                              output_tokens_details={'thinking_tokens': 60}),
+                    'stop_details': None, 'diagnostics': None}
+        thinking_null = message(2000, 100, output_tokens_details=None)
+        thinking_all = message(2000, 100, output_tokens_details={'thinking_tokens': 100})
         for name, reply, expected, step, hour in (('lower', lower, Decimal('0.000815'), 'up_to_100k', 2000),
                                                   ('upper', upper, Decimal('0.05475'), 'over_100k', 2000),
                                                   ('no_split', no_split, Decimal('0.00089'), 'up_to_100k', 3000),
                                                   ('documented_zeros', documented, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
-                                                  ('nulls', nulls, cost(LOWER, 2000, output=100), 'up_to_100k', 0)):
+                                                  ('nulls', nulls, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
+                                                  ('documented_thinking_split', thinking, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
+                                                  ('thinking_split_null', thinking_null, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
+                                                  ('thinking_equals_output', thinking_all, cost(LOWER, 2000, output=100), 'up_to_100k', 0)):
             with self.subTest(name):
                 _, entry = self.settle(reply)
                 accounting = entry['accounting']
@@ -425,6 +439,12 @@ class SettlementTests(AnthropicTest):
             'input_float': {'input_tokens': Decimal('1000.0')},
             'input_bool': {'input_tokens': True},
             'input_negative': {'input_tokens': -1},
+            'output_details_not_a_dict': {'output_tokens_details': 60},
+            'output_details_unknown_key': {'output_tokens_details': {'thinking_tokens': 0, 'tool_tokens': 0}},
+            'output_details_negative': {'output_tokens_details': {'thinking_tokens': -1}},
+            'output_details_float': {'output_tokens_details': {'thinking_tokens': Decimal('1.0')}},
+            'output_details_bool': {'output_tokens_details': {'thinking_tokens': True}},
+            'output_details_above_output': {'output_tokens_details': {'thinking_tokens': 501}},
             'output_missing': None,
         }
         replies = {name: {**good, 'usage': {k: v for k, v in usage.items() if k != 'output_tokens'}} if extra is None
@@ -443,9 +463,12 @@ class SettlementTests(AnthropicTest):
             'unknown_block': {**good, 'content': [{'type': 'image', 'source': {}}]},
             'block_without_type': {**good, 'content': [{'text': 'OK'}]},
             'container': {**good, 'container': {'id': 'c', 'expires_at': 'x'}},
+            'container_empty_object': {**good, 'container': {}},
             'context_management': {**good, 'context_management': {'applied_edits': []}},
+            'context_management_empty_object': {**good, 'context_management': {}},
             'usage_outside_usage': {**good, 'server_usage': {'x': 1}},
             'tokens_outside_usage': {**good, 'cache_tokens': 5},
+            'tokens_outside_usage_null': {**good, 'cache_tokens': None},
             'usage_a_list': {**good, 'usage': [1000, 500]},
         })
         for name, reply in replies.items():
@@ -457,6 +480,100 @@ class SettlementTests(AnthropicTest):
                 self.assert_uncertain_halt(gate)
         # The control: the same reply with the documented fields is valid.
         self.assertTrue(ANTHROPIC.account(good, ANTHROPIC.rows[HAIKU], None)['usage_valid'])
+
+    def test_a_reply_with_a_null_container_and_null_context_editing_settles(self):
+        # Messages reference (read 2026-10-11): `container` is "Container or null"; a reply that used
+        # none carries it as null, and context_management likewise. Null means none was used.
+        documented = {**message(cache_creation_input_tokens=0, cache_read_input_tokens=0,
+                                cache_creation={'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0},
+                                server_tool_use={'web_search_requests': 0, 'web_fetch_requests': 0},
+                                service_tier='standard', inference_geo='global',
+                                output_tokens_details={'thinking_tokens': 0}),
+                      'container': None, 'context_management': None, 'stop_details': None, 'diagnostics': None}
+        accounting = ANTHROPIC.account(documented, ANTHROPIC.rows[HAIKU], None)
+        self.assertTrue(accounting['usage_valid'])
+        self.assertEqual(accounting['guard_charge_usd'],
+                         ANTHROPIC.account(message(), ANTHROPIC.rows[HAIKU], None)['guard_charge_usd'])
+        self.assertNotIn('invalid_reason', accounting)
+        self.assertNotIn('reply_shape', accounting)
+        gate = self.ready()
+        self.call(gate, reply=documented)
+        self.assertEqual(entry_of(gate)['state'], 'settled')
+        self.assertEqual(gate.status()['state'], 'active')
+
+    def test_an_unreadable_usage_records_which_check_failed(self):
+        cases = {
+            'not_a_message': ({**message(), 'type': 'error'}, 'not_a_message'),
+            'container': ({**message(), 'container': {'id': 'c', 'expires_at': 'x'}}, 'unpriced_reply_member'),
+            'context_management': ({**message(), 'context_management': {}}, 'unpriced_reply_member'),
+            'counts_outside_usage': ({**message(), 'cache_tokens': 5}, 'counts_outside_usage'),
+            'content_not_a_list': ({**message(), 'content': 'OK'}, 'content_block'),
+            'tool_block': (message(content=[{'type': 'tool_use', 'id': 't', 'name': 'x', 'input': {}}]), 'content_block'),
+            'usage_missing': (without('usage', message()), 'usage_missing'),
+            'unknown_usage_field': (message(cache_write_tokens=7), 'usage_unknown_field'),
+            'token_counts': (message(input_tokens=True), 'token_counts'),
+            'output_details': (message(output_tokens_details={'thinking_tokens': 501}), 'output_tokens_details'),
+            'cache_counts': (message(cache_read_input_tokens=-1), 'cache_counts'),
+            'server_tool_use': (message(server_tool_use={'web_search_requests': 1}), 'server_tool_use'),
+            'service_tier': (message(service_tier='priority'), 'service_tier'),
+            'inference_geo': (message(inference_geo='us'), 'inference_geo'),
+            'cache_split': (message(cache_creation={'ephemeral_5m_input_tokens': 5, 'ephemeral_1h_input_tokens': 0}),
+                            'cache_split'),
+        }
+        for name, (reply, reason) in cases.items():
+            with self.subTest(name):
+                accounting = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)
+                self.assertFalse(accounting['usage_valid'])
+                self.assertEqual(accounting['invalid_reason'], reason)
+                self.assertIn('reply_shape', accounting)
+
+    def test_the_outline_holds_field_names_kinds_and_two_usage_labels_only(self):
+        # Never the reply text, a token count, an id, the model name or any free-form name.
+        reply = {**message(input_tokens=1234, output_tokens=56, text='private words', service_tier='standard',
+                           inference_geo='us', cache_creation_input_tokens=0,
+                           cache_creation={'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0}),
+                 'container': None, 'stop_details': None, 'Free Form-Name': 3,
+                 'content': [{'type': 'text', 'text': 'private words'}, {'type': 'thinking', 'thinking': 'more'}]}
+        accounting = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)
+        self.assertEqual(accounting['invalid_reason'], 'inference_geo')
+        self.assertEqual(accounting['reply_shape'], {
+            'reply': ['(other):number', 'container:null', 'content:array', 'id:string', 'model:string', 'role:string',
+                      'stop_details:null', 'stop_reason:string', 'stop_sequence:null', 'type:string', 'usage:object'],
+            'content': ['text', 'thinking'],
+            'usage': ['cache_creation.ephemeral_1h_input_tokens:number', 'cache_creation.ephemeral_5m_input_tokens:number',
+                      'cache_creation:object', 'cache_creation_input_tokens:number', 'inference_geo:string',
+                      'input_tokens:number', 'output_tokens:number', 'service_tier:string'],
+            'usage_labels': {'service_tier': 'standard', 'inference_geo': 'us'}})
+        text = json.dumps(accounting)
+        for secret in ('private', 'more', '1234', '56', 'msg_synthetic', HAIKU, 'Free'):
+            self.assertNotIn(secret, text)
+
+    def test_the_outline_is_bounded_and_odd_values_become_kinds(self):
+        many = {'k%03d' % index: index for index in range(200)}
+        reply = {**message(service_tier='Not A Label', inference_geo=7, **many), 'content': [{'text': 'x'}, 'x'] * 50}
+        shape = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)['reply_shape']
+        self.assertEqual(shape['usage_labels'], {'service_tier': '(other)', 'inference_geo': 'number'})
+        self.assertEqual(len(shape['usage']), 41)
+        self.assertEqual(shape['usage'][-1], '(+164 more)')
+        self.assertEqual(len(shape['content']), 41)
+        self.assertEqual(shape['content'][:2], ['(no type)', '(not an object)'])
+        self.assertEqual(ANTHROPIC.account({'_invalid_json': True}, ANTHROPIC.rows[HAIKU], None)['reply_shape'],
+                         {'reply': ['_invalid_json:boolean']})
+        self.assertEqual(ANTHROPIC.account([1], ANTHROPIC.rows[HAIKU], None)['reply_shape'], {'reply_kind': 'array'})
+        self.assertLess(len(json.dumps(shape)), 8192)
+
+    def test_a_halted_call_keeps_the_reason_and_the_outline_in_its_ledger_entry(self):
+        reply = {**message(text='private words'), 'container': {'id': 'c-77', 'expires_at': 'x'}}
+        gate = self.ready()
+        with self.refused('NEW_CHARGE_UNCERTAIN'):
+            self.call(gate, reply=reply)
+        self.assert_uncertain_halt(gate)
+        accounting = entry_of(gate)['accounting']
+        self.assertEqual(accounting['invalid_reason'], 'unpriced_reply_member')
+        self.assertIn('container:object', accounting['reply_shape']['reply'])
+        ledger = ''.join(path.read_text() for path in sorted(gate.private.iterdir()) if path.suffix == '.json')
+        self.assertNotIn('private words', ledger)
+        self.assertNotIn('c-77', ledger)
 
     def test_thinking_blocks_are_allowed_and_ignored_by_the_text(self):
         reply = message(content=[{'type': 'thinking', 'thinking': 'hmm', 'signature': 'sig'},

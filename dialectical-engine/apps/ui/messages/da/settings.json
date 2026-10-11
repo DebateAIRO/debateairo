@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Åbn downloadlinket fra din e-mail igen. Det virker, indtil det udløber.",
   "settings.export.download.wrongAccount": "Dette downloadlink tilhører en anden konto. Log ud, og log ind på den konto, der anmodede om eksporten.",
   "settings.export.download.backToSettings": "Tilbage til Indstillinger",
+  "settings.erasure.endsContract": "Når du lukker din konto, afslutter du din aftale med os.",
   "settings.sessions.operationFailed": "Sessionshandlingen mislykkedes",
   "settings.sessions.signedIn": "Logget ind {date}",
   "settings.sessions.title": "Aktive sessioner",

@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Znova otvorte odkaz na stiahnutie z e-mailu. Bude fungovať až do uplynutia platnosti.",
   "settings.export.download.wrongAccount": "Tento odkaz na stiahnutie patrí inému účtu. Odhláste sa a prihláste do účtu, ktorý požiadal o export.",
   "settings.export.download.backToSettings": "Späť do Nastavení",
+  "settings.erasure.endsContract": "Zrušením účtu ukončíte aj zmluvu, ktorú máte s nami.",
   "settings.sessions.operationFailed": "Operácia s reláciou zlyhala",
   "settings.sessions.signedIn": "Prihlásenie {date}",
   "settings.sessions.title": "Aktívne relácie",

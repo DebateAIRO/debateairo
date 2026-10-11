@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "E-postanızdaki indirme bağlantısını yeniden açın. Süresi dolana kadar çalışmaya devam eder.",
   "settings.export.download.wrongAccount": "Bu indirme bağlantısı başka bir hesaba ait. Oturumu kapatıp dışa aktarmayı isteyen hesapta oturum açın.",
   "settings.export.download.backToSettings": "Ayarlar'a geri dön",
+  "settings.erasure.endsContract": "Hesabınızı kapatmak, bizimle olan sözleşmenizi de sona erdirir.",
   "settings.sessions.operationFailed": "Oturum işlemi başarısız oldu",
   "settings.sessions.signedIn": "Oturum açma: {date}",
   "settings.sessions.title": "Etkin oturumlar",

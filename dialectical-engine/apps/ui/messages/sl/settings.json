@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Znova odprite povezavo za prenos v e-pošti. Delovala bo do poteka veljavnosti.",
   "settings.export.download.wrongAccount": "Ta povezava za prenos pripada drugemu računu. Odjavite se in prijavite v račun, ki je zahteval izvoz.",
   "settings.export.download.backToSettings": "Nazaj v Nastavitve",
+  "settings.erasure.endsContract": "Z zaprtjem računa se konča tudi vaša pogodba z nami.",
   "settings.sessions.operationFailed": "Dejanje s sejo ni uspelo",
   "settings.sessions.signedIn": "Prijava: {date}",
   "settings.sessions.title": "Aktivne seje",

@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "メールに記載されたダウンロードリンクをもう一度開いてください。有効期限までは引き続き利用できます。",
   "settings.export.download.wrongAccount": "このダウンロードリンクは別のアカウントのものです。サインアウトして、エクスポートをリクエストしたアカウントにサインインしてください。",
   "settings.export.download.backToSettings": "設定に戻る",
+  "settings.erasure.endsContract": "アカウントを閉じると、当社との契約も終了します。",
   "settings.sessions.operationFailed": "セッション操作に失敗しました",
   "settings.sessions.signedIn": "サインイン日時：{date}",
   "settings.sessions.title": "有効なセッション",

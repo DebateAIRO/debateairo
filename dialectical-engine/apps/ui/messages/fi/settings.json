@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Avaa latauslinkki sähköpostistasi uudelleen. Se toimii voimassaolon päättymiseen asti.",
   "settings.export.download.wrongAccount": "Tämä latauslinkki kuuluu toiselle tilille. Kirjaudu ulos ja sitten siihen tiliin, jolta vientiä pyydettiin.",
   "settings.export.download.backToSettings": "Takaisin Asetuksiin",
+  "settings.erasure.endsContract": "Tilin sulkeminen päättää myös sopimuksesi kanssamme.",
   "settings.sessions.operationFailed": "Istuntotoiminto epäonnistui",
   "settings.sessions.signedIn": "Kirjauduttu {date}",
   "settings.sessions.title": "Aktiiviset istunnot",

@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Buka kembali tautan unduhan dari email Anda. Tautan itu tetap berfungsi hingga kedaluwarsa.",
   "settings.export.download.wrongAccount": "Tautan unduhan ini milik akun lain. Keluar, lalu masuk ke akun yang meminta ekspor.",
   "settings.export.download.backToSettings": "Kembali ke Pengaturan",
+  "settings.erasure.endsContract": "Menutup akun Anda juga mengakhiri kontrak Anda dengan kami.",
   "settings.sessions.operationFailed": "Operasi sesi gagal",
   "settings.sessions.signedIn": "Masuk pada {date}",
   "settings.sessions.title": "Sesi aktif",

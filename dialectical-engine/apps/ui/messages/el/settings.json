@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Ανοίξτε ξανά τον σύνδεσμο λήψης από το email σας. Λειτουργεί μέχρι να λήξει.",
   "settings.export.download.wrongAccount": "Αυτός ο σύνδεσμος λήψης ανήκει σε διαφορετικό λογαριασμό. Αποσυνδεθείτε και συνδεθείτε στον λογαριασμό που ζήτησε την εξαγωγή.",
   "settings.export.download.backToSettings": "Επιστροφή στις Ρυθμίσεις",
+  "settings.erasure.endsContract": "Το κλείσιμο του λογαριασμού σας τερματίζει και τη σύμβασή σας μαζί μας.",
   "settings.sessions.operationFailed": "Η ενέργεια συνεδρίας απέτυχε",
   "settings.sessions.signedIn": "Σύνδεση στις {date}",
   "settings.sessions.title": "Ενεργές συνεδρίες",

@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Vuelva a abrir el enlace de descarga de su correo electrónico. Seguirá funcionando hasta que caduque.",
   "settings.export.download.wrongAccount": "Este enlace de descarga pertenece a otra cuenta. Cierre sesión e inicie sesión en la cuenta que solicitó la exportación.",
   "settings.export.download.backToSettings": "Volver a Configuración",
+  "settings.erasure.endsContract": "Cerrar su cuenta pone fin a su contrato con nosotros.",
   "settings.sessions.operationFailed": "Falló la operación de sesión",
   "settings.sessions.signedIn": "Sesión iniciada el {date}",
   "settings.sessions.title": "Sesiones activas",

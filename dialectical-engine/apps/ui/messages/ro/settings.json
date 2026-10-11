@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Deschideți din nou linkul de descărcare din e-mail. Va funcționa până la expirare.",
   "settings.export.download.wrongAccount": "Acest link de descărcare aparține altui cont. Deconectați-vă și autentificați-vă în contul care a solicitat exportul.",
   "settings.export.download.backToSettings": "Înapoi la Setări",
+  "settings.erasure.endsContract": "Închiderea contului încheie și contractul nostru cu dumneavoastră.",
   "settings.sessions.operationFailed": "Operațiunea asupra sesiunii a eșuat",
   "settings.sessions.signedIn": "Autentificat la {date}",
   "settings.sessions.title": "Sesiuni active",

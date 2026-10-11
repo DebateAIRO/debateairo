@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Hãy mở lại liên kết tải xuống trong email của bạn. Liên kết vẫn hoạt động cho đến khi hết hạn.",
   "settings.export.download.wrongAccount": "Liên kết tải xuống này thuộc về một tài khoản khác. Hãy đăng xuất rồi đăng nhập vào tài khoản đã yêu cầu xuất dữ liệu.",
   "settings.export.download.backToSettings": "Quay lại Cài đặt",
+  "settings.erasure.endsContract": "Đóng tài khoản của bạn cũng chấm dứt hợp đồng của bạn với chúng tôi.",
   "settings.sessions.operationFailed": "Thao tác phiên thất bại",
   "settings.sessions.signedIn": "Đăng nhập lúc {date}",
   "settings.sessions.title": "Phiên đang hoạt động",

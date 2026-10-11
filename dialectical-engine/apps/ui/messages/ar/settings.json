@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "افتح رابط التنزيل من بريدك الإلكتروني مرة أخرى. سيظل صالحًا حتى تنتهي صلاحيته.",
   "settings.export.download.wrongAccount": "رابط التنزيل هذا يخص حسابًا آخر. سجّل الخروج ثم ادخل إلى الحساب الذي طلب التصدير.",
   "settings.export.download.backToSettings": "العودة إلى الإعدادات",
+  "settings.erasure.endsContract": "إغلاق حسابك يُنهي عقدك معنا.",
   "settings.sessions.operationFailed": "فشلت عملية الجلسة",
   "settings.sessions.signedIn": "تم تسجيل الدخول في {date}",
   "settings.sessions.title": "الجلسات النشطة",

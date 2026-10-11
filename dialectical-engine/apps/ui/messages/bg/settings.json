@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Отворете отново връзката за изтегляне от имейла си. Тя ще работи до изтичане на срока ѝ.",
   "settings.export.download.wrongAccount": "Тази връзка за изтегляне принадлежи на друг профил. Излезте и влезте в профила, от който е заявен експортът.",
   "settings.export.download.backToSettings": "Към Настройки",
+  "settings.erasure.endsContract": "Затварянето на профила ви прекратява договора ви с нас.",
   "settings.sessions.operationFailed": "Операцията със сесията е неуспешна",
   "settings.sessions.signedIn": "Влизане на {date}",
   "settings.sessions.title": "Активни сесии",

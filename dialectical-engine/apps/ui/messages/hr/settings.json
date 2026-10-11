@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Ponovno otvorite poveznicu za preuzimanje iz svoje e-pošte. Radit će do isteka valjanosti.",
   "settings.export.download.wrongAccount": "Ova poveznica za preuzimanje pripada drugom računu. Odjavite se i prijavite na račun koji je zatražio izvoz.",
   "settings.export.download.backToSettings": "Natrag na Postavke",
+  "settings.erasure.endsContract": "Zatvaranjem računa prekidate i ugovor koji imate s nama.",
   "settings.sessions.operationFailed": "Radnja sesije nije uspjela",
   "settings.sessions.signedIn": "Prijavljeno {date}",
   "settings.sessions.title": "Aktivne sesije",

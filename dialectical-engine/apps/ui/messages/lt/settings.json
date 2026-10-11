@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Dar kartą atidarykite atsisiuntimo nuorodą savo el. laiške. Ji veiks iki galiojimo pabaigos.",
   "settings.export.download.wrongAccount": "Ši atsisiuntimo nuoroda priklauso kitai paskyrai. Atsijunkite ir prisijunkite prie paskyros, kuri paprašė eksporto.",
   "settings.export.download.backToSettings": "Grįžti į nustatymus",
+  "settings.erasure.endsContract": "Uždarius paskyrą, nutrūksta ir jūsų sutartis su mumis.",
   "settings.sessions.operationFailed": "Seanso veiksmas nepavyko",
   "settings.sessions.signedIn": "Prisijungta {date}",
   "settings.sessions.title": "Aktyvūs seansai",

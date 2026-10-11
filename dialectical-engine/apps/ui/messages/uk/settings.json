@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Знову відкрийте посилання для завантаження зі свого електронного листа. Воно працюватиме до закінчення терміну дії.",
   "settings.export.download.wrongAccount": "Це посилання для завантаження належить іншому обліковому запису. Вийдіть і ввійдіть в обліковий запис, із якого було запрошено експорт.",
   "settings.export.download.backToSettings": "Назад до налаштувань",
+  "settings.erasure.endsContract": "Закриття облікового запису припиняє і ваш договір з нами.",
   "settings.sessions.operationFailed": "Не вдалося виконати дію із сеансом",
   "settings.sessions.signedIn": "Вхід виконано {date}",
   "settings.sessions.title": "Активні сеанси",

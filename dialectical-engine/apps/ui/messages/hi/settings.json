@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "अपने ईमेल से डाउनलोड लिंक फिर से खोलें। इसकी समय-सीमा समाप्त होने तक यह काम करेगा।",
   "settings.export.download.wrongAccount": "यह डाउनलोड लिंक किसी दूसरे खाते का है। साइन-आउट करके उस खाते में साइन-इन करें जिसने निर्यात माँगा था।",
   "settings.export.download.backToSettings": "सेटिंग्स पर वापस जाएँ",
+  "settings.erasure.endsContract": "अपना खाता बंद करने से हमारे साथ आपका अनुबंध भी समाप्त हो जाता है।",
   "settings.sessions.operationFailed": "सत्र कार्रवाई विफल रही",
   "settings.sessions.signedIn": "{date} को साइन-इन किया",
   "settings.sessions.title": "सक्रिय सत्र",

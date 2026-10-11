@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Ouvrez à nouveau le lien de téléchargement reçu par e-mail. Il fonctionnera jusqu’à son expiration.",
   "settings.export.download.wrongAccount": "Ce lien de téléchargement appartient à un autre compte. Déconnectez-vous et connectez-vous au compte qui a demandé l’exportation.",
   "settings.export.download.backToSettings": "Retour aux Paramètres",
+  "settings.erasure.endsContract": "La fermeture de votre compte met fin à votre contrat avec nous.",
   "settings.sessions.operationFailed": "Échec de l’opération sur la session",
   "settings.sessions.signedIn": "Connexion le {date}",
   "settings.sessions.title": "Sessions actives",

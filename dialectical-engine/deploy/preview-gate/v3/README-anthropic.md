@@ -70,7 +70,14 @@ cache reads.
 - **Answers the gate cannot price stop the gate.** Any usage field it does not know, any web
   search or other server tool, a region other than "global", a service tier other than
   "standard", a code container, context editing, token counts outside the usage block, or any
-  answer part other than text or thinking: the call is held in full and the gate halts.
+  answer part other than text or thinking: the call is held in full and the gate halts. A
+  `container` or `context_management` that is null means none was used (the reference documents both
+  as "X or null"; since 2026-10-11 a null one no longer halts, and the second live probe halted on it).
+- The usage fields it knows: `input_tokens`, `output_tokens`, `cache_creation_input_tokens`,
+  `cache_read_input_tokens`, `cache_creation` (the 5-minute/1-hour split), `server_tool_use` (all zero),
+  `service_tier` ("standard"), `inference_geo` ("global") and `output_tokens_details` (since 2026-10-11:
+  `thinking_tokens`, a read-only part of `output_tokens`, which stays the billed total; Haiku 5.5 thinks by
+  default, so every real answer carries it, and the first live probe halted on it).
 - A price change is a reviewed code change (the gate, the app and their shared test file
   `tests/unit/fixtures/preview-model-rows-anthropic.json`), never an edit of the GO.
 
@@ -420,7 +427,10 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
    page of the preview workspace in the Anthropic Console for that time before re-opening. Its
    full set-aside amount stays counted in that day's pot.
 3. If the reason is `provider_error_or_model_identity`, the entry's `reply_model` in that day's
-   record shows which model the answer named.
+   record shows which model the answer named. For an answer the gate could not price, the entry's
+   `accounting.invalid_reason` names the check it failed and `accounting.reply_shape` outlines the
+   answer: its field names with each value's kind, its part types, its usage field names and the
+   `service_tier` and `inference_geo` labels. Never its text, a number or an id.
 4. Then run this (owner's yes). No restart is needed.
 
 ```sh

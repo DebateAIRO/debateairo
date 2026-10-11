@@ -493,12 +493,22 @@ console.log(JSON.stringify({
     // uncaughtExceptionMonitor already observes rejections and suppresses
     // nothing, so the property is keyed on it plus the exit sink — both
     // observed BEFORE @debateai/db evaluates, not by reading source text.
+    //
+    // The database connection budget (#129) added `RUNNER_CAPACITY` and
+    // `RUNNER_DATABASE_POOLS` to main.ts's @debateai/db line; this stand-in
+    // missed them and the case went RED at link time. Their values copy the
+    // shape of packages/db/src/pool-budget.ts, although the throw below fires
+    // before anything reads them.
     const throwingDb = `data:text/javascript,${encodeURIComponent(`
 export function createPool() {}
 export function configureContentEncryption() {}
 export class RunRepository {}
 export class EntitlementRepository {}
 export class PostgresInternalAllowanceRepository {}
+export const RUNNER_CAPACITY = Object.freeze({ concurrentRuns: 8 });
+export const RUNNER_DATABASE_POOLS = Object.freeze({
+  runtime: Object.freeze({ name: "runner:runtime", max: 20, connectionTimeoutMillis: 5000 })
+});
 const uncaught = process.listenerCount("uncaughtExceptionMonitor");
 const exitSink = process.listenerCount("exit");
 if (uncaught < 1 || exitSink < 1) throw new Error("RUNNER_INSTALLER_NOT_FIRST");

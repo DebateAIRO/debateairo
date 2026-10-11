@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Erġa’ iftaħ il-ħolqa tat-tniżżil mill-email tiegħek. Tibqa’ taħdem sakemm tiskadi.",
   "settings.export.download.wrongAccount": "Din il-ħolqa tat-tniżżil tappartjeni għal kont ieħor. Oħroġ u idħol fil-kont li talab l-esportazzjoni.",
   "settings.export.download.backToSettings": "Lura għall-Issettjar",
+  "settings.erasure.endsContract": "Li tagħlaq il-kont tiegħek, il-kuntratt tiegħek magħna jintemm ukoll.",
   "settings.sessions.operationFailed": "L-operazzjoni tas-sessjoni falliet",
   "settings.sessions.signedIn": "Dħalt fil-kont {date}",
   "settings.sessions.title": "Sessjonijiet attivi",

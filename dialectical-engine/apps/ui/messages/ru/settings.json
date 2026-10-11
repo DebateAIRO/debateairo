@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Снова откройте ссылку для скачивания из письма. Она будет работать до истечения срока действия.",
   "settings.export.download.wrongAccount": "Эта ссылка для скачивания относится к другой учётной записи. Выйдите и войдите в учётную запись, из которой был запрошен экспорт.",
   "settings.export.download.backToSettings": "Назад к настройкам",
+  "settings.erasure.endsContract": "Закрытие аккаунта прекращает и ваш договор с нами.",
   "settings.sessions.operationFailed": "Не удалось выполнить операцию с сеансом",
   "settings.sessions.signedIn": "Вход выполнен {date}",
   "settings.sessions.title": "Активные сеансы",

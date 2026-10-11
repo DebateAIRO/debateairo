@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Avage allalaadimislink oma e-kirjast uuesti. See töötab kuni kehtivuse lõppemiseni.",
   "settings.export.download.wrongAccount": "See allalaadimislink kuulub teisele kontole. Logige välja ja seejärel sisse kontosse, millelt eksporti taotleti.",
   "settings.export.download.backToSettings": "Tagasi seadetesse",
+  "settings.erasure.endsContract": "Konto sulgemisega lõpeb ka teie leping meiega.",
   "settings.sessions.operationFailed": "Seansitoiming nurjus",
   "settings.sessions.signedIn": "Sisse logitud {date}",
   "settings.sessions.title": "Aktiivsed seansid",

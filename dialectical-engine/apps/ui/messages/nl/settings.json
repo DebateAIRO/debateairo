@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Open de downloadlink uit uw e-mail opnieuw. Die blijft werken totdat hij verloopt.",
   "settings.export.download.wrongAccount": "Deze downloadlink hoort bij een ander account. Meld u af en aan bij het account dat de export heeft aangevraagd.",
   "settings.export.download.backToSettings": "Terug naar Instellingen",
+  "settings.erasure.endsContract": "Als u uw account sluit, eindigt ook uw overeenkomst met ons.",
   "settings.sessions.operationFailed": "Sessiehandeling mislukt",
   "settings.sessions.signedIn": "Aangemeld op {date}",
   "settings.sessions.title": "Actieve sessies",

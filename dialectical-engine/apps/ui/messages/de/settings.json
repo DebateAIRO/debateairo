@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Öffnen Sie den Downloadlink aus Ihrer E-Mail erneut. Er funktioniert bis zum Ablaufdatum.",
   "settings.export.download.wrongAccount": "Dieser Downloadlink gehört zu einem anderen Konto. Melden Sie sich ab und bei dem Konto an, das den Export angefordert hat.",
   "settings.export.download.backToSettings": "Zurück zu den Einstellungen",
+  "settings.erasure.endsContract": "Wenn Sie Ihr Konto schließen, endet auch Ihr Vertrag mit uns.",
   "settings.sessions.operationFailed": "Sitzungsaktion fehlgeschlagen",
   "settings.sessions.signedIn": "Angemeldet am {date}",
   "settings.sessions.title": "Aktive Sitzungen",

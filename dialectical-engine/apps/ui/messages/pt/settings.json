@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Abra novamente a ligação de transferência no seu e-mail. Continuará a funcionar até expirar.",
   "settings.export.download.wrongAccount": "Esta ligação de transferência pertence a outra conta. Termine sessão e inicie sessão na conta que pediu a exportação.",
   "settings.export.download.backToSettings": "Voltar às Definições",
+  "settings.erasure.endsContract": "Encerrar a sua conta também põe fim ao seu contrato connosco.",
   "settings.sessions.operationFailed": "Falha na operação da sessão",
   "settings.sessions.signedIn": "Sessão iniciada em {date}",
   "settings.sessions.title": "Sessões ativas",

@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Öppna nedladdningslänken i ditt mejl igen. Den fungerar tills den går ut.",
   "settings.export.download.wrongAccount": "Den här nedladdningslänken hör till ett annat konto. Logga ut och logga in på kontot som begärde exporten.",
   "settings.export.download.backToSettings": "Tillbaka till Inställningar",
+  "settings.erasure.endsContract": "När du stänger ditt konto avslutas även ditt avtal med oss.",
   "settings.sessions.operationFailed": "Sessionsåtgärden misslyckades",
   "settings.sessions.signedIn": "Inloggad {date}",
   "settings.sessions.title": "Aktiva sessioner",

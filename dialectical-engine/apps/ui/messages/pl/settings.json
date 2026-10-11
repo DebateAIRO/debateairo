@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Otwórz ponownie link do pobrania z wiadomości e-mail. Będzie działał do chwili wygaśnięcia.",
   "settings.export.download.wrongAccount": "Ten link do pobrania należy do innego konta. Wyloguj się i zaloguj na konto, z którego poproszono o eksport.",
   "settings.export.download.backToSettings": "Wróć do Ustawień",
+  "settings.erasure.endsContract": "Zamknięcie konta kończy także Twoją umowę z nami.",
   "settings.sessions.operationFailed": "Operacja na sesji nie powiodła się",
   "settings.sessions.signedIn": "Zalogowano {date}",
   "settings.sessions.title": "Aktywne sesje",

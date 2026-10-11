@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "פתחו שוב את קישור ההורדה מהדוא״ל שלכם. הוא ימשיך לפעול עד שתוקפו יפוג.",
   "settings.export.download.wrongAccount": "קישור ההורדה הזה שייך לחשבון אחר. יש להתנתק ולהתחבר לחשבון שביקש את הייצוא.",
   "settings.export.download.backToSettings": "חזרה להגדרות",
+  "settings.erasure.endsContract": "סגירת החשבון שלך מסיימת גם את החוזה שלך איתנו.",
   "settings.sessions.operationFailed": "פעולת ההפעלה נכשלה",
   "settings.sessions.signedIn": "התחברות ב-{date}",
   "settings.sessions.title": "הפעלות פעילות",

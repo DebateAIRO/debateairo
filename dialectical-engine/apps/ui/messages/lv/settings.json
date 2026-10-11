@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Vēlreiz atveriet lejupielādes saiti savā e-pastā. Tā darbosies līdz derīguma termiņa beigām.",
   "settings.export.download.wrongAccount": "Šī lejupielādes saite pieder citam kontam. Izrakstieties un pierakstieties kontā, kas pieprasīja eksportu.",
   "settings.export.download.backToSettings": "Atpakaļ uz iestatījumiem",
+  "settings.erasure.endsContract": "Slēdzot kontu, izbeidzas arī jūsu līgums ar mums.",
   "settings.sessions.operationFailed": "Sesijas darbība neizdevās",
   "settings.sessions.signedIn": "Pierakstīšanās: {date}",
   "settings.sessions.title": "Aktīvās sesijas",

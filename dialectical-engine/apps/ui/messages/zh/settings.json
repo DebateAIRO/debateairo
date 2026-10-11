@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "请再次打开电子邮件中的下载链接。链接在过期前仍可使用。",
   "settings.export.download.wrongAccount": "此下载链接属于另一个账户。请退出登录，然后登录请求导出的账户。",
   "settings.export.download.backToSettings": "返回设置",
+  "settings.erasure.endsContract": "关闭您的账户也将终止您与我们之间的合同。",
   "settings.sessions.operationFailed": "会话操作失败",
   "settings.sessions.signedIn": "登录时间：{date}",
   "settings.sessions.title": "活跃会话",

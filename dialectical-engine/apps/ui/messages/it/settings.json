@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Apri di nuovo il link per il download nella tua email. Funzionerà fino alla scadenza.",
   "settings.export.download.wrongAccount": "Questo link per il download appartiene a un altro account. Esci e accedi all’account che ha richiesto l’esportazione.",
   "settings.export.download.backToSettings": "Torna alle Impostazioni",
+  "settings.erasure.endsContract": "Chiudere il tuo account pone fine anche al contratto che hai con noi.",
   "settings.sessions.operationFailed": "Operazione sulla sessione non riuscita",
   "settings.sessions.signedIn": "Accesso effettuato il {date}",
   "settings.sessions.title": "Sessioni attive",

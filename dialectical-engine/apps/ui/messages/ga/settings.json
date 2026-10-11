@@ -77,6 +77,7 @@
   "settings.export.download.reopenFromEmail": "Oscail an nasc íoslódála ó do ríomhphost arís. Oibreoidh sé go dtí go rachaidh sé in éag.",
   "settings.export.download.wrongAccount": "Is le cuntas eile an nasc íoslódála seo. Sínigh amach agus sínigh isteach sa chuntas a d’iarr an easpórtáil.",
   "settings.export.download.backToSettings": "Ar ais chuig na Socruithe",
+  "settings.erasure.endsContract": "Trí do chuntas a dhúnadh, cuirtear deireadh lenár gconradh leat.",
   "settings.sessions.operationFailed": "Theip ar oibríocht an tseisiúin",
   "settings.sessions.signedIn": "Sínithe isteach {date}",
   "settings.sessions.title": "Seisiúin ghníomhacha",
