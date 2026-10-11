@@ -161,7 +161,7 @@ function previewGateway(port: PreviewBudgetPort, waits: number[]): ProviderGatew
   return withPreviewProviderCallPolicy(gateway, PREVIEW, TARGET, { sleep: async (milliseconds) => { waits.push(milliseconds); } });
 }
 
-function rootRequest(work: Readonly<{ runId: string; workItemId: string }>, maxAttempts = POLICY.bounds.JUDGE.maxAttempts): ProviderCallRequest {
+function rootRequest(work: Readonly<{ runId: string; workItemId: string }>, maxAttempts: number = POLICY.bounds.JUDGE.maxAttempts): ProviderCallRequest {
   return {
     runId: work.runId, subjectItemId: work.workItemId, callSiteKey: "JUDGE", role: "JUDGE", lane: "served",
     bound: { ...POLICY.bounds.JUDGE, maxAttempts }, contractHash: CONTRACT, providerRef: REF,

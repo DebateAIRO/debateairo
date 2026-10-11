@@ -9808,6 +9808,9 @@ export function createPostgresProviderGateway(
       }
       try {
         return await http.call({
+          // Preview retry fix, option B (spec 2026-10-11 §1.1): the spread forwards the preview's
+          // `maxAttemptsThisCall` (one POST per call), and `remaining` stays the step's billed allowance,
+          // which `countModelAttempts` reads without REFUSED rows. Hosted and local never set the field.
           ...request,
           bound: { ...request.bound, maxAttempts: remaining },
           // DL4-F3: the pinned run ceiling is consulted before EVERY attempt of the gateway's

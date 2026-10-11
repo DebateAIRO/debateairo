@@ -3,8 +3,11 @@
 // socket protocol: the team's day being used up becomes the product's own daily code
 // (DAILY_COST_ENVELOPE_REACHED, a run-level spend stop with its own "wait for tomorrow"
 // lift); too many calls in flight is a transient provider failure (PROVIDER_CALL_FAILED, the
-// runner cools down and retries), never a money stop; every other refusal, and any body it
-// cannot read, keeps today's behaviour.
+// runner cools down and retries), never a money stop, and by owner ruling R4 (2026-10-11) an
+// unbilled one (one resend after the cooldown, a REFUSED row); every other refusal, and any body
+// it cannot read, keeps today's behaviour. The counting gateway in front of the native one (the
+// runner's ledger allowance) is proved on embedded PostgreSQL in
+// tests/integration/preview-unbilled-retry-ledger.test.ts: this file wraps a bare gateway.
 import { createServer, type Server, type ServerResponse } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -21,8 +24,10 @@ import {
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
   PreviewUnbilledRefusal,
+  ProviderUnbilledRefusal,
   type PreviewBudgetPort,
-  type PreviewProviderTestConfig
+  type PreviewProviderTestConfig,
+  type ProviderLedgerInput
 } from "@debateai/providers";
 import { framedFixturePacket } from "../support/framed-packet.js";
 
@@ -124,6 +129,9 @@ describe("the preview spending gate's 409 refusal body", () => {
     const { port } = await gate({ status: 409, body: JSON.stringify({ error: "CONCURRENCY_LIMIT_REACHED" }) });
     const refusal: unknown = await port.execute(execution).then(() => null, (error: unknown) => error);
     expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+    // Owner ruling R4 (2026-10-11): nothing was reserved or sent, so it is an unbilled refusal too.
+    expect(refusal).toBeInstanceOf(PreviewUnbilledRefusal);
+    expect(refusal).toBeInstanceOf(ProviderUnbilledRefusal);
     expect(isRunLevelSpendStop(refusal)).toBe(false);
     expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
   });
@@ -158,17 +166,17 @@ describe("the preview spending gate's 409 refusal body", () => {
     const busy = await call("CONCURRENCY_LIMIT_REACHED");
     expect(busy).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
     expect(isRunLevelSpendStop(busy)).toBe(false);
-    // A busy gate is not retried here (the runner's own cooldown is).
-    expect(slept).toEqual([]);
+    // Owner ruling R4 (2026-10-11): a busy gate is unbilled, so it gets the one resend after the cooldown.
+    expect(slept).toEqual([COOLDOWN_MS]);
     for (const unsent of ["PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"]) {
       const refusal = await call(unsent);
       expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
       expect(isRunLevelSpendStop(refusal)).toBe(false);
     }
     // Owner ruling 5: each unbilled refusal is sent once more after the cooldown, and only once.
-    expect(slept).toEqual([COOLDOWN_MS, COOLDOWN_MS]);
+    expect(slept).toEqual([COOLDOWN_MS, COOLDOWN_MS, COOLDOWN_MS]);
     await expect(call("PREVIEW_TEST_AUTHORITY_STOPPED")).resolves.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
-    expect(slept).toHaveLength(2);
+    expect(slept).toHaveLength(3);
   });
 
   describe("owner ruling 5: one retry after the cooldown, only for a call the gate proved unbilled", () => {
@@ -193,7 +201,7 @@ describe("the preview spending gate's 409 refusal body", () => {
       } };
       return { sent, port };
     };
-    const gatewayFor = (port: PreviewBudgetPort, slept: number[]) => {
+    const gatewayFor = (port: PreviewBudgetPort, slept: number[], ledger: ProviderLedgerInput[] = []) => {
       const thinking = { thinking_parameter: "reasoning_effort", thinking_levels: ["high"] };
       const target = parseProviderDiscoveryTargets(JSON.stringify([{
         provider_ref: REF, base_url: "https://api.deepinfra.com/v1/openai", model: MODEL,
@@ -203,7 +211,8 @@ describe("the preview spending gate's 409 refusal body", () => {
       return withPreviewProviderCallPolicy(new OpenAICompatibleProviderGateway({
         endpoint: target.baseUrl, model: target.model, maker: target.maker, ...providerTargetGatewayControls(target),
         fetchImplementation: createPreviewGuardedFetch(port),
-        persistRawArtifact: async (artifact) => artifact.artifactId, appendLedgerEntry: async (entry) => entry.attemptId,
+        persistRawArtifact: async (artifact) => artifact.artifactId,
+        appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
         assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
       }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); } });
     };
@@ -226,7 +235,9 @@ describe("the preview spending gate's 409 refusal body", () => {
       expect(slept).toEqual([COOLDOWN_MS]);
     });
 
-    it("never a second retry, never for any other failure", async () => {
+    // Preview retry fix, option B (spec 2026-10-11 §1.1): the step's bound (3 here) is its lifetime
+    // allowance; each send inside one call is ONE POST, so "never a second retry" is per call.
+    it("never a second retry inside one call, never for any other failure, one POST per send", async () => {
       const twice: number[] = [];
       const again = scripted([new PreviewUnbilledRefusal(), new PreviewUnbilledRefusal(), answer]);
       await expect(gatewayFor(again.port, twice).call(request)).rejects.toMatchObject({ code: "PROVIDER_CALL_FAILED" });
@@ -237,6 +248,18 @@ describe("the preview spending gate's 409 refusal body", () => {
       await expect(gatewayFor(failed.port, other).call(request)).rejects.toMatchObject({ code: "PROVIDER_CALL_FAILED" });
       expect(failed.sent).toHaveLength(1);
       expect(other).toEqual([]);
+    });
+
+    it("an unbilled attempt is recorded REFUSED, a billed failure FAILED; the thrown error keeps FAILED", async () => {
+      const ledger: ProviderLedgerInput[] = [];
+      const refused = scripted([new PreviewUnbilledRefusal(), new PreviewUnbilledRefusal()]);
+      await expect(gatewayFor(refused.port, [], ledger).call(request))
+        .rejects.toMatchObject({ code: "PROVIDER_CALL_FAILED", lastOutcome: "FAILED" });
+      expect(ledger.map((entry) => entry.outcome)).toEqual(["REFUSED", "REFUSED"]);
+      const billed: ProviderLedgerInput[] = [];
+      const reset = scripted([new Error("connection reset")]);
+      await expect(gatewayFor(reset.port, [], billed).call(request)).rejects.toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+      expect(billed.map((entry) => entry.outcome)).toEqual(["FAILED"]);
     });
   });
 

@@ -18,6 +18,7 @@ import {
   readAnthropicMessagesReply
 } from "./anthropic-messages.js";
 import { previewModelRowForEndpoint } from "./preview-models.js";
+import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
 // not organ aliases. A debater's model may hold either role; the CALL is
@@ -142,6 +143,14 @@ export interface ProviderCallRequest {
    * database (DL4-F3).
    */
   readonly assertAttemptAllowed?: () => void | Promise<void>;
+  /**
+   * Preview retry fix, option B (spec 2026-10-11 §1.1): how many POSTs THIS gateway call may send, at
+   * most `bound.maxAttempts`. `bound.maxAttempts` stays the step's lifetime allowance, which the
+   * counting gateway turns into what is left (`remaining`), so the two limits never meet in one
+   * number. The preview's call policy sets 1 (its storyteller's repair call: 2); absent means
+   * `bound.maxAttempts`, which is hosted and local byte for byte. A positive whole number.
+   */
+  readonly maxAttemptsThisCall?: number;
   /**
    * V-28: the money bound for THIS call. Per request and not per gateway,
    * because the price is the target's but the SPEND is the run's, and a gateway
@@ -1079,7 +1088,8 @@ export interface ProviderLedgerInput {
   readonly callSiteKey: string;
   readonly subjectItemId: string;
   readonly stanceAtAction: "UNASSIGNED";
-  readonly outcome: "OK" | "FAILED" | "TIMED_OUT";
+  /** REFUSED: a `ProviderUnbilledRefusal` (nothing billed); no attempt count includes it (spec 2026-10-11 §1.2). */
+  readonly outcome: "OK" | "FAILED" | "TIMED_OUT" | "REFUSED";
   readonly inputHash: string;
   readonly contractHash: string;
   readonly actorRef: string;
@@ -1606,6 +1616,17 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     if (!Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 1) {
       throw new TypeError("CallBound.maxAttempts must be a positive integer");
     }
+    if (request.maxAttemptsThisCall !== undefined
+      && (!Number.isInteger(request.maxAttemptsThisCall) || request.maxAttemptsThisCall < 1)) {
+      throw new TypeError("ProviderCallRequest.maxAttemptsThisCall must be a positive integer");
+    }
+    /**
+     * Preview retry fix, option B (spec 2026-10-11 §1.1): the POSTs of THIS call, decided once and used
+     * by both the loop and the repair test below. Without `maxAttemptsThisCall` it is the bound, as
+     * today; the field is also honoured when this gateway is called directly, without the counting
+     * gateway in front.
+     */
+    const callAttempts = Math.min(request.bound.maxAttempts, request.maxAttemptsThisCall ?? request.bound.maxAttempts);
     /**
      * V-11 addendum, layer 1 — THE DOOR. Every hand-off in the engine passes
      * through this method, so holding the frame HERE is what makes "no call
@@ -1672,7 +1693,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       contextWindowTokens === undefined
         || estimateWindowTokens(packet.messages) + tokenCeiling <= contextWindowTokens;
 
-    for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
+    for (let attempt = 1; attempt <= callAttempts; attempt += 1) {
       const attemptTokenCeiling = Math.min(
         lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures),
         this.#options.maxOutputTokens ?? Number.MAX_SAFE_INTEGER
@@ -2097,7 +2118,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // Role rotation, Task 12: the original packet goes out again, so a repair adopted before
             // it no longer describes the reply that is finally accepted. Count afresh from here.
             repairAttempts = 0;
-          } else if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
+          } else if (attempt < callAttempts && request.buildRepairPacket !== undefined) {
             const repair = request.buildRepairPacket({
               // `content` is the strict parse's, or the raw body when the cut
               // landed before one existed. Either way it is what arrived.
@@ -2216,7 +2237,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           callSiteKey: request.callSiteKey,
           subjectItemId: request.subjectItemId,
           stanceAtAction: "UNASSIGNED",
-          outcome: lastOutcome,
+          // Preview retry fix, option B (spec 2026-10-11 §1.2 (d)): a provably unbilled refusal is
+          // recorded as REFUSED, which no attempt count includes, so it never uses up the step. The
+          // thrown error keeps `lastOutcome` FAILED: hold and halt records accept only TIMED_OUT/FAILED
+          // (`migrations/0021_dr174_cooldown_prune.sql:34-38`).
+          outcome: error instanceof ProviderUnbilledRefusal ? "REFUSED" : lastOutcome,
           ...callFacts,
           thinkingLevel: attemptThinkingLevel,
           inputHash,
@@ -2345,6 +2370,7 @@ export {
   type ProviderProbeRecorder
 } from "./provider-probe.js";
 
+export { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 export * from "./preview-test.js";
 
 // Multi-model preview, PR B: the native Anthropic Messages wire.
