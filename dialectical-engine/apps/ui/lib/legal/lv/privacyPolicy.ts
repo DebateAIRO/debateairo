@@ -183,12 +183,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Piekļuve (GDPR 15. pants; Art. 15) — Mūsu rīcībā esošo jūsu personas datu kopija un šī informācija. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Piekļuve (GDPR 15. pants; Art. 15) — Mūsu rīcībā esošo jūsu personas datu kopija un šī informācija. Iestatījumos izvēlieties Eksportēt datus: mēs sagatavojam ZIP failu ar JSON failiem un vienu lapu, ko var atvērt jebkurā pārlūkprogrammā, un pa e-pastu nosūtām lejupielādes saiti, kas darbojas 24 stundas un tikai tad, kad esat pieteicies savā kontā.",
         "Labošana (GDPR 16. pants; Art. 16) — Savas e-pasta adreses vai atkopšanas e-pasta adreses labošana Iestatījumos. Jūsu pseidonīmu nevar mainīt Noteikumos izskaidroto iemeslu dēļ; varat slēgt kontu un atvērt jaunu",
         "Dzēšana (GDPR 17. pants; Art. 17) — Privātu debašu dzēšana jebkurā laikā debašu lapā. Konta slēgšana Iestatījumos; 7. sadaļā ir precīzi paskaidrots, ko tas nozīmē. Pieprasījums mums noņemt publicētas debates, kas satur jūsu datus, neatkarīgi no tā, vai esat to autors",
         "Ierobežošana (GDPR 18. pants; Art. 18) — Pieprasījums mums pārtraukt konkrētu datu apstrādi, kamēr tiek atrisināts strīds par tiem",
         "Iebildums (GDPR 21. pants; Art. 21) — Iebildums pret apstrādi, kas balstīta uz leģitīmām interesēm — 4. sadaļā minēto drošības un audita apstrādi —, un mēs to pārtrauksim, ja vien nevarēsim pierādīt pārliecinošu pamatojumu. Jebkurā laikā varat iebilst pret tirgvedību, un mēs to pārtrauksim",
-        "Pārnesamība (GDPR 20. pants; Art. 20) — Jūsu debates un konta dati plaši izmantotā, mašīnlasāmā formātā. [Pending: same export as Access.] Jūsu radītais saturs, kas nav personas dati, piemēram, jūsu jautājumi, pēc pieprasījuma tiek jums atdots, beidzoties līgumam",
+        "Pārnesamība (GDPR 20. pants; Art. 20) — Jūsu debates un konta dati plaši izmantotā, mašīnlasāmā formātā. Izmantojiet Iestatījumu funkciju Eksportēt datus: ZIP failā ir jūsu dati mašīnlasāmos JSON failos un viena lasāma lapa; pa e-pastu nosūtītā saite darbojas 24 stundas un tikai tad, kad esat pieteicies savā kontā. Jūsu radītais saturs, kas nav personas dati, piemēram, jūsu jautājumi, pēc pieprasījuma tiek jums atdots, beidzoties līgumam",
         "Piekrišanas atsaukšana (GDPR 7. panta 3. punkts; Art. 7(3)) — Tirgvedības piekrišanas atsaukšana jebkurā e-pasta ziņojumā vai Iestatījumos; piekrišanas sensitīvu datu apstrādei atsaukšana, slēdzot kontu Iestatījumos (šādus datus var arī neiekļaut vai dzēst debates, kurās tie ir). Atsaukšana neietekmē jau notikušu apstrādi",
         "Sūdzība — Rumānijas uzraudzības iestādei ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukareste, anspdcp@dataprotection.ro, vai jūsu dzīvesvietas valsts uzraudzības iestādei. Mēs vēlētos, lai jūs vispirms sazinātos ar mums"
         ]
@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Sīkdatnes",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine izmanto 18 elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai Dialectical Engine: 13 sīkdatnes un 5 ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. Sīkdatņu politikā vietnē dezbatere.ro/cookies tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits." },
+      { kind: "p", text: "Dialectical Engine izmanto 20 elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai Dialectical Engine: 13 sīkdatnes un 7 ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. Sīkdatņu politikā vietnē dezbatere.ro/cookies tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokālā krātuve — Vai izmantojat gaišo vai tumšo režīmu. — Līdz jūs to notīrāt",
         "debateai.languageOffer.dismissed — Sesijas krātuve — Atceras šai cilnei, ka atteicāties no piedāvājuma rādīt debates citā valodā. — Līdz jūs aizverat cilni",
         "debateai.support.conversation.v2 — Sesijas krātuve — Saglabā jūsu palīdzības tērzēšanas sarunu ekrānā, kamēr cilne ir atvērta. Tā tiek izdzēsta, kad šajā cilnē kāds pierakstās vai izrakstās. — Līdz jūs aizverat cilni",
-        "debateai.phone-completion-draft.v1 — Sesijas krātuve — Nepabeigts jautājums tālruņa soļa laikā; dzēsts pie sesijas maiņas, izrakstīšanās vai īpašnieka maiņas — 15 minūtes vai līdz agrākai dzēšanai"
+        "debateai.phone-completion-draft.v1 — Sesijas krātuve — Nepabeigts jautājums tālruņa soļa laikā; dzēsts pie sesijas maiņas, izrakstīšanās vai īpašnieka maiņas — 15 minūtes vai līdz agrākai dzēšanai",
+        "debateai.exportPending — Sesijas krātuve — Saglabā e-pastā saņemto eksporta saiti šajā cilnē, lai varētu pierakstīties un mēģināt vēlreiz. — Līdz cilnes aizvēršanai, izrakstīšanai, jaunai saitei, pirmajai veiksmīgajai lejupielādei vai nederīgas saites vai nepareiza konta rezultātam",
+        "debateai.exportLinkOutcome — Sesijas krātuve — Atceras, kurš lejupielādes saites ziņojums jārāda šajā cilnē. — Līdz cilnes aizvēršanai, izrakstīšanai vai jaunai saitei"
         ]
       },
       { kind: "p", text: "Neviena cita puse ar Dialectical Engine starpniecību nevāc informāciju par jūsu darbībām tiešsaistē laika gaitā un dažādās tīmekļa vietnēs." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "def946eca7abdffc6506f40bf3e48f20b0f340d10dbb1a43f2785a7d955c231f",
+  sha256: "c016c7ad6771377a52df3da6207fde2682a441b8139eacab04d8c2dceb64f407",
   eyebrow: "PRIVĀTUMA POLITIKA · v3.3 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",

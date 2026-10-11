@@ -444,6 +444,8 @@ const apiEnvironmentShape = {
     AUDIT_KEY_STORE_PATH: z.string().min(1),
     AUDIT_SOURCE_IP_SALT_PATH: z.string().min(1),
     USER_DEK_STORE_PATH: z.string().min(1),
+    DATA_EXPORT_STORE_PATH: z.string().min(1).optional(),
+    DATA_EXPORT_DATABASE_URL: z.string().url().optional(),
     CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
     CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),
     CONTENT_PROVISION_DATABASE_URL: z.string().url(),
@@ -599,6 +601,17 @@ function validateApiEnvironment(
     || environment.ERASURE_DATABASE_URL === environment.CONTENT_PROVISION_DATABASE_URL
     || environment.ERASURE_DATABASE_URL === environment.EVALUATOR_DEV_MENU_DATABASE_URL) {
     throw new TypeError("ERASURE_DATABASE_URL_MUST_BE_SEPARATE");
+  }
+  if (environment.DATA_EXPORT_STORE_PATH !== undefined && environment.DATA_EXPORT_DATABASE_URL === undefined) {
+    throw new TypeError("DATA_EXPORT_DATABASE_URL_REQUIRED");
+  }
+  if (environment.DATA_EXPORT_DATABASE_URL !== undefined && [
+    environment.DATABASE_URL, environment.AUTHORIZATION_DATABASE_URL,
+    environment.CONTENT_PROVISION_DATABASE_URL, environment.PUBLICATION_CLEANUP_DATABASE_URL,
+    environment.ERASURE_DATABASE_URL, environment.SUPPORT_DATABASE_URL,
+    environment.EVALUATOR_DEV_MENU_DATABASE_URL
+  ].includes(environment.DATA_EXPORT_DATABASE_URL)) {
+    throw new TypeError("DATA_EXPORT_DATABASE_URL_MUST_BE_SEPARATE");
   }
   if (environment.CONTENT_PROVISION_DATABASE_URL === environment.DATABASE_URL
       || environment.CONTENT_PROVISION_DATABASE_URL === environment.AUTHORIZATION_DATABASE_URL

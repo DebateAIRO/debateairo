@@ -15,6 +15,7 @@ import type {
 import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
+export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export * from "./pool-budget.js";
 import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
@@ -1173,7 +1174,14 @@ export async function migrate(pool: Pool): Promise<void> {
     else await client.query(forwardVerifierSql);
     await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
     await applyForward110(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
+    const compatEvidenceBeforeChain = await lineageEvidence(client);
     await applyForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]));
+    // data-export 0115 (V-41; the re-seal is V-28's): a chain step that moves lineageEvidence (step_up_grant_action_check, valid_consumer_authorization_internal)
+    // re-seals the compatibility row it moved; the check above guards every later run (V-18).
+    const compatEvidenceAfterChain = await lineageEvidence(client);
+    if (compatEvidenceAfterChain !== compatEvidenceBeforeChain) {
+      await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[compatEvidenceAfterChain,compat.logicalName]);
+    }
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");

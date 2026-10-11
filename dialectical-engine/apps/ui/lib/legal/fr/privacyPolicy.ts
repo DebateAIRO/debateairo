@@ -183,12 +183,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Accès (Art. 15) — Une copie des données à caractère personnel que nous détenons à votre sujet, ainsi que les présentes informations. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Accès (Art. 15) — Une copie des données à caractère personnel que nous détenons à votre sujet, ainsi que les présentes informations. Dans Paramètres, choisissez Exporter les données : nous préparons un fichier ZIP contenant des fichiers JSON et une page ouvrable dans tout navigateur, puis nous vous envoyons par e-mail un lien de téléchargement valable 24 heures et utilisable uniquement lorsque vous êtes connecté à votre compte.",
         "Rectification (Art. 16) — Corrigez votre adresse e-mail ou votre adresse e-mail de récupération depuis les Paramètres. Votre pseudonyme ne peut pas être modifié, pour les raisons indiquées dans les Conditions ; vous pouvez clôturer le compte et en ouvrir un nouveau",
         "Effacement (Art. 17) — Supprimez à tout moment un débat privé depuis sa page. Clôturez votre compte depuis les Paramètres ; la section 7 explique précisément l'effet de cette opération. Demandez-nous de retirer un débat publié qui contient vos données, que vous en soyez ou non l'auteur",
         "Limitation (Art. 18) — Demandez-nous de suspendre le traitement de certaines données jusqu'à la résolution d'un litige les concernant",
         "Opposition (Art. 21) — Opposez-vous au traitement fondé sur des intérêts légitimes — les traitements de sécurité et d'audit de la section 4 — et nous y mettrons fin, sauf si nous pouvons démontrer des motifs impérieux. Opposez-vous à tout moment à la prospection, et nous y mettrons fin",
-        "Portabilité (Art. 20) — Vos débats et les données de votre compte dans un format couramment utilisé et lisible par machine. [Pending: same export as Access.] Le contenu non personnel que vous avez créé, notamment vos questions, vous est restitué sur demande à la fin du contrat",
+        "Portabilité (Art. 20) — Vos débats et les données de votre compte dans un format couramment utilisé et lisible par machine. Utilisez Exporter les données dans Paramètres : le ZIP contient vos données dans des fichiers JSON lisibles par machine et une page lisible ; le lien envoyé par e-mail est valable 24 heures et utilisable uniquement lorsque vous êtes connecté à votre compte. Le contenu non personnel que vous avez créé, notamment vos questions, vous est restitué sur demande à la fin du contrat",
         "Retrait du consentement (Art. 7(3)) — Retirez votre consentement à la prospection depuis n'importe quel e-mail ou depuis les Paramètres ; retirez votre consentement au traitement des données sensibles en clôturant votre compte depuis les Paramètres (vous pouvez aussi omettre ces données ou supprimer un débat qui les contient). Le retrait n'affecte pas les traitements déjà effectués",
         "Réclamation — Auprès de l'autorité de contrôle roumaine, l'ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucarest, anspdcp@dataprotection.ro, ou auprès de l'autorité du pays dans lequel vous vivez. Nous préférerions toutefois que vous nous contactiez d'abord"
         ]
@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine utilise 18 éléments, tous strictement nécessaires au service que vous avez demandé et tous déposés uniquement par Dialectical Engine : 13 cookies et 5 entrées dans le stockage de votre navigateur. Nous ne déposons aucun cookie d'analyse, de publicité ou de suivi. La Politique relative aux cookies disponible à l'adresse dezbatere.ro/cookies les énumère en indiquant le rôle de chacun et qui le reçoit, et sera modifiée avant tout autre ajout." },
+      { kind: "p", text: "Dialectical Engine utilise 20 éléments, tous strictement nécessaires au service que vous avez demandé et tous déposés uniquement par Dialectical Engine : 13 cookies et 7 entrées dans le stockage de votre navigateur. Nous ne déposons aucun cookie d'analyse, de publicité ou de suivi. La Politique relative aux cookies disponible à l'adresse dezbatere.ro/cookies les énumère en indiquant le rôle de chacun et qui le reçoit, et sera modifiée avant tout autre ajout." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Stockage local — Votre choix entre le mode clair et le mode sombre. — Jusqu’à ce que vous l’effaciez",
         "debateai.languageOffer.dismissed — Stockage de session — Retient, pour cet onglet, que vous avez décliné la proposition d’afficher un débat dans une autre langue. — Jusqu’à la fermeture de l’onglet",
         "debateai.support.conversation.v2 — Stockage de session — Garde votre conversation avec l’aide à l’écran tant que l’onglet reste ouvert. Elle est effacée quand quelqu’un se connecte ou se déconnecte dans cet onglet. — Jusqu’à la fermeture de l’onglet",
-        "debateai.phone-completion-draft.v1 — Stockage de session — Question inachevée pendant l’étape du téléphone ; effacée lors d’un changement de session, d’une déconnexion ou d’un changement de propriétaire — 15 minutes ou jusqu’à l’effacement"
+        "debateai.phone-completion-draft.v1 — Stockage de session — Question inachevée pendant l’étape du téléphone ; effacée lors d’un changement de session, d’une déconnexion ou d’un changement de propriétaire — 15 minutes ou jusqu’à l’effacement",
+        "debateai.exportPending — Stockage de session — Conserve dans cet onglet le lien d’exportation reçu par e-mail pour la connexion et une nouvelle tentative. — Jusqu’à la fermeture de l’onglet, la déconnexion, un nouveau lien, le premier téléchargement réussi ou un résultat de lien invalide ou de mauvais compte",
+        "debateai.exportLinkOutcome — Stockage de session — Mémorise le message concernant le lien de téléchargement à afficher dans cet onglet. — Jusqu’à la fermeture de l’onglet, la déconnexion ou un nouveau lien"
         ]
       },
       { kind: "p", text: "Aucun autre tiers ne collecte, par l'intermédiaire de Dialectical Engine, d'informations sur vos activités en ligne au fil du temps et sur différents sites web." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "1d81817c5640ee93948293e6fc272161210e3e2737fdbab9289eca50425c722c",
+  sha256: "b274f09cdbdb038ec28624dfb33d3f2980e8dc40b98294a3ce731f2f4c99c1d6",
   eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.3 · EN VIGUEUR LE 12 OCTOBRE 2026",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",

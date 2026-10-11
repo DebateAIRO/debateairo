@@ -148,12 +148,12 @@ Pode exercer qualquer um destes direitos gratuitamente escrevendo para **privacy
 
 | Direito | O que significa neste contexto |
 | --- | --- |
-| **Acesso** (Art. 15) | Uma cópia dos dados pessoais que detemos a seu respeito e estas informações. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Acesso** (Art. 15) | Uma cópia dos dados pessoais que detemos a seu respeito e estas informações. Em Definições, escolha Exportar dados: preparamos um ficheiro ZIP com ficheiros JSON e uma página que pode abrir em qualquer navegador, e enviamos-lhe por email uma ligação de transferência válida durante 24 horas e apenas enquanto tiver sessão iniciada na sua conta. |
 | **Retificação** (Art. 16) | Corrija o seu endereço de correio eletrónico ou o endereço de recuperação nas Definições. O seu pseudónimo não pode ser alterado, pelas razões indicadas nos Termos; pode encerrar a conta e abrir uma nova |
 | **Apagamento** (Art. 17) | Elimine um debate privado a qualquer momento a partir da página do debate. Encerre a sua conta nas Definições; a secção 7 explica exatamente o que isso faz. Peça-nos que removamos um debate publicado que contenha os seus dados, seja ou não o seu autor |
 | **Limitação** (Art. 18) | Peça-nos que suspendamos o tratamento de determinados dados enquanto é resolvido um litígio relativo a esses dados |
 | **Oposição** (Art. 21) | Oponha-se ao tratamento baseado em interesses legítimos — o tratamento de segurança e auditoria da secção 4 — e cessaremos esse tratamento, salvo se demonstrarmos motivos imperiosos. Oponha-se ao marketing a qualquer momento, e cessá-lo-emos |
-| **Portabilidade** (Art. 20) | Os seus debates e dados da conta num formato de uso corrente e de leitura automática. \[Pending: same export as Access.\] O conteúdo não pessoal que criou, como as suas perguntas, é-lhe devolvido mediante pedido quando o contrato terminar |
+| **Portabilidade** (Art. 20) | Os seus debates e dados da conta num formato de uso corrente e de leitura automática. Utilize Exportar dados em Definições: o ZIP contém os seus dados em ficheiros JSON de leitura automática e uma página legível; a ligação enviada por email é válida durante 24 horas e apenas enquanto tiver sessão iniciada na sua conta. O conteúdo não pessoal que criou, como as suas perguntas, é-lhe devolvido mediante pedido quando o contrato terminar |
 | **Retirada do consentimento** (Art. 7(3)) | Retire o consentimento para marketing a partir de qualquer mensagem de correio eletrónico ou das Definições; retire o consentimento para dados sensíveis encerrando a sua conta nas Definições (também pode omitir esses dados ou eliminar um debate que os contenha). A retirada não afeta o tratamento que já ocorreu |
 | **Reclamação** | À autoridade de controlo romena, a **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bucareste, <anspdcp@dataprotection.ro>, ou à autoridade do país onde reside. Preferimos que nos contacte primeiro |
 
@@ -174,7 +174,7 @@ A Dialectical Engine destina-se a adultos. Confirma que tem pelo menos 18 anos a
 ## 13. Cookies
 
 
-O Dialectical Engine utiliza 18 elementos, todos estritamente necessários para o serviço que pediu e todos definidos apenas pelo Dialectical Engine: 13 cookies e 5 entradas no armazenamento do seu navegador. Não instalamos cookies de análise, publicidade ou rastreio. A **Política de Cookies** em dezbatere.ro/cookies enumera-os, indicando o que cada um faz e quem o recebe, e será alterada antes de ser adicionada qualquer outra coisa.
+O Dialectical Engine utiliza 20 elementos, todos estritamente necessários para o serviço que pediu e todos definidos apenas pelo Dialectical Engine: 13 cookies e 7 entradas no armazenamento do seu navegador. Não instalamos cookies de análise, publicidade ou rastreio. A **Política de Cookies** em dezbatere.ro/cookies enumera-os, indicando o que cada um faz e quem o recebe, e será alterada antes de ser adicionada qualquer outra coisa.
 
 | Nome | Tipo | Finalidade | Duração |
 |---|---|---|---|
@@ -196,6 +196,8 @@ O Dialectical Engine utiliza 18 elementos, todos estritamente necessários para 
 | `debateai.languageOffer.dismissed` | Armazenamento de sessão | Lembra-se, para este separador, de que recusou a proposta de mostrar um debate noutra língua. | Até fechar o separador |
 | `debateai.support.conversation.v2` | Armazenamento de sessão | Mantém a sua conversa com o chat de ajuda no ecrã enquanto o separador estiver aberto. É apagada quando alguém inicia ou termina sessão neste separador. | Até fechar o separador |
 | `debateai.phone-completion-draft.v1` | Armazenamento de sessão | Pergunta inacabada durante o passo do telefone; apagada ao mudar a sessão, sair ou mudar o titular | 15 minutos ou até ser apagado |
+| `debateai.exportPending` | Armazenamento de sessão | Guarda nesta aba a ligação de exportação recebida por email para iniciar sessão e tentar novamente. | Até fechar a aba, terminar sessão, abrir uma nova ligação, concluir a primeira transferência ou obter um resultado de ligação inválida ou conta errada |
+| `debateai.exportLinkOutcome` | Armazenamento de sessão | Memoriza a mensagem da ligação de transferência a apresentar nesta aba. | Até fechar a aba, terminar sessão ou abrir uma nova ligação |
 
 Nenhuma outra parte recolhe, através do Dialectical Engine, informações sobre as suas atividades online ao longo do tempo e em diferentes sítios web.
 

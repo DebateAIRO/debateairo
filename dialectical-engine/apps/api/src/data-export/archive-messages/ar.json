@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "بياناتك في Dialectical Engine",
+  "archive.generated": "أُعدّت في {time} باسم {pseudonym}.",
+  "archive.accountHeading": "الحساب",
+  "archive.email": "البريد الإلكتروني",
+  "archive.memberSince": "عضو منذ",
+  "archive.debatesHeading": "مناظراتك ({count})",
+  "archive.question": "السؤال",
+  "archive.verdict": "الحكم",
+  "archive.verdictSupported": "مدعوم",
+  "archive.verdictContested": "موضع نزاع",
+  "archive.verdictUnsupported": "غير مدعوم",
+  "archive.story": "ملخص المناظرة",
+  "archive.arguments": "الحجج",
+  "archive.visibilityPublic": "منشور",
+  "archive.visibilityPrivate": "خاص",
+  "archive.unreadable": "تعذّرت قراءة محتوى هذه المناظرة لأن مفتاحها أُتلف.",
+  "archive.noDebates": "ليس لديك مناظرات.",
+  "archive.filesNote": "تحتوي ملفات JSON في أرشيف ZIP هذا على البيانات نفسها بصيغة قابلة للمعالجة آليًا؛ ويسردها ملف README.txt."
+}

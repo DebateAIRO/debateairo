@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Datele dvs. din Dialectical Engine",
+  "archive.generated": "Pregătit la {time} pentru {pseudonym}.",
+  "archive.accountHeading": "Cont",
+  "archive.email": "E-mail",
+  "archive.memberSince": "Membru din",
+  "archive.debatesHeading": "Dezbaterile dvs. ({count})",
+  "archive.question": "Întrebare",
+  "archive.verdict": "Verdictul",
+  "archive.verdictSupported": "Susținut",
+  "archive.verdictContested": "Contestat",
+  "archive.verdictUnsupported": "Nesusținut",
+  "archive.story": "Dezbaterea pe scurt",
+  "archive.arguments": "Argumente",
+  "archive.visibilityPublic": "Publicată",
+  "archive.visibilityPrivate": "Privată",
+  "archive.unreadable": "Conținutul acestei dezbateri nu mai poate fi citit deoarece cheia sa a fost distrusă.",
+  "archive.noDebates": "Nu aveți dezbateri.",
+  "archive.filesNote": "Fișierele JSON din această arhivă ZIP conțin aceleași date într-un format prelucrabil automat; lista lor se află în README.txt."
+}

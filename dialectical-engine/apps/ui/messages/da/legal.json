@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Op til 30 minutter",
   "legal.cookies.mfaRecovery.life": "Op til 299 sekunder",
   "legal.cookies.social.life": "Op til 5 minutter",
-  "legal.cookies.phoneDraft.life": "15 minutter eller indtil tidligere sletning"
+  "legal.cookies.phoneDraft.life": "15 minutter eller indtil tidligere sletning",
+  "legal.cookies.exportPending.purpose": "Gemmer eksportlinket fra e-mailen i denne fane til login og nye forsøg.",
+  "legal.cookies.exportLinkOutcome.purpose": "Husker, hvilken besked om downloadlinket der skal vises i denne fane.",
+  "legal.cookies.exportPending.life": "Indtil fanen lukkes, du logger ud, et nyt link åbnes, den første vellykkede download eller et resultat om ugyldigt link eller forkert konto",
+  "legal.cookies.exportLinkOutcome.life": "Indtil fanen lukkes, du logger ud, eller et nyt link åbnes"
 }

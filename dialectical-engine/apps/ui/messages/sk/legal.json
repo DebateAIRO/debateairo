@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Najviac 30 minút",
   "legal.cookies.mfaRecovery.life": "Najviac 299 sekúnd",
   "legal.cookies.social.life": "Najviac 5 minút",
-  "legal.cookies.phoneDraft.life": "15 minút alebo do skoršieho vymazania"
+  "legal.cookies.phoneDraft.life": "15 minút alebo do skoršieho vymazania",
+  "legal.cookies.exportPending.purpose": "Uchováva odkaz na export z e-mailu na tejto karte na prihlásenie a opakovaný pokus.",
+  "legal.cookies.exportLinkOutcome.purpose": "Pamätá si, ktoré hlásenie o odkaze na stiahnutie sa má na tejto karte zobraziť.",
+  "legal.cookies.exportPending.life": "Do zatvorenia karty, odhlásenia, nového odkazu, prvého úspešného stiahnutia alebo výsledku neplatného odkazu či nesprávneho účtu",
+  "legal.cookies.exportLinkOutcome.life": "Do zatvorenia karty, odhlásenia alebo nového odkazu"
 }

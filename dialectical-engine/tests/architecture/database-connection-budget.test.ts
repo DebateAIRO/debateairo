@@ -126,7 +126,9 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
       // Opening a case holds one connection and reads the messages on another.
       support: 2 * 2,
       // Every relay slot the register may allow, plus the queue's bookkeeping.
-      supportRelayLease: relaySlots + 2
+      supportRelayLease: relaySlots + 2,
+      // One export build at a time (single-flight timer): its snapshot read and its lease renewal overlap.
+      dataExport: 2
     };
     for (const [key, floor] of Object.entries(floors)) {
       expect(API_DATABASE_POOLS[key as keyof typeof API_DATABASE_POOLS].max, key).toBeGreaterThanOrEqual(floor);

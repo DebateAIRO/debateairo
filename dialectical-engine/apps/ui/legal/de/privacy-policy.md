@@ -148,12 +148,12 @@ Sie können jedes dieser Rechte unentgeltlich ausüben, indem Sie an **privacy@d
 
 | Recht | Bedeutung in diesem Zusammenhang |
 | --- | --- |
-| **Auskunft** (Art. 15) | Eine Kopie der personenbezogenen Daten, die wir über Sie gespeichert haben, sowie diese Informationen. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Auskunft** (Art. 15) | Eine Kopie der personenbezogenen Daten, die wir über Sie gespeichert haben, sowie diese Informationen. Wählen Sie unter Einstellungen Daten exportieren: Wir erstellen eine ZIP-Datei mit JSON-Dateien und einer Seite, die Sie in jedem Browser öffnen können, und senden Ihnen per E-Mail einen Downloadlink, der 24 Stunden lang und nur bei Anmeldung in Ihrem Konto funktioniert. |
 | **Berichtigung** (Art. 16) | Korrigieren Sie Ihre E-Mail- oder Wiederherstellungs-E-Mail-Adresse in den Einstellungen. Ihr Pseudonym kann aus den in den Nutzungsbedingungen genannten Gründen nicht geändert werden; Sie können das Konto schließen und ein neues eröffnen |
 | **Löschung** (Art. 17) | Löschen Sie eine private Debatte jederzeit auf der Debattenseite. Schließen Sie Ihr Konto in den Einstellungen; Abschnitt 7 erläutert die Folgen genau. Verlangen Sie von uns die Entfernung einer veröffentlichten Debatte, die Ihre Daten enthält, unabhängig davon, ob Sie sie verfasst haben |
 | **Einschränkung** (Art. 18) | Verlangen Sie, dass wir die Verarbeitung bestimmter Daten aussetzen, solange eine Streitigkeit darüber geklärt wird |
 | **Widerspruch** (Art. 21) | Widersprechen Sie einer Verarbeitung auf Grundlage berechtigter Interessen, nämlich der Sicherheits- und Prüfverarbeitung in Abschnitt 4; wir stellen sie ein, sofern wir keine zwingenden Gründe nachweisen können. Der Werbung können Sie jederzeit widersprechen; wir stellen sie ein |
-| **Datenübertragbarkeit** (Art. 20) | Ihre Debatten und Kontodaten in einem gängigen, maschinenlesbaren Format. \[Pending: same export as Access.\] Von Ihnen erstellte nicht personenbezogene Inhalte, etwa Ihre Fragen, werden Ihnen auf Antrag bei Vertragsende herausgegeben |
+| **Datenübertragbarkeit** (Art. 20) | Ihre Debatten und Kontodaten in einem gängigen, maschinenlesbaren Format. Nutzen Sie Daten exportieren unter Einstellungen: Die ZIP-Datei enthält Ihre Daten als maschinenlesbare JSON-Dateien und eine lesbare Seite; der per E-Mail versandte Link funktioniert 24 Stunden lang und nur bei Anmeldung in Ihrem Konto. Von Ihnen erstellte nicht personenbezogene Inhalte, etwa Ihre Fragen, werden Ihnen auf Antrag bei Vertragsende herausgegeben |
 | **Einwilligung widerrufen** (Art. 7(3)) | Widerrufen Sie die Einwilligung in den Erhalt von Werbung über jede E-Mail oder die Einstellungen; widerrufen Sie die Einwilligung zu sensiblen Daten durch Schließen Ihres Kontos in den Einstellungen (Sie können diese Daten auch weglassen oder eine Debatte löschen, die sie enthält). Der Widerruf berührt bereits erfolgte Verarbeitungen nicht |
 | **Beschwerde** | Bei der rumänischen Aufsichtsbehörde **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, <anspdcp@dataprotection.ro>, oder bei der Behörde in Ihrem Wohnsitzland. Wir würden es vorziehen, zunächst von Ihnen zu hören |
 
@@ -174,7 +174,7 @@ Dialectical Engine ist für Erwachsene bestimmt. Bei der Registrierung bestätig
 ## 13. Cookies
 
 
-Dialectical Engine verwendet 18 Elemente, die alle für den von Ihnen angeforderten Dienst unbedingt erforderlich sind und alle ausschließlich von Dialectical Engine gesetzt werden: 13 Cookies und 5 Einträge im Speicher Ihres Browsers. Wir setzen keine Analyse-, Werbe- oder Tracking-Cookies. Die **Cookie-Richtlinie** unter dezbatere.ro/cookies führt sie auf, mit dem Zweck jedes Elements und seinem Empfänger, und wird geändert, bevor irgendetwas anderes hinzukommt.
+Dialectical Engine verwendet 20 Elemente, die alle für den von Ihnen angeforderten Dienst unbedingt erforderlich sind und alle ausschließlich von Dialectical Engine gesetzt werden: 13 Cookies und 7 Einträge im Speicher Ihres Browsers. Wir setzen keine Analyse-, Werbe- oder Tracking-Cookies. Die **Cookie-Richtlinie** unter dezbatere.ro/cookies führt sie auf, mit dem Zweck jedes Elements und seinem Empfänger, und wird geändert, bevor irgendetwas anderes hinzukommt.
 
 | Name | Art | Zweck | Laufzeit |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine verwendet 18 Elemente, die alle für den von Ihnen angeforder
 | `debateai.languageOffer.dismissed` | Sitzungsspeicher | Merkt sich für diesen Tab, dass Sie das Angebot abgelehnt haben, eine Debatte in einer anderen Sprache zu zeigen. | Bis Sie den Tab schließen |
 | `debateai.support.conversation.v2` | Sitzungsspeicher | Hält Ihr Gespräch mit dem Hilfe-Chat auf dem Bildschirm, solange der Tab offen ist. Es wird gelöscht, sobald sich in diesem Tab jemand anmeldet oder abmeldet. | Bis Sie den Tab schließen |
 | `debateai.phone-completion-draft.v1` | Sitzungsspeicher | Unfertige Frage während des Telefonschritts; gelöscht bei Sitzungswechsel, Abmeldung oder Besitzerwechsel | 15 Minuten oder bis zur früheren Löschung |
+| `debateai.exportPending` | Sitzungsspeicher | Bewahrt den per E-Mail gesendeten Exportlink in diesem Tab für Anmeldung und erneute Versuche auf. | Bis zum Schließen des Tabs, zur Abmeldung, zu einem neuen Link, zum ersten erfolgreichen Download oder zu einem Ergebnis für einen ungültigen Link oder ein falsches Konto |
+| `debateai.exportLinkOutcome` | Sitzungsspeicher | Merkt sich, welche Meldung zum Downloadlink in diesem Tab angezeigt werden soll. | Bis zum Schließen des Tabs, zur Abmeldung oder zu einem neuen Link |
 
 Keine andere Partei erhebt über Dialectical Engine Informationen über Ihre Online-Aktivitäten im Zeitverlauf und über verschiedene Websites hinweg.
 

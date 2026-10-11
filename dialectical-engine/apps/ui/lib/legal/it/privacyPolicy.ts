@@ -183,12 +183,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Accesso (Art. 15) — Una copia dei dati personali che deteniamo su di te e le presenti informazioni. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Accesso (Art. 15) — Una copia dei dati personali che deteniamo su di te e le presenti informazioni. In Impostazioni scegli Esporta dati: prepariamo un file ZIP con file JSON e una pagina apribile in qualsiasi browser, poi ti inviamo via e-mail un link per il download che funziona per 24 ore e solo mentre hai effettuato l'accesso al tuo account.",
         "Rettifica (Art. 16) — Correggere il tuo indirizzo email o l'indirizzo email di recupero dalle Impostazioni. Il tuo pseudonimo non può essere modificato, per i motivi indicati nelle Condizioni; puoi chiudere l'account e aprirne uno nuovo",
         "Cancellazione (Art. 17) — Cancellare in qualsiasi momento un dibattito privato dalla pagina del dibattito. Chiudere il tuo account dalle Impostazioni; la sezione 7 spiega esattamente cosa comporta. Chiederci di rimuovere un dibattito pubblicato contenente i tuoi dati, indipendentemente dal fatto che tu ne sia l'autore",
         "Limitazione (Art. 18) — Chiederci di interrompere il trattamento di determinati dati mentre viene risolta una controversia che li riguarda",
         "Opposizione (Art. 21) — Opporti al trattamento basato su legittimi interessi — i trattamenti di sicurezza e controllo di cui alla sezione 4 — nel qual caso interrompiamo il trattamento, salvo che possiamo dimostrare motivi cogenti. Puoi opporti al marketing in qualsiasi momento e lo interromperemo",
-        "Portabilità (Art. 20) — I tuoi dibattiti e i dati del tuo account in un formato di uso comune e leggibile da dispositivo automatico. [Pending: same export as Access.] I contenuti non personali da te creati, come le tue domande, ti vengono restituiti su richiesta alla cessazione del contratto",
+        "Portabilità (Art. 20) — I tuoi dibattiti e i dati del tuo account in un formato di uso comune e leggibile da dispositivo automatico. Usa Esporta dati in Impostazioni: lo ZIP contiene i tuoi dati in file JSON leggibili da un dispositivo automatico e una pagina leggibile; il link inviato via e-mail funziona per 24 ore e solo mentre hai effettuato l'accesso al tuo account. I contenuti non personali da te creati, come le tue domande, ti vengono restituiti su richiesta alla cessazione del contratto",
         "Revoca del consenso (Art. 7(3)) — Revocare il consenso al marketing tramite qualsiasi email o dalle Impostazioni; revocare il consenso relativo ai dati sensibili chiudendo il tuo account dalle Impostazioni (puoi anche omettere tali dati o cancellare un dibattito che li contiene). La revoca non pregiudica il trattamento già effettuato",
         "Reclamo — All'autorità di controllo rumena, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucarest, anspdcp@dataprotection.ro, oppure all'autorità del Paese in cui vivi. Preferiremmo che ti rivolgessi prima a noi"
         ]
@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine utilizza 18 elementi, tutti strettamente necessari per il servizio che hai richiesto e tutti impostati esclusivamente da Dialectical Engine: 13 cookie e 5 voci nella memoria del tuo browser. Non impostiamo cookie analitici, pubblicitari o di tracciamento. L'Informativa sui cookie disponibile su dezbatere.ro/cookies li elenca indicando a cosa serve ciascuno e chi lo riceve, e sarà modificata prima di qualsiasi altra aggiunta." },
+      { kind: "p", text: "Dialectical Engine utilizza 20 elementi, tutti strettamente necessari per il servizio che hai richiesto e tutti impostati esclusivamente da Dialectical Engine: 13 cookie e 7 voci nella memoria del tuo browser. Non impostiamo cookie analitici, pubblicitari o di tracciamento. L'Informativa sui cookie disponibile su dezbatere.ro/cookies li elenca indicando a cosa serve ciascuno e chi lo riceve, e sarà modificata prima di qualsiasi altra aggiunta." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Archiviazione locale — Se usi la visualizzazione chiara o quella scura. — Finché non lo cancelli",
         "debateai.languageOffer.dismissed — Archiviazione di sessione — Ricorda, per questa scheda, che hai rifiutato la proposta di mostrare un dibattito in un’altra lingua. — Finché non chiudi la scheda",
         "debateai.support.conversation.v2 — Archiviazione di sessione — Mantiene sullo schermo la tua conversazione con la chat di assistenza finché la scheda resta aperta. Viene cancellata quando qualcuno accede o esce in questa scheda. — Finché non chiudi la scheda",
-        "debateai.phone-completion-draft.v1 — Archiviazione di sessione — Domanda incompleta durante il passaggio telefonico; eliminata al cambio di sessione, alla disconnessione o al cambio di titolare — 15 minuti o fino all’eliminazione"
+        "debateai.phone-completion-draft.v1 — Archiviazione di sessione — Domanda incompleta durante il passaggio telefonico; eliminata al cambio di sessione, alla disconnessione o al cambio di titolare — 15 minuti o fino all’eliminazione",
+        "debateai.exportPending — Archiviazione di sessione — Conserva in questa scheda il link di esportazione ricevuto via email per accedere e riprovare. — Fino alla chiusura della scheda, alla disconnessione, a un nuovo link, al primo download riuscito o a un esito di link non valido o account errato",
+        "debateai.exportLinkOutcome — Archiviazione di sessione — Ricorda quale messaggio sul link di download mostrare in questa scheda. — Fino alla chiusura della scheda, alla disconnessione o a un nuovo link"
         ]
       },
       { kind: "p", text: "Nessun'altra parte raccoglie, tramite Dialectical Engine, informazioni sulle tue attività online nel tempo e su siti web diversi." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "7c04a9e6b754aaac10e1e23bb7916d7e03157777d91dedaaa6f905c44e899f50",
+  sha256: "a6e29dff09a5da5c0d2b9a29271cd70215fcb918b14836f6ca59d6d563da990c",
   eyebrow: "INFORMATIVA SULLA PRIVACY · v3.3 · IN VIGORE DAL 12 OTTOBRE 2026",
   title: "Cosa conserviamo e perché",
   lede: "I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.",

@@ -183,12 +183,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Akses (Art. 15) — Salinan data pribadi yang kami miliki tentang Anda, dan informasi ini. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Akses (Art. 15) — Salinan data pribadi yang kami miliki tentang Anda, dan informasi ini. Di Pengaturan, pilih Ekspor data: kami menyiapkan berkas ZIP berisi berkas JSON dan satu halaman yang dapat dibuka di peramban apa pun, lalu mengirimkan tautan unduhan melalui email yang berlaku selama 24 jam dan hanya berfungsi saat Anda masuk ke akun Anda.",
         "Perbaikan (Art. 16) — Perbaiki email atau email pemulihan Anda dari Pengaturan. Nama samaran Anda tidak dapat diubah karena alasan dalam Ketentuan; Anda dapat menutup akun dan membuka akun baru",
         "Penghapusan (Art. 17) — Hapus debat privat kapan saja dari halaman debat. Tutup akun Anda dari Pengaturan; bagian 7 menjelaskan secara tepat akibatnya. Minta kami menghapus debat terpublikasi yang memuat data Anda, baik Anda penulisnya maupun bukan",
         "Pembatasan (Art. 18) — Minta kami berhenti memproses data tertentu sementara perselisihan mengenainya diselesaikan",
         "Keberatan (Art. 21) — Ajukan keberatan terhadap pemrosesan berdasarkan kepentingan yang sah — pemrosesan keamanan dan audit dalam bagian 4 — dan kami berhenti kecuali dapat menunjukkan alasan kuat. Ajukan keberatan terhadap pemasaran kapan saja, dan kami berhenti",
-        "Portabilitas (Art. 20) — Debat dan data akun Anda dalam format yang umum digunakan serta dapat dibaca mesin. [Pending: same export as Access.] Konten nonpribadi yang Anda buat, seperti pertanyaan Anda, dikembalikan kepada Anda atas permintaan ketika kontrak berakhir",
+        "Portabilitas (Art. 20) — Debat dan data akun Anda dalam format yang umum digunakan serta dapat dibaca mesin. Gunakan Ekspor data di Pengaturan: ZIP memuat data Anda dalam berkas JSON yang dapat dibaca mesin serta satu halaman yang mudah dibaca; tautan yang dikirim melalui email berlaku selama 24 jam dan hanya berfungsi saat Anda masuk ke akun Anda. Konten nonpribadi yang Anda buat, seperti pertanyaan Anda, dikembalikan kepada Anda atas permintaan ketika kontrak berakhir",
         "Menarik persetujuan (Art. 7(3)) — Tarik persetujuan pemasaran dari email mana pun atau Pengaturan; tarik persetujuan data sensitif dengan menutup akun Anda dari Pengaturan (Anda juga dapat tidak menyertakan data tersebut atau menghapus debat yang memuatnya). Penarikan tidak memengaruhi pemrosesan yang telah terjadi",
         "Mengadu — Kepada otoritas pengawas Rumania, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukares, anspdcp@dataprotection.ro, atau kepada otoritas di negara tempat Anda tinggal. Kami lebih memilih Anda menghubungi kami terlebih dahulu"
         ]
@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kuki",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine menggunakan 18 item, semuanya mutlak diperlukan untuk layanan yang Anda minta dan semuanya hanya dipasang oleh Dialectical Engine: 13 kuki dan 5 entri di penyimpanan browser Anda. Kami tidak memasang kuki analitik, iklan, atau pelacakan. Kebijakan Kuki di dezbatere.ro/cookies mencantumkannya beserta fungsi masing-masing dan pihak yang menerimanya, dan akan berubah sebelum apa pun ditambahkan." },
+      { kind: "p", text: "Dialectical Engine menggunakan 20 item, semuanya mutlak diperlukan untuk layanan yang Anda minta dan semuanya hanya dipasang oleh Dialectical Engine: 13 kuki dan 7 entri di penyimpanan browser Anda. Kami tidak memasang kuki analitik, iklan, atau pelacakan. Kebijakan Kuki di dezbatere.ro/cookies mencantumkannya beserta fungsi masing-masing dan pihak yang menerimanya, dan akan berubah sebelum apa pun ditambahkan." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Penyimpanan lokal — Apakah Anda menggunakan mode terang atau mode gelap. — Sampai Anda menghapusnya",
         "debateai.languageOffer.dismissed — Penyimpanan sesi — Mengingat, untuk tab ini, bahwa Anda menolak tawaran untuk menampilkan debat dalam bahasa lain. — Sampai Anda menutup tab",
         "debateai.support.conversation.v2 — Penyimpanan sesi — Menjaga percakapan obrolan bantuan Anda tetap di layar selama tab masih terbuka. Percakapan dihapus saat seseorang masuk atau keluar di tab ini. — Sampai Anda menutup tab",
-        "debateai.phone-completion-draft.v1 — Penyimpanan sesi — Pertanyaan belum selesai pada langkah telepon; dihapus saat sesi berubah, keluar, atau pemilik berubah — 15 menit atau sampai lebih awal dihapus"
+        "debateai.phone-completion-draft.v1 — Penyimpanan sesi — Pertanyaan belum selesai pada langkah telepon; dihapus saat sesi berubah, keluar, atau pemilik berubah — 15 menit atau sampai lebih awal dihapus",
+        "debateai.exportPending — Penyimpanan sesi — Menyimpan tautan ekspor dari email di tab ini untuk masuk dan mencoba lagi. — Hingga tab ditutup, keluar, tautan baru dibuka, unduhan pertama berhasil, atau hasil tautan tidak valid maupun akun yang salah",
+        "debateai.exportLinkOutcome — Penyimpanan sesi — Mengingat pesan tautan unduhan yang perlu ditampilkan di tab ini. — Hingga tab ditutup, keluar, atau tautan baru dibuka"
         ]
       },
       { kind: "p", text: "Tidak ada pihak lain yang mengumpulkan informasi tentang aktivitas online Anda dari waktu ke waktu dan di berbagai situs web melalui Dialectical Engine." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "84e70869aaf4e23a067040d32e70b23da75c436c03ada451f1f8c2a8ceac8c4d",
+  sha256: "66bb4eda3e22eb85d8a837f740481bf4b34f5d84502bd1ac4b0844f9a71380a3",
   eyebrow: "KEBIJAKAN PRIVASI · v3.3 · BERLAKU 12 OKTOBER 2026",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",

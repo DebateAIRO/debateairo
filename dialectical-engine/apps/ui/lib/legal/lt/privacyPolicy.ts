@@ -183,12 +183,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Teisė susipažinti (Art. 15) — Mūsų turimų jūsų asmens duomenų kopija ir ši informacija. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Teisė susipažinti (Art. 15) — Mūsų turimų jūsų asmens duomenų kopija ir ši informacija. Nustatymuose pasirinkite Eksportuoti duomenis: parengiame ZIP failą su JSON failais ir vienu bet kurioje naršyklėje atveriamu puslapiu, o el. paštu atsiunčiame atsisiuntimo nuorodą, kuri galioja 24 valandas ir veikia tik prisijungus prie savo paskyros.",
         "Teisė ištaisyti duomenis (Art. 16) — Nustatymuose ištaisykite savo el. pašto ar atkūrimo el. pašto adresą. Dėl Sąlygose nurodytų priežasčių jūsų slapyvardžio pakeisti negalima; galite uždaryti paskyrą ir atidaryti naują",
         "Teisė reikalauti ištrinti duomenis (Art. 17) — Bet kada debatų puslapyje ištrinkite privačius debatus. Uždarykite paskyrą Nustatymuose; 7 skyriuje tiksliai paaiškinta, ką tai reiškia. Paprašykite pašalinti paskelbtus debatus, kuriuose yra jūsų duomenų, nepriklausomai nuo to, ar esate jų autorius",
         "Teisė apriboti duomenų tvarkymą (Art. 18) — Paprašykite sustabdyti konkrečių duomenų tvarkymą, kol bus išspręstas dėl jų kilęs ginčas",
         "Teisė nesutikti (Art. 21) — Nesutikite, kad duomenys būtų tvarkomi remiantis teisėtais interesais — 4 skyriuje aprašytas saugumo ir audito duomenų tvarkymas — ir mes sustabdysime tvarkymą, nebent galėsime įrodyti įtikinamas priežastis. Bet kada nesutikite su rinkodara, ir ją nutrauksime",
-        "Teisė į duomenų perkeliamumą (Art. 20) — Jūsų debatai ir paskyros duomenys įprastai naudojamu, kompiuterio skaitomu formatu. [Pending: same export as Access.] Jūsų sukurtas neasmeninis turinys, pavyzdžiui, jūsų klausimai, pasibaigus sutarčiai jūsų prašymu grąžinamas jums",
+        "Teisė į duomenų perkeliamumą (Art. 20) — Jūsų debatai ir paskyros duomenys įprastai naudojamu, kompiuterio skaitomu formatu. Naudokite Nustatymų funkciją Eksportuoti duomenis: ZIP faile yra jūsų duomenys kompiuterio skaitomuose JSON failuose ir vienas skaitomas puslapis; el. paštu atsiųsta nuoroda galioja 24 valandas ir veikia tik prisijungus prie savo paskyros. Jūsų sukurtas neasmeninis turinys, pavyzdžiui, jūsų klausimai, pasibaigus sutarčiai jūsų prašymu grąžinamas jums",
         "Sutikimo atšaukimas (Art. 7(3)) — Atšaukite rinkodaros sutikimą bet kuriame el. laiške arba Nustatymuose; atšaukite sutikimą tvarkyti neskelbtinus duomenis uždarydami paskyrą Nustatymuose (tokių duomenų galite ir neįtraukti arba ištrinti debatus, kuriuose jie yra). Atšaukimas neturi įtakos jau atliktam tvarkymui",
         "Skundo pateikimas — Rumunijos priežiūros institucijai ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukareštas, anspdcp@dataprotection.ro, arba šalies, kurioje gyvenate, institucijai. Norėtume, kad pirmiausia kreiptumėtės į mus"
         ]
@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Slapukai",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine naudoja 18 elementų – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik Dialectical Engine: 13 slapukų ir 5 įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. Slapukų politikoje adresu dezbatere.ro/cookies jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita." },
+      { kind: "p", text: "Dialectical Engine naudoja 20 elementų – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik Dialectical Engine: 13 slapukų ir 7 įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. Slapukų politikoje adresu dezbatere.ro/cookies jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Vietinė saugykla — Ar naudojate šviesųjį, ar tamsųjį režimą. — Kol jo neišvalysite",
         "debateai.languageOffer.dismissed — Seanso saugykla — Įsimena šiam skirtukui, kad atsisakėte pasiūlymo parodyti debatus kita kalba. — Kol uždarysite skirtuką",
         "debateai.support.conversation.v2 — Seanso saugykla — Laiko jūsų pokalbį su pagalbos pokalbių langu ekrane, kol skirtukas atidarytas. Jis ištrinamas, kai šiame skirtuke kas nors prisijungia arba atsijungia. — Kol uždarysite skirtuką",
-        "debateai.phone-completion-draft.v1 — Seanso saugykla — Nebaigtas klausimas telefono veiksmo metu; pašalinamas pasikeitus sesijai, atsijungus ar pasikeitus savininkui — 15 minučių arba iki ankstesnio pašalinimo"
+        "debateai.phone-completion-draft.v1 — Seanso saugykla — Nebaigtas klausimas telefono veiksmo metu; pašalinamas pasikeitus sesijai, atsijungus ar pasikeitus savininkui — 15 minučių arba iki ankstesnio pašalinimo",
+        "debateai.exportPending — Seanso saugykla — Šiame skirtuke saugo el. paštu atsiųstą eksporto nuorodą prisijungimui ir pakartotiniam bandymui. — Iki skirtuko uždarymo, atsijungimo, naujos nuorodos, pirmo sėkmingo atsisiuntimo arba netinkamos nuorodos ar kitos paskyros rezultato",
+        "debateai.exportLinkOutcome — Seanso saugykla — Prisimena, kurį atsisiuntimo nuorodos pranešimą rodyti šiame skirtuke. — Iki skirtuko uždarymo, atsijungimo arba naujos nuorodos"
         ]
       },
       { kind: "p", text: "Jokia kita šalis per Dialectical Engine nerenka informacijos apie jūsų veiklą internete laikui bėgant ir įvairiose svetainėse." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "8f4d7707f0e767f630f90839cdfdeb4489e6adf5e3554c62c6d0603e9343e0bf",
+  sha256: "fbe92278b01e5af0d0a4bee5c7a13440398989bfe987f073dadba0dc9378220f",
   eyebrow: "PRIVATUMO POLITIKA · v3.3 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",

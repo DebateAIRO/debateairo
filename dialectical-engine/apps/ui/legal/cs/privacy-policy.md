@@ -144,16 +144,16 @@ Pokud dojde k porušení zabezpečení osobních údajů, oznámíme je rumunsk�
 
 ## 10. Vaše práva a způsob jejich uplatnění
 
-Kterékoli z těchto práv můžete bezplatně uplatnit písemnou žádostí na **privacy@dezbatere.ro** nebo v nabídce **Nastavení → Soukromí**, pokud je příslušný ovládací prvek k dispozici. Odpovíme do jednoho měsíce; je-li žádost složitá, můžeme lhůtu prodloužit až o další dva měsíce a sdělíme vám proč. Můžeme vás požádat o potvrzení totožnosti prostřednictvím vašeho účtu.
+Kterékoli z těchto práv můžete bezplatně uplatnit písemnou žádostí na **privacy@dezbatere.ro** nebo v nabídce **Nastavení → Ochrana soukromí**, pokud je příslušný ovládací prvek k dispozici. Odpovíme do jednoho měsíce; je-li žádost složitá, můžeme lhůtu prodloužit až o další dva měsíce a sdělíme vám proč. Můžeme vás požádat o potvrzení totožnosti prostřednictvím vašeho účtu.
 
 | Právo | Co zde znamená |
 | --- | --- |
-| **Přístup** (Art. 15) | Kopie osobních údajů, které o vás uchováváme, a tyto informace. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Přístup** (Art. 15) | Kopie osobních údajů, které o vás uchováváme, a tyto informace. V Nastavení zvolte Exportovat data: připravíme soubor ZIP se soubory JSON a jednou stránkou, kterou otevřete v libovolném prohlížeči, a e-mailem vám pošleme odkaz ke stažení platný 24 hodin pouze při přihlášení k vašemu účtu. |
 | **Oprava** (Art. 16) | Opravte svou e-mailovou adresu nebo e-mailovou adresu pro obnovení v Nastavení. Váš pseudonym nelze z důvodů uvedených v Podmínkách změnit; účet můžete uzavřít a otevřít nový |
 | **Výmaz** (Art. 17) | Soukromou debatu můžete kdykoli vymazat na její stránce. Uzavřete účet v Nastavení; oddíl 7 přesně vysvětluje následky. Požádejte nás o odstranění zveřejněné debaty obsahující vaše údaje bez ohledu na to, zda jste jejím autorem |
 | **Omezení zpracování** (Art. 18) | Požádejte nás, abychom přestali zpracovávat určité údaje, dokud nebude vyřešen spor, který se jich týká |
 | **Námitka** (Art. 21) | Vzneste námitku proti zpracování založenému na oprávněných zájmech — bezpečnostnímu a auditnímu zpracování podle oddílu 4 — a my je ukončíme, pokud neprokážeme závažné oprávněné důvody. Proti marketingu můžete vznést námitku kdykoli a my jej ukončíme |
-| **Přenositelnost** (Art. 20) | Vaše debaty a údaje účtu v běžně používaném, strojově čitelném formátu. \[Pending: same export as Access.\] Neosobní obsah, který jste vytvořili, například vaše otázky, vám na požádání vrátíme při skončení smlouvy |
+| **Přenositelnost** (Art. 20) | Vaše debaty a údaje účtu v běžně používaném, strojově čitelném formátu. Použijte Exportovat data v Nastavení: soubor ZIP obsahuje vaše údaje ve strojově čitelných souborech JSON a jednu čitelnou stránku; e-mailem vám pošleme odkaz platný 24 hodin pouze při přihlášení k vašemu účtu. Neosobní obsah, který jste vytvořili, například vaše otázky, vám na požádání vrátíme při skončení smlouvy |
 | **Odvolání souhlasu** (Art. 7(3)) | Odvolejte souhlas s marketingem v kterémkoli e-mailu nebo v Nastavení; souhlas se zpracováním citlivých údajů odvolejte uzavřením účtu v Nastavení (takové údaje také nemusíte uvádět nebo můžete smazat debatu, která je obsahuje). Odvolání nemá vliv na zpracování, které již proběhlo |
 | **Stížnost** | Rumunskému dozorovému úřadu **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukurešť, <anspdcp@dataprotection.ro>, nebo úřadu v zemi vašeho bydliště. Budeme raději, když se nejprve obrátíte na nás |
 
@@ -174,7 +174,7 @@ Dialectical Engine je určena dospělým. Při registraci potvrzujete, že je v�
 ## 13. Soubory cookie
 
 
-Dialectical Engine používá 18 položek, všechny nezbytně nutné pro službu, o kterou jste požádali, a všechny nastavované pouze službou Dialectical Engine: 13 souborů cookie a 5 záznamů v úložišti vašeho prohlížeče. Nenastavujeme žádné analytické, reklamní ani sledovací soubory cookie. **Zásady používání souborů cookie** na adrese dezbatere.ro/cookies je uvádějí spolu s tím, k čemu každá z nich slouží a kdo ji obdrží, a budou změněny dříve, než bude přidáno cokoli dalšího.
+Dialectical Engine používá 20 položek, všechny nezbytně nutné pro službu, o kterou jste požádali, a všechny nastavované pouze službou Dialectical Engine: 13 souborů cookie a 7 záznamů v úložišti vašeho prohlížeče. Nenastavujeme žádné analytické, reklamní ani sledovací soubory cookie. **Zásady používání souborů cookie** na adrese dezbatere.ro/cookies je uvádějí spolu s tím, k čemu každá z nich slouží a kdo ji obdrží, a budou změněny dříve, než bude přidáno cokoli dalšího.
 
 | Název | Typ | Účel | Platnost |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine používá 18 položek, všechny nezbytně nutné pro službu
 | `debateai.languageOffer.dismissed` | Úložiště relace | Pamatuje si pro tuto kartu, že jste odmítli nabídku zobrazit debatu v jiném jazyce. | Do zavření karty |
 | `debateai.support.conversation.v2` | Úložiště relace | Drží vaši konverzaci s nápovědou na obrazovce, dokud je karta otevřená. Smaže se, když se na této kartě kdokoli přihlásí nebo odhlásí. | Do zavření karty |
 | `debateai.phone-completion-draft.v1` | Úložiště relace | Nedokončená otázka během telefonního kroku; odstraněna při změně relace, odhlášení nebo změně vlastníka | 15 minut nebo do dřívějšího vymazání |
+| `debateai.exportPending` | Úložiště relace | Uchovává odkaz pro export zaslaný e-mailem na této kartě pro přihlášení a opakovaný pokus. | Do zavření karty, odhlášení, otevření nového odkazu, prvního úspěšného stažení nebo výsledku neplatného odkazu či jiného účtu |
+| `debateai.exportLinkOutcome` | Úložiště relace | Pamatuje si, která zpráva o odkazu ke stažení se má na této kartě zobrazit. | Do zavření karty, odhlášení nebo otevření nového odkazu |
 
 Žádná jiná strana prostřednictvím Dialectical Engine neshromažďuje informace o vašich online aktivitách v průběhu času a napříč webovými stránkami.
 

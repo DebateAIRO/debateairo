@@ -148,12 +148,12 @@ Tista’ teżerċita kwalunkwe wieħed minn dawn mingħajr ħlas billi tikteb li
 
 | Dritt | Xi jfisser hawnhekk |
 | --- | --- |
-| **Aċċess** (Art. 15) | Kopja tad-data personali li nżommu dwarek, u din l-informazzjoni. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Aċċess** (Art. 15) | Kopja tad-data personali li nżommu dwarek, u din l-informazzjoni. Fl-Issettjar agħżel Esporta d-data: inħejju fajl ZIP b’fajls JSON u paġna waħda li tista’ tiftaħ fi kwalunkwe browser, u nibagħtulek b’email link biex tniżżel il-fajl li jaħdem għal 24 siegħa u biss waqt li tkun dħalt fil-kont tiegħek. |
 | **Rettifika** (Art. 16) | Ikkoreġi l-indirizz elettroniku jew l-indirizz elettroniku għall-irkupru tiegħek mill-issettjar. Il-psewdonimu tiegħek ma jistax jinbidel, għar-raġunijiet fit-Termini; tista’ tagħlaq il-kont u tiftaħ wieħed ġdid |
 | **Tħassir** (Art. 17) | Ħassar dibattitu privat fi kwalunkwe ħin mill-paġna tad-dibattitu. Agħlaq il-kont tiegħek mill-issettjar; it-taqsima 7 tispjega eżattament x’jagħmel dan. Itlobna nneħħu dibattitu ppubblikat li jkun fih id-data tiegħek kemm jekk inti l-awtur kif ukoll jekk le |
 | **Restrizzjoni** (Art. 18) | Itlobna nieqfu nipproċessaw data partikolari waqt li tiġi solvuta tilwima dwarha |
 | **Oġġezzjoni** (Art. 21) | Oġġezzjona għall-ipproċessar ibbażat fuq interessi leġittimi — l-ipproċessar tas-sigurtà u tal-awditjar fit-taqsima 4 — u nieqfu sakemm ma nkunux nistgħu nuru raġunijiet konvinċenti. Oġġezzjona għall-kummerċjalizzazzjoni fi kwalunkwe ħin, u nieqfu |
-| **Portabbiltà** (Art. 20) | Id-dibattiti u d-data tal-kont tiegħek f’format komuni li jista’ jinqara minn magna. \[Pending: same export as Access.\] Kontenut mhux personali li ħloqt, bħall-mistoqsijiet tiegħek, jingħatalek lura fuq talba meta jintemm il-kuntratt |
+| **Portabbiltà** (Art. 20) | Id-dibattiti u d-data tal-kont tiegħek f’format komuni li jista’ jinqara minn magna. Uża Esporta d-data fl-Issettjar: il-ZIP fih id-data tiegħek f’fajls JSON li jistgħu jinqraw minn magna u paġna waħda li tista’ tinqara faċilment; il-link mibgħut b’email jaħdem għal 24 siegħa u biss waqt li tkun dħalt fil-kont tiegħek. Kontenut mhux personali li ħloqt, bħall-mistoqsijiet tiegħek, jingħatalek lura fuq talba meta jintemm il-kuntratt |
 | **Irtirar tal-kunsens** (Art. 7(3)) | Irtira l-kunsens għall-kummerċjalizzazzjoni minn kwalunkwe messaġġ elettroniku jew mill-issettjar; irtira l-kunsens għal data sensittiva billi tagħlaq il-kont tiegħek mill-issettjar (tista’ wkoll tħalli barra din id-data jew tħassar dibattitu li jkun fiha). L-irtirar ma jaffettwax ipproċessar li jkun diġà sar |
 | **Ilment** | Lill-awtorità superviżorja Rumena, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, <anspdcp@dataprotection.ro>, jew lill-awtorità fil-pajjiż fejn tgħix. Nippreferu li l-ewwel tikkuntattja lilna |
 
@@ -174,7 +174,7 @@ Dialectical Engine hija għall-adulti. Tikkonferma li għandek 18-il sena jew ak
 ## 13. Cookies
 
 
-Dialectical Engine juża 18-il element, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn Dialectical Engine: 13-il cookie u 5 entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-**Politika dwar il-Cookies** fuq dezbatere.ro/cookies telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra.
+Dialectical Engine juża 20-il element, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn Dialectical Engine: 13-il cookie u 7 entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-**Politika dwar il-Cookies** fuq dezbatere.ro/cookies telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra.
 
 | Isem | Tip | Skop | Durata |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine juża 18-il element, ilkoll strettament meħtieġa għas-serv
 | `debateai.languageOffer.dismissed` | Ħażna tas-sessjoni | Jiftakar, għal din it-tab, li rrifjutajt l-offerta li jintwera dibattitu b’lingwa oħra. | Sakemm tagħlaq it-tab |
 | `debateai.support.conversation.v2` | Ħażna tas-sessjoni | Iżomm il-konversazzjoni tiegħek mal-chat tal-għajnuna fuq l-iskrin sakemm it-tab tibqa’ miftuħa. Titħassar meta xi ħadd jidħol jew joħroġ mill-kont f’din it-tab. | Sakemm tagħlaq it-tab |
 | `debateai.phone-completion-draft.v1` | Ħażna tas-sessjoni | Mistoqsija mhux lesta waqt il-pass tat-telefon; titħassar meta tinbidel is-sessjoni, toħroġ jew jinbidel is-sid | 15-il minuta jew sakemm jitħassar qabel |
+| `debateai.exportPending` | Ħażna tas-sessjoni | Iżomm il-link tal-esportazzjoni mibgħut bl-email f’din it-tab biex tidħol u terġa’ tipprova. | Sakemm tingħalaq it-tab, toħroġ, jinfetaħ link ġdid, jirnexxi l-ewwel tniżżil jew jirriżulta link invalidu jew kont ħażin |
+| `debateai.exportLinkOutcome` | Ħażna tas-sessjoni | Jiftakar liema messaġġ dwar il-link tat-tniżżil għandu jintwera f’din it-tab. | Sakemm tingħalaq it-tab, toħroġ jew jinfetaħ link ġdid |
 
 L-ebda parti oħra ma tiġbor, permezz ta’ Dialectical Engine, informazzjoni dwar l-attivitajiet tiegħek online matul iż-żmien u fuq diversi siti web.
 

@@ -43,6 +43,8 @@ const EN_KIND = [
   "Local storage",
   "Session storage",
   "Session storage",
+  "Session storage",
+  "Session storage",
   "Session storage"
 ];
 const EN_LIFE = [
@@ -63,7 +65,9 @@ const EN_LIFE = [
   "Until you clear it",
   "Until you close the tab",
   "Until you close the tab",
-  "15 minutes or until earlier clearing"
+  "15 minutes or until earlier clearing",
+  "Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result",
+  "Until tab close, sign-out, or a new link"
 ];
 const ACK = JSON.stringify({ v: 2, acknowledgedAt: "2026-09-29T00:00:00.000Z" });
 const consent = consentEnglish as MessageCatalog;
@@ -196,7 +200,7 @@ describe("S01 one card, four doors (SPEC-v2 R07, R02, R04, R08)", () => {
   it.each(DOORS.map((door) => [door.name, door] as const))(
     "opens the one card from %s and returns focus to it on close",
     (_name, door) => {
-      // PROPERTY (R07, R02): every door opens the same read-only card of eight rows whose kind
+      // PROPERTY (R07, R02): every door opens the same read-only card of twenty rows whose kind
       // and lifetime are the English /cookies strings, and closing it returns focus to the door.
       mount(door.node());
       const opener = door.opener();
@@ -205,7 +209,7 @@ describe("S01 one card, four doors (SPEC-v2 R07, R02, R04, R08)", () => {
       const dialogs = document.querySelectorAll('[role="dialog"]');
       expect(dialogs.length, "one dialog").toBe(1);
       const rows = [...dialogs[0]!.querySelectorAll<HTMLElement>(".consentCatRow")];
-      expect(rows.length, "eight rows").toBe(18);
+      expect(rows.length, "twenty rows").toBe(20);
       expect(rows.map((row) => row.querySelector(".consentTag-kind")?.textContent), "kinds").toEqual(EN_KIND);
       expect(rows.map((row) => row.querySelector(".consentCatDetail")?.textContent), "lifetimes").toEqual(EN_LIFE);
 

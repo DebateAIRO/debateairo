@@ -148,12 +148,12 @@ Du kan udøve alle disse rettigheder uden betaling ved at skrive til **privacy@d
 
 | Ret | Hvad den betyder her |
 | --- | --- |
-| **Indsigt** (Art. 15) | En kopi af de personoplysninger, vi har om dig, samt disse oplysninger. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Indsigt** (Art. 15) | En kopi af de personoplysninger, vi har om dig, samt disse oplysninger. Vælg Eksportér data under Indstillinger: Vi klargør en ZIP-fil med JSON-filer og én side, som du kan åbne i enhver browser, og sender dig et downloadlink via e-mail, der virker i 24 timer og kun, mens du er logget ind på din konto. |
 | **Berigtigelse** (Art. 16) | Ret din e-mailadresse eller gendannelsesadresse fra Indstillinger. Dit pseudonym kan af de grunde, der er angivet i Vilkårene, ikke ændres; du kan lukke kontoen og oprette en ny |
 | **Sletning** (Art. 17) | Slet til enhver tid en privat debat fra debatens side. Luk din konto fra Indstillinger; afsnit 7 forklarer præcist, hvad det medfører. Bed os om at fjerne en offentliggjort debat, som indeholder dine data, uanset om du er forfatteren |
 | **Begrænsning** (Art. 18) | Bed os om at standse behandlingen af bestemte data, mens en tvist om dem afgøres |
 | **Indsigelse** (Art. 21) | Gør indsigelse mod behandling baseret på legitime interesser — sikkerheds- og revisionsbehandlingen i afsnit 4 — hvorefter vi standser, medmindre vi kan påvise vægtige grunde. Gør til enhver tid indsigelse mod markedsføring, hvorefter vi standser den |
-| **Dataportabilitet** (Art. 20) | Dine debatter og kontodata i et almindeligt anvendt, maskinlæsbart format. \[Pending: same export as Access.\] Ikke-personligt indhold, du har skabt, såsom dine spørgsmål, returneres til dig efter anmodning, når kontrakten ophører |
+| **Dataportabilitet** (Art. 20) | Dine debatter og kontodata i et almindeligt anvendt, maskinlæsbart format. Brug Eksportér data under Indstillinger: ZIP-filen indeholder dine data som maskinlæsbare JSON-filer og én læsbar side; linket sendes via e-mail, virker i 24 timer og kun, mens du er logget ind på din konto. Ikke-personligt indhold, du har skabt, såsom dine spørgsmål, returneres til dig efter anmodning, når kontrakten ophører |
 | **Tilbagetrækning af samtykke** (Art. 7(3)) | Træk samtykke til markedsføring tilbage fra enhver e-mail eller fra Indstillinger; træk samtykket til følsomme data tilbage ved at lukke din konto fra Indstillinger (du kan også undlade at medtage dem eller slette en debat, der indeholder dem). Tilbagetrækningen påvirker ikke behandling, der allerede er sket |
 | **Klage** | Til den rumænske tilsynsmyndighed, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, <anspdcp@dataprotection.ro>, eller til myndigheden i det land, hvor du bor. Vi ser helst, at du kontakter os først |
 
@@ -174,7 +174,7 @@ Dialectical Engine er for voksne. Du bekræfter ved registreringen, at du er fyl
 ## 13. Cookies
 
 
-Dialectical Engine bruger 18 elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af Dialectical Engine: 13 cookies og 5 poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. **Cookiepolitikken** på dezbatere.ro/cookies angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes.
+Dialectical Engine bruger 20 elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af Dialectical Engine: 13 cookies og 7 poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. **Cookiepolitikken** på dezbatere.ro/cookies angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes.
 
 | Navn | Type | Formål | Varighed |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine bruger 18 elementer, som alle er strengt nødvendige for den 
 | `debateai.languageOffer.dismissed` | Sessionslagring | Husker for denne fane, at du har takket nej til at se en debat på et andet sprog. | Indtil du lukker fanen |
 | `debateai.support.conversation.v2` | Sessionslagring | Holder din samtale med hjælpechatten på skærmen, så længe fanen er åben. Den slettes, når nogen logger ind eller ud i denne fane. | Indtil du lukker fanen |
 | `debateai.phone-completion-draft.v1` | Sessionslagring | Ufærdigt spørgsmål under telefontrinnet; slettes ved sessionsskift, logout eller ejerskift | 15 minutter eller indtil tidligere sletning |
+| `debateai.exportPending` | Sessionslagring | Gemmer eksportlinket fra e-mailen i denne fane til login og nye forsøg. | Indtil fanen lukkes, du logger ud, et nyt link åbnes, den første vellykkede download eller et resultat om ugyldigt link eller forkert konto |
+| `debateai.exportLinkOutcome` | Sessionslagring | Husker, hvilken besked om downloadlinket der skal vises i denne fane. | Indtil fanen lukkes, du logger ud, eller et nyt link åbnes |
 
 Ingen anden part indsamler via Dialectical Engine oplysninger om dine onlineaktiviteter over tid og på tværs af websteder.
 

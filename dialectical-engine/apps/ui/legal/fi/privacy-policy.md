@@ -148,12 +148,12 @@ Voit käyttää mitä tahansa näistä oikeuksista maksutta kirjoittamalla osoit
 
 | Oikeus | Mitä se tarkoittaa tässä yhteydessä |
 | --- | --- |
-| **Tarkastusoikeus** (Art. 15) | Jäljennös hallussamme olevista sinua koskevista henkilötiedoista sekä nämä tiedot. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Tarkastusoikeus** (Art. 15) | Jäljennös hallussamme olevista sinua koskevista henkilötiedoista sekä nämä tiedot. Valitse Asetuksista Vie tiedot: kokoamme ZIP-tiedoston, jossa on JSON-tiedostoja ja yksi missä tahansa selaimessa avattava sivu, ja lähetämme sähköpostiisi latauslinkin, joka toimii 24 tuntia ja vain silloin, kun olet kirjautunut tilillesi. |
 | **Oikeus tietojen oikaisemiseen** (Art. 16) | Korjaa sähköpostiosoitteesi tai palautussähköpostiosoitteesi Asetuksissa. Nimimerkkiäsi ei voi muuttaa Ehdoissa mainituista syistä; voit sulkea tilin ja avata uuden |
 | **Oikeus tietojen poistamiseen** (Art. 17) | Poista yksityinen väittely milloin tahansa väittelysivulta. Sulje tilisi Asetuksista; osiossa 7 kerrotaan tarkasti, mitä silloin tapahtuu. Pyydä meitä poistamaan tietojasi sisältävä julkaistu väittely riippumatta siitä, oletko sen tekijä |
 | **Oikeus käsittelyn rajoittamiseen** (Art. 18) | Pyydä meitä lopettamaan tiettyjen tietojen käsittely siksi aikaa, kun niitä koskeva erimielisyys ratkaistaan |
 | **Vastustamisoikeus** (Art. 21) | Vastusta oikeutettuihin etuihin perustuvaa käsittelyä — osiossa 4 tarkoitettua turvallisuus- ja kirjauskäsittelyä — jolloin lopetamme käsittelyn, ellemme voi osoittaa pakottavia perusteita. Vastusta markkinointia milloin tahansa, jolloin lopetamme sen |
-| **Oikeus siirtää tiedot järjestelmästä toiseen** (Art. 20) | Väittelysi ja tilitietosi yleisesti käytetyssä, koneellisesti luettavassa muodossa. \[Pending: same export as Access.\] Luomasi muu kuin henkilötieto, kuten kysymyksesi, palautetaan sinulle pyynnöstä sopimuksen päättyessä |
+| **Oikeus siirtää tiedot järjestelmästä toiseen** (Art. 20) | Väittelysi ja tilitietosi yleisesti käytetyssä, koneellisesti luettavassa muodossa. Käytä Asetusten Vie tiedot -toimintoa: ZIP-tiedosto sisältää tietosi koneellisesti luettavina JSON-tiedostoina ja yhden luettavan sivun; sähköpostitse lähetetty linkki toimii 24 tuntia ja vain silloin, kun olet kirjautunut tilillesi. Luomasi muu kuin henkilötieto, kuten kysymyksesi, palautetaan sinulle pyynnöstä sopimuksen päättyessä |
 | **Suostumuksen peruuttaminen** (Art. 7(3)) | Peruuta markkinointisuostumus mistä tahansa sähköpostista tai Asetuksista; peruuta arkaluonteisia tietoja koskeva suostumus sulkemalla tilisi Asetuksista (voit myös jättää tiedot pois tai poistaa niitä sisältävän väittelyn). Peruuttaminen ei vaikuta jo tapahtuneeseen käsittelyyn |
 | **Valituksen tekeminen** | Romanian valvontaviranomaiselle **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, <anspdcp@dataprotection.ro>, tai asuinmaasi viranomaiselle. Toivomme kuitenkin, että otat ensin yhteyttä meihin |
 
@@ -174,7 +174,7 @@ Dialectical Engine on tarkoitettu aikuisille. Vahvistat rekisteröityessäsi ole
 ## 13. Evästeet
 
 
-Dialectical Engine käyttää 18 kohdetta, jotka kaikki ovat ehdottoman välttämättömiä pyytämällesi palvelulle ja jotka kaikki asettaa vain Dialectical Engine: 13 evästettä ja 5 merkintää selaimesi tallennustilassa. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa dezbatere.ro/cookies oleva **Evästekäytäntö** luettelee ne ja kertoo, mitä kukin tekee ja kuka sen vastaanottaa, ja sitä muutetaan ennen kuin mitään muuta lisätään.
+Dialectical Engine käyttää 20 kohdetta, jotka kaikki ovat ehdottoman välttämättömiä pyytämällesi palvelulle ja jotka kaikki asettaa vain Dialectical Engine: 13 evästettä ja 7 merkintää selaimesi tallennustilassa. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa dezbatere.ro/cookies oleva **Evästekäytäntö** luettelee ne ja kertoo, mitä kukin tekee ja kuka sen vastaanottaa, ja sitä muutetaan ennen kuin mitään muuta lisätään.
 
 | Nimi | Tyyppi | Käyttötarkoitus | Voimassaolo |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine käyttää 18 kohdetta, jotka kaikki ovat ehdottoman välttä
 | `debateai.languageOffer.dismissed` | Istunnon tallennustila | Muistaa tämän välilehden osalta, että kieltäydyit tarjouksesta näyttää väittely toisella kielellä. | Kunnes suljet välilehden |
 | `debateai.support.conversation.v2` | Istunnon tallennustila | Pitää ohjekeskustelusi näytöllä niin kauan kuin välilehti on auki. Se poistetaan, kun joku kirjautuu sisään tai ulos tässä välilehdessä. | Kunnes suljet välilehden |
 | `debateai.phone-completion-draft.v1` | Istunnon tallennustila | Keskeneräinen kysymys puhelinvaiheen aikana; poistetaan istunnon vaihtuessa, uloskirjautuessa tai omistajan vaihtuessa | 15 minuuttia tai aiempaan poistamiseen asti |
+| `debateai.exportPending` | Istunnon tallennustila | Säilyttää sähköpostitse lähetetyn vientilinkin tässä välilehdessä kirjautumista ja uutta yritystä varten. | Kunnes välilehti suljetaan, kirjaudut ulos, avaat uuden linkin, ensimmäinen lataus onnistuu tai linkki todetaan virheelliseksi tai väärän tilin linkiksi |
+| `debateai.exportLinkOutcome` | Istunnon tallennustila | Muistaa, mikä latauslinkkiä koskeva viesti tässä välilehdessä näytetään. | Kunnes välilehti suljetaan, kirjaudut ulos tai avaat uuden linkin |
 
 Mikään muu osapuoli ei kerää Dialectical Engine:n kautta tietoja verkkotoiminnastasi ajan mittaan eikä eri verkkosivustoilla.
 

@@ -183,12 +183,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Hozzáférés (Art. 15; a GDPR 15. cikke) — Az Önről tárolt személyes adatok és ezen információk másolata. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Hozzáférés (Art. 15; a GDPR 15. cikke) — Az Önről tárolt személyes adatok és ezen információk másolata. A Beállításokban válassza az Adatok exportálása lehetőséget: ZIP-fájlt készítünk JSON-fájlokkal és egy bármely böngészőben megnyitható oldallal, majd e-mailben letöltési hivatkozást küldünk, amely 24 órán át és csak a fiókjába bejelentkezve működik.",
         "Helyesbítés (Art. 16; a GDPR 16. cikke) — E-mail- vagy helyreállítási e-mail-címének helyesbítése a Beállításokban. Álneve a Feltételekben ismertetett okokból nem módosítható; megszüntetheti a fiókot, és újat nyithat",
         "Törlés (Art. 17; a GDPR 17. cikke) — Magánjellegű vita bármikori törlése a vita oldaláról. Fiókja megszüntetése a Beállításokból; a 7. szakasz pontosan ismerteti ennek hatását. Kérheti tőlünk az Ön adatait tartalmazó közzétett vita eltávolítását, függetlenül attól, hogy Ön-e a szerző",
         "Az adatkezelés korlátozása (Art. 18; a GDPR 18. cikke) — Kérheti, hogy állítsuk le meghatározott adatok kezelését, amíg az azokkal kapcsolatos vita rendeződik",
         "Tiltakozás (Art. 21; a GDPR 21. cikke) — Tiltakozhat a jogos érdeken alapuló adatkezelés — a 4. szakasz szerinti biztonsági és auditcélú adatkezelés — ellen, és azt leállítjuk, kivéve, ha kényszerítő erejű okokat tudunk igazolni. A marketing ellen bármikor tiltakozhat, és azt leállítjuk",
-        "Adathordozhatóság (Art. 20; a GDPR 20. cikke) — Vitái és fiókadatai széles körben használt, géppel olvasható formátumban. [Pending: same export as Access.] Az Ön által létrehozott nem személyes tartalmat, például kérdéseit, a szerződés megszűnésekor kérésére visszaadjuk Önnek",
+        "Adathordozhatóság (Art. 20; a GDPR 20. cikke) — Vitái és fiókadatai széles körben használt, géppel olvasható formátumban. Használja a Beállítások Adatok exportálása lehetőségét: a ZIP az adatait géppel olvasható JSON-fájlokban és egy olvasható oldalon tartalmazza; az e-mailben küldött hivatkozás 24 órán át és csak a fiókjába bejelentkezve működik. Az Ön által létrehozott nem személyes tartalmat, például kérdéseit, a szerződés megszűnésekor kérésére visszaadjuk Önnek",
         "Hozzájárulás visszavonása (Art. 7(3); a GDPR 7. cikkének (3) bekezdése) — A marketing-hozzájárulás visszavonása bármely e-mailből vagy a Beállításokban; a különleges adatokra vonatkozó hozzájárulás visszavonása a fiókja megszüntetésével a Beállításokban (az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát). A visszavonás nem érinti a már megtörtént adatkezelést",
         "Panasztétel — A román felügyeleti hatóságnál, az ANSPDCP-nél, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, vagy a lakóhelye szerinti ország hatóságánál. Örömmel vennénk, ha először bennünket keresne meg"
         ]
@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Sütik",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "A Dialectical Engine 18 elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a Dialectical Engine helyezi el: 13 sütit és 5 bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A dezbatere.ro/cookies címen található Sütiszabályzat felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog." },
+      { kind: "p", text: "A Dialectical Engine 20 elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a Dialectical Engine helyezi el: 13 sütit és 7 bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A dezbatere.ro/cookies címen található Sütiszabályzat felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Helyi tárhely — Megjegyzi, hogy a világos vagy a sötét módot használja. — Amíg Ön nem törli",
         "debateai.languageOffer.dismissed — Munkamenet-tárhely — Megjegyzi ennél a lapnál, hogy Ön elutasította az ajánlatot, hogy egy vitát más nyelven mutassunk meg. — Amíg be nem zárja a lapot",
         "debateai.support.conversation.v2 — Munkamenet-tárhely — A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik. — Amíg be nem zárja a lapot",
-        "debateai.phone-completion-draft.v1 — Munkamenet-tárhely — Befejezetlen kérdés a telefonos lépés alatt; munkamenetváltáskor, kijelentkezéskor vagy tulajdonosváltáskor törlődik — 15 perc vagy a korábbi törlésig"
+        "debateai.phone-completion-draft.v1 — Munkamenet-tárhely — Befejezetlen kérdés a telefonos lépés alatt; munkamenetváltáskor, kijelentkezéskor vagy tulajdonosváltáskor törlődik — 15 perc vagy a korábbi törlésig",
+        "debateai.exportPending — Munkamenet-tárhely — Ebben a lapon megőrzi az e-mailben kapott exporthivatkozást a bejelentkezéshez és az újrapróbálkozáshoz. — A lap bezárásáig, kijelentkezésig, új hivatkozásig, az első sikeres letöltésig vagy érvénytelen hivatkozásra vagy téves fiókra vonatkozó eredményig",
+        "debateai.exportLinkOutcome — Munkamenet-tárhely — Megjegyzi, melyik letöltési hivatkozással kapcsolatos üzenetet kell megjeleníteni ezen a lapon. — A lap bezárásáig, kijelentkezésig vagy új hivatkozásig"
         ]
       },
       { kind: "p", text: "Semmilyen más fél nem gyűjt a Dialectical Engine-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "39046ee439f24caa456bc4bb0306fc72ee0e48211c9b4530ac38a8affaa28169",
+  sha256: "b4949426335b1046cf76232a71f7a5a5f6566d3e44734e09ef501a201e5940c3",
   eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.3 · HATÁLYOS 2026. OKTÓBER 12.",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",

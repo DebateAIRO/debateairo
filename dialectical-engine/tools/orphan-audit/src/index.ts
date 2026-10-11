@@ -652,7 +652,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // (SERVE_DISCLOSURE_FALLBACK_REASONS, serveDisclosureFallbackReasonOf). migrate() is byte-identical.
 // Role rotation, Task 12 item 5: the reviewed module after readRoleRotationCounts moved into a short transaction
 // with SET LOCAL statement_timeout = '5s' on a dedicated connection. migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "512c08e40eb461aedee4a0570611fa426f16a435cca651164d2fafd0049aa5e4";
+// data-export S01 (V-28, renumbered by V-30 and V-41): dev's module plus the export's repository exports and the
+// compatibility re-seal after applyForwardChain (0115 moves lineageEvidence; V-18).
+const NATIVE_MIGRATE_MODULE_SHA256 = "c4533880630481b9448777a4b7251b524beeaf129020a438e103b677766df8f1";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"
@@ -684,6 +686,7 @@ function assertNativeReplayBinding(name: string, source: string, { plan, migrate
     "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
     "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,", "await applyForward110(client,plan,lineage,",
     "await applyForwardChain(client,plan,",
+    "[compatEvidenceAfterChain,compat.logicalName]",
     'await client.query("COMMIT")', "} catch (error) {", 'await client.query("ROLLBACK")',
     "throw error;", "} finally {", "client.release();"
   ];

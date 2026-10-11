@@ -148,12 +148,12 @@ Bạn có thể thực hiện miễn phí bất kỳ quyền nào trong số nà
 
 | Quyền | Ý nghĩa trong trường hợp này |
 | --- | --- |
-| **Truy cập** (Art. 15) | Một bản sao dữ liệu cá nhân chúng tôi lưu giữ về bạn và thông tin này. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Truy cập** (Art. 15) | Một bản sao dữ liệu cá nhân chúng tôi lưu giữ về bạn và thông tin này. Trong Cài đặt, chọn Xuất dữ liệu: chúng tôi chuẩn bị tệp ZIP gồm các tệp JSON và một trang có thể mở bằng bất kỳ trình duyệt nào, rồi gửi cho bạn qua email liên kết tải xuống có hiệu lực trong 24 giờ và chỉ dùng được khi bạn đã đăng nhập vào tài khoản của mình. |
 | **Chỉnh sửa** (Art. 16) | Sửa email hoặc email khôi phục của bạn trong phần Cài đặt. Bí danh của bạn không thể thay đổi vì các lý do nêu trong Điều khoản; bạn có thể đóng tài khoản và mở tài khoản mới |
 | **Xóa** (Art. 17) | Xóa một cuộc tranh luận riêng tư bất cứ lúc nào từ trang tranh luận. Đóng tài khoản của bạn trong phần Cài đặt; mục 7 giải thích chính xác tác dụng của việc đó. Yêu cầu chúng tôi gỡ một cuộc tranh luận đã công khai có chứa dữ liệu của bạn dù bạn có phải tác giả hay không |
 | **Hạn chế** (Art. 18) | Yêu cầu chúng tôi ngừng xử lý dữ liệu cụ thể trong khi tranh chấp liên quan đến dữ liệu đó được giải quyết |
 | **Phản đối** (Art. 21) | Phản đối việc xử lý dựa trên lợi ích hợp pháp — hoạt động xử lý bảo mật và kiểm toán tại mục 4 — và chúng tôi sẽ dừng trừ khi có thể chứng minh lý do thuyết phục. Phản đối tiếp thị bất cứ lúc nào và chúng tôi sẽ dừng |
-| **Khả năng di chuyển dữ liệu** (Art. 20) | Các cuộc tranh luận và dữ liệu tài khoản của bạn ở định dạng thông dụng, máy có thể đọc được. \[Pending: same export as Access.\] Nội dung không phải dữ liệu cá nhân do bạn tạo, chẳng hạn câu hỏi của bạn, sẽ được trả lại theo yêu cầu khi hợp đồng chấm dứt |
+| **Khả năng di chuyển dữ liệu** (Art. 20) | Các cuộc tranh luận và dữ liệu tài khoản của bạn ở định dạng thông dụng, máy có thể đọc được. Dùng mục Xuất dữ liệu trong Cài đặt: tệp ZIP chứa dữ liệu của bạn dưới dạng tệp JSON mà máy có thể đọc được cùng một trang dễ đọc; liên kết gửi qua email có hiệu lực trong 24 giờ và chỉ dùng được khi bạn đã đăng nhập vào tài khoản của mình. Nội dung không phải dữ liệu cá nhân do bạn tạo, chẳng hạn câu hỏi của bạn, sẽ được trả lại theo yêu cầu khi hợp đồng chấm dứt |
 | **Rút lại sự đồng ý** (Art. 7(3)) | Rút lại sự đồng ý tiếp thị từ bất kỳ email nào hoặc trong phần Cài đặt; rút lại sự đồng ý về dữ liệu nhạy cảm bằng cách đóng tài khoản của bạn trong phần Cài đặt (bạn cũng có thể không đưa dữ liệu đó vào hoặc xóa cuộc tranh luận chứa dữ liệu đó). Việc rút lại không ảnh hưởng đến hoạt động xử lý đã diễn ra |
 | **Khiếu nại** | Gửi đến cơ quan giám sát Romania, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bucharest, <anspdcp@dataprotection.ro>, hoặc đến cơ quan tại quốc gia nơi bạn sinh sống. Chúng tôi mong bạn liên hệ với chúng tôi trước |
 
@@ -174,7 +174,7 @@ Dialectical Engine dành cho người trưởng thành. Khi đăng ký, bạn x�
 ## 13. Cookie
 
 
-Dialectical Engine sử dụng 18 mục, tất cả đều thực sự cần thiết cho dịch vụ bạn đã yêu cầu và tất cả chỉ do Dialectical Engine đặt: 13 cookie và 5 mục nhập trong bộ nhớ trình duyệt của bạn. Chúng tôi không đặt cookie phân tích, quảng cáo hoặc theo dõi. **Chính sách Cookie** tại dezbatere.ro/cookies liệt kê chúng cùng với chức năng của từng mục và bên nhận mục đó, và sẽ được thay đổi trước khi bất kỳ thứ gì khác được thêm vào.
+Dialectical Engine sử dụng 20 mục, tất cả đều thực sự cần thiết cho dịch vụ bạn đã yêu cầu và tất cả chỉ do Dialectical Engine đặt: 13 cookie và 7 mục nhập trong bộ nhớ trình duyệt của bạn. Chúng tôi không đặt cookie phân tích, quảng cáo hoặc theo dõi. **Chính sách Cookie** tại dezbatere.ro/cookies liệt kê chúng cùng với chức năng của từng mục và bên nhận mục đó, và sẽ được thay đổi trước khi bất kỳ thứ gì khác được thêm vào.
 
 | Tên | Loại | Mục đích | Thời hạn |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine sử dụng 18 mục, tất cả đều thực sự cần thi
 | `debateai.languageOffer.dismissed` | Bộ nhớ phiên | Ghi nhớ, cho thẻ này, rằng bạn đã từ chối đề nghị hiển thị một cuộc tranh luận bằng ngôn ngữ khác. | Cho đến khi bạn đóng thẻ |
 | `debateai.support.conversation.v2` | Bộ nhớ phiên | Giữ cuộc trò chuyện trợ giúp của bạn trên màn hình khi thẻ vẫn mở. Cuộc trò chuyện bị xóa khi có người đăng nhập hoặc đăng xuất trong thẻ này. | Cho đến khi bạn đóng thẻ |
 | `debateai.phone-completion-draft.v1` | Bộ nhớ phiên | Câu hỏi chưa hoàn tất ở bước điện thoại; xóa khi đổi phiên, đăng xuất hoặc đổi chủ sở hữu | 15 phút hoặc đến khi bị xóa sớm hơn |
+| `debateai.exportPending` | Bộ nhớ phiên | Giữ liên kết xuất dữ liệu trong email ở thẻ này để đăng nhập và thử lại. | Cho đến khi đóng thẻ, đăng xuất, mở liên kết mới, tải xuống thành công lần đầu hoặc nhận kết quả liên kết không hợp lệ hay sai tài khoản |
+| `debateai.exportLinkOutcome` | Bộ nhớ phiên | Ghi nhớ thông báo về liên kết tải xuống cần hiển thị trong thẻ này. | Cho đến khi đóng thẻ, đăng xuất hoặc mở liên kết mới |
 
 Không có bên nào khác thu thập, thông qua Dialectical Engine, thông tin về các hoạt động trực tuyến của bạn theo thời gian và trên nhiều trang web khác nhau.
 

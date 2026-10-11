@@ -183,12 +183,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Inzage (Art. 15) — Een kopie van de persoonsgegevens die wij over u bewaren, en deze informatie. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Inzage (Art. 15) — Een kopie van de persoonsgegevens die wij over u bewaren, en deze informatie. Kies in Instellingen voor Gegevens exporteren: wij maken een ZIP-bestand met JSON-bestanden en één pagina die u in elke browser kunt openen, en e-mailen u een downloadlink die 24 uur werkt en alleen wanneer u bent ingelogd op uw account.",
         "Rectificatie (Art. 16) — Corrigeer uw e-mailadres of herstel-e-mailadres via Instellingen. Uw pseudoniem kan niet worden gewijzigd om de redenen in de Voorwaarden; u kunt het account sluiten en een nieuw account openen",
         "Wissing (Art. 17) — Verwijder een privédebat op elk moment vanaf de debatpagina. Sluit uw account via Instellingen; hoofdstuk 7 legt precies uit wat dat doet. Vraag ons een gepubliceerd debat met uw gegevens te verwijderen, ongeacht of u de auteur bent",
         "Beperking (Art. 18) — Vraag ons de verwerking van bepaalde gegevens stop te zetten terwijl een geschil daarover wordt beslecht",
         "Bezwaar (Art. 21) — Maak bezwaar tegen verwerking op grond van gerechtvaardigde belangen — de beveiligings- en auditverwerking in hoofdstuk 4 — en wij stoppen tenzij wij dwingende gronden kunnen aantonen. Maak op elk moment bezwaar tegen marketing en wij stoppen",
-        "Overdraagbaarheid (Art. 20) — Uw debatten en accountgegevens in een gangbaar, machineleesbaar formaat. [Pending: same export as Access.] Niet-persoonlijke inhoud die u hebt gemaakt, zoals uw vragen, wordt op uw verzoek aan u teruggegeven wanneer de overeenkomst eindigt",
+        "Overdraagbaarheid (Art. 20) — Uw debatten en accountgegevens in een gangbaar, machineleesbaar formaat. Gebruik Gegevens exporteren in Instellingen: het ZIP-bestand bevat uw gegevens als machineleesbare JSON-bestanden en één leesbare pagina; de per e-mail verzonden link werkt 24 uur en alleen wanneer u bent ingelogd op uw account. Niet-persoonlijke inhoud die u hebt gemaakt, zoals uw vragen, wordt op uw verzoek aan u teruggegeven wanneer de overeenkomst eindigt",
         "Toestemming intrekken (Art. 7(3)) — Trek uw marketingtoestemming in via een e-mail of Instellingen; trek toestemming voor gevoelige gegevens in door uw account via Instellingen te sluiten (u kunt dergelijke gegevens ook weglaten of een debat verwijderen waarin zij voorkomen). Intrekking laat reeds uitgevoerde verwerking onverlet",
         "Klacht indienen — Bij de Roemeense toezichthoudende autoriteit, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Boekarest, anspdcp@dataprotection.ro, of bij de autoriteit in het land waar u woont. Wij horen echter liever eerst van u"
         ]
@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine gebruikt 18 items, die alle strikt noodzakelijk zijn voor de dienst waarom u hebt gevraagd en die alle uitsluitend door Dialectical Engine worden geplaatst: 13 cookies en 5 vermeldingen in de opslag van uw browser. Wij plaatsen geen analyse-, reclame- of trackingcookies. Het Cookiebeleid op dezbatere.ro/cookies vermeldt ze, met wat elk item doet en wie het ontvangt, en wordt gewijzigd voordat er iets anders wordt toegevoegd." },
+      { kind: "p", text: "Dialectical Engine gebruikt 20 items, die alle strikt noodzakelijk zijn voor de dienst waarom u hebt gevraagd en die alle uitsluitend door Dialectical Engine worden geplaatst: 13 cookies en 7 vermeldingen in de opslag van uw browser. Wij plaatsen geen analyse-, reclame- of trackingcookies. Het Cookiebeleid op dezbatere.ro/cookies vermeldt ze, met wat elk item doet en wie het ontvangt, en wordt gewijzigd voordat er iets anders wordt toegevoegd." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokale opslag — Of u de lichte of de donkere weergave gebruikt. — Totdat u dit wist",
         "debateai.languageOffer.dismissed — Sessieopslag — Onthoudt voor dit tabblad dat u het aanbod hebt afgeslagen om een debat in een andere taal te tonen. — Totdat u het tabblad sluit",
         "debateai.support.conversation.v2 — Sessieopslag — Houdt uw gesprek met de hulpchat op het scherm zolang het tabblad open blijft. Het wordt gewist wanneer iemand zich in dit tabblad aanmeldt of afmeldt. — Totdat u het tabblad sluit",
-        "debateai.phone-completion-draft.v1 — Sessieopslag — Onvoltooide vraag tijdens de telefoonstap; gewist bij sessiewisseling, afmelden of eigenaarswissel — 15 minuten of tot eerder wissen"
+        "debateai.phone-completion-draft.v1 — Sessieopslag — Onvoltooide vraag tijdens de telefoonstap; gewist bij sessiewisseling, afmelden of eigenaarswissel — 15 minuten of tot eerder wissen",
+        "debateai.exportPending — Sessieopslag — Bewaart de per e-mail ontvangen exportlink in dit tabblad om in te loggen en opnieuw te proberen. — Tot het tabblad sluit, u zich afmeldt, een nieuwe link opent, de eerste download slaagt of een ongeldige link of verkeerd account wordt vastgesteld",
+        "debateai.exportLinkOutcome — Sessieopslag — Onthoudt welk bericht over de downloadlink in dit tabblad moet worden getoond. — Tot het tabblad sluit, u zich afmeldt of een nieuwe link opent"
         ]
       },
       { kind: "p", text: "Geen enkele andere partij verzamelt via Dialectical Engine informatie over uw onlineactiviteiten in de loop van de tijd en over verschillende websites heen." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "3bec64007c8685ffb499c211c79a2d550d039f21a56dc339d5dbf18cdd0c3333",
+  sha256: "9efdf04c0b33affa50857a7ee35ad25fdcca14ff848b6d559597875e39be15d1",
   eyebrow: "PRIVACYBELEID · v3.3 · VAN KRACHT OP 12 OKTOBER 2026",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",

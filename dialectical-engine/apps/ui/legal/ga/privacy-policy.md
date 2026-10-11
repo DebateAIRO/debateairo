@@ -148,12 +148,12 @@ Is féidir leat aon cheann de na cearta seo a fheidhmiú saor in aisce trí scr�
 
 | Ceart | An bhrí atá leis anseo |
 | --- | --- |
-| **Rochtain** (Art. 15) | Cóip de na sonraí pearsanta atá againn fút, agus an fhaisnéis seo. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Rochtain** (Art. 15) | Cóip de na sonraí pearsanta atá againn fút, agus an fhaisnéis seo. I Socruithe, roghnaigh Easpórtáil sonraí: ullmhaímid comhad ZIP ina bhfuil comhaid JSON agus leathanach amháin is féidir a oscailt in aon bhrabhsálaí, agus seolaimid nasc íoslódála chugat ar ríomhphost a oibríonn ar feadh 24 uair an chloig agus nuair atá tú sínithe isteach i do chuntas amháin. |
 | **Ceartúchán** (Art. 16) | Ceartaigh do ríomhphost nó do ríomhphost athshlánaithe ó na Socruithe. Ní féidir d'ainm cleite a athrú, ar na cúiseanna sna Téarmaí; is féidir leat an cuntas a dhúnadh agus ceann nua a oscailt |
 | **Léirscriosadh** (Art. 17) | Scrios díospóireacht phríobháideach am ar bith ó leathanach na díospóireachta. Dún do chuntas ó na Socruithe; mínítear i rannán 7 cad go díreach a dhéanann sé sin. Iarr orainn díospóireacht fhoilsithe ina bhfuil do shonraí a bhaint cibé acu is tusa an t-údar nó nach ea |
 | **Srianadh** (Art. 18) | Iarr orainn stopadh de shonraí ar leith a phróiseáil fad atá díospóid fúthu á réiteach |
 | **Agóid** (Art. 21) | Déan agóid i gcoinne próiseála atá bunaithe ar leasanna dlisteanacha — an phróiseáil slándála agus iniúchóireachta i rannán 4 — agus stopaimid mura féidir linn forais sháraitheacha a léiriú. Déan agóid i gcoinne margaíochta am ar bith, agus stopaimid |
-| **Iniomparthacht** (Art. 20) | Do dhíospóireachtaí agus sonraí do chuntais i bhformáid a úsáidtear go coitianta agus atá inléite ag meaisín. \[Pending: same export as Access.\] Tugtar ábhar neamhphearsanta a chruthaigh tú, amhail do cheisteanna, ar ais duit má iarrann tú é nuair a thagann deireadh leis an gconradh |
+| **Iniomparthacht** (Art. 20) | Do dhíospóireachtaí agus sonraí do chuntais i bhformáid a úsáidtear go coitianta agus atá inléite ag meaisín. Úsáid Easpórtáil sonraí i Socruithe: tá do shonraí sa ZIP mar chomhaid JSON atá inléite ag meaisín agus mar leathanach amháin atá inléite; seoltar an nasc ar ríomhphost, oibríonn sé ar feadh 24 uair an chloig agus nuair atá tú sínithe isteach i do chuntas amháin. Tugtar ábhar neamhphearsanta a chruthaigh tú, amhail do cheisteanna, ar ais duit má iarrann tú é nuair a thagann deireadh leis an gconradh |
 | **Toiliú a tharraingt siar** (Art. 7(3)) | Tarraing toiliú margaíochta siar ó aon ríomhphost nó ó na Socruithe; tarraing an toiliú le haghaidh sonraí íogaire siar trí do chuntas a dhúnadh ó na Socruithe (is féidir leat na sonraí a fhágáil ar lár nó díospóireacht ina bhfuil siad a scriosadh freisin). Ní dhéanann tarraingt siar difear don phróiseáil a tharla cheana |
 | **Gearán** | Le húdarás maoirseachta na Rómáine, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Búcairist, <anspdcp@dataprotection.ro>, nó leis an údarás sa tír ina bhfuil cónaí ort. B'fhearr linn cloisteáil uait ar dtús |
 
@@ -174,7 +174,7 @@ Is do dhaoine fásta é Dialectical Engine. Deimhníonn tú go bhfuil tú 18 mbl
 ## 13. Fianáin
 
 
-Úsáideann Dialectical Engine 18 mír, agus tá géarghá le gach ceann acu don tseirbhís a d'iarr tú agus ní shocraíonn ach Dialectical Engine iad: 13 fhianán agus 5 iontráil i stóras do bhrabhsálaí. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad sa **Bheartas Fianán** ag dezbatere.ro/cookies, mar aon leis an méid a dhéanann gach ceann acu agus cé a fhaigheann é, agus athrófar é sula gcuirfear aon rud eile leis.
+Úsáideann Dialectical Engine 20 mír, agus tá géarghá le gach ceann acu don tseirbhís a d'iarr tú agus ní shocraíonn ach Dialectical Engine iad: 13 fhianán agus 7 iontráil i stóras do bhrabhsálaí. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad sa **Bheartas Fianán** ag dezbatere.ro/cookies, mar aon leis an méid a dhéanann gach ceann acu agus cé a fhaigheann é, agus athrófar é sula gcuirfear aon rud eile leis.
 
 | Ainm | Cineál | Cuspóir | Tréimhse |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Is do dhaoine fásta é Dialectical Engine. Deimhníonn tú go bhfuil tú 18 mbl
 | `debateai.languageOffer.dismissed` | Stóras seisiúin | Cuimhníonn sé, don chluaisín seo, gur dhiúltaigh tú don tairiscint díospóireacht a thaispeáint i dteanga eile. | Go dtí go ndúnann tú an cluaisín |
 | `debateai.support.conversation.v2` | Stóras seisiúin | Coinníonn sé do chomhrá leis an gcabhair ar an scáileán fad a fhanann an cluaisín oscailte. Scriostar é nuair a shíníonn duine ar bith isteach nó amach sa chluaisín seo. | Go dtí go ndúnann tú an cluaisín |
 | `debateai.phone-completion-draft.v1` | Stóras seisiúin | Ceist neamhchríochnaithe le linn chéim an ghutháin; glantar í ag athrú seisiúin, síniú amach nó athrú úinéara | 15 nóiméad nó go dtí glanadh níos luaithe |
+| `debateai.exportPending` | Stóras seisiúin | Coinníonn sé an nasc easpórtála a seoladh ar ríomhphost sa chluaisín seo chun síniú isteach agus triail eile a dhéanamh. | Go ndúnfar an cluaisín, go síneofar amach, go n-osclófar nasc nua, go n-éireoidh leis an gcéad íoslódáil nó go bhfaighfear toradh naisc neamhbhailí nó cuntais mhícheart |
+| `debateai.exportLinkOutcome` | Stóras seisiúin | Cuimhníonn sé cén teachtaireacht faoin nasc íoslódála atá le taispeáint sa chluaisín seo. | Go ndúnfar an cluaisín, go síneofar amach nó go n-osclófar nasc nua |
 
 Ní bhailíonn aon pháirtí eile faisnéis faoi do ghníomhaíochtaí ar líne le himeacht ama agus thar shuímh ghréasáin éagsúla trí Dialectical Engine.
 
