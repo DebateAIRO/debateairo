@@ -970,6 +970,7 @@ packages/providers/src/preview-test.ts
 packages/providers/src/prompt-frame.ts
 packages/providers/src/prompt-tripwire.ts
 packages/providers/src/provider-probe.ts
+packages/providers/src/unbilled-refusal.ts
 packages/published-arithmetic/src/index.ts
 packages/register/src/algorithm-policy.ts
 packages/register/src/answer-role-rotation-policy.ts

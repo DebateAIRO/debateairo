@@ -206,6 +206,30 @@ export function buildLegacyRunSeatBook(debaters: readonly ConfiguredSeatMaker[])
   });
 }
 
+/**
+ * Opener rotation (spec 2026-10-11 Part 2, option B; owner rulings R2, R5): a rotated run's debaters in its
+ * pin's position order. The pin's `eligibleModelIds` is written opener first, then the members after it in
+ * panel order, then those before it; each debater is stable-sorted by the first index of its model id there.
+ * A debater the list does not name (or whose model id is unknown) goes last, in panel order. An opener that
+ * is not claim-eligible is simply not among `debaters`, so the next member in the turned order opens. Pure;
+ * the caller decides when it applies (a rotation pin and no scorecard assignment).
+ */
+export function pinnedPositionOrder<T>(
+  debaters: readonly T[],
+  modelIdOf: (debater: T) => string | undefined,
+  positionOrder: readonly string[]
+): readonly T[] {
+  const rank = (debater: T): number => {
+    const modelId = modelIdOf(debater);
+    const at = modelId === undefined ? -1 : positionOrder.indexOf(modelId);
+    return at < 0 ? positionOrder.length : at;
+  };
+  return Object.freeze(debaters
+    .map((debater, index) => ({ debater, index, rank: rank(debater) }))
+    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .map((entry) => entry.debater));
+}
+
 /** A legacy run's synthesis seat: the sealed role ref's configured maker, no runner-up. */
 export function legacySynthesisSeat(role: "ANSWER_WRITER" | "ANSWER_CHECKER", maker: ConfiguredSeatMaker): RunSeat {
   return legacySeat(role, 0, maker);

@@ -654,7 +654,10 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // with SET LOCAL statement_timeout = '5s' on a dedicated connection. migrate() is byte-identical.
 // data-export S01 (V-28, renumbered by V-30 and V-41): dev's module plus the export's repository exports and the
 // compatibility re-seal after applyForwardChain (0115 moves lineageEvidence; V-18).
-const NATIVE_MIGRATE_MODULE_SHA256 = "c4533880630481b9448777a4b7251b524beeaf129020a438e103b677766df8f1";
+// Opener rotation (spec 2026-10-11 Part 2, option B): the reviewed module after readRoleRotationCounts gained the
+// OPENER tally (each pin's first eligible entry) and the pin type's comment its position order, merged with the
+// data-export module above. migrate() is unchanged by this.
+const NATIVE_MIGRATE_MODULE_SHA256 = "22de0ff607b2ceabbcb1c851592f7a0be6b103d4d3795defce75f35f4fc48c40";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

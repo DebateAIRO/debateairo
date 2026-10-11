@@ -86,17 +86,21 @@ function nativeHarness(contents: readonly string[], finishReasons: readonly stri
   return { gateway: withPreviewProviderCallPolicy(native, CONFIG, { model: MODEL }), executions, artifacts, ledger };
 }
 
+// Preview retry fix, option B (spec 2026-10-11 §1.1): the writer's bound is its LIFETIME allowance and passes
+// through (token floor and deadline applied); the attempts of ONE call are `maxAttemptsThisCall`.
 describe("preview storyteller v2 safe repair allowance", () => {
-  it.each([2, 3, 8])("permits two attempts when the writer's original allowance is %i", async maxAttempts => {
+  it.each([2, 3, 8])("permits two attempts per call when the writer's original allowance is %i", async maxAttempts => {
     const request = storyRequest();
     const effective = await forwarded({ ...request, bound: { ...request.bound, maxAttempts } });
-    expect(effective.bound).toEqual({ maxAttempts: 2, tokenCeiling: 8192, deadlineMs: 600000 });
+    expect(effective.maxAttemptsThisCall).toBe(2);
+    expect(effective.bound).toEqual({ maxAttempts, tokenCeiling: 8192, deadlineMs: 600000 });
     expect(effective.thinkingLevel).toBe("high");
   });
 
   it("preserves an explicit one-attempt writer bound", async () => {
     const request = storyRequest();
     const effective = await forwarded({ ...request, bound: { ...request.bound, maxAttempts: 1 } });
+    expect(effective.maxAttemptsThisCall).toBe(1);
     expect(effective.bound).toEqual({ maxAttempts: 1, tokenCeiling: 8192, deadlineMs: 600000 });
   });
 
@@ -105,7 +109,8 @@ describe("preview storyteller v2 safe repair allowance", () => {
     const assertAttemptAllowed = () => undefined;
     const costEnvelope = { assertCallAllowed: () => undefined, recordCall: () => undefined, assertUsageReported: () => undefined };
     const effective = await forwarded({ ...request, bound: { ...request.bound, tokenCeiling: 12000 }, assertAttemptAllowed, costEnvelope });
-    expect(effective.bound).toEqual({ maxAttempts: 2, tokenCeiling: 12000, deadlineMs: 600000 });
+    expect(effective.maxAttemptsThisCall).toBe(2);
+    expect(effective.bound).toEqual({ maxAttempts: 3, tokenCeiling: 12000, deadlineMs: 600000 });
     expect(effective.packet).toBe(request.packet);
     expect(effective.providerRef).toBe("preview:fixture-a");
     expect(effective.contractHash).toBe("contract:synthetic-story");
@@ -118,7 +123,7 @@ describe("preview storyteller v2 safe repair allowance", () => {
 
   it.each([1, 8])("accepts the canonical storyteller round %i", async round => {
     const effective = await forwarded({ ...storyRequest(), callSiteKey: `STORY:STORYTELLER:${round}` });
-    expect(effective.bound.maxAttempts).toBe(2);
+    expect(effective.maxAttemptsThisCall).toBe(2);
   });
 
   const oneAttemptCases: ReadonlyArray<readonly [string, () => ProviderCallRequest]> = [
@@ -150,9 +155,11 @@ describe("preview storyteller v2 safe repair allowance", () => {
       }
     ] as const)
   ];
-  it.each(oneAttemptCases)("keeps %s at one attempt", async (_name, makeRequest) => {
-    const effective = await forwarded(makeRequest());
-    expect(effective.bound).toEqual({ maxAttempts: 1, tokenCeiling: 8192, deadlineMs: 600000 });
+  it.each(oneAttemptCases)("keeps %s at one attempt per call", async (_name, makeRequest) => {
+    const request = makeRequest();
+    const effective = await forwarded(request);
+    expect(effective.maxAttemptsThisCall).toBe(1);
+    expect(effective.bound).toEqual({ maxAttempts: request.bound.maxAttempts, tokenCeiling: 8192, deadlineMs: 600000 });
   });
 
   it("still refuses a weaker thinking request before forwarding", async () => {

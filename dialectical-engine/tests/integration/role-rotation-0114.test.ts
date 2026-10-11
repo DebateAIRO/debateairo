@@ -271,7 +271,13 @@ describe("insertRunRoleRotation / readRunRoleRotation", () => {
     const input = { runId, ...rotated } satisfies RunRoleRotationInput;
     await insertRunRoleRotation(db(), input);
     const pinned = await readRunRoleRotation(db(), runId);
-    expect(pinned).toMatchObject({ ...rotated, runId, eligibleModelIds: ["model-a", "model-b"] });
+    // Opener rotation (spec 2026-10-11 Part 2, option B): the opener has no column; it is the pin's first
+    // eligible entry, and the list is the debate's position order (owner ruling R5), one model per maker.
+    const { opener, ...pin } = rotated;
+    expect(pinned).toMatchObject({ ...pin, runId });
+    expect(pinned!.eligibleModelIds).toEqual(rotated.eligibleModelIds);
+    expect(pinned!.eligibleModelIds[0]).toBe(opener.modelId);
+    expect([...pinned!.eligibleModelIds].sort()).toEqual(["model-a", "model-b"]);
   });
   it("refuses a malformed pin before the database does", async () => {
     const runId = randomUUID();
@@ -337,7 +343,7 @@ describe("readRoleRotationCounts", () => {
     for (const roleName of ["ANSWER_WRITER", "ANSWER_CHECKER", "STORYTELLER", "STORY_CHECKER"] as const) {
       expect(after[roleName]!["model-d"]).toEqual({ picked: 0, eligible: tally(before, roleName, "model-d").eligible + 2 });
     }
-    expect(Object.keys(after).sort()).toEqual(["ANSWER_CHECKER", "ANSWER_WRITER", "STORYTELLER", "STORY_CHECKER"]);
+    expect(Object.keys(after).sort()).toEqual(["ANSWER_CHECKER", "ANSWER_WRITER", "OPENER", "STORYTELLER", "STORY_CHECKER"]);
     expect(Object.isFrozen(after)).toBe(true);
     expect(Object.isFrozen(after.ANSWER_WRITER)).toBe(true);
     expect(Object.isFrozen(after.ANSWER_WRITER!["model-c"])).toBe(true);
@@ -350,6 +356,27 @@ describe("readRoleRotationCounts", () => {
     expect(moved(before, after, "ANSWER_WRITER", "model-a")).toEqual({ picked: 1, eligible: 1 });
     expect(moved(before, after, "STORY_CHECKER", "model-a")).toEqual({ picked: 1, eligible: 1 });
     expect(moved(before, after, "ANSWER_CHECKER", "model-e")).toEqual({ picked: 0, eligible: 1 });
+    expect(moved(before, after, "OPENER", "model-a")).toEqual({ picked: 1, eligible: 1 });
+    expect(moved(before, after, "OPENER", "model-e")).toEqual({ picked: 0, eligible: 1 });
+  });
+  // Opener rotation (spec 2026-10-11 Part 2, option B; owner rulings R2, R6): no column of its own. The
+  // opener is the pin's FIRST eligible entry, and a pin written before the rotation (in panel order) counts
+  // its first entry, the debate's actual opener, as true history.
+  it("counts the opener as each pin's first eligible entry, older panel-order pins included", async () => {
+    const before = await readRoleRotationCounts(db());
+    for (const label of ["opener-1", "opener-2"]) {
+      await insertRunRoleRotation(db(), { runId: await createRun(label), rule: RULE, answerWriter: C, answerChecker: B, storyteller: B,
+        storyChecker: C, eligibleModelIds: ["model-b", "model-c", "model-d"] });
+    }
+    await insertRunRoleRotation(db(), { runId: await createRun("opener-3"), rule: RULE, answerWriter: A, answerChecker: B, storyteller: A,
+      storyChecker: B, eligibleModelIds: ["model-d", "model-a", "model-b"] });
+    const after = await readRoleRotationCounts(db());
+    expect(moved(before, after, "OPENER", "model-b")).toEqual({ picked: 2, eligible: 3 });
+    expect(moved(before, after, "OPENER", "model-d")).toEqual({ picked: 1, eligible: 3 });
+    expect(moved(before, after, "OPENER", "model-c")).toEqual({ picked: 0, eligible: 2 });
+    expect(moved(before, after, "OPENER", "model-a")).toEqual({ picked: 0, eligible: 1 });
+    // The opener is independent of the four roles: model-c wrote twice and opened none of these.
+    expect(moved(before, after, "ANSWER_WRITER", "model-c")).toEqual({ picked: 2, eligible: 2 });
   });
   it("feeds the picker as they are", async () => {
     const counts = await readRoleRotationCounts(db());

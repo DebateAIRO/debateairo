@@ -553,11 +553,16 @@ export class BudgetRepository {
     this.#ledger = new LedgerRepository(pool);
   }
 
+  /**
+   * The run-wide attempt ceiling's count. Preview retry fix, option B (spec 2026-10-11 §1.2 (d)): REFUSED
+   * rows (provably unbilled refusals) are left out, so a storm of free 429s never turns into
+   * RUN_COST_ENVELOPE_EXHAUSTED.
+   */
   async countRunModelAttempts(runId: string): Promise<number> {
     const result = await this.pool.query<{ count: string }>(
       `SELECT count(*)::text AS count
        FROM ledger.ledger_entry
-       WHERE run_id = $1 AND action_kind = 'MODEL_CALL'
+       WHERE run_id = $1 AND action_kind = 'MODEL_CALL' AND outcome <> 'REFUSED'
          AND call_site_key NOT LIKE 'STORY:%'
          AND NOT evaluator.ledger_entry_is_authenticated_scope(ledger_entry_id)`,
       [runId]

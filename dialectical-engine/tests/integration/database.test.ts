@@ -12171,6 +12171,52 @@ describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come f
     ]);
   });
 
+  // Opener rotation (spec 2026-10-11 Part 2, option B; owner rulings R2, R5): the pin's eligible list is the
+  // debate's position order, opener first, in the frozen panel's own model ids (`fixtureDiscoveredPanel`).
+  const panelPick = (route: SeatRoute, index: number) => ({ ...pick(route), modelId: `model:${String(index)}` });
+  const OPENER_THIRD: RunRoleRotationInputWithoutRun = Object.freeze({
+    ...ROTATION,
+    answerWriter: panelPick("secondary", 2), answerChecker: panelPick("third", 3),
+    storyteller: panelPick("third", 3), storyChecker: panelPick("primary", 1),
+    eligibleModelIds: Object.freeze(["model:3", "model:1", "model:2"])
+  });
+  const rootActors = (scenario: Readonly<{ calls: readonly Readonly<{ call_site_key: string; actor_ref: string }>[] }>) =>
+    ["JUDGE", "JUDGE:root:secondary"].map((key) => scenario.calls.find((call) => call.call_site_key === key)?.actor_ref);
+
+  it("opener rotation: the pin's first entry opens root position 0, and the rest follow in turn", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-opener", rotation: OPENER_THIRD, panelSize: 3, ...rotationDoubles("rotation-opener", "secondary", "third")
+    });
+    expect(scenario.error).toBeNull();
+    expect(rootActors(scenario)).toEqual([SEAT_ROUTES.third.providerRef, SEAT_ROUTES.primary.providerRef]);
+  });
+
+  it("opener rotation: an opener absent at claim hands root position 0 to the next member in the turned order", async () => {
+    // The pin opens with the secondary, then the third, then the primary; the secondary is absent at claim, so
+    // the third opens (panel order would have put the primary first). The four pinned roles avoid the absent
+    // secondary, so the claim is not refused for an absent pinned role.
+    const scenario = await executeSeatScenario({
+      label: "rotation-opener-absent", panelSize: 3, rotation: {
+        ...OPENER_THIRD, eligibleModelIds: Object.freeze(["model:2", "model:3", "model:1"]),
+        answerWriter: panelPick("third", 3), answerChecker: panelPick("primary", 1),
+        storyteller: panelPick("primary", 1), storyChecker: panelPick("third", 3)
+      },
+      ...rotationDoubles("rotation-opener-absent", "third", "primary"),
+      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef) }
+    });
+    expect(scenario.error).toBeNull();
+    expect(rootActors(scenario)).toEqual([SEAT_ROUTES.third.providerRef, SEAT_ROUTES.primary.providerRef]);
+  });
+
+  it("opener rotation: a pin in panel order (written before the opener rotated) keeps today's order", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-opener-panel-order", rotation: { ...OPENER_THIRD, eligibleModelIds: Object.freeze(["model:1", "model:2", "model:3"]) },
+      panelSize: 3, ...rotationDoubles("rotation-opener-panel-order", "secondary", "third")
+    });
+    expect(scenario.error).toBeNull();
+    expect(rootActors(scenario)).toEqual([SEAT_ROUTES.primary.providerRef, SEAT_ROUTES.secondary.providerRef]);
+  });
+
   it("the story is written by the pinned storyteller and checked by the pinned story checker", async () => {
     // The register's story refs name the secondary, a claim-eligible debater with no story answers: a story
     // sent there instead of to the pin would be handed a debate double and fail loudly.

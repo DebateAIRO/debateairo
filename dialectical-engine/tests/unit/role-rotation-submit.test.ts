@@ -48,7 +48,7 @@ import { RunRepository, type DiscoveredPanelMember } from "@debateai/db";
 import { LivenessRepository } from "@debateai/liveness";
 import { computeStructuralCeilingBasis } from "@debateai/register";
 import { ServeRepository } from "@debateai/serve";
-import { pickRotatedRoles, roleRotationSeed } from "@debateai/scorecard";
+import { pickRotatedRoles, roleRotationSeed, rotationPinFields } from "@debateai/scorecard";
 import type { Pool, PoolClient, QueryResult } from "pg";
 import type { AskRoomPort, AskWaitingLinePort, RoomDecision } from "../../apps/api/src/ask-room.js";
 
@@ -260,9 +260,11 @@ describe("role rotation: the pin is a setup step before anything is queued", () 
     const { order, submit } = arrange();
     await expect(submit()).resolves.toEqual({ run_ref: RUN_ID, status: "QUEUED" });
     // The pin is exactly the admission's pick with the run id: no question, no seed, nothing else.
-    expect(pinning.rotations).toEqual([{ runId: RUN_ID, ...EXPECTED }]);
+    expect(pinning.rotations).toEqual([{ runId: RUN_ID, ...rotationPinFields(EXPECTED) }]);
     expect(Object.keys(pinning.rotations[0] as object).sort()).toEqual(
       ["answerChecker", "answerWriter", "eligibleModelIds", "rule", "runId", "storyChecker", "storyteller"]);
+    // Opener rotation (spec 2026-10-11 Part 2, option B): no opener field; it is the pin's first eligible entry.
+    expect((pinning.rotations[0] as { eligibleModelIds: readonly string[] }).eligibleModelIds[0]).toBe(EXPECTED.opener.modelId);
     expect(order).toEqual(["startRun", "insertRunRoleRotation", "recordMemoryQuestion", "enqueue", "dispatch"]);
     expect(counts.reads).toBe(1);
     expect(picker.rotationPicks).toBe(1);
@@ -290,7 +292,7 @@ describe("role rotation with a room (B6b): START and WAIT alike pin before the h
   it("START: pins right after the run exists, before the memory question, the hold and the queue", async () => {
     const { order, submit } = arrange({ decision: START });
     await expect(submit()).resolves.toEqual({ run_ref: RUN_ID, status: "QUEUED" });
-    expect(pinning.rotations).toEqual([{ runId: RUN_ID, ...EXPECTED }]);
+    expect(pinning.rotations).toEqual([{ runId: RUN_ID, ...rotationPinFields(EXPECTED) }]);
     expect(order).toEqual([
       "precheck", "decide", "startRun", "insertRunRoleRotation", "recordMemoryQuestion", "openStart", "enqueue", "dispatch"
     ]);
@@ -299,7 +301,7 @@ describe("role rotation with a room (B6b): START and WAIT alike pin before the h
   it("WAIT: pins before the place in line; the waker later starts it on that pin and never picks again", async () => {
     const { order, submit, application } = arrange({ decision: WAIT });
     await expect(submit()).resolves.toMatchObject({ run_ref: RUN_ID, status: "WAITING" });
-    expect(pinning.rotations).toEqual([{ runId: RUN_ID, ...EXPECTED }]);
+    expect(pinning.rotations).toEqual([{ runId: RUN_ID, ...rotationPinFields(EXPECTED) }]);
     expect(order).toEqual(["precheck", "decide", "startRun", "insertRunRoleRotation", "recordMemoryQuestion", "enterWait"]);
     const picksAtSubmit = picker.rotationPicks;
     const readsAtSubmit = counts.reads;

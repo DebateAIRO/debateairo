@@ -21,6 +21,11 @@ const tieKey = (seed: string, role: string, model: string) =>
   createHash("sha256").update(["ROLE_ROTATION_V1", seed, role, model].join("\u0000")).digest("hex");
 const fourPicks = (picked: RotatedRoles) =>
   [picked.answerWriter, picked.answerChecker, picked.storyteller, picked.storyChecker];
+/** Owner ruling R5: [opener, the members after it in panel order, then the members before it]. */
+const turned = (panel: readonly RotationPanelMember[], openerModelId: string) => {
+  const at = panel.findIndex((member) => member.model_id === openerModelId);
+  return [...panel.slice(at), ...panel.slice(0, at)].map((member) => member.model_id);
+};
 
 describe("the seed is the ask's own, repeatable and never the run's", () => {
   it("is sha256 over [as_of, question_line] as JSON", () => {
@@ -40,9 +45,9 @@ describe("eligibility: the debate's own panel, one member per maker", () => {
     expect(pickRotatedRoles({ panel: [GLM_A, GLM_B], counts: {}, seed: SEED })).toBeNull();
     expect(pickRotatedRoles({ panel: [GLM_A], counts: {}, seed: SEED })).toBeNull();
   });
-  it("the picks carry the eligible model ids, deduplicated, in panel order, frozen", () => {
+  it("the picks carry the eligible model ids, deduplicated, in the debate's position order (opener first), frozen", () => {
     const picked = pickRotatedRoles({ panel: [GLM_A, GLM_B, DEEPSEEK, HAIKU], counts: {}, seed: SEED })!;
-    expect(picked.eligibleModelIds).toEqual([GLM_A.model_id, DEEPSEEK.model_id, HAIKU.model_id]);
+    expect(picked.eligibleModelIds).toEqual(turned([GLM_A, DEEPSEEK, HAIKU], picked.opener.modelId));
     expect(Object.isFrozen(picked.eligibleModelIds)).toBe(true);
     expect(Object.isFrozen(picked)).toBe(true);
     for (const pick of fourPicks(picked)) expect(picked.eligibleModelIds).toContain(pick.modelId);
@@ -128,7 +133,8 @@ describe("ties: a fixed, repeatable shuffle from the seed, salted per role", () 
     for (let i = 0; i < 5; i += 1) {
       const again = pickRotatedRoles({ panel: [...FIVE].reverse(), counts: {}, seed: SEED })!;
       expect(fourPicks(again)).toEqual(fourPicks(first));
-      expect(again.eligibleModelIds).toEqual([...FIVE].reverse().map((member) => member.model_id));
+      expect(again.opener).toEqual(first.opener);
+      expect(again.eligibleModelIds).toEqual(turned([...FIVE].reverse(), first.opener.modelId));
     }
   });
   it("the tie key is sha256 of ROLE_ROTATION_V1, seed, role and model id, joined by NUL", () => {
@@ -142,6 +148,68 @@ describe("ties: a fixed, repeatable shuffle from the seed, salted per role", () 
       writers.add(pickRotatedRoles({ panel: FIVE, counts: {}, seed })!.answerWriter.modelId);
     }
     expect(writers.size).toBe(5);
+  });
+});
+
+describe("the opener: root position 0 rotates by the same least-share rule (owner rulings R2, R5, R6, R7)", () => {
+  it("goes to the least OPENER share, and the pin's eligible list starts with it", () => {
+    const counts: RoleRotationCounts = { OPENER: {
+      [GLM_A.model_id]: pe(4, 4), [DEEPSEEK.model_id]: pe(1, 4), [MIMO.model_id]: pe(0, 4), [QWEN.model_id]: pe(1, 4), [HAIKU.model_id]: pe(1, 4)
+    } };
+    const picked = pickRotatedRoles({ panel: FIVE, counts, seed: SEED })!;
+    expect(picked.opener).toEqual({ providerRef: MIMO.provider_ref, modelId: MIMO.model_id, maker: MIMO.maker });
+    expect(picked.eligibleModelIds[0]).toBe(MIMO.model_id);
+  });
+  it("R5: the rest shift round in turn: the opener, the members after it in panel order, then those before it", () => {
+    const counts: RoleRotationCounts = { OPENER: { [GLM_A.model_id]: pe(1, 1), [DEEPSEEK.model_id]: pe(1, 1), [QWEN.model_id]: pe(1, 1), [HAIKU.model_id]: pe(1, 1) } };
+    const picked = pickRotatedRoles({ panel: FIVE, counts, seed: SEED })!;
+    expect(picked.eligibleModelIds).toEqual([MIMO.model_id, QWEN.model_id, HAIKU.model_id, GLM_A.model_id, DEEPSEEK.model_id]);
+    const first = pickRotatedRoles({ panel: FIVE, counts: { OPENER: { [GLM_A.model_id]: pe(0, 1), [DEEPSEEK.model_id]: pe(1, 1), [MIMO.model_id]: pe(1, 1), [QWEN.model_id]: pe(1, 1), [HAIKU.model_id]: pe(1, 1) } }, seed: SEED })!;
+    expect(first.eligibleModelIds).toEqual(FIVE.map((member) => member.model_id));
+  });
+  it("equal shares fall to the seeded tie key, salted with the role OPENER", () => {
+    for (let i = 0; i < 40; i += 1) {
+      const seed = roleRotationSeed({ as_of: "2026-10-11T00:00:00.000Z", question_line: `opener tie ${String(i)}` });
+      const expected = [...FIVE].sort((a, b) => tieKey(seed, "OPENER", a.model_id) < tieKey(seed, "OPENER", b.model_id) ? -1 : 1)[0]!;
+      const picked = pickRotatedRoles({ panel: FIVE, counts: {}, seed })!;
+      expect(picked.opener.modelId).toBe(expected.model_id);
+      expect(picked.eligibleModelIds).toEqual(turned(FIVE, expected.model_id));
+    }
+  });
+  it("has no maker rule and is independent of the four roles", () => {
+    const four: RoleRotationCounts = {
+      ANSWER_WRITER: { [GLM_A.model_id]: pe(0, 3), [DEEPSEEK.model_id]: pe(3, 3) },
+      ANSWER_CHECKER: { [DEEPSEEK.model_id]: pe(0, 3), [GLM_A.model_id]: pe(3, 3) },
+      STORYTELLER: { [GLM_A.model_id]: pe(0, 3), [DEEPSEEK.model_id]: pe(3, 3) },
+      STORY_CHECKER: { [DEEPSEEK.model_id]: pe(0, 3), [GLM_A.model_id]: pe(3, 3) }
+    };
+    const withOpener = pickRotatedRoles({ panel: [GLM_A, DEEPSEEK], counts: { ...four, OPENER: { [GLM_A.model_id]: pe(0, 3), [DEEPSEEK.model_id]: pe(3, 3) } }, seed: SEED })!;
+    // The writer's own model opens too: no maker or role rule touches the opener.
+    expect(withOpener.opener.modelId).toBe(GLM_A.model_id);
+    expect(withOpener.answerWriter.modelId).toBe(GLM_A.model_id);
+    const otherOpener = pickRotatedRoles({ panel: [GLM_A, DEEPSEEK], counts: { ...four, OPENER: { [GLM_A.model_id]: pe(3, 3), [DEEPSEEK.model_id]: pe(0, 3) } }, seed: SEED })!;
+    expect(otherOpener.opener.modelId).toBe(DEEPSEEK.model_id);
+    expect(fourPicks(otherOpener)).toEqual(fourPicks(withOpener));
+    expect(otherOpener.eligibleModelIds).toEqual([DEEPSEEK.model_id, GLM_A.model_id]);
+  });
+  it("R6: older pins, written in panel order, count their first entry as the opener: GLM sits out until the others catch up", () => {
+    type Tally = Record<string, Record<string, { picked: number; eligible: number }>>;
+    // Six debates before the opener rotated: every pin in panel order, so GLM (first) opened each one.
+    const tally: Tally = { OPENER: Object.fromEntries(FIVE.map((member) => [member.model_id, pe(member === GLM_A ? 6 : 0, 6)])) };
+    const openers: string[] = [];
+    for (let i = 0; i < 8; i += 1) {
+      const picked = pickRotatedRoles({ panel: FIVE, counts: tally, seed: roleRotationSeed({ as_of: "2026-10-11T00:00:00.000Z", question_line: `after ${String(i)}` }) })!;
+      openers.push(picked.opener.modelId);
+      // The counts query reads the opener off the pin's first entry (eligible_model_ids[1] in SQL).
+      for (const modelId of picked.eligibleModelIds) {
+        const entry = tally.OPENER![modelId]!;
+        entry.eligible += 1;
+        if (modelId === picked.eligibleModelIds[0]) entry.picked += 1;
+      }
+    }
+    // GLM is at 6/6; each other model opens once before any opens twice, and GLM never opens in these eight.
+    expect(new Set(openers.slice(0, 4)).size).toBe(4);
+    expect(openers).not.toContain(GLM_A.model_id);
   });
 });
 

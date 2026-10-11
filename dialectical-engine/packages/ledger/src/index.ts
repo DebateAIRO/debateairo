@@ -546,6 +546,12 @@ export class LedgerRepository {
     return row === undefined ? null : { attemptId: row.attempt_id, artifactRef: row.subject_item_id };
   }
 
+  /**
+   * The re-claim check: the latest billed row of a call site whose billed attempts reached `maxAttempts`.
+   * Preview retry fix, option B (spec 2026-10-11 §1.2 (d)): REFUSED rows (provably unbilled refusals) are
+   * neither counted nor picked, so a site holding only free refusals never reads as used up, and a
+   * REFUSED row never reaches `failFromExhaustedAttempt`.
+   */
   async findExhaustedModelAttempt(input: {
     readonly runId: string;
     readonly workItemId: string;
@@ -573,7 +579,7 @@ export class LedgerRepository {
          SELECT call_site_key, count(*)::text AS attempt_count, max(sequence) AS last_sequence
          FROM ledger.ledger_entry
          WHERE run_id = $1 AND subject_item_id = $2
-           AND action_kind = 'MODEL_CALL' AND contract_hash = $3
+           AND action_kind = 'MODEL_CALL' AND contract_hash = $3 AND outcome <> 'REFUSED'
          GROUP BY call_site_key HAVING count(*) >= $4
        ) AS grouped ON grouped.last_sequence = entry.sequence
        WHERE entry.run_id = $1 AND entry.subject_item_id = $2
@@ -601,6 +607,10 @@ export class LedgerRepository {
    * answered a root, and which marker a cross-exchange site already holds
    * (controller ruling A14 — DR-184-v5 is exact only if both hold across
    * restarts). A run without a pinned assignment records no such key.
+   *
+   * Preview retry fix, option B (spec 2026-10-11 §1.2 (d)): REFUSED rows are left out, as from every
+   * attempt count. A free refusal spent nothing of a seat key, and a halt may cite only a TIMED_OUT or
+   * FAILED row (`migrations/0021_dr174_cooldown_prune.sql:34-38`).
    */
   async readSeatMarkedModelCalls(input: {
     readonly runId: string;
@@ -639,7 +649,7 @@ export class LedgerRepository {
       `SELECT call_site_key, outcome, ledger_entry_id, attempt_id, raw_artifact_ref, actor_ref, candidate_id
        FROM ledger.ledger_entry
        WHERE run_id = $1 AND subject_item_id = $2
-         AND action_kind = 'MODEL_CALL' AND contract_hash = $3
+         AND action_kind = 'MODEL_CALL' AND contract_hash = $3 AND outcome <> 'REFUSED'
          AND (call_site_key LIKE '%:seat:main' OR call_site_key LIKE '%:seat:runnerUp')
        ORDER BY sequence`,
       [input.runId, input.workItemId, input.contractHash]
@@ -655,6 +665,11 @@ export class LedgerRepository {
     })));
   }
 
+  /**
+   * The step's spent allowance: its MODEL_CALL rows under one call-site key. Preview retry fix, option B
+   * (spec 2026-10-11 §1.2 (d), owner ruling R1): a REFUSED row (a provably unbilled refusal) is not an
+   * attempt spent, so a free refusal never uses up a step.
+   */
   async countModelAttempts(input: {
     readonly runId: string | null;
     readonly workItemId: string;
@@ -665,7 +680,8 @@ export class LedgerRepository {
     const result = await this.pool.query<{ count: string }>(
       `SELECT count(*)::text AS count FROM ledger.ledger_entry
        WHERE run_id = $1 AND subject_item_id = $2
-         AND action_kind = 'MODEL_CALL' AND contract_hash = $3 AND call_site_key = $4`,
+         AND action_kind = 'MODEL_CALL' AND contract_hash = $3 AND call_site_key = $4
+         AND outcome <> 'REFUSED'`,
       [input.runId, input.workItemId, input.contractHash, input.callSiteKey]
     );
     return Number(result.rows[0]?.count ?? 0);

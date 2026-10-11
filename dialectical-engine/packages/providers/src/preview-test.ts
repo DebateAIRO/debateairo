@@ -4,6 +4,7 @@ import { request as httpRequest } from "node:http";
 import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel";
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
+import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import {
   PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
   previewModelRow, previewModelRowForRef, previewNanoUsdText, previewRefsAreReviewedSet, previewReservationNanoUsd,
@@ -224,8 +225,15 @@ export function previewTargetGatewayControls(
   if (config === undefined) return Object.freeze({});
   return Object.freeze({ maxOutputTokens: (previewModelRow(target.model) ?? refused()).outputBound });
 }
+/**
+ * The preview's token floor and deadline on a call bound. Preview retry fix, option B (spec 2026-10-11
+ * §1.1, owner ruling R1): `maxAttempts` is kept, because it is the step's sealed LIFETIME allowance the
+ * counting gateway reads against the ledger. Lowering it to 1 made the one resend after an unbilled
+ * refusal, and the runner's own final retry after a cooldown, meet a spent step (CALL_BUDGET_EXHAUSTED);
+ * the preview's one POST per call is `maxAttemptsThisCall` (withPreviewProviderCallPolicy) instead.
+ */
 export function previewCallBound(bound: CallBound, config: PreviewProviderTestConfig | undefined): CallBound {
-  return config === undefined ? bound : Object.freeze({ maxAttempts: 1, tokenCeiling: Math.max(bound.tokenCeiling, PREVIEW_GLM_GENERATION_TOKEN_FLOOR), deadlineMs: PREVIEW_GLM_DEADLINE_MS });
+  return config === undefined ? bound : Object.freeze({ maxAttempts: bound.maxAttempts, tokenCeiling: Math.max(bound.tokenCeiling, PREVIEW_GLM_GENERATION_TOKEN_FLOOR), deadlineMs: PREVIEW_GLM_DEADLINE_MS });
 }
 export function previewRunnerPolicy<T extends { bounds: Readonly<Record<"JUDGE" | "COMPOSER" | "CONFORMANCE", CallBound>>; synthesisRolePolicy: { synthesizerBound: CallBound; evaluatorBound: CallBound } }>(policy: T, config: PreviewProviderTestConfig | undefined): T {
   if (config === undefined) return policy;
@@ -242,12 +250,17 @@ function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
 }
 /**
  * Owner ruling 5 (2026-10-10): how long the preview waits before its one retry of a call the gate
- * proved was never billed (PROVIDER_NOT_REACHED, PROVIDER_REFUSED_UNBILLED).
+ * proved was never billed (PROVIDER_NOT_REACHED, PROVIDER_REFUSED_UNBILLED, and by owner ruling R4 of
+ * 2026-10-11 its own CONCURRENCY_LIMIT_REACHED).
  */
 const PREVIEW_UNBILLED_RETRY_COOLDOWN_MS = 60_000;
-/** A gate refusal for a call that provably cost nothing: the vendor was never reached, or refused unbilled. */
-export class PreviewUnbilledRefusal extends TypedDomainError {
-  constructor() { super("PROVIDER_CALL_FAILED", "Private preview call was not billed and did not reach an answer"); }
+/**
+ * A gate refusal for a call that provably cost nothing: the vendor was never reached, refused unbilled,
+ * or the gate itself had too many calls in flight. A ProviderUnbilledRefusal, so the gateway records the
+ * attempt as REFUSED and no attempt count includes it (spec 2026-10-11 §1.2 (d)).
+ */
+export class PreviewUnbilledRefusal extends ProviderUnbilledRefusal {
+  constructor(message = "Private preview call was not billed and did not reach an answer") { super(message); }
 }
 /** The refusal itself, or the gateway's PROVIDER_CALL_FAILED wrapping it as its cause. */
 function previewCallWasUnbilled(error: unknown): boolean {
@@ -259,10 +272,17 @@ function previewCallWasUnbilled(error: unknown): boolean {
  * configured level ("high"); a row without one (MiMo, Qwen) never sends a level, and a request that asks
  * for one is refused before anything is sent.
  *
- * Owner ruling 5: a one-attempt call the gate proves was never billed is sent ONCE more after
- * PREVIEW_UNBILLED_RETRY_COOLDOWN_MS (the runner's own retry would meet the call site's spent
- * attempt). Only those two refusals; never a second retry; never on the storyteller, whose two
- * attempts already include one after any failure. The start-of-debate estimate counts this retry.
+ * Preview retry fix, option B (spec 2026-10-11 §1.1, owner ruling R1): the request's lifetime bound
+ * passes through (token floor and deadline applied, `maxAttempts` kept), and each call may send ONE
+ * POST (`maxAttemptsThisCall`; the storyteller's repair call two). The counting gateway behind this
+ * wrapper reads the step's allowance off the ledger, where an unbilled refusal is a REFUSED row it
+ * does not count.
+ *
+ * Owner ruling 5: a call the gate proves was never billed is sent ONCE more after
+ * PREVIEW_UNBILLED_RETRY_COOLDOWN_MS. Only those refusals (R4: the gate's own concurrency refusal too);
+ * never a second retry; never on the storyteller, whose two attempts already include one after any
+ * failure. The start-of-debate estimate counts this retry. The runner's own cooldown and final retry
+ * still follow a failure this wrapper passes up.
  */
 export function withPreviewProviderCallPolicy(
   gateway: ProviderGateway, config: PreviewProviderTestConfig, target: Readonly<{ model: string }>,
@@ -279,12 +299,13 @@ export function withPreviewProviderCallPolicy(
         ? "The private preview connection for this model has no thinking level"
         : "The private preview connection is configured for high only");
     }
-    const previewBound = previewCallBound(request.bound, config);
-    const bound = previewStoryRepairAllowed(request) ? Object.freeze({ ...previewBound, maxAttempts: 2 }) : previewBound;
+    const bound = previewCallBound(request.bound, config);
+    const storyRepair = previewStoryRepairAllowed(request);
     // One explicit level replaces whatever the request carried: the configured level on an effort
     // row; DEFAULT_ONLY on a row without one, which the gateway treats exactly as "no level".
-    const send = () => gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level, bound });
-    if (bound.maxAttempts !== 1) return send();
+    const send = () => gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
+      bound, maxAttemptsThisCall: storyRepair ? 2 : 1 });
+    if (storyRepair) return send();
     return send().catch(async (error: unknown) => {
       if (!previewCallWasUnbilled(error)) throw error;
       await sleep(PREVIEW_UNBILLED_RETRY_COOLDOWN_MS);
@@ -391,8 +412,9 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
  * Too many calls in flight (CONCURRENCY_LIMIT_REACHED) is the gate's own 429: nothing was
  * reserved, and the same call fits once one in flight settles, so it is the transient transport
  * failure every vendor 429 already is (PROVIDER_CALL_FAILED: the gateway wraps it, the runner
- * cools down and retries), never a money stop. Every other refusal, and any body that is not
- * exactly that shape, keeps the per-run money code.
+ * cools down and retries), never a money stop. Owner ruling R4 (2026-10-11): it is also unbilled
+ * (PreviewUnbilledRefusal: a REFUSED row, and the one 60-second resend). Every other refusal, and
+ * any body that is not exactly that shape, keeps the per-run money code.
  */
 const PREVIEW_DAILY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_DAILY_BUDGET_REACHED", "DAILY_CALL_LIMIT_REACHED"]);
 /**
@@ -411,8 +433,10 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
     return new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "Private preview team budget for today is used up");
   }
   if (typeof code === "string" && PREVIEW_TRANSIENT_REFUSALS.has(code)) {
+    // Owner ruling R4 (2026-10-11): the gate's own concurrency refusal reserved and sent nothing, so it
+    // is unbilled like the other two: a REFUSED row no count includes, and the one 60-second resend.
     return code === "CONCURRENCY_LIMIT_REACHED"
-      ? new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate is at its limit of calls in flight")
+      ? new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight")
       : new PreviewUnbilledRefusal();
   }
   return new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request");

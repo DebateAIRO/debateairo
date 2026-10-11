@@ -9,6 +9,7 @@ import {
   buildLegacyRunSeatBook,
   createSeatCaller,
   legacySynthesisSeat,
+  pinnedPositionOrder,
   roleAssignmentSeatProblem,
   rotateSeats,
   rotatedSeatSelection,
@@ -94,6 +95,36 @@ describe("A15 · the legacy book is today's rule, byte for byte", () => {
     expect(legacySynthesisSeat("ANSWER_WRITER", configured("a"))).toMatchObject({
       role: "ANSWER_WRITER", seatIndex: 0, runnerUp: null, main: { providerRef: "provider:a", candidate: null }
     });
+  });
+});
+
+// Opener rotation (spec 2026-10-11 Part 2, option B; owner rulings R2, R5): a rotated run's pin lists its
+// model ids in the debate's position order, opener first, and the runner seats the legacy book in that order.
+describe("opener rotation · a rotated run's legacy book follows the pin's position order", () => {
+  const panel = [configured("a"), configured("b"), configured("c"), configured("d")];
+  const modelIdOf = (maker: ConfiguredSeatMaker) => `model:${maker.providerRef.slice("provider:".length)}`;
+  const order = (debaters: readonly ConfiguredSeatMaker[]) => debaters.map((maker) => maker.providerRef);
+
+  it("a pin turns the position order: the opener first, then the members after it, then those before it", () => {
+    const turned = pinnedPositionOrder(panel, modelIdOf, ["model:c", "model:d", "model:a", "model:b"]);
+    expect(order(turned)).toEqual(["provider:c", "provider:d", "provider:a", "provider:b"]);
+    const book = buildLegacyRunSeatBook(turned);
+    for (const seats of [book.position, book.supportAttack, book.crossExchange, book.judge, book.reviewer]) {
+      expect(seats.map((entry) => [entry.seatIndex, entry.main.providerRef]))
+        .toEqual([[0, "provider:c"], [1, "provider:d"], [2, "provider:a"], [3, "provider:b"]]);
+    }
+  });
+  it("an opener absent at claim is not seated: the next member in the turned order opens", () => {
+    const claimEligible = panel.filter((maker) => maker.providerRef !== "provider:c");
+    expect(order(pinnedPositionOrder(claimEligible, modelIdOf, ["model:c", "model:d", "model:a", "model:b"])))
+      .toEqual(["provider:d", "provider:a", "provider:b"]);
+  });
+  it("a member the pin does not list goes last, in panel order; a panel-order pin changes nothing", () => {
+    expect(order(pinnedPositionOrder(panel, modelIdOf, ["model:c", "model:a"])))
+      .toEqual(["provider:c", "provider:a", "provider:b", "provider:d"]);
+    expect(order(pinnedPositionOrder(panel, () => undefined, ["model:c"]))).toEqual(order(panel));
+    expect(order(pinnedPositionOrder(panel, modelIdOf, panel.map(modelIdOf)))).toEqual(order(panel));
+    expect(Object.isFrozen(pinnedPositionOrder(panel, modelIdOf, []))).toBe(true);
   });
 });
 
