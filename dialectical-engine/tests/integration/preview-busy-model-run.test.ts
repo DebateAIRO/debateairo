@@ -50,6 +50,7 @@ import {
   previewModelRow,
   previewProbeControls,
   previewRunnerPolicy,
+  previewRunResilience,
   previewSealedRoleFallbackCovered,
   previewTargetGatewayControls,
   previewTargetJsonRow,
@@ -155,14 +156,11 @@ const INCIDENT_PIN: RotatedRoles = Object.freeze({
 });
 /**
  * Spec 2026-10-12 fixes (a)-(d): the runner's one new preview setting, which gate serves a ref and which model it is
- * (so a busy model sits out on all of its refs, and a halted gate takes every member behind it). Built here as
- * apps/runner/src/main.ts composes it on the preview; both answer undefined for a ref the preview does not know.
- * Today's WalkingSkeletonSettings has no such field, so 8b3201d75's runner ignores it.
+ * (so a busy model sits out on all of its refs, and a halted gate takes every member behind it). The same helper
+ * apps/runner/src/main.ts composes it with on the preview (`previewRunResilience`); both answer undefined for a ref
+ * the preview does not know. (The red run on 8b3201d75 built it inline: that runner had no such field and ignored it.)
  */
-const RUN_RESILIENCE = Object.freeze({
-  gateOf: (providerRef: string) => previewModelRow(PREVIEW_PROVIDER_REF_MODELS[providerRef])?.provider,
-  modelOf: (providerRef: string): string | undefined => PREVIEW_PROVIDER_REF_MODELS[providerRef]
-});
+const RUN_RESILIENCE = previewRunResilience(PREVIEW)!;
 const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:preview-busy-model-run" });
 
@@ -847,5 +845,80 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
     expect(writers).toHaveLength(1);
     expect(PREVIEW_PROVIDER_REF_MODELS[writers[0]!]).not.toBe(GLM);
     expect(await disclosureOf(result.answerId)).toMatchObject({ fallback_reason: null, writer_fallback_reason: "ROLE_UNAVAILABLE" });
+  });
+
+  /**
+   * Spec (d): "Serve must accept a gap in the middle of the root set. Prove it." The incident's GLM is the LAST root, so
+   * T2 drops root 4; here GLM sits in the middle of the position order and its root 2 is the gap. Everything around it
+   * is argued in full: the other four roots, their second-round legs, the cross-root exchanges among them, and the
+   * answer is served from the four.
+   */
+  it("a gap in the middle of the root set: GLM busy as root 2, the other four roots argued and the answer served", async () => {
+    const pin: RotatedRoles = Object.freeze({ ...INCIDENT_PIN, eligibleModelIds: Object.freeze([DEEPSEEK, MIMO, GLM, QWEN, HAIKU]) });
+    const debate = await admittedRun("gap", { panelRefs: FIVE_MAKER_REFS, pin });
+    const gates = await startGates({}, { unbilled: [GLM] });
+    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const result = await completedRun(composed, debate, gates);
+
+    const { answer, story, workItem } = await servedAnswer(debate, result.answerId);
+    expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
+    expect(story).toMatchObject({ outcome: "READY", failureCode: null });
+    expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
+    expect(composed.holdWaits).toEqual([]);
+    const calls = await modelCalls(debate.runId);
+    const ok = (key: string) => calls.filter((call) => call.call_site_key === key && call.outcome === "OK");
+    // Roots 0, 1, 3 and 4 written; root 2 (GLM's) never asked.
+    for (const key of ["JUDGE", "JUDGE:root:secondary", "JUDGE:root:3", "JUDGE:root:4"]) expect(ok(key), key).toHaveLength(1);
+    expect(calls.filter((call) => call.call_site_key === "JUDGE:root:2")).toEqual([]);
+    // Nothing planned beneath the gap. The legs GLM's seat would author elsewhere (seat (root + round) % 5 = 2: root
+    // 0's round 2, root 1's round 1 and so its round 2) take the existing EXPANSION_HALTED path (spec (d)) without a
+    // call; every other leg is argued, depth 2 included.
+    const argued = (root: number, round: number) => calls.some((call) => call.outcome === "OK"
+      && new RegExp(`^JUDGE:(?:defender|critic):root${String(root)}:r${String(round)}:`, "u").test(call.call_site_key));
+    for (const [root, round] of [[0, 1], [3, 1], [3, 2], [4, 1], [4, 2]] as const) {
+      expect(argued(root, round), `root ${String(root)} round ${String(round)}`).toBe(true);
+    }
+    expect(calls.filter((call) => /^JUDGE:(?:defender|critic):root2:/u.test(call.call_site_key))).toEqual([]);
+    expect(gates.requests.filter((request) => request.model === GLM && request.kind !== "PROBE")).toHaveLength(2);
+    expect(answer!.condition_marks).toContain("UNAUTHORED-BRANCH-HALTED");
+    // The cross-root exchanges among the four, none to or from the gap.
+    expect(calls.filter((call) => /^JUDGE:cross-root:(?:2->|\d+->2$)/u.test(call.call_site_key))).toEqual([]);
+    expect(ok("JUDGE:cross-root:0->1")).toHaveLength(1);
+    expect(ok("JUDGE:cross-root:4->3")).toHaveLength(1);
+    const records = answer!.condition_mark_records;
+    const recordsText = JSON.stringify(records.map((record) => [record.mark, record.reason]));
+    expect(records.find((record) => record.mark === "CRITIQUE-UNAVAILABLE")?.reason, recordsText).toMatch(GLM_SAT_OUT);
+    // Four positions authored, so the answer names the unserved ones (no single-lineage step-down).
+    expect(answer!.condition_marks).toContain("UNSERVED-MAKER-POSITION");
+    expect(answer!.condition_marks).not.toContain("SINGLE-LINEAGE");
+  });
+
+  it("a busy opener: GLM opens and is refused; the next member opens root 0 at once, and GLM's seat becomes the dropped root", async () => {
+    const pin: RotatedRoles = Object.freeze({
+      ...INCIDENT_PIN, opener: rotationPick(SEALED_WRITER_REF), eligibleModelIds: Object.freeze([GLM, DEEPSEEK, MIMO, QWEN, HAIKU])
+    });
+    const debate = await admittedRun("opener", { panelRefs: FIVE_MAKER_REFS, pin });
+    const gates = await startGates({}, { unbilled: [GLM] });
+    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const result = await completedRun(composed, debate, gates);
+
+    // GLM's one call is root 0 itself (POST + its one resend); no ten-minute hold before DeepSeek opens.
+    expect(gates.requests.filter((request) => request.model === GLM && request.kind !== "PROBE")
+      .map((request) => [request.kind, request.answer])).toEqual([["JUDGE", "UNBILLED"], ["JUDGE", "UNBILLED"]]);
+    expect(composed.callSleeps).toEqual([UNBILLED_RESEND_MS]);
+    expect(composed.holdWaits).toEqual([]);
+    const calls = await modelCalls(debate.runId);
+    expect(calls.filter((call) => call.call_site_key === "JUDGE").map((call) => [call.actor_ref, call.outcome])).toEqual([
+      [SEALED_WRITER_REF, "REFUSED"], [SEALED_WRITER_REF, "REFUSED"], ["preview:deepseek-v4-1-flash", "OK"]
+    ]);
+    // The seats traded roots: root 1 (where GLM's seat went) is the gap; MiMo, Qwen and Haiku keep roots 2-4.
+    expect(calls.filter((call) => call.call_site_key === "JUDGE:root:secondary")).toEqual([]);
+    for (const key of ["JUDGE:root:2", "JUDGE:root:3", "JUDGE:root:4"]) {
+      expect(calls.filter((call) => call.call_site_key === key && call.outcome === "OK"), key).toHaveLength(1);
+    }
+    const { answer, workItem } = await servedAnswer(debate, result.answerId);
+    expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
+    expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
+    expect(answer!.condition_mark_records.find((record) => record.mark === "CRITIQUE-UNAVAILABLE")?.reason).toMatch(GLM_SAT_OUT);
   });
 });

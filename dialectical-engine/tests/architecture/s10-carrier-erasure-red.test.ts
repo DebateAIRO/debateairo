@@ -236,6 +236,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "apps/runner/src/run-keep-alive.ts",
       // Model scorecard A15: the seat caller's candidate stamp forwards the leased runner's request.
       "apps/runner/src/run-seats.ts",
+      // Run resilience (spec 2026-10-12, fix (d)): the sit-out book hands each runner call, unchanged, to the
+      // member's gateway it wraps, or refuses it before anything is sent. It opens no lease and reads no content.
+      "apps/runner/src/run-sit-out.ts",
       "packages/evaluator/src/index.ts",
       "packages/judgement/src/index.ts",
       "packages/providers/src/preview-test.ts",

@@ -71,8 +71,10 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(snapshot).toContain("answeredRound === undefined ? undefined : writerPlannedByRound.get(answeredRound.round)),");
     expect(snapshot).toContain("checker: storySeatRoleMaker(seatBook.answerChecker,");
     expect(snapshot).toContain("answeredRound === undefined ? undefined : checkerPlannedByRound.get(answeredRound.round))");
-    // The cost fallback is unchanged: the planned maker first, then the run's own debaters.
-    expect(snapshot).toContain("costFallback: storyCostFallback(synthesisMakers, servePrices)");
+    // The cost fallback is unchanged: the planned maker first, then the run's own debaters. Run resilience (spec
+    // 2026-10-12, fix (a)): on the preview it also moves on from a member that sits out (the run's sit-out book,
+    // null and so absent off the preview).
+    expect(snapshot).toContain("costFallback: storyCostFallback(synthesisMakers, servePrices, sitOut ?? undefined)");
     const passThrough = await read("apps/runner/src/story-snapshot.ts");
     expect(passThrough).toContain("...(source.roleMakers === undefined ? {} : { roleMakers: source.roleMakers })");
     const writer = await read("packages/story/src/writer.ts");
