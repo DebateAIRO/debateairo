@@ -4,7 +4,7 @@
  */
 import { createServer, type Server, type Socket } from "node:net";
 import { describe, expect, it, vi } from "vitest";
-import { createPool, isDatabasePoolBusy } from "../../packages/db/src/index.js";
+import { createPool, isDatabasePoolBusy, readRoleRotationCounts } from "../../packages/db/src/index.js";
 
 /** Spec Part 5: the estimate is told whether the debate is rotated (Task 5 prices it); recorded here, never priced. */
 const estimate = vi.hoisted(() => ({ inputs: [] as unknown[] }));
@@ -96,11 +96,81 @@ describe("role rotation at admission", () => {
 });
 
 /**
+ * Task 12 item 5: the counts are read on one dedicated connection, in a short transaction whose
+ * statement_timeout is SET LOCAL (it ends with the transaction, never leaks into the pool), so a slow
+ * tally cannot hold an ask: the timeout is the existing one-minute ASK_MODEL_CANDIDATE_UNAVAILABLE refusal.
+ */
+describe("readRoleRotationCounts: a short transaction with a 5 s statement timeout", () => {
+  type Stub = { statements: string[]; released: unknown[]; pool: Parameters<typeof readRoleRotationCounts>[0] };
+  /** A pool whose one connection records every statement; `fail` decides which statement throws what. */
+  function stubPool(fail: (sql: string) => unknown = () => undefined, rows: unknown[] = []): Stub {
+    const statements: string[] = [], released: unknown[] = [];
+    const client = {
+      async query(sql: string) {
+        statements.push(sql.replace(/\s+/g, " ").trim());
+        const failure = fail(sql);
+        if (failure !== undefined) throw failure;
+        return { rows: /^\s*WITH picked/.test(sql) ? rows : [] };
+      },
+      release(error?: unknown) { released.push(error); }
+    };
+    return { statements, released, pool: { connect: async () => client } as unknown as Stub["pool"] };
+  }
+  const timeout = () => Object.assign(new Error("canceling statement due to statement timeout"), { code: "57014" });
+
+  it("BEGIN, SET LOCAL statement_timeout = '5s', the one counts query, COMMIT, then the connection goes back", async () => {
+    const stub = stubPool(undefined, [{ role: "ANSWER_WRITER", model_id: "model-a", picked: 1, eligible: 2 }]);
+    const counts = await readRoleRotationCounts(stub.pool);
+    expect(counts.ANSWER_WRITER).toEqual({ "model-a": { picked: 1, eligible: 2 } });
+    expect(stub.statements.map((sql) => sql.startsWith("WITH picked") ? "COUNTS" : sql))
+      .toEqual(["BEGIN", "SET LOCAL statement_timeout = '5s'", "COUNTS", "COMMIT"]);
+    expect(stub.released).toEqual([undefined]);
+  });
+  it("a statement timeout rolls back, releases the connection and is rethrown as it is", async () => {
+    const failure = timeout();
+    const stub = stubPool((sql) => /WITH picked/.test(sql) ? failure : undefined);
+    await expect(readRoleRotationCounts(stub.pool)).rejects.toBe(failure);
+    expect(stub.statements.map((sql) => sql.startsWith("WITH picked") ? "COUNTS" : sql))
+      .toEqual(["BEGIN", "SET LOCAL statement_timeout = '5s'", "COUNTS", "ROLLBACK"]);
+    expect(stub.released).toEqual([undefined]);
+  });
+  it("a failed ROLLBACK destroys the connection instead of returning it, and the first failure is the one rethrown", async () => {
+    const failure = timeout(), rollback = new Error("connection lost");
+    const stub = stubPool((sql) => /WITH picked/.test(sql) ? failure : sql === "ROLLBACK" ? rollback : undefined);
+    await expect(readRoleRotationCounts(stub.pool)).rejects.toBe(failure);
+    expect(stub.released).toEqual([rollback]);
+  });
+  it("at admission, the timeout is the one-minute ASK_MODEL_CANDIDATE_UNAVAILABLE refusal, never an unpinned debate", async () => {
+    const stub = stubPool((sql) => /WITH picked/.test(sql) ? timeout() : undefined);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const before = Date.now();
+    try {
+      const refused = await evaluateAskAdmission({ ...settings({}), roleRotation: { readCounts: () => readRoleRotationCounts(stub.pool) } }, ASK).then(
+        () => { throw new Error("admitted without its counts"); }, (caught: unknown) => caught);
+      expect(refused).toMatchObject({ name: "AskRefusal", code: "ASK_MODEL_CANDIDATE_UNAVAILABLE" });
+      const retryAt = (refused as { retryAt?: Date }).retryAt!;
+      expect(retryAt.getTime() - before).toBeGreaterThanOrEqual(60_000);
+      expect(retryAt.getTime() - before).toBeLessThan(65_000);
+      expect(stub.released).toEqual([undefined]);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+  it("a busy pool (no connection handed out) is still rethrown for SERVICE_BUSY (ruling H)", async () => {
+    const busy = await busyPoolFailure((pool) => readRoleRotationCounts(pool));
+    expect(isDatabasePoolBusy(busy)).toBe(true);
+    const refused = await evaluateAskAdmission(settings({ rotation: true, countsError: busy }), ASK).then(
+      () => { throw new Error("admitted without its counts"); }, (caught: unknown) => caught);
+    expect(refused).toBe(busy);
+  });
+});
+
+/**
  * A real busy-pool failure, built as dev's connection-budget tests build it (tests/unit/database-pool-busy.test.ts):
  * a TCP server that accepts and never answers is a database that never hands out a connection. The busy marker
  * is only set by the pool itself, so it cannot be faked.
  */
-async function busyPoolFailure(): Promise<unknown> {
+async function busyPoolFailure(operation: (pool: ReturnType<typeof createPool>) => Promise<unknown> = (pool) => pool.query("SELECT 1")): Promise<unknown> {
   const sockets: Socket[] = [];
   const server: Server = createServer((socket) => { sockets.push(socket); });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -109,7 +179,7 @@ async function busyPoolFailure(): Promise<unknown> {
   const pool = createPool(`postgresql://nobody@127.0.0.1:${address.port}/none`, { max: 1, connectionTimeoutMillis: 100, name: "test:rotation-busy" });
   const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
   try {
-    return await pool.query("SELECT 1").then(() => { throw new TypeError("EXPECTED_REJECTION"); }, (caught: unknown) => caught);
+    return await operation(pool).then(() => { throw new TypeError("EXPECTED_REJECTION"); }, (caught: unknown) => caught);
   } finally {
     logged.mockRestore();
     await pool.end().catch(() => undefined);

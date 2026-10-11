@@ -1487,9 +1487,43 @@ export async function readRunRoleRotation(executor: Pick<Pool, "query"> | PoolCl
  * Per role, per model id: `picked` = pins naming it in that role; `eligible` = pins whose eligible list holds it, each
  * pin counted once per model id (ruling E). One query, both aggregates; a model eligible but never picked in a role
  * answers `picked: 0`, and (never in a lawful table) a model picked but never eligible answers `eligible: 0`.
+ *
+ * Task 12 item 5: it runs on one dedicated connection from the pool, in a short read transaction whose
+ * `statement_timeout` is SET LOCAL (it ends with the transaction and never leaks into the pool), so a slow tally
+ * cannot hold an ask: the timeout is rethrown and admission refuses with its one-minute
+ * ASK_MODEL_CANDIDATE_UNAVAILABLE. A pool that hands out no connection rethrows its busy failure unchanged
+ * (ruling H: SERVICE_BUSY). ROLLBACK on any failure; a failed ROLLBACK destroys the connection. Always released.
+ * (A per-role tally table is a later optimisation, spec Part 3.)
  */
-export async function readRoleRotationCounts(executor: Pick<Pool, "query"> | PoolClient): Promise<RunRoleRotationCounts> {
-  const rows = (await executor.query<{ role: RoleRotationCountRole; model_id: string; picked: number; eligible: number }>(
+export async function readRoleRotationCounts(pool: Pick<Pool, "connect">): Promise<RunRoleRotationCounts> {
+  const client = await pool.connect();
+  let destroy: unknown;
+  let rows: { role: RoleRotationCountRole; model_id: string; picked: number; eligible: number }[];
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    rows = await queryRoleRotationCounts(client);
+    await client.query("COMMIT");
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch (rollbackFailure) { destroy = rollbackFailure; }
+    throw error;
+  } finally {
+    client.release(destroy as Error | undefined);
+  }
+  const counts = new Map(ROLE_ROTATION_COUNT_ROLES.map((role) => [role, new Map<string, RunRoleRotationTally>()]));
+  for (const row of rows) {
+    const byModel = counts.get(row.role);
+    if (byModel === undefined || !Number.isSafeInteger(row.picked) || !Number.isSafeInteger(row.eligible)) {
+      throw new TypeError("RUN_ROLE_ROTATION_INVALID");
+    }
+    byModel.set(row.model_id, Object.freeze({ picked: row.picked, eligible: row.eligible }));
+  }
+  return Object.freeze(Object.fromEntries([...counts].map(([role, byModel]) =>
+    [role, Object.freeze(Object.fromEntries(byModel))]))) as RunRoleRotationCounts;
+}
+
+async function queryRoleRotationCounts(client: PoolClient) {
+  return (await client.query<{ role: RoleRotationCountRole; model_id: string; picked: number; eligible: number }>(
     `WITH picked AS (
        SELECT pick.role, pick.model_id, count(*)::integer AS picked
        FROM core.run_role_rotation
@@ -1505,16 +1539,6 @@ export async function readRoleRotationCounts(executor: Pick<Pool, "query"> | Poo
             coalesce(picked.picked, 0) AS picked, coalesce(eligible.eligible, 0) AS eligible
      FROM picked FULL JOIN eligible ON eligible.role = picked.role AND eligible.model_id = picked.model_id`
   )).rows;
-  const counts = new Map(ROLE_ROTATION_COUNT_ROLES.map((role) => [role, new Map<string, RunRoleRotationTally>()]));
-  for (const row of rows) {
-    const byModel = counts.get(row.role);
-    if (byModel === undefined || !Number.isSafeInteger(row.picked) || !Number.isSafeInteger(row.eligible)) {
-      throw new TypeError("RUN_ROLE_ROTATION_INVALID");
-    }
-    byModel.set(row.model_id, Object.freeze({ picked: row.picked, eligible: row.eligible }));
-  }
-  return Object.freeze(Object.fromEntries([...counts].map(([role, byModel]) =>
-    [role, Object.freeze(Object.fromEntries(byModel))]))) as RunRoleRotationCounts;
 }
 
 export interface InitialBatteryRow {

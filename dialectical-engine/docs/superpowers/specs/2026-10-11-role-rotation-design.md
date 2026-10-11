@@ -93,6 +93,8 @@ pickRotatedRoles({ panel, counts, seed }) -> RotatedRoles | null
 
 The counts are read at admission with one query over the pin table (`per role and model: picks and eligible appearances, two aggregates`), before the estimate and so before the preview's admission lock is taken. Two debates admitted at the same instant may therefore read the same counts and pick the same model; the next debate evens it out (the rule is "balanced over time", not "exact").
 
+The query runs on one dedicated connection from the API's pool, inside a short read transaction (`BEGIN`, `SET LOCAL statement_timeout = '5s'`, the query, `COMMIT`; `ROLLBACK` on any failure; the connection always goes back, or is destroyed when the `ROLLBACK` itself fails). `SET LOCAL` ends with the transaction, so the timeout never leaks into the pool. A query slower than 5 s is cancelled and the ask gets the existing one-minute `ASK_MODEL_CANDIDATE_UNAVAILABLE` refusal; a pool that hands out no connection stays the API's `SERVICE_BUSY` (ruling H). The query scans the whole pin table, which grows by one row per rotated debate; a per-role tally table (one row per role and model id, updated with the pin) is a later optimisation if the scan ever nears the timeout.
+
 ## Part 3: the per-run record and the story's repair count (migration 0114)
 
 One migration, `migrations/0114_role_rotation.sql`, the fourth forward step of the chain after 0113 (`migrations/lineage/README.md`: SQL, manifest `lineage/role-rotation-forward0114.json`, loader `packages/db/src/migration-forward0114.ts`, appended last to `STEPS` in `packages/db/src/migration-forward-chain.ts`). It adds no billing relation or function, so its manifest names `lineage/verify-effective-capabilities-111.sql` as the verifier in force. If another branch takes 0114 first, this step is renumbered at merge time (check the newest migration on `origin/dev` then).
@@ -174,7 +176,7 @@ When a claimed run has a rotation pin (read with `readRunRoleRotation(pool, runI
 | Row malformed | API boot refuses (`ANSWER_ROLE_ROTATION_POLICY_INVALID`). |
 | Panel with one maker | Today's fixed roles; no pin. |
 | Scorecard assignment pinned | The scorecard owns the roles; no pin. |
-| Count query fails at admission | The ask is refused with the existing "a model this debate needs cannot be reached right now" code (`ASK_MODEL_CANDIDATE_UNAVAILABLE`, one-minute retry), never admitted with unpinned roles. |
+| Count query fails or exceeds its 5 s statement timeout at admission | The ask is refused with the existing "a model this debate needs cannot be reached right now" code (`ASK_MODEL_CANDIDATE_UNAVAILABLE`, one-minute retry), never admitted with unpinned roles. A busy pool stays `SERVICE_BUSY` (ruling H). |
 | Pin insert fails in `submit` | `RUN_SETUP_FAILED:ROLE_ROTATION`, nothing queued (the setup-step rule). |
 | Pin present but unreadable at claim | Terminal `RUN_ROLE_ROTATION_INVALID`, like `RUN_ROLE_ASSIGNMENT_INVALID`. |
 | Pinned answer role absent at claim | The sealed register ref for that role serves (today's claim rules), disclosed as a fallback for `ROLE_UNAVAILABLE` (no "lower-cost" text), when it is one of the debate's panel refs and the estimate covers it (orchestrator, 2026-10-11, "always an answer"; panel ref: Task 12). |
