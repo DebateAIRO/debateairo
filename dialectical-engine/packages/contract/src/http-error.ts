@@ -28,7 +28,13 @@ export class ContractHttpError extends Error {
      * debates rather than a reset (final review Part 1b, Important 1). The ask
      * page shows sentence D with that time when its room re-read fails.
      */
-    readonly waiting: ContractWaitingRefusal | null = null
+    readonly waiting: ContractWaitingRefusal | null = null,
+    /**
+     * Live run events (2026-10-11): how long the server asked the caller to wait (its
+     * `Retry-After`, in milliseconds), or null when it named no time. Set on any refused
+     * response that carries the header — the admission gate's 429 always does.
+     */
+    readonly retryAfterMs: number | null = null
   ) {
     super(message);
     this.name = "ContractHttpError";

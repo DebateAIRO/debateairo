@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { RunEventSchema, type RunEvent } from "@debateai/contract";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ContractHttpError, createContractClient, RunEventSchema, type RunEvent } from "@debateai/contract";
 import {
   applyRunEvent,
+  createLiveEventGate,
   createLiveRunState,
+  LIVE_STREAM_RECONNECT,
+  liveReconnectDelay,
   liveTreeFromState,
-  refreshTriggeredBy
+  refreshTriggeredBy,
+  startLiveEventStream
 } from "../../apps/ui/lib/v3/liveEvents.js";
 
 let sequence = 0;
@@ -144,5 +148,159 @@ describe("pending progress copy (UI honesty: never claim 'connecting' while work
     const copy = pendingProgressCopy(state, { status: "reconnecting", retryInMs: 4000 });
     expect(copy).toContain("Reconnecting");
     expect(copy).toContain("1 node");
+  });
+});
+
+/**
+ * Live run events (2026-10-11): the page held one tab's whole `publicReads`
+ * budget in about two minutes — it reset its back-off on the first REPLAYED
+ * event, reconnected about once a second, and re-read the page on every
+ * connect and for every replayed node event. These pin the stream loop.
+ */
+describe("live stream loop (one open stream, honest back-off)", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  function streamEvent(sequence: number, eventType: RunEvent["event_type"] = "node.complete"): RunEvent {
+    return RunEventSchema.parse({
+      event_id: `stream:${sequence}`, event_type: eventType, run_ref: "run:live",
+      subject_ref: "node:a", at_sequence: sequence, payload: {}
+    });
+  }
+
+  type Script = (emit: (event: RunEvent) => void) => Promise<void>;
+
+  function harness(scripts: Script[]) {
+    const opened: number[] = [];
+    const consumed: string[] = [];
+    const refreshes: Array<boolean | undefined> = [];
+    const statuses: Array<{ status: string; retryInMs?: number }> = [];
+    let terminal = false;
+    const stop = startLiveEventStream({
+      open: (emit) => {
+        opened.push(Date.now());
+        const script = scripts.shift();
+        return script === undefined ? new Promise<void>(() => {}) : script(emit);
+      },
+      consume: (event) => {
+        consumed.push(event.event_id);
+        if (event.event_type === "run.terminal") terminal = true;
+        if (refreshTriggeredBy(event.event_type)) refreshes.push(event.event_type === "run.terminal");
+      },
+      refresh: (answerExpected) => { refreshes.push(answerExpected); },
+      isTerminal: () => terminal,
+      onStatus: (status) => { statuses.push(status); },
+      onFatal: () => false,
+      gate: createLiveEventGate()
+    });
+    return { opened, consumed, refreshes, statuses, stop };
+  }
+
+  it("waits at least 5 s after a clean close, and doubling, while only replayed events arrive", async () => {
+    vi.useFakeTimers({ now: 0 });
+    const replay: Script = async (emit) => { emit(streamEvent(1, "run.running")); emit(streamEvent(2)); };
+    const run = harness([replay, replay, replay, replay]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(run.opened).toEqual([0]);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(run.opened).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(run.opened).toEqual([0, 5_000]);
+    // The replayed events of the 2nd stream are not new: no back-off reset.
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(run.opened).toEqual([0, 5_000, 15_000]);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(run.opened).toEqual([0, 5_000, 15_000, 35_000]);
+    // Each event was applied once, however often it was replayed.
+    expect(run.consumed).toEqual(["stream:1", "stream:2"]);
+    run.stop();
+  });
+
+  it("re-reads the page only for NEW events (and once per close), never for replayed history", async () => {
+    vi.useFakeTimers({ now: 0 });
+    const run = harness([
+      async (emit) => { emit(streamEvent(1, "run.running")); emit(streamEvent(2)); },
+      async (emit) => { emit(streamEvent(1, "run.running")); emit(streamEvent(2)); emit(streamEvent(3)); }
+    ]);
+    await vi.advanceTimersByTimeAsync(0);
+    // node.complete #2 is new (one refresh), then the clean close (one refresh).
+    expect(run.refreshes).toEqual([false, undefined]);
+    await vi.advanceTimersByTimeAsync(5_000);
+    // Only #3 is new on the second stream, then its close.
+    expect(run.refreshes).toEqual([false, undefined, false, undefined]);
+    expect(run.consumed).toEqual(["stream:1", "stream:2", "stream:3"]);
+    run.stop();
+  });
+
+  it("a NEW event resets the back-off to the 5 s floor", async () => {
+    vi.useFakeTimers({ now: 0 });
+    const run = harness([
+      async (emit) => { emit(streamEvent(1, "run.running")); },
+      async (emit) => { emit(streamEvent(1, "run.running")); },
+      async (emit) => { emit(streamEvent(1, "run.running")); emit(streamEvent(2)); }
+    ]);
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(run.opened).toEqual([0, 5_000, 15_000]);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(run.opened).toEqual([0, 5_000, 15_000, 20_000]);
+    run.stop();
+  });
+
+  it("honours the server's Retry-After on a 429, and waits at least a minute without one", async () => {
+    vi.useFakeTimers({ now: 0 });
+    const run = harness([
+      async () => { throw new ContractHttpError("RATE_LIMITED", 429, "ADMISSION_RATE_LIMITED", "ADMISSION_RATE_LIMITED", null, null, 780_000); },
+      async () => { throw new ContractHttpError("RATE_LIMITED", 429, "ADMISSION_RATE_LIMITED"); }
+    ]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(run.statuses.at(-1)).toEqual({ status: "reconnecting", retryInMs: 780_000 });
+    await vi.advanceTimersByTimeAsync(779_999);
+    expect(run.opened).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(run.opened).toHaveLength(2);
+    expect(run.statuses.at(-1)).toEqual({ status: "reconnecting", retryInMs: LIVE_STREAM_RECONNECT.rateLimitedFloorMs });
+    run.stop();
+  });
+
+  it("stops on terminal: no reconnect, one settled re-read", async () => {
+    vi.useFakeTimers({ now: 0 });
+    const run = harness([async (emit) => { emit(streamEvent(1, "run.running")); emit(streamEvent(2, "run.terminal")); }]);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(run.opened).toHaveLength(1);
+    expect(run.refreshes).toEqual([true, true]);
+    run.stop();
+  });
+
+  it("computes the reconnect delay from the 5 s floor, doubling to the 60 s ceiling, never under Retry-After", () => {
+    expect([0, 1, 2, 3, 4, 5].map((attempt) => liveReconnectDelay(attempt, null))).toEqual([5_000, 10_000, 20_000, 40_000, 60_000, 60_000]);
+    expect(liveReconnectDelay(0, new ContractHttpError("RATE_LIMITED", 429, "x", null, null, null, 120_000))).toBe(120_000);
+    expect(liveReconnectDelay(5, new ContractHttpError("RATE_LIMITED", 429, "x", null, null, null, 2_000))).toBe(60_000);
+    expect(liveReconnectDelay(0, new ContractHttpError("NETWORK_FAILURE", 0, "x"))).toBe(5_000);
+  });
+
+  it("the contract client reads Retry-After (seconds or a date) and skips SSE heartbeats", async () => {
+    const limited = (retryAfter: string) => createContractClient("https://api.example.test", async () => new Response(
+      JSON.stringify({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" }),
+      { status: 429, headers: { "content-type": "application/json", "retry-after": retryAfter } }
+    ));
+    await expect(limited("780").streamEvents("run:test", () => {})).rejects.toMatchObject({ code: "RATE_LIMITED", retryAfterMs: 780_000 });
+    const inTwoMinutes = new Date(Date.now() + 120_000).toUTCString();
+    const dated = await limited(inTwoMinutes).streamEvents("run:test", () => {}).catch((error: ContractHttpError) => error);
+    expect((dated as ContractHttpError).retryAfterMs).toBeGreaterThan(100_000);
+    expect((dated as ContractHttpError).retryAfterMs).toBeLessThanOrEqual(120_000);
+    await expect(limited("soon").streamEvents("run:test", () => {})).rejects.toMatchObject({ retryAfterMs: null });
+
+    const event = JSON.stringify({ event_id: "1", event_type: "run.running", run_ref: "run:test", at_sequence: 1, payload: {} });
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(`: keep-alive\n\nid: 1\nevent: run.running\ndata: ${event}\n\n: keep-alive\n\n`));
+        controller.close();
+      }
+    });
+    const observed: RunEvent[] = [];
+    await createContractClient("https://api.example.test", async () => new Response(body, { status: 200 }))
+      .streamEvents("run:test", (candidate) => observed.push(candidate));
+    expect(observed.map((candidate) => candidate.event_id)).toEqual(["1"]);
   });
 });

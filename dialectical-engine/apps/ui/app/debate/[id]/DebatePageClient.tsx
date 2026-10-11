@@ -48,9 +48,11 @@ import { requestFailureMessage } from "@/lib/v3/requestFailure";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import {
   applyRunEvent,
+  createLiveEventGate,
   createLiveRunState,
   liveTreeFromState,
   refreshTriggeredBy,
+  startLiveEventStream,
   type LiveRunState } from "@/lib/v3/liveEvents";
 import { AnswerHonestyDrawer } from "@/components/AnswerHonestyDrawer";
 import type {
@@ -675,6 +677,9 @@ export default function DebatePageClient({
   const [privateDeletionStatus,setPrivateDeletionStatus]=useState<PrivateDeletionStatus|null>(null);
   const privateDeletionRef=useRef<PrivateDeletionStatus|null>(null);
   const liveRef = useRef<LiveRunState>(createLiveRunState());
+  // Live run events (2026-10-11): the events this page already applied, across reconnects —
+  // each reconnect replays the run's history, and history is applied once.
+  const liveGateRef = useRef(createLiveEventGate());
   const answerRef = useRef<Answer | null>(initialAnswer);
   const [synthesisDraft, setSynthesisDraft] = useState<SynthesisDraft | null>(() =>
     activeSynthesisDraft(initialDebate)
@@ -933,69 +938,28 @@ export default function DebatePageClient({
       };
     }
 
-    let stopped = false;
-    let timer: number | null = null;
-    let attempt = 0;
-    const controller = new AbortController();
-
-    function scheduleReconnect() {
-      if (stopped || timer) return;
-      const delay = Math.min(30000, 1000 * 2 ** attempt);
-      attempt += 1;
-      setStreamState({ status: "reconnecting", retryInMs: delay });
-      timer = window.setTimeout(connect, delay);
-    }
-
-    function connect() {
-      timer = null;
-      setStreamState({ status: "connecting" });
-      let opened = false;
-      contractClient
-        .streamEvents(
-          runRef,
-          (event) => {
-            if (!opened) {
-              opened = true;
-              attempt = 0;
-              setStreamState({ status: "live" });
-              // Live stream (re)connected: clear any stale transient error so
-              // recovered data is never masked by an old banner/fatal screen.
-              setError(null);
-              void refresh();
-            }
-            consume(event);
-          },
-          controller.signal
-        )
-        .then(() => {
-          if (stopped) return;
-          // The stream closed. If the run reached terminal we are done —
-          // refresh() pulls the settled projection; otherwise reconnect.
-          if (liveRef.current.runPhase === "terminal") {
-            void refresh(true);
-            return;
-          }
-          void refresh();
-          scheduleReconnect();
-        })
-        .catch((failure) => {
-          if (stopped || controller.signal.aborted) return;
-          if (failure instanceof ContractHttpError && (failure.code === "NOT_FOUND" || failure.code === "SESSION_REQUIRED" || failure.code === "FORBIDDEN")) {
-            // Terminal stream refusal: this run is not visible to this asker.
-            setError(failure.code);
-            return;
-          }
-          void refresh();
-          scheduleReconnect();
-        });
-    }
-
-    connect();
-    return () => {
-      stopped = true;
-      controller.abort();
-      if (timer) window.clearTimeout(timer);
-    };
+    // Live run events (2026-10-11): one open stream that the server keeps following; only NEW
+    // events are applied (and may re-read the page); a close reconnects after at least 5 s, with
+    // back-off, and a 429 waits at least the server's Retry-After (lib/v3/liveEvents.ts).
+    return startLiveEventStream({
+      open: (emit, signal) => contractClient.streamEvents(runRef, emit, signal),
+      consume,
+      refresh: (answerExpected) => { void refresh(answerExpected); },
+      isTerminal: () => liveRef.current.runPhase === "terminal",
+      onStatus: setStreamState,
+      // Live stream (re)connected: clear any stale transient error so
+      // recovered data is never masked by an old banner/fatal screen.
+      onLive: () => setError(null),
+      onFatal: (failure) => {
+        if (failure instanceof ContractHttpError && (failure.code === "NOT_FOUND" || failure.code === "SESSION_REQUIRED" || failure.code === "FORBIDDEN")) {
+          // Terminal stream refusal: this run is not visible to this asker.
+          setError(failure.code);
+          return true;
+        }
+        return false;
+      },
+      gate: liveGateRef.current
+    });
   }, [answer?.run_ref,composeCatalog,debateChromeCatalog,debateTerminal,id,privateDeletionStatus,refresh]);
 
   // Honesty surfaces: the execution-ledger digest rides every settled answer.

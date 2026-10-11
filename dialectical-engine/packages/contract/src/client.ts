@@ -174,7 +174,19 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
   const detail = serverCode !== null && serverMessage !== null
     ? `${serverCode}: ${serverMessage}`
     : serverCode ?? serverMessage ?? `Contract request failed with ${response.status}`;
-  return new ContractHttpError(codeForStatus(response.status), response.status, detail, serverCode, statement, waiting);
+  return new ContractHttpError(
+    codeForStatus(response.status), response.status, detail, serverCode, statement, waiting,
+    retryAfterMs(response.headers.get("retry-after"))
+  );
+}
+
+/** `Retry-After` as milliseconds: delay-seconds or an HTTP date (RFC 9110 §10.2.3); null when absent or unreadable. */
+function retryAfterMs(header: string | null): number | null {
+  if (header === null) return null;
+  const value = header.trim();
+  if (/^\d{1,9}$/u.test(value)) return Number(value) * 1_000;
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
 }
 
 async function requestJson<T>(
