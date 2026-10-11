@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "До 30 минути",
   "legal.cookies.mfaRecovery.life": "До 299 секунди",
   "legal.cookies.social.life": "До 5 минути",
-  "legal.cookies.phoneDraft.life": "15 минути или до по-ранно изтриване"
+  "legal.cookies.phoneDraft.life": "15 минути или до по-ранно изтриване",
+  "legal.cookies.exportPending.purpose": "Запазва изпратената по имейл връзка за експортиране в този раздел за вход и повторен опит.",
+  "legal.cookies.exportLinkOutcome.purpose": "Помни кое съобщение за връзката за изтегляне да се покаже в този раздел.",
+  "legal.cookies.exportPending.life": "До затваряне на раздела, излизане, нова връзка, първото успешно изтегляне или резултат за невалидна връзка или друг акаунт",
+  "legal.cookies.exportLinkOutcome.life": "До затваряне на раздела, излизане или нова връзка"
 }

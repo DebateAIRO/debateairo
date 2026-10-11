@@ -174,7 +174,7 @@ Dialectical Engine está destinado a adultos. Al registrarse, confirma que tiene
 ## 13. Cookies
 
 
-Dialectical Engine utiliza 18 elementos, todos estrictamente necesarios para el servicio que ha solicitado y todos establecidos únicamente por Dialectical Engine: 13 cookies y 5 entradas en el almacenamiento de su navegador. No instalamos cookies analíticas, publicitarias ni de seguimiento. La **Política de cookies**, disponible en dezbatere.ro/cookies, los enumera indicando qué hace cada uno y quién lo recibe, y se modificará antes de añadir cualquier otra cosa.
+Dialectical Engine utiliza 20 elementos, todos estrictamente necesarios para el servicio que ha solicitado y todos establecidos únicamente por Dialectical Engine: 13 cookies y 7 entradas en el almacenamiento de su navegador. No instalamos cookies analíticas, publicitarias ni de seguimiento. La **Política de cookies**, disponible en dezbatere.ro/cookies, los enumera indicando qué hace cada uno y quién lo recibe, y se modificará antes de añadir cualquier otra cosa.
 
 | Nombre | Tipo | Finalidad | Duración |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine utiliza 18 elementos, todos estrictamente necesarios para el 
 | `debateai.languageOffer.dismissed` | Almacenamiento de sesión | Recuerda, para esta pestaña, que rechazó la oferta de mostrar un debate en otro idioma. | Hasta que cierre la pestaña |
 | `debateai.support.conversation.v2` | Almacenamiento de sesión | Mantiene en pantalla su conversación con el chat de ayuda mientras la pestaña siga abierta. Se borra cuando alguien inicia o cierra sesión en esta pestaña. | Hasta que cierre la pestaña |
 | `debateai.phone-completion-draft.v1` | Almacenamiento de sesión | Pregunta sin terminar durante el paso del teléfono; borrada al cambiar sesión, cerrar sesión o cambiar titular | 15 minutos o hasta que se borre |
+| `debateai.exportPending` | Almacenamiento de sesión | Conserva en esta pestaña el enlace de exportación enviado por correo para iniciar sesión y volver a intentarlo. | Hasta cerrar la pestaña, cerrar sesión, abrir un enlace nuevo, completar la primera descarga o recibir un resultado de enlace no válido o cuenta incorrecta |
+| `debateai.exportLinkOutcome` | Almacenamiento de sesión | Recuerda qué mensaje sobre el enlace de descarga debe mostrarse en esta pestaña. | Hasta cerrar la pestaña, cerrar sesión o abrir un enlace nuevo |
 
 Ningún tercero recopila, a través de Dialectical Engine, información sobre sus actividades en línea a lo largo del tiempo y en distintos sitios web.
 

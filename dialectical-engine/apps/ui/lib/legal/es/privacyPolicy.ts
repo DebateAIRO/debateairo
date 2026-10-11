@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine utiliza 18 elementos, todos estrictamente necesarios para el servicio que ha solicitado y todos establecidos únicamente por Dialectical Engine: 13 cookies y 5 entradas en el almacenamiento de su navegador. No instalamos cookies analíticas, publicitarias ni de seguimiento. La Política de cookies, disponible en dezbatere.ro/cookies, los enumera indicando qué hace cada uno y quién lo recibe, y se modificará antes de añadir cualquier otra cosa." },
+      { kind: "p", text: "Dialectical Engine utiliza 20 elementos, todos estrictamente necesarios para el servicio que ha solicitado y todos establecidos únicamente por Dialectical Engine: 13 cookies y 7 entradas en el almacenamiento de su navegador. No instalamos cookies analíticas, publicitarias ni de seguimiento. La Política de cookies, disponible en dezbatere.ro/cookies, los enumera indicando qué hace cada uno y quién lo recibe, y se modificará antes de añadir cualquier otra cosa." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Almacenamiento local — Si utiliza el modo de visualización claro u oscuro. — Hasta que lo borre",
         "debateai.languageOffer.dismissed — Almacenamiento de sesión — Recuerda, para esta pestaña, que rechazó la oferta de mostrar un debate en otro idioma. — Hasta que cierre la pestaña",
         "debateai.support.conversation.v2 — Almacenamiento de sesión — Mantiene en pantalla su conversación con el chat de ayuda mientras la pestaña siga abierta. Se borra cuando alguien inicia o cierra sesión en esta pestaña. — Hasta que cierre la pestaña",
-        "debateai.phone-completion-draft.v1 — Almacenamiento de sesión — Pregunta sin terminar durante el paso del teléfono; borrada al cambiar sesión, cerrar sesión o cambiar titular — 15 minutos o hasta que se borre"
+        "debateai.phone-completion-draft.v1 — Almacenamiento de sesión — Pregunta sin terminar durante el paso del teléfono; borrada al cambiar sesión, cerrar sesión o cambiar titular — 15 minutos o hasta que se borre",
+        "debateai.exportPending — Almacenamiento de sesión — Conserva en esta pestaña el enlace de exportación enviado por correo para iniciar sesión y volver a intentarlo. — Hasta cerrar la pestaña, cerrar sesión, abrir un enlace nuevo, completar la primera descarga o recibir un resultado de enlace no válido o cuenta incorrecta",
+        "debateai.exportLinkOutcome — Almacenamiento de sesión — Recuerda qué mensaje sobre el enlace de descarga debe mostrarse en esta pestaña. — Hasta cerrar la pestaña, cerrar sesión o abrir un enlace nuevo"
         ]
       },
       { kind: "p", text: "Ningún tercero recopila, a través de Dialectical Engine, información sobre sus actividades en línea a lo largo del tiempo y en distintos sitios web." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "116e8300acd131be2883ff09dd1cf86750f73fb84815b02fa7410e7497e9cfe7",
+  sha256: "9d3868fa6bfacf0325fca734c0c53b9f1e78eea08bca7a39c4c32b16312e5551",
   eyebrow: "POLÍTICA DE PRIVACIDAD · v3.3 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026",
   title: "Qué almacenamos y por qué",
   lede: "Sus derechos y nuestras obligaciones conforme al RGPD – GDPR (EU) 2016/679, en lenguaje claro. Catorce secciones y el anexo B — desplácese hasta el final.",

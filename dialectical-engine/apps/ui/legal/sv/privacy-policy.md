@@ -174,7 +174,7 @@ Dialectical Engine är avsett för vuxna. När du registrerar dig bekräftar du 
 ## 13. Cookies
 
 
-Dialectical Engine använder 18 objekt, som alla är strikt nödvändiga för den tjänst du har bett om och som alla placeras endast av Dialectical Engine: 13 cookies och 5 poster i din webbläsares lagring. Vi placerar inga cookies för analys, reklam eller spårning. **Cookiepolicyn** på dezbatere.ro/cookies listar dem med vad vart och ett gör och vem som tar emot det, och kommer att ändras innan något annat läggs till.
+Dialectical Engine använder 20 objekt, som alla är strikt nödvändiga för den tjänst du har bett om och som alla placeras endast av Dialectical Engine: 13 cookies och 7 poster i din webbläsares lagring. Vi placerar inga cookies för analys, reklam eller spårning. **Cookiepolicyn** på dezbatere.ro/cookies listar dem med vad vart och ett gör och vem som tar emot det, och kommer att ändras innan något annat läggs till.
 
 | Namn | Typ | Ändamål | Lagringstid |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine använder 18 objekt, som alla är strikt nödvändiga för de
 | `debateai.languageOffer.dismissed` | Sessionslagring | Kommer ihåg, för den här fliken, att du tackade nej till att visa en debatt på ett annat språk. | Tills du stänger fliken |
 | `debateai.support.conversation.v2` | Sessionslagring | Håller ditt samtal med hjälpchatten på skärmen så länge fliken är öppen. Det raderas när någon loggar in eller ut i den här fliken. | Tills du stänger fliken |
 | `debateai.phone-completion-draft.v1` | Sessionslagring | Ofärdig fråga under telefonsteget; raderas vid sessionsbyte, utloggning eller ägarbyte | 15 minuter eller tills tidigare radering |
+| `debateai.exportPending` | Sessionslagring | Sparar exportlänken från e-postmeddelandet i den här fliken för inloggning och nya försök. | Tills fliken stängs, du loggar ut, en ny länk öppnas, den första nedladdningen lyckas eller länken bedöms ogiltig eller tillhör fel konto |
+| `debateai.exportLinkOutcome` | Sessionslagring | Minns vilket meddelande om nedladdningslänken som ska visas i den här fliken. | Tills fliken stängs, du loggar ut eller en ny länk öppnas |
 
 Ingen annan part samlar via Dialectical Engine in information om dina aktiviteter på nätet över tid och på olika webbplatser.
 

@@ -174,7 +174,7 @@ Dialectical Engine is bestemd voor volwassenen. Bij uw registratie bevestigt u d
 ## 13. Cookies
 
 
-Dialectical Engine gebruikt 18 items, die alle strikt noodzakelijk zijn voor de dienst waarom u hebt gevraagd en die alle uitsluitend door Dialectical Engine worden geplaatst: 13 cookies en 5 vermeldingen in de opslag van uw browser. Wij plaatsen geen analyse-, reclame- of trackingcookies. Het **Cookiebeleid** op dezbatere.ro/cookies vermeldt ze, met wat elk item doet en wie het ontvangt, en wordt gewijzigd voordat er iets anders wordt toegevoegd.
+Dialectical Engine gebruikt 20 items, die alle strikt noodzakelijk zijn voor de dienst waarom u hebt gevraagd en die alle uitsluitend door Dialectical Engine worden geplaatst: 13 cookies en 7 vermeldingen in de opslag van uw browser. Wij plaatsen geen analyse-, reclame- of trackingcookies. Het **Cookiebeleid** op dezbatere.ro/cookies vermeldt ze, met wat elk item doet en wie het ontvangt, en wordt gewijzigd voordat er iets anders wordt toegevoegd.
 
 | Naam | Soort | Doel | Looptijd |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine gebruikt 18 items, die alle strikt noodzakelijk zijn voor de 
 | `debateai.languageOffer.dismissed` | Sessieopslag | Onthoudt voor dit tabblad dat u het aanbod hebt afgeslagen om een debat in een andere taal te tonen. | Totdat u het tabblad sluit |
 | `debateai.support.conversation.v2` | Sessieopslag | Houdt uw gesprek met de hulpchat op het scherm zolang het tabblad open blijft. Het wordt gewist wanneer iemand zich in dit tabblad aanmeldt of afmeldt. | Totdat u het tabblad sluit |
 | `debateai.phone-completion-draft.v1` | Sessieopslag | Onvoltooide vraag tijdens de telefoonstap; gewist bij sessiewisseling, afmelden of eigenaarswissel | 15 minuten of tot eerder wissen |
+| `debateai.exportPending` | Sessieopslag | Bewaart de per e-mail ontvangen exportlink in dit tabblad om in te loggen en opnieuw te proberen. | Tot het tabblad sluit, u zich afmeldt, een nieuwe link opent, de eerste download slaagt of een ongeldige link of verkeerd account wordt vastgesteld |
+| `debateai.exportLinkOutcome` | Sessieopslag | Onthoudt welk bericht over de downloadlink in dit tabblad moet worden getoond. | Tot het tabblad sluit, u zich afmeldt of een nieuwe link opent |
 
 Geen enkele andere partij verzamelt via Dialectical Engine informatie over uw onlineactiviteiten in de loop van de tijd en over verschillende websites heen.
 

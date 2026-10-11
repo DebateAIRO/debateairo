@@ -174,7 +174,7 @@ Dialectical Engine skirta suaugusiesiems. Registruodamiesi patvirtinate, kad jum
 ## 13. Slapukai
 
 
-Dialectical Engine naudoja 18 elementų – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik Dialectical Engine: 13 slapukų ir 5 įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. **Slapukų politikoje** adresu dezbatere.ro/cookies jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita.
+Dialectical Engine naudoja 20 elementų – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik Dialectical Engine: 13 slapukų ir 7 įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. **Slapukų politikoje** adresu dezbatere.ro/cookies jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita.
 
 | Pavadinimas | Tipas | Paskirtis | Trukmė |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine naudoja 18 elementų – visi jie yra griežtai būtini jūs�
 | `debateai.languageOffer.dismissed` | Seanso saugykla | Įsimena šiam skirtukui, kad atsisakėte pasiūlymo parodyti debatus kita kalba. | Kol uždarysite skirtuką |
 | `debateai.support.conversation.v2` | Seanso saugykla | Laiko jūsų pokalbį su pagalbos pokalbių langu ekrane, kol skirtukas atidarytas. Jis ištrinamas, kai šiame skirtuke kas nors prisijungia arba atsijungia. | Kol uždarysite skirtuką |
 | `debateai.phone-completion-draft.v1` | Seanso saugykla | Nebaigtas klausimas telefono veiksmo metu; pašalinamas pasikeitus sesijai, atsijungus ar pasikeitus savininkui | 15 minučių arba iki ankstesnio pašalinimo |
+| `debateai.exportPending` | Seanso saugykla | Šiame skirtuke saugo el. paštu atsiųstą eksporto nuorodą prisijungimui ir pakartotiniam bandymui. | Iki skirtuko uždarymo, atsijungimo, naujos nuorodos, pirmo sėkmingo atsisiuntimo arba netinkamos nuorodos ar kitos paskyros rezultato |
+| `debateai.exportLinkOutcome` | Seanso saugykla | Prisimena, kurį atsisiuntimo nuorodos pranešimą rodyti šiame skirtuke. | Iki skirtuko uždarymo, atsijungimo arba naujos nuorodos |
 
 Jokia kita šalis per Dialectical Engine nerenka informacijos apie jūsų veiklą internete laikui bėgant ir įvairiose svetainėse.
 

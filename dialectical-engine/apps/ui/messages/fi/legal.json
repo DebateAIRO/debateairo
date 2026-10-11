@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Enintään 30 minuuttia",
   "legal.cookies.mfaRecovery.life": "Enintään 299 sekuntia",
   "legal.cookies.social.life": "Enintään 5 minuuttia",
-  "legal.cookies.phoneDraft.life": "15 minuuttia tai aiempaan poistamiseen asti"
+  "legal.cookies.phoneDraft.life": "15 minuuttia tai aiempaan poistamiseen asti",
+  "legal.cookies.exportPending.purpose": "Säilyttää sähköpostitse lähetetyn vientilinkin tässä välilehdessä kirjautumista ja uutta yritystä varten.",
+  "legal.cookies.exportLinkOutcome.purpose": "Muistaa, mikä latauslinkkiä koskeva viesti tässä välilehdessä näytetään.",
+  "legal.cookies.exportPending.life": "Kunnes välilehti suljetaan, kirjaudut ulos, avaat uuden linkin, ensimmäinen lataus onnistuu tai linkki todetaan virheelliseksi tai väärän tilin linkiksi",
+  "legal.cookies.exportLinkOutcome.life": "Kunnes välilehti suljetaan, kirjaudut ulos tai avaat uuden linkin"
 }

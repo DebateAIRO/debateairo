@@ -174,7 +174,7 @@ Dialectical Engine is for adults. You confirm that you are 18 or over when you r
 ## 13. Cookies
 
 
-Dialectical Engine uses 18 items, all strictly necessary for the service you asked for and all set only by Dialectical Engine: 13 cookies and 5 entries in your browser's storage. We set no analytics, advertising or tracking cookies. The **Cookie Policy** at dezbatere.ro/cookies lists them with what each one does and who receives it, and will change before anything else is added.
+Dialectical Engine uses 20 items, all strictly necessary for the service you asked for and all set only by Dialectical Engine: 13 cookies and 7 entries in your browser's storage. We set no analytics, advertising or tracking cookies. The **Cookie Policy** at dezbatere.ro/cookies lists them with what each one does and who receives it, and will change before anything else is added.
 
 | Name | Type | Purpose | Lasts |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine uses 18 items, all strictly necessary for the service you ask
 | `debateai.languageOffer.dismissed` | Session storage | Remembers, for this tab, that you declined the offer to show a debate in another language. | Until you close the tab |
 | `debateai.support.conversation.v2` | Session storage | Keeps your help-chat conversation on screen while the tab stays open. It is erased when someone signs in or signs out in this tab. | Until you close the tab |
 | `debateai.phone-completion-draft.v1` | Session storage | Unfinished question during phone completion; cleared on session, sign-out or owner changes | 15 minutes or until earlier clearing |
+| `debateai.exportPending` | Session storage | Keeps the emailed export link in this tab for sign-in and retry. | Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result |
+| `debateai.exportLinkOutcome` | Session storage | Remembers which download-link message to show in this tab. | Until tab close, sign-out, or a new link |
 
 No other party collects information about your online activities over time and across websites through Dialectical Engine.
 

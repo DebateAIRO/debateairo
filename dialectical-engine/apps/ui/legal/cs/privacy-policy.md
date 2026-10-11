@@ -174,7 +174,7 @@ Dialectical Engine je určena dospělým. Při registraci potvrzujete, že je v�
 ## 13. Soubory cookie
 
 
-Dialectical Engine používá 18 položek, všechny nezbytně nutné pro službu, o kterou jste požádali, a všechny nastavované pouze službou Dialectical Engine: 13 souborů cookie a 5 záznamů v úložišti vašeho prohlížeče. Nenastavujeme žádné analytické, reklamní ani sledovací soubory cookie. **Zásady používání souborů cookie** na adrese dezbatere.ro/cookies je uvádějí spolu s tím, k čemu každá z nich slouží a kdo ji obdrží, a budou změněny dříve, než bude přidáno cokoli dalšího.
+Dialectical Engine používá 20 položek, všechny nezbytně nutné pro službu, o kterou jste požádali, a všechny nastavované pouze službou Dialectical Engine: 13 souborů cookie a 7 záznamů v úložišti vašeho prohlížeče. Nenastavujeme žádné analytické, reklamní ani sledovací soubory cookie. **Zásady používání souborů cookie** na adrese dezbatere.ro/cookies je uvádějí spolu s tím, k čemu každá z nich slouží a kdo ji obdrží, a budou změněny dříve, než bude přidáno cokoli dalšího.
 
 | Název | Typ | Účel | Platnost |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine používá 18 položek, všechny nezbytně nutné pro službu
 | `debateai.languageOffer.dismissed` | Úložiště relace | Pamatuje si pro tuto kartu, že jste odmítli nabídku zobrazit debatu v jiném jazyce. | Do zavření karty |
 | `debateai.support.conversation.v2` | Úložiště relace | Drží vaši konverzaci s nápovědou na obrazovce, dokud je karta otevřená. Smaže se, když se na této kartě kdokoli přihlásí nebo odhlásí. | Do zavření karty |
 | `debateai.phone-completion-draft.v1` | Úložiště relace | Nedokončená otázka během telefonního kroku; odstraněna při změně relace, odhlášení nebo změně vlastníka | 15 minut nebo do dřívějšího vymazání |
+| `debateai.exportPending` | Úložiště relace | Uchovává odkaz pro export zaslaný e-mailem na této kartě pro přihlášení a opakovaný pokus. | Do zavření karty, odhlášení, otevření nového odkazu, prvního úspěšného stažení nebo výsledku neplatného odkazu či jiného účtu |
+| `debateai.exportLinkOutcome` | Úložiště relace | Pamatuje si, která zpráva o odkazu ke stažení se má na této kartě zobrazit. | Do zavření karty, odhlášení nebo otevření nového odkazu |
 
 Žádná jiná strana prostřednictvím Dialectical Engine neshromažďuje informace o vašich online aktivitách v průběhu času a napříč webovými stránkami.
 

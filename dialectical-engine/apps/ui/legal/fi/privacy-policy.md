@@ -174,7 +174,7 @@ Dialectical Engine on tarkoitettu aikuisille. Vahvistat rekisteröityessäsi ole
 ## 13. Evästeet
 
 
-Dialectical Engine käyttää 18 kohdetta, jotka kaikki ovat ehdottoman välttämättömiä pyytämällesi palvelulle ja jotka kaikki asettaa vain Dialectical Engine: 13 evästettä ja 5 merkintää selaimesi tallennustilassa. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa dezbatere.ro/cookies oleva **Evästekäytäntö** luettelee ne ja kertoo, mitä kukin tekee ja kuka sen vastaanottaa, ja sitä muutetaan ennen kuin mitään muuta lisätään.
+Dialectical Engine käyttää 20 kohdetta, jotka kaikki ovat ehdottoman välttämättömiä pyytämällesi palvelulle ja jotka kaikki asettaa vain Dialectical Engine: 13 evästettä ja 7 merkintää selaimesi tallennustilassa. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa dezbatere.ro/cookies oleva **Evästekäytäntö** luettelee ne ja kertoo, mitä kukin tekee ja kuka sen vastaanottaa, ja sitä muutetaan ennen kuin mitään muuta lisätään.
 
 | Nimi | Tyyppi | Käyttötarkoitus | Voimassaolo |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine käyttää 18 kohdetta, jotka kaikki ovat ehdottoman välttä
 | `debateai.languageOffer.dismissed` | Istunnon tallennustila | Muistaa tämän välilehden osalta, että kieltäydyit tarjouksesta näyttää väittely toisella kielellä. | Kunnes suljet välilehden |
 | `debateai.support.conversation.v2` | Istunnon tallennustila | Pitää ohjekeskustelusi näytöllä niin kauan kuin välilehti on auki. Se poistetaan, kun joku kirjautuu sisään tai ulos tässä välilehdessä. | Kunnes suljet välilehden |
 | `debateai.phone-completion-draft.v1` | Istunnon tallennustila | Keskeneräinen kysymys puhelinvaiheen aikana; poistetaan istunnon vaihtuessa, uloskirjautuessa tai omistajan vaihtuessa | 15 minuuttia tai aiempaan poistamiseen asti |
+| `debateai.exportPending` | Istunnon tallennustila | Säilyttää sähköpostitse lähetetyn vientilinkin tässä välilehdessä kirjautumista ja uutta yritystä varten. | Kunnes välilehti suljetaan, kirjaudut ulos, avaat uuden linkin, ensimmäinen lataus onnistuu tai linkki todetaan virheelliseksi tai väärän tilin linkiksi |
+| `debateai.exportLinkOutcome` | Istunnon tallennustila | Muistaa, mikä latauslinkkiä koskeva viesti tässä välilehdessä näytetään. | Kunnes välilehti suljetaan, kirjaudut ulos tai avaat uuden linkin |
 
 Mikään muu osapuoli ei kerää Dialectical Engine:n kautta tietoja verkkotoiminnastasi ajan mittaan eikä eri verkkosivustoilla.
 

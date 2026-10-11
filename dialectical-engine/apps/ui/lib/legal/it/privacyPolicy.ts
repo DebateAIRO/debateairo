@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine utilizza 18 elementi, tutti strettamente necessari per il servizio che hai richiesto e tutti impostati esclusivamente da Dialectical Engine: 13 cookie e 5 voci nella memoria del tuo browser. Non impostiamo cookie analitici, pubblicitari o di tracciamento. L'Informativa sui cookie disponibile su dezbatere.ro/cookies li elenca indicando a cosa serve ciascuno e chi lo riceve, e sarà modificata prima di qualsiasi altra aggiunta." },
+      { kind: "p", text: "Dialectical Engine utilizza 20 elementi, tutti strettamente necessari per il servizio che hai richiesto e tutti impostati esclusivamente da Dialectical Engine: 13 cookie e 7 voci nella memoria del tuo browser. Non impostiamo cookie analitici, pubblicitari o di tracciamento. L'Informativa sui cookie disponibile su dezbatere.ro/cookies li elenca indicando a cosa serve ciascuno e chi lo riceve, e sarà modificata prima di qualsiasi altra aggiunta." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Archiviazione locale — Se usi la visualizzazione chiara o quella scura. — Finché non lo cancelli",
         "debateai.languageOffer.dismissed — Archiviazione di sessione — Ricorda, per questa scheda, che hai rifiutato la proposta di mostrare un dibattito in un’altra lingua. — Finché non chiudi la scheda",
         "debateai.support.conversation.v2 — Archiviazione di sessione — Mantiene sullo schermo la tua conversazione con la chat di assistenza finché la scheda resta aperta. Viene cancellata quando qualcuno accede o esce in questa scheda. — Finché non chiudi la scheda",
-        "debateai.phone-completion-draft.v1 — Archiviazione di sessione — Domanda incompleta durante il passaggio telefonico; eliminata al cambio di sessione, alla disconnessione o al cambio di titolare — 15 minuti o fino all’eliminazione"
+        "debateai.phone-completion-draft.v1 — Archiviazione di sessione — Domanda incompleta durante il passaggio telefonico; eliminata al cambio di sessione, alla disconnessione o al cambio di titolare — 15 minuti o fino all’eliminazione",
+        "debateai.exportPending — Archiviazione di sessione — Conserva in questa scheda il link di esportazione ricevuto via email per accedere e riprovare. — Fino alla chiusura della scheda, alla disconnessione, a un nuovo link, al primo download riuscito o a un esito di link non valido o account errato",
+        "debateai.exportLinkOutcome — Archiviazione di sessione — Ricorda quale messaggio sul link di download mostrare in questa scheda. — Fino alla chiusura della scheda, alla disconnessione o a un nuovo link"
         ]
       },
       { kind: "p", text: "Nessun'altra parte raccoglie, tramite Dialectical Engine, informazioni sulle tue attività online nel tempo e su siti web diversi." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "0141d3ca328a57d28f5e2edfb2f49b2a5db2e8bbe2dbd288fe3521a69bc3f1c9",
+  sha256: "a6e29dff09a5da5c0d2b9a29271cd70215fcb918b14836f6ca59d6d563da990c",
   eyebrow: "INFORMATIVA SULLA PRIVACY · v3.3 · IN VIGORE DAL 12 OTTOBRE 2026",
   title: "Cosa conserviamo e perché",
   lede: "I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.",

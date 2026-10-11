@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Evästeet",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine käyttää 18 kohdetta, jotka kaikki ovat ehdottoman välttämättömiä pyytämällesi palvelulle ja jotka kaikki asettaa vain Dialectical Engine: 13 evästettä ja 5 merkintää selaimesi tallennustilassa. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa dezbatere.ro/cookies oleva Evästekäytäntö luettelee ne ja kertoo, mitä kukin tekee ja kuka sen vastaanottaa, ja sitä muutetaan ennen kuin mitään muuta lisätään." },
+      { kind: "p", text: "Dialectical Engine käyttää 20 kohdetta, jotka kaikki ovat ehdottoman välttämättömiä pyytämällesi palvelulle ja jotka kaikki asettaa vain Dialectical Engine: 13 evästettä ja 7 merkintää selaimesi tallennustilassa. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa dezbatere.ro/cookies oleva Evästekäytäntö luettelee ne ja kertoo, mitä kukin tekee ja kuka sen vastaanottaa, ja sitä muutetaan ennen kuin mitään muuta lisätään." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Paikallinen tallennustila — Käytätkö vaaleaa vai tummaa tilaa. — Kunnes tyhjennät sen",
         "debateai.languageOffer.dismissed — Istunnon tallennustila — Muistaa tämän välilehden osalta, että kieltäydyit tarjouksesta näyttää väittely toisella kielellä. — Kunnes suljet välilehden",
         "debateai.support.conversation.v2 — Istunnon tallennustila — Pitää ohjekeskustelusi näytöllä niin kauan kuin välilehti on auki. Se poistetaan, kun joku kirjautuu sisään tai ulos tässä välilehdessä. — Kunnes suljet välilehden",
-        "debateai.phone-completion-draft.v1 — Istunnon tallennustila — Keskeneräinen kysymys puhelinvaiheen aikana; poistetaan istunnon vaihtuessa, uloskirjautuessa tai omistajan vaihtuessa — 15 minuuttia tai aiempaan poistamiseen asti"
+        "debateai.phone-completion-draft.v1 — Istunnon tallennustila — Keskeneräinen kysymys puhelinvaiheen aikana; poistetaan istunnon vaihtuessa, uloskirjautuessa tai omistajan vaihtuessa — 15 minuuttia tai aiempaan poistamiseen asti",
+        "debateai.exportPending — Istunnon tallennustila — Säilyttää sähköpostitse lähetetyn vientilinkin tässä välilehdessä kirjautumista ja uutta yritystä varten. — Kunnes välilehti suljetaan, kirjaudut ulos, avaat uuden linkin, ensimmäinen lataus onnistuu tai linkki todetaan virheelliseksi tai väärän tilin linkiksi",
+        "debateai.exportLinkOutcome — Istunnon tallennustila — Muistaa, mikä latauslinkkiä koskeva viesti tässä välilehdessä näytetään. — Kunnes välilehti suljetaan, kirjaudut ulos tai avaat uuden linkin"
         ]
       },
       { kind: "p", text: "Mikään muu osapuoli ei kerää Dialectical Engine:n kautta tietoja verkkotoiminnastasi ajan mittaan eikä eri verkkosivustoilla." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "1167bae25091850188310300190558e94468815482a2a5062104a9af79069406",
+  sha256: "95fc652363f7e8fac3264a54e998e6deb4d871040bf1c9f4ba3a39e263395279",
   eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.3 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",

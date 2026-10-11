@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kolačići",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine koristi 18 stavki, sve strogo nužne za uslugu koju ste zatražili i sve ih postavlja isključivo Dialectical Engine: 13 kolačića i 5 zapisa u pohrani vašeg preglednika. Ne postavljamo analitičke, oglasne ni prateće kolačiće. Pravila o kolačićima na dezbatere.ro/cookies navode ih uz opis onoga što svaka stavka radi i tko je prima te će se promijeniti prije nego što se doda bilo što drugo." },
+      { kind: "p", text: "Dialectical Engine koristi 20 stavki, sve strogo nužne za uslugu koju ste zatražili i sve ih postavlja isključivo Dialectical Engine: 13 kolačića i 7 zapisa u pohrani vašeg preglednika. Ne postavljamo analitičke, oglasne ni prateće kolačiće. Pravila o kolačićima na dezbatere.ro/cookies navode ih uz opis onoga što svaka stavka radi i tko je prima te će se promijeniti prije nego što se doda bilo što drugo." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokalna pohrana — Upotrebljavate li svijetli ili tamni način prikaza. — Dok ga ne izbrišete",
         "debateai.languageOffer.dismissed — Pohrana sesije — Pamti, za ovu karticu, da ste odbili ponudu da se rasprava prikaže na drugom jeziku. — Dok ne zatvorite karticu",
         "debateai.support.conversation.v2 — Pohrana sesije — Drži vaš razgovor s pomoći na zaslonu dok je kartica otvorena. Briše se kada se bilo tko prijavi ili odjavi u ovoj kartici. — Dok ne zatvorite karticu",
-        "debateai.phone-completion-draft.v1 — Pohrana sesije — Nedovršeno pitanje tijekom koraka s telefonom; briše se pri promjeni sesije, odjavi ili promjeni vlasnika — 15 minuta ili do ranijeg brisanja"
+        "debateai.phone-completion-draft.v1 — Pohrana sesije — Nedovršeno pitanje tijekom koraka s telefonom; briše se pri promjeni sesije, odjavi ili promjeni vlasnika — 15 minuta ili do ranijeg brisanja",
+        "debateai.exportPending — Pohrana sesije — Čuva poveznicu za izvoz poslanu e-poštom u ovoj kartici za prijavu i ponovni pokušaj. — Do zatvaranja kartice, odjave, nove poveznice, prvog uspješnog preuzimanja ili ishoda nevaljane poveznice ili pogrešnog računa",
+        "debateai.exportLinkOutcome — Pohrana sesije — Pamti koju poruku o poveznici za preuzimanje treba prikazati u ovoj kartici. — Do zatvaranja kartice, odjave ili nove poveznice"
         ]
       },
       { kind: "p", text: "Nijedna druga strana putem Dialectical Engine-ja ne prikuplja informacije o vašim internetskim aktivnostima tijekom vremena i na različitim web-mjestima." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "3e731a649745f80adc7ae504dff5fd0c4d1340cd5451da6503cd367db569ed5c",
+  sha256: "61a79b823b3c5df23d5ab3c0d336b55ed16e047eed31651ac3d1ec6f821dee2f",
   eyebrow: "PRAVILA O PRIVATNOSTI · v3.3 · NA SNAZI OD 12. LISTOPADA 2026.",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",

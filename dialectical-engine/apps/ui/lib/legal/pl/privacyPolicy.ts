@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Pliki cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine używa 18 elementów, z których wszystkie są bezwzględnie konieczne do świadczenia usługi, o którą prosisz, i wszystkie są ustawiane wyłącznie przez Dialectical Engine: 13 plików cookie i 5 wpisów w pamięci Twojej przeglądarki. Nie ustawiamy plików cookie do celów analitycznych, reklamowych ani śledzenia. Polityka plików cookie pod adresem dezbatere.ro/cookies wymienia je wraz z opisem tego, do czego służy każdy z nich i kto go otrzymuje, i zostanie zmieniona, zanim zostanie dodane cokolwiek innego." },
+      { kind: "p", text: "Dialectical Engine używa 20 elementów, z których wszystkie są bezwzględnie konieczne do świadczenia usługi, o którą prosisz, i wszystkie są ustawiane wyłącznie przez Dialectical Engine: 13 plików cookie i 7 wpisów w pamięci Twojej przeglądarki. Nie ustawiamy plików cookie do celów analitycznych, reklamowych ani śledzenia. Polityka plików cookie pod adresem dezbatere.ro/cookies wymienia je wraz z opisem tego, do czego służy każdy z nich i kto go otrzymuje, i zostanie zmieniona, zanim zostanie dodane cokolwiek innego." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Pamięć lokalna — Czy korzystasz z trybu jasnego, czy ciemnego. — Do wyczyszczenia",
         "debateai.languageOffer.dismissed — Pamięć sesji — Zapamiętuje dla tej karty, że odrzucono propozycję pokazania debaty w innym języku. — Do zamknięcia karty",
         "debateai.support.conversation.v2 — Pamięć sesji — Utrzymuje Twoją rozmowę z czatem pomocy na ekranie, dopóki karta jest otwarta. Zostaje usunięta, gdy ktokolwiek zaloguje się lub wyloguje w tej karcie. — Do zamknięcia karty",
-        "debateai.phone-completion-draft.v1 — Pamięć sesji — Niedokończone pytanie podczas kroku z telefonem; usuwane przy zmianie sesji, wylogowaniu lub zmianie właściciela — 15 minut lub do wcześniejszego usunięcia"
+        "debateai.phone-completion-draft.v1 — Pamięć sesji — Niedokończone pytanie podczas kroku z telefonem; usuwane przy zmianie sesji, wylogowaniu lub zmianie właściciela — 15 minut lub do wcześniejszego usunięcia",
+        "debateai.exportPending — Pamięć sesji — Przechowuje w tej karcie link do eksportu otrzymany e-mailem na czas logowania i ponownej próby. — Do zamknięcia karty, wylogowania, otwarcia nowego linku, pierwszego udanego pobrania lub wyniku wskazującego nieprawidłowy link albo inne konto",
+        "debateai.exportLinkOutcome — Pamięć sesji — Zapamiętuje, który komunikat o linku do pobrania wyświetlić w tej karcie. — Do zamknięcia karty, wylogowania lub otwarcia nowego linku"
         ]
       },
       { kind: "p", text: "Żaden inny podmiot nie zbiera za pośrednictwem Dialectical Engine informacji o Twojej aktywności w internecie na przestrzeni czasu i w różnych witrynach." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "933fce537ec82cc5fcdc245aaabef31a1c5fceae70b8d51b316339a67713ee16",
+  sha256: "83dce46d32ed41a583f996fcf77dbb26e9da3f8537d47ef4e34bb1eba0a63449",
   eyebrow: "POLITYKA PRYWATNOŚCI · v3.3 · OBOWIĄZUJE OD 12 PAŹDZIERNIKA 2026",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",

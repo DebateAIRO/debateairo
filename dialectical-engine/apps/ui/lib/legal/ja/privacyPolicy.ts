@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "クッキー",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engineは18個の項目を使用します。いずれもお客様が求めたサービスに厳密に必要なもので、すべてDialectical Engineのみが設定します。内訳は、13個のクッキーと、お客様のブラウザのストレージ内の5個のエントリです。分析、広告または追跡用のクッキーは設定しません。dezbatere.ro/cookies のクッキーポリシーには、それぞれの働きと受け取る者とともにこれらの項目が記載されており、他のものを追加する前に変更されます。" },
+      { kind: "p", text: "Dialectical Engineは20個の項目を使用します。いずれもお客様が求めたサービスに厳密に必要なもので、すべてDialectical Engineのみが設定します。内訳は、13個のクッキーと、お客様のブラウザのストレージ内の7個のエントリです。分析、広告または追跡用のクッキーは設定しません。dezbatere.ro/cookies のクッキーポリシーには、それぞれの働きと受け取る者とともにこれらの項目が記載されており、他のものを追加する前に変更されます。" },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — ローカルストレージ — ライトモードとダークモードのどちらを使用しているかを記憶します。 — お客様が消去するまで",
         "debateai.languageOffer.dismissed — セッションストレージ — このタブでは、議論を別の言語で表示するという提案をお断りになったことを記憶します。 — タブを閉じるまで",
         "debateai.support.conversation.v2 — セッションストレージ — タブを開いている間、ヘルプチャットでの会話を画面に表示したままにします。このタブで誰かがログインまたはログアウトすると消去されます。 — タブを閉じるまで",
-        "debateai.phone-completion-draft.v1 — セッションストレージ — 電話の手続き中の未完了の質問。セッション変更、サインアウト、所有者変更時に削除 — 15分またはそれ以前の削除まで"
+        "debateai.phone-completion-draft.v1 — セッションストレージ — 電話の手続き中の未完了の質問。セッション変更、サインアウト、所有者変更時に削除 — 15分またはそれ以前の削除まで",
+        "debateai.exportPending — セッションストレージ — メールで届いたエクスポートリンクを、ログインや再試行のためにこのタブに保持します。 — タブを閉じる、ログアウトする、新しいリンクを開く、最初のダウンロードが成功する、または無効なリンクか別のアカウントという結果になるまで",
+        "debateai.exportLinkOutcome — セッションストレージ — このタブに表示するダウンロードリンクのメッセージを記憶します。 — タブを閉じる、ログアウトする、または新しいリンクを開くまで"
         ]
       },
       { kind: "p", text: "Dialectical Engineを通じて、他のいかなる者も、お客様のオンライン活動に関する情報を、時間の経過にわたって、また複数のウェブサイトにまたがって収集することはありません。" },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "a6d235df6d1b40eed543c706191f581b70995f6e8d23a91af5d9b6515b1e7b53",
+  sha256: "13729d2643f9516503200d51914acd198681dea2ee2c3f86a5a6fbdb4590a027",
   eyebrow: "プライバシーポリシー · v3.3 · 発効日 2026年10月12日",
   title: "当社が保存する情報とその理由",
   lede: "GDPR (EU) 2016/679に基づくお客様の権利と当社の義務を、わかりやすく説明します。全14節および附属書Bです。末尾までスクロールしてください。",

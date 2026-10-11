@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "最大30分",
   "legal.cookies.mfaRecovery.life": "最大299秒",
   "legal.cookies.social.life": "最大5分",
-  "legal.cookies.phoneDraft.life": "15分またはそれ以前の削除まで"
+  "legal.cookies.phoneDraft.life": "15分またはそれ以前の削除まで",
+  "legal.cookies.exportPending.purpose": "メールで届いたエクスポートリンクを、ログインや再試行のためにこのタブに保持します。",
+  "legal.cookies.exportLinkOutcome.purpose": "このタブに表示するダウンロードリンクのメッセージを記憶します。",
+  "legal.cookies.exportPending.life": "タブを閉じる、ログアウトする、新しいリンクを開く、最初のダウンロードが成功する、または無効なリンクか別のアカウントという結果になるまで",
+  "legal.cookies.exportLinkOutcome.life": "タブを閉じる、ログアウトする、または新しいリンクを開くまで"
 }

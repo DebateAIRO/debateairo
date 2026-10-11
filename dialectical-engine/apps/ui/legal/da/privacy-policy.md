@@ -174,7 +174,7 @@ Dialectical Engine er for voksne. Du bekræfter ved registreringen, at du er fyl
 ## 13. Cookies
 
 
-Dialectical Engine bruger 18 elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af Dialectical Engine: 13 cookies og 5 poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. **Cookiepolitikken** på dezbatere.ro/cookies angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes.
+Dialectical Engine bruger 20 elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af Dialectical Engine: 13 cookies og 7 poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. **Cookiepolitikken** på dezbatere.ro/cookies angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes.
 
 | Navn | Type | Formål | Varighed |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine bruger 18 elementer, som alle er strengt nødvendige for den 
 | `debateai.languageOffer.dismissed` | Sessionslagring | Husker for denne fane, at du har takket nej til at se en debat på et andet sprog. | Indtil du lukker fanen |
 | `debateai.support.conversation.v2` | Sessionslagring | Holder din samtale med hjælpechatten på skærmen, så længe fanen er åben. Den slettes, når nogen logger ind eller ud i denne fane. | Indtil du lukker fanen |
 | `debateai.phone-completion-draft.v1` | Sessionslagring | Ufærdigt spørgsmål under telefontrinnet; slettes ved sessionsskift, logout eller ejerskift | 15 minutter eller indtil tidligere sletning |
+| `debateai.exportPending` | Sessionslagring | Gemmer eksportlinket fra e-mailen i denne fane til login og nye forsøg. | Indtil fanen lukkes, du logger ud, et nyt link åbnes, den første vellykkede download eller et resultat om ugyldigt link eller forkert konto |
+| `debateai.exportLinkOutcome` | Sessionslagring | Husker, hvilken besked om downloadlinket der skal vises i denne fane. | Indtil fanen lukkes, du logger ud, eller et nyt link åbnes |
 
 Ingen anden part indsamler via Dialectical Engine oplysninger om dine onlineaktiviteter over tid og på tværs af websteder.
 

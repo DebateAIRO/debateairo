@@ -174,7 +174,7 @@ Dialectical Engine hija għall-adulti. Tikkonferma li għandek 18-il sena jew ak
 ## 13. Cookies
 
 
-Dialectical Engine juża 18-il element, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn Dialectical Engine: 13-il cookie u 5 entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-**Politika dwar il-Cookies** fuq dezbatere.ro/cookies telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra.
+Dialectical Engine juża 20-il element, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn Dialectical Engine: 13-il cookie u 7 entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-**Politika dwar il-Cookies** fuq dezbatere.ro/cookies telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra.
 
 | Isem | Tip | Skop | Durata |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine juża 18-il element, ilkoll strettament meħtieġa għas-serv
 | `debateai.languageOffer.dismissed` | Ħażna tas-sessjoni | Jiftakar, għal din it-tab, li rrifjutajt l-offerta li jintwera dibattitu b’lingwa oħra. | Sakemm tagħlaq it-tab |
 | `debateai.support.conversation.v2` | Ħażna tas-sessjoni | Iżomm il-konversazzjoni tiegħek mal-chat tal-għajnuna fuq l-iskrin sakemm it-tab tibqa’ miftuħa. Titħassar meta xi ħadd jidħol jew joħroġ mill-kont f’din it-tab. | Sakemm tagħlaq it-tab |
 | `debateai.phone-completion-draft.v1` | Ħażna tas-sessjoni | Mistoqsija mhux lesta waqt il-pass tat-telefon; titħassar meta tinbidel is-sessjoni, toħroġ jew jinbidel is-sid | 15-il minuta jew sakemm jitħassar qabel |
+| `debateai.exportPending` | Ħażna tas-sessjoni | Iżomm il-link tal-esportazzjoni mibgħut bl-email f’din it-tab biex tidħol u terġa’ tipprova. | Sakemm tingħalaq it-tab, toħroġ, jinfetaħ link ġdid, jirnexxi l-ewwel tniżżil jew jirriżulta link invalidu jew kont ħażin |
+| `debateai.exportLinkOutcome` | Ħażna tas-sessjoni | Jiftakar liema messaġġ dwar il-link tat-tniżżil għandu jintwera f’din it-tab. | Sakemm tingħalaq it-tab, toħroġ jew jinfetaħ link ġdid |
 
 L-ebda parti oħra ma tiġbor, permezz ta’ Dialectical Engine, informazzjoni dwar l-attivitajiet tiegħek online matul iż-żmien u fuq diversi siti web.
 

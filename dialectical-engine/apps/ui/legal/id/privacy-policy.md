@@ -174,7 +174,7 @@ Dialectical Engine ditujukan untuk orang dewasa. Anda mengonfirmasi bahwa Anda b
 ## 13. Kuki
 
 
-Dialectical Engine menggunakan 18 item, semuanya mutlak diperlukan untuk layanan yang Anda minta dan semuanya hanya dipasang oleh Dialectical Engine: 13 kuki dan 5 entri di penyimpanan browser Anda. Kami tidak memasang kuki analitik, iklan, atau pelacakan. **Kebijakan Kuki** di dezbatere.ro/cookies mencantumkannya beserta fungsi masing-masing dan pihak yang menerimanya, dan akan berubah sebelum apa pun ditambahkan.
+Dialectical Engine menggunakan 20 item, semuanya mutlak diperlukan untuk layanan yang Anda minta dan semuanya hanya dipasang oleh Dialectical Engine: 13 kuki dan 7 entri di penyimpanan browser Anda. Kami tidak memasang kuki analitik, iklan, atau pelacakan. **Kebijakan Kuki** di dezbatere.ro/cookies mencantumkannya beserta fungsi masing-masing dan pihak yang menerimanya, dan akan berubah sebelum apa pun ditambahkan.
 
 | Nama | Jenis | Tujuan | Masa berlaku |
 |---|---|---|---|
@@ -196,6 +196,8 @@ Dialectical Engine menggunakan 18 item, semuanya mutlak diperlukan untuk layanan
 | `debateai.languageOffer.dismissed` | Penyimpanan sesi | Mengingat, untuk tab ini, bahwa Anda menolak tawaran untuk menampilkan debat dalam bahasa lain. | Sampai Anda menutup tab |
 | `debateai.support.conversation.v2` | Penyimpanan sesi | Menjaga percakapan obrolan bantuan Anda tetap di layar selama tab masih terbuka. Percakapan dihapus saat seseorang masuk atau keluar di tab ini. | Sampai Anda menutup tab |
 | `debateai.phone-completion-draft.v1` | Penyimpanan sesi | Pertanyaan belum selesai pada langkah telepon; dihapus saat sesi berubah, keluar, atau pemilik berubah | 15 menit atau sampai lebih awal dihapus |
+| `debateai.exportPending` | Penyimpanan sesi | Menyimpan tautan ekspor dari email di tab ini untuk masuk dan mencoba lagi. | Hingga tab ditutup, keluar, tautan baru dibuka, unduhan pertama berhasil, atau hasil tautan tidak valid maupun akun yang salah |
+| `debateai.exportLinkOutcome` | Penyimpanan sesi | Mengingat pesan tautan unduhan yang perlu ditampilkan di tab ini. | Hingga tab ditutup, keluar, atau tautan baru dibuka |
 
 Tidak ada pihak lain yang mengumpulkan informasi tentang aktivitas online Anda dari waktu ke waktu dan di berbagai situs web melalui Dialectical Engine.
 

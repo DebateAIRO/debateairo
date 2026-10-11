@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Legfeljebb 30 perc",
   "legal.cookies.mfaRecovery.life": "Legfeljebb 299 másodperc",
   "legal.cookies.social.life": "Legfeljebb 5 perc",
-  "legal.cookies.phoneDraft.life": "15 perc vagy a korábbi törlésig"
+  "legal.cookies.phoneDraft.life": "15 perc vagy a korábbi törlésig",
+  "legal.cookies.exportPending.purpose": "Ebben a lapon megőrzi az e-mailben kapott exporthivatkozást a bejelentkezéshez és az újrapróbálkozáshoz.",
+  "legal.cookies.exportLinkOutcome.purpose": "Megjegyzi, melyik letöltési hivatkozással kapcsolatos üzenetet kell megjeleníteni ezen a lapon.",
+  "legal.cookies.exportPending.life": "A lap bezárásáig, kijelentkezésig, új hivatkozásig, az első sikeres letöltésig vagy érvénytelen hivatkozásra vagy téves fiókra vonatkozó eredményig",
+  "legal.cookies.exportLinkOutcome.life": "A lap bezárásáig, kijelentkezésig vagy új hivatkozásig"
 }

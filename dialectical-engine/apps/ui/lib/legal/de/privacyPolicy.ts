@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine verwendet 18 Elemente, die alle für den von Ihnen angeforderten Dienst unbedingt erforderlich sind und alle ausschließlich von Dialectical Engine gesetzt werden: 13 Cookies und 5 Einträge im Speicher Ihres Browsers. Wir setzen keine Analyse-, Werbe- oder Tracking-Cookies. Die Cookie-Richtlinie unter dezbatere.ro/cookies führt sie auf, mit dem Zweck jedes Elements und seinem Empfänger, und wird geändert, bevor irgendetwas anderes hinzukommt." },
+      { kind: "p", text: "Dialectical Engine verwendet 20 Elemente, die alle für den von Ihnen angeforderten Dienst unbedingt erforderlich sind und alle ausschließlich von Dialectical Engine gesetzt werden: 13 Cookies und 7 Einträge im Speicher Ihres Browsers. Wir setzen keine Analyse-, Werbe- oder Tracking-Cookies. Die Cookie-Richtlinie unter dezbatere.ro/cookies führt sie auf, mit dem Zweck jedes Elements und seinem Empfänger, und wird geändert, bevor irgendetwas anderes hinzukommt." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokaler Speicher — Ob Sie die helle oder die dunkle Darstellung verwenden. — Bis zur Löschung",
         "debateai.languageOffer.dismissed — Sitzungsspeicher — Merkt sich für diesen Tab, dass Sie das Angebot abgelehnt haben, eine Debatte in einer anderen Sprache zu zeigen. — Bis Sie den Tab schließen",
         "debateai.support.conversation.v2 — Sitzungsspeicher — Hält Ihr Gespräch mit dem Hilfe-Chat auf dem Bildschirm, solange der Tab offen ist. Es wird gelöscht, sobald sich in diesem Tab jemand anmeldet oder abmeldet. — Bis Sie den Tab schließen",
-        "debateai.phone-completion-draft.v1 — Sitzungsspeicher — Unfertige Frage während des Telefonschritts; gelöscht bei Sitzungswechsel, Abmeldung oder Besitzerwechsel — 15 Minuten oder bis zur früheren Löschung"
+        "debateai.phone-completion-draft.v1 — Sitzungsspeicher — Unfertige Frage während des Telefonschritts; gelöscht bei Sitzungswechsel, Abmeldung oder Besitzerwechsel — 15 Minuten oder bis zur früheren Löschung",
+        "debateai.exportPending — Sitzungsspeicher — Bewahrt den per E-Mail gesendeten Exportlink in diesem Tab für Anmeldung und erneute Versuche auf. — Bis zum Schließen des Tabs, zur Abmeldung, zu einem neuen Link, zum ersten erfolgreichen Download oder zu einem Ergebnis für einen ungültigen Link oder ein falsches Konto",
+        "debateai.exportLinkOutcome — Sitzungsspeicher — Merkt sich, welche Meldung zum Downloadlink in diesem Tab angezeigt werden soll. — Bis zum Schließen des Tabs, zur Abmeldung oder zu einem neuen Link"
         ]
       },
       { kind: "p", text: "Keine andere Partei erhebt über Dialectical Engine Informationen über Ihre Online-Aktivitäten im Zeitverlauf und über verschiedene Websites hinweg." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "f4121cd8e362e9562e4bed066ebf01fe385329ededffc7f21ec9cbf462bedcb5",
+  sha256: "e276cb02ec7ec5783400eeeccb88121d6130e20f4236c78395cf261fe1d5b6c2",
   eyebrow: "DATENSCHUTZERKLÄRUNG · v3.3 · GÜLTIG AB 12. OKTOBER 2026",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",

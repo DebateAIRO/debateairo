@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Súbory cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine používa 18 položiek, pričom všetky sú nevyhnutne potrebné pre službu, o ktorú ste požiadali, a všetky nastavuje výlučne Dialectical Engine: 13 súborov cookie a 5 záznamov v úložisku vášho prehliadača. Nenastavujeme analytické, reklamné ani sledovacie súbory cookie. Zásady používania súborov cookie na dezbatere.ro/cookies ich uvádzajú spolu s tým, na čo každá položka slúži a kto ju dostáva, a zmenia sa skôr, než sa pridá čokoľvek ďalšie." },
+      { kind: "p", text: "Dialectical Engine používa 20 položiek, pričom všetky sú nevyhnutne potrebné pre službu, o ktorú ste požiadali, a všetky nastavuje výlučne Dialectical Engine: 13 súborov cookie a 7 záznamov v úložisku vášho prehliadača. Nenastavujeme analytické, reklamné ani sledovacie súbory cookie. Zásady používania súborov cookie na dezbatere.ro/cookies ich uvádzajú spolu s tým, na čo každá položka slúži a kto ju dostáva, a zmenia sa skôr, než sa pridá čokoľvek ďalšie." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokálne úložisko — Či používate svetlý, alebo tmavý režim zobrazenia. — Do vymazania",
         "debateai.languageOffer.dismissed — Úložisko relácie — Pamätá si pre túto kartu, že ste odmietli ponuku zobraziť debatu v inom jazyku. — Do zatvorenia karty",
         "debateai.support.conversation.v2 — Úložisko relácie — Drží vašu konverzáciu s chatom pomoci na obrazovke, kým je karta otvorená. Vymaže sa, keď sa na tejto karte ktokoľvek prihlási alebo odhlási. — Do zatvorenia karty",
-        "debateai.phone-completion-draft.v1 — Úložisko relácie — Nedokončená otázka počas telefonického kroku; odstránená pri zmene relácie, odhlásení alebo zmene vlastníka — 15 minút alebo do skoršieho vymazania"
+        "debateai.phone-completion-draft.v1 — Úložisko relácie — Nedokončená otázka počas telefonického kroku; odstránená pri zmene relácie, odhlásení alebo zmene vlastníka — 15 minút alebo do skoršieho vymazania",
+        "debateai.exportPending — Úložisko relácie — Uchováva odkaz na export z e-mailu na tejto karte na prihlásenie a opakovaný pokus. — Do zatvorenia karty, odhlásenia, nového odkazu, prvého úspešného stiahnutia alebo výsledku neplatného odkazu či nesprávneho účtu",
+        "debateai.exportLinkOutcome — Úložisko relácie — Pamätá si, ktoré hlásenie o odkaze na stiahnutie sa má na tejto karte zobraziť. — Do zatvorenia karty, odhlásenia alebo nového odkazu"
         ]
       },
       { kind: "p", text: "Žiadna iná strana prostredníctvom Dialectical Engine nezhromažďuje informácie o vašich online aktivitách v priebehu času a naprieč webovými stránkami." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "a662e2045aaf1a8b2e2b68bbbd0704ca897a6bbcf4832774bec9191e97055019",
+  sha256: "83ba479a5ed61c499b395d6bac3e29f08aaded9b8915b9e3f951a8dc69f74b93",
   eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.3 · ÚČINNÉ OD 12. OKTÓBRA 2026",
   title: "Čo uchovávame a prečo",
   lede: "Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.",

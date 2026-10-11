@@ -219,7 +219,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine gebruikt 18 items, die alle strikt noodzakelijk zijn voor de dienst waarom u hebt gevraagd en die alle uitsluitend door Dialectical Engine worden geplaatst: 13 cookies en 5 vermeldingen in de opslag van uw browser. Wij plaatsen geen analyse-, reclame- of trackingcookies. Het Cookiebeleid op dezbatere.ro/cookies vermeldt ze, met wat elk item doet en wie het ontvangt, en wordt gewijzigd voordat er iets anders wordt toegevoegd." },
+      { kind: "p", text: "Dialectical Engine gebruikt 20 items, die alle strikt noodzakelijk zijn voor de dienst waarom u hebt gevraagd en die alle uitsluitend door Dialectical Engine worden geplaatst: 13 cookies en 7 vermeldingen in de opslag van uw browser. Wij plaatsen geen analyse-, reclame- of trackingcookies. Het Cookiebeleid op dezbatere.ro/cookies vermeldt ze, met wat elk item doet en wie het ontvangt, en wordt gewijzigd voordat er iets anders wordt toegevoegd." },
       {
         kind: "list",
         items: [
@@ -240,7 +240,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokale opslag — Of u de lichte of de donkere weergave gebruikt. — Totdat u dit wist",
         "debateai.languageOffer.dismissed — Sessieopslag — Onthoudt voor dit tabblad dat u het aanbod hebt afgeslagen om een debat in een andere taal te tonen. — Totdat u het tabblad sluit",
         "debateai.support.conversation.v2 — Sessieopslag — Houdt uw gesprek met de hulpchat op het scherm zolang het tabblad open blijft. Het wordt gewist wanneer iemand zich in dit tabblad aanmeldt of afmeldt. — Totdat u het tabblad sluit",
-        "debateai.phone-completion-draft.v1 — Sessieopslag — Onvoltooide vraag tijdens de telefoonstap; gewist bij sessiewisseling, afmelden of eigenaarswissel — 15 minuten of tot eerder wissen"
+        "debateai.phone-completion-draft.v1 — Sessieopslag — Onvoltooide vraag tijdens de telefoonstap; gewist bij sessiewisseling, afmelden of eigenaarswissel — 15 minuten of tot eerder wissen",
+        "debateai.exportPending — Sessieopslag — Bewaart de per e-mail ontvangen exportlink in dit tabblad om in te loggen en opnieuw te proberen. — Tot het tabblad sluit, u zich afmeldt, een nieuwe link opent, de eerste download slaagt of een ongeldige link of verkeerd account wordt vastgesteld",
+        "debateai.exportLinkOutcome — Sessieopslag — Onthoudt welk bericht over de downloadlink in dit tabblad moet worden getoond. — Tot het tabblad sluit, u zich afmeldt of een nieuwe link opent"
         ]
       },
       { kind: "p", text: "Geen enkele andere partij verzamelt via Dialectical Engine informatie over uw onlineactiviteiten in de loop van de tijd en over verschillende websites heen." },
@@ -327,7 +329,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "c977964efd1b151b72036e3112f1f59089136c12833a20149c6d6d69c4802716",
+  sha256: "9efdf04c0b33affa50857a7ee35ad25fdcca14ff848b6d559597875e39be15d1",
   eyebrow: "PRIVACYBELEID · v3.3 · VAN KRACHT OP 12 OKTOBER 2026",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",
