@@ -37,6 +37,9 @@ function harness() {
   return { raw, ownerView, decrypt, source, collect };
 }
 
+// SPEC-v11 row C7 (V-42): raw-a.json's run-1 rotation as the archive carries it (no run_id at any depth).
+const RAW_ROTATION = { rule: "LEAST_SHARE_SEEDED_TIE_V1", writer: { provider_ref: "p:raw:w", model_id: "raw-writer-model", maker: "Maker A" }, checker: { provider_ref: "p:raw:c", model_id: "raw-checker-model", maker: "Maker B" }, storyteller: { provider_ref: "p:raw:s", model_id: "raw-storyteller-model", maker: "Maker C" }, story_checker: { provider_ref: "p:raw:sc", model_id: "raw-story-checker-model", maker: "Maker D" }, eligible_model_ids: ["raw-writer-model", "raw-checker-model", "raw-storyteller-model", "raw-story-checker-model"], created_at: "2026-10-03T00:00:01.000Z" };
+
 describe("data-export snapshot", () => {
   it("S-1 decrypts A1, A2 and B6 user fields with the sealed field identity", async () => {
     const h = harness();
@@ -97,7 +100,7 @@ describe("data-export snapshot", () => {
     const h = harness();
     h.raw.erasure_tombstones = [{ run_id: "run-1", completed_at: "2026-10-04T00:00:00.000Z" }];
     const entry = (await h.collect()).debates.debates[0];
-    expect(entry).toEqual({ reference: "run-1", content_status: "UNRECOVERABLE", created_at: "2026-10-03T00:00:00.000Z", deleted_at: "2026-10-04T00:00:00.000Z", tier: "STANDARD", depth: { depth: 2 }, plan_tier: "BASIC", state: null, visibility_history: [{ state: "PRIVATE", at: "2026-10-03T00:00:00.000Z" }] });
+    expect(entry).toEqual({ reference: "run-1", content_status: "UNRECOVERABLE", created_at: "2026-10-03T00:00:00.000Z", deleted_at: "2026-10-04T00:00:00.000Z", tier: "STANDARD", depth: { depth: 2 }, plan_tier: "BASIC", state: null, visibility_history: [{ state: "PRIVATE", at: "2026-10-03T00:00:00.000Z" }], role_rotation: RAW_ROTATION });
     expect(h.ownerView.readRun).not.toHaveBeenCalled();
   });
 
@@ -199,6 +202,18 @@ describe("data-export snapshot", () => {
     const missingColumn = harness();
     delete missingColumn.raw.billing.quotes[0].expires_at;
     await expect(missingColumn.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_SOURCE_FAILED" });
+  });
+
+  it("S-12 (V-42) carries each run's role rotation with exactly the C7 keys, null for none, and refuses a malformed one", async () => {
+    const h = harness();
+    expect((await h.collect()).debates.debates[0]?.role_rotation).toEqual(RAW_ROTATION);
+    expect(Object.keys((await h.collect()).debates.debates[0]!.role_rotation!)).toEqual(["rule", "writer", "checker", "storyteller", "story_checker", "eligible_model_ids", "created_at"]);
+    h.raw.runs[0].role_rotation = null;
+    expect((await h.collect()).debates.debates[0]?.role_rotation).toBeNull();
+    delete h.raw.runs[0].role_rotation;
+    await expect(h.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_SOURCE_FAILED" });
+    h.raw.runs[0].role_rotation = { ...structuredClone(rawFixture.runs[0].role_rotation), checker: { provider_ref: "p", maker: "m" } };
+    await expect(h.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_SOURCE_FAILED" });
   });
 
   it("S-11 rejects a records-key failure without a destruction record", async () => {

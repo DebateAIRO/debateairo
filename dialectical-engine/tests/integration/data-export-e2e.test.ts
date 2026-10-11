@@ -385,6 +385,11 @@ describe("data export over a real database and encrypted file store", () => {
     } catch (error) { await supportClient.query("ROLLBACK"); throw error; }
     finally { supportClient.release(); }
     const [runId] = await seedRuns(a, 1), deletedAt = new Date();
+    // SPEC-v11 row C7 (V-42): the deleted run carries a rotation pin; R25 keeps it on the UNRECOVERABLE entry.
+    await db.pool.query(`INSERT INTO core.run_role_rotation(run_id,rule,writer_provider_ref,writer_model_id,writer_maker,checker_provider_ref,checker_model_id,
+      checker_maker,storyteller_provider_ref,storyteller_model_id,storyteller_maker,story_checker_provider_ref,story_checker_model_id,story_checker_maker,eligible_model_ids)
+      VALUES($1,'LEAST_SHARE_SEEDED_TIE_V1','p:w','matrix-rotation-writer','Maker A','p:c','matrix-rotation-checker','Maker B','p:s','matrix-rotation-storyteller',
+      'Maker C','p:sc','matrix-rotation-story-checker','Maker D',ARRAY['matrix-rotation-writer','matrix-rotation-checker','matrix-rotation-storyteller','matrix-rotation-story-checker']::text[])`, [runId]);
     const readableRun = (await seedRuns(a, 1))[0]!;
     const readableAnswer = await persistTerminalRun({ pool: db.pool, runId: readableRun, fixtureKey: "matrix",
       factBundle: { facts: ["matrix-answer-fact"], residualObjections: [], badges: [], conditionMarks: ["DEFECT"],
@@ -499,6 +504,7 @@ describe("data export over a real database and encrypted file store", () => {
       ["B7", "security.json", "password_recovery_retry_lock"],
       ["C1", "debates.json", runId],
       ["C2", "debates.json", readableAnswer.answerId], ["C3", "debates.json", "PUBLISHED"],
+      ["C7", "debates.json", "matrix-rotation-story-checker"],
       ["D1", "consents.json", "99.1"], ["D2", "consents.json", "matrix-consent-v1"],
       ["E1", "billing.json", "123456789"], ["E2", "billing.json", "matrix-tax"],
       ["E3", "billing.json", "CONFIRMED_BY_PERSON"],

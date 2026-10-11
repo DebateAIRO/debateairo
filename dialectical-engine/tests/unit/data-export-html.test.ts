@@ -73,6 +73,11 @@ describe("data export readable page", () => {
     expect(html).toContain("08.10.2026");
     expect(html).toContain("09.10.2026");
   });
+  it("H-11 (V-42) does not show the role rotation record", () => {
+    const html = page();
+    expect(html).not.toMatch(/MARK-ROT|Maker [ABCD]|LEAST_SHARE_SEEDED_TIE_V1/);
+  });
+
   it("H-10 keeps the S5 heading, label, and unreadable metadata declarations", () => {
     const style = page().match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "";
     const declarations = (selector: string) => {

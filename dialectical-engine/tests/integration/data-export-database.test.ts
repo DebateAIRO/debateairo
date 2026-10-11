@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { migrate } from "@debateai/db";
+import { migrate, RunRepository } from "@debateai/db";
+import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { Pool, type PoolClient } from "pg";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { PostgresDataExportRepository } from "../../packages/db/src/data-export.js";
@@ -386,6 +387,45 @@ describe("data export database authority", () => {
     expect(audit).not.toContain(hash("9"));
     expect(audit).not.toContain("fixture-ip-plaintext");
     await db.pool.query("UPDATE identity.data_export SET status='CANCELLED',closed_at=clock_timestamp() WHERE export_id=$1", [exportId]);
+  });
+
+  it("D15 (V-42) returns each owned run's role rotation with every C7 field, null without a row, and no other account's", async () => {
+    const a = await account(), b = await account(), exportId = randomUUID(), worker = randomUUID();
+    const ownerOf = async (user: string) => (await db.pool.query(`SELECT owner_ref FROM identity."user" WHERE user_id=$1`, [user])).rows[0].owner_ref as string;
+    const repository = new RunRepository(db.pool);
+    const run = async (owner: string, tag: string) => {
+      const runId = await repository.startRun({ questionLine: `d15-${tag}`, principal: { kind: "legacy", legacyAskerId: `d15-${tag}` },
+        sessionId: `session:d15-${tag}`, callerScope: "ASKER", asOf: new Date(), askerRiskTier: "casual", effectiveRiskTier: "casual",
+        tierSource: "ASKER", tierProvenanceRef: `d15:${tag}`, compositionBudgetTier: "low", depthParams: { depth: 1 },
+        discoveredPanel: fixtureDiscoveredPanel(2), strangerSampleRate: 1, envelopeBasis: { source: "d15" }, registerVersion: 1,
+        batteryVersion: "d15", batteryRows: [] });
+      await db.pool.query("SELECT core.append_run_ownership_event($1,$2)", [runId, owner]);
+      return runId;
+    };
+    const rotate = (runId: string, t: string) => db.pool.query(`INSERT INTO core.run_role_rotation(run_id,rule,writer_provider_ref,writer_model_id,writer_maker,
+      checker_provider_ref,checker_model_id,checker_maker,storyteller_provider_ref,storyteller_model_id,storyteller_maker,story_checker_provider_ref,
+      story_checker_model_id,story_checker_maker,eligible_model_ids) VALUES($1,'LEAST_SHARE_SEEDED_TIE_V1',$2,$3,'Maker A',$4,$5,'Maker B',$6,$7,'Maker C',$8,$9,'Maker D',$10::text[])`,
+      [runId, `p:${t}:w`, `${t}-writer-model`, `p:${t}:c`, `${t}-checker-model`, `p:${t}:s`, `${t}-storyteller-model`, `p:${t}:sc`, `${t}-story-checker-model`,
+        [`${t}-writer-model`, `${t}-checker-model`, `${t}-storyteller-model`, `${t}-story-checker-model`]]);
+    const rotated = await run(await ownerOf(a.user), "mine"), plain = await run(await ownerOf(a.user), "plain"), other = await run(await ownerOf(b.user), "theirs");
+    await rotate(rotated, "d15-mine"); await rotate(other, "d15-theirs");
+    const createdAt = (await db.pool.query("SELECT created_at FROM core.run_role_rotation WHERE run_id=$1", [rotated])).rows[0].created_at as Date;
+    await db.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until)
+      VALUES($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '45 seconds')`, [exportId, a.user, a.session, worker]);
+    const raw = (await workerPool.query("SELECT identity.read_data_export_snapshot($1,$2) s", [exportId, worker])).rows[0].s;
+    const byId = Object.fromEntries(raw.runs.map((item: { run_id: string }) => [item.run_id, item]));
+    expect(Object.keys(byId).sort()).toEqual([rotated, plain].sort());
+    expect(JSON.stringify(raw)).not.toContain("d15-theirs");
+    const role = (t: string, r: string) => ({ provider_ref: `p:d15-mine:${t}`, model_id: `d15-mine-${r}-model`, maker: { w: "Maker A", c: "Maker B", s: "Maker C", sc: "Maker D" }[t] });
+    expect(byId[rotated].role_rotation).toEqual({ rule: "LEAST_SHARE_SEEDED_TIE_V1", writer: role("w", "writer"), checker: role("c", "checker"),
+      storyteller: role("s", "storyteller"), story_checker: role("sc", "story-checker"),
+      eligible_model_ids: ["d15-mine-writer-model", "d15-mine-checker-model", "d15-mine-storyteller-model", "d15-mine-story-checker-model"],
+      created_at: expect.any(String) });
+    expect(Date.parse(byId[rotated].role_rotation.created_at)).toBe(createdAt.getTime());
+    expect(Object.hasOwn(byId[plain], "role_rotation")).toBe(true);
+    expect(byId[plain].role_rotation).toBeNull();
+    await expect(workerPool.query("SELECT 1 FROM core.run_role_rotation LIMIT 1")).rejects.toMatchObject({ code: "42501" });
+    await db.pool.query("UPDATE identity.data_export SET status='CANCELLED',closed_at=clock_timestamp(),lease_owner=NULL,lease_until=NULL WHERE export_id=$1", [exportId]);
   });
 
   it("R31 fails a PREPARING row whose fourth lease expired without fail()", async () => {

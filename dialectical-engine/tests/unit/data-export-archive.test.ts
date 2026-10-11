@@ -87,11 +87,17 @@ describe("data export archive", () => {
       expect(keys(JSON.parse(entry.bytes.toString())).filter((key) => forbidden.test(key))).toEqual([]);
     }
   });
-  it("A-7 uses exactly nine keys for unrecoverable debates", () => {
+  it("A-7 uses exactly ten keys for unrecoverable debates", () => {
     const data = JSON.parse(archive().find((entry) => entry.name === "debates.json")!.bytes.toString());
-    expect(Object.keys(data.debates[2])).toEqual(["reference", "content_status", "created_at", "deleted_at", "tier", "depth", "plan_tier", "state", "visibility_history"]);
+    expect(Object.keys(data.debates[2])).toEqual(["reference", "content_status", "created_at", "deleted_at", "tier", "depth", "plan_tier", "state", "visibility_history", "role_rotation"]);
     expect(data.debates.slice(0, 2).map((entry: { content_status: string }) => entry.content_status)).toEqual(["READABLE", "READABLE"]);
   });
+  it("A-12 (V-42) carries role_rotation on every debate as the snapshot gives it, null when none", () => {
+    const data = JSON.parse(archive().find((entry) => entry.name === "debates.json")!.bytes.toString());
+    expect(data.debates.map((entry: { role_rotation: unknown }) => entry.role_rotation)).toEqual(snapshotA.debates.debates.map((entry) => entry.role_rotation));
+    expect(data.debates.map((entry: { role_rotation: unknown }) => entry.role_rotation === null)).toEqual([false, true, false]);
+  });
+
   it("A-8 names the ZIP from the UTC request date", () => {
     expect(archiveFilename(new Date("2026-10-09T04:30:00Z"))).toBe("dialectical-engine-export-2026-10-09.zip");
     expect(archiveFilename(new Date("2026-10-08T23:59:59Z"))).toBe("dialectical-engine-export-2026-10-08.zip");

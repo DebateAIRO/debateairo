@@ -1,6 +1,18 @@
 export type ContentStatus = "READABLE" | "UNRECOVERABLE";
 export type Row = Readonly<Record<string, unknown>>;
 
+/** SPEC-v11 row C7 (V-42): origin/dev's core.run_role_rotation row of a C1 run, every column but run_id. */
+export type RoleRotationRole = Readonly<{ provider_ref: string; model_id: string; maker: string }>;
+export type RoleRotation = Readonly<{
+  rule: string;
+  writer: RoleRotationRole;
+  checker: RoleRotationRole;
+  storyteller: RoleRotationRole;
+  story_checker: RoleRotationRole;
+  eligible_model_ids: readonly string[];
+  created_at: string;
+}>;
+
 export type DebateEntry = Readonly<{
   reference: string;
   content_status: ContentStatus;
@@ -11,6 +23,7 @@ export type DebateEntry = Readonly<{
   plan_tier: unknown;
   state: unknown;
   visibility_history: Readonly<{ state: string; at: string }>[];
+  role_rotation: RoleRotation | null;
   question?: string;
   run?: unknown;
   run_answer?: unknown | null;

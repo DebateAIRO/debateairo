@@ -1,4 +1,4 @@
-import type { ExportSnapshot, DebateEntry, Row, SupportCaseEntry, SupportSessionEntry } from "./types.js";
+import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry } from "./types.js";
 import type { RecordAad } from "../../../../packages/crypto/src/records.js";
 
 export type ExportClaim = Readonly<{
@@ -65,7 +65,7 @@ export const KEEP_COLUMNS = {
   email_change_requests: ["issued_at", "new_email_ciphertext", "outcome", "closed_at"],
   recovery_email_requests: ["issued_at", "candidate_ciphertext", "outcome", "closed_at"],
   recovery_requests: ["kind", "at", "state"],
-  runs: ["as_of", "composition_budget_tier", "depth_params", "plan_tier"],
+  runs: ["as_of", "composition_budget_tier", "depth_params", "plan_tier", "role_rotation"],
   erasure_tombstones: ["completed_at"],
   visibility_events: ["state", "occurred_at"],
   legal_acceptances: ["kind", "document_version", "document_sha256", "locale", "surface", "accepted_at", "evidence_ciphertext"],
@@ -186,6 +186,20 @@ function openedRecord(decrypt: ExportDecryptors, source: RawRow, column: string,
   return source[column] == null ? null : decrypt.openRecord(aad, bytes(source[column]));
 }
 
+// SPEC-v11 row C7 (V-42): null when the run has no row; otherwise exactly C7's keys, each role projected to its three.
+function roleRotation(value: unknown): RoleRotation | null {
+  if (value === null) return null;
+  const source = row(value);
+  const role = (name: string) => {
+    const item = row(source[name]);
+    return { provider_ref: string(item.provider_ref), model_id: string(item.model_id), maker: string(item.maker) };
+  };
+  const eligible = source.eligible_model_ids;
+  if (!Array.isArray(eligible)) throw new DataExportBuildError("DATA_EXPORT_SOURCE_FAILED");
+  return { rule: string(source.rule), writer: role("writer"), checker: role("checker"), storyteller: role("storyteller"),
+    story_checker: role("story_checker"), eligible_model_ids: eligible.map(string), created_at: string(source.created_at) };
+}
+
 async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, ownerRef: string): Promise<DebateEntry[]> {
   const tombstones = new Map(rows(raw.erasure_tombstones).map((item) => [string(item.run_id), string(item.completed_at)]));
   const visibility = rows(raw.visibility_events);
@@ -198,6 +212,7 @@ async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, owne
       reference, created_at: string(run.as_of), deleted_at: deletedAt,
       tier: run.composition_budget_tier, depth: run.depth_params, plan_tier: run.plan_tier,
       state: null as unknown, visibility_history: history,
+      role_rotation: roleRotation(Object.hasOwn(run, "role_rotation") ? run.role_rotation : undefined),
     };
     if (deletedAt !== null || !await ownerView.runKeyPresent(reference)) {
       entries.push({ ...base, content_status: "UNRECOVERABLE" });

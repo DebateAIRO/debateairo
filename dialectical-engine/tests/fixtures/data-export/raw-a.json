@@ -134,7 +134,17 @@
       "depth_params": {
         "depth": 2
       },
-      "plan_tier": "BASIC"
+      "plan_tier": "BASIC",
+      "role_rotation": {
+        "rule": "LEAST_SHARE_SEEDED_TIE_V1",
+        "writer": { "provider_ref": "p:raw:w", "model_id": "raw-writer-model", "maker": "Maker A", "run_id": "run-1" },
+        "checker": { "provider_ref": "p:raw:c", "model_id": "raw-checker-model", "maker": "Maker B" },
+        "storyteller": { "provider_ref": "p:raw:s", "model_id": "raw-storyteller-model", "maker": "Maker C" },
+        "story_checker": { "provider_ref": "p:raw:sc", "model_id": "raw-story-checker-model", "maker": "Maker D" },
+        "eligible_model_ids": ["raw-writer-model", "raw-checker-model", "raw-storyteller-model", "raw-story-checker-model"],
+        "created_at": "2026-10-03T00:00:01.000Z",
+        "run_id": "run-1"
+      }
     }
   ],
   "erasure_tombstones": [],

@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0115_data_export.sql",
-    "sha256": "65d5638b0ed0bfbc70cc3c00d29481f31d7d97d415ca68620a7efc3eea8e51d9"
+    "sha256": "fd47b13b422112d7dd71e866a9c38901e7c5cae9d899e255b1d35b180dd245d5"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",
