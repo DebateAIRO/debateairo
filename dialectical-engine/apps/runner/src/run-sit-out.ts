@@ -1,7 +1,7 @@
 import { TypedDomainError } from "@debateai/kernel";
 import {
   ProviderCallFailedError,
-  providerCallEndedUnbilled,
+  providerCallEndedVendorRefusedUnbilled,
   providerCallGateUnavailable,
   type ProviderCallRequest,
   type ProviderCallResult,
@@ -15,9 +15,12 @@ import {
  * On 2026-10-11 (run b53b9a9e) a busy GLM was asked again and again: every panel seat, its own root, a ten-minute
  * hold, a final retry, and then the serve fallback, each refusal one more unbilled release of the DeepInfra gate,
  * until the gate halted and the run died. Asking a model the gate has just proved busy only spends the gate's
- * patience. So, on the preview only, ONE call that ends in gate-proven unbilled refusals (the call and its one
- * 60-second resend, `withPreviewProviderCallPolicy`) makes that MODEL sit out for the rest of the run, on every ref
- * that serves it (R-a); and a gate that answers it is unavailable (fix (c), PROVIDER_GATE_UNAVAILABLE) makes every
+ * patience. So, on the preview only, ONE call that ends in the VENDOR's gate-proven unbilled refusal (the call and its
+ * one 60-second resend, `withPreviewProviderCallPolicy`) makes that MODEL sit out for the rest of the run, on every
+ * ref that serves it (R-a). Review amendment R-d (orchestrator, 2026-10-12): the gate's OWN unbilled refusals — its
+ * slots were full (CONCURRENCY_LIMIT_REACHED), or the vendor was never reached (PROVIDER_NOT_REACHED) — say nothing
+ * about the model: they never make it sit out, and the cooldown keeps its hold and final retry for them. A gate
+ * that answers it is unavailable (fix (c), PROVIDER_GATE_UNAVAILABLE) makes every
  * member behind that gate sit out. A member that sits out is never asked again: its gateway refuses before anything
  * is sent and no ledger row is written (`MAKER_SAT_OUT`).
  *
@@ -52,6 +55,15 @@ export interface RunSitOutView {
 }
 
 export interface RunSitOutBook extends RunSitOutView {
+  /**
+   * True for a failure after which the runner's ten-minute cooldown hold, and its final retry, would only ask a
+   * member that now sits out (R-a): the failure is of a kind that makes a member sit out (a call that ended in the
+   * vendor's gate-proven unbilled refusal, a gate that is unavailable, or the refusal of a member already sitting
+   * out) AND it came through this book's own gateway for a member that does sit out now (finding 4, 2026-10-12: a
+   * busy failure from a gateway the book never wrapped keeps the hold). Read by `withCooldownRetry`'s `haltsAtOnce`
+   * on the preview only.
+   */
+  haltsAtOnce(error: unknown): boolean;
   /** Why `providerRef` sits out, or null while it may still be asked. */
   reasonOf(providerRef: string): RunSitOutReason | null;
   /**
@@ -69,14 +81,10 @@ interface SitOutMark {
   readonly order: number;
 }
 
-/**
- * True for a failure after which the runner's ten-minute cooldown hold, and its final retry, would only ask a
- * member that now sits out (R-a): a call that ended in gate-proven unbilled refusals, a gate that is unavailable,
- * or a member that already sits out. Read by `withCooldownRetry`'s `haltsAtOnce` on the preview only.
- */
-export function runSitOutHaltsAtOnce(error: unknown): boolean {
+/** The kinds of failure that make a member sit out (or show it already does): the type half of `haltsAtOnce`. */
+function sitOutFailureKind(error: unknown): boolean {
   if (!(error instanceof ProviderCallFailedError)) return false;
-  if (providerCallEndedUnbilled(error) || providerCallGateUnavailable(error)) return true;
+  if (providerCallEndedVendorRefusedUnbilled(error) || providerCallGateUnavailable(error)) return true;
   return error.cause instanceof TypedDomainError && error.cause.code === MAKER_SAT_OUT;
 }
 
@@ -96,6 +104,9 @@ export function runPanelRevisedReason(book: RunSitOutBook | null, providerRefs: 
 export function createRunSitOutBook(settings: RunResilienceSettings): RunSitOutBook {
   const busyModels = new Map<string, SitOutMark>();
   const closedGates = new Map<string, SitOutMark>();
+  // Finding 4: the failures this book's gateways raised or passed on for a member that sits out because of them (or
+  // already did) — the only ones `haltsAtOnce` may halt at once.
+  const satOutFailures = new WeakSet<object>();
   let marks = 0;
   // A ref whose model the composition does not know is its own model: it sits out alone.
   const modelKey = (providerRef: string): string => settings.modelOf(providerRef) ?? `ref:${providerRef}`;
@@ -120,7 +131,8 @@ export function createRunSitOutBook(settings: RunResilienceSettings): RunSitOutB
       }
       return;
     }
-    if (providerCallEndedUnbilled(error) && !busyModels.has(modelKey(providerRef))) {
+    // R-d: only the vendor's unbilled refusal says the model is busy; the gate's own unbilled refusals leave the book.
+    if (providerCallEndedVendorRefusedUnbilled(error) && !busyModels.has(modelKey(providerRef))) {
       busyModels.set(modelKey(providerRef), Object.freeze({ reason: "PROVIDER_BUSY", ledgerEntryRef: error.lastLedgerEntryRef, order: marks++ }));
     }
   };
@@ -128,6 +140,7 @@ export function createRunSitOutBook(settings: RunResilienceSettings): RunSitOutB
     sitsOut: (providerRef: string) => markOf(providerRef) !== undefined,
     gateOf: (providerRef: string) => settings.gateOf(providerRef),
     reasonOf: (providerRef: string) => markOf(providerRef)?.reason ?? null,
+    haltsAtOnce: (error: unknown) => sitOutFailureKind(error) && satOutFailures.has(error as object),
     gateway: (providerRef: string, provider: ProviderGateway): ProviderGateway => Object.freeze({
       call: async (request: ProviderCallRequest): Promise<ProviderCallResult> => {
         const mark = markOf(providerRef);
@@ -135,21 +148,44 @@ export function createRunSitOutBook(settings: RunResilienceSettings): RunSitOutB
           // Typed as the transport failure every caller already handles (a panel seat left out, a cooldown that
           // halts, a serve role that moves on), with the reason as its cause; zero attempts were made, and the halt
           // record cites the row that made the member sit out.
-          throw new ProviderCallFailedError(
+          const refusal = new ProviderCallFailedError(
             new TypedDomainError(MAKER_SAT_OUT, `${providerRef} sits out the rest of this run (${mark.reason})`),
             0,
             "FAILED",
             mark.ledgerEntryRef
           );
+          satOutFailures.add(refusal);
+          throw refusal;
         }
         try {
           return await provider.call(request);
         } catch (error) {
           note(providerRef, error);
+          if (error instanceof ProviderCallFailedError && markOf(providerRef) !== undefined) satOutFailures.add(error);
           throw error;
         }
       }
     })
   });
   return book;
+}
+
+/**
+ * Finding 3 (review, 2026-10-12): may a review that has no reviewer of another maker left end the arguing as
+ * MEMBERS_SAT_OUT? Only on the preview (a book), only when every remaining candidate is the author's own maker (none
+ * at all included), and only when at least one member of the REVIEWER seats actually sits out. A review that never
+ * had a reviewer of another maker keeps today's DIFFERENT_MAKER_REVIEWER_UNAVAILABLE, book or not.
+ */
+export function reviewEndsForMembersSatOut(input: Readonly<{
+  book: RunSitOutView | null;
+  /** Every member of the run's reviewer seats, whether or not it may still be asked. */
+  reviewerRefs: readonly string[];
+  /** The makers the reviewer choice could still call for this node. */
+  candidateMakers: readonly string[];
+  authorMaker: string;
+}>): boolean {
+  const book = input.book;
+  return book !== null
+    && input.reviewerRefs.some((providerRef) => book.sitsOut(providerRef))
+    && input.candidateMakers.every((maker) => maker === input.authorMaker);
 }

@@ -32,6 +32,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery";
 import { RunRepository, insertRunRoleRotation, migrate, type DiscoveredPanelMember } from "@debateai/db";
+import { LedgerRepository } from "@debateai/ledger";
 import {
   assertPreviewProviderTargets,
   assertPreviewRoleTargets,
@@ -80,7 +81,7 @@ import {
 } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS, DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
-import { startPreviewGateStubs, type GateDebateScripts } from "../support/preview-gate-stubs.js";
+import { startPreviewGateStubs, type GateDebateScripts, type GateOverride, type GateRequest } from "../support/preview-gate-stubs.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
@@ -183,10 +184,14 @@ afterAll(async () => database?.stop());
  * `positions` field, packages/story/src/material.ts), so a debate that lost a root mid-run (T1, T2) is told with as
  * many paths as it has positions (validate.ts STORY_POSITION_COVERAGE).
  */
-async function startGates(probeScripts: Readonly<Record<string, readonly ("OK" | "UNBILLED")[]>>, debate?: GateDebateScripts) {
+async function startGates(
+  probeScripts: Readonly<Record<string, readonly ("OK" | "UNBILLED")[]>>, debate?: GateDebateScripts,
+  override?: (request: GateRequest) => GateOverride | null
+) {
   const stubs = await startPreviewGateStubs({
     storyDefaultShape: PACK.defaultShape, probeScripts,
-    ...(debate === undefined ? { refuseModels: [GLM] } : { debate })
+    ...(debate === undefined ? { refuseModels: [GLM] } : { debate }),
+    ...(override === undefined ? {} : { override })
   });
   stubClosers.push(stubs.close);
   // The /remaining reads arrive on the same socket as /complete, as on the preview (createPreviewRemainingRpcPort).
@@ -520,6 +525,13 @@ async function disclosureOf(answerId: string) {
        WHERE answer_id=$1 ORDER BY answer_version DESC LIMIT 1`, [answerId])).rows[0];
 }
 
+/** The owner-side row's body facts (migration 0076): the spend stop that ended the arguing, and the points it left unreviewed. */
+async function bodyFactsOf(answerId: string) {
+  return (await database.pool.query<{ body_stop: string | null; points_without_review: number | null }>(
+    `SELECT body_stop, points_without_review FROM serve.serve_disclosure WHERE answer_id=$1 ORDER BY answer_version DESC LIMIT 1`,
+    [answerId])).rows[0];
+}
+
 /** The served answer and its story, read as the asker reads them; with the work item's settled state. */
 async function servedAnswer(debate: Awaited<ReturnType<typeof admittedRun>>, answerId: string) {
   const answer = await new ServeRepository(database.pool).readAnswerProjection(answerId, debate.askerId);
@@ -577,6 +589,35 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
     const revised = records.find((record) => record.mark === "CRITIQUE-UNAVAILABLE" && record.reason.includes("RUN_PANEL_REVISED:"));
     expect(revised, `condition mark records: ${recordsText}`).toBeDefined();
     expect(revised!.reason, `condition mark records: ${recordsText}`).toMatch(GLM_SAT_OUT);
+    // Review 2026-10-12, test gap (a): the disclosure pinned to the byte, derived from what the run did. A model whose
+    // calls the vendor refused unbilled (two UNBILLED answers: the call and its resend) is PROVIDER_BUSY — Qwen and
+    // GLM, in root 0's panel; every other DeepInfra member of the panel sat out when MiMo's root 1 met the halted gate
+    // (STOPPED, /remaining "halted"): PROVIDER_GATE_UNAVAILABLE. Haiku, behind the other gate, never sat out. The list
+    // follows the run's configured makers, the panel's order (GLM by its writer ref first).
+    const vendorBusyModels = new Set(gates.requests.filter((request) => request.kind !== "PROBE" && request.answer === "UNBILLED")
+      .map((request) => request.model));
+    expect([...vendorBusyModels].sort()).toEqual([GLM, QWEN].sort());
+    const derived = `RUN_PANEL_REVISED:${FIVE_MAKER_REFS.filter((ref) => ref !== HAIKU_REF)
+      .map((ref) => `${ref}=${vendorBusyModels.has(PREVIEW_PROVIDER_REF_MODELS[ref]!) ? "PROVIDER_BUSY" : "PROVIDER_GATE_UNAVAILABLE"}`).join(",")}`;
+    const T1_RUN_PANEL_REVISED = "RUN_PANEL_REVISED:preview:fixture-a=PROVIDER_BUSY,preview:deepseek-v4-1-flash=PROVIDER_GATE_UNAVAILABLE,"
+      + "preview:mimo-v2-6-pro=PROVIDER_GATE_UNAVAILABLE,preview:qwen-3-8-flash=PROVIDER_BUSY";
+    expect(derived).toBe(T1_RUN_PANEL_REVISED);
+    // Nobody was absent at claim, so the CRITIQUE-UNAVAILABLE reason is the run-time revision alone.
+    expect(revised!.reason).toBe(T1_RUN_PANEL_REVISED);
+
+    // Test gap (b): fewer than 2 members were left to argue (after the halt only Haiku could still be asked), so the
+    // arguing ended as a non-money stop: one authored root (the opener DeepSeek's), served on the members-sat-out
+    // footing with a SINGLE-LINEAGE record naming the members that sat out; the owner's row has no spend stop and
+    // counts the points left without a review (a number; null on a run that reviewed what it could).
+    expect(calls.filter((call) => /^JUDGE(?::root:(?:secondary|\d+))?$/u.test(call.call_site_key) && call.outcome === "OK")
+      .map((call) => [call.call_site_key, call.actor_ref])).toEqual([["JUDGE", "preview:deepseek-v4-1-flash"]]);
+    expect(answer!.condition_marks).toContain("SINGLE-LINEAGE");
+    expect(records.filter((record) => record.mark === "SINGLE-LINEAGE")).toEqual([expect.objectContaining({
+      mark: "SINGLE-LINEAGE", scope: "answer", reason: T1_RUN_PANEL_REVISED, lift_path: "RESTORE_PINNED_PROVIDER_AND_RUN_AGAIN"
+    })]);
+    const body = await bodyFactsOf(result.answerId);
+    // The one point the arguing left without a review is that root itself: no reviewer of another maker was left.
+    expect(body).toEqual({ body_stop: null, points_without_review: 1 });
 
     // Zero DeepInfra requests after the halt: none arrives after the one the gate first answered STOPPED; and that
     // STOPPED was read back as a halted gate through its /remaining.
@@ -708,5 +749,108 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
     expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
     expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
     expect(answer!.condition_mark_records.find((record) => record.mark === "CRITIQUE-UNAVAILABLE")?.reason).toMatch(GLM_SAT_OUT);
+  });
+  /**
+   * Review amendment R-d (orchestrator, 2026-10-12): only a VENDOR's gate-proven unbilled refusal makes a model sit
+   * out. The gate's own unbilled refusals — its slots were full (CONCURRENCY_LIMIT_REACHED), or it never reached the
+   * vendor (PROVIDER_NOT_REACHED) — are still REFUSED rows, never counted, with the one 60-second resend; but the
+   * model is not busy, so it never sits out and the runner keeps today's ten-minute hold and final retry.
+   */
+  it.each(["CONCURRENCY_LIMIT_REACHED", "PROVIDER_NOT_REACHED"] as const)(
+    "R-d: GLM's own root refused twice by the gate itself (%s): no sit-out, the hold happens, the final retry is sent and authors it",
+    async (code) => {
+      const debate = await admittedRun(`gate-own-${code}`, { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
+      // GLM's first JUDGE request is its own root (root 4; its earlier asks are panel seats, PANEL): the call and its
+      // one resend are refused by the gate itself; everything after is answered.
+      let refused = 0;
+      const gates = await startGates({}, { unbilled: [] }, (request) => {
+        if (request.model !== GLM || request.kind !== "JUDGE" || refused >= 2) return null;
+        refused += 1;
+        return { gateRefuses: code };
+      });
+      const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+      const result = await completedRun(composed, debate, gates);
+
+      expect(gates.requests.filter((request) => request.model === GLM && request.kind === "JUDGE").slice(0, 3)
+        .map((request) => request.answer)).toEqual(["GATE_REFUSED", "GATE_REFUSED", "OK"]);
+      // The one 60-second resend inside the call, then the runner's ten-minute hold, then its final retry.
+      expect(composed.callSleeps).toEqual([UNBILLED_RESEND_MS]);
+      expect(composed.holdWaits).toEqual([DEVELOPMENT_RUN_DEATH_POLICY.cooldown_ms]);
+      const calls = await modelCalls(debate.runId);
+      expect(calls.filter((call) => call.call_site_key === GLM_ROOT_KEY).map((call) => [call.actor_ref, call.outcome]))
+        .toEqual([[SEALED_WRITER_REF, "REFUSED"], [SEALED_WRITER_REF, "REFUSED"], [SEALED_WRITER_REF, "OK"]]);
+      // GLM never sat out: it keeps writing (the pinned writer) and nothing discloses a run-time panel revision.
+      expect(calls.filter((call) => call.call_site_key === WRITER_KEY && call.outcome === "OK").map((call) => call.actor_ref))
+        .toEqual([SEALED_WRITER_REF]);
+      const { answer, workItem } = await servedAnswer(debate, result.answerId);
+      expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
+      expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
+      expect(JSON.stringify(answer!.condition_mark_records)).not.toContain("RUN_PANEL_REVISED");
+      expect(gates.halt.unbilledReleases).toBe(0);
+    }
+  );
+
+  /**
+   * Review 2026-10-12, test gap (e): the merged CRITIQUE-UNAVAILABLE record (R-b). With nobody sitting out, its reason
+   * is today's to the byte — the claim-time revision alone; with a member that sat out too, the two join with "|".
+   * MiMo is absent at claim (its probe and the probe's one resend refused unbilled), so the panel shrinks to four.
+   */
+  it("nobody sat out: the CRITIQUE-UNAVAILABLE reason is the claim-time revision alone, byte for byte", async () => {
+    const debate = await admittedRun("claim-only", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
+    const gates = await startGates({ [MIMO]: ["UNBILLED", "UNBILLED"] }, { unbilled: [] });
+    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const result = await completedRun(composed, debate, gates);
+    const { answer } = await servedAnswer(debate, result.answerId);
+    const critique = answer!.condition_mark_records.filter((record) => record.mark === "CRITIQUE-UNAVAILABLE");
+    expect(critique.map((record) => record.reason)).toEqual(["CLAIM_PANEL_REVISED:preview:mimo-v2-6-pro=PROVIDER_PROBE_UNBILLED_REFUSAL"]);
+    expect(composed.holdWaits).toEqual([]);
+  });
+
+  it("a claim-time revision and a member that sat out: one record, CLAIM_PANEL_REVISED|RUN_PANEL_REVISED", async () => {
+    const debate = await admittedRun("claim-and-run", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
+    const gates = await startGates({ [MIMO]: ["UNBILLED", "UNBILLED"] }, { unbilled: [GLM] });
+    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const result = await completedRun(composed, debate, gates);
+    const { answer } = await servedAnswer(debate, result.answerId);
+    const critique = answer!.condition_mark_records.filter((record) => record.mark === "CRITIQUE-UNAVAILABLE");
+    expect(critique.map((record) => record.reason)).toEqual([
+      "CLAIM_PANEL_REVISED:preview:mimo-v2-6-pro=PROVIDER_PROBE_UNBILLED_REFUSAL|RUN_PANEL_REVISED:preview:fixture-a=PROVIDER_BUSY"
+    ]);
+    expect(answer!.condition_marks.filter((mark) => mark === "CRITIQUE-UNAVAILABLE")).toHaveLength(1);
+  });
+
+  /**
+   * Review 2026-10-12, test gap (c): the runner's re-claim check reads each maker's own attempts on the preview
+   * (fix (b), `byActor`). Before the run is claimed, root 2's site (Qwen's, key JUDGE:root:2) already holds the judge
+   * contract's whole allowance — the sealed bound plus the final retry — in FAILED rows, but written by two OTHER
+   * makers, two each, as fallback hops would leave them. Read per site (hosted and local) that site is spent at claim;
+   * read per maker nobody is, so Qwen is asked and authors root 2.
+   */
+  it("fix (b): the re-claim check counts per maker, so other makers' FAILED rows at a root's site never spend it", async () => {
+    const debate = await admittedRun("reclaim-per-maker", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
+    const allowance = POLICY.bounds.JUDGE.maxAttempts + DEVELOPMENT_RUN_DEATH_POLICY.final_retry_attempts;
+    const others = ["preview:mimo-v2-6-pro", HAIKU_REF];
+    const ledger = new LedgerRepository(database.pool);
+    for (let index = 0; index < allowance; index += 1) {
+      await ledger.append({
+        runId: debate.runId, attemptId: randomUUID(), actionKind: "MODEL_CALL", callSiteKey: "JUDGE:root:2",
+        subjectItemId: debate.workItemId, stanceAtAction: "UNASSIGNED", outcome: "FAILED", actorRef: others[index % 2]!,
+        inputHash: "input:preview-reclaim-per-maker", contractHash: fixtureSettings().judgeContractHash, rawArtifactRef: null,
+        startedAt: new Date(), finishedAt: new Date()
+      });
+    }
+    // The site holds the whole allowance across makers, and less than it for any one maker.
+    expect(await ledger.findExhaustedModelAttempt({
+      runId: debate.runId, workItemId: debate.workItemId, contractHash: fixtureSettings().judgeContractHash, maxAttempts: allowance
+    })).toMatchObject({ callSiteKey: "JUDGE:root:2", outcome: "FAILED" });
+    const gates = await startGates({}, { unbilled: [] });
+    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const result = await completedRun(composed, debate, gates);
+    const calls = await modelCalls(debate.runId);
+    expect(calls.filter((call) => call.call_site_key === "JUDGE:root:2" && call.outcome === "OK").map((call) => call.actor_ref))
+      .toEqual(["preview:qwen-3-8-flash"]);
+    const { workItem } = await servedAnswer(debate, result.answerId);
+    expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
+    expect(composed.holdWaits).toEqual([]);
   });
 });

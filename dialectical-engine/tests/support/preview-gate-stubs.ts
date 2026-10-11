@@ -22,11 +22,13 @@ export type GateRequestKind = "PROBE" | "STORYTELLER" | "STORY_CHECKER" | "PANEL
 export type GateRequest = Readonly<{ provider: GateProvider; model: string; kind: GateRequestKind | "UNKNOWN"; body: Readonly<Record<string, unknown>> }>;
 /**
  * How the gate answered a /complete request: by its contract or a scenario's content (OK), a gate-proven unbilled
- * vendor 429 (UNBILLED, 409 PROVIDER_REFUSED_UNBILLED), a halted gate (STOPPED, 409 PREVIEW_TEST_AUTHORITY_STOPPED), a
+ * vendor 429 (UNBILLED, 409 PROVIDER_REFUSED_UNBILLED), the gate's OWN unbilled refusal (GATE_REFUSED, 409
+ * CONCURRENCY_LIMIT_REACHED or PROVIDER_NOT_REACHED: never one of its unbilled releases), a halted gate (STOPPED, 409
+ * PREVIEW_TEST_AUTHORITY_STOPPED), a
  * billed vendor error (BILLED_500 for a refused model; VENDOR_ERROR for a scenario's vendor status), or a request no
  * contract answers (UNEXPECTED, a billed vendor 500 too).
  */
-export type GateAnswer = "OK" | "UNBILLED" | "STOPPED" | "BILLED_500" | "VENDOR_ERROR" | "UNEXPECTED";
+export type GateAnswer = "OK" | "UNBILLED" | "GATE_REFUSED" | "STOPPED" | "BILLED_500" | "VENDOR_ERROR" | "UNEXPECTED";
 /** A recorded /complete request: the request and how it was answered, in arrival order. */
 export type GateRecord = GateRequest & Readonly<{ answer: GateAnswer }>;
 /** One read of a gate's `POST /remaining` (contract A §5), with the state it was answered. */
@@ -49,7 +51,9 @@ export type GateDebateScripts = Readonly<{ unbilled: readonly string[]; deepInfr
  */
 export type GateHalt = { unbilledReleases: number; haltedAt: number | null; firstStoppedAt: number | null };
 /** What a scenario may answer instead of the contract's valid reply. */
-export type GateOverride = Readonly<{ content: string }> | Readonly<{ unbilled: true }> | Readonly<{ vendorStatus: number }>;
+export type GateOverride = Readonly<{ content: string }> | Readonly<{ unbilled: true }> | Readonly<{ vendorStatus: number }>
+  /** The gate's own unbilled refusal (review amendment R-d, 2026-10-12): its slots full, or the vendor not reached. */
+  | Readonly<{ gateRefuses: "CONCURRENCY_LIMIT_REACHED" | "PROVIDER_NOT_REACHED" }>;
 
 /* ------------------------------------------------------------------ the doubles' answers */
 
@@ -265,6 +269,7 @@ export async function startPreviewGateStubs(input: Readonly<{
         const override = input.override?.(seen, chat) ?? null;
         if (override !== null) {
           if ("unbilled" in override) { unbilled(); return; }
+          if ("gateRefuses" in override) { record("GATE_REFUSED"); refuse(override.gateRefuses); return; }
           if ("vendorStatus" in override) {
             record("VENDOR_ERROR");
             reply(override.vendorStatus, JSON.stringify({ error: { message: "scripted vendor error" } }));

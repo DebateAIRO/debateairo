@@ -118,3 +118,40 @@ story checker Haiku.
 - **T4:** `STOPPED` plus a halted `/remaining` gives `PROVIDER_GATE_UNAVAILABLE`, not MONEY.
 - **T5:** hosted and local are unchanged. The existing hosted cases still pass; with nobody sitting out, the money
   fallback order is unchanged.
+
+## Review amendments 2026-10-12
+
+Rulings taken after the review of the first build (orchestrator, 2026-10-12). Where they differ from the sections
+above, these win.
+
+- **R-d. Only a vendor's refusal makes a model busy.** One unbilled refusal says the model is busy: the gate's
+  `PROVIDER_REFUSED_UNBILLED` (the vendor answered 429 or "overloaded" and the gate proved it unbilled).
+  - The app maps it to its own class, `PreviewVendorRefusedUnbilled` (a `PreviewUnbilledRefusal`), in
+    `packages/providers/src/preview-test.ts`.
+  - The predicate `providerCallEndedVendorRefusedUnbilled(error)` replaces the generic `providerCallEndedUnbilled`
+    named in (d). It is true only when the call's last attempt (its 60-second resend) was the vendor's refusal.
+  - The gate's own two unbilled refusals stay plain `PreviewUnbilledRefusal`s:
+    - `CONCURRENCY_LIMIT_REACHED`: the gate's slots were full;
+    - `PROVIDER_NOT_REACHED`: the connection failed before anything was sent.
+  - They are still free: REFUSED rows, not counted, and the one 60-second resend, as today.
+  - They do NOT make the model sit out, and they do NOT halt at once. They keep today's 10-minute cooldown hold and
+    the final retry.
+- **Finding 3. A review ends the arguing only when someone really sat out.**
+  - `reviewEndsForMembersSatOut` (`apps/runner/src/run-sit-out.ts`) decides when the review guard ends the arguing as
+    MEMBERS_SAT_OUT. That needs at least one member of the reviewer seats to sit out, and no reviewer of another
+    maker left.
+  - A node that never had a reviewer of another maker keeps today's `DIFFERENT_MAKER_REVIEWER_UNAVAILABLE`.
+- **Finding 4. The book decides "halt at once".**
+  - `withCooldownRetry`'s `haltsAtOnce` is now the run's book (`RunSitOutBook.haltsAtOnce`). The failure must be of
+    a sit-out kind AND it must have come through that book's own gateway for a member that now sits out.
+  - A busy failure from a gateway the book never wrapped keeps the hold and the final retry.
+- **Tests added for these rulings and for the review's test gaps:**
+  - T1 pins the exact `RUN_PANEL_REVISED` reason, derived from what the run did: GLM and Qwen PROVIDER_BUSY, DeepSeek
+    and MiMo PROVIDER_GATE_UNAVAILABLE.
+  - T1 reaches the "fewer than 2 left" path, and pins what it leaves: one authored root, a SINGLE-LINEAGE record
+    naming the members, `body_stop` null and `points_without_review` 1.
+  - A runner-level test proves the re-claim check counts per maker (`byActor`). It fails when `byActor` is removed.
+  - T3: the sending maker's own rows at its bound are still refused `CALL_BUDGET_EXHAUSTED`, with 0 POSTs.
+  - The CRITIQUE-UNAVAILABLE reason is pinned exactly when nobody sat out. A second test exercises the
+    `CLAIM_PANEL_REVISED:…|RUN_PANEL_REVISED:…` join.
+  - A source pin proves `apps/runner/src/main.ts` sets `runResilience` on the preview only.

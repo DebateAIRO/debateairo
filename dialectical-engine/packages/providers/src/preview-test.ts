@@ -272,6 +272,27 @@ export function waitBeforePreviewUnbilledResend(
 export class PreviewUnbilledRefusal extends ProviderUnbilledRefusal {
   constructor(message = "Private preview call was not billed and did not reach an answer") { super(message); }
 }
+/**
+ * Run resilience, review amendment R-d (orchestrator, 2026-10-12): the one unbilled refusal that says the MODEL is
+ * busy — the VENDOR refused the call and the gate proved it unbilled (PROVIDER_REFUSED_UNBILLED: a vendor 429/529,
+ * hold released). The gate's own unbilled refusals stay plain `PreviewUnbilledRefusal`s: its slots were full
+ * (CONCURRENCY_LIMIT_REACHED) or the vendor was never reached (PROVIDER_NOT_REACHED); they are still REFUSED rows
+ * with the one 60-second resend, but they say nothing about the model, so they never make it sit out
+ * (`providerCallEndedVendorRefusedUnbilled`, read by the runner's sit-out book).
+ */
+export class PreviewVendorRefusedUnbilled extends PreviewUnbilledRefusal {
+  constructor() { super("Private preview vendor refused the call unbilled"); }
+}
+/**
+ * R-d: a call that ENDED in the vendor's gate-proven unbilled refusal — the gateway's PROVIDER_CALL_FAILED whose last
+ * attempt (on the preview, the one 60-second resend) was a `PreviewVendorRefusedUnbilled`. A bare refusal is not a
+ * call's end (the gateway records and wraps every one), so it is false; so is a call that ended in the gate's own
+ * refusal, even after a vendor refusal before it.
+ */
+export function providerCallEndedVendorRefusedUnbilled(error: unknown): boolean {
+  return error instanceof TypedDomainError && error.code === "PROVIDER_CALL_FAILED"
+    && (error as { cause?: unknown }).cause instanceof PreviewVendorRefusedUnbilled;
+}
 /** The refusal itself, or the gateway's PROVIDER_CALL_FAILED wrapping it as its cause. */
 function previewCallWasUnbilled(error: unknown): boolean {
   return error instanceof PreviewUnbilledRefusal || (typeof error === "object" && error !== null
@@ -447,6 +468,8 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
   if (typeof code === "string" && PREVIEW_TRANSIENT_REFUSALS.has(code)) {
     // Owner ruling R4 (2026-10-11): the gate's own concurrency refusal reserved and sent nothing, so it
     // is unbilled like the other two: a REFUSED row no count includes, and the one 60-second resend.
+    // R-d (2026-10-12): only the vendor's refusal says the model is busy; the gate's own two never do.
+    if (code === "PROVIDER_REFUSED_UNBILLED") return new PreviewVendorRefusedUnbilled();
     return code === "CONCURRENCY_LIMIT_REACHED"
       ? new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight")
       : new PreviewUnbilledRefusal();

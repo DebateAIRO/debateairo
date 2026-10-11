@@ -126,6 +126,17 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     }
   });
 
+  it("run resilience is the preview's alone: main.ts sets runResilience only when the preview config is present", () => {
+    // Review 2026-10-12, test gap (f) (ruling R-c: hosted and local unchanged). The one place main.ts sets the
+    // runner's runResilience is a spread guarded by the preview config, which only the preview's environment carries.
+    const code = withoutComments(RUNNER_MAIN);
+    expect(code.match(/\brunResilience\b/gu) ?? []).toHaveLength(1);
+    expect(code).toContain("...(previewConfig === undefined ? {} : { runResilience: previewRunResilience(previewConfig)! })");
+    expect(code).toMatch(/const previewConfig = environment\.PREVIEW_PROVIDER_TEST_CONFIG;/u);
+    // Control: the unguarded form is not what ships.
+    expect(code).not.toMatch(/^\s*runResilience: previewRunResilience\(previewConfig\)!,/mu);
+  });
+
   it("control: the reader sees a key that is missing", () => {
     const shipped = objectKeys("{ a: 1, ...(x ? {} : { b: 2, c: { d: 3 } }), e: f(g, { h: 1 }), m(n: string) { return { o: n }; }, i }");
     expect([...shipped].sort()).toEqual(["a", "b", "c", "e", "i", "m"]);

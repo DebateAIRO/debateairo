@@ -199,7 +199,7 @@ import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type Ru
 import {
   createRunSitOutBook,
   runPanelRevisedReason,
-  runSitOutHaltsAtOnce,
+  reviewEndsForMembersSatOut,
   type RunResilienceSettings,
   type RunSitOutBook,
   type RunSitOutView
@@ -996,8 +996,9 @@ export async function withCooldownRetry<T>(input: {
   readonly siteAttemptsSpent?: () => Promise<number>;
   /**
    * Run resilience (spec 2026-10-12, fix (d); ruling R-a): a failure after which the cooldown hold and the final
-   * retry would only ask a member that now sits out the rest of the run — a call made only of gate-proven unbilled
-   * refusals, an unavailable gate, or a member already sitting out (`runSitOutHaltsAtOnce`). Such a failure HALTS at
+   * retry would only ask a member that now sits out the rest of the run — a call that ended in the vendor's gate-proven
+   * unbilled refusal (review amendment R-d: never the gate's own), an unavailable gate, or a member already sitting
+   * out, each seen through the run's sit-out book (`RunSitOutBook.haltsAtOnce`). Such a failure HALTS at
    * once: no ten-minute hold, no final retry. Absent (hosted, local, every direct caller), every failure keeps
    * today's path.
    */
@@ -4680,7 +4681,10 @@ export class WalkingSkeletonRunner {
         ...(siteAttemptsSpent === undefined ? {} : { siteAttemptsSpent }),
         // Run resilience (spec 2026-10-12, ruling R-a): on the preview a busy member, an unavailable gate or a member
         // that already sits out halts the site at once — no ten-minute hold for a model that will not be asked again.
-        ...(this.settings.runResilience === undefined ? {} : { haltsAtOnce: runSitOutHaltsAtOnce }),
+        // Finding 4 (review, 2026-10-12): the book judges it — a failure of the kind AND of a member that sat out through
+        // its own gateway — so a busy failure the book never saw keeps the hold. `sitOut` is built at claim, below,
+        // before any site is attempted; R-d: the gate's own unbilled refusals never sit a member out, so they hold.
+        ...(sitOut === null ? {} : { haltsAtOnce: sitOut.haltsAtOnce }),
         // A15d (controller carry 3, the ruling's preferred option): the site's
         // ONE final retry. A seat key past the sequence bound has spent it, so
         // the member answering here gets none when its partner's key has.
@@ -6653,7 +6657,14 @@ export class WalkingSkeletonRunner {
         });
         // Fix (d): every reviewer that could judge this node sits out — the same state as too few members left, so
         // the arguing ends here and the node keeps its own panel's footing (`membersSatOutStop`), never a dead run.
-        if (sitOut !== null && reviewerCandidates.every((candidate) => candidate.maker === authoredNode.maker)) {
+        // Finding 3 (review, 2026-10-12): only when a reviewer seat's member actually sat out; a node that never had a
+        // reviewer of another maker keeps today's DIFFERENT_MAKER_REVIEWER_UNAVAILABLE (selectDifferentMakerReviewer).
+        if (reviewEndsForMembersSatOut({
+          book: sitOut,
+          reviewerRefs: reviewerSeats.flatMap((seat) => membersOf(seat).map((member) => member.providerRef)),
+          candidateMakers: reviewerCandidates.map((candidate) => candidate.maker),
+          authorMaker: authoredNode.maker
+        })) {
           reviewScheduledNodeIds.delete(authoredNode.nodeId);
           membersSatOutStop = true;
           return;
