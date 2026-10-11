@@ -193,7 +193,7 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { buildStoryRunSnapshot, storySeatRoleMaker } from "./story-snapshot.js";
+import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 
 // Model scorecard A15/A16: the seat book and the seat caller live in their own module.
 export * from "./run-seats.js";
@@ -8203,11 +8203,6 @@ export class WalkingSkeletonRunner {
       const storyWriter = this.settings.story;
       const floorRecorded = floor !== null && disclosureRecorded;
       if (storyWriter !== undefined && (answerCarriesLabel || floorRecorded)) {
-        /** Role rotation: a pinned story member among this run's claim-eligible members, or null. */
-        const storyRotationRoleMaker = (providerRef: string) => {
-          const maker = synthesisMakers.find((candidate) => candidate.providerRef === providerRef);
-          return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };
-        };
         try {
           afterSettle.story = {
             kind: "SNAPSHOT",
@@ -8253,6 +8248,8 @@ export class WalkingSkeletonRunner {
               // The run's OWN claim-eligible providers: a role provider that the
               // claim-time probe found absent is never called for the story.
               resolveProvider: (roleRef) => {
+                // Role rotation, Task 12: on a rotated run the register's story ref serves only when it is a panel ref.
+                if (rotationPin !== null && !panelRefs.has(roleRef)) return null;
                 const maker = synthesisMakers.find((candidate) => candidate.providerRef === roleRef);
                 return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };
               },
@@ -8278,14 +8275,19 @@ export class WalkingSkeletonRunner {
                   }
                 // Role rotation (spec 2026-10-11 Part 6): a rotated run (never an assigned one; the claim
                 // refuses both pins) hands the story its pinned pair, looked up among this run's
-                // claim-eligible members. A pinned member not claim-eligible reads null, and the story then
-                // uses the register's ref, as it does for a FALLBACK seat (packages/story writer.ts).
+                // claim-eligible members. Task 12 ("always an answer"): a pinned member not claim-eligible
+                // hands its role to another claim-eligible member of the stored panel, in panel order, the
+                // story checker always of another maker than the storyteller serving
+                // (`storyRotationRoleMakers`). None: null, and the story uses the register's ref, as for a
+                // FALLBACK seat (packages/story writer.ts), only when that ref is a panel ref (above).
                 : rotationPin === null
                   ? undefined
-                  : {
-                      storyteller: storyRotationRoleMaker(rotationPin.storyteller.providerRef),
-                      checker: storyRotationRoleMaker(rotationPin.storyChecker.providerRef)
-                    },
+                  : storyRotationRoleMakers({
+                      panelRefs: run.discoveredPanel.map((member) => member.provider_ref),
+                      claimEligible: synthesisMakers,
+                      storytellerRef: rotationPin.storyteller.providerRef,
+                      storyCheckerRef: rotationPin.storyChecker.providerRef
+                    }),
               // Each story step re-takes the SAME disclosure lease the debate held
               // (this run and its memory-linked prior run), briefly, on this
               // runner's pool: every store and gateway inside it borrows it, and

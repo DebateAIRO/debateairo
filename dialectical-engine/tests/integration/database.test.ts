@@ -11946,14 +11946,15 @@ describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come f
     ];
     return { primary: route("primary"), secondary: route("secondary"), third: route("third") };
   };
-  /** The seat harness's story with one path per position of a three-debater debate (P1-P3). */
-  const threePositionStory = (): string => {
+  /** The seat harness's story with one path per position of a debate with `count` debaters (P1-Pcount). */
+  const positionStory = (count: number): string => {
     const story = JSON.parse(seatHarnessStory()) as { short: { paths: unknown[] } };
-    story.short.paths = [1, 2, 3].map((index) => ({
+    story.short.paths = Array.from({ length: count }, (_, offset) => offset + 1).map((index) => ({
       position_ref: `P${String(index)}`, fate: "HELD_UP", line: "This position held up.", node_refs: [`P${String(index)}`]
     }));
     return JSON.stringify(story);
   };
+  const threePositionStory = (): string => positionStory(3);
   /** A claim-time probe: each of `refs` is ABSENT, every other member HEALTHY with its pinned model (T9/J24's probe). */
   const absentFor = (...refs: string[]): NonNullable<WalkingSkeletonSettings["claimTimeProbe"]> => async (member) =>
     refs.includes(member.provider_ref)
@@ -12034,13 +12035,20 @@ describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come f
     ]);
   });
 
-  it("a pinned story member not claim-eligible hands the story to the register's ref (today's FALLBACK-seat rule)", async () => {
-    // The primary, the pinned story checker, is absent at claim; the answer's pinned pair is not touched.
-    const story = seatStoryWriter(SEAT_ROUTES.secondary.providerRef);
+  /**
+   * Task 12 ("always an answer"): a pinned story member not claim-eligible hands its role to another claim-eligible
+   * member of the run's stored panel, in panel order — the storyteller to one of another maker than the pinned story
+   * checker, the story checker to one of another maker than the storyteller serving; only when there is none, to the
+   * register's story ref if that is a panel ref; else today's STORY_ROLE_UNAVAILABLE. The lineage names who served.
+   */
+  it("a pinned story checker not claim-eligible: the next claim-eligible panel member of another maker checks the story", async () => {
+    // The primary, the pinned story checker, is absent at claim; the answer's pinned pair is not touched. The register's
+    // story refs name the absent primary too, so a story handed to the register's ref would fail STORY_ROLE_UNAVAILABLE.
+    const story = seatStoryWriter(SEAT_ROUTES.primary.providerRef);
     const answers = Object.freeze({ storyteller: seatHarnessStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
     const scenario = await executeSeatScenario({
-      label: "rotation-story-fallback", rotation: ROTATION, panelSize: 3,
-      ...rotationDoubles("rotation-story-fallback", "secondary", "third"),
+      label: "rotation-story-checker-stand-in", rotation: ROTATION, panelSize: 3,
+      ...rotationDoubles("rotation-story-checker-stand-in", "secondary", "third"),
       settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.primary.providerRef) },
       storyAnswers: { third: answers, secondary: answers }
     });
@@ -12049,10 +12057,82 @@ describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come f
       writer: SEAT_ROUTES.secondary.providerRef, checker: SEAT_ROUTES.third.providerRef
     })]);
     expect(story.records).toEqual([expect.objectContaining({
-      outcome: "READY",
+      outcome: "READY", failureCode: null,
       storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.third.providerRef }),
       checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.secondary.providerRef })
     })]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("STORY:"))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.third.providerRef],
+      ["STORY:CHECKER:1", "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+  });
+
+  it("a pinned storyteller not claim-eligible: the next claim-eligible panel member writes the story, and the pinned checker still checks", async () => {
+    // The third, the pinned storyteller, is absent. In panel order the primary comes first and is not of the pinned
+    // story checker's (the secondary's) maker: it writes; the secondary still checks. The register's ref is the absent third.
+    const rotation = { ...ROTATION, answerWriter: pick("secondary"), answerChecker: pick("primary"), storyteller: pick("third"), storyChecker: pick("secondary") };
+    const story = seatStoryWriter(SEAT_ROUTES.third.providerRef);
+    const answers = Object.freeze({ storyteller: seatHarnessStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-storyteller-stand-in", rotation, panelSize: 3,
+      ...rotationDoubles("rotation-storyteller-stand-in", "secondary", "primary"),
+      settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef) },
+      storyAnswers: { primary: answers, secondary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY", failureCode: null,
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.secondary.providerRef })
+    })]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("STORY:"))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.primary.providerRef],
+      ["STORY:CHECKER:1", "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+  });
+
+  /** A two-member panel (primary, secondary) whose pinned checkers are both the secondary, absent at claim. */
+  const TWO_MAKER_ROTATION: RunRoleRotationInputWithoutRun = Object.freeze({
+    ...ROTATION,
+    answerWriter: pick("primary"), answerChecker: pick("secondary"), storyteller: pick("primary"), storyChecker: pick("secondary"),
+    eligibleModelIds: Object.freeze([SEAT_ROUTES.primary.model, SEAT_ROUTES.secondary.model])
+  });
+
+  it("no claim-eligible panel member of another maker: the register's story ref checks the story when it is a panel ref", async () => {
+    // The secondary is absent: the answer's checker stands in as the sealed primary (a panel ref), and no other maker
+    // is left for the story checker, so the register's story ref (the primary, a claim-eligible panel ref) checks.
+    const story = seatStoryWriter(SEAT_ROUTES.primary.providerRef);
+    const answers = Object.freeze({ storyteller: positionStory(1), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-story-register-ref", rotation: TWO_MAKER_ROTATION, panelSize: 2,
+      ...rotationDoubles("rotation-story-register-ref", "primary", "primary"),
+      settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef) },
+      storyAnswers: { primary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY", failureCode: null,
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef })
+    })]);
+  });
+
+  it("no claim-eligible panel member of another maker and a register story ref off the panel: today's STORY_ROLE_UNAVAILABLE", async () => {
+    // The register's story refs name the twin route: configured, healthy, of the primary's model, but not on the panel.
+    const story = seatStoryWriter(SEAT_TWIN.providerRef);
+    const answers = Object.freeze({ storyteller: seatHarnessStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-story-unavailable", rotation: TWO_MAKER_ROTATION, panelSize: 2, twin: true,
+      ...rotationDoubles("rotation-story-unavailable", "primary", "primary"),
+      settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef) },
+      storyAnswers: { primary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(story.records).toEqual([expect.objectContaining({ outcome: "FAILED", failureCode: "STORY_ROLE_UNAVAILABLE" })]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("STORY:"))).toEqual([]);
   });
 
   /**

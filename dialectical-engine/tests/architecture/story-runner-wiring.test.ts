@@ -83,18 +83,21 @@ describe("verdict story — wired into the shipped runner, after settle, never i
   /**
    * Role rotation (spec 2026-10-11 Part 6): a rotated run (never an assigned one;
    * the claim refuses both pins) hands its story the pinned storyteller and story
-   * checker, looked up among the run's claim-eligible members; a member that is
-   * not claim-eligible reads null, so the story keeps the register's ref.
+   * checker, looked up among the run's claim-eligible members. Task 12 ("always an
+   * answer"): a pinned member that is not claim-eligible hands its role to another
+   * claim-eligible member of the run's stored panel, in panel order
+   * (`storyRotationRoleMakers`); none, null, and the register's story ref serves only
+   * when it is a panel ref (the rotated run's resolver refuses any other ref).
    */
-  it("hands a rotated run's story its pinned pair, among the run's claim-eligible members (role rotation)", async () => {
+  it("hands a rotated run's story its pinned pair, or a panel stand-in, among the run's claim-eligible members (role rotation)", async () => {
     const runner = await read("apps/runner/src/index.ts");
     const snapshot = runner.slice(runner.indexOf("input: buildStoryRunSnapshot({"),
       runner.indexOf('return { kind: "COMPLETED", answerId: persisted.answerId };'));
-    expect(snapshot).toMatch(/: rotationPin === null\s+\? undefined\s+: \{\s+storyteller: storyRotationRoleMaker\(rotationPin\.storyteller\.providerRef\),\s+checker: storyRotationRoleMaker\(rotationPin\.storyChecker\.providerRef\)\s+\}/u);
-    const helper = runner.slice(runner.indexOf("const storyRotationRoleMaker = (providerRef: string) => {"),
-      runner.indexOf("input: buildStoryRunSnapshot({"));
-    expect(helper).toContain("const maker = synthesisMakers.find((candidate) => candidate.providerRef === providerRef);");
-    expect(helper).toContain("return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };");
+    expect(snapshot).toMatch(/: rotationPin === null\s+\? undefined\s+: storyRotationRoleMakers\(\{\s+panelRefs: run\.discoveredPanel\.map\(\(member\) => member\.provider_ref\),\s+claimEligible: synthesisMakers,\s+storytellerRef: rotationPin\.storyteller\.providerRef,\s+storyCheckerRef: rotationPin\.storyChecker\.providerRef\s+\}\)/u);
+    expect(snapshot).toContain("if (rotationPin !== null && !panelRefs.has(roleRef)) return null;");
+    expect(runner).not.toContain("const storyRotationRoleMaker = ");
+    const helper = await read("apps/runner/src/story-snapshot.ts");
+    expect(helper).toContain("export function storyRotationRoleMakers(");
   });
 
   it("keeps the runner's framed-prompt builders at one: the story builds its prompts in packages/story", async () => {
