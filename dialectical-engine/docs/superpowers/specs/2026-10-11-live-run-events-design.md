@@ -30,7 +30,9 @@ One request = one admission = one long-lived stream.
 3. While nothing new is sent, write an SSE comment `: keep-alive` at least every 15 s, so the UI proxy and
    Caddy never cut an idle stream.
 4. The stream ends when: a `run.terminal` event has been sent; the change mark says the run is settled (every
-   work item DONE or FAILED) and its last events were sent; the run is no longer the caller's (the mark
+   work item DONE or FAILED) — right after the replay when it was settled at open (the settled page's one-shot
+   read), or after one quiet minute when it settled while watched (its closing events may still be written);
+   the run is no longer the caller's (the mark
    query is owner-gated); the client went away (abort signal: no further query); or the stream has lived
    30 minutes (the page simply reconnects).
 5. The session is re-checked as today: `streamAuthorizedEvents` keeps its 250 ms authority monitor and its
