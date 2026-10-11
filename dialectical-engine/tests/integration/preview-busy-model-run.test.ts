@@ -20,8 +20,8 @@
 // response_format on any other row (packages/providers/src/preview-test.ts:341-346, deepInfraBodyAccepted). So
 // without GLM every story call goes out WITHOUT JSON mode, and the story's reader is a strict JSON.parse
 // (packages/story/src/validate.ts:262-270),
-// with the storyteller's one repair turn (story bound maxAttempts 2) as the only fallback. The doubles below answer
-// bare JSON, so this file proves the plumbing, not that a real model answers bare JSON without JSON mode.
+// with the storyteller's one repair turn (story bound maxAttempts 2) as the only fallback. The doubles
+// (tests/support/preview-gate-stubs.ts) answer bare JSON, so this file proves the plumbing, not that a real model answers bare JSON without JSON mode.
 //
 // Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, "Tests" T1 and T2): the
 // second describe replays the live incident of run b53b9a9e on the same harness. Five makers at depth 2 with the
@@ -29,14 +29,9 @@
 // the DeepInfra gate halts after its 4th unbilled release (409 PREVIEW_TEST_AUTHORITY_STOPPED, /remaining "halted").
 // Both expect the run to be served all the same. They were written red first, against 8b3201d75.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { createServer, type Server } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery";
 import { RunRepository, insertRunRoleRotation, migrate, type DiscoveredPanelMember } from "@debateai/db";
-import { argumentLanguageDirective } from "@debateai/kernel";
 import {
   assertPreviewProviderTargets,
   assertPreviewRoleTargets,
@@ -78,8 +73,6 @@ import {
 } from "@debateai/scorecard";
 import { ServeRepository } from "@debateai/serve";
 import {
-  STORY_CHECKER_CONTRACT_ID,
-  STORYTELLER_CONTRACT_ID,
   StoryRepository,
   StoryWriter,
   loadStoryPack,
@@ -87,8 +80,7 @@ import {
 } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS, DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
-import { framedField, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
-import { reviewArtifact, withRequestDerivedBearings } from "../support/reviewBearings.js";
+import { startPreviewGateStubs, type GateDebateScripts } from "../support/preview-gate-stubs.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
@@ -165,249 +157,45 @@ const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:preview-busy-model-run" });
 
 let database: TestDatabase;
-const servers: Server[] = [];
-const directories: string[] = [];
+const stubClosers: (() => Promise<void>)[] = [];
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
 }, 600_000);
 afterEach(async () => {
-  await Promise.all(servers.splice(0).map((server) => new Promise<void>((done) => server.close(() => done()))));
-  await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  await Promise.all(stubClosers.splice(0).map((close) => close()));
 });
 afterAll(async () => database?.stop());
 
-/* ------------------------------------------------------------------ the doubles' answers */
-
-const judgement = (statement: string): string => JSON.stringify({
-  statement, way_of_knowing: "REASONING", locator: null, restatement_text: statement, restatement_status: "PASS",
-  value_laden: false, claim_type: "unknown",
-  steelman: { summary: statement, fidelity: 0.72 },
-  critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
-  evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] },
-  fallacy: { severity: 0.28, fatalFlags: [] }
-});
-/** A panel member's assessment at fidelity 0 (tau 0): it never displaces an author's voice (tests/integration/database.test.ts). */
-const PANEL_ASSESSMENT = JSON.stringify({
-  steelman: { summary: "Panel member assessment.", fidelity: 0 },
-  critic: { summary: "Panel member counter.", counterargumentStrength: 1, basis: "PLAUSIBLE_COUNTER" },
-  evidence: { quality: 0, relevance: 0 }, context: { fit: 0, ambiguityFlags: [] }, fallacy: { severity: 1, fatalFlags: [] }
-});
-const COMPOSITION = JSON.stringify({ segments: [
-  { segment_id: "segment:verdict", text: "Congestion pricing on central roads is worth trying.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
-  { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
-] });
-const EVALUATOR_SATISFIED = JSON.stringify({ satisfied: true, objection: null, criteria: {
-  fairness_to_losers: true, statement_label_agreement: true, no_overstatement: true, restatement: true, citation_tracing: true
-} });
-const STORY_CHECKER_SATISFIED = JSON.stringify({ satisfied: true, objection: null, criteria: {
-  faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: true,
-  citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
-} });
-/**
- * A story with one path per position the storyteller was given (P1-Pn: the story's models never see a node id). The
- * positions are read off the request's own `positions` field (packages/story/src/material.ts:528), so a debate that
- * lost a root mid-run (T1, T2) is told with as many paths as it has positions (validate.ts:235,
- * STORY_POSITION_COVERAGE); a debate of five makers has fewer positions than the path cap of 8.
- */
-const positionStory = (chat: string): string => {
-  const positions = JSON.parse(framedField(readFramedMaterial(wirePacket(chat)), "positions")) as readonly { id: string }[];
-  const paragraph = (text: string) => ({ text, node_refs: ["P1"] });
-  return JSON.stringify({
-    shape_id: PACK.defaultShape,
-    short: {
-      headline: "The positions were argued, and they held up.",
-      summary: "You asked whether to price congestion; the answers were weighed against their strongest objections.",
-      confidence: "Fairly sure, until a sourced objection turns up.",
-      paths: positions.map(({ id }) => ({ position_ref: id, fate: "HELD_UP", line: "This position held up.", node_refs: [id] })),
-      change: paragraph("A stronger, sourced objection would change the answer.")
-    },
-    why: { reasons: [paragraph("The first position held up against its strongest objection.")] },
-    long: { sections: ["What you are deciding", "The verdict", "What would change it"].map((title) => ({
-      title, paragraphs: [paragraph(`${title}, in the debate's own terms.`)]
-    })) },
-    reviewer_note: null
-  });
-};
-
 /* ------------------------------------------------------------------ the gates */
 
-type RequestKind = "PROBE" | "STORYTELLER" | "STORY_CHECKER" | "PANEL" | "REVIEW" | "JUDGE" | "EVALUATOR" | "COMPOSE";
-type GateName = "deepinfra" | "anthropic";
 /**
- * How the gate answered a /complete request: by its contract (OK), a gate-proven unbilled vendor 429 (UNBILLED, 409
- * PROVIDER_REFUSED_UNBILLED), a halted gate (STOPPED, 409 PREVIEW_TEST_AUTHORITY_STOPPED), a billed vendor 500 (BILLED_500,
- * the first describe's GLM rule), or a request no contract answers (UNEXPECTED, a billed vendor 500 too).
+ * Both preview gates over real unix sockets (tests/support/preview-gate-stubs.ts, shared with the preview practice
+ * tool's integration test), speaking the gate's RPC protocol, routed by URL as the gate routes them: `POST /complete`
+ * (one model call) and `POST /remaining` (the read-only day figures, contract A §5). Every /complete request is
+ * recorded in arrival order with how it was answered; every /remaining read is recorded apart. Without `debate`
+ * scripts a GLM request is answered as a billed vendor 500 (and fails the test by the record). A probe takes the next
+ * step of its model's script (OK once spent); with `debate` scripts (GateDebateScripts: absent, the first describe's
+ * rule stands) a scripted model refuses every other request unbilled, and the DeepInfra gate halts at its ceiling
+ * (409 PREVIEW_TEST_AUTHORITY_STOPPED, /remaining "halted"); the Anthropic gate never halts. Every other request is
+ * answered by its contract. The story double tells one path per position the storyteller was handed (its own
+ * `positions` field, packages/story/src/material.ts), so a debate that lost a root mid-run (T1, T2) is told with as
+ * many paths as it has positions (validate.ts STORY_POSITION_COVERAGE).
  */
-type GateAnswer = "OK" | "UNBILLED" | "STOPPED" | "BILLED_500" | "UNEXPECTED";
-type GateRequest = Readonly<{
-  provider: GateName; model: string; kind: RequestKind | "UNKNOWN"; body: Readonly<Record<string, unknown>>; answer: GateAnswer;
-}>;
-/** One read of a gate's `POST /remaining` (contract A §5), with the state it was answered. */
-type RemainingRead = Readonly<{ provider: GateName; state: "active" | "halted" }>;
-/**
- * The run-resilience scripts (spec 2026-10-12 "Tests", T1/T2 setup). Absent, the first describe's rule stands: GLM is
- * never to be called, and a GLM request is answered as a billed vendor 500.
- */
-type DebateScripts = Readonly<{
-  /**
-   * Models that passed their claim probe and then refuse every other request: a gate-proven unbilled vendor 429
-   * (409 PROVIDER_REFUSED_UNBILLED), which the app maps to PreviewUnbilledRefusal (packages/providers/src/preview-test.ts
-   * previewAuthorityRefusal) and withPreviewProviderCallPolicy sends once more after its injected 60-second wait.
-   */
-  unbilled: readonly string[];
-  /**
-   * The DeepInfra gate's day ceiling of unbilled releases (the incident's `unbilled_release_ceiling`): once it has given
-   * this many PROVIDER_REFUSED_UNBILLED answers it HALTS, so every later DeepInfra /complete is refused 409
-   * PREVIEW_TEST_AUTHORITY_STOPPED before anything is reserved, and its /remaining answers state "halted" (the window
-   * stays open). Absent, it never halts. The Anthropic gate never halts.
-   */
-  deepInfraHaltAt?: number;
-}>;
-
-/** The argument-language directive names the machine keys below, so it is removed before routing (as database.test.ts). */
-const LANGUAGE_DIRECTIVE = new RegExp(argumentLanguageDirective("\u0000")
-  .replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\u0000", "[^.]+?"), "gu");
-const PROBE_QUESTION = "Reply exactly: OK";
-
-/**
- * The OpenAI-shaped body the frame reader reads: an Anthropic Messages body carries the system text beside its
- * turns, so it is put back in front of them (the adapter only lifted it out).
- */
-function chatBody(provider: "deepinfra" | "anthropic", body: Readonly<Record<string, unknown>>): string {
-  if (provider === "deepinfra") return JSON.stringify(body);
-  const turns = Array.isArray(body.messages) ? body.messages : [];
-  return JSON.stringify({ messages: typeof body.system === "string" ? [{ role: "system", content: body.system }, ...turns] : turns });
-}
-
-/** Which contract a request is for: the probe by its question, the story by its contract id, the debate by structural keys. */
-function classify(chat: string): RequestKind | "UNKNOWN" {
-  const messages = wirePacket(chat).messages;
-  if (messages.length === 1 && messages[0]!.role === "user" && messages[0]!.content.includes(PROBE_QUESTION)) return "PROBE";
-  const contractId = readFramedMaterial(wirePacket(chat)).contractId;
-  if (contractId === STORYTELLER_CONTRACT_ID) return "STORYTELLER";
-  if (contractId === STORY_CHECKER_CONTRACT_ID) return "STORY_CHECKER";
-  const instruction = (messages[0]?.content ?? "").replace(LANGUAGE_DIRECTIVE, "");
-  // The panel's assessment is the judge's schema WITHOUT restatement_text (tests/unit/t03-judge-panel.test.ts).
-  if (instruction.includes("fatalFlags") && !instruction.includes("restatement_text")) return "PANEL";
-  if (instruction.includes("edge_bearings")) return "REVIEW";
-  if (instruction.includes("restatement_text")) return "JUDGE";
-  if (instruction.includes("fairness_to_losers")) return "EVALUATOR";
-  if (instruction.includes("served_number_refs")) return "COMPOSE";
-  return "UNKNOWN";
-}
-
-/** The vendor's own reply shape: an OpenAI chat completion (DeepInfra) or a Messages reply (Anthropic), with usage. */
-function vendorReply(provider: "deepinfra" | "anthropic", model: string, content: string, id: string): string {
-  return provider === "anthropic"
-    ? JSON.stringify({ id: `msg_${id}`, type: "message", role: "assistant", model, content: [{ type: "text", text: content }],
-      stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 100, output_tokens: 50 } })
-    : JSON.stringify({ id, model, choices: [{ message: { role: "assistant", content }, finish_reason: "stop" }],
-      usage: { prompt_tokens: 100, completion_tokens: 50 } });
-}
-
-/** Contract A §5's reply, exactly the shape packages/providers/src/preview-remaining.ts parsePreviewGateRemaining reads. */
-function remainingReply(provider: GateName, state: RemainingRead["state"]): string {
-  return JSON.stringify(provider === "deepinfra"
-    ? { enabled_models: [GLM, DEEPSEEK, MIMO, QWEN], largest_reservation_usd: "0.500000000", max_concurrent_calls: 10,
-      remaining_calls: 2000, remaining_usd: "10.000000000", state, window_open: true }
-    : { enabled_models: [HAIKU], largest_reservation_usd: "0.500000000", max_concurrent_calls: 2,
-      remaining_calls: 600, remaining_usd: "2.000000000", state, window_open: true });
-}
-
-/**
- * Both preview gates over real unix sockets, speaking the gate's RPC protocol, routed by URL as the gate routes them:
- * `POST /complete` (one model call) and `POST /remaining` (the read-only day figures, contract A §5). Every /complete
- * request is recorded in arrival order with how it was answered; every /remaining read is recorded apart. Without
- * `debate` scripts a GLM request is answered as a billed vendor 500 (and fails the test by the record). A probe takes
- * the next step of its model's script (OK once spent); with `debate` scripts a scripted model refuses every other
- * request unbilled, and the DeepInfra gate halts at its ceiling. Every other request is answered by its contract.
- */
-async function startGates(probeScripts: Readonly<Record<string, readonly ("OK" | "UNBILLED")[]>>, debate?: DebateScripts) {
-  const requests: GateRequest[] = [];
-  const remainingReads: RemainingRead[] = [];
-  const queues = new Map<string, ("OK" | "UNBILLED")[]>(Object.entries(probeScripts).map(([model, steps]) => [model, [...steps]]));
-  /**
-   * The DeepInfra gate's halt: its count of unbilled releases, the index (in `requests`) of the request whose release
-   * reached the ceiling, and the index of the first request it answered STOPPED. The Anthropic gate never halts.
-   */
-  const halt = { unbilledReleases: 0, haltedAt: null as number | null, firstStoppedAt: null as number | null };
-  let served = 0;
-  const answerFor = (kind: RequestKind | "UNKNOWN", chat: string): string | null => {
-    served += 1;
-    switch (kind) {
-      case "PROBE": return "OK";
-      case "STORYTELLER": return positionStory(chat);
-      case "STORY_CHECKER": return STORY_CHECKER_SATISFIED;
-      case "PANEL": return PANEL_ASSESSMENT;
-      case "REVIEW": return withRequestDerivedBearings(reviewArtifact("agree", [`Review ${String(served)} agrees.`]), chat);
-      case "JUDGE": return judgement(`Busy-model debate point ${String(served)}.`);
-      case "EVALUATOR": return EVALUATOR_SATISFIED;
-      case "COMPOSE": return COMPOSITION;
-      default: return null;
-    }
-  };
-  const socketFor = async (provider: GateName): Promise<string> => {
-    const directory = await mkdtemp(join(tmpdir(), "pbr-"));
-    directories.push(directory);
-    const socket = join(directory, "gate.sock");
-    const server = createServer((request, response) => {
-      const chunks: Buffer[] = [];
-      request.on("data", (chunk: Buffer) => chunks.push(chunk));
-      request.on("end", () => {
-        const json = (status: number, payload: string) => response.writeHead(status, { "content-type": "application/json" }).end(payload);
-        if (request.url === "/remaining") {
-          const state = provider === "deepinfra" && halt.haltedAt !== null ? "halted" : "active";
-          remainingReads.push(Object.freeze({ provider, state }));
-          json(200, remainingReply(provider, state));
-          return;
-        }
-        if (request.url !== "/complete") { json(404, JSON.stringify({ error: "NOT_FOUND" })); return; }
-        const execution = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { requestBody: string };
-        const body = JSON.parse(execution.requestBody) as Record<string, unknown>;
-        const model = String(body.model);
-        const chat = chatBody(provider, body);
-        let kind: RequestKind | "UNKNOWN";
-        try { kind = classify(chat); } catch { kind = "UNKNOWN"; }
-        const record = (answer: GateAnswer): number => requests.push(Object.freeze({ provider, model, kind, body, answer })) - 1;
-        const reply = (status: number, vendorBody: string) => json(200, JSON.stringify({ status, body: vendorBody }));
-        const refuse = (code: string) => json(409, JSON.stringify({ error: code }));
-        if (provider === "deepinfra" && halt.haltedAt !== null) {
-          const at = record("STOPPED");
-          halt.firstStoppedAt ??= at;
-          refuse("PREVIEW_TEST_AUTHORITY_STOPPED");
-          return;
-        }
-        if (debate === undefined && model === GLM) {
-          record("BILLED_500");
-          reply(500, JSON.stringify({ error: { message: "GLM must never be called in this test" } }));
-          return;
-        }
-        const unbilled = kind === "PROBE" ? queues.get(model)?.shift() === "UNBILLED" : debate?.unbilled.includes(model) === true;
-        if (unbilled) {
-          const at = record("UNBILLED");
-          if (provider === "deepinfra") {
-            halt.unbilledReleases += 1;
-            if (debate?.deepInfraHaltAt !== undefined && halt.unbilledReleases >= debate.deepInfraHaltAt) halt.haltedAt ??= at;
-          }
-          refuse("PROVIDER_REFUSED_UNBILLED");
-          return;
-        }
-        const content = answerFor(kind, chat);
-        if (content === null) { record("UNEXPECTED"); reply(500, JSON.stringify({ error: { message: "unexpected test request" } })); return; }
-        record("OK");
-        reply(200, vendorReply(provider, model, content, `busy-model-${String(served)}`));
-      });
-    });
-    servers.push(server);
-    await new Promise<void>((done) => server.listen(socket, done));
-    return socket;
-  };
+async function startGates(probeScripts: Readonly<Record<string, readonly ("OK" | "UNBILLED")[]>>, debate?: GateDebateScripts) {
+  const stubs = await startPreviewGateStubs({
+    storyDefaultShape: PACK.defaultShape, probeScripts,
+    ...(debate === undefined ? { refuseModels: [GLM] } : { debate })
+  });
+  stubClosers.push(stubs.close);
   // The /remaining reads arrive on the same socket as /complete, as on the preview (createPreviewRemainingRpcPort).
-  const deepinfra = createPreviewBudgetRpcPort(PREVIEW, await socketFor("deepinfra"));
-  const anthropic = createPreviewBudgetRpcPort(PREVIEW, await socketFor("anthropic"));
-  return { requests, remainingReads, halt, guardedFetch: createPreviewGuardedFetch({ deepinfra, anthropic }) };
+  const deepinfra = createPreviewBudgetRpcPort(PREVIEW, stubs.sockets.deepinfra);
+  const anthropic = createPreviewBudgetRpcPort(PREVIEW, stubs.sockets.anthropic);
+  return {
+    requests: stubs.requests, remainingReads: stubs.remainingReads, halt: stubs.halt,
+    guardedFetch: createPreviewGuardedFetch({ deepinfra, anthropic })
+  };
 }
 
 /* ------------------------------------------------------------------ the runner, composed as main.ts */
