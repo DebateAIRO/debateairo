@@ -230,6 +230,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       .sort();
     expect(providerFiles).toEqual([
       "apps/runner/src/index.ts",
+      // L4-F9 repair: the keep-alive hands each runner call, unchanged, to the
+      // gateway it wraps (the run-required, leased gateway), or refuses it before
+      // anything is sent. It opens no lease and reads no content of its own.
+      "apps/runner/src/run-keep-alive.ts",
       // Model scorecard A15: the seat caller's candidate stamp forwards the leased runner's request.
       "apps/runner/src/run-seats.ts",
       "packages/evaluator/src/index.ts",

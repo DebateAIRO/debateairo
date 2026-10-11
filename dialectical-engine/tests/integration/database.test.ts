@@ -1841,6 +1841,145 @@ describe("P11 / ADR-0017 — claim discipline", () => {
   });
 });
 
+/**
+ * L4-F9 repair (owner ruling 2026-10-11) — the database-backed race the finding
+ * asked for (tests/unit/runner-claim-window.test.ts). A debate is one work item
+ * claimed for a window sized to ONE model call, and a debate makes many, so the
+ * claim used to lapse while the debate was still running: a Hatchet retry (or
+ * the start-up sweep) then claimed the same item and ran the debate a second
+ * time, re-authoring every node and paying for every call again. The running
+ * copy now renews its claim, fenced on the deadline it last saw.
+ */
+describe("L4-F9 / ADR-0017 §3(c) — a running debate keeps its claim", () => {
+  const SHORT_CLAIM_MS = 2_400;
+  const servedAnswer = (): readonly string[] => [
+    JSON.stringify({ statement: "A kept-claim test-layer answer.", way_of_knowing: "REASONING",
+      locator: null, restatement_text: "A kept-claim test-layer answer.", restatement_status: "PASS", value_laden: false,
+      steelman: { summary: "A kept-claim test-layer answer.", fidelity: 0.72 }, critic: { summary: "A test-layer counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+      evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] }, fallacy: { severity: 0.28, fatalFlags: [] } }),
+    JSON.stringify({ segments: [
+      { segment_id: "segment:verdict", text: "A kept-claim test-layer answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+      { segment_id: "segment:research", text: "Check a test-layer source.", node_refs: [], served_number_refs: [] }
+    ] }),
+    evaluatorSatisfied()
+  ];
+
+  /** A gateway whose FIRST call waits until the test releases it: a long model call. */
+  function heldFirstCall(endpoint: string) {
+    const inner = createPostgresProviderGateway(database.pool, { endpoint, model: "test-layer/model", maker: "test-layer" });
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => { release = resolve; });
+    let entered!: () => void;
+    const firstCallSent = new Promise<void>((resolve) => { entered = resolve; });
+    let held = false;
+    const gateway: ProviderGateway = {
+      call: async (request) => {
+        if (!held) {
+          held = true;
+          entered();
+          await released;
+        }
+        return inner.call(request);
+      }
+    };
+    return { gateway, inner, firstCallSent, release };
+  }
+
+  const settled = <T>(promise: Promise<T>) => promise.then(
+    (value) => ({ value }) as const,
+    (error: unknown) => ({ error }) as const
+  );
+
+  it("renews only the claim it holds, and says when the job is already settled", async () => {
+    const work = new WorkItemRepository(database.pool);
+    const { runId, workItemId } = await createRunnerWork(`l4f9-renew-${randomUUID()}`);
+    const workerId = "worker:l4f9";
+    const claimed = await work.claimById({ workItemId, workerId, claimSeconds: 30 });
+    if (claimed === null) throw new Error("TEST_EXPECTED_CLAIM");
+
+    const renewed = await work.renewClaim({ workItemId, workerId, claimSeconds: 60, heldUntil: claimed.claimDeadline });
+    if (renewed.kind !== "RENEWED") throw new Error(`TEST_EXPECTED_RENEWAL:${renewed.kind}`);
+    expect(renewed.claimDeadline.getTime()).toBeGreaterThan(claimed.claimDeadline.getTime());
+    // The deadline seen before the renewal is no longer the claim: a stale fence renews nothing.
+    await expect(work.renewClaim({ workItemId, workerId, claimSeconds: 60, heldUntil: claimed.claimDeadline }))
+      .resolves.toEqual({ kind: "LOST" });
+
+    // The claim lapses and a second copy takes the item — under the SAME worker id,
+    // which is what a Hatchet retry in the same process looks like.
+    await database.pool.query(
+      "UPDATE core.work_item SET claim_deadline = clock_timestamp() - interval '1 second' WHERE work_item_id = $1",
+      [workItemId]
+    );
+    const second = await work.claimById({ workItemId, workerId, claimSeconds: 30 });
+    if (second === null) throw new Error("TEST_EXPECTED_RECLAIM");
+    await expect(work.renewClaim({ workItemId, workerId, claimSeconds: 60, heldUntil: renewed.claimDeadline }))
+      .resolves.toEqual({ kind: "LOST" });
+    await expect(work.renewClaim({ workItemId, workerId, claimSeconds: 60, heldUntil: second.claimDeadline }))
+      .resolves.toMatchObject({ kind: "RENEWED" });
+
+    await work.recordTerminalFailure({ runId, workItemId, reason: "TEST_LAYER_SETTLED" });
+    await expect(work.renewClaim({ workItemId, workerId, claimSeconds: 60, heldUntil: second.claimDeadline }))
+      .resolves.toEqual({ kind: "FINISHED" });
+  });
+
+  it("makes a second dispatch stand down while the debate outlives its first claim", async () => {
+    const { workItemId } = await createRunnerWork(`l4f9-race-${randomUUID()}`);
+    const provider = await startProviderDouble(servedAnswer());
+    const held = heldFirstCall(provider.endpoint);
+    const settings = { ...runnerSettings(), claimMs: SHORT_CLAIM_MS };
+    const secondCopyCalls: ProviderCallRequest[] = [];
+    const secondCopy = new WalkingSkeletonRunner(database.pool, {
+      call: async (request) => {
+        secondCopyCalls.push(request);
+        return held.inner.call(request);
+      }
+    }, settings);
+    try {
+      const first = settled(new WalkingSkeletonRunner(database.pool, held.gateway, settings).executeWorkItem(workItemId));
+      await held.firstCallSent;
+      // Well past the first claim's whole length: before the repair it had lapsed here.
+      await new Promise((resolve) => setTimeout(resolve, SHORT_CLAIM_MS + 1_200));
+      await expect(secondCopy.executeWorkItem(workItemId)).resolves.toEqual({ kind: "NO_WORK" });
+      held.release();
+      expect(await first).toMatchObject({ value: { kind: "COMPLETED" } });
+      expect(secondCopyCalls).toEqual([]);
+    } finally {
+      held.release();
+      await provider.stop();
+    }
+  });
+
+  it("makes no further model call once another copy holds the claim", async () => {
+    const { workItemId } = await createRunnerWork(`l4f9-lost-${randomUUID()}`);
+    const provider = await startProviderDouble(servedAnswer());
+    const held = heldFirstCall(provider.endpoint);
+    try {
+      const first = settled(new WalkingSkeletonRunner(database.pool, held.gateway, {
+        ...runnerSettings(), claimMs: SHORT_CLAIM_MS
+      }).executeWorkItem(workItemId));
+      await held.firstCallSent;
+      // Another copy's claim: the deadline the running copy last saw is gone.
+      await database.pool.query(
+        "UPDATE core.work_item SET claim_deadline = clock_timestamp() + interval '1 hour' WHERE work_item_id = $1",
+        [workItemId]
+      );
+      // One renewal beat (a third of the claim) and a margin.
+      await new Promise((resolve) => setTimeout(resolve, SHORT_CLAIM_MS / 3 + 600));
+      held.release();
+      expect(await first).toMatchObject({ error: { code: "RUNNER_CLAIM_LOST" } });
+      // Only the call already in flight reached the vendor.
+      expect(provider.calls()).toBe(1);
+      const item = await database.pool.query<{ state: string }>(
+        "SELECT state FROM core.work_item WHERE work_item_id = $1", [workItemId]
+      );
+      expect(item.rows[0]?.state).toBe("CLAIMED");
+    } finally {
+      held.release();
+      await provider.stop();
+    }
+  });
+});
+
 describe("P7 — graph aggregate write seam", () => {
   it("serializes graph writes with an advisory lock and materialises an immutable one-node snapshot", async () => {
     const run = new RunRepository(database.pool);

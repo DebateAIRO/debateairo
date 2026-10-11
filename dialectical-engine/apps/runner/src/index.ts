@@ -194,6 +194,7 @@ import {
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 
 // Model scorecard A15/A16: the seat book and the seat caller live in their own module.
 export * from "./run-seats.js";
@@ -393,10 +394,15 @@ export type ReviewFailureOutcome =
  * Task M2: `RUN_COST_ENVELOPE_EXHAUSTED` left this list. The attempt ceiling is
  * a phase stop now (`RUN_BODY_STOP_KINDS`), so a review it refuses is a
  * `BUDGET_STOP` — the entry here could no longer be reached.
+ *
+ * L4-F9 repair: a debate that must stop (its claim taken, or its time limit
+ * reached) is not one unavailable review; the stop leaves as it arrived.
  */
 const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
   "CALL_BUDGET_EXHAUSTED",
-  "PRODUCER_GRADING_FORBIDDEN"
+  "PRODUCER_GRADING_FORBIDDEN",
+  "RUNNER_CLAIM_LOST",
+  "RUNNER_TIME_LIMIT_REACHED"
 ]);
 
 export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
@@ -4058,7 +4064,10 @@ export class WalkingSkeletonRunner {
     this.#runs = new RunRepository(pool);
     this.#work = new WorkItemRepository(pool);
     this.#graph = new GraphRepository(pool);
-    this.#judge = new Judge(provider);
+    // L4-F9 repair: every model call the runner makes goes through the keep-alive
+    // of the debate making it, refused once that debate must stop.
+    const primary = keepAliveProviderGateway(provider);
+    this.#judge = new Judge(primary);
     this.#judgements = new JudgementRepository(pool);
     this.#ledger = new LedgerRepository(pool);
     this.#budget = new BudgetRepository(pool);
@@ -4068,20 +4077,20 @@ export class WalkingSkeletonRunner {
     this.#providerProbes = new ProviderProbeRepository(pool);
     this.#serveDisclosure = settings.serveDisclosure?.store ?? new ServeDisclosureRepository(pool);
     this.#costSubstitutions = settings.costSubstitutions?.store ?? new RunCostSubstitutionRepository(pool);
+    const critique = settings.critique === undefined ? undefined
+      : { ...settings.critique, provider: keepAliveProviderGateway(settings.critique.provider) };
     this.#configuredMakers = Object.freeze([
-      Object.freeze({ judge: this.#judge, provider, providerRef: settings.providerRef, maker: settings.maker }),
-      ...(settings.critique === undefined ? [] : [Object.freeze({
-        judge: new Judge(settings.critique.provider),
-        provider: settings.critique.provider,
-        providerRef: settings.critique.providerRef,
-        maker: settings.critique.maker
+      Object.freeze({ judge: this.#judge, provider: primary, providerRef: settings.providerRef, maker: settings.maker }),
+      ...(critique === undefined ? [] : [Object.freeze({
+        judge: new Judge(critique.provider),
+        provider: critique.provider,
+        providerRef: critique.providerRef,
+        maker: critique.maker
       })]),
-      ...(settings.additionalMakers ?? []).map((maker) => Object.freeze({
-        judge: new Judge(maker.provider),
-        provider: maker.provider,
-        providerRef: maker.providerRef,
-        maker: maker.maker
-      }))
+      ...(settings.additionalMakers ?? []).map((maker) => {
+        const kept = keepAliveProviderGateway(maker.provider);
+        return Object.freeze({ judge: new Judge(kept), provider: kept, providerRef: maker.providerRef, maker: maker.maker });
+      })
     ]);
   }
 
@@ -4152,8 +4161,8 @@ export class WalkingSkeletonRunner {
     }
   }
 
-  async executeWorkItem(workItemId: string): Promise<RunnerExecutionResult> {
-    return this.execute(workItemId);
+  async executeWorkItem(workItemId: string, task?: RunnerTaskControl): Promise<RunnerExecutionResult> {
+    return this.execute(workItemId, task);
   }
 
   async executeValueOverlay(input: ValueOverlayExecutionInput): Promise<MixedValueAnswer> {
@@ -4241,7 +4250,7 @@ export class WalkingSkeletonRunner {
     });
   }
 
-  private async execute(workItemId?: string): Promise<RunnerExecutionResult> {
+  private async execute(workItemId?: string, task?: RunnerTaskControl): Promise<RunnerExecutionResult> {
     // W10/3: the claim must cover the LONGEST call this execution can make, and
     // since the synthesis legs now spend their own sealed bounds those two
     // deadlines belong in the max. The composer/conformance pair STAYS: both are
@@ -4401,6 +4410,21 @@ export class WalkingSkeletonRunner {
     if (claimed === null) return { kind: "NO_WORK" };
     if (claimed.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", claimed.workItemId);
     const claimedRunId = claimed.runId;
+    /**
+     * L4-F9 repair (owner ruling 2026-10-11): the claim covers ONE model call and
+     * the debate makes many, so it is renewed while the debate runs, fenced on the
+     * deadline last seen; a second dispatch then finds the item taken. The debate
+     * stops at its next model call once the claim is another copy's, or once
+     * Hatchet gives up on the task (run-keep-alive.ts).
+     */
+    const keepAlive = startRunKeepAlive({
+      claimDeadline: claimed.claimDeadline,
+      renewEveryMs: this.settings.claimMs / 3,
+      renew: (heldUntil) => this.#work.renewClaim({ ...claimInput, workItemId: claimed.workItemId, heldUntil }),
+      ...(task === undefined ? {} : { task })
+    });
+    try {
+    return await runKeepAliveScope.run(keepAlive, async () => {
     /**
      * VERDICT STORY (spec §3, amended): what the settled debate hands its story.
      * The snapshot is built INSIDE the lease below, where the in-memory material
@@ -8340,6 +8364,10 @@ export class WalkingSkeletonRunner {
       }
     }
     return executed;
+    });
+    } finally {
+      keepAlive.stop();
+    }
   }
 }
 
@@ -8781,8 +8809,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RISK_TIER_POLICY_PROVENANCE_MISSING",
   "RISK_TIER_POLICY_UNRESOLVED",
   "RIVAL_CARVER_UNAVAILABLE",
+  "RUNNER_CLAIM_LOST",
   "RUNNER_DISCLOSURE_PIPELINE_FAILED",
   "RUNNER_FAILURE_STATE_NOT_RECORDED",
+  "RUNNER_TIME_LIMIT_REACHED",
   "RUN_CEILING_BELOW_FIRST_CALL",
   "RUN_CEILING_BELOW_ONE_CALL",
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
@@ -9432,11 +9462,14 @@ export function declareHatchetWalkingSkeletonTask(input: {
   if (!Number.isInteger(input.engineRetries) || input.engineRetries < 0) {
     throw new TypeError("Hatchet retry count must be a non-negative register value");
   }
+  const executionTimeout = input.previewExecutionTimeout ?? RUNNER_EXECUTION_LIMIT;
+  // The debate keeps its own copy of the limit it was registered with (L4-F9 repair).
+  const executionLimitMs = Number(executionTimeout.slice(0, -1)) * 1_000;
   return input.client.task({
     name: input.workflowName,
     retries: input.engineRetries,
     scheduleTimeout: RUNNER_QUEUE_WAIT_LIMIT,
-    executionTimeout: input.previewExecutionTimeout ?? RUNNER_EXECUTION_LIMIT,
+    executionTimeout,
     // S06 capture binding. It was written in e8d99d33 and destroyed by the
     // conflict resolution in merge 1c9578a2, which took the mainline side of
     // this file whole; the test that specifies it survived the same merge.
@@ -9445,7 +9478,11 @@ export function declareHatchetWalkingSkeletonTask(input: {
     // that escapes is the one that would have escaped without any of this.
     fn: async (
       rawDispatch: { runId: string; workItemId: string },
-      hatchetContext?: { retryCount?(): number }
+      hatchetContext?: {
+        retryCount?(): number;
+        readonly abortController?: { readonly signal: AbortSignal };
+        refreshTimeout?(incrementBy: `${number}s`): Promise<void>;
+      }
     ) => {
       // L4-F6: BEFORE the runner, before the repository, before anything reads
       // a field — and, at INT2 (SYNC2 into integration), before the S06 capture
@@ -9473,9 +9510,27 @@ export function declareHatchetWalkingSkeletonTask(input: {
         && observedRetryCount >= 0
         ? observedRetryCount
         : 0;
+      // L4-F9 repair: the debate hears Hatchet — its stop signal, its "still
+      // working" call and its limit. Read inside a guard like retryCount: a
+      // throwing accessor never stops the debate from starting; without the
+      // signal the debate still stops at the limit on its own clock.
+      let signal: AbortSignal | undefined;
+      try {
+        signal = hatchetContext?.abortController?.signal;
+      } catch {
+        signal = undefined;
+      }
+      const refreshTimeout = typeof hatchetContext?.refreshTimeout === "function"
+        ? (incrementBy: `${number}s`) => hatchetContext.refreshTimeout!(incrementBy)
+        : undefined;
+      const task: RunnerTaskControl = Object.freeze({
+        executionLimitMs,
+        ...(signal === undefined ? {} : { signal }),
+        ...(refreshTimeout === undefined ? {} : { refreshTimeout })
+      });
       const execute = async () => {
         try {
-          const result = await input.runner.executeWorkItem(dispatch.workItemId);
+          const result = await input.runner.executeWorkItem(dispatch.workItemId, task);
           return result.kind === "COMPLETED"
             ? { kind: result.kind, answerId: result.answerId }
             : { kind: result.kind };
@@ -9492,6 +9547,12 @@ export function declareHatchetWalkingSkeletonTask(input: {
             source: "hatchet",
             attemptIndex
           }));
+          // L4-F9 repair: a copy whose claim another copy took leaves the work
+          // item to that copy. Recording FAILED here would end a debate that is
+          // still running, under the asker's eyes.
+          if (error instanceof TypedDomainError && error.code === "RUNNER_CLAIM_LOST") {
+            throw scrubbedTaskFailure(error);
+          }
           const recorded = await input.failures.recordTerminalFailure({
             runId: dispatch.runId,
             workItemId: dispatch.workItemId,
