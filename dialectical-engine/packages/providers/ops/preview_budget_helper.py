@@ -427,7 +427,11 @@ class DeepInfraProfile:
 PriceStep = namedtuple('PriceStep', 'name prompt_tokens_up_to input_usd_per_m cache_write_5m_usd_per_m '
                                     'cache_write_1h_usd_per_m cache_read_usd_per_m output_usd_per_m')
 ANTHROPIC_USAGE_KEYS = frozenset({'input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens',
-                                  'cache_creation', 'server_tool_use', 'service_tier', 'inference_geo'})
+                                  'cache_creation', 'server_tool_use', 'service_tier', 'inference_geo',
+                                  'output_tokens_details'})
+# usage.output_tokens_details (Messages reference, read 2026-10-11): a read-only split of output_tokens,
+# which stays the inclusive billed total; thinking_tokens <= output_tokens. Nothing in it is charged.
+ANTHROPIC_OUTPUT_DETAIL_KEYS = frozenset({'thinking_tokens'})
 ANTHROPIC_CACHE_SPLIT_KEYS = frozenset({'ephemeral_5m_input_tokens', 'ephemeral_1h_input_tokens'})
 # The characters JavaScript's String.prototype.trim() removes (WhiteSpace and LineTerminator):
 # the app's adapter refuses text that is only these, and body_valid refuses exactly the same text.
@@ -573,6 +577,13 @@ class AnthropicProfile:
         input_tokens, output_tokens = usage.get('input_tokens'), usage.get('output_tokens')
         creation, read = usage.get('cache_creation_input_tokens'), usage.get('cache_read_input_tokens')
         if not (integer(input_tokens) and integer(output_tokens)):
+            return None
+        # The thinking split is informational: output_tokens already includes it. A split this profile does
+        # not know, or one larger than the billed total, makes the usage invalid.
+        details = usage.get('output_tokens_details')
+        if details is not None and not (isinstance(details, dict) and set(details) <= ANTHROPIC_OUTPUT_DETAIL_KEYS
+                                        and all(integer(value) for value in details.values())
+                                        and details.get('thinking_tokens', 0) <= output_tokens):
             return None
         if not all(value is None or integer(value) for value in (creation, read)):
             return None

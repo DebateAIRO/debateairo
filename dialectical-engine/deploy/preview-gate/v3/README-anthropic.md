@@ -71,6 +71,11 @@ cache reads.
   search or other server tool, a region other than "global", a service tier other than
   "standard", a code container, context editing, token counts outside the usage block, or any
   answer part other than text or thinking: the call is held in full and the gate halts.
+- The usage fields it knows: `input_tokens`, `output_tokens`, `cache_creation_input_tokens`,
+  `cache_read_input_tokens`, `cache_creation` (the 5-minute/1-hour split), `server_tool_use` (all zero),
+  `service_tier` ("standard"), `inference_geo` ("global") and `output_tokens_details` (since 2026-10-11:
+  `thinking_tokens`, a read-only part of `output_tokens`, which stays the billed total; Haiku 5.5 thinks by
+  default, so every real answer carries it, and the first live probe halted on it).
 - A price change is a reviewed code change (the gate, the app and their shared test file
   `tests/unit/fixtures/preview-model-rows-anthropic.json`), never an edit of the GO.
 
