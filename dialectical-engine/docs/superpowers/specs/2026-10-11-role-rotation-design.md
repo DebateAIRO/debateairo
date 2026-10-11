@@ -67,7 +67,7 @@ A new code-owned register row, **`answerRoleRotationPolicy`**, alone in its own 
 - It is **not** a `register.required_row`, needs no migration, and is **not** added to `developmentRows` in `apps/runner/src/dev-deployment-register.ts` (that would shift every count pin and the byte-for-byte v1 preview kit, which hard-fails on 66 rows). Local development without the row is today's engine; tests publish the row where they need it.
 - At run time only the API reads it (admission decides); the hosted publish's boot-readiness check also reads it, to refuse a malformed row before a restart. The runner's debate code never reads it: a pin present means a rotated debate, whatever the register says later.
 
-**Preview.** The v2 publish kit (`deploy/preview-auth-dev/v1/publish-register-v2.ts`) builds the row with `enabled: true` and adds `answerRoleRotationPolicy` to `PREVIEW_SOURCE_ROW_KEYS_V2` (66 to 67 keys). The v1 kit is untouched. It reaches the live preview only when the operator republishes the register.
+**Preview.** The v2 publish kit (`deploy/preview-auth-dev/v1/publish-register-v2.ts`) builds the row with `enabled: true` by default and adds `answerRoleRotationPolicy` to `PREVIEW_SOURCE_ROW_KEYS_V2` (66 to 67 keys). The operator's choice `roleRotation: 'on' | 'off'` (default `'on'`; release tool `--role-rotation off`, carried by the native plan as `roleRotation: "off"`) maps to `enabled: true | false`; the row stays present either way, so the composer's base-row refusal is never hit. The v1 kit is untouched. It reaches the live preview only when the operator republishes the register.
 
 **Hosted.** The hosted register file (`apps/runner/src/hosted-register-publish.ts`) gains an optional operator member, `answerRoleRotation: { "enabled": true | false }`, published as the row under the file's sourceRef; absent publishes no row. `verifyHostedRegisterBootReadiness` reads the row (absent is fine; malformed refuses). `pnpm hosted:publish-provider-set` copies its base version's rows, so the row survives a provider-set republish. Rotation names no provider ref of its own, so `assertHostedRoleProvidersKept` (`apps/runner/src/hosted-provider-set.ts:174-183`) needs no change: the four register refs stay required as the fallback.
 
@@ -212,7 +212,8 @@ All tests use stand-in providers; no paid calls.
 
 - Preview: apply migration 0114 only through the native operator's `apply-and-plan`, with the owner's yes (the preview refuses to start while a chain step is pending); then republish the register with the v2 kit (adds the row, `enabled: true`); then restart the API and the runner. Billing stays off; local mode stays.
 - Hosted: the operator adds `answerRoleRotation` to the hosted register file when wanted, publishes, repins `REGISTER_VERSION`, restarts.
-- Rollback: republish without the row (a new register version) and restart; pinned debates keep their pins.
+- Rollback on the preview: republish with `off` (`native-plan --operation plan --role-rotation off`, owner review, publish, verify; a new register version whose only change is the row's `enabled: false`), then restart the API and the runner. No code change. Pinned debates keep their pins.
+- Rollback on hosted: republish with `answerRoleRotation: { "enabled": false }`, repin `REGISTER_VERSION` and restart; pinned debates keep their pins.
 
 ## Questions for the owner
 

@@ -18,7 +18,9 @@
 //   release-artifacts.mjs native-plan --operation apply-and-plan|plan|publish|verify --from <existing native plan>
 //       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
 //       [--publication <publish output>] [--checker glm|deepseek --deepseek-enabled-on-gate yes] --out <file>
-//       (--checker only with --operation plan; publish carries the plan's choice; default glm)
+//       [--role-rotation on|off]
+//       (--checker and --role-rotation only with --operation plan; publish carries the plan's choices;
+//        defaults glm and on; --role-rotation off publishes the rotation row disabled: the preview's rollback)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
@@ -86,7 +88,7 @@ const COMMANDS = Object.freeze({
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate'] }
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation'] }
 });
 
 export class Refusal extends Error {
@@ -413,6 +415,9 @@ async function nativePlanCommand(options, { layout, deps }) {
   if ((checker !== undefined || acknowledged !== undefined) && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--checker']);
   if (checker === 'deepseek' && acknowledged !== 'yes') refuse('CHECKER_DEEPSEEK_NOT_ENABLED_ON_GATE');
   if (acknowledged !== undefined && checker !== 'deepseek') refuse('ARGUMENTS_REFUSED', ['--deepseek-enabled-on-gate']);
+  // Role rotation stays on unless the operator says off for a new `plan` (publish-register-v2.ts checks it again).
+  const roleRotation = options['--role-rotation'];
+  if (roleRotation !== undefined && (!['on', 'off'].includes(roleRotation) || operation !== 'plan')) refuse('ARGUMENTS_REFUSED', ['--role-rotation']);
   await assertOutputFree(options['--out'], { layout });
   // Lazy: native-operator.mjs loads tsx and pg, which exist only in an installed release root.
   const validateNativePlan = deps.validateNativePlan ?? (await import('../../preview-auth-dev/v1/native-operator.mjs')).validateNativePlan;
@@ -463,11 +468,15 @@ async function nativePlanCommand(options, { layout, deps }) {
   // publish recomposes the snapshot the owner approved, so it carries the plan's checker choice unchanged.
   const checkerChoice = operation === 'plan' ? (checker === 'deepseek' ? { checker: 'deepseek', deepseekEnabledOnGate: true } : undefined)
     : operation === 'publish' ? from.value.checkerChoice : undefined;
+  // The same for the rotation switch: only 'off' is carried ('on' is the default, no field).
+  const rotationChoice = operation === 'plan' ? (roleRotation === 'off' ? 'off' : undefined)
+    : operation === 'publish' ? from.value.roleRotation : undefined;
   const plan = {
     schema: from.value.schema, operation, sourceRoot: source.value.sourceRoot, sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree,
     sourceManifest: { path: source.path, sha256: source.sha256 }, operatorManifestSha256: operatorDigest,
     selectedBaseRegisterVersion, selectedBaseSnapshotSha256, publicationId, approval,
-    ...(checkerChoice === undefined ? {} : { checkerChoice })
+    ...(checkerChoice === undefined ? {} : { checkerChoice }),
+    ...(rotationChoice === undefined ? {} : { roleRotation: rotationChoice })
   };
   try { validateNativePlan(plan); } catch { refuse('NATIVE_PLAN_INVALID'); }
   await (deps.verifySourceManifest ?? verifySourceManifest)(source.value, sourceBinding(source));

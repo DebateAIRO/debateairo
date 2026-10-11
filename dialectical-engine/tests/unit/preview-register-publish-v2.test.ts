@@ -268,6 +268,48 @@ describe('publish kit v2: the checker choice (GLM by default, DeepSeek only on t
   });
 });
 
+describe('publish kit v2: the role rotation switch (on by default; off is a republish, not a code change)', () => {
+  const build = async (roleRotation?: unknown, checker?: unknown) => [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, checker as any, roleRotation as any)] as Row[];
+  const rotation = (rows: Row[]) => JSON.parse(rows.find(row => row.rowKey === ROTATION_KEY)!.valueJsonText);
+
+  it('an explicit \'on\' is the default, byte for byte, and the row is enabled', async () => {
+    expect(await build('on')).toEqual(await build());
+    expect(rotation(await build('on'))).toEqual({ kind: 'ANSWER_ROLE_ROTATION_POLICY', enabled: true, rule: 'LEAST_SHARE_SEEDED_TIE_V1' });
+  });
+
+  it('\'off\' keeps the row present (same reviewed key list) and changes only its enabled flag', async () => {
+    const on = await build('on'), off = await build('off');
+    expect(off.map(row => row.rowKey)).toEqual(on.map(row => row.rowKey));
+    expect(rotation(off)).toEqual({ kind: 'ANSWER_ROLE_ROTATION_POLICY', enabled: false, rule: 'LEAST_SHARE_SEEDED_TIE_V1' });
+    const differing = off.filter((row, index) => JSON.stringify(row) !== JSON.stringify(on[index])).map(row => row.rowKey);
+    expect(differing).toEqual([ROTATION_KEY]);
+  });
+
+  it('switching off is one changed row on top of the published on-version, and switching back restores its snapshot', async () => {
+    const f = await fixture();
+    const first = compose(f.source, f.v9);
+    const off = compose(await build('off'), [...first.rows] as Row[], '10');
+    expect(off.changedKeys).toEqual([ROTATION_KEY]);
+    expect(off.addedKeys).toEqual([]);
+    expect(JSON.parse(off.delta.find(entry => entry.rowKey === ROTATION_KEY)!.oldValueJsonText!).enabled).toBe(true);
+    expect(JSON.parse(off.delta.find(entry => entry.rowKey === ROTATION_KEY)!.newValueJsonText).enabled).toBe(false);
+    const back = compose(await build('on'), [...off.rows] as Row[], '11');
+    expect(back.changedKeys).toEqual([ROTATION_KEY]);
+    expect(back.snapshotSha256).toBe(first.snapshotSha256);
+  });
+
+  it('combines with the DeepSeek checker choice: off moves only the rotation row', async () => {
+    const off = await build('off', DEEPSEEK), on = await build('on', DEEPSEEK);
+    expect(off.filter((row, index) => JSON.stringify(row) !== JSON.stringify(on[index])).map(row => row.rowKey)).toEqual([ROTATION_KEY]);
+  });
+
+  it.each([
+    ['upper case', 'OFF'], ['a boolean false', false], ['a boolean true', true], ['null', null], ['another word', 'disabled'], ['an object', { roleRotation: 'off' }]
+  ])('refuses %s, by its own rule, before building any row', async (_name, choice) => {
+    await expect(build(choice)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: role-rotation-choice');
+  });
+});
+
 /** A pool that answers only the currency query and records every statement. */
 function fakePool(above: { register_version: string; publication_id: string | null }[]) {
   const statements: string[] = [];

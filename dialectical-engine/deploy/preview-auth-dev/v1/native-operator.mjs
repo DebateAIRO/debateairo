@@ -12,16 +12,24 @@ const NATIVE_PLAN_KEYS=['schema','operation','sourceRoot','sourceRevision','sour
  * so only they may carry it; the publisher checks it again before it builds a row.
  */
 export const DEEPSEEK_CHECKER_CHOICE=Object.freeze({checker:'deepseek',deepseekEnabledOnGate:true});
+/**
+ * The one non-default role rotation choice a plan may carry (publish-register-v2.ts PreviewRoleRotationChoice):
+ * `roleRotation: 'off'` publishes the rotation row disabled (the preview's rollback). Without it rotation stays on.
+ * Like the checker choice, only plan and publish may carry it; the publisher checks it again.
+ */
+export const ROLE_ROTATION_OFF='off';
 /** The reviewed native-plan schema check; the release tool runs it before writing a plan. */
 export function validateNativePlan(plan) {
  const chosen=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'checkerChoice');
- exactKeys(plan,chosen?[...NATIVE_PLAN_KEYS,'checkerChoice']:NATIVE_PLAN_KEYS);
+ const rotation=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'roleRotation');
+ exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[])]);
  if(plan.schema!=='preview-auth-dev-native-plan-v1'||!['apply-and-plan','plan','publish','verify'].includes(plan.operation)
   ||!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(plan.sourceRoot))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  if(chosen){
   exactKeys(plan.checkerChoice,Object.keys(DEEPSEEK_CHECKER_CHOICE),'PREVIEW_NATIVE_PLAN_REFUSED');
   if(!['plan','publish'].includes(plan.operation)||Object.entries(DEEPSEEK_CHECKER_CHOICE).some(([key,value])=>plan.checkerChoice[key]!==value))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  }
+ if(rotation&&(plan.roleRotation!==ROLE_ROTATION_OFF||!['plan','publish'].includes(plan.operation)))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  return plan;
 }
 /**
@@ -50,7 +58,7 @@ export async function runNativeOperator() {
   // Publish kit v2: plan and publish compose from the CURRENT published version (nothing sealed above the base but this publication's own replay).
   if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
   const runtimeObservedAt=plan.approval?.runtimeObservedAt??new Date().toISOString();
-  const rows=await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt},plan.checkerChoice);
+  const rows=await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt},plan.checkerChoice,plan.roleRotation);
   const snapshot=publisher.composePreviewSnapshotV2({sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256});
   const metadata=snapshotProposal({runtimeObservedAt,source,plan,snapshot});
   if(plan.operation==='plan'||plan.operation==='apply-and-plan')return metadata;
