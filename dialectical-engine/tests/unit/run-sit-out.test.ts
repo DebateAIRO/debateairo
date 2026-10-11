@@ -1,14 +1,16 @@
-// Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, fix (d); rulings R-a, R-b):
-// the per-run sit-out book, driven alone. The whole run is driven through the REAL runner by
-// tests/integration/preview-busy-model-run.test.ts (T1, T2); this file pins the book's own rules: a call ending in
-// gate-proven unbilled refusals makes the MODEL sit out on every ref, an unavailable gate makes every member behind it
-// sit out, a member that sits out is refused before anything is sent, and nothing else changes the book.
+// Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, fix (d); rulings R-a, R-b,
+// and the review amendment R-d of 2026-10-12): the per-run sit-out book, driven alone. The whole run is driven through
+// the REAL runner by tests/integration/preview-busy-model-run.test.ts (T1, T2); this file pins the book's own rules: a
+// call ending in a VENDOR's gate-proven unbilled refusal makes the MODEL sit out on every ref, an unavailable gate
+// makes every member behind it sit out, a member that sits out is refused before anything is sent, and nothing else
+// changes the book — the gate's own unbilled refusals (its slots full, the vendor not reached) included (R-d).
 import { describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   PROVIDER_GATE_UNAVAILABLE,
   ProviderCallFailedError,
   PreviewUnbilledRefusal,
+  PreviewVendorRefusedUnbilled,
   previewRunResilience,
   type PreviewProviderTestConfig,
   type ProviderCallRequest,
@@ -18,8 +20,8 @@ import {
 import {
   MAKER_SAT_OUT,
   createRunSitOutBook,
-  runPanelRevisedReason,
-  runSitOutHaltsAtOnce
+  reviewEndsForMembersSatOut,
+  runPanelRevisedReason
 } from "../../apps/runner/src/run-sit-out.js";
 import {
   buildMakerPositionDisclosure,
@@ -44,7 +46,15 @@ const answered = { content: "{}" } as unknown as ProviderCallResult;
 /** A failure as the counting gateway throws it: PROVIDER_CALL_FAILED with the last attempt's error as its cause. */
 const failed = (cause: unknown, ledgerEntryRef = "ledger:failure"): ProviderCallFailedError =>
   new ProviderCallFailedError(cause, 1, "FAILED", ledgerEntryRef);
-const unbilled = (ref = "ledger:refused") => failed(new PreviewUnbilledRefusal(), ref);
+/** R-d: the vendor refused unbilled (the gate's PROVIDER_REFUSED_UNBILLED): the only unbilled refusal that marks busy. */
+const unbilled = (ref = "ledger:refused") => failed(new PreviewVendorRefusedUnbilled(), ref);
+/**
+ * R-d: the gate's OWN unbilled refusals — its slots were full (CONCURRENCY_LIMIT_REACHED) or the vendor was never
+ * reached (PROVIDER_NOT_REACHED). The app maps both to a plain PreviewUnbilledRefusal (pinned through the real socket
+ * in tests/unit/preview-budget-gate-refusals.test.ts); neither says anything about the model.
+ */
+const gateSlotsFull = (ref = "ledger:gate-busy") => failed(new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight"), ref);
+const notReached = (ref = "ledger:not-reached") => failed(new PreviewUnbilledRefusal(), ref);
 const gateClosed = (ref = "ledger:gate") => failed(new TypedDomainError(PROVIDER_GATE_UNAVAILABLE, "halted"), ref);
 const billed = () => failed(new Error("connection reset"));
 
@@ -66,7 +76,10 @@ describe("the run's sit-out book (fix (d), R-a)", () => {
   it("knows the preview's gates and models", () => {
     expect(SETTINGS.gateOf(GLM_A)).toBe("deepinfra");
     expect(SETTINGS.gateOf(HAIKU)).toBe("anthropic");
-    expect(SETTINGS.modelOf(GLM_A)).toBe(SETTINGS.modelOf(GLM_B));
+    // Both GLM refs serve the one GLM model (so a busy GLM sits out on both); never two undefined values agreeing.
+    expect(SETTINGS.modelOf(GLM_A)).toBe("zai-org/GLM-5.3-Flash");
+    expect(SETTINGS.modelOf(GLM_B)).toBe("zai-org/GLM-5.3-Flash");
+    expect(SETTINGS.modelOf(QWEN)).toBe("Qwen/Qwen3.8-Flash");
     expect(previewRunResilience(undefined)).toBeUndefined();
   });
 
@@ -91,7 +104,7 @@ describe("the run's sit-out book (fix (d), R-a)", () => {
     expect(refusal).toBeInstanceOf(ProviderCallFailedError);
     expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", attempts: 0, lastOutcome: "FAILED",
       lastLedgerEntryRef: "ledger:glm-refused", cause: { code: MAKER_SAT_OUT } });
-    expect(runSitOutHaltsAtOnce(refusal)).toBe(true);
+    expect(book.haltsAtOnce(refusal)).toBe(true);
   });
 
   it("an unavailable gate makes every member behind it sit out, and only those", async () => {
@@ -119,7 +132,7 @@ describe("the run's sit-out book (fix (d), R-a)", () => {
     await book.gateway(GLM_A, scripted([billed()])).call(request).catch(() => undefined);
     await book.gateway(GLM_A, scripted(["OK"])).call(request);
     // A bare unbilled refusal (never what the counting gateway throws) cites no ledger row, so it marks nothing.
-    await book.gateway(GLM_A, scripted([new PreviewUnbilledRefusal()])).call(request).catch(() => undefined);
+    await book.gateway(GLM_A, scripted([new PreviewVendorRefusedUnbilled()])).call(request).catch(() => undefined);
     await book.gateway(GLM_A, scripted([new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "money")])).call(request)
       .catch(() => undefined);
     expect(book.sitsOut(GLM_A)).toBe(false);
@@ -127,11 +140,48 @@ describe("the run's sit-out book (fix (d), R-a)", () => {
     expect(runPanelRevisedReason(null, [GLM_A])).toBeNull();
   });
 
-  it("the cooldown halts at once only for the failures that make a member sit out", () => {
-    expect(runSitOutHaltsAtOnce(unbilled())).toBe(true);
-    expect(runSitOutHaltsAtOnce(gateClosed())).toBe(true);
-    expect(runSitOutHaltsAtOnce(billed())).toBe(false);
-    expect(runSitOutHaltsAtOnce(new TypedDomainError(MAKER_SAT_OUT, "bare"))).toBe(false);
+  it("R-d: a call ending in the gate's OWN unbilled refusals (slots full, vendor not reached) never makes a member sit out", async () => {
+    const book = createRunSitOutBook(SETTINGS);
+    for (const failure of [gateSlotsFull(), notReached()]) {
+      const glm = scripted([failure]);
+      await expect(book.gateway(GLM_A, glm).call(request)).rejects.toBe(failure);
+      expect(book.sitsOut(GLM_A)).toBe(false);
+      expect(book.haltsAtOnce(failure)).toBe(false);
+    }
+    // GLM is still asked: the next call goes out and is answered.
+    const again = scripted(["OK"]);
+    await expect(book.gateway(GLM_B, again).call(request)).resolves.toBe(answered);
+    expect(again.calls).toBe(1);
+    expect(runPanelRevisedReason(book, [GLM_A, GLM_B])).toBeNull();
+  });
+
+  it("the cooldown halts at once only for the failures that made a member sit out, seen through this book", async () => {
+    const book = createRunSitOutBook(SETTINGS);
+    const busy = unbilled();
+    await book.gateway(GLM_A, scripted([busy])).call(request).catch(() => undefined);
+    expect(book.haltsAtOnce(busy)).toBe(true);
+    const closed = gateClosed();
+    await book.gateway(HAIKU, scripted([closed])).call(request).catch(() => undefined);
+    expect(book.haltsAtOnce(closed)).toBe(true);
+    const billedFailure = billed();
+    await book.gateway(DEEPSEEK, scripted([billedFailure])).call(request).catch(() => undefined);
+    expect(book.haltsAtOnce(billedFailure)).toBe(false);
+    expect(book.haltsAtOnce(new TypedDomainError(MAKER_SAT_OUT, "bare"))).toBe(false);
+  });
+
+  it("finding 4: a busy failure that never went through this book's gateway keeps the hold (the member did not sit out)", async () => {
+    const book = createRunSitOutBook(SETTINGS);
+    // An unwrapped gateway's vendor-busy failure: the type alone would halt at once, but nobody sits out in the book.
+    const unwrapped = unbilled("ledger:unwrapped");
+    expect(book.sitsOut(GLM_A)).toBe(false);
+    expect(book.haltsAtOnce(unwrapped)).toBe(false);
+    // An unavailable gate the book never saw, and a sat-out refusal some OTHER book made, keep the hold too.
+    expect(book.haltsAtOnce(gateClosed("ledger:elsewhere"))).toBe(false);
+    const other = createRunSitOutBook(SETTINGS);
+    await other.gateway(GLM_A, scripted([unbilled()])).call(request).catch(() => undefined);
+    const foreignSatOut: unknown = await other.gateway(GLM_A, scripted(["OK"])).call(request).then(() => null, (error: unknown) => error);
+    expect(other.haltsAtOnce(foreignSatOut)).toBe(true);
+    expect(book.haltsAtOnce(foreignSatOut)).toBe(false);
   });
 });
 
@@ -180,7 +230,7 @@ describe("the serve fallback with the sit-out book (fix (a))", () => {
       call: (maker, sent) => maker.provider.call(sent)
     }).then(() => null, (error: unknown) => error);
     expect(asked).toEqual([GLM_A, DEEPSEEK]);
-    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: expect.any(PreviewUnbilledRefusal) });
+    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: expect.any(PreviewVendorRefusedUnbilled) });
     // Never CALL_BUDGET_EXHAUSTED: the search ended because nobody was left, not because an allowance was spent.
   });
 
@@ -221,11 +271,13 @@ describe("withCooldownRetry's haltsAtOnce (ruling R-a)", () => {
   const site = { runId: "run:synthetic", callSiteKey: "JUDGE:root:4", parentNodeId: null, plannedLegCount: 1,
     baseMaxAttempts: 3, failureScope: "MAKER_POSITION" as const, policy };
 
-  it("an unbilled-only failure halts at once: no ten-minute hold, no final retry", async () => {
+  it("a vendor's unbilled-only failure through the book halts at once: no ten-minute hold, no final retry", async () => {
     const { events, waits, hold } = recorder();
+    const book = createRunSitOutBook(SETTINGS);
     let attempts = 0;
-    const result = await withCooldownRetry({ ...site, hold, haltsAtOnce: runSitOutHaltsAtOnce,
-      attempt: async () => { attempts += 1; throw unbilled("ledger:busy"); } });
+    const glm = book.gateway(GLM_A, { call: async () => { attempts += 1; throw unbilled("ledger:busy"); } });
+    const result = await withCooldownRetry({ ...site, hold, haltsAtOnce: book.haltsAtOnce,
+      attempt: () => glm.call(request) });
     expect(result).toMatchObject({ kind: "HALTED", record: { lastLedgerEntryRef: "ledger:busy", terminalTransportOutcome: "FAILED" } });
     expect(attempts).toBe(1);
     expect(waits).toEqual([]);
@@ -233,15 +285,47 @@ describe("withCooldownRetry's haltsAtOnce (ruling R-a)", () => {
   });
 
   it("a billed failure keeps the hold and the final retry; so does every failure without the option", async () => {
-    for (const [failure, haltsAtOnce] of [[billed(), runSitOutHaltsAtOnce], [unbilled(), undefined]] as const) {
+    // A billed failure through the book's gateway, with the option; a vendor-busy failure with no option at all.
+    for (const withBook of [true, false]) {
       const { events, waits, hold } = recorder();
+      const book = createRunSitOutBook(SETTINGS);
+      const failure = withBook ? billed() : unbilled();
       let attempts = 0;
-      const result = await withCooldownRetry({ ...site, hold, ...(haltsAtOnce === undefined ? {} : { haltsAtOnce }),
-        attempt: async () => { attempts += 1; if (attempts === 1) throw failure; return "authored"; } });
-      expect(result).toEqual({ kind: "AUTHORED", value: "authored" });
+      const vendor: ProviderGateway = { call: async () => { attempts += 1; if (attempts === 1) throw failure; return answered; } };
+      const glm = withBook ? book.gateway(GLM_A, vendor) : vendor;
+      const result = await withCooldownRetry({ ...site, hold, ...(withBook ? { haltsAtOnce: book.haltsAtOnce } : {}),
+        attempt: () => glm.call(request) });
+      expect(result).toEqual({ kind: "AUTHORED", value: answered });
       expect(waits).toEqual([policy.cooldownMs]);
       expect(events.map((event) => event.state)).toEqual(["COOLDOWN_HOLD", "COOLDOWN_RETRY"]);
     }
+  });
+
+  it.each([
+    ["CONCURRENCY_LIMIT_REACHED (the gate's slots were full)", gateSlotsFull],
+    ["PROVIDER_NOT_REACHED (the vendor was never reached)", notReached]
+  ])("R-d: a call ending in two %s refusals: no sit-out, the hold happens, and the final retry is sent", async (_name, refusal) => {
+    const { events, waits, hold } = recorder();
+    const book = createRunSitOutBook(SETTINGS);
+    let attempts = 0;
+    const glm = book.gateway(GLM_A, { call: async () => { attempts += 1; if (attempts === 1) throw refusal(); return answered; } });
+    const result = await withCooldownRetry({ ...site, hold, haltsAtOnce: book.haltsAtOnce, attempt: () => glm.call(request) });
+    expect(result).toEqual({ kind: "AUTHORED", value: answered });
+    expect(attempts).toBe(2);
+    expect(waits).toEqual([policy.cooldownMs]);
+    expect(events.map((event) => event.state)).toEqual(["COOLDOWN_HOLD", "COOLDOWN_RETRY"]);
+    expect(book.sitsOut(GLM_A)).toBe(false);
+  });
+
+  it("finding 4: an unwrapped gateway's vendor-busy failure keeps the hold and the final retry", async () => {
+    const { events, waits, hold } = recorder();
+    const book = createRunSitOutBook(SETTINGS);
+    let attempts = 0;
+    const result = await withCooldownRetry({ ...site, hold, haltsAtOnce: book.haltsAtOnce,
+      attempt: async () => { attempts += 1; if (attempts === 1) throw unbilled("ledger:unwrapped"); return "authored"; } });
+    expect(result).toEqual({ kind: "AUTHORED", value: "authored" });
+    expect(waits).toEqual([policy.cooldownMs]);
+    expect(events.map((event) => event.state)).toEqual(["COOLDOWN_HOLD", "COOLDOWN_RETRY"]);
   });
 });
 
@@ -259,5 +343,28 @@ describe("the answer's disclosure when too few members were left to argue (fix (
   });
   it("T5: without it the state is still refused as unreachable, exactly as before", () => {
     expect(() => buildMakerPositionDisclosure(base)).toThrow(expect.objectContaining({ code: "MAKER_POSITION_DISCLOSURE_UNRESOLVED" }));
+  });
+});
+
+describe("finding 3: a review ends the arguing for members that sat out only when one actually did", () => {
+  const author = "Z.AI";
+  it("no reviewer of another maker and nobody sat out: not a sat-out stop (the run keeps DIFFERENT_MAKER_REVIEWER_UNAVAILABLE)", () => {
+    const book = createRunSitOutBook(SETTINGS);
+    for (const candidateMakers of [[], [author], [author, author]]) {
+      expect(reviewEndsForMembersSatOut({ book, reviewerRefs: [GLM_A, GLM_B], candidateMakers, authorMaker: author })).toBe(false);
+    }
+  });
+  it("a reviewer that sat out and no other maker left to review: the arguing ends (MEMBERS_SAT_OUT)", async () => {
+    const book = createRunSitOutBook(SETTINGS);
+    await book.gateway(QWEN, scripted([unbilled()])).call(request).catch(() => undefined);
+    expect(reviewEndsForMembersSatOut({ book, reviewerRefs: [GLM_A, QWEN], candidateMakers: [], authorMaker: author })).toBe(true);
+    expect(reviewEndsForMembersSatOut({ book, reviewerRefs: [GLM_A, QWEN], candidateMakers: [author], authorMaker: author })).toBe(true);
+    // Another maker can still review: no stop.
+    expect(reviewEndsForMembersSatOut({ book, reviewerRefs: [GLM_A, QWEN], candidateMakers: ["DeepSeek"], authorMaker: author })).toBe(false);
+    // A member that sat out but is not a reviewer does not make an unreviewable node a sat-out stop.
+    expect(reviewEndsForMembersSatOut({ book, reviewerRefs: [GLM_A, HAIKU], candidateMakers: [], authorMaker: author })).toBe(false);
+  });
+  it("without the book (hosted and local): never", () => {
+    expect(reviewEndsForMembersSatOut({ book: null, reviewerRefs: [GLM_A], candidateMakers: [], authorMaker: author })).toBe(false);
   });
 });

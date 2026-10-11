@@ -202,16 +202,6 @@ export class ProviderCallFailedError extends TypedDomainError {
   }
 }
 
-/**
- * Run resilience (spec 2026-10-12, fix (d); ruling R-a): a call that ENDED in a provably unbilled refusal — the
- * gateway's failure whose last attempt was a `ProviderUnbilledRefusal` (on the preview, after its one 60-second
- * resend: the call and its resend were both refused unbilled, since a billed resend would be the cause instead).
- * Generic: any wrapper that raises a `ProviderUnbilledRefusal` is read the same way. Hosted and local never raise one.
- */
-export function providerCallEndedUnbilled(error: unknown): boolean {
-  return error instanceof ProviderCallFailedError && error.cause instanceof ProviderUnbilledRefusal;
-}
-
 export class ProviderContentUnacceptedError extends TypedDomainError {
   override readonly code = "PROVIDER_CONTENT_UNACCEPTED";
 

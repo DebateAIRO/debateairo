@@ -26,6 +26,7 @@ import {
   parseProviderDiscoveryTargets,
   PREVIEW_GLM_TARGET,
   previewRunnerPolicy,
+  previewRunResilience,
   previewTargetGatewayControls,
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
@@ -36,6 +37,7 @@ import {
 } from "@debateai/providers";
 import { createPostgresProviderGateway, withCooldownRetry, type HoldProgressEvent } from "@debateai/runner";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS, DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
+import { createRunSitOutBook } from "../../apps/runner/src/run-sit-out.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { framedFixturePacket } from "../support/framed-packet.js";
@@ -121,6 +123,7 @@ async function refusingGate(code: string): Promise<PreviewBudgetPort> {
 type Step = Readonly<{ refuse: string }> | Readonly<{ throws: () => unknown }> | Readonly<{ answer: string }>;
 const unbilled: Step = { refuse: "PROVIDER_REFUSED_UNBILLED" };
 const busyGate: Step = { refuse: "CONCURRENCY_LIMIT_REACHED" };
+const notReached: Step = { refuse: "PROVIDER_NOT_REACHED" };
 const answer: Step = { answer: "{\"statement\":\"Synthetic answer.\"}" };
 /** The fetch's own deadline firing: a billed transport failure (TIMED_OUT), never an unbilled refusal. */
 const timeout: Step = { throws: () => new DOMException("The operation was aborted due to timeout", "TimeoutError") };
@@ -354,6 +357,19 @@ describe("run resilience (b): on the preview a step's allowance is each maker's 
     })).resolves.toMatchObject({ callSiteKey: "JUDGE", outcome: "FAILED" });
   });
 
+  it("the SENDING maker's own rows at its bound: refused CALL_BUDGET_EXHAUSTED before a byte is sent", async () => {
+    // Review 2026-10-12, test gap (d): the per-maker count still bounds the maker that asks. Its own FAILED rows, as
+    // many as the sealed JUDGE bound, spend its allowance at this step even though no other maker wrote any.
+    const work = await createRunWork("t3-own");
+    for (let index = 0; index < POLICY.bounds.JUDGE.maxAttempts; index += 1) await failedRowBy(work, REF);
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([answer]);
+    await expect(previewGateway(port, waits).call(rootRequest(work))).rejects.toMatchObject({ code: "CALL_BUDGET_EXHAUSTED" });
+    expect(sent).toHaveLength(0);
+    expect(waits).toEqual([]);
+    expect(await outcomes(work.runId)).toEqual(["FAILED", "FAILED", "FAILED"]);
+  });
+
   it("T5: without the per-maker read (hosted and local), the same rows exhaust the site exactly as before", async () => {
     const work = await createRunWork("t3-hosted");
     for (const actorRef of OTHER_MAKERS) await failedRowBy(work, actorRef);
@@ -370,6 +386,63 @@ describe("run resilience (b): on the preview a step's allowance is each maker's 
     await expect(hosted.call({ ...rootRequest(work), providerRef: "provider:test-layer" }))
       .rejects.toMatchObject({ code: "CALL_BUDGET_EXHAUSTED" });
     expect(posts).toBe(0);
+  });
+});
+
+/**
+ * Review amendment R-d (orchestrator, 2026-10-12), through the real counting gateway, the real gate protocol and the
+ * runner's sit-out book composed as the runner composes it (the book wraps the maker's gateway; `withCooldownRetry`
+ * reads the book's `haltsAtOnce`). Only the VENDOR's gate-proven unbilled refusal makes a model sit out; the gate's
+ * own — its slots full, the vendor never reached — keep the ten-minute hold and the final retry.
+ */
+describe("run resilience R-d: only a vendor's unbilled refusal makes a model sit out", () => {
+  const RESILIENCE = previewRunResilience(PREVIEW)!;
+
+  it.each([
+    ["CONCURRENCY_LIMIT_REACHED", busyGate],
+    ["PROVIDER_NOT_REACHED", notReached]
+  ] as const)("a call ending in two %s refusals: REFUSED rows, no sit-out, the hold happens and the final retry sends", async (_code, step) => {
+    const work = await createRunWork(`rd-${_code}`);
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([step, step, answer]);
+    const book = createRunSitOutBook(RESILIENCE);
+    const gateway = book.gateway(REF, previewGateway(port, waits));
+    const { events, hold } = recordingHold(waits);
+    const result = await withCooldownRetry({
+      runId: work.runId, callSiteKey: "JUDGE", parentNodeId: null, plannedLegCount: 1,
+      baseMaxAttempts: POLICY.bounds.JUDGE.maxAttempts, failureScope: "MAKER_POSITION", policy: DEATH, hold,
+      haltsAtOnce: book.haltsAtOnce,
+      attempt: (maxAttempts) => gateway.call(rootRequest(work, maxAttempts))
+    });
+    expect(result.kind).toBe("AUTHORED");
+    expect(sent).toHaveLength(3);
+    expect(waits).toEqual([UNBILLED_RESEND_MS, DEATH.cooldownMs]);
+    expect(events.map((event) => event.state)).toEqual(["COOLDOWN_HOLD", "COOLDOWN_RETRY"]);
+    expect(await outcomes(work.runId)).toEqual(["REFUSED", "REFUSED", "OK"]);
+    expect(book.sitsOut(REF)).toBe(false);
+    expect(book.reasonOf(REF)).toBeNull();
+  });
+
+  it("a call ending in two PROVIDER_REFUSED_UNBILLED refusals: the model sits out at once, no hold, no final retry", async () => {
+    const work = await createRunWork("rd-vendor");
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([unbilled, unbilled, answer]);
+    const book = createRunSitOutBook(RESILIENCE);
+    const gateway = book.gateway(REF, previewGateway(port, waits));
+    const { events, hold } = recordingHold(waits);
+    const result = await withCooldownRetry({
+      runId: work.runId, callSiteKey: "JUDGE", parentNodeId: null, plannedLegCount: 1,
+      baseMaxAttempts: POLICY.bounds.JUDGE.maxAttempts, failureScope: "MAKER_POSITION", policy: DEATH, hold,
+      haltsAtOnce: book.haltsAtOnce,
+      attempt: (maxAttempts) => gateway.call(rootRequest(work, maxAttempts))
+    });
+    expect(result.kind).toBe("HALTED");
+    expect(sent).toHaveLength(2);
+    expect(waits).toEqual([UNBILLED_RESEND_MS]);
+    expect(events.map((event) => event.state)).toEqual(["MAKER_POSITION_HALTED"]);
+    expect(await outcomes(work.runId)).toEqual(["REFUSED", "REFUSED"]);
+    expect(book.sitsOut(REF)).toBe(true);
+    expect(book.reasonOf(REF)).toBe("PROVIDER_BUSY");
   });
 });
 

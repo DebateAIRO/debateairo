@@ -24,6 +24,8 @@ import {
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
   PreviewUnbilledRefusal,
+  PreviewVendorRefusedUnbilled,
+  providerCallEndedVendorRefusedUnbilled,
   providerCallGateUnavailable,
   ProviderUnbilledRefusal,
   type PreviewBudgetPort,
@@ -93,13 +95,19 @@ describe("the preview spending gate's 409 refusal body", () => {
     }
   );
 
-  it.each(["PREVIEW_TEST_AUTHORITY_STOPPED", "SOMETHING_NEW"])(
-    "%s keeps today's per-run money refusal",
-    async (code) => {
-      const { port } = await gate({ status: 409, body: JSON.stringify({ error: code }) });
-      await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
-    }
-  );
+  it("SOMETHING_NEW (a code the app does not know) keeps today's per-run money refusal", async () => {
+    const { port, received } = await gate({ status: 409, body: JSON.stringify({ error: "SOMETHING_NEW" }) });
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+  });
+
+  it("PREVIEW_TEST_AUTHORITY_STOPPED whose /remaining read fails keeps today's per-run money refusal", async () => {
+    // Run resilience (c): STOPPED asks /remaining; this stand-in answers every path with the same 409, so the read
+    // fails and the mapping falls back to today's money code. A halted /remaining is pinned in the describe below.
+    const { port, received } = await gate({ status: 409, body: JSON.stringify({ error: "PREVIEW_TEST_AUTHORITY_STOPPED" }) });
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete", "/remaining"]);
+  });
 
   it.each([
     ["an array", "[\"TEAM_DAILY_BUDGET_REACHED\"]"],
@@ -133,6 +141,9 @@ describe("the preview spending gate's 409 refusal body", () => {
     // Owner ruling R4 (2026-10-11): nothing was reserved or sent, so it is an unbilled refusal too.
     expect(refusal).toBeInstanceOf(PreviewUnbilledRefusal);
     expect(refusal).toBeInstanceOf(ProviderUnbilledRefusal);
+    // Review amendment R-d (2026-10-12): the gate's OWN refusal says nothing about the model, so it is never the
+    // vendor's unbilled refusal that makes a model sit out the rest of a run.
+    expect(refusal).not.toBeInstanceOf(PreviewVendorRefusedUnbilled);
     expect(isRunLevelSpendStop(refusal)).toBe(false);
     expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
   });
@@ -169,10 +180,15 @@ describe("the preview spending gate's 409 refusal body", () => {
     expect(isRunLevelSpendStop(busy)).toBe(false);
     // Owner ruling R4 (2026-10-11): a busy gate is unbilled, so it gets the one resend after the cooldown.
     expect(slept).toEqual([COOLDOWN_MS]);
-    for (const unsent of ["PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"]) {
+    // Review amendment R-d (2026-10-12): only the vendor's unbilled refusal ends a call as "the model is busy".
+    expect(providerCallEndedVendorRefusedUnbilled(busy)).toBe(false);
+    expect(busy).toMatchObject({ cause: expect.any(PreviewUnbilledRefusal) });
+    for (const [unsent, vendorBusy] of [["PROVIDER_NOT_REACHED", false], ["PROVIDER_REFUSED_UNBILLED", true]] as const) {
       const refusal = await call(unsent);
-      expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+      expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: expect.any(PreviewUnbilledRefusal) });
       expect(isRunLevelSpendStop(refusal)).toBe(false);
+      expect(providerCallEndedVendorRefusedUnbilled(refusal), unsent).toBe(vendorBusy);
+      expect((refusal as { cause: unknown }).cause instanceof PreviewVendorRefusedUnbilled, unsent).toBe(vendorBusy);
     }
     // Owner ruling 5: each unbilled refusal is sent once more after the cooldown, and only once.
     expect(slept).toEqual([COOLDOWN_MS, COOLDOWN_MS, COOLDOWN_MS]);
