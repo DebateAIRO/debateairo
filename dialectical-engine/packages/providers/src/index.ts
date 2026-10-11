@@ -152,6 +152,13 @@ export interface ProviderCallRequest {
    */
   readonly maxAttemptsThisCall?: number;
   /**
+   * Run resilience (spec 2026-10-12, fix (b)): whose attempts the step's allowance counts. "actor" — set only by
+   * the preview's call policy (`withPreviewProviderCallPolicy`) — counts the asking maker's own rows
+   * (`providerRef`), so each maker that a fallback moves a call to has its own allowance at the call site. Absent
+   * means the whole call site, which is hosted and local byte for byte. Never sent.
+   */
+  readonly attemptScope?: "actor";
+  /**
    * V-28: the money bound for THIS call. Per request and not per gateway,
    * because the price is the target's but the SPEND is the run's, and a gateway
    * is built once per target and then serves every run that reaches it.
@@ -193,6 +200,16 @@ export class ProviderCallFailedError extends TypedDomainError {
     this.name = "ProviderCallFailedError";
     this.cause = cause;
   }
+}
+
+/**
+ * Run resilience (spec 2026-10-12, fix (d); ruling R-a): a call that ENDED in a provably unbilled refusal — the
+ * gateway's failure whose last attempt was a `ProviderUnbilledRefusal` (on the preview, after its one 60-second
+ * resend: the call and its resend were both refused unbilled, since a billed resend would be the cause instead).
+ * Generic: any wrapper that raises a `ProviderUnbilledRefusal` is read the same way. Hosted and local never raise one.
+ */
+export function providerCallEndedUnbilled(error: unknown): boolean {
+  return error instanceof ProviderCallFailedError && error.cause instanceof ProviderUnbilledRefusal;
 }
 
 export class ProviderContentUnacceptedError extends TypedDomainError {

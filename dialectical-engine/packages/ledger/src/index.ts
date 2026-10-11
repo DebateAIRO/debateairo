@@ -551,12 +551,18 @@ export class LedgerRepository {
    * Preview retry fix, option B (spec 2026-10-11 §1.2 (d)): REFUSED rows (provably unbilled refusals) are
    * neither counted nor picked, so a site holding only free refusals never reads as used up, and a
    * REFUSED row never reaches `failFromExhaustedAttempt`.
+   *
+   * Run resilience (spec 2026-10-12, fix (b)): with `byActor`, the preview's allowance is each MAKER's own, so the
+   * rows are grouped by call site AND by the maker that made them (`actor_ref`): three makers that each failed once
+   * at one site, as the serve fallback's hops do, never read as that site used up. Absent (hosted and local), the
+   * query is today's, byte for byte.
    */
   async findExhaustedModelAttempt(input: {
     readonly runId: string;
     readonly workItemId: string;
     readonly contractHash: string;
     readonly maxAttempts: number;
+    readonly byActor?: boolean;
   }): Promise<{
     readonly attemptId: string;
     readonly artifactRef: string | null;
@@ -580,7 +586,7 @@ export class LedgerRepository {
          FROM ledger.ledger_entry
          WHERE run_id = $1 AND subject_item_id = $2
            AND action_kind = 'MODEL_CALL' AND contract_hash = $3 AND outcome <> 'REFUSED'
-         GROUP BY call_site_key HAVING count(*) >= $4
+         GROUP BY ${input.byActor === true ? "call_site_key, actor_ref" : "call_site_key"} HAVING count(*) >= $4
        ) AS grouped ON grouped.last_sequence = entry.sequence
        WHERE entry.run_id = $1 AND entry.subject_item_id = $2
          AND entry.action_kind = 'MODEL_CALL' AND entry.contract_hash = $3
@@ -669,14 +675,29 @@ export class LedgerRepository {
    * The step's spent allowance: its MODEL_CALL rows under one call-site key. Preview retry fix, option B
    * (spec 2026-10-11 §1.2 (d), owner ruling R1): a REFUSED row (a provably unbilled refusal) is not an
    * attempt spent, so a free refusal never uses up a step.
+   *
+   * Run resilience (spec 2026-10-12, fix (b)): with `actorRef`, only that maker's rows are counted, so a step's
+   * allowance on the preview is each maker's own and a fallback hop never spends the next maker's. Absent (hosted and
+   * local), the query is today's, byte for byte. The run-wide ceiling (`countRunModelAttempts`) is untouched.
    */
   async countModelAttempts(input: {
     readonly runId: string | null;
     readonly workItemId: string;
     readonly contractHash: string;
     readonly callSiteKey: string;
+    readonly actorRef?: string;
   }): Promise<number> {
     if (input.runId === null) return 0;
+    if (input.actorRef !== undefined) {
+      const mine = await this.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM ledger.ledger_entry
+         WHERE run_id = $1 AND subject_item_id = $2
+           AND action_kind = 'MODEL_CALL' AND contract_hash = $3 AND call_site_key = $4
+           AND outcome <> 'REFUSED' AND actor_ref = $5`,
+        [input.runId, input.workItemId, input.contractHash, input.callSiteKey, input.actorRef]
+      );
+      return Number(mine.rows[0]?.count ?? 0);
+    }
     const result = await this.pool.query<{ count: string }>(
       `SELECT count(*)::text AS count FROM ledger.ledger_entry
        WHERE run_id = $1 AND subject_item_id = $2

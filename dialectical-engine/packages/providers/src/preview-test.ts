@@ -5,6 +5,7 @@ import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel"
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
+import { createPreviewRemainingRpcPort, type PreviewRemainingPort } from "./preview-remaining.js";
 import {
   PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
   previewModelRow, previewModelRowForRef, previewNanoUsdText, previewRefsAreReviewedSet, previewReservationNanoUsd,
@@ -312,8 +313,10 @@ export function withPreviewProviderCallPolicy(
     const storyRepair = previewStoryRepairAllowed(request);
     // One explicit level replaces whatever the request carried: the configured level on an effort
     // row; DEFAULT_ONLY on a row without one, which the gateway treats exactly as "no level".
+    // Run resilience (spec 2026-10-12, fix (b)): the step's allowance is this maker's own (`attemptScope`), so a
+    // fallback that moves a call to another maker never finds the step spent by the makers it moved away from.
     const send = () => gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
-      bound, maxAttemptsThisCall: storyRepair ? 2 : 1 });
+      bound, maxAttemptsThisCall: storyRepair ? 2 : 1, attemptScope: "actor" });
     if (storyRepair) return send();
     return send().catch(async (error: unknown) => {
       if (!previewCallWasUnbilled(error)) throw error;
@@ -450,8 +453,53 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
   }
   return new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request");
 }
+/**
+ * Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, fix (c)) — A HALTED GATE
+ * IS UNAVAILABLE, NOT MONEY. On 2026-10-11 the DeepInfra gate halted (its daily unbilled ceiling) and refused the next
+ * call PREVIEW_TEST_AUTHORITY_STOPPED, which `previewAuthorityRefusal` reads as the run's money ceiling; the preview
+ * has no run money seam (apps/runner/src/main.ts, costEnvelopePolicy is hosted only), so that was a misdiagnosis, and
+ * the serve fallback then walked every maker behind the same halted gate. A STOPPED refusal now asks the gate's
+ * read-only `/remaining` (preview-remaining.ts, on the same socket): a gate that is not active, or whose window is
+ * shut, is UNAVAILABLE. The code is never a spend stop, the call is never resent (it is not an unbilled refusal),
+ * and the gateway still records its FAILED row (counted against this maker only, fix (b)). Any other `/remaining`
+ * answer, or none, keeps today's mapping. App-only: the gate's own codes are a later change (ruling, spec "Gate
+ * change, later").
+ */
+export const PROVIDER_GATE_UNAVAILABLE = "PROVIDER_GATE_UNAVAILABLE" as const;
+export class PreviewGateUnavailable extends TypedDomainError {
+  constructor() { super(PROVIDER_GATE_UNAVAILABLE, "Private preview gate is halted or its window is shut"); }
+}
+/** The refusal itself, or the gateway's PROVIDER_CALL_FAILED with it as its cause. */
+export function providerCallGateUnavailable(error: unknown): boolean {
+  const unavailable = (value: unknown): boolean => value instanceof TypedDomainError && value.code === PROVIDER_GATE_UNAVAILABLE;
+  return unavailable(error) || (typeof error === "object" && error !== null && unavailable((error as { cause?: unknown }).cause));
+}
+/** The one refusal that asks `/remaining`: a 409 whose body is exactly {"error": "PREVIEW_TEST_AUTHORITY_STOPPED", …}. */
+function previewAuthorityStopped(status: number | undefined, row: unknown): boolean {
+  return status === 409 && typeof row === "object" && row !== null && !Array.isArray(row)
+    && (row as Record<string, unknown>).error === "PREVIEW_TEST_AUTHORITY_STOPPED";
+}
+/**
+ * Run resilience (spec 2026-10-12, fix (d)): what the runner's per-run sit-out book needs to know of a reviewed ref
+ * on the preview — the gate its calls go through and the model it serves. Undefined off the preview, where the
+ * runner builds no book (hosted and local unchanged).
+ */
+export function previewRunResilience(config: PreviewProviderTestConfig | undefined): Readonly<{
+  gateOf: (providerRef: string) => string | undefined;
+  modelOf: (providerRef: string) => string | undefined;
+}> | undefined {
+  if (config === undefined) return undefined;
+  return Object.freeze({
+    gateOf: (providerRef: string) => previewModelRowForRef(providerRef)?.provider,
+    modelOf: (providerRef: string) => previewModelRowForRef(providerRef)?.model
+  });
+}
 /** Local IPC only: application principals never receive the provider credential or ledger write access. */
-export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig, socketPath: string = config.budget_socket): PreviewBudgetPort {
+export function createPreviewBudgetRpcPort(
+  config: PreviewProviderTestConfig, socketPath: string = config.budget_socket,
+  // Fix (c): the same gate's read-only `/remaining`, asked only after a STOPPED refusal.
+  remaining: PreviewRemainingPort = createPreviewRemainingRpcPort({ budget_socket: socketPath, scope_id: config.scope_id })
+): PreviewBudgetPort {
   return Object.freeze({ execute(input: PreviewBudgetExecution, signal?: AbortSignal) {
     return new Promise<Readonly<{ status: number; body: string }>>((resolve, reject) => {
       const data = JSON.stringify({ scope_id: config.scope_id, ...input });
@@ -472,7 +520,14 @@ export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig, so
           let result: unknown; try { result = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority response invalid")); return; }
           const row = result as Record<string, unknown>;
           if (response.statusCode !== 200 || typeof row !== "object" || row === null || !Number.isInteger(row.status) || typeof row.body !== "string") {
-            reject(previewAuthorityRefusal(response.statusCode, row)); return;
+            const refusal = previewAuthorityRefusal(response.statusCode, row);
+            if (!previewAuthorityStopped(response.statusCode, row)) { reject(refusal); return; }
+            // Fix (c): STOPPED asks whether the gate itself is halted; a failed read keeps today's mapping.
+            remaining.remaining(signal).then(
+              (gate) => reject(gate.state !== "active" || !gate.windowOpen ? new PreviewGateUnavailable() : refusal),
+              () => reject(refusal)
+            );
+            return;
           }
           resolve({ status: Number(row.status), body: row.body });
         });
