@@ -46,9 +46,12 @@ describe("auth database batch: the forward step after NETOPIA's 0111", () => {
     expect(plan.forwardChain.map((step) => step.name)).toContain(AUTH_DB_BATCH_MIGRATION);
     const step = plan.forwardChain.find((entry) => entry.name === AUTH_DB_BATCH_MIGRATION)!;
     expect(AUTH_DB_BATCH_MIGRATION).toBe("0112_auth_db_batch.sql");
-    // It was the last step until Part C's 0113 was chained directly after it (spec 2026-10-05 §2.16.6).
-    expect(plan.forwardChain.at(-1)!.name).toBe("0113_billing_price_currencies.sql");
-    expect(plan.forwardChain.at(-1)!.previousName).toBe(step.name);
+    // It was the last step until Part C's 0113 was chained directly after it (spec 2026-10-05 §2.16.6); role rotation's
+    // 0114 follows 0113 and is the last (spec 2026-10-11 Part 3).
+    const next = plan.forwardChain[plan.forwardChain.indexOf(step) + 1]!;
+    expect(next.name).toBe("0113_billing_price_currencies.sql");
+    expect(next.previousName).toBe(step.name);
+    expect(plan.forwardChain.at(-1)!.name).toBe("0114_role_rotation.sql");
     const netopia = plan.forwardChain.find((entry) => entry.name === "0111_billing_netopia.sql")!;
     expect(plan.forwardChain.indexOf(step)).toBe(plan.forwardChain.indexOf(netopia) + 1);
     expect(step.previousName).toBe(netopia.name);

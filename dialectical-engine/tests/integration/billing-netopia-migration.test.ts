@@ -19,7 +19,9 @@ const NETOPIA_MIGRATION = "0111_billing_netopia.sql";
 const AUTH_DB_BATCH = "0112_auth_db_batch.sql";
 /** Part C's step, chained after the auth DB batch (spec 2026-10-05 §2.16.6): migrate() applies it last. */
 const PART_C_MIGRATION = "0113_billing_price_currencies.sql";
-const CHAIN = [NETOPIA_MIGRATION, AUTH_DB_BATCH, PART_C_MIGRATION] as const;
+/** Role rotation's step, chained after Part C's (spec 2026-10-11 Part 3): migrate() applies it last. */
+const ROLE_ROTATION_MIGRATION = "0114_role_rotation.sql";
+const CHAIN = [NETOPIA_MIGRATION, AUTH_DB_BATCH, PART_C_MIGRATION, ROLE_ROTATION_MIGRATION] as const;
 const DEV_110 = "0110_account_erasure_public_debates.sql";
 const SUPERSEDING_VERIFIER = "lineage/verify-effective-capabilities-111.sql";
 const SEALED_VERIFIER = "lineage/verify-effective-capabilities.sql";
@@ -483,7 +485,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
 
   it("applies 0111 once over dev's 0108+0110 lineage, records its ledger row and its receipt, and leaves 0108's and 0110's alone", async () => {
     const plan = await loadMigrationPlan();
-    const [step, batch, partC] = plan.forwardChain;
+    const [step, batch, partC, rotation] = plan.forwardChain;
     expect(plan.forwardChain.map((entry) => entry.name)).toEqual([...CHAIN]);
     const before = ledgersBefore as { ledger: Array<{ name: string }>; forward108: unknown[]; forward110: unknown[]; steps: unknown };
     expect(before.ledger.map((row) => row.name)).toEqual([...plan.manifest.order, plan.forward108.name, DEV_110].sort());
@@ -494,7 +496,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
     expect(after.ledger.filter((row) => !(CHAIN as readonly string[]).includes(row.name))).toEqual(before.ledger);
     expect(after.forward108).toEqual(before.forward108);
     expect(after.forward110).toEqual(before.forward110);
-    expect(after.steps).toHaveLength(3);
+    expect(after.steps).toHaveLength(4);
     expect(after.steps[0]).toMatchObject({
       source_name: NETOPIA_MIGRATION, base_recipe_sha256: plan.recipeSha256,
       previous_manifest_sha256: plan.forward110.manifestSha256, forward_manifest_sha256: step!.manifestSha256,
@@ -511,6 +513,12 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       source_name: PART_C_MIGRATION, base_recipe_sha256: plan.recipeSha256,
       previous_manifest_sha256: batch!.manifestSha256, forward_manifest_sha256: partC!.manifestSha256,
       source_sha256: partC!.sourceSha256, verifier_sha256: step!.verifierSha256
+    });
+    // Role rotation's step follows Part C's, bound to Part C's manifest, and keeps the same effective verifier in force.
+    expect(after.steps[3]).toMatchObject({
+      source_name: ROLE_ROTATION_MIGRATION, base_recipe_sha256: plan.recipeSha256,
+      previous_manifest_sha256: partC!.manifestSha256, forward_manifest_sha256: rotation!.manifestSha256,
+      source_sha256: rotation!.sourceSha256, verifier_sha256: step!.verifierSha256
     });
     // Private to the installer, as 0108's receipt is.
     for (const role of ["debateai_runtime", "debateai_billing_runtime", "debateai_authorization_runtime"]) {
@@ -588,7 +596,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       }
     }
     // A real drift of an 0111 object that its verifier does not pin (a purge's body, same owner, grants and settings) is
-    // refused by 0111's postcondition, although Part C's step is the last one.
+    // refused by 0111's postcondition, although role rotation's step is the last one.
     const purge = "billing.purge_short_lived(timestamptz)";
     const definition = (await query("SELECT pg_get_functiondef($1::regprocedure) AS def", [purge])).rows[0].def as string;
     const drifted = definition.replace(/\$function\$\s*$/u, "-- drift\n$function$\n");
@@ -629,7 +637,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
     expect(await receiptOf()).toEqual(receipts);
   });
 
-  it("migrates a fresh database through 0108, 0110, 0111, 0112 and 0113, and a second migrate() is a no-op", async () => {
+  it("migrates a fresh database through 0108, 0110, 0111, 0112, 0113 and 0114, and a second migrate() is a no-op", async () => {
     const fresh = await startTestDatabase();
     try {
       await migrate(fresh.pool);
@@ -649,7 +657,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
     }
   }, 600_000);
 
-  it("a database at 0108 without 0110 gets 0110, then 0111, 0112 and 0113, once each; a second migrate() is a no-op", async () => {
+  it("a database at 0108 without 0110 gets 0110, then 0111, 0112, 0113 and 0114, once each; a second migrate() is a no-op", async () => {
     const older = await startTestDatabase();
     try {
       await seedDevLineage108(older.pool);
@@ -657,14 +665,16 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       await migrate(older.pool);
       const counts = (await older.pool.query("SELECT name, count(*)::int n FROM public.debateai_schema_migration WHERE name = ANY($1) GROUP BY name ORDER BY name",
         [[DEV_110, ...CHAIN]])).rows;
-      expect(counts).toEqual([{ name: DEV_110, n: 1 }, { name: NETOPIA_MIGRATION, n: 1 }, { name: AUTH_DB_BATCH, n: 1 }, { name: PART_C_MIGRATION, n: 1 }]);
+      expect(counts).toEqual([{ name: DEV_110, n: 1 }, { name: NETOPIA_MIGRATION, n: 1 }, { name: AUTH_DB_BATCH, n: 1 }, { name: PART_C_MIGRATION, n: 1 },
+        { name: ROLE_ROTATION_MIGRATION, n: 1 }]);
       const receipt110 = (await older.pool.query("SELECT source_name, chain_manifest_sha256 FROM public.debateai_schema_migration_forward110")).rows;
       expect(receipt110).toEqual([{ source_name: DEV_110, chain_manifest_sha256: plan.forward108.manifestSha256 }]);
       const receipts = await receiptOf(older.pool);
-      expect(receipts).toHaveLength(3);
+      expect(receipts).toHaveLength(4);
       expect(receipts[0]).toMatchObject({ source_name: NETOPIA_MIGRATION, previous_manifest_sha256: plan.forward110.manifestSha256 });
       expect(receipts[1]).toMatchObject({ source_name: AUTH_DB_BATCH, previous_manifest_sha256: plan.forwardChain[0]!.manifestSha256 });
       expect(receipts[2]).toMatchObject({ source_name: PART_C_MIGRATION, previous_manifest_sha256: plan.forwardChain[1]!.manifestSha256 });
+      expect(receipts[3]).toMatchObject({ source_name: ROLE_ROTATION_MIGRATION, previous_manifest_sha256: plan.forwardChain[2]!.manifestSha256 });
       const before = (await older.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
       await migrate(older.pool);
       expect((await older.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows).toEqual(before);

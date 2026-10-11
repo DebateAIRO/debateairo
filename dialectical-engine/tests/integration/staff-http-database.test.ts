@@ -42,8 +42,10 @@ async function account() {
     await database.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at) VALUES($1,$2,$3,$3,$4,$5,'active',now())`,[userId,createEmailBlindIndex(blindIndexKey,email),address,passwordHash,'private-customer-'+userId]);
     await database.pool.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,created_at,verified_at) VALUES($1,'email',$2,'verified',now(),now())`,[userId,address]);
     await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',now(),now())`,[factorId,userId,encrypt(dek,secret,['identity','mfa_factor.secret_ciphertext',factorId,'run:none',userId,`user-dek:${userId}`,'1'])]);
-    const step = Math.floor(Date.now()/(mfaPolicy.totp.periodSeconds*1000));
-    const login = await sessions.beginLogin({email,password},source), logged = await sessions.completeLogin({challengeToken: login.challengeToken,code: totpCodeAtStep(secret,step-1)},source);
+    // The step is read AFTER the password check: read before it, a 30 s boundary crossed during the Argon2 work left
+    // step-1 two steps old against a one-step drift, and the login failed AUTH_CREDENTIALS_INVALID (PR #134's CI).
+    const login = await sessions.beginLogin({email,password},source), step = Math.floor(Date.now()/(mfaPolicy.totp.periodSeconds*1000));
+    const logged = await sessions.completeLogin({challengeToken: login.challengeToken,code: totpCodeAtStep(secret,step-1)},source);
     const own = (await sessions.authenticate(logged.sessionToken,source))!;
     await seedStaffPrivateObject(database.pool,{userId,ownerRef:own.ownerRef,ordinarySessionId:logged.session.session_id});
     return {userId,email,secret,factorId,sessionToken: logged.sessionToken,csrfToken: logged.csrfToken,ordinarySessionId: logged.session.session_id,one: await hardware(userId)};

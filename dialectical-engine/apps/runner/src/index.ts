@@ -9,11 +9,13 @@ import {
   assertNoOpenWriteTransaction,
   insertCallPrompt,
   readRunRoleAssignment,
+  readRunRoleRotation,
   withRunContentLease,
   withWriteTransaction,
   type CompletionActivationResolution,
   type DiscoveredPanelMember,
   type RunCostSubstitutionReason,
+  type RunRoleRotationRecord,
   type ServeDisclosureRecord
 } from "@debateai/db";
 import {
@@ -191,7 +193,7 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { buildStoryRunSnapshot, storySeatRoleMaker } from "./story-snapshot.js";
+import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 
 // Model scorecard A15/A16: the seat book and the seat caller live in their own module.
@@ -2085,6 +2087,17 @@ export interface WalkingSkeletonSettings {
     readonly modelId: string | null;
     readonly failureCode: string | null;
   }>;
+  /**
+   * Role rotation, Task 11 (orchestrator ruling 2026-10-11): may the SEALED answer-role ref `roleRef` stand in for a
+   * rotated debate's pinned member that is not claim-eligible? Only when the debate's start-of-debate estimate already
+   * covers that ref's model. Absent: yes — off the preview the estimate prices the sealed roles exactly as for a debate
+   * that is not rotated. The preview's runner answers with `previewSealedRoleFallbackCovered` (its rotated estimate
+   * prices only the panel's models). No: the pinned role refuses with today's J24.
+   */
+  readonly answerRoleFallbackCovered?: (input: Readonly<{
+    roleRef: string;
+    panel: readonly DiscoveredPanelMember[];
+  }>) => boolean;
   readonly scoringOperator?: ScoringOperatorRegisterInput;
   readonly runDeathPolicy?: RunDeathPolicy;
   readonly hiddenNodeScoreThreshold?: {
@@ -3037,10 +3050,13 @@ export function serveFloorOf(input: Readonly<{
  *
  * Content-free: provider refs, codes and counts. The served refs are the
  * makers that wrote and checked the round the answer serves (null when the
- * answer has no checked round). A served maker other than the planned one can
- * only be the money fallback — every other substitution is refused — so the
- * fallback flags and the reason are derived from the refs, and migration 0076
- * refuses a row where they disagree. `checkerSameAsWriter` is R9's disclosure:
+ * answer has no checked round). On a run that is not rotated, a served maker
+ * other than the planned one can only be the money fallback — every other
+ * substitution is refused — so the fallback flags and the reason are derived
+ * from the refs, and migration 0076 refuses a row where they disagree. On a
+ * rotated run (Task 11, migration 0114) the planned refs are the pin's, and a
+ * sealed register ref that stood in for an unavailable pinned member is the one
+ * other substitution: its role's reason is ROLE_UNAVAILABLE, named per role. `checkerSameAsWriter` is R9's disclosure:
  * DEGRADED-DIVERSITY reads the SEALED refs, so a fallback that put both roles
  * on one maker is recorded here instead. The digest fields (Task M4) are the
  * rung and the points left out of the digest the answer-writer was handed
@@ -3060,9 +3076,22 @@ export function buildServeDisclosureRecord(input: Readonly<{
   digest: Readonly<{ rung: number; pointsOmitted: number }> | null;
   /** The floor of a components-only answer (`serveFloorOf`), or null. */
   floor: ServeFloor | null;
+  /**
+   * Role rotation, Task 11 (orchestrator ruling 2026-10-11): a rotated run's stand-ins — per answer role, the sealed
+   * register ref that took the role because the pinned member was not claim-eligible, or null when the pin held it.
+   * Present only on a rotated run; the record then names each fallback's reason per role. Absent on every other run,
+   * whose record is today's to the byte.
+   */
+  standIns?: Readonly<{ writerRef: string | null; checkerRef: string | null }>;
 }>): ServeDisclosureRecord {
   const writerFallback = input.served !== null && input.served.writerRef !== input.planned.writerRef;
   const checkerFallback = input.served !== null && input.served.checkerRef !== input.planned.checkerRef;
+  // A role the stand-in served fell back because its pinned model was unavailable; any other served model than the
+  // planned one was chosen for money (a stand-in a cheaper model then replaced included: what served was chosen for money).
+  const reasonOf = (fallback: boolean, servedRef: string | undefined, standIn: string | null | undefined) =>
+    !fallback ? null : standIn !== null && standIn !== undefined && servedRef === standIn ? "ROLE_UNAVAILABLE" as const : "MONEY" as const;
+  const writerReason = reasonOf(writerFallback, input.served?.writerRef, input.standIns?.writerRef);
+  const checkerReason = reasonOf(checkerFallback, input.served?.checkerRef, input.standIns?.checkerRef);
   return Object.freeze({
     answerId: input.answerId,
     answerVersion: input.answerVersion,
@@ -3073,7 +3102,9 @@ export function buildServeDisclosureRecord(input: Readonly<{
     checkerServedRef: input.served?.checkerRef ?? null,
     writerFallback,
     checkerFallback,
-    fallbackReason: writerFallback || checkerFallback ? "MONEY" as const : null,
+    fallbackReason: writerReason === "MONEY" || checkerReason === "MONEY" ? "MONEY" as const : null,
+    ...(input.standIns === undefined || writerReason === null ? {} : { writerFallbackReason: writerReason }),
+    ...(input.standIns === undefined || checkerReason === null ? {} : { checkerFallbackReason: checkerReason }),
     checkerSameAsWriter: input.served !== null && input.served.checkerRef === input.served.writerRef,
     bodyStop: input.body.bodyStop,
     pointsWithoutReview: input.body.pointsWithoutReview,
@@ -4601,6 +4632,30 @@ export class WalkingSkeletonRunner {
       }
       roleAssignment = parsedAssignment.data;
     }
+    /**
+     * Role rotation (spec 2026-10-11 Part 6): the four roles admission picked, pinned beside the run.
+     * A rotated run swaps the two sealed answer-role refs for the pinned ones for THIS run only (the
+     * per-run `synthesisRolePolicy` below) and hands its story the pinned pair; the legacy seat book and
+     * every other path stay as they are. Admission picks only among the debate's own frozen panel, and a
+     * run never carries both pins (admission pins a rotation only where no scorecard assignment is
+     * pinned), so a pin that breaks either rule, or that does not read, is a TERMINAL refusal before any
+     * probe or call, like RUN_ROLE_ASSIGNMENT_INVALID. A database failure is not a TypeError and keeps
+     * today's (non-terminal) path.
+     */
+    let rotationPin: RunRoleRotationRecord | null;
+    try {
+      rotationPin = await readRunRoleRotation(this.pool, run.runId);
+      if (rotationPin !== null && roleAssignment !== null) throw new TypeError("BOTH_PINS");
+      if (rotationPin !== null) {
+        const panelRefs = new Set(run.discoveredPanel.map((member) => member.provider_ref));
+        const pinned = [rotationPin.answerWriter, rotationPin.answerChecker, rotationPin.storyteller, rotationPin.storyChecker];
+        if (!pinned.every((role) => panelRefs.has(role.providerRef))) throw new TypeError("PIN_OFF_PANEL");
+      }
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      await this.#work.recordTerminalFailure({ runId: run.runId, workItemId: claimed.workItemId, reason: "RUN_ROLE_ROTATION_INVALID" });
+      throw new TypedDomainError("RUN_ROLE_ROTATION_INVALID", "The run's pinned role rotation cannot seat a debate");
+    }
     const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, maker] as const));
     const absentAtClaim: Array<{ readonly member: DiscoveredPanelMember; readonly failureCode: string }> = [];
     const configuredMakers: Array<{
@@ -4816,7 +4871,35 @@ export class WalkingSkeletonRunner {
         "Every provider pinned at ask time was absent when the runner claimed the work item"
       );
     }
-    const synthesisRolePolicy = this.settings.synthesisRolePolicy;
+    // Role rotation, Task 11 (orchestrator ruling 2026-10-11 under the owner's delegation, "always an answer"): a
+    // pinned answer member that is not claim-eligible hands its role back to the SEALED register ref for that role —
+    // today's unpinned role, with today's off-panel probe and today's J24 below — when the debate's estimate already
+    // covers that ref's model (`answerRoleFallbackCovered`). Task 12: the sealed ref must itself be one of the debate's
+    // panel REFS (not merely a panel model), so a stand-in was priced, switched on and health-checked with the panel and
+    // never needs an off-panel probe the estimate did not count. Not a panel ref, not covered, or the sealed ref is the
+    // pinned one: no stand-in, and the pinned role refuses with today's J24. The pin stays the disclosure's planned ref,
+    // so the stand-in is recorded as that role's fallback for ROLE_UNAVAILABLE (`rotationStandIns`).
+    const standInFor = (pinnedRef: string, sealedRef: string): string | null =>
+      configuredMakers.some((maker) => maker.providerRef === pinnedRef) || sealedRef === pinnedRef
+        || !run.discoveredPanel.some((member) => member.provider_ref === sealedRef)
+        || !(this.settings.answerRoleFallbackCovered?.({ roleRef: sealedRef, panel: run.discoveredPanel }) ?? true)
+        ? null
+        : sealedRef;
+    const rotationStandIns = this.settings.synthesisRolePolicy === undefined || rotationPin === null ? null : Object.freeze({
+      writerRef: standInFor(rotationPin.answerWriter.providerRef, this.settings.synthesisRolePolicy.synthesizerRoleRef),
+      checkerRef: standInFor(rotationPin.answerChecker.providerRef, this.settings.synthesisRolePolicy.evaluatorRoleRef)
+    });
+    // Role rotation: a rotated run's per-claim policy is the boot policy with the two answer-role refs
+    // replaced by the pin's, or by a role's stand-in (bounds and loop bound unchanged). Every per-run use below
+    // reads this one value; the pre-claim J24 (2) check above keeps the sealed refs, the fallback a one-maker
+    // debate needs.
+    const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined || rotationPin === null || rotationStandIns === null
+      ? this.settings.synthesisRolePolicy
+      : Object.freeze({
+        ...this.settings.synthesisRolePolicy,
+        synthesizerRoleRef: rotationStandIns.writerRef ?? rotationPin.answerWriter.providerRef,
+        evaluatorRoleRef: rotationStandIns.checkerRef ?? rotationPin.answerChecker.providerRef
+      });
     if (synthesisRolePolicy === undefined) {
       // Unreachable: the pre-claim gate refuses first. Typed rather than
       // optional-chained so a future caller cannot reach synthesis without it.
@@ -4917,9 +5000,13 @@ export class WalkingSkeletonRunner {
         workItemId: claimed.workItemId,
         reason: `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:${role}`
       });
+      // Task 12: on a rotated run the role's ref is the debate's PIN (unless a sealed stand-in replaced it), so the
+      // message says which: a pinned ref is never called sealed.
+      const refKind = rotationPin !== null && roleRef === (role === "SYNTHESIZER" ? rotationPin.answerWriter : rotationPin.answerChecker).providerRef
+        ? "pinned" : "sealed";
       throw new TypedDomainError(
         "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM",
-        `J24: the sealed ${role} role ref ${roleRef} was ${absent === undefined ? "not claim-eligible" : `absent at claim (${absent.failureCode})`}; the run refuses rather than serving from a provider the sealed row did not name`
+        `J24: the ${refKind} ${role} role ref ${roleRef} was ${absent === undefined ? "not claim-eligible" : `absent at claim (${absent.failureCode})`}; the run refuses rather than serving from a provider ${refKind === "pinned" ? "the debate's pin" : "the sealed row"} did not name`
       );
     }
     // A15: the same refusal for an assigned run's synthesis seats — neither the
@@ -7159,7 +7246,8 @@ export class WalkingSkeletonRunner {
       }))
     ]);
     // ---- T9: the synthesis serve chain's inputs -------------------------
-    const synthesisRoles = this.settings.synthesisRolePolicy;
+    // Role rotation: the per-claim policy (the pin's two answer refs on a rotated run, else the sealed one).
+    const synthesisRoles = synthesisRolePolicy;
     if (synthesisRoles === undefined) {
       // Unreachable from executeWorkItem: the claim-time gate refuses first.
       // Kept as the typed defence for any future caller that reaches serve by
@@ -8084,7 +8172,10 @@ export class WalkingSkeletonRunner {
             writerRef: plannedRoleRef(writerPlannedByRound.get(answeredRound.round), "writer"),
             checkerRef: plannedRoleRef(checkerPlannedByRound.get(answeredRound.round), "checker")
           }
-        : { writerRef: synthesisRoles.synthesizerRoleRef, checkerRef: synthesisRoles.evaluatorRoleRef },
+        // Role rotation, Task 11: a rotated run plans its pin's refs, so a stand-in is disclosed as a fallback.
+        : rotationPin === null
+          ? { writerRef: synthesisRoles.synthesizerRoleRef, checkerRef: synthesisRoles.evaluatorRoleRef }
+          : { writerRef: rotationPin.answerWriter.providerRef, checkerRef: rotationPin.answerChecker.providerRef },
       served: answeredRound === undefined ? null : {
         writerRef: servedRoleRef(servedDrafts.get(answeredRound.candidateRef)?.providerRef, "writer"),
         checkerRef: servedRoleRef(servedChecks.get(answeredRound.verdictRef), "checker")
@@ -8092,7 +8183,8 @@ export class WalkingSkeletonRunner {
       body: serveDisclosureBody,
       serveStop: serveLoopStopOf(servePhaseFailure),
       digest: serveDisclosureDigestFacts(writerDigest),
-      floor
+      floor,
+      ...(rotationStandIns === null ? {} : { standIns: rotationStandIns })
     }));
     await runnerStage(
       "ANSWER_MEMORY_OBSERVATION_FAILED",
@@ -8184,6 +8276,8 @@ export class WalkingSkeletonRunner {
               // The run's OWN claim-eligible providers: a role provider that the
               // claim-time probe found absent is never called for the story.
               resolveProvider: (roleRef) => {
+                // Role rotation, Task 12: on a rotated run the register's story ref serves only when it is a panel ref.
+                if (rotationPin !== null && !panelRefs.has(roleRef)) return null;
                 const maker = synthesisMakers.find((candidate) => candidate.providerRef === roleRef);
                 return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };
               },
@@ -8207,7 +8301,21 @@ export class WalkingSkeletonRunner {
                     checker: storySeatRoleMaker(seatBook.answerChecker,
                       answeredRound === undefined ? undefined : checkerPlannedByRound.get(answeredRound.round))
                   }
-                : undefined,
+                // Role rotation (spec 2026-10-11 Part 6): a rotated run (never an assigned one; the claim
+                // refuses both pins) hands the story its pinned pair, looked up among this run's
+                // claim-eligible members. Task 12 ("always an answer"): a pinned member not claim-eligible
+                // hands its role to another claim-eligible member of the stored panel, in panel order, the
+                // story checker always of another maker than the storyteller serving
+                // (`storyRotationRoleMakers`). None: null, and the story uses the register's ref, as for a
+                // FALLBACK seat (packages/story writer.ts), only when that ref is a panel ref (above).
+                : rotationPin === null
+                  ? undefined
+                  : storyRotationRoleMakers({
+                      panelRefs: run.discoveredPanel.map((member) => member.provider_ref),
+                      claimEligible: synthesisMakers,
+                      storytellerRef: rotationPin.storyteller.providerRef,
+                      storyCheckerRef: rotationPin.storyChecker.providerRef
+                    }),
               // Each story step re-takes the SAME disclosure lease the debate held
               // (this run and its memory-linked prior run), briefly, on this
               // runner's pool: every store and gateway inside it borrows it, and
@@ -8725,6 +8833,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_OWNER_REF_INVALID",
   "RUN_PRINCIPAL_SESSION_MISMATCH",
   "RUN_ROLE_ASSIGNMENT_INVALID",
+  "RUN_ROLE_ROTATION_INVALID",
   "SCALAR_DECISION_CANNOT_SPAWN",
   "SCORECARD_INTERVAL_INVALID",
   "SCORECARD_TASK_CLASS_AMBIGUOUS",

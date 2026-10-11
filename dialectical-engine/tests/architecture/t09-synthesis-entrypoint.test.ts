@@ -114,4 +114,95 @@ describe("T9 production entry point wiring", () => {
     expect(roles).toContain('"SYNTHESIZER"');
     expect(roles).toContain('"EVALUATOR"');
   });
+
+  /**
+   * Role rotation (spec 2026-10-11 Part 6): the runner-level rows live in
+   * tests/integration/database.test.ts, which CI does not run, so the wiring is
+   * also pinned here by name. A rotated run's per-claim policy carries the pin's
+   * two answer refs, and every per-run use reads that one value; the pre-claim
+   * J24 (2) check keeps the sealed refs. A pin that does not read, sits beside a
+   * scorecard assignment or leaves the panel is a terminal refusal; a database
+   * error is not.
+   */
+  it("swaps the sealed answer refs for a rotated run's pinned ones, per claim only (role rotation)", async () => {
+    const source = await readFile(
+      new URL("../../apps/runner/src/index.ts", import.meta.url),
+      "utf8"
+    );
+    const claim = source.indexOf("const claimed = workItemId === undefined");
+    const read = source.indexOf("rotationPin = await readRunRoleRotation(this.pool, run.runId);");
+    const assignment = source.indexOf("const pinnedRoleAssignment = await readRunRoleAssignment(this.pool, run.runId);");
+    const firstProbe = source.indexOf("const probe = await this.settings.claimTimeProbe(member);");
+    expect(claim).toBeGreaterThan(-1);
+    expect(read).toBeGreaterThan(assignment);
+    expect(assignment).toBeGreaterThan(claim);
+    // Read before any member is probed: a refused pin costs no probe and no call.
+    expect(firstProbe).toBeGreaterThan(read);
+    const guard = source.slice(read, firstProbe);
+    expect(guard).toContain('if (rotationPin !== null && roleAssignment !== null) throw new TypeError("BOTH_PINS");');
+    expect(guard).toContain("if (!pinned.every((role) => panelRefs.has(role.providerRef))) throw new TypeError(\"PIN_OFF_PANEL\");");
+    expect(guard).toContain("if (!(error instanceof TypeError)) throw error;");
+    expect(guard).toContain('reason: "RUN_ROLE_ROTATION_INVALID"');
+    expect(guard).toContain('throw new TypedDomainError("RUN_ROLE_ROTATION_INVALID",');
+    // The per-claim policy: the boot policy with the two answer refs replaced (by the pin's, or by a role's
+    // stand-in), nothing else.
+    expect(source).toContain(
+      "const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined || rotationPin === null || rotationStandIns === null"
+    );
+    expect(source).toContain("synthesizerRoleRef: rotationStandIns.writerRef ?? rotationPin.answerWriter.providerRef,");
+    expect(source).toContain("evaluatorRoleRef: rotationStandIns.checkerRef ?? rotationPin.answerChecker.providerRef");
+    // The serve chain reads the per-claim policy, never the boot one.
+    expect(source).toContain("const synthesisRoles = synthesisRolePolicy;");
+    expect(source).not.toContain("const synthesisRoles = this.settings.synthesisRolePolicy;");
+    // The pre-claim J24 (2) check still names the sealed refs.
+    expect(source).toContain("? this.settings.synthesisRolePolicy.synthesizerRoleRef");
+    expect(source).toContain(": this.settings.synthesisRolePolicy.evaluatorRoleRef;");
+  });
+
+  /**
+   * Role rotation, Task 11 (orchestrator ruling 2026-10-11, "always an answer"): a pinned answer member that is not
+   * claim-eligible hands its role to the SEALED register ref, only when the debate's estimate covers that ref
+   * (`answerRoleFallbackCovered`), BEFORE today's off-panel probe and J24 refusal run on the per-claim policy. The
+   * disclosure keeps the pin as planned and receives the stand-ins, so the stand-in is a fallback for ROLE_UNAVAILABLE.
+   */
+  it("lets the sealed answer role stand in for an unavailable pinned member, before today's probe and J24 (Task 11)", async () => {
+    const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    const standIn = source.indexOf("const standInFor = (pinnedRef: string, sealedRef: string): string | null =>");
+    const policy = source.indexOf("const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined");
+    const probe = source.indexOf("const sealedRefRoles = SYNTHESIS_ROLES.filter((role) => {");
+    const refusal = source.indexOf("reason: `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:${role}`");
+    expect(standIn).toBeGreaterThan(-1);
+    expect(policy).toBeGreaterThan(standIn);
+    expect(probe).toBeGreaterThan(policy);
+    expect(refusal).toBeGreaterThan(probe);
+    const rule = source.slice(standIn, policy);
+    // Only for a member not claim-eligible, never the pinned ref itself, only a panel REF (Task 12: never an off-panel
+    // route the estimate did not count or a probe the panel did not run), and only when the estimate covers the ref.
+    expect(rule).toContain("configuredMakers.some((maker) => maker.providerRef === pinnedRef) || sealedRef === pinnedRef");
+    expect(rule).toContain("|| !run.discoveredPanel.some((member) => member.provider_ref === sealedRef)");
+    expect(rule.indexOf("|| !run.discoveredPanel.some((member) => member.provider_ref === sealedRef)"))
+      .toBeLessThan(rule.indexOf("this.settings.answerRoleFallbackCovered?.("));
+    expect(rule).toContain("|| !(this.settings.answerRoleFallbackCovered?.({ roleRef: sealedRef, panel: run.discoveredPanel }) ?? true)");
+    expect(rule).toContain("standInFor(rotationPin.answerWriter.providerRef, this.settings.synthesisRolePolicy.synthesizerRoleRef)");
+    expect(rule).toContain("standInFor(rotationPin.answerChecker.providerRef, this.settings.synthesisRolePolicy.evaluatorRoleRef)");
+    // The disclosure plans the pin's refs and is told the stand-ins.
+    expect(source).toContain(": { writerRef: rotationPin.answerWriter.providerRef, checkerRef: rotationPin.answerChecker.providerRef },");
+    expect(source).toContain("...(rotationStandIns === null ? {} : { standIns: rotationStandIns })");
+    // The preview's runner answers the money question with the preview's own rule.
+    const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
+    expect(main).toContain("previewSealedRoleFallbackCovered(roleRef, panel)");
+  });
+
+  /**
+   * Task 12 item 7: on a rotated run the J24 refusal names a PINNED ref as pinned, never as sealed (only a ref that
+   * is not the role's pin, i.e. today's register ref or its stand-in, is called sealed).
+   */
+  it("the J24 refusal calls a pinned ref pinned, not sealed (Task 12)", async () => {
+    const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    const refusal = source.indexOf("reason: `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:${role}`");
+    const j24 = source.slice(source.lastIndexOf("for (const role of sealedRefRoles) {", refusal), source.indexOf("// A15: the same refusal", refusal));
+    expect(j24).toContain("const refKind = rotationPin !== null && roleRef === (role === \"SYNTHESIZER\" ? rotationPin.answerWriter : rotationPin.answerChecker).providerRef");
+    expect(j24).toContain("`J24: the ${refKind} ${role} role ref ${roleRef} was ");
+    expect(j24).not.toContain("`J24: the sealed ${role} role ref ${roleRef} was ");
+  });
 });

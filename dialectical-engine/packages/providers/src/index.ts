@@ -219,6 +219,13 @@ export interface ProviderCallResult {
   readonly thinkingLevel?: string;
   /** Model scorecard §2.3: the vendor-reported thinking tokens of the accepted attempt; null when not reported. */
   readonly reasoningTokens?: number | null;
+  /**
+   * Role rotation (spec 2026-10-11 Part 3): repair packets sent before the accepted reply since the original
+   * packet was last sent (0: the accepted reply answered the original packet). A length retry re-sends the
+   * original packet, is not a repair, and starts the count again at 0 (Task 12). A gateway or double that
+   * builds its own result and leaves it out means 0.
+   */
+  readonly repairAttempts?: number;
 }
 
 export interface ProviderGateway {
@@ -1640,6 +1647,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     }
     /** W10/2: how many attempts of THIS call were cut off at the bound. */
     let lengthFailures = 0;
+    /**
+     * Role rotation (spec 2026-10-11 Part 3): how many repair packets this call adopted since the original
+     * packet was last sent (a length retry re-sends it and resets this to 0), so above 0 exactly when the
+     * accepted reply answered a repair packet.
+     */
+    let repairAttempts = 0;
     let lastContentRejection: {
       attempts: number;
       parseStatus: ProviderContentRejectionStatus;
@@ -2081,6 +2094,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // ORIGINAL packet under a raised bound.
             lengthFailures += 1;
             attemptPacket = request.packet;
+            // Role rotation, Task 12: the original packet goes out again, so a repair adopted before
+            // it no longer describes the reply that is finally accepted. Count afresh from here.
+            repairAttempts = 0;
           } else if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
             const repair = request.buildRepairPacket({
               // `content` is the strict parse's, or the raw body when the cut
@@ -2094,6 +2110,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // through the same door as the first packet, with no exception.
             assertFramedPrompt(repair);
             attemptPacket = repair;
+            repairAttempts += 1;
           }
           continue;
         }
@@ -2143,7 +2160,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           maker: this.#options.maker,
           modelVersion: responseJson.model,
           thinkingLevel: thinkingLevelUsed,
-          reasoningTokens
+          reasoningTokens,
+          repairAttempts
         };
       } catch (error) {
         /**

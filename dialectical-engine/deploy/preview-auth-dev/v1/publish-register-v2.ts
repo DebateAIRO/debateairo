@@ -25,6 +25,9 @@
 // PR B (2026-10-10): the source set also carries Anthropic's reviewed ref (preview:claude-haiku-5-5,
 // maker Anthropic, adapter kind anthropic-messages-http). A base may be any reviewed set: DeepInfra's
 // refs plus any other reviewed providers' refs, in register order.
+// Role rotation (spec 2026-10-11): the source also carries the answerRoleRotationPolicy row, enabled, so the
+// preview rotates the four roles over each debate's own panel. A base without it (the live v9) shows it as `added`.
+// The operator's `roleRotation: 'off'` publishes the same row disabled (the preview's rollback: a republish).
 // The delta now carries the old and new canonical values, so the owner reviews values, not hashes;
 // deltaSha256 binds that exact document and the approval binds deltaSha256.
 import { createHash } from 'node:crypto';
@@ -33,6 +36,7 @@ import {
   canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256,
   parseRegisterVersionText, buildConfiguredProviderSetSealedRow, buildConfiguredProviderSetDeploymentRow,
   PASSWORD_RESET_POLICY_REGISTER_ROW, BACKUP_EMAIL_POLICY_REGISTER_ROW, MFA_RECOVERY_POLICY_REGISTER_ROW,
+  answerRoleRotationPolicyRow,
   type BootstrapRegister, type RegisterPublicationRow
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
@@ -55,12 +59,13 @@ const COMPOSER = 'preview-register-composer-v2' as const;
 export const PREVIEW_BASE_OWNED_KEYS = Object.freeze(['internalAllowancePolicy','staffAccessPolicy'] as const);
 const FORBIDDEN_KEYS = Object.freeze(['modelScorecard','supportActivation']);
 /**
- * The reviewed source closure: exactly the keys buildPreviewSourceRowsV2 must produce (66 at
- * dev b75e4c294, the same keys the live v9 holds minus the two base-owned ones).
+ * The reviewed source closure: exactly the keys buildPreviewSourceRowsV2 must produce (67 at
+ * dev 5109a5501 plus role rotation: the 66 of dev b75e4c294 and answerRoleRotationPolicy; the same keys the
+ * live v9 holds minus the two base-owned ones, plus that row once it is published).
  * A new register row reaches the preview only by being added here.
  */
 export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
-  'acceptanceOrganCostBounds','admissionPolicy','auditSourceIpKdfPolicy','backupEmailVerificationPolicy','billingPlans','billingPolicy',
+  'acceptanceOrganCostBounds','admissionPolicy','answerRoleRotationPolicy','auditSourceIpKdfPolicy','backupEmailVerificationPolicy','billingPlans','billingPolicy',
   'branchFreezeEpsilon','candidateConfidenceBand','channelPolicy','claimTypeCompositionMap','composerContractHash','compositionBundleBudget',
   'configuredProviderSet','conformanceContractHash','consumerRecoveryPolicy','costEnvelopePolicy','countryPolicy','disagreementQuantity',
   'disagreementThreshold','dispersionScale','downgradeBands','envelopeFormulaInputs','evaluatorCallBound','evaluatorLoopMaxRounds',
@@ -94,15 +99,29 @@ export function previewCheckerRoleRef(choice:unknown={checker:'glm'}):string {
   return PREVIEW_DEEPSEEK_CHECKER_ROLE_REF;
 }
 
+/**
+ * Role rotation on the preview (spec 2026-10-11, Deploying): 'on' (the default) publishes the row enabled, 'off'
+ * publishes it disabled. The row stays present either way, so switching rotation off (the preview's rollback) is a
+ * republish with 'off', never a code change, and the base-row-dropped refusal is never hit.
+ */
+export type PreviewRoleRotationChoice = 'on' | 'off';
+/** The row's enabled flag for a choice; anything but the two exact words refuses by its own rule. */
+export function previewRoleRotationEnabled(choice:unknown='on'):boolean {
+  if(choice!=='on'&&choice!=='off')fail('role-rotation-choice');
+  return choice==='on';
+}
+
 const sameKeys = (actual:readonly string[], expected:readonly string[]) =>
   actual.length===expected.length && [...actual].sort().join('\0')===[...expected].sort().join('\0');
 
 /**
  * v1's source build (same runtime gate, same provider panel), closed by the reviewed key list instead of a count.
- * `checker` is the reviewed checker choice (default GLM); it is checked before anything else is built.
+ * `checker` is the reviewed checker choice (default GLM) and `roleRotation` the operator's rotation switch
+ * (default 'on'); both are checked before anything else is built.
  */
-export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}):Promise<readonly RegisterPublicationRow[]> {
+export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on'):Promise<readonly RegisterPublicationRow[]> {
   const evaluatorRoleRef=previewCheckerRoleRef(checker);
+  const rotationEnabled=previewRoleRotationEnabled(roleRotation);
   if(runtime.nodeVersion!=='v26.8.2'||runtime.pnpmVersion!=='11.20.0'||!/^([0-9a-f]{40})$/.test(runtime.sourceRevision)
     ||!/^([0-9a-f]{40})$/.test(runtime.sourceTree)||!/^([0-9a-f]{64})$/.test(runtime.operatorSha256)
     ||!Number.isFinite(Date.parse(runtime.observedAt))||bootstrap.values.pnpmVersion!==runtime.pnpmVersion||bootstrap.values.postgresMajorVersion!=='18')fail();
@@ -117,7 +136,10 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
   const projected:BootstrapRegister={...bootstrap,values:{...bootstrap.values,nodeRuntimeVersion:runtime.nodeVersion},resolution:{...bootstrap.resolution,
     nodeRuntimeVersion:`preview-auth-dev-v1 actual Node ${runtime.nodeVersion}; measured ${runtime.observedAt}; source ${runtime.sourceRevision}/${runtime.sourceTree}; operator sha256:${runtime.operatorSha256}`}};
   const rows=[...await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef},'local'),
-    ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+    ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef})),
+    // Role rotation (spec 2026-10-11): the preview rotates the four roles over each debate's own panel, unless the
+    // operator published with roleRotation 'off' (the row stays, disabled: behaviour is then today's).
+    answerRoleRotationPolicyRow(rotationEnabled,'docs/superpowers/specs/2026-10-11-role-rotation-design.md; owner 2026-10-10')];
   if(!sameKeys(rows.map(row=>row.rowKey),PREVIEW_SOURCE_ROW_KEYS_V2))fail('source-key-list');
   return Object.freeze(rows.map(row=>Object.freeze(row)));
 }

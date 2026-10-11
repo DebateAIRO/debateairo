@@ -3,12 +3,13 @@
  * 2026-10-10):
  * - the admission lock is one advisory lock: a second ask waits until the first releases it;
  * - the unfinished-debates read holds a debate still debating (a READY job) and one only writing its
- *   story (answer served, no story row, a model call within the window), and nothing else.
+ *   story (answer served, no story row, a model call within the window), and nothing else;
+ * - spec 2026-10-11 Part 5: it says whether each held debate has a role rotation pin (`rotated`).
  */
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WorkItemRepository } from "@debateai/battery";
-import { RunRepository, migrate } from "@debateai/db";
+import { RunRepository, insertRunRoleRotation, migrate } from "@debateai/db";
 import { LedgerRepository } from "@debateai/ledger";
 import { createPreviewAdmissionLock, PREVIEW_UNFINISHED_RUNS_SQL } from "../../apps/api/src/preview-budget-estimate.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
@@ -96,6 +97,23 @@ describe("the unfinished debates the estimate holds", () => {
        VALUES ($1,$2,$3,$4,'FAILED','STORY_FIXTURE_FAILED',0,'[]'::jsonb,'{}'::jsonb)`,
       [randomUUID(), runId, answer.rows[0]!.answer_id, answer.rows[0]!.answer_version]);
     expect((await unfinished(true)).has("story-written")).toBe(false);
+  });
+
+  it("reports a run with a role rotation pin as rotated, and one without as not (spec 2026-10-11, Part 5)", async () => {
+    const plain = await createRun("plain-debating");
+    await readyJob(plain);
+    const pinned = await createRun("rotated-debating");
+    await readyJob(pinned);
+    const [first, second] = fixtureDiscoveredPanel(2);
+    const role = (member: typeof first) => ({ providerRef: member!.provider_ref, modelId: member!.model_id, maker: member!.maker });
+    await insertRunRoleRotation(database.pool, { runId: pinned, rule: "LEAST_SHARE_SEEDED_TIE_V1",
+      answerWriter: role(first), answerChecker: role(second), storyteller: role(second), storyChecker: role(first),
+      eligibleModelIds: [first!.model_id, second!.model_id] });
+    const result = await database.pool.query<{ envelope_basis: { source: string }; rotated: unknown }>(
+      PREVIEW_UNFINISHED_RUNS_SQL, [true, WINDOW_SECONDS]);
+    const rotated = new Map(result.rows.map((row) => [row.envelope_basis.source, row.rotated]));
+    expect(rotated.get("rotated-debating")).toBe(true);
+    expect(rotated.get("plain-debating")).toBe(false);
   });
 });
 

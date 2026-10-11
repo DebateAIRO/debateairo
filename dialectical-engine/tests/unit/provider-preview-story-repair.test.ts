@@ -66,14 +66,14 @@ async function forwarded(request: ProviderCallRequest): Promise<ProviderCallRequ
   if (received === undefined) throw new Error("PREVIEW_REQUEST_NOT_FORWARDED");
   return received;
 }
-function nativeHarness(contents: readonly string[]) {
+function nativeHarness(contents: readonly string[], finishReasons: readonly string[] = []) {
   const executions: PreviewBudgetExecution[] = [];
   const artifacts: RawArtifactInput[] = [];
   const ledger: ProviderLedgerInput[] = [];
   const fetcher = createPreviewGuardedFetch({ execute: async input => {
     executions.push(input);
     return { status: 200, body: JSON.stringify({ id: `fixture-${executions.length}`, model: MODEL,
-      choices: [{ message: { content: contents[executions.length - 1] ?? contents.at(-1)! }, finish_reason: "stop" }],
+      choices: [{ message: { content: contents[executions.length - 1] ?? contents.at(-1)! }, finish_reason: finishReasons[executions.length - 1] ?? "stop" }],
       usage: { prompt_tokens: 10, completion_tokens: 20 } }) };
   } });
   const native = new OpenAICompatibleProviderGateway({
@@ -174,6 +174,7 @@ describe("preview storyteller v2 safe repair allowance", () => {
       recordCall: charge => { charges.push(charge); }, assertUsageReported: () => undefined
     } });
     expect(result.content).toBe(accepted);
+    expect(result.repairAttempts).toBe(1);
     expect(executions).toHaveLength(2);
     expect(attempts).toBe(2);
     expect(projections).toHaveLength(2);
@@ -198,6 +199,25 @@ describe("preview storyteller v2 safe repair allowance", () => {
     expect(ledger.map(entry => entry.outcome)).toEqual(["FAILED", "OK"]);
     expect(ledger.map(entry => entry.contractHash)).toEqual(["contract:synthetic-story", "contract:synthetic-story"]);
     expect(ledger[0]?.inputHash).not.toBe(ledger[1]?.inputHash);
+  });
+
+  it("a story accepted on the first try reports no repair", async () => {
+    const { gateway } = nativeHarness([story()]);
+    const result = await gateway.call({ ...storyRequest(), costEnvelope: {
+      assertCallAllowed: () => undefined, recordCall: () => undefined, assertUsageReported: () => undefined } });
+    expect(result.repairAttempts).toBe(0);
+  });
+
+  it("a length retry re-sends the original packet and is not counted as a repair", async () => {
+    const { gateway, executions, artifacts } = nativeHarness([story().slice(0, 40), story()], ["length", "stop"]);
+    const result = await gateway.call({ ...storyRequest(), costEnvelope: {
+      assertCallAllowed: () => undefined, recordCall: () => undefined, assertUsageReported: () => undefined } });
+    expect(artifacts.map(artifact => artifact.parseStatus)).toEqual(["PARSE_FAILED", "PARSED"]);
+    // The W10 length retry: the ORIGINAL packet under a raised bound, never the repair packet.
+    const bodies = executions.map(execution => JSON.parse(execution.requestBody));
+    expect(bodies[1].messages).toEqual(bodies[0].messages);
+    expect(bodies[1].max_tokens).toBe(bodies[0].max_tokens * 2);
+    expect(result.repairAttempts).toBe(0);
   });
 
   it("native gateway stops after the one permitted repair and retains both failed charges", async () => {

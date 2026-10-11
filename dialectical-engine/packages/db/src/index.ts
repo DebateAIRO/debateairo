@@ -49,10 +49,13 @@ export {
 export {
   FLOOR_BASIS_INCOMPLETE_SQL,
   SERVE_DISCLOSURE_BODY_STOPS,
+  SERVE_DISCLOSURE_FALLBACK_REASONS,
   SERVE_DISCLOSURE_FLOOR_STATES,
   SERVE_DISCLOSURE_SERVE_STOPS,
   ServeDisclosureRepository,
+  serveDisclosureFallbackReasonOf,
   type ServeDisclosureBodyStop,
+  type ServeDisclosureFallbackReason,
   type ServeDisclosureFloorState,
   type ServeDisclosureModel,
   type ServeDisclosureRead,
@@ -1397,6 +1400,145 @@ export async function readRunRoleAssignment(
     steppedDown: row.stepped_down,
     createdAt: row.created_at
   });
+}
+
+/** Role rotation (spec 2026-10-11, Part 3): one pinned role. */
+export type RunRoleRotationRole = Readonly<{ providerRef: string; modelId: string; maker: string }>;
+/**
+ * The pin `core.run_role_rotation` holds for one rotated debate. Structurally a `RotatedRoles` (@debateai/scorecard)
+ * plus `runId`, so the API passes `{ runId, ...rotated }`. `eligibleModelIds`: the eligible members' model ids at
+ * admission, in panel order; repeats allowed (two makers may serve one model id, ruling E).
+ */
+export type RunRoleRotationInput = Readonly<{
+  runId: string; rule: "LEAST_SHARE_SEEDED_TIE_V1";
+  answerWriter: RunRoleRotationRole; answerChecker: RunRoleRotationRole;
+  storyteller: RunRoleRotationRole; storyChecker: RunRoleRotationRole;
+  eligibleModelIds: readonly string[];
+}>;
+export type RunRoleRotationRecord = RunRoleRotationInput & Readonly<{ createdAt: Date }>;
+export type RoleRotationCountRole = "ANSWER_WRITER" | "ANSWER_CHECKER" | "STORYTELLER" | "STORY_CHECKER";
+/** One model in one role: pins naming it (`picked`) out of pins whose eligible list holds it (`eligible`). */
+export type RunRoleRotationTally = Readonly<{ picked: number; eligible: number }>;
+/** Per role, per model id; the shape of `RoleRotationCounts` (@debateai/scorecard), which db does not depend on. */
+export type RunRoleRotationCounts = Readonly<Record<RoleRotationCountRole, Readonly<Record<string, RunRoleRotationTally>>>>;
+
+const ROLE_ROTATION_RULE = "LEAST_SHARE_SEEDED_TIE_V1";
+const ROLE_ROTATION_COUNT_ROLES: readonly RoleRotationCountRole[] = ["ANSWER_WRITER", "ANSWER_CHECKER", "STORYTELLER", "STORY_CHECKER"];
+
+/** Non-blank after trim and at most 256 characters: as strict as the 0114 CHECKs (JS trims more, counts UTF-16 units). */
+const isRotationText = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length >= 1 && value.length <= 256;
+
+const isRotationRole = (value: unknown): value is RunRoleRotationRole => typeof value === "object" && value !== null
+  && ["providerRef", "modelId", "maker"].every((key) => isRotationText((value as Record<string, unknown>)[key]));
+
+/** The 0114 CHECKs, in TypeScript, so a malformed pin is refused before the database. */
+function assertRotationShape(input: Omit<RunRoleRotationInput, "runId">): void {
+  const picks = [input.answerWriter, input.answerChecker, input.storyteller, input.storyChecker];
+  const eligible: unknown = input.eligibleModelIds;
+  const eligibleOk = Array.isArray(eligible) && eligible.length >= 2 && eligible.length <= 16
+    && Array.from({ length: eligible.length }, (_, index) => eligible[index] as unknown).every(isRotationText);
+  if (input.rule !== ROLE_ROTATION_RULE
+    || !picks.every(isRotationRole)
+    || input.answerChecker.maker === input.answerWriter.maker
+    || input.storyChecker.maker === input.storyteller.maker
+    || !eligibleOk
+    || !picks.every((pick) => (eligible as readonly string[]).includes(pick.modelId))) {
+    throw new TypeError("RUN_ROLE_ROTATION_INVALID");
+  }
+}
+
+export async function insertRunRoleRotation(executor: Pick<Pool, "query"> | PoolClient, input: RunRoleRotationInput): Promise<void> {
+  assertRotationShape(input);
+  const roles = [input.answerWriter, input.answerChecker, input.storyteller, input.storyChecker]
+    .flatMap((pick) => [pick.providerRef, pick.modelId, pick.maker]);
+  await executor.query(
+    `INSERT INTO core.run_role_rotation (run_id, rule,
+       writer_provider_ref, writer_model_id, writer_maker, checker_provider_ref, checker_model_id, checker_maker,
+       storyteller_provider_ref, storyteller_model_id, storyteller_maker,
+       story_checker_provider_ref, story_checker_model_id, story_checker_maker, eligible_model_ids)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::text[])`,
+    [input.runId, input.rule, ...roles, [...input.eligibleModelIds]]
+  );
+}
+
+export async function readRunRoleRotation(executor: Pick<Pool, "query"> | PoolClient, runId: string): Promise<RunRoleRotationRecord | null> {
+  const row = (await executor.query<Record<string, string> & { eligible_model_ids: string[]; created_at: Date }>(
+    `SELECT run_id, rule, writer_provider_ref, writer_model_id, writer_maker, checker_provider_ref, checker_model_id, checker_maker,
+            storyteller_provider_ref, storyteller_model_id, storyteller_maker,
+            story_checker_provider_ref, story_checker_model_id, story_checker_maker, eligible_model_ids, created_at
+     FROM core.run_role_rotation WHERE run_id=$1`,
+    [runId]
+  )).rows[0];
+  if (row === undefined) return null;
+  const pick = (prefix: string): RunRoleRotationRole => Object.freeze({
+    providerRef: row[`${prefix}_provider_ref`]!, modelId: row[`${prefix}_model_id`]!, maker: row[`${prefix}_maker`]!
+  });
+  const record = {
+    runId: row.run_id!, rule: row.rule as typeof ROLE_ROTATION_RULE,
+    answerWriter: pick("writer"), answerChecker: pick("checker"), storyteller: pick("storyteller"), storyChecker: pick("story_checker"),
+    eligibleModelIds: Object.freeze(Array.isArray(row.eligible_model_ids) ? [...row.eligible_model_ids] : []) as readonly string[]
+  };
+  assertRotationShape(record);
+  return Object.freeze({ ...record, createdAt: row.created_at });
+}
+
+/**
+ * Per role, per model id: `picked` = pins naming it in that role; `eligible` = pins whose eligible list holds it, each
+ * pin counted once per model id (ruling E). One query, both aggregates; a model eligible but never picked in a role
+ * answers `picked: 0`, and (never in a lawful table) a model picked but never eligible answers `eligible: 0`.
+ *
+ * Task 12 item 5: it runs on one dedicated connection from the pool, in a short read transaction whose
+ * `statement_timeout` is SET LOCAL (it ends with the transaction and never leaks into the pool), so a slow tally
+ * cannot hold an ask: the timeout is rethrown and admission refuses with its one-minute
+ * ASK_MODEL_CANDIDATE_UNAVAILABLE. A pool that hands out no connection rethrows its busy failure unchanged
+ * (ruling H: SERVICE_BUSY). ROLLBACK on any failure; a failed ROLLBACK destroys the connection. Always released.
+ * (A per-role tally table is a later optimisation, spec Part 3.)
+ */
+export async function readRoleRotationCounts(pool: Pick<Pool, "connect">): Promise<RunRoleRotationCounts> {
+  const client = await pool.connect();
+  let destroy: unknown;
+  let rows: { role: RoleRotationCountRole; model_id: string; picked: number; eligible: number }[];
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    rows = await queryRoleRotationCounts(client);
+    await client.query("COMMIT");
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch (rollbackFailure) { destroy = rollbackFailure; }
+    throw error;
+  } finally {
+    client.release(destroy as Error | undefined);
+  }
+  const counts = new Map(ROLE_ROTATION_COUNT_ROLES.map((role) => [role, new Map<string, RunRoleRotationTally>()]));
+  for (const row of rows) {
+    const byModel = counts.get(row.role);
+    if (byModel === undefined || !Number.isSafeInteger(row.picked) || !Number.isSafeInteger(row.eligible)) {
+      throw new TypeError("RUN_ROLE_ROTATION_INVALID");
+    }
+    byModel.set(row.model_id, Object.freeze({ picked: row.picked, eligible: row.eligible }));
+  }
+  return Object.freeze(Object.fromEntries([...counts].map(([role, byModel]) =>
+    [role, Object.freeze(Object.fromEntries(byModel))]))) as RunRoleRotationCounts;
+}
+
+async function queryRoleRotationCounts(client: PoolClient) {
+  return (await client.query<{ role: RoleRotationCountRole; model_id: string; picked: number; eligible: number }>(
+    `WITH picked AS (
+       SELECT pick.role, pick.model_id, count(*)::integer AS picked
+       FROM core.run_role_rotation
+       CROSS JOIN LATERAL (VALUES ('ANSWER_WRITER', writer_model_id), ('ANSWER_CHECKER', checker_model_id),
+         ('STORYTELLER', storyteller_model_id), ('STORY_CHECKER', story_checker_model_id)) AS pick(role, model_id)
+       GROUP BY pick.role, pick.model_id),
+     eligible AS (
+       SELECT role.role, listed.model_id, count(*)::integer AS eligible
+       FROM (SELECT DISTINCT run_id, unnest(eligible_model_ids) AS model_id FROM core.run_role_rotation) AS listed
+       CROSS JOIN (VALUES ('ANSWER_WRITER'), ('ANSWER_CHECKER'), ('STORYTELLER'), ('STORY_CHECKER')) AS role(role)
+       GROUP BY role.role, listed.model_id)
+     SELECT coalesce(picked.role, eligible.role) AS role, coalesce(picked.model_id, eligible.model_id) AS model_id,
+            coalesce(picked.picked, 0) AS picked, coalesce(eligible.eligible, 0) AS eligible
+     FROM picked FULL JOIN eligible ON eligible.role = picked.role AND eligible.model_id = picked.model_id`
+  )).rows;
 }
 
 export interface InitialBatteryRow {

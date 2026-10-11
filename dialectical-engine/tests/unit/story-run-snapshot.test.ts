@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ProviderGateway } from "@debateai/providers";
 import type { StoryCostFallback, StoryStepLease } from "@debateai/story";
-import { buildStoryRunSnapshot, storySeatRoleMaker, type StorySnapshotSource } from "../../apps/runner/src/story-snapshot.js";
+import {
+  buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker, type StorySnapshotSource
+} from "../../apps/runner/src/story-snapshot.js";
 
 /**
  * Verdict story, Task 9 — the runner's in-memory material, projected for the
@@ -257,5 +259,75 @@ describe("the story's per-run role makers (P4-D)", () => {
 
   it("keeps the register's ref (null) for a role with no scorecard seat", () => {
     expect(storySeatRoleMaker(null, "provider:main")).toBeNull();
+  });
+});
+
+/**
+ * Role rotation, Task 12 (spec 2026-10-11 Part 6, "Story roles"; "always an answer"): a rotated run's story pair.
+ * A pinned member that is claim-eligible keeps its role. One that is not hands it to another claim-eligible member of
+ * the run's stored panel, in that panel's order: the storyteller first to a member of another maker than the pinned
+ * story checker (when that checker can serve), else to the first one; the story checker to the first member whose
+ * maker differs from the storyteller actually serving (re-checked when the storyteller fell back). None: null, and the
+ * story package then takes the register's story ref (the runner only resolves it when it is a panel ref).
+ */
+describe("the story's rotated role makers, with a panel stand-in for an absent pinned member (role rotation, Task 12)", () => {
+  const member = (providerRef: string, maker: string) => Object.freeze({
+    provider: { call: async () => { throw new Error("unused"); } } as ProviderGateway, providerRef, maker
+  });
+  const A = member("provider:a", "maker x");
+  const B = member("provider:b", "maker y");
+  const C = member("provider:c", "maker z");
+  const D = member("provider:d", "maker w");
+  const C2 = member("provider:c2", "maker z");
+  const pick = (
+    panel: readonly (typeof A)[], eligible: readonly (typeof A)[], storyteller: typeof A, checker: typeof A
+  ) => storyRotationRoleMakers({
+    panelRefs: panel.map((entry) => entry.providerRef), claimEligible: eligible,
+    storytellerRef: storyteller.providerRef, storyCheckerRef: checker.providerRef
+  });
+  /** The role is exactly that member: its own ref AND its own gateway object. */
+  const expectRoles = (made: ReturnType<typeof pick>, storyteller: typeof A | null, checker: typeof A | null) => {
+    expect(made.storyteller === null ? null : { ref: made.storyteller.providerRef, provider: made.storyteller.provider })
+      .toEqual(storyteller === null ? null : { ref: storyteller.providerRef, provider: storyteller.provider });
+    expect(made.storyteller?.provider).toBe(storyteller?.provider);
+    expect(made.checker === null ? null : { ref: made.checker.providerRef, provider: made.checker.provider })
+      .toEqual(checker === null ? null : { ref: checker.providerRef, provider: checker.provider });
+    expect(made.checker?.provider).toBe(checker?.provider);
+  };
+
+  it("keeps both pinned members when both are claim-eligible", () => {
+    expectRoles(pick([A, B, C], [A, B, C], C, A), C, A);
+  });
+
+  it("an absent storyteller: the next claim-eligible panel member of another maker than the pinned checker", () => {
+    // C absent; A is the pinned checker's maker, so B (panel order, skipping A) writes and A still checks.
+    expectRoles(pick([A, B, C], [A, B], C, A), B, A);
+    // Panel order decides among several: D before B when D comes first.
+    expectRoles(pick([A, D, B, C], [A, D, B], C, A), D, A);
+  });
+
+  it("an absent storyteller whose only stand-ins share the pinned checker's maker: the first one, and the checker is re-checked", () => {
+    // C absent; the only claim-eligible members are of maker x (A and its second ref). The storyteller falls to A; the
+    // pinned checker (maker x) now shares its maker, and no member of another maker is left: null (the register's ref).
+    const A2 = member("provider:a2", "maker x");
+    expectRoles(pick([A, A2, C], [A, A2], C, A2), A, null);
+  });
+
+  it("an absent story checker: the next claim-eligible panel member whose maker differs from the storyteller's", () => {
+    // A absent; the storyteller is C (maker z): B is the first other-maker member in panel order.
+    expectRoles(pick([A, B, C], [B, C], C, A), C, B);
+    // C2 shares the storyteller's maker and is skipped although it comes first; D serves.
+    expectRoles(pick([A, C2, D, C], [C2, D, C], C, A), C, D);
+  });
+
+  it("no claim-eligible panel member of another maker: null, so the register's story ref is tried", () => {
+    expectRoles(pick([A, B], [A], A, B), A, null);
+    expectRoles(pick([A, C2, C], [C2, C], C, A), C, null);
+  });
+
+  it("never takes a claim-eligible member that is not on the run's panel", () => {
+    const offPanel = member("provider:off-panel", "maker y");
+    expectRoles(pick([A, B], [A, offPanel], A, B), A, null);
+    expectRoles(pick([A, B, C], [offPanel, B, C], C, A), C, B);
   });
 });

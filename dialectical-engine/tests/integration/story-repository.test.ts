@@ -96,7 +96,8 @@ function readyRecord(runId: string, answerId: string, marker: string): StoryReco
     reservation: `RESERVATION ${marker}`,
     verdictBasis: VERDICT_BASIS,
     pointNumbers: { "node-1": "P1", "node-2": "P2" },
-    languageTag: "ro"
+    languageTag: "ro",
+    storytellerRepairs: 0
   };
 }
 
@@ -221,7 +222,8 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
     const mark = marker();
     const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story roundtrip ${mark}`);
     const answerId = await answerFor(runId, mark);
-    const record = readyRecord(runId, answerId, mark);
+    // Role rotation (spec 2026-10-11 Part 3): the readable repair count rides beside the sealed content.
+    const record: StoryRecordInput = { ...readyRecord(runId, answerId, mark), storytellerRepairs: 2 };
     const repository = new StoryRepository(database.pool);
     await repository.insert(record);
 
@@ -232,9 +234,13 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
       shapeId: "general", packVersion: "2026-09-26.1", packFingerprint: "f".repeat(64), rounds: 2,
       storytellerLineage: record.storytellerLineage, checkerLineage: record.checkerLineage,
       artifactRefs: record.artifactRefs, reservation: `RESERVATION ${mark}`, verdictBasis: VERDICT_BASIS,
-      pointNumbers: { "node-1": "P1", "node-2": "P2" }, languageTag: "ro"
+      pointNumbers: { "node-1": "P1", "node-2": "P2" }, languageTag: "ro", storytellerRepairs: 2
     });
     expect(read?.body).toEqual(record.body);
+    const column = await database.pool.query<{ storyteller_repairs: number | null }>(
+      "SELECT storyteller_repairs FROM serve.answer_story WHERE story_id = $1", [read!.storyId]
+    );
+    expect(column.rows).toEqual([{ storyteller_repairs: 2 }]);
     expect(read?.storyId).toMatch(/^[0-9a-f-]{36}$/u);
     expect(read?.createdAt).toBeInstanceOf(Date);
     await expect(repository.readForAnswer({ answerId, answerVersion: 1, ownership }))
@@ -254,9 +260,11 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
     const repository = new StoryRepository(database.pool);
     await expect(repository.insert({ ...readyRecord(runId, answerId, mark), languageTag: "x".repeat(36) }))
       .rejects.toMatchObject({ code: "STORY_RECORD_INVALID", message: expect.stringContaining("languageTag") });
-    await expect(repository.insert({ ...readyRecord(runId, answerId, mark), languageTag: null })).resolves.toBe("INSERTED");
+    // A null repair count (no storyteller reply) round-trips as null beside it.
+    await expect(repository.insert({ ...readyRecord(runId, answerId, mark), languageTag: null, storytellerRepairs: null }))
+      .resolves.toBe("INSERTED");
     await expect(repository.readForAnswer({ answerId, answerVersion: null, ownership: { ownerRef: theOwner().ownerRef } }))
-      .resolves.toMatchObject({ languageTag: null });
+      .resolves.toMatchObject({ languageTag: null, storytellerRepairs: null });
   });
 
   it("closes the story to a foreign owner and to a malformed principal", async () => {
@@ -393,6 +401,11 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
     await expect(repository.insert({
       ...readyRecord(runId, answerId, mark), outcome: "FAILED", failureCode: "STORY_WRITE_REJECTED", body: null
     })).rejects.toMatchObject(refused);
+    // Role rotation: a repair count outside migration 0114's CHECK (NULL or 0..32), refused typed before the seal.
+    for (const storytellerRepairs of [-1, 33, 1.5, Number.NaN]) {
+      await expect(repository.insert({ ...readyRecord(runId, answerId, mark), storytellerRepairs }))
+        .rejects.toMatchObject({ ...refused, message: expect.stringContaining("storytellerRepairs") });
+    }
     expect(await storyCount(answerId)).toBe("0");
     // Positive control: the same answer takes a well-formed story.
     await expect(repository.insert(readyRecord(runId, answerId, mark))).resolves.toBe("INSERTED");

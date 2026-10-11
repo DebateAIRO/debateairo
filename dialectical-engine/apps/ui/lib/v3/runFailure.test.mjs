@@ -77,6 +77,12 @@ test("every code family lands in its group, whether or not the runner wrapped it
     // debate never began.
     ["RUN_ROLE_ASSIGNMENT_INVALID", "NOT_STARTED"],
     ["RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID", "NOT_STARTED"],
+    // Role rotation (spec 2026-10-11, error table): the role rotation pinned at
+    // the ask is unreadable, sits beside a scorecard assignment, or names a
+    // model outside the debate's panel; the runner refuses it at claim, before
+    // any model is asked, like the scorecard's refusal above.
+    ["RUN_ROLE_ROTATION_INVALID", "NOT_STARTED"],
+    ["RUNNER_EXECUTION_FAILED:RUN_ROLE_ROTATION_INVALID", "NOT_STARTED"],
     ["RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL", "RUN_LIMIT_REACHED"],
     // Budget spec 2026-09-28 §2.11: group 4 is retired. The shared wall stops
     // only the arguing, so these never end a debate; a stray one is STOPPED.
@@ -236,6 +242,9 @@ test("maps only codes their writers still produce", () => {
     // reason and then thrown (the catch keeps it, since it is in the alphabet).
     RUN_ROLE_ASSIGNMENT_INVALID: (code) =>
       runner.includes(`reason: "${code}"`) && thrown(code) && inAlphabet(code),
+    // Role rotation: the same claim-time shape, written, then thrown.
+    RUN_ROLE_ROTATION_INVALID: (code) =>
+      runner.includes(`reason: "${code}"`) && thrown(code) && inAlphabet(code),
     RUN_CEILING_BELOW_FIRST_CALL: (code) => thrown(code) && inAlphabet(code)
   };
   assert.deepEqual(Object.keys(RUN_FAILURE_CODES).sort(), Object.keys(writers).sort(), "a writer check per mapped code");
@@ -285,7 +294,11 @@ test("a debate the site's day stopped is told the group-5 sentence (budget spec 
 });
 
 test("a debate whose pinned role assignment the runner refused at claim is told the not-started sentence (P3-M18)", () => {
-  for (const reason of ["RUN_ROLE_ASSIGNMENT_INVALID", "RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID"]) {
+  for (const reason of [
+    "RUN_ROLE_ASSIGNMENT_INVALID", "RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID",
+    // Role rotation (spec 2026-10-11): a pinned rotation refused at claim is the same case.
+    "RUN_ROLE_ROTATION_INVALID", "RUNNER_EXECUTION_FAILED:RUN_ROLE_ROTATION_INVALID"
+  ]) {
     for (const namespace of NAMESPACES) {
       assert.equal(
         runFailureMessage(reason, catalogue("en", namespace)), ENGLISH.NOT_STARTED, `en/${namespace} ${reason}`

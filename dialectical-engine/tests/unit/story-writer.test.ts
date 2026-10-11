@@ -231,6 +231,8 @@ describe("StoryWriter — readiness, in order, each a FAILED row with its own co
     await writer.writeAfterSettle(SNAPSHOT);
     expect(inserted[0]?.failureCode).toBe("STORY_MATERIAL_TOO_LARGE");
     expect(inserted[0]?.pointNumbers).toBeNull();
+    // Role rotation (spec Part 3): no storyteller ever replied, so the repair count is unknown, not zero.
+    expect(inserted[0]?.storytellerRepairs).toBeNull();
     expect(calls).toEqual([]);
   });
 });
@@ -250,7 +252,9 @@ describe("StoryWriter — the write-and-check loop, on the story lane", () => {
       checkerLineage: {
         maker: "unit-maker", model_id: "unit/model", transport: "openai-compatible-http", provider_ref: "provider:checker"
       },
-      rounds: 1, artifactRefs: ["artifact:1", "artifact:2"], reservation: null, verdictBasis: SNAPSHOT.verdictBasis
+      rounds: 1, artifactRefs: ["artifact:1", "artifact:2"], reservation: null, verdictBasis: SNAPSHOT.verdictBasis,
+      // Role rotation (spec Part 3): the storyteller's reply was accepted as first asked.
+      storytellerRepairs: 0
     });
     // The model wrote P1/P2; the STORED body names the real nodes (restoreStoryRefs),
     // and the same numbering is stored as the story's point numbers.
@@ -886,5 +890,62 @@ describe("StoryWriter — per-run role makers (P4-D, P3-N1)", () => {
     expect(inserted[0]).toMatchObject({
       outcome: "READY", storytellerLineage: { provider_ref: CHEAPER }, checkerLineage: { provider_ref: CHEAPER }
     });
+  });
+});
+
+/**
+ * Role rotation (spec 2026-10-11 Part 3): `serve.answer_story.storyteller_repairs`
+ * counts the story's ROUNDS whose storyteller reply was accepted only after the
+ * format repair try (`ProviderCallResult.repairAttempts` above zero), never the
+ * repair packets themselves; NULL when no storyteller ever replied.
+ */
+function storytellerRepairing(inner: ProviderGateway, repairsByRound: ReadonlyMap<number, number>): ProviderGateway {
+  return {
+    async call(request) {
+      const result = await inner.call(request);
+      if (!isStoryteller(request)) return result;
+      const round = Number(request.callSiteKey.split(":").at(-1));
+      const repairAttempts = repairsByRound.get(round);
+      return repairAttempts === undefined ? result : { ...result, repairAttempts };
+    }
+  };
+}
+
+describe("StoryWriter — the storyteller's repair count (role rotation)", () => {
+  it("a storyteller reply accepted after a repair counts its round once", async () => {
+    const { provider } = scripted(byContract);
+    const { writer, inserted } = harness(providing(storytellerRepairing(provider, new Map([[1, 1]]))));
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", rounds: 1, storytellerRepairs: 1 });
+  });
+
+  it("counts rounds, not repair packets: two packets in round 1 and a clean round 2 are one", async () => {
+    const { provider } = numbered((request) => (isStoryteller(request) ? story() : CHECKER_OBJECTS));
+    const { writer, inserted } = harness(providing(storytellerRepairing(provider, new Map([[1, 2], [2, 0]]))));
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]).toMatchObject({ outcome: "READY_WITH_RESERVATION", rounds: 2, storytellerRepairs: 1 });
+  });
+
+  it("two rounds that each needed the repair count two", async () => {
+    const { provider } = numbered((request) => (isStoryteller(request) ? story() : CHECKER_OBJECTS));
+    const { writer, inserted } = harness(providing(storytellerRepairing(provider, new Map([[1, 1], [2, 1]]))));
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]).toMatchObject({ outcome: "READY_WITH_RESERVATION", rounds: 2, storytellerRepairs: 2 });
+  });
+
+  it("a FAILED story keeps the count of the storyteller replies it did get", async () => {
+    const { provider } = numbered((request) => (isStoryteller(request)
+      ? story()
+      : new ProviderCallFailedError(new Error("socket hang up"), 2, "TIMED_OUT", "ledger:dead")));
+    const { writer, inserted } = harness(providing(storytellerRepairing(provider, new Map([[1, 1]]))));
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]).toMatchObject({ outcome: "FAILED", rounds: 1, storytellerRepairs: 1 });
+  });
+
+  it("a story that failed before any storyteller reply stores no count", async () => {
+    const { provider } = scripted((request) => (isStoryteller(request) ? "not a story" : CHECKER_SATISFIED));
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_WRITE_REJECTED", rounds: 0, storytellerRepairs: null });
   });
 });

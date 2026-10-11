@@ -231,6 +231,62 @@ describe("W10 C2 · a truncation is not retried into the identical truncation", 
 });
 
 /**
+ * Role rotation, Task 12 item 6 (spec 2026-10-11 Part 3): `repairAttempts` feeds the story's
+ * `storyteller_repairs`, which counts only rounds whose ACCEPTED reply answered a repair packet. A
+ * length retry re-sends the ORIGINAL packet, so a repair adopted before it no longer describes the
+ * reply that is finally accepted: the count starts again at zero.
+ */
+describe("role rotation · repairAttempts names only a repair the accepted reply answered", () => {
+  const VALID = '{"segments":[{"segment_id":"s1","text":"the whole answer"}]}';
+  const repairing = (script: readonly { finish_reason: string; content: string }[]) => {
+    const { gateway, attempts } = scriptedGateway(script);
+    const framed = framedFixture("compose the served answer");
+    return {
+      attempts,
+      call: () => gateway.call(w10Request({
+        bound: { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 },
+        packet: framed.packet,
+        buildRepairPacket: () => appendingRepairPacket(framed)
+      }))
+    };
+  };
+
+  it("a repair, then a length cut, then the ORIGINAL packet accepted: 0", async () => {
+    const { attempts, call } = repairing([
+      { finish_reason: "stop", content: "this is not json at all" },
+      { finish_reason: "length", content: TRUNCATED_JSON },
+      { finish_reason: "stop", content: VALID }
+    ]);
+    const result = await call();
+    // The second attempt was the repair packet (3 messages); the third re-sent the original (2).
+    expect(attempts.map((attempt) => attempt.body.messages.length)).toEqual([2, 3, 2]);
+    expect(result.content).toBe(VALID);
+    expect(result.repairAttempts).toBe(0);
+  });
+
+  it("a repair accepted: 1", async () => {
+    const { attempts, call } = repairing([
+      { finish_reason: "stop", content: "this is not json at all" },
+      { finish_reason: "stop", content: VALID }
+    ]);
+    const result = await call();
+    expect(attempts.map((attempt) => attempt.body.messages.length)).toEqual([2, 3]);
+    expect(result.repairAttempts).toBe(1);
+  });
+
+  it("a length cut, then a repair of the re-sent original, accepted: 1", async () => {
+    const { attempts, call } = repairing([
+      { finish_reason: "length", content: TRUNCATED_JSON },
+      { finish_reason: "stop", content: "this is not json at all" },
+      { finish_reason: "stop", content: VALID }
+    ]);
+    const result = await call();
+    expect(attempts.map((attempt) => attempt.body.messages.length)).toEqual([2, 2, 3]);
+    expect(result.repairAttempts).toBe(1);
+  });
+});
+
+/**
  * A pool that answers the ONE query `readFamily` makes, from a row set the test
  * controls. `register.register_row` is APPEND-ONLY and a seeder re-reads what it
  * wrote (`.hermes/TOOLING-TRAPS.md:1759`), so "the deployment never sealed this

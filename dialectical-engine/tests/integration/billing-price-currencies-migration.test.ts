@@ -20,6 +20,8 @@ const NETOPIA_STEP = "0111_billing_netopia.sql";
 const BATCH_STEP = "0112_auth_db_batch.sql";
 const PART_C_STEP = "0113_billing_price_currencies.sql";
 const PART_C_MANIFEST = "lineage/billing-price-currencies-forward0113.json";
+/** Role rotation's step, chained after Part C's (spec 2026-10-11 Part 3): the same migrate() applies it after 0113. */
+const ROLE_ROTATION_STEP = "0114_role_rotation.sql";
 // A made-up key id, built from pieces so the whole value never appears as one secret-shaped literal.
 const KEY_ID = ["01234567", "89abcdef"].join("");
 const SEALED = Buffer.from([1, 2, 3, 4]);
@@ -135,7 +137,7 @@ describe("Part C's migration step: the currency of every quote, charge and subsc
     const plan = await loadMigrationPlan();
     const before = await migrationState();
     expect(before.ledger.map((row) => row.name).filter((name) => name === PART_C_STEP)).toHaveLength(1);
-    expect(before.steps.map((row) => row.source_name)).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP]);
+    expect(before.steps.map((row) => row.source_name)).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP]);
     const step = plan.forwardChain.find((entry) => entry.name === PART_C_STEP)!;
     const netopia = plan.forwardChain.find((entry) => entry.name === NETOPIA_STEP)!;
     const batch = plan.forwardChain.find((entry) => entry.name === BATCH_STEP)!;

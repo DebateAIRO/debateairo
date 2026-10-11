@@ -1014,6 +1014,66 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
     expect(record).toMatchObject({ bodyStop: "MONEY", serveStop: "NO_ARTIFACT", writerServedRef: "provider:a" });
   });
 
+  /**
+   * Role rotation, Task 11 (orchestrator ruling 2026-10-11): a rotated run hands the record the sealed ref that stood
+   * in for each pinned answer member found unavailable at claim (`standIns`). The reason is then named PER ROLE:
+   * ROLE_UNAVAILABLE for a role the stand-in served, MONEY for a role a cheaper model served; `fallbackReason` stays
+   * "money was used" (0076's meaning). Without `standIns` (every run that is not rotated) the record is today's.
+   */
+  const rotated = (served: Readonly<{ writerRef: string; checkerRef: string }>,
+    standIns: Readonly<{ writerRef: string | null; checkerRef: string | null }>) => buildServeDisclosureRecord({
+    ...ids,
+    planned: { writerRef: "provider:pinned-writer", checkerRef: "provider:pinned-checker" },
+    served,
+    standIns,
+    body: { bodyStop: null, pointsWithoutReview: null },
+    serveStop: null,
+    digest: null,
+    floor: null
+  });
+
+  it("a pinned writer the sealed writer stood in for is a fallback for ROLE_UNAVAILABLE, never for money", () => {
+    const record = rotated(
+      { writerRef: "provider:sealed-writer", checkerRef: "provider:pinned-checker" },
+      { writerRef: "provider:sealed-writer", checkerRef: null }
+    );
+    expect(record).toMatchObject({
+      writerPlannedRef: "provider:pinned-writer", writerServedRef: "provider:sealed-writer",
+      writerFallback: true, checkerFallback: false,
+      writerFallbackReason: "ROLE_UNAVAILABLE", fallbackReason: null
+    });
+    expect(record).not.toHaveProperty("checkerFallbackReason");
+  });
+
+  it("a stand-in checker and a cheaper writer each carry their own reason", () => {
+    const record = rotated(
+      { writerRef: "provider:cheaper", checkerRef: "provider:sealed-checker" },
+      { writerRef: null, checkerRef: "provider:sealed-checker" }
+    );
+    expect(record).toMatchObject({
+      writerFallback: true, checkerFallback: true,
+      writerFallbackReason: "MONEY", checkerFallbackReason: "ROLE_UNAVAILABLE", fallbackReason: "MONEY"
+    });
+  });
+
+  it("a stand-in that a cheaper model then replaced is the money fallback (what served was chosen for money)", () => {
+    const record = rotated(
+      { writerRef: "provider:cheaper", checkerRef: "provider:pinned-checker" },
+      { writerRef: "provider:sealed-writer", checkerRef: null }
+    );
+    expect(record).toMatchObject({ writerFallback: true, writerFallbackReason: "MONEY", fallbackReason: "MONEY" });
+  });
+
+  it("a rotated run served as pinned names no reason at all", () => {
+    const record = rotated(
+      { writerRef: "provider:pinned-writer", checkerRef: "provider:pinned-checker" },
+      { writerRef: null, checkerRef: null }
+    );
+    expect(record).toMatchObject({ writerFallback: false, checkerFallback: false, fallbackReason: null });
+    expect(record).not.toHaveProperty("writerFallbackReason");
+    expect(record).not.toHaveProperty("checkerFallbackReason");
+  });
+
   it("counts the points a stop left without a cross-review only on the spend-stopped footing", () => {
     const seeded = Object.freeze(["n1", "n2"]);
     expect(serveDisclosureBodyFacts({

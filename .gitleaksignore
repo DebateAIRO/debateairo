@@ -103,3 +103,13 @@ fd422018e71b56b9826d8d6ce9f6a0fb4840b249:dialectical-engine/tests/unit/preview_b
 # 2026-10-10 — Anthropic gate (PR #126): generic-api-key matched a list of temporary file names
 # ('.api-key.txt.<pid>.tmp') in the key command's test. File names, not a key. Owner's ruling on 2026-10-10.
 523d0a3a0c8c6dad359b2c9138b9714eeca53917:dialectical-engine/tests/unit/preview_key_test.py:generic-api-key:226
+# a database step file name (0112_auth_db_batch.sql) in a test list, not a key
+4cbdfd7169686350b246c86c5a3ce57ae2589b05:dialectical-engine/tests/architecture/migration-forward-chain.test.ts:generic-api-key:55
+# a database step file name (0112_auth_db_batch.sql) in a test list, not a key
+4cbdfd7169686350b246c86c5a3ce57ae2589b05:dialectical-engine/tests/architecture/migration-forward-chain.test.ts:generic-api-key:96
+# a database step file name (0112_auth_db_batch.sql) in a test list, not a key
+4cbdfd7169686350b246c86c5a3ce57ae2589b05:dialectical-engine/tests/architecture/migration-forward-chain.test.ts:generic-api-key:131
+# a database step file name (0112_auth_db_batch.sql) in a test list, not a key
+4cbdfd7169686350b246c86c5a3ce57ae2589b05:dialectical-engine/tests/architecture/security-migration-0065.test.ts:generic-api-key:624
+# a database step file name (0112_auth_db_batch.sql) in a test list, not a key
+4cbdfd7169686350b246c86c5a3ce57ae2589b05:dialectical-engine/tests/integration/preview-auth-dev-fallback.test.ts:generic-api-key:162

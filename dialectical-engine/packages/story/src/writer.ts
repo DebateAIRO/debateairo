@@ -300,7 +300,9 @@ function failedRecord(input: StoryWriteInput, failureCode: string, pack: StoryPa
     verdictBasis: input.verdictBasis,
     // No material was built, so no point was numbered.
     pointNumbers: null,
-    languageTag: storyLanguageTag(input)
+    languageTag: storyLanguageTag(input),
+    // Role rotation (spec 2026-10-11 Part 3): no storyteller replied, so there is no repair count.
+    storytellerRepairs: null
   };
   return Object.freeze(record);
 }
@@ -319,7 +321,8 @@ function recordFromOutcome(
   input: StoryWriteInput,
   pack: StoryPack,
   outcome: StoryLoopOutcome,
-  refMap: ReadonlyMap<string, string>
+  refMap: ReadonlyMap<string, string>,
+  storytellerRepairs: number
 ): StoryRecordInput {
   // The lineage is the SERVED round's: under the earlier-draft fallback that is
   // the earlier round, whose writer wrote and whose checker judged the story
@@ -345,7 +348,10 @@ function recordFromOutcome(
     // The short refs the models wrote in ARE the story's point numbers (node id
     // -> Pn), so a reservation that says "P3" matches appendix entry P3.
     pointNumbers: pointNumbersFrom(refMap),
-    languageTag: storyLanguageTag(input)
+    languageTag: storyLanguageTag(input),
+    // Role rotation (spec 2026-10-11 Part 3): the rounds whose storyteller reply needed the repair try. A loop
+    // that recorded no round got no storyteller reply at all (the round-1 write failed), so its count is null.
+    storytellerRepairs: outcome.rounds.length === 0 ? null : storytellerRepairs
   };
   if (outcome.outcome === "FAILED") {
     const failed: StoryRecordInput = {
@@ -523,6 +529,11 @@ export class StoryWriter {
     };
     /** Who actually wrote each round's draft: its checker prefers another maker. */
     const draftWriterByRound = new Map<number, string>();
+    /**
+     * Role rotation (spec 2026-10-11 Part 3): the rounds whose storyteller reply was accepted only after the
+     * format repair try. Rounds, not repair packets; a gateway that reports no count reported none.
+     */
+    const repairedRounds = new Set<number>();
     const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds }, {
       writeStory: async ({ round, priorObjection }) => {
         const request = storyCallRequest({
@@ -547,6 +558,7 @@ export class StoryWriter {
         // Short refs on purpose: the checker judges this body against the SAME
         // material the storyteller read. Real ids are restored only for storage.
         const body: StoryBody = parseStoryBody(result.content, built.index);
+        if ((result.repairAttempts ?? 0) > 0) repairedRounds.add(round);
         return {
           artifactRef: result.rawArtifactRef,
           callSiteKey: request.callSiteKey,
@@ -597,6 +609,6 @@ export class StoryWriter {
         cause: laterFailure.cause
       }));
     }
-    return recordFromOutcome(input, pack, outcome, built.refMap);
+    return recordFromOutcome(input, pack, outcome, built.refMap, repairedRounds.size);
   }
 }
