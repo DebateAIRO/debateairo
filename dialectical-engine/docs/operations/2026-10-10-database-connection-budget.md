@@ -41,8 +41,8 @@ guard that keeps the code and the numbers in step is
 | `api:support` | 10 | 6 | 5 s | Opening a support case holds one connection and reads messages on a second |
 | `api:support-relay-lease` | 18 | 18 | 5 s | Unchanged: up to 16 AI support chats at once (a live register setting the owner can raise without a restart) plus 2 for the queue |
 | `support:control` | 2 | 2 | 0.2 s | Unchanged; the support settings reader |
-| `api:data-export` (only when the export store is set; mission data-export S01) | — | 2 | 5 s | One export build at a time holds its snapshot read while its lease renewal takes the second |
-| **Total on the server** (dev menu off) | **104** | **80** | | |
+| `api:data-export` (only when the export store is set; mission data-export S01) | — | 1 | 15 s | One export build at a time on one connection: its lease renewal (every 15 s) waits for the snapshot read to free it, so a read of up to about 30 s keeps its lease |
+| **Total on the server** (dev menu off) | **104** | **79** | | |
 
 ### Debate runner
 
@@ -55,17 +55,17 @@ guard that keeps the code and the numbers in step is
 
 | Who | Connections at most |
 |---|---|
-| Website (API), one process | 80 |
+| Website (API), one process | 79 |
 | Debate runner | 20 |
 | Hatchet (its role's limit, `deploy/postgres/bootstrap.sql`) | 50 |
 | Migrator (its role's limit) | 3 |
 | Owner's commands (billing, support, owner CLI; by hand, one at a time) | about 10 |
-| **Sum of ceilings** | **163 of 197** |
-| Left free | 34: room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
+| **Sum of ceilings** | **162 of 197** |
+| Left free | 35: room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
 
 Backups (`pg_dump` as the `postgres` user) use the 3 administrator slots.
 
-A second API process does **not** fit: 163 + 80 is more than 197. Before running two (for example to restart without a
+A second API process does **not** fit: 162 + 79 is more than 197. Before running two (for example to restart without a
 gap, or to grow), put PgBouncer in front (section 4) or raise `max_connections` together with the memory settings
 (section 3).
 
