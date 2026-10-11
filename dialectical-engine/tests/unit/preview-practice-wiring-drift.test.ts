@@ -10,11 +10,11 @@ import { buildSynthesisDigest, idShapedTokensIn } from "@debateai/serve";
 import { buildStoryMaterial, classifyStoryContent, loadStoryPack, resolveStoryPackDir } from "@debateai/story";
 import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
 import {
-  PRACTICE_COMPOSITION_BUDGET_HIGH,
   practiceCandidateStatement,
   practiceCannedStory,
   practiceComposedPostCheck,
   practiceDebateGraph,
+  practiceDigestBudgetBound,
   practiceDigestNodes,
   practiceReviewEdges,
   practiceServedNodes,
@@ -182,7 +182,7 @@ describe("preview practice lanes: the jobs see the runner's context", () => {
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
   const digest = (() => {
     const outcome = buildSynthesisDigest({ nodes: practiceDigestNodes(graph), servedRootNodeId: graph.servedRootNodeId,
-      budgetBound: PRACTICE_COMPOSITION_BUDGET_HIGH });
+      budgetBound: practiceDigestBudgetBound() });
     if (outcome.kind !== "DIGEST") throw new Error("no digest");
     return outcome.digest;
   })();
@@ -246,7 +246,7 @@ describe("preview practice lanes: the jobs see the runner's context", () => {
 
   it("the digest's byte budget is the sealed high tier's composition bundle budget", async () => {
     const row = (await buildDevelopmentRunnerRegisterRows()).find((entry) => entry.rowKey === "compositionBundleBudget");
-    expect((row?.value as { high?: number } | undefined)?.high).toBe(PRACTICE_COMPOSITION_BUDGET_HIGH);
+    expect((row?.value as { high?: number } | undefined)?.high).toBe(practiceDigestBudgetBound());
   });
 
   it("the checker reads a written draft joined as serve joins it, never a bare position", () => {

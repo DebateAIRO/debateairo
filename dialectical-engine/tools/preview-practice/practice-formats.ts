@@ -12,17 +12,19 @@
  * so one busy model's 60-second resend wait never holds the others back for long. Each model's own jobs keep their
  * order (job by job, the samples of a job together).
  *
- * A busy model: when a job's call ends refused as busy (the gate proved the call and its one resend were never
- * billed: the vendor refused, PROVIDER_REFUSED_UNBILLED), the model is marked busy and its remaining jobs are skipped
- * (SKIPPED_MODEL_BUSY), as the runner makes a busy member sit out the rest of a debate (apps/runner/src/run-sit-out.ts).
- * The other models, on the same gate too, go on. The gate's own "too many calls in flight" refusal is the gate's, not
- * the model's: it never marks a model busy. The practice's gate brake (practice-gate-observer.ts) stays the safety net.
+ * A busy model: when a job's call ends in the vendor's refusal, not billed (the call and its one resend, the gate's
+ * PROVIDER_REFUSED_UNBILLED), the model is marked busy and its remaining jobs are skipped (SKIPPED_MODEL_BUSY), read by
+ * the runner's own predicate (providerCallEndedVendorRefusedUnbilled) on the job's gateway, as the runner's sit-out
+ * book reads it on a member's gateway (apps/runner/src/run-sit-out.ts). The other models, on the same gate too, go
+ * on. The gate's own refusals (too many calls in flight, vendor not reached) are the gate's, not the model's: they
+ * never mark a model busy. The practice's gate brake (practice-gate-observer.ts) stays the safety net.
  */
 import { randomUUID } from "node:crypto";
 import {
   OpenAICompatibleProviderGateway,
   previewModelRow,
   previewTargetGatewayControls,
+  providerCallEndedVendorRefusedUnbilled,
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
   createPreviewGuardedFetch,
@@ -194,8 +196,21 @@ export async function runPracticeFormats(input: Readonly<{
       if (!first && input.gapMs > 0) await sleep(input.gapMs);
       first = false;
       const sink = { artifacts: [] as RawArtifactInput[], ledger: [] as ProviderLedgerInput[] };
-      const gateway = recordingGateway({ target, config: input.config, guardedFetch, sink,
+      const recording = recordingGateway({ target, config: input.config, guardedFetch, sink,
         ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
+      // The job's gateway, watched as the runner's sit-out book watches a member's (the story writer swallows its
+      // calls' failures, so the job's own outcome cannot say it).
+      let endedBusy = false;
+      const gateway: ProviderGateway = Object.freeze({
+        call: async (request: Parameters<ProviderGateway["call"]>[0]) => {
+          try {
+            return await recording.call(request);
+          } catch (error) {
+            if (providerCallEndedVendorRefusedUnbilled(error)) endedBusy = true;
+            throw error;
+          }
+        }
+      });
       const eventsBefore = input.observer.events.length;
       const started = performance.now();
       let errorCode: string | null = null;
@@ -245,9 +260,8 @@ export async function runPracticeFormats(input: Readonly<{
         replyText: content === null ? null : reportableReplyText(content),
         detail
       }));
-      // The call ended refused as busy by the vendor (not the gate's own in-flight limit): the model sits out the rest.
-      const lastSent = [...wire].reverse().find((event) => event.outcome !== "STOPPED");
-      if (lastSent !== undefined && lastSent.outcome === "UNBILLED" && !lastSent.concurrencyLimit && !busy.includes(target.model)) {
+      // A call ended in the vendor's refusal, not billed: the model sits out the rest.
+      if (endedBusy && !busy.includes(target.model)) {
         busy.push(target.model);
         input.progress?.(`${target.model} is busy (refused, not billed): its remaining jobs are skipped`);
       }

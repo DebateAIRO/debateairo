@@ -8,6 +8,7 @@ import {
   PREVIEW_REVIEWED_PROVIDER_REFS,
   PreviewGateUnavailable,
   PreviewUnbilledRefusal,
+  PreviewVendorRefusedUnbilled,
   parsePreviewProviderTestConfig,
   parseProviderDiscoveryTargets,
   previewModelRow,
@@ -125,13 +126,15 @@ describe("practice redaction", () => {
 describe("practice gate brake", () => {
   const body = (model: string) => JSON.stringify({ model, max_tokens: 1, messages: [] });
   const execution = (model: string) => ({ operationId: "op", requestBody: body(model), requestSha256: "0".repeat(64), reservedUsd: "0.1" });
-  function scriptedPort(steps: ("OK" | "UNBILLED" | "INFLIGHT" | "DAILY" | "HALTED")[]) {
+  function scriptedPort(steps: ("OK" | "UNBILLED" | "NOTREACHED" | "INFLIGHT" | "DAILY" | "HALTED")[]) {
     let sent = 0;
     const port: PreviewBudgetPort = {
       async execute() {
         const step = steps[sent] ?? "OK";
         sent += 1;
-        if (step === "UNBILLED") throw new PreviewUnbilledRefusal();
+        // The vendor's PROVIDER_REFUSED_UNBILLED and the gate's PROVIDER_NOT_REACHED, as previewAuthorityRefusal maps them.
+        if (step === "UNBILLED") throw new PreviewVendorRefusedUnbilled();
+        if (step === "NOTREACHED") throw new PreviewUnbilledRefusal();
         // The gate's own CONCURRENCY_LIMIT_REACHED, as previewAuthorityRefusal maps it.
         if (step === "INFLIGHT") throw new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight");
         if (step === "DAILY") throw new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "day");
@@ -196,16 +199,34 @@ describe("practice gate brake", () => {
     expect(untouched.sent()).toBe(0);
     expect(full.stopped("anthropic")).toMatchObject({ reason: "UNBILLED_TODAY_12" });
   });
-  it("names the models whose last call ended refused as busy (the debate's sit-outs)", async () => {
+  it("'vendor not reached' counts in a row (as the gate's streak) but not toward the day (the gate keeps no entry)", async () => {
+    const observer = new PracticeGateObserver({ unbilledTodayAtStart: { deepinfra: 11 } });
+    const gate = scriptedPort(["NOTREACHED", "NOTREACHED", "NOTREACHED", "OK", "NOTREACHED", "NOTREACHED", "UNBILLED", "NOTREACHED"]);
+    const watched = observer.wrap("deepinfra", gate.port);
+    for (let index = 0; index < 3; index += 1) await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
+    await expect(watched.execute(execution("m"))).resolves.toMatchObject({ status: 200 });
+    expect(observer.stopped("deepinfra")).toBeNull();
+    for (let index = 0; index < 3; index += 1) await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
+    // Eleven at the start plus the one vendor refusal reach twelve (and the run is three in a row).
+    expect(observer.summary("deepinfra")).toMatchObject({ unbilledCounted: 1, maxConsecutiveUnbilled: 3, stop: { reason: "UNBILLED_TODAY_12" } });
+    await expect(watched.execute(execution("m"))).rejects.toMatchObject({ code: PRACTICE_GATE_STOPPED });
+    // Four "not reached" in a row on the other gate: the run stops it, the day's count does not move.
+    const notReached = observer.wrap("anthropic", scriptedPort(["NOTREACHED", "NOTREACHED", "NOTREACHED", "NOTREACHED"]).port);
+    for (let index = 0; index < 4; index += 1) await expect(notReached.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
+    expect(observer.summary("anthropic")).toMatchObject({ unbilledCounted: 0, stop: { reason: "UNBILLED_IN_A_ROW_4" } });
+  });
+  it("names the models whose last call ended in the vendor's refusal (the debate's sit-outs), not the gate's own", async () => {
     const observer = new PracticeGateObserver();
-    const gate = scriptedPort(["UNBILLED", "OK", "UNBILLED", "UNBILLED", "OK"]);
+    const gate = scriptedPort(["UNBILLED", "OK", "UNBILLED", "UNBILLED", "OK", "NOTREACHED", "INFLIGHT"]);
     const watched = observer.wrap("deepinfra", gate.port);
     await watched.execute(execution("glm")).catch(() => undefined);
     await watched.execute(execution("glm"));
     await watched.execute(execution("mimo")).catch(() => undefined);
     await watched.execute(execution("mimo")).catch(() => undefined);
     await watched.execute(execution("qwen"));
-    expect(observer.modelsEndingUnbilled()).toEqual(["mimo"]);
+    await watched.execute(execution("deepseek")).catch(() => undefined);
+    await watched.execute(execution("haiku")).catch(() => undefined);
+    expect(observer.modelsEndingBusy()).toEqual(["mimo"]);
   });
   it("any gate refusal that is not unbilled stops the gate at once", async () => {
     const observer = new PracticeGateObserver();
@@ -349,13 +370,17 @@ describe("practice formats: a busy model sits out, the others go on, in turns", 
     synthesisRolePolicy: { synthesizerBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.COMPOSER, evaluatorBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.CONFORMANCE } }, config);
   const pack = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
 
-  /** A gate port answering every model with a (wrong-format) reply, except the busy ones: refused, not billed, every time. */
-  function gatePort(provider: "deepinfra" | "anthropic", busy: readonly string[], seen: string[]): PreviewBudgetPort {
+  /**
+   * A gate port answering every model with a (wrong-format) reply, except: the busy ones, refused by the vendor, not
+   * billed, every time; the unreached ones, the gate's own "vendor not reached", every time.
+   */
+  function gatePort(provider: "deepinfra" | "anthropic", busy: readonly string[], seen: string[], unreached: readonly string[] = []): PreviewBudgetPort {
     let id = 0;
     return { async execute(input) {
       const model = String((JSON.parse(input.requestBody) as { model: unknown }).model);
       seen.push(model);
-      if (busy.includes(model)) throw new PreviewUnbilledRefusal();
+      if (busy.includes(model)) throw new PreviewVendorRefusedUnbilled();
+      if (unreached.includes(model)) throw new PreviewUnbilledRefusal();
       id += 1;
       return { status: 200, body: stubVendorReply(provider, model, "{}", `unit-${String(id)}`) };
     } };
@@ -387,5 +412,17 @@ describe("practice formats: a busy model sits out, the others go on, in turns", 
     expect(observer.stopped("deepinfra")).toBeNull();
     // The first round: one job of each model, in turn order.
     expect(result.samples.slice(0, 5).map((sample) => sample.model)).toEqual(practiceTurnOrder(targets).map((target) => target.model));
+  });
+
+  it("the gate's own refusal (vendor not reached) never marks a model busy: its jobs are each tried", async () => {
+    const observer = new PracticeGateObserver({ now: () => 0 });
+    const seen: string[] = [];
+    const ports = { deepinfra: observer.wrap("deepinfra", gatePort("deepinfra", [], seen, [GLM])),
+      anthropic: observer.wrap("anthropic", gatePort("anthropic", [], seen)) };
+    const result = await runPracticeFormats({ config, targets, ports, observer, lanes: ["JUDGE_POSITION"], samples: 1, gapMs: 0,
+      pack, bounds: { judge: policy.bounds.JUDGE, synthesizer: policy.synthesisRolePolicy.synthesizerBound,
+        evaluator: policy.synthesisRolePolicy.evaluatorBound }, sleep: async () => undefined });
+    expect(result.busyModels).toEqual([]);
+    expect(result.samples.find((sample) => sample.model === GLM)?.status).toBe("UNBILLED_REFUSED");
   });
 });

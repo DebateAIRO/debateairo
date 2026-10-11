@@ -244,7 +244,12 @@ const NODE_OBJECTION = "22222222-2222-4222-8222-222222222222";
 const NODE_OTHER_POSITION = "33333333-3333-4333-8333-333333333333";
 
 /** The sealed composition bundle budget of the "high" tier (register row compositionBundleBudget; pinned by a unit test). */
-export const PRACTICE_COMPOSITION_BUDGET_HIGH = 30_000;
+const PRACTICE_COMPOSITION_BUDGET_HIGH = 30_000;
+
+/** The digest's byte budget the practice uses: the high tier's, as the story lanes' tier. */
+export function practiceDigestBudgetBound(): number {
+  return PRACTICE_COMPOSITION_BUDGET_HIGH;
+}
 
 export type PracticeDebateGraph = Readonly<{
   authored: readonly Readonly<{ nodeId: string; statement: string; provenanceRef: string; wayOfKnowing: WayOfKnowing;

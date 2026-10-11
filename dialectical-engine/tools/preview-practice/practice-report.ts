@@ -173,10 +173,10 @@ export function debateReport(input: Readonly<{
   finishedAt: Date;
 }>): PracticeReport {
   const r = input.result;
-  // The members the runner made sit out for being busy during the debate (their last call ended refused, not billed),
+  // The members the runner made sit out for being busy during the debate (their last call ended in the vendor's refusal),
   // beside those that sat out at the ask: not exercised to the end, so NOT_PROVEN, never FAIL on their own.
   const satOutAtAsk = new Set(r.admission.satOut.map((entry) => entry.model));
-  const busyDuringRun = input.observer.modelsEndingUnbilled().filter((model) => !satOutAtAsk.has(model));
+  const busyDuringRun = input.observer.modelsEndingBusy().filter((model) => !satOutAtAsk.has(model));
   const verdict = practiceVerdict({
     harnessError: null,
     completed: r.admission.admitted && r.run.workItemOutcome === "COMPLETED",

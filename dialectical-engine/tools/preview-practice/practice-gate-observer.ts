@@ -19,14 +19,18 @@
  * Every later call to that gate fails at once, before the socket is opened. The gate's own "too many calls in flight"
  * refusal is refused before the gate reserves anything and moves neither of its counters, so it moves neither here.
  *
- * What the app's port tells apart (packages/providers/src/preview-test.ts previewAuthorityRefusal): the gate's own
- * "too many calls in flight" (CONCURRENCY_LIMIT_REACHED) has its own message; PROVIDER_REFUSED_UNBILLED and
- * PROVIDER_NOT_REACHED reach the app as the same refusal. Both are counted here, which can only stop sooner.
+ * The three unbilled refusals the app's port tells apart (packages/providers/src/preview-test.ts
+ * previewAuthorityRefusal), counted as the gate counts them:
+ *  - the vendor refused, not billed (PROVIDER_REFUSED_UNBILLED, PreviewVendorRefusedUnbilled): the run in a row AND
+ *    the day's count (the gate keeps it as a released_unbilled entry);
+ *  - the vendor was not reached (PROVIDER_NOT_REACHED): the run in a row only (the gate keeps no entry);
+ *  - the gate's own "too many calls in flight" (CONCURRENCY_LIMIT_REACHED): neither (refused before it reserves).
  */
 import { TypedDomainError } from "@debateai/kernel";
 import {
   PROVIDER_GATE_UNAVAILABLE,
   PreviewUnbilledRefusal,
+  PreviewVendorRefusedUnbilled,
   type PreviewBudgetExecution,
   type PreviewBudgetPort
 } from "@debateai/providers";
@@ -34,9 +38,9 @@ import {
 export type PracticeGateName = "deepinfra" | "anthropic";
 
 /** The brake in a row: one below the gate's own five-in-a-row halt. */
-export const PRACTICE_MAX_CONSECUTIVE_UNBILLED = 4;
+const PRACTICE_MAX_CONSECUTIVE_UNBILLED = 4;
 /** The brake for the day: the gate halts at its twentieth unbilled release of a day; the live site keeps the rest. */
-export const PRACTICE_BRAKE_UNBILLED_TODAY = 12;
+const PRACTICE_BRAKE_UNBILLED_TODAY = 12;
 /** The code every call carries once a gate's brake is on. Nothing was sent. */
 export const PRACTICE_GATE_STOPPED = "PRACTICE_GATE_STOPPED" as const;
 
@@ -71,12 +75,23 @@ export type PracticeWireEvent = Readonly<{
   refusalCode: string | null;
   /** True when the unbilled refusal was the gate's own "too many calls in flight". */
   concurrencyLimit: boolean;
+  /** Which unbilled refusal it was (null for any other outcome). */
+  unbilledKind: PracticeUnbilledKind | null;
   inputTokens: number | null;
   outputTokens: number | null;
   reasoningTokens: number | null;
 }>;
 
 export type PracticeGateStop = Readonly<{ gate: PracticeGateName; reason: string; atSeq: number }>;
+
+/** The vendor refused, not billed; the vendor was not reached; the gate's own in-flight limit. */
+export type PracticeUnbilledKind = "VENDOR_REFUSED" | "NOT_REACHED" | "GATE_IN_FLIGHT";
+
+/** Which unbilled refusal an error is, read as the app's port raises them. */
+export function practiceUnbilledKind(error: PreviewUnbilledRefusal): PracticeUnbilledKind {
+  if (error instanceof PreviewVendorRefusedUnbilled) return "VENDOR_REFUSED";
+  return /calls in flight/u.test(error.message) ? "GATE_IN_FLIGHT" : "NOT_REACHED";
+}
 
 /**
  * A stop for busy refusals only (in a row, or the day's room), as opposed to a gate that refused, halted or could not
@@ -98,7 +113,7 @@ export type PracticeGateSummary = Readonly<{
   maxConsecutiveUnbilled: number;
   /** Root's `status` count of the day's unbilled releases at the start (null when not given). */
   unbilledTodayAtStart: number | null;
-  /** The busy refusals seen in this practice that the gate's day count may include (not the in-flight limit). */
+  /** The vendor's unbilled refusals seen in this practice: the ones the gate's day count includes. */
   unbilledCounted: number;
   stop: PracticeGateStop | null;
 }>;
@@ -183,14 +198,14 @@ export class PracticeGateObserver {
   }
 
   /**
-   * The models whose LAST call through the gates ended refused as busy (unbilled, any kind): in a finished debate,
+   * The models whose LAST call through the gates ended refused by the vendor, not billed: in a finished debate,
    * exactly the members the runner made sit out for being busy (apps/runner/src/run-sit-out.ts reads the same
-   * refusal), so they were not exercised to the end.
+   * refusal, providerCallEndedVendorRefusedUnbilled), so they were not exercised to the end.
    */
-  modelsEndingUnbilled(): readonly string[] {
+  modelsEndingBusy(): readonly string[] {
     const last = new Map<string, PracticeWireEvent>();
     for (const event of this.#events) if (event.outcome !== "STOPPED") last.set(event.model, event);
-    return Object.freeze([...last.values()].filter((event) => event.outcome === "UNBILLED").map((event) => event.model).sort());
+    return Object.freeze([...last.values()].filter((event) => event.unbilledKind === "VENDOR_REFUSED").map((event) => event.model).sort());
   }
 
   stopped(gate: PracticeGateName): PracticeGateStop | null { return this.#stops.get(gate) ?? null; }
@@ -226,11 +241,12 @@ export class PracticeGateObserver {
     if (event.outcome === "STOPPED") return;
     if (event.outcome === "UNBILLED") {
       // The gate's own in-flight limit refuses before it reserves anything: neither of its counters moves.
-      if (event.concurrencyLimit) return;
+      if (event.unbilledKind === "GATE_IN_FLIGHT") return;
       const run = (this.#consecutive.get(gate) ?? 0) + 1;
       this.#consecutive.set(gate, run);
       this.#maxConsecutive.set(gate, Math.max(run, this.#maxConsecutive.get(gate) ?? 0));
-      this.#counted.set(gate, (this.#counted.get(gate) ?? 0) + 1);
+      // Only the vendor's refusal stays on the gate's day record (released_unbilled).
+      if (event.unbilledKind === "VENDOR_REFUSED") this.#counted.set(gate, (this.#counted.get(gate) ?? 0) + 1);
       if (run >= this.#maxConsecutiveUnbilled) this.stop(gate, `UNBILLED_IN_A_ROW_${String(run)}`);
       this.#checkDay(gate);
       return;
@@ -247,7 +263,7 @@ export class PracticeGateObserver {
       execute: async (input: PreviewBudgetExecution, signal?: AbortSignal) => {
         const model = modelOf(input.requestBody);
         const startedAt = new Date().toISOString();
-        const base = { gate, model, startedAt, concurrencyLimit: false,
+        const base = { gate, model, startedAt, concurrencyLimit: false, unbilledKind: null,
           inputTokens: null, outputTokens: null, reasoningTokens: null } as const;
         if (this.#stops.has(gate)) {
           this.#record({ ...base, latencyMs: 0, outcome: "STOPPED", vendorStatus: null, refusalCode: PRACTICE_GATE_STOPPED });
@@ -264,8 +280,9 @@ export class PracticeGateObserver {
           const latencyMs = Math.round(this.#now() - started);
           const code = error instanceof TypedDomainError ? error.code : "UNTYPED";
           if (error instanceof PreviewUnbilledRefusal) {
+            const unbilledKind = practiceUnbilledKind(error);
             this.#record({ ...base, latencyMs, outcome: "UNBILLED", vendorStatus: null, refusalCode: code,
-              concurrencyLimit: /calls in flight/u.test(error.message) });
+              concurrencyLimit: unbilledKind === "GATE_IN_FLIGHT", unbilledKind });
           } else if (code === "DAILY_COST_ENVELOPE_REACHED" || code === "RUN_COST_ENVELOPE_MONEY_REACHED"
             || code === PROVIDER_GATE_UNAVAILABLE) {
             this.#record({ ...base, latencyMs, outcome: "GATE_REFUSED", vendorStatus: null, refusalCode: code });
