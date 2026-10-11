@@ -163,6 +163,12 @@ describe("N2 — a status read's answer (spec §2.3 NO_SUCH_ORDER, §2.4.4)", ()
     expect(isNotFoundAnswer(parse({ error: { code: "99" } }))).toBe(false);
   });
 
+  it("refuses NETOPIA's invalid-id answer (error 99 with a zeroed payment) as an invalid response, and keeps the other 99s as they were", () => {
+    expect(() => read({ error: { code: "99", message: "Invalid ntpID" }, payment: { amount: 0, status: 0 } })).toThrow("PAYMENT_RESPONSE_INVALID:99");
+    expect(() => read({ error: { code: "99" } })).toThrow("PAYMENT_CONFIGURATION_REFUSED:99");
+    expect(reportOf(read({ error: { code: "99" }, payment: payment({ status: 12 }) })).state).toBe("DECLINED");
+  });
+
   it("reads every later status from the table, and a merchant code beside a declined status as MERCHANT", () => {
     const states = [8, 9, 10, 16, 17, 4, 23, 2].map((status) => reportOf(read({ error: { code: "00" }, payment: payment({ status }) })).state);
     expect(states).toEqual(["REFUNDED", "CHARGEBACK_OPENED", "CHARGEBACK_LOST", "CHARGEBACK_REPRESENTED", "UNCLEAR", "VOIDED", "EXPIRED", "AUTHORIZED"]);
