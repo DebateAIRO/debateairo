@@ -173,6 +173,7 @@ import {
   createSeatCaller,
   effectiveSynthesisCollapse,
   legacySynthesisSeat,
+  pinnedPositionOrder,
   plannedSeatSlot,
   roleAssignmentSeatProblem,
   roleFallbackEventValue,
@@ -5035,7 +5036,17 @@ export class WalkingSkeletonRunner {
         `The pinned ${unavailable.role} seat had neither its main nor its runner-up claim-eligible (${unavailable.failureCode}); the run refuses rather than serving from a route the assignment did not name`
       );
     }
-    const seatBook: RunSeatBook = assignedSeats?.book ?? buildLegacyRunSeatBook(configuredMakers);
+    /**
+     * Opener rotation (spec 2026-10-11 Part 2, option B; owner rulings R2, R5, R7): a rotated run (a pin, and
+     * so no scorecard assignment) seats its legacy book in the pin's position order, opener first, so root
+     * position 0 (the bare `JUDGE` key) and position 1 rotate. Only the seat book is turned: `configuredMakers`
+     * keeps panel order for the cost fallback and the synthesis makers. The pin is fixed, so every pass of the
+     * work item gets the same order; a pin written in panel order (before the opener rotated) changes nothing.
+     */
+    const panelModelIds = new Map(run.discoveredPanel.map((member) => [member.provider_ref, member.model_id] as const));
+    const seatBook: RunSeatBook = assignedSeats?.book ?? buildLegacyRunSeatBook(rotationPin === null
+      ? configuredMakers
+      : pinnedPositionOrder(configuredMakers, (maker) => panelModelIds.get(maker.providerRef), rotationPin.eligibleModelIds));
     /**
      * Model scorecard A16c (R4; controller carries 8 and 15) — the progress
      * stream's side of every switch: the owner/admin record that names the
