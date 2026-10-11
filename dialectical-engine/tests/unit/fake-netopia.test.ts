@@ -227,17 +227,34 @@ describe("N5 — saved-card charges (spec §2.4.2, §2.9)", () => {
 });
 
 describe("N5 — status reads, refunds and disputes (spec §2.12, §2.13, §2.14)", () => {
-  it("reads with and without ntpID, and says no such order plainly", async () => {
+  it("reads with and without ntpID", async () => {
     const { payments, paidWithCard } = await setup();
     const { orderId, ntpId } = await paidWithCard();
-    expect(await payments.status({ orderId: hex(), providerPaymentId: null })).toBe("NO_SUCH_ORDER");
     expect(asReport(await payments.status({ orderId, providerPaymentId: null })).state).toBe("PAID");
     expect(asReport(await payments.status({ orderId, providerPaymentId: ntpId })).state).toBe("PAID");
+    const strict = await setup({ statusWithoutNtpId: "INVALID_NTP_ID" });
+    const paid = await strict.paidWithCard();
+    expect(asReport(await strict.payments.status({ orderId: paid.orderId, providerPaymentId: paid.ntpId })).state).toBe("PAID");
+  });
+
+  // Known gap (owner decision): the sandbox answers an id it does not hold with error 99 "Invalid ntpID" and an all-zero
+  // payment, which the status read refuses as PAYMENT_RESPONSE_INVALID. This states the wanted result; it starts failing,
+  // and must be made a plain test, once that changes.
+  it.fails("says no such order plainly (known gap: NETOPIA's invalid-id answer is refused)", async () => {
+    const { payments, paidWithCard } = await setup();
+    const { orderId } = await paidWithCard();
+    expect(await payments.status({ orderId: hex(), providerPaymentId: null })).toBe("NO_SUCH_ORDER");
     expect(await payments.status({ orderId, providerPaymentId: "999999999" })).toBe("NO_SUCH_ORDER");
-    const strict = await setup({ statusWithoutNtpId: "NOT_FOUND" });
+    const strict = await setup({ statusWithoutNtpId: "INVALID_NTP_ID" });
     const paid = await strict.paidWithCard();
     expect(await strict.payments.status({ orderId: paid.orderId, providerPaymentId: null })).toBe("NO_SUCH_ORDER");
-    expect(asReport(await strict.payments.status({ orderId: paid.orderId, providerPaymentId: paid.ntpId })).state).toBe("PAID");
+  });
+
+  it("refuses an id the sandbox does not hold as its invalid-id answer, never as a report", async () => {
+    const { payments, paidWithCard } = await setup();
+    const { orderId } = await paidWithCard();
+    await expect(payments.status({ orderId: hex(), providerPaymentId: null })).rejects.toThrow("PAYMENT_RESPONSE_INVALID:99");
+    await expect(payments.status({ orderId, providerPaymentId: "999999999" })).rejects.toThrow("PAYMENT_RESPONSE_INVALID:99");
   });
 
   it("reports admin refunds (whole and partial), the three charge-back statuses and status 17, each with a message", async () => {
