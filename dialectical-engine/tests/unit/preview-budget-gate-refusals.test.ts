@@ -24,6 +24,7 @@ import {
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
   PreviewUnbilledRefusal,
+  providerCallGateUnavailable,
   ProviderUnbilledRefusal,
   type PreviewBudgetPort,
   type PreviewProviderTestConfig,
@@ -279,6 +280,139 @@ describe("the preview spending gate's 409 refusal body", () => {
     expect(received).toEqual([`POST /complete ${JSON.stringify({ scope_id: "fixture-scope", ...execution })}`]);
   });
 });
+
+/**
+ * Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, fix (c), test T4). On
+ * 2026-10-11 the DeepInfra gate reached its daily unbilled ceiling and halted; the resend that followed was refused
+ * PREVIEW_TEST_AUTHORITY_STOPPED, which the app read as the run's money ceiling (preview-test.ts previewAuthorityRefusal)
+ * although the preview has no run money seam. A STOPPED refusal now asks the same gate's read-only `/remaining`: a gate
+ * that is not active, or whose window is shut, is UNAVAILABLE (a non-money PROVIDER_GATE_UNAVAILABLE, never resent);
+ * any other answer, and any failure to read one, keeps today's mapping.
+ */
+describe("run resilience (c): a halted gate is unavailable, not money", () => {
+  type Remaining = Readonly<{ state: "active" | "initialized" | "halted"; window_open: boolean }>;
+  /** The /remaining reply of Contract A §5, with the given state and window. */
+  const remainingReply = (remaining: Remaining): string => JSON.stringify({
+    enabled_models: ["zai-org/GLM-5.3-Flash"], largest_reservation_usd: "0.080000000", max_concurrent_calls: 10,
+    remaining_calls: 1980, remaining_usd: "9.500000000", state: remaining.state, window_open: remaining.window_open
+  });
+  /** One gate socket: /complete refuses STOPPED, /remaining answers `remaining` (a status and body). */
+  async function stoppedGate(remaining: Reply) {
+    return answeringByPath((path, response) => {
+      if (path === "/remaining") {
+        response.writeHead(remaining.status, { "content-type": "application/json" });
+        response.end(remaining.body);
+        return;
+      }
+      response.writeHead(409, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "PREVIEW_TEST_AUTHORITY_STOPPED" }));
+    });
+  }
+
+  it.each([
+    ["halted", { state: "halted", window_open: true }],
+    ["initialized", { state: "initialized", window_open: true }],
+    ["active but with its window shut", { state: "active", window_open: false }]
+  ] as const)("STOPPED from a gate that reads %s is PROVIDER_GATE_UNAVAILABLE, never a spend stop", async (_name, state) => {
+    const { port, received } = await stoppedGate({ status: 200, body: remainingReply(state) });
+    const refusal: unknown = await port.execute(execution).then(() => null, (error: unknown) => error);
+    expect(refusal).toMatchObject({ code: "PROVIDER_GATE_UNAVAILABLE" });
+    expect(providerCallGateUnavailable(refusal)).toBe(true);
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
+    // One /complete, then one read-only /remaining on the same socket with the scope only.
+    expect(received).toEqual([
+      `POST /complete ${JSON.stringify({ scope_id: "fixture-scope", ...execution })}`,
+      `POST /remaining ${JSON.stringify({ scope_id: "fixture-scope" })}`
+    ]);
+  });
+
+  it("STOPPED from a gate that still reads active and open keeps today's money mapping", async () => {
+    const { port } = await stoppedGate({ status: 200, body: remainingReply({ state: "active", window_open: true }) });
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+  });
+
+  it.each([
+    ["a refusal", { status: 409, body: JSON.stringify({ error: "PREVIEW_TEST_AUTHORITY_STOPPED" }) }],
+    ["a reply of another shape", { status: 200, body: JSON.stringify({ state: "halted" }) }]
+  ])("STOPPED with /remaining answering %s keeps today's money mapping", async (_name, reply) => {
+    const { port } = await stoppedGate(reply);
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+  });
+
+  it("only STOPPED asks /remaining: every other refusal keeps its own mapping and reads nothing more", async () => {
+    for (const code of ["TEAM_DAILY_BUDGET_REACHED", "PROVIDER_REFUSED_UNBILLED", "SOMETHING_NEW"]) {
+      const { port, received } = await answeringByPath((_path, response) => {
+        response.writeHead(409, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: code }));
+      });
+      await port.execute(execution).catch(() => undefined);
+      expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+    }
+  });
+
+  it("through the native gateway: one POST, no resend, a FAILED row, and PROVIDER_CALL_FAILED caused by the unavailable gate", async () => {
+    const MODEL = "zai-org/GLM-5.3-Flash";
+    const REF = "preview:fixture-a";
+    const target = parseProviderDiscoveryTargets(JSON.stringify([{
+      provider_ref: REF, base_url: "https://api.deepinfra.com/v1/openai", model: MODEL,
+      input_price_micros_per_million: 150000, output_price_micros_per_million: 500000,
+      thinking_parameter: "reasoning_effort", thinking_levels: ["high"], context_window_tokens: 1048576
+    }]), [{ providerRef: REF, maker: "Z.AI" }])[0]!;
+    const preview = parsePreviewProviderTestConfig(JSON.stringify({
+      deployment: "v3-preview", free_model_ids: [MODEL], requested_thinking_level: "high",
+      budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture-scope"
+    }))!;
+    const { port, received } = await stoppedGate({ status: 200, body: remainingReply({ state: "halted", window_open: true }) });
+    const slept: number[] = [];
+    const ledger: ProviderLedgerInput[] = [];
+    const gateway = withPreviewProviderCallPolicy(new OpenAICompatibleProviderGateway({
+      endpoint: target.baseUrl, model: target.model, maker: target.maker, ...providerTargetGatewayControls(target),
+      fetchImplementation: createPreviewGuardedFetch(port),
+      persistRawArtifact: async (artifact) => artifact.artifactId,
+      appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
+      assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
+    }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); } });
+    const refusal: unknown = await gateway.call({
+      runId: "run:synthetic", subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
+      bound: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 5000 }, contractHash: "contract:test", providerRef: REF,
+      packet: framedFixturePacket("Synthetic school phone policy; no personal data.")
+    }).then(() => null, (error: unknown) => error);
+    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: { code: "PROVIDER_GATE_UNAVAILABLE" } });
+    expect(providerCallGateUnavailable(refusal)).toBe(true);
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    // Never resent: the 60-second resend is for unbilled refusals only, and a halted gate stays halted.
+    expect(slept).toEqual([]);
+    expect(received.filter((line) => line.startsWith("POST /complete"))).toHaveLength(1);
+    // The FAILED row is kept (a counted attempt of THIS maker only, fix (b)).
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+  });
+});
+
+/** Like `answering`, with the request's path handed to `answer`, so /complete and /remaining can answer apart. */
+async function answeringByPath(
+  answer: (path: string, response: ServerResponse) => void
+): Promise<Readonly<{ port: ReturnType<typeof createPreviewBudgetRpcPort>; received: string[] }>> {
+  const directory = await mkdtemp(join(tmpdir(), "pvg-"));
+  directories.push(directory);
+  const socket = join(directory, "gate.sock");
+  const received: string[] = [];
+  const server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => {
+      received.push(`${request.method} ${request.url} ${Buffer.concat(chunks).toString("utf8")}`);
+      answer(request.url ?? "", response);
+    });
+  });
+  servers.push(server);
+  await new Promise<void>((done) => server.listen(socket, done));
+  const config = Object.freeze({
+    deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash"], requested_thinking_level: "high",
+    budget_socket: socket, scope_id: "fixture-scope"
+  }) as unknown as PreviewProviderTestConfig;
+  return Object.freeze({ port: createPreviewBudgetRpcPort(config), received });
+}
 
 /** The port's promise, or a test failure if it has not settled within `ms`: a reply that never settles hangs a debate. */
 function settledWithin<T>(promise: Promise<T>, ms: number): Promise<T> {
