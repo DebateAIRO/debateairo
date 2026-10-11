@@ -515,7 +515,10 @@ export class StoryWriter {
      * run's cost fallback when the runner handed one over. Each try is one
      * provider call, so each takes its own short step lease. The ROLE rule
      * above is untouched: an absent role never reaches here, so a maker is only
-     * ever substituted for money.
+     * ever substituted for money — or, on the preview (run resilience, spec
+     * 2026-10-12 fix (a)), because the runner's fallback found the planned maker
+     * sitting out the rest of the run (the runner's own move rule, handed over
+     * inside `costFallback`; this writer is unchanged).
      */
     const callStoryRole = async (
       planned: StoryRoleMaker,

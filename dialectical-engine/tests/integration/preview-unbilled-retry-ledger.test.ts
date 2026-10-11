@@ -299,6 +299,80 @@ describe("the preview's unbilled resend through the real counting gateway (owner
   });
 });
 
+/**
+ * Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, fix (b), test T3). On
+ * 2026-10-11 the serve fallback walked GLM, MiMo and Qwen at ONE call site, each hop writing one FAILED row under
+ * `COMPOSER:SYNTHESIZER:INITIAL:1`; the count was per call-site key, so the fourth maker (whose gate was open) was
+ * refused CALL_BUDGET_EXHAUSTED before it sent a byte. On the preview the step's allowance is now each MAKER's: the
+ * preview call policy asks for `attemptScope: "actor"`, the counting gateway counts the asking maker's rows only, and
+ * the re-claim check groups by maker (`byActor`).
+ */
+const OTHER_MAKERS = Object.freeze(["preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro", "preview:qwen-3-8-flash"]);
+
+/** One counted FAILED attempt by `actorRef` at the root site, as a hop of the incident wrote it. */
+async function failedRowBy(work: Readonly<{ runId: string; workItemId: string }>, actorRef: string): Promise<void> {
+  await new LedgerRepository(database.pool).append({
+    runId: work.runId, attemptId: randomUUID(), actionKind: "MODEL_CALL", callSiteKey: "JUDGE",
+    subjectItemId: work.workItemId, stanceAtAction: "UNASSIGNED", outcome: "FAILED", actorRef,
+    inputHash: "input:preview-run-resilience", contractHash: CONTRACT, rawArtifactRef: null,
+    startedAt: new Date(), finishedAt: new Date()
+  });
+}
+
+describe("run resilience (b): on the preview a step's allowance is each maker's own (T3)", () => {
+  it("three FAILED rows by three other makers at one key: a fourth maker still sends, and its count is its own", async () => {
+    const work = await createRunWork("t3-send");
+    for (const actorRef of OTHER_MAKERS) await failedRowBy(work, actorRef);
+    // The site holds the sealed JUDGE bound's worth of counted rows: the incident's state.
+    expect(await billedAttempts(work)).toBe(POLICY.bounds.JUDGE.maxAttempts);
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([answer]);
+    await expect(previewGateway(port, waits).call(rootRequest(work))).resolves.toMatchObject({ model: MODEL });
+    expect(sent).toHaveLength(1);
+    expect(await outcomes(work.runId)).toEqual(["FAILED", "FAILED", "FAILED", "OK"]);
+    const ledger = new LedgerRepository(database.pool);
+    expect(await ledger.countModelAttempts({
+      runId: work.runId, workItemId: work.workItemId, contractHash: CONTRACT, callSiteKey: "JUDGE", actorRef: REF
+    })).toBe(1);
+    expect(await ledger.countModelAttempts({
+      runId: work.runId, workItemId: work.workItemId, contractHash: CONTRACT, callSiteKey: "JUDGE", actorRef: OTHER_MAKERS[0]!
+    })).toBe(1);
+  });
+
+  it("the re-claim check reads per maker: three makers with one FAILED row each never exhaust the site", async () => {
+    const work = await createRunWork("t3-reclaim");
+    for (const actorRef of OTHER_MAKERS) await failedRowBy(work, actorRef);
+    const ledger = new LedgerRepository(database.pool);
+    const maxAttempts = POLICY.bounds.JUDGE.maxAttempts;
+    await expect(ledger.findExhaustedModelAttempt({
+      runId: work.runId, workItemId: work.workItemId, contractHash: CONTRACT, maxAttempts, byActor: true
+    })).resolves.toBeNull();
+    // One maker at its own bound is still found, per maker.
+    for (let index = 1; index < maxAttempts; index += 1) await failedRowBy(work, OTHER_MAKERS[1]!);
+    await expect(ledger.findExhaustedModelAttempt({
+      runId: work.runId, workItemId: work.workItemId, contractHash: CONTRACT, maxAttempts, byActor: true
+    })).resolves.toMatchObject({ callSiteKey: "JUDGE", outcome: "FAILED" });
+  });
+
+  it("T5: without the per-maker read (hosted and local), the same rows exhaust the site exactly as before", async () => {
+    const work = await createRunWork("t3-hosted");
+    for (const actorRef of OTHER_MAKERS) await failedRowBy(work, actorRef);
+    const ledger = new LedgerRepository(database.pool);
+    await expect(ledger.findExhaustedModelAttempt({
+      runId: work.runId, workItemId: work.workItemId, contractHash: CONTRACT, maxAttempts: POLICY.bounds.JUDGE.maxAttempts
+    })).resolves.toMatchObject({ callSiteKey: "JUDGE", outcome: "FAILED" });
+    // The counting gateway with no preview policy counts the whole site and refuses before sending.
+    let posts = 0;
+    const hosted = createPostgresProviderGateway(database.pool, {
+      fetchImplementation: async () => { posts += 1; throw new Error("test: nothing may be sent"); },
+      endpoint: "http://127.0.0.1:9", model: "test-layer/model", maker: "test-layer", sleepImplementation: async () => undefined
+    });
+    await expect(hosted.call({ ...rootRequest(work), providerRef: "provider:test-layer" }))
+      .rejects.toMatchObject({ code: "CALL_BUDGET_EXHAUSTED" });
+    expect(posts).toBe(0);
+  });
+});
+
 describe("R9: hosted and local wiring (no preview config) are unchanged", () => {
   it("(f) maxAttempts 3 and three transport failures: three POSTs inside one call, three counted FAILED rows", async () => {
     const work = await createRunWork("f");
