@@ -303,4 +303,41 @@ describe("live stream loop (one open stream, honest back-off)", () => {
       .streamEvents("run:test", (candidate) => observed.push(candidate));
     expect(observed.map((candidate) => candidate.event_id)).toEqual(["1"]);
   });
+
+  it("reads a Retry-After that names no usable wait as no wait at all, so a 429 keeps the 60 s floor", async () => {
+    const pastDate = new Date(Date.now() - 120_000).toUTCString();
+    for (const retryAfter of ["0", "-5", "1.5", pastDate]) {
+      const refused = await createContractClient("https://api.example.test", async () => new Response(
+        JSON.stringify({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" }),
+        { status: 429, headers: { "content-type": "application/json", "retry-after": retryAfter } }
+      )).streamEvents("run:test", () => {}).catch((error: unknown) => error);
+      expect(refused, retryAfter).toBeInstanceOf(ContractHttpError);
+      expect((refused as ContractHttpError).retryAfterMs, retryAfter).toBeNull();
+      expect(liveReconnectDelay(0, refused), retryAfter).toBe(LIVE_STREAM_RECONNECT.rateLimitedFloorMs);
+    }
+  });
+
+  it("clamps a huge Retry-After to 15 minutes, so the reconnect timer can never overflow", async () => {
+    const refused = await createContractClient("https://api.example.test", async () => new Response(
+      JSON.stringify({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" }),
+      { status: 429, headers: { "content-type": "application/json", "retry-after": "99999999" } }
+    )).streamEvents("run:test", () => {}).catch((error: unknown) => error);
+    expect((refused as ContractHttpError).retryAfterMs).toBe(99_999_999_000);
+    expect(liveReconnectDelay(0, refused)).toBe(900_000);
+    expect(liveReconnectDelay(5, new ContractHttpError("RATE_LIMITED", 429, "x", null, null, null, 1_200_000))).toBe(900_000);
+  });
+
+  it("a huge Retry-After reconnects at the 15 minute cap, not after one millisecond", async () => {
+    vi.useFakeTimers({ now: 0 });
+    const run = harness([
+      async () => { throw new ContractHttpError("RATE_LIMITED", 429, "ADMISSION_RATE_LIMITED", null, null, null, 99_999_999_000); }
+    ]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(run.statuses.at(-1)).toEqual({ status: "reconnecting", retryInMs: 900_000 });
+    await vi.advanceTimersByTimeAsync(899_999);
+    expect(run.opened).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(run.opened).toHaveLength(2);
+    run.stop();
+  });
 });

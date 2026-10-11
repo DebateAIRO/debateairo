@@ -180,13 +180,24 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
   );
 }
 
-/** `Retry-After` as milliseconds: delay-seconds or an HTTP date (RFC 9110 §10.2.3); null when absent or unreadable. */
+/**
+ * `Retry-After` as milliseconds: delay-seconds or an HTTP date (RFC 9110 §10.2.3). Null when the header
+ * is absent or names no usable wait (zero, negative, fractional, a date already past, unreadable), so the
+ * caller keeps its own floor rather than reading a zero wait.
+ */
 function retryAfterMs(header: string | null): number | null {
   if (header === null) return null;
   const value = header.trim();
-  if (/^\d{1,9}$/u.test(value)) return Number(value) * 1_000;
+  if (/^\d{1,9}$/u.test(value)) {
+    const seconds = Number(value);
+    return seconds > 0 ? seconds * 1_000 : null;
+  }
+  // An HTTP date opens with a day or month name; a signed or fractional number is not one.
+  if (!/^[A-Za-z]/u.test(value)) return null;
   const at = Date.parse(value);
-  return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
+  if (Number.isNaN(at)) return null;
+  const wait = at - Date.now();
+  return wait > 0 ? wait : null;
 }
 
 async function requestJson<T>(

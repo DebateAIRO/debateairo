@@ -95,6 +95,10 @@ export async function* tailRunEvents(input: Readonly<{
   let lastWrite = started;
 
   async function* fresh(): AsyncGenerator<RunEventTailItem, void, undefined> {
+    // Ordering: a re-read may emit an event whose at_sequence is LOWER than one already sent. events() reads
+    // the progress and failed-work rows and the lifecycle rows in separate snapshots, so a row can commit
+    // between them. The page applies each event per node (applyRunEvent in apps/ui/lib/v3/liveEvents.ts) and
+    // tolerates that order; this loop only guarantees that each event is sent once.
     for await (const event of input.snapshot(signal)) {
       if (signal.aborted) return;
       const key = eventKey(event);

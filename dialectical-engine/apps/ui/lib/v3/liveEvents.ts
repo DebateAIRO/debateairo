@@ -106,15 +106,21 @@ export function createLiveEventGate(): LiveEventGate {
  * Reconnect timing. Before 2026-10-11 the page reconnected about once a second and one tab spent its
  * address's whole `publicReads` admission budget in about two minutes. A clean close of a live run now
  * waits at least 5 s, doubling to 60 s, until a NEW event arrives; a 429 waits at least the server's
- * `Retry-After` (a minute when it names none).
+ * `Retry-After` (a minute when it names none), and never more than `capMs` (15 minutes).
  */
-export const LIVE_STREAM_RECONNECT = Object.freeze({ minGapMs: 5_000, maxGapMs: 60_000, rateLimitedFloorMs: 60_000 });
+export const LIVE_STREAM_RECONNECT = Object.freeze({
+  minGapMs: 5_000,
+  maxGapMs: 60_000,
+  rateLimitedFloorMs: 60_000,
+  /** The longest any wait may be, whatever the server asked: setTimeout above ~24.8 days fires after 1 ms. */
+  capMs: 900_000
+});
 
 export function liveReconnectDelay(attempt: number, failure: unknown): number {
   const backoff = Math.min(LIVE_STREAM_RECONNECT.maxGapMs, LIVE_STREAM_RECONNECT.minGapMs * 2 ** Math.max(0, attempt));
   const rateLimited = failure instanceof ContractHttpError && failure.code === "RATE_LIMITED";
   const floor = rateLimited ? failure.retryAfterMs ?? LIVE_STREAM_RECONNECT.rateLimitedFloorMs : 0;
-  return Math.max(backoff, floor);
+  return Math.min(LIVE_STREAM_RECONNECT.capMs, Math.max(backoff, floor));
 }
 
 export type LiveStreamStatus = Readonly<{ status: "connecting" | "live" | "reconnecting"; retryInMs?: number }>;

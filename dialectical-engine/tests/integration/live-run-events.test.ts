@@ -90,15 +90,21 @@ function countingApplication() {
     createTestAskAdmissionPoolFacades(database.pool)
   );
   const calls = { snapshot: 0, mark: 0 };
+  // The signal the stream hands to each mark read. It aborts when the server sees the client leave.
+  const streamSignal: { current: AbortSignal | undefined } = { current: undefined };
   const events = application.events.bind(application);
   application.events = (...args: Parameters<typeof events>) => { calls.snapshot += 1; return events(...args); };
   const mark = application.eventMark.bind(application);
-  application.eventMark = (...args: Parameters<typeof mark>) => { calls.mark += 1; return mark(...args); };
-  return { application, calls };
+  application.eventMark = (...args: Parameters<typeof mark>) => {
+    calls.mark += 1;
+    streamSignal.current = args[3];
+    return mark(...args);
+  };
+  return { application, calls, streamSignal };
 }
 
 async function startApi(identity: TestHttpIdentity) {
-  const { application, calls } = countingApplication();
+  const { application, calls, streamSignal } = countingApplication();
   const limiter = new AdmissionLimiter(admissionPolicyFromValue(
     ADMISSION_POLICY_REGISTER_ROW.value, ADMISSION_POLICY_REGISTER_ROW.sourceRef
   ));
@@ -112,7 +118,7 @@ async function startApi(identity: TestHttpIdentity) {
   });
   const base = await api.listen({ port: 0, host: "127.0.0.1" });
   const publicReadCharges = () => decide.mock.calls.filter(([scope]) => scope === "publicReads").length;
-  return { api, base, calls, publicReadCharges };
+  return { api, base, calls, streamSignal, publicReadCharges };
 }
 
 /** Reads a streaming body chunk by chunk, so a test can wait for what has arrived SO FAR. */
@@ -205,7 +211,7 @@ describe("live run events: one long-lived stream per page open", () => {
   it("stops polling the database once the client aborts", async () => {
     const identity = testHttpIdentity(`live-run-events-${randomUUID()}`);
     const runId = await ownedRunningRun(identity, "abort");
-    const { api, base, calls } = await startApi(identity);
+    const { api, base, calls, streamSignal } = await startApi(identity);
     try {
       const controller = new AbortController();
       const response = await fetch(`${base}/v1/runs/${runId}/events`, {
@@ -213,12 +219,14 @@ describe("live run events: one long-lived stream per page open", () => {
       });
       const stream = streamReader(response);
       await stream.until((text) => heartbeats(text) >= 1);
-      expect(calls.mark).toBeGreaterThan(1);
+      await vi.waitFor(() => expect(calls.mark).toBeGreaterThan(1), { timeout: 5_000, interval: POLL_MS });
       controller.abort();
-      // Let any poll already in flight finish, then no new one may start.
-      await new Promise((resolve) => setTimeout(resolve, POLL_MS * 6));
+      // The server learns of the abort only when it sees the socket close, a little after the client
+      // aborted. Wait until the stream's own signal reports it; from then on no mark or snapshot may start.
+      await vi.waitFor(() => expect(streamSignal.current?.aborted).toBe(true), { timeout: 5_000, interval: POLL_MS });
       const settled = { ...calls };
-      await new Promise((resolve) => setTimeout(resolve, POLL_MS * 12));
+      // Ten poll intervals of silence, measured after the abort was observed: no new mark or snapshot.
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS * 10));
       expect(calls).toEqual(settled);
     } finally {
       await api.close();
