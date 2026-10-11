@@ -439,8 +439,13 @@ JS_WHITESPACE = '\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u20
 # The only content blocks a reply the gate settles may carry: text, and thinking it never shows.
 ANTHROPIC_CONTENT_BLOCKS = frozenset({'text', 'thinking', 'redacted_thinking'})
 # Top-level reply members that mean work the token usage may not cover (a code container, context
-# editing): the usage is then invalid. Any other top-level key naming usage or tokens is too.
+# editing): the usage is then invalid, unless the member is null (the reference documents both as
+# "X or null"; null means none was used). Any other top-level key naming usage or tokens is invalid too.
 ANTHROPIC_UNPRICED_REPLY_KEYS = frozenset({'container', 'context_management'})
+# The outline an unreadable reply leaves in its ledger entry: names and kinds only (see reply_outline).
+OUTLINE_NAME = re.compile(r'[a-z0-9_]{1,64}')
+OUTLINE_LABEL = re.compile(r'[a-z0-9_]{1,32}')
+OUTLINE_MAX_ITEMS = 40
 
 
 def names_any_key_suffixed(value, suffix):
@@ -455,6 +460,65 @@ def names_any_key_suffixed(value, suffix):
         elif isinstance(item, list):
             stack.extend(item)
     return False
+
+
+def outline_kind(value):
+    """A parsed JSON value's kind, never the value itself."""
+    if value is None:
+        return 'null'
+    if isinstance(value, bool):
+        return 'boolean'
+    if isinstance(value, (int, float, Decimal)):
+        return 'number'
+    if isinstance(value, str):
+        return 'string'
+    return 'array' if isinstance(value, list) else 'object' if isinstance(value, dict) else 'other'
+
+
+def outline_name(name):
+    return name if isinstance(name, str) and OUTLINE_NAME.fullmatch(name) else '(other)'
+
+
+def outline_capped(items):
+    return items if len(items) <= OUTLINE_MAX_ITEMS else items[:OUTLINE_MAX_ITEMS] + ['(+%d more)' % (len(items) - OUTLINE_MAX_ITEMS)]
+
+
+def outline_block(block):
+    if not isinstance(block, dict):
+        return '(not an object)'
+    return outline_name(block['type']) if isinstance(block.get('type'), str) else '(no type)'
+
+
+def reply_outline(response):
+    """What an unreadable Anthropic reply looked like, for the operator: its top-level field names
+    with each value's kind, its content block types, its usage field names (one level into nested
+    objects) with kinds, and the service_tier and inference_geo labels. Never text, a number, an id
+    or a name outside lowercase snake_case (it shows as (other)); at most 40 items a list."""
+    if not isinstance(response, dict):
+        return {'reply_kind': outline_kind(response)}
+    outline = {'reply': outline_capped(sorted('%s:%s' % (outline_name(key), outline_kind(value))
+                                              for key, value in response.items()))}
+    content = response.get('content')
+    if isinstance(content, list):
+        outline['content'] = outline_capped([outline_block(block) for block in content])
+    usage = response.get('usage')
+    if isinstance(usage, dict):
+        names = []
+        for key, value in usage.items():
+            names.append('%s:%s' % (outline_name(key), outline_kind(value)))
+            if isinstance(value, dict):
+                names.extend('%s.%s:%s' % (outline_name(key), outline_name(inner), outline_kind(item))
+                             for inner, item in value.items())
+        outline['usage'] = outline_capped(sorted(names))
+        labels = {}
+        for key in ('service_tier', 'inference_geo'):
+            if key in usage:
+                value = usage[key]
+                labels[key] = (value if OUTLINE_LABEL.fullmatch(value) else '(other)') if isinstance(value, str) \
+                    else outline_kind(value)
+        if labels:
+            outline['usage_labels'] = labels
+    return outline
 
 
 class AnthropicProfile:
@@ -473,8 +537,10 @@ class AnthropicProfile:
     list-price charge. Any usage field this profile does not know, any server-tool use, another
     service tier or region, or a tool block makes the usage invalid: uncertain, and the gate halts.
     A cache write reported without its 5-minute/1-hour split is charged at the 1-hour
-    price (the dearer one). A reply with a container, context editing, usage or token counts
-    outside `usage`, or a content block other than text or thinking is invalid too.
+    price (the dearer one). A reply with a container or context editing (a null one means none was
+    used), usage or token counts outside `usage`, or a content block other than text or thinking is
+    invalid too. An invalid reply's ledger entry names the check it failed and keeps an outline of
+    the reply (field names and kinds only: reply_outline).
     """
     name = 'anthropic'
     host = 'api.anthropic.com'
@@ -558,41 +624,53 @@ class AnthropicProfile:
     def usage_counts(self, response):
         """(input, cache creation, cache read, 1-hour part of the creation, output) from a reply
         whose usage this profile fully understands, else None (uncertain)."""
+        return self.usage_check(response)[1]
+
+    def usage_check(self, response):
+        """(None, counts) for a reply whose usage this profile fully understands, else (the name of
+        the check it failed, None): the gate is then uncertain and halts."""
         if not isinstance(response, dict) or response.get('type') != 'message':
-            return None
-        # A container, context editing, or usage/token counts outside `usage` may bill beyond it.
-        if any(key in ANTHROPIC_UNPRICED_REPLY_KEYS or key != 'usage' and ('usage' in key or 'tokens' in key)
+            return 'not_a_message', None
+        # A container or context editing (unless null: none used) may bill beyond the usage.
+        if any(key in ANTHROPIC_UNPRICED_REPLY_KEYS and value is not None for key, value in response.items()):
+            return 'unpriced_reply_member', None
+        # So may usage or token counts outside `usage`.
+        if any(key not in ANTHROPIC_UNPRICED_REPLY_KEYS and key != 'usage' and ('usage' in key or 'tokens' in key)
                for key in response):
-            return None
+            return 'counts_outside_usage', None
         content = response.get('content')
         if not isinstance(content, list) or not all(isinstance(block, dict) for block in content):
-            return None
+            return 'content_block', None
         # Only text and thinking: any tool activity (client or server side), a container upload or
         # any block this profile does not know may bill beyond the tokens.
         if not all(block.get('type') in ANTHROPIC_CONTENT_BLOCKS for block in content):
-            return None
+            return 'content_block', None
         usage = response.get('usage')
-        if not isinstance(usage, dict) or not set(usage) <= ANTHROPIC_USAGE_KEYS:
-            return None
+        if not isinstance(usage, dict):
+            return 'usage_missing', None
+        if not set(usage) <= ANTHROPIC_USAGE_KEYS:
+            return 'usage_unknown_field', None
         input_tokens, output_tokens = usage.get('input_tokens'), usage.get('output_tokens')
         creation, read = usage.get('cache_creation_input_tokens'), usage.get('cache_read_input_tokens')
         if not (integer(input_tokens) and integer(output_tokens)):
-            return None
+            return 'token_counts', None
         # The thinking split is informational: output_tokens already includes it. A split this profile does
         # not know, or one larger than the billed total, makes the usage invalid.
         details = usage.get('output_tokens_details')
         if details is not None and not (isinstance(details, dict) and set(details) <= ANTHROPIC_OUTPUT_DETAIL_KEYS
                                         and all(integer(value) for value in details.values())
                                         and details.get('thinking_tokens', 0) <= output_tokens):
-            return None
+            return 'output_tokens_details', None
         if not all(value is None or integer(value) for value in (creation, read)):
-            return None
+            return 'cache_counts', None
         creation, read = creation or 0, read or 0
         tools = usage.get('server_tool_use')
         if tools is not None and not (isinstance(tools, dict) and all(type(v) is int and v == 0 for v in tools.values())):
-            return None
-        if usage.get('service_tier') not in (None, 'standard') or usage.get('inference_geo') not in (None, 'global'):
-            return None
+            return 'server_tool_use', None
+        if usage.get('service_tier') not in (None, 'standard'):
+            return 'service_tier', None
+        if usage.get('inference_geo') not in (None, 'global'):
+            return 'inference_geo', None
         # A cache write reported without its 5-minute/1-hour split is charged at the dearer 1-hour
         # price (the gate never asks for caching; a write it cannot place is priced on the safe side).
         hour = creation
@@ -601,21 +679,24 @@ class AnthropicProfile:
             if not (isinstance(split, dict) and set(split) == ANTHROPIC_CACHE_SPLIT_KEYS
                     and all(integer(value) for value in split.values())
                     and split['ephemeral_5m_input_tokens'] + split['ephemeral_1h_input_tokens'] == creation):
-                return None
+                return 'cache_split', None
             hour = split['ephemeral_1h_input_tokens']
-        return input_tokens, creation, read, hour, output_tokens
+        return None, (input_tokens, creation, read, hour, output_tokens)
 
     def step_for(self, prompt_total):
         lower, upper = self.settlement_steps
         return lower if prompt_total <= lower.prompt_tokens_up_to else upper
 
     def account(self, response, row, moment):
-        counts = self.usage_counts(response)
+        reason, counts = self.usage_check(response)
         if counts is None:
+            # The check that failed and an outline of the reply (names and kinds only) stay in the
+            # ledger entry, so the operator can see why without the reply's text or numbers.
             return {'input_usd_per_m': None, 'output_usd_per_m': None, 'prompt_tokens': None, 'completion_tokens': None,
                     'total_tokens': None, 'cached_tokens': None, 'reasoning_tokens': None, 'usage_valid': False,
                     'configured_price_cost_usd': None, 'provider_estimated_cost_usd': None, 'guard_charge_usd': None,
-                    'cost_basis': 'unknown; full reservation retained'}
+                    'cost_basis': 'unknown; full reservation retained', 'invalid_reason': reason,
+                    'reply_shape': reply_outline(response)}
         input_tokens, creation, read, hour, output_tokens = counts
         prompt = input_tokens + creation + read
         step = self.step_for(prompt)
