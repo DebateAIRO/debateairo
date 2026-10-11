@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "IŠTRINTI MANO PASKYRĄ",
   "settings.erasure.authorizing": "Patvirtinama…",
   "settings.erasure.schedule": "Suplanuoti ištrynimą",
+  "settings.erasure.endsContract": "Uždarius paskyrą, nutrūksta ir jūsų sutartis su mumis.",
   "settings.sessions.operationFailed": "Seanso veiksmas nepavyko",
   "settings.sessions.signedIn": "Prisijungta {date}",
   "settings.sessions.title": "Aktyvūs seansai",

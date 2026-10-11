@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "מחקו את החשבון שלי",
   "settings.erasure.authorizing": "מתבצע אישור…",
   "settings.erasure.schedule": "תזמון המחיקה",
+  "settings.erasure.endsContract": "סגירת החשבון שלך מסיימת גם את החוזה שלך איתנו.",
   "settings.sessions.operationFailed": "פעולת ההפעלה נכשלה",
   "settings.sessions.signedIn": "התחברות ב-{date}",
   "settings.sessions.title": "הפעלות פעילות",

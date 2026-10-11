@@ -166,7 +166,7 @@ export function AccountErasureControls({
         {t(catalog, "settings.erasure.title")}
       </h2>
       <p className="setCardHint">
-        {t(catalog, "settings.erasure.hint")}
+        {t(catalog, "settings.erasure.hint")} {t(catalog, "settings.erasure.endsContract")}
       </p>
       <p className="setCardNote">
         {removalChosen

@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "ĦASSAR IL-KONT TIEGĦI",
   "settings.erasure.authorizing": "Qed tingħata l-awtorizzazzjoni…",
   "settings.erasure.schedule": "Skeda t-tħassir",
+  "settings.erasure.endsContract": "Li tagħlaq il-kont tiegħek, il-kuntratt tiegħek magħna jintemm ukoll.",
   "settings.sessions.operationFailed": "L-operazzjoni tas-sessjoni falliet",
   "settings.sessions.signedIn": "Dħalt fil-kont {date}",
   "settings.sessions.title": "Sessjonijiet attivi",

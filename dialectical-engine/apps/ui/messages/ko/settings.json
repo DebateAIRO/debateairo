@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "내 계정 삭제",
   "settings.erasure.authorizing": "승인 중…",
   "settings.erasure.schedule": "삭제 예약",
+  "settings.erasure.endsContract": "계정을 해지하면 당사와의 계약도 함께 종료됩니다.",
   "settings.sessions.operationFailed": "세션 작업 실패",
   "settings.sessions.signedIn": "{date}에 로그인",
   "settings.sessions.title": "활성 세션",

@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "ELIMINA IL MIO ACCOUNT",
   "settings.erasure.authorizing": "Autorizzazione in corso…",
   "settings.erasure.schedule": "Programma l’eliminazione",
+  "settings.erasure.endsContract": "Chiudere il tuo account pone fine anche al contratto che hai con noi.",
   "settings.sessions.operationFailed": "Operazione sulla sessione non riuscita",
   "settings.sessions.signedIn": "Accesso effettuato il {date}",
   "settings.sessions.title": "Sessioni attive",

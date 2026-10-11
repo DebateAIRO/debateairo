@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "TÖRÖLJE A FIÓKOMAT",
   "settings.erasure.authorizing": "Engedélyezés…",
   "settings.erasure.schedule": "Törlés ütemezése",
+  "settings.erasure.endsContract": "A fiók lezárásával a közöttünk fennálló szerződés is megszűnik.",
   "settings.sessions.operationFailed": "A munkamenet-művelet sikertelen",
   "settings.sessions.signedIn": "Bejelentkezés ideje: {date}",
   "settings.sessions.title": "Aktív munkamenetek",

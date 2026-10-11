@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "SUPPRIMER MON COMPTE",
   "settings.erasure.authorizing": "Autorisation…",
   "settings.erasure.schedule": "Programmer la suppression",
+  "settings.erasure.endsContract": "La fermeture de votre compte met fin à votre contrat avec nous.",
   "settings.sessions.operationFailed": "Échec de l’opération sur la session",
   "settings.sessions.signedIn": "Connexion le {date}",
   "settings.sessions.title": "Sessions actives",

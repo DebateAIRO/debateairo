@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "SLET MIN KONTO",
   "settings.erasure.authorizing": "Godkender…",
   "settings.erasure.schedule": "Planlæg sletning",
+  "settings.erasure.endsContract": "Når du lukker din konto, afslutter du din aftale med os.",
   "settings.sessions.operationFailed": "Sessionshandlingen mislykkedes",
   "settings.sessions.signedIn": "Logget ind {date}",
   "settings.sessions.title": "Aktive sessioner",

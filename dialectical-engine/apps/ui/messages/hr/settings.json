@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "IZBRIŠITE MOJ RAČUN",
   "settings.erasure.authorizing": "Odobravanje…",
   "settings.erasure.schedule": "Zakažite brisanje",
+  "settings.erasure.endsContract": "Zatvaranjem računa prekidate i ugovor koji imate s nama.",
   "settings.sessions.operationFailed": "Radnja sesije nije uspjela",
   "settings.sessions.signedIn": "Prijavljeno {date}",
   "settings.sessions.title": "Aktivne sesije",

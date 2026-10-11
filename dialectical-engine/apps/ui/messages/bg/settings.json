@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "ИЗТРИЙТЕ ПРОФИЛА МИ",
   "settings.erasure.authorizing": "Проверка на самоличността…",
   "settings.erasure.schedule": "Насрочване на изтриването",
+  "settings.erasure.endsContract": "Затварянето на профила ви прекратява договора ви с нас.",
   "settings.sessions.operationFailed": "Операцията със сесията е неуспешна",
   "settings.sessions.signedIn": "Влизане на {date}",
   "settings.sessions.title": "Активни сесии",

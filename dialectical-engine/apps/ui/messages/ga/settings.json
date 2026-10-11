@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "SCRIOS MO CHUNTAS",
   "settings.erasure.authorizing": "Á údarú…",
   "settings.erasure.schedule": "Sceidealaigh scriosadh",
+  "settings.erasure.endsContract": "Trí do chuntas a dhúnadh, cuirtear deireadh lenár gconradh leat.",
   "settings.sessions.operationFailed": "Theip ar oibríocht an tseisiúin",
   "settings.sessions.signedIn": "Sínithe isteach {date}",
   "settings.sessions.title": "Seisiúin ghníomhacha",

@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "HAPUS AKUN SAYA",
   "settings.erasure.authorizing": "Mengotorisasi…",
   "settings.erasure.schedule": "Jadwalkan penghapusan",
+  "settings.erasure.endsContract": "Menutup akun Anda juga mengakhiri kontrak Anda dengan kami.",
   "settings.sessions.operationFailed": "Operasi sesi gagal",
   "settings.sessions.signedIn": "Masuk pada {date}",
   "settings.sessions.title": "Sesi aktif",

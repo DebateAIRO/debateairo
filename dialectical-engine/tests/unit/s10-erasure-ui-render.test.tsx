@@ -151,6 +151,18 @@ describe("S10 rendered erasure boundaries",()=>{
       expect(document.body.textContent).not.toContain(settingsEnglish["settings.erasure.schedule"]);
     });
 
+    it(`${name} says right after the notice-channel sentence that closing the account ends the contract`,async ()=>{
+      const line=settingsEnglish["settings.erasure.endsContract"];
+      expect(line).toBe("Closing your account ends your contract with us.");
+      const client=erasureClient(async ()=>({subscription:null}));
+      root=createRoot(document.getElementById("root")!);
+      await act(async ()=>{ root!.render(<Control client={client as never} />); });
+      await flush();
+      const hint=document.querySelector(".setCardHint");
+      expect(hint?.textContent).toBe(`${settingsEnglish["settings.erasure.hint"]} ${line}`);
+      expect(document.body.textContent?.split(line).length).toBe(2);
+    });
+
     // W7 (P2-I10): while a paid plan is live, one sentence says what scheduling does to it.
     const PAID_PLAN_SENTENCE=settingsEnglish["settings.erasure.paidPlan"];
     const liveSubscription=(status:string)=>({ subscription:{

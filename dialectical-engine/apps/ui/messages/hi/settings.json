@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "मेरा खाता मिटाएँ",
   "settings.erasure.authorizing": "अधिकृत किया जा रहा है…",
   "settings.erasure.schedule": "विलोपन निर्धारित करें",
+  "settings.erasure.endsContract": "अपना खाता बंद करने से हमारे साथ आपका अनुबंध भी समाप्त हो जाता है।",
   "settings.sessions.operationFailed": "सत्र कार्रवाई विफल रही",
   "settings.sessions.signedIn": "{date} को साइन-इन किया",
   "settings.sessions.title": "सक्रिय सत्र",

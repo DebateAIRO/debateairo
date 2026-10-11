@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "УДАЛИТЬ МОЮ УЧЁТНУЮ ЗАПИСЬ",
   "settings.erasure.authorizing": "Подтверждение…",
   "settings.erasure.schedule": "Запланировать удаление",
+  "settings.erasure.endsContract": "Закрытие аккаунта прекращает и ваш договор с нами.",
   "settings.sessions.operationFailed": "Не удалось выполнить операцию с сеансом",
   "settings.sessions.signedIn": "Вход выполнен {date}",
   "settings.sessions.title": "Активные сеансы",

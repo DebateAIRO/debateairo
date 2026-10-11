@@ -48,6 +48,7 @@
   "settings.erasure.confirmationPhrase": "SMAZAT MŮJ ÚČET",
   "settings.erasure.authorizing": "Probíhá autorizace…",
   "settings.erasure.schedule": "Naplánovat smazání",
+  "settings.erasure.endsContract": "Zrušením účtu ukončíte smlouvu, kterou máte s námi.",
   "settings.sessions.operationFailed": "Operace s relací selhala",
   "settings.sessions.signedIn": "Přihlášení {date}",
   "settings.sessions.title": "Aktivní relace",
