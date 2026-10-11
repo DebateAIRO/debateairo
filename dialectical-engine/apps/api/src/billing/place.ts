@@ -1,7 +1,8 @@
 import { isIP } from "node:net";
 import { decidePayment, UNKNOWN_COUNTRY, type GeoLookup, type GeoRefusalCode } from "@debateai/geo";
 import { exhaustive } from "@debateai/kernel";
-import type { CountryPolicy } from "@debateai/register";
+import type { BillingCurrency } from "@debateai/contract";
+import { priceCurrencyFor, type BillingPlans, type CountryPolicy } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
 import { BillingRefusal, type BillingRefusalCode } from "./refusal.js";
 
@@ -35,6 +36,17 @@ export function decidePaymentPlace(input: Readonly<{
     default:
       return exhaustive(decision);
   }
+}
+
+/**
+ * Spec 2026-10-05 §2.16.1: the currency a visitor's connection pays in, from the same lookup the quote uses when no
+ * country is declared. An address that is not an IP, the lookup's "XX" and a Tor exit say nothing about where the
+ * person is billed: the rule's default.
+ */
+export function connectionCurrency(input: Readonly<{ geo: GeoLookup | undefined; plans: BillingPlans; ip: string }>): BillingCurrency {
+  if (input.geo === undefined || isIP(input.ip) === 0) return priceCurrencyFor(input.plans, null);
+  const located = input.geo.lookup(input.ip);
+  return priceCurrencyFor(input.plans, located.tor || located.country === UNKNOWN_COUNTRY ? null : located.country);
 }
 
 function paymentRefusalCode(code: GeoRefusalCode): BillingRefusalCode {

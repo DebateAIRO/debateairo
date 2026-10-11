@@ -119,7 +119,9 @@ describe("P2-I7 a saved-card charge's outcome rows are dated when the call retur
           expYear: 2029, tokenCiphertext: card.ciphertext, keyId: card.keyId
         }),
         chargesForSubscription: async () => [{ kind: "INITIAL", quoteId: QUOTE_ID }],
-        quote: async () => ({ quoteId: QUOTE_ID, planId: "PLUS", locationCiphertext: location.ciphertext, keyId: location.keyId }),
+        quote: async () => ({
+          quoteId: QUOTE_ID, planId: "PLUS", locationCiphertext: location.ciphertext, keyId: location.keyId, currency: "USD"
+        }),
         customerByOwner: async () => ({ customerId: CUSTOMER_ID }),
         latestProfile: async () => ({ profileCiphertext: profile.ciphertext, keyId: profile.keyId })
       } as unknown as BillingRepository,

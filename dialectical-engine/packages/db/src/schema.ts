@@ -353,6 +353,27 @@ export const runRoleAssignment = core.table("run_role_assignment", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull()
 });
 
+// Role rotation (0114): the four roles one rotated debate was given at admission, and the model ids that were eligible
+// for them. Append-only.
+export const runRoleRotation = core.table("run_role_rotation", {
+  runId: uuid("run_id").primaryKey(),
+  rule: text("rule").notNull(),
+  writerProviderRef: text("writer_provider_ref").notNull(),
+  writerModelId: text("writer_model_id").notNull(),
+  writerMaker: text("writer_maker").notNull(),
+  checkerProviderRef: text("checker_provider_ref").notNull(),
+  checkerModelId: text("checker_model_id").notNull(),
+  checkerMaker: text("checker_maker").notNull(),
+  storytellerProviderRef: text("storyteller_provider_ref").notNull(),
+  storytellerModelId: text("storyteller_model_id").notNull(),
+  storytellerMaker: text("storyteller_maker").notNull(),
+  storyCheckerProviderRef: text("story_checker_provider_ref").notNull(),
+  storyCheckerModelId: text("story_checker_model_id").notNull(),
+  storyCheckerMaker: text("story_checker_maker").notNull(),
+  eligibleModelIds: text("eligible_model_ids").array().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+});
+
 export const nodeReview = ledger.table("node_review", {
   nodeReviewId: uuid("node_review_id").primaryKey(),
   runId: uuid("run_id").notNull(),
@@ -592,6 +613,7 @@ export const answerStory = serve.table("answer_story", {
   content: jsonb("content").notNull(),
   contentCiphertext: jsonb("content_ciphertext"),
   contentAttestation: bytea("content_attestation"),
+  storytellerRepairs: integer("storyteller_repairs"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull()
 });
 

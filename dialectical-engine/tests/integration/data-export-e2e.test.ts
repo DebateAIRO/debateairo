@@ -361,8 +361,8 @@ describe("data export over a real database and encrypted file store", () => {
     await db.pool.query("INSERT INTO identity.sensitive_data_consent(user_id,notice_version,locale,consented_at) VALUES($1,'matrix-consent-v1','en',clock_timestamp())", [a.userId]);
     await db.pool.query("INSERT INTO billing.customer(customer_id,owner_ref,created_at,created_locale) VALUES($1,$2,clock_timestamp(),'ro')", [customerId, a.ownerRef]);
     await db.pool.query("INSERT INTO billing.customer_xmoney(customer_id,environment,xmoney_customer_id,at) VALUES($1,'stage','123456789',clock_timestamp())", [customerId]);
-    await db.pool.query(`INSERT INTO billing.quote(quote_id,owner_ref,plan_id,kind,net_micros,tax_micros,total_micros,tax_country,tax_rate_bp,tax_status,tax_name,created_at,expires_at,location_ciphertext,key_id)
-      VALUES($1,$2,'PLUS','SUBSCRIBE',10000,0,10000,'RO',0,'NON_TAXABLE','matrix-tax',clock_timestamp(),clock_timestamp()+interval '1 hour',$3,$4)`, [quoteId, a.ownerRef, location.ciphertext, location.keyId]);
+    await db.pool.query(`INSERT INTO billing.quote(quote_id,owner_ref,plan_id,kind,net_micros,tax_micros,total_micros,tax_country,tax_rate_bp,tax_status,tax_name,created_at,expires_at,location_ciphertext,key_id,currency)
+      VALUES($1,$2,'PLUS','SUBSCRIBE',10000,0,10000,'RO',0,'NON_TAXABLE','matrix-tax',clock_timestamp(),clock_timestamp()+interval '1 hour',$3,$4,'RON')`, [quoteId, a.ownerRef, location.ciphertext, location.keyId]);
     await db.pool.query(`INSERT INTO billing.charge(charge_id,owner_ref,subscription_id,kind,attempt,period_start,period_end,
       net_micros,tax_micros,total_micros,currency,created_at,payment_provider,payment_environment)
       VALUES($1,$2,$3,'CARD_CHECK',1,clock_timestamp(),clock_timestamp()+interval '30 days',0,0,0,'USD',clock_timestamp(),'netopia','sandbox')`, [chargeId, a.ownerRef, randomUUID()]);

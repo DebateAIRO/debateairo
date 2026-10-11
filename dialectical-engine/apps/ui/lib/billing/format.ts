@@ -1,12 +1,16 @@
+import type { BillingCurrency } from "@debateai/contract";
 import { formatDate, formatNumber, t, type MessageCatalog } from "../i18n/translate.js";
 import type { BillingPlanId } from "./plans.js";
 
 const DECIMAL_PRICE = /^\d{1,9}\.\d{2}$/;
 
-/** A decimal the API sends ("24.20") as US dollars in the reader's locale; display only, never arithmetic. */
-export function formatUsd(locale: string, decimal: string): string {
+/**
+ * A decimal the API sends ("24.20") in the currency it is in (spec 2026-10-05 §2.16.5), in the reader's locale;
+ * display only, never arithmetic. Anything else is shown as it came.
+ */
+export function formatMoney(locale: string, decimal: string, currency: BillingCurrency): string {
   return DECIMAL_PRICE.test(decimal)
-    ? formatNumber(locale, Number(decimal), { style: "currency", currency: "USD" })
+    ? formatNumber(locale, Number(decimal), { style: "currency", currency })
     : decimal;
 }
 
@@ -48,17 +52,19 @@ export type TaxLabelParts = Readonly<{
   status: "TAXABLE" | "NON_TAXABLE" | "NOT_REGISTERED" | "REVERSE_CHARGE";
   /** The quote's `tax`, a decimal ("4.20"): the amount, shown before the rate as spec §1.3 does. */
   taxAmount: string;
+  /** The quote's currency. */
+  currency: BillingCurrency;
   taxName: string;
   rateBasisPoints: number;
   country: string;
 }>;
 
-/** "$4.20 VAT (21%, Romania)", built in the reader's locale from the quote's parts (spec §1.3, §2.5.3). */
+/** "€3.80 VAT (19%, Germany)", built in the reader's locale from the quote's parts (spec §1.3, §2.5.3). */
 export function taxLabel(catalog: MessageCatalog, locale: string, parts: TaxLabelParts): string {
   if (parts.status === "REVERSE_CHARGE") return t(catalog, "billing.checkout.taxReverseCharge");
   if (parts.status !== "TAXABLE" || parts.rateBasisPoints === 0) return t(catalog, "billing.checkout.noTax");
   return t(catalog, "billing.checkout.taxLabel", {
-    tax: formatUsd(locale, parts.taxAmount),
+    tax: formatMoney(locale, parts.taxAmount, parts.currency),
     taxName: parts.taxName,
     // P8b/P12c: basis points may carry a half (887.5 = 8.875 %), so three decimals are kept.
     rate: formatNumber(locale, parts.rateBasisPoints / 100, { maximumFractionDigits: 3 }),

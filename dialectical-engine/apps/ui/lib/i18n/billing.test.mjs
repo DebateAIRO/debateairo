@@ -87,7 +87,7 @@ const catalogue = (locale) => JSON.parse(source(`messages/${locale}/billing.json
 const REQUIRED = [
   "billing.plans.FREE.name", "billing.plans.PLUS.name", "billing.plans.PRO.name", "billing.plans.MAX.name",
   "billing.pricing.eyebrow", "billing.pricing.title", "billing.pricing.lede", "billing.pricing.perMonth",
-  "billing.pricing.plusTax", "billing.pricing.allowanceFree", "billing.pricing.allowancePlus", "billing.pricing.allowance",
+  "billing.pricing.plusTax", "billing.pricing.currencyNote", "billing.pricing.allowanceFree", "billing.pricing.allowancePlus", "billing.pricing.allowance",
   "billing.pricing.freeFeatures", "billing.pricing.paidFeatures", "billing.pricing.startFree", "billing.pricing.choose",
   "billing.pricing.unavailable", "billing.pricing.faqTitle", "billing.pricing.faqLimitsQuestion",
   "billing.pricing.faqLimitsAnswer", "billing.pricing.faqCancelQuestion", "billing.pricing.faqCancelAnswer",
@@ -292,6 +292,9 @@ test("/pricing's plan lines say what is true: Free's low-cost models, and the pa
   const english = catalogue("en");
   assert.equal(english["billing.pricing.freeFeatures"], "2 debaters, carefully chosen low-cost models, fixed settings");
   assert.equal(english["billing.pricing.paidFeatures"], "3 debaters, all settings, and your pick of Best, Balanced or Economy models for each debate");
+  // Spec 2026-10-05 §2.16.5 (Part C): under the cards, which show the connection's currency; it names no currency.
+  assert.equal(english["billing.pricing.currencyNote"],
+    "You pay in the currency of your billing country. At checkout you see the exact amount, with tax, before you pay.");
   assert.deepEqual(Object.keys(RETIRED_PLAN_LINES).sort(), LOCALES.map(({ code }) => code).sort());
   for (const { code } of LOCALES) {
     const billing = catalogue(code);

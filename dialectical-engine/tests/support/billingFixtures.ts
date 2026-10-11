@@ -3,7 +3,16 @@ import type { AskApplication } from "@debateai/api";
 import type { SubscriptionEvent } from "@debateai/billing-core";
 import type { GeoLookup } from "@debateai/geo";
 import { TypedDomainError } from "@debateai/kernel";
-import type { BillingPlans, BillingPolicy, CountryPolicy, CountryRule } from "@debateai/register";
+import {
+  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
+  billingPlansFromValue,
+  planById,
+  planNetPrice,
+  type BillingPlans,
+  type BillingPolicy,
+  type CountryPolicy,
+  type CountryRule
+} from "@debateai/register";
 import type { BillingRecipientReader } from "../../apps/api/src/billing/account-email.js";
 // R-16: tests import the fakes through tests/support/ (P4's fake-tax-engine.ts re-exports the tax rules).
 import { FakeTaxEngine, fakeTaxMicros } from "./fake-tax-engine.js";
@@ -15,21 +24,34 @@ import { FakeTaxEngine, fakeTaxMicros } from "./fake-tax-engine.js";
  */
 export const PROFILE_ADDRESS_ONLY: BillingRecipientReader = Object.freeze({ currentAddress: async () => null });
 
+/**
+ * The engine's plans in the v2 shape (spec 2026-10-05 §2.16.2). Suites about something else keep their dollar amounts:
+ * every country pays in USD here. Part C's suites use `testRegionalPlans`, the engine's own rule (spec 2026-10-05
+ * §2.16.1).
+ */
 export const testBillingPlans: BillingPlans = Object.freeze({
-  currency: "USD",
+  creditCurrency: "USD",
+  currencyByCountry: Object.freeze({ defaultCurrency: "USD", countries: Object.freeze({}) }),
   sourceRef: "test:billing-plans",
   plans: Object.freeze([
     // R-11: Free's fixed risk tier is "standard", what apps/ui/app/new/defaults.tsx sends today.
-    { planId: "FREE", tier: "free", netPriceMicros: 0, monthlyCreditMicros: 200_000, dayBasisPoints: null,
+    { planId: "FREE", tier: "free", netPrices: { USD: 0, EUR: 0, RON: 0 }, monthlyCreditMicros: 200_000, dayBasisPoints: null,
       weekBasisPoints: null, finishBasisPoints: 11_000, fixedGauges: { riskTier: "standard", compositionBudgetTier: "low", depth: 1 } },
-    { planId: "PLUS", tier: "premium", netPriceMicros: 20_000_000, monthlyCreditMicros: 5_000_000, dayBasisPoints: 2_000,
-      weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null },
-    { planId: "PRO", tier: "premium", netPriceMicros: 50_000_000, monthlyCreditMicros: 20_000_000, dayBasisPoints: 2_000,
-      weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null },
-    { planId: "MAX", tier: "premium", netPriceMicros: 200_000_000, monthlyCreditMicros: 150_000_000, dayBasisPoints: 2_000,
-      weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null }
+    { planId: "PLUS", tier: "premium", netPrices: { USD: 20_000_000, EUR: 20_000_000, RON: 100_000_000 },
+      monthlyCreditMicros: 5_000_000, dayBasisPoints: 2_000, weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null },
+    { planId: "PRO", tier: "premium", netPrices: { USD: 50_000_000, EUR: 50_000_000, RON: 250_000_000 },
+      monthlyCreditMicros: 20_000_000, dayBasisPoints: 2_000, weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null },
+    { planId: "MAX", tier: "premium", netPrices: { USD: 200_000_000, EUR: 200_000_000, RON: 1_000_000_000 },
+      monthlyCreditMicros: 150_000_000, dayBasisPoints: 2_000, weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null }
   ])
 }) as BillingPlans;
+
+/** Spec 2026-10-05 §2.16.1: testBillingPlans' plans under the engine's own region rule (RO RON, 31 countries EUR, else USD). */
+export const testRegionalPlans: BillingPlans = Object.freeze({
+  ...testBillingPlans,
+  currencyByCountry: billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, "test").currencyByCountry,
+  sourceRef: "test:billing-plans-regional"
+});
 
 export const testBillingPolicy: BillingPolicy = Object.freeze({
   enabled: true,
@@ -90,7 +112,7 @@ export function activeSubscriptionEvents(
   system: TestPaymentSystem = { provider: "netopia", environment: "sandbox" }
 ): SubscriptionEvent[] {
   const subscriptionId = randomUUID();
-  const netMicros = testBillingPlans.plans.find((plan) => plan.planId === planId)!.netPriceMicros;
+  const netMicros = planNetPrice(planById(testBillingPlans, planId), "USD");
   const base = { subscriptionId, ownerRef, planId, cardTokenId: null } as const;
   const created = { payment_provider: system.provider, payment_environment: system.environment };
   return [

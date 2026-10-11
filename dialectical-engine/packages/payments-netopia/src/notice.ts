@@ -17,6 +17,8 @@ import { createSecretToken, isSecretTokenText } from "./secret-token.js";
 import { parseOccurredAt } from "./time.js";
 
 export type TrustedKey = Readonly<{ key: KeyObject; fingerprint: string }>;
+// With one POS per currency (spec 2026-10-05 §2.16.4), the trust would hold every POS signature of the account: the aud
+// check and quarantinable accept any of them.
 export type NoticeTrust = Readonly<{ posSignature: string; keys: ReadonlyArray<TrustedKey> }>;
 export type NoticeRejectionReason =
   | "NOTICE_HEADER_MISSING" | "NOTICE_ALG_REFUSED" | "NOTICE_SIGNATURE_INVALID" | "NOTICE_ISSUER_INVALID"

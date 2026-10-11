@@ -619,9 +619,15 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     expect(ordered.at(-1)).toBe("0107_auth_dev_integration.sql");
     expect(plan.forward108.name).toBe("0108_preview_recovery_verified_bindings.sql");
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
-    // The chain in merge order (migrations/lineage/README.md, "renumber"): NETOPIA, then the auth DB batch, last.
-    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql", "0113_data_export.sql"]);
-    // data-export S01 (V-30): the export is appended after the batch, so the batch is the second step, no longer the last.
+    // The chain in merge order (migrations/lineage/README.md, "renumber"): NETOPIA, then the auth DB batch, then Part C's
+    // prices (spec 2026-10-05 §2.16.6), then role rotation (spec 2026-10-11 Part 3), then the data export, last (V-41).
+    expect(plan.forwardChain.map((step) => step.name)).toEqual([
+      "0111_billing_netopia.sql",
+      "0112_auth_db_batch.sql",
+      "0113_billing_price_currencies.sql",
+      "0114_role_rotation.sql",
+      "0115_data_export.sql"
+    ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });
 });

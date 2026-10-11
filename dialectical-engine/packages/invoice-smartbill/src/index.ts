@@ -117,6 +117,8 @@ export class SmartBillInvoiceIssuer implements InvoiceIssuer {
    * The line is the charged gross, tax included: with one line at quantity 1 and precision 2, SmartBill derives
    * exactly our net and our tax from it (task text), so the legal invoice equals what the card paid. Outside those
    * two conditions the invoice is refused here and goes to the owner, never to SmartBill's own rounding.
+   * The invoice is in the charge's currency (spec 2026-10-05 §2.16.4). No `exchangeRate` is sent: a RON invoice needs
+   * none, and for EUR or USD SmartBill applies the BNR rate it holds for the currency (smartbill-api-facts row 11).
    */
   async issue(i: SaleRecord): Promise<Issued> {
     const line = i.lines[0];
@@ -130,11 +132,11 @@ export class SmartBillInvoiceIssuer implements InvoiceIssuer {
       issueDate: bucharestDate(i.issuedOn),
       seriesName: this.#series,
       isDraft: this.#draft,
-      currency: "USD",
+      currency: i.currency,
       precision: 2,
       mentions: `debateai-charge:${i.chargeId}`,
       products: [{
-        name: line.description, code: "DEBATEAI-PLAN", isDiscount: false, measuringUnitName: "buc", currency: "USD",
+        name: line.description, code: "DEBATEAI-PLAN", isDiscount: false, measuringUnitName: "buc", currency: i.currency,
         quantity: 1, price: Number(microsToDecimal(line.netMicros + line.taxMicros)), isTaxIncluded: true,
         taxName: this.#taxName, taxPercentage: line.taxRateBasisPoints / 100, isService: true, saveToDb: false
       }]
@@ -157,12 +159,12 @@ export class SmartBillInvoiceIssuer implements InvoiceIssuer {
       issueDate: bucharestDate(i.issuedOn),
       seriesName: this.#series,
       isDraft: this.#draft,
-      currency: "USD",
+      currency: i.currency,
       precision: 2,
       mentions: `Storno partial al facturii ${i.series}-${i.number}; debateai-charge:${i.chargeId}`,
       products: [{
         name: `Rambursare partiala ${i.series}-${i.number}`, code: "DEBATEAI-PLAN", isDiscount: false,
-        measuringUnitName: "buc", currency: "USD", quantity: -1, price: Number(microsToDecimal(i.refundTotalMicros)), isTaxIncluded: true, taxName: this.#taxName,
+        measuringUnitName: "buc", currency: i.currency, quantity: -1, price: Number(microsToDecimal(i.refundTotalMicros)), isTaxIncluded: true, taxName: this.#taxName,
         taxPercentage: i.taxRateBasisPoints / 100, isService: true, saveToDb: false
       }]
     }));

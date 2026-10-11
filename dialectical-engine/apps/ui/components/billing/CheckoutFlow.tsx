@@ -11,7 +11,7 @@ import { contractClient } from "@/lib/api";
 import { phonePrefill, phoneTyped } from "@/lib/billing/callingCodes";
 import { checkoutFailureKey } from "@/lib/billing/checkoutFailure";
 import { COUNTRY_CODES } from "@/lib/billing/countries";
-import { countryName, formatUsd, planName, renewDayLabel, taxLabel } from "@/lib/billing/format";
+import { countryName, formatMoney, planName, renewDayLabel, taxLabel } from "@/lib/billing/format";
 import type { PaymentMarks } from "@/lib/billing/paymentMarks";
 import type { PaidPlanId } from "@/lib/billing/plans";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -213,12 +213,12 @@ export function CheckoutFlow({
 
   const totalLine = quote === null ? "" : t(catalog, "billing.checkout.total", {
     plan: name,
-    net: formatUsd(locale, quote.net),
+    net: formatMoney(locale, quote.net, quote.currency),
     taxLabel: taxLabel(catalog, locale, {
-      status: quote.tax_status, taxAmount: quote.tax, taxName: quote.tax_name, rateBasisPoints: quote.tax_rate_bp,
-      country: quote.tax_country
+      status: quote.tax_status, taxAmount: quote.tax, currency: quote.currency, taxName: quote.tax_name,
+      rateBasisPoints: quote.tax_rate_bp, country: quote.tax_country
     }),
-    total: formatUsd(locale, quote.total),
+    total: formatMoney(locale, quote.total, quote.currency),
     day: renewDayLabel(locale, quote.renews_on)
   });
 
@@ -360,7 +360,7 @@ export function CheckoutFlow({
           <label className="billingConsent">
             <input type="checkbox" checked={renewalAccepted} onChange={(event) => setRenewalAccepted(event.target.checked)} />
             {/* Spec §2.18: the card-saving agreement names the monthly total (N20 adds {total} to the sentence). */}
-            <span>{t(catalog, "billing.consent.renewal", { total: formatUsd(locale, quote.total) })}</span>
+            <span>{t(catalog, "billing.consent.renewal", { total: formatMoney(locale, quote.total, quote.currency) })}</span>
           </label>
           <label className="billingConsent">
             <input type="checkbox" checked={immediateAccepted} onChange={(event) => setImmediateAccepted(event.target.checked)} />

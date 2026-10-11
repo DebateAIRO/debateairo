@@ -29,7 +29,9 @@
  *    band must carry it (ruling C7, `ASK_ROOM_ADMISSION_UNSEALED`). Likewise optional, the
  *    `publicationCheckPolicy` (the pre-publish check's deadline, owner's ruling 2026-10-04,
  *    checked by the register's own parser); without the member the seeder's code-owned row is
- *    sealed as it is.
+ *    sealed as it is. Likewise optional, the `answerRoleRotation` (spec 2026-10-11, role rotation):
+ *    `{ "enabled": true | false }`, sealed as the ADDITIVE `answerRoleRotationPolicy` row under the
+ *    file's sourceRef; left out, no such row is sealed and the engine keeps its fixed roles.
  *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
  *    own `--scorecard` file: the owners' approved document, sealed as it is,
  *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
@@ -73,6 +75,8 @@ import {
   type Scorecard
 } from "@debateai/scorecard";
 import {
+  ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND,
   assertDeploymentProviderTargets,
   assertPricedProviderTargets,
   parseProviderDiscoveryTargets,
@@ -81,6 +85,7 @@ import {
 import {
   ADMISSION_POLICY_ROW_KEY,
   ALGORITHM_REGISTER_ROW_KEYS,
+  ANSWER_ROLE_ROTATION_POLICY_ROW_KEY,
   BILLING_PLANS_ROW_KEY,
   BILLING_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
@@ -92,6 +97,7 @@ import {
   STORY_ROW_KEYS,
   TAX_AUTHORITIES_ROW_KEY,
   admissionPolicyFromValue,
+  answerRoleRotationPolicyRow,
   assertAskRoomAdmissionSealed,
   assertBillingReady,
   assertHostedCostEnvelopesSealed,
@@ -117,6 +123,7 @@ import {
   planCapMicros,
   publicationCheckPolicyFromValue,
   readAdmissionPolicy,
+  readAnswerRoleRotationPolicy,
   readAuthPolicy,
   readBillingPlans,
   readBillingPolicy,
@@ -192,7 +199,9 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // code-owned admissionPolicy row is sealed as it is; required with the budget band (ruling C7).
   "askRoomReads",
   // hate-speech S02 (owner, 2026-10-04): OPTIONAL. Left out, the code-owned publicationCheckPolicy row is sealed as it is.
-  "publicationCheckPolicy"
+  "publicationCheckPolicy",
+  // Role rotation (spec 2026-10-11): OPTIONAL. Left out, no row is sealed and the engine keeps its fixed roles.
+  "answerRoleRotation"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -339,9 +348,11 @@ const configuredProviderSetSchema = z.object({
   requiredDistinctMakers: z.number().int(),
   providers: z.array(z.object({
     providerRef: boundedText,
-    // A hosted deployment reaches paid vendor APIs through the one OpenAI-
-    // compatible adapter (V-9(3)); it has no self-hosted inference server (V-20).
-    adapterKind: z.literal("openai-compatible-http"),
+    // A hosted deployment reaches paid vendor APIs through the OpenAI-
+    // compatible adapter (V-9(3)) or, since the multi-model preview's PR B, the
+    // native Anthropic Messages adapter; it has no self-hosted inference server
+    // (V-20), so the vLLM kind stays refused.
+    adapterKind: z.enum([OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND]),
     maker: boundedText,
     vetting: vettingSchema.optional()
   }).strict()).min(1).max(32)
@@ -380,6 +391,8 @@ export type HostedRegisterFile = Readonly<{
   askRoomReads?: unknown;
   /** Optional (2026-10-04): the pre-publish check's deadline; absent = the code-owned row. */
   publicationCheckPolicy?: unknown;
+  /** Optional (spec 2026-10-11): `{ "enabled": boolean }`; absent = no answerRoleRotationPolicy row. */
+  answerRoleRotation?: unknown;
 }>;
 
 /**
@@ -439,7 +452,8 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null,
     ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {}),
     ...(Object.hasOwn(record, "askRoomReads") ? { askRoomReads: record.askRoomReads } : {}),
-    ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {})
+    ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {}),
+    ...(Object.hasOwn(record, "answerRoleRotation") ? { answerRoleRotation: record.answerRoleRotation } : {})
   });
 }
 
@@ -734,6 +748,19 @@ function resolveSynthesisRoles(
 }
 
 /**
+ * The answerRoleRotationPolicy row for the file's optional member (spec 2026-10-11). The member is exactly
+ * `{ "enabled": boolean }`: another key, a non-boolean or a `null` member is refused with the file's own code,
+ * so a malformed member can never seal a malformed row.
+ */
+function roleRotationRowOf(member: unknown, sourceRef: string): ReturnType<typeof answerRoleRotationPolicyRow> {
+  if (typeof member !== "object" || member === null || Array.isArray(member)
+    || Object.keys(member).join() !== "enabled" || typeof (member as { enabled: unknown }).enabled !== "boolean") {
+    return refuse("HOSTED_REGISTER_ROLE_ROTATION_INVALID");
+  }
+  return answerRoleRotationPolicyRow((member as { enabled: boolean }).enabled, sourceRef);
+}
+
+/**
  * Everything decided before a connection exists. A refusal here has published
  * nothing and opened nothing; a plan that returns is exactly what would be sealed.
  */
@@ -761,6 +788,10 @@ export async function planHostedRegisterPublication(
   // hate-speech S02: the operator's deadline, by the register's own parser (PUBLICATION_CHECK_POLICY_INVALID).
   // Absent member = the code-owned row, sealed as it is.
   if (file.publicationCheckPolicy !== undefined) publicationCheckPolicyFromValue(file.publicationCheckPolicy, file.sourceRef);
+  // Role rotation (spec 2026-10-11): the member is the file's own shape, exactly `{ "enabled": boolean }`, so it is
+  // checked here, before anything is sealed. Absent = no row (the fixed roles, as before).
+  const roleRotationRow = file.answerRoleRotation === undefined ? null
+    : roleRotationRowOf(file.answerRoleRotation, file.sourceRef);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -879,9 +910,20 @@ export async function planHostedRegisterPublication(
     valueJsonText: scorecard.valueJsonText,
     sourceRef: `${file.sourceRef} | ${MODEL_SCORECARD_ROW_KEY} v${scorecard.scorecardVersion} sha256:${scorecard.sha256}`
   })];
+  // Role rotation (spec 2026-10-11) is ADDITIVE, like the scorecard: the seeder never builds it, so it replaces no
+  // code-owned row (it must not join operatorRows, whose every key has a twin). A twin would be two sources for one key.
+  if (roleRotationRow !== null && codeOwnedRows.some((row) => row.rowKey === ANSWER_ROLE_ROTATION_POLICY_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const roleRotationRows: readonly RegisterPublicationRow[] = roleRotationRow === null ? [] : [Object.freeze({
+    rowKey: roleRotationRow.rowKey,
+    valueJsonText: roleRotationRow.valueJsonText,
+    sourceRef: roleRotationRow.sourceRef
+  })];
   const rows = Object.freeze([
     ...codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row),
-    ...scorecardRows
+    ...scorecardRows,
+    ...roleRotationRows
   ]);
   const keys = new Set(rows.map((row) => row.rowKey));
   if (keys.size !== rows.length || ALGORITHM_REGISTER_ROW_KEYS.some((key) => !keys.has(key))) {
@@ -1213,6 +1255,8 @@ export async function verifyHostedRegisterBootReadiness(
   await readDeploymentRiskTier(pool, version);
   // hate-speech S02: main.ts's publication-check-policy stage (the pre-publish check's deadline).
   await readPublicationCheckPolicy(pool, version);
+  // Role rotation (spec 2026-10-11): optional (ABSENT keeps the fixed roles), but a malformed row would refuse the API's boot.
+  await readAnswerRoleRotationPolicy(pool, version);
   // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
   // sealed one the API would refuse at start-up is refused here, by its reason.
   const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());

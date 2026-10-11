@@ -1,11 +1,11 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { foldSubscription, paymentError, type PaymentState } from "@debateai/billing-core";
+import { foldSubscription, paymentError, type PaymentState, type PriceCurrency } from "@debateai/billing-core";
 import { BillingCardChangeResponseSchema, BillingCardDetailsResponseSchema, e164Phone } from "@debateai/contract";
 import { BillingRepository, migrate } from "@debateai/db";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
-import { StubGeo } from "../support/billingFixtures.js";
+import { StubGeo, testRegionalPlans } from "../support/billingFixtures.js";
 import {
   mountSubscriptionRoutes, recordingAudit, seedNetopiaSubscription, subscriptionDeps, testAgreement,
   testCardToken, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
@@ -33,16 +33,22 @@ const CORRECTED = {
   first_name: "Ana", last_name: "Pop", phone: "+40722111222", street: "Strada Noua 2", city: "Cluj-Napoca", postal_code: "400001"
 };
 
-async function start(label: string) {
+async function start(label: string, options: Readonly<{
+  /** Part C (spec 2026-10-05 §2.16.3): the subscription's currency; with one, the plans are the engine's region rule. */
+  currency?: PriceCurrency;
+}> = {}) {
   const identity = testHttpIdentity(label);
   const clock = { now: new Date() };
   const payments = new StubCardPayments();
   const audit = recordingAudit();
   const seeded = await seedNetopiaSubscription(database.pool, {
-    ownerRef: identity.authenticated.ownerRef, planId: "PLUS", activatedAt: new Date(clock.now.getTime() - 3 * DAY), taxCountry: "RO"
+    ownerRef: identity.authenticated.ownerRef, planId: "PLUS", activatedAt: new Date(clock.now.getTime() - 3 * DAY), taxCountry: "RO",
+    ...(options.currency === undefined ? {} : { currency: options.currency }),
+    ...(options.currency === "RON" ? { netMicros: 100_000_000 } : {})
   });
   const deps = subscriptionDeps(database.pool, {
-    payments, audit, geo: new StubGeo(), clock: () => clock.now, accountEmail: { read: async () => EMAIL }
+    payments, audit, geo: new StubGeo(), clock: () => clock.now, accountEmail: { read: async () => EMAIL },
+    ...(options.currency === undefined ? {} : { plans: testRegionalPlans })
   });
   const api = await mountSubscriptionRoutes(deps, identity);
   const headers = { "x-test-session": identity.rawSessionToken, "x-test-ip": IP };
@@ -154,6 +160,16 @@ describe("N13 the card page's details and NETOPIA's 0 check (spec §2.11)", () =
     expect(BillingCardDetailsResponseSchema.parse((await run.details()).json())).toMatchObject({ first_name: "Ana", country: "RO" });
     expect((await stateOf(run)).cardTokenId).toBe(run.seeded.cardTokenId);
     expect(run.audit.events.map((entry) => entry.event)).toContain("billing.card.change.started");
+    await run.api.close();
+  });
+
+  it("an EUR subscription checks its new card in EUR", async () => {
+    const run = await start("c2-card-check-eur", { currency: "EUR" });
+    const answer = await run.started();
+    expect((await repository.charge(answer.charge_ref))!).toMatchObject({ kind: "CARD_CHECK", totalMicros: 0, currency: "EUR" });
+    expect(run.payments.hosted).toEqual([
+      expect.objectContaining({ orderId: answer.charge_ref, amountMicros: 0, currency: "EUR" })
+    ]);
     await run.api.close();
   });
 

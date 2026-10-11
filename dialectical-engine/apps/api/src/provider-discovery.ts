@@ -46,6 +46,11 @@ export function createProviderDiscoveryResolver(input: Readonly<{
   probeTimeoutMs: number;
   thinkingLevel?: string;
   probeTokenCeiling?: number;
+  /**
+   * Preview multi-model (contract A §1): each target's own probe controls (a level only where the
+   * row has one, a ceiling within the row's bound). When given, it replaces the two fields above.
+   */
+  probeControlsFor?: (target: ProviderDiscoveryTarget) => Readonly<{ thinkingLevel?: string; tokenCeiling?: number }>;
   fetchImplementation?: typeof fetch;
   clock?: () => Date;
 }>): () => Promise<readonly DiscoveredPanelMember[]> {
@@ -69,8 +74,18 @@ export function createProviderDiscoveryResolver(input: Readonly<{
     const latestByRef = new Map(latest.map((record) => [record.providerRef, record] as const));
     const observations = await Promise.all(input.targets.map(async (target) => {
       const record = latestByRef.get(target.providerRef);
-      return isFreshMatchingRecord(record, target, now, input.probeFreshnessMs)
-        ? record
+      if (isFreshMatchingRecord(record, target, now, input.probeFreshnessMs)) return record;
+      const controls = input.probeControlsFor?.(target);
+      return controls !== undefined
+        ? probeTarget({
+            target,
+            probes: input.probes,
+            timeoutMs: input.probeTimeoutMs,
+            ...(controls.thinkingLevel===undefined?{}:{thinkingLevel:controls.thinkingLevel}),
+            ...(controls.tokenCeiling===undefined?{}:{tokenCeiling:controls.tokenCeiling}),
+            fetchImplementation,
+            clock
+          })
         : probeTarget({
             target,
             probes: input.probes,

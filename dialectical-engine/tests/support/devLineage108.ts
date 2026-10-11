@@ -2,6 +2,7 @@ import type { Pool } from '@debateai/db';
 import { loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
 import { applyForward108 } from '../../packages/db/src/migration-forward108.js';
 import { applyForward110 } from '../../packages/db/src/migration-forward110.js';
+import { applyForwardChain } from '../../packages/db/src/migration-forward-chain.js';
 
 /**
  * A database as dev at dedbb2d50 leaves it (PR-54, task N26n): every source of dev's sealed recipe executed in the
@@ -21,6 +22,25 @@ export async function seedDevLineage108(pool:Pool):Promise<void>{
  */
 export async function seedDevLineage110(pool:Pool):Promise<void>{
  await seedDevLineage(pool,true);
+}
+
+/**
+ * Part C: dev's lineage through 0110 (seedDevLineage110), then the forward chain up to and including `lastStep`
+ * exactly as migrate() applies it (its SQL, its verifier, its ledger row and its receipt), so a later migrate() applies
+ * only the steps after it.
+ */
+export async function seedDevLineageThroughStep(pool:Pool,lastStep:string):Promise<void>{
+ const plan=await loadMigrationPlan();
+ const index=plan.forwardChain.findIndex((step)=>step.name===lastStep);
+ if(index<0)throw new Error(`SEED_DEV_LINEAGE_UNKNOWN_STEP ${lastStep}`);
+ await seedDevLineage110(pool);
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  const ledger=(await client.query<{name:string}>('SELECT name FROM public.debateai_schema_migration')).rows.map((row)=>row.name);
+  await applyForwardChain(client,{...plan,forwardChain:plan.forwardChain.slice(0,index+1)},new Set(ledger));
+  await client.query('COMMIT');
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }
 
 async function seedDevLineage(pool:Pool,with110:boolean):Promise<void>{

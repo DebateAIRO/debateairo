@@ -4,9 +4,17 @@ import { authorizationPolicyInventory, buildApi } from "@debateai/api";
 import { BillingPlansResponseSchema, contractInventory } from "@debateai/contract";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import { BILLING_ROUTE_PATHS, type BillingRouteOptions } from "../../apps/api/src/billing/index.js";
-import { testBillingPlans, unusedAskApplication } from "../support/billingFixtures.js";
+import type { GeoLookup } from "@debateai/geo";
+import { testBillingPlans, testRegionalPlans, unusedAskApplication } from "../support/billingFixtures.js";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
+/** testBillingPlans' prices (the regional fixture shares them): every plan in every currency. */
+const PLANS_ANSWER = [
+  { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.04" },
+  { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" },
+  { plan_id: "PRO", net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, allowance_vs_plus: "4" },
+  { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "30" }
+] as const;
 const billing = (): BillingRouteOptions => ({
   plans: testBillingPlans, legal: { requiresReacceptance: async () => false }, clock: () => NOW
 });
@@ -24,30 +32,51 @@ describe("P8a GET /v1/billing/plans", () => {
     }
   });
 
-  it("lists net prices and the allowance as a multiple of Plus, never credit in dollars", async () => {
+  it("lists net prices in each currency and the allowance as a multiple of Plus, never credit in dollars", async () => {
     const api = buildApi({ application: unusedAskApplication(), billing: billing() });
     const response = await api.inject({ method: "GET", url: "/v1/billing/plans" });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
-      currency: "USD",
-      plans: [
-        { plan_id: "FREE", net_price: "0.00", allowance_vs_plus: "0.04" },
-        { plan_id: "PLUS", net_price: "20.00", allowance_vs_plus: "1" },
-        { plan_id: "PRO", net_price: "50.00", allowance_vs_plus: "4" },
-        { plan_id: "MAX", net_price: "200.00", allowance_vs_plus: "30" }
-      ]
-    });
+    expect(response.json()).toEqual({ currency: "USD", plans: PLANS_ANSWER });
     expect(response.body).not.toMatch(/credit|5\.00|150\.00|0\.20/);
     expect(BillingPlansResponseSchema.safeParse({
-      ...response.json<Record<string, unknown>>(), plans: [{ plan_id: "PLUS", net_price: "20.00", allowance_vs_plus: "1", credit: "5.00" }]
+      ...response.json<Record<string, unknown>>(),
+      plans: [{ plan_id: "PLUS", net_prices: PLANS_ANSWER[1]!.net_prices, allowance_vs_plus: "1", credit: "5.00" }]
     }).success).toBe(false);
+    // Part C: one price per plan is gone; every plan carries all three.
+    expect(BillingPlansResponseSchema.safeParse({
+      currency: "USD", plans: [{ plan_id: "PLUS", net_price: "20.00", allowance_vs_plus: "1" }]
+    }).success).toBe(false);
+    await api.close();
+  });
+
+  it("answers each visitor in the currency their connection pays in, with the same prices for everyone (spec 2026-10-05 §2.16.1)", async () => {
+    const PLACES: Readonly<Record<string, Readonly<{ country: string; tor: boolean }>>> = {
+      "198.51.100.10": { country: "RO", tor: false },
+      "198.51.100.20": { country: "DE", tor: false },
+      "198.51.100.30": { country: "US", tor: false },
+      "198.51.100.40": { country: "RO", tor: true }
+    };
+    const geo: GeoLookup = { lookup: (ip) => PLACES[ip] ?? { country: "XX", tor: false }, close: () => undefined };
+    const api = buildApi({ application: unusedAskApplication(), billing: { ...billing(), plans: testRegionalPlans, geo } });
+    const answers: Array<[string, string]> = [
+      ["198.51.100.10", "RON"], ["198.51.100.20", "EUR"], ["198.51.100.30", "USD"],
+      // An unknown place, a Tor exit and an address that is not an IP say nothing about where the person is billed.
+      ["198.51.100.99", "USD"], ["198.51.100.40", "USD"], ["not-an-address", "USD"]
+    ];
+    for (const [remoteAddress, currency] of answers) {
+      const response = await api.inject({ method: "GET", url: "/v1/billing/plans", remoteAddress });
+      expect(response.statusCode, remoteAddress).toBe(200);
+      expect(response.json(), remoteAddress).toEqual({ currency, plans: PLANS_ANSWER });
+      expect(response.body, remoteAddress).not.toMatch(/credit/u);
+    }
     await api.close();
   });
 
   it("lets a served list be cached for 60 seconds, and nothing else (spec §2.5.3)", async () => {
     const on = buildApi({ application: unusedAskApplication(), billing: billing() });
     const served = await on.inject({ method: "GET", url: "/v1/billing/plans" });
-    expect([served.statusCode, served.headers["cache-control"]]).toEqual([200, "public, max-age=60"]);
+    // Spec 2026-10-05 §2.16.5: the answer names the caller's currency, so no shared cache may keep it.
+    expect([served.statusCode, served.headers["cache-control"]]).toEqual([200, "private, max-age=60"]);
     // The house security headers still ride along on the cached answer.
     expect(served.headers["x-content-type-options"]).toBe("nosniff");
     await on.close();

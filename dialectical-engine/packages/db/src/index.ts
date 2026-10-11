@@ -16,6 +16,8 @@ import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type Compositi
 
 export * from "./publication-check.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
+export * from "./pool-budget.js";
+import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
 import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";
 
@@ -48,10 +50,13 @@ export {
 export {
   FLOOR_BASIS_INCOMPLETE_SQL,
   SERVE_DISCLOSURE_BODY_STOPS,
+  SERVE_DISCLOSURE_FALLBACK_REASONS,
   SERVE_DISCLOSURE_FLOOR_STATES,
   SERVE_DISCLOSURE_SERVE_STOPS,
   ServeDisclosureRepository,
+  serveDisclosureFallbackReasonOf,
   type ServeDisclosureBodyStop,
+  type ServeDisclosureFallbackReason,
   type ServeDisclosureFloorState,
   type ServeDisclosureModel,
   type ServeDisclosureRead,
@@ -828,10 +833,65 @@ async function runWaitingLineIsApplied(
 }
 type UntypedMethod = (...args: unknown[]) => unknown;
 
+/**
+ * Connection budget (2026-10-10, src/pool-budget.ts): a pool that could not
+ * hand out a connection in time, or a server that is full, is BUSY — the same
+ * call a moment later can succeed. pg-pool's own words for its two waits
+ * (pg-pool index.js "timeout exceeded when trying to connect" for the queue,
+ * "Connection terminated due to connection timeout" for a slow connect) and
+ * Postgres's too_many_connections. Marked by origin in a WeakSet, never by
+ * message, so a failure merely quoting those words is not busy.
+ */
+const busyPoolFailures = new WeakSet<TypedDomainError>();
+type BusyReason = "WAIT_TIMEOUT" | "CONNECT_TIMEOUT" | "SERVER_FULL";
+
+function busyReason(error: unknown): BusyReason | undefined {
+  if (!(error instanceof Error) || error instanceof TypedDomainError) return undefined;
+  if (error.message === "timeout exceeded when trying to connect") return "WAIT_TIMEOUT";
+  if (error.message === "Connection terminated due to connection timeout") return "CONNECT_TIMEOUT";
+  return (error as Error & Readonly<{ code?: unknown }>).code === "53300" ? "SERVER_FULL" : undefined;
+}
+
+/** True when this failure, or one it wraps as `cause`, is a busy pool or a full server. */
+export function isDatabasePoolBusy(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
+    if (current instanceof TypedDomainError && busyPoolFailures.has(current)) return true;
+    current = current.cause;
+  }
+  return false;
+}
+
 function typedPoolFailure(error: unknown): TypedDomainError {
   if (error instanceof TypedDomainError && error.code === DATABASE_POOL_FAILED) return error;
   const detail = error instanceof Error ? error.message : String(error);
-  return new TypedDomainError(DATABASE_POOL_FAILED, `PostgreSQL pool operation failed: ${detail}`);
+  const failure = new TypedDomainError(DATABASE_POOL_FAILED, `PostgreSQL pool operation failed: ${detail}`);
+  if (busyReason(error) !== undefined) busyPoolFailures.add(failure);
+  return failure;
+}
+
+const BUSY_LOG_INTERVAL_MS = 10_000;
+
+/**
+ * One journal line per pool per 10 s when it runs dry, with how many callers
+ * were turned away since the last line — the operator's signal (and the alert's)
+ * that a pool is too small or the server is full, without a line per request.
+ */
+function busyReporter(pool: Pool, name: string): (error: unknown) => void {
+  let lastLoggedAt = Number.NEGATIVE_INFINITY;
+  let turnedAway = 0;
+  return (error) => {
+    const reason = busyReason(error);
+    if (reason === undefined) return;
+    turnedAway += 1;
+    const now = performance.now();
+    if (now - lastLoggedAt < BUSY_LOG_INTERVAL_MS) return;
+    lastLoggedAt = now;
+    const options = pool.options as Readonly<{ max?: number }>;
+    console.error(`[DATABASE_POOL_BUSY] pool=${name} reason=${reason} max=${String(options.max ?? 10)}`
+      + ` open=${String(pool.totalCount)} waiting=${String(pool.waitingCount)} turned_away=${String(turnedAway)}`);
+    turnedAway = 0;
+  };
 }
 
 function typedQueryFailure(error: unknown): unknown {
@@ -881,7 +941,7 @@ function wrapClientQueries(client: PoolClient): PoolClient {
 
 export function createPool(
   connectionString: string,
-  options: Readonly<{ max?: number; connectionTimeoutMillis?: number }> = {}
+  options: Readonly<{ max?: number; connectionTimeoutMillis?: number; name?: string }> = {}
 ): Pool {
   if (options.max !== undefined
     && (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100)) {
@@ -892,7 +952,12 @@ export function createPool(
       || options.connectionTimeoutMillis < 1 || options.connectionTimeoutMillis > 600_000)) {
     throw new TypeError("DATABASE_POOL_CONNECTION_TIMEOUT_INVALID");
   }
-  const pool = new PgPool({ connectionString,...options });
+  if (options.name !== undefined && !/^[a-z][a-z0-9:-]{0,47}$/u.test(options.name)) {
+    throw new TypeError("DATABASE_POOL_NAME_INVALID");
+  }
+  const { name, ...sizing } = options;
+  const pool = new PgPool({ connectionString, ...sizing, ...(name === undefined ? {} : { application_name: name }) });
+  const reportBusy = busyReporter(pool, name ?? "unnamed");
   let terminalFailure: TypedDomainError | undefined;
 
   pool.on("error", (error: Error) => {
@@ -928,6 +993,7 @@ export function createPool(
     const callback = args.at(-1);
     if (typeof callback === "function") {
       return connect((error: unknown, client: PoolClient | undefined, release: unknown) => {
+        if (error !== undefined && error !== null) reportBusy(error);
         callback(
           error === undefined || error === null ? error : typedPoolFailure(error),
           client === undefined ? undefined : wrapClientQueries(client),
@@ -939,7 +1005,10 @@ export function createPool(
       const result = connect();
       return result instanceof Promise
         ? result.then((client: PoolClient) => wrapClientQueries(client))
-          .catch((error: unknown) => Promise.reject(typedPoolFailure(error)))
+          .catch((error: unknown) => {
+            reportBusy(error);
+            return Promise.reject(typedPoolFailure(error));
+          })
         : result;
     } catch (error) {
       throw typedPoolFailure(error);
@@ -952,8 +1021,9 @@ export function createPool(
 export function createSupportControlPlanePool(connectionString: string): Pool {
   const pool = new PgPool({
     connectionString,
-    max: 2,
-    connectionTimeoutMillis: 200,
+    max: SUPPORT_CONTROL_PLANE_POOL.max,
+    connectionTimeoutMillis: SUPPORT_CONTROL_PLANE_POOL.connectionTimeoutMillis,
+    application_name: SUPPORT_CONTROL_PLANE_POOL.name,
     statement_timeout: 700,
     query_timeout: 750
   });
@@ -1106,7 +1176,7 @@ export async function migrate(pool: Pool): Promise<void> {
     await applyForward110(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
     const compatEvidenceBeforeChain = await lineageEvidence(client);
     await applyForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]));
-    // data-export 0113 (V-30; the re-seal is V-28's): a chain step that moves lineageEvidence (step_up_grant_action_check, valid_consumer_authorization_internal)
+    // data-export 0115 (V-41; the re-seal is V-28's): a chain step that moves lineageEvidence (step_up_grant_action_check, valid_consumer_authorization_internal)
     // re-seals the compatibility row it moved; the check above guards every later run (V-18).
     const compatEvidenceAfterChain = await lineageEvidence(client);
     if (compatEvidenceAfterChain !== compatEvidenceBeforeChain) {
@@ -1338,6 +1408,145 @@ export async function readRunRoleAssignment(
     steppedDown: row.stepped_down,
     createdAt: row.created_at
   });
+}
+
+/** Role rotation (spec 2026-10-11, Part 3): one pinned role. */
+export type RunRoleRotationRole = Readonly<{ providerRef: string; modelId: string; maker: string }>;
+/**
+ * The pin `core.run_role_rotation` holds for one rotated debate. Structurally a `RotatedRoles` (@debateai/scorecard)
+ * plus `runId`, so the API passes `{ runId, ...rotated }`. `eligibleModelIds`: the eligible members' model ids at
+ * admission, in panel order; repeats allowed (two makers may serve one model id, ruling E).
+ */
+export type RunRoleRotationInput = Readonly<{
+  runId: string; rule: "LEAST_SHARE_SEEDED_TIE_V1";
+  answerWriter: RunRoleRotationRole; answerChecker: RunRoleRotationRole;
+  storyteller: RunRoleRotationRole; storyChecker: RunRoleRotationRole;
+  eligibleModelIds: readonly string[];
+}>;
+export type RunRoleRotationRecord = RunRoleRotationInput & Readonly<{ createdAt: Date }>;
+export type RoleRotationCountRole = "ANSWER_WRITER" | "ANSWER_CHECKER" | "STORYTELLER" | "STORY_CHECKER";
+/** One model in one role: pins naming it (`picked`) out of pins whose eligible list holds it (`eligible`). */
+export type RunRoleRotationTally = Readonly<{ picked: number; eligible: number }>;
+/** Per role, per model id; the shape of `RoleRotationCounts` (@debateai/scorecard), which db does not depend on. */
+export type RunRoleRotationCounts = Readonly<Record<RoleRotationCountRole, Readonly<Record<string, RunRoleRotationTally>>>>;
+
+const ROLE_ROTATION_RULE = "LEAST_SHARE_SEEDED_TIE_V1";
+const ROLE_ROTATION_COUNT_ROLES: readonly RoleRotationCountRole[] = ["ANSWER_WRITER", "ANSWER_CHECKER", "STORYTELLER", "STORY_CHECKER"];
+
+/** Non-blank after trim and at most 256 characters: as strict as the 0114 CHECKs (JS trims more, counts UTF-16 units). */
+const isRotationText = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length >= 1 && value.length <= 256;
+
+const isRotationRole = (value: unknown): value is RunRoleRotationRole => typeof value === "object" && value !== null
+  && ["providerRef", "modelId", "maker"].every((key) => isRotationText((value as Record<string, unknown>)[key]));
+
+/** The 0114 CHECKs, in TypeScript, so a malformed pin is refused before the database. */
+function assertRotationShape(input: Omit<RunRoleRotationInput, "runId">): void {
+  const picks = [input.answerWriter, input.answerChecker, input.storyteller, input.storyChecker];
+  const eligible: unknown = input.eligibleModelIds;
+  const eligibleOk = Array.isArray(eligible) && eligible.length >= 2 && eligible.length <= 16
+    && Array.from({ length: eligible.length }, (_, index) => eligible[index] as unknown).every(isRotationText);
+  if (input.rule !== ROLE_ROTATION_RULE
+    || !picks.every(isRotationRole)
+    || input.answerChecker.maker === input.answerWriter.maker
+    || input.storyChecker.maker === input.storyteller.maker
+    || !eligibleOk
+    || !picks.every((pick) => (eligible as readonly string[]).includes(pick.modelId))) {
+    throw new TypeError("RUN_ROLE_ROTATION_INVALID");
+  }
+}
+
+export async function insertRunRoleRotation(executor: Pick<Pool, "query"> | PoolClient, input: RunRoleRotationInput): Promise<void> {
+  assertRotationShape(input);
+  const roles = [input.answerWriter, input.answerChecker, input.storyteller, input.storyChecker]
+    .flatMap((pick) => [pick.providerRef, pick.modelId, pick.maker]);
+  await executor.query(
+    `INSERT INTO core.run_role_rotation (run_id, rule,
+       writer_provider_ref, writer_model_id, writer_maker, checker_provider_ref, checker_model_id, checker_maker,
+       storyteller_provider_ref, storyteller_model_id, storyteller_maker,
+       story_checker_provider_ref, story_checker_model_id, story_checker_maker, eligible_model_ids)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::text[])`,
+    [input.runId, input.rule, ...roles, [...input.eligibleModelIds]]
+  );
+}
+
+export async function readRunRoleRotation(executor: Pick<Pool, "query"> | PoolClient, runId: string): Promise<RunRoleRotationRecord | null> {
+  const row = (await executor.query<Record<string, string> & { eligible_model_ids: string[]; created_at: Date }>(
+    `SELECT run_id, rule, writer_provider_ref, writer_model_id, writer_maker, checker_provider_ref, checker_model_id, checker_maker,
+            storyteller_provider_ref, storyteller_model_id, storyteller_maker,
+            story_checker_provider_ref, story_checker_model_id, story_checker_maker, eligible_model_ids, created_at
+     FROM core.run_role_rotation WHERE run_id=$1`,
+    [runId]
+  )).rows[0];
+  if (row === undefined) return null;
+  const pick = (prefix: string): RunRoleRotationRole => Object.freeze({
+    providerRef: row[`${prefix}_provider_ref`]!, modelId: row[`${prefix}_model_id`]!, maker: row[`${prefix}_maker`]!
+  });
+  const record = {
+    runId: row.run_id!, rule: row.rule as typeof ROLE_ROTATION_RULE,
+    answerWriter: pick("writer"), answerChecker: pick("checker"), storyteller: pick("storyteller"), storyChecker: pick("story_checker"),
+    eligibleModelIds: Object.freeze(Array.isArray(row.eligible_model_ids) ? [...row.eligible_model_ids] : []) as readonly string[]
+  };
+  assertRotationShape(record);
+  return Object.freeze({ ...record, createdAt: row.created_at });
+}
+
+/**
+ * Per role, per model id: `picked` = pins naming it in that role; `eligible` = pins whose eligible list holds it, each
+ * pin counted once per model id (ruling E). One query, both aggregates; a model eligible but never picked in a role
+ * answers `picked: 0`, and (never in a lawful table) a model picked but never eligible answers `eligible: 0`.
+ *
+ * Task 12 item 5: it runs on one dedicated connection from the pool, in a short read transaction whose
+ * `statement_timeout` is SET LOCAL (it ends with the transaction and never leaks into the pool), so a slow tally
+ * cannot hold an ask: the timeout is rethrown and admission refuses with its one-minute
+ * ASK_MODEL_CANDIDATE_UNAVAILABLE. A pool that hands out no connection rethrows its busy failure unchanged
+ * (ruling H: SERVICE_BUSY). ROLLBACK on any failure; a failed ROLLBACK destroys the connection. Always released.
+ * (A per-role tally table is a later optimisation, spec Part 3.)
+ */
+export async function readRoleRotationCounts(pool: Pick<Pool, "connect">): Promise<RunRoleRotationCounts> {
+  const client = await pool.connect();
+  let destroy: unknown;
+  let rows: { role: RoleRotationCountRole; model_id: string; picked: number; eligible: number }[];
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    rows = await queryRoleRotationCounts(client);
+    await client.query("COMMIT");
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch (rollbackFailure) { destroy = rollbackFailure; }
+    throw error;
+  } finally {
+    client.release(destroy as Error | undefined);
+  }
+  const counts = new Map(ROLE_ROTATION_COUNT_ROLES.map((role) => [role, new Map<string, RunRoleRotationTally>()]));
+  for (const row of rows) {
+    const byModel = counts.get(row.role);
+    if (byModel === undefined || !Number.isSafeInteger(row.picked) || !Number.isSafeInteger(row.eligible)) {
+      throw new TypeError("RUN_ROLE_ROTATION_INVALID");
+    }
+    byModel.set(row.model_id, Object.freeze({ picked: row.picked, eligible: row.eligible }));
+  }
+  return Object.freeze(Object.fromEntries([...counts].map(([role, byModel]) =>
+    [role, Object.freeze(Object.fromEntries(byModel))]))) as RunRoleRotationCounts;
+}
+
+async function queryRoleRotationCounts(client: PoolClient) {
+  return (await client.query<{ role: RoleRotationCountRole; model_id: string; picked: number; eligible: number }>(
+    `WITH picked AS (
+       SELECT pick.role, pick.model_id, count(*)::integer AS picked
+       FROM core.run_role_rotation
+       CROSS JOIN LATERAL (VALUES ('ANSWER_WRITER', writer_model_id), ('ANSWER_CHECKER', checker_model_id),
+         ('STORYTELLER', storyteller_model_id), ('STORY_CHECKER', story_checker_model_id)) AS pick(role, model_id)
+       GROUP BY pick.role, pick.model_id),
+     eligible AS (
+       SELECT role.role, listed.model_id, count(*)::integer AS eligible
+       FROM (SELECT DISTINCT run_id, unnest(eligible_model_ids) AS model_id FROM core.run_role_rotation) AS listed
+       CROSS JOIN (VALUES ('ANSWER_WRITER'), ('ANSWER_CHECKER'), ('STORYTELLER'), ('STORY_CHECKER')) AS role(role)
+       GROUP BY role.role, listed.model_id)
+     SELECT coalesce(picked.role, eligible.role) AS role, coalesce(picked.model_id, eligible.model_id) AS model_id,
+            coalesce(picked.picked, 0) AS picked, coalesce(eligible.eligible, 0) AS eligible
+     FROM picked FULL JOIN eligible ON eligible.role = picked.role AND eligible.model_id = picked.model_id`
+  )).rows;
 }
 
 export interface InitialBatteryRow {

@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
 import { SubscriptionControls, type SubscriptionClient } from "../../apps/ui/components/billing/SubscriptionControls.js";
+import { formatMoney } from "../../apps/ui/lib/billing/format.js";
 import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -15,7 +16,7 @@ let goToPayment: ReturnType<typeof vi.fn>;
 function subscription(overrides: Record<string, unknown> = {}) {
   return {
     plan_id: "PLUS", status: "ACTIVE", cancel_requested: false, current_period_end: "2026-10-29T10:00:00.000Z",
-    renews_on: "2026-10-29T10:00:00.000Z", renewal_total: "24.20", scheduled_downgrade_plan_id: null,
+    renews_on: "2026-10-29T10:00:00.000Z", renewal_total: "24.20", currency: "USD", scheduled_downgrade_plan_id: null,
     // A Romanian window: it closes at midnight in Bucharest (UTC+3 in October), the end of October 13 there.
     withdrawal_open_until: "2026-10-13T21:00:00.000Z", withdrawal_last_day: "2026-10-13",
     can_upgrade: true, can_change_card: true, can_revoke_cancel: false, ...overrides
@@ -23,18 +24,18 @@ function subscription(overrides: Record<string, unknown> = {}) {
 }
 const INVOICES = {
   invoices: [
-    { number: "DBAI 0042", issued_on: "2026-10-01", total: "24.20", kind: "INVOICE", url: "https://quadernoapp.com/i/abc" },
-    { number: "DBAI 0043", issued_on: "2026-10-02", total: "24.20", kind: "CREDIT_NOTE", url: null }
+    { number: "DBAI 0042", issued_on: "2026-10-01", total: "24.20", currency: "USD", kind: "INVOICE", url: "https://quadernoapp.com/i/abc" },
+    { number: "DBAI 0043", issued_on: "2026-10-02", total: "24.20", currency: "USD", kind: "CREDIT_NOTE", url: null }
   ]
 };
 /** P8a's public plans list: the net prices the downgrade confirm names (ruling Q-7). */
 const PLANS = {
   currency: "USD",
   plans: [
-    { plan_id: "FREE", net_price: "0.00", allowance_vs_plus: "0.04" },
-    { plan_id: "PLUS", net_price: "20.00", allowance_vs_plus: "1" },
-    { plan_id: "PRO", net_price: "50.00", allowance_vs_plus: "4" },
-    { plan_id: "MAX", net_price: "200.00", allowance_vs_plus: "30" }
+    { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.04" },
+    { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" },
+    { plan_id: "PRO", net_prices: { USD: "50.00", EUR: "50.00", RON: "250.00" }, allowance_vs_plus: "4" },
+    { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "30" }
   ]
 };
 
@@ -148,7 +149,7 @@ describe("P20 SubscriptionControls (S1)", () => {
       status: "step_up_complete", csrf_token: "c".repeat(43),
       step_up_grant: { token: "G".repeat(43), action: "WITHDRAW_SUBSCRIPTION", expires_at: "2026-10-03T12:05:00.000Z" }
     });
-    client.withdrawSubscription.mockResolvedValue({ refund: "18.00" });
+    client.withdrawSubscription.mockResolvedValue({ refund: "18.00", currency: "USD" });
     await render();
     await click("Withdraw");
     expect(text()).toContain("You can withdraw until October 13, 2026.");
@@ -173,7 +174,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     ] as const) {
       act(() => root.unmount());
       root = createRoot(container);
-      client.withdrawSubscription.mockResolvedValueOnce({ refund });
+      client.withdrawSubscription.mockResolvedValueOnce({ refund, currency: "USD" });
       await render();
       await click("Withdraw");
       await fill("#billing-withdraw-password", "correct horse");
@@ -217,7 +218,7 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("upgrades with a quote for the rest of the month, the agreement with the new monthly total, then NETOPIA's page", async () => {
     const quoteRef = "22222222-2222-4222-8222-222222222222";
     client.quoteSubscriptionUpgrade.mockResolvedValue({
-      quote_ref: quoteRef, plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", tax_name: "TVA",
+      quote_ref: quoteRef, plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", currency: "USD", tax_name: "TVA",
       tax_rate_basis_points: 2100, tax_country: "RO", recurring_total: "60.50",
       renews_on: "2026-10-29T10:00:00.000Z", expires_at: "2026-10-03T12:30:00.000Z"
     });
@@ -241,7 +242,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     const used = "55555555-5555-4555-8555-555555555555";
     const fresh = "66666666-6666-4666-8666-666666666666";
     const upgradeQuote = (quoteRef: string) => ({
-      quote_ref: quoteRef, plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", tax_name: "TVA",
+      quote_ref: quoteRef, plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", currency: "USD", tax_name: "TVA",
       tax_rate_basis_points: 2100, tax_country: "RO", recurring_total: "60.50",
       renews_on: "2026-10-29T10:00:00.000Z", expires_at: "2026-10-03T12:30:00.000Z"
     });
@@ -293,6 +294,26 @@ describe("P20 SubscriptionControls (S1)", () => {
     const paragraphs = [...container.querySelectorAll("p")].map((paragraph) => paragraph.textContent);
     expect(paragraphs).toContain("Done. You'll move to Plus on October 29, 2026, for $24.20 a month, tax included.");
     expect(paragraphs).toContain("You'll move to Plus on October 29, 2026.");
+  });
+
+  it("offers a downgrade at the price in the subscription's currency, never the visitor's, and words its amounts in it (spec 2026-10-05 §2.16.3)", async () => {
+    // A RON subscription; the visitor's connection would pay in EUR (the plans answer's `currency`).
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({ plan_id: "MAX", renewal_total: "1210.00", currency: "RON" })
+    });
+    client.getBillingInvoices.mockResolvedValue({
+      invoices: [{ number: "DBAI 0044", issued_on: "2026-10-01", total: "1210.00", currency: "RON", kind: "INVOICE", url: null }]
+    });
+    client.getBillingPlans.mockResolvedValue({ ...PLANS, currency: "EUR" });
+    await render();
+    expect(text()).toContain(`Renews on October 29, 2026 for ${formatMoney("en", "1210.00", "RON")}`);
+    expect(text()).toContain(`DBAI 0044 · October 1, 2026 · ${formatMoney("en", "1210.00", "RON")}`);
+    await click("Change plan");
+    await click("Move to Pro at renewal");
+    expect(text()).toContain(`Move to Pro at your next renewal? It costs ${formatMoney("en", "250.00", "RON")} a month + tax,`
+      + " from October 29, 2026.");
+    expect(text()).not.toContain("€");
+    expect(text()).not.toContain("$");
   });
 
   it("keeps the plan when the person steps back, and offers no confirm when the price cannot be read", async () => {
@@ -436,7 +457,7 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("says 'Nothing changed' only for a refusal made before any charge, and 'still confirming' when money may be moving", async () => {
     const quoteRef = "33333333-3333-4333-8333-333333333333";
     client.quoteSubscriptionUpgrade.mockResolvedValue({
-      quote_ref: quoteRef, plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", tax_name: "TVA",
+      quote_ref: quoteRef, plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", currency: "USD", tax_name: "TVA",
       tax_rate_basis_points: 2100, tax_country: "RO", recurring_total: "60.50",
       renews_on: "2026-10-29T10:00:00.000Z", expires_at: "2026-10-03T12:30:00.000Z"
     });
@@ -532,7 +553,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     act(() => root.unmount());
     root = createRoot(container);
     client.quoteSubscriptionUpgrade.mockResolvedValueOnce({
-      quote_ref: "44444444-4444-4444-8444-444444444444", plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30",
+      quote_ref: "44444444-4444-4444-8444-444444444444", plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", currency: "USD",
       tax_name: "TVA", tax_rate_basis_points: 2100, tax_country: "RO", recurring_total: "60.50",
       renews_on: "2026-10-29T10:00:00.000Z", expires_at: "2026-10-03T12:30:00.000Z"
     });

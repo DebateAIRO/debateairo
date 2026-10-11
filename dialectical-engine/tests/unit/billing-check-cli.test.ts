@@ -9,9 +9,12 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SELLER_COMPANY, type SellerCompany } from "@debateai/billing-core";
 import { createNetopiaPayments, NETOPIA_FACTS, netopiaNoticeAnswer } from "@debateai/payments-netopia";
-import { BILLING_CHECK_ENVIRONMENT_KEYS, readBillingCheckEnvironment } from "@debateai/register";
 import {
-  renderCheckLines, runBillingCheck, runBillingCheckCli, type BillingCheckDeps, type RegisterFacts
+  BILLING_CHECK_ENVIRONMENT_KEYS, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue,
+  readBillingCheckEnvironment
+} from "@debateai/register";
+import {
+  registerPlansFacts, renderCheckLines, runBillingCheck, runBillingCheckCli, type BillingCheckDeps, type RegisterFacts
 } from "../../apps/api/src/billing/check-cli.js";
 import { NETOPIA_NOTIFY_PATH } from "../../apps/api/src/billing/index.js";
 
@@ -67,7 +70,10 @@ const UNVERIFIED = () => {
   const answer = netopiaNoticeAnswer("NOTICE_HEADER_MISSING");
   return new Response(answer.body, { status: answer.status, headers: { "content-type": "application/json" } });
 };
-const OFF: RegisterFacts = Object.freeze({ registerVersion: 7, billingEnabled: false, planCurrency: "USD", countryPolicy: true });
+const OFF: RegisterFacts = Object.freeze({
+  registerVersion: 7, billingEnabled: false, countryPolicy: true,
+  plans: { ownPriceList: true, countriesIn: { USD: 0, EUR: 31, RON: 1 }, defaultCurrency: "USD" as const }
+});
 
 function depsFor(environment: Record<string, string>, script: Partial<{
   status: () => Response; notify: () => Response | Promise<Response>; register: () => Promise<RegisterFacts>; company: SellerCompany;
@@ -115,7 +121,7 @@ describe("N21 pnpm billing:check", () => {
       "✓ NETOPIA accepted the API key (it answered that our made-up order does not exist; nothing was charged).",
       "✓ https://dezbatere.test/api/v1/billing/netopia/notify gives the notify route's own answer to an unsigned message (HTTP 503, \"retry\"), with no redirect, so NETOPIA's messages can reach it.",
       "✓ Billing is off in register version 7: with NETOPIA's four settings complete, the API serves only NETOPIA's message (the provider-only mode).",
-      "✓ The plans of register version 7 are priced in USD.",
+      "✓ The plans of register version 7 carry your prices in USD, EUR and RON: 1 country pays in RON, 31 countries pay in EUR; every other country pays in USD.",
       "✓ Register version 7 carries countryPolicy.",
       "✓ The company's facts (CUI, name, registered office, general address) are filled in."
     ]) expect(text, sentence).toContain(`${sentence}\n`);
@@ -128,6 +134,15 @@ describe("N21 pnpm billing:check", () => {
     expect(`/api${NETOPIA_NOTIFY_PATH}`).toBe("/api/v1/billing/netopia/notify");
   });
 
+  it("crosses the plans while they are the engine's own row, whose EUR and RON prices are placeholders (Part C)", async () => {
+    const lines = await runBillingCheck(depsFor(await stage(), {
+      register: async () => ({ ...OFF, plans: { ...OFF.plans!, ownPriceList: false } })
+    }));
+    expect(texts(lines, false)).toEqual([
+      "The plans of register version 7 are the engine's own row, whose EUR and RON prices are placeholders: publish your price list (README §14.4)."
+    ]);
+  });
+
   it("names what is wrong, item by item, and never a value", async () => {
     const environment = await stage();
     const { QUADERNO_API_KEY_PATH: _missing, ...incomplete } = environment;
@@ -135,7 +150,7 @@ describe("N21 pnpm billing:check", () => {
     await chmod(environment.NETOPIA_IPN_KEYS_PATH!, 0o666);
     const lines = await runBillingCheck(depsFor({ ...incomplete, NETOPIA_API_BASE_URL: "https://secure.netopia-payments.com/api" }, {
       notify: () => new Response(null, { status: 301, headers: { location: "https://www.dezbatere.test/" } }),
-      register: async () => ({ registerVersion: 8, billingEnabled: true, planCurrency: null, countryPolicy: false }),
+      register: async () => ({ registerVersion: 8, billingEnabled: true, plans: null, countryPolicy: false }),
       company: UNFILLED
     }));
     const crosses = texts(lines, false);
@@ -267,5 +282,47 @@ describe("N21 pnpm billing:check", () => {
     expect(BILLING_CHECK_ENVIRONMENT_KEYS).toContain("NETOPIA_IPN_KEYS_PATH");
     expect(readBillingCheckEnvironment({ NETOPIA_POS_SIGNATURE: " A ", DATABASE_URL: "postgres://x", PATH: "/bin" }))
       .toEqual({ NETOPIA_POS_SIGNATURE: " A " });
+  });
+});
+
+/**
+ * Spec 2026-10-05 §2.16.2 and §2.17.3 (go-live row 73): the plans are the owner's price list only when they are not the
+ * engine's own row and do not still carry its placeholder EUR and RON prices. A hosted file's billingPlans is sealed
+ * under the file's own sourceRef, so a copy of the kit's example is recognised by those prices alone.
+ */
+describe("Part C registerPlansFacts: the plans line's facts", () => {
+  const ENGINE = BILLING_PLANS_DEPLOYMENT_REGISTER_ROW;
+  const FOREIGN_SOURCE = "operator hosted register file 2026-10-10";
+  type PricedPlan = { plan_id: string; net_prices: { USD: number; EUR: number; RON: number } };
+  /** The engine row's value with some paid plans' prices in one currency replaced (PLUS, PRO, MAX in order). */
+  const repriced = (currency: "USD" | "RON", prices: readonly [number, number, number]): unknown => {
+    const value = JSON.parse(JSON.stringify(ENGINE.value)) as { plans: PricedPlan[] };
+    ["PLUS", "PRO", "MAX"].forEach((planId, index) => {
+      value.plans.find((plan) => plan.plan_id === planId)!.net_prices[currency] = prices[index]!;
+    });
+    return value;
+  };
+
+  it("the engine's own row under its own sourceRef is not the owner's price list", () => {
+    expect(registerPlansFacts(billingPlansFromValue(ENGINE.value, ENGINE.sourceRef)))
+      .toEqual({ ownPriceList: false, countriesIn: { USD: 0, EUR: 31, RON: 1 }, defaultCurrency: "USD" });
+  });
+
+  it("the engine row's value under a foreign sourceRef (a copy of the kit's example) is not the owner's price list", () => {
+    expect(registerPlansFacts(billingPlansFromValue(ENGINE.value, FOREIGN_SOURCE))?.ownPriceList).toBe(false);
+  });
+
+  it("that value with the owner's own RON prices, under a foreign sourceRef, is the owner's price list", () => {
+    const value = repriced("RON", [99_000_000, 249_000_000, 999_000_000]);
+    expect(registerPlansFacts(billingPlansFromValue(value, FOREIGN_SOURCE))?.ownPriceList).toBe(true);
+  });
+
+  it("that value with only its USD prices raised still carries the placeholder EUR and RON prices", () => {
+    const value = repriced("USD", [25_000_000, 60_000_000, 250_000_000]);
+    expect(registerPlansFacts(billingPlansFromValue(value, FOREIGN_SOURCE))?.ownPriceList).toBe(false);
+  });
+
+  it("no billingPlans row gives no facts", () => {
+    expect(registerPlansFacts(null)).toBeNull();
   });
 });

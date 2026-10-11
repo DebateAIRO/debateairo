@@ -466,7 +466,7 @@ describe("N14 the owner's daily job and the withdrawal on a NETOPIA plan", () =>
       .rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
     expect(await repository.withdrawalOwnerSettlement(seeded.subscriptionId)).toBeNull();
     expect(await settleOwnerWithdrawal(storesFor("sandbox"), { ownerRef: seeded.ownerRef, refundMicros: 0, dashboardMicros: 2_000_000 }))
-      .toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 2_000_000 });
+      .toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 2_000_000, currency: "USD" });
   });
 });
 

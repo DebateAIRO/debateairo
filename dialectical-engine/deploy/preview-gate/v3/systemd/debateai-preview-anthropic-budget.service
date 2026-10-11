@@ -1,0 +1,76 @@
+# Install as /etc/systemd/system/debateai-preview-anthropic-budget.service (root:root 0644).
+# The Anthropic spending gate (README-anthropic.md). A NEW unit beside the DeepInfra gate
+# (debateai-preview-provider-budget.service), which it does not touch. It starts at boot only
+# through debateai-preview.target (the drop-in debateai-preview.target.d/50-anthropic-gate.conf
+# Wants= it); it has no [Install] section of its own.
+# Base: the reviewed DeepInfra v3 unit, hardening unchanged. Changes: the Anthropic paths and
+# socket, the address check against Anthropic's published range as the only start check, IPv4
+# only (no AF_INET6), and the other gates' state hidden from this one.
+[Unit]
+Description=DebateAI preview: Anthropic spending gate v1 (reviewed model table, one daily pot, Europe/Bucharest)
+Documentation=file:///opt/debateai-v3-preview/operator/anthropic-budget-v1/README-anthropic.md
+Wants=network-online.target
+After=network-online.target nss-lookup.target
+# Same policy as the lifecycle drop-ins: at most 4 tries in 15 minutes, then one email.
+StartLimitIntervalSec=900
+StartLimitBurst=4
+OnFailure=debateai-preview-alert@%n.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+# The only start check: every IPv4 address api.anthropic.com has today must be inside
+# 160.79.104.0/23, or the gate does not start (ANTHROPIC_ADDRESSES_OUTSIDE_RANGE). There is no
+# model check: Anthropic has no model list readable without a key, and a start check never sends
+# the key (README-anthropic.md "Start check").
+ExecStartPre=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/anthropic_addresses.py check
+ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py serve --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 --go /etc/debateai-v3-preview/provider-anthropic-go-v1.json --socket /run/debateai-v3-preview/anthropic-budget-v1.sock
+# Restart after a crash. Safe because a restart can never spend more: the pot, the ledger and a
+# halt live on disk; serve start halts on any call the crash interrupted, and only root's
+# `activate` re-opens a halted gate. A start-up refusal (exit 2) retries too, then emails.
+Restart=on-failure
+RestartMode=direct
+RestartSec=30
+# SIGTERM: the socket closes at once and nothing more is reserved; calls in flight finish and
+# settle (600 s deadline, plus 2 x 10 s locks), and each reply then gets 30 s or the gate halts;
+# the socket file is removed and serve exits 0. After 700 s systemd sends SIGKILL; the next
+# start then removes the stale socket and halts on any interrupted call.
+KillSignal=SIGTERM
+TimeoutStopSec=700
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+LimitCORE=0
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RemoveIPC=yes
+ReadWritePaths=/var/lib/debateai-v3-preview/provider-anthropic-authority-v1 /run/debateai-v3-preview
+InaccessiblePaths=-/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/etc/debateai-v3-preview/api.env -/root -/var/lib/postgresql -/etc/postfix
+InaccessiblePaths=-/etc/debateai-v3-preview/auth-dev-v1 -/var/lib/debateai-v3-preview/provider-test-authority -/var/lib/debateai-v3-preview/api -/etc/debateai-v3-preview/lifecycle
+# The other gates' state (their keys, ledgers and GOs): this gate never needs them.
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json
+# IPv4 only: no AF_INET6 socket can even be opened, so a connect to an IPv6 answer fails at once
+# and the transport moves on to the IPv4 one.
+RestrictAddressFamilies=AF_UNIX AF_INET
+# Nothing but the local resolver stub (127.0.0.53; not all of localhost, which would open local
+# services such as the mail relay) and Anthropic's published inbound IPv4 range (recheck it at
+# install: README-anthropic.md "Addresses").
+IPAddressDeny=any
+IPAddressAllow=127.0.0.53/32 160.79.104.0/23

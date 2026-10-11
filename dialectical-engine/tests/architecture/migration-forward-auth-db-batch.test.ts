@@ -40,14 +40,19 @@ describe("auth database batch: the forward step after NETOPIA's 0111", () => {
     for (const source of recipe.sources) expect(sha256(await bytesOf(source.name)), source.name).toBe(source.sha256);
   });
 
-  it("is the chain's step after 0111 (the export's 0113 follows it, V-30), bound to the recipe, 0111's manifest and the verifier it keeps (0111's)", async () => {
+  it("is the chain's step after 0111, bound to the recipe, 0111's manifest and the verifier it keeps (0111's)", async () => {
     expect(AUTH_DB_BATCH_MIGRATION).toMatch(/^\d{4}_auth_db_batch\.sql$/u);
     const plan = await loadMigrationPlan();
     expect(plan.forwardChain.map((step) => step.name)).toContain(AUTH_DB_BATCH_MIGRATION);
     const step = plan.forwardChain.find((entry) => entry.name === AUTH_DB_BATCH_MIGRATION)!;
     expect(AUTH_DB_BATCH_MIGRATION).toBe("0112_auth_db_batch.sql");
-    // data-export S01 (V-30): the export's 0113 is appended after the batch, so the batch is no longer the last step.
-    expect(plan.forwardChain[plan.forwardChain.indexOf(step) + 1]?.name).toBe("0113_data_export.sql");
+    // It was the last step until Part C's 0113 was chained directly after it (spec 2026-10-05 §2.16.6); role rotation's
+    // 0114 follows 0113 (spec 2026-10-11 Part 3); the data export's 0115 follows 0114 and is the last (V-41).
+    const next = plan.forwardChain[plan.forwardChain.indexOf(step) + 1]!;
+    expect(next.name).toBe("0113_billing_price_currencies.sql");
+    expect(next.previousName).toBe(step.name);
+    expect(plan.forwardChain.at(-2)!.name).toBe("0114_role_rotation.sql");
+    expect(plan.forwardChain.at(-1)!.name).toBe("0115_data_export.sql");
     const netopia = plan.forwardChain.find((entry) => entry.name === "0111_billing_netopia.sql")!;
     expect(plan.forwardChain.indexOf(step)).toBe(plan.forwardChain.indexOf(netopia) + 1);
     expect(step.previousName).toBe(netopia.name);

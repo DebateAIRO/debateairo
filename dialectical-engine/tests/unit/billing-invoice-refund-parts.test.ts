@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { PriceCurrency } from "@debateai/billing-core";
 import type { BillingRepository, ChargeEventRow, ChargeRow, InvoiceRow, OutboxJob, QuoteRow } from "@debateai/db";
 import { creditNoteContext, saleRefundOf, type CreditNoteContext } from "../../apps/api/src/billing/invoice-common.js";
 import { sealBillingProfile, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
@@ -26,11 +27,11 @@ const event = (kind: ChargeEventRow["kind"], at: Date, amountMicros: number, err
 });
 
 /** A paid NETOPIA sandbox charge whose 12.10 refund request the owner recorded as 5.00, then the 7.10 that closed it. */
-function refundedInParts(): ChargeRow & { events: ChargeEventRow[] } {
+function refundedInParts(currency: PriceCurrency = "USD"): ChargeRow & { events: ChargeEventRow[] } {
   return {
     chargeId: CHARGE_ID, ownerRef: OWNER_REF, subscriptionId: "4f5a6b7c-8d9e-4f0a-9b2c-3d4e5f6a7b8c", kind: "INITIAL",
     attempt: 1, periodStart: PAID_AT, periodEnd: new Date("2026-11-01T09:00:00.000Z"), quoteId: QUOTE_ID,
-    netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: 24_200_000, currency: "USD", createdAt: PAID_AT,
+    netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: 24_200_000, currency, createdAt: PAID_AT,
     paymentProvider: "netopia", paymentEnvironment: "sandbox",
     events: [
       event("SUCCEEDED", PAID_AT, 24_200_000),
@@ -55,8 +56,8 @@ describe("PR-39 the NETOPIA credit note of a refund recorded in parts", () => {
     expect(saleRefundOf(charge, paid, "8899999")).toEqual({ kind: "MISSING" });
   });
 
-  it("credits that sum on the credit note, dated by the last part (creditNoteContext)", async () => {
-    const charge = refundedInParts();
+  /** creditNoteContext over one charge, as the SmartBill storno or partial credit job (or Quaderno's refund job) runs it. */
+  async function contextOf(charge: ChargeRow & { events: ChargeEventRow[] }, issuer: "SMARTBILL" | "QUADERNO") {
     const location = sealQuoteLocation(RECORDS_KEY, QUOTE_ID, {
       name: "Test Subscriber", firstName: "Test", lastName: "Subscriber", phone: "+40712345678", country: "RO", region: null,
       postalCode: "010101", city: "Bucuresti", street: "Strada Exemplu 1", ip: "192.0.2.10", ipCountry: "RO", company: null
@@ -86,12 +87,25 @@ describe("PR-39 the NETOPIA credit note of a refund recorded in parts", () => {
     const context = await creditNoteContext({
       repository, recordsKey: RECORDS_KEY, recipients: { currentAddress: async () => "parts@example.test" },
       policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", paymentEnvironment: "sandbox", audit: () => undefined
-    }, job, LAST_PART_AT, "SMARTBILL");
+    }, job, LAST_PART_AT, issuer);
     expect(context).toHaveProperty("refund");
-    const { refund } = context as CreditNoteContext;
+    return (context as CreditNoteContext).refund;
+  }
+
+  it("credits that sum on the credit note, dated by the last part (creditNoteContext)", async () => {
+    const refund = await contextOf(refundedInParts(), "SMARTBILL");
     expect(refund).toMatchObject({
       chargeId: CHARGE_ID, transactionId: PAYMENT, refundTotalMicros: 12_100_000, issuedOn: LAST_PART_AT,
       original: { documentId: "sb-original", number: "0042" }, processor: "netopia"
     });
   });
+
+  // CF1 (tax-2, spec 2026-10-05 §2.16.5): the credit note is in the charge's own currency, never a fixed one: a Romanian
+  // sale's SmartBill credit in RON, a German sale's Quaderno refund in EUR.
+  it.each([["RON", "SMARTBILL"], ["EUR", "QUADERNO"]] as const)(
+    "the credit note of a charge in %s (%s) is in that currency", async (currency, issuer) => {
+      const refund = await contextOf(refundedInParts(currency), issuer);
+      expect(refund).toMatchObject({ chargeId: CHARGE_ID, currency, refundTotalMicros: 12_100_000 });
+    }
+  );
 });

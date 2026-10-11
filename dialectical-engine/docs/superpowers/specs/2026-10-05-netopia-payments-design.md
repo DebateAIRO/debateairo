@@ -9,8 +9,10 @@
   Everything there stays true **except** what this document replaces (§2.1.2). Where the two differ, this document
   wins. The 29 September design carries amendment **A32**, which points here.
 - **Owner decisions:** §1.8.
-- **Status:** written spec, revised after an independent review (34 findings, all resolved here); awaiting the owner's
-  review. No product code has been written.
+- **Status:** written spec, revised after an independent review (34 findings, all resolved here); approved by the owner
+  on 6 October 2026; Part N built and merged into `dev` (pull request #103, 9 October 2026). **Part C revised on 10
+  October 2026** (rulings PR-60 and PR-61): RON, EUR and USD at once, by the buyer's tax country (§2.16), and NETOPIA's
+  answers of 9 October in §2.24; the decision log is §2.25.
 - **Research behind it:** a NETOPIA API v2 reference, an xMoney coupling map and the review, in the session's SDD
   folder (`.superpowers/sdd/2026-10-05-netopia-switch/`, private working notes, not committed). Facts marked
   **[N-x]** are open NETOPIA questions (§2.24); everything else is confirmed by NETOPIA's published OpenAPI file, its
@@ -38,9 +40,9 @@ emails, cancelling and withdrawal rules. Billing stays switched off until you sw
 |---|---|---|
 | Checkout | card form inside our page | billing details on our page, then NETOPIA's payment page |
 | Billing details | country; name and address only for Romania and companies | first and last name, phone and full address for everyone (NETOPIA requires them for the monthly payments) |
-| Paying | card | card, or Apple Pay or Google Pay on NETOPIA's page. A wallet may not leave a saved card behind (N-17); if so, the site asks for a card before the first renewal |
+| Paying | card | a card on NETOPIA's page: NETOPIA never offers a wallet, Click to Pay or instalments on a recurring payment (N-17, answered 9 October 2026). If a payment still leaves no saved card (a lost message), the site asks for a card before the first renewal |
 | Upgrade | charged at once to the saved card | pays the difference on NETOPIA's page; the new plan starts as soon as it is paid |
-| Change of card | a $1.00 hold, released at once | a check for 0 on NETOPIA's page: no money is held. It must be a card, not a wallet (N-11, N-17) |
+| Change of card | a $1.00 hold, released at once | a check for 0 on NETOPIA's page: no money is held. It must leave a saved card (N-11) |
 | Monthly renewal | our server charged the saved card | the same |
 | Card about to expire | nothing | an email 10 days before a renewal the card would not survive |
 
@@ -54,7 +56,8 @@ the dispute pause, account deletion, the quarterly tax summary and the owner com
 ### 1.4 Refunds, while NETOPIA's refund feature is unconfirmed
 
 NETOPIA's API lists a refund call, but marks it "available at a future date", and none of NETOPIA's own plugins uses
-it. Until NETOPIA confirms it works for our account (N-10), **you make refunds in NETOPIA's admin**:
+it. NETOPIA said on 9 October 2026 that refunds also work by API, whole or part (N-10). Until the call's address and
+fields are known and tested in the sandbox, **you make refunds in NETOPIA's admin**:
 
 1. When a refund is owed (for example, a withdrawal within 14 days), the site emails you at once: which payment,
    exactly how much, why, the deadline when there is one, and the one command to run once you have refunded.
@@ -65,7 +68,7 @@ it. Until NETOPIA confirms it works for our account (N-10), **you make refunds i
    and issues the credit note by itself.
 4. The site reminds you of every refund still open, and every day once a withdrawal's deadline is three days away.
 
-When NETOPIA confirms the refund call, the site makes refunds by itself, the way it did with xMoney.
+Once the refund call is proven in the sandbox, the site makes refunds by itself, the way it did with xMoney.
 
 ### 1.5 Your private settings: one guided command
 
@@ -89,10 +92,10 @@ value. No agent ever sees a key.
 |---|---|---|
 | 1 | Send NETOPIA the email drafted for you in Romanian (kept outside this public repository, with your business papers). It asks them to switch on recurring payments for your account and asks the questions in §2.24. | now |
 | 2 | Tell me NETOPIA's answers as they come. Each one closes a row of §2.24. | as they come |
-| 3 | Choose the currency once NETOPIA says what your account can take (§1.8, §2.16). | after NETOPIA answers |
+| 3 | Fill in and sign NETOPIA's settlement form for RON, EUR and USD (NETOPIA settles each payment in the currency it was asked in, N-14), and set your price list: each plan's price in RON, EUR and USD, in whole bani or cents, published in the register (§2.16.2, README §14.4). Until you publish it, the EUR and RON prices are the engine's placeholders. | before billing goes on |
 | 4 | On a separate test server, run the guided command with NETOPIA's sandbox values and do the sandbox test run in the runbook. Let NETOPIA test our flow there, as they asked. | after the build |
-| 5 | Ask NETOPIA whether their shop check can be done on that test server, or with the paid plans still hidden on the live site (N-26). If they need the plans visible on the live site, you rule how. | after the build |
-| 6 | Do the small live test, with billing still switched off: one real 1.00 payment with your own card, one saved-card charge of 1.00, then refund both in NETOPIA's admin (§2.21). NETOPIA says the monthly payments can only be tested this way. | after NETOPIA switches on recurring payments |
+| 5 | NETOPIA answered on 9 October 2026 (N-26): its shop check (the POS validation) is done only on the live site, and card payments become active only after both sides sign the contract; NETOPIA recommends switching card payments off between the validation and the contract. Your reply asks what the validation checks; the go-live sequence is redesigned with that answer. | when NETOPIA answers the follow-up |
+| 6 | Do the small live test, with billing still switched off: one real 1.00 payment with your own card, one saved-card charge of 1.00, then refund both in NETOPIA's admin (§2.21). NETOPIA says the monthly payments can only be tested this way. | after NETOPIA switches on recurring payments and both sides have signed the contract (N-26) |
 | 7 | The website items NETOPIA checks before approving a shop: NETOPIA's logo and the card marks, the consumer-protection (ANPC) links, Terms, privacy, cancellation rules (§2.21, go-live rows). | before billing goes on |
 | 8 | Your colleague and the lawyer: the Privacy Policy must name NETOPIA and the details it receives (name, email, phone, address, internet address at each payment), and confirm the card-saving wording (§2.22). | before billing goes on |
 | 9 | Sign the support assistant's page list again, because the checkout entries change their wording (§2.18). | before billing goes on |
@@ -102,14 +105,15 @@ value. No agent ever sees a key.
 NETOPIA's public documents leave 26 points open. For each one the build makes the safe choice and records it in the
 table of §2.24, with what it assumes until NETOPIA answers and whether it keeps billing off until then. Most answers
 change one named place in the code; a few (N-8, N-12, N-15) change a rule, and the table says which. The email in §1.6
-item 1 asks all of them.
+item 1 asks all of them. NETOPIA answered six on 9 October 2026, through the sales contact (N-10, N-14, N-17, N-22,
+N-25, N-26; ruling PR-61); §2.24 records each answer and what it changes.
 
 ### 1.8 Your decisions (5 October 2026)
 
 | Question | Your choice |
 |---|---|
 | The processor | NETOPIA, instead of xMoney (better rates) |
-| The currency | build for USD, EUR or RON; you choose one when NETOPIA answers, by publishing the prices in it. Until then the plans stay $20, $50 and $200 + VAT |
+| The currency (revised 9–10 October 2026, ruling PR-60) | all three at once, by the buyer's tax country: RON for Romania; EUR for the other 26 EU countries and Norway, Iceland, Liechtenstein, Switzerland and the United Kingdom; USD for everyone else. Every plan has a price in each, which you set in the register (§2.16). The AI credit stays in USD |
 | The design (§1.1–§1.5) | approved: "write it up" |
 | xMoney | removed from the code (it stays in the history) |
 
@@ -122,7 +126,7 @@ Rulings made by the controller (this design's author), which you can overturn:
 | C-3 | Refunds by you in NETOPIA's admin until the refund call is confirmed (§1.4) | NETOPIA marks the call "future" and none of its own plugins uses it |
 | C-4 | A message whose signature does not check is answered "try again later", never "OK", and it is kept, sealed, for 14 days | NETOPIA sends the saved-card code only once. If our key were wrong, an "OK" would lose every card for good; "try again" keeps NETOPIA sending, and the kept copy is checked again as soon as you fix the key |
 | C-5 | A saved-card code is deleted the day after it stops being the card of a live plan | data minimisation; refunds and disputes use NETOPIA's payment number, never the card code |
-| C-6 | Each subscription keeps the currency it was sold in; publishing another currency affects only new subscriptions; a plan change between two currencies is refused with a sentence | a live plan keeps the price it was sold at (Terms §12) |
+| C-6 | Each subscription keeps the currency it was sold in, for good; renewals, retries, upgrades and downgrades use that currency's price; a person who moves country keeps it until they subscribe again. Revised by your choice of 9–10 October (PR-60): three currencies are sold at once, so "one currency at a time" and the refusal of a plan change between two currencies are gone (every plan has every price, so a plan change never crosses currencies) | a live plan keeps the price it was sold at (Terms §12) |
 | C-7 | NETOPIA statuses whose meaning is not confirmed (17 "reversed", 10 "charge-back accepted") never act on their own: they record what is safe and email you | a wrong guess would issue a credit note or end a plan for good |
 | C-8 | A NETOPIA refusal caused by our own setup (merchant settings, recurring payments off, an unknown code) never starts the failed-payment emails: the renewal waits and you are emailed | otherwise one setup mistake would end every subscriber's plan |
 | C-9 | The small live test runs with billing switched off: NETOPIA's message reaches the server for the test tool's own orders only | so the live checkout never opens to the public before you switch billing on |
@@ -205,7 +209,7 @@ the tests implement it too.
 ```ts
 export type PaymentProvider = "netopia";
 export type PaymentEnvironment = "sandbox" | "live";
-export type PriceCurrency = "USD" | "EUR" | "RON";          // Part C (§2.16); Part N keeps "USD"
+export type PriceCurrency = "USD" | "EUR" | "RON";          // Part C (§2.16): the subscription's own currency
 
 /** The cardholder NETOPIA needs on every payment (mandatory for saved-card charges, [SALES]). */
 export type Payer = Readonly<{
@@ -322,7 +326,7 @@ package count change with it.
   "payment": {"options": {"installments": 0, "bonus": 0}, "instrument": {"type": "card"}},
   "order": {
     "ntpID": "", "posSignature": "<POS>", "dateTime": "<ISO 8601, UTC>", "description": "<description>",
-    "orderID": "<orderId>", "amount": 24.20, "currency": "USD", "clientID": "<clientId>",
+    "orderID": "<orderId>", "amount": 24.20, "currency": "<the charge's currency>", "clientID": "<clientId>",
     "billing": {"email": "…", "phone": "…", "firstName": "…", "lastName": "…", "city": "…",
                 "country": 642, "countryName": "Romania", "state": "…", "postalCode": "…", "details": "<street>"}
   }
@@ -343,7 +347,10 @@ package count change with it.
 - `postalCode` is the payer's, or `""` for a country of the static no-postcode list (§2.6.1).
 - `language`: the buyer's interface locale when it is one of NETOPIA's page languages (`ro`, `en`, `bg`, `es`, `hu`,
   `it`, `nl`, `de`, `fr`), else `en`.
-- `emailTemplate: ""` selects no custom NETOPIA email template; whether NETOPIA then emails the payer at all is N-22.
+- `emailTemplate: ""` selects no custom NETOPIA email template. NETOPIA emails the payer on every payment and renewal
+  (N-22, answered 9 October 2026); our own emails stay as they are.
+- `currency` is the charge's (USD, EUR or RON, §2.16); NETOPIA settles each payment in the currency of its request, on
+  the owner's signed form (N-14).
 - `installments` comes from one constant (§2.4.7), `0` until the recording shows which value keeps the payment in one
   go and leaves a saved card (N-24).
 
@@ -355,7 +362,7 @@ package count change with it.
   "payment": {"options": {"installments": 0, "bonus": 0}, "instrument": {"type": "card", "token": "<token>"},
               "data": {"IP_ADDRESS": "<payerIp>"}},
   "order": {"ntpID": "", "posSignature": "<POS>", "dateTime": "…", "description": "…", "orderID": "<orderId>",
-            "amount": 24.20, "currency": "USD", "scaExemptionInd": "MIT", "billing": {…the full payer…}}
+            "amount": 24.20, "currency": "<the charge's currency>", "scaExemptionInd": "MIT", "billing": {…the full payer…}}
 }
 ```
 
@@ -552,6 +559,10 @@ timers, refused by the commands. Two job kinds need their own handler so that ol
 live boot's refusal while records of another system are open (`BILLING_STAGE_RECORDS_OPEN`) becomes
 `BILLING_OTHER_SYSTEM_RECORDS_OPEN` and covers xMoney-era rows too.
 
+The reverse direction is refused too: a sandbox boot with billing on is refused while live NETOPIA plans are open, with
+the same code `BILLING_OTHER_SYSTEM_RECORDS_OPEN`, so a sandbox API never runs over live customers' plans and cards
+(final review data-2, task F7).
+
 #### 2.5.5 The subscription fold (`packages/billing-core/src/subscription.ts`)
 
 - The provider and environment come from CREATED: `data.payment_provider` and `data.payment_environment`, or, for an
@@ -620,7 +631,7 @@ INITIAL charge is classified from our rows and one status read (`status(orderId,
 | The open charge | What the new checkout does |
 |---|---|
 | **paid or almost**: SUCCEEDED; or the newest stored message, or the status read, says `PAID`, `AUTHORIZED`, or `PENDING` with NETOPIA status 6, 13, 14 or 18; or the status read fails (the safe side) | 409 `CHECKOUT_PENDING`: the page shows the waiting screen |
-| **reusable**: younger than 30 minutes, the same plan, total, environment and buyer, a stored payment URL, and not final (untouched (status 1), declined (the person may retry on the same page) or waiting for the bank's check (status 15)) | the same payment URL again; no second start |
+| **reusable**: younger than 15 minutes (`reuseWindowMs()`: NETOPIA's payment page lasts 20 minutes, N-25, so a page handed back always has at least 5 minutes left), the same plan, total, environment and buyer, a stored payment URL, and not final (untouched (status 1), declined (the person may retry on the same page) or waiting for the bank's check (status 15)) | the same payment URL again; no second start |
 | **anything else**: older, another purchase, no stored URL (an unknown start), or a final failure | `ENDED(ABANDONED, NEW_CHECKOUT)`, then a new checkout |
 
 - `inFlightAttemptLifeMs` (20 minutes) still bounds how long a not-final payment counts as "almost paid".
@@ -704,8 +715,8 @@ transaction: the sales contact says NETOPIA never sends it again.
 
 **Provider-only mode (ruling C-9).** When the deployment is hosted, the NETOPIA settings are complete and billing is
 off, the API builds the NETOPIA connector and serves only this route. The intake then handles tool orders only; every
-other verified message is stored with the outcome `BILLING_OFF`, with no token and no job. The test tool and the check
-command work in this mode; nothing else of billing runs.
+other verified message is stored with the outcome `BILLING_OFF`, with no token and no job. The test tool, the check
+command and the daily card cleanup (the sweep and both purges, §2.15.4) work in this mode; nothing else of billing runs.
 
 #### 2.7.4 A message that fails verification
 
@@ -828,8 +839,10 @@ Q-1 hold, and the owner knows.
   `{redirect_url, charge_ref}`; Settings sends the browser there.
 - VERIFY_PAYMENT's `PAID` runs today's upgrade settlement (UPGRADED with A6's credit and the same anchor). The upgrade's
   saved card becomes the subscription's card (§2.15.2). A declined upgrade stays payable on NETOPIA's page.
-- **One open upgrade at a time.** A second request for the same quote while the first is reusable (under 30 minutes,
-  not final) returns the same payment URL; one that is paid or almost (§2.6.3's first row) answers 409
+- **One open upgrade at a time.** A second request for the same quote while the first is reusable (the quote still
+  valid, its page opened less than 15 minutes ago (`reuseWindowMs()`, N-25), not final) returns the same payment URL; an
+  older page is closed like any unpaid upgrade, and the quote answers 409 `QUOTE_EXPIRED`, so the person gets a fresh
+  price. One that is paid or almost (§2.6.3's first row) answers 409
   `UPGRADE_PENDING`. After the quote's lifetime (30 minutes) an unpaid upgrade **closes** (FAILED `NO_TRANSACTION`): it
   no longer blocks a new upgrade and no longer holds the renewal (today's Q-1 rule for an unsettled upgrade,
   `renewal.ts:306-316`, then lets the renewal go on).
@@ -848,7 +861,10 @@ Q-1 hold, and the owner knows.
   is captured at 0) as success **when a token from this charge is stored**; without one it stays not final for 15
   minutes (the message may come after the status), then FAILED(`CARD_NOT_SAVED`). The page then says "Your card was
   checked, but it couldn't be saved for your monthly payments. Please try again with a card instead of a wallet."
-  (`billing.card.notSaved`, 35 locales), and nothing else changes: no dunning retry is used.
+  (`billing.card.notSaved`, 35 locales), and nothing else changes: no dunning retry is used. NETOPIA's answer to N-17
+  (9 October 2026: wallets, Click to Pay and instalments are never offered on recurring payments) leaves the rule as it
+  is, because a lost message also leaves no card; the sentence's "instead of a wallet" is the owner's to reword (go-live
+  row 63).
 - On success: CARD_CHANGED with the new `card_token_id`; the old token is revoked (`REPLACED`); a 0 check needs no
   release (A31 (j)), so no refund and no owner email follow. For a plan behind on payment, today's `retry_now` then
   runs.
@@ -885,7 +901,9 @@ its own transaction, the refund-sum guard (0086), the split newest-first (A4 (b)
 
 #### 2.12.3 The API mode (once NETOPIA confirms its refund call, N-10)
 
-The package then offers `refund` (`POST {base}/operation/credit` with `{ntpID, amount}`), RefundDesk calls it, and
+NETOPIA said on 9 October 2026 that refunds work by API, whole or part (N-10); the owner mode stays until the call's
+endpoint and fields are known and recorded in the sandbox. The package then offers `refund` (`POST
+{base}/operation/credit` with `{ntpID, amount}`, or what the recording shows), RefundDesk calls it, and
 today's look-before-retry rule (A4 (c)) uses the status read: a payment already `REFUNDED` is recorded, never refunded
 again. Turning the API mode on is a code change made after the sandbox recording proves the call, never a setting.
 
@@ -925,10 +943,14 @@ not yet record. Each read writes a `billing.status_read` row, and each charge's 
 | Charges | Read |
 |---|---|
 | open (REQUESTED with a stored payment URL, SUBMITTED, SUBMIT_UNKNOWN), not final | 10 min, 30 min, 1 h, 3 h after the submit, then daily up to 30 days |
-| closed unpaid hosted payments (FAILED `NO_TRANSACTION` or ABANDONED checkouts and upgrades) | daily for 30 days, so a late payment is never missed (N-25 asks how long NETOPIA keeps a page payable) |
+| closed unpaid hosted payments (FAILED `NO_TRANSACTION` or ABANDONED checkouts and upgrades) | daily for 30 days, so a late payment or a late message is never missed (N-25: a page lasts 20 minutes; the 30 days stay as a cheap margin) |
 | renewals held under §2.9.3 or §2.9.4 | hourly until decided |
 | SUCCEEDED | at 1, 7, 30, 60, 90 and 120 days after the payment, to catch refunds and charge-backs whose message was missed |
 | with an open owner refund (§2.12.2) | daily until recorded |
+
+A declined 0.00 card check (CARD_CHECK) is not read on this schedule: its card comes only with NETOPIA's message
+(§2.11), so a read could never complete it, and starting VERIFY_PAYMENT's card wait on a read would close a check whose
+message is only late (task F5).
 
 - The frequent pass (every 10 minutes) takes the charges whose next read is due, **newest due first**, with a cursor
   across passes, at most 200 reads a pass; the rest wait for the next pass and none is starved (the cursor goes round).
@@ -978,33 +1000,231 @@ before then." or "We couldn't keep your card from your last payment." and a link
   SUSPENDED): the reason is `PLAN_ENDED`, `REPLACED`, `NOT_ADOPTED`, `TOOL_ORDER`, `OTHER_SYSTEM` or `ERASURE`, as it
   applies. A token whose source charge is not yet decided (no SUCCEEDED or final FAILED) is kept up to 30 days, so A8
   (c)'s late activation can still adopt it. An erasure commit revokes the owner's tokens at once.
+- A sandbox API leaves live NETOPIA tokens alone, whatever they are: its sweep never revokes (and so its purge never
+  deletes) a live customer's card. `OTHER_SYSTEM` is for the other direction only: a sandbox token seen by a live API,
+  and the previous card processor's tokens (final review data-2, task F7).
 - The daily owner job then calls `billing.purge_revoked_card_tokens`, so a revoked token is gone within about a day,
   and `billing.purge_short_lived`, which deletes raw messages and the quarantine after 14 days.
 - The nightly backups keep deleted rows until the backups themselves expire; the Privacy Policy note says how long
   (§2.22).
 
-### 2.16 Prices in USD, EUR or RON (Part C)
+### 2.16 Prices in RON, EUR and USD, by region (Part C, revised 10 October 2026)
 
-The owner chose to build for all three; one currency is published at a time (ruling C-6).
+The owner's choice of 9–10 October 2026 (ruling PR-60) replaces ruling C-6's "one currency published at a time": all
+three currencies are sold at once, and the buyer's tax country picks one. NETOPIA's answer to N-14 (9 October 2026,
+ruling PR-61) settles each payment in the currency of its request, on the owner's signed form. The tasks are C0–C4 (the
+SDD briefs) and C5 (the controller's review and records); §2.25 is the decision log.
 
-- **Only the price changes currency.** The AI credit stays in US dollars, because it is what the AI companies charge us
-  (`monthly_credit_micros`, the cost envelopes, the budget package and the evaluator keep `"USD"`). A6's prorated
-  credit and the withdrawal's credit share are ratios and do not change.
-- `billingPlans.currency` becomes `"USD" | "EUR" | "RON"` (a new register version picks it; the example stays USD, $20 /
-  $50 / $200). Prices are whole cents (or bani) as today.
-- **Each subscription keeps its currency.** The quote records its currency (a column, Part C's migration) and CREATED
-  records `data.currency`; every charge of a subscription (renewals, retries, upgrades) is made in the subscription's
-  currency, at its own recurring price. Publishing another currency therefore changes only new subscriptions; no boot
-  check and no publish refusal is needed.
-- **A plan change between two currencies is refused:** an upgrade or downgrade whose target plan is now priced in
-  another currency answers 409 `PLAN_CHANGE_CURRENCY_DIFFERS`, and Settings says "This plan change isn't available for
-  your subscription. You can cancel and subscribe again in {currency}." (35 locales).
-- `billing.charge.currency`'s CHECK becomes `IN ('USD','EUR','RON')`.
-- Every `"USD"` literal on the price side follows the subscription's or the quote's currency: the contract
-  (`BillingPlansResponseSchema`, the quote and charge answers), `TaxEngine.quote`, Quaderno's records, SmartBill's
-  invoices (a RON invoice needs no BNR rate; EUR and USD keep today's BNR conversion), the mail renderer, the UI's money
-  formatting, and the tax summary (every amount printed with its currency; a quarter with two currencies prints each
-  separately).
+#### 2.16.1 The rule
+
+| Currency | Countries (ISO 3166-1 alpha-2) |
+|---|---|
+| RON | RO |
+| EUR | the other 26 EU countries (AT, BE, BG, HR, CY, CZ, DK, EE, FI, FR, DE, GR, HU, IE, IT, LV, LT, LU, MT, NL, PL, PT, SK, SI, ES, SE), plus NO, IS, LI, CH and GB |
+| USD | every other country (the rule's default) |
+
+- **Which country.** The checkout's tax location decides: `QuoteLocation.country`, which the quote sets to
+  `decidePaymentPlace`'s `declaredCountry` (`apps/api/src/billing/quote.ts`: the billing country the person declared,
+  or the connection's country when the page declared none, P19's pre-fill). It is the `to_country` the tax quote asks
+  Quaderno for, so the currency always matches the tax country. The quote also checks Quaderno's answer: a `taxCountry`
+  whose currency under the rule differs from the quote's is refused like a subtotal that differs today, 503
+  `TAX_SERVICE_UNAVAILABLE`, and nothing is written.
+- **The pricing page** shows the visitor's currency from the same source: the connection's country (the same
+  `GeoLookup` the quote uses when no country is declared), through the same rule.
+- **An unknown location.** Nothing is ever charged without a country: a quote with no declared country and an unknown
+  connection, or over Tor, is refused as today (`COUNTRY_UNKNOWN`, `TOR_REFUSED`), and a declared country always maps
+  to a currency (an unlisted one to the default). The pricing page, for a connection whose country is unknown (no
+  address, the lookup's `XX`, or a Tor exit), shows the rule's default currency, USD. The page always carries one
+  sentence, `billing.pricing.currencyNote`: "You pay in the currency of your billing country. At checkout you see the
+  exact amount, with tax, before you pay."
+- **Only the price changes currency.** The AI credit and every cost envelope stay in US dollars, because that is what
+  the AI companies charge us: `monthly_credit_micros`, the day and week caps, the cost envelopes, the budget package,
+  the evaluator and the story policy keep `"USD"`. A6's prorated credit and the withdrawal's credit share are ratios
+  and do not change.
+
+#### 2.16.2 The price list in the register (`billingPlans` v2)
+
+The rule and the prices live together in the `billingPlans` row (`packages/register/src/billing-plans.ts`), the
+code-owned row the hosted file may supersede (`deploy/vps/register/README.md`), exactly as today's prices do. The owner
+changes a price or the rule by publishing a new register version; a published version is never edited.
+
+```json
+{
+  "kind": "BILLING_PLANS",
+  "credit_currency": "USD",
+  "minor_units_per_unit": 1000000,
+  "currency_by_country": { "default": "USD", "countries": { "RO": "RON", "AT": "EUR", "…": "…", "GB": "EUR" } },
+  "plans": [
+    { "plan_id": "FREE", "tier": "free", "net_prices": { "USD": 0, "EUR": 0, "RON": 0 }, "monthly_credit_micros": 200000, "…": "…" },
+    { "plan_id": "PLUS", "tier": "premium", "net_prices": { "USD": 20000000, "EUR": 20000000, "RON": 100000000 }, "…": "…" }
+  ]
+}
+```
+
+- **Refused** (`BILLING_PLANS_INVALID`, the row's one code, at publish and at every start): a plan whose `net_prices`
+  lacks USD, EUR or RON or names any other key; a price that is not a whole number of cents or bani (a multiple of
+  10,000 micros); Free with a price above 0 in any currency; a paid plan at 0 in any currency; in any one currency, a
+  plan that does not cost strictly more than the one before (so the plan order is the same in all three);
+  `credit_currency` other than `"USD"`; a `currency_by_country` whose `default` or any value is not one of the three, or
+  whose key is not upper-case ISO alpha-2 (`XX` refused), or with more than 249 countries; and the v1 members
+  `currency` and `net_price_micros`, which v2 replaces. Every other member keeps today's rule.
+- **Parsed** (`@debateai/register`): `BillingPlans` = `{ creditCurrency: "USD"; currencyByCountry: { defaultCurrency:
+  BillingCurrency; countries: Readonly<Record<string, BillingCurrency>> }; plans; sourceRef }`; `BillingPlan.netPrices:
+  Readonly<Record<BillingCurrency, number>>` replaces `netPriceMicros`; `priceCurrencyFor(plans, country: string |
+  null): BillingCurrency` (either letter case; null, empty, `XX` or unlisted → the default) and `planNetPrice(plan,
+  currency): number`. `BillingCurrency` is `@debateai/contract`'s `BillingCurrencySchema` (`z.enum(["USD", "EUR",
+  "RON"])`), pinned equal to billing-core's `PriceCurrency` by a type test (register cannot import billing-core).
+- **The engine's own row** (`BILLING_PLANS_DEPLOYMENT_REGISTER_ROW`, edited in place as `countryPolicy`'s row is, so the
+  next publication seals it as a new version): the rule of §2.16.1; USD 0 / 20.00 / 50.00 / 200.00 (the owner's values
+  of 29 September); EUR 0 / 20.00 / 50.00 / 200.00 and RON 0 / 100.00 / 250.00 / 1,000.00 as **placeholders** until the
+  owner's price list (§1.6 item 3, go-live row 73). Its `sourceRef` says so. The hosted example
+  (`deploy/vps/register/hosted-register.example.json`) carries the same v2 row.
+- **The check command** (`pnpm billing:check`, §2.17.3) prints the plans line as a tick naming the three currencies and
+  how many countries each covers, and as a cross while the version's `billingPlans` is the engine's own row ("The plans
+  of register version N are the engine's own row, whose EUR and RON prices are placeholders: publish your price list
+  (README §14.4)."). `RegisterFacts.planCurrency`
+  becomes `plans: { ownPriceList: boolean; countriesIn: Record<BillingCurrency, number>; defaultCurrency } | null`.
+- **The staff funding check** (`apps/api/src/staff/internal-allowances.ts`, "hosted USD billing") reads
+  `billingPlans.creditCurrency !== "USD"`; the funding is AI credit, which stays in dollars.
+- **Old versions.** A register version sealed before Part C holds the v1 row, which v2's parser refuses, so the API and
+  the runner refuse to start on it (`BILLING_PLANS_INVALID`). Deploying Part C therefore publishes a new version first
+  (§2.16.8).
+
+#### 2.16.3 Each subscription keeps its currency, for good
+
+- **Recorded where each price is.** The quote records its currency (`billing.quote.currency`, Part C's migration); the
+  checkout's CREATED records `data.currency` (the SUBSCRIBE quote's); the fold gives `SubscriptionState.currency:
+  PriceCurrency` from CREATED only (absent: `"USD"`, a history written before Part C; any other value refuses the
+  history, `BILLING_SUBSCRIPTION_EVENTS_INVALID`). No later event changes it.
+- **Every later price is in it.** Renewals, dunning retries, upgrades, downgrades and the card check use the
+  subscription's currency: every UPGRADE and RENEWAL quote row records `state.currency`; every plan price a plan change
+  compares or records is `planNetPrice(plan, state.currency)` (the upgrade's and downgrade's "higher/lower" checks,
+  UPGRADED's and DOWNGRADE_SCHEDULED's `recurring_net_micros`, the upgrade settlement's checks); a renewal keeps its
+  recorded `recurring_net_micros` (Terms §12), which is already in that currency.
+- **A plan change never crosses currencies**, because every register version prices every plan in every currency. The
+  drafted refusal `PLAN_CHANGE_CURRENCY_DIFFERS` (409, with its Settings sentence) is **dropped**: it is not built, and
+  no code, copy or test names it.
+- **Moving country** changes nothing: the tax location is the checkout's sealed one (the card page shows the country
+  and region read-only, §2.11), so a person who moves keeps the subscription's currency until they subscribe again.
+  The owner changing the rule (a new register version) likewise reaches only new subscriptions.
+- **The stored tax context** (`apps/api/src/billing/stored-tax-context.ts`) carries `currency` (the subscription's);
+  `quoteTaxAt` and `quoteTax` ask Quaderno in it. A subscription whose CREATED and checkout quote name different
+  currencies is a writer's bug and is never priced: `TypedDomainError("BILLING_CURRENCY_MISMATCH")`.
+
+#### 2.16.4 Charges, NETOPIA and the documents
+
+- **Every charge row** is in its quote's currency (INITIAL, RENEWAL with its retries, UPGRADE); a CARD_CHECK, which has
+  no quote, in the subscription's. `billing.charge.currency`'s CHECK becomes `IN ('USD','EUR','RON')`.
+- **NETOPIA.** The hosted start (checkout, upgrade, card check) and the saved-card charge are requested in the charge's
+  currency, which is also the settlement currency (N-14). VERIFY_PAYMENT already compares the report's currency with
+  the charge's (`PAYMENT_AMOUNT_MISMATCH`). The build uses **one POS** for the three currencies.
+  **Where a POS per currency would go (named, not built):** `NetopiaConfig.posSignature`
+  (`packages/payments-netopia/src/client.ts`) would become a choice by the request's currency for the hosted start and
+  the saved-card charge, and by the charge's currency for the status read (`buildStatusBody`'s `posID`);
+  `NoticeTrust.posSignature` (`packages/payments-netopia/src/notice.ts`, the `aud` check and `quarantinable`) would hold
+  every POS of the account; the settings `NETOPIA_POS_SIGNATURE` (`readBillingEnvironmentGroup`,
+  `apps/api/src/billing/connectors.ts`, `check-cli.ts`, the guided setup) would gain one line per currency. A task
+  builds it only if NETOPIA's answer needs it (go-live row 61).
+- **The tax quote.** `TaxEngine.quote` takes `currency: PriceCurrency`. Quaderno is asked in it and its answer must name
+  the same currency (`TAX_SERVICE_REFUSED` with the detail `QUADERNO_CURRENCY_MISMATCH`). A Romanian quote asks in RON.
+- **Quaderno's records** (`recordSale`, `recordRefund`) post the charge's currency: EUR and USD under the default rule,
+  because Romania's sales are SmartBill's (`invoice_issuer_rules`).
+- **SmartBill** (Romanian sales) issues the invoice and the partial credit note in the charge's currency, RON under the
+  default rule, and never sends an `exchangeRate`: a RON invoice needs no BNR rate, and an EUR or USD invoice keeps
+  today's conversion, SmartBill's own BNR rate for the currency (`docs/architecture/smartbill-api-facts.md` row 11).
+  The storno sends no currency (SmartBill reverses the invoice as issued).
+- `SaleRecord.currency` and `RefundRecord.currency` are required, so no document is issued in a currency nobody chose.
+- **The owner's sandbox tool** (`tools/billing/netopia-sandbox.ts`) takes `--currency USD|EUR|RON` (default USD) on
+  `start`, `zero` and `charge`, so the sandbox run can show a payment and its status answer in each currency.
+
+#### 2.16.5 Showing every amount in its currency
+
+- **Contract** (`@debateai/contract`): `BillingCurrencySchema`; `GET /v1/billing/plans` answers `{ currency, plans: [{
+  plan_id, net_prices: { USD, EUR, RON }, allowance_vs_plus }] }` (`net_price` goes; `currency` is the visitor's);
+  `currency` joins the quote answer, the upgrade-quote answer, the subscription answer (`subscription.currency`), each
+  invoice of the invoices answer, and the withdraw answer. Each is `BillingCurrencySchema`, required.
+- **`GET /v1/billing/plans`** picks the currency from the caller's connection (§2.16.1), keeps one memoised body per
+  currency, and is cached `private, max-age=60` instead of `public` (a shared cache would hand one country's currency to
+  everyone). Settings reads a plan's price in the subscription's own currency from `net_prices`, never the visitor's.
+- **Pages** (`formatMoney(locale, decimal, currency)` replaces `formatUsd`): /pricing (the cards in the visitor's
+  currency, and the note), the landing page's lowest price, the checkout (net, tax label, total, the card-saving
+  sentence), the card page's agreement sentence, Settings (the renewal sentence, the downgrade price and total, the
+  upgrade quote and its button, the withdrawal's refund, the invoice list).
+- **Emails.** Any template with an amount accepts `params.currency` (USD, EUR or RON) without declaring it; absent, the
+  amount renders in USD (every email queued before Part C). The callers pass it: M1, M2_INVOICE_LINK,
+  M2_INVOICE_ATTACHED, M3, M4, M8, M8_RECEIVED, M11, M11_DUPLICATE, O2 and the refund-done preview (O2_REFUND_DUE
+  already declares and passes `currency`).
+- **The owner's texts.** The quarterly tax summary keeps one block per country or state, tax scheme **and currency**,
+  and prints every amount with its currency ("Net sales 99.99 RON, tax collected 20.99 RON"); the charge-backs and the
+  refunds of unknown amount name theirs. `pnpm billing:withdraw` and `pnpm billing:invoice` print the charge's currency
+  instead of " USD". Owner texts stay English.
+
+#### 2.16.6 Data: Part C's migration, the next forward step
+
+- **The number** is decided at merge time: the next free number after the last forward step on `origin/dev`, chained
+  after that step (`migrations/lineage/README.md`; PR-58's rule that whoever merges second renumbers). At this base
+  (`origin/dev` b75e4c294) the last step is 0111 and the auth DB batch has reserved 0112, so Part C builds as
+  `0113_billing_price_currencies.sql`, chained after 0111 (the chain needs only increasing names). Before the pull
+  request C5 re-chains it after the last step on `origin/dev` (after 0112 if the auth batch merged first), or renumbers
+  it 0112 if Part C must merge first (then the batch renumbers). `<NNNN>` below is that number. Dev's sealed and merged
+  files (0108, 0110, 0111 and their manifests, loaders and verifiers) are never edited. Done in C5a (10 October 2026):
+  the batch merged first as 0112 (`origin/dev` 7db4a7b72), so Part C's step keeps 0113 and is chained after 0112.
+- **The files** (new files only): the SQL; `lineage/billing-price-currencies-forward<NNNN>.json` (bound to the recipe,
+  to the previous step's name, manifest and verifier, and naming the previous step's verifier as its own, because the
+  step adds no billing relation and no function); `packages/db/src/migration-forward<NNNN>.ts`; one loader appended to
+  `STEPS` in `packages/db/src/migration-forward-chain.ts`.
+- **The SQL** (forward-only, replayable, guarded by `BILLING_<NNNN>_REQUIRES_0111`):
+  - `billing.quote.currency text NOT NULL`, filled `'USD'` for older rows by `ADD COLUMN … DEFAULT 'USD'` (no UPDATE
+    under the append-only guard), then `DROP DEFAULT`, so every writer names it; CHECK `quote_currency_known`
+    `IN ('USD','EUR','RON')`;
+  - `billing.charge`: 0086's `charge_currency_check` (USD only) is replaced by `charge_currency_known`
+    `IN ('USD','EUR','RON')`;
+  - `billing.subscription_event`: `subscription_event_created_currency_known`: a CREATED names no `currency`, or names
+    one of the three as a JSON string.
+- No table is created, so no grant is added and 0093's contract still holds.
+
+#### 2.16.7 Codes
+
+| Code | Where | When |
+|---|---|---|
+| `BILLING_PLANS_INVALID` | register parser, hosted publish, API and runner start | a `billingPlans` row that is v1 or breaks §2.16.2's rules |
+| `BILLING_SUBSCRIPTION_EVENTS_INVALID` | the fold | a CREATED naming a currency outside the three |
+| `BILLING_CURRENCY_MISMATCH` | `storedTaxContext`, the upgrade under the lock | a subscription whose CREATED and checkout quote, or whose upgrade quote, name another currency (a writer's bug) |
+| `TAX_SERVICE_REFUSED` / `QUADERNO_CURRENCY_MISMATCH` | `QuadernoTaxEngine.quote` | Quaderno answered in another currency than asked |
+| 503 `TAX_SERVICE_UNAVAILABLE` (existing) | `POST /v1/billing/quote` | Quaderno's tax country falls in another currency than the declared country |
+| `PAYMENT_AMOUNT_MISMATCH` (existing) | VERIFY_PAYMENT | NETOPIA reports another currency than the charge's |
+| `quote_currency_known`, `charge_currency_known`, `subscription_event_created_currency_known` | SQL CHECKs | a row outside the three |
+| `BILLING_<NNNN>_REQUIRES_0111`, `MIGRATION_FORWARD<NNNN>_*` | the migration, its loader | a database without 0111; a changed manifest, source or verifier |
+| ~~`PLAN_CHANGE_CURRENCY_DIFFERS`~~ | — | dropped (§2.16.3) |
+
+#### 2.16.8 Deploying Part C
+
+- Billing stays off. On a host that runs the V3 engine, the first start on Part C's code needs a register version
+  whose `billingPlans` is v2: publish first (`pnpm register:publish-hosted`, which seals the engine's own v2 row when
+  the hosted file has no `billingPlans`, or the owner's), pin the printed `REGISTER_VERSION` in both `api.env` and
+  `runner.env`, then restart both. A hosted file that still carries a v1 `billingPlans` is refused by the dry run
+  (`BILLING_PLANS_INVALID`); README §14.4 says how to rewrite it. A host other than the preview migrates before it
+  publishes, following README §14.4 "Upgrading to Part C (migration 0113)": it opens the migrator window, runs
+  `pnpm db:migrate` (which applies 0113 and any pending forward step), then `hardening.sql`, because the API does not
+  check the schema when it starts; then it publishes, pins and restarts both services as above. On the preview, the
+  operator's `publish` seals the new source rows and `apply-and-plan` (with the owner's yes) applies the migration
+  step (PR-57).
+- Before billing goes on: NETOPIA's settlement form for RON, EUR and USD is signed, and the owner's price list is
+  published (go-live row 73).
+
+#### 2.16.9 The tasks
+
+- **C0**: NETOPIA's page lasts 20 minutes (N-25): the checkout's reuse window 30 → 15 minutes, and an upgrade's page
+  is reused only within the same 15 minutes of its start.
+- **C1**: the price list in the register, the contract's currency type, the tax quote's currency, the migration step,
+  the currency on quotes, CREATED and the fold, and every later quote and plan comparison in the subscription's
+  currency.
+- **C2**: every charge, NETOPIA request and document in the charge's currency; the sandbox tool's `--currency`.
+- **C3**: every answer, page, email and owner text shows the amount in its currency; the plans route by the visitor's
+  country; the pricing page's note in 35 locales.
+- **C4**: RON, EUR and USD end to end under one register version, renewals and plan changes in each subscription's own
+  currency, and a subscription keeping its currency after the owner changes the rule.
+- **C5** (controller): final review, fix wave, the go-live rows the build changes, the pull request.
 
 ### 2.17 Configuration, the guided setup and the check command
 
@@ -1013,7 +1233,7 @@ The owner chose to build for all three; one currency is published at a time (rul
 | Setting | Where | Notes |
 |---|---|---|
 | `NETOPIA_API_BASE_URL` | `api.env` | one of §2.4.1's four; it also decides sandbox or live |
-| `NETOPIA_POS_SIGNATURE` | `api.env` | private, not a secret |
+| `NETOPIA_POS_SIGNATURE` | `api.env` | private, not a secret; one POS for RON, EUR and USD until NETOPIA says otherwise (N-14, §2.16.4) |
 | `NETOPIA_API_KEY_PATH` | `api.env` → custody file `/etc/debateai/api/billing/netopia-api-key` | secret, one line, 0600, owned by `debateai-api` |
 | `NETOPIA_IPN_KEYS_PATH` | `api.env` → `/etc/debateai/api/billing/netopia-ipn-keys.pem` | not secret, but trusted: one or more PEM blocks, owned by root, mode 0644, never writable by `debateai-api` (a writable list would let anyone who controls the API user forge messages); the boot refuses otherwise |
 | `XMONEY_*`, the UI's `XMONEY_SDK_ORIGIN` | — | removed; a boot that still finds one prints a warning naming it (never its value) |
@@ -1064,7 +1284,9 @@ one line per item, a tick or a cross and a plain sentence, and **never a secret*
   accepted; a redirect or any non-NETOPIA answer is a cross; nothing is charged);
 - the notify address `PUBLIC_APP_URL/api/v1/billing/netopia/notify` answers a GET without a redirect (a GET never
   reaches the intake, which takes only POST);
-- the published register version: `billingPolicy.enabled`, the plans' currency, `countryPolicy` present;
+- the published register version: `billingPolicy.enabled`; the plans' price list (a tick naming the three currencies
+  and how many countries pay in RON and in EUR, a cross while it is the engine's own row with its placeholder EUR and
+  RON prices, §2.16.2); `countryPolicy` present;
 - the company facts are no longer in brackets (today's `BILLING_COMPANY_FACTS_UNVERIFIED` codes).
 
 ### 2.18 Pages, copy and emails
@@ -1090,7 +1312,7 @@ one line per item, a tick or a cross and a plain sentence, and **never a secret*
   store your card number."), `billing.checkout.cardTitle`, `formUnavailable` ("The payment page could not be opened.
   Please try again in a minute."), the billing block's labels and errors, the upgrade and card-page lines,
   `billing.card.notSaved`, the return page's upgrade sentence, `mail.M5.confirmCard`, M12 and its two lines, and Part
-  C's `PLAN_CHANGE_CURRENCY_DIFFERS` sentence. English and Romanian are written with care; the other 33 are machine
+  C's pricing-page sentence `billing.pricing.currencyNote` (§2.16.1). English and Romanian are written with care; the other 33 are machine
   translations for go-live row 36. The translators' note says "NETOPIA Payments is a brand name; keep it."
 - **Owner emails (English):** O2's xMoney-dashboard wording becomes NETOPIA's admin; new O2_REFUND_DUE,
   O2_REFUND_REMINDER, O4, and the O3 codes `RENEWAL_OUTCOME_OPEN`, `PAYMENT_AMOUNT_MISMATCH`,
@@ -1155,8 +1377,9 @@ It also backs the dev stack (`DEBATEAI_BILLING_FAKES=1`) in place of the xMoney 
   the command); a refund made by hand in the admin; status 17; the three charge-back statuses with and without status 9
   first; a verified message that does not parse; a rejected message quarantined and recovered after a key change; the
   provider-only mode; the bring-forward of a waiting check; the read schedule and its cursor; the token sweep and both
-  purges; the invoicer pairing guards; the whole flow; and, in Part C, a checkout, renewal and invoices in EUR and in
-  RON, and a refused plan change across currencies.
+  purges; the invoicer pairing guards; the whole flow; and, in Part C, checkouts in RON, EUR and USD under one register
+  version, their renewals and invoices (SmartBill in RON with no exchange rate, Quaderno in EUR and USD), a plan change
+  in the subscription's own currency, and a subscription keeping its currency after the owner changes the rule.
 - **Render:** the checkout's billing block and its errors, the card page (read-only country and region, the agreement
   sentence, `notSaved`), the upgrade button and its agreement sentence.
 
@@ -1166,7 +1389,8 @@ It also backs the dev stack (`DEBATEAI_BILLING_FAKES=1`) in place of the xMoney 
 in provider-only mode for the small live test); it reads the key file itself and prints no secret. Subcommands:
 
 - `check`: the check command's NETOPIA lines.
-- `start --amount 1.00 [--client-id-at order|instrument] [--installments 0|1]`: registers a tool order
+- `start --amount 1.00 [--currency USD|EUR|RON] [--client-id-at order|instrument] [--installments 0|1]` (Part C adds
+  `--currency`, default USD, to `start`, `zero` and `charge`): registers a tool order
   (`billing.tool_order`) and starts a hosted payment for it; prints the payment URL for the owner to pay (a NETOPIA
   test card in the sandbox, the owner's own card on live).
 - `zero`: a 0 card check as a tool order (N-11).
@@ -1229,13 +1453,15 @@ These are go-live row 24's; the build does not edit the legal drafts.
   the intake, the quarantine and the provider-only mode; VERIFY_PAYMENT; renewals and unknown outcomes; upgrades; the
   card change; refunds; charge-backs; the checks; the saved card; pages, copy, emails; the removals and renames; the
   runbook, the go-live rows and the records; the recording tool.
-- **Part C (prices in USD, EUR or RON)**, its own pull request after Part N merges.
+- **Part C (prices in RON, EUR and USD, by region; revised 10 October 2026)**, its own pull request after Part N
+  merged (#103): C0 → C1 → C2 → C3 → C4 → C5 (§2.16.9).
 - Each part ends with a final review, a fix wave and the controller's records, as Parts 1–4 did.
 
 ### 2.24 Open NETOPIA facts and where each one bites
 
 The email (§1.6 item 1) asks every one. "Gate" means a go-live row keeps billing off until it is answered. "Changes"
-says what a different answer would change.
+says what a different answer would change. NETOPIA answered N-10, N-14, N-17, N-22, N-25 and N-26 on 9 October 2026,
+through the sales contact (ruling PR-61); their rows say **Answered** and what the build does now.
 
 | # | Question | What the build assumes until answered | Gate | Changes |
 |---|---|---|---|---|
@@ -1248,20 +1474,63 @@ says what a different answer would change.
 | N-7 | The exact answer to a message; the resend policy; does a resent first message still carry the token | §2.7.2's bodies; 503 for "try again"; the quarantine | yes | the answer bodies |
 | N-8 | Which status changes send a message; refunds: the status of a whole and of a partial refund, the amount reported; the meaning of 10 and 17 | statuses read daily (§2.14); a whole refund recorded by status, a partial one by command; 10 and 17 to the owner | yes | the refund and dispute rules |
 | N-9 | Status 3 versus 5 | both are PAID | — | one constant |
-| N-10 | Is the refund call available | no: owner mode (§2.12.2) | — | the API mode (§2.12.3) |
+| N-10 | Is the refund call available | **Answered 9 October 2026:** refunds also work by API, whole or part. The owner mode (§2.12.2) is kept until the call's endpoint and fields are known and tested in the sandbox | — | the API mode (§2.12.3), a code change after the sandbox recording proves the call |
 | N-11 | Does a 0 check with `clientID` give a saved card | yes | yes | the card change (owner rules again) |
 | N-12 | Saved-card charges: mandatory fields; which IP; the answer when the bank wants 3-D Secure; which codes are card-side and retryable | the full payer; the latest in-person IP; 100/15 → `ACTION_REQUIRED`; §2.4.5's tables | — | the decline tables, the renewal's outcome rules |
 | N-13 | `orderID` length and characters | 32 lower-case hex is accepted | — | the charge id form |
-| N-14 | Currencies; settlement | USD until the owner publishes another (§2.16) | yes | the published currency |
+| N-14 | Currencies; settlement; one POS or one per currency | **Answered 9 October 2026:** RON, EUR and USD are each settled in the currency of the request, on the owner's signed form. Each request is made in the subscription's currency (§2.16.4). Whether one POS takes all three is asked again; until then the build uses one POS (`NETOPIA_POS_SIGNATURE`) | yes (the signed form; the POS answer) | a POS per currency, at the place §2.16.4 names |
 | N-15 | Is a repeated `orderID` refused (56) for token payments, also while the first is still processing; can a declined orderID be reused | yes; no | yes | the unknown-outcome rule (§2.9.3) |
 | N-16 | A status read by `orderID` alone; how "no such order" is said | tried; the recorded answer | — | §2.9.3 step 1 |
-| N-17 | Do wallets, Click to Pay, BT Pay or instalment plans on a payment leave a saved card; can a payment be limited to card entry | not guaranteed: §2.11 and §2.15.3 handle a payment without one | yes | the card page's wording, maybe a card-only start |
+| N-17 | Do wallets, Click to Pay, BT Pay or instalment plans on a payment leave a saved card; can a payment be limited to card entry | **Answered 9 October 2026:** wallets, Click to Pay and instalments are never offered on recurring payments. §2.11 and §2.15.3 keep handling a payment without a saved card (a lost message still leaves none) | yes (until the owner rewords the card page) | the card page's "instead of a wallet" wording (`billing.card.notSaved`), the owner's choice |
 | N-18 | Parameters added to the return address; `cancelUrl`; rate limits; message sources; TLS; redirects | none trusted; no `cancelUrl`; no limit; no redirects | — | nothing |
 | N-19 | A reporting or listing API | none (§2.14) | — | the checks could use it |
 | N-20 | Sandbox test cards | the two in NETOPIA's OpenAPI file | — | the runbook |
 | N-21 | What the recurring flag switches on | token payments | — | nothing |
-| N-22 | Does NETOPIA email the payer; can it be turned off | `emailTemplate: ""` | — | maybe a setting to send |
+| N-22 | Does NETOPIA email the payer; can it be turned off | **Answered 9 October 2026:** NETOPIA emails the payer on every payment and renewal. Kept; `emailTemplate: ""` and our own emails stay | — | nothing |
 | N-23 | Merchant rules for subscriptions: notice before an amount change, site content, AI services accepted, refused card countries | A7's 7 business days kept; §2.21's site items | yes (site items) | the site items |
 | N-24 | How to keep a payment in one go (instalments off); does an instalment payment leave a saved card | `installments: 0`; recorded both ways | yes | one constant |
-| N-25 | How long a payment page stays payable | 30 days at most (§2.14 reads closed charges that long) | — | the read window |
-| N-26 | Can NETOPIA's shop check and their test of our flow be done on the test server, or with the paid plans hidden on the live site | the test server | yes | maybe a preview the owner rules |
+| N-25 | How long a payment page stays payable | **Answered 9 October 2026:** 20 minutes. Fix (task C0): the checkout's reuse window goes from 30 minutes to 15 (`reuseWindowMs()`), and an upgrade's page is reused only within 15 minutes of its start. §2.14 still reads closed charges for 30 days | — | nothing further |
+| N-26 | Can NETOPIA's shop check and their test of our flow be done on the test server, or with the paid plans hidden on the live site | **Answered 9 October 2026:** the POS validation is possible only on the live site; payments become active only after both sides sign the contract, and NETOPIA recommends switching card payments off between the validation and the contract. The go-live sequence is redesigned once NETOPIA says what the validation checks (the follow-up is in the owner's reply) | yes | the go-live sequence (§2.21, go-live rows 66, 68 and 69) |
+
+### 2.25 Part C decision log (10 October 2026)
+
+Each choice made while revising Part C under rulings PR-60 and PR-61, with its reason and the alternative it rejects.
+**Unsure** marks a point where the owner should rule; the three open questions are at the end.
+
+| # | Decision | Why | Rejected |
+|---|---|---|---|
+| D1 | The country → currency rule is a validated member of the `billingPlans` row (`currency_by_country`, with a default), next to the prices | the owner changes it by publishing, through the same parser, dry run, boot check and hosted-file member as the prices; one row means a version can never carry a rule without its prices; it fits dev's code-owned-row-plus-hosted-override pattern exactly as `billingPlans` does today | a code constant (a release for every change); a member of `countryPolicy` (an optional row: absent means no gate, yet a currency is always needed); a new register row (more members, pins and docs for no gain) |
+| D2 | `billingPlans` v2: `net_prices: {USD, EUR, RON}` per plan, `credit_currency: "USD"`; a v1 row is refused everywhere, the API's and the runner's start included | the owner's rule that a version without all three prices is refused; one shape for every reader, so no price reader handles a "USD only" state | a parser that reads v1 as dollars only while billing is off (every price reader would carry a missing-price case). **Unsure:** this makes the first start on Part C's code need a new publication (§2.16.8); open question 2 |
+| D3 | The engine's own row is edited in place to v2, with placeholder EUR 20 / 50 / 200 and RON 100 / 250 / 1,000, and `pnpm billing:check` shows a cross while that row is the one in force | every version must carry all three prices, so the engine's row needs EUR and RON values; the cross keeps a placeholder from going live unnoticed (go-live row 73) | no engine row (every development and test register needs one); RON at the dollar figures (20 lei would sell Plus for about a fifth of its price). **Unsure:** the placeholder values; open question 1 |
+| D4 | The currency is decided by `QuoteLocation.country` (the declared billing country, else the connection's), and the quote refuses (503 `TAX_SERVICE_UNAVAILABLE`) when Quaderno's tax country falls in another currency | that country is the tax quote's `to_country`, so the currency always matches the tax country; the check covers a tax answer for another country | the connection's country (can differ from the billing country); the card's country (known only after the payment) |
+| D5 | An unknown location shows the rule's default currency (USD) on the pricing page, with one note under the cards (`billing.pricing.currencyNote`); nothing is ever charged without a country | the quote already refuses an unknown connection with no declared country, so only the display needs a rule; the note also covers a visitor connecting from one country and billed in another | showing all three prices (a busy page, and the checkout shows the exact amount anyway); hiding the prices |
+| D6 | `GET /v1/billing/plans` answers every price in all three currencies plus the caller's currency, cached `private` and memoised per currency | Settings reads a plan's price in the subscription's own currency, which the visitor's single-currency answer could not give; a `public` cache would serve one country's currency to all | a single-currency answer; a `?currency=` parameter (one more input to validate, and the page still needs the visitor's default) |
+| D7 | `PLAN_CHANGE_CURRENCY_DIFFERS` is dropped, not reduced: no code, copy or test names it | every version prices every plan in every currency and a subscription's currency never changes, so a plan change cannot cross currencies; the refusal would be dead code with a sentence in 35 locales | keeping it as a defensive 409 |
+| D8 | `BILLING_CURRENCY_MISMATCH` (an internal error, never a route answer) where the stored tax context or an upgrade quote names another currency than the subscription | such a row can only come from a writer's bug, and it must never be priced or charged | trusting the rows; a database trigger (a new function for the verifier's closed list, for a case the code already rules out) |
+| D9 | The test fixture `testBillingPlans` maps every country to USD; `testRegionalPlans` carries the real rule | the suites about something else keep their dollar amounts (the harness's default buyer is Romanian, who would otherwise pay 100 lei); Part C's suites prove the rule | the real rule in the default fixture (a large, unrelated rewrite of expected amounts) |
+| D10 | Part C's migration is built as 0113, chained after 0111, and is renumbered and re-chained when it merges (C5, with C1's recipe) | the auth DB batch has reserved 0112; the chain only needs increasing names, so the working number keeps the reservation; whoever merges second renumbers (PR-58's rule) | 0112 now (two branches would carry it). **Unsure:** if Part C must merge before the auth batch, it takes 0112 and the batch renumbers; the owner coordinates the two sessions, as on 9 October |
+| D11 | The step adds the quote's column and three CHECKs, and names 0111's verifier as its own | it adds no billing relation and no function (`migrations/lineage/README.md` rule 3); 0093's table grants cover the column | a superseding verifier copy with no difference |
+| D12 | CREATED's currency CHECK accepts only a JSON string of the three, or no `currency` | closes the drafted CHECK's gap, where a JSON `null` passed the database and failed only in the fold | `COALESCE(data ->> 'currency', 'USD')` (lets `null` through) |
+| D13 | One POS for the three currencies; the place a POS per currency would go is named in the spec (§2.16.4) and in two code comments | PR-61: NETOPIA is asked again; building it now would guess its shape | building per-currency settings now |
+| D14 | SmartBill never receives an `exchangeRate`; RON needs none, EUR and USD keep SmartBill's own BNR rate | today's behaviour for USD (smartbill-api-facts row 11); we hold no BNR rate of our own | sending a rate we would have to fetch and keep |
+| D15 | Quaderno is asked for the tax in RON for a Romanian buyer; its records stay EUR and USD under the default rule (Romania's documents are SmartBill's) | the tax quote is Quaderno's for every country today. **Unsure:** a Quaderno calculation in RON is assumed, not yet recorded; go-live row 74 (task C5) proves it in Quaderno's sandbox | a fixed 21 % for Romania outside Quaderno (two tax engines) |
+| D16 | C0 also bounds an upgrade's page reuse to 15 minutes from its start | N-25's 20-minute page applies to the upgrade's page as much as the checkout's; without it an upgrade could hand back a dead page for its quote's last 10 minutes | PR-61's checkout-only wording |
+| D17 | The 30-day reads of closed unpaid pages (§2.14) stay | cheap, and they also catch a late message | shortening them to the page's life |
+| D18 | The owner's sandbox tool takes `--currency` | so the sandbox run shows a RON and an EUR payment's status and message before any is sold | proving the other currencies only on the live site |
+| D19 | The emails take one renderer-level `params.currency` for any template with an amount (absent: USD) | no template definition changes, and every email queued before Part C still renders as charged | declaring `currency` in every template with an amount |
+| D20 | The withdraw answer, the quote, upgrade-quote, subscription and invoices answers each name their currency | every answer that carries an amount says what it is in; Settings never guesses | reading the currency from the subscription answer only |
+| D21 | The go-live rows that NETOPIA's answers change (14, 61, 63, 66, 68, 69, 73) are edited in the design commit and count as C0's records; the rows that depend on what Part C builds (a new row 74, rows 16, 23, 24) are C5's | the answers are facts today and need no code; the build-dependent rows follow the build. The row the request called "row 72" is row 73 in the file (row 72 is PR-41's refund hold) | putting every doc edit in C5 (the answers would wait for the whole build) |
+
+**Open questions for the owner (at most three).**
+
+1. **The placeholder prices.** The engine's own row carries EUR 20.00 / 50.00 / 200.00 and RON 100.00 / 250.00 /
+   1,000.00 until you publish your price list (USD stays 20 / 50 / 200). Keep these as the example, or give the price
+   list now so the example carries it? Either way you publish your own before billing goes on (go-live row 73).
+2. **The first start on Part C's code.** A register version with one price per plan is refused at start (API and
+   runner), so each host publishes a new version before restarting on Part C's code (on the preview, the operator's
+   `publish`, then `apply-and-plan` for the migration). Accept this, or should the engine keep reading an older version
+   while billing is off (decision D2's rejected alternative)?
+3. **The card page after N-17.** NETOPIA offers no wallet on a recurring payment, so "Please try again with a card
+   instead of a wallet." no longer fits `billing.card.notSaved`. Pick one ending for "Your card was checked, but it
+   couldn't be saved for your monthly payments.": (a) "Please try again in a few minutes."; (b) "Please try again; if
+   it happens again, use another card."; (c) "Please try again, or write to us if it happens again." (go-live row 63)

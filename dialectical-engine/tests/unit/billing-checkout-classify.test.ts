@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PaymentReport, PaymentState } from "@debateai/billing-core";
 import {
-  classifyOpenCheckout, hostedStartInFlightMs, inFlightAttemptLifeMs, type OpenCheckoutFacts
+  classifyOpenCheckout, hostedStartInFlightMs, inFlightAttemptLifeMs, reuseWindowMs, type OpenCheckoutFacts
 } from "../../apps/api/src/billing/checkout.js";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
@@ -51,6 +51,15 @@ describe("N18 spec §2.6.3: one open checkout at a time", () => {
     expect(verdict({})).toBe("REUSE");
     expect(verdict({ read: report("DECLINED", "12"), events: [event("REQUESTED"), event("SUBMITTED"), event("FAILED", "PAYMENT_DECLINED")] })).toBe("REUSE");
     expect(verdict({ read: report("ACTION_REQUIRED", "15") })).toBe("REUSE");
+  });
+
+  it("hands a page back only within 15 minutes of the checkout, inside NETOPIA's 20-minute page (N-25)", () => {
+    expect(reuseWindowMs()).toBe(15 * MINUTE);
+    // At least 5 minutes left on any page handed back, against the page life the classifier already uses.
+    expect(reuseWindowMs()).toBeLessThanOrEqual(inFlightAttemptLifeMs() - 5 * MINUTE);
+    expect(verdict({ createdAt: ago(15 * MINUTE - 1_000) })).toBe("REUSE");
+    expect(verdict({ createdAt: ago(15 * MINUTE) })).toBe("ABANDON");
+    expect(verdict({ createdAt: ago(16 * MINUTE) })).toBe("ABANDON");
   });
 
   it("abandons an older checkout, another purchase, an order NETOPIA does not know, a final failure or an unknown start", () => {

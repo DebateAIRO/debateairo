@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ContractHttpError, postcodeOptional, type ContractClient } from "@debateai/contract";
+import { ContractHttpError, postcodeOptional, type BillingCurrency, type ContractClient } from "@debateai/contract";
 import { contractClient } from "@/lib/api";
-import { countryName, formatUsd } from "@/lib/billing/format";
+import { countryName, formatMoney } from "@/lib/billing/format";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import billingEnglish from "@/messages/en/billing.json";
 import { BillingDetailsFields, type BillingDetails } from "./BillingDetailsFields";
@@ -41,6 +41,8 @@ export function CardChangeFlow({
   const [details, setDetails] = useState<BillingDetails | null>(null);
   const [city, setCity] = useState("");
   const [total, setTotal] = useState<string | null>(null);
+  // Spec 2026-10-05 §2.16.3: the subscription's own currency, the one its total is in.
+  const [currency, setCurrency] = useState<BillingCurrency | null>(null);
   const [cancelRequested, setCancelRequested] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -60,6 +62,7 @@ export function CardChangeFlow({
         });
         setCity(read.city ?? "");
         setTotal(subscribed.subscription?.renewal_total ?? null);
+        setCurrency(subscribed.subscription?.currency ?? null);
         setCancelRequested(subscribed.subscription?.cancel_requested ?? false);
       } catch (failure) {
         if (!active) return;
@@ -106,7 +109,7 @@ export function CardChangeFlow({
   const postalOptional = stored !== null && postcodeOptional(stored.country);
   const complete = details !== null && [details.firstName, details.lastName, details.phone, details.street, city]
     .every((value) => value.trim() !== "") && (postalOptional || details.postalCode.trim() !== "");
-  const canStart = !busy && complete && agreed && renewalConsent !== null && total !== null;
+  const canStart = !busy && complete && agreed && renewalConsent !== null && total !== null && currency !== null;
 
   return (
     <section aria-labelledby="card-change-title">
@@ -142,11 +145,11 @@ export function CardChangeFlow({
             <input id="card-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required />
           </div>
           <p className="billingNote">{t(catalog, "billing.card.noHoldNote")}</p>
-          {total !== null ? (
+          {total !== null && currency !== null ? (
             <>
               <label className="billingConsent">
                 <input id="card-agreement" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
-                <span>{t(catalog, "billing.consent.renewal", { total: formatUsd(locale, total) })}</span>
+                <span>{t(catalog, "billing.consent.renewal", { total: formatMoney(locale, total, currency) })}</span>
               </label>
               <div className="billingActions">
                 <button type="button" className="btn btnDark" disabled={!canStart} onClick={() => { void start(); }}>

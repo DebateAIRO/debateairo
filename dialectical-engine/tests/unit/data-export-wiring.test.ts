@@ -32,7 +32,7 @@ describe("data export production wiring", () => {
   });
 
   it("W5 opens a separate worker pool before role attestation and uses it only for export work", () => {
-    const pool = "const dataExportPool = environment.DATA_EXPORT_STORE_PATH === undefined ? undefined : boot.hold(createPool(environment.DATA_EXPORT_DATABASE_URL!));";
+    const pool = "const dataExportPool = environment.DATA_EXPORT_STORE_PATH === undefined ? undefined : boot.hold(createPool(environment.DATA_EXPORT_DATABASE_URL!, API_DATABASE_POOLS.dataExport));";
     expect(source.split(pool)).toHaveLength(2);
     expect(source.indexOf(pool)).toBeLessThan(source.indexOf('await boot.run("database-roles"'));
     expect(source).toContain("assertDataExportDatabaseRoles(authorizationPool, dataExportPool)");

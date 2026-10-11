@@ -1,6 +1,7 @@
 import { TypedDomainError, exhaustive } from "@debateai/kernel";
 import type { PlanId } from "@debateai/register";
 import { periodBoundary } from "./calendar.js";
+import type { PriceCurrency } from "./payments.js";
 
 export type SubscriptionEventKind =
   | "CREATED" | "ACTIVATED" | "RENEWED" | "PAST_DUE" | "RECOVERED" | "UPGRADED" | "DOWNGRADE_SCHEDULED"
@@ -45,6 +46,11 @@ export type SubscriptionState = Readonly<{
   paymentEnvironment: "stage" | "sandbox" | "live";
   /** §2.15.2: the card of the newest adopting event that named one; null while none has (§2.15.3 asks for one). */
   cardTokenId: string | null;
+  /**
+   * Spec 2026-10-05 §2.16.3: the currency every price and charge of this subscription is in, for good — CREATED's
+   * `data.currency`, or "USD" for a history written before Part C.
+   */
+  currency: PriceCurrency;
 }>;
 
 type Working = {
@@ -54,6 +60,7 @@ type Working = {
   pastDueSince: Date | null; retryIndex: number; renewalPostponedUntil: Date | null;
   announcedTotalMicros: number | null; lastNoticeAt: Date | null;
   paymentProvider: "xmoney" | "netopia"; paymentEnvironment: "stage" | "sandbox" | "live"; cardTokenId: string | null;
+  currency: PriceCurrency;
 };
 
 const ENDED_CAUSES: ReadonlySet<string> = new Set<EndedCause>(["CANCEL", "DUNNING", "ERASURE", "ABANDONED", "DISPUTE"]);
@@ -293,10 +300,24 @@ function paymentSystemOf(data: SubscriptionEvent["data"]): Pick<SubscriptionStat
   throw new TypedDomainError("BILLING_SUBSCRIPTION_EVENTS_INVALID", "CREATED must name its payment system");
 }
 
+const PRICE_CURRENCIES: ReadonlySet<string> = new Set<PriceCurrency>(["USD", "EUR", "RON"]);
+
+/**
+ * Spec 2026-10-05 §2.16.3: the subscription's currency comes from CREATED. An older CREATED names none and was priced in
+ * US dollars; one naming anything else is not a legal history (Part C's subscription_event_created_currency_known).
+ */
+function priceCurrencyOf(data: SubscriptionEvent["data"]): PriceCurrency {
+  if (!Object.hasOwn(data, "currency")) return "USD";
+  const currency = data.currency;
+  if (typeof currency === "string" && PRICE_CURRENCIES.has(currency)) return currency as PriceCurrency;
+  throw new TypedDomainError("BILLING_SUBSCRIPTION_EVENTS_INVALID", "CREATED names an unknown currency");
+}
+
 export function foldSubscription(events: ReadonlyArray<SubscriptionEvent>): SubscriptionState {
   const first = events[0];
   if (first === undefined || first.kind !== "CREATED") illegal("the first event is not CREATED");
   const system = paymentSystemOf(first.data);
+  const currency = priceCurrencyOf(first.data);
   if (first.cardTokenId !== null) illegal("CREATED carries a card");
   checkPaymentFields(system, first);
   const state: Working = {
@@ -304,7 +325,8 @@ export function foldSubscription(events: ReadonlyArray<SubscriptionEvent>): Subs
     periodAnchorAt: null, periodIndex: 0, periodStart: null, periodEnd: null, cancelRequested: false,
     scheduledDowngradePlanId: null, activatedAt: null, endedCause: null, pastDueSince: null, retryIndex: 0,
     renewalPostponedUntil: null, announcedTotalMicros: null, lastNoticeAt: null,
-    paymentProvider: system.paymentProvider, paymentEnvironment: system.paymentEnvironment, cardTokenId: null
+    paymentProvider: system.paymentProvider, paymentEnvironment: system.paymentEnvironment, cardTokenId: null,
+    currency
   };
   for (const event of events.slice(1)) {
     if (event.subscriptionId !== state.subscriptionId || event.ownerRef !== state.ownerRef) {
@@ -325,7 +347,8 @@ export function foldSubscription(events: ReadonlyArray<SubscriptionEvent>): Subs
     activatedAt: state.activatedAt, endedCause: state.endedCause, pastDueSince: state.pastDueSince,
     retryIndex: state.retryIndex, renewalPostponedUntil: state.renewalPostponedUntil,
     announcedTotalMicros: state.announcedTotalMicros, lastNoticeAt: state.lastNoticeAt,
-    paymentProvider: state.paymentProvider, paymentEnvironment: state.paymentEnvironment, cardTokenId: state.cardTokenId
+    paymentProvider: state.paymentProvider, paymentEnvironment: state.paymentEnvironment, cardTokenId: state.cardTokenId,
+    currency: state.currency
   });
 }
 

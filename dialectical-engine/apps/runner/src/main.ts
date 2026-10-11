@@ -8,7 +8,7 @@ import {
   loadKekRing,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { configureContentEncryption, createPool, EntitlementRepository, PostgresInternalAllowanceRepository, RunRepository } from "@debateai/db";
+import { configureContentEncryption, createPool, EntitlementRepository, PostgresInternalAllowanceRepository, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
@@ -39,7 +39,7 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertPreviewProviderTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPort, previewRunnerPolicy, withPreviewProviderCallPolicy, PREVIEW_GLM_GENERATION_TOKEN_FLOOR, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewRunnerPolicy, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -75,7 +75,7 @@ configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
 // Absent, this is the single key it has always loaded. The runner only ever
 // READS this store, so no write ever chooses between the two.
 const kek = loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH);
-const pool = createPool(environment.DATABASE_URL);
+const pool = createPool(environment.DATABASE_URL, RUNNER_DATABASE_POOLS.runtime);
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   const users = new FileUserDekStore(environment.USER_DEK_STORE_PATH!, kek);
   configureContentEncryption(pool, new ContentCipher(
@@ -169,11 +169,16 @@ assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE
 // V-9(2): each vendor's credential file, read once under the custody contract.
 if (previewConfig !== undefined) {
   assertPreviewProviderTargets(previewConfig, declaredProviderTargets);
+  // Every role the register names must be a declared target, or its debates would fail at claim.
+  assertPreviewRoleTargets(previewConfig, declaredProviderTargets, [
+    policy.synthesisRolePolicy.synthesizerRoleRef, policy.synthesisRolePolicy.evaluatorRoleRef,
+    ...(storyPolicy === null ? [] : [storyPolicy.storytellerRoleRef, storyPolicy.storyCheckerRoleRef])
+  ]);
   if ((await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID") {
     throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT", "Preview roster cannot override a valid scorecard");
   }
 }
-const previewFetch = previewConfig === undefined ? fetch : createPreviewGuardedFetch(createPreviewBudgetRpcPort(previewConfig));
+const previewFetch = previewConfig === undefined ? fetch : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewConfig));
 const providerTargets = resolveProviderTargetCredentials(
   declaredProviderTargets, readCustodyAuthorizationHeader
 );
@@ -317,6 +322,8 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
     maker: target.maker,
     // Model scorecard §2.2/§2.10: the levels this target can set and its window.
     ...providerTargetGatewayControls(target),
+    // Contract A §2: on the preview only, max_tokens never exceeds the target's reviewed row bound.
+    ...previewTargetGatewayControls(previewConfig, target),
     ...(target.authorizationHeader === undefined
       ? {} : { authorizationHeader: target.authorizationHeader }),
     ...(costEnvelopeGuard === undefined || price === null ? {} : {
@@ -339,7 +346,7 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
       })
     })
   });
-  return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig);
+  return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig, target);
 });
 const runRepository = new RunRepository(pool);
 // V-20: taken on the DECLARED targets, because the three optional keys describe
@@ -427,7 +434,7 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     const observation = await observeProviderTarget({
       target,
       timeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
-      ...(previewConfig === undefined ? {} : { thinkingLevel: "high", tokenCeiling: PREVIEW_GLM_GENERATION_TOKEN_FLOOR }),
+      ...(previewConfig === undefined ? {} : previewProbeControls(target)),
       fetchImplementation: previewFetch,
       clock: () => new Date()
     });
@@ -473,11 +480,19 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     // persists this observation separately from the selected debate panel.
     const observation = await observeProviderTarget({
       target, timeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
-      ...(previewConfig === undefined ? {} : { thinkingLevel: "high", tokenCeiling: PREVIEW_GLM_GENERATION_TOKEN_FLOOR }),
+      ...(previewConfig === undefined ? {} : previewProbeControls(target)),
       fetchImplementation: previewFetch, clock: () => new Date()
     });
     return { state: observation.state, modelId: observation.modelId, failureCode: observation.failureCode };
   },
+  // Role rotation, Task 11: a sealed answer role stands in for an unavailable pinned member only when the debate's
+  // estimate covers it. On the preview the rotated estimate prices only the panel's members; off the preview the
+  // estimate prices the sealed roles as for any debate (no setting: always covered). Everywhere (Task 12) the runner
+  // also requires the stand-in to be one of the debate's panel refs.
+  ...(previewConfig === undefined ? {} : {
+    answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ provider_ref: string; model_id: string }>[] }>) =>
+      previewSealedRoleFallbackCovered(roleRef, panel)
+  }),
   holdRecorder: {
     countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),
     record: (event) => runRepository.recordRunLifecycleEvent({
@@ -510,7 +525,10 @@ await refusePreviewOutsiderWork({
   ...postgresRunnerPreviewTeamGateStore(pool),
   log: (line) => console.warn(JSON.stringify(line))
 });
-const worker = await hatchet.worker(environment.HATCHET_WORKER_NAME);
+// Connection budget (2026-10-10, owner ruling): at most 8 debates at once, each
+// holding two of the pool's connections; the rest wait in Hatchet's queue
+// (packages/db/src/pool-budget.ts). Unset, Hatchet hands one worker 100.
+const worker = await hatchet.worker(environment.HATCHET_WORKER_NAME, { slots: RUNNER_CAPACITY.concurrentRuns });
 await worker.registerWorkflows([task]);
 const started = worker.start();
 await worker.waitUntilReady(30_000);

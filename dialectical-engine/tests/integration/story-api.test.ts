@@ -134,7 +134,8 @@ function readyRecord(runId: string, answerId: string): StoryRecordInput {
     reservation: null,
     verdictBasis: STORY_TEST_BASIS,
     pointNumbers: { "node:position": "P1", "node:defeater": "P2" },
-    languageTag: "ro"
+    languageTag: "ro",
+    storytellerRepairs: 0
   };
 }
 

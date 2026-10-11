@@ -74,7 +74,7 @@ async function quoteAndCharge(
       netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: 24_200_000, taxCountry: "RO", taxRegion: null,
       taxRateBasisPoints: 2100, taxStatus: "TAXABLE", taxName: "VAT", quadernoRef: null, createdAt: now,
       expiresAt: new Date(now.getTime() + 1_800_000), locationCiphertext: location.ciphertext, keyId: location.keyId,
-      recurringTotalMicros: null
+      recurringTotalMicros: null, currency: "USD"
     });
     await billing.insertCharge(c, charge);
   });
@@ -191,7 +191,7 @@ describe("P1b — quotes, subscriptions and charges", () => {
         quoteId, ownerRef, planId: "PLUS", kind: "SUBSCRIBE", netMicros: 20_000_000, taxMicros: 4_200_000,
         totalMicros: 24_200_000, taxCountry: "RO", taxRegion: null, taxRateBasisPoints: 2100, taxStatus: "TAXABLE",
         taxName: "VAT", quadernoRef: null, createdAt: now, expiresAt: new Date(now.getTime() + 1_800_000),
-        locationCiphertext: location.ciphertext, keyId: location.keyId, recurringTotalMicros: null
+        locationCiphertext: location.ciphertext, keyId: location.keyId, recurringTotalMicros: null, currency: "USD"
       });
       await billing.insertCharge(c, {
         chargeId, ownerRef, subscriptionId, kind: "INITIAL", attempt: 1, periodStart: anchor,
@@ -528,10 +528,10 @@ describe("P1b — invoices and the tax summary", () => {
     expect(rows).toEqual([
       { type: "SALE", chargeId: charge.chargeId, at: paidAt, taxCountry: "RO", taxRegion: null, taxStatus: "TAXABLE",
         chargeNetMicros: 20_000_000, chargeTaxMicros: 4_200_000, chargeTotalMicros: 24_200_000, amountMicros: 24_200_000,
-        amountKnown: true, saleRecorded: true, locationVerdict: "AGREED" },
+        amountKnown: true, saleRecorded: true, locationVerdict: "AGREED", currency: "USD" },
       { type: "REFUND", chargeId: charge.chargeId, at: refundedAt, taxCountry: "RO", taxRegion: null, taxStatus: "TAXABLE",
         chargeNetMicros: 20_000_000, chargeTaxMicros: 4_200_000, chargeTotalMicros: 24_200_000, amountMicros: 4_200_000,
-        amountKnown: true, saleRecorded: true, locationVerdict: "AGREED" }
+        amountKnown: true, saleRecorded: true, locationVerdict: "AGREED", currency: "USD" }
     ]);
     const next = await billing.quarterSummaryRows(new Date("2031-04-01T00:00:00Z"), new Date("2031-07-01T00:00:00Z"), { provider: "netopia", environment: "sandbox" });
     expect(next).toEqual([expect.objectContaining({ type: "SALE", chargeId: renewal.chargeId, locationVerdict: null })]);
@@ -572,7 +572,7 @@ describe("P1b — invoices and the tax summary", () => {
     expect(rows.filter((row) => row.type === "CHARGEBACK")).toEqual([
       { type: "CHARGEBACK", chargeId: open.chargeId, at: disputedAt, taxCountry: "RO", taxRegion: null,
         taxStatus: "TAXABLE", chargeNetMicros: 20_000_000, chargeTaxMicros: 4_200_000, chargeTotalMicros: 24_200_000,
-        amountMicros: 24_200_000, amountKnown: true, saleRecorded: true, locationVerdict: null }
+        amountMicros: 24_200_000, amountKnown: true, saleRecorded: true, locationVerdict: null, currency: "USD" }
     ]);
     // C-19: the never-verified charge's charge-back says no sale was recorded for it (and it gives no SALE row).
     const unsoldRows = (await billing.quarterSummaryRows(new Date("2032-01-01T00:00:00Z"), new Date("2032-04-01T00:00:00Z"), { provider: "netopia", environment: "sandbox" }))

@@ -117,7 +117,8 @@ function storyRecord(runId: string, answerId: string, outcome: StoredOutcome): S
     reservation: outcome === "READY_WITH_RESERVATION" ? RESERVATION : null,
     verdictBasis: ready ? STORY_TEST_BASIS : null,
     pointNumbers: ready ? { "node:position": "P1", "node:defeater": "P2" } : null,
-    languageTag: ready ? "ro" : null
+    languageTag: ready ? "ro" : null,
+    storytellerRepairs: 0
   };
 }
 

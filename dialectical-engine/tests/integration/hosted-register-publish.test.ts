@@ -33,6 +33,7 @@ import {
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
   readAdmissionPolicy,
+  readAnswerRoleRotationPolicy,
   readAuthPolicy,
   readBillingPlans,
   readBillingPolicy,
@@ -459,5 +460,51 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     await expect(readBillingPolicy(database.pool, version)).resolves.toMatchObject({ enabled: false });
     expect((await readBillingPlans(database.pool, version))?.plans.map((plan) => plan.planId))
       .toEqual(["FREE", "PLUS", "PRO", "MAX"]);
+  }, 120_000);
+
+  // Role rotation (spec 2026-10-11, Part 1): the optional answerRoleRotation member becomes one row.
+  it("seals answerRoleRotation as the answerRoleRotationPolicy row the boot reader reads, and a file without the member seals none", async () => {
+    const operations = createPostgresHostedRegisterOperations(database.pool);
+    const absent = await publishHostedRegister({ plan: await planOf(hostedFile()), operations });
+    await expect(readAnswerRoleRotationPolicy(
+      database.pool, registerVersionToSafeLegacyNumber(absent.registerVersion)
+    )).resolves.toEqual({ state: "ABSENT" });
+
+    const on = await publishHostedRegister({
+      plan: await planOf({ ...hostedFile(), answerRoleRotation: { enabled: true } }),
+      operations
+    });
+    expect(on.outcome).toBe("CREATED");
+    const onVersion = registerVersionToSafeLegacyNumber(on.registerVersion);
+    await expect(readAnswerRoleRotationPolicy(database.pool, onVersion))
+      .resolves.toEqual({ state: "ON", rule: "LEAST_SHARE_SEEDED_TIE_V1" });
+    const sealed = await database.pool.query<{ value_json: unknown; source_ref: string }>(
+      "SELECT value_json,source_ref FROM register.register_row WHERE register_version=$1 AND row_key='answerRoleRotationPolicy'",
+      [on.registerVersion]
+    );
+    expect(sealed.rows).toEqual([{
+      value_json: { kind: "ANSWER_ROLE_ROTATION_POLICY", enabled: true, rule: "LEAST_SHARE_SEEDED_TIE_V1" },
+      source_ref: "task-14b integration: first hosted register"
+    }]);
+
+    const off = await publishHostedRegister({
+      plan: await planOf({ ...hostedFile(), answerRoleRotation: { enabled: false } }),
+      operations
+    });
+    await expect(readAnswerRoleRotationPolicy(
+      database.pool, registerVersionToSafeLegacyNumber(off.registerVersion)
+    )).resolves.toEqual({ state: "OFF" });
+  }, 120_000);
+
+  it.each([
+    ["a string for enabled", { enabled: "yes" }],
+    ["a member with an extra field", { enabled: true, rule: "LEAST_SHARE_SEEDED_TIE_V1" }],
+    ["a member without enabled", {}],
+    ["a member present as JSON null", null]
+  ])("refuses %s before anything is sealed", async (_name, member) => {
+    const before = await versionCount();
+    const code = await planOf({ ...hostedFile(), answerRoleRotation: member }).then(() => "NO_REFUSAL", hostedRegisterRefusalCode);
+    expect(code).toBe("HOSTED_REGISTER_ROLE_ROTATION_INVALID");
+    expect(await versionCount()).toBe(before);
   }, 120_000);
 });

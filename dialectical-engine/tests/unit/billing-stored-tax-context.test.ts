@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import type { PriceCurrency } from "@debateai/billing-core";
 import type { BillingRepository } from "@debateai/db";
 import {
   sealBillingProfile,
@@ -7,7 +8,9 @@ import {
   type BillingProfile,
   type QuoteLocation
 } from "../../apps/api/src/billing/records.js";
-import { storedTaxContext } from "../../apps/api/src/billing/stored-tax-context.js";
+import { quoteTaxAt, storedTaxContext } from "../../apps/api/src/billing/stored-tax-context.js";
+import { testBillingPolicy } from "../support/billingFixtures.js";
+import { FakeTaxEngine } from "../support/fake-tax-engine.js";
 
 /**
  * P2-M30 follow-up: a later quote for a subscription (renewal, look-ahead, upgrade, downgrade, card change) is priced
@@ -31,7 +34,10 @@ const LATER_PROFILE: BillingProfile = Object.freeze({
   postalCode: "10115", city: "Berlin", street: null, company: COMPANY
 });
 
-function stub(sealedLocation: QuoteLocation) {
+function stub(
+  sealedLocation: QuoteLocation,
+  currencies: Readonly<{ quote: PriceCurrency; subscription: PriceCurrency }> = { quote: "USD", subscription: "USD" }
+) {
   const ownerRef = randomUUID();
   const subscriptionId = randomUUID();
   const quoteId = randomUUID();
@@ -40,14 +46,18 @@ function stub(sealedLocation: QuoteLocation) {
     chargesForSubscription: async (id: string) => id === subscriptionId
       ? [{ chargeId: randomUUID(), subscriptionId, kind: "INITIAL", quoteId }] : [],
     quote: async (id: string, owner: string) => id === quoteId && owner === ownerRef
-      ? { quoteId, ownerRef, locationCiphertext: sealQuoteLocation(KEY, quoteId, sealedLocation).ciphertext } : null,
+      ? {
+          quoteId, ownerRef, locationCiphertext: sealQuoteLocation(KEY, quoteId, sealedLocation).ciphertext,
+          currency: currencies.quote
+        }
+      : null,
     customerByOwner: async (owner: string) => owner === ownerRef
       ? { customerId, locale: "de" } : null,
     latestProfile: async (id: string) => id === customerId
       ? { profileCiphertext: sealBillingProfile(KEY, customerId, LATER_PROFILE).ciphertext, keyId: "k", at: new Date(), locale: "de" }
       : null
   } as unknown as Pick<BillingRepository, "chargesForSubscription" | "quote" | "customerByOwner" | "latestProfile">;
-  return { deps: { billing, recordsKey: KEY }, state: { subscriptionId, ownerRef } };
+  return { deps: { billing, recordsKey: KEY }, state: { subscriptionId, ownerRef, currency: currencies.subscription } };
 }
 
 describe("storedTaxContext prices with the subscription's own checkout VAT id (P2-M30)", () => {
@@ -68,5 +78,26 @@ describe("storedTaxContext prices with the subscription's own checkout VAT id (P
   it("control: a sealed company whose VAT id was not validated prices without a tax id", async () => {
     const { deps, state } = stub(location({ ...COMPANY, vatValidated: false }));
     expect((await storedTaxContext(deps, state)).taxId).toBeNull();
+  });
+});
+
+/**
+ * Spec 2026-10-05 §2.16.3 (Part C): every later quote of a subscription is in its own currency, CREATED's, which its
+ * checkout quote was priced in; a subscription and a checkout quote that disagree are not ours to price.
+ */
+describe("storedTaxContext carries the subscription's currency (Part C)", () => {
+  it("a RON subscription with a RON checkout quote prices every later quote in RON", async () => {
+    const { deps, state } = stub(location(null), { quote: "RON", subscription: "RON" });
+    const context = await storedTaxContext(deps, state);
+    expect(context.currency).toBe("RON");
+    const tax = new FakeTaxEngine();
+    await quoteTaxAt(tax, testBillingPolicy, context, 100_000_000, new Date("2026-10-10T08:00:00.000Z"));
+    expect(tax.quotedCurrencies).toEqual(["RON"]);
+  });
+
+  it("refuses a RON subscription whose checkout quote is EUR", async () => {
+    const { deps, state } = stub(location(null), { quote: "EUR", subscription: "RON" });
+    await expect(storedTaxContext(deps, state))
+      .rejects.toThrowError(expect.objectContaining({ code: "BILLING_CURRENCY_MISMATCH" }));
   });
 });

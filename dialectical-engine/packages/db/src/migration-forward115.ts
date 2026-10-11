@@ -3,12 +3,12 @@ import { readFile } from 'node:fs/promises';
 import type { PoolClient } from 'pg';
 import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-chain.js';
 
-/** The data export as the chain step after the auth DB batch's 0112 (mission data-export S01, V-30; migrations/lineage/README.md). */
-const NAME='0113_data_export.sql';
-const VERSION='data-export-forward113-v1';
-const MANIFEST_PATH='lineage/data-export-forward113.json';
-const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0113 adds no billing relation or function, so it names the verifier in force (0111's, which 0112 keeps)
-const PREVIOUS='0112_auth_db_batch.sql';
+/** The data export as the chain step after role rotation's 0114 (mission data-export S01, V-41; migrations/lineage/README.md). */
+const NAME='0115_data_export.sql';
+const VERSION='data-export-forward115-v1';
+const MANIFEST_PATH='lineage/data-export-forward115.json';
+const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0115 adds no billing relation or function, so it names the verifier in force (0111's, which 0112, 0113 and 0114 keep)
+const PREVIOUS='0114_role_rotation.sql';
 const FUNCTIONS=[
  'identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)',
  'identity.valid_consumer_authorization_internal(jsonb)',
@@ -18,12 +18,12 @@ const FUNCTIONS=[
  'identity.fail_data_export(uuid,uuid,text)','identity.sweep_data_exports()','identity.mark_data_export_key_destroyed(uuid)',
  'identity.live_data_export_ids(uuid[])','identity.open_data_export_link(uuid,text)','identity.record_data_export_download(uuid,uuid,jsonb)'
 ] as const;
-const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD113_${detail}`);};
+const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD115_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 const exactKeys=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
 const digest=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
 
-/** 0113's table, its 14 functions, the worker role, the identity schema grant it adds and the action CHECK it replaces. */
+/** 0115's table, its 14 functions, the worker role, the identity schema grant it adds and the action CHECK it replaces. */
 async function postconditionEvidence(client:PoolClient):Promise<string>{
  const functions=(await client.query(`
   SELECT signature,pg_get_userbyid(p.proowner) owner,p.prosecdef definer,p.proconfig config,p.provolatile volatility,
@@ -60,7 +60,7 @@ async function postconditionEvidence(client:PoolClient):Promise<string>{
  return sha(JSON.stringify({functions,table,role,memberships,effectiveMemberships,check}));
 }
 
-export async function loadForward113(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
+export async function loadForward115(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
  const directory=new URL('../../../migrations/',import.meta.url);
  const bytes=await readFile(new URL(MANIFEST_PATH,directory));const raw:unknown=JSON.parse(bytes.toString('utf8'));
  if(!exactKeys(raw,['version','baseRecipeSha256','previous','migration','verifier'])||raw.version!==VERSION||raw.baseRecipeSha256!==anchor.baseRecipeSha256

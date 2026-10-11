@@ -149,6 +149,46 @@ export function storySeatRoleMaker(
 }
 
 /**
+ * Role rotation, Task 12 (spec 2026-10-11 Part 6, "Story roles"; the orchestrator's "always an answer"): a rotated
+ * run's story pair. A pinned story member that is claim-eligible keeps its role. One that is not hands it to another
+ * claim-eligible member of the run's STORED panel (`discoveredPanel`), in that panel's order, skipping every member not
+ * claim-eligible:
+ * - the storyteller: the first member of another maker than the pinned story checker, when that checker can serve
+ *   (so the pinned checker keeps its role whenever it can); otherwise the first member;
+ * - the story checker: the pinned one when it can serve and its maker differs from the storyteller ACTUALLY serving
+ *   (re-checked when the storyteller fell back); otherwise the first member of another maker than that storyteller.
+ * A role with no such member reads null, and the story package then takes the register's story ref, exactly as for a
+ * FALLBACK seat; the runner resolves that ref on a rotated run only when it is a panel ref, else STORY_ROLE_UNAVAILABLE.
+ * A claim-eligible member that is not on the panel is never taken. Pure; each member keeps its own gateway object.
+ */
+export function storyRotationRoleMakers(input: Readonly<{
+  panelRefs: readonly string[];
+  claimEligible: readonly Readonly<{ provider: StoryRoleMaker["provider"]; providerRef: string; maker: string }>[];
+  storytellerRef: string;
+  storyCheckerRef: string;
+}>): StoryRunRoleMakers {
+  const eligibleByRef = new Map(input.claimEligible.map((member) => [member.providerRef, member] as const));
+  const seen = new Set<string>();
+  const inPanelOrder = input.panelRefs.flatMap((ref) => {
+    const member = eligibleByRef.get(ref);
+    if (member === undefined || seen.has(ref)) return [];
+    seen.add(ref);
+    return [member];
+  });
+  const pinnedStoryteller = inPanelOrder.find((member) => member.providerRef === input.storytellerRef);
+  const pinnedChecker = inPanelOrder.find((member) => member.providerRef === input.storyCheckerRef);
+  const storyteller = pinnedStoryteller
+    ?? inPanelOrder.find((member) => pinnedChecker === undefined || member.maker !== pinnedChecker.maker)
+    ?? inPanelOrder[0];
+  const checker = pinnedChecker !== undefined && pinnedChecker.maker !== storyteller?.maker
+    ? pinnedChecker
+    : inPanelOrder.find((member) => member.maker !== storyteller?.maker);
+  const roleMaker = (member: (typeof inPanelOrder)[number] | undefined): StoryRoleMaker | null =>
+    member === undefined ? null : Object.freeze({ provider: member.provider, providerRef: member.providerRef });
+  return Object.freeze({ storyteller: roleMaker(storyteller), checker: roleMaker(checker) });
+}
+
+/**
  * The arrows in the engine's fixed order. An arrow the order does not list is
  * never dropped: it follows, in the order it was read, so every argued point
  * keeps the arrow that ties it to the debate.

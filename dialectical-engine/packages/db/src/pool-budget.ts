@@ -1,0 +1,76 @@
+/**
+ * How many Postgres connections each always-on process may hold, pool by pool,
+ * and how long a caller waits for one before it is told the database is busy.
+ *
+ * Pre-launch budget, 2026-10-10. The server allows 200 connections (3 kept for
+ * the superuser) and Hatchet's role may take 50 of them. Owner rulings that day:
+ * size for ONE API process — the server runs exactly one — and let the runner
+ * run at most 8 debates at once. One API is 80 connections at most and the
+ * runner 20, which leaves room for Hatchet, the migrator, the operator's
+ * commands and spare. A second API process needs PgBouncer or a higher limit
+ * first. The plan, the per-pool audit and the arithmetic:
+ * docs/operations/2026-10-10-database-connection-budget.md; the guard that keeps
+ * main.ts and these numbers in step: tests/architecture/database-connection-budget.test.ts.
+ *
+ * A pool only opens a connection when it needs one and closes it after 10 s
+ * idle, so `max` is a ceiling, not a reservation. `connectionTimeoutMillis`
+ * bounds the wait for a free connection as well as the opening of a new one;
+ * past it the caller gets a busy failure (isDatabasePoolBusy) that the API
+ * answers with a retryable 503, where before it waited for ever.
+ *
+ * `name` is sent as the connection's application_name, so pg_stat_activity
+ * says which pool holds which connection.
+ */
+export type DatabasePoolBudget = Readonly<{ name: string; max: number; connectionTimeoutMillis: number }>;
+
+function budget(name: string, max: number, connectionTimeoutMillis: number): DatabasePoolBudget {
+  return Object.freeze({ name, max, connectionTimeoutMillis });
+}
+
+export const API_DATABASE_POOLS = Object.freeze({
+  // Almost every read and write. A content lease holds one connection while its
+  // body takes a second, so 8 overlapping reads need 17; billing's timers and
+  // the other background loops take the rest.
+  runtime: budget("api:runtime", 20, 5_000),
+  // Every signed-in request, a session check every 250 ms per open debate
+  // page, and recovery mail that holds one across a send of up to 5 s.
+  authorization: budget("api:authorization", 12, 5_000),
+  // The 30 s cleanup timer runs two cleanups at once, each a lease plus a query.
+  publicationCleanup: budget("api:publication-cleanup", 4, 5_000),
+  // Only the single-flight erasure cycle uses it at run time.
+  contentProvision: budget("api:content-provision", 2, 5_000),
+  // One per ask in flight. Asks are meant to wait their turn here, so the wait
+  // is longer than for a page read.
+  serverAskAdmission: budget("api:ask-admission-server", 4, 10_000),
+  legacyAskAdmission: budget("api:ask-admission-legacy", 2, 10_000),
+  // The room decision holds the site's day lock; waiters queue on this pool,
+  // never on the pool that decision needs (packages/budget/src/spend-lock.ts).
+  roomDecision: budget("api:room-decision", 4, 10_000),
+  // The erasure timer holds a notice lease plus one more; deletes wait here.
+  erasure: budget("api:erasure", 4, 5_000),
+  // Development only: the runtime environment refuses it anywhere else.
+  evaluatorDevMenu: budget("api:evaluator-dev-menu", 2, 5_000),
+  // Opening a support case holds one connection and reads the messages on another.
+  support: budget("api:support", 6, 5_000),
+  // Every relay slot the register may allow (16, live, no restart) holds one
+  // for the whole AI call, plus 2 for the queue's bookkeeping.
+  supportRelayLease: budget("api:support-relay-lease", 18, 5_000),
+  // The data export worker (mission data-export S01; opened only when DATA_EXPORT_STORE_PATH is set): one build at a
+  // time (single-flight timer) holds its snapshot read while its lease renewal takes the second.
+  dataExport: budget("api:data-export", 2, 5_000)
+});
+
+/** The support settings reader (API and the support commands): it gives up after 200 ms by design. */
+export const SUPPORT_CONTROL_PLANE_POOL = budget("support:control", 2, 200);
+
+/**
+ * Debates one runner process runs at once. Each holds its content lease for
+ * the whole debate and takes a second connection for spend and memory reads,
+ * so the runner's pool is twice this plus 4 for the claim, the start-up
+ * reconciliation and the story writer. Further debates wait in Hatchet's queue.
+ */
+export const RUNNER_CAPACITY = Object.freeze({ concurrentRuns: 8 });
+
+export const RUNNER_DATABASE_POOLS = Object.freeze({
+  runtime: budget("runner:runtime", RUNNER_CAPACITY.concurrentRuns * 2 + 4, 5_000)
+});

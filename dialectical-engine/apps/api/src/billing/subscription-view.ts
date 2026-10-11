@@ -124,6 +124,7 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
     renews_on: iso(renewsOn),
     renewal_total: !chargedAgain || state.announcedTotalMicros === null
       ? null : microsToDecimal(state.announcedTotalMicros),
+    currency: state.currency,
     scheduled_downgrade_plan_id: state.scheduledDowngradePlanId === null ? null : paidPlanOf(state.scheduledDowngradePlanId),
     withdrawal_open_until: iso(withdrawal?.closesAt ?? null),
     withdrawal_last_day: withdrawal?.lastDay ?? null,
@@ -153,6 +154,7 @@ export async function listInvoices(
       number: row.series === null ? row.number : `${row.series}-${row.number}`,
       issued_on: row.at.toISOString().slice(0, 10),
       total: microsToDecimal(row.totalMicros),
+      currency: row.currency,
       kind: row.kind,
       url: row.url
     }))

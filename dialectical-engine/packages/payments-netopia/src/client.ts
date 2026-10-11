@@ -15,6 +15,9 @@ import {
  * retry, no redirect followed. Every error is one of N1's payment codes; its detail is an HTTP status, a transport code,
  * `timeout`, `transport`, `redirect`, `json` or `size` — never NETOPIA's text, our request, or the token.
  */
+// One POS takes RON, EUR and USD (spec 2026-10-05 §2.16.4, N-14). If NETOPIA needs one POS per currency, posSignature
+// becomes a choice by the request's currency here (hosted start and saved-card charge) and by the charge's currency in
+// the status read (buildStatusBody's posID).
 export type NetopiaConfig = Readonly<{ baseUrl: string; apiKey: string; posSignature: string }>;
 export type NetopiaDeps = Readonly<{ fetch?: typeof fetch; now?: () => Date }>;
 

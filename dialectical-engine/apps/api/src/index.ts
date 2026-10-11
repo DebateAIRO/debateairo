@@ -98,6 +98,7 @@ import {
   AskRoomResponseSchema
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
+import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
 import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
@@ -106,6 +107,8 @@ import {
   RunRepository,
   decryptLeasedContentForRun,
   insertRunRoleAssignment,
+  insertRunRoleRotation,
+  isDatabasePoolBusy,
   prepareLeasedContentEncryptionForRun,
   queryPrivateStream,
   withOwnerAskAdmissionLease,
@@ -153,7 +156,15 @@ import {
   type PersonRoomInput,
   type PersonRoomPick
 } from "./person-room-picker.js";
-import { RoleAssignmentSchema, type RoleAssignment, type Scorecard } from "@debateai/scorecard";
+import {
+  RoleAssignmentSchema,
+  pickRotatedRoles,
+  roleRotationSeed,
+  type RoleAssignment,
+  type RoleRotationCounts,
+  type RotatedRoles,
+  type Scorecard
+} from "@debateai/scorecard";
 import {
   ASK_MODEL_ASSIGNMENT_INVALID,
   ASK_MODEL_REFUSALS,
@@ -683,8 +694,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RISK_TIER_POLICY_PROVENANCE_MISSING",
   "RISK_TIER_POLICY_UNRESOLVED",
   "RIVAL_CARVER_UNAVAILABLE",
+  "RUNNER_CLAIM_LOST",
   "RUNNER_DISCLOSURE_PIPELINE_FAILED",
   "RUNNER_FAILURE_STATE_NOT_RECORDED",
+  "RUNNER_TIME_LIMIT_REACHED",
   "RUN_CEILING_BELOW_FIRST_CALL",
   "RUN_CEILING_BELOW_ONE_CALL",
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
@@ -705,6 +718,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_OWNER_REF_INVALID",
   "RUN_PRINCIPAL_SESSION_MISMATCH",
   "RUN_ROLE_ASSIGNMENT_INVALID",
+  "RUN_ROLE_ROTATION_INVALID",
   "SCALAR_DECISION_CANNOT_SPAWN",
   "SCORECARD_INTERVAL_INVALID",
   "SCORECARD_TASK_CLASS_AMBIGUOUS",
@@ -1796,8 +1810,13 @@ export function askRefusalPublicMessage(code: string, message: string): string {
   return code === "DAILY_COST_ENVELOPE_REACHED" ? code : message;
 }
 
-/** The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. */
-export function askRefusalRetryAfter(code: string, now: Date): string | null {
+/**
+ * The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. A refusal that
+ * names its own retry instant uses that one, whatever its status: the preview gate's day ends at
+ * Bucharest midnight, and a preview gate that cannot be used right now asks for about a minute.
+ */
+export function askRefusalRetryAfter(code: string, now: Date, retryAt?: Date): string | null {
+  if (retryAt !== undefined && Number.isFinite(retryAt.getTime()) && retryAt.getTime() > now.getTime()) return retryAt.toUTCString();
   if (askRefusalStatus(code) !== 429) return null;
   const midnight = new Date(Date.UTC(
     now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1
@@ -1805,13 +1824,25 @@ export function askRefusalRetryAfter(code: string, now: Date): string | null {
   return midnight.toUTCString();
 }
 
+/**
+ * Connection budget (2026-10-10): the one envelope for a busy database, and how
+ * long a well-behaved client waits before trying again. The site's own pages
+ * treat any 503 as "try again in a moment" (apps/ui/lib/v3/requestFailure.ts).
+ */
+const SERVICE_BUSY_CODE = "SERVICE_BUSY";
+const SERVICE_BUSY_RETRY_AFTER_SECONDS = "2";
+
 export class AskRefusal extends Error {
   readonly code: string;
+  /** The refusal's own reset instant, when it names one (the preview's Bucharest day). */
+  readonly retryAt?: Date;
 
   constructor(refusal: TypedDomainError) {
     super(refusal.message);
     this.name = "AskRefusal";
     this.code = refusal.code;
+    const retryAt = (refusal as TypedDomainError & Readonly<{ retryAt?: unknown }>).retryAt;
+    if (retryAt instanceof Date) this.retryAt = retryAt;
   }
 }
 
@@ -2478,16 +2509,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // fall through to the generic 500 branch, whose body is `knownError.message`
     // — for these that message IS the internal ARGON2_* code.
     const argon2Unavailable = knownError instanceof Argon2InfrastructureError;
+    // Connection budget (2026-10-10): a database pool that could not hand out a
+    // connection within its wait limit, or a full server, is busy, not broken —
+    // one constant retryable 503 that names neither the database nor the pool.
+    const databaseBusy = !malformed && !authFlow && !argon2Unavailable && !askRefusal
+      && isDatabasePoolBusy(knownError);
     const statusCode = malformed ? 400
       : authFlow ? knownError.statusCode
-        : argon2Unavailable ? 503
+        : argon2Unavailable || databaseBusy ? 503
           // R1: an ask refusal is 422, except the one that will pass tomorrow.
           : askRefusal ? askRefusalStatus(knownError.code) : 500;
     const errorCode = malformed
       ? "MALFORMED_REQUEST"
       : authFlow ? knownError.code
         : argon2Unavailable ? AUTH_RETRYABLE_UNAVAILABLE_CODE
-          : askRefusal ? knownError.code : "INTERNAL_ERROR";
+          : databaseBusy ? SERVICE_BUSY_CODE
+            : askRefusal ? knownError.code : "INTERNAL_ERROR";
     if (statusCode >= 500) {
       console.error(JSON.stringify(Object.freeze({
         event: "api.request.failed",
@@ -2499,7 +2536,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     // R1: `Retry-After` names the instant the daily envelope resets, so a client
     // library that honours the header waits exactly as long as it must.
-    const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date()) : null;
+    const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date(), knownError.retryAt)
+      : databaseBusy ? SERVICE_BUSY_RETRY_AFTER_SECONDS : null;
     if (retryAfter !== null) reply.header("retry-after", retryAfter);
     // I6: the spend figures the refusal carries are the OPERATOR's, so they are
     // logged here and withheld from the body below.
@@ -3814,6 +3852,12 @@ export class HatchetDispatcher implements Dispatcher {
 
 export interface RunCreationSettings {
   readonly previewProviderTestConfig?: PreviewProviderTestConfig;
+  /**
+   * Contract A §5: the preview's start-of-debate estimate asks the gate what is left today.
+   * Read only with `previewProviderTestConfig`; absent there, every preview ask is refused
+   * (fail closed). Off the preview it is never asked.
+   */
+  readonly previewBudgetGate?: PreviewBudgetGateSettings;
   /** Step 1: the preview's team; `submit` refuses everyone else (the route refuses them first). */
   readonly previewTeamUserIds?: readonly string[];
   readonly strangerSampleRate: number;
@@ -3876,6 +3920,12 @@ export interface RunCreationSettings {
    * assignment is pinned.
    */
   readonly modelPicker?: AskModelPickerSettings;
+  /**
+   * Role rotation (spec 2026-10-11): present only when the register's answerRoleRotationPolicy row is ON.
+   * Asked only for a debate with two or more makers and no scorecard assignment (a VALID scorecard
+   * admits through `admitWithScorecard`, which never reads it). Absent: today's fixed roles, byte for byte.
+   */
+  readonly roleRotation?: Readonly<{ readCounts: () => Promise<RoleRotationCounts> }>;
 }
 
 /** One planned admission: the run's basis, panel and (with a VALID scorecard) its assignment. */
@@ -3886,6 +3936,8 @@ export type PlannedAskAdmission = {
   readonly criticUnavailableCap: ReturnType<typeof applyCriticUnavailableCap>;
   /** A20: present only when a VALID scorecard drove admission. */
   readonly modelAssignment?: AdmittedModelAssignment;
+  /** Role rotation (spec 2026-10-11): the four roles picked for this debate, pinned by submit before the work is queued. */
+  readonly roleRotation?: RotatedRoles;
   /** S2: the figure the run's hold opens with when the picker planned it (hosted); B6 uses its estimator otherwise. */
   readonly pickedHoldMicros?: number;
   /** S2 / A5: nothing fitted the person's room at any strength; the debate starts on the cheapest choice the site allows (logged when it does). */
@@ -4151,10 +4203,14 @@ async function admitWithScorecard(input: Readonly<{
   return Object.freeze({ ...planned, ifStartsNow: await admitPicked(pickAt(nowAt)) });
 }
 
+/** Role rotation: how long a refused ask whose counts could not be read is asked to wait (spec: one minute). */
+const ROLE_ROTATION_UNAVAILABLE_RETRY_MS = 60_000;
+
 export async function evaluateAskAdmission(
   settings: RunCreationSettings,
   ask: AskRequest,
-  personRoom: PersonRoomInput | null = null
+  personRoom: PersonRoomInput | null = null,
+  previewAdmissionLock?: PreviewAdmissionLock
 ): Promise<AskAdmission> {
   const previewConfig=validatePreviewProviderTestConfig(settings.previewProviderTestConfig);
   if(previewConfig!==undefined&&settings.modelPicker?.scorecard.state==="VALID")
@@ -4223,6 +4279,28 @@ export async function evaluateAskAdmission(
   } catch (error) {
     markAskRefusal(error);
   }
+  // Role rotation (spec 2026-10-11 Part 4): picked here, before the estimate, from this debate's own
+  // panel. Only on this path (no scorecard assignment), only with the row ON and two or more makers.
+  // The seed and the question stay in memory: never logged, stored or sent.
+  let roleRotation: RotatedRoles | null = null;
+  if (settings.roleRotation !== undefined && new Set(filteredPanel.map((entry) => entry.maker)).size >= 2) {
+    let counts: RoleRotationCounts;
+    try {
+      counts = await settings.roleRotation.readCounts();
+    } catch (error) {
+      // Ruling H (connection budget, #129): a busy pool or a full server is the API's one
+      // SERVICE_BUSY 503, as everywhere else; still never admitted with unpinned roles.
+      if (isDatabasePoolBusy(error)) throw error;
+      // Never admitted with unpinned roles: the existing "cannot be reached right now" refusal,
+      // with its one-minute retry. The operator's line names no question (ids and codes only).
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.ask.role_rotation_counts_unavailable",
+        diagnostic: apiOperationalErrorDiagnostic(error)
+      })));
+      return markAskRefusal(new PreviewGateUnavailableRefusal(new Date(Date.now() + ROLE_ROTATION_UNAVAILABLE_RETRY_MS)));
+    }
+    roleRotation = pickRotatedRoles({ panel: filteredPanel, counts, seed: roleRotationSeed(ask) });
+  }
   let envelopeBasis: Readonly<Record<string, unknown>>;
   try {
     envelopeBasis = await settings.resolveEnvelopeBasis({
@@ -4235,11 +4313,28 @@ export async function evaluateAskAdmission(
   } catch (error) {
     markAskRefusal(error);
   }
+  // Owner's rule (never stop a debate half-way): on the preview, the debate's estimated calls and
+  // money must fit what the gate has left today, BEFORE any run exists. The panel is known and the
+  // basis resolved; the only model calls so far are discovery's. A refusal is the daily code (429).
+  if (previewConfig !== undefined) {
+    try {
+      // Review finding 2: with the submit's lock, taken here and held until the debate is queued.
+      await assertPreviewBudgetAdmits(settings.previewBudgetGate, {
+        basis: envelopeBasis,
+        panel: filteredPanel,
+        storyTier: ask.composition_budget_tier,
+        rotated: roleRotation !== null
+      }, undefined, previewAdmissionLock);
+    } catch (error) {
+      markAskRefusal(error);
+    }
+  }
   return {
     risk,
     envelopeBasis,
     discoveredPanel: filteredPanel,
-    criticUnavailableCap: applyCriticUnavailableCap(makerAvailability)
+    criticUnavailableCap: applyCriticUnavailableCap(makerAvailability),
+    ...(roleRotation === null ? {} : { roleRotation })
   };
 }
 
@@ -4267,11 +4362,13 @@ function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> |
  * the owner's record of the interim roster swap, written before the run's first
  * job on either path; no run spends on the swapped roster without it. And the
  * pinned model assignment (A20, paid plans S1a): `MODEL_ASSIGNMENT`, on either
- * path after `COST_RECORD` and before the memory question.
+ * path after `COST_RECORD` and before the memory question. And the role rotation pin
+ * (spec 2026-10-11 Part 4): `ROLE_ROTATION`, on either path next to `MODEL_ASSIGNMENT`
+ * (a debate has one or the other, never both) and before the memory question.
  */
 type RunSetupStep =
   | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD" | "PLAN_CHANGED"
-  | "COST_RECORD" | "MODEL_ASSIGNMENT";
+  | "COST_RECORD" | "MODEL_ASSIGNMENT" | "ROLE_ROTATION";
 
 /**
  * What `evaluateAskAdmission` admits an ask with. B8 keeps two inside
@@ -4447,7 +4544,13 @@ export class PostgresAskApplication implements AskApplication {
       );
       return Object.freeze({ ...accepted, ...appliedField });
     }
-    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment } = await evaluateAskAdmission(this.settings, ask);
+    // Review finding 2 (preview only): one ask at a time is estimated and started. The lock is taken
+    // inside admission just before the estimate, and released once this debate's first job is queued
+    // (or on any refusal or failure), so the next ask's estimate already holds this debate.
+    const previewAdmissionLock = validatePreviewProviderTestConfig(this.settings.previewProviderTestConfig) === undefined
+      ? undefined : this.settings.previewBudgetGate?.openAdmissionLock?.();
+    try {
+    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment, roleRotation } = await evaluateAskAdmission(this.settings, ask, null, previewAdmissionLock);
     const argumentLanguage = detectArgumentLanguage(ask.question_line);
     let runId:string;
     // Set the moment startRun commits: the lease's release can still throw
@@ -4534,6 +4637,14 @@ export class PostgresAskApplication implements AskApplication {
         });
         setupStep = "MEMORY_QUESTION";
       }
+      // Role rotation (spec 2026-10-11): the four roles are pinned beside the run (core.run_role_rotation,
+      // append-only) BEFORE its work is queued, so no runner can claim a rotated debate without them. A failed
+      // pin records the run FAILED (RUN_SETUP_FAILED:ROLE_ROTATION). No rotation: nothing is pinned.
+      if (roleRotation !== undefined) {
+        setupStep = "ROLE_ROTATION";
+        await insertRunRoleRotation(this.pool, { runId, ...roleRotation });
+        setupStep = "MEMORY_QUESTION";
+      }
       await this.#serve.recordMemoryQuestion({
         runId,
         questionLine: ask.question_line,
@@ -4549,6 +4660,8 @@ export class PostgresAskApplication implements AskApplication {
         ...firstRunJob(runId),
         nodeSet: []
       });
+      // The job is READY: the next ask's estimate holds this debate from here on.
+      await previewAdmissionLock?.release();
       setupStep = "DISPATCH";
       await this.dispatcher.dispatch({ runId, workItemId });
     } catch (error) {
@@ -4564,6 +4677,9 @@ export class PostgresAskApplication implements AskApplication {
           model_strength_stepped_down: modelAssignment.steppedDown,
           ...appliedField
         };
+    } finally {
+      await previewAdmissionLock?.release();
+    }
   }
 
   /**
@@ -4768,6 +4884,13 @@ export class PostgresAskApplication implements AskApplication {
               steppedDown: evaluated.modelAssignment.steppedDown
             });
             pinned.assignment = evaluated.modelAssignment;
+          }
+          // Role rotation (spec 2026-10-11 Part 4): the same setup step for START and WAIT alike, before the
+          // hold, the place in line and the first job. The pick is `evaluated`'s, the admission the run was
+          // created from; a WAIT keeps it, and the waker starts the run on it without picking again.
+          if (evaluated.roleRotation !== undefined) {
+            setupStep = "ROLE_ROTATION";
+            await insertRunRoleRotation(this.pool, { runId, ...evaluated.roleRotation });
           }
           pinned.personRoomTight = admission.kind === "START" && evaluated.personRoomTight === true;
           setupStep = "MEMORY_QUESTION";

@@ -1,16 +1,16 @@
--- 0113 — the account data export (mission data-export S01). The forward step after dev's 0112 (auth DB batch): its manifest
--- lineage/data-export-forward113.json binds these bytes (migrations/lineage/README.md). It replaces two 0107 functions,
+-- 0115 — the account data export (mission data-export S01). The forward step after dev's 0114 (role rotation): its manifest
+-- lineage/data-export-forward115.json binds these bytes (migrations/lineage/README.md). It replaces two 0107 functions,
 -- so it first refuses unless each still holds the body 0107 gave it (the chain runs a step's SQL once; replays read its receipt).
-DO $dx113_requires$
+DO $dx115_requires$
 BEGIN
   IF encode(sha256(convert_to((SELECT prosrc FROM pg_proc WHERE oid=to_regprocedure('identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)')),'UTF8')),'hex')
        IS DISTINCT FROM '728977e0a52dc1820f26fe07dca72a99775f4295039cf7a4ad04bda1a9935c3b'
     OR encode(sha256(convert_to((SELECT prosrc FROM pg_proc WHERE oid=to_regprocedure('identity.valid_consumer_authorization_internal(jsonb)')),'UTF8')),'hex')
        IS DISTINCT FROM 'cb189f5f59917b30668216415f89226f65377a4237856dfeb363a8fb50f8352b' THEN
-    RAISE EXCEPTION 'DATA_EXPORT_0113_REQUIRES_0107_BODIES';
+    RAISE EXCEPTION 'DATA_EXPORT_0115_REQUIRES_0107_BODIES';
   END IF;
 END
-$dx113_requires$;
+$dx115_requires$;
 
 -- Private, replay-safe account export queue. Function grants are closed below.
 CREATE TABLE IF NOT EXISTS identity.data_export (
@@ -241,7 +241,7 @@ BEGIN
     'billing',jsonb_build_object('customers',COALESCE((SELECT jsonb_agg(jsonb_build_object('customer_id',r.customer_id,'created_at',r.created_at,'created_locale',r.created_locale) ORDER BY r.created_at,to_jsonb(r)) FROM billing.customer r WHERE r.owner_ref=v_owner),'[]'::jsonb),
     'customer_xmoney',COALESCE((SELECT jsonb_agg(jsonb_build_object('customer_id',r.customer_id,'environment',r.environment,'xmoney_customer_id',r.xmoney_customer_id,'at',r.at) ORDER BY r.at,to_jsonb(r)) FROM billing.customer_xmoney r WHERE r.customer_id IN (SELECT customer_id FROM billing.customer WHERE owner_ref=v_owner)),'[]'::jsonb),
     'customer_profile_events',COALESCE((SELECT jsonb_agg(jsonb_build_object('customer_id',r.customer_id,'at',r.at,'locale',r.locale,'profile_ciphertext',encode(r.profile_ciphertext,'base64')) ORDER BY r.at,to_jsonb(r)) FROM billing.customer_profile_event r WHERE r.customer_id IN (SELECT customer_id FROM billing.customer WHERE owner_ref=v_owner)),'[]'::jsonb),
-    'quotes',COALESCE((SELECT jsonb_agg(jsonb_build_object('quote_id',r.quote_id,'plan_id',r.plan_id,'kind',r.kind,'net_micros',r.net_micros,'tax_micros',r.tax_micros,'total_micros',r.total_micros,'tax_country',r.tax_country,'tax_region',r.tax_region,'tax_rate_bp',r.tax_rate_bp,'tax_status',r.tax_status,'tax_name',r.tax_name,'quaderno_ref',r.quaderno_ref,'created_at',r.created_at,'expires_at',r.expires_at,'location_ciphertext',encode(r.location_ciphertext,'base64'),'recurring_total_micros',r.recurring_total_micros) ORDER BY r.created_at,to_jsonb(r)) FROM billing.quote r WHERE r.owner_ref=v_owner),'[]'::jsonb),
+    'quotes',COALESCE((SELECT jsonb_agg(jsonb_build_object('quote_id',r.quote_id,'plan_id',r.plan_id,'kind',r.kind,'net_micros',r.net_micros,'tax_micros',r.tax_micros,'total_micros',r.total_micros,'tax_country',r.tax_country,'tax_region',r.tax_region,'tax_rate_bp',r.tax_rate_bp,'tax_status',r.tax_status,'tax_name',r.tax_name,'quaderno_ref',r.quaderno_ref,'created_at',r.created_at,'expires_at',r.expires_at,'location_ciphertext',encode(r.location_ciphertext,'base64'),'recurring_total_micros',r.recurring_total_micros,'currency',r.currency) ORDER BY r.created_at,to_jsonb(r)) FROM billing.quote r WHERE r.owner_ref=v_owner),'[]'::jsonb),
     'subscription_events',COALESCE((SELECT jsonb_agg(jsonb_build_object('kind',r.kind,'at',r.at,'plan_id',r.plan_id,'period_anchor_at',r.period_anchor_at,'xmoney_order_id',r.xmoney_order_id,'xmoney_customer_id',r.xmoney_customer_id,'card_ref',r.card_ref,'data',r.data) ORDER BY r.at,to_jsonb(r)) FROM billing.subscription_event r WHERE r.owner_ref=v_owner),'[]'::jsonb),
     'entitlement_events',COALESCE((SELECT jsonb_agg(jsonb_build_object('plan_id',r.plan_id,'effective_at',r.effective_at,'period_anchor_at',r.period_anchor_at,'cause',r.cause,'month_credit_override_micros',r.month_credit_override_micros,'paid_through',r.paid_through,'recorded_at',r.recorded_at) ORDER BY r.effective_at,to_jsonb(r)) FROM billing.entitlement_event r WHERE r.owner_ref=v_owner),'[]'::jsonb),
     'run_charge_scopes',COALESCE((SELECT jsonb_agg(jsonb_build_object('run_id',r.run_id,'plan_id',r.plan_id,'admitted_at',r.admitted_at,'recorded_at',r.recorded_at,'funding_kind',r.funding_kind) ORDER BY r.admitted_at,to_jsonb(r)) FROM billing.run_charge_scope r WHERE r.owner_ref=v_owner),'[]'::jsonb),

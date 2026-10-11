@@ -185,6 +185,22 @@ describe("M5 · the disclosure contract", () => {
     for (const forbidden of ["http://", "https://", "authorization", "price", "base_url"]) expect(text).not.toContain(forbidden);
   });
 
+  it("says lower-cost only for a role a cheaper model served for money, never for a stand-in for an unavailable model (role rotation)", () => {
+    // Task 11: the writer's pinned model was unavailable at claim and the sealed writer stood in (ROLE_UNAVAILABLE);
+    // the checker was moved to a cheaper model (MONEY). The page already names who served; only money says lower-cost.
+    const disclosure = AnswerDisclosureSchema.parse(buildAnswerDisclosure({
+      ...FALLBACK_READ,
+      row: storedRow({ ...FALLBACK_READ.row, writerFallbackReason: "ROLE_UNAVAILABLE", checkerFallbackReason: "MONEY" })
+    }));
+    expect(disclosure.writer?.lower_cost).toBe(false);
+    expect(disclosure.checker?.lower_cost).toBe(true);
+    const both = buildAnswerDisclosure({
+      ...FALLBACK_READ,
+      row: storedRow({ ...FALLBACK_READ.row, fallbackReason: null, writerFallbackReason: "ROLE_UNAVAILABLE", checkerFallbackReason: "ROLE_UNAVAILABLE" })
+    });
+    expect([both.writer?.lower_cost, both.checker?.lower_cost]).toEqual([false, false]);
+  });
+
   it("keeps a planned model it cannot name as null, and returns no digest when none was handed to the writer", () => {
     const disclosure = buildAnswerDisclosure({
       row: storedRow({

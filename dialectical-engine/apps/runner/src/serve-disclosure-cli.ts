@@ -31,6 +31,7 @@ import {
   createPool,
   RunCostSubstitutionRepository,
   ServeDisclosureRepository,
+  serveDisclosureFallbackReasonOf,
   type Pool,
   type RunCostSubstitution,
   type ServeDisclosureModel,
@@ -121,6 +122,17 @@ function substitutionLines(substitutions: readonly RunCostSubstitution[] | undef
   ];
 }
 
+/** Role rotation, Task 11: the roles a sealed register model stood in for, its pinned model being unavailable. */
+function standInLines(row: ServeDisclosureReport["row"]): readonly string[] {
+  const roles = [
+    ...(serveDisclosureFallbackReasonOf(row, "writer") === "ROLE_UNAVAILABLE" ? ["the answer writer"] : []),
+    ...(serveDisclosureFallbackReasonOf(row, "checker") === "ROLE_UNAVAILABLE" ? ["the answer checker"] : [])
+  ];
+  return roles.length === 0
+    ? []
+    : [`a planned model was unavailable when the debate started, so the register's model stood in for: ${roles.join(" and ")}`];
+}
+
 /** The report: one fact per line, ending with a newline. */
 export function renderServeDisclosure(read: ServeDisclosureReport): string {
   const { row, models } = read;
@@ -145,7 +157,11 @@ export function renderServeDisclosure(read: ServeDisclosureReport): string {
     `answer writer used: ${usedWords(models.writerServed, row.writerServedRef)}`,
     `answer checker planned: ${modelWords(models.checkerPlanned, row.checkerPlannedRef)}`,
     `answer checker used: ${usedWords(models.checkerServed, row.checkerServedRef)}`,
-    `a lower-cost model was used: ${row.writerFallback || row.checkerFallback ? "yes, for money" : "no"}`,
+    // Task 11: "for money" only when money was a role's reason; a rotated debate's stand-in for an unavailable
+    // pinned model gets its own line, printed only when there is one (every other row prints what it always did).
+    `a lower-cost model was used: ${serveDisclosureFallbackReasonOf(row, "writer") === "MONEY"
+      || serveDisclosureFallbackReasonOf(row, "checker") === "MONEY" ? "yes, for money" : "no"}`,
+    ...standInLines(row),
     `one model both wrote and checked the answer: ${row.checkerSameAsWriter ? "yes" : "no"}`,
     `arguing cut short by: ${stopWords(row.bodyStop)}`,
     `points left without a cross-review: ${row.pointsWithoutReview === null ? "not counted" : String(row.pointsWithoutReview)}`,

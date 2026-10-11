@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
-import { computeWindows, type CardPayments, type Payer, type PaymentReport, type SubscriptionState } from "@debateai/billing-core";
+import {
+  computeWindows, type CardPayments, type Payer, type PaymentReport, type PriceCurrency, type SubscriptionState
+} from "@debateai/billing-core";
 import type {
   AcceptanceInput, AcceptanceRepository, BillingJobQueries, BillingRepository, ChargeEventRow, ChargeRow, QuoteRow
 } from "@debateai/db";
@@ -86,9 +88,12 @@ export function inFlightAttemptLifeMs(): number {
   return 20 * 60_000;
 }
 
-/** A3 (b): an open checkout is reused only while it is this young (from its CREATED event). */
-function reuseWindowMs(): number {
-  return 30 * 60_000;
+/**
+ * A3 (b): an open checkout is reused only while it is this young (from its CREATED event). NETOPIA's payment page lasts
+ * 20 minutes (N-25, answered 9 October 2026), so a page handed back always has at least 5 minutes left.
+ */
+export function reuseWindowMs(): number {
+  return 15 * 60_000;
 }
 
 /** A start whose page has not come back yet may still be on its way: above the 15-second start timeout (§2.4.1). */
@@ -165,7 +170,9 @@ type Verdict =
 
 type Prepared =
   | Readonly<{ kind: "REUSE"; chargeId: string; redirectUrl: string; planId: PlanId }>
-  | Readonly<{ kind: "START"; chargeId: string; customerId: string; totalMicros: number; planId: PlanId; payer: Payer }>;
+  | Readonly<{
+    kind: "START"; chargeId: string; customerId: string; totalMicros: number; currency: PriceCurrency; planId: PlanId; payer: Payer;
+  }>;
 type StartPrepared = Extract<Prepared, { kind: "START" }>;
 
 export class CheckoutService implements CheckoutServicePort {
@@ -241,7 +248,9 @@ export class CheckoutService implements CheckoutServicePort {
         data: {
           country_confirmed: place.kind === "CONFIRM_COUNTRY", ip_country: place.ipCountry, quote_id: quote.quoteId,
           // Spec §2.5.5: the payment system this subscription's charges and saved card belong to.
-          payment_provider: "netopia", payment_environment: environment
+          payment_provider: "netopia", payment_environment: environment,
+          // Spec 2026-10-05 §2.16.3: the subscription's currency, for good.
+          currency: quote.currency
         }
       });
       // Provisional: the paid period starts at activation (P9b anchors it there).
@@ -249,7 +258,8 @@ export class CheckoutService implements CheckoutServicePort {
       const charge: ChargeRow = Object.freeze({
         chargeId, ownerRef: input.ownerRef, subscriptionId, kind: "INITIAL", attempt: 1, periodStart: month.start,
         periodEnd: month.end, quoteId: quote.quoteId, netMicros: quote.netMicros, taxMicros: quote.taxMicros,
-        totalMicros: quote.totalMicros, currency: "USD", createdAt: input.now,
+        // Spec 2026-10-05 §2.16.4: the charge is in its quote's currency.
+        totalMicros: quote.totalMicros, currency: quote.currency, createdAt: input.now,
         paymentProvider: "netopia", paymentEnvironment: environment
       });
       await this.deps.repository.insertCharge(client, charge);
@@ -260,7 +270,10 @@ export class CheckoutService implements CheckoutServicePort {
       if (await this.deps.repository.useQuote(client, { quoteId: quote.quoteId, usedAt: input.now, chargeId }) === "ALREADY_USED") {
         throw new BillingRefusal(409, "QUOTE_EXPIRED");
       }
-      return { kind: "START", chargeId, customerId: customer.customerId, totalMicros: charge.totalMicros, planId: quote.planId, payer };
+      return {
+        kind: "START", chargeId, customerId: customer.customerId, totalMicros: charge.totalMicros, currency: charge.currency,
+        planId: quote.planId, payer
+      };
     });
 
     const redirectUrl = prepared.kind === "REUSE" ? prepared.redirectUrl : await this.startPayment(prepared, input);
@@ -284,7 +297,7 @@ export class CheckoutService implements CheckoutServicePort {
     }, {
       operation: "checkout", now: input.now,
       start: {
-        orderId: prepared.chargeId, amountMicros: prepared.totalMicros, currency: "USD",
+        orderId: prepared.chargeId, amountMicros: prepared.totalMicros, currency: prepared.currency,
         description: text("ORDER_PLAN", input.locale, { plan: planName(prepared.planId) }), payer: prepared.payer,
         clientId: clientIdOf(prepared.customerId),
         returnUrl: paymentReturnUrl(this.deps.publicAppUrl, "/checkout/return", prepared.chargeId),

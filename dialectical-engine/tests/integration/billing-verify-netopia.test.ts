@@ -8,7 +8,7 @@ import {
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { createSecretToken } from "@debateai/payments-netopia";
-import { planById } from "@debateai/register";
+import { planById, planNetPrice } from "@debateai/register";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testBillingPlans, testBillingPolicy, testCountryPolicy } from "../support/billingFixtures.js";
 import {
@@ -96,7 +96,7 @@ async function checkout(_label: string) {
   const subscriptionId = randomUUID();
   const quoteId = randomUUID();
   const chargeId = newChargeId();
-  const netMicros = planById(testBillingPlans, "PLUS").netPriceMicros;
+  const netMicros = planNetPrice(planById(testBillingPlans, "PLUS"), "USD");
   const taxMicros = 3_800_000;
   const totalMicros = netMicros + taxMicros;
   const at = new Date(Date.now() - 5 * MINUTE);
@@ -117,7 +117,7 @@ async function checkout(_label: string) {
       quoteId, ownerRef, planId: "PLUS", kind: "SUBSCRIBE", netMicros, taxMicros, totalMicros, taxCountry: "DE",
       taxRegion: null, taxRateBasisPoints: 1_900, taxStatus: "TAXABLE", taxName: "VAT", quadernoRef: null, createdAt: at,
       expiresAt: new Date(at.getTime() + 30 * MINUTE), locationCiphertext: location.ciphertext, keyId: location.keyId,
-      recurringTotalMicros: null
+      recurringTotalMicros: null, currency: "USD"
     });
     await repository.insertCharge(client, {
       chargeId, ownerRef, subscriptionId, kind: "INITIAL", attempt: 1, periodStart: at, periodEnd, quoteId, netMicros,

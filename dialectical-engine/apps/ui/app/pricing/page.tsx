@@ -1,6 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { ContractHttpError } from "@debateai/contract";
+import { ContractHttpError, type BillingCurrency } from "@debateai/contract";
 import { PricingCards, type PricingPlan } from "@/components/billing/PricingCards";
 import { SiteFooter } from "@/components/SiteFooter";
 import { billingPageFooter } from "@/lib/billing/footerBilling";
@@ -10,13 +10,17 @@ import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
 import { createServerContractClient, readTrustedClientIp } from "@/lib/serverApi";
 
-async function readPlans(): Promise<readonly PricingPlan[] | null> {
+/** The plans, and the currency the visitor's connection pays in (spec 2026-10-05 §2.16.1). */
+async function readPlans(): Promise<Readonly<{ currency: BillingCurrency; plans: readonly PricingPlan[] }> | null> {
   const headerStore = await headers();
   try {
     const answer = await createServerContractClient(
       fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
     ).getBillingPlans();
-    return answer.plans.filter((plan): plan is PricingPlan => isBillingPlanId(plan.plan_id));
+    return {
+      currency: answer.currency,
+      plans: answer.plans.filter((plan): plan is PricingPlan => isBillingPlanId(plan.plan_id))
+    };
   } catch (failure) {
     // Billing off, or local mode: the route answers 404, and so does this page (spec §2.2 rule 1).
     if (failure instanceof ContractHttpError && failure.status === 404) notFound();
@@ -36,7 +40,12 @@ export default async function PricingPage() {
         <p className="setLede">{t(billingCatalog, "billing.pricing.lede")}</p>
         {plans === null
           ? <p className="billingError" role="status">{t(billingCatalog, "billing.pricing.unavailable")}</p>
-          : <PricingCards catalog={billingCatalog} locale={locale} plans={plans} />}
+          : (
+            <>
+              <PricingCards catalog={billingCatalog} locale={locale} currency={plans.currency} plans={plans.plans} />
+              <p className="pricingNote">{t(billingCatalog, "billing.pricing.currencyNote")}</p>
+            </>
+          )}
         <section className="pricingFaq" aria-labelledby="pricing-faq">
           <h2 id="pricing-faq">{t(billingCatalog, "billing.pricing.faqTitle")}</h2>
           <h3>{t(billingCatalog, "billing.pricing.faqLimitsQuestion")}</h3>

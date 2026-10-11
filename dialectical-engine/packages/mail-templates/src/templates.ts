@@ -16,7 +16,7 @@ export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
 
 /**
  * How a param is checked and shown. plan: a plan id shown by its catalogue name. amount: a decimal
- * "24.20" shown as USD in the locale. date: an ISO date or instant shown as a long date (UTC).
+ * "24.20" shown in the email's currency (`params.currency`: USD, EUR or RON; USD when absent) in the locale. date: an ISO date or instant shown as a long date (UTC).
  * datetime: the same date plus 24-hour UTC time. url: https
  * only, rendered as a link. count: a small whole number. text: one short line. block: the owner summary's
  * preformatted lines. flag: "true" or "false"; it only chooses a sentence and is never printed.

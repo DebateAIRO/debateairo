@@ -1735,7 +1735,7 @@ journalctl -u debateai-runner --since today -o cat | grep -E 'DEBATEAI_SERVE_DIS
 |---|---|---|
 | `"kind":"DEBATEAI_SERVE_DISCLOSURE"`, `"event":"SERVE_DISCLOSURE_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `answerId` | The answer's owner-side record (above) could not be written. The answer itself is exactly what it would have been. What is lost is the record. **When no model could write the answer, its floor is lost**: the pages say the verdict is unavailable instead of showing "Our best answer:", the answer gets no story, and `pnpm ops:serve-disclosure` answers `SERVE_DISCLOSURE_NOT_FOUND`. For a written answer, the owner's record and the PDF's lower-cost note are missing. | Nothing writes the row later: it is written once, right after the answer. Keep the line. A typed `code` (for example `SERVE_DISCLOSURE_RECORD_INVALID`) is a defect to report. `UNTYPED` with a `sqlState` is the database refusing (for example `23503`) or a lost connection. More than one in a day is worth investigating. |
 | A failed debate whose reason is `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL`, kept in `core.work_item.terminal_reason` (the asker sees "This debate reached its limit…", see [below](#what-the-asker-sees-when-a-debate-fails)) | The debate's allowance for arguing could not pay for even the first position's own call, so there was nothing to answer from. There are two readings. Either the ceiling for arguing (`per_run_ceiling_micros` less the reserve) is below one call at the vendors' prices, or a re-claim of the same debate found the earlier claim's spend already over it. | Several in a row: publish a register version with a higher `per_run_ceiling_micros` or a lower `serve_reserve_basis_points`. A single one after a runner restart in the middle of a debate is the re-claim reading, and the next debate is unaffected. |
-| A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`, `RUN_SETUP_FAILED:MODEL_ASSIGNMENT`, `RUN_SETUP_FAILED:MEMORY_QUESTION`, `RUN_SETUP_FAILED:WORK_QUEUE`, `RUN_SETUP_FAILED:DISPATCH`, `RUN_SETUP_FAILED:WAITING_LINE`, `RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, kept the same way (the asker sees "Something went wrong on our side before this debate began…", or for `PLAN_CHANGED` "Your paid plan ended or was paused while this question waited…", see [below](#what-the-asker-sees-when-a-debate-fails)) | The API accepted the ask and wrote the debate's record, then a later step of starting it failed: letting go of the owner's ask lock, which keeps one owner's asks from colliding (`ADMISSION_RELEASE`, usually a dropped database connection), saving the AI models chosen for the debate (`MODEL_ASSIGNMENT`, only while a model scorecard is in force), recording the question for the owner's history (`MEMORY_QUESTION`), putting the debate's first job in the queue (`WORK_QUEUE`), handing that job to the job system (`DISPATCH`), writing the question's place in the waiting line (`WAITING_LINE`), or writing the hold that reserves the debate's cost on the site's day and on its owner's allowance (`ROOM_HOLD`). With the waiting line on, the first job and the hold are written together, so a debate that failed at `ROOM_HOLD` or `WORK_QUEUE` has no job any runner could pick up. The asker got an error at that moment, and the debate never started, so no model argued in it. Before this reason existed, such a debate showed as "generating" forever. If the job system had in fact taken the job and a runner had already started it, the debate is left running and ends normally. `PLAN_CHANGED` is not a fault: the question waited in line on a paid plan, and by the time there was room its owner's plan had ended (back to Free), so it was not started on the paid plan's models; the owner can ask again under the plan they have now. `COST_RECORD` means a paid question that did not fit its owner's remaining allowance was moved to the Free plan's models, and the owner's record of that move (`core.run_cost_substitution`) could not be written, so the debate was stopped before its first job: no debate runs on cheaper models without that record. On the private preview only (see `api.wait.preview_team_only`), `RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY` is kept the same way, and its owner reads the same "Something went wrong on our side before this debate began…": the question's owner is not on the preview's team, so the question was never started. It is not a fault. | A single one: nothing; the asker can ask again. Several in a row: read the API's `api.request.failed` lines from the same minutes. `DISPATCH` points at the job system, the others at the database. `PLAN_CHANGED`: nothing to do. |
+| A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`, `RUN_SETUP_FAILED:MODEL_ASSIGNMENT`, `RUN_SETUP_FAILED:ROLE_ROTATION`, `RUN_SETUP_FAILED:MEMORY_QUESTION`, `RUN_SETUP_FAILED:WORK_QUEUE`, `RUN_SETUP_FAILED:DISPATCH`, `RUN_SETUP_FAILED:WAITING_LINE`, `RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, kept the same way (the asker sees "Something went wrong on our side before this debate began…", or for `PLAN_CHANGED` "Your paid plan ended or was paused while this question waited…", see [below](#what-the-asker-sees-when-a-debate-fails)) | The API accepted the ask and wrote the debate's record, then a later step of starting it failed: letting go of the owner's ask lock, which keeps one owner's asks from colliding (`ADMISSION_RELEASE`, usually a dropped database connection), saving the AI models chosen for the debate (`MODEL_ASSIGNMENT`, only while a model scorecard is in force), saving which AI models take the debate's answer and story writing and checking roles when those roles rotate between debates (`ROLE_ROTATION`, only while role rotation is on, in `core.run_role_rotation`), recording the question for the owner's history (`MEMORY_QUESTION`), putting the debate's first job in the queue (`WORK_QUEUE`), handing that job to the job system (`DISPATCH`), writing the question's place in the waiting line (`WAITING_LINE`), or writing the hold that reserves the debate's cost on the site's day and on its owner's allowance (`ROOM_HOLD`). With the waiting line on, the first job and the hold are written together, so a debate that failed at `ROOM_HOLD` or `WORK_QUEUE` has no job any runner could pick up. The asker got an error at that moment, and the debate never started, so no model argued in it. Before this reason existed, such a debate showed as "generating" forever. If the job system had in fact taken the job and a runner had already started it, the debate is left running and ends normally. `PLAN_CHANGED` is not a fault: the question waited in line on a paid plan, and by the time there was room its owner's plan had ended (back to Free), so it was not started on the paid plan's models; the owner can ask again under the plan they have now. `COST_RECORD` means a paid question that did not fit its owner's remaining allowance was moved to the Free plan's models, and the owner's record of that move (`core.run_cost_substitution`) could not be written, so the debate was stopped before its first job: no debate runs on cheaper models without that record. On the private preview only (see `api.wait.preview_team_only`), `RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY` is kept the same way, and its owner reads the same "Something went wrong on our side before this debate began…": the question's owner is not on the preview's team, so the question was never started. It is not a fault. | A single one: nothing; the asker can ask again. Several in a row: read the API's `api.request.failed` lines from the same minutes. `DISPATCH` points at the job system, the others at the database. `PLAN_CHANGED`: nothing to do. |
 | `"kind":"DEBATEAI_STORY"`, `"event":"STORY_PACK_INVALID"`, with `reason` (once, when the runner starts) | The story shapes (`story-shapes/`, or the directory `DEBATEAI_STORY_SHAPES_DIR` names) broke a rule or could not be read. `reason` names the rule, for example `STORY_PACK_DIR_UNRESOLVED`. The runner starts anyway, but every story is then stored as failed (`STORY_PACK_INVALID`) and the pages show the answer without one. | Fix the files or the variable, then restart the runner. |
 | `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it. |
 | `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once, pin the new version in both `EnvironmentFile`s, and restart both units. |
@@ -1750,6 +1750,7 @@ ids and a bounded diagnostic only:
 |---|---|---|
 | `"event":"api.disclosure.unreadable"`, with `diagnostic` | An answer's owner-side record exists but is corrupt: a floor without its label receipt (`SERVE_DISCLOSURE_ROW_INVALID`) or a stored cause outside the closed list (`SCHEMA_VALIDATION_ERROR`). The owner's page and the PDF then behave as if there were no record: no floor, no lower-cost note. A database outage is not this line; it stays a 500. | A defect to report, with the answer id from `pnpm ops:serve-disclosure`. |
 | `"event":"api.story.unreadable"`, with `diagnostic` | The story of an answer the caller owns could not be read, decrypted or derived (a database hiccup included). The route answers "unavailable" rather than an error; the owner's page asks again a few times, then shows the answer without its story. | A single one during a database hiccup is harmless. Repeated ones for the same answer are a defect to report. |
+| `"event":"api.ask.role_rotation_counts_unavailable"`, with `diagnostic` | Only while role rotation is on (the register's `answerRoleRotationPolicy` row). A new question needed the per-model role counts (`core.run_role_rotation`) to pick its writing and checking models, and they could not be read, most likely a database fault. The question was refused before any debate record was written, and the asker was asked to try again in a minute ("a model this debate needs cannot be reached right now"); no question is ever started without its picked models. | One: nothing. Several in a row: read the API's `api.request.failed` lines from the same minutes and check the database. |
 | `"event":"api.run.setup_failure_unrecorded"`, with `runId`, `reason` and `diagnostic` | A debate's start failed as for `RUN_SETUP_FAILED` above, and marking it failed failed too, most likely in the same database outage. The asker still got the original error. What happens next depends on `reason`. With `RUN_SETUP_FAILED:DISPATCH`, or `RUN_SETUP_FAILED:ADMISSION_RELEASE` while the budget rule's members are published, the debate was started or placed in the waiting line before the failure. A started one has its first job queued, but no runner may have been handed it: with the members published, the API's waker hands it to the job system again once it has waited five minutes (`api.wait.redispatched` with the same `runId`), and without them the next runner start does. A question placed in the line starts by itself when there is room. The debate then runs normally, and only once: a runner claims a job once. With `RUN_SETUP_FAILED:PLAN_CHANGED`, the question stays in the line only until a later tick manages to record it failed: its owner's plan no longer covers it, so it never starts. With any other reason the debate has no job, so nothing will ever start it, and it keeps showing as "generating" on its owner's page. | `DISPATCH` with the budget members published: nothing; the waker hands the job over again within about five minutes (if `api.wait.redispatch_failed` repeats with that `runId`, see that row). `DISPATCH` without them (this host until go-live line 13): `systemctl restart debateai-runner.service`; a runner start hands every queued job over. `ADMISSION_RELEASE` with the members published: nothing; the question starts by itself when there is room. `PLAN_CHANGED`: nothing; a later tick records the debate failed, so it never starts. `ADMISSION_RELEASE` without the members, and any other reason: the debate has no job and never starts; rare; report the `runId`. Nothing here closes that debate on its own. |
 | `"event":"api.wait.redispatch_failed"`, with `runId` and `diagnostic` | The waker tried to hand a started debate's first job to the job system again (the job had waited five minutes, see the row above) and the job system refused. The job stays queued, its hold keeps counting, and the next tick tries again. Nothing is marked failed, because the job may already be on its way. | One: nothing. Every minute: the job system is not taking work. The `diagnostic` names the code; check `debateai-hatchet` and the API's `api.request.failed` lines, as for `RUN_SETUP_FAILED:DISPATCH`. |
 | `"event":"api.wait.preview_team_only"`, with `runId` | Private preview only (`PREVIEW_PROVIDER_TEST_CONFIG_JSON` set). The waker found a waiting question, or a started debate's first job still waiting for a runner, whose owner is not on the team (`PREVIEW_TEAM_USER_IDS_JSON`), or that belongs to a legacy asker. It was not started or handed over; it was recorded failed (`RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY`), so its owner reads "Something went wrong on our side before this debate began". With an empty team list nothing is started, handed over or failed, and no such line appears. Never on the real site. | Nothing; the rule worked. Many at once after a cutover: expected, they are the questions that waited from before it. If a team member's question shows here, their identity user id is missing from `PREVIEW_TEAM_USER_IDS_JSON`. The API's rule does not cover the runner's own start-up recovery, which hands every queued job over without a team check: start the runner only with an empty queue. |
@@ -1777,11 +1778,11 @@ to look for:
 
 | The asker sees (English) | Group | Reason codes |
 |---|---|---|
-| "Something went wrong on our side before this debate began. Please ask again." | `NOT_STARTED` | `RUN_SETUP_FAILED:<step>`, every step but `PLAN_CHANGED` (see the row above), and `RUN_ROLE_ASSIGNMENT_INVALID` (the runner, claiming the debate, found the model scorecard's role assignment pinned at the ask corrupt or unable to seat a debate; its job catch then overwrites it with `RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID`, and both forms read the same) |
+| "Something went wrong on our side before this debate began. Please ask again." | `NOT_STARTED` | `RUN_SETUP_FAILED:<step>`, every step but `PLAN_CHANGED` (see the row above), and `RUN_ROLE_ASSIGNMENT_INVALID` (the runner, claiming the debate, found the model scorecard's role assignment pinned at the ask corrupt or unable to seat a debate; its job catch then overwrites it with `RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID`, and both forms read the same), and `RUN_ROLE_ROTATION_INVALID` (the same claim-time refusal for the role rotation pinned at the ask: unreadable, beside a scorecard assignment, or naming a model outside the debate's panel; both forms read the same) |
 | "Your paid plan ended or was paused while this question waited, so the debate didn't start. You can ask it again." | `PLAN_ENDED` | `RUN_SETUP_FAILED:PLAN_CHANGED` only, the whole code (see the row above): not a fault. With billing on, a paid question waited in line, and by the time there was room its owner was on Free, because the plan ended, was withdrawn or erased, or was paused by a card dispute. Nothing to do; the owner can ask again under the plan they have now. Every other `RUN_SETUP_FAILED:<step>` reads `NOT_STARTED`. |
 | "This debate could not start because the AI models it needs were unavailable. Please try again in a while." | `MODELS_UNAVAILABLE` | `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM`, `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:<role>`. The runner writes these first, then its job catch overwrites them with `RUNNER_EXECUTION_FAILED:<the same code>` (the role is lost there). Both forms read the same. |
 | "This debate reached its limit before it could produce an answer." | `RUN_LIMIT_REACHED` | `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL` (see the row above) |
-| "This debate stopped partway because of a problem on our side. Please ask your question again." | `STOPPED` | Everything else: `CALL_BUDGET_EXHAUSTED` (a re-claim found a step's tries already used up), `DAILY_COST_ENVELOPE_REACHED` and `PERSON_ALLOWANCE_REACHED` (with the budget members published they stop only the arguing and never end a debate; a question the day holds back waits in line, and its page says when it will start), every other `RUNNER_EXECUTION_FAILED:<diagnostic>`, older codes, and any code the table does not know |
+| "This debate stopped partway because of a problem on our side. Please ask your question again." | `STOPPED` | Everything else: `CALL_BUDGET_EXHAUSTED` (a re-claim found a step's tries already used up), `RUNNER_EXECUTION_FAILED:RUNNER_TIME_LIMIT_REACHED` (the debate was stopped at its next model call because no call had finished for 60 minutes, or it had run past its six-hour ceiling; owner ruling 2026-10-11), `DAILY_COST_ENVELOPE_REACHED` and `PERSON_ALLOWANCE_REACHED` (with the budget members published they stop only the arguing and never end a debate; a question the day holds back waits in line, and its page says when it will start), every other `RUNNER_EXECUTION_FAILED:<diagnostic>`, older codes, and any code the table does not know |
 
 A code added to the engine lands in `STOPPED` until it is given a group of its own. The UI's test
 (`apps/ui/lib/v3/runFailure.test.mjs`) reads each code's write site in the runner and the API, and
@@ -1799,6 +1800,7 @@ version must carry, besides the algorithm's own rows:
 | `costEnvelopePolicy` | both services refuse: `COST_ENVELOPE_POLICY_UNRESOLVED` |
 | `publicationCheckPolicy` | the API refuses: `PUBLICATION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the publication-check deadline release on carries it (the code-owned 60000 ms, or the file's member); a version sealed before that release does not |
 | `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
+| `answerRoleRotationPolicy` | optional: without it the engine keeps its fixed roles. The file's `answerRoleRotation` member seals it (`"Upgrading to role rotation"` below); the API reads it at start-up, and a malformed row refuses the boot (`ANSWER_ROLE_ROTATION_POLICY_INVALID`) |
 | `admissionPolicy`, with the three support budgets | the API refuses: `SUPPORT_ADMISSION_SCOPES_NOT_SEALED`; and, with the band, `ask_room_reads` (from the file's `askRoomReads`), else the API refuses with `ASK_ROOM_ADMISSION_UNSEALED` |
 | `configuredProviderSet`, every vendor vetted | the publication refuses `PROVIDER_VENDOR_NOT_VETTED`; a target not in it refuses `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` |
 | the support configuration rows (`support_enabled`, `support_model_ref`, the limits) | the support chat has no configuration; §13's commands change these rows, each change a new version |
@@ -1824,6 +1826,8 @@ version must carry, besides the algorithm's own rows:
 - seals the file's `countryPolicy`, when the file carries it, as that version's `countryPolicy`
   row; a file without it publishes no `countryPolicy` row, so that version has no country gate
   (A14). The kit's example leaves it out; §5 "Country data" says what must hold before you add it;
+- seals the file's `answerRoleRotation` member, when the file carries it, as the `answerRoleRotationPolicy`
+  row; a file without it publishes no such row (the fixed roles, as before);
 - then runs the start-up readers against the new version, and only then prints the version to pin.
 
 `providerTargets` in the file (prices, addresses, credential paths) is never sealed: it is there
@@ -1859,6 +1863,8 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` | billing is switched on without the three budget members in `costEnvelopePolicy`, or without plans |
 | `ASK_ROOM_ADMISSION_UNSEALED` | the file seals the band (the budget rule's three members in `costEnvelopePolicy`) without `askRoomReads`, the room read's budget. Refused by the plan (a dry run included), by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ASK_ROOM_ADMISSION_UNSEALED`, and when the API starts. Add `askRoomReads` to the same file (go-live line 13, "Publishing them" under the cost envelopes above) |
 | `PUBLICATION_CHECK_POLICY_INVALID` | the file's optional `publicationCheckPolicy` is not `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 60000, or the member is `null` |
+| `HOSTED_REGISTER_ROLE_ROTATION_INVALID` | the file's optional `answerRoleRotation` (role rotation, spec 2026-10-11) is not exactly `{"enabled": true}` or `{"enabled": false}`: another member, a value that is not `true` or `false`, or the member is `null`. Nothing is sealed |
+| `ANSWER_ROLE_ROTATION_POLICY_INVALID` | the sealed `answerRoleRotationPolicy` row does not parse (a hand-made or damaged row). Refused by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ANSWER_ROLE_ROTATION_POLICY_INVALID`, and the API refuses to start on that version: pin nothing, publish a corrected file |
 | `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
 | `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
 | `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |
@@ -1872,6 +1878,41 @@ sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM regi
 
 Four rows is the pass. Then set `REGISTER_VERSION` to that version in both `EnvironmentFile`s
 and restart both units.
+
+### Upgrading to role rotation
+
+Per-debate role rotation (spec 2026-10-11) gives each of a debate's four jobs (the answer writer, the answer
+checker, the storyteller and the story checker) to a model of that debate's own panel: the one that has done that
+job least often so far. The choice is written down for the debate when it is accepted, and it never changes after
+that. The rotation is off until the register says otherwise: without the `answerRoleRotation` member the engine keeps
+its fixed roles, exactly as before. This release adds migration `migrations/0114_role_rotation.sql` (a new table,
+`core.run_role_rotation`, and a new column on `serve.answer_story`), so the migration comes first.
+
+**Step 1 is required on every host that takes this release, even with the rotation left off.** This code reads
+and writes the new table and column whatever the register says: the budget estimate's query of unfinished
+debates reads the table, the runner reads a debate's pin when it claims the debate, and every story is saved with
+the new `storyteller_repairs` column. Without the migration those reads and writes fail and debates do not run.
+Steps 2 and 3 only turn the rotation on; skip them to keep it off. In this order, before the API and the runner
+next start on this code:
+
+1. **Apply the migration.** Open the migrator window (§4 step 2), run `pnpm db:migrate` and then `hardening.sql` as
+   §4 step 3 does, and close the window (§4 step 5).
+2. **Publish a register version with the member.** Add `"answerRoleRotation": { "enabled": true }` to the top level of
+   `/etc/debateai/register/hosted-register.json` (`deploy/vps/register/README.md`), then run the dry run and the
+   publish exactly as above. The plan's `row_keys=` line names `answerRoleRotationPolicy`. Pin the version the publish
+   prints as `REGISTER_VERSION` in both `EnvironmentFile`s.
+3. **Restart the API and the runner** (`systemctl restart debateai-api debateai-runner`). The API reads the setting at
+   start-up; the runner never reads it, and a debate accepted before the restart keeps the roles it was given. A
+   debate whose panel has models from two or more companies is rotated once the API runs the new version; a panel
+   from one company keeps the fixed roles.
+
+`pnpm hosted:publish-provider-set` copies the rows of the version it starts from, this row included, so a later
+vendor change does not switch the rotation off. Pin the newest version that command prints.
+
+**Rolling back** needs no migration step. Remove the `answerRoleRotation` member from the file, publish again (a new
+version; the sealed one stays as it is), pin that version in both `EnvironmentFile`s and restart both units. Without
+the row the API reads the setting as absent, and the engine keeps its fixed roles. Debates already rotated keep their
+pins. An older checkout ignores the new table and column, so nothing needs reverting for the migration.
 
 ---
 
@@ -2328,7 +2369,17 @@ with the spec's values and billing **off**: copy those two into `/etc/debateai/r
 also carries `taxAuthorities`, equal to the code-owned text; copy that member only to correct the text (the register
 README's `taxAuthorities` row says what carrying it costs). `countryPolicy` is not in that example: it lives in
 `deploy/vps/register/country-policy.example.json`, and goes into the hosted file only once every condition of §5
-"Country data" holds (go-live lines 27–30). Then, inside a migrator window (§4 steps 2 and 5), check and publish:
+"Country data" holds (go-live lines 27–30).
+
+**Your price list (Part C).** Every plan has a price in USD, EUR and RON, and `currency_by_country` says which one each
+buyer pays, by the country of the billing address: RON for Romania, EUR for the other 26 EU countries and Norway,
+Iceland, Liechtenstein, Switzerland and the United Kingdom, USD for everyone else. Set your prices in `net_prices`
+(micro-units: 100 lei is `100000000`; whole bani or cents only), keep `credit_currency` at `USD`, dry-run, publish, pin,
+restart. A subscription keeps its currency and its price for good; a new price list or a changed country reaches only
+new subscriptions. `pnpm billing:check` shows a cross while the published plans are the engine's own row or still carry
+its placeholder EUR and RON prices, as a copy of the kit's example does.
+
+Then, inside a migrator window (§4 steps 2 and 5), check and publish:
 
 ```sh
 pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-register.json
@@ -2345,6 +2396,31 @@ below is the same: edit the file, dry-run, publish, pin, restart. A published ve
 `recurring_net_micros`) and renews at that price plus the current tax. So a `billingPlans` version with a new price
 reaches only new subscriptions; existing subscribers keep their price until a price-change command with the 30 days'
 notice of Terms §12 exists (it is not built yet).
+
+#### Upgrading to Part C (migration 0113)
+
+Part C prices every plan in RON, EUR and USD at once. Its migration `migrations/0113_billing_price_currencies.sql` adds
+each quote's currency and lets a charge be in RON or EUR as well as USD; Part C's code writes and reads that currency,
+and the API does not check the schema when it starts, so the migration must be applied before either service starts on
+this code. The engine also refuses to start on a register version whose `billingPlans` has one price per plan
+(`BILLING_PLANS_INVALID`). A host that runs an earlier release does these, in this order, in one sitting:
+
+1. **Put the new checkout in place**, with its dependencies installed, and restart nothing yet.
+2. **Open the migrator window** (§4 step 2).
+3. **Migrate**: `pnpm db:migrate`. It applies `migrations/0113_billing_price_currencies.sql` and any other pending
+   forward step, in order (on a host older than them, dev's 0110, 0111 and 0112 come first).
+4. **Run `hardening.sql`** (§4 step 3).
+5. **Close the window** (§4 step 5).
+6. **Publish the v2 `billingPlans`**: rewrite the hosted file's `billingPlans` in the new shape (your price list,
+   above; or remove the member to seal the engine's own row), then dry-run and publish with the two commands above.
+   The publish runs inside a migrator window (§4 steps 2 and 5): open one again for it, or do this step before
+   closing the window in step 5.
+7. **Pin it**: copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`.
+8. **Restart both**: `systemctl restart debateai-api debateai-runner`.
+
+**Rolling back** past Part C: before restarting the older code, pin the register version it ran on (the one you
+replaced) in both `api.env` and `runner.env`, because the forward migration stays applied and older code refuses a v2
+version (`BILLING_PLANS_INVALID`). The applied 0113 is harmless to older code while billing is off.
 
 ### 14.5 NETOPIA's message
 
@@ -2449,7 +2525,7 @@ version the person accepted from there, even after the Terms change. The site li
 
 **Switching billing on.** Before this, make sure:
 
-- every row of the go-live checklist from 13 to 73 is proven (its last column holds the proof), the void rows (20, 40
+- every row of the go-live checklist from 13 to 74 is proven (its last column holds the proof), the void rows (20, 40
   and 46) excepted. Some proofs can be read only after the switch-on: they are proven right after it, and their Proof
   cells are filled then. These are parts of four rows' "How to prove it" cells: row 17, the footer of `/pricing` on the
   live site; row 18, the API's start with billing on; row 19, the first real payment's message; row 23, the check run
@@ -3027,8 +3103,10 @@ For an invoice or a credit note, settle the line with `pnpm billing:invoice`, gi
 - `--record` with `--amount`, for a `DASHBOARD_REFUND` line only: a refund made in NETOPIA's admin that NETOPIA
   reported on the payment itself, so the site does not know its amount and queued no credit note. Issue the credit
   note by hand in SmartBill (a Romanian sale) or Quaderno, then record it with `--kind CREDIT_NOTE`, its document as
-  above, and the amount you refunded in dollars and cents (for example `12.10`). The amount can be at most what the
-  payment held (the "up to" figure the tax summary gives for that charge). The line then leaves the list, and the
+  above, and the amount you refunded, in the charge's own currency as the tax summary's "up to" line names it (lei for
+  a Romanian sale, euro or dollars otherwise), in units and cents or bani (for example `50.00` for 50.00 RON). Never
+  convert it to another currency. The amount can be at most what the payment held (the "up to" figure the tax summary
+  gives for that charge). The line then leaves the list, and the
   quarter's tax summary subtracts the refund at that amount instead of listing it as "amount unknown". A charge has
   one credit note at most: if it already has one, the command refuses (`BILLING_INVOICE_ALREADY_RECORDED`), and that
   refund goes to your accountant. A refund transaction of a payment whose dashboard-refund credit note is recorded is
@@ -3051,7 +3129,7 @@ read -r CHARGE_REF && read -r KIND && read -r DOCUMENT && systemd-run --pipe --w
 To record a dashboard refund's credit note with its amount (`DASHBOARD_REFUND` lines only):
 
 ```sh
-# Paste the charge reference as the summary prints it and press Enter; paste the credit note (for example DBAI-0042, or the Quaderno document id) and press Enter; then type the amount you refunded in NETOPIA's admin, in dollars and cents (for example 12.10), and press Enter.
+# Paste the charge reference as the summary prints it and press Enter; paste the credit note (for example DBAI-0042, or the Quaderno document id) and press Enter; then type the amount you refunded in NETOPIA's admin, in the charge's own currency as the summary's "up to" line names it, in units and cents or bani (for example 50.00 for 50.00 RON), and press Enter.
 read -r CHARGE_REF && read -r DOCUMENT && read -r AMOUNT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind CREDIT_NOTE --record "$DOCUMENT" --amount "$AMOUNT"
 ```
 
@@ -3073,8 +3151,9 @@ It prints one line saying what it recorded or queued; a re-queued job that fails
 A refusal is one code and nothing is written. What each code means, and what to do:
 
 - `BILLING_INVOICE_USAGE`: the command line is not one of the forms above (a missing or repeated value, a kind other
-  than INVOICE or CREDIT_NOTE, both `--record` and `--requeue`, or neither, or an `--amount` that is not dollars and
-  cents above zero, such as `12.10`, or that comes without `--record` and `--kind CREDIT_NOTE`). Run it again as shown.
+  than INVOICE or CREDIT_NOTE, both `--record` and `--requeue`, or neither, or an `--amount` that is not units and cents
+  (or bani) above zero, such as `50.00`, or that comes without `--record` and `--kind CREDIT_NOTE`). Run it again as
+  shown.
 - `BILLING_INVOICE_CHARGE_UNKNOWN`: no charge has that reference. Paste it again exactly as the summary prints it.
 - `BILLING_INVOICE_OTHER_PAYMENT_SYSTEM`: the charge was paid in another payment system than the one this host's
   `NETOPIA_API_BASE_URL` names (NETOPIA's sandbox or live, or the previous card processor). It owes no document here:
@@ -3139,15 +3218,19 @@ real accounts, and destroy it at the end (step 8). It needs its own:
   member the publish seals the version and refuses it
   (`HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_CONFIGURATION_INCOMPLETE`, §14.8), and the server cannot start billing.
   Whether §5's four conditions for that member ("Country data") must hold on a throwaway server that only you use is
-  your call; they do hold for the live site.
+  your call; they do hold for the live site. Steps 1–5 buy as a buyer in the United States, and step 4's withdrawal is
+  open only to a country in `billingPolicy`'s `withdrawal_countries` (the EU, the EEA and the UK, none of which pays in
+  USD), so in the version you publish on this server only, add `"US"` to `withdrawal_countries`; never on the live
+  host.
 
 The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if a sandbox NETOPIA address sits beside anything
 but Quaderno's sandbox and a `.invalid` SmartBill address. Fill in the company's CUI first (§14.7): the sandbox server
 builds the SmartBill connection too, so it also refuses to start with `BILLING_COMPANY_FACTS_UNVERIFIED:cui` while the
 CUI is still in square brackets, and likewise while the company's name, registered office or general email address is
 (`BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice`, for example), because the sandbox emails print them too. Run the
-check command (§14.2) before step 1: every line must show a tick. Write down what you see at each step; go-live row 15
-needs your notes.
+check command (§14.2) before step 1: every line must show a tick, except one. The plans line's cross ("…placeholders…")
+is expected on this server unless you publish a price list here too; on the live host it must be a tick (go-live row
+73). Write down what you see at each step; go-live row 15 needs your notes.
 
 **Before step 1: read the journal of the first start with billing on.** Two minutes after that start, run the command
 below. For the API's current start only, it prints the lines that say NETOPIA refused our key, a message did not pass,
@@ -3168,10 +3251,16 @@ needs nothing:
 journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E '"event":"billing\.|\[BILLING_'
 ```
 
-**Every purchase in steps 1–5 is made as a buyer outside Romania.** Choose a country whose `pay` is on, for example
-Germany (DE), and answer the "Do you live in …" question with yes. The tax then goes to Germany and the invoice to
-Quaderno's sandbox. The Romanian path (SmartBill, the attached PDF) is proven only by the fake stack in step 6 and by
-the SmartBill contract tests, never in this run.
+**Every purchase in steps 1–5 is made as a buyer in the United States (US)**, which pays in USD under the example's
+price list and whose `pay` is on in `deploy/vps/register/country-policy.example.json`. Pick the United States as your
+country, answer the "Do you live in …" question with yes, and give a state in the billing details. The invoice goes to
+Quaderno's sandbox. NETOPIA's sandbox may refuse EUR and RON until the settlement form is signed, so the EUR and RON
+payments come later, in step 7. Step 4's withdrawal needs the `"US"` you added to `withdrawal_countries` in this
+server's register version (above). The Romanian path (SmartBill, the attached
+PDF) is proven only by the fake stack in step 6 and by the SmartBill contract tests, never in this run. For go-live row
+74, ask once for a quote as a Romanian buyer and do not pay: on a fresh test account choose Plus, pick Romania, confirm
+it, fill in a Romanian address, write down the total the page shows in lei (Quaderno's sandbox calculation in RON), and
+leave without pressing **Continue to payment**.
 
 **The stage clock only ever goes up.** Step 2 sets `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, and it stays at 31 through
 steps 3, 4 and 5 (to see a second renewal, raise it to 62; never lower it or remove it during the run). While it is
@@ -3185,14 +3274,14 @@ not part of this run (the fake stack in step 6 proves the bars and the share). T
 it (step 8). A host must never go live holding rows written on a moved clock; a live start refuses while any is still
 dated ahead (`BILLING_RECORDS_DATED_AHEAD`, §14.8).
 
-1. **Pay.** Sign up from the pricing page, choose Plus, pick Germany as your country, confirm it, fill in the billing
-   details, and press **Continue to payment**. On NETOPIA's sandbox page pay with the test card 9900 0048 1022 5098
-   (any future expiry, CVV 111).
+1. **Pay.** Sign up from the pricing page, choose Plus, pick the United States as your country, confirm it, fill in the
+   billing details, and press **Continue to payment**. On NETOPIA's sandbox page pay with the test card
+   9900 0048 1022 5098 (any future expiry, CVV 111).
    - Expect: you come back to the site, the plan is active within seconds, and the confirmation (M1) and receipt (M2)
      emails arrive. Settings shows the saved card.
-   - Then, on a second test account (Germany again: this account already has Plus, so a second checkout on it is
-     refused with `ALREADY_SUBSCRIBED`), pay for Plus with the 3-D Secure test card 9900 0091 8421 4768 and write down
-     how the bank's check looked.
+   - Then, on a second test account (the United States again: this account already has Plus, so a second checkout on it
+     is refused with `ALREADY_SUBSCRIBED`), pay for Plus with the 3-D Secure test card 9900 0091 8421 4768 and write
+     down how the bank's check looked.
 2. **Renew.** Move the billing clock forward by a month.
    - Open `api.env` and add the line `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, then restart the API. Keep the line.
    - Two minutes after the restart, run the journal command from **Before step 1** again; it should print nothing
@@ -3216,14 +3305,14 @@ systemctl restart debateai-api
    - Expect: Settings shows the new card, and no money is taken or held. Write down whether NETOPIA showed 0.00 and
      whether the card was saved (go-live row N-11).
    - The "we couldn't take the payment" emails (M5a–c) and the move to Free (M6) are proven by the fake stack in step 6.
-4. **Withdraw.** On a fresh test account (Germany again), pay for Plus, then in Settings press Withdraw within 14 days
-   and confirm with your password and authenticator code.
+4. **Withdraw.** On a fresh test account (the United States again), pay for Plus, then in Settings press Withdraw within
+   14 days and confirm with your password and authenticator code.
    - Expect the acknowledgement email (M8_RECEIVED), the Free plan, and your own email O2_REFUND_DUE with the amount.
    - Refund exactly that amount on that payment in NETOPIA's sandbox admin, then record it with `pnpm billing:refund-done`
      (**A refund handed to you**, §14.8). Expect the refund email (M8).
-5. **Cancel through the emailed link.** On another test account (Germany again), pay for Plus first: a cancel link is
-   sent only for a plan that is paid and not cancelled yet. Then open `/cancel` signed out and enter the account's
-   email.
+5. **Cancel through the emailed link.** On another test account (the United States again), pay for Plus first: a cancel
+   link is sent only for a plan that is paid and not cancelled yet. Then open `/cancel` signed out and enter the
+   account's email.
    - Open the link in the email (M9) and press the button.
    - Expect the cancellation email (M7), and Settings saying when the plan ends.
 6. **What the sandbox cannot show.** The fake stack proves the rest: a failing card through the retries to Free, a
@@ -3283,7 +3372,11 @@ systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --prop
 systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox start --capture-dir /var/tmp/netopia-capture --amount 1.00
 ```
 
-   Once it is paid, read that order's status twice, with NETOPIA's payment number and without it:
+   Once it is paid, read that order's status twice, with NETOPIA's payment number and without it. Each read prints the
+   state, NETOPIA's status, the amount and the currency on one line, for example
+   `NETOPIA_SANDBOX_STATUS=PAID:3:1.00 USD`: check that the line names the currency the payment was started in. A line
+   ending in `NO_CURRENCY` means NETOPIA's answer named none; the site would count such a payment as a mismatch and give
+   no plan, so write it down and hand the capture folder to a developer session:
 
 ```sh
 # Paste the tool order's id the start printed and press Enter.
@@ -3316,6 +3409,16 @@ systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --prop
 read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox charge --capture-dir /var/tmp/netopia-capture --from-order "$ORDER"
 ```
 
+   **Once NETOPIA's sandbox accepts EUR and RON**, also run `start --currency RON` and `start --currency EUR` (each then
+   paid on its page, and `status --order` and `fixture --order` run for each, within the same 14 days), so the
+   recording shows a payment's status and message in each currency; check that each status line names RON or EUR, the
+   currency that payment was started in. Take each currency's payment all the way to its fixture (start, pay on its
+   page, `status --order`, `fixture --order`) before you start the next one, so the newest start, status read and
+   first message all belong to one payment: turning the captures into fixtures keeps only the newest of each, and the
+   recorded suite compares them. Then, on a fresh test account on the site, buy Plus once as a German buyer, as
+   in step 1 but with Germany as your country: it pays in EUR, and it is Quaderno's sandbox calculation and sale in EUR
+   for go-live row 74. If NETOPIA's sandbox refuses them before the settlement form is signed, wait for the form.
+
    Once NETOPIA's messages for the three orders have arrived, and within 14 days (the raw messages are deleted after
    that), store each order's messages: run this once for each of the three ids (the payment's, the card check's and
    the charge's):
@@ -3329,7 +3432,7 @@ read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=de
    folder, turn it into fixtures:
 
 ```sh
-# Paste the path of the copied capture folder and press Enter; then the day you recorded, as YYYY-MM-DD (for example 2026-10-20), and press Enter.
+# Paste the path of the copied capture folder and press Enter; then the last day you recorded, as YYYY-MM-DD (for example 2026-10-20), and press Enter.
 read -r CAPTURE_DIR && read -r RECORDED_ON && pnpm exec tsx tools/billing/scrub-netopia-fixture.ts --capture-dir "$CAPTURE_DIR" --out tests/fixtures/netopia --recorded-on "$RECORDED_ON"
 ```
 
@@ -3342,9 +3445,13 @@ pnpm exec vitest run tests/unit/payments-netopia-recorded-fixtures.test.ts
    Commit the scrubbed fixtures only when that suite is green (go-live row for the recording). A red run means: do not
    commit, keep the raw folder private, and hand it to a developer session.
 8. **Destroy the sandbox server.** Once your notes are written and both fake-stack runs have passed, delete the server
-   and its disks at your hosting provider and remove the sandbox domain's DNS record. If you set up its nightly backup
-   (§9), it must have had its own storage: delete that too. Never copy its database, a backup of it or its `api.env` to
-   the live host, and never point the sandbox server at live: go live on the production host, as §14.8 says.
+   and its disks at your hosting provider and remove the sandbox domain's DNS record. Keep the server until step 7's RON
+   and EUR runs (`start --currency RON` and `start --currency EUR`) are done, with the German purchase; if NETOPIA's
+   sandbox accepts EUR and RON only after you destroyed it, build a sandbox server again as above for those runs
+   (go-live row 74). If you set up its nightly
+   backup (§9), it must have had its own storage: delete that too. Never copy its database, a backup of it or its
+   `api.env` to the live host, and never point the sandbox server at live: go live on the production host, as §14.8
+   says.
 
 **The small live test, with billing off.** NETOPIA says monthly payments can only be tested with a real card on live.
 Do it on the production host once NETOPIA has switched on recurring payments, before billing goes on (§1.6 item 6 of

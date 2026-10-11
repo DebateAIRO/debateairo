@@ -12,6 +12,7 @@ import {
   loadBootstrapRegister,
   planById,
   planCapMicros,
+  planNetPrice,
   readBillingPlans,
   readBillingPolicy,
   type PlanId
@@ -26,33 +27,34 @@ import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderP
  * every refusal the parser owes, so a malformed hosted row is refused by name.
  */
 const plansRow = () => structuredClone(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value) as unknown as {
-  plans: Array<Record<string, unknown>>;
+  plans: Array<Record<string, unknown> & { net_prices: Record<string, number> }>;
 } & Record<string, unknown>;
 const policyRow = () => structuredClone(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value) as unknown as Record<string, unknown>;
 const plansOf = (value: unknown) => billingPlansFromValue(value, "b4 test");
 const policyOf = (value: unknown) => billingPolicyFromValue(value, "b4 test");
 
-describe("billingPlans v1 carries exactly the owner's plans", () => {
+describe("billingPlans v2 carries exactly the owner's plans", () => {
   const plans = plansOf(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value);
 
   it("names the row and the four plans in price order", () => {
     expect(BILLING_PLANS_ROW_KEY).toBe("billingPlans");
     expect(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.rowKey).toBe("billingPlans");
     expect(PLAN_IDS).toEqual(["FREE", "PLUS", "PRO", "MAX"]);
-    expect(plans.currency).toBe("USD");
+    expect(plans.creditCurrency).toBe("USD");
     expect(plans.plans.map((plan) => plan.planId)).toEqual(["FREE", "PLUS", "PRO", "MAX"]);
   });
 
   it.each([
-    ["FREE", "free", 0, 200_000, null, null],
-    ["PLUS", "premium", 20_000_000, 5_000_000, 2_000, 5_000],
-    ["PRO", "premium", 50_000_000, 20_000_000, 2_000, 5_000],
-    ["MAX", "premium", 200_000_000, 150_000_000, 2_000, 5_000]
-  ] as const)("%s: tier %s, price %d, credit %d, day %s, week %s, finish 11000", (id, tier, price, credit, day, week) => {
-    expect(planById(plans, id)).toMatchObject({
-      planId: id, tier, netPriceMicros: price, monthlyCreditMicros: credit,
-      dayBasisPoints: day, weekBasisPoints: week, finishBasisPoints: 11_000
+    ["FREE", "free", 0, 0, 0, 200_000, null, null],
+    ["PLUS", "premium", 20_000_000, 20_000_000, 100_000_000, 5_000_000, 2_000, 5_000],
+    ["PRO", "premium", 50_000_000, 50_000_000, 250_000_000, 20_000_000, 2_000, 5_000],
+    ["MAX", "premium", 200_000_000, 200_000_000, 1_000_000_000, 150_000_000, 2_000, 5_000]
+  ] as const)("%s: tier %s, price USD %d EUR %d RON %d, credit %d, day %s, week %s, finish 11000", (id, tier, usd, eur, ron, credit, day, week) => {
+    const plan = planById(plans, id);
+    expect(plan).toMatchObject({
+      planId: id, tier, monthlyCreditMicros: credit, dayBasisPoints: day, weekBasisPoints: week, finishBasisPoints: 11_000
     });
+    expect([planNetPrice(plan, "USD"), planNetPrice(plan, "EUR"), planNetPrice(plan, "RON")]).toEqual([usd, eur, ron]);
   });
 
   it("gives Free, and only Free, fixed gauges: the values /new sends for Free today", async () => {
@@ -84,7 +86,7 @@ describe("billingPlans v1 carries exactly the owner's plans", () => {
   });
 
   it.each([
-    ["a price that is not whole cents", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.net_price_micros = 20_000_001; }],
+    ["a price that is not whole cents", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.net_prices.USD = 20_000_001; }],
     ["Free with a day cap", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.day_bp = 2_000; }],
     ["a paid plan without a week cap", (row: ReturnType<typeof plansRow>) => { row.plans[2]!.week_bp = null; }],
     ["a paid plan whose day cap exceeds its week cap", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.day_bp = 6_000; }],
@@ -95,19 +97,19 @@ describe("billingPlans v1 carries exactly the owner's plans", () => {
     ["a fixed depth outside 1-5", (row: ReturnType<typeof plansRow>) => {
       row.plans[0]!.fixed_gauges = { risk_tier: "standard", composition_budget_tier: "low", depth: 6 };
     }],
-    ["plans out of price order", (row: ReturnType<typeof plansRow>) => { row.plans[2]!.net_price_micros = 10_000_000; }],
+    ["plans out of price order", (row: ReturnType<typeof plansRow>) => { row.plans[2]!.net_prices.USD = 10_000_000; }],
     ["plans in the wrong order", (row: ReturnType<typeof plansRow>) => { [row.plans[1], row.plans[2]] = [row.plans[2]!, row.plans[1]!]; }],
     ["a duplicated plan", (row: ReturnType<typeof plansRow>) => { row.plans[3] = structuredClone(row.plans[2]!); }],
     ["a missing plan", (row: ReturnType<typeof plansRow>) => { row.plans.pop(); }],
     ["a finish edge under 100%", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_bp = 9_999; }],
     ["a finish edge over 200%", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_bp = 20_001; }],
-    ["Free with a price", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.net_price_micros = 10_000; }],
+    ["Free with a price", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.net_prices.RON = 10_000; }],
     // 4 micros x 2000 bp / 10000 rounds down to a 0-micro day cap, and a 0-micro
     // limit breaks every admission and wall check on that plan. (A week cap can
     // only round to nothing when the day cap, never larger, already has.)
     ["a day cap that rounds down to nothing", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.monthly_credit_micros = 4; }],
     ["an unknown member", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.discount = 0; }],
-    ["another currency", (row: ReturnType<typeof plansRow>) => { row.currency = "EUR"; }]
+    ["a credit currency other than USD", (row: ReturnType<typeof plansRow>) => { row.credit_currency = "EUR"; }]
   ])("refuses %s (BILLING_PLANS_INVALID)", (_name, mutate) => {
     const row = plansRow();
     mutate(row);

@@ -9,11 +9,13 @@ import {
   assertNoOpenWriteTransaction,
   insertCallPrompt,
   readRunRoleAssignment,
+  readRunRoleRotation,
   withRunContentLease,
   withWriteTransaction,
   type CompletionActivationResolution,
   type DiscoveredPanelMember,
   type RunCostSubstitutionReason,
+  type RunRoleRotationRecord,
   type ServeDisclosureRecord
 } from "@debateai/db";
 import {
@@ -191,7 +193,8 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { buildStoryRunSnapshot, storySeatRoleMaker } from "./story-snapshot.js";
+import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 
 // Model scorecard A15/A16: the seat book and the seat caller live in their own module.
 export * from "./run-seats.js";
@@ -391,10 +394,15 @@ export type ReviewFailureOutcome =
  * Task M2: `RUN_COST_ENVELOPE_EXHAUSTED` left this list. The attempt ceiling is
  * a phase stop now (`RUN_BODY_STOP_KINDS`), so a review it refuses is a
  * `BUDGET_STOP` — the entry here could no longer be reached.
+ *
+ * L4-F9 repair: a debate that must stop (its claim taken, or its time limit
+ * reached) is not one unavailable review; the stop leaves as it arrived.
  */
 const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
   "CALL_BUDGET_EXHAUSTED",
-  "PRODUCER_GRADING_FORBIDDEN"
+  "PRODUCER_GRADING_FORBIDDEN",
+  "RUNNER_CLAIM_LOST",
+  "RUNNER_TIME_LIMIT_REACHED"
 ]);
 
 export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
@@ -831,20 +839,71 @@ interface PanelDegradationRecord {
   readonly reason: string;
 }
 
+/**
+ * Owner ruling 2026-10-10 — "shuffled per debate, then taken in turn". Each
+ * maker's place in one debate's reviewer circle: a key seeded by the run id
+ * alone (no clock, no Math.random), so the same debate always draws the same
+ * circle and different debates draw different ones. Sorting by a seeded key is
+ * a seeded shuffle that does not depend on the order the panel lists its
+ * makers in, and a maker missing from one node's candidates (down, or its
+ * seat's member filtered) does not reorder the others.
+ */
+function reviewerTurnKey(runId: string, maker: string): string {
+  return createHash("sha256")
+    .update(JSON.stringify(["debateai:reviewer-turn-order:v1", runId, maker]), "utf8")
+    .digest("hex");
+}
+
+const compareReviewerTurn = (
+  left: { readonly key: string; readonly maker: string },
+  right: { readonly key: string; readonly maker: string }
+): number => left.key < right.key ? -1 : left.key > right.key ? 1 : left.maker < right.maker ? -1 : left.maker > right.maker ? 1 : 0;
+
+/** One debate's reviewer circle: the distinct makers in their seeded order. */
+export function reviewerTurnOrder(runId: string, makers: readonly string[]): readonly string[] {
+  return Object.freeze([...new Set(makers)]
+    .map((maker) => ({ maker, key: reviewerTurnKey(runId, maker) }))
+    .sort(compareReviewerTurn)
+    .map((entry) => entry.maker));
+}
+
+/**
+ * The reviewer of one node: always a different maker from its author, taken
+ * IN TURN round this debate's seeded circle (`reviewerTurnOrder`). The turn
+ * after the author's latest recorded reviewer is the next maker clockwise that
+ * is not the author; an author with no review yet starts at the maker after
+ * itself, so a debate's first reviews go once round the whole circle and every
+ * maker reviews. One author's reviews therefore spread over the other makers
+ * to within one review of each other.
+ *
+ * A pure function of (run, author, candidate makers, latest reviewer): the only
+ * moving input is the latest reviewer, which changes only when a review for
+ * that author LANDS — and a reviewed node is never reviewed again — so a
+ * retried node is given the same reviewer. Of several candidates of the chosen
+ * maker (two refs of one model), the first listed is taken, as before.
+ */
 export function selectDifferentMakerReviewer<T extends { readonly maker: string }>(
+  runId: string,
   authorMaker: string,
   configuredMakers: readonly T[],
   latestReviewerMaker: string | null = null
 ): T {
   const candidates = configuredMakers.filter((candidate) => candidate.maker !== authorMaker);
-  const reviewer = candidates.find((candidate) => candidate.maker !== latestReviewerMaker) ?? candidates[0];
-  if (reviewer === undefined) {
+  if (candidates.length === 0) {
     throw new TypedDomainError(
       "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE",
       `No configured maker differs from node author ${authorMaker}`
     );
   }
-  return reviewer;
+  const circle = [...new Set(candidates.map((candidate) => candidate.maker))]
+    .map((maker) => ({ maker, key: reviewerTurnKey(runId, maker) }))
+    .sort(compareReviewerTurn);
+  // The place the turn moves on from: the latest reviewer's, or the author's own
+  // when it has none (or the latest is the author's maker, which cannot review).
+  const from = latestReviewerMaker === null || latestReviewerMaker === authorMaker ? authorMaker : latestReviewerMaker;
+  const fromEntry = { maker: from, key: reviewerTurnKey(runId, from) };
+  const next = circle.find((entry) => compareReviewerTurn(entry, fromEntry) > 0) ?? circle[0]!;
+  return candidates.find((candidate) => candidate.maker === next.maker)!;
 }
 
 /**
@@ -1471,7 +1530,7 @@ export async function runReviewCatchUp(input: {
   let reviewed = 0;
   for (const node of work) {
     const latestReviewerMaker = await input.dependencies.readLatestReviewerMaker(input.runId, node.authorMaker);
-    const reviewer = selectDifferentMakerReviewer(node.authorMaker, reviewers, latestReviewerMaker);
+    const reviewer = selectDifferentMakerReviewer(input.runId, node.authorMaker, reviewers, latestReviewerMaker);
     const callSiteKey = reviewCatchUpCallSiteKey(input.invocationId, node.nodeId);
     const outcome = await withCooldownRetry({
       runId: input.runId,
@@ -2028,6 +2087,17 @@ export interface WalkingSkeletonSettings {
     readonly modelId: string | null;
     readonly failureCode: string | null;
   }>;
+  /**
+   * Role rotation, Task 11 (orchestrator ruling 2026-10-11): may the SEALED answer-role ref `roleRef` stand in for a
+   * rotated debate's pinned member that is not claim-eligible? Only when the debate's start-of-debate estimate already
+   * covers that ref's model. Absent: yes — off the preview the estimate prices the sealed roles exactly as for a debate
+   * that is not rotated. The preview's runner answers with `previewSealedRoleFallbackCovered` (its rotated estimate
+   * prices only the panel's models). No: the pinned role refuses with today's J24.
+   */
+  readonly answerRoleFallbackCovered?: (input: Readonly<{
+    roleRef: string;
+    panel: readonly DiscoveredPanelMember[];
+  }>) => boolean;
   readonly scoringOperator?: ScoringOperatorRegisterInput;
   readonly runDeathPolicy?: RunDeathPolicy;
   readonly hiddenNodeScoreThreshold?: {
@@ -2980,10 +3050,13 @@ export function serveFloorOf(input: Readonly<{
  *
  * Content-free: provider refs, codes and counts. The served refs are the
  * makers that wrote and checked the round the answer serves (null when the
- * answer has no checked round). A served maker other than the planned one can
- * only be the money fallback — every other substitution is refused — so the
- * fallback flags and the reason are derived from the refs, and migration 0076
- * refuses a row where they disagree. `checkerSameAsWriter` is R9's disclosure:
+ * answer has no checked round). On a run that is not rotated, a served maker
+ * other than the planned one can only be the money fallback — every other
+ * substitution is refused — so the fallback flags and the reason are derived
+ * from the refs, and migration 0076 refuses a row where they disagree. On a
+ * rotated run (Task 11, migration 0114) the planned refs are the pin's, and a
+ * sealed register ref that stood in for an unavailable pinned member is the one
+ * other substitution: its role's reason is ROLE_UNAVAILABLE, named per role. `checkerSameAsWriter` is R9's disclosure:
  * DEGRADED-DIVERSITY reads the SEALED refs, so a fallback that put both roles
  * on one maker is recorded here instead. The digest fields (Task M4) are the
  * rung and the points left out of the digest the answer-writer was handed
@@ -3003,9 +3076,22 @@ export function buildServeDisclosureRecord(input: Readonly<{
   digest: Readonly<{ rung: number; pointsOmitted: number }> | null;
   /** The floor of a components-only answer (`serveFloorOf`), or null. */
   floor: ServeFloor | null;
+  /**
+   * Role rotation, Task 11 (orchestrator ruling 2026-10-11): a rotated run's stand-ins — per answer role, the sealed
+   * register ref that took the role because the pinned member was not claim-eligible, or null when the pin held it.
+   * Present only on a rotated run; the record then names each fallback's reason per role. Absent on every other run,
+   * whose record is today's to the byte.
+   */
+  standIns?: Readonly<{ writerRef: string | null; checkerRef: string | null }>;
 }>): ServeDisclosureRecord {
   const writerFallback = input.served !== null && input.served.writerRef !== input.planned.writerRef;
   const checkerFallback = input.served !== null && input.served.checkerRef !== input.planned.checkerRef;
+  // A role the stand-in served fell back because its pinned model was unavailable; any other served model than the
+  // planned one was chosen for money (a stand-in a cheaper model then replaced included: what served was chosen for money).
+  const reasonOf = (fallback: boolean, servedRef: string | undefined, standIn: string | null | undefined) =>
+    !fallback ? null : standIn !== null && standIn !== undefined && servedRef === standIn ? "ROLE_UNAVAILABLE" as const : "MONEY" as const;
+  const writerReason = reasonOf(writerFallback, input.served?.writerRef, input.standIns?.writerRef);
+  const checkerReason = reasonOf(checkerFallback, input.served?.checkerRef, input.standIns?.checkerRef);
   return Object.freeze({
     answerId: input.answerId,
     answerVersion: input.answerVersion,
@@ -3016,7 +3102,9 @@ export function buildServeDisclosureRecord(input: Readonly<{
     checkerServedRef: input.served?.checkerRef ?? null,
     writerFallback,
     checkerFallback,
-    fallbackReason: writerFallback || checkerFallback ? "MONEY" as const : null,
+    fallbackReason: writerReason === "MONEY" || checkerReason === "MONEY" ? "MONEY" as const : null,
+    ...(input.standIns === undefined || writerReason === null ? {} : { writerFallbackReason: writerReason }),
+    ...(input.standIns === undefined || checkerReason === null ? {} : { checkerFallbackReason: checkerReason }),
     checkerSameAsWriter: input.served !== null && input.served.checkerRef === input.served.writerRef,
     bodyStop: input.body.bodyStop,
     pointsWithoutReview: input.body.pointsWithoutReview,
@@ -3976,7 +4064,10 @@ export class WalkingSkeletonRunner {
     this.#runs = new RunRepository(pool);
     this.#work = new WorkItemRepository(pool);
     this.#graph = new GraphRepository(pool);
-    this.#judge = new Judge(provider);
+    // L4-F9 repair: every model call the runner makes goes through the keep-alive
+    // of the debate making it, refused once that debate must stop.
+    const primary = keepAliveProviderGateway(provider);
+    this.#judge = new Judge(primary);
     this.#judgements = new JudgementRepository(pool);
     this.#ledger = new LedgerRepository(pool);
     this.#budget = new BudgetRepository(pool);
@@ -3986,20 +4077,20 @@ export class WalkingSkeletonRunner {
     this.#providerProbes = new ProviderProbeRepository(pool);
     this.#serveDisclosure = settings.serveDisclosure?.store ?? new ServeDisclosureRepository(pool);
     this.#costSubstitutions = settings.costSubstitutions?.store ?? new RunCostSubstitutionRepository(pool);
+    const critique = settings.critique === undefined ? undefined
+      : { ...settings.critique, provider: keepAliveProviderGateway(settings.critique.provider) };
     this.#configuredMakers = Object.freeze([
-      Object.freeze({ judge: this.#judge, provider, providerRef: settings.providerRef, maker: settings.maker }),
-      ...(settings.critique === undefined ? [] : [Object.freeze({
-        judge: new Judge(settings.critique.provider),
-        provider: settings.critique.provider,
-        providerRef: settings.critique.providerRef,
-        maker: settings.critique.maker
+      Object.freeze({ judge: this.#judge, provider: primary, providerRef: settings.providerRef, maker: settings.maker }),
+      ...(critique === undefined ? [] : [Object.freeze({
+        judge: new Judge(critique.provider),
+        provider: critique.provider,
+        providerRef: critique.providerRef,
+        maker: critique.maker
       })]),
-      ...(settings.additionalMakers ?? []).map((maker) => Object.freeze({
-        judge: new Judge(maker.provider),
-        provider: maker.provider,
-        providerRef: maker.providerRef,
-        maker: maker.maker
-      }))
+      ...(settings.additionalMakers ?? []).map((maker) => {
+        const kept = keepAliveProviderGateway(maker.provider);
+        return Object.freeze({ judge: new Judge(kept), provider: kept, providerRef: maker.providerRef, maker: maker.maker });
+      })
     ]);
   }
 
@@ -4070,8 +4161,8 @@ export class WalkingSkeletonRunner {
     }
   }
 
-  async executeWorkItem(workItemId: string): Promise<RunnerExecutionResult> {
-    return this.execute(workItemId);
+  async executeWorkItem(workItemId: string, task?: RunnerTaskControl): Promise<RunnerExecutionResult> {
+    return this.execute(workItemId, task);
   }
 
   async executeValueOverlay(input: ValueOverlayExecutionInput): Promise<MixedValueAnswer> {
@@ -4159,7 +4250,7 @@ export class WalkingSkeletonRunner {
     });
   }
 
-  private async execute(workItemId?: string): Promise<RunnerExecutionResult> {
+  private async execute(workItemId?: string, task?: RunnerTaskControl): Promise<RunnerExecutionResult> {
     // W10/3: the claim must cover the LONGEST call this execution can make, and
     // since the synthesis legs now spend their own sealed bounds those two
     // deadlines belong in the max. The composer/conformance pair STAYS: both are
@@ -4319,6 +4410,21 @@ export class WalkingSkeletonRunner {
     if (claimed === null) return { kind: "NO_WORK" };
     if (claimed.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", claimed.workItemId);
     const claimedRunId = claimed.runId;
+    /**
+     * L4-F9 repair (owner ruling 2026-10-11): the claim covers ONE model call and
+     * the debate makes many, so it is renewed while the debate runs, fenced on the
+     * deadline last seen; a second dispatch then finds the item taken. The debate
+     * stops at its next model call once the claim is another copy's, or once
+     * Hatchet gives up on the task (run-keep-alive.ts).
+     */
+    const keepAlive = startRunKeepAlive({
+      claimDeadline: claimed.claimDeadline,
+      renewEveryMs: this.settings.claimMs / 3,
+      renew: (heldUntil) => this.#work.renewClaim({ ...claimInput, workItemId: claimed.workItemId, heldUntil }),
+      ...(task === undefined ? {} : { task })
+    });
+    try {
+    return await runKeepAliveScope.run(keepAlive, async () => {
     /**
      * VERDICT STORY (spec §3, amended): what the settled debate hands its story.
      * The snapshot is built INSIDE the lease below, where the in-memory material
@@ -4525,6 +4631,30 @@ export class WalkingSkeletonRunner {
         );
       }
       roleAssignment = parsedAssignment.data;
+    }
+    /**
+     * Role rotation (spec 2026-10-11 Part 6): the four roles admission picked, pinned beside the run.
+     * A rotated run swaps the two sealed answer-role refs for the pinned ones for THIS run only (the
+     * per-run `synthesisRolePolicy` below) and hands its story the pinned pair; the legacy seat book and
+     * every other path stay as they are. Admission picks only among the debate's own frozen panel, and a
+     * run never carries both pins (admission pins a rotation only where no scorecard assignment is
+     * pinned), so a pin that breaks either rule, or that does not read, is a TERMINAL refusal before any
+     * probe or call, like RUN_ROLE_ASSIGNMENT_INVALID. A database failure is not a TypeError and keeps
+     * today's (non-terminal) path.
+     */
+    let rotationPin: RunRoleRotationRecord | null;
+    try {
+      rotationPin = await readRunRoleRotation(this.pool, run.runId);
+      if (rotationPin !== null && roleAssignment !== null) throw new TypeError("BOTH_PINS");
+      if (rotationPin !== null) {
+        const panelRefs = new Set(run.discoveredPanel.map((member) => member.provider_ref));
+        const pinned = [rotationPin.answerWriter, rotationPin.answerChecker, rotationPin.storyteller, rotationPin.storyChecker];
+        if (!pinned.every((role) => panelRefs.has(role.providerRef))) throw new TypeError("PIN_OFF_PANEL");
+      }
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      await this.#work.recordTerminalFailure({ runId: run.runId, workItemId: claimed.workItemId, reason: "RUN_ROLE_ROTATION_INVALID" });
+      throw new TypedDomainError("RUN_ROLE_ROTATION_INVALID", "The run's pinned role rotation cannot seat a debate");
     }
     const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, maker] as const));
     const absentAtClaim: Array<{ readonly member: DiscoveredPanelMember; readonly failureCode: string }> = [];
@@ -4741,7 +4871,35 @@ export class WalkingSkeletonRunner {
         "Every provider pinned at ask time was absent when the runner claimed the work item"
       );
     }
-    const synthesisRolePolicy = this.settings.synthesisRolePolicy;
+    // Role rotation, Task 11 (orchestrator ruling 2026-10-11 under the owner's delegation, "always an answer"): a
+    // pinned answer member that is not claim-eligible hands its role back to the SEALED register ref for that role —
+    // today's unpinned role, with today's off-panel probe and today's J24 below — when the debate's estimate already
+    // covers that ref's model (`answerRoleFallbackCovered`). Task 12: the sealed ref must itself be one of the debate's
+    // panel REFS (not merely a panel model), so a stand-in was priced, switched on and health-checked with the panel and
+    // never needs an off-panel probe the estimate did not count. Not a panel ref, not covered, or the sealed ref is the
+    // pinned one: no stand-in, and the pinned role refuses with today's J24. The pin stays the disclosure's planned ref,
+    // so the stand-in is recorded as that role's fallback for ROLE_UNAVAILABLE (`rotationStandIns`).
+    const standInFor = (pinnedRef: string, sealedRef: string): string | null =>
+      configuredMakers.some((maker) => maker.providerRef === pinnedRef) || sealedRef === pinnedRef
+        || !run.discoveredPanel.some((member) => member.provider_ref === sealedRef)
+        || !(this.settings.answerRoleFallbackCovered?.({ roleRef: sealedRef, panel: run.discoveredPanel }) ?? true)
+        ? null
+        : sealedRef;
+    const rotationStandIns = this.settings.synthesisRolePolicy === undefined || rotationPin === null ? null : Object.freeze({
+      writerRef: standInFor(rotationPin.answerWriter.providerRef, this.settings.synthesisRolePolicy.synthesizerRoleRef),
+      checkerRef: standInFor(rotationPin.answerChecker.providerRef, this.settings.synthesisRolePolicy.evaluatorRoleRef)
+    });
+    // Role rotation: a rotated run's per-claim policy is the boot policy with the two answer-role refs
+    // replaced by the pin's, or by a role's stand-in (bounds and loop bound unchanged). Every per-run use below
+    // reads this one value; the pre-claim J24 (2) check above keeps the sealed refs, the fallback a one-maker
+    // debate needs.
+    const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined || rotationPin === null || rotationStandIns === null
+      ? this.settings.synthesisRolePolicy
+      : Object.freeze({
+        ...this.settings.synthesisRolePolicy,
+        synthesizerRoleRef: rotationStandIns.writerRef ?? rotationPin.answerWriter.providerRef,
+        evaluatorRoleRef: rotationStandIns.checkerRef ?? rotationPin.answerChecker.providerRef
+      });
     if (synthesisRolePolicy === undefined) {
       // Unreachable: the pre-claim gate refuses first. Typed rather than
       // optional-chained so a future caller cannot reach synthesis without it.
@@ -4842,9 +5000,13 @@ export class WalkingSkeletonRunner {
         workItemId: claimed.workItemId,
         reason: `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:${role}`
       });
+      // Task 12: on a rotated run the role's ref is the debate's PIN (unless a sealed stand-in replaced it), so the
+      // message says which: a pinned ref is never called sealed.
+      const refKind = rotationPin !== null && roleRef === (role === "SYNTHESIZER" ? rotationPin.answerWriter : rotationPin.answerChecker).providerRef
+        ? "pinned" : "sealed";
       throw new TypedDomainError(
         "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM",
-        `J24: the sealed ${role} role ref ${roleRef} was ${absent === undefined ? "not claim-eligible" : `absent at claim (${absent.failureCode})`}; the run refuses rather than serving from a provider the sealed row did not name`
+        `J24: the ${refKind} ${role} role ref ${roleRef} was ${absent === undefined ? "not claim-eligible" : `absent at claim (${absent.failureCode})`}; the run refuses rather than serving from a provider ${refKind === "pinned" ? "the debate's pin" : "the sealed row"} did not name`
       );
     }
     // A15: the same refusal for an assigned run's synthesis seats — neither the
@@ -6273,7 +6435,7 @@ export class WalkingSkeletonRunner {
         const reviewerSeats = seatBook.assigned
           ? rotateSeats(seatBook.reviewer, seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey: reviewCallSiteKey }))
           : seatBook.reviewer;
-        const reviewer = selectDifferentMakerReviewer(authoredNode.maker, reviewerSeats.flatMap((seat) => {
+        const reviewer = selectDifferentMakerReviewer(run.runId, authoredNode.maker, reviewerSeats.flatMap((seat) => {
           const planned = seatCallPlan(seat, reviewCallSiteKey, differentMaker);
           const first = seatCaller.plan(seat, reviewCallSiteKey, planned.options);
           return first === null ? [] : [{ seat, maker: first.maker, plan: planned }];
@@ -7084,7 +7246,8 @@ export class WalkingSkeletonRunner {
       }))
     ]);
     // ---- T9: the synthesis serve chain's inputs -------------------------
-    const synthesisRoles = this.settings.synthesisRolePolicy;
+    // Role rotation: the per-claim policy (the pin's two answer refs on a rotated run, else the sealed one).
+    const synthesisRoles = synthesisRolePolicy;
     if (synthesisRoles === undefined) {
       // Unreachable from executeWorkItem: the claim-time gate refuses first.
       // Kept as the typed defence for any future caller that reaches serve by
@@ -8009,7 +8172,10 @@ export class WalkingSkeletonRunner {
             writerRef: plannedRoleRef(writerPlannedByRound.get(answeredRound.round), "writer"),
             checkerRef: plannedRoleRef(checkerPlannedByRound.get(answeredRound.round), "checker")
           }
-        : { writerRef: synthesisRoles.synthesizerRoleRef, checkerRef: synthesisRoles.evaluatorRoleRef },
+        // Role rotation, Task 11: a rotated run plans its pin's refs, so a stand-in is disclosed as a fallback.
+        : rotationPin === null
+          ? { writerRef: synthesisRoles.synthesizerRoleRef, checkerRef: synthesisRoles.evaluatorRoleRef }
+          : { writerRef: rotationPin.answerWriter.providerRef, checkerRef: rotationPin.answerChecker.providerRef },
       served: answeredRound === undefined ? null : {
         writerRef: servedRoleRef(servedDrafts.get(answeredRound.candidateRef)?.providerRef, "writer"),
         checkerRef: servedRoleRef(servedChecks.get(answeredRound.verdictRef), "checker")
@@ -8017,7 +8183,8 @@ export class WalkingSkeletonRunner {
       body: serveDisclosureBody,
       serveStop: serveLoopStopOf(servePhaseFailure),
       digest: serveDisclosureDigestFacts(writerDigest),
-      floor
+      floor,
+      ...(rotationStandIns === null ? {} : { standIns: rotationStandIns })
     }));
     await runnerStage(
       "ANSWER_MEMORY_OBSERVATION_FAILED",
@@ -8109,6 +8276,8 @@ export class WalkingSkeletonRunner {
               // The run's OWN claim-eligible providers: a role provider that the
               // claim-time probe found absent is never called for the story.
               resolveProvider: (roleRef) => {
+                // Role rotation, Task 12: on a rotated run the register's story ref serves only when it is a panel ref.
+                if (rotationPin !== null && !panelRefs.has(roleRef)) return null;
                 const maker = synthesisMakers.find((candidate) => candidate.providerRef === roleRef);
                 return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };
               },
@@ -8132,7 +8301,21 @@ export class WalkingSkeletonRunner {
                     checker: storySeatRoleMaker(seatBook.answerChecker,
                       answeredRound === undefined ? undefined : checkerPlannedByRound.get(answeredRound.round))
                   }
-                : undefined,
+                // Role rotation (spec 2026-10-11 Part 6): a rotated run (never an assigned one; the claim
+                // refuses both pins) hands the story its pinned pair, looked up among this run's
+                // claim-eligible members. Task 12 ("always an answer"): a pinned member not claim-eligible
+                // hands its role to another claim-eligible member of the stored panel, in panel order, the
+                // story checker always of another maker than the storyteller serving
+                // (`storyRotationRoleMakers`). None: null, and the story uses the register's ref, as for a
+                // FALLBACK seat (packages/story writer.ts), only when that ref is a panel ref (above).
+                : rotationPin === null
+                  ? undefined
+                  : storyRotationRoleMakers({
+                      panelRefs: run.discoveredPanel.map((member) => member.provider_ref),
+                      claimEligible: synthesisMakers,
+                      storytellerRef: rotationPin.storyteller.providerRef,
+                      storyCheckerRef: rotationPin.storyChecker.providerRef
+                    }),
               // Each story step re-takes the SAME disclosure lease the debate held
               // (this run and its memory-linked prior run), briefly, on this
               // runner's pool: every store and gateway inside it borrows it, and
@@ -8181,6 +8364,10 @@ export class WalkingSkeletonRunner {
       }
     }
     return executed;
+    });
+    } finally {
+      keepAlive.stop();
+    }
   }
 }
 
@@ -8622,8 +8809,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RISK_TIER_POLICY_PROVENANCE_MISSING",
   "RISK_TIER_POLICY_UNRESOLVED",
   "RIVAL_CARVER_UNAVAILABLE",
+  "RUNNER_CLAIM_LOST",
   "RUNNER_DISCLOSURE_PIPELINE_FAILED",
   "RUNNER_FAILURE_STATE_NOT_RECORDED",
+  "RUNNER_TIME_LIMIT_REACHED",
   "RUN_CEILING_BELOW_FIRST_CALL",
   "RUN_CEILING_BELOW_ONE_CALL",
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
@@ -8644,6 +8833,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_OWNER_REF_INVALID",
   "RUN_PRINCIPAL_SESSION_MISMATCH",
   "RUN_ROLE_ASSIGNMENT_INVALID",
+  "RUN_ROLE_ROTATION_INVALID",
   "SCALAR_DECISION_CANNOT_SPAWN",
   "SCORECARD_INTERVAL_INVALID",
   "SCORECARD_TASK_CLASS_AMBIGUOUS",
@@ -9248,6 +9438,21 @@ export function captureFailureEnvelope(input: {
   });
 }
 
+/**
+ * How long a debate may wait for a free place on a runner before Hatchet gives
+ * it up. The runner takes 8 at once (RUNNER_CAPACITY.concurrentRuns); Hatchet's own
+ * default is 5 minutes, shorter than one debate. Owner ruling 2026-10-10.
+ */
+export const RUNNER_QUEUE_WAIT_LIMIT = "30m" as const;
+
+/**
+ * How long one debate may run before Hatchet gives it up. One task is one whole
+ * debate; a task declared without a limit is registered by the SDK with '60s'.
+ * Owner ruling 2026-10-10: 60 minutes in every deployment, the preview's value
+ * since 2026-10-06.
+ */
+export const RUNNER_EXECUTION_LIMIT = "3600s" as const;
+
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
   readonly runner: WalkingSkeletonRunner;
@@ -9260,10 +9465,14 @@ export function declareHatchetWalkingSkeletonTask(input: {
   if (!Number.isInteger(input.engineRetries) || input.engineRetries < 0) {
     throw new TypeError("Hatchet retry count must be a non-negative register value");
   }
+  const executionTimeout = input.previewExecutionTimeout ?? RUNNER_EXECUTION_LIMIT;
+  // The debate keeps its own copy of the limit it was registered with (L4-F9 repair).
+  const executionLimitMs = Number(executionTimeout.slice(0, -1)) * 1_000;
   return input.client.task({
     name: input.workflowName,
     retries: input.engineRetries,
-    ...(input.previewExecutionTimeout===undefined?{}:{executionTimeout:input.previewExecutionTimeout}),
+    scheduleTimeout: RUNNER_QUEUE_WAIT_LIMIT,
+    executionTimeout,
     // S06 capture binding. It was written in e8d99d33 and destroyed by the
     // conflict resolution in merge 1c9578a2, which took the mainline side of
     // this file whole; the test that specifies it survived the same merge.
@@ -9272,7 +9481,11 @@ export function declareHatchetWalkingSkeletonTask(input: {
     // that escapes is the one that would have escaped without any of this.
     fn: async (
       rawDispatch: { runId: string; workItemId: string },
-      hatchetContext?: { retryCount?(): number }
+      hatchetContext?: {
+        retryCount?(): number;
+        readonly abortController?: { readonly signal: AbortSignal };
+        refreshTimeout?(incrementBy: `${number}s`): Promise<void>;
+      }
     ) => {
       // L4-F6: BEFORE the runner, before the repository, before anything reads
       // a field — and, at INT2 (SYNC2 into integration), before the S06 capture
@@ -9300,9 +9513,27 @@ export function declareHatchetWalkingSkeletonTask(input: {
         && observedRetryCount >= 0
         ? observedRetryCount
         : 0;
+      // L4-F9 repair: the debate hears Hatchet — its stop signal, its "still
+      // working" call and its limit. Read inside a guard like retryCount: a
+      // throwing accessor never stops the debate from starting; without the
+      // signal the debate still stops at the limit on its own clock.
+      let signal: AbortSignal | undefined;
+      try {
+        signal = hatchetContext?.abortController?.signal;
+      } catch {
+        signal = undefined;
+      }
+      const refreshTimeout = typeof hatchetContext?.refreshTimeout === "function"
+        ? (incrementBy: `${number}s`) => hatchetContext.refreshTimeout!(incrementBy)
+        : undefined;
+      const task: RunnerTaskControl = Object.freeze({
+        executionLimitMs,
+        ...(signal === undefined ? {} : { signal }),
+        ...(refreshTimeout === undefined ? {} : { refreshTimeout })
+      });
       const execute = async () => {
         try {
-          const result = await input.runner.executeWorkItem(dispatch.workItemId);
+          const result = await input.runner.executeWorkItem(dispatch.workItemId, task);
           return result.kind === "COMPLETED"
             ? { kind: result.kind, answerId: result.answerId }
             : { kind: result.kind };
@@ -9319,6 +9550,12 @@ export function declareHatchetWalkingSkeletonTask(input: {
             source: "hatchet",
             attemptIndex
           }));
+          // L4-F9 repair: a copy whose claim another copy took leaves the work
+          // item to that copy. Recording FAILED here would end a debate that is
+          // still running, under the asker's eyes.
+          if (error instanceof TypedDomainError && error.code === "RUNNER_CLAIM_LOST") {
+            throw scrubbedTaskFailure(error);
+          }
           const recorded = await input.failures.recordTerminalFailure({
             runId: dispatch.runId,
             workItemId: dispatch.workItemId,

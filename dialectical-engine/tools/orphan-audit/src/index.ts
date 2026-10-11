@@ -642,9 +642,19 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // N26m/N26n (PR-54): the reviewed module after the NETOPIA branch merged dev (its billing exports and #101's
 // applyForward110) and added the forward chain (migrate() runs the superseding verifier, applyForward110, then
 // applyForwardChain; migrations/lineage/README.md).
-// data-export S01 (V-28, renumbered by V-30): dev's module plus the export's repository exports and the compatibility
-// re-seal after applyForwardChain (0113 moves lineageEvidence; V-18).
-const NATIVE_MIGRATE_MODULE_SHA256 = "b8b75bb4043ce32cbb4ad62ae38ce629e9ab889275ef93564c89ba3f137a294b";
+// Connection budget (2026-10-10, docs/operations/2026-10-10-database-connection-budget.md): the reviewed
+// module after createPool gained a pool name, a busy marker (isDatabasePoolBusy) and a busy log line, and the
+// support control-plane pool took its size from packages/db/src/pool-budget.ts. migrate() is byte-identical.
+// Role rotation (spec 2026-10-11, Part 3): the reviewed module after it gained the 0114 pin's access
+// (insertRunRoleRotation, readRunRoleRotation, readRoleRotationCounts), merged with the connection budget above.
+// migrate() is byte-identical.
+// Role rotation, Task 11: the reviewed module after it exported the serve disclosure's per-role fallback reason
+// (SERVE_DISCLOSURE_FALLBACK_REASONS, serveDisclosureFallbackReasonOf). migrate() is byte-identical.
+// Role rotation, Task 12 item 5: the reviewed module after readRoleRotationCounts moved into a short transaction
+// with SET LOCAL statement_timeout = '5s' on a dedicated connection. migrate() is byte-identical.
+// data-export S01 (V-28, renumbered by V-30 and V-41): dev's module plus the export's repository exports and the
+// compatibility re-seal after applyForwardChain (0115 moves lineageEvidence; V-18).
+const NATIVE_MIGRATE_MODULE_SHA256 = "c4533880630481b9448777a4b7251b524beeaf129020a438e103b677766df8f1";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

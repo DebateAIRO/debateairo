@@ -21,7 +21,7 @@ export class StaffInternalFundingReadiness implements StaffInternalFundingApplic
   /** Static startup facts only: hosted USD billing, priced targets and the exact sealed selection. */
   async requireConfigured(): Promise<void> {
     const unavailable = () => new Error("STAFF_UNAVAILABLE");
-    if (this.input.deploymentMode !== "hosted" || this.input.billingPlans === null || this.input.billingPlans.currency !== "USD"
+    if (this.input.deploymentMode !== "hosted" || this.input.billingPlans === null || this.input.billingPlans.creditCurrency !== "USD"
       || this.input.providerTargets.length === 0) throw unavailable();
     assertPricedProviderTargets(this.input.providerTargets, this.input.deploymentMode);
     const selected = await this.allowances.readPolicy();

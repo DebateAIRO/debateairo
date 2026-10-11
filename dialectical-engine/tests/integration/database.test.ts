@@ -28,8 +28,10 @@ import {
   RunCostSubstitutionRepository,
   RunRepository,
   ServeDisclosureRepository,
+  insertRunRoleRotation,
   migrate,
   readCallPrompt,
+  type RunRoleRotationInput,
   type StoredServeDisclosure
 } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
@@ -81,6 +83,7 @@ import {
   FIRST_POSITION_CALL_SITE_KEY,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
+  reviewerTurnOrder,
   rotateSeats,
   rotatedSeatSelection,
   runnerTerminalFailureReason,
@@ -1838,6 +1841,145 @@ describe("P11 / ADR-0017 — claim discipline", () => {
   });
 });
 
+/**
+ * L4-F9 repair (owner ruling 2026-10-11) — the database-backed race the finding
+ * asked for (tests/unit/runner-claim-window.test.ts). A debate is one work item
+ * claimed for a window sized to ONE model call, and a debate makes many, so the
+ * claim used to lapse while the debate was still running: a Hatchet retry (or
+ * the start-up sweep) then claimed the same item and ran the debate a second
+ * time, re-authoring every node and paying for every call again. The running
+ * copy now renews its claim, fenced on the deadline it last saw.
+ */
+describe("L4-F9 / ADR-0017 §3(c) — a running debate keeps its claim", () => {
+  const SHORT_CLAIM_MS = 2_400;
+  const servedAnswer = (): readonly string[] => [
+    JSON.stringify({ statement: "A kept-claim test-layer answer.", way_of_knowing: "REASONING",
+      locator: null, restatement_text: "A kept-claim test-layer answer.", restatement_status: "PASS", value_laden: false,
+      steelman: { summary: "A kept-claim test-layer answer.", fidelity: 0.72 }, critic: { summary: "A test-layer counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+      evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] }, fallacy: { severity: 0.28, fatalFlags: [] } }),
+    JSON.stringify({ segments: [
+      { segment_id: "segment:verdict", text: "A kept-claim test-layer answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+      { segment_id: "segment:research", text: "Check a test-layer source.", node_refs: [], served_number_refs: [] }
+    ] }),
+    evaluatorSatisfied()
+  ];
+
+  /** A gateway whose FIRST call waits until the test releases it: a long model call. */
+  function heldFirstCall(endpoint: string) {
+    const inner = createPostgresProviderGateway(database.pool, { endpoint, model: "test-layer/model", maker: "test-layer" });
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => { release = resolve; });
+    let entered!: () => void;
+    const firstCallSent = new Promise<void>((resolve) => { entered = resolve; });
+    let held = false;
+    const gateway: ProviderGateway = {
+      call: async (request) => {
+        if (!held) {
+          held = true;
+          entered();
+          await released;
+        }
+        return inner.call(request);
+      }
+    };
+    return { gateway, inner, firstCallSent, release };
+  }
+
+  const settled = <T>(promise: Promise<T>) => promise.then(
+    (value) => ({ value }) as const,
+    (error: unknown) => ({ error }) as const
+  );
+
+  it("renews only the claim it holds, and says when the job is already settled", async () => {
+    const work = new WorkItemRepository(database.pool);
+    const { runId, workItemId } = await createRunnerWork(`l4f9-renew-${randomUUID()}`);
+    const workerId = "worker:l4f9";
+    const claimed = await work.claimById({ workItemId, workerId, claimSeconds: 30 });
+    if (claimed === null) throw new Error("TEST_EXPECTED_CLAIM");
+
+    const renewed = await work.renewClaim({ workItemId, workerId, claimSeconds: 60, heldUntil: claimed.claimDeadline });
+    if (renewed.kind !== "RENEWED") throw new Error(`TEST_EXPECTED_RENEWAL:${renewed.kind}`);
+    expect(renewed.claimDeadline.getTime()).toBeGreaterThan(claimed.claimDeadline.getTime());
+    // The deadline seen before the renewal is no longer the claim: a stale fence renews nothing.
+    await expect(work.renewClaim({ workItemId, workerId, claimSeconds: 60, heldUntil: claimed.claimDeadline }))
+      .resolves.toEqual({ kind: "LOST" });
+
+    // The claim lapses and a second copy takes the item — under the SAME worker id,
+    // which is what a Hatchet retry in the same process looks like.
+    await database.pool.query(
+      "UPDATE core.work_item SET claim_deadline = clock_timestamp() - interval '1 second' WHERE work_item_id = $1",
+      [workItemId]
+    );
+    const second = await work.claimById({ workItemId, workerId, claimSeconds: 30 });
+    if (second === null) throw new Error("TEST_EXPECTED_RECLAIM");
+    await expect(work.renewClaim({ workItemId, workerId, claimSeconds: 60, heldUntil: renewed.claimDeadline }))
+      .resolves.toEqual({ kind: "LOST" });
+    await expect(work.renewClaim({ workItemId, workerId, claimSeconds: 60, heldUntil: second.claimDeadline }))
+      .resolves.toMatchObject({ kind: "RENEWED" });
+
+    await work.recordTerminalFailure({ runId, workItemId, reason: "TEST_LAYER_SETTLED" });
+    await expect(work.renewClaim({ workItemId, workerId, claimSeconds: 60, heldUntil: second.claimDeadline }))
+      .resolves.toEqual({ kind: "FINISHED" });
+  });
+
+  it("makes a second dispatch stand down while the debate outlives its first claim", async () => {
+    const { workItemId } = await createRunnerWork(`l4f9-race-${randomUUID()}`);
+    const provider = await startProviderDouble(servedAnswer());
+    const held = heldFirstCall(provider.endpoint);
+    const settings = { ...runnerSettings(), claimMs: SHORT_CLAIM_MS };
+    const secondCopyCalls: ProviderCallRequest[] = [];
+    const secondCopy = new WalkingSkeletonRunner(database.pool, {
+      call: async (request) => {
+        secondCopyCalls.push(request);
+        return held.inner.call(request);
+      }
+    }, settings);
+    try {
+      const first = settled(new WalkingSkeletonRunner(database.pool, held.gateway, settings).executeWorkItem(workItemId));
+      await held.firstCallSent;
+      // Well past the first claim's whole length: before the repair it had lapsed here.
+      await new Promise((resolve) => setTimeout(resolve, SHORT_CLAIM_MS + 1_200));
+      await expect(secondCopy.executeWorkItem(workItemId)).resolves.toEqual({ kind: "NO_WORK" });
+      held.release();
+      expect(await first).toMatchObject({ value: { kind: "COMPLETED" } });
+      expect(secondCopyCalls).toEqual([]);
+    } finally {
+      held.release();
+      await provider.stop();
+    }
+  });
+
+  it("makes no further model call once another copy holds the claim", async () => {
+    const { workItemId } = await createRunnerWork(`l4f9-lost-${randomUUID()}`);
+    const provider = await startProviderDouble(servedAnswer());
+    const held = heldFirstCall(provider.endpoint);
+    try {
+      const first = settled(new WalkingSkeletonRunner(database.pool, held.gateway, {
+        ...runnerSettings(), claimMs: SHORT_CLAIM_MS
+      }).executeWorkItem(workItemId));
+      await held.firstCallSent;
+      // Another copy's claim: the deadline the running copy last saw is gone.
+      await database.pool.query(
+        "UPDATE core.work_item SET claim_deadline = clock_timestamp() + interval '1 hour' WHERE work_item_id = $1",
+        [workItemId]
+      );
+      // One renewal beat (a third of the claim) and a margin.
+      await new Promise((resolve) => setTimeout(resolve, SHORT_CLAIM_MS / 3 + 600));
+      held.release();
+      expect(await first).toMatchObject({ error: { code: "RUNNER_CLAIM_LOST" } });
+      // Only the call already in flight reached the vendor.
+      expect(provider.calls()).toBe(1);
+      const item = await database.pool.query<{ state: string }>(
+        "SELECT state FROM core.work_item WHERE work_item_id = $1", [workItemId]
+      );
+      expect(item.rows[0]?.state).toBe("CLAIMED");
+    } finally {
+      held.release();
+      await provider.stop();
+    }
+  });
+});
+
 describe("P7 — graph aggregate write seam", () => {
   it("serializes graph writes with an advisory lock and materialises an immutable one-node snapshot", async () => {
     const run = new RunRepository(database.pool);
@@ -2631,15 +2773,19 @@ describe("apps/runner — legal command lifecycle", () => {
       const reviewersFor = (author: string): readonly string[] => reviews.rows
         .filter((row) => row.author_maker === author)
         .map((row) => row.reviewer_maker);
-      expect(reviewersFor("Rotation maker A")).toEqual([
-        "Rotation maker B", "Rotation maker C", "Rotation maker B", "Rotation maker C", "Rotation maker B"
-      ]);
-      expect(reviewersFor("Rotation maker B")).toEqual([
-        "Rotation maker A", "Rotation maker C", "Rotation maker A", "Rotation maker C", "Rotation maker A"
-      ]);
-      expect(reviewersFor("Rotation maker C")).toEqual([
-        "Rotation maker A", "Rotation maker B", "Rotation maker A", "Rotation maker B", "Rotation maker A"
-      ]);
+      // Owner ruling 2026-10-10 (PR #131): the turn goes round THIS debate's seeded circle, not panel order. An
+      // author's first review goes to the maker after it round the circle; each later one moves on from the latest
+      // PERSISTED reviewer, which with three makers alternates the other two. A runner that ignored the latest
+      // reviewer would give every author its first pick five times.
+      const makers = ["Rotation maker A", "Rotation maker B", "Rotation maker C"] as const;
+      const circle = reviewerTurnOrder(runId, makers);
+      expect([...circle].sort()).toEqual([...makers]);
+      for (const author of makers) {
+        const at = circle.indexOf(author);
+        const first = circle[(at + 1) % 3]!;
+        const second = circle[(at + 2) % 3]!;
+        expect(reviewersFor(author)).toEqual([first, second, first, second, first]);
+      }
     } finally {
       await makerC.stop();
       await makerB.stop();
@@ -9053,13 +9199,16 @@ function refuseBodyOrdinals(ordinals: readonly number[]) {
   });
 }
 
-/** B9c: a money seam that refuses the BODY calls whose call site `refuse` names — the one its gateway was last handed. */
-function refuseBodyCallSites(refuse: (callSiteKey: string) => boolean) {
+/**
+ * B9c: a money seam that refuses the BODY calls whose call site `refuse` names — the one its gateway was last handed.
+ * `refuse` is also told the run, for a choice that depends on the debate (its seeded reviewer circle).
+ */
+function refuseBodyCallSites(refuse: (callSiteKey: string, runId: string) => boolean) {
   let lastCallSiteKey = "";
   return Object.freeze({
     observe: (request: ProviderCallRequest) => { lastCallSiteKey = request.callSiteKey; },
-    build: (_runId: string, phase: CostEnvelopePhase): ProviderCostEnvelopeSeam => {
-      const refused = phase === "BODY" && refuse(lastCallSiteKey);
+    build: (runId: string, phase: CostEnvelopePhase): ProviderCostEnvelopeSeam => {
+      const refused = phase === "BODY" && refuse(lastCallSiteKey, runId);
       const site = lastCallSiteKey;
       return {
         assertCallAllowed: () => {
@@ -9222,7 +9371,7 @@ function b9OnlyTheCheaperMakerPays() {
 async function runB9ThreeMakers(input: Readonly<{
   label: string;
   responses: Readonly<Record<"a" | "b" | "c", readonly ProviderDoubleResponse[]>>;
-  refuse: Readonly<Record<"a" | "b" | "c", (callSiteKey: string) => boolean>>;
+  refuse: Readonly<Record<"a" | "b" | "c", (callSiteKey: string, runId: string) => boolean>>;
   onCall?: (maker: "a" | "b" | "c", request: ProviderCallRequest) => void;
 }>): Promise<Readonly<{ runId: string; result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> }>> {
   const doubles = {
@@ -9588,7 +9737,18 @@ describe("B9c — a cheaper maker while arguing, the first call's try, the owner
 
   it("keeps a review off the node's ACTUAL author even when that author is the cheapest maker (M=3)", async () => {
     const EXPANSION = /^JUDGE:(defender|critic):/u;
-    let reviewsAskedOfA = 0;
+    // Owner ruling 2026-10-10 (PR #131): reviewers go round each debate's own seeded circle. The moved root is C's
+    // first node, so its review is planned on the maker right after C round THIS debate's circle — A in some debates,
+    // B in others — and that is the planned maker's first review of the run: A never reviews its own root, and when
+    // B follows C, A's root goes to C. So whichever maker is planned there is refused for money on that first review,
+    // and the review must move to the other one, never to C.
+    const plannedOnMoved = (runId: string): "a" | "b" => {
+      const circle = reviewerTurnOrder(runId, ["Maker A", "Maker B", "Maker C"]);
+      return circle[(circle.indexOf("Maker C") + 1) % 3] === "Maker A" ? "a" : "b";
+    };
+    const reviewsAsked = { a: 0, b: 0 };
+    const refusedFirstReview = (maker: "a" | "b", key: string, runId: string): boolean =>
+      key.startsWith("JUDGE:review:") && plannedOnMoved(runId) === maker && (reviewsAsked[maker] += 1) === 1;
     const { runId, result } = await runB9ThreeMakers({
       label: "b9c-review-actual-author",
       responses: {
@@ -9596,12 +9756,13 @@ describe("B9c — a cheaper maker while arguing, the first call's try, the owner
           reviewDouble("agree", "B9c A review 2"), resil01Composition, evaluatorSatisfied()],
         b: [reviewDouble("agree", "B9c B review 1"), reviewDouble("agree", "B9c B review 2"),
           reviewDouble("agree", "B9c B review 3"), judgementDouble("B9c Maker B spare")],
-        c: [judgementDouble("B9c Maker C root 1"), judgementDouble("B9c Maker C root 2"), reviewDouble("agree", "B9c C spare review")]
+        c: [judgementDouble("B9c Maker C root 1"), judgementDouble("B9c Maker C root 2"), reviewDouble("agree", "B9c C review 1")]
       },
       refuse: {
-        a: (key) => EXPANSION.test(key) || (key.startsWith("JUDGE:review:") && (reviewsAskedOfA += 1) === 1),
+        a: (key, runId) => EXPANSION.test(key) || refusedFirstReview("a", key, runId),
         // B can pay neither its own root nor any panel seat: its seats are left out, as failed seats are.
-        b: (key) => key === "JUDGE:root:secondary" || EXPANSION.test(key) || key.startsWith("PANEL:"),
+        b: (key, runId) => key === "JUDGE:root:secondary" || EXPANSION.test(key) || key.startsWith("PANEL:")
+          || refusedFirstReview("b", key, runId),
         c: (key) => EXPANSION.test(key)
       }
     });
@@ -9611,11 +9772,12 @@ describe("B9c — a cheaper maker while arguing, the first call's try, the owner
     const roots = await b9RootAuthors(runId);
     expect(roots.map((root) => root.provider_ref)).toEqual([PRIMARY_REF, THIRD_REF, THIRD_REF]);
     const moved = roots[1]!;
-    // A, the planned reviewer of C's node, could not pay either; the review went to B, never to C.
-    expect(await b9Callers(runId, `JUDGE:review:${moved.node_id}`)).toEqual([SECONDARY_REF]);
+    // The planned reviewer of C's node could not pay either; the review went to the other maker, never to C.
+    const [planned, standIn] = plannedOnMoved(runId) === "a" ? [PRIMARY_REF, SECONDARY_REF] : [SECONDARY_REF, PRIMARY_REF];
+    expect(await b9Callers(runId, `JUDGE:review:${moved.node_id}`)).toEqual([standIn]);
     expect(await b9Substitutions(runId)).toEqual([
       { callSiteKey: "JUDGE:root:secondary", plannedProviderRef: SECONDARY_REF, usedProviderRef: THIRD_REF, reason: "RUN_ARGUING" },
-      { callSiteKey: `JUDGE:review:${moved.node_id}`, plannedProviderRef: PRIMARY_REF, usedProviderRef: SECONDARY_REF, reason: "RUN_ARGUING" }
+      { callSiteKey: `JUDGE:review:${moved.node_id}`, plannedProviderRef: planned, usedProviderRef: standIn, reason: "RUN_ARGUING" }
     ]);
     // B's refused seats were left out, noted as refused for money and never as a vendor's fault.
     const notes = await b9PanelNotes(runId);
@@ -9839,9 +10001,17 @@ async function pinRoleAssignment(runId: string, assignment: ReturnType<typeof pi
   );
 }
 
+/** Role rotation (spec 2026-10-11 Part 6): a rotation pin as admission writes it, without its run. */
+type RunRoleRotationInputWithoutRun = Omit<RunRoleRotationInput, "runId">;
+
 async function executeSeatScenario(input: {
   readonly label: string;
-  readonly assignment: ReturnType<typeof pinnedAssignment>;
+  /** Absent: no scorecard assignment is pinned (a legacy run, or a rotated one). */
+  readonly assignment?: ReturnType<typeof pinnedAssignment>;
+  /** Role rotation: the four roles admission picked, pinned beside the run before its work is queued. */
+  readonly rotation?: RunRoleRotationInputWithoutRun;
+  /** Role rotation: the frozen panel's size (default 2: the primary and the secondary debate). */
+  readonly panelSize?: number;
   readonly primary: readonly ProviderDoubleResponse[];
   readonly secondary: readonly ProviderDoubleResponse[];
   readonly third: readonly ProviderDoubleResponse[];
@@ -9893,8 +10063,9 @@ async function executeSeatScenario(input: {
   }));
   try {
     const question = `${input.label}-${randomUUID()}`;
-    const runId = await createRun(question, 100, 2, 1, `asker:${question}`, undefined, input.language ?? null);
-    await pinRoleAssignment(runId, input.assignment);
+    const runId = await createRun(question, 100, input.panelSize ?? 2, 1, `asker:${question}`, undefined, input.language ?? null);
+    if (input.assignment !== undefined) await pinRoleAssignment(runId, input.assignment);
+    if (input.rotation !== undefined) await insertRunRoleRotation(database.pool, { runId, ...input.rotation });
     const workItemId = await new WorkItemRepository(database.pool).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `${input.label}:${runId}`
     });
@@ -11903,6 +12074,420 @@ describe("P4-D · control: a legacy run's story keeps the register's refs", () =
       { call_site_key: "STORY:STORYTELLER:1", actor_ref: PRIMARY_REF, candidate_id: null },
       { call_site_key: "STORY:CHECKER:1", actor_ref: PRIMARY_REF, candidate_id: null }
     ]);
+  });
+});
+
+/**
+ * Role rotation (spec 2026-10-11 Part 6) — a debate admission rotated carries a pin beside its run: the
+ * answer's writer and checker and the story's teller and checker. The runner swaps the two sealed answer
+ * refs for the pinned ones for that run only, and hands the story the pinned pair; everything else is
+ * today's legacy path. The three seat routes all debate here (`panelSize: 3`, the fixture panel's three
+ * refs), because admission picks only among the debate's own panel. The sealed refs of `runnerSettings()`
+ * name the primary for both answer roles, so a rotated answer on the secondary and the third is the pin's.
+ * Every route is handed spare judgements and reviews (the doubles serve by kind), so the legacy book's
+ * three-debater run never runs dry; only the routes a row names may write or check the answer.
+ */
+describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come from its pin", () => {
+  const pick = (route: SeatRoute) => ({
+    providerRef: SEAT_ROUTES[route].providerRef, modelId: SEAT_ROUTES[route].model, maker: SEAT_ROUTES[route].maker
+  });
+  const ROTATION: RunRoleRotationInputWithoutRun = Object.freeze({
+    rule: "LEAST_SHARE_SEEDED_TIE_V1" as const,
+    answerWriter: pick("secondary"), answerChecker: pick("third"), storyteller: pick("third"), storyChecker: pick("primary"),
+    eligibleModelIds: Object.freeze([SEAT_ROUTES.primary.model, SEAT_ROUTES.secondary.model, SEAT_ROUTES.third.model])
+  });
+  /** A three-debater debate's doubles: spares of every kind on every route; the writer drafts, the checker checks. */
+  const rotationDoubles = (label: string, writer: SeatRoute, checker: SeatRoute) => {
+    const route = (name: SeatRoute) => [
+      ...Array.from({ length: 16 }, (_, index) => judgementDouble(`${name} ${label} node ${index + 1}`, 0.5)),
+      ...Array.from({ length: 16 }, (_, index) => reviewDouble("agree", `${name} ${label} review ${index + 1}`)),
+      ...(name === writer ? [resil01Composition] : []),
+      ...(name === checker ? [evaluatorSatisfied()] : [])
+    ];
+    return { primary: route("primary"), secondary: route("secondary"), third: route("third") };
+  };
+  /** The seat harness's story with one path per position of a debate with `count` debaters (P1-Pcount). */
+  const positionStory = (count: number): string => {
+    const story = JSON.parse(seatHarnessStory()) as { short: { paths: unknown[] } };
+    story.short.paths = Array.from({ length: count }, (_, offset) => offset + 1).map((index) => ({
+      position_ref: `P${String(index)}`, fate: "HELD_UP", line: "This position held up.", node_refs: [`P${String(index)}`]
+    }));
+    return JSON.stringify(story);
+  };
+  const threePositionStory = (): string => positionStory(3);
+  /** A claim-time probe: each of `refs` is ABSENT, every other member HEALTHY with its pinned model (T9/J24's probe). */
+  const absentFor = (...refs: string[]): NonNullable<WalkingSkeletonSettings["claimTimeProbe"]> => async (member) =>
+    refs.includes(member.provider_ref)
+      ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
+      : { state: "HEALTHY", modelId: member.model_id, failureCode: null };
+  /** The sealed refs of every scenario below: the primary holds both answer roles (`runnerSettings`). */
+  const SEALED_REF = SEAT_ROUTES.primary.providerRef;
+  const j24Events = async (runId: string) => (await database.pool.query<{ value_json: Record<string, unknown> }>(
+    `SELECT value_json FROM core.run_progress_event
+      WHERE run_id=$1 AND kind='ledger.could_not_do' AND value_json->>'state'='SYNTHESIS_ROLE_PROVIDER_ABSENT'`,
+    [runId]
+  )).rows.map((row) => row.value_json);
+  /** Task 11's money rule, recorded: which sealed refs the runner asked about, with the debate's frozen panel. */
+  const coverage = (answer: boolean) => {
+    const asked: Array<Readonly<{ roleRef: string; panel: readonly string[] }>> = [];
+    const answerRoleFallbackCovered: NonNullable<WalkingSkeletonSettings["answerRoleFallbackCovered"]> = (input) => {
+      asked.push({ roleRef: input.roleRef, panel: input.panel.map((member) => member.provider_ref) });
+      return answer;
+    };
+    return { asked, answerRoleFallbackCovered };
+  };
+  const PANEL_REFS = [SEAT_ROUTES.primary.providerRef, SEAT_ROUTES.secondary.providerRef, SEAT_ROUTES.third.providerRef];
+  const workItemOf = async (runId: string) => (await database.pool.query<{ state: string; terminal_reason: string | null }>(
+    "SELECT state, terminal_reason FROM core.work_item WHERE run_id=$1", [runId]
+  )).rows;
+
+  it("the secondary writes the answer and the third checks it, recorded as planned (no false fallback)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-answer", rotation: ROTATION, panelSize: 3, ...rotationDoubles("rotation-answer", "secondary", "third")
+    });
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: SEAT_ROUTES.secondary.providerRef, checker: SEAT_ROUTES.third.providerRef,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.secondary.providerRef,
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef,
+      writerServedRef: SEAT_ROUTES.secondary.providerRef,
+      checkerServedRef: SEAT_ROUTES.third.providerRef,
+      writerFallback: false,
+      checkerFallback: false,
+      fallbackReason: null,
+      checkerSameAsWriter: false
+    });
+    // The legacy book: bare keys (no seat marker), no candidate, and the sealed primary never wrote or checked.
+    expect(scenario.calls.filter((call) => call.call_site_key.includes(":seat:"))).toEqual([]);
+    expect(scenario.calls.filter((call) => call.candidate_id !== null)).toEqual([]);
+    expect(scenario.calls.filter((call) => /^(?:COMPOSER|POST_COMPOSE_R9):/u.test(call.call_site_key))
+      .map((call) => [call.call_site_key, call.actor_ref])).toEqual([
+      ["COMPOSER:SYNTHESIZER:INITIAL:1", SEAT_ROUTES.secondary.providerRef],
+      ["POST_COMPOSE_R9:EVALUATOR:1", SEAT_ROUTES.third.providerRef]
+    ]);
+  });
+
+  it("the story is written by the pinned storyteller and checked by the pinned story checker", async () => {
+    // The register's story refs name the secondary, a claim-eligible debater with no story answers: a story
+    // sent there instead of to the pin would be handed a debate double and fail loudly.
+    const story = seatStoryWriter(SEAT_ROUTES.secondary.providerRef);
+    const answers = Object.freeze({ storyteller: threePositionStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-story", rotation: ROTATION, panelSize: 3, ...rotationDoubles("rotation-story", "secondary", "third"),
+      settings: { story: story.writer },
+      storyAnswers: { third: answers, primary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY", failureCode: null,
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.third.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef })
+    })]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("STORY:"))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.third.providerRef],
+      ["STORY:CHECKER:1", "OK", SEAT_ROUTES.primary.providerRef]
+    ]);
+  });
+
+  /**
+   * Task 12 ("always an answer"): a pinned story member not claim-eligible hands its role to another claim-eligible
+   * member of the run's stored panel, in panel order — the storyteller to one of another maker than the pinned story
+   * checker, the story checker to one of another maker than the storyteller serving; only when there is none, to the
+   * register's story ref if that is a panel ref; else today's STORY_ROLE_UNAVAILABLE. The lineage names who served.
+   */
+  it("a pinned story checker not claim-eligible: the next claim-eligible panel member of another maker checks the story", async () => {
+    // The primary, the pinned story checker, is absent at claim; the answer's pinned pair is not touched. The register's
+    // story refs name the absent primary too, so a story handed to the register's ref would fail STORY_ROLE_UNAVAILABLE.
+    const story = seatStoryWriter(SEAT_ROUTES.primary.providerRef);
+    const answers = Object.freeze({ storyteller: seatHarnessStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-story-checker-stand-in", rotation: ROTATION, panelSize: 3,
+      ...rotationDoubles("rotation-story-checker-stand-in", "secondary", "third"),
+      settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.primary.providerRef) },
+      storyAnswers: { third: answers, secondary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(await servedRoundMakers(answerIdOf(scenario))).toEqual([expect.objectContaining({
+      writer: SEAT_ROUTES.secondary.providerRef, checker: SEAT_ROUTES.third.providerRef
+    })]);
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY", failureCode: null,
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.third.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.secondary.providerRef })
+    })]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("STORY:"))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.third.providerRef],
+      ["STORY:CHECKER:1", "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+  });
+
+  it("a pinned storyteller not claim-eligible: the next claim-eligible panel member writes the story, and the pinned checker still checks", async () => {
+    // The third, the pinned storyteller, is absent. In panel order the primary comes first and is not of the pinned
+    // story checker's (the secondary's) maker: it writes; the secondary still checks. The register's ref is the absent third.
+    const rotation = { ...ROTATION, answerWriter: pick("secondary"), answerChecker: pick("primary"), storyteller: pick("third"), storyChecker: pick("secondary") };
+    const story = seatStoryWriter(SEAT_ROUTES.third.providerRef);
+    const answers = Object.freeze({ storyteller: seatHarnessStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-storyteller-stand-in", rotation, panelSize: 3,
+      ...rotationDoubles("rotation-storyteller-stand-in", "secondary", "primary"),
+      settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef) },
+      storyAnswers: { primary: answers, secondary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY", failureCode: null,
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.secondary.providerRef })
+    })]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("STORY:"))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.primary.providerRef],
+      ["STORY:CHECKER:1", "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+  });
+
+  /** A two-member panel (primary, secondary) whose pinned checkers are both the secondary, absent at claim. */
+  const TWO_MAKER_ROTATION: RunRoleRotationInputWithoutRun = Object.freeze({
+    ...ROTATION,
+    answerWriter: pick("primary"), answerChecker: pick("secondary"), storyteller: pick("primary"), storyChecker: pick("secondary"),
+    eligibleModelIds: Object.freeze([SEAT_ROUTES.primary.model, SEAT_ROUTES.secondary.model])
+  });
+
+  it("no claim-eligible panel member of another maker: the register's story ref checks the story when it is a panel ref", async () => {
+    // The secondary is absent: the answer's checker stands in as the sealed primary (a panel ref), and no other maker
+    // is left for the story checker, so the register's story ref (the primary, a claim-eligible panel ref) checks.
+    const story = seatStoryWriter(SEAT_ROUTES.primary.providerRef);
+    const answers = Object.freeze({ storyteller: positionStory(1), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-story-register-ref", rotation: TWO_MAKER_ROTATION, panelSize: 2,
+      ...rotationDoubles("rotation-story-register-ref", "primary", "primary"),
+      settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef) },
+      storyAnswers: { primary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY", failureCode: null,
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef })
+    })]);
+  });
+
+  it("no claim-eligible panel member of another maker and a register story ref off the panel: today's STORY_ROLE_UNAVAILABLE", async () => {
+    // The register's story refs name the twin route: configured, healthy, of the primary's model, but not on the panel.
+    const story = seatStoryWriter(SEAT_TWIN.providerRef);
+    const answers = Object.freeze({ storyteller: seatHarnessStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
+    const scenario = await executeSeatScenario({
+      label: "rotation-story-unavailable", rotation: TWO_MAKER_ROTATION, panelSize: 2, twin: true,
+      ...rotationDoubles("rotation-story-unavailable", "primary", "primary"),
+      settings: { story: story.writer, claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef) },
+      storyAnswers: { primary: answers }
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(story.records).toEqual([expect.objectContaining({ outcome: "FAILED", failureCode: "STORY_ROLE_UNAVAILABLE" })]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("STORY:"))).toEqual([]);
+  });
+
+  /**
+   * Task 11 (orchestrator ruling 2026-10-11, "always an answer"): a pinned answer member not claim-eligible hands its
+   * role to the SEALED register ref (today's unpinned role, today's probe and J24), when the debate's estimate covers
+   * that ref's model. The disclosure keeps the pin as planned and names the reason ROLE_UNAVAILABLE for that role.
+   */
+  it("a pinned writer absent at claim: the sealed writer serves, disclosed as a fallback for ROLE_UNAVAILABLE", async () => {
+    const covered = coverage(true);
+    const scenario = await executeSeatScenario({
+      label: "rotation-writer-stand-in", rotation: ROTATION, panelSize: 3,
+      ...rotationDoubles("rotation-writer-stand-in", "primary", "third"),
+      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef), answerRoleFallbackCovered: covered.answerRoleFallbackCovered }
+    });
+    expect(scenario.error).toBeNull();
+    expect(covered.asked).toEqual([{ roleRef: SEALED_REF, panel: PANEL_REFS }]);
+    const answerId = answerIdOf(scenario);
+    expect(await servedRoundMakers(answerId)).toEqual([expect.objectContaining({
+      writer: SEALED_REF, checker: SEAT_ROUTES.third.providerRef
+    })]);
+    const row = await disclosureRowOf(answerId);
+    expect(row).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.secondary.providerRef, writerServedRef: SEALED_REF,
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef, checkerServedRef: SEAT_ROUTES.third.providerRef,
+      writerFallback: true, checkerFallback: false,
+      writerFallbackReason: "ROLE_UNAVAILABLE", fallbackReason: null, checkerSameAsWriter: false
+    });
+    expect(row).not.toHaveProperty("checkerFallbackReason");
+    expect(await j24Events(scenario.runId)).toEqual([]);
+  });
+
+  it("a pinned checker absent at claim: the sealed checker serves, disclosed as a fallback for ROLE_UNAVAILABLE", async () => {
+    const probed: string[] = [];
+    const scenario = await executeSeatScenario({
+      label: "rotation-checker-stand-in", rotation: ROTATION, panelSize: 3,
+      ...rotationDoubles("rotation-checker-stand-in", "secondary", "primary"),
+      settings: {
+        claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef),
+        // Task 12: the stand-in is a panel ref, already health-checked with the panel: no off-panel probe.
+        claimTimeSynthesisRoleProbe: async (providerRef) => {
+          probed.push(providerRef);
+          return { state: "HEALTHY", modelId: SEAT_ROUTES.primary.model, failureCode: null };
+        }
+      }
+    });
+    expect(scenario.error).toBeNull();
+    expect(probed).toEqual([]);
+    const answerId = answerIdOf(scenario);
+    expect(await servedRoundMakers(answerId)).toEqual([expect.objectContaining({
+      writer: SEAT_ROUTES.secondary.providerRef, checker: SEALED_REF
+    })]);
+    const row = await disclosureRowOf(answerId);
+    expect(row).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.secondary.providerRef, writerServedRef: SEAT_ROUTES.secondary.providerRef,
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef, checkerServedRef: SEALED_REF,
+      writerFallback: false, checkerFallback: true,
+      checkerFallbackReason: "ROLE_UNAVAILABLE", fallbackReason: null
+    });
+    expect(row).not.toHaveProperty("writerFallbackReason");
+  });
+
+  it("a sealed checker off the panel never stands in, even with its model on the panel: no off-panel probe, today's J24", async () => {
+    // Task 12: the sealed checker is the twin route, whose MODEL is the primary's (on the frozen panel) but whose REF is
+    // not on the panel. A stand-in must be a panel ref, so the estimate never meets a health check it did not count.
+    const probed: string[] = [];
+    const covered = coverage(true);
+    const scenario = await executeSeatScenario({
+      label: "rotation-off-panel-stand-in", rotation: ROTATION, panelSize: 3, twin: true,
+      ...rotationDoubles("rotation-off-panel-stand-in", "secondary", "primary"),
+      settings: {
+        claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef),
+        answerRoleFallbackCovered: covered.answerRoleFallbackCovered,
+        synthesisRolePolicy: { ...runnerSettings().synthesisRolePolicy, evaluatorRoleRef: SEAT_TWIN.providerRef, identicalRoleRefs: false },
+        claimTimeSynthesisRoleProbe: async (providerRef) => {
+          probed.push(providerRef);
+          return { state: "HEALTHY", modelId: SEAT_TWIN.model, failureCode: null };
+        }
+      }
+    });
+    expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+    expect(probed).toEqual([]);
+    expect(covered.asked).toEqual([]);
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId))
+      .toEqual([{ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:EVALUATOR" }]);
+    expect(await j24Events(scenario.runId)).toEqual([{
+      state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+      call_site_key: `EVALUATOR:${SEAT_ROUTES.third.providerRef}`,
+      role_ref: SEAT_ROUTES.third.providerRef,
+      role: "EVALUATOR",
+      absent_failure_code: "CLAIM_PROVIDER_ABSENT"
+    }]);
+  });
+
+  it("a pinned writer absent and the sealed writer absent too: today's J24 refusal, naming the sealed ref", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-both-absent", rotation: ROTATION, panelSize: 3, ...rotationDoubles("rotation-both-absent", "primary", "third"),
+      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef, SEALED_REF) }
+    });
+    expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId))
+      .toEqual([{ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:SYNTHESIZER" }]);
+    expect(await j24Events(scenario.runId)).toEqual([{
+      state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+      call_site_key: `SYNTHESIZER:${SEALED_REF}`,
+      role_ref: SEALED_REF,
+      role: "SYNTHESIZER",
+      absent_failure_code: "CLAIM_PROVIDER_ABSENT"
+    }]);
+  });
+
+  it("a pinned writer absent at claim whose sealed writer the estimate does not cover refuses with J24, terminally, with today's event", async () => {
+    const covered = coverage(false);
+    const scenario = await executeSeatScenario({
+      label: "rotation-absent", rotation: ROTATION, panelSize: 3, ...rotationDoubles("rotation-absent", "secondary", "third"),
+      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.secondary.providerRef), answerRoleFallbackCovered: covered.answerRoleFallbackCovered }
+    });
+    expect(covered.asked).toEqual([{ roleRef: SEALED_REF, panel: PANEL_REFS }]);
+    expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId))
+      .toEqual([{ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:SYNTHESIZER" }]);
+    const events = await database.pool.query<{ value_json: Record<string, unknown> }>(
+      `SELECT value_json FROM core.run_progress_event
+        WHERE run_id=$1 AND kind='ledger.could_not_do' AND value_json->>'state'='SYNTHESIS_ROLE_PROVIDER_ABSENT'`,
+      [scenario.runId]
+    );
+    expect(events.rows.map((row) => row.value_json)).toEqual([{
+      state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+      call_site_key: `SYNTHESIZER:${SEAT_ROUTES.secondary.providerRef}`,
+      role_ref: SEAT_ROUTES.secondary.providerRef,
+      role: "SYNTHESIZER",
+      absent_failure_code: "CLAIM_PROVIDER_ABSENT"
+    }]);
+  });
+
+  it("a run with both a scorecard assignment and a rotation pin is refused (RUN_ROLE_ROTATION_INVALID), terminally, before any call", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-both", assignment: runnerUpAssignment(), rotation: ROTATION, panelSize: 3,
+      ...rotationDoubles("rotation-both", "secondary", "third")
+    });
+    expect(scenario.error).toMatchObject({ code: "RUN_ROLE_ROTATION_INVALID" });
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId)).toEqual([{ state: "FAILED", terminal_reason: "RUN_ROLE_ROTATION_INVALID" }]);
+  });
+
+  it("a pin naming a route outside the debate's panel is refused (RUN_ROLE_ROTATION_INVALID), terminally", async () => {
+    // The twin route (the primary's maker) is not in the frozen panel: admission could never have picked it.
+    const twin = { providerRef: SEAT_TWIN.providerRef, modelId: SEAT_TWIN.model, maker: SEAT_TWIN.maker };
+    const scenario = await executeSeatScenario({
+      label: "rotation-off-panel", rotation: { ...ROTATION, answerChecker: twin }, panelSize: 3, twin: true,
+      ...rotationDoubles("rotation-off-panel", "secondary", "primary")
+    });
+    expect(scenario.error).toMatchObject({ code: "RUN_ROLE_ROTATION_INVALID" });
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId)).toEqual([{ state: "FAILED", terminal_reason: "RUN_ROLE_ROTATION_INVALID" }]);
+  });
+
+  it("an unreadable pin is refused (RUN_ROLE_ROTATION_INVALID), terminally, before any call", async () => {
+    // A maker of only a tab passes 0114's btrim CHECK and fails the reader's stricter trim: the row exists, unreadable.
+    const scenario = await executeSeatScenario({
+      label: "rotation-unreadable", panelSize: 3, ...rotationDoubles("rotation-unreadable", "primary", "primary"),
+      beforeExecute: async ({ runId }) => {
+        const picks = [ROTATION.answerWriter, ROTATION.answerChecker, ROTATION.storyteller, { ...ROTATION.storyChecker, maker: "\t" }]
+          .flatMap((role) => [role.providerRef, role.modelId, role.maker]);
+        await database.pool.query(
+          `INSERT INTO core.run_role_rotation (run_id, rule,
+             writer_provider_ref, writer_model_id, writer_maker, checker_provider_ref, checker_model_id, checker_maker,
+             storyteller_provider_ref, storyteller_model_id, storyteller_maker,
+             story_checker_provider_ref, story_checker_model_id, story_checker_maker, eligible_model_ids)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::text[])`,
+          [runId, ROTATION.rule, ...picks, [...ROTATION.eligibleModelIds]]
+        );
+      }
+    });
+    expect(scenario.error).toMatchObject({ code: "RUN_ROLE_ROTATION_INVALID" });
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId)).toEqual([{ state: "FAILED", terminal_reason: "RUN_ROLE_ROTATION_INVALID" }]);
+  });
+
+  it("a run without a pin is today's run (the sealed refs serve)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "rotation-none", panelSize: 3, ...rotationDoubles("rotation-none", "primary", "primary")
+    });
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    const sealed = runnerSettings().synthesisRolePolicy;
+    expect(await servedRoundMakers(answerId)).toEqual([expect.objectContaining({
+      writer: sealed.synthesizerRoleRef, checker: sealed.evaluatorRoleRef
+    })]);
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      writerPlannedRef: sealed.synthesizerRoleRef, checkerPlannedRef: sealed.evaluatorRoleRef,
+      writerFallback: false, checkerFallback: false
+    });
   });
 });
 

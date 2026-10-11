@@ -105,7 +105,7 @@ describe("P6b — development billing fakes", () => {
       // The fake SmartBill refuses any other company code (400), so an issued invoice proves the code built from the
       // company facts is the one the fake answers, in the form SMARTBILL_CIF_FORM names.
       const invoice = await connectors.invoiceRo.issue({
-        chargeId: "p6b-dev-check", transactionId: "0", issuedOn: new Date(),
+        chargeId: "p6b-dev-check", transactionId: "0", issuedOn: new Date(), currency: "USD",
         customer: {
           name: "Test Person", email: "person@example.test", country: "RO", region: "Cluj", postalCode: "400001",
           city: "Cluj-Napoca", street: "Str. Exemplu 1", taxId: null, locale: "ro"

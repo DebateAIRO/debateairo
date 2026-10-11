@@ -283,6 +283,7 @@ export class BillingMaintenance {
       params: {
         // P2-M14: the price is the next renewal's (a scheduled downgrade announces the lower plan's), so is the plan.
         plan: state.scheduledDowngradePlanId ?? state.planId, totalAmount: microsToDecimal(state.announcedTotalMicros ?? 0),
+        currency: state.currency,
         renewDate: state.currentPeriodEnd.toISOString(), cancelPageUrl: new URL("/cancel", this.deps.publicAppUrl).toString()
       },
       notBefore: now

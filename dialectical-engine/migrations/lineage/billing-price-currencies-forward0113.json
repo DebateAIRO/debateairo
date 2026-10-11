@@ -1,0 +1,17 @@
+{
+  "version": "billing-price-currencies-forward0113-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0112_auth_db_batch.sql",
+    "manifestSha256": "43bacc208983f59b4621385b062ba4c8df7304eb5f4f2415094584d0318acd02",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0113_billing_price_currencies.sql",
+    "sha256": "0953c46e94f8667b2f51c9dd5c693b106262724ed8331e55d701f539e1dc4749"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  }
+}

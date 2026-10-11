@@ -1100,6 +1100,8 @@ export {
   billingPlansFromValue,
   planById,
   planCapMicros,
+  planNetPrice,
+  priceCurrencyFor,
   readBillingPlans,
   type BillingPlan,
   type BillingPlans,
@@ -1163,6 +1165,13 @@ export {
   type ModelScorecardReadResult,
   type ModelScorecardRefusalReason
 } from "./model-scorecard-policy.js";
+export {
+  ANSWER_ROLE_ROTATION_POLICY_ROW_KEY,
+  answerRoleRotationPolicyFromValue,
+  answerRoleRotationPolicyRow,
+  readAnswerRoleRotationPolicy,
+  type AnswerRoleRotationPolicyState
+} from "./answer-role-rotation-policy.js";
 export {
   MFA_POLICY_REGISTER_ROW,
   MFA_POLICY_DEPLOYMENT_REGISTER_ROW,

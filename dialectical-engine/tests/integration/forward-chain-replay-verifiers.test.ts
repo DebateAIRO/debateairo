@@ -19,6 +19,10 @@ beforeAll(async () => {
   first = probe(plan.forwardChain.at(-1)!, "0199_replay_probe.sql");
 }, 300_000);
 const NETOPIA = "0111_billing_netopia.sql";
+/** Part C's step, chained after the auth DB batch (spec 2026-10-05 §2.16.6); it keeps 0111's verifier in force too. */
+const PART_C = "0113_billing_price_currencies.sql";
+/** Role rotation's step, chained after Part C's (spec 2026-10-11 Part 3); it keeps 0111's verifier in force too. */
+const ROLE_ROTATION = "0114_role_rotation.sql";
 afterAll(async () => { await db?.stop(); });
 
 const READINESS_PUBLISH = "staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz)";
@@ -52,15 +56,18 @@ const runtimeMayPublish = async (): Promise<boolean> =>
 it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch (0112) is appended after it", async () => {
   // First in this file: the probe steps below add ledger rows that the real migrate() would refuse as unknown.
   const real = await loadMigrationPlan();
-  // data-export S01 (V-30): the export (0113) follows the batch and keeps the same effective verifier.
-  expect(real.forwardChain.map((step) => step.name)).toEqual([NETOPIA, AUTH_DB_BATCH_MIGRATION, "0113_data_export.sql"]);
-  const [netopia, batch] = real.forwardChain;
+  // data-export S01 (V-41): the export (0115) follows role rotation and keeps the same effective verifier.
+  expect(real.forwardChain.map((step) => step.name)).toEqual([NETOPIA, AUTH_DB_BATCH_MIGRATION, PART_C, ROLE_ROTATION, "0115_data_export.sql"]);
+  const [netopia, batch, partC, rotation] = real.forwardChain;
   const applied = new Set(await ledger());
-  expect(applied.has(NETOPIA) && applied.has(AUTH_DB_BATCH_MIGRATION)).toBe(true);
-  // The batch and export keep 0111's effective-capability verifier: with 0113 last, it remains 0111's, byte for byte.
+  expect(applied.has(NETOPIA) && applied.has(AUTH_DB_BATCH_MIGRATION) && applied.has(PART_C) && applied.has(ROLE_ROTATION)).toBe(true);
+  // The batch, Part C's step, role rotation's and the export's keep 0111's effective-capability verifier: with 0115
+  // last, the verifier in force is 0111's, byte for byte.
   expect(batch!.verifierSha256).toBe(netopia!.verifierSha256);
+  expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
+  expect(rotation!.verifierSha256).toBe(netopia!.verifierSha256);
   expect(effectiveForwardVerifierSql(real, applied)).toBe(netopia!.verifierSql);
-  // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0113 last.
+  // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0115 last.
   await db.pool.query("GRANT SELECT ON billing.card_token TO debateai_authorization_runtime");
   try {
     await expect(migrate(db.pool)).rejects.toThrow("BILLING_NETOPIA_111_TABLE_PRIVILEGE card_token");

@@ -1,11 +1,12 @@
 import { FloorReasonSchema, type AnswerDisclosure, type AnswerFloor, type MakerLineage } from "@debateai/contract";
-import type {
-  RunOwnershipAccess,
-  ServeDisclosureModel,
-  ServeDisclosureRead,
-  ServeDisclosureRepository,
-  StoredServeDisclosure,
-  StoredServeFloor
+import {
+  serveDisclosureFallbackReasonOf,
+  type RunOwnershipAccess,
+  type ServeDisclosureModel,
+  type ServeDisclosureRead,
+  type ServeDisclosureRepository,
+  type StoredServeDisclosure,
+  type StoredServeFloor
 } from "@debateai/db";
 
 /**
@@ -73,15 +74,17 @@ export function buildAnswerDisclosure(read: ServeDisclosureRead): AnswerDisclosu
     // runner writes only the sealed crash classes; anything else is refused at
     // the parse, never shown as it is.
     floor_reason: floor === null ? null : FloorReasonSchema.parse(row.floorReason),
+    // "Lower-cost" only when money was that role's reason (Task 11): a rotated debate's stand-in for an
+    // unavailable model (ROLE_UNAVAILABLE) is not said to be cheaper; the served model already names who served.
     writer: row.writerServedRef === null ? null : {
       planned_model: lineageOfModel(models.writerPlanned),
       served_model: lineageOfModel(models.writerServed),
-      lower_cost: row.writerFallback
+      lower_cost: serveDisclosureFallbackReasonOf(row, "writer") === "MONEY"
     },
     checker: row.checkerServedRef === null ? null : {
       planned_model: lineageOfModel(models.checkerPlanned),
       served_model: lineageOfModel(models.checkerServed),
-      lower_cost: row.checkerFallback
+      lower_cost: serveDisclosureFallbackReasonOf(row, "checker") === "MONEY"
     },
     checker_same_as_writer: row.checkerSameAsWriter,
     // Any rung above the whole digest is a shortened one (spec §14.4.3); no

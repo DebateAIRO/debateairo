@@ -529,10 +529,14 @@ export class RefundDesk {
     const ref = `${intent.chargeId}:${intent.transactionId}`;
     const deadline = real ? await this.withdrawalDeadlineOf(intent) : null;
     const dedupeRef = notRequested ? `${ref}:not-requested` : otherSystem ? `${ref}:other-system` : ref;
+    // Spec 2026-10-05 §2.16.5: the amount in its charge's currency. A charge that no longer exists is the
+    // REFUND_CHARGE_MISSING case, whose amount is only the job's claim: it names none (read as before, in dollars).
+    const refunded = await this.deps.repository.charge(intent.chargeId);
     await this.deps.repository.withTransaction((client) => enqueueEmail(this.deps.repository, client, {
       template: "O2", recipient: { kind: "OWNER" }, dedupeRef,
       params: {
         chargeRef: intent.chargeId, refundAmount: microsToDecimal(intent.amountMicros), reasonCode: code,
+        ...(refunded === null ? {} : { currency: refunded.currency }),
         notRequested: notRequested ? "true" : "false",
         ...(otherSystem ? { otherSystem: "true" } : {}),
         ...(real ? { refundReason: intent.reason } : {}),
@@ -645,7 +649,12 @@ export class RefundDesk {
   ): Promise<FollowUp> {
     const customer = await this.deps.repository.customerByOwner(intent.ownerRef);
     if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a refund without its customer");
-    const params = { refundAmount: microsToDecimal(intent.amountMicros), ...(endedPlan === null ? {} : { endedPlan }) };
+    // Spec 2026-10-05 §2.16.5: the amount in its charge's currency.
+    const refunded = await this.deps.repository.charge(intent.chargeId);
+    const params = {
+      refundAmount: microsToDecimal(intent.amountMicros), ...(endedPlan === null ? {} : { endedPlan }),
+      ...(refunded === null ? {} : { currency: refunded.currency })
+    };
     return async (client, at) => {
       await enqueueEmail(this.deps.repository, client, {
         template, recipient: { kind: "CUSTOMER", customerId: customer.customerId }, dedupeRef, params, notBefore: at
@@ -712,7 +721,7 @@ export class RefundDesk {
       await enqueueEmail(this.deps.repository, client, {
         template: "M8", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
         dedupeRef: charge.subscriptionId,
-        params: { plan: withdrawn.planId, refundAmount: microsToDecimal(refundMicros) }, notBefore: at
+        params: { plan: withdrawn.planId, refundAmount: microsToDecimal(refundMicros), currency: charge.currency }, notBefore: at
       });
     };
   }
@@ -896,12 +905,15 @@ export class RefundDesk {
     const customer = await this.deps.repository.customerByOwner(intent.ownerRef);
     const locale = customer?.locale ?? "en";
     const params: Record<string, string> = { refundAmount: microsToDecimal(intent.amountMicros) };
+    // Spec 2026-10-05 §2.16.5: the preview shows the amount in its charge's currency, as the email will.
+    const refunded = await this.deps.repository.charge(intent.chargeId);
+    if (refunded !== null) params.currency = refunded.currency;
     if (template === "M11") {
       const endedPlan = await this.planEndedByRefusal(intent);
       if (endedPlan !== null) params.endedPlan = endedPlan;
     }
     if (template === "M8") {
-      const charge = await this.deps.repository.charge(intent.chargeId);
+      const charge = refunded;
       const events = charge === null ? [] : await this.deps.repository.subscriptionEvents(charge.subscriptionId);
       const withdrawn = events.find((event) => event.kind === "WITHDRAWN");
       if (charge === null || withdrawn === undefined) return null;

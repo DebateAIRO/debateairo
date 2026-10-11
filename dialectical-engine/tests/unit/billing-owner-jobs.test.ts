@@ -64,7 +64,7 @@ describe("P16c the owner's tax-summary job", () => {
     const { enqueued, billing, jobs } = fakes([{
       type: "SALE", chargeId: "a".repeat(32), at: new Date("2026-11-03T00:00:00.000Z"), taxCountry: "RO", taxRegion: null,
       taxStatus: "TAXABLE", chargeNetMicros: 20_000_000, chargeTaxMicros: 4_200_000, chargeTotalMicros: 24_200_000,
-      amountMicros: 24_200_000, amountKnown: true, locationVerdict: "AGREED"
+      amountMicros: 24_200_000, amountKnown: true, locationVerdict: "AGREED", currency: "USD"
     } as TaxSummaryRow]);
     const owner = new OwnerJobs({
       billing: billing as never, jobs,

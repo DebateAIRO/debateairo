@@ -285,7 +285,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   });
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({
-    plans: deps.plans, legal: deps.legal, clock: deps.clock,
+    plans: deps.plans, geo: deps.geo, legal: deps.legal, clock: deps.clock,
     quotes: new QuoteService({
       repository, tax: deps.connectors.tax, geo: deps.geo, countryPolicy: deps.countryPolicy, policy: deps.policy,
       plans: deps.plans, recordsKey: deps.connectors.recordsKey, audit: deps.audit

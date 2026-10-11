@@ -807,15 +807,17 @@ describe("P3-01 production database-principal manifest", () => {
     expect([...new Set(sourceConnectionPairs)].sort())
       .toEqual([...new Set(manifestConnectionPairs)].sort());
 
-    expect(apiMain).toContain("createPool(environment.DATABASE_URL)");
-    expect(apiMain).toContain("createPool(environment.CONTENT_PROVISION_DATABASE_URL)");
-    expect(apiMain).toContain("createPool(environment.ERASURE_DATABASE_URL)");
-    expect(apiMain).toContain("createPool(environment.DATA_EXPORT_DATABASE_URL!)");
-    expect(apiMain).toContain("createPool(environment.AUTHORIZATION_DATABASE_URL!)");
-    expect(apiMain).toContain("createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!)");
-    expect(apiMain).toContain("createPool(environment.SUPPORT_DATABASE_URL)");
-    expect(apiMain).toContain("createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!)");
-    expect(runnerMain).toContain("createPool(environment.DATABASE_URL)");
+    // Connection budget (2026-10-10): every pool now names its row of
+    // packages/db/src/pool-budget.ts; the principal each one opens is unchanged.
+    expect(apiMain).toContain("createPool(environment.DATABASE_URL, API_DATABASE_POOLS.runtime)");
+    expect(apiMain).toContain("createPool(environment.CONTENT_PROVISION_DATABASE_URL, API_DATABASE_POOLS.contentProvision)");
+    expect(apiMain).toContain("createPool(environment.ERASURE_DATABASE_URL, API_DATABASE_POOLS.erasure)");
+    expect(apiMain).toContain("createPool(environment.DATA_EXPORT_DATABASE_URL!, API_DATABASE_POOLS.dataExport)");
+    expect(apiMain).toContain("createPool(environment.AUTHORIZATION_DATABASE_URL!, API_DATABASE_POOLS.authorization)");
+    expect(apiMain).toContain("createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!, API_DATABASE_POOLS.publicationCleanup)");
+    expect(apiMain).toContain("createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.support)");
+    expect(apiMain).toContain("createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!, API_DATABASE_POOLS.evaluatorDevMenu)");
+    expect(runnerMain).toContain("createPool(environment.DATABASE_URL, RUNNER_DATABASE_POOLS.runtime)");
     expect(schedulerCli).toContain("REPLAY_SELF_TEST_DATABASE_URL");
     expect(schedulerCli).toContain("LIVENESS_DATABASE_URL");
     expect(schedulerCli).toContain("SETTLEMENT_DATABASE_URL");

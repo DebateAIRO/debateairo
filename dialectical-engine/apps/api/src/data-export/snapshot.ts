@@ -74,7 +74,7 @@ export const KEEP_COLUMNS = {
     customers: ["customer_id", "created_at", "created_locale"],
     customer_xmoney: ["customer_id", "environment", "xmoney_customer_id", "at"],
     customer_profile_events: ["customer_id", "at", "locale", "profile_ciphertext"],
-    quotes: ["plan_id", "kind", "net_micros", "tax_micros", "total_micros", "tax_country", "tax_region", "tax_rate_bp", "tax_status", "tax_name", "quaderno_ref", "created_at", "expires_at", "location_ciphertext", "recurring_total_micros"],
+    quotes: ["plan_id", "kind", "net_micros", "tax_micros", "total_micros", "tax_country", "tax_region", "tax_rate_bp", "tax_status", "tax_name", "quaderno_ref", "created_at", "expires_at", "location_ciphertext", "recurring_total_micros", "currency"],
     subscription_events: ["kind", "at", "plan_id", "period_anchor_at", "xmoney_order_id", "xmoney_customer_id", "card_ref", "data"],
     entitlement_events: ["plan_id", "effective_at", "period_anchor_at", "cause", "month_credit_override_micros", "paid_through", "recorded_at"],
     run_charge_scopes: ["plan_id", "admitted_at", "recorded_at", "funding_kind"],

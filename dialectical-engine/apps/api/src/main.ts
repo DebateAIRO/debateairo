@@ -1,5 +1,6 @@
-import { assertPreviewProviderTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPort, PREVIEW_GLM_GENERATION_TOKEN_FLOOR, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
 import { readModelScorecard, readEngineVersion } from "@debateai/register";
+import { readPreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
 import { BackupEmailService, MfaRecoveryService } from "./email-mfa-recovery.js";
@@ -53,7 +54,9 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+// Role rotation (spec 2026-10-11): the per-role, per-model counts admission reads when the row is ON.
+import { readRoleRotationCounts } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -86,6 +89,7 @@ import {
   readMfaPolicy,
   readProductRolePolicy,
   readPublicationCheckPolicy,
+  readAnswerRoleRotationPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -294,26 +298,26 @@ await boot.run("publication-secret-domains", async () => assertPublicationSecret
   additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH, ...billingCustodyPaths(environment),
     ...(environment.DATA_EXPORT_STORE_PATH === undefined ? [] : [environment.DATA_EXPORT_STORE_PATH])]
 }));
-const pool = boot.hold(createPool(environment.DATABASE_URL));
-const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!));
+const pool = boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.runtime));
+const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!, API_DATABASE_POOLS.authorization));
 const publicationCleanupPool = environment.PUBLICATION_ENABLED === "true"
-  ? boot.hold(createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!)) : pool;
+  ? boot.hold(createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!, API_DATABASE_POOLS.publicationCleanup)) : pool;
 // Cleanup remains necessary when new encrypted writes are disabled: an intent
 // left by an earlier enabled process must not abort every erasure cycle under
 // the ordinary runtime principal.
-const contentProvisionPool = boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL));
+const contentProvisionPool = boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL, API_DATABASE_POOLS.contentProvision));
 // Ask admission holds a session advisory lock while the count-changing run
 // commit uses that same backend. Keep both principal paths on explicit pool
 // instances so lock waiters cannot consume ordinary runtime/provision capacity.
-const serverAskAdmissionPool=boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL));
-const legacyAskAdmissionPool=boot.hold(createPool(environment.DATABASE_URL));
+const serverAskAdmissionPool=boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL, API_DATABASE_POOLS.serverAskAdmission));
+const legacyAskAdmissionPool=boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.legacyAskAdmission));
 // Budget spec §2.6 (B6b): the room decision holds the site's day lock while the
 // run is created, so its transaction takes a connection from a pool of its own —
 // a decision waiting for the lock must never hold a connection the decision it
 // waits for needs (packages/budget/src/spend-lock.ts). The runtime principal's
 // URL on purpose: the hold, the wait row and the run's charge scope are
 // debateai_runtime's grants (0083, 0084), never the content-provision role's.
-const roomDecisionPool=boot.hold(createPool(environment.DATABASE_URL,{ max: 4 }));
+const roomDecisionPool=boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.roomDecision));
 await boot.run("ask-admission-pools", async () => {
   if (serverAskAdmissionPool === contentProvisionPool
     || serverAskAdmissionPool === pool
@@ -323,8 +327,8 @@ await boot.run("ask-admission-pools", async () => {
     throw new TypeError("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE");
   }
 });
-const erasurePool = boot.hold(createPool(environment.ERASURE_DATABASE_URL));
-const dataExportPool = environment.DATA_EXPORT_STORE_PATH === undefined ? undefined : boot.hold(createPool(environment.DATA_EXPORT_DATABASE_URL!));
+const erasurePool = boot.hold(createPool(environment.ERASURE_DATABASE_URL, API_DATABASE_POOLS.erasure));
+const dataExportPool = environment.DATA_EXPORT_STORE_PATH === undefined ? undefined : boot.hold(createPool(environment.DATA_EXPORT_DATABASE_URL!, API_DATABASE_POOLS.dataExport));
 // DL7-F7: the hand-rolled pool cleanup this stage carried is the ledger's job
 // now, and it covers the KEKs the old one never reached.
 await boot.run("database-roles", () => Promise.all([
@@ -502,7 +506,16 @@ if (previewConfig !== undefined) {
     }
   });
 }
-const previewFetch = previewConfig === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPort(previewConfig));
+const previewFetch = previewConfig === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewConfig));
+// Contract A §5: the preview's start-of-debate estimate asks the gate what is left today (read-only).
+const previewBudgetGate = previewConfig === undefined ? undefined : await boot.run("preview-budget-gate", async () => {
+  // Every declared target is health-checked at ask time, paid through the gate even when the ask is refused.
+  const settings = await readPreviewBudgetGateSettings(pool, environment.REGISTER_VERSION, previewConfig,
+    declaredProviderTargets.map((target) => target.model));
+  // Every role the register names must be a declared target, or its debates would fail at claim.
+  assertPreviewRoleTargets(previewConfig, declaredProviderTargets, settings.roleProviderRefs);
+  return settings;
+});
 const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
   resolveProviderTargetCredentials(declaredProviderTargets, readCustodyAuthorizationHeader));
 const resolveProviderPanel = createProviderDiscoveryResolver({
@@ -511,7 +524,7 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   probes,
   probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
   probeTimeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
-  ...(previewConfig === undefined ? {} : { thinkingLevel: "high", probeTokenCeiling: PREVIEW_GLM_GENERATION_TOKEN_FLOOR, fetchImplementation: previewFetch! })
+  ...(previewConfig === undefined ? {} : { probeControlsFor: previewProbeControls, fetchImplementation: previewFetch! })
 });
 /**
  * Budget spec 2026-09-28 §2.4–§2.7 and the paid-plans spec §2.4 (B6b): THE ROOM.
@@ -939,8 +952,11 @@ const emailChange = new EmailChangeService({
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
+// Role rotation (spec 2026-10-11): the optional row; ABSENT/OFF is today's engine, a malformed row refuses the boot.
+const answerRoleRotation = await boot.run("answer-role-rotation-policy", () => readAnswerRoleRotationPolicy(pool, environment.REGISTER_VERSION));
 const application = new PostgresAskApplication(pool, dispatcher, {
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
+  ...(previewBudgetGate === undefined ? {} : { previewBudgetGate }),
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   registerVersion: environment.REGISTER_VERSION,
   batteryVersion: environment.BATTERY_VERSION,
@@ -958,6 +974,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   resolveDiscoveredPanel: resolveProviderPanel,
   // A20: the per-role model picker (built above, under the boot ledger).
   modelPicker,
+  // Role rotation (spec 2026-10-11 Part 4): admission reads the counts only with the row ON.
+  ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
     panelSize: input.panelSize,
@@ -1100,14 +1118,14 @@ const triggerAskWake = createSingleFlightErasureReconciler(
 );
 let askWaker: Readonly<{ stop(): void }> | undefined;
 const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
-  ? boot.hold(createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!))
+  ? boot.hold(createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!, API_DATABASE_POOLS.evaluatorDevMenu))
   : undefined;
 const evaluatorDevMenu = evaluatorDevMenuPool !== undefined
   ? new PostgresEvaluatorDevMenuRepository(evaluatorDevMenuPool)
   : undefined;
-const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL));
+const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.support));
 const supportRelayLeasePool = boot.hold(
-  createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 })
+  createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.supportRelayLease)
 );
 const supportKeys = await boot.run("support-keys", () => createSupportKeyPort({
   supportKekPath: environment.SUPPORT_KEK_PATH,

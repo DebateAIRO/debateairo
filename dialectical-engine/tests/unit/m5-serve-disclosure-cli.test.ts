@@ -282,4 +282,21 @@ describe("B9 · the report lists the models chosen for cost (the owner's record)
       .toContain("models chosen for cost: none\n");
     expect(renderServeDisclosure(SERVED)).not.toContain("models chosen for cost");
   });
+
+  it("says 'for money' only when money was a role's reason, and names a stand-in for an unavailable model on its own line", () => {
+    // Role rotation, Task 11: the writer's pinned model was unavailable at claim (the register's writer stood in);
+    // the checker was moved for money.
+    const mixed = renderServeDisclosure({ ...SERVED, row: row({ writerFallbackReason: "ROLE_UNAVAILABLE", checkerFallbackReason: "MONEY" }) });
+    expect(mixed).toContain("a lower-cost model was used: yes, for money\n");
+    expect(mixed).toContain("a planned model was unavailable when the debate started, so the register's model stood in for: the answer writer\n");
+    // Neither role fell back for money: no "for money".
+    const unavailable = renderServeDisclosure({
+      ...SERVED, row: row({ fallbackReason: null, writerFallbackReason: "ROLE_UNAVAILABLE", checkerFallbackReason: "ROLE_UNAVAILABLE" })
+    });
+    expect(unavailable).toContain("a lower-cost model was used: no\n");
+    expect(unavailable).toContain("so the register's model stood in for: the answer writer and the answer checker\n");
+    expect(unavailable).not.toContain("for money");
+    // A row without per-role reasons (every run that is not rotated) prints exactly what it always did.
+    expect(renderServeDisclosure(SERVED)).not.toContain("stood in");
+  });
 });

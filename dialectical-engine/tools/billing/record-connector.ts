@@ -64,7 +64,7 @@ export function quadernoRecordingQuotes(vatCountry: string, vatId: string): Read
 /** The synthetic sale the recording books (a German consumer at 19 %); the recorded suite replays the same one. */
 export function quadernoRecordingSale(transactionId: string): SaleRecord {
   return {
-    chargeId: RECORDING_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-02T10:00:00.000Z"),
+    chargeId: RECORDING_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-02T10:00:00.000Z"), currency: "USD",
     customer: {
       name: "Test Person", email: "person@example.test", country: "DE", region: null, postalCode: "10115",
       city: "Berlin", street: null, taxId: null, locale: "de"
@@ -81,7 +81,7 @@ export function quadernoRecordingRefund(
   transactionId: string, original: Readonly<{ documentId: string; number: string }>
 ): RefundRecord {
   return {
-    chargeId: RECORDING_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-05T10:00:00.000Z"),
+    chargeId: RECORDING_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-05T10:00:00.000Z"), currency: "USD",
     refundTotalMicros: 11_900_000, original: { documentId: original.documentId, number: original.number },
     description: "Teilerstattung DebateAI Plus",
     processor: "netopia"
@@ -95,7 +95,7 @@ export function quadernoRecordingRefund(
  */
 export function quadernoRecordingCompanySale(transactionId: string, vatCountry: string, vatId: string): SaleRecord {
   return {
-    chargeId: RECORDING_COMPANY_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-02T10:00:00.000Z"),
+    chargeId: RECORDING_COMPANY_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-02T10:00:00.000Z"), currency: "USD",
     customer: {
       name: "Test Company Ltd", email: "person@example.test", country: vatCountry, region: null, postalCode: null,
       city: null, street: "1 Test Street", taxId: vatId, locale: "en"
@@ -112,7 +112,7 @@ export function quadernoRecordingCompanyRefund(
   transactionId: string, original: Readonly<{ documentId: string; number: string }>
 ): RefundRecord {
   return {
-    chargeId: RECORDING_COMPANY_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-05T10:00:00.000Z"),
+    chargeId: RECORDING_COMPANY_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-05T10:00:00.000Z"), currency: "USD",
     refundTotalMicros: 10_000_000, original: { documentId: original.documentId, number: original.number },
     description: "Partial refund, DebateAI Plus",
     processor: "netopia"
@@ -202,10 +202,14 @@ export const SMARTBILL_WRITE_STEPS = Object.freeze([
 /** When the accountant allows no real test invoice: the issue shape alone, as a SmartBill draft. */
 export const SMARTBILL_DRAFT_STEPS = Object.freeze(["issue-draft"] as const);
 
-/** The synthetic Romanian sale of the recording (one line: 1.00 net + 0.21 VAT, the charged gross 1.21). */
+/**
+ * The synthetic Romanian sale of the recording (one line: 1.00 net + 0.21 VAT in lei, the charged gross 1.21 RON; no
+ * exchangeRate is sent). Spec 2026-10-05 §2.16.1 and §2.16.4: every Romanian sale is RON, and only Romanian sales are
+ * SmartBill's to invoice.
+ */
 export function smartbillRecordingSale(chargeId: string, issuedOn: Date): SaleRecord {
   return {
-    chargeId, transactionId: "0", issuedOn,
+    chargeId, transactionId: "0", issuedOn, currency: "RON",
     customer: {
       name: "Test Person", email: "person@example.test", country: "RO", region: "Cluj", postalCode: "400001",
       city: "Cluj-Napoca", street: "Str. Exemplu 1", taxId: null, locale: "ro"
@@ -217,11 +221,12 @@ export function smartbillRecordingSale(chargeId: string, issuedOn: Date): SaleRe
   };
 }
 
+/** A refund of the recording's Romanian sale, in RON like the sale (no exchangeRate is sent). */
 export function smartbillRecordingRefund(
   chargeId: string, issuedOn: Date, original: Readonly<{ externalRef: string; number: string }>, refundTotalMicros: number
 ): RefundRecord {
   return {
-    chargeId, transactionId: "0", issuedOn, refundTotalMicros,
+    chargeId, transactionId: "0", issuedOn, currency: "RON", refundTotalMicros,
     original: { documentId: original.externalRef, number: original.number },
     description: "Rambursare DebateAI Plus",
     processor: "netopia"

@@ -1,5 +1,5 @@
 import { TypedDomainError } from "@debateai/kernel";
-import type { SubscriptionState, TaxEngine, TaxLocation, TaxQuote } from "@debateai/billing-core";
+import type { PriceCurrency, SubscriptionState, TaxEngine, TaxLocation, TaxQuote } from "@debateai/billing-core";
 import type { BillingRepository } from "@debateai/db";
 import type { BillingPolicy } from "@debateai/register";
 import { taxServiceRefusal } from "./quote.js";
@@ -29,6 +29,8 @@ export type StoredTaxContext = Readonly<{
   taxId: string | null;
   profile: BillingProfile | null;
   customerId: string;
+  /** The subscription's currency (CREATED's), which its checkout quote was priced in: every later quote's. */
+  currency: PriceCurrency;
 }>;
 
 export async function storedTaxContext(
@@ -36,7 +38,7 @@ export async function storedTaxContext(
     billing: Pick<BillingRepository, "chargesForSubscription" | "quote" | "customerByOwner" | "latestProfile">;
     recordsKey: Buffer;
   }>,
-  state: Pick<SubscriptionState, "subscriptionId" | "ownerRef">
+  state: Pick<SubscriptionState, "subscriptionId" | "ownerRef" | "currency">
 ): Promise<StoredTaxContext> {
   const charges = await deps.billing.chargesForSubscription(state.subscriptionId);
   const initial = charges.find((charge) => charge.kind === "INITIAL");
@@ -45,6 +47,9 @@ export async function storedTaxContext(
   const customer = await deps.billing.customerByOwner(state.ownerRef);
   if (quote === null || customer === null) {
     throw new TypedDomainError("BILLING_STORED_CONTEXT_MISSING", "The subscription has no initial quote or customer");
+  }
+  if (quote.currency !== state.currency) {
+    throw new TypedDomainError("BILLING_CURRENCY_MISMATCH", "The subscription and its checkout quote name different currencies");
   }
   const quoteLocation = openQuoteLocation(deps.recordsKey, quote.quoteId, quote.locationCiphertext);
   const latest = await deps.billing.latestProfile(customer.customerId);
@@ -55,7 +60,8 @@ export async function storedTaxContext(
     location: taxLocationOf(quoteLocation),
     taxId: company !== null && company.vatValidated ? company.vatId : null,
     profile,
-    customerId: customer.customerId
+    customerId: customer.customerId,
+    currency: state.currency
   });
 }
 
@@ -68,7 +74,7 @@ export async function quoteTaxAt(
   tax: Pick<TaxEngine, "quote">, policy: BillingPolicy, context: StoredTaxContext, netMicros: number, now: Date
 ): Promise<TaxQuote> {
   return tax.quote({
-    netMicros, currency: "USD", location: context.location, taxId: context.taxId, taxCode: policy.taxCode, date: now
+    netMicros, currency: context.currency, location: context.location, taxId: context.taxId, taxCode: policy.taxCode, date: now
   });
 }
 

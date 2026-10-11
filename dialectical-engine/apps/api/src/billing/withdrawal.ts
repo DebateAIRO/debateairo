@@ -2,7 +2,7 @@ import type { PoolClient } from "pg";
 import { hashToken } from "@debateai/crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  microsToDecimal, withdrawalRefundDeadline, withdrawalRefundPerPaymentMicros, type WithdrawalPayment
+  microsToDecimal, withdrawalRefundDeadline, withdrawalRefundPerPaymentMicros, type PriceCurrency, type WithdrawalPayment
 } from "@debateai/billing-core";
 import type { ChargeEventRow, ChargeRow } from "@debateai/db";
 import { planById } from "@debateai/register";
@@ -31,8 +31,11 @@ export type WithdrawalRequest = Readonly<{
   authorize: (client: PoolClient) => Promise<void>;
 }>;
 
-/** The refund on its way back, or null when the owner settles it by hand (a dashboard refund touched a payment). */
-export type WithdrawalOutcome = Readonly<{ refundMicros: number | null }>;
+/**
+ * The refund on its way back, or null when the owner settles it by hand (a dashboard refund touched a payment), and
+ * the subscription's currency, the one the refund is in (spec 2026-10-05 §2.16.5).
+ */
+export type WithdrawalOutcome = Readonly<{ refundMicros: number | null; currency: PriceCurrency }>;
 
 /**
  * W6 (P2-I8): each paid transaction with what it still holds (never below zero: a provider refund's figure is only an
@@ -174,13 +177,13 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
       await enqueueEmail(deps.billing, client, !byOwner && allocations.length === 0
         ? {
           template: "M8", recipient, dedupeRef: state.subscriptionId,
-          params: { plan: state.planId, refundAmount: microsToDecimal(refundMicros) }, notBefore: now
+          params: { plan: state.planId, refundAmount: microsToDecimal(refundMicros), currency: state.currency }, notBefore: now
         }
         : {
           template: "M8_RECEIVED", recipient, dedupeRef: state.subscriptionId,
           params: byOwner
             ? { plan: state.planId, withdrawalDate }
-            : { plan: state.planId, withdrawalDate, refundAmount: microsToDecimal(refundMicros) },
+            : { plan: state.planId, withdrawalDate, refundAmount: microsToDecimal(refundMicros), currency: state.currency },
           notBefore: now
         });
     }
@@ -195,12 +198,14 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
         notBefore: now
       });
     }
-    return Object.freeze({ refundMicros: byOwner ? null : refundMicros, refunds: allocations.length, byOwner });
+    return Object.freeze({
+      refundMicros: byOwner ? null : refundMicros, refunds: allocations.length, byOwner, currency: state.currency
+    });
   });
   deps.audit("billing.withdrawal", { refunds: decided.refunds, source: request.source });
   if (decided.byOwner) deps.audit("billing.withdrawal.owner_review", { source: request.source });
   if (decided.refunds > 0) deps.kick();
-  return Object.freeze({ refundMicros: decided.refundMicros });
+  return Object.freeze({ refundMicros: decided.refundMicros, currency: decided.currency });
 }
 
 /** The Settings route: now, with the step-up grant (P12a) spent under the owner lock. */

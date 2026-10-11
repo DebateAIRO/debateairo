@@ -73,7 +73,7 @@ afterEach(async () => {
 
 describe("data export application", () => {
   it("R27 orders visibility history by event sequence regardless of insertion order", async () => {
-    const sql = await readFile("migrations/0113_data_export.sql", "utf8");
+    const sql = await readFile("migrations/0115_data_export.sql", "utf8");
     const line = sql.split("\n").find((part) => part.includes("'visibility_events',COALESCE"))!;
     const aggregate = line.match(/COALESCE\(\(SELECT .*\),'\[\]'::jsonb\)/)?.[0]!;
     const run = "11111111-1111-4111-8111-111111111111", owner = "22222222-2222-4222-8222-222222222222";
@@ -98,7 +98,7 @@ describe("data export application", () => {
   });
 
   it("R22 pins each snapshot list's sequence key and direction", async () => {
-    const sql = await readFile("migrations/0113_data_export.sql", "utf8");
+    const sql = await readFile("migrations/0115_data_export.sql", "utf8");
     const functionSql = sql.split("CREATE OR REPLACE FUNCTION identity.read_data_export_snapshot(")[1]!.split("CREATE OR REPLACE FUNCTION identity.complete_data_export(")[0]!;
     const expected: Record<string, string> = {
       channels: "r.verified_at,to_jsonb(r)", age_checks: "r.checked_at,to_jsonb(r)", erasure_requests: "r.requested_at,to_jsonb(r)",
@@ -125,7 +125,7 @@ describe("data export application", () => {
   });
 
   it("R22 orders support messages, case messages and activity by their event time", async () => {
-    const sql = await readFile("migrations/0113_data_export.sql", "utf8");
+    const sql = await readFile("migrations/0115_data_export.sql", "utf8");
     const db = await startTestDatabase();
     const cases = [
       { key: "support_messages", table: "support.message", temporary: "dx_order_messages",
