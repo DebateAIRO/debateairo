@@ -126,6 +126,7 @@ apps/api/src/recovery.ts
 apps/api/src/registration.ts
 apps/api/src/retention-purge.ts
 apps/api/src/risk-signal-identity.ts
+apps/api/src/run-event-tail.ts
 apps/api/src/sessions.ts
 apps/api/src/social-auth.ts
 apps/api/src/social-providers/hashes.ts
