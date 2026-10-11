@@ -652,7 +652,10 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // (SERVE_DISCLOSURE_FALLBACK_REASONS, serveDisclosureFallbackReasonOf). migrate() is byte-identical.
 // Role rotation, Task 12 item 5: the reviewed module after readRoleRotationCounts moved into a short transaction
 // with SET LOCAL statement_timeout = '5s' on a dedicated connection. migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "512c08e40eb461aedee4a0570611fa426f16a435cca651164d2fafd0049aa5e4";
+// Opener rotation (spec 2026-10-11 Part 2, option B): the reviewed module after readRoleRotationCounts gained the
+// OPENER tally (each pin's first eligible entry) and the pin type's comment its position order. migrate() is
+// byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "c46dd4a1d95988aa51c6e333dd404cb995b18dd6dd5e580c9714439f677fa7f6";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

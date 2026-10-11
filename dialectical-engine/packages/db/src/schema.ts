@@ -370,6 +370,8 @@ export const runRoleRotation = core.table("run_role_rotation", {
   storyCheckerProviderRef: text("story_checker_provider_ref").notNull(),
   storyCheckerModelId: text("story_checker_model_id").notNull(),
   storyCheckerMaker: text("story_checker_maker").notNull(),
+  // Opener rotation (spec 2026-10-11 Part 2, option B): the debate's position order, opener (root position 0)
+  // first. Pins written before the opener rotated are in panel order, whose first entry was the actual opener.
   eligibleModelIds: text("eligible_model_ids").array().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull()
 });

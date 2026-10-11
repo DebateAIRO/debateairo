@@ -1407,7 +1407,13 @@ export type RunRoleRotationRole = Readonly<{ providerRef: string; modelId: strin
 /**
  * The pin `core.run_role_rotation` holds for one rotated debate. Structurally a `RotatedRoles` (@debateai/scorecard)
  * plus `runId`, so the API passes `{ runId, ...rotated }`. `eligibleModelIds`: the eligible members' model ids at
- * admission, in panel order; repeats allowed (two makers may serve one model id, ruling E).
+ * admission; repeats allowed (two makers may serve one model id, ruling E).
+ *
+ * Opener rotation (spec 2026-10-11 Part 2, option B; owner rulings R2, R5, R6): the array is written in the
+ * debate's position order, so its FIRST entry is the opener (root position 0), which has no column of its own;
+ * the runner seats the debaters in this order. 0114's own comment still says "in panel order" (its bytes are
+ * pinned by the lineage manifest): a pin written before the opener rotated is in panel order, and its first
+ * entry was that debate's actual opener, so both read the same way.
  */
 export type RunRoleRotationInput = Readonly<{
   runId: string; rule: "LEAST_SHARE_SEEDED_TIE_V1";
@@ -1416,14 +1422,15 @@ export type RunRoleRotationInput = Readonly<{
   eligibleModelIds: readonly string[];
 }>;
 export type RunRoleRotationRecord = RunRoleRotationInput & Readonly<{ createdAt: Date }>;
-export type RoleRotationCountRole = "ANSWER_WRITER" | "ANSWER_CHECKER" | "STORYTELLER" | "STORY_CHECKER";
+/** The four rotated roles and the opener (root position 0, read off each pin's first eligible entry). */
+export type RoleRotationCountRole = "ANSWER_WRITER" | "ANSWER_CHECKER" | "STORYTELLER" | "STORY_CHECKER" | "OPENER";
 /** One model in one role: pins naming it (`picked`) out of pins whose eligible list holds it (`eligible`). */
 export type RunRoleRotationTally = Readonly<{ picked: number; eligible: number }>;
 /** Per role, per model id; the shape of `RoleRotationCounts` (@debateai/scorecard), which db does not depend on. */
 export type RunRoleRotationCounts = Readonly<Record<RoleRotationCountRole, Readonly<Record<string, RunRoleRotationTally>>>>;
 
 const ROLE_ROTATION_RULE = "LEAST_SHARE_SEEDED_TIE_V1";
-const ROLE_ROTATION_COUNT_ROLES: readonly RoleRotationCountRole[] = ["ANSWER_WRITER", "ANSWER_CHECKER", "STORYTELLER", "STORY_CHECKER"];
+const ROLE_ROTATION_COUNT_ROLES: readonly RoleRotationCountRole[] = ["ANSWER_WRITER", "ANSWER_CHECKER", "STORYTELLER", "STORY_CHECKER", "OPENER"];
 
 /** Non-blank after trim and at most 256 characters: as strict as the 0114 CHECKs (JS trims more, counts UTF-16 units). */
 const isRotationText = (value: unknown): value is string =>
@@ -1487,6 +1494,9 @@ export async function readRunRoleRotation(executor: Pick<Pool, "query"> | PoolCl
  * Per role, per model id: `picked` = pins naming it in that role; `eligible` = pins whose eligible list holds it, each
  * pin counted once per model id (ruling E). One query, both aggregates; a model eligible but never picked in a role
  * answers `picked: 0`, and (never in a lawful table) a model picked but never eligible answers `eligible: 0`.
+ * OPENER (spec 2026-10-11 Part 2, option B): `picked` = pins whose first eligible entry is the model
+ * (`eligible_model_ids[1]`, SQL arrays count from 1), `eligible` as for the four roles. Pins written before
+ * the opener rotated count too (owner ruling R6): their first entry was the debate's actual opener.
  *
  * Task 12 item 5: it runs on one dedicated connection from the pool, in a short read transaction whose
  * `statement_timeout` is SET LOCAL (it ends with the transaction and never leaks into the pool), so a slow tally
@@ -1528,12 +1538,13 @@ async function queryRoleRotationCounts(client: PoolClient) {
        SELECT pick.role, pick.model_id, count(*)::integer AS picked
        FROM core.run_role_rotation
        CROSS JOIN LATERAL (VALUES ('ANSWER_WRITER', writer_model_id), ('ANSWER_CHECKER', checker_model_id),
-         ('STORYTELLER', storyteller_model_id), ('STORY_CHECKER', story_checker_model_id)) AS pick(role, model_id)
+         ('STORYTELLER', storyteller_model_id), ('STORY_CHECKER', story_checker_model_id),
+         ('OPENER', eligible_model_ids[1])) AS pick(role, model_id)
        GROUP BY pick.role, pick.model_id),
      eligible AS (
        SELECT role.role, listed.model_id, count(*)::integer AS eligible
        FROM (SELECT DISTINCT run_id, unnest(eligible_model_ids) AS model_id FROM core.run_role_rotation) AS listed
-       CROSS JOIN (VALUES ('ANSWER_WRITER'), ('ANSWER_CHECKER'), ('STORYTELLER'), ('STORY_CHECKER')) AS role(role)
+       CROSS JOIN (VALUES ('ANSWER_WRITER'), ('ANSWER_CHECKER'), ('STORYTELLER'), ('STORY_CHECKER'), ('OPENER')) AS role(role)
        GROUP BY role.role, listed.model_id)
      SELECT coalesce(picked.role, eligible.role) AS role, coalesce(picked.model_id, eligible.model_id) AS model_id,
             coalesce(picked.picked, 0) AS picked, coalesce(eligible.eligible, 0) AS eligible
