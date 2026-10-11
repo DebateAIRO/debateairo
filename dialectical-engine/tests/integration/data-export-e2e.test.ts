@@ -45,6 +45,17 @@ function entries(zip: Buffer): Record<string, string> {
   return result;
 }
 
+const providerStepUpFlowInsert = `WITH fixture_time AS MATERIALIZED (SELECT clock_timestamp() AS at)
+        INSERT INTO identity.social_flow(state_hash,cookie_hash,binding_hash,nonce_hash,retention_hash,
+        provider,configuration,purpose,next_path,user_id,session_id,session_token_hash,security_epoch,created_at,expires_at,
+        proof_hash,continuation_cookie_hash,issuer,app_scope,subject,authorization_binding)
+        SELECT $1,$2,$3,$4,$5,'google',$6,'PROVIDER_STEP_UP','/',$7,$8,$9,0,fixture_time.at,fixture_time.at+interval '5 minutes',
+        $10,$11,'https://accounts.google.com',$12,$13,'{"action":"EXPORT_DATA"}'::jsonb FROM fixture_time`;
+
+const riskSignalInsert = `WITH fixture_time AS MATERIALIZED (SELECT clock_timestamp() AS at)
+      INSERT INTO identity.authentication_risk_signal(risk_signal_id,user_id,signal_kind,context_ciphertext,observed_at,expires_at)
+      SELECT $1,$2,'LOGIN_SUCCESS',$3::jsonb,fixture_time.at,fixture_time.at+interval '7776000 seconds' FROM fixture_time`;
+
 describe("data export over a real database and encrypted file store", () => {
   let db: TestDatabase, runtime: ReturnType<typeof createPool>, workerRuntime: ReturnType<typeof createPool>, root: string;
   const sent: TemplatedMail[] = [];
@@ -201,17 +212,37 @@ describe("data export over a real database and encrypted file store", () => {
       const providerSubject = randomUUID();
       await db.pool.query("INSERT INTO identity.social_identity(user_id,provider,issuer,app_scope,subject,configuration) VALUES($1,'google','https://accounts.google.com',$2,$3,$4)",
         [provider.userId, configuration.appScope, providerSubject, configuration.configuration]);
+      // A fixture clock with six-minute jumps makes two independent reads violate social_flow's five-minute CHECK.
+      await db.pool.query("CREATE SCHEMA fixture_clock");
+      await db.pool.query(`CREATE FUNCTION fixture_clock.clock_timestamp() RETURNS timestamptz LANGUAGE plpgsql VOLATILE AS $function$
+        DECLARE n integer;
+        BEGIN
+          n := COALESCE(current_setting('fixture.calls', true)::integer, 0) + 1;
+          PERFORM set_config('fixture.calls', n::text, false);
+          RETURN '2026-01-01T00:00:00Z'::timestamptz + n * interval '6 minutes';
+        END $function$`);
+      const clockClient = await db.pool.connect();
+      const clockState = socialHash("state", randomUUID());
+      try {
+        await clockClient.query("SET search_path = fixture_clock, pg_catalog, identity, public");
+        await expect(clockClient.query(providerStepUpFlowInsert,
+          [clockState, socialHash("flow-cookie", randomUUID()), sessions.consumerProducer().bindingHash(source),
+            socialHash("nonce", randomUUID()), socialHash("browser", randomUUID()), configuration.configuration,
+            provider.userId, provider.sessionId, hashToken("session", providerToken), socialHash("step-up", randomUUID()),
+            socialHash("browser", randomUUID()), configuration.appScope, providerSubject])).resolves.toMatchObject({ rowCount: 1 });
+        expect((await clockClient.query("SELECT expires_at = created_at + interval '5 minutes' AS exact FROM identity.social_flow WHERE state_hash=$1", [clockState])).rows[0].exact).toBe(true);
+      } finally {
+        await clockClient.query("RESET search_path");
+        clockClient.release();
+        await db.pool.query("DROP SCHEMA fixture_clock CASCADE");
+      }
       await db.pool.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',clock_timestamp(),clock_timestamp())",
         [providerFactorId, provider.userId, encrypt(dek, providerSecret,
           ["identity", "mfa_factor.secret_ciphertext", providerFactorId, "run:none", provider.userId, `user-dek:${provider.userId}`, "1"])]);
       await db.pool.query("UPDATE identity.session SET token_hash=$2,csrf_token_hash=$3,binding_context=$4::jsonb WHERE session_id=$1",
         [provider.sessionId, hashToken("session", providerToken), hashToken("csrf", providerCsrf),
           JSON.stringify({ user_agent_hash: sessions.consumerProducer().bindingHash(source) })]);
-      await db.pool.query(`INSERT INTO identity.social_flow(state_hash,cookie_hash,binding_hash,nonce_hash,retention_hash,
-        provider,configuration,purpose,next_path,user_id,session_id,session_token_hash,security_epoch,created_at,expires_at,
-        proof_hash,continuation_cookie_hash,issuer,app_scope,subject,authorization_binding)
-        VALUES($1,$2,$3,$4,$5,'google',$6,'PROVIDER_STEP_UP','/',$7,$8,$9,0,clock_timestamp(),clock_timestamp()+interval '5 minutes',
-        $10,$11,'https://accounts.google.com',$12,$13,'{"action":"EXPORT_DATA"}'::jsonb)`,
+      await db.pool.query(providerStepUpFlowInsert,
         [socialHash("state", randomUUID()), socialHash("flow-cookie", randomUUID()), sessions.consumerProducer().bindingHash(source),
           socialHash("nonce", randomUUID()), socialHash("browser", randomUUID()), configuration.configuration,
           provider.userId, provider.sessionId, hashToken("session", providerToken), socialHash("step-up", continuation),
@@ -404,8 +435,29 @@ describe("data export over a real database and encrypted file store", () => {
     noticeId = (await db.pool.query("SELECT notice_id FROM identity.consumer_security_notice WHERE user_id=$1 AND channel_binding_id=$2 AND event_kind='METHOD_CHANGED'", [a.userId, channelId])).rows[0].notice_id;
     const riskEnvelope = encrypt(Buffer.alloc(32, 11), Buffer.from("matrix-risk-signal"),
       ["identity", "authentication_risk_signal.context_ciphertext", riskId, "run:none", a.userId, `auth-risk:${a.userId}:v1`, "1"]);
-    await db.pool.query(`INSERT INTO identity.authentication_risk_signal(risk_signal_id,user_id,signal_kind,context_ciphertext,observed_at,expires_at)
-      VALUES($1,$2,'LOGIN_SUCCESS',$3::jsonb,clock_timestamp(),clock_timestamp()+interval '7776000 seconds')`,
+    const probeRiskId = randomUUID();
+    const probeRiskEnvelope = encrypt(Buffer.alloc(32, 11), Buffer.from("matrix-risk-probe"),
+      ["identity", "authentication_risk_signal.context_ciphertext", probeRiskId, "run:none", a.userId, `auth-risk:${a.userId}:v1`, "1"]);
+    await db.pool.query("CREATE SCHEMA fixture_risk_clock");
+    await db.pool.query(`CREATE FUNCTION fixture_risk_clock.clock_timestamp() RETURNS timestamptz LANGUAGE plpgsql VOLATILE AS $function$
+      DECLARE n integer;
+      BEGIN
+        n := COALESCE(current_setting('fixture.risk_calls', true)::integer, 0) + 1;
+        PERFORM set_config('fixture.risk_calls', n::text, false);
+        RETURN '2026-01-01T00:00:00Z'::timestamptz + n * interval '6 minutes';
+      END $function$`);
+    const riskClockClient = await db.pool.connect();
+    try {
+      await riskClockClient.query("SET search_path = fixture_risk_clock, pg_catalog, identity, public");
+      await expect(riskClockClient.query(riskSignalInsert,
+        [probeRiskId, a.userId, JSON.stringify(probeRiskEnvelope)])).resolves.toMatchObject({ rowCount: 1 });
+      expect((await riskClockClient.query("SELECT expires_at = observed_at + interval '7776000 seconds' AS exact FROM identity.authentication_risk_signal WHERE risk_signal_id=$1", [probeRiskId])).rows[0].exact).toBe(true);
+    } finally {
+      await riskClockClient.query("RESET search_path");
+      riskClockClient.release();
+      await db.pool.query("DROP SCHEMA fixture_risk_clock CASCADE");
+    }
+    await db.pool.query(riskSignalInsert,
     [riskId, a.userId, JSON.stringify(riskEnvelope)]);
     await db.pool.query("INSERT INTO identity.account_security_hold(user_id,held,changed_at) VALUES($1,false,'2031-07-08T09:10:11Z')", [a.userId]);
     await db.pool.query(`INSERT INTO identity.run_execution_binding(execution_ref,user_id,identity_session_id,run_id,created_at)
