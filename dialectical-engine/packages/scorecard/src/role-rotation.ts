@@ -7,9 +7,19 @@ import { createHash } from "node:crypto";
  * (picked / eligible, compared exactly; never eligible = share 0), then the fewest picks,
  * then a fixed shuffle seeded from the ask. A checker is never its writer's maker.
  * Pure: the caller reads the counts.
+ *
+ * Opener rotation (spec 2026-10-11 Part 2, option B; owner rulings R2, R5-R7): root position 0 is a fifth
+ * pick by the same rule (role OPENER in the tie key), with no maker constraint and independent of the four
+ * roles. It is not stored in a column of its own: the pin's `eligible_model_ids` is written in the
+ * debate's position order, opener first (R5: [opener, the members after it in panel order, then the
+ * members before it]), and the counts read the opener as that array's first entry. Pins written before
+ * this were in panel order, whose first entry was the debate's actual opener, so they count as true
+ * history (R6). The same `answerRoleRotationPolicy` switch governs it (R7).
  */
 export const ROTATED_ROLES = Object.freeze(["ANSWER_WRITER", "ANSWER_CHECKER", "STORYTELLER", "STORY_CHECKER"] as const);
 export type RotatedRole = typeof ROTATED_ROLES[number];
+/** The roles the counts are kept for: the four rotated roles and the opener (root position 0). */
+export type RotationCountRole = RotatedRole | "OPENER";
 export const ROLE_ROTATION_RULE = "LEAST_SHARE_SEEDED_TIE_V1" as const;
 const TIE_SALT = "ROLE_ROTATION_V1";
 
@@ -18,13 +28,18 @@ export type RotationPick = Readonly<{ providerRef: string; modelId: string; make
 export type RotatedRoles = Readonly<{
   rule: typeof ROLE_ROTATION_RULE;
   answerWriter: RotationPick; answerChecker: RotationPick; storyteller: RotationPick; storyChecker: RotationPick;
-  /** The eligible members' model ids (one per maker), in panel order: what the pin records. */
+  /** Root position 0's member (owner ruling R2); always the first entry of `eligibleModelIds`. */
+  opener: RotationPick;
+  /**
+   * The eligible members' model ids (one per maker), in the debate's position order, opener first (R5):
+   * what the pin records, and the order the runner seats the debaters in.
+   */
   eligibleModelIds: readonly string[];
 }>;
 /** One model in one role: earlier pins naming it (`picked`) out of earlier pins it was eligible in (`eligible`). */
 export type RoleRotationTally = Readonly<{ picked: number; eligible: number }>;
-/** Per role, per model id. A model absent here counts as picked 0 of eligible 0 (share 0). */
-export type RoleRotationCounts = Readonly<Partial<Record<RotatedRole, Readonly<Record<string, RoleRotationTally>>>>>;
+/** Per role (the opener included), per model id. A model absent here counts as picked 0 of eligible 0 (share 0). */
+export type RoleRotationCounts = Readonly<Partial<Record<RotationCountRole, Readonly<Record<string, RoleRotationTally>>>>>;
 
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 const invalid = (): never => { throw new TypeError("ROLE_ROTATION_INPUT_INVALID"); };
@@ -81,7 +96,7 @@ export function pickRotatedRoles(input: Readonly<{
   assertCounts(input.counts);
   const eligible = rotationEligible(input.panel);
   if (eligible.length < 2) return null;
-  const ordered = (role: RotatedRole): readonly RotationPick[] => eligible
+  const ordered = (role: RotationCountRole): readonly RotationPick[] => eligible
     .map((pick): Candidate => {
       const tally = Object.hasOwn(input.counts[role] ?? {}, pick.modelId) ? input.counts[role]![pick.modelId] : undefined;
       return {
@@ -93,13 +108,31 @@ export function pickRotatedRoles(input: Readonly<{
     })
     .sort(compareCandidates)
     .map((candidate) => candidate.pick);
-  const first = (role: RotatedRole, avoidMaker?: string): RotationPick => ordered(role).find((pick) => pick.maker !== avoidMaker)!;
+  const first = (role: RotationCountRole, avoidMaker?: string): RotationPick => ordered(role).find((pick) => pick.maker !== avoidMaker)!;
   const answerWriter = first("ANSWER_WRITER");
   const storyteller = first("STORYTELLER");
+  const opener = first("OPENER");
+  // R5: the members shift round in turn, so the second speaker (root position 1) rotates as well.
+  const at = eligible.indexOf(opener);
+  const positionOrder = [...eligible.slice(at), ...eligible.slice(0, at)];
   return Object.freeze({
     rule: ROLE_ROTATION_RULE,
     answerWriter, answerChecker: first("ANSWER_CHECKER", answerWriter.maker),
     storyteller, storyChecker: first("STORY_CHECKER", storyteller.maker),
-    eligibleModelIds: Object.freeze(eligible.map((pick) => pick.modelId))
+    opener,
+    eligibleModelIds: Object.freeze(positionOrder.map((pick) => pick.modelId))
+  });
+}
+
+/**
+ * Opener rotation (spec 2026-10-11 Part 2, option B): the fields the pin stores. The opener has no column of its
+ * own; it is the first entry of `eligibleModelIds`, which the pin keeps in this order.
+ */
+export function rotationPinFields(rotated: RotatedRoles): Omit<RotatedRoles, "opener"> {
+  return Object.freeze({
+    rule: rotated.rule,
+    answerWriter: rotated.answerWriter, answerChecker: rotated.answerChecker,
+    storyteller: rotated.storyteller, storyChecker: rotated.storyChecker,
+    eligibleModelIds: rotated.eligibleModelIds
   });
 }

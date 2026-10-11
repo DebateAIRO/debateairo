@@ -164,6 +164,7 @@ import {
 import {
   RoleAssignmentSchema,
   pickRotatedRoles,
+  rotationPinFields,
   roleRotationSeed,
   type RoleAssignment,
   type RoleRotationCounts,
@@ -4657,9 +4658,10 @@ export class PostgresAskApplication implements AskApplication {
       // Role rotation (spec 2026-10-11): the four roles are pinned beside the run (core.run_role_rotation,
       // append-only) BEFORE its work is queued, so no runner can claim a rotated debate without them. A failed
       // pin records the run FAILED (RUN_SETUP_FAILED:ROLE_ROTATION). No rotation: nothing is pinned.
+      // Opener rotation (spec 2026-10-11 Part 2, option B): the opener is the pin's first eligible entry.
       if (roleRotation !== undefined) {
         setupStep = "ROLE_ROTATION";
-        await insertRunRoleRotation(this.pool, { runId, ...roleRotation });
+        await insertRunRoleRotation(this.pool, { runId, ...rotationPinFields(roleRotation) });
         setupStep = "MEMORY_QUESTION";
       }
       await this.#serve.recordMemoryQuestion({
@@ -4907,7 +4909,7 @@ export class PostgresAskApplication implements AskApplication {
           // created from; a WAIT keeps it, and the waker starts the run on it without picking again.
           if (evaluated.roleRotation !== undefined) {
             setupStep = "ROLE_ROTATION";
-            await insertRunRoleRotation(this.pool, { runId, ...evaluated.roleRotation });
+            await insertRunRoleRotation(this.pool, { runId, ...rotationPinFields(evaluated.roleRotation) });
           }
           pinned.personRoomTight = admission.kind === "START" && evaluated.personRoomTight === true;
           setupStep = "MEMORY_QUESTION";
