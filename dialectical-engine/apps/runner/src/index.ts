@@ -4850,11 +4850,14 @@ export class WalkingSkeletonRunner {
     // Role rotation, Task 11 (orchestrator ruling 2026-10-11 under the owner's delegation, "always an answer"): a
     // pinned answer member that is not claim-eligible hands its role back to the SEALED register ref for that role —
     // today's unpinned role, with today's off-panel probe and today's J24 below — when the debate's estimate already
-    // covers that ref's model (`answerRoleFallbackCovered`). Not covered, or the sealed ref is the pinned one: no
-    // stand-in, and the pinned role refuses with today's J24. The pin stays the disclosure's planned ref, so the
-    // stand-in is recorded as that role's fallback for ROLE_UNAVAILABLE (`rotationStandIns`).
+    // covers that ref's model (`answerRoleFallbackCovered`). Task 12: the sealed ref must itself be one of the debate's
+    // panel REFS (not merely a panel model), so a stand-in was priced, switched on and health-checked with the panel and
+    // never needs an off-panel probe the estimate did not count. Not a panel ref, not covered, or the sealed ref is the
+    // pinned one: no stand-in, and the pinned role refuses with today's J24. The pin stays the disclosure's planned ref,
+    // so the stand-in is recorded as that role's fallback for ROLE_UNAVAILABLE (`rotationStandIns`).
     const standInFor = (pinnedRef: string, sealedRef: string): string | null =>
       configuredMakers.some((maker) => maker.providerRef === pinnedRef) || sealedRef === pinnedRef
+        || !run.discoveredPanel.some((member) => member.provider_ref === sealedRef)
         || !(this.settings.answerRoleFallbackCovered?.({ roleRef: sealedRef, panel: run.discoveredPanel }) ?? true)
         ? null
         : sealedRef;

@@ -12085,12 +12085,21 @@ describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come f
   });
 
   it("a pinned checker absent at claim: the sealed checker serves, disclosed as a fallback for ROLE_UNAVAILABLE", async () => {
+    const probed: string[] = [];
     const scenario = await executeSeatScenario({
       label: "rotation-checker-stand-in", rotation: ROTATION, panelSize: 3,
       ...rotationDoubles("rotation-checker-stand-in", "secondary", "primary"),
-      settings: { claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef) }
+      settings: {
+        claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef),
+        // Task 12: the stand-in is a panel ref, already health-checked with the panel: no off-panel probe.
+        claimTimeSynthesisRoleProbe: async (providerRef) => {
+          probed.push(providerRef);
+          return { state: "HEALTHY", modelId: SEAT_ROUTES.primary.model, failureCode: null };
+        }
+      }
     });
     expect(scenario.error).toBeNull();
+    expect(probed).toEqual([]);
     const answerId = answerIdOf(scenario);
     expect(await servedRoundMakers(answerId)).toEqual([expect.objectContaining({
       writer: SEAT_ROUTES.secondary.providerRef, checker: SEALED_REF
@@ -12105,14 +12114,17 @@ describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come f
     expect(row).not.toHaveProperty("writerFallbackReason");
   });
 
-  it("a sealed checker off the panel stands in only after today's claim-time probe finds it healthy", async () => {
-    // The sealed checker is the twin route (the primary's maker, not on the frozen panel): probed as today.
+  it("a sealed checker off the panel never stands in, even with its model on the panel: no off-panel probe, today's J24", async () => {
+    // Task 12: the sealed checker is the twin route, whose MODEL is the primary's (on the frozen panel) but whose REF is
+    // not on the panel. A stand-in must be a panel ref, so the estimate never meets a health check it did not count.
     const probed: string[] = [];
+    const covered = coverage(true);
     const scenario = await executeSeatScenario({
       label: "rotation-off-panel-stand-in", rotation: ROTATION, panelSize: 3, twin: true,
       ...rotationDoubles("rotation-off-panel-stand-in", "secondary", "primary"),
       settings: {
         claimTimeProbe: absentFor(SEAT_ROUTES.third.providerRef),
+        answerRoleFallbackCovered: covered.answerRoleFallbackCovered,
         synthesisRolePolicy: { ...runnerSettings().synthesisRolePolicy, evaluatorRoleRef: SEAT_TWIN.providerRef, identicalRoleRefs: false },
         claimTimeSynthesisRoleProbe: async (providerRef) => {
           probed.push(providerRef);
@@ -12120,12 +12132,19 @@ describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come f
         }
       }
     });
-    expect(scenario.error).toBeNull();
-    expect(probed).toEqual([SEAT_TWIN.providerRef]);
-    expect(await disclosureRowOf(answerIdOf(scenario))).toMatchObject({
-      checkerPlannedRef: SEAT_ROUTES.third.providerRef, checkerServedRef: SEAT_TWIN.providerRef,
-      checkerFallback: true, checkerFallbackReason: "ROLE_UNAVAILABLE", fallbackReason: null
-    });
+    expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+    expect(probed).toEqual([]);
+    expect(covered.asked).toEqual([]);
+    expect(scenario.calls).toEqual([]);
+    expect(await workItemOf(scenario.runId))
+      .toEqual([{ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:EVALUATOR" }]);
+    expect(await j24Events(scenario.runId)).toEqual([{
+      state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+      call_site_key: `EVALUATOR:${SEAT_ROUTES.third.providerRef}`,
+      role_ref: SEAT_ROUTES.third.providerRef,
+      role: "EVALUATOR",
+      absent_failure_code: "CLAIM_PROVIDER_ABSENT"
+    }]);
   });
 
   it("a pinned writer absent and the sealed writer absent too: today's J24 refusal, naming the sealed ref", async () => {

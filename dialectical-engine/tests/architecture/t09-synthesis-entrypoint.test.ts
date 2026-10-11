@@ -176,8 +176,12 @@ describe("T9 production entry point wiring", () => {
     expect(probe).toBeGreaterThan(policy);
     expect(refusal).toBeGreaterThan(probe);
     const rule = source.slice(standIn, policy);
-    // Only for a member not claim-eligible, never the pinned ref itself, and only when the estimate covers the ref.
+    // Only for a member not claim-eligible, never the pinned ref itself, only a panel REF (Task 12: never an off-panel
+    // route the estimate did not count or a probe the panel did not run), and only when the estimate covers the ref.
     expect(rule).toContain("configuredMakers.some((maker) => maker.providerRef === pinnedRef) || sealedRef === pinnedRef");
+    expect(rule).toContain("|| !run.discoveredPanel.some((member) => member.provider_ref === sealedRef)");
+    expect(rule.indexOf("|| !run.discoveredPanel.some((member) => member.provider_ref === sealedRef)"))
+      .toBeLessThan(rule.indexOf("this.settings.answerRoleFallbackCovered?.("));
     expect(rule).toContain("|| !(this.settings.answerRoleFallbackCovered?.({ roleRef: sealedRef, panel: run.discoveredPanel }) ?? true)");
     expect(rule).toContain("standInFor(rotationPin.answerWriter.providerRef, this.settings.synthesisRolePolicy.synthesizerRoleRef)");
     expect(rule).toContain("standInFor(rotationPin.answerChecker.providerRef, this.settings.synthesisRolePolicy.evaluatorRoleRef)");

@@ -486,10 +486,11 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     return { state: observation.state, modelId: observation.modelId, failureCode: observation.failureCode };
   },
   // Role rotation, Task 11: a sealed answer role stands in for an unavailable pinned member only when the debate's
-  // estimate covers it. On the preview the rotated estimate prices only the panel's models; off the preview the
-  // estimate prices the sealed roles as for any debate (no setting: always covered).
+  // estimate covers it. On the preview the rotated estimate prices only the panel's members; off the preview the
+  // estimate prices the sealed roles as for any debate (no setting: always covered). Everywhere (Task 12) the runner
+  // also requires the stand-in to be one of the debate's panel refs.
   ...(previewConfig === undefined ? {} : {
-    answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ model_id: string }>[] }>) =>
+    answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ provider_ref: string; model_id: string }>[] }>) =>
       previewSealedRoleFallbackCovered(roleRef, panel)
   }),
   holdRecorder: {
