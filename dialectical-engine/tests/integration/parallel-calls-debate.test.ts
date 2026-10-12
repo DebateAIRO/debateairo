@@ -406,6 +406,8 @@ describe("parallel calls: replies and cross-exchanges (Task 11)", () => {
     expect(serial.saved.nodes).toHaveLength(2 + 3 + 6 + 2);
     for (const [index, run] of runs.entries()) {
       const name = variants[index]!.name;
+      // Final review T11: the parallel variants really overlapped calls (the serial one never does).
+      if (variants[index]!.row !== undefined) expect(run.concurrencyMost, name).toBeGreaterThan(1);
       // Nothing beneath the halted reply was asked.
       expect(run.callSiteKeys.filter((key) => /^JUDGE:(defender|critic):root0:r2:p2(:|$)/u.test(key)), name).toEqual([]);
       expect(run.holdRecords, name).toEqual(serial.holdRecords);
@@ -437,6 +439,8 @@ describe("parallel calls: replies and cross-exchanges (Task 11)", () => {
     expect(serial.saved.nodes).toHaveLength(3 + 4 + 6);
     for (const [index, run] of runs.entries()) {
       const name = variants[index]!.name;
+      // Final review T11: the parallel variants really overlapped calls (the serial one never does).
+      if (variants[index]!.row !== undefined) expect(run.concurrencyMost, name).toBeGreaterThan(1);
       // The dropped root (root 3) has no replies and no exchanges: none was ever asked.
       expect(run.callSiteKeys.filter((key) => /^JUDGE:(defender|critic):root3:|^JUDGE:cross-root:(3->|\d->3)/u.test(key)), name).toEqual([]);
       expect(run.saved, name).toEqual(serial.saved);
