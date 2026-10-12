@@ -129,6 +129,12 @@ function issueCode(parseError: string): string {
   return "SCHEMA_FAILED";
 }
 
+/**
+ * The patch reply decoded to one object with a key outside the request — most often the whole answer again. The
+ * gateway then checks that reply as a whole answer (owner ruling 2026-10-12); the merge itself never accepts it.
+ */
+export const PATCH_KEY_NOT_REQUESTED = "PATCH_KEY_NOT_REQUESTED@$" as const;
+
 export type PatchMerge =
   | { readonly ok: true; readonly content: string }
   | { readonly ok: false; readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly parseError: string };
@@ -147,7 +153,7 @@ export function mergePatchReply(plan: PatchFollowUpPlan, patchText: string, repl
   const keys = Object.keys(patch);
   if (keys.length === 0) return Object.freeze({ ok: false, parseStatus: "SCHEMA_FAILED", parseError: "PATCH_EMPTY@$" });
   if (!keys.every((key) => plan.locator.paths.includes(key))) {
-    return Object.freeze({ ok: false, parseStatus: "SCHEMA_FAILED", parseError: "PATCH_KEY_NOT_REQUESTED@$" });
+    return Object.freeze({ ok: false, parseStatus: "SCHEMA_FAILED", parseError: PATCH_KEY_NOT_REQUESTED });
   }
   const merged = structuredClone(plan.base) as Record<string, unknown>;
   for (const key of plan.locator.paths) {
