@@ -238,6 +238,10 @@ async function apiKeyLine(deps: BillingCheckDeps): Promise<CheckLine> {
     if (kind === "PAYMENT_CONFIGURATION_REFUSED") {
       return tick(`NETOPIA accepted the API key: it answered our made-up order with its own error (${code}); nothing was charged.`);
     }
+    // NETOPIA answers a status read with an empty payment id with error 99 ("Invalid ntpID") only after it has accepted the key.
+    if (kind === "PAYMENT_RESPONSE_INVALID" && detail === "99") {
+      return tick(`NETOPIA accepted the API key: it answered our made-up order with its own error (${code}); nothing was charged.`);
+    }
     if (kind === "PAYMENT_PROVIDER_UNAVAILABLE" || kind === "PAYMENT_OUTCOME_UNKNOWN") {
       return cross(`NETOPIA could not be reached (${code}); try again in a few minutes.`);
     }

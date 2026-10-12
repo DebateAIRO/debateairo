@@ -111,6 +111,7 @@ const capabilityRoles = [
   // Go-live row 41 (migration 0093): billing's privileges, held by api-runtime alone.
   "debateai_billing_runtime",
   "debateai_content_provision",
+  "debateai_data_export_worker",
   "debateai_erasure_runtime",
   "debateai_evaluator_api",
   "debateai_evaluator_reader",
@@ -184,6 +185,7 @@ describe("P3-01 production database-principal manifest", () => {
       { roleName: "debateai_authorization_runtime", inherit: true, directMemberships: ["debateai_runtime"] },
       { roleName: "debateai_billing_runtime", inherit: true, directMemberships: ["debateai_runtime"] },
       { roleName: "debateai_content_provision", inherit: false, directMemberships: [] },
+      { roleName: "debateai_data_export_worker", inherit: false, directMemberships: [] },
       { roleName: "debateai_erasure_runtime", inherit: false, directMemberships: [] },
       { roleName: "debateai_evaluator_api", inherit: true, directMemberships: [] },
       { roleName: "debateai_evaluator_reader", inherit: true, directMemberships: [] },
@@ -248,6 +250,7 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "api-authorization", roleName: "debateai_prod_api_authorization", kind: "SERVICE" },
         { id: "api-publication-cleanup", roleName: "debateai_prod_api_publication_cleanup", kind: "SERVICE" },
         { id: "api-support", roleName: "debateai_prod_api_support", kind: "SERVICE" },
+        { id: "api-data-export", roleName: "debateai_prod_api_data_export", kind: "SERVICE" },
         { id: "runner-runtime", roleName: "debateai_prod_runner_runtime", kind: "SERVICE" },
         { id: "scheduler-replay", roleName: "debateai_prod_scheduler_replay", kind: "SERVICE" },
         { id: "scheduler-liveness", roleName: "debateai_prod_scheduler_liveness", kind: "SERVICE" },
@@ -305,6 +308,7 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "api-authorization", database: "debateai", inherit: true, directMemberships: ["debateai_authorization_runtime"], effectiveMemberships: ["debateai_authorization_runtime", "debateai_runtime"] },
         { id: "api-publication-cleanup", database: "debateai", inherit: true, directMemberships: ["debateai_publication_cleanup"], effectiveMemberships: ["debateai_publication_cleanup"] },
         { id: "api-support", database: "debateai", inherit: true, directMemberships: ["debateai_support"], effectiveMemberships: ["debateai_support"] },
+        { id: "api-data-export", database: "debateai", inherit: true, directMemberships: ["debateai_data_export_worker"], effectiveMemberships: ["debateai_data_export_worker"] },
         { id: "runner-runtime", database: "debateai", inherit: true, directMemberships: ["debateai_runtime"], effectiveMemberships: ["debateai_runtime"] },
         { id: "scheduler-replay", database: "debateai", inherit: true, directMemberships: ["debateai_replay"], effectiveMemberships: ["debateai_replay"] },
         { id: "scheduler-liveness", database: "debateai", inherit: true, directMemberships: ["debateai_runtime"], effectiveMemberships: ["debateai_runtime"] },
@@ -483,6 +487,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "tools/billing:netopia-sandbox", environmentKey: "DATABASE_URL", purpose: "BILLING_NETOPIA_RECORDING_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:netopia-sandbox" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "SERVER_ASK_ADMISSION_POOL", binding: "WIRED" },
+        { component: "apps/api", environmentKey: "DATA_EXPORT_DATABASE_URL", purpose: "DATA_EXPORT_WORKER", binding: "WIRED_WHEN_ENABLED", condition: "DATA_EXPORT_STORE_PATH set" },
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },
         { component: "apps/api", environmentKey: "AUTHORIZATION_DATABASE_URL", purpose: "STEP_UP_SESSION_ROTATION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "PUBLICATION_CLEANUP_DATABASE_URL", purpose: "PUBLICATION_KEY_CLEANUP", binding: "WIRED_WHEN_ENABLED", condition: "PUBLICATION_ENABLED=true" },
@@ -807,6 +812,7 @@ describe("P3-01 production database-principal manifest", () => {
     expect(apiMain).toContain("createPool(environment.DATABASE_URL, API_DATABASE_POOLS.runtime)");
     expect(apiMain).toContain("createPool(environment.CONTENT_PROVISION_DATABASE_URL, API_DATABASE_POOLS.contentProvision)");
     expect(apiMain).toContain("createPool(environment.ERASURE_DATABASE_URL, API_DATABASE_POOLS.erasure)");
+    expect(apiMain).toContain("createPool(environment.DATA_EXPORT_DATABASE_URL!, API_DATABASE_POOLS.dataExport)");
     expect(apiMain).toContain("createPool(environment.AUTHORIZATION_DATABASE_URL!, API_DATABASE_POOLS.authorization)");
     expect(apiMain).toContain("createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!, API_DATABASE_POOLS.publicationCleanup)");
     expect(apiMain).toContain("createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.support)");
@@ -855,6 +861,7 @@ describe("P3-01 production database-principal manifest", () => {
       .sort();
     expect(sourceEvaluatorCrossSchemaGrants).toEqual(manifestEvaluatorCrossSchemaGrants);
     expect(migrations).toContain("CREATE ROLE debateai_erasure_runtime NOLOGIN NOINHERIT");
+    expect(migrations).toContain("CREATE ROLE debateai_data_export_worker NOLOGIN NOINHERIT");
     expect(migrations).toContain("CREATE ROLE debateai_publication_cleanup NOLOGIN NOINHERIT");
     expect(migrations).toContain("CREATE ROLE debateai_content_provision NOLOGIN NOINHERIT");
 

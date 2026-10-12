@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "До 30 хвилин",
   "legal.cookies.mfaRecovery.life": "До 299 секунд",
   "legal.cookies.social.life": "До 5 хвилин",
-  "legal.cookies.phoneDraft.life": "15 хвилин або до попереднього видалення"
+  "legal.cookies.phoneDraft.life": "15 хвилин або до попереднього видалення",
+  "legal.cookies.exportPending.purpose": "Зберігає посилання для експорту з електронного листа в цій вкладці для входу та повторної спроби.",
+  "legal.cookies.exportLinkOutcome.purpose": "Запам’ятовує, яке повідомлення про посилання для завантаження показувати в цій вкладці.",
+  "legal.cookies.exportPending.life": "До закриття вкладки, виходу, нового посилання, першого успішного завантаження або результату про недійсне посилання чи неправильний обліковий запис",
+  "legal.cookies.exportLinkOutcome.life": "До закриття вкладки, виходу або нового посилання"
 }

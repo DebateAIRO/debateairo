@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.3 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
-**In short.** Bir hesabın ihtiyaç duyduğu bilgileri ve yazmayı seçtiğiniz içerikleri toplarız. Sorularınız Sicilimizde listelenen yapay zekâ sağlayıcılarına gider; model eğitimi için kullanılmazlar. Tartışmalar, siz yayımlamadıkça gizlidir. Hesabınızı silmek özel verilerinizin anahtarlarını imha eder; silme işlemini planlarken yayımlanmış tartışmalarınızın da kaldırılmasını veya kullanımdan kaldırılmış takma adınız altında herkese açık kalmasını seçersiniz. Bize privacy@dezbatere.ro adresinden ulaşabilirsiniz; bir tartışmada adı geçen kişiler de hesapları olmadan kaldırma talebinde bulunabilir.
+**In short.** Bir hesabın ihtiyaç duyduğu bilgileri ve yazmayı seçtiğiniz içerikleri toplarız. Sorularınız Sicilimizde listelenen yapay zekâ sağlayıcılarına gider; model eğitimi için kullanılmazlar. Barındırma sağlayıcımız hesabınızı ve tartışmalarınızı Birleşik Krallık'taki Londra'da saklar; verilerinizin başka nerelere gittiğini bölüm 5 anlatır. Tartışmalar, siz yayımlamadıkça gizlidir. Hesabınızı silmek özel verilerinizin anahtarlarını imha eder; silme işlemini planlarken yayımlanmış tartışmalarınızın da kaldırılmasını veya kullanımdan kaldırılmış takma adınız altında herkese açık kalmasını seçersiniz. Bize privacy@dezbatere.ro adresinden ulaşabilirsiniz; bir tartışmada adı geçen kişiler de hesapları olmadan kaldırma talebinde bulunabilir.
 
 ## 1. Verilerinizden kim sorumludur
 
@@ -95,6 +95,8 @@ Profilinizi çıkarmayız, verilerinizi reklam amacıyla kullanmayız ve satmay�
 
 **Diğer alıcılar.** Yapay zekâ sağlayıcılarının yanı sıra aşağıdaki veri işleyenler de bizim adımıza veri işler. Barındırma sağlayıcımız OVHcloud, hizmeti Birleşik Krallık'taki Londra veri merkezinde barındırır ve çalıştırır. Avrupa Komisyonu, Birleşik Krallık'ın kişisel verileri yeterli düzeyde koruduğuna karar vermiştir (yeterlilik kararı Aralık 2031'e kadar geçerlidir); bu nedenle bu aktarım için ek güvencelere gerek yoktur. Cloudflare sayfalarımızı sunar, sizinle hizmet arasındaki trafiği taşır ve bot kontrolünü çalıştırır (bölüm 2); Cloudflare, AB–ABD Veri Gizliliği Çerçevesi (EU–US Data Privacy Framework) kapsamında sertifikalı bir ABD şirketidir ve bizimle yaptığı sözleşme yedek olarak AB standart sözleşme hükümlerini de içerir. E-posta aktarıcımız Amazon Simple Email Service, Lüksemburg'daki Amazon Web Services EMEA SARL ile yaptığımız sözleşme uyarınca hesap e-postalarını gönderir; Amazon bu verileri Amerika Birleşik Devletleri'nde işlerse aktarım, Amazon'un veri işleme koşullarındaki AB standart sözleşme hükümlerine dayanır. Ödemeler, ücretli planlar başladığında ödeme sağlayıcımız NETOPIA Payments üzerinden yapılır. Her biri, 28. maddenin gerektirdiği güvenceleri içeren bir veri işleme sözleşmesi kapsamında belgelenmiş talimatlarımız doğrultusunda hareket eder. Hiçbir veri işleyenin verilerinizi kendi amaçları için kullanmasına izin vermeyiz. Bir sağlayıcı bunu yapacak olursa kendi başına veri sorumlusu olur ve ona verilerinizi göndermeyiz.
 
+**Verilerinizin bulunduğu yer.** Hesabınız ve tartışmalarınız, barındırma sağlayıcımızın Londra'daki sunucularında, Birleşik Krallık'ta saklanır. Cloudflare trafiği kendi ağı üzerinden taşır, Amazon ise hesap e-postalarını Amerika Birleşik Devletleri'nde işleyebilir. Her yapay zekâ sağlayıcısı aldığı metni Sicilin o sağlayıcı için belirttiği ülkelerde, çoğunlukla Amerika Birleşik Devletleri'nde işler.
+
 **Kamu makamları.** Kanunun gerektirdiği durumlarda kişisel verileri mahkemelere, düzenleyici kurumlara veya kolluk makamlarına açıklarız ve kanun engellemedikçe size bildiririz.
 
 ## 6. Yayımlama ve görünürlük
@@ -148,12 +150,12 @@ Bu hakların herhangi birini **privacy@dezbatere.ro** adresine yazarak veya ilgi
 
 | Hak | Buradaki anlamı |
 | --- | --- |
-| **Erişim** (Art. 15) | Hakkınızda tuttuğumuz kişisel verilerin ve bu bilgilerin bir kopyası. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Erişim** (Art. 15) | Hakkınızda tuttuğumuz kişisel verilerin ve bu bilgilerin bir kopyası. Ayarlar bölümünde Verileri dışa aktar seçeneğini seçin: JSON dosyaları ve herhangi bir tarayıcıda açabileceğiniz tek bir sayfa içeren ZIP dosyası hazırlarız ve size e-postayla, 24 saat boyunca yalnızca hesabınızda oturum açıkken çalışan bir indirme bağlantısı göndeririz. |
 | **Düzeltme** (Art. 16) | E-posta veya kurtarma e-posta adresinizi Ayarlar'dan düzeltin. Koşullarda belirtilen nedenlerle takma adınız değiştirilemez; hesabı kapatıp yeni bir hesap açabilirsiniz |
 | **Silme** (Art. 17) | Gizli bir tartışmayı tartışma sayfasından istediğiniz zaman silin. Hesabınızı Ayarlar'dan kapatın; bunun tam olarak ne yaptığını bölüm 7 açıklar. Yazarı olup olmadığınıza bakılmaksızın verilerinizi içeren yayımlanmış bir tartışmayı kaldırmamızı isteyin |
 | **Kısıtlama** (Art. 18) | Bir uyuşmazlık çözümlenene kadar belirli verileri işlemeyi durdurmamızı isteyin |
 | **İtiraz** (Art. 21) | Meşru menfaatlere dayalı işlemeye — bölüm 4'teki güvenlik ve denetim işlemesine — itiraz edin; zorlayıcı gerekçeler gösterebilmediğimiz sürece işlemeyi durdururuz. Pazarlamaya istediğiniz zaman itiraz edin; durdururuz |
-| **Taşınabilirlik** (Art. 20) | Tartışmalarınız ve hesap verileriniz yaygın kullanılan, makinece okunabilir bir biçimde sağlanır. \[Pending: same export as Access.\] Sorularınız gibi oluşturduğunuz kişisel olmayan içerik, sözleşme sona erdiğinde talebiniz üzerine size iade edilir |
+| **Taşınabilirlik** (Art. 20) | Tartışmalarınız ve hesap verileriniz yaygın kullanılan, makinece okunabilir bir biçimde sağlanır. Ayarlar bölümündeki Verileri dışa aktar seçeneğini kullanın: ZIP dosyası verilerinizi makinece okunabilir JSON dosyalarında ve okunabilir tek bir sayfada içerir; e-postayla gönderilen bağlantı 24 saat boyunca yalnızca hesabınızda oturum açıkken çalışır. Sorularınız gibi oluşturduğunuz kişisel olmayan içerik, sözleşme sona erdiğinde talebiniz üzerine size iade edilir |
 | **Rızayı geri çekme** (Art. 7(3)) | Pazarlama rızasını herhangi bir e-postadan veya Ayarlar'dan geri çekin; hassas veri rızasını hesabınızı Ayarlar'dan kapatarak geri çekin (bu tür verilere yer vermeyebilir veya bunları içeren bir tartışmayı silebilirsiniz). Geri çekme, daha önce gerçekleşmiş işlemeyi etkilemez |
 | **Şikâyet** | Romanya denetim makamı **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bükreş, <anspdcp@dataprotection.ro> adresine veya yaşadığınız ülkedeki makama. Önce bizden haber almayı tercih ederiz |
 
@@ -174,7 +176,7 @@ Dialectical Engine yetişkinler içindir. Kayıt olurken 18 yaşında veya daha 
 ## 13. Çerezler
 
 
-Dialectical Engine, tamamı talep ettiğiniz hizmet için kesinlikle gerekli olan ve tamamı yalnızca Dialectical Engine tarafından yerleştirilen 18 öğe kullanır: 13 çerez ve tarayıcınızın depolama alanında 5 kayıt. Analitik, reklam veya izleme çerezi yerleştirmeyiz. dezbatere.ro/cookies adresindeki **Çerez Politikası** bunları, her birinin ne yaptığı ve kimin aldığıyla birlikte listeler ve başka herhangi bir şey eklenmeden önce değiştirilecektir.
+Dialectical Engine, tamamı talep ettiğiniz hizmet için kesinlikle gerekli olan ve tamamı yalnızca Dialectical Engine tarafından yerleştirilen 20 öğe kullanır: 13 çerez ve tarayıcınızın depolama alanında 7 kayıt. Analitik, reklam veya izleme çerezi yerleştirmeyiz. dezbatere.ro/cookies adresindeki **Çerez Politikası** bunları, her birinin ne yaptığı ve kimin aldığıyla birlikte listeler ve başka herhangi bir şey eklenmeden önce değiştirilecektir.
 
 | Ad | Tür | Amaç | Süre |
 |---|---|---|---|
@@ -196,6 +198,8 @@ Dialectical Engine, tamamı talep ettiğiniz hizmet için kesinlikle gerekli ola
 | `debateai.languageOffer.dismissed` | Oturum depolaması | Bu sekme için bir tartışmayı başka bir dilde gösterme önerisini reddettiğinizi hatırlar. | Sekmeyi kapatana kadar |
 | `debateai.support.conversation.v2` | Oturum depolaması | Sekme açık kaldığı sürece yardım sohbetindeki konuşmanızı ekranda tutar. Bu sekmede biri oturum açtığında veya kapattığında silinir. | Sekmeyi kapatana kadar |
 | `debateai.phone-completion-draft.v1` | Oturum depolaması | Telefon adımında tamamlanmamış soru; oturum değişikliği, çıkış veya sahip değişikliğiyle silinir | 15 dakika veya daha erken silinene kadar |
+| `debateai.exportPending` | Oturum depolaması | E-postayla gelen dışa aktarma bağlantısını oturum açma ve yeniden deneme için bu sekmede tutar. | Sekme kapanana, oturum kapatılana, yeni bağlantı açılana, ilk başarılı indirme yapılana veya geçersiz bağlantı ya da yanlış hesap sonucu alınana kadar |
+| `debateai.exportLinkOutcome` | Oturum depolaması | Bu sekmede hangi indirme bağlantısı iletisinin gösterileceğini hatırlar. | Sekme kapanana, oturum kapatılana veya yeni bağlantı açılana kadar |
 
 Başka hiçbir taraf, Dialectical Engine aracılığıyla zaman içinde ve farklı web siteleri genelinde çevrimiçi etkinlikleriniz hakkında bilgi toplamaz.
 
@@ -229,7 +233,7 @@ Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu ki�
 
 ### B.4 Avustralya ve Yeni Zelanda
 
-**Avustralya.** Kişisel bilgilerinizin yurt dışındaki alıcıları, Sicilde listelenen ve Amerika Birleşik Devletleri ve Avrupa Birliği'nde bulunan yapay zekâ sağlayıcıları ile veri işleyenlerdir; bu bilgileri Avustralya Gizlilik İlkelerine uygun şekilde işlemelerini sağlamak için makul adımlar atarız. **Otomatik kararlar:** bu politika, 10 Aralık 2026 tarihinden itibaren haklarınızı veya menfaatlerinizi önemli ölçüde etkileyen bilgisayar programı kararlarının türlerini — böyle kararlar yoktur; puanlar ve hükümler sizi değil, argümanları ilgilendirir — ve bu kararlarda kullanılan kişisel bilgileri tanımlar. Şikâyetler **Avustralya Bilgi Komiserliği Ofisine** yapılabilir. **Yeni Zelanda.** Gizlilik görevlimiz müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Hakkınızdaki kişisel bilgileri dolaylı olarak — başka bir kullanıcı bunları bir soruya dâhil ettiği için — topladığımızda bu politika ve bölüm 11, size sunduğumuz bildirimi oluşturur. Sicildeki yapay zekâ sağlayıcılarına, karşılaştırılabilir güvenceler gerektiren sözleşmeler kapsamında temsilcilerimiz sıfatıyla açıklama yaparız. Şikâyetler **Gizlilik Komiserliği Ofisine** yapılabilir.
+**Avustralya.** Kişisel bilgilerinizin yurt dışındaki alıcıları, Londra'daki (Birleşik Krallık) barındırma sağlayıcımız dahil olmak üzere bölüm 5'te adı geçen veri işleyenler ile Sicilde listelenen yapay zekâ sağlayıcılarıdır. Bunlar Birleşik Krallık'ta, Amerika Birleşik Devletleri'nde ve Avrupa Birliği'nde yer alır ve Sicil her yapay zekâ sağlayıcısının ülkelerini belirtir; bu bilgileri Avustralya Gizlilik İlkelerine uygun şekilde işlemelerini sağlamak için makul adımlar atarız. **Otomatik kararlar:** bu politika, 10 Aralık 2026 tarihinden itibaren haklarınızı veya menfaatlerinizi önemli ölçüde etkileyen bilgisayar programı kararlarının türlerini — böyle kararlar yoktur; puanlar ve hükümler sizi değil, argümanları ilgilendirir — ve bu kararlarda kullanılan kişisel bilgileri tanımlar. Şikâyetler **Avustralya Bilgi Komiserliği Ofisine** yapılabilir. **Yeni Zelanda.** Gizlilik görevlimiz müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Hakkınızdaki kişisel bilgileri dolaylı olarak — başka bir kullanıcı bunları bir soruya dâhil ettiği için — topladığımızda bu politika ve bölüm 11, size sunduğumuz bildirimi oluşturur. Sicildeki yapay zekâ sağlayıcılarına, karşılaştırılabilir güvenceler gerektiren sözleşmeler kapsamında temsilcilerimiz sıfatıyla açıklama yaparız. Şikâyetler **Gizlilik Komiserliği Ofisine** yapılabilir.
 
 ### B.5 İsviçre
 

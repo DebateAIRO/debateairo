@@ -187,9 +187,9 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
       repositoryRoot,
       providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       supportModelTarget: JSON.stringify({
-        provider_ref: "development:hermes-glm-5.3-flash",
+        provider_ref: "development:claude-haiku-5.5",
         base_url: "http://127.0.0.1:8794/v1",
-        model: "z-ai/glm-5.3-flash",
+        model: "claude-haiku-5-5",
         authorization_header: "Bearer support-test"
       }),
       registerReceipt: createDevelopmentDeploymentRegisterMachineReceipt({

@@ -177,6 +177,17 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
             setError(t(catalog, "auth.social.unavailable"));
         }
     }
+    const cancelButton = onCancel ? <button type="button" className="setBtn setBtnQuiet" onClick={() => {
+                sequence.current++;
+                browser.cancel();
+                flight.current = false;
+                setBusy(false);
+                setError(null);
+                setSignInAgain(null);
+                setPassword('');
+                setCode('');
+                onCancel();
+            }}>{t(catalog, "auth.security.cancel")}</button> : null;
     return <section className="authSecurityConfirmation" aria-label={t(catalog, "auth.security.title")}>
  {error ? <p className="authFieldError" role="alert">{error}{signInAgain ? <> <a href={signInAgain}>{t(catalog, "auth.signUp.logIn")}</a></> : null}</p> : null}
  {initialProof ? <button type="button" className="setBtn setBtnPrimary" disabled={busy || disabled} onClick={async () => {
@@ -202,24 +213,22 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                     setBusy(false);
                 }
             }}>{t(catalog, "auth.security.confirm")}</button> : <>
- <div className="authSecurityActions">
- {methods?.available_step_up_methods.includes('passkey') ? <button type="button" className="setBtn" disabled={busy || disabled} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button> : null}
- {methods?.available_step_up_methods.includes('password_totp') ? <button type="button" className="setBtn" aria-expanded={passwordMode} disabled={busy || disabled} onClick={() => {
+ {methods?.available_step_up_methods.includes('passkey') ? <div className="authSecurityActions"><button type="button" className="setBtn" disabled={busy || disabled} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button></div> : null}
+ {methods?.available_step_up_methods.includes('provider') ? <div><p className="authFieldHint">{t(catalog, "auth.security.providerProof")}</p><div className="authSecurityActions">{methods.step_up_providers.map(providerId => <button type="button" className="setBtn" key={providerId} disabled={busy || disabled} onClick={() => void provider(providerId)}>{t(catalog, "auth.social.continue", { provider: providerId === 'google' ? 'Google' : providerId === 'apple' ? 'Apple' : providerId === 'facebook' ? 'Facebook' : 'X' })}</button>)}</div></div> : null}
+ {methods?.available_step_up_methods.includes('password_totp') ? <div className="authSecurityActions"><button type="button" className="setBtn" aria-expanded={passwordMode} aria-pressed={passwordMode} disabled={busy || disabled} onClick={() => {
                     browser.cancel();
                     setPasswordMode(!passwordMode);
-                }}>{t(catalog, "auth.security.passwordMethod")}</button> : null}
- </div>
- {methods?.available_step_up_methods.includes('provider') ? <div className="authSecurityActions"><p>{t(catalog, "auth.security.providerProof")}</p>{methods.step_up_providers.map(providerId => <button type="button" className="setBtn" key={providerId} disabled={busy || disabled} onClick={() => void provider(providerId)}>{t(catalog, "auth.social.continue", { provider: providerId === 'google' ? 'Google' : providerId === 'apple' ? 'Apple' : providerId === 'facebook' ? 'Facebook' : 'X' })}</button>)}</div> : null}
+                }}>{t(catalog, "auth.security.passwordMethod")}</button></div> : null}
  {methods?.available_step_up_methods.includes('password_totp') && passwordMode ? <form className="authForm" method="post" action="/settings/security" noValidate onSubmit={e => {
                         e.preventDefault();
                         const data = new FormData(e.currentTarget);
                         void passwordProof(readSixDigitCode(String(data.get('security-code') ?? '')).digits, String(data.get('security-password') ?? ''));
                     }}>
- <div className="authField"><label htmlFor={`${id}-password`}>{t(catalog, "auth.password")}</label><input id={`${id}-password`} name="security-password" type="password" autoComplete="current-password" value={password} disabled={busy || disabled} onChange={e => {
+ <div className="setField authField"><label htmlFor={`${id}-password`}>{t(catalog, "auth.password")}</label><input id={`${id}-password`} name="security-password" type="password" autoComplete="current-password" placeholder={t(catalog, "auth.password")} value={password} disabled={busy || disabled} onChange={e => {
                         setPassword(e.target.value);
                         attempt.current.edited();
                     }}/></div>
- <div className="authField"><label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" value={code} disabled={busy || disabled} aria-invalid={!!codeError || undefined} aria-describedby={codeError ? `${id}-code-error` : undefined} onChange={e => {
+ <div className="setField authField"><label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" placeholder={t(catalog, "auth.login.authenticationCodeLabel")} value={code} disabled={busy || disabled} aria-invalid={!!codeError || undefined} aria-describedby={codeError ? `${id}-code-error` : undefined} onChange={e => {
                         const typed = readSixDigitCode(e.target.value);
                         const shown = typed.valid ? typed.digits : e.target.value;
                         if (shown !== code)
@@ -232,21 +241,12 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                         if (typed.complete)
                             void passwordProof(typed.digits, String(e.currentTarget.form ? new FormData(e.currentTarget.form).get('security-password') ?? '' : password));
                     }}/><InlineFieldMessage id={`${id}-code-error`} message={codeError}/></div>
- <button type="submit" className="authPrimary" disabled={busy || disabled || !password || !readSixDigitCode(code).complete}>{t(catalog, "auth.security.confirm")}</button>
+ <button type="submit" className="setBtn setBtnPrimary" disabled={busy || disabled || !password || !readSixDigitCode(code).complete}>{t(catalog, "auth.security.confirm")}</button>
+ {cancelButton}
  {announcer.region}
  </form> : null}
  {!methods && !error ? <p role="status">{t(catalog, "auth.login.checking")}</p> : null}
  </>}
- {onCancel ? <button type="button" className="setBtn setBtnQuiet" onClick={() => {
-                sequence.current++;
-                browser.cancel();
-                flight.current = false;
-                setBusy(false);
-                setError(null);
-                setSignInAgain(null);
-                setPassword('');
-                setCode('');
-                onCancel();
-            }}>{t(catalog, "auth.security.cancel")}</button> : null}
+ {cancelButton && !(methods?.available_step_up_methods.includes('password_totp') && passwordMode) ? <div>{cancelButton}</div> : null}
  </section>;
 }

@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Na kratko",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Zbiramo podatke, ki jih potrebuje račun, in to, kar se odločite vnesti. Vaša vprašanja se pošljejo ponudnikom umetne inteligence, navedenim v našem Registru; ne uporabljajo se za učenje modelov. Razprave so zasebne, razen če jih objavite. Z izbrisom računa se uničijo ključi vaših zasebnih podatkov; ob načrtovanju izbrisa izberete, ali bodo odstranjene tudi objavljene razprave ali bodo ostale javne pod vašim umaknjenim psevdonimom. Dosegljivi smo na privacy@dezbatere.ro, osebe, navedene v razpravi, pa lahko zahtevajo odstranitev brez računa." }
+      { kind: "p", text: "Zbiramo podatke, ki jih potrebuje račun, in to, kar se odločite vnesti. Vaša vprašanja se pošljejo ponudnikom umetne inteligence, navedenim v našem Registru; ne uporabljajo se za učenje modelov. Naš ponudnik gostovanja hrani vaš račun in vaše razprave v Londonu v Združenem kraljestvu; razdelek 5 pojasnjuje, kam še gredo vaši podatki. Razprave so zasebne, razen če jih objavite. Z izbrisom računa se uničijo ključi vaših zasebnih podatkov; ob načrtovanju izbrisa izberete, ali bodo odstranjene tudi objavljene razprave ali bodo ostale javne pod vašim umaknjenim psevdonimom. Dosegljivi smo na privacy@dezbatere.ro, osebe, navedene v razpravi, pa lahko zahtevajo odstranitev brez računa." }
     ]
   },
   {
@@ -113,6 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Učenje in hramba sta različni stvari. Ponudnike umetne inteligence uporabljamo samo pod pogoji, ki jim ne dovoljujejo uporabe vaše vsebine za učenje ali izboljševanje njihovih modelov; Register za vsakega ponudnika prikaže, ali smo to preverili na našem računu, in kdaj. Nekateri ponudniki navodila in odgovore hranijo omejeno obdobje zaradi varnosti, preprečevanja zlorab ali lastnih pravnih obveznosti; Register navaja trajanje in razlog. Če je vključena ničelna hramba podatkov, Register to navede skupaj s funkcijami, za katere velja. Za vsebino ne bomo trdili, da se ne hrani, kadar se dejansko hrani." },
       { kind: "p", text: "Prenosi zunaj EGP. Ponudniki s sedežem v Združenih državah prejemajo podatke na podlagi enega od mehanizmov iz poglavja V GDPR: okvira za varstvo podatkov med EU in ZDA, če je določena pogodbena pravna oseba certificirana za te podatke, ali standardnih pogodbenih določil Evropske komisije (modul dva, upravljavec obdelovalcu), podprtih z oceno tveganja prenosa in dopolnilnimi ukrepi. Register navaja mehanizem za vsakega ponudnika. Izvod določil, na katera se opiramo, lahko dobite tako, da pišete na privacy@dezbatere.ro. Če je mehanizem, na katerega se opiramo, razveljavljen, pred nadaljevanjem prenosov preidemo na drugega in vas o tem obvestimo." },
       { kind: "p", text: "Drugi prejemniki. Poleg ponudnikov umetne inteligence podatke za nas obdelujejo naslednji obdelovalci. Naš ponudnik gostovanja, OVHcloud, hrani in poganja storitev v svojem podatkovnem centru v Londonu v Združenem kraljestvu. Evropska komisija je odločila, da Združeno kraljestvo zagotavlja ustrezno raven varstva osebnih podatkov (njen sklep o ustreznosti velja do decembra 2031), zato ta prenos ne zahteva dodatnih zaščitnih ukrepov. Cloudflare dostavlja naše strani, prenaša podatkovni promet med vami in storitvijo ter izvaja preverjanje robotov (razdelek 2); je ameriško podjetje, certificirano po okviru EU–ZDA za varstvo podatkov (EU–US Data Privacy Framework), pogodba z nami pa kot rezervo dodaja standardne pogodbene klavzule EU. Naš ponudnik posredovanja e-pošte, Amazon Simple Email Service, na podlagi naše pogodbe z družbo Amazon Web Services EMEA SARL v Luksemburgu pošilja e-poštna sporočila v zvezi z računom; kadar Amazon te podatke obdeluje v Združenih državah, prenos temelji na standardnih pogodbenih klavzulah EU iz Amazonovih pogojev o obdelavi podatkov. Plačila potekajo prek našega ponudnika plačilnih storitev, NETOPIA Payments, ko se plačljivi paketi začnejo. Vsak deluje po naših dokumentiranih navodilih na podlagi pogodbe o obdelavi podatkov z zaščitnimi ukrepi, ki jih zahteva člen 28. Nobenemu obdelovalcu ne dovolimo uporabe vaših podatkov za lastne namene. Če bi ponudnik tako ravnal, bi bil samostojen upravljavec in mu vaših podatkov ne bi pošiljali." },
+      { kind: "p", text: "Kje so vaši podatki. Vaš račun in vaše razprave so shranjeni v Združenem kraljestvu, na strežnikih našega ponudnika gostovanja v Londonu. Cloudflare prenaša podatkovni promet prek lastnega omrežja, Amazon pa lahko e-poštna sporočila v zvezi z računom obdeluje v Združenih državah. Vsak ponudnik umetne inteligence obdeluje besedilo, ki ga prejme, v državah, ki jih zanj navaja Register, večinoma v Združenih državah." },
       { kind: "p", text: "Javni organi. Osebne podatke razkrijemo sodiščem, regulatorjem ali organom kazenskega pregona, kadar to zahteva zakon, in vas obvestimo, razen če nam zakon to prepoveduje." }
     ]
   },
@@ -179,16 +180,16 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Vaše pravice in njihovo uveljavljanje",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Katero koli od teh pravic lahko brezplačno uveljavite tako, da pišete na privacy@dezbatere.ro, ali v Nastavitvah → Zasebnost, kjer obstaja ustrezni kontrolnik. Odgovorimo v enem mesecu; če je zahteva zapletena, lahko rok podaljšamo za največ dva dodatna meseca in vam pojasnimo razlog. Lahko vas prosimo, da prek računa potrdite svojo identiteto." },
+      { kind: "p", text: "Katero koli od teh pravic lahko brezplačno uveljavite tako, da pišete na privacy@dezbatere.ro, ali v Nastavitve → Zasebnost, kjer obstaja ustrezni kontrolnik. Odgovorimo v enem mesecu; če je zahteva zapletena, lahko rok podaljšamo za največ dva dodatna meseca in vam pojasnimo razlog. Lahko vas prosimo, da prek računa potrdite svojo identiteto." },
       {
         kind: "list",
         items: [
-        "Dostop (Art. 15) — Kopija osebnih podatkov, ki jih hranimo o vas, in te informacije. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Dostop (Art. 15) — Kopija osebnih podatkov, ki jih hranimo o vas, in te informacije. V Nastavitvah izberite Izvozi podatke: pripravimo datoteko ZIP z datotekami JSON in eno stranjo, ki jo lahko odprete v katerem koli brskalniku, ter vam po e-pošti pošljemo povezavo za prenos, ki velja 24 ur in deluje le, ko ste prijavljeni v svoj račun.",
         "Popravek (Art. 16) — V Nastavitvah popravite svoj e-poštni naslov ali e-poštni naslov za obnovitev. Psevdonima zaradi razlogov, navedenih v Pogojih, ni mogoče spremeniti; račun lahko zaprete in odprete novega",
         "Izbris (Art. 17) — Zasebno razpravo lahko kadar koli izbrišete na strani razprave. Račun zaprete v Nastavitvah; razdelek 7 natančno pojasnjuje posledice. Prosite nas lahko, naj odstranimo objavljeno razpravo, ki vsebuje vaše podatke, ne glede na to, ali ste njen avtor",
         "Omejitev (Art. 18) — Prosite nas lahko, naj prenehamo obdelovati določene podatke, dokler se spor o njih ne razreši",
         "Ugovor (Art. 21) — Ugovarjate lahko obdelavi na podlagi zakonitih interesov — varnostni in revizijski obdelavi iz razdelka 4 — in prenehali bomo, razen če lahko dokažemo nujne razloge. Trženju lahko ugovarjate kadar koli in prenehali bomo",
-        "Prenosljivost (Art. 20) — Vaše razprave in podatki računa v splošno uporabljani, strojno berljivi obliki. [Pending: same export as Access.] Neosebna vsebina, ki ste jo ustvarili, na primer vaša vprašanja, vam bo na zahtevo vrnjena ob prenehanju pogodbe",
+        "Prenosljivost (Art. 20) — Vaše razprave in podatki računa v splošno uporabljani, strojno berljivi obliki. Uporabite Izvozi podatke v Nastavitvah: ZIP vsebuje vaše podatke v strojno berljivih datotekah JSON in eno berljivo stran; povezava, poslana po e-pošti, velja 24 ur in deluje le, ko ste prijavljeni v svoj račun. Neosebna vsebina, ki ste jo ustvarili, na primer vaša vprašanja, vam bo na zahtevo vrnjena ob prenehanju pogodbe",
         "Preklic privolitve (Art. 7(3)) — Privolitev za trženje prekličete v katerem koli e-poštnem sporočilu ali Nastavitvah; privolitev za občutljive podatke prekličete z zaprtjem računa v Nastavitvah (take podatke lahko tudi izpustite ali izbrišete razpravo, ki jih vsebuje). Preklic ne vpliva na obdelavo, ki je že bila izvedena",
         "Pritožba — Romunskemu nadzornemu organu ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarešta, anspdcp@dataprotection.ro, ali organu v državi, v kateri živite. Raje bi videli, da se najprej obrnete na nas"
         ]
@@ -219,7 +220,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Piškotki",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine uporablja 18 elementov, ki so vsi nujno potrebni za storitev, ki ste jo zahtevali, in jih vse nastavlja izključno Dialectical Engine: 13 piškotkov in 5 vnosov v shrambi vašega brskalnika. Ne nastavljamo analitičnih, oglaševalskih ali sledilnih piškotkov. Pravilnik o piškotkih na dezbatere.ro/cookies jih navaja skupaj s tem, kaj vsak od njih počne in kdo ga prejme, in bo spremenjen, preden bo dodano karkoli drugega." },
+      { kind: "p", text: "Dialectical Engine uporablja 20 elementov, ki so vsi nujno potrebni za storitev, ki ste jo zahtevali, in jih vse nastavlja izključno Dialectical Engine: 13 piškotkov in 7 vnosov v shrambi vašega brskalnika. Ne nastavljamo analitičnih, oglaševalskih ali sledilnih piškotkov. Pravilnik o piškotkih na dezbatere.ro/cookies jih navaja skupaj s tem, kaj vsak od njih počne in kdo ga prejme, in bo spremenjen, preden bo dodano karkoli drugega." },
       {
         kind: "list",
         items: [
@@ -240,7 +241,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokalna shramba — Ali uporabljate svetli ali temni način prikaza. — Dokler ga ne izbrišete",
         "debateai.languageOffer.dismissed — Shramba seje — Za ta zavihek si zapomni, da ste zavrnili ponudbo, da se razprava prikaže v drugem jeziku. — Dokler ne zaprete zavihka",
         "debateai.support.conversation.v2 — Shramba seje — Ohranja vaš pogovor s klepetom za pomoč na zaslonu, dokler je zavihek odprt. Izbriše se, ko se v tem zavihku kdor koli prijavi ali odjavi. — Dokler ne zaprete zavihka",
-        "debateai.phone-completion-draft.v1 — Shramba seje — Nedokončano vprašanje med telefonskim korakom; izbriše se ob spremembi seje, odjavi ali spremembi lastnika — 15 minut ali do predhodnega brisanja"
+        "debateai.phone-completion-draft.v1 — Shramba seje — Nedokončano vprašanje med telefonskim korakom; izbriše se ob spremembi seje, odjavi ali spremembi lastnika — 15 minut ali do predhodnega brisanja",
+        "debateai.exportPending — Shramba seje — V tem zavihku hrani povezavo za izvoz iz e-pošte za prijavo in ponovni poskus. — Do zaprtja zavihka, odjave, nove povezave, prvega uspešnega prenosa ali izida neveljavne povezave oziroma napačnega računa",
+        "debateai.exportLinkOutcome — Shramba seje — Zapomni si, katero sporočilo o povezavi za prenos prikazati v tem zavihku. — Do zaprtja zavihka, odjave ali nove povezave"
         ]
       },
       { kind: "p", text: "Nobena druga stran prek Dialectical Engine ne zbira informacij o vaših spletnih dejavnostih skozi čas in na različnih spletnih mestih." },
@@ -295,7 +298,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Avstralija in Nova Zelandija",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Avstralija. Čezmorski prejemniki vaših osebnih podatkov so ponudniki umetne inteligence in obdelovalci, navedeni v Registru, ki se nahajajo v Združenih državah Amerike in Evropski uniji; sprejemamo razumne ukrepe, da z njimi ravnajo v skladu z avstralskimi načeli zasebnosti. Avtomatizirane odločitve: od 10. decembra 2026 ta pravilnik opredeljuje vrste odločitev, ki jih sprejemajo računalniški programi in pomembno vplivajo na vaše pravice ali interese — takih odločitev ni; ocene in razsodbe se nanašajo na argumente, ne na vas — ter osebne podatke, uporabljene pri njih. Pritožbe se lahko vložijo pri Uradu avstralskega informacijskega pooblaščenca. Nova Zelandija. Naša oseba, odgovorna za zasebnost, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro. Kadar osebne podatke o vas zbiramo posredno — ker jih je drug uporabnik vključil v vprašanje — sta ta pravilnik in razdelek 11 obvestilo, ki vam ga zagotovimo. Ponudnikom umetne inteligence v Registru jih razkrijemo kot svojim zastopnikom na podlagi pogodb, ki zahtevajo primerljive zaščitne ukrepe. Pritožbe se lahko vložijo pri Uradu pooblaščenca za zasebnost." }
+      { kind: "p", text: "Avstralija. Čezmorski prejemniki vaših osebnih podatkov so obdelovalci, navedeni v razdelku 5, vključno z našim ponudnikom gostovanja v Londonu v Združenem kraljestvu, in ponudniki umetne inteligence, navedeni v Registru. Nahajajo se v Združenem kraljestvu, Združenih državah Amerike in Evropski uniji, Register pa navaja države vsakega ponudnika umetne inteligence; sprejemamo razumne ukrepe, da z njimi ravnajo v skladu z avstralskimi načeli zasebnosti. Avtomatizirane odločitve: od 10. decembra 2026 ta pravilnik opredeljuje vrste odločitev, ki jih sprejemajo računalniški programi in pomembno vplivajo na vaše pravice ali interese — takih odločitev ni; ocene in razsodbe se nanašajo na argumente, ne na vas — ter osebne podatke, uporabljene pri njih. Pritožbe se lahko vložijo pri Uradu avstralskega informacijskega pooblaščenca. Nova Zelandija. Naša oseba, odgovorna za zasebnost, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro. Kadar osebne podatke o vas zbiramo posredno — ker jih je drug uporabnik vključil v vprašanje — sta ta pravilnik in razdelek 11 obvestilo, ki vam ga zagotovimo. Ponudnikom umetne inteligence v Registru jih razkrijemo kot svojim zastopnikom na podlagi pogodb, ki zahtevajo primerljive zaščitne ukrepe. Pritožbe se lahko vložijo pri Uradu pooblaščenca za zasebnost." }
     ]
   },
   {
@@ -327,7 +330,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "33be0177c9baf5e4e03c1133f1af638822518cb7e4a0264262d565700b47d677",
+  sha256: "ebdebad3adbbef36dec8d161e2aff31fc8934b598a4ec4b9525b1711e9f4c83d",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.3 · VELJA OD 12. OKTOBRA 2026",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",

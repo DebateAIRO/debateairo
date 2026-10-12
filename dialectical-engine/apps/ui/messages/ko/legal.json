@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "최대 30분",
   "legal.cookies.mfaRecovery.life": "최대 299초",
   "legal.cookies.social.life": "최대 5분",
-  "legal.cookies.phoneDraft.life": "15분 또는 그전에 삭제할 때까지"
+  "legal.cookies.phoneDraft.life": "15분 또는 그전에 삭제할 때까지",
+  "legal.cookies.exportPending.purpose": "로그인하거나 다시 시도할 수 있도록 이메일로 받은 내보내기 링크를 이 탭에 보관합니다.",
+  "legal.cookies.exportLinkOutcome.purpose": "이 탭에 표시할 다운로드 링크 메시지를 기억합니다.",
+  "legal.cookies.exportPending.life": "탭을 닫거나 로그아웃하거나 새 링크를 열거나 첫 다운로드가 성공하거나 링크가 유효하지 않거나 계정이 다르다는 결과가 나올 때까지",
+  "legal.cookies.exportLinkOutcome.life": "탭을 닫거나 로그아웃하거나 새 링크를 열 때까지"
 }

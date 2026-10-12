@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Uw gegevens bij Dialectical Engine",
+  "archive.generated": "Opgesteld op {time} voor {pseudonym}.",
+  "archive.accountHeading": "Uw account",
+  "archive.email": "E-mailadres",
+  "archive.memberSince": "Lid sinds",
+  "archive.debatesHeading": "Uw debatten ({count})",
+  "archive.question": "Vraag",
+  "archive.verdict": "Oordeel",
+  "archive.verdictSupported": "Ondersteund",
+  "archive.verdictContested": "Betwist",
+  "archive.verdictUnsupported": "Niet ondersteund",
+  "archive.story": "Het debat in het kort",
+  "archive.arguments": "Argumenten",
+  "archive.visibilityPublic": "Gepubliceerd",
+  "archive.visibilityPrivate": "Privé",
+  "archive.unreadable": "De inhoud van dit debat kan niet meer worden gelezen omdat de sleutel is vernietigd.",
+  "archive.noDebates": "U hebt geen debatten.",
+  "archive.filesNote": "De JSON-bestanden in dit ZIP-archief bevatten dezelfde gegevens in een machineleesbare vorm; README.txt geeft de lijst."
+}

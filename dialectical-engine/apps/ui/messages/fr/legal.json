@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Jusqu’à 30 minutes",
   "legal.cookies.mfaRecovery.life": "Jusqu’à 299 secondes",
   "legal.cookies.social.life": "Jusqu’à 5 minutes",
-  "legal.cookies.phoneDraft.life": "15 minutes ou jusqu’à l’effacement"
+  "legal.cookies.phoneDraft.life": "15 minutes ou jusqu’à l’effacement",
+  "legal.cookies.exportPending.purpose": "Conserve dans cet onglet le lien d’exportation reçu par e-mail pour la connexion et une nouvelle tentative.",
+  "legal.cookies.exportLinkOutcome.purpose": "Mémorise le message concernant le lien de téléchargement à afficher dans cet onglet.",
+  "legal.cookies.exportPending.life": "Jusqu’à la fermeture de l’onglet, la déconnexion, un nouveau lien, le premier téléchargement réussi ou un résultat de lien invalide ou de mauvais compte",
+  "legal.cookies.exportLinkOutcome.life": "Jusqu’à la fermeture de l’onglet, la déconnexion ou un nouveau lien"
 }

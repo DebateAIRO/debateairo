@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Tối đa 30 phút",
   "legal.cookies.mfaRecovery.life": "Tối đa 299 giây",
   "legal.cookies.social.life": "Tối đa 5 phút",
-  "legal.cookies.phoneDraft.life": "15 phút hoặc đến khi bị xóa sớm hơn"
+  "legal.cookies.phoneDraft.life": "15 phút hoặc đến khi bị xóa sớm hơn",
+  "legal.cookies.exportPending.purpose": "Giữ liên kết xuất dữ liệu trong email ở thẻ này để đăng nhập và thử lại.",
+  "legal.cookies.exportLinkOutcome.purpose": "Ghi nhớ thông báo về liên kết tải xuống cần hiển thị trong thẻ này.",
+  "legal.cookies.exportPending.life": "Cho đến khi đóng thẻ, đăng xuất, mở liên kết mới, tải xuống thành công lần đầu hoặc nhận kết quả liên kết không hợp lệ hay sai tài khoản",
+  "legal.cookies.exportLinkOutcome.life": "Cho đến khi đóng thẻ, đăng xuất hoặc mở liên kết mới"
 }

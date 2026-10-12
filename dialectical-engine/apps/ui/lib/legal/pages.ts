@@ -139,23 +139,24 @@ export const LEGAL_COOKIES: readonly LegalInventoryItem[] = Object.freeze([
 ]);
 
 /**
- * The four browser-storage keys the UI writes, none ever sent to a server: two in local storage
- * (the notice acknowledgement, the display mode) and two in session storage (the declined
- * language offer, the help-chat conversation — `components/support/conversation.ts`, named here
- * as a literal so the page does not pull the support widget in).
+ * Browser-storage keys the UI writes: two in local storage and five in session storage. The
+ * export link token is sent to the DebateAI server when redeemed; the link outcome stays in the
+ * browser. The help-chat name is literal so this page does not pull in the support widget.
  */
 export const LEGAL_BROWSER_STORAGE: readonly LegalInventoryItem[] = Object.freeze([
   { name: CONSENT_KEY, kindKey: "legal.cookies.consent.kind", purposeKey: "legal.cookies.consent.purpose", lifeKey: "legal.cookies.consent.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: "debateai.mode", kindKey: "legal.cookies.mode.kind", purposeKey: "legal.cookies.mode.purpose", lifeKey: "legal.cookies.mode.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: LANGUAGE_OFFER_DISMISSED_KEY, kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.languageOffer.purpose", lifeKey: "legal.cookies.languageOffer.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: "debateai.support.conversation.v2", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.supportConversation.purpose", lifeKey: "legal.cookies.supportConversation.life", recipientKey: "legal.cookies.recipient.browser" },
-  { name: "debateai.phone-completion-draft.v1", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.phoneDraft.purpose", lifeKey: "legal.cookies.phoneDraft.life", recipientKey: "legal.cookies.recipient.browser" }
+  { name: "debateai.phone-completion-draft.v1", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.phoneDraft.purpose", lifeKey: "legal.cookies.phoneDraft.life", recipientKey: "legal.cookies.recipient.browser" },
+  { name: "debateai.exportPending", kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.exportPending.purpose", lifeKey: "legal.cookies.exportPending.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "debateai.exportLinkOutcome", kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.exportLinkOutcome.purpose", lifeKey: "legal.cookies.exportLinkOutcome.life", recipientKey: "legal.cookies.recipient.browser" }
 ]);
 
 /** All current stored items, cookies first, in the order /cookies and the storage card list them. */
 export const LEGAL_INVENTORY: readonly LegalInventoryItem[] = Object.freeze([...LEGAL_COOKIES, ...LEGAL_BROWSER_STORAGE]);
 
-/** The 24 kind/purpose/life strings of LEGAL_INVENTORY picked out of a legal catalogue (missing keys are left out). */
+/** The kind/purpose/life strings of LEGAL_INVENTORY picked out of a legal catalogue (missing keys are left out). */
 export function inventoryCopy(legal: MessageCatalog): MessageCatalog {
   const copy: Record<string, string> = {};
   for (const { kindKey, purposeKey, lifeKey } of LEGAL_INVENTORY) {
@@ -262,26 +263,31 @@ export const MODEL_PROVIDERS: readonly ProviderRegisterEntry[] = Object.freeze([
 ]);
 
 /**
- * The support chat calls one model of its own (`apps/api/src/support/model.ts`), chosen when the
- * product is hosted; until then every fact about it is a placeholder.
+ * The support chat calls one model of its own (`apps/api/src/support/model.ts`): Claude Haiku 5.5
+ * on Anthropic's API (owner, 12 October 2026). Its facts are the ones checked against Anthropic's
+ * published terms on 10 October 2026 for the preview's Anthropic row (`ANTHROPIC_PREVIEW_PROVIDER`
+ * below; `docs/legal/2026-10-10-preview-provider-facts.md`): a customer in the EEA contracts with
+ * Anthropic Ireland, Limited; API inputs and outputs are deleted within 30 days unless flagged for
+ * misuse or the law requires more; zero data retention needs Anthropic's approval, which we do not
+ * have; no training on customer content; transfers under standard contractual clauses.
  */
 export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
   key: "support",
   provider: null,
   nameKey: "legal.providers.supportName",
-  models: "[…]",
+  models: "Claude Haiku 5.5",
   modelsKey: null,
-  entity: "[…]",
-  homeCountryKey: "legal.providers.unconfirmed",
+  entity: "Anthropic Ireland, Limited",
+  homeCountryKey: "legal.providers.ireland",
   purposes: Object.freeze<ProviderPurpose[]>(["support"]),
   purposesConfirmed: true,
-  locationKey: "legal.providers.unconfirmed",
-  retentionKey: "legal.providers.unconfirmed",
-  zeroRetention: "unconfirmed",
-  training: "unconfirmed",
-  basisKey: "legal.providers.unconfirmed",
-  contact: "[…]",
-  checkedOn: null
+  locationKey: "legal.providers.locationAnthropic",
+  retentionKey: "legal.providers.retentionAnthropic",
+  zeroRetention: "no",
+  training: "no",
+  basisKey: "legal.providers.sccBasis",
+  contact: "privacy@anthropic.com",
+  checkedOn: "2026-10-10"
 });
 
 /**

@@ -333,14 +333,14 @@ describe("the cookie policy describes the cookies the product really sets", () =
   const INV_COOKIES = ["__Host-debateai-session", "__Host-debateai-csrf", "__Host-debateai-age-refusal", "debateai.locale",
     "__Host-debateai-staff", "__Host-debateai-staff-csrf", "__Host-debateai-password-reset", "__Host-debateai-password-reset-csrf",
     "__Host-debateai-mfa-recovery", "__Host-debateai-mfa-recovery-csrf", "__Host-debateai-social-flow", "__Host-debateai-social-apple", "__Host-debateai-social-browser"];
-  const INV_STORAGE = ["debateai.consent", "debateai.mode", "debateai.languageOffer.dismissed", "debateai.support.conversation.v2", "debateai.phone-completion-draft.v1"];
-  const EN_KIND = ["Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Local storage", "Local storage", "Session storage", "Session storage", "Session storage"];
-  const EN_LIFE = ["14 days", "14 days", "30 days", "1 year", "Up to 8 hours; 15-minute idle expiry", "Up to 8 hours; 15-minute idle expiry", "Up to 30 minutes", "Up to 30 minutes", "Up to 299 seconds", "Up to 299 seconds", "Up to 5 minutes", "Up to 5 minutes", "Up to 5 minutes", "Until you clear it", "Until you clear it", "Until you close the tab", "Until you close the tab", "15 minutes or until earlier clearing"];
-  const EN_RECIPIENT = [...Array(13).fill("DebateAI's server only"), ...Array(5).fill("stays in your browser")];
+  const INV_STORAGE = ["debateai.consent", "debateai.mode", "debateai.languageOffer.dismissed", "debateai.support.conversation.v2", "debateai.phone-completion-draft.v1", "debateai.exportPending", "debateai.exportLinkOutcome"];
+  const EN_KIND = ["Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Local storage", "Local storage", "Session storage", "Session storage", "Session storage", "Session storage", "Session storage"];
+  const EN_LIFE = ["14 days", "14 days", "30 days", "1 year", "Up to 8 hours; 15-minute idle expiry", "Up to 8 hours; 15-minute idle expiry", "Up to 30 minutes", "Up to 30 minutes", "Up to 299 seconds", "Up to 299 seconds", "Up to 5 minutes", "Up to 5 minutes", "Up to 5 minutes", "Until you clear it", "Until you clear it", "Until you close the tab", "Until you close the tab", "15 minutes or until earlier clearing", "Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result", "Until tab close, sign-out, or a new link"];
+  const EN_RECIPIENT = [...Array(13).fill("DebateAI's server only"), ...Array(5).fill("stays in your browser"), "DebateAI's server only", "stays in your browser"];
   const english = legalEnglish as Record<string, string>;
-  const INV_IDS = ["session", "csrf", "ageRefusal", "locale", "staff", "staff", "passwordReset", "passwordReset", "mfaRecovery", "mfaRecovery", "social", "social", "social", "consent", "mode", "languageOffer", "supportConversation", "phoneDraft"];
+  const INV_IDS = ["session", "csrf", "ageRefusal", "locale", "staff", "staff", "passwordReset", "passwordReset", "mfaRecovery", "mfaRecovery", "social", "social", "social", "consent", "mode", "languageOffer", "supportConversation", "phoneDraft", "exportPending", "exportLinkOutcome"];
 
-  it("lists INV 1-4 as cookies and INV 5-8 as browser storage, in SPEC-v2 §2 order", () => {
+  it("lists the current cookies and browser storage in inventory order", () => {
     expect(LEGAL_COOKIES.map(({ name }) => name)).toEqual(INV_COOKIES);
     expect(LEGAL_BROWSER_STORAGE.map(({ name }) => name)).toEqual(INV_STORAGE);
     expect(LEGAL_INVENTORY).toEqual([...LEGAL_COOKIES, ...LEGAL_BROWSER_STORAGE]);
@@ -354,6 +354,8 @@ describe("the cookie policy describes the cookies the product really sets", () =
     expect(source("packages/contract/src/index.ts")).toMatch(/AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS = 30 \* 24 \* 60 \* 60;/);
     expect(INV_IDS.map((id) => english[`legal.cookies.${id}.life`])).toEqual(EN_LIFE);
     expect(LEGAL_INVENTORY.map(({ lifeKey }) => lifeKey)).toEqual(INV_IDS.map((id) => `legal.cookies.${id}.life`));
+    expect(english["legal.cookies.exportPending.purpose"]).toBe("Keeps the emailed export link in this tab for sign-in and retry.");
+    expect(english["legal.cookies.exportLinkOutcome.purpose"]).toBe("Remembers which download-link message to show in this tab.");
     // REV-S01 p1 SD-B1: the help-chat row says when its transcript ends besides the tab closing; each event it names is
     // one the code runs. The stored value carries no person id (conversation.ts), so the row names the two events in
     // this tab that clear it: a sign-in (LoginFlow, once completeLogin succeeds) and a sign-out (SessionControls).
@@ -379,7 +381,7 @@ describe("the cookie policy describes the cookies the product really sets", () =
       );
     }
     const rows = tables.flatMap((table) => [...table.querySelectorAll("tbody tr")]);
-    expect(rows.map((row) => tables.indexOf(row.closest("table") as Element))).toEqual([...Array(13).fill(0), ...Array(5).fill(1)]);
+    expect(rows.map((row) => tables.indexOf(row.closest("table") as Element))).toEqual([...Array(13).fill(0), ...Array(7).fill(1)]);
     const cells = rows.map((row) => texts(row.querySelectorAll("th, td")));
     expect(rows.map((row) => row.querySelector("th code")?.textContent)).toEqual([...INV_COOKIES, ...INV_STORAGE]);
     // DONE.md default 8 (REV-S01 p1 PT-B1): a long name breaks only after a dot. Each dot-separated part is one unbreakable
@@ -424,7 +426,7 @@ describe("the cookie policy describes the cookies the product really sets", () =
       .map((rule) => Number(/max-width:\s*(\d+)px/.exec((rule as CSSMediaRule).media.mediaText)?.[1] ?? 0));
     style.remove();
     expect(Math.max(0, ...stackedUpTo), "the cookie tables stack at every width below 995px").toBeGreaterThanOrEqual(994);
-    expect(cells.map((row) => row.length)).toEqual(Array(18).fill(5));
+    expect(cells.map((row) => row.length)).toEqual(Array(20).fill(5));
     expect(cells.map((row) => row[1])).toEqual(EN_KIND);
     expect(cells.map((row) => row[3])).toEqual(EN_RECIPIENT);
     expect(cells.map((row) => row[4])).toEqual(EN_LIFE);
@@ -485,6 +487,30 @@ describe("the model providers page lists the model families the product runs", (
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
     expect(headings).toEqual([...MODEL_PROVIDERS.map(({ provider }) => provider), "Support chat model"]);
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
+  });
+
+  it("names Claude Haiku 5.5 as the support chat's model, with Anthropic's checked facts and no brackets", () => {
+    // Owner, 12 October 2026: the support chat runs on Claude Haiku 5.5 on Anthropic's API.
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
+    const support = [...view.querySelectorAll(".legalProviderEntry")].at(-1);
+    expect(support?.querySelector("h2")?.textContent).toBe("Support chat model");
+    const cells = Object.fromEntries([...(support?.querySelectorAll("tbody tr") ?? [])].map((row) => [
+      row.querySelector("th")?.textContent, row.querySelector("td")?.textContent?.trim()
+    ]));
+    expect(cells).toEqual({
+      "Models": "Claude Haiku 5.5",
+      "Company": "Anthropic Ireland, Limited",
+      "Home country": "Ireland",
+      "What it receives, and why": "What you type in the support chat — to answer you",
+      "Where it processes": legalEnglish["legal.providers.locationAnthropic"],
+      "How long it keeps data": legalEnglish["legal.providers.retentionAnthropic"],
+      "Zero data retention": "No",
+      "May it train on your data?": "No",
+      "Transfer basis": legalEnglish["legal.providers.sccBasis"],
+      "Contact": "privacy@anthropic.com",
+      "Last checked": "2026-10-10"
+    });
+    expect(support?.textContent).not.toMatch(/\[/u);
   });
 
   it("on the private preview's GLM build, lists DeepInfra just before the support chat's model, and no hosted cloud row", async () => {

@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Teie Dialectical Engine'i andmed",
+  "archive.generated": "Koostatud {time} kasutajale {pseudonym}.",
+  "archive.accountHeading": "Konto",
+  "archive.email": "E-post",
+  "archive.memberSince": "Liige alates",
+  "archive.debatesHeading": "Teie väitlused ({count})",
+  "archive.question": "Küsimus",
+  "archive.verdict": "Hinnang",
+  "archive.verdictSupported": "Toetatud",
+  "archive.verdictContested": "Vaidlustatud",
+  "archive.verdictUnsupported": "Toetamata",
+  "archive.story": "Väitlus lühidalt",
+  "archive.arguments": "Argumendid",
+  "archive.visibilityPublic": "Avaldatud",
+  "archive.visibilityPrivate": "Privaatne",
+  "archive.unreadable": "Selle väitluse sisu ei saa enam lugeda, sest selle võti hävitati.",
+  "archive.noDebates": "Teil pole väitlusi.",
+  "archive.filesNote": "Selle ZIP-arhiivi JSON-failid sisaldavad samu andmeid masinloetaval kujul; failis README.txt on nende loend."
+}

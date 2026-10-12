@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  paymentErrorCode, type CardPayments, type Payer, type PaymentEnvironment, type PaymentReport, type PriceCurrency, type SecretToken
+  type CardPayments, type Payer, type PaymentEnvironment, type PaymentReport, type PriceCurrency, type SecretToken
 } from "@debateai/billing-core";
 import { BillingRepository } from "@debateai/db";
 import { loadApiEnvironment, readNetopiaEnvironmentGroup } from "@debateai/register";
@@ -163,6 +163,8 @@ export type SandboxSession = Readonly<{
   exchanges: ReadonlyArray<CapturedExchange>;
   trustedKeys: ReadonlyArray<Readonly<{ fingerprint: string }>>;
   payments(facts: NetopiaRequestFacts): CardPayments;
+  /** Whether NETOPIA accepts the API key (see probeApiKey): the check command's only call to NETOPIA. */
+  probeKey(): Promise<KeyProbe>;
   insertToolOrder(row: Readonly<{ orderId: string; paymentEnvironment: PaymentEnvironment; createdAt: Date; purpose: "SANDBOX_RECORDING" | "LIVE_TEST" }>): Promise<void>;
   toolOrder(orderId: string): Promise<Readonly<{ orderId: string; paymentEnvironment: string }> | null>;
   /** The newest unrevoked card the API stored for a tool order (N9's intake), opened. */
@@ -343,21 +345,39 @@ async function fixture(command: Extract<ToolCommand, { command: "fixture" }>, se
   return notices.length > 0 ? 0 : 1;
 }
 
+export type KeyProbe = "ACCEPTED" | "REFUSED" | "UNREACHABLE";
+
+/**
+ * NETOPIA checks the API key before it reads anything else: a wrong key gets 401 or 403, and a key it accepts gets a
+ * JSON answer (for an empty payment id, error 99 "Invalid ntpID"). The request names no payment, so it changes nothing.
+ */
+export async function probeApiKey(baseUrl: string, apiKey: string, posSignature: string, send: typeof fetch): Promise<KeyProbe> {
+  let status: number;
+  try {
+    const response = await send(`${baseUrl}/operation/status`, {
+      method: "POST",
+      headers: { authorization: apiKey, "content-type": "application/json" },
+      body: JSON.stringify({ posID: posSignature, ntpID: "", orderID: "" }),
+    });
+    await response.body?.cancel();
+    status = response.status;
+  } catch {
+    return "UNREACHABLE";
+  }
+  if (status === 401 || status === 403) return "REFUSED";
+  return status >= 200 && status < 300 ? "ACCEPTED" : "UNREACHABLE";
+}
+
 /** The check command's NETOPIA lines (spec §2.17.3), for this tool's own run: never a secret. */
 async function check(session: SandboxSession, output: SandboxOutput): Promise<number> {
   const lines = [`✓ NETOPIA ${session.environment} at ${session.baseUrl}`, "✓ POS signature in NETOPIA's pattern"];
   for (const key of session.trustedKeys) {
     lines.push(`✓ trusted key ${key.fingerprint}${key.fingerprint === publishedIpnKeyFingerprint() ? " (NETOPIA's published key)" : ""}`);
   }
-  let accepted = false;
-  try {
-    await session.payments(DEFAULT_REQUEST_FACTS).status({ orderId: newToolOrderId(), providerPaymentId: null });
-    accepted = true;
-  } catch (error) {
-    const code = paymentErrorCode(error);
-    accepted = code === "PAYMENT_CONFIGURATION_REFUSED";
-    if (!accepted) lines.push(code === "PAYMENT_CREDENTIALS_REFUSED" ? "✗ NETOPIA refused the API key" : `✗ NETOPIA could not be asked (${codeOf(error)})`);
-  }
+  const probe = await session.probeKey();
+  if (probe === "REFUSED") lines.push("✗ NETOPIA refused the API key");
+  if (probe === "UNREACHABLE") lines.push("✗ NETOPIA could not be asked");
+  const accepted = probe === "ACCEPTED";
   if (accepted) lines.push("✓ NETOPIA accepts the API key");
   output.stdout(`${lines.join("\n")}\n`);
   return accepted ? 0 : 1;
@@ -409,6 +429,7 @@ export async function openProductionSession(): Promise<SandboxSession> {
     exchanges, trustedKeys: Object.freeze(keys.map((key) => Object.freeze({ fingerprint: key.fingerprint }))),
     payments: (facts: NetopiaRequestFacts) => createNetopiaPaymentsForRecording(
       { baseUrl: group.netopiaApiBaseUrl, apiKey, posSignature: group.netopiaPosSignature }, { fetch: recordingFetch }, facts),
+    probeKey: () => probeApiKey(group.netopiaApiBaseUrl, apiKey, group.netopiaPosSignature, fetch),
     insertToolOrder: (row) => repository.withTransaction((client) => repository.insertToolOrder(client, row)),
     toolOrder: async (orderId) => {
       const row = await repository.toolOrder(pool, orderId);
