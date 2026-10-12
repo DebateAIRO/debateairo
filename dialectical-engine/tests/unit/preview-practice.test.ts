@@ -1095,7 +1095,9 @@ describe("practice debate: --call-concurrency and the parallel stats", () => {
     for (const text of ["", "12/3", "12/3/default=50/4", "0/3/default=50", "65/3/default=50", "12/0/default=50", "12/17/default=50",
       "12/3/deepinfra=150", "12/3/default=0", "12/3/default=1001", "12/3/default=50,default=60", "12/3/Default=50",
       "12/3/default=5x", "12/ 3/default=50", "1.5/3/default=50", "012/3/default=50", "+12/3/default=50", "12/3/default=50,",
-      "12/3/default", "12/3/default==50", "12/3/=50,default=1", "1e1/3/default=50", "12/3/default=-1"]) {
+      "12/3/default", "12/3/default==50", "12/3/=50,default=1", "1e1/3/default=50", "12/3/default=-1",
+      // Final review T14: a "__proto__" pair is a key the register's parser sees (and refuses), never a silent no-op.
+      "12/3/__proto__=5,default=50", "12/3/default=50,__proto__=5"]) {
       let caught: unknown = null;
       try { parsePracticeCallConcurrency(text); } catch (error) { caught = error; }
       expect(caught, text).toBeInstanceOf(PracticeRefusal);

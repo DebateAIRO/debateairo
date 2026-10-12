@@ -32,12 +32,15 @@ export function parsePracticeCallConcurrency(text: string): CallConcurrencyPolic
   if (parts.length !== 3) return refuse();
   const [perDebate, perModelPerDebate, vendors] = parts as [string, string, string];
   if (!WHOLE.test(perDebate) || !WHOLE.test(perModelPerDebate)) return refuse();
-  const perModelPerRunner: Record<string, number> = {};
+  // Built from entries (Object.fromEntries), never by assignment: a "__proto__" pair then becomes an own key the
+  // register's parser sees and refuses, instead of an assignment to the prototype that silently drops the pair.
+  const entries: Array<[string, number]> = [];
   for (const pair of vendors.split(",")) {
     const match = /^([^=]+)=([^=]+)$/u.exec(pair);
-    if (match === null || !WHOLE.test(match[2]!) || Object.hasOwn(perModelPerRunner, match[1]!)) return refuse();
-    perModelPerRunner[match[1]!] = Number(match[2]);
+    if (match === null || !WHOLE.test(match[2]!) || entries.some(([vendor]) => vendor === match[1]!)) return refuse();
+    entries.push([match[1]!, Number(match[2])]);
   }
+  const perModelPerRunner: Record<string, number> = Object.fromEntries(entries);
   try {
     return callConcurrencyPolicyFromValue({ kind: "CALL_CONCURRENCY_POLICY", perDebate: Number(perDebate),
       perModelPerDebate: Number(perModelPerDebate), perModelPerRunner });

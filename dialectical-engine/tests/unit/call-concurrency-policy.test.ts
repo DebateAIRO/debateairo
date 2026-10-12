@@ -20,6 +20,14 @@ describe("callConcurrencyPolicy row", () => {
   ])("refuses %j", (value) => {
     expect(() => callConcurrencyPolicyFromValue(value)).toThrow("CALL_CONCURRENCY_POLICY_INVALID");
   });
+  // Final review T14: a "__proto__" vendor key (an own key, as JSON.parse and Object.fromEntries make it) is refused,
+  // never silently dropped by the record schema.
+  it("refuses a __proto__ vendor key, from JSON text or from entries", () => {
+    const fromJson = JSON.parse('{"kind":"CALL_CONCURRENCY_POLICY","perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"__proto__":5,"default":50}}') as unknown;
+    expect(() => callConcurrencyPolicyFromValue(fromJson)).toThrow("CALL_CONCURRENCY_POLICY_INVALID");
+    const fromEntries = { ...valid, perModelPerRunner: Object.fromEntries([["default", 50], ["__proto__", 5]]) };
+    expect(() => callConcurrencyPolicyFromValue(fromEntries)).toThrow("CALL_CONCURRENCY_POLICY_INVALID");
+  });
   it("absent means one call at a time per debate", () => {
     expect(effectiveCallConcurrency({ state: "ABSENT" })).toEqual({ perDebate: 1, perModelPerDebate: 1,
       perModelPerRunner: { default: 1000 } });

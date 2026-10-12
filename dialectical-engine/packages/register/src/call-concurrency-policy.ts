@@ -41,6 +41,10 @@ export function callConcurrencyPolicyFromValue(value: unknown): CallConcurrencyP
   const parsed = schema.safeParse(value);
   if (!parsed.success) return invalid();
   const { perDebate, perModelPerDebate, perModelPerRunner } = parsed.data;
+  // The record schema silently drops a "__proto__" key (an own key, as JSON.parse makes it): every vendor key the value
+  // names must survive the parse, so such a key is refused rather than ignored (final review T14).
+  const named = (value as { perModelPerRunner: object }).perModelPerRunner;
+  if (Object.keys(named).length !== Object.keys(perModelPerRunner).length) return invalid();
   return Object.freeze({
     perDebate,
     perModelPerDebate,
