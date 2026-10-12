@@ -4,7 +4,7 @@
  *
  * The contract is `docs/architecture/01-decisions/ADR-0032-cookie-notice-acknowledgement-and-storage-inventory.md`
  * (which supersedes decisions 1, 2, 3 and 5 of ADR-0021); the requirements are SPEC-v2 R06
- * and R08 of mission `cookie-compliance`. DebateAI stores only strictly necessary items, so
+ * and R08 of mission `cookie-compliance`. Dialectical Engine stores only strictly necessary items, so
  * the notice asks for no consent: pressing its acknowledgement records that the visitor has
  * seen it, and nothing in the product reads that record except the notice itself.
  */

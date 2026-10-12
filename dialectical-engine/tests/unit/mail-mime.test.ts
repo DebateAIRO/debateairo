@@ -23,7 +23,7 @@ const BASE = Object.freeze({
 describe("P17 MIME assembly", () => {
   it("keeps an ASCII subject as it is and encodes any other in words of at most 75 characters", () => {
     expect(encodeHeaderText("Your Plus plan is active")).toBe("Your Plus plan is active");
-    const subject = "Ваш план Plus активен — спасибо, что выбрали DebateAI для своих дебатов";
+    const subject = "Ваш план Plus активен — спасибо, что выбрали Dialectical Engine для своих дебатов";
     const encoded = encodeHeaderText(subject);
     expect(encoded).toMatch(/^=\?UTF-8\?B\?/);
     for (const word of encoded.split(" ")) expect(word.length).toBeLessThanOrEqual(75);

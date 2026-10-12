@@ -23,7 +23,7 @@ const customer = (overrides: Partial<SaleRecord["customer"]> = {}): SaleRecord["
 });
 const sale = (chargeId: string, overrides: Partial<SaleRecord["customer"]> = {}): SaleRecord => ({
   chargeId, transactionId: "9001", issuedOn: new Date("2026-10-01T22:30:00Z"), currency: "USD", customer: customer(overrides),
-  lines: [{ description: "DebateAI Plus, octombrie 2026", netMicros: 20_000_000, taxMicros: 4_200_000, taxRateBasisPoints: 2100 }],
+  lines: [{ description: "Dialectical Engine Plus, octombrie 2026", netMicros: 20_000_000, taxMicros: 4_200_000, taxRateBasisPoints: 2100 }],
   taxCode: "saas", evidence: { billingCountry: "RO", ipAddress: "203.0.113.10", bankCountry: "RO" }, processor: "netopia"
 });
 
@@ -48,14 +48,14 @@ describe("P5 — SmartBill invoices against the fake", () => {
       issueDate: "2026-10-02",
       mentions: "debateai-charge:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
       client: { name: "Ion Popescu", vatCode: "0000000000000", isTaxPayer: false, country: "Romania", county: "Cluj", city: "Cluj-Napoca", email: "person@example.test" },
-      products: [{ name: "DebateAI Plus, octombrie 2026", quantity: 1, price: 24.2, currency: "USD", isTaxIncluded: true, taxName: "Normala", taxPercentage: 21, isService: true }]
+      products: [{ name: "Dialectical Engine Plus, octombrie 2026", quantity: 1, price: 24.2, currency: "USD", isTaxIncluded: true, taxName: "Normala", taxPercentage: 21, isService: true }]
     });
   });
 
   it("sends the charged gross, so SmartBill's own base and VAT come out at the quoted cents (a half-cent case)", async () => {
     // 12.50 net at 21 % is 2.625; the quote (fakeTaxMicros, half up) charged 2.63, so the card paid 15.13.
     const halfCent = { ...sale("a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"),
-      lines: [{ description: "DebateAI Plus, upgrade", netMicros: 12_500_000, taxMicros: 2_630_000, taxRateBasisPoints: 2100 }] };
+      lines: [{ description: "Dialectical Engine Plus, upgrade", netMicros: 12_500_000, taxMicros: 2_630_000, taxRateBasisPoints: 2100 }] };
     const issued = await issuer.issue(halfCent);
     const recorded = fake.invoices.get(issued.externalRef)!;
     expect(recorded.body).toMatchObject({ products: [{ price: 15.13, isTaxIncluded: true, taxPercentage: 21 }] });
@@ -65,7 +65,7 @@ describe("P5 — SmartBill invoices against the fake", () => {
   it("refuses a tax more than half a cent from net × rate, or more than one line, before calling SmartBill", async () => {
     const before = fake.requestTimes.length;
     const off = { ...sale("a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3"),
-      lines: [{ description: "DebateAI Plus", netMicros: 12_500_000, taxMicros: 2_700_000, taxRateBasisPoints: 2100 }] };
+      lines: [{ description: "Dialectical Engine Plus", netMicros: 12_500_000, taxMicros: 2_700_000, taxRateBasisPoints: 2100 }] };
     await expect(issuer.issue(off)).rejects.toMatchObject({ code: "INVOICE_SERVICE_REFUSED", message: "SMARTBILL_TAX_MISMATCH" });
     const twoLines = { ...sale("a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4"), lines: [...sale("a4").lines, ...sale("a4").lines] };
     await expect(issuer.issue(twoLines)).rejects.toMatchObject({ code: "INVOICE_SERVICE_REFUSED", message: "SMARTBILL_TAX_MISMATCH" });
@@ -95,7 +95,7 @@ describe("P5 — SmartBill invoices against the fake", () => {
     const original = await issuer.issue(sale("d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"));
     const refund = { chargeId: "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4", transactionId: "9001", issuedOn: new Date("2026-10-03T10:00:00Z"),
       currency: "USD" as const, refundTotalMicros: 24_200_000, original: { documentId: original.externalRef, number: original.number },
-      description: "Rambursare DebateAI Plus", processor: "netopia" as const };
+      description: "Rambursare Dialectical Engine Plus", processor: "netopia" as const };
     const storno = await issuer.storno({ ...refund, series: original.series, number: original.number });
     expect(storno.number).not.toBe(original.number);
     expect(fake.invoices.get(original.externalRef)!.reversedBy).toBe(storno.externalRef);

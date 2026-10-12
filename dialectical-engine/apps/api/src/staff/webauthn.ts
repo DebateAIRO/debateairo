@@ -61,7 +61,7 @@ export class StaffWebAuthnService {
         const persisted = await this.repository.beginWebAuthn({ ...base, purpose, challengeHash: digest(challenge), handleHash: handle(challengeHandle), rpId: this.rpId, origin: this.origin, userHandleHash: userHandle === null ? null : digest(userHandle), operationId, context, binding, scope });
         const credentials = persisted.credentials.map(c => ({ ...c, transports: [...c.transports] }));
         if (userHandle !== null)
-            return { challenge_handle: challengeHandle, options: { challenge, rp: { id: this.rpId, name: 'DebateAI staff' }, user: { id: encodeBase64url(userHandle), name: 'Staff hardware key', displayName: 'Staff hardware key' }, pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }], timeout: 300000, attestation: 'none', authenticatorSelection: { userVerification: 'required', authenticatorAttachment: 'cross-platform' }, excludeCredentials: credentials } };
+            return { challenge_handle: challengeHandle, options: { challenge, rp: { id: this.rpId, name: 'Dialectical Engine staff' }, user: { id: encodeBase64url(userHandle), name: 'Staff hardware key', displayName: 'Staff hardware key' }, pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }], timeout: 300000, attestation: 'none', authenticatorSelection: { userVerification: 'required', authenticatorAttachment: 'cross-platform' }, excludeCredentials: credentials } };
         return { challenge_handle: challengeHandle, options: { challenge, rpId: this.rpId, timeout: 300000, userVerification: 'required', allowCredentials: credentials } };
     }
     beginRegistration(base: StaffOrdinarySession, authority: StaffRegistrationAuthority): Promise<CreationOptions> {

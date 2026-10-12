@@ -7,7 +7,7 @@
  * its own, so `CookieConsent` (the ONE state machine) stays the only reader and writer of
  * `debateai.consent`.
  *
- * DebateAI stores only strictly necessary items, so the notice offers no choice and asks for
+ * Dialectical Engine stores only strictly necessary items, so the notice offers no choice and asks for
  * no consent (SPEC-v2 R01, R05): a link to the cookie policy, a button that opens the storage
  * card, and an acknowledgement — in that DOM order, the tab order DONE.md draws.
  *

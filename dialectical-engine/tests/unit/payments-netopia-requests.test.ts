@@ -21,11 +21,11 @@ const PAYER: Payer = Object.freeze({
   region: "Cluj", city: "Cluj-Napoca", postalCode: "400001", street: "Strada Exemplu 1"
 });
 const START: HostedPaymentStart = Object.freeze({
-  orderId: ORDER, amountMicros: 24_200_000, currency: "USD", description: "DebateAI Plus, one month", payer: PAYER,
+  orderId: ORDER, amountMicros: 24_200_000, currency: "USD", description: "Dialectical Engine Plus, one month", payer: PAYER,
   clientId: CLIENT, returnUrl: RETURN, notifyUrl: NOTIFY, language: "ro"
 });
 const CHARGE: SavedCardCharge = Object.freeze({
-  orderId: ORDER, amountMicros: 24_200_000, currency: "USD", description: "DebateAI Plus, one month", payer: PAYER,
+  orderId: ORDER, amountMicros: 24_200_000, currency: "USD", description: "Dialectical Engine Plus, one month", payer: PAYER,
   cardToken: createSecretToken(TOKEN_TEXT), payerIp: "203.0.113.7", returnUrl: RETURN, notifyUrl: NOTIFY, language: "ro"
 });
 const BILLING = {
@@ -33,7 +33,7 @@ const BILLING = {
   country: 642, countryName: "Romania", state: "Cluj", postalCode: "400001", details: "Strada Exemplu 1"
 };
 const CONFIG = { emailTemplate: "", notifyUrl: NOTIFY, redirectUrl: RETURN, language: "ro" };
-const HEAD = { ntpID: "", posSignature: POS, dateTime: "2026-10-06T10:00:00Z", description: "DebateAI Plus, one month", orderID: ORDER, amount: 24.2, currency: "USD" };
+const HEAD = { ntpID: "", posSignature: POS, dateTime: "2026-10-06T10:00:00Z", description: "Dialectical Engine Plus, one month", orderID: ORDER, amount: 24.2, currency: "USD" };
 const codeOf = (run: () => unknown): string => {
   try { run(); } catch (error) { if (error instanceof TypedDomainError) return error.code; throw error; }
   throw new Error("expected a refusal");

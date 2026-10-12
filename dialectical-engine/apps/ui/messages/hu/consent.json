@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Adatvédelem",
-  "consent.settings.hint": "Ez a böngésző csak azt őrzi meg, amire a DebateAI-nak a működéshez szüksége van. A teljes listát itt bármikor megtekintheti.",
+  "consent.settings.hint": "Ez a böngésző csak azt őrzi meg, amire a Dialectical Engine-nek a működéshez szüksége van. A teljes listát itt bármikor megtekintheti.",
   "consent.settings.button": "Mit tárolunk",
   "consent.bar.label": "Sütikről szóló tájékoztató",
   "consent.bar.eyebrow": "AZ ÖN ADATAI, ÁTLÁTHATÓAN",
   "consent.bar.title": "Csak a rendszer működéséhez szükséges adatokat tároljuk.",
-  "consent.bar.body": "Négy süti és négy elem a böngésző tárhelyén, mindegyik szükséges a DebateAI működéséhez. Semmi sem opcionális, és semmit sem osztunk meg másokkal.",
+  "consent.bar.body": "Négy süti és négy elem a böngésző tárhelyén, mindegyik szükséges a Dialectical Engine működéséhez. Semmi sem opcionális, és semmit sem osztunk meg másokkal.",
   "consent.bar.acknowledge": "Rendben",
   "consent.bar.whatWeStore": "Mit tárolunk",
   "consent.link.cookiePolicy": "Sütiszabályzat",

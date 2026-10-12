@@ -1,4 +1,4 @@
-# DebateAI — Warunki świadczenia usług
+# Dialectical Engine — Warunki świadczenia usług
 
 <!-- legal-chrome
 summaryTitle: W skrócie
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
-**In short.** Musisz mieć ukończone 18 lat. DebateAI tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. Twoje debaty są prywatne, chyba że je opublikujesz; po publikacji każdy może je przeczytać. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
+**In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. Twoje debaty są prywatne, chyba że je opublikujesz; po publikacji każdy może je przeczytać. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
 ## 1. Kim jesteśmy i jak się z nami skontaktować
 
-Operatorem DebateAI jest **DMS Merchandise Shop S.R.L.**, spółka zarejestrowana w Rumunii.
+Operatorem Dialectical Engine jest **DMS Merchandise Shop S.R.L.**, spółka zarejestrowana w Rumunii.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ Operatorem DebateAI jest **DMS Merchandise Shop S.R.L.**, spółka zarejestrowan
 
 Dane te są również stale dostępne w serwisie pod adresem dezbatere.ro/legal. Zawsze możesz skontaktować się z człowiekiem, a nie wyłącznie z naszym asystentem; sposób kontaktu opisano w sekcji 10.
 
-## 2. Gdzie oferujemy DebateAI
+## 2. Gdzie oferujemy Dialectical Engine
 
-Oferujemy DebateAI osobom mieszkającym w Unii Europejskiej (27 państw) i Europejskim Obszarze Gospodarczym (Norwegia, Islandia i Liechtenstein), Szwajcarii, Mołdawii, Stanach Zjednoczonych (z wyjątkiem stanu Tennessee), Kanadzie, Australii, Nowej Zelandii, Singapurze, Japonii, Korei Południowej i na Tajwanie. Nie oferujemy usługi w innych miejscach. Jeżeli mieszkasz poza tymi państwami, możesz mieć dostęp do serwisu, ale usługa nie jest do Ciebie kierowana, nie przyjmujemy od Ciebie płatności, a niniejsze Warunki i nasza Polityka prywatności nie są dostosowane do prawa Twojego państwa. Załącznik A określa zasady mające zastosowanie w każdym obsługiwanym przez nas regionie.
+Oferujemy Dialectical Engine osobom mieszkającym w Unii Europejskiej (27 państw) i Europejskim Obszarze Gospodarczym (Norwegia, Islandia i Liechtenstein), Szwajcarii, Mołdawii, Stanach Zjednoczonych (z wyjątkiem stanu Tennessee), Kanadzie, Australii, Nowej Zelandii, Singapurze, Japonii, Korei Południowej i na Tajwanie. Nie oferujemy usługi w innych miejscach. Jeżeli mieszkasz poza tymi państwami, możesz mieć dostęp do serwisu, ale usługa nie jest do Ciebie kierowana, nie przyjmujemy od Ciebie płatności, a niniejsze Warunki i nasza Polityka prywatności nie są dostosowane do prawa Twojego państwa. Załącznik A określa zasady mające zastosowanie w każdym obsługiwanym przez nas regionie.
 
 ## 3. Akceptacja niniejszych Warunków
 
@@ -58,21 +58,21 @@ Nasza **Polityka prywatności**, dostępna pod adresem dezbatere.ro/privacy, wyj
 
 Przed zawarciem z nami jakiejkolwiek umowy drogą elektroniczną interfejs przedstawia poszczególne etapy, umożliwia sprawdzenie i poprawienie wprowadzonych danych przed ich przesłaniem oraz informuje o językach, w których można zawrzeć umowę. Niniejsze Warunki są udostępniane w formie umożliwiającej ich zapisanie i wydrukowanie. Gdy kupisz płatny plan, wyślemy Ci pocztą elektroniczną zaakceptowaną wersję. Kopię możesz również otrzymać w każdej chwili na żądanie. Żadne postanowienie niniejszych Warunków nie ogranicza praw przysługujących Ci na mocy rumuńskiego lub unijnego prawa ochrony konsumentów ani prawa państwa, w którym mieszkasz, jeżeli praw tych nie można ograniczyć w drodze umowy.
 
-## 4. Kto może korzystać z DebateAI
+## 4. Kto może korzystać z Dialectical Engine
 
-Aby utworzyć konto, musisz mieć **co najmniej 18 lat**, co potwierdzasz podczas rejestracji. DebateAI nie jest kierowane do dzieci i świadomie nie udostępniamy go osobom poniżej 18. roku życia. Jeżeli dowiemy się, że konto należy do osoby poniżej 18. roku życia, zamkniemy je. Niektóre regiony wymagają więcej niż samego potwierdzenia; odpowiednie zasady regionalne określa załącznik A.
+Aby utworzyć konto, musisz mieć **co najmniej 18 lat**, co potwierdzasz podczas rejestracji. Dialectical Engine nie jest kierowane do dzieci i świadomie nie udostępniamy go osobom poniżej 18. roku życia. Jeżeli dowiemy się, że konto należy do osoby poniżej 18. roku życia, zamkniemy je. Niektóre regiony wymagają więcej niż samego potwierdzenia; odpowiednie zasady regionalne określa załącznik A.
 
-Musisz posiadać zdolność prawną do zawarcia niniejszej umowy. Jeżeli korzystasz z DebateAI w imieniu organizacji, potwierdzasz, że masz umocowanie do zaciągania w jej imieniu zobowiązań, a określenie „Ty” oznacza wówczas tę organizację.
+Musisz posiadać zdolność prawną do zawarcia niniejszej umowy. Jeżeli korzystasz z Dialectical Engine w imieniu organizacji, potwierdzasz, że masz umocowanie do zaciągania w jej imieniu zobowiązań, a określenie „Ty” oznacza wówczas tę organizację.
 
 Każdy może przeczytać opublikowaną debatę. Czytanie nie wymaga konta, lecz stanowi korzystanie z usługi i podlega sekcjom 7, 15, 16 i 18.
 
-## 5. Co robi DebateAI i czym nie jest
+## 5. Co robi Dialectical Engine i czym nie jest
 
-Przesyłasz pytanie lub twierdzenie. DebateAI przekazuje je kilku modelom AI dostarczanym przez podmioty trzecie, które tworzą wokół niego graf argumentów: twierdzenia, kontrtwierdzenia, krytyki, odwołania do dowodów, oceny oraz werdykt z przedziałem ufności. Możesz kwestionować poszczególne twierdzenia, prosić o dokładniejsze zbadanie danej kwestii oraz zdecydować, czy opublikować wynik.
+Przesyłasz pytanie lub twierdzenie. Dialectical Engine przekazuje je kilku modelom AI dostarczanym przez podmioty trzecie, które tworzą wokół niego graf argumentów: twierdzenia, kontrtwierdzenia, krytyki, odwołania do dowodów, oceny oraz werdykt z przedziałem ufności. Możesz kwestionować poszczególne twierdzenia, prosić o dokładniejsze zbadanie danej kwestii oraz zdecydować, czy opublikować wynik.
 
 **Wszystko w debacie jest generowane przez AI.** Argumenty, krytyki, odwołania do dowodów, oceny, werdykty oraz odpowiedzi asystenta wsparcia są generowane maszynowo. Mogą być błędne, niepełne, nieaktualne lub przedstawiać błędne wnioski z dużą pewnością, a także odzwierciedlać uprzedzenia obecne w modelach. Żaden człowiek nie sprawdza ich przed wyświetleniem Tobie lub opublikowaniem, a żadna wskazana z imienia i nazwiska osoba nie ponosi za nie odpowiedzialności redakcyjnej. W produkcie, na opublikowanych stronach i w eksportowanych materiałach treści generowane są oznaczone jako wygenerowane przez AI.
 
-**DebateAI nie udziela porad.** Usługa nie stanowi porady prawnej, medycznej, finansowej, podatkowej, psychologicznej, dotyczącej bezpieczeństwa ani żadnej innej porady zawodowej, a werdykt nie stanowi ustalenia faktu. Nie wykorzystuj debaty jako podstawy decyzji istotnej dla Twojego zdrowia, bezpieczeństwa, majątku, sytuacji prawnej lub dobrostanu innych osób bez sprawdzenia źródeł pierwotnych oraz, w stosownych przypadkach, konsultacji z wykwalifikowanym specjalistą. Wysoki przedział ufności oznacza, że modele uznały daną interpretację za dobrze ugruntowaną na podstawie materiałów, które przeanalizowały; nie stanowi to gwarancji jej prawdziwości.
+**Dialectical Engine nie udziela porad.** Usługa nie stanowi porady prawnej, medycznej, finansowej, podatkowej, psychologicznej, dotyczącej bezpieczeństwa ani żadnej innej porady zawodowej, a werdykt nie stanowi ustalenia faktu. Nie wykorzystuj debaty jako podstawy decyzji istotnej dla Twojego zdrowia, bezpieczeństwa, majątku, sytuacji prawnej lub dobrostanu innych osób bez sprawdzenia źródeł pierwotnych oraz, w stosownych przypadkach, konsultacji z wykwalifikowanym specjalistą. Wysoki przedział ufności oznacza, że modele uznały daną interpretację za dobrze ugruntowaną na podstawie materiałów, które przeanalizowały; nie stanowi to gwarancji jej prawdziwości.
 
 **Do czego się zobowiązujemy.** Będziemy świadczyć usługę z należytą starannością i fachowością oraz zgodnie z publikowanym przez nas opisem. Jeżeli prawo przyznaje Ci gwarancję zgodności usługi z jej opisem i przydatności do zwykłego celu, gwarancja ta ma zastosowanie i żadne postanowienie niniejszych Warunków jej nie wyłącza. Nie gwarantujemy natomiast prawidłowości żadnego konkretnego wyniku: jest to cecha wygenerowanej treści, a nie miara prawidłowego działania usługi.
 
@@ -92,19 +92,19 @@ Możesz w każdej chwili zamknąć konto w sekcji **Ustawienia → Konto**. Zamk
 
 Niniejsze zasady mają zastosowanie do przesyłanych przez Ciebie treści, sposobu korzystania z usługi oraz treści publikowanych.
 
-**Nie przesyłaj danych osobowych innych osób.** Pytaj o zagadnienia, argumenty i sprawy publiczne, a nie o możliwe do zidentyfikowania osoby prywatne. Nie podawaj nazwisk, danych kontaktowych, numerów identyfikacyjnych, wizerunku ani danych dotyczących zdrowia, finansów lub innych szczegółów pozwalających zidentyfikować daną osobę oraz nie używaj DebateAI do tworzenia materiałów, profilu lub dossier dotyczącego określonej osoby. Pytania o osoby publiczne działające w roli publicznej są dozwolone; pytania wymierzone w osobę prywatną nie są dozwolone. Jeżeli mimo to prześlesz takie dane, ponosisz za nie odpowiedzialność, a my możemy usunąć tę treść.
+**Nie przesyłaj danych osobowych innych osób.** Pytaj o zagadnienia, argumenty i sprawy publiczne, a nie o możliwe do zidentyfikowania osoby prywatne. Nie podawaj nazwisk, danych kontaktowych, numerów identyfikacyjnych, wizerunku ani danych dotyczących zdrowia, finansów lub innych szczegółów pozwalających zidentyfikować daną osobę oraz nie używaj Dialectical Engine do tworzenia materiałów, profilu lub dossier dotyczącego określonej osoby. Pytania o osoby publiczne działające w roli publicznej są dozwolone; pytania wymierzone w osobę prywatną nie są dozwolone. Jeżeli mimo to prześlesz takie dane, ponosisz za nie odpowiedzialność, a my możemy usunąć tę treść.
 
 **Twoje własne informacje wrażliwe.** Zadawane przez Ciebie pytania mogą dotyczyć Twojego zdrowia, przekonań, poglądów politycznych lub innych kwestii wrażliwych. Zgodę na takie przetwarzanie wyrażasz na osobnym ekranie przed pierwszą debatą. Jeżeli mieszkasz w miejscu, w którym obowiązują szczególne przepisy dotyczące danych o zdrowiu, załącznik A może odsyłać Cię do odrębnej informacji.
 
 **Nie przesyłaj ani nie publikuj treści niezgodnych z prawem**, w tym treści zniesławiających, podżegających do przemocy lub nienawiści, stanowiących nękanie lub groźby, przedstawiających intymny wizerunek udostępniony bez zgody, naruszających własność intelektualną lub poufność, ujawniających tajemnice handlowe, stanowiących materiał przedstawiający seksualne wykorzystywanie dzieci albo naruszających sankcje lub ograniczenia eksportowe.
 
-**Nie używaj DebateAI do wprowadzania w błąd.** Nie przedstawiaj wygenerowanych wyników jako napisanych przez człowieka, jeżeli mogłoby to wprowadzać w błąd, nie usuwaj z nich oznaczenia o wygenerowaniu przez AI ani nie używaj ich do tworzenia pozorów konsensusu, fałszywych dowodów lub podszywania się pod inne osoby.
+**Nie używaj Dialectical Engine do wprowadzania w błąd.** Nie przedstawiaj wygenerowanych wyników jako napisanych przez człowieka, jeżeli mogłoby to wprowadzać w błąd, nie usuwaj z nich oznaczenia o wygenerowaniu przez AI ani nie używaj ich do tworzenia pozorów konsensusu, fałszywych dowodów lub podszywania się pod inne osoby.
 
 **Nie atakuj usługi.** Zwykłe indeksowanie opublikowanych debat przez wyszukiwarki jest dozwolone. Inny zautomatyzowany dostęp, pozyskiwanie danych, przeszukiwanie lub masowe wydobywanie opublikowanych debat wymaga naszej pisemnej zgody. Zabronione są: obchodzenie limitów częstotliwości, mechanizmów uwierzytelniania lub kontroli publikacji; próby wydobywania promptów lub instrukcji systemowych; wstrzykiwanie promptów mające skłonić silnik do ignorowania jego ograniczeń; a także testowanie zabezpieczeń lub obciążenia bez naszej pisemnej zgody.
 
 **Nie odsprzedawaj ani nie oferuj pod inną marką** usługi oraz nie wykorzystuj jej do budowy konkurencyjnego silnika, w tym przez używanie wyników jako danych treningowych, bez naszej pisemnej zgody.
 
-**Nie używaj DebateAI do podejmowania decyzji dotyczących** zdrowia, bezpieczeństwa, praw, zatrudnienia, zdolności kredytowej, mieszkania lub statusu imigracyjnego danej osoby. Usługa nie została do tego przeznaczona, a jej wyniki nie stanowią bezpiecznej podstawy takich decyzji.
+**Nie używaj Dialectical Engine do podejmowania decyzji dotyczących** zdrowia, bezpieczeństwa, praw, zatrudnienia, zdolności kredytowej, mieszkania lub statusu imigracyjnego danej osoby. Usługa nie została do tego przeznaczona, a jej wyniki nie stanowią bezpiecznej podstawy takich decyzji.
 
 **Prawo miejscowe w miejscu publikacji.** Odpowiadasz za zapewnienie zgodności wszystkich publikowanych treści z prawem państwa, w którym się znajdujesz. Możemy ograniczać publikowanie określonych tematów w niektórych regionach.
 
@@ -132,9 +132,9 @@ Debaty są **domyślnie prywatne**. Żadna utworzona przez Ciebie treść nie je
 
 **Skutek publikacji.** Publikacja jest świadomą czynnością wymagającą odrębnego potwierdzenia. Po opublikowaniu tworzymy niezmienną migawkę debaty i udostępniamy ją do odczytu każdemu, bez konieczności posiadania konta. Wyszukiwarki mogą ją indeksować. Migawka zawiera Twój **pseudonim**, pytanie w napisanym przez Ciebie brzmieniu, drzewo argumentów, oceny, werdykt i przedział ufności, a także widoczne oznaczenie, że treść została wygenerowana przez AI. Nie zawiera Twojego adresu e-mail, zapisów sesji ani historii konta.
 
-**W praktyce skutki publikacji są nieodwracalne.** Gdy debata zostanie upubliczniona, inne osoby mogą ją czytać, cytować, utrwalać na zrzutach ekranu, archiwizować i zapisywać w pamięci podręcznej. Cofnięcie publikacji usuwa ją z DebateAI i niszczy klucz do naszej kopii, lecz nie może usunąć kopii istniejących już w innych miejscach. Nie publikuj niczego, czego nie chcesz trwale powiązać ze swoim pseudonimem.
+**W praktyce skutki publikacji są nieodwracalne.** Gdy debata zostanie upubliczniona, inne osoby mogą ją czytać, cytować, utrwalać na zrzutach ekranu, archiwizować i zapisywać w pamięci podręcznej. Cofnięcie publikacji usuwa ją z Dialectical Engine i niszczy klucz do naszej kopii, lecz nie może usunąć kopii istniejących już w innych miejscach. Nie publikuj niczego, czego nie chcesz trwale powiązać ze swoim pseudonimem.
 
-**Opublikowane debaty po zamknięciu konta.** Gdy planujesz zamknięcie konta, wybierasz, co stanie się z opublikowanymi przez Ciebie debatami. Jeśli zaznaczysz **„Usuń również moje publiczne debaty”**, podczas zamknięcia usuniemy każdą z DebateAI i zniszczymy klucz do naszej kopii, tak jak przy cofnięciu publikacji, chyba że prawo wymaga zachowania określonego elementu. Jeśli nie zaznaczysz pola, debaty pozostaną publiczne pod Twoim wycofanym pseudonimem. Kopie wykonane przez inne osoby przed usunięciem pozostają poza naszą kontrolą. Jeśli chcesz zachować dostęp do usuwanej debaty, najpierw ją pobierz.
+**Opublikowane debaty po zamknięciu konta.** Gdy planujesz zamknięcie konta, wybierasz, co stanie się z opublikowanymi przez Ciebie debatami. Jeśli zaznaczysz **„Usuń również moje publiczne debaty”**, podczas zamknięcia usuniemy każdą z Dialectical Engine i zniszczymy klucz do naszej kopii, tak jak przy cofnięciu publikacji, chyba że prawo wymaga zachowania określonego elementu. Jeśli nie zaznaczysz pola, debaty pozostaną publiczne pod Twoim wycofanym pseudonimem. Kopie wykonane przez inne osoby przed usunięciem pozostają poza naszą kontrolą. Jeśli chcesz zachować dostęp do usuwanej debaty, najpierw ją pobierz.
 
 **Zawsze możemy usunąć opublikowaną treść.** Możemy usunąć opublikowaną debatę lub ograniczyć do niej dostęp, jeżeli wymaga tego prawo, nakaże to sąd lub właściwy organ albo debata narusza niniejsze Warunki lub jest niezgodna z prawem. Żadne postanowienie niniejszej sekcji nie ogranicza naszego prawa do podjęcia działań na podstawie ważnego zgłoszenia dokonanego zgodnie z sekcją 10 ani nie stanowi obietnicy trwałej dostępności opublikowanej debaty.
 
@@ -161,7 +161,7 @@ Niezwłocznie potwierdzamy otrzymanie każdego zgłoszenia. Zgłoszenia rozpatru
 
 **Kontakt z człowiekiem.** Nasz asystent wsparcia jest systemem AI i wyraźnie o tym informuje. W każdej chwili możesz poprosić o rozmowę z człowiekiem, a każda rozmowa ze wsparciem przewiduje taką możliwość. W komunikacji z Tobą nie polegamy wyłącznie na zautomatyzowanych narzędziach.
 
-**Treści o charakterze terrorystycznym.** Treści o charakterze terrorystycznym są niezgodne z prawem i niedozwolone na DebateAI (sekcja 7). Właściwe organy w Unii Europejskiej mogą przesyłać nam nakazy usunięcia na podstawie rozporządzenia (UE) 2021/784 na punkt kontaktowy wskazany w sekcji 1. Po otrzymaniu takiego nakazu usuwamy treść albo blokujemy do niej dostęp we wszystkich państwach UE w ciągu jednej godziny. Informujemy osobę, która opublikowała treść, że została ona usunięta, a na jej żądanie — także o przyczynach i sposobie zakwestionowania nakazu, chyba że organ uzna, że bezpieczeństwo publiczne wymaga zachowania tajemnicy przez ograniczony czas. Zgodnie z wymogami rozporządzenia przechowujemy usunięte treści i powiązane z nimi dane przez sześć miesięcy, aby umożliwić weryfikację usunięcia i jego odwrócenie, jeżeli było nieprawidłowe. Osoba, która opublikowała treść, może zakwestionować nakaz przed sądami państwa, którego organ go wydał, oraz skorzystać z naszej procedury składania skarg. Żaden organ nie nałożył na nas obowiązku podjęcia szczególnych środków przeciwdziałających treściom o charakterze terrorystycznym na podstawie rozporządzenia; jeżeli którykolwiek to zrobi, opiszemy tutaj te środki, w tym wszelkie narzędzia zautomatyzowane.
+**Treści o charakterze terrorystycznym.** Treści o charakterze terrorystycznym są niezgodne z prawem i niedozwolone na Dialectical Engine (sekcja 7). Właściwe organy w Unii Europejskiej mogą przesyłać nam nakazy usunięcia na podstawie rozporządzenia (UE) 2021/784 na punkt kontaktowy wskazany w sekcji 1. Po otrzymaniu takiego nakazu usuwamy treść albo blokujemy do niej dostęp we wszystkich państwach UE w ciągu jednej godziny. Informujemy osobę, która opublikowała treść, że została ona usunięta, a na jej żądanie — także o przyczynach i sposobie zakwestionowania nakazu, chyba że organ uzna, że bezpieczeństwo publiczne wymaga zachowania tajemnicy przez ograniczony czas. Zgodnie z wymogami rozporządzenia przechowujemy usunięte treści i powiązane z nimi dane przez sześć miesięcy, aby umożliwić weryfikację usunięcia i jego odwrócenie, jeżeli było nieprawidłowe. Osoba, która opublikowała treść, może zakwestionować nakaz przed sądami państwa, którego organ go wydał, oraz skorzystać z naszej procedury składania skarg. Żaden organ nie nałożył na nas obowiązku podjęcia szczególnych środków przeciwdziałających treściom o charakterze terrorystycznym na podstawie rozporządzenia; jeżeli którykolwiek to zrobi, opiszemy tutaj te środki, w tym wszelkie narzędzia zautomatyzowane.
 
 **Poważne zagrożenie dla życia lub bezpieczeństwa.** Jeżeli uzyskamy informację wskazującą na popełnienie przestępstwa związanego z zagrożeniem życia lub bezpieczeństwa danej osoby, zawiadomimy właściwe organy.
 
@@ -183,7 +183,7 @@ Sekcje 8 (w zakresie treści już opublikowanych), 15, 16 i 18 zachowują moc po
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI oferuje plan bezpłatny. Dostępny będzie płatny plan **Premium**, który odblokowuje pełną listę modeli i umożliwia samodzielne ustawianie wskaźników debaty.
+Dialectical Engine oferuje plan bezpłatny. Dostępny będzie płatny plan **Premium**, który odblokowuje pełną listę modeli i umożliwia samodzielne ustawianie wskaźników debaty.
 
 **Przed dokonaniem płatności** bezpośrednio nad przyciskiem płatności wyświetlamy: plan; łączną cenę z uwzględnieniem należnego podatku; okres rozliczeniowy; informację, że plan odnawia się automatycznie do czasu anulowania; datę zakończenia ewentualnego bezpłatnego okresu próbnego i kwotę, która zostanie następnie pobrana; oraz sposób anulowania. Potwierdzasz warunki odnowienia, zaznaczając odrębne pole. Przycisk ma treść **Subskrybuj i zapłać** (po rumuńsku *Comandă cu obligație de plată*). Przekazujemy Ci na trwałym nośniku potwierdzenie zawierające te same informacje, niniejsze Warunki oraz formularz odstąpienia.
 
@@ -211,11 +211,11 @@ Jeżeli mieszkasz w innym miejscu, załącznik A określa prawo odstąpienia lub
 
 ## 14. Zmiany usługi i niniejszych Warunków
 
-**Zmiany usługi.** Stale rozwijamy DebateAI, a rutynowe ulepszenia, poprawki i zmiany listy modeli są wprowadzane bez powiadomienia. Jeżeli dokonujemy zmiany wykraczającej poza utrzymanie działania usługi zgodnie z opisem, robimy to wyłącznie z jednego z następujących powodów: w celu wykonania obowiązku prawnego lub regulacyjnego; w reakcji na problem dotyczący bezpieczeństwa lub nadużycia; ponieważ dostawca modelu zmienia, ogranicza lub wycofuje model bądź funkcję, od których zależymy; w celu dostosowania się do środowiska technicznego pozostającego poza naszą kontrolą; albo w celu dodania, ulepszenia lub wycofania funkcji w sposób, który nie powoduje po Twojej stronie dodatkowych kosztów.
+**Zmiany usługi.** Stale rozwijamy Dialectical Engine, a rutynowe ulepszenia, poprawki i zmiany listy modeli są wprowadzane bez powiadomienia. Jeżeli dokonujemy zmiany wykraczającej poza utrzymanie działania usługi zgodnie z opisem, robimy to wyłącznie z jednego z następujących powodów: w celu wykonania obowiązku prawnego lub regulacyjnego; w reakcji na problem dotyczący bezpieczeństwa lub nadużycia; ponieważ dostawca modelu zmienia, ogranicza lub wycofuje model bądź funkcję, od których zależymy; w celu dostosowania się do środowiska technicznego pozostającego poza naszą kontrolą; albo w celu dodania, ulepszenia lub wycofania funkcji w sposób, który nie powoduje po Twojej stronie dodatkowych kosztów.
 
 Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmianie. Jeżeli zmiana ma więcej niż nieznaczny negatywny wpływ na Twój dostęp do usługi lub korzystanie z niej, możesz bezpłatnie rozwiązać umowę w terminie **30 dni** od otrzymania informacji lub wejścia zmiany w życie — w zależności od tego, która z tych dat jest późniejsza — a my zwrócimy wszelkie kwoty zapłacone z góry za niewykorzystany okres.
 
-**Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z DebateAI po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
+**Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
 
 ## 15. Odpowiedzialność
 
@@ -231,15 +231,15 @@ Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmiani
 
 ## 16. Własność intelektualna
 
-Sama usługa — oprogramowanie, silnik, metoda oceny, interfejs, nazwy DebateAI i DebateAIRO oraz nasze logo — należy do nas lub naszych licencjodawców. Niniejsze Warunki udzielają Ci pozwolenia na korzystanie z usługi, a nie prawa własności do niej.
+Sama usługa — oprogramowanie, silnik, metoda oceny, interfejs, nazwy Dialectical Engine i DebateAIRO oraz nasze logo — należy do nas lub naszych licencjodawców. Niniejsze Warunki udzielają Ci pozwolenia na korzystanie z usługi, a nie prawa własności do niej.
 
-Możesz cytować opublikowane debaty i zamieszczać do nich linki z podaniem DebateAI jako źródła oraz linkiem do oryginalnej strony. Masowe kopiowanie, systematyczne powielanie publicznego korpusu oraz wykorzystywanie opublikowanych debat jako danych treningowych bez naszej pisemnej zgody jest zabronione.
+Możesz cytować opublikowane debaty i zamieszczać do nich linki z podaniem Dialectical Engine jako źródła oraz linkiem do oryginalnej strony. Masowe kopiowanie, systematyczne powielanie publicznego korpusu oraz wykorzystywanie opublikowanych debat jako danych treningowych bez naszej pisemnej zgody jest zabronione.
 
-Sekcja 8 reguluje kwestie Twoich treści i status wygenerowanych wyników. Jeżeli uważasz, że treść zamieszczona w DebateAI narusza Twoją własność intelektualną, skorzystaj ze ścieżki zgłoszeniowej opisanej w sekcji 10.
+Sekcja 8 reguluje kwestie Twoich treści i status wygenerowanych wyników. Jeżeli uważasz, że treść zamieszczona w Dialectical Engine narusza Twoją własność intelektualną, skorzystaj ze ścieżki zgłoszeniowej opisanej w sekcji 10.
 
 ## 17. Dane osobowe
 
-Sposób przetwarzania przez nas danych osobowych określa **Polityka prywatności**, dostępna pod adresem dezbatere.ro/privacy. Wyjaśnia ona, jakie dane zbieramy, jaka podstawa prawna ma zastosowanie do każdego celu, jak długo przechowujemy poszczególne dane, kto je otrzymuje, jakie przekazywanie danych ma miejsce oraz jak wykonywać swoje prawa. W tym miejscu należy również wskazać trzy kwestie. Sekcja 7 wymaga, aby w pytaniach nie podawać danych osobowych innych osób; jeżeli je podasz, odpowiadasz za to, a my możemy usunąć treść. Jeżeli debata opublikowana w DebateAI zawiera Twoje dane osobowe, możesz zażądać ich usunięcia bez posiadania konta (sekcja 9). Ponadto przechowujemy zapis akceptacji przez Ciebie niniejszych Warunków — wersję, czas i dane techniczne sesji — jako dowód zawarcia umowy, zgodnie z Polityką prywatności.
+Sposób przetwarzania przez nas danych osobowych określa **Polityka prywatności**, dostępna pod adresem dezbatere.ro/privacy. Wyjaśnia ona, jakie dane zbieramy, jaka podstawa prawna ma zastosowanie do każdego celu, jak długo przechowujemy poszczególne dane, kto je otrzymuje, jakie przekazywanie danych ma miejsce oraz jak wykonywać swoje prawa. W tym miejscu należy również wskazać trzy kwestie. Sekcja 7 wymaga, aby w pytaniach nie podawać danych osobowych innych osób; jeżeli je podasz, odpowiadasz za to, a my możemy usunąć treść. Jeżeli debata opublikowana w Dialectical Engine zawiera Twoje dane osobowe, możesz zażądać ich usunięcia bez posiadania konta (sekcja 9). Ponadto przechowujemy zapis akceptacji przez Ciebie niniejszych Warunków — wersję, czas i dane techniczne sesji — jako dowód zawarcia umowy, zgodnie z Polityką prywatności.
 
 ## 18. Prawo właściwe i sądy rozpatrujące spory
 
@@ -277,7 +277,7 @@ Część główna niniejszych Warunków została opracowana z myślą o Tobie. P
 
 ### A.2 Stany Zjednoczone
 
-**Tennessee.** Nie oferujemy DebateAI osobom mieszkającym w stanie Tennessee.
+**Tennessee.** Nie oferujemy Dialectical Engine osobom mieszkającym w stanie Tennessee.
 
 **Zawiadomienia i usuwanie treści.** Intymny wizerunek udostępniony bez zgody można zgłosić e-mailem na adres abuse@dezbatere.ro, bez posiadania konta; zostanie on usunięty w ciągu 48 godzin od otrzymania ważnego żądania. Skargi dotyczące praw autorskich należy zgłaszać w sposób opisany w sekcji 10.
 
