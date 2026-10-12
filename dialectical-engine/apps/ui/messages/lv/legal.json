@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Līdz 30 minūtēm",
   "legal.cookies.mfaRecovery.life": "Līdz 299 sekundēm",
   "legal.cookies.social.life": "Līdz 5 minūtēm",
-  "legal.cookies.phoneDraft.life": "15 minūtes vai līdz agrākai dzēšanai"
+  "legal.cookies.phoneDraft.life": "15 minūtes vai līdz agrākai dzēšanai",
+  "legal.cookies.exportPending.purpose": "Saglabā e-pastā saņemto eksporta saiti šajā cilnē, lai varētu pierakstīties un mēģināt vēlreiz.",
+  "legal.cookies.exportLinkOutcome.purpose": "Atceras, kurš lejupielādes saites ziņojums jārāda šajā cilnē.",
+  "legal.cookies.exportPending.life": "Līdz cilnes aizvēršanai, izrakstīšanai, jaunai saitei, pirmajai veiksmīgajai lejupielādei vai nederīgas saites vai nepareiza konta rezultātam",
+  "legal.cookies.exportLinkOutcome.life": "Līdz cilnes aizvēršanai, izrakstīšanai vai jaunai saitei"
 }

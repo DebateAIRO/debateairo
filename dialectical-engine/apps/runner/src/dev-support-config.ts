@@ -31,7 +31,7 @@ export const DEVELOPMENT_SUPPORT_CONFIGURATION = Object.freeze({
 } satisfies Readonly<Record<SupportConfigurationKey,unknown>>);
 
 const DEVELOPMENT_SUPPORT_SOURCE_REF =
-  "DEV-SUPPORT-HERMES-GLM-5.3-FLASH#support-only-binding" as const;
+  "DEV-SUPPORT-CLAUDE-HAIKU-5.5#support-only-binding" as const;
 
 function currentBinding(status: NonNullable<SupportConfigurationStatus>): Readonly<{
   enabled: boolean;

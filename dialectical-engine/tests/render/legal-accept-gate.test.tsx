@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     revokeAllSessions: vi.fn(),
     stepUp: vi.fn(),
     readAccountErasure: vi.fn(),
+    readDataExportStatus: vi.fn(),
     scheduleAccountErasure: vi.fn(),
     cancelAccountErasure: vi.fn(),
     claimLegacyRuns: vi.fn(),
@@ -85,6 +86,7 @@ beforeEach(() => {
   for (const method of Object.values(mocks.client)) method.mockReset();
   mocks.client.listSessions.mockResolvedValue({ sessions: [] });
   mocks.client.readAccountErasure.mockRejectedValue(new Error("offline"));
+  mocks.client.readDataExportStatus.mockResolvedValue({ status: "NONE" });
   mocks.client.readAccountEmail.mockRejectedValue(new Error("offline"));
   const container = document.createElement("div");
   document.body.append(container);
@@ -293,6 +295,8 @@ describe("which signed-in pages the accept screen covers (paid plans L4)", () =>
     expect(document.querySelector("#legal-gate-title")).toBeNull();
     expect(mocks.client.getLegalStatus).not.toHaveBeenCalled();
     expect(document.querySelector("#account-deletion-heading")?.textContent).toBe("Delete account");
+    expect(document.querySelector("#export-heading")).not.toBeNull();
+    expect(mocks.client.readDataExportStatus).toHaveBeenCalledTimes(1);
     expect(document.querySelector("#consent-privacy-heading")?.textContent).toContain("Privacy");
     expect(document.querySelector("#active-sessions-heading")).not.toBeNull();
     expect([...document.querySelectorAll("button")].filter((node) => node.textContent === "Sign out")).toHaveLength(1);

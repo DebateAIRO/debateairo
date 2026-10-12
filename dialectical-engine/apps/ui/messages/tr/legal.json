@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "En fazla 30 dakika",
   "legal.cookies.mfaRecovery.life": "En fazla 299 saniye",
   "legal.cookies.social.life": "En fazla 5 dakika",
-  "legal.cookies.phoneDraft.life": "15 dakika veya daha erken silinene kadar"
+  "legal.cookies.phoneDraft.life": "15 dakika veya daha erken silinene kadar",
+  "legal.cookies.exportPending.purpose": "E-postayla gelen dışa aktarma bağlantısını oturum açma ve yeniden deneme için bu sekmede tutar.",
+  "legal.cookies.exportLinkOutcome.purpose": "Bu sekmede hangi indirme bağlantısı iletisinin gösterileceğini hatırlar.",
+  "legal.cookies.exportPending.life": "Sekme kapanana, oturum kapatılana, yeni bağlantı açılana, ilk başarılı indirme yapılana veya geçersiz bağlantı ya da yanlış hesap sonucu alınana kadar",
+  "legal.cookies.exportLinkOutcome.life": "Sekme kapanana, oturum kapatılana veya yeni bağlantı açılana kadar"
 }

@@ -63,7 +63,7 @@ export type DevelopmentAuthDataPlaneReceipt = Readonly<{
   migrations: "APPLIED";
   principals: "ATTESTED";
   register: DevelopmentDeploymentRegisterMachineReceiptV1;
-  supportConfiguration: "HERMES_GLM_5_3_FLASH";
+  supportConfiguration: "CLAUDE_HAIKU_5_5";
   secrets: "ATTESTED";
   mailCapture: "ATTESTED";
 }>;
@@ -157,7 +157,7 @@ export async function startDevelopmentAuthDataPlane(
       migrations: "APPLIED",
       principals: "ATTESTED",
       register: registerReceipt,
-      supportConfiguration: "HERMES_GLM_5_3_FLASH",
+      supportConfiguration: "CLAUDE_HAIKU_5_5",
       secrets: "ATTESTED",
       mailCapture: "ATTESTED"
     } as const);

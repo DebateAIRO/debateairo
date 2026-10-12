@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Upp till 30 minuter",
   "legal.cookies.mfaRecovery.life": "Upp till 299 sekunder",
   "legal.cookies.social.life": "Upp till 5 minuter",
-  "legal.cookies.phoneDraft.life": "15 minuter eller tills tidigare radering"
+  "legal.cookies.phoneDraft.life": "15 minuter eller tills tidigare radering",
+  "legal.cookies.exportPending.purpose": "Sparar exportlänken från e-postmeddelandet i den här fliken för inloggning och nya försök.",
+  "legal.cookies.exportLinkOutcome.purpose": "Minns vilket meddelande om nedladdningslänken som ska visas i den här fliken.",
+  "legal.cookies.exportPending.life": "Tills fliken stängs, du loggar ut, en ny länk öppnas, den första nedladdningen lyckas eller länken bedöms ogiltig eller tillhör fel konto",
+  "legal.cookies.exportLinkOutcome.life": "Tills fliken stängs, du loggar ut eller en ny länk öppnas"
 }

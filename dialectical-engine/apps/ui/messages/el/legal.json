@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Έως 30 λεπτά",
   "legal.cookies.mfaRecovery.life": "Έως 299 δευτερόλεπτα",
   "legal.cookies.social.life": "Έως 5 λεπτά",
-  "legal.cookies.phoneDraft.life": "15 λεπτά ή έως την προηγούμενη διαγραφή"
+  "legal.cookies.phoneDraft.life": "15 λεπτά ή έως την προηγούμενη διαγραφή",
+  "legal.cookies.exportPending.purpose": "Διατηρεί τον σύνδεσμο εξαγωγής από το email σε αυτή την καρτέλα για σύνδεση και νέα προσπάθεια.",
+  "legal.cookies.exportLinkOutcome.purpose": "Θυμάται ποιο μήνυμα για τον σύνδεσμο λήψης θα εμφανιστεί σε αυτή την καρτέλα.",
+  "legal.cookies.exportPending.life": "Έως το κλείσιμο της καρτέλας, την αποσύνδεση, έναν νέο σύνδεσμο, την πρώτη επιτυχή λήψη ή αποτέλεσμα μη έγκυρου συνδέσμου ή λάθος λογαριασμού",
+  "legal.cookies.exportLinkOutcome.life": "Έως το κλείσιμο της καρτέλας, την αποσύνδεση ή έναν νέο σύνδεσμο"
 }

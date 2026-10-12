@@ -652,7 +652,7 @@ describe("check", () => {
     expect(calls).toBe(0);
     expect(rows).toMatchObject([{ failure_cause: "JUDGE_NOT_CONFIGURED", judge_provider_ref: null, judge_model_id: null, judge_call_count: 0 }]);
   });
-  it.each([["development:hermes-glm-5.3-flash", "z-ai/glm-5.3-flash"], ["vendor:acme", "Acme-Large_2.1+beta"]])(
+  it.each([["development:claude-haiku-5.5", "claude-haiku-5-5"], ["vendor:acme", "Acme-Large_2.1+beta"]])(
     "a configured identifier pair %s / %s is a judge", async (providerRef, modelId) => {
       const c = await import("../../apps/api/src/publication-check/check.js");
       const { bindJudgeAnswer } = await import("../support/hs-s02-judge-stub.js");

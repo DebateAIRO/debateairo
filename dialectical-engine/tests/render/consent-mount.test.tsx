@@ -30,7 +30,7 @@ import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type:
  * S01-S40 pins the EVENT, which is the helper's. `onDismiss` is the exact
  * callback `useModalSurface` will invoke; the double below records the props the
  * machine passes and then renders the REAL card, so every other assertion in
- * this file — the scrim, the eight rows, the footer labels — is still made
+ * this file — the scrim, the twenty rows, the footer labels — is still made
  * against the shipped component.
  */
 const recorder = vi.hoisted(() => ({ props: [] as { onDismiss: () => void }[] }));
@@ -359,7 +359,7 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     act(() => opener!.click());
 
     expect(card(), "the same card opens").not.toBeNull();
-    expect(card()!.querySelectorAll(".consentCatRow").length, "the eight items").toBe(18);
+    expect(card()!.querySelectorAll(".consentCatRow").length, "the twenty items").toBe(20);
     expect(raw(), "opening the card writes nothing").toBe(before);
 
     // One panel, mounted once, in the page the SPEC names.

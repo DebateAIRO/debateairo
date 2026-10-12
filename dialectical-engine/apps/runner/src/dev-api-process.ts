@@ -240,6 +240,7 @@ function validateExactEnvironment(
       postgresPort
     );
     assertLocalDatabaseUrl(values.ERASURE_DATABASE_URL!, "debateai_dev_erasure", postgresPort);
+    assertLocalDatabaseUrl(values.DATA_EXPORT_DATABASE_URL!, "debateai_dev_data_export", postgresPort);
     assertLocalDatabaseUrl(
       values.EVALUATOR_DEV_MENU_DATABASE_URL!,
       "debateai_dev_evaluator_api",

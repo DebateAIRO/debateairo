@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.3 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/privacy/versions · Duomenų valdytojas: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
-**In short.** Renkame tai, ko reikia paskyrai, ir tai, ką nusprendžiate įvesti. Jūsų klausimai perduodami mūsų Registre išvardytiems DI paslaugų teikėjams; jie nenaudojami modeliams mokyti. Debatai yra privatūs, nebent juos paskelbiate. Ištrynus paskyrą sunaikinami jūsų privačių duomenų raktai; planuodami ištrynimą pasirenkate, ar bus pašalinti ir paskelbti debatai, ar jie liks vieši su jūsų nebenaudojamu slapyvardžiu. Su mumis galite susisiekti adresu privacy@dezbatere.ro, o debatuose paminėti asmenys gali prašyti pašalinti duomenis ir neturėdami paskyros.
+**In short.** Renkame tai, ko reikia paskyrai, ir tai, ką nusprendžiate įvesti. Jūsų klausimai perduodami mūsų Registre išvardytiems DI paslaugų teikėjams; jie nenaudojami modeliams mokyti. Mūsų prieglobos paslaugų teikėjas jūsų paskyrą ir debatus saugo Londone, Jungtinėje Karalystėje; 5 skyriuje nurodyta, kur dar siunčiami jūsų duomenys. Debatai yra privatūs, nebent juos paskelbiate. Ištrynus paskyrą sunaikinami jūsų privačių duomenų raktai; planuodami ištrynimą pasirenkate, ar bus pašalinti ir paskelbti debatai, ar jie liks vieši su jūsų nebenaudojamu slapyvardžiu. Su mumis galite susisiekti adresu privacy@dezbatere.ro, o debatuose paminėti asmenys gali prašyti pašalinti duomenis ir neturėdami paskyros.
 
 ## 1. Kas atsako už jūsų duomenis
 
@@ -95,6 +95,8 @@ Mes jūsų neprofiliuojame, nenaudojame jūsų duomenų reklamai ir jų neparduo
 
 **Kiti gavėjai.** Be DI paslaugų teikėjų, duomenis mums tvarko šie duomenų tvarkytojai. Mūsų prieglobos paslaugų teikėjas OVHcloud talpina paslaugą ir užtikrina jos veikimą savo duomenų centre Londone, Jungtinėje Karalystėje. Europos Komisija nusprendė, kad Jungtinė Karalystė užtikrina tinkamą asmens duomenų apsaugą (sprendimas dėl tinkamumo galioja iki 2031 m. gruodžio), todėl šiam perdavimui papildomų apsaugos priemonių nereikia. Cloudflare pristato mūsų puslapius, perduoda duomenų srautą tarp jūsų ir paslaugos ir atlieka robotų patikrą (2 skyrius); tai JAV bendrovė, sertifikuota pagal ES ir JAV duomenų privatumo programą (EU–US Data Privacy Framework), o jos sutartyje su mumis kaip atsarginė priemonė papildomai numatytos ES standartinės sutarčių sąlygos. Su paskyra susijusius el. laiškus siunčia Amazon Simple Email Service pagal mūsų sutartį su Amazon Web Services EMEA SARL Liuksemburge; kai Amazon tvarko šiuos duomenis Jungtinėse Amerikos Valstijose, perdavimas grindžiamas ES standartinėmis sutarčių sąlygomis, įtrauktomis į Amazon duomenų tvarkymo sąlygas. Mokėjimai vykdomi per mūsų mokėjimo paslaugų teikėją NETOPIA Payments, pradėjus taikyti mokamus planus. Kiekvienas jų veikia pagal mūsų dokumentuotus nurodymus, vadovaudamasis duomenų tvarkymo sutartimi, kurioje numatytos 28 straipsnyje reikalaujamos apsaugos priemonės. Neleidžiame jokiam duomenų tvarkytojui naudoti jūsų duomenų savais tikslais. Jei teikėjas taip darytų, jis būtų savarankiškas duomenų valdytojas, ir mes jam jūsų duomenų nesiunčiame.
 
+**Kur yra jūsų duomenys.** Jūsų paskyra ir debatai saugomi Jungtinėje Karalystėje, mūsų prieglobos paslaugų teikėjo serveriuose Londone. Cloudflare perduoda srautą per savo tinklą, o Amazon su paskyra susijusius el. laiškus gali tvarkyti Jungtinėse Amerikos Valstijose. Kiekvienas DI paslaugų teikėjas gautą tekstą tvarko tose šalyse, kurias jam nurodo Registras, dažniausiai Jungtinėse Amerikos Valstijose.
+
 **Valdžios institucijos.** Asmens duomenis atskleidžiame teismams, reguliavimo ar teisėsaugos institucijoms, kai to reikalauja įstatymai, ir jus informuojame, nebent įstatymai mums tai draudžia.
 
 ## 6. Paskelbimas ir matomumas
@@ -148,12 +150,12 @@ Bet kuria iš šių teisių galite pasinaudoti nemokamai parašę **privacy@dezb
 
 | Teisė | Ką ji reiškia čia |
 | --- | --- |
-| **Teisė susipažinti** (Art. 15) | Mūsų turimų jūsų asmens duomenų kopija ir ši informacija. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Teisė susipažinti** (Art. 15) | Mūsų turimų jūsų asmens duomenų kopija ir ši informacija. Nustatymuose pasirinkite Eksportuoti duomenis: parengiame ZIP failą su JSON failais ir vienu bet kurioje naršyklėje atveriamu puslapiu, o el. paštu atsiunčiame atsisiuntimo nuorodą, kuri galioja 24 valandas ir veikia tik prisijungus prie savo paskyros. |
 | **Teisė ištaisyti duomenis** (Art. 16) | Nustatymuose ištaisykite savo el. pašto ar atkūrimo el. pašto adresą. Dėl Sąlygose nurodytų priežasčių jūsų slapyvardžio pakeisti negalima; galite uždaryti paskyrą ir atidaryti naują |
 | **Teisė reikalauti ištrinti duomenis** (Art. 17) | Bet kada debatų puslapyje ištrinkite privačius debatus. Uždarykite paskyrą Nustatymuose; 7 skyriuje tiksliai paaiškinta, ką tai reiškia. Paprašykite pašalinti paskelbtus debatus, kuriuose yra jūsų duomenų, nepriklausomai nuo to, ar esate jų autorius |
 | **Teisė apriboti duomenų tvarkymą** (Art. 18) | Paprašykite sustabdyti konkrečių duomenų tvarkymą, kol bus išspręstas dėl jų kilęs ginčas |
 | **Teisė nesutikti** (Art. 21) | Nesutikite, kad duomenys būtų tvarkomi remiantis teisėtais interesais — 4 skyriuje aprašytas saugumo ir audito duomenų tvarkymas — ir mes sustabdysime tvarkymą, nebent galėsime įrodyti įtikinamas priežastis. Bet kada nesutikite su rinkodara, ir ją nutrauksime |
-| **Teisė į duomenų perkeliamumą** (Art. 20) | Jūsų debatai ir paskyros duomenys įprastai naudojamu, kompiuterio skaitomu formatu. \[Pending: same export as Access.\] Jūsų sukurtas neasmeninis turinys, pavyzdžiui, jūsų klausimai, pasibaigus sutarčiai jūsų prašymu grąžinamas jums |
+| **Teisė į duomenų perkeliamumą** (Art. 20) | Jūsų debatai ir paskyros duomenys įprastai naudojamu, kompiuterio skaitomu formatu. Naudokite Nustatymų funkciją Eksportuoti duomenis: ZIP faile yra jūsų duomenys kompiuterio skaitomuose JSON failuose ir vienas skaitomas puslapis; el. paštu atsiųsta nuoroda galioja 24 valandas ir veikia tik prisijungus prie savo paskyros. Jūsų sukurtas neasmeninis turinys, pavyzdžiui, jūsų klausimai, pasibaigus sutarčiai jūsų prašymu grąžinamas jums |
 | **Sutikimo atšaukimas** (Art. 7(3)) | Atšaukite rinkodaros sutikimą bet kuriame el. laiške arba Nustatymuose; atšaukite sutikimą tvarkyti neskelbtinus duomenis uždarydami paskyrą Nustatymuose (tokių duomenų galite ir neįtraukti arba ištrinti debatus, kuriuose jie yra). Atšaukimas neturi įtakos jau atliktam tvarkymui |
 | **Skundo pateikimas** | Rumunijos priežiūros institucijai **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukareštas, <anspdcp@dataprotection.ro>, arba šalies, kurioje gyvenate, institucijai. Norėtume, kad pirmiausia kreiptumėtės į mus |
 
@@ -174,7 +176,7 @@ Dialectical Engine skirta suaugusiesiems. Registruodamiesi patvirtinate, kad jum
 ## 13. Slapukai
 
 
-Dialectical Engine naudoja 18 elementų – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik Dialectical Engine: 13 slapukų ir 5 įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. **Slapukų politikoje** adresu dezbatere.ro/cookies jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita.
+Dialectical Engine naudoja 20 elementų – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik Dialectical Engine: 13 slapukų ir 7 įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. **Slapukų politikoje** adresu dezbatere.ro/cookies jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita.
 
 | Pavadinimas | Tipas | Paskirtis | Trukmė |
 |---|---|---|---|
@@ -196,6 +198,8 @@ Dialectical Engine naudoja 18 elementų – visi jie yra griežtai būtini jūs�
 | `debateai.languageOffer.dismissed` | Seanso saugykla | Įsimena šiam skirtukui, kad atsisakėte pasiūlymo parodyti debatus kita kalba. | Kol uždarysite skirtuką |
 | `debateai.support.conversation.v2` | Seanso saugykla | Laiko jūsų pokalbį su pagalbos pokalbių langu ekrane, kol skirtukas atidarytas. Jis ištrinamas, kai šiame skirtuke kas nors prisijungia arba atsijungia. | Kol uždarysite skirtuką |
 | `debateai.phone-completion-draft.v1` | Seanso saugykla | Nebaigtas klausimas telefono veiksmo metu; pašalinamas pasikeitus sesijai, atsijungus ar pasikeitus savininkui | 15 minučių arba iki ankstesnio pašalinimo |
+| `debateai.exportPending` | Seanso saugykla | Šiame skirtuke saugo el. paštu atsiųstą eksporto nuorodą prisijungimui ir pakartotiniam bandymui. | Iki skirtuko uždarymo, atsijungimo, naujos nuorodos, pirmo sėkmingo atsisiuntimo arba netinkamos nuorodos ar kitos paskyros rezultato |
+| `debateai.exportLinkOutcome` | Seanso saugykla | Prisimena, kurį atsisiuntimo nuorodos pranešimą rodyti šiame skirtuke. | Iki skirtuko uždarymo, atsijungimo arba naujos nuorodos |
 
 Jokia kita šalis per Dialectical Engine nerenka informacijos apie jūsų veiklą internete laikui bėgant ir įvairiose svetainėse.
 
@@ -229,7 +233,7 @@ Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą
 
 ### B.4 Australija ir Naujoji Zelandija
 
-**Australija.** Jūsų asmeninės informacijos gavėjai užsienyje yra Registre nurodyti DI paslaugų teikėjai ir duomenų tvarkytojai, esantys Jungtinėse Amerikos Valstijose ir Europos Sąjungoje; imamės pagrįstų veiksmų užtikrinti, kad jie tvarkytų šią informaciją laikydamiesi Australijos privatumo principų. **Automatizuoti sprendimai:** nuo 2026 m. gruodžio 10 d. šioje politikoje nurodomos kompiuterių programų priimamų sprendimų, darančių reikšmingą poveikį jūsų teisėms ar interesams, rūšys — tokių sprendimų nėra; įverčiai ir verdiktai susiję su argumentais, o ne su jumis — ir juose naudojama asmeninė informacija. Skundus galima teikti **Australijos informacijos komisaro biurui**. **Naujoji Zelandija.** Mūsų privatumo pareigūnas yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Kai jūsų asmeninę informaciją renkame netiesiogiai — nes kitas naudotojas įtraukė ją į klausimą — šia politika ir 11 skyriumi pateikiame jums pranešimą. Informaciją Registre nurodytiems DI paslaugų teikėjams atskleidžiame kaip savo atstovams pagal sutartis, kuriose reikalaujama lygiaverčių apsaugos priemonių. Skundus galima teikti **Privatumo komisaro biurui**.
+**Australija.** Jūsų asmeninės informacijos gavėjai užsienyje yra 5 skyriuje nurodyti duomenų tvarkytojai, įskaitant mūsų prieglobos paslaugų teikėją Londone, Jungtinėje Karalystėje, ir Registre nurodyti DI paslaugų teikėjai. Jie yra Jungtinėje Karalystėje, Jungtinėse Amerikos Valstijose ir Europos Sąjungoje, o Registras nurodo kiekvieno DI paslaugų teikėjo šalis; imamės pagrįstų veiksmų užtikrinti, kad jie tvarkytų šią informaciją laikydamiesi Australijos privatumo principų. **Automatizuoti sprendimai:** nuo 2026 m. gruodžio 10 d. šioje politikoje nurodomos kompiuterių programų priimamų sprendimų, darančių reikšmingą poveikį jūsų teisėms ar interesams, rūšys — tokių sprendimų nėra; įverčiai ir verdiktai susiję su argumentais, o ne su jumis — ir juose naudojama asmeninė informacija. Skundus galima teikti **Australijos informacijos komisaro biurui**. **Naujoji Zelandija.** Mūsų privatumo pareigūnas yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Kai jūsų asmeninę informaciją renkame netiesiogiai — nes kitas naudotojas įtraukė ją į klausimą — šia politika ir 11 skyriumi pateikiame jums pranešimą. Informaciją Registre nurodytiems DI paslaugų teikėjams atskleidžiame kaip savo atstovams pagal sutartis, kuriose reikalaujama lygiaverčių apsaugos priemonių. Skundus galima teikti **Privatumo komisaro biurui**.
 
 ### B.5 Šveicarija
 

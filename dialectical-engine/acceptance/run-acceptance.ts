@@ -378,9 +378,11 @@ export async function runAcceptanceCeremony(
     // and a proven independence receipt, all read from the recorded run.
     const fairDebate = await assertFairDebate(database.pool, accepted.run_ref);
     const [modelCalls, lineage, reviewLineage, runFacts, probeEvidence, envelopeState] = await Promise.all([
+      // Preview retry fix (spec 2026-10-11 §1.2 (d)): a provably unbilled refusal is a REFUSED row no
+      // attempt ceiling counts, so the proofs compare only the attempts the ceiling bounds.
       database.pool.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM ledger.ledger_entry
-         WHERE run_id=$1 AND action_kind='MODEL_CALL'`,
+         WHERE run_id=$1 AND action_kind='MODEL_CALL' AND outcome <> 'REFUSED'`,
         [accepted.run_ref]
       ),
       database.pool.query<{
