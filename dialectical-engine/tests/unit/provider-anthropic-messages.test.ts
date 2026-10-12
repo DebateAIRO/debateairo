@@ -180,9 +180,16 @@ describe("PR B — the Anthropic request on the wire", () => {
       expect(() => anthropicMessagesRequestBody({ model: MODEL, maxTokens: 10, thinkingLevel: "DEFAULT_ONLY", messages }))
         .toThrowError(expect.objectContaining({ code: PROVIDER_PACKET_UNSUPPORTED }));
     }
-    expect(() => anthropicMessagesRequestBody({
-      model: MODEL, maxTokens: 10, thinkingLevel: "low", messages: [{ role: "user", content: "q" }]
-    })).toThrowError(expect.objectContaining({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" }));
+    // Spec 2026-10-12 §4.4: the reviewed Haiku menu (low, medium, high) is carried; xhigh and max are not reviewed.
+    for (const thinkingLevel of ["low", "medium", "high"]) {
+      expect(JSON.parse(anthropicMessagesRequestBody({ model: MODEL, maxTokens: 10, thinkingLevel, messages: [{ role: "user", content: "q" }] })))
+        .toMatchObject({ output_config: { effort: thinkingLevel } });
+    }
+    for (const thinkingLevel of ["xhigh", "max", "none", "default"]) {
+      expect(() => anthropicMessagesRequestBody({
+        model: MODEL, maxTokens: 10, thinkingLevel, messages: [{ role: "user", content: "q" }]
+      })).toThrowError(expect.objectContaining({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" }));
+    }
   });
 });
 
@@ -502,8 +509,10 @@ describe("PR B — construction refuses what would fail on every call", () => {
       .toThrowError(new TypeError("PROVIDER_GATEWAY_CREDENTIAL_INVALID"));
     expect(() => new AnthropicMessagesProviderGateway({ ...base, thinking: { parameter: "x_thinking_level", levels: ["high"] } }))
       .toThrowError(new TypeError("PROVIDER_GATEWAY_THINKING_INVALID"));
-    expect(() => new AnthropicMessagesProviderGateway({ ...base, thinking: { parameter: "reasoning_effort", levels: ["low", "high"] } }))
+    expect(() => new AnthropicMessagesProviderGateway({ ...base, thinking: { parameter: "reasoning_effort", levels: ["xhigh", "high"] } }))
       .toThrowError(new TypeError("PROVIDER_GATEWAY_THINKING_INVALID"));
+    expect(() => new AnthropicMessagesProviderGateway({ ...base, authorizationHeader: "fixture-key",
+      thinking: { parameter: "reasoning_effort", levels: ["low", "medium", "high"] } })).not.toThrow();
     for (const credential of ["", "key with space", "key\twith-tab", "k\u00e9y", "key\n"]) {
       expect(() => new AnthropicMessagesProviderGateway({ ...base, authorizationHeader: credential }))
         .toThrowError(new TypeError("PROVIDER_GATEWAY_CREDENTIAL_INVALID"));
@@ -576,7 +585,7 @@ describe("PR B — the target and the register pick the wire", () => {
   it("refuses a native target declaring a level its wire cannot carry, or the relay spelling", () => {
     const configured = [{ providerRef: "vendor:anthropic", maker: "Anthropic", adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND }];
     for (const thinking of [
-      { thinking_parameter: "reasoning_effort", thinking_levels: ["low", "high"] },
+      { thinking_parameter: "reasoning_effort", thinking_levels: ["max", "high"] },
       { thinking_parameter: "x_thinking_level", thinking_levels: ["high"] }
     ]) {
       expect(() => parseProviderDiscoveryTargets(targetJson(thinking), configured))

@@ -75,7 +75,8 @@ class RequestModeTests(unittest.TestCase):
 
     def test_other_body_fields_model_effort_and_token_bound_remain_refused(self):
         invalid = [{**body(), 'arbitrary': True}, {**body(), 'response_format': {'type': 'json_object'}, 'extra': True},
-                   {**body(), 'reasoning_effort': 'low'},
+                   # Spec 2026-10-12 section 4.5: off GLM's reviewed menu (high, low); GLM would run 'medium' at its maximum.
+                   {**body(), 'reasoning_effort': 'medium'},
                    {**body(), 'max_tokens': 163841}, {**body(), 'max_tokens': True},
                    {**body(), 'max_tokens': 1.5}, {**body(), 'max_tokens': 0}]
         for value in invalid:

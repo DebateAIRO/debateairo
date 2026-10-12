@@ -401,14 +401,29 @@ def sampling_reviewed(profile, sampling):
             and len({pair[0] for pair in sampling}) == len(sampling))
 
 
+def efforts_reviewed(profile, efforts):
+    """Spec 2026-10-12 section 4.5: a non-empty tuple of distinct words from the profile's effort_words
+    (None there is no effort member at all). Membership is checked first, so an unhashable item is refused, not raised."""
+    words = getattr(profile, 'effort_words', ())
+    return (type(efforts) is tuple and 1 <= len(efforts) <= len(words)
+            and all(word is None or type(word) is str for word in efforts)
+            and all(word in words for word in efforts) and len(set(efforts)) == len(efforts))
+
+
+def effort_word(value):
+    """Spec 2026-10-12 section 4.5: a level as the records name it, 'default' for no effort member (None)."""
+    return 'default' if value is None else value
+
+
 def row_reviewed(profile, model, row):
     """A row the gate will price with: positive ceiling prices under MAX_PRICE_USD_PER_M, a sane
-    bound, a known effort rule, a well-formed sampling (if any), a valid path, and a full-size
-    request that reserves no more than the profile's per-call cap."""
+    bound, a reviewed thinking-level menu (efforts_reviewed), a well-formed sampling (if any), a valid path, and a
+    full-size request that reserves no more than the profile's per-call cap."""
     return bool(isinstance(model, str) and MODEL_ID_PATTERN.fullmatch(model) and '..' not in model
                 and getattr(row, 'model', None) == model and isinstance(row.maker, str) and 1 <= len(row.maker) <= 64
                 and prices_ok(profile.ceiling_prices(row)) and helper.path_valid(profile.path_for(row))
-                and _int_in(row.output_bound, 1, MAX_OUTPUT_BOUND) and row.effort in ('high', None)
+                and _int_in(row.output_bound, 1, MAX_OUTPUT_BOUND)
+                and efforts_reviewed(profile, getattr(row, 'efforts', None))
                 and type(row.json_object) is bool and sampling_reviewed(profile, getattr(row, 'sampling', None))
                 and worst_case_reservation(profile, row) <= profile.per_call_cap_usd)
 
@@ -936,6 +951,9 @@ def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now,
     hold, unlock. A halted gate refuses AUTHORITY_HALTED here, before anything is reserved. A call that
     asked for a cache write says so in its entry (cache_write_requested: '5m')."""
     prices = (row.input_usd_per_m, row.output_usd_per_m) if prices is None else prices
+    # Spec 2026-10-12 section 4.5: the entry records the level the BODY carried ('default' for no member).
+    # validate_request accepted these exact bytes for this GO's profile, so they parse.
+    requested_effort = effort_word(helper.PROFILES[go['provider']].body_effort(json.loads(input['requestBody'])))
     with TeamStore(private) as store:
         control = store.control()
         if control['state'] == 'halted':
@@ -980,7 +998,7 @@ def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now,
                                        'provider': go['provider'], 'model': row.model, 'maker': row.maker,
                                        'reserve_input_usd_per_m': str(prices[0]), 'reserve_output_usd_per_m': str(prices[1]),
                                        'output_bound': row.output_bound,
-                                       'requested_effort': row.effort or 'none', 'peer_uid': peer_uid,
+                                       'requested_effort': requested_effort, 'peer_uid': peer_uid,
                                        **({'cache_write_requested': '5m'} if cache_write else {}),
                                        **({'probe': True} if probe else {})}
         data = helper.encode_json(ledger)
@@ -1441,7 +1459,7 @@ def probe_summary(observed, profile):
     billed = accounting.get('billed_output_tokens')
     completion = billed if billed is not None else accounting.get('completion_tokens')
     return {'status': 'probed', 'provider': profile.name, 'model': row.model, 'maker': row.maker,
-            'sent': {'max_tokens': max_tokens, 'effort': row.effort or 'none',
+            'sent': {'max_tokens': max_tokens, 'effort': effort_word(row.efforts[0]),  # The row's default (probe_body).
                      **({'sampling': dict(row.sampling)} if getattr(row, 'sampling', None) else {})},
             # A model that bills past max_tokens would overrun its reservation in real use: do not enable it.
             'completion_within_max_tokens': completion <= max_tokens if type(completion) is int else None,

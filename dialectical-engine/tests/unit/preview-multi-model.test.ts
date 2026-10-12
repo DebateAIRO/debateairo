@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  OpenAICompatibleProviderGateway, PREVIEW_MODEL_ROWS_BY_PROVIDER, PREVIEW_REVIEWED_PROVIDER_REFS, assertPreviewProviderTargets,
+  OpenAICompatibleProviderGateway, PREVIEW_MODEL_ROWS as PREVIEW_MODEL_ROWS_ALL, PREVIEW_MODEL_ROWS_BY_PROVIDER, PREVIEW_REVIEWED_PROVIDER_REFS, assertPreviewProviderTargets,
   createPreviewGuardedFetch, observeProviderTarget, parsePreviewProviderTestConfig, parseProviderDiscoveryTargets,
   previewModelRow, previewNanoUsdText, previewPlanTierRosters, previewProbeControls, previewReservationNanoUsd,
   previewTargetJsonRow, providerTargetGatewayControls, withPreviewProviderCallPolicy, previewTargetGatewayControls,
@@ -44,9 +44,9 @@ const parse = (value: unknown) => parsePreviewProviderTestConfig(JSON.stringify(
 const messages = [{ role: "user", content: "synthetic" }];
 
 type FixtureRow = { model: string; maker: string; input_usd_per_m: string; output_usd_per_m: string; output_bound: number;
-  effort: "high" | null; json_object: boolean; sampling: Record<string, number> | null; worst_case_reservation_usd: string;
+  efforts: string[]; json_object: boolean; sampling: Record<string, number> | null; worst_case_reservation_usd: string;
   input_nano_usd_per_token: number; output_nano_usd_per_token: number };
-/** The gate's parity file (schema preview-model-rows-v1): the Python gate asserts the same rows. */
+/** The gate's parity file (schema preview-model-rows-v2): the Python gate asserts the same rows. */
 const fixtureFile = JSON.parse(readFileSync(new URL("./fixtures/preview-model-rows.json", import.meta.url), "utf8")) as {
   schema: string; provider: string; reservation: { overhead_bytes: number; worst_case_request_bytes: number; per_call_cap_usd: string };
   rows: FixtureRow[] };
@@ -70,10 +70,10 @@ function recordingFetch() {
 describe("the reviewed rows equal the shared parity file (contract A §1, §3)", () => {
   it("has exactly the four rows, in order, field for field", () => {
     expect(PREVIEW_MODEL_ROWS.map(row => ({ model: row.model, maker: row.maker, input_usd_per_m: row.inputUsdPerM,
-      output_usd_per_m: row.outputUsdPerM, output_bound: row.outputBound, effort: row.effort, json_object: row.jsonObject,
+      output_usd_per_m: row.outputUsdPerM, output_bound: row.outputBound, efforts: row.efforts, json_object: row.jsonObject,
       sampling: row.sampling ?? null })))
       .toEqual(fixtureRows.map(({ worst_case_reservation_usd: _worst, input_nano_usd_per_token: _in, output_nano_usd_per_token: _out, ...row }) => row));
-    expect(fixtureFile.schema).toBe("preview-model-rows-v1");
+    expect(fixtureFile.schema).toBe("preview-model-rows-v2");
     expect(fixtureFile.provider).toBe("deepinfra");
     expect(fixtureFile.reservation).toEqual({ formula: expect.any(String), overhead_bytes: 2048, worst_case_request_bytes: 256 * 1024, per_call_cap_usd: "0.25" });
   });
@@ -373,11 +373,51 @@ describe("role rotation, Task 11/12: a sealed answer role may stand in for an un
   });
 });
 
+describe("reviewed thinking-level menus (spec 2026-10-12 §4.1)", () => {
+  it("each row carries its menu, first entry = default = today's request", () => {
+    expect(Object.fromEntries(PREVIEW_MODEL_ROWS_ALL.map(row => [row.model, [row.efforts, row.defaultEffort]]))).toEqual({
+      [GLM]: [["high", "low"], "high"],
+      [DEEPSEEK]: [["high", "low", "none"], "high"],
+      [MIMO]: [["default", "none"], "default"],
+      [QWEN]: [["default", "low", "medium", "none"], "default"],
+      "claude-haiku-5-5": [["high", "medium", "low"], "high"]
+    });
+  });
+  it("the guarded fetch accepts exactly the menu, and 'default' only as an absent member", async () => {
+    const accepted = [
+      { model: GLM, reasoning_effort: "low" }, { model: DEEPSEEK, reasoning_effort: "none" },
+      { model: MIMO, ...MIMO_SAMPLING, reasoning_effort: "none" }, { model: MIMO, ...MIMO_SAMPLING },
+      { model: QWEN, ...QWEN_SAMPLING, reasoning_effort: "medium" }, { model: QWEN, ...QWEN_SAMPLING }
+    ];
+    const refusedBodies = [
+      { model: GLM, reasoning_effort: "medium" }, { model: GLM, reasoning_effort: "max" }, { model: GLM, reasoning_effort: "none" },
+      { model: GLM }, { model: DEEPSEEK, reasoning_effort: "default" }, { model: MIMO, ...MIMO_SAMPLING, reasoning_effort: "low" },
+      { model: QWEN, ...QWEN_SAMPLING, reasoning_effort: "high" }, { model: DEEPSEEK, reasoning_effort: null }
+    ];
+    for (const body of accepted) {
+      const { executions, post } = recordingFetch();
+      await post({ ...body, max_tokens: 8, messages });
+      expect(executions, JSON.stringify(body)).toHaveLength(1);
+    }
+    for (const body of refusedBodies) {
+      const { executions, post } = recordingFetch();
+      await expect(post({ ...body, max_tokens: 8, messages }), JSON.stringify(body)).rejects.toThrow();
+      expect(executions).toHaveLength(0);
+    }
+  });
+  it("targets and probes keep today's single level (no server file changes)", () => {
+    expect(previewTargetJsonRow("preview:deepseek-v4-1-flash")).toMatchObject({ thinking_parameter: "reasoning_effort", thinking_levels: ["high"] });
+    expect(previewTargetJsonRow("preview:qwen-3-8-flash")).not.toHaveProperty("thinking_parameter");
+    expect(previewProbeControls({ model: GLM })).toEqual({ thinkingLevel: "high", tokenCeiling: 8192 });
+    expect(previewProbeControls({ model: MIMO })).toEqual({ tokenCeiling: 8192 });
+  });
+});
 describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 32768, its own window", () => {
   const body = (change: Record<string, unknown> = {}) => ({ model: QWEN, max_tokens: 32_768, ...QWEN_SAMPLING, messages, ...change });
   it("its reviewed row, ref and target row", () => {
     expect(previewModelRow(QWEN)).toMatchObject({ maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
-      inputNanoUsdPerToken: 113n, outputNanoUsdPerToken: 382n, outputBound: 32_768, effort: null, jsonObject: false, contextWindowTokens: 1_000_000,
+      inputNanoUsdPerToken: 113n, outputNanoUsdPerToken: 382n, outputBound: 32_768,
+      efforts: ["default", "low", "medium", "none"], defaultEffort: "default", jsonObject: false, contextWindowTokens: 1_000_000,
       sampling: QWEN_SAMPLING });
     expect(PREVIEW_REVIEWED_PROVIDER_REFS).toEqual(["preview:fixture-a", "preview:fixture-b", "preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro", "preview:qwen-3-8-flash",
       "preview:claude-haiku-5-5"]); // PR B: Anthropic's ref after DeepInfra's.
@@ -532,7 +572,7 @@ describe("reviewed sampling: a row's own sampling settings, exactly, and none on
         // The body exactly as the gateway built it before 2026-10-12: model, max_tokens, the effort member, messages,
         // and response_format only for a story JSON request on a JSON row.
         expect(text, model).toBe(JSON.stringify({ model, max_tokens: sent.max_tokens,
-          ...(row.effort === null ? {} : { reasoning_effort: row.effort }), messages: sent.messages,
+          ...(row.defaultEffort === "default" ? {} : { reasoning_effort: row.defaultEffort }), messages: sent.messages,
           ...(request === story && row.jsonObject ? { response_format: { type: "json_object" } } : {}) }));
         for (const key of Object.keys(QWEN_SAMPLING)) expect(Object.hasOwn(sent, key)).toBe(false);
       }
@@ -616,7 +656,7 @@ describe("JSON mode stays on the story calls: no debate step asks for it", () =>
         const sent = JSON.parse(text) as { max_tokens: number; messages: unknown };
         const row = previewModelRow(model)!;
         expect(text, `${model} ${role}`).toBe(JSON.stringify({ model, max_tokens: sent.max_tokens,
-          ...(row.effort === null ? {} : { reasoning_effort: row.effort }), ...(row.sampling ?? {}), messages: sent.messages }));
+          ...(row.defaultEffort === "default" ? {} : { reasoning_effort: row.defaultEffort }), ...(row.sampling ?? {}), messages: sent.messages }));
         expect(Object.hasOwn(sent, "response_format")).toBe(false);
         expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(row, Buffer.byteLength(text))));
       }

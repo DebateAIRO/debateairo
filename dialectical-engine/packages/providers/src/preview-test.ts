@@ -172,9 +172,9 @@ export function assertPreviewProviderTargets(config: PreviewTargetRosters | unde
     if (reviewed === undefined || target.model !== reviewed.model || target.maker !== reviewed.maker
       || target.baseUrl !== reviewed.baseUrl
       || (target.adapterKind ?? "openai-compatible-http") !== reviewed.adapterKind
-      || (reviewed.effort === null
+      || (reviewed.defaultEffort === "default"
         ? target.thinkingParameter !== undefined || target.thinkingLevels !== undefined
-        : target.thinkingParameter !== "reasoning_effort" || target.thinkingLevels?.length !== 1 || target.thinkingLevels[0] !== reviewed.effort)
+        : target.thinkingParameter !== "reasoning_effort" || target.thinkingLevels?.length !== 1 || target.thinkingLevels[0] !== reviewed.defaultEffort)
       || target.inputPriceMicrosPerMillionTokens !== reviewed.inputPriceMicrosPerMillion
       || target.outputPriceMicrosPerMillionTokens !== reviewed.outputPriceMicrosPerMillion
       || target.contextWindowTokens !== reviewed.contextWindowTokens
@@ -207,12 +207,13 @@ export function assertPreviewRoleGateSockets(config: PreviewTargetRosters, roleR
   }
 }
 /**
- * The probe's controls for one reviewed target: "high" only where the row has an effort switch,
- * and the generation floor, never above the row's bound. Throws for a target off the reviewed rows.
+ * The probe's controls for one reviewed target: the row's default level (spec 2026-10-12 §4.5: today's request) unless
+ * that is "default" (no member), and the generation floor, never above the row's bound. Throws for a target off the
+ * reviewed rows.
  */
-export function previewProbeControls(target: Readonly<{ model: string }>): Readonly<{ thinkingLevel?: "high"; tokenCeiling: number }> {
+export function previewProbeControls(target: Readonly<{ model: string }>): Readonly<{ thinkingLevel?: string; tokenCeiling: number }> {
   const reviewed = previewModelRow(target.model) ?? refused();
-  return Object.freeze({ ...(reviewed.effort === null ? {} : { thinkingLevel: reviewed.effort }),
+  return Object.freeze({ ...(reviewed.defaultEffort === "default" ? {} : { thinkingLevel: reviewed.defaultEffort }),
     tokenCeiling: Math.min(PREVIEW_GLM_GENERATION_TOKEN_FLOOR, reviewed.outputBound) });
 }
 /**
@@ -389,9 +390,9 @@ export function withPreviewProviderCallPolicy(
   return Object.freeze({ call(request: ProviderCallRequest) {
     // A row with no effort switch runs at the vendor default, so "DEFAULT_ONLY" asks for exactly that.
     const asksNoLevel = request.thinkingLevel === undefined
-      || (reviewed.effort === null && request.thinkingLevel === THINKING_LEVEL_DEFAULT_ONLY);
-    if (!asksNoLevel && (reviewed.effort === null || request.thinkingLevel !== config.requested_thinking_level)) {
-      throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", reviewed.effort === null
+      || (reviewed.defaultEffort === "default" && request.thinkingLevel === THINKING_LEVEL_DEFAULT_ONLY);
+    if (!asksNoLevel && (reviewed.defaultEffort === "default" || request.thinkingLevel !== config.requested_thinking_level)) {
+      throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", reviewed.defaultEffort === "default"
         ? "The private preview connection for this model has no thinking level"
         : "The private preview connection is configured for high only");
     }
@@ -404,7 +405,7 @@ export function withPreviewProviderCallPolicy(
     // row; DEFAULT_ONLY on a row without one, which the gateway treats exactly as "no level".
     // Run resilience (spec 2026-10-12, fix (b)): the step's allowance is this maker's own (`attemptScope`), so a
     // fallback that moves a call to another maker never finds the step spent by the makers it moved away from.
-    const send = () => gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
+    const send = () => gateway.call({ ...request, thinkingLevel: reviewed.defaultEffort === "default" ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
       bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1, attemptScope: "actor",
       ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
     if (storyRepair) return send();
@@ -430,10 +431,18 @@ export type PreviewBudgetPorts = Readonly<Partial<Record<PreviewProviderName, Pr
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+/** Spec 2026-10-12 §4.5: a body's effort is on the row's menu; "default" only as an absent member, never a wire word. */
+function effortOnMenu(present: boolean, value: unknown, reviewed: PreviewModelRow): boolean {
+  return present
+    ? typeof value === "string" && value !== "default" && (reviewed.efforts as readonly string[]).includes(value)
+    : reviewed.efforts.includes("default");
+}
 /**
  * Contract A §2: the DeepInfra (OpenAI) body the DeepInfra gate accepts for a row of its own. Reviewed sampling
  * (2026-10-12): a row with `sampling` requires exactly those members with exactly those numbers (a row without one
- * accepts none of them, as it accepts no other member), as the gate's DeepInfraProfile.body_valid does.
+ * accepts none of them, as it accepts no other member), as the gate's DeepInfraProfile.body_valid does. Spec
+ * 2026-10-12 §4.5: `reasoning_effort`, when present, is a word on the row's menu; absent only where the menu holds
+ * "default".
  */
 function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
   if (reviewed.provider !== "deepinfra") return false;
@@ -442,11 +451,12 @@ function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
   if (hasResponseFormat && (!reviewed.jsonObject || !isPlainObject(responseFormat)
     || Object.keys(responseFormat).length !== 1 || !Object.hasOwn(responseFormat, "type") || responseFormat.type !== "json_object")) return false;
   const sampling = Object.entries(reviewed.sampling ?? {});
-  const required = ["model", "max_tokens", "messages", ...(reviewed.effort === null ? [] : ["reasoning_effort"]),
+  const hasEffort = Object.hasOwn(body, "reasoning_effort");
+  const required = ["model", "max_tokens", "messages", ...(hasEffort ? ["reasoning_effort"] : []),
     ...sampling.map(([key]) => key)];
   return Object.keys(body).length === required.length + (hasResponseFormat ? 1 : 0)
     && required.every(key => Object.hasOwn(body, key))
-    && (reviewed.effort === null || body.reasoning_effort === reviewed.effort)
+    && effortOnMenu(hasEffort, body.reasoning_effort, reviewed)
     && sampling.every(([key, value]) => typeof body[key] === "number" && body[key] === value)
     && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
     && Array.isArray(body.messages);
@@ -479,19 +489,21 @@ function anthropicBodyAsksCacheWrite(body: Record<string, unknown>): boolean {
  * `max_tokens` (1..the row's bound), `messages` (each exactly {role, content: non-empty text},
  * roles alternating user/assistant, first and last a user turn, as the adapter builds them), an
  * optional `system` (a non-empty text, or the two blocks carrying the one cache mark:
- * anthropicSystemAccepted), and `output_config` {"effort": "high"} exactly when the row has an
- * effort switch. Nothing else, anywhere.
+ * anthropicSystemAccepted), and `output_config` exactly {"effort": <a word on the row's menu>} (spec 2026-10-12
+ * §4.5; absent only where the menu holds "default", which no Anthropic row does). Nothing else, anywhere.
  */
 function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
   if (reviewed.provider !== "anthropic") return false;
-  const required = ["model", "max_tokens", "messages", ...(reviewed.effort === null ? [] : ["output_config"])];
+  const hasEffort = Object.hasOwn(body, "output_config");
+  const required = ["model", "max_tokens", "messages", ...(hasEffort ? ["output_config"] : [])];
   const optional = Object.hasOwn(body, "system") ? 1 : 0;
   const messages = body.messages;
   const effort = body.output_config;
   return Object.keys(body).length === required.length + optional
     && required.every(key => Object.hasOwn(body, key))
     && (optional === 0 || anthropicSystemAccepted(body.system))
-    && (reviewed.effort === null || (isPlainObject(effort) && Object.keys(effort).length === 1 && effort.effort === reviewed.effort))
+    && (hasEffort ? isPlainObject(effort) && Object.keys(effort).length === 1 && effortOnMenu(true, effort.effort, reviewed)
+      : effortOnMenu(false, undefined, reviewed))
     && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
     && Array.isArray(messages) && messages.length % 2 === 1
     && messages.every((message, index) => isPlainObject(message) && Object.keys(message).length === 2

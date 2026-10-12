@@ -189,7 +189,9 @@ class ParityAndReservationTests(AnthropicTest):
                           'output_nano_usd_per_token': int(row.output_usd_per_m * 1000),
                           'cache_write_5m_input_usd_per_m': str(ANTHROPIC.settlement_steps[0].cache_write_5m_usd_per_m),
                           'cache_write_5m_input_nano_usd_per_token': int(ANTHROPIC.settlement_steps[0].cache_write_5m_usd_per_m * 1000),
-                          'output_bound': row.output_bound, 'effort': row.effort, 'json_object': row.json_object,
+                          'output_bound': row.output_bound,
+                          'efforts': ['default' if word is None else word for word in row.efforts],
+                          'json_object': row.json_object,
                           'worst_case_reservation_usd': '%.9f' % bridge.worst_case_reservation(ANTHROPIC, row),
                           'worst_case_uncached_reservation_usd': '%.9f' % bridge.reservation_for(
                               ANTHROPIC.max_request_bytes, row, ANTHROPIC.reservation_prices(row, None, ANTHROPIC.max_request_bytes))},
@@ -201,8 +203,8 @@ class ParityAndReservationTests(AnthropicTest):
                            'output_usd_per_m': str(step.output_usd_per_m)} for step in ANTHROPIC.settlement_steps],
                          parity['settlement_steps'])
         # And the independent copy these tests use.
-        self.assertEqual((row.input_usd_per_m, row.output_usd_per_m, row.output_bound, row.effort, row.json_object),
-                         (PRICE_IN, PRICE_OUT, BOUND, 'high', False))
+        self.assertEqual((row.input_usd_per_m, row.output_usd_per_m, row.output_bound, row.efforts, row.json_object),
+                         (PRICE_IN, PRICE_OUT, BOUND, ('high', 'medium', 'low'), False))
         lower, upper = ANTHROPIC.settlement_steps
         self.assertEqual((lower.input_usd_per_m, lower.cache_write_5m_usd_per_m, lower.cache_write_1h_usd_per_m,
                           lower.cache_read_usd_per_m, lower.output_usd_per_m), tuple(LOWER.values()))
@@ -963,6 +965,7 @@ class RequestShapeTests(AnthropicTest):
     def test_the_wire_contract_shape_is_accepted(self):
         go = bridge.read_go(self.gate().go_path)
         for value in (request(), without('system'), request(max_tokens=1), request(max_tokens=32768),
+                      request(output_config={'effort': 'medium'}), request(output_config={'effort': 'low'}),
                       request(messages=[{'role': 'user', 'content': 'a'}, {'role': 'assistant', 'content': 'b'},
                                         {'role': 'user', 'content': 'c'}])):
             with self.subTest(value=value):
@@ -989,7 +992,10 @@ class RequestShapeTests(AnthropicTest):
             request(messages=[]), request(messages='hi'), request(messages=['hi']),
             request(max_tokens=0), request(max_tokens=32769), request(max_tokens=True), request(max_tokens=8.0),
             request(max_tokens='8'), request(max_tokens=None), without('max_tokens'), without('messages'),
-            without('output_config'), request(output_config={'effort': 'low'}), request(output_config={'effort': 'max'}),
+            # Spec 2026-10-12 section 4.5: off the reviewed Haiku menu, or no level at all (the menu holds no None).
+            without('output_config'), request(output_config={'effort': 'max'}), request(output_config={'effort': 'xhigh'}),
+            request(output_config={'effort': 'none'}), request(output_config={'effort': 'default'}),
+            request(output_config={'effort': None}), request(output_config={'effort': ['low']}),
             request(output_config={'effort': 'high', 'budget_tokens': 1}), request(output_config={}),
             request(output_config='high'), request(output_config=None),
             request(system=[{'type': 'text', 'text': 'x'}]), request(system=7), request(system=None),
@@ -1029,7 +1035,7 @@ class RequestShapeTests(AnthropicTest):
                 self.assertFalse(ANTHROPIC.body_valid(json.loads(case['body']), ANTHROPIC.rows[HAIKU]))
 
     def test_a_row_without_effort_must_not_carry_output_config(self):
-        row = ANTHROPIC.rows[HAIKU]._replace(effort=None)
+        row = ANTHROPIC.rows[HAIKU]._replace(efforts=(None,))
         self.assertTrue(ANTHROPIC.body_valid(without('output_config'), row))
         self.assertFalse(ANTHROPIC.body_valid(request(), row))
         self.assertNotIn('output_config', ANTHROPIC.probe_body(row))
@@ -1060,6 +1066,45 @@ class RequestShapeTests(AnthropicTest):
         self.assertFalse(re.fullmatch(deepinfra.key_pattern, KEY))  # An Anthropic key in the DeepInfra gate is refused.
         self.assertFalse(re.fullmatch(deepinfra.key_pattern, 'AIza' + 'x' * 35))
         self.assertTrue(re.fullmatch(deepinfra.key_pattern, 'synthetic-key-0123456789'))
+
+
+class ThinkingLevelMenus(AnthropicTest):
+    """Spec 2026-10-12 section 4.5: the Anthropic gate accepts exactly the reviewed Haiku menu."""
+
+    def test_the_haiku_menu_and_the_profile_words(self):
+        self.assertEqual(ANTHROPIC.rows[HAIKU].efforts, ('high', 'medium', 'low'))
+        self.assertEqual(ANTHROPIC.effort_words, ('low', 'medium', 'high'))
+
+    def test_every_menu_level_is_accepted_and_nothing_else(self):
+        row = ANTHROPIC.rows[HAIKU]
+        for word in ('none', 'low', 'medium', 'high', 'max', 'xhigh', 'default', 'minimal'):
+            with self.subTest(word=word):
+                self.assertEqual(ANTHROPIC.body_valid(request(output_config={'effort': word}), row), word in row.efforts)
+        # No output_config is refused: the menu holds no None (Haiku's own default is not today's request).
+        self.assertFalse(ANTHROPIC.body_valid(without('output_config'), row))
+        for bad in (None, 1, True, ['low'], {'effort': 'low'}):
+            with self.subTest(bad=repr(bad)):
+                self.assertFalse(ANTHROPIC.body_valid(request(output_config={'effort': bad}), row))
+
+    def test_row_review_refuses_a_malformed_menu(self):
+        row = ANTHROPIC.rows[HAIKU]
+        for efforts in ((), (None,), ('none',), ('high', None), ('high', 'high'), ('xhigh',), 'high', ['high']):
+            with self.subTest(efforts=repr(efforts)):
+                self.assertFalse(bridge.row_reviewed(ANTHROPIC, HAIKU, row._replace(efforts=efforts)))
+        self.assertTrue(bridge.row_reviewed(ANTHROPIC, HAIKU, row))
+
+    def test_body_effort_and_the_probe_default(self):
+        self.assertEqual(ANTHROPIC.body_effort(request(output_config={'effort': 'low'})), 'low')
+        self.assertIsNone(ANTHROPIC.body_effort(without('output_config')))
+        self.assertIsNone(ANTHROPIC.body_effort({'output_config': 'low'}))
+        self.assertEqual(ANTHROPIC.probe_body(ANTHROPIC.rows[HAIKU])['output_config'], {'effort': 'high'})
+
+    def test_the_ledger_records_the_level_the_body_carried(self):
+        gate = self.ready()
+        for operation_id, word in (('op-low', 'low'), ('op-medium', 'medium'), ('op-high', 'high')):
+            with self.subTest(word=word):
+                self.assertEqual(self.call(gate, operation_id, value=request(output_config={'effort': word}))['status'], 200)
+                self.assertEqual(entry_of(gate, operation_id)['requested_effort'], word)
 
 
 class RemainingAndProbeTests(AnthropicTest):
