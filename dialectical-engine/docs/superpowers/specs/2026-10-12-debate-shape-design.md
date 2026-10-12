@@ -94,14 +94,17 @@ Rules the code enforces, never the AI:
   gap rounds are kept apart, so "raised independently by N makers" counts only blind items.
 - **Choose quotas.** Each chosen set must include:
   - at least one point raised by exactly one AI;
-  - the strongest `OPPOSITE_CASE` point;
-  - the `ASKER_WORRY` point, when the map has one.
+  - an `OPPOSITE_CASE` point;
+  - an `ASKER_WORRY` point, when the map has one.
 
-  When the choose reply misses a quota, the code adds the missing point by rule, ranked by "raised by most different
-  makers", and records `CHOOSE_QUOTA_FILLED`.
-- **Distinct answers.** The choose AI must name at least 2 distinct answers. When it names one, the code adds the
-  map's best-supported different candidate answer. When the map has none, it adds the negation framed by the
-  `OPPOSITE_CASE` angle, and records `ANSWERS_FILLED`.
+  The quotas apply to the whole chosen set (all answers together), and any point of the kind meets its quota. When the
+  choose reply misses a quota, the code adds the top-ranked missing point, ranked by "raised by most different makers",
+  and records `CHOOSE_QUOTA_FILLED`.
+- **Distinct answers.** The choose AI must name at least 2 distinct answers. When it names one, the code adds, in
+  this order and recording `ANSWERS_FILLED`:
+  - the map's best-supported different merged answer;
+  - else a candidate answer from an `OPPOSITE_CASE` list;
+  - else a code-owned opposite-answer template. Phase 1 has it in en/ro; Phase 2 needs every site language.
 - **Everything not chosen is kept.** Each unchosen point is stored with its makers as "also raised, not debated".
 
 ### 1.2 Fallbacks ("always an answer")
