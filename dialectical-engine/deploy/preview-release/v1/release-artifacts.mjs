@@ -20,7 +20,7 @@
 //       [--publication <publish output>] [--checker glm|deepseek --deepseek-enabled-on-gate yes] --out <file>
 //       [--role-rotation on|off] [--call-concurrency '<JSON object>']
 //       (--checker, --role-rotation and --call-concurrency only with --operation plan; publish carries the plan's choices;
-//        defaults glm, on and no call-concurrency row; --role-rotation off publishes the rotation row disabled: the preview's rollback;
+//        defaults glm, on and the base's call-concurrency row kept as it is (or none); --role-rotation off publishes the rotation row disabled: the preview's rollback;
 //        --call-concurrency '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}' publishes that row)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
@@ -419,8 +419,9 @@ async function nativePlanCommand(options, { layout, deps }) {
   // Role rotation stays on unless the operator says off for a new `plan` (publish-register-v2.ts checks it again).
   const roleRotation = options['--role-rotation'];
   if (roleRotation !== undefined && (!['on', 'off'].includes(roleRotation) || operation !== 'plan')) refuse('ARGUMENTS_REFUSED', ['--role-rotation']);
-  // No call-concurrency row unless the operator gives the policy for a new `plan`, as one JSON object
-  // (native-operator.mjs validateCallConcurrencyChoice below, and publish-register-v2.ts checks it again).
+  // The call-concurrency row changes only when the operator gives the policy for a new `plan`, as one JSON object
+  // (native-operator.mjs validateCallConcurrencyChoice below, and publish-register-v2.ts checks it again);
+  // without it the kit keeps the base version's row unchanged, or builds none if the base has none (R19).
   const concurrencyText = options['--call-concurrency'];
   if (concurrencyText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--call-concurrency']);
   let concurrencyValue;

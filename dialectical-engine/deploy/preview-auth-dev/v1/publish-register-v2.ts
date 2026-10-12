@@ -30,7 +30,8 @@
 // The operator's `roleRotation: 'off'` publishes the same row disabled (the preview's rollback: a republish).
 // Parallel calls (spec 2026-10-12 §3.1): the operator MAY also hand the kit a callConcurrencyPolicy; only then does
 // the source carry that row (an optional key, PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2). Left out (the default), the
-// source has no such row and the preview runs one call at a time per debate, as before.
+// source has no such row: a base without it stays without it (one call at a time per debate, as before), and a base
+// that holds it keeps it unchanged (controller ruling R19: the composer carries it from the base, like a base-owned row).
 // The delta now carries the old and new canonical values, so the owner reviews values, not hashes;
 // deltaSha256 binds that exact document and the approval binds deltaSha256.
 import { createHash } from 'node:crypto';
@@ -39,7 +40,7 @@ import {
   canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256,
   parseRegisterVersionText, buildConfiguredProviderSetSealedRow, buildConfiguredProviderSetDeploymentRow,
   PASSWORD_RESET_POLICY_REGISTER_ROW, BACKUP_EMAIL_POLICY_REGISTER_ROW, MFA_RECOVERY_POLICY_REGISTER_ROW,
-  answerRoleRotationPolicyRow, callConcurrencyPolicyRow, CALL_CONCURRENCY_POLICY_ROW_KEY,
+  answerRoleRotationPolicyRow, callConcurrencyPolicyRow, callConcurrencyPolicyFromValue, CALL_CONCURRENCY_POLICY_ROW_KEY,
   type BootstrapRegister, type CallConcurrencyPolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
@@ -82,7 +83,8 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
 ] as const);
 /**
  * Reviewed keys the source carries only when the operator supplies them (spec 2026-10-12 §3.1): never required,
- * never in PREVIEW_SOURCE_ROW_KEYS_V2's exact closure. A base row with such a key is still never dropped silently.
+ * never in PREVIEW_SOURCE_ROW_KEYS_V2's exact closure. A base row with such a key that the source leaves out is
+ * carried from the base unchanged (R19: a plan that does not name the value keeps the current one); it is never dropped.
  */
 export const PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 = Object.freeze([CALL_CONCURRENCY_POLICY_ROW_KEY] as const);
 
@@ -224,14 +226,18 @@ export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly Reg
   if(source.some(row=>owned.includes(row.rowKey)))fail('base-owned-row-in-source');
   if(owned.some(key=>!baseMap.has(key)))fail('base-owned-row-missing');
   if(!sourceKeysReviewed(source.map(row=>row.rowKey)))fail('source-key-list');
-  // A base row the source no longer builds is never dropped silently.
-  if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)))fail('base-row-dropped');
+  // An optional row the source leaves out keeps the base's value (R19), checked by its own parser, never in the delta.
+  const optional=PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 as readonly string[];
+  const carried=base.filter(row=>optional.includes(row.rowKey)&&!sourceMap.has(row.rowKey));
+  for(const row of carried)if(row.rowKey===CALL_CONCURRENCY_POLICY_ROW_KEY)callConcurrencyPolicyFromValue(JSON.parse(row.valueJsonText));
+  // Any other base row the source no longer builds is never dropped silently.
+  if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)&&!optional.includes(row.rowKey)))fail('base-row-dropped');
   assertProviderRows(sourceMap,'source');
   assertProviderRows(baseMap,'base');
   const staff=baseMap.get('staffAccessPolicy')!,internal=baseMap.get('internalAllowancePolicy')!;
   staffAccessPolicyFromValue(JSON.parse(staff.valueJsonText),staff.sourceRef);
   internalAllowancePolicyFromValue(JSON.parse(internal.valueJsonText),internal.sourceRef);
-  const rows=canonicalRows([...source,...owned.map(key=>baseMap.get(key)!)]);
+  const rows=canonicalRows([...source,...owned.map(key=>baseMap.get(key)!),...carried]);
   const delta:SnapshotDeltaV2[]=[];
   for(const row of source){
     const old=baseMap.get(row.rowKey);

@@ -329,11 +329,43 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     await expect(build({ ...policy, perModelPerRunner: { deepinfra: 150 } })).rejects.toThrow('CALL_CONCURRENCY_POLICY_INVALID');
   });
 
-  it('composes with or without the row, and never drops a sealed one silently', async () => {
+  it('composes with or without the row: a base without it and a plan without it give no row, as before', async () => {
     const f = await fixture();
     const given = compose(await build(policy), f.v9);
     expect(given.addedKeys).toEqual([ROTATION_KEY, CALL_CONCURRENCY_POLICY_ROW_KEY].sort((a, b) => a.localeCompare(b, 'en')));
-    expect(() => compose(f.source, [...given.rows] as Row[], '10')).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: base-row-dropped');
+    const absent = compose(f.source, f.v9);
+    expect(absent.rows.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
+    expect(absent.delta.map(entry => entry.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
+  });
+
+  it('R19: a plan without a value keeps the base version\'s row unchanged (no delta entry, never base-row-dropped)', async () => {
+    const f = await fixture();
+    const published = compose(await build(policy), f.v9);
+    const base = [...published.rows] as Row[];
+    const sealed = base.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)!;
+    const kept = compose(f.source, base, '10');
+    // The very base row, value and source reference byte for byte.
+    expect(kept.rows.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)).toEqual(sealed);
+    expect(kept.delta.map(entry => entry.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
+    // Nothing else changed either: the source on its own result is an empty delta and the same snapshot.
+    expect(kept.delta).toEqual([]);
+    expect(kept.snapshotSha256).toBe(published.snapshotSha256);
+    // A base row that does not parse is refused, never carried.
+    const broken = base.map(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY ? { ...row, valueJsonText: canonical({ ...JSON.parse(row.valueJsonText), perDebate: 65 }) } : row);
+    expect(() => compose(f.source, broken, '10')).toThrow('CALL_CONCURRENCY_POLICY_INVALID');
+  });
+
+  it('R19: a plan with a new value replaces the base version\'s row (changed in the delta); the off switch is a value', async () => {
+    const f = await fixture();
+    const base = [...compose(await build(policy), f.v9).rows] as Row[];
+    const off = { perDebate: 1, perModelPerDebate: 1, perModelPerRunner: { default: 1000 } };
+    const next = compose(await build(off), base, '10');
+    expect(next.changedKeys).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY]);
+    const entry = next.delta.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)!;
+    expect(JSON.parse(entry.oldValueJsonText!)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
+    expect(JSON.parse(entry.newValueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...off });
+    // The same value again is no change at all.
+    expect(compose(await build(policy), base, '10').delta).toEqual([]);
   });
 
   it('the native operator hands the plan\'s policy to the builder as its fifth argument, so the row is in the reviewed delta', async () => {
