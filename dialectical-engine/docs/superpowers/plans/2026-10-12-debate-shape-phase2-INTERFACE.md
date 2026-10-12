@@ -1,0 +1,100 @@
+# Debate shape Phase 2 — binding interface contract for the plan drafters
+
+Spec: docs/superpowers/specs/2026-10-12-debate-shape-design.md (§3–§6 are Phase 2). Phase 1 (packages/map + practice
+`openings`) is built on branch design/2026-10-12-debate-shape. This file fixes the NAMES every Phase 2 sub-plan uses so
+sub-plans written in parallel agree. A drafter who finds a name impossible (clash, convention) proposes the change in
+its plan's "Contract deviations" section instead of silently renaming.
+
+Sub-plans (each its own plan file, its own SDD run, in this order):
+- P2a — settings and money: register row `debateShapePolicy`, ask-contract fields, plan normalisation, start-of-debate
+  estimate + attempt ceiling + four money places, preview publish kit + hosted optional member.
+- P2b — the runner shape (needs Project 1's scheduler merged in): map stage in the runner, assigned positions, chosen
+  points, panels J + close-call extension, sparse cross-replies, adaptive/fixed rounds, scrutiny, answer length,
+  storage migration, marks, fallbacks, ledger call sites.
+- P2c — what people see: story "also raised" material + story-shapes paragraph, debate page also-raised list and
+  position titles, /new controls real (35 locales), legacy notice removed.
+- P2d — practice + proof: practice `debate` mode runs the new shape behind a throwaway-register override; integration
+  tests; the whole-debate comparison run (owners' private method; nothing about the method in the repo).
+
+## 1. Register row (P2a)
+
+- Family/key: `debateShapePolicy` (register row key), kind `"DEBATE_SHAPE_POLICY"`, `version: 1`. OPTIONAL row: absent
+  → today's shape byte for byte. Invalid → runner boot refuses with `DEBATE_SHAPE_POLICY_INVALID`.
+- Pattern to copy: `answerRoleRotationPolicy` (optional single-row family) and Project 1's `callConcurrencyPolicy`.
+- TypeScript: `DebateShapePolicy`, parser `parseDebateShapePolicy(value: unknown): DebateShapePolicy` (throws
+  `TypeError("DEBATE_SHAPE_POLICY_INVALID:<path>")`), reader `readDebateShapePolicy(register, version): DebateShapePolicy | null`.
+- Shape (start values = spec rulings S5–S8):
+
+```text
+{ kind: "DEBATE_SHAPE_POLICY", version: 1,
+  plans: { free: PlanShape, plus: PlanShape, pro: PlanShape, max: PlanShape, premium: PlanShape },
+  answerLength: { short: { words: 300, writerBound: 8192 }, standard: { words: 700, writerBound: 12288 },
+                  detailed: { words: 1500, writerBound: 16384 } } }
+PlanShape = { mapAIs: int 2..9, answers: int 2..5, graders: int 1..5, pointsPerAnswer: int 1..6, deeperTopPoints: int 1..6,
+              gapRoundsMax: int 0..3, closeCallExtraGraders: int 0..4, fixedDepthAllowed: boolean,
+              scrutiny: { deep: null | { roundsPerPoint: int 1..5, pointsPerDebate: int 1..30 },
+                          exhaustive: null | { roundsPerPoint: int 1..8, pointsPerDebate: int 1..60 },
+                          scrutinyLeverageMin: number 0..1, scrutinyWeakBelow: number 0..1 },
+              opening: "ANGLE_MAP" | "BLIND_LISTS" | "SNOWBALL" }
+```
+- Start values: free {3,3,2,3,1,1,2,false, deep null, exhaustive null, 0.05, 0.5, ANGLE_MAP};
+  plus {4,3,3,4,2,2,2,true, deep {2,6}, exhaustive {3,15}, 0.05, 0.5, ANGLE_MAP};
+  pro {5,4,3,4,2,2,2,true, …same}; max {7,4,3,4,2,2,2,true, …same}; premium = pro (fallback for unknown premium ids).
+  `opening` is filled from the Phase 1 measurement (default ANGLE_MAP = ruling S1).
+- Plan lookup: the run's plan id (FREE/PLUS/PRO/MAX) when billing is on, else tier free → `free`, premium → `premium`.
+- Sizes are capped at run time: `answers ≤ distinct makers`, `graders ≤ distinct makers − 1`, `mapAIs ≤ makers present`.
+
+## 2. Ask contract fields (P2a)
+
+In `packages/contract` ask config (today only `{ depth }`, index.ts ~137–181), all optional, strict enums:
+- `depthMode: "fixed" | "adaptive"` (default `"adaptive"`)
+- `scrutiny: "standard" | "deep" | "exhaustive"` (default `"standard"`)
+- `answerLength: "short" | "standard" | "detailed"` (default `"standard"`)
+Normalisation (API, per plan): fixed→adaptive when `fixedDepthAllowed` false; scrutiny→standard when the plan's budget
+is null; Free depth stays 2. Stored with depth in `core.run.depth_params` (JSON) as `{ depth, depthMode, scrutiny,
+answerLength }`; `readFrozenHead` returns them; missing keys read as defaults (old runs).
+
+## 3. Runner names (P2b)
+
+- New judge leg kind: `"assigned-root"`; directive text: "Author the strongest case for the answer named in
+  assigned_answer." Material fields (closed table): `question_line`, `assigned_answer`, `map_points`.
+- Support/attack legs gain the material field `consideration` (the chosen key point's claim) when the shape row is on;
+  directive sentence appended: "Build your reply on the consideration named in consideration." Closed-table change →
+  the sealed judge contract hash changes (new register version; register `policy.hashes.judge`).
+- Map call-site keys (as Phase 1): `MAP:angles`, `MAP:list:<i>`, `MAP:merge`, `MAP:gap:<k>`, `MAP:choose`.
+  Gateway role `JUDGE`, lane `served`, bound = the judge bound (preview floor 8,192).
+- Map contracts fingerprint: `mapPromptContractHash()` sealed as register `policy.hashes.map` (new key in the policy
+  hashes row; new register version).
+- Close-call extension mark: `PANEL-CLOSE-CALL-EXTENDED`; scrutiny mark: `SCRUTINY-EXTENDED`; map marks (answer-scope
+  records): `MAP_ANGLES_FALLBACK`, `MAP_MERGE_FALLBACK`, `MAP_CHOOSE_FALLBACK`, `MAP_UNAVAILABLE_TODAYS_OPENING`,
+  `ANSWERS_FILLED`, `CHOOSE_QUOTA_FILLED` — added to the kernel's `CONDITION_MARKS` (never at its tail) each with a
+  typed record.
+- Round order: breadth-first global rounds across all positions (round 1 = all positions' chosen points + cross-replies;
+  round k ≥ 2 = deeper exchanges), so δ/ε boundaries come after each full round.
+
+## 4. Storage (P2b)
+
+New migration (next free number at build time) with:
+- `core.map_item(run_id uuid, step text, item_id text, ai_ref text, maker text, origin text CHECK IN ('BLIND','GAP','SHOWN'),
+  angle_id text NULL, angle_kind text NULL, kind text CHECK IN ('POINT','ANSWER'), claim text, why text NULL, leans text NULL,
+  list_index int NULL, position int NOT NULL, PRIMARY KEY (run_id, item_id))`
+- `core.map_choice(run_id uuid PRIMARY KEY, answers jsonb, also_raised jsonb, marks jsonb, notes jsonb, opening text)`
+- Both: append-only guards, runtime grants like other core carriers, content encryption like other debate text where
+  enabled, TRUNCATE guard, erasure coverage. Read model: `readMapChoiceForRun(runId)`.
+
+## 5. What people see (P2c)
+
+- Story material: `alsoRaised: { claim: string; raisedBy: number }[]` (bounded by the story budget); story-shapes
+  common.md paragraph "Also raised" (owner-editable text; the owner picks among 3 phrasings).
+- Debate page: section "Also raised, not debated" (message keys `debate.alsoRaised.title`, `debate.alsoRaised.empty`);
+  position title "The case for {answer}, argued by {ai}" (`debate.positionTitle`); 3 phrasings offered to the owner,
+  option 1 in code.
+- /new: Depth mode (Fixed / Adaptive), Depth of scrutiny (Standard / Deep / Exhaustive), Answer length (Short /
+  Standard / Detailed) — keys under `newDebate.*`; legacy notice removed; all 35 locales (parallel Haiku translators by
+  language group + one Opus spot-check of risky locales).
+
+## 6. Practice (P2d)
+
+- Practice `debate` mode accepts `--shape-policy <file>` that adds a `debateShapePolicy` row to the THROWAWAY database's
+  register only (like Project 1's concurrency override); the report adds map marks, chosen answers count, also-raised
+  count, panel extensions, scrutiny extensions.
