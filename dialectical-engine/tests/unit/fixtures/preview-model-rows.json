@@ -46,7 +46,7 @@
       "efforts": ["default", "none"],
       "json_object": false,
       "sampling": {
-        "temperature": 1.0,
+        "temperature": 0.7,
         "top_p": 0.95
       },
       "worst_case_reservation_usd": "0.142110720"

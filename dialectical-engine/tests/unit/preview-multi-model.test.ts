@@ -28,12 +28,13 @@ const BARE_BODY = ["max" + "_tokens", "messages", "model"];
 /** Qwen's reviewed sampling (2026-10-12): Qwen's own thinking-mode settings, so its JSON does not slide into noise. */
 const QWEN_SAMPLING = { temperature: 0.6, top_p: 0.95, top_k: 20 };
 /**
- * MiMo's reviewed sampling (owner approval 2026-10-12): DeepInfra's MiMo page recommends temperature 1.0 and top_p 0.95.
+ * MiMo's reviewed sampling (owner approval 2026-10-12): DeepInfra's MiMo page recommends temperature 1.0 and top_p 0.95;
+ * the owner lowered the temperature to 0.7 the same day, after MiMo wrote 10 of 71 practice replies in another language.
  * JSON mode was tried the same day and withdrawn: when MiMo closed a Romanian quote („…) with a straight double quote,
  * DeepInfra's JSON constraint ended the string there and forced the rest into garbage, which the engine's reader
  * (INNER_QUOTE) repairs without any call when JSON mode is off. MiMo's row allows no JSON mode.
  */
-const MIMO_SAMPLING = { temperature: 1.0, top_p: 0.95 };
+const MIMO_SAMPLING = { temperature: 0.7, top_p: 0.95 };
 const DEFAULT_LEVEL = "DEFAULT_ONLY";
 const URL_COMPLETIONS = "https://api.deepinfra.com/v1/openai/chat/completions";
 const BASE = { deployment: "v3-preview", requested_thinking_level: "high",
@@ -557,7 +558,7 @@ describe("reviewed sampling: a row's own sampling settings, exactly, and none on
       const sent = JSON.parse(text) as { max_tokens: number; messages: unknown };
       // The judging (served) call and the story call alike: sampling, and no JSON mode (MiMo's row allows none).
       expect(text).toBe(JSON.stringify({ model: MIMO, max_tokens: sent.max_tokens, ...MIMO_SAMPLING, messages: sent.messages }));
-      expect(text).toContain('"temperature":1,"top_p":0.95,"messages":');
+      expect(text).toContain('"temperature":0.7,"top_p":0.95,"messages":');
       expect(Object.keys(sent)).toEqual(Object.keys(JSON.parse(mimoSent[0]!.body)));
       expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(MIMO)!, Buffer.byteLength(text))));
     }

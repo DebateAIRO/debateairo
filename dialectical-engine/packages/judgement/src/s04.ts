@@ -297,12 +297,18 @@ export function parseStructuredArtifact<T>(
 /**
  * The content classifier every judge-family call hands the gateway (author legs, review, panel): the same reading as
  * `parseStructuredArtifact`, with the repair it needed as `jsonRepair` (all-steps format robustness, 2026-10-12).
+ * Reply language (2026-10-12): `check` reads the accepted object (the step's language check, `replyLanguageCheck`);
+ * its issues refuse the reply as SCHEMA_FAILED, a JSON array of issues at machine paths, so the call's own repair asks
+ * again.
  */
 export function classifyStructuredArtifact<T>(
-  content: string, schema: z.ZodType<T>, reply?: ModelReplyFacts, options?: StructuredReadingOptions
+  content: string, schema: z.ZodType<T>, reply?: ModelReplyFacts, options?: StructuredReadingOptions,
+  check?: (value: T) => readonly unknown[]
 ): ContentClassification {
   const outcome = parseStructuredArtifact(content, schema, reply, options);
   if (outcome.kind === "PARSED") {
+    const issues = check?.(outcome.value) ?? [];
+    if (issues.length > 0) return { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
     const repair = structuredParseRepair(outcome.strategy);
     return repair === null ? { parseStatus: "PARSED", parseError: null } : { parseStatus: "PARSED", parseError: null, jsonRepair: repair };
   }

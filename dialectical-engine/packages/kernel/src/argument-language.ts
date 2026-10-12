@@ -57,7 +57,7 @@ const LATIN_FUNCTION_WORDS: Readonly<Record<KnownArgumentLanguageTag, readonly s
   cs: ["a", "ale", "by", "byl", "byla", "je", "jsou", "když", "má", "měl", "měla", "měli", "mělo", "mohou", "nebo", "pro", "protože", "se", "své", "že"],
   da: ["af", "at", "bør", "de", "den", "det", "en", "er", "for", "fordi", "ikke", "kan", "med", "når", "og", "på", "som", "til"],
   de: ["aber", "als", "das", "den", "der", "die", "ein", "eine", "für", "ist", "kann", "können", "mit", "nicht", "sollte", "sollten", "und", "weil", "wenn", "zu"],
-  en: ["and", "are", "because", "can", "for", "from", "government", "it", "of", "should", "that", "the", "their", "they", "to", "when", "with"],
+  en: ["and", "are", "be", "because", "been", "can", "could", "does", "for", "from", "government", "has", "have", "if", "it", "its", "more", "not", "of", "or", "should", "than", "that", "the", "their", "these", "they", "this", "to", "when", "which", "will", "with", "would"],
   es: ["cuando", "de", "debería", "deberían", "el", "en", "es", "la", "las", "los", "para", "porque", "pueden", "que", "sus", "una", "y"],
   et: ["aga", "et", "ja", "kas", "kui", "ning", "oma", "on", "peaks", "peaksid", "saavad", "see", "sest", "seal", "või"],
   fi: ["että", "ja", "jos", "koska", "kun", "mutta", "ne", "on", "pitäisi", "se", "tai", "voi", "voivat"],
@@ -301,7 +301,12 @@ export function detectArgumentLanguage(text: string): ArgumentLanguageDetection 
   return scriptDetection(matrix) ?? latinDetection(matrix);
 }
 
+/**
+ * Reply language (owner approval 2026-10-12): a named language is called the question's, and every language holds
+ * where the material quotes another one; the fallback already says "the same language as the question".
+ */
 export function argumentLanguageDirective(name: string): string {
   const language = name.trim() || FALLBACK.nameEn;
-  return `Write every natural-language field in ${language}. Keep JSON keys, enum tokens, JSON literals (null, true, false), and identifier-shaped values (including claim_type, basis, outcome, fatalFlags[].type, segment_id, node_refs, and served_number_refs) in English exactly as specified; never translate an identifier or literal.`;
+  const named = language === FALLBACK.nameEn ? `${language},` : `${language}, the language of the question,`;
+  return `Write every natural-language field in ${named} even where the material quotes another language. Keep JSON keys, enum tokens, JSON literals (null, true, false), and identifier-shaped values (including claim_type, basis, outcome, fatalFlags[].type, segment_id, node_refs, and served_number_refs) in English exactly as specified; never translate an identifier or literal.`;
 }

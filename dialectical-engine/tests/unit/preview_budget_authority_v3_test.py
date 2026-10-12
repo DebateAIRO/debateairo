@@ -1932,11 +1932,12 @@ class ProbeFenceTests(GateTest):
 class SamplingTests(GateTest):
     """Reviewed sampling (2026-10-12): a row may carry its own sampling settings (Qwen, at its makers' thinking-mode
     values, after it slid into random multilingual tokens at DeepInfra's defaults; MiMo, at DeepInfra's recommended
-    temperature 1.0 and top_p 0.95, after it broke its JSON with a straight closing quote). Its requests must
+    top_p 0.95, after it broke its JSON with a straight closing quote, and the owner's temperature 0.7, after it wrote
+    replies in other languages at 1.0). Its requests must
     carry exactly those keys with exactly those values; every other row's requests must carry none of them."""
     QWEN_SAMPLING = (('temperature', 0.6), ('top_p', 0.95), ('top_k', 20))
-    # Owner approval 2026-10-12: DeepInfra's recommended settings for MiMo, with no top_k.
-    MIMO_SAMPLING = (('temperature', 1.0), ('top_p', 0.95))
+    # Owner approval 2026-10-12: DeepInfra's recommended top_p for MiMo and the owner's temperature 0.7, with no top_k.
+    MIMO_SAMPLING = (('temperature', 0.7), ('top_p', 0.95))
 
     def test_only_the_mimo_and_qwen_rows_carry_sampling_and_they_equal_the_independent_copy(self):
         self.assertEqual(DEEPINFRA.rows[QWEN].sampling, self.QWEN_SAMPLING)
@@ -1980,15 +1981,15 @@ class SamplingTests(GateTest):
         exact = body(model=MIMO)
         self.assertEqual({k: exact[k] for k in ('temperature', 'top_p')}, SAMPLING[MIMO])
         self.assertTrue(DEEPINFRA.body_valid(exact, row))
-        self.assertTrue(DEEPINFRA.body_valid({**exact, 'temperature': 1}, row))  # 1 and 1.0: one JSON number (the app writes 1).
 
         def without(name):
             return {k: v for k, v in exact.items() if k != name}
         refused = {'no_sampling': {k: v for k, v in exact.items() if k not in SAMPLING[MIMO]},
                    'no_temperature': without('temperature'), 'no_top_p': without('top_p'),
                    'with_top_k': {**exact, 'top_k': 20}, 'qwen_temperature': {**exact, 'temperature': 0.6},
+                   'temperature_before_2026_10_12': {**exact, 'temperature': 1}, 'temperature_hair': {**exact, 'temperature': 0.700001},
                    'top_p_default': {**exact, 'top_p': 1}, 'top_p_hair': {**exact, 'top_p': 0.950001},
-                   'temperature_true': {**exact, 'temperature': True}, 'temperature_text': {**exact, 'temperature': '1.0'},
+                   'temperature_true': {**exact, 'temperature': True}, 'temperature_text': {**exact, 'temperature': '0.7'},
                    'temperature_null': {**exact, 'temperature': None}, 'effort': {**exact, 'reasoning_effort': 'high'},
                    'json_mode': {**exact, 'response_format': {'type': 'json_object'}},
                    'json_schema': {**exact, 'response_format': {'type': 'json_schema'}},

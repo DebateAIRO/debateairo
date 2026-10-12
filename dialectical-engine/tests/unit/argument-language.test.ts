@@ -248,6 +248,11 @@ describe("detectArgumentLanguage", () => {
     expect(detectArgumentLanguage(text)).toMatchObject({ tag, confidence: "high" });
   });
 
+  it("detects the 2026-10-12 practice question as English (it was \"und\", so every step was told \"the same language as the question\")", () => {
+    expect(detectArgumentLanguage("Should a mid-sized city make its central bus lines free to ride?"))
+      .toEqual({ tag: "en", nameEn: "English", confidence: "high" });
+  });
+
   it("detects the packet's short Russian sentence at high confidence", () => {
     expect(detectArgumentLanguage("Следует ли отменить субсидии на топливо?"))
       .toMatchObject({ tag: "ru", confidence: "high" });
@@ -309,9 +314,19 @@ describe("detectArgumentLanguage", () => {
 });
 
 describe("argumentLanguageDirective", () => {
+  it("calls a named language the question's, and holds where the material quotes another (owner approval 2026-10-12)", () => {
+    expect(argumentLanguageDirective("English")).toMatch(
+      /^Write every natural-language field in English, the language of the question, even where the material quotes another language\. Keep JSON keys,/u);
+    // The fallback names no language, so it is not called the question's twice.
+    for (const blank of ["", "   "]) {
+      expect(argumentLanguageDirective(blank)).toMatch(
+        /^Write every natural-language field in the same language as the question, even where the material quotes another language\. Keep JSON keys,/u);
+    }
+  });
+
   it("protects every machine-consumed value class while localizing prose", () => {
     expect(argumentLanguageDirective("Romanian")).toBe(
-      "Write every natural-language field in Romanian. Keep JSON keys, enum tokens, JSON literals (null, true, false), and identifier-shaped values (including claim_type, basis, outcome, fatalFlags[].type, segment_id, node_refs, and served_number_refs) in English exactly as specified; never translate an identifier or literal."
+      "Write every natural-language field in Romanian, the language of the question, even where the material quotes another language. Keep JSON keys, enum tokens, JSON literals (null, true, false), and identifier-shaped values (including claim_type, basis, outcome, fatalFlags[].type, segment_id, node_refs, and served_number_refs) in English exactly as specified; never translate an identifier or literal."
     );
   });
 });
