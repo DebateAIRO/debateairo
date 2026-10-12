@@ -69,7 +69,7 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | `operator-digest --source <file>` | prints `operatorManifestSha256` (the shared function the launchers use) and the operator file count |
 | `launch-plan --service api\|ui\|runner --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, everything else from `--from`; for `--service runner` the API plan may be `--from` (identity from the runner OS account, runner.env custody); `validateLaunchPlan` before writing |
 | `native-plan --operation apply-and-plan\|verify --from <existing native plan> --source-manifest <candidate api manifest> --out <file>` | new native plan for a candidate API root; `verify` carries the `approval` of `--from` over unchanged; the reviewed `validateNativePlan` before writing |
-| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> [--checker glm\|deepseek --deepseek-enabled-on-gate yes] [--role-rotation on\|off] --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval. The answer checker stays GLM unless `--checker deepseek` is given together with `--deepseek-enabled-on-gate yes` (your statement that the gate's GO switches DeepSeek on). Role rotation stays on unless `--role-rotation off` is given: the rotation row is then published disabled (the preview's rollback for rotation; a later plan without the flag switches it back on, and its delta shows that row changing). `publish` carries the plan's choices |
+| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> [--checker glm\|deepseek --deepseek-enabled-on-gate yes] [--role-rotation on\|off] [--call-concurrency '<JSON object>'] --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval. The answer checker stays GLM unless `--checker deepseek` is given together with `--deepseek-enabled-on-gate yes` (your statement that the gate's GO switches DeepSeek on). Role rotation stays on unless `--role-rotation off` is given: the rotation row is then published disabled (the preview's rollback for rotation; a later plan without the flag switches it back on, and its delta shows that row changing). No call-concurrency row unless `--call-concurrency` gives the policy as one JSON object (see "Publishing the call-concurrency row" below). `publish` carries the plan's choices |
 | `native-plan --operation publish --from <the plan above> --proposal <what the native operator printed for it> --source-manifest <same manifest> --out <file>` | step 2, after the owner reviewed the proposal: re-hashes every value the proposal shows and its `deltaSha256`, checks it belongs to that plan (release, operator digest, base), copies the approval from it, picks a fresh `publicationId`, and prints the approval it wrote |
 | `native-plan --operation verify --from <the publish plan> --publication <what the native operator printed for publish> --source-manifest <manifest> --out <file>` | step 3: the verify plan for the NEW publication (same id, base and snapshot as the publish plan) |
 | `launch-plan … --publication <what the native operator printed for publish>` | launch plans that carry the new publication instead of the old plan's; the `--native-attestation` proof must already name it |
@@ -319,6 +319,27 @@ cp -a "$NP" "$S/native-plan.before.json"
    both drop-ins; `daemon-reload`; then restart the API and the UI (and the runner, if it is
    active) in one step. Each start's prestart re-verifies natively against the verify plan of
    step 4. The API refuses to start if `REGISTER_VERSION` differs from the pinned publication.
+
+**Publishing the call-concurrency row.** The register row `callConcurrencyPolicy` says how many AI
+calls a debate may run at the same time (spec 2026-10-12, parallel calls; values and bounds in
+`deploy/vps/register/README.md`, "The call-concurrency setting"). To publish it, add one option to
+step 1's `plan` command and follow the same steps 1 to 6: the plan carries the policy, the owner
+sees `callConcurrencyPolicy` in the delta (`added` the first time, `changed` for a new value),
+`publish` copies it from the plan, and the API and the runner restart on the new version. Give the
+three values without the row kind, in single quotes, with no line break. The owner's start values:
+
+```sh
+rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --call-concurrency '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50,"deepinfra":150,"anthropic":50}}' --out "$ART/native-plan-plan.json"
+```
+
+The tool refuses (`ARGUMENTS_REFUSED` naming `--call-concurrency`, nothing written) text that is
+not one JSON object, a missing or extra key, a number outside its bounds or not whole, a vendor
+name that is not lower case, runner limits without `default`, and the option on any operation but
+`plan`. To turn parallel calls off later, publish again the same way with
+`--call-concurrency '{"perDebate":1,"perModelPerDebate":1,"perModelPerRunner":{"default":1000}}'`.
+Once a version holds the row, every later plan must give the option again, with the same or a
+new value: without it, `nat` refuses the plan (its line is the plain
+`PREVIEW_NATIVE_OPERATION_REFUSED`; the cause is the kit's `base-row-dropped`).
 
 **Rolling back.** Re-install the archived `$S/native-plan.before.json`, set `REGISTER_VERSION` back
 to the old version, and re-pin the old launch plans. The new version stays sealed, unused. Later

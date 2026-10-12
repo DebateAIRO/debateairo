@@ -335,6 +335,25 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     expect(given.addedKeys).toEqual([ROTATION_KEY, CALL_CONCURRENCY_POLICY_ROW_KEY].sort((a, b) => a.localeCompare(b, 'en')));
     expect(() => compose(f.source, [...given.rows] as Row[], '10')).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: base-row-dropped');
   });
+
+  it('the native operator hands the plan\'s policy to the builder as its fifth argument, so the row is in the reviewed delta', async () => {
+    const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
+    const calls = text.split('publisher.buildPreviewSourceRowsV2(');
+    expect(calls).toHaveLength(2); // the operator's one builder call
+    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null\);/);
+    // What it hands over is the plan's value exactly as the plan check accepted it.
+    const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+    const plan = operator.validateNativePlan({ schema: 'preview-auth-dev-native-plan-v1', operation: 'plan', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api',
+      sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), sourceManifest: {}, operatorManifestSha256: 'c'.repeat(64), selectedBaseRegisterVersion: '9', selectedBaseSnapshotSha256: 'd'.repeat(64),
+      publicationId: id, approval: null, callConcurrency: JSON.parse(JSON.stringify(policy)) });
+    const f = await fixture();
+    const snapshot = compose(await build(plan.callConcurrency ?? null), f.v9);
+    const entry = snapshot.delta.find((row: any) => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY) as any;
+    expect(entry.change).toBe('added');
+    expect(JSON.parse(entry.newValueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
+    // A plan without the key hands null: the source, and so the delta, is today's.
+    expect(compose(await build(null), f.v9).deltaSha256).toBe(compose(f.source, f.v9).deltaSha256);
+  });
 });
 
 /** A pool that answers only the currency query and records every statement. */

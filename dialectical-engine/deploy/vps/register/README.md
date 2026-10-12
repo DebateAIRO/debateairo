@@ -180,7 +180,7 @@ To turn it off on the hosted server:
 1. Remove the `callConcurrencyPolicy` member from the file. Leave the other members as they are.
 2. Do steps 2 to 8 above again. In step 2 the plan's `row_keys=` line no longer names `callConcurrencyPolicy`. In step 6 the result has zero rows, which is right. Nothing is edited: the earlier version stays sealed, and the new version has no row. With no row, the runner makes one call at a time per debate.
 
-On the preview, this setting is not in this file. The preview publishes its own register through its kit. See `deploy/preview-auth-dev/v1/README.md`, "Call-concurrency row". The preview's operator cannot carry the row yet, so the preview cannot use the setting until that is wired.
+On the preview, this setting is not in this file. The preview publishes its own register through its kit. See `deploy/preview-auth-dev/v1/README.md`, "Call-concurrency row". The preview's native plan carries it as `callConcurrency` (the release tool's `native-plan --operation plan --call-concurrency '<JSON>'`); the steps are in that section.
 
 ## What `sourceRef` becomes
 

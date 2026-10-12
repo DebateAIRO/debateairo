@@ -18,9 +18,10 @@
 //   release-artifacts.mjs native-plan --operation apply-and-plan|plan|publish|verify --from <existing native plan>
 //       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
 //       [--publication <publish output>] [--checker glm|deepseek --deepseek-enabled-on-gate yes] --out <file>
-//       [--role-rotation on|off]
-//       (--checker and --role-rotation only with --operation plan; publish carries the plan's choices;
-//        defaults glm and on; --role-rotation off publishes the rotation row disabled: the preview's rollback)
+//       [--role-rotation on|off] [--call-concurrency '<JSON object>']
+//       (--checker, --role-rotation and --call-concurrency only with --operation plan; publish carries the plan's choices;
+//        defaults glm, on and no call-concurrency row; --role-rotation off publishes the rotation row disabled: the preview's rollback;
+//        --call-concurrency '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}' publishes that row)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
@@ -88,7 +89,7 @@ const COMMANDS = Object.freeze({
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation'] }
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency'] }
 });
 
 export class Refusal extends Error {
@@ -418,9 +419,21 @@ async function nativePlanCommand(options, { layout, deps }) {
   // Role rotation stays on unless the operator says off for a new `plan` (publish-register-v2.ts checks it again).
   const roleRotation = options['--role-rotation'];
   if (roleRotation !== undefined && (!['on', 'off'].includes(roleRotation) || operation !== 'plan')) refuse('ARGUMENTS_REFUSED', ['--role-rotation']);
+  // No call-concurrency row unless the operator gives the policy for a new `plan`, as one JSON object
+  // (native-operator.mjs validateCallConcurrencyChoice below, and publish-register-v2.ts checks it again).
+  const concurrencyText = options['--call-concurrency'];
+  if (concurrencyText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--call-concurrency']);
+  let concurrencyValue;
+  if (concurrencyText !== undefined) try { concurrencyValue = strictJson(Buffer.from(concurrencyText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--call-concurrency']); }
   await assertOutputFree(options['--out'], { layout });
   // Lazy: native-operator.mjs loads tsx and pg, which exist only in an installed release root.
-  const validateNativePlan = deps.validateNativePlan ?? (await import('../../preview-auth-dev/v1/native-operator.mjs')).validateNativePlan;
+  const nativeOperator = () => import('../../preview-auth-dev/v1/native-operator.mjs');
+  const validateNativePlan = deps.validateNativePlan ?? (await nativeOperator()).validateNativePlan;
+  let concurrencyChoice;
+  if (concurrencyText !== undefined) {
+    const check = deps.validateCallConcurrencyChoice ?? (await nativeOperator()).validateCallConcurrencyChoice;
+    try { concurrencyChoice = check(concurrencyValue); } catch { refuse('ARGUMENTS_REFUSED', ['--call-concurrency']); }
+  }
   const from = await readJson(options['--from'], { layout, flag: '--from', maxBytes: MAX_PLAN_BYTES, artifact: false });
   try { validateNativePlan(from.value); } catch { refuse('FROM_PLAN_INVALID'); }
   const source = await readSource(options['--source-manifest'], { layout, flag: '--source-manifest' });
@@ -471,12 +484,16 @@ async function nativePlanCommand(options, { layout, deps }) {
   // The same for the rotation switch: only 'off' is carried ('on' is the default, no field).
   const rotationChoice = operation === 'plan' ? (roleRotation === 'off' ? 'off' : undefined)
     : operation === 'publish' ? from.value.roleRotation : undefined;
+  // The same for the call-concurrency policy: present only when the plan's operator gave one.
+  const callConcurrency = operation === 'plan' ? concurrencyChoice
+    : operation === 'publish' ? from.value.callConcurrency : undefined;
   const plan = {
     schema: from.value.schema, operation, sourceRoot: source.value.sourceRoot, sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree,
     sourceManifest: { path: source.path, sha256: source.sha256 }, operatorManifestSha256: operatorDigest,
     selectedBaseRegisterVersion, selectedBaseSnapshotSha256, publicationId, approval,
     ...(checkerChoice === undefined ? {} : { checkerChoice }),
-    ...(rotationChoice === undefined ? {} : { roleRotation: rotationChoice })
+    ...(rotationChoice === undefined ? {} : { roleRotation: rotationChoice }),
+    ...(callConcurrency === undefined ? {} : { callConcurrency })
   };
   try { validateNativePlan(plan); } catch { refuse('NATIVE_PLAN_INVALID'); }
   await (deps.verifySourceManifest ?? verifySourceManifest)(source.value, sourceBinding(source));
