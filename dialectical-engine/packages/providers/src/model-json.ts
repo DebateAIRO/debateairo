@@ -27,10 +27,16 @@ export interface ModelReplyFacts {
  *  · CLOSING_BRACKETS — the brackets still open at the very end appended, only for a reply that finished normally.
  */
 const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INNER_QUOTE", "CLOSING_BRACKETS"] as const);
-export type ModelJsonRepair = typeof MODEL_JSON_REPAIRS[number];
+/**
+ * The repair codes a classification can name (`ContentClassification.jsonRepair`): this file's four decode repairs and
+ * NESTED_FIELDS, the judge's one SHAPE repair (judge nested fields, 2026-10-12: `packages/judgement/src/s04.ts`
+ * `nestedFieldsPlan`), made only after a decoded object failed the judge artifact's schema. `decodeModelJson` never
+ * makes NESTED_FIELDS: it does not know any schema.
+ */
+export type ModelJsonRepair = typeof MODEL_JSON_REPAIRS[number] | "NESTED_FIELDS";
 
 export type ModelJsonDecoded =
-  | { readonly ok: true; readonly value: unknown; readonly repair: ModelJsonRepair | null }
+  | { readonly ok: true; readonly value: unknown; readonly repair: typeof MODEL_JSON_REPAIRS[number] | null }
   | { readonly ok: false; readonly error: string };
 
 /** The finish reasons that mean the model ended its answer itself (OpenAI-compatible "stop"; Anthropic's two). */
@@ -268,7 +274,7 @@ export function decodeModelJson(content: string, reply?: ModelReplyFacts): Model
   }
   const failed: ModelJsonDecoded = Object.freeze({ ok: false, error: strictError });
   if (reply?.finishReason === TRUNCATED_FINISH_REASON) return failed;
-  const accept = (value: unknown, repair: ModelJsonRepair): ModelJsonDecoded => Object.freeze({ ok: true, value, repair });
+  const accept = (value: unknown, repair: typeof MODEL_JSON_REPAIRS[number]): ModelJsonDecoded => Object.freeze({ ok: true, value, repair });
   const fenced = modelJsonFenceBody(content);
   if (fenced !== null) {
     const body = parsed(fenced);
