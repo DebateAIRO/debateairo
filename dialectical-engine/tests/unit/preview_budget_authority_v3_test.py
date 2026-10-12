@@ -1995,5 +1995,223 @@ class SamplingTests(GateTest):
             self.assertIsNone(bridge.profile_of('deepinfra'))
 
 
+
+def with_headers(status, reply, headers):
+    """A dispatch that answers like the real transport: status and body, and the vendor facts it kept from the
+    answer's headers on its vendor_headers attribute (helper.vendor_headers' output)."""
+    def dispatch(_sent, _key):
+        return status, json.loads(json.dumps(reply))
+    dispatch.vendor_headers = headers
+    return dispatch
+
+
+def journal(out, operation_id):
+    """The gate's journal lines (preview_provider_paid_post) for one call."""
+    return [line for line in map(json.loads, filter(None, out.getvalue().splitlines()))
+            if line.get('event') == 'preview_provider_paid_post' and line.get('operation_id') == operation_id]
+
+
+class VendorRefusalFactsTests(GateTest):
+    """2026-10-12: GLM on DeepInfra answers 429 about 2 calls in 3 while we send one at a time, and the gate kept
+    neither the answer's message nor its Retry-After, so nobody could tell an account rate limit from a busy model.
+    An answer released unbilled now keeps the vendor's Retry-After (whole seconds), the NAMES of its rate-limit
+    headers, and the error's type, code and a short, redacted message, on its ledger entry and its journal line;
+    and a cool-off lasts at least as long as the vendor asked (never past COOL_OFF_MAX_SECONDS)."""
+    MOMENT = bridge.datetime(2026, 10, 8, 9, 0, 0, tzinfo=bridge.timezone.utc)
+    RATE_LIMITED = UnbilledRefusalTests.RATE_LIMITED
+
+    def test_retry_after_is_whole_seconds_from_delta_seconds_or_an_http_date_clamped_to_an_hour(self):
+        parse = bridge.helper.retry_after_seconds
+        cases = {'120': 120, ' 7 ': 7, '0': 0, '3600': 3600, '3601': 3600, '1' * 40: 3600,
+                 'Thu, 08 Oct 2026 09:02:00 GMT': 120, 'Thu, 08 Oct 2026 08:59:00 GMT': 0,
+                 'Fri, 09 Oct 2026 09:00:00 GMT': 3600, 'Thursday, 08-Oct-26 09:00:30 GMT': 30,
+                 'Thu Oct  8 09:00:45 2026': 45}
+        for value, seconds in cases.items():
+            with self.subTest(value=value):
+                self.assertEqual(parse(value, self.MOMENT), seconds)
+        # A part second ahead is a whole second to wait.
+        self.assertEqual(parse('Thu, 08 Oct 2026 09:02:00 GMT', self.MOMENT + bridge.timedelta(milliseconds=500)), 120)
+        for junk in (None, '', '   ', 'soon', '-5', '1.5', '12abc', '+3', '0x10', 'Thu, 99 Foo 2026', 7, b'7', '1e3',
+                     '١٢'):
+            with self.subTest(junk=junk):
+                self.assertIsNone(parse(junk, self.MOMENT))
+
+    def test_the_transport_keeps_retry_after_and_rate_limit_header_names_only(self):
+        kept = bridge.helper.vendor_headers([
+            ('Content-Type', 'application/json'), ('Retry-After', ' 30 '), ('retry-after', '999'),
+            ('X-RateLimit-Remaining-Requests', '0'), ('x-ratelimit-reset-requests', '12s'), ('RateLimit-Policy', '10;w=60'),
+            ('anthropic-ratelimit-requests-remaining', '0'), ('Set-Cookie', 'session=secret'), ('Authorization', 'Bearer x'),
+            ('X-Request-Id', 'req-1'), ('x-ratelimit-remaining-requests', '0'), ('x-ratelimit-bad name', '1')])
+        self.assertEqual(kept, {'retry_after': '30', 'rate_limit_header_names': [
+            'anthropic-ratelimit-requests-remaining', 'ratelimit-policy', 'x-ratelimit-remaining-requests',
+            'x-ratelimit-reset-requests']})
+        self.assertEqual(bridge.helper.vendor_headers([]), {'retry_after': None, 'rate_limit_header_names': []})
+        self.assertEqual(bridge.helper.vendor_headers(None), {'retry_after': None, 'rate_limit_header_names': []})
+        many = bridge.helper.vendor_headers([('x-ratelimit-n%02d' % n, '1') for n in range(40)])
+        self.assertEqual(len(many['rate_limit_header_names']), bridge.helper.MAX_RATE_LIMIT_HEADER_NAMES)
+        self.assertEqual(len(bridge.helper.vendor_headers([('Retry-After', '9' * 500)])['retry_after']),
+                         bridge.helper.MAX_RETRY_AFTER_CHARS)
+
+    def test_the_real_transport_records_the_answers_vendor_headers(self):
+        class Response:
+            status = 429
+
+            def __init__(self):
+                self.chunks = [b'{"error": {"message": "Rate limit exceeded"}}']
+
+            def read(self, _size):
+                return self.chunks.pop() if self.chunks else b''
+
+            def getheaders(self):
+                return [('Retry-After', '45'), ('X-RateLimit-Limit-Requests', '60'), ('Set-Cookie', 'a=b')]
+
+        class Connection:
+            def __init__(self, host, timeout, context):
+                self.sock = None
+
+            def connect(self):
+                pass
+
+            def request(self, method, path, body, headers):
+                pass
+
+            def getresponse(self):
+                return Response()
+
+            def close(self):
+                pass
+        with patch.object(bridge.helper.http.client, 'HTTPSConnection', Connection):
+            transport = _HTTPS(timeout=5, profile=DEEPINFRA, path=DEEPINFRA.path)
+            self.assertIsNone(transport.vendor_headers)
+            self.assertEqual(transport(b'{}', KEY), (429, {'error': {'message': 'Rate limit exceeded'}}))
+        self.assertEqual(transport.vendor_headers, {'retry_after': '45', 'rate_limit_header_names': ['x-ratelimit-limit-requests']})
+
+    def test_the_vendor_error_keeps_type_code_and_a_short_safe_message(self):
+        summary = bridge.helper.vendor_error_summary
+        self.assertEqual(summary({'error': {'message': 'Rate limit exceeded', 'type': 'rate_limit', 'code': 429}}),
+                         {'type': 'rate_limit', 'code': '429', 'message': 'Rate limit exceeded'})
+        self.assertEqual(summary({'type': 'error', 'error': {'type': 'overloaded_error', 'message': 'Overloaded'}}),
+                         {'type': 'overloaded_error', 'code': None, 'message': 'Overloaded'})
+        self.assertEqual(summary({'error': 'Model is busy, retry later'}), {'type': None, 'code': None, 'message': 'Model is busy, retry later'})
+        for odd in ('rate limit', 'x' * 65, True, Decimal('4.5'), ['a'], {'a': 1}, ''):
+            with self.subTest(odd=odd):
+                self.assertEqual(summary({'error': {'type': odd, 'code': odd, 'message': 'm'}}),
+                                 {'type': '(other)', 'code': '(other)', 'message': 'm'})
+        for nothing in ({}, {'error': None}, {'error': 7}, {'detail': 'busy'}, None, []):
+            with self.subTest(nothing=nothing):
+                self.assertIsNone(summary(nothing))
+        self.assertEqual(summary({'error': {'message': {'nested': 'x'}}}), {'type': None, 'code': None, 'message': None})
+        long = summary({'error': {'message': 'busy ' * 100}})['message']
+        self.assertEqual(len(long), bridge.helper.MAX_VENDOR_MESSAGE_CHARS)
+        self.assertEqual(bridge.helper.MAX_VENDOR_MESSAGE_CHARS, 200)
+
+    def test_the_message_loses_control_characters_and_anything_like_a_key_token_email_or_url(self):
+        safe = bridge.helper.safe_vendor_message
+        self.assertEqual(safe('Too\x00many\nrequests\t‮please​ wait'), 'Too many requests please wait')
+        secrets = {'email': 'contact ops.team+x@example.com for a raise', 'url': 'see https://example.com/limits?account=12345&k=abc',
+                   'www': 'see www.example.com/limits', 'bearer': 'header Bearer abc.def.ghi was rejected',
+                   'assignment': 'invalid api_' + 'key=abc123 for org', 'colon': 'token: ' + 'tok_' + 'live_1234 refused',
+                   'prefixed': 'key ' + 'sk-' + 'proj-abcdef123456 is limited', 'long': 'account ' + 'A1b2C3d4E5f6G7h8' + 'I9j0K1l2M3n4 limited',
+                   'query': 'retry /v1/x?signature=zzz later', 'password': 'pass' + 'word=hunter2'}
+        # Synthetic values only, built from pieces so a secret scanner does not read them as real ones (.gitleaksignore).
+        leaks = ('ops.team', 'example.com', 'account=12345', 'abc.def.ghi', 'abc123', 'tok_' + 'live_1234', 'sk-' + 'proj-abcdef123456',
+                 'A1b2C3d4E5f6G7h8' + 'I9j0K1l2M3n4', 'signature=zzz', 'hunter2')
+        for name, text in secrets.items():
+            with self.subTest(name):
+                cleaned = safe(text)
+                self.assertTrue(cleaned is None or not any(leak in cleaned for leak in leaks), cleaned)
+                self.assertTrue(cleaned is None or '[REDACTED]' in cleaned, cleaned)
+        # Plain rate-limit wording survives as it is.
+        self.assertEqual(safe('Rate limit reached for requests: 60 per 1m. Please try again in 20s.'),
+                         'Rate limit reached for requests: 60 per 1m. Please try again in 20s.')
+        for nothing in (None, 7, {'a': 1}, '', ' \n\t ', '\x00\x01'):
+            with self.subTest(nothing=nothing):
+                self.assertIsNone(safe(nothing))
+        # When in doubt, the message goes: anything still looking like an address after redaction.
+        self.assertIsNone(safe('write to @ops or ftp:/x'))
+
+    def test_a_released_429_keeps_the_vendor_facts_on_its_entry_and_its_journal_line(self):
+        gate = self.gate().ready()
+        reply = {'error': {'message': 'Rate limit exceeded for key ' + KEY + ', see https://deepinfra.com/x?u=1',
+                           'type': 'rate_limit', 'code': 'too_many_requests'}}
+        headers = {'retry_after': '30', 'rate_limit_header_names': ['x-ratelimit-remaining-requests']}
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call('op-1', dispatch=with_headers(429, reply, headers))
+        entry = entry_of(gate, 'op-1')
+        expected = {'vendor_retry_after_seconds': 30, 'vendor_rate_limit_headers': ['x-ratelimit-remaining-requests'],
+                    'vendor_error': {'type': 'rate_limit', 'code': 'too_many_requests',
+                                     'message': 'Rate limit exceeded for key [REDACTED], see [REDACTED]'}}
+        self.assertEqual({k: entry[k] for k in expected}, expected)
+        self.assertEqual((entry['state'], entry['held_usd'], entry['http_status']), ('released_unbilled', '0', 429))
+        [line] = journal(self.out, 'op-1')
+        self.assertEqual({k: line[k] for k in expected}, expected)
+        self.assertEqual((line['status'], line['reason'], line['vendor_busy']), ('not_sent', 'unbilled_refusal', True))
+        self.assertNotIn(KEY, self.out.getvalue())
+        self.assertNotIn(KEY, json.dumps(gate.day('2026-10-08')))
+        # The caller's refusal body is unchanged: the app parses {"error": CODE} only.
+        self.assertEqual(json.loads(bridge.refusal_body(bridge.CallNotSent('PROVIDER_REFUSED_UNBILLED'))),
+                         {'error': 'PROVIDER_REFUSED_UNBILLED'})
+
+    def test_without_headers_or_an_error_the_facts_are_null_and_empty(self):
+        gate = self.gate().ready()
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call('op-1', dispatch=lambda _s, _k: (429, {'error': True}))
+        entry = entry_of(gate, 'op-1')
+        self.assertEqual((entry['vendor_retry_after_seconds'], entry['vendor_rate_limit_headers'], entry['vendor_error']),
+                         (None, [], None))
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call('op-2', dispatch=with_headers(429, self.RATE_LIMITED, {'retry_after': 'later', 'rate_limit_header_names': []}))
+        self.assertIsNone(entry_of(gate, 'op-2')['vendor_retry_after_seconds'])
+        # A settled reply carries none of the vendor refusal fields (past the cool-off the two refusals started).
+        later(gate, 61)
+        gate.call('op-3', dispatch=with_headers(200, provider_response('0.01'), {'retry_after': '5', 'rate_limit_header_names': []}))
+        self.assertFalse({'vendor_retry_after_seconds', 'vendor_rate_limit_headers', 'vendor_error'} & set(entry_of(gate, 'op-3')))
+
+    def test_a_malformed_vendor_headers_attribute_is_treated_as_none(self):
+        gate = self.gate().ready()
+        for number, odd in enumerate(({'retry_after': 30}, 'x', {'rate_limit_header_names': ['ok', 7]},
+                                      {'rate_limit_header_names': 'x-ratelimit-a'})):
+            with self.subTest(odd=odd), self.refused('PROVIDER_REFUSED_UNBILLED'):
+                gate.call('op-%d' % number, dispatch=with_headers(429, self.RATE_LIMITED, odd))
+            later(gate, 601)
+        entries = gate.day('2026-10-08')['entries'].values()
+        self.assertEqual({(e['vendor_retry_after_seconds'], tuple(e['vendor_rate_limit_headers'])) for e in entries}, {(None, ())})
+
+    def cool(self, retry_after):
+        gate = self.gate().ready()
+        headers = {'retry_after': retry_after, 'rate_limit_header_names': []}
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call('op-1', dispatch=with_headers(429, self.RATE_LIMITED, headers))
+        self.assertIsNone(gate.control()['cooling'][MODEL]['until_utc'])  # One refusal never cools, Retry-After or not.
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call('op-2', dispatch=with_headers(429, self.RATE_LIMITED, headers))
+        record = gate.control()['cooling'][MODEL]
+        with self.assertRaises(bridge.ModelCooling) as caught:
+            gate.call('op-3', dispatch=lambda *_: self.fail('sent while cooling'))
+        return record, caught.exception.retry_after, gate
+
+    def test_a_cool_off_lasts_at_least_the_vendors_retry_after_within_the_maximum(self):
+        record, wait, _ = self.cool('300')
+        # The gate's own window (60 s, which a refused trial still doubles) is kept; the end is the vendor's.
+        self.assertEqual((record['window_seconds'], record['until_utc'], wait), (60, '2026-10-08T09:05:00+00:00', 300))
+        record, wait, _ = self.cool('5')
+        self.assertEqual((record['window_seconds'], record['until_utc'], wait), (60, '2026-10-08T09:01:00+00:00', 60))
+        record, wait, _ = self.cool('3600')
+        self.assertEqual((record['until_utc'], wait), ('2026-10-08T09:10:00+00:00', bridge.COOL_OFF_MAX_SECONDS))
+        record, wait, _ = self.cool('Thu, 08 Oct 2026 09:02:30 GMT')
+        self.assertEqual((record['until_utc'], wait), ('2026-10-08T09:02:30+00:00', 150))
+        record, wait, _ = self.cool(None)
+        self.assertEqual((record['until_utc'], wait), ('2026-10-08T09:01:00+00:00', 60))
+        self.assertEqual(json.loads(bridge.refusal_body(bridge.ModelCooling(300))), {'error': 'MODEL_COOLING', 'retry_after': 300})
+
+    def test_a_refused_trial_still_doubles_the_gates_own_window(self):
+        record, _, gate = self.cool('300')
+        later(gate, 301)  # The vendor's wait is over: the next call is the trial.
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call('op-4', dispatch=with_headers(429, self.RATE_LIMITED, {'retry_after': '30', 'rate_limit_header_names': []}))
+        record = gate.control()['cooling'][MODEL]
+        self.assertEqual((record['window_seconds'], record['until_utc']), (120, '2026-10-08T09:07:01+00:00'))
+
+
 if __name__ == '__main__':
     unittest.main()

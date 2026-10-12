@@ -183,6 +183,13 @@ The smallest pot that passes with all four switched on is $1.43.
     time, so it can be checked against DeepInfra's billing page. `status` shows today's number
     (`today_unbilled_releases`). There is no limit on that number, and these answers do not count
     toward the 2,000 calls a day.
+  - Since 2026-10-12 each such entry (and its line in the journal) also keeps what DeepInfra said,
+    so a limit on our account can be told apart from a busy model: `vendor_retry_after_seconds`
+    (its Retry-After, in whole seconds, at most 3600, or null), `vendor_rate_limit_headers` (only
+    the NAMES of its rate-limit headers, never their values) and `vendor_error` (the error's type
+    and code, and its message cut to 200 characters with anything like a key, token, email or link
+    replaced by `[REDACTED]`; a message that still looks unsafe is dropped). Nothing from our
+    request and no other header is kept.
   - A cool-off for one model (`MODEL_COOLING`). After 2 such answers for one model with no normal
     answer from that model in between (in real use: one call, then the app's one resend 60 seconds
     later), the gate refuses new calls for that model only. It sets aside no money and does not
@@ -190,7 +197,8 @@ The smallest pot that passes with all four switched on is $1.43.
     through as a trial; the others are still refused while it is out. If the trial is refused the
     same way, the wait doubles: 120, 240, 480, then 600 seconds (10 minutes at most). A call that
     was already on its way when the cool-off began, and comes back refused, restarts the current
-    wait (never shortening it) without doubling it. A normal answer from that model ends its
+    wait (never shortening it) without doubling it. When DeepInfra names a longer Retry-After, the
+    wait is that long instead (still 600 seconds at most). A normal answer from that model ends its
     cool-off. The other models are never affected. Nothing needs re-opening: the cool-off ends by
     itself, and `status` shows it under `cooling`. `activate` does not clear a cooling model either:
     its wait runs on after a re-open.

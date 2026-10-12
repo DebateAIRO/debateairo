@@ -1093,5 +1093,49 @@ class RemainingAndProbeTests(AnthropicTest):
         self.assertEqual(gate.status()['state'], 'halted')
 
 
+
+class VendorRefusalFactsTests(AnthropicTest):
+    """2026-10-12: an answer released unbilled keeps the vendor's Retry-After, its rate-limit header NAMES and the
+    error's type, code and a short redacted message, on the entry and the journal line (both profiles)."""
+    BUSY = UnbilledAndUnsentTests.BUSY
+
+    @staticmethod
+    def answering(status, reply, headers):
+        def dispatch(_sent, _key):
+            return status, json.loads(json.dumps(reply))
+        dispatch.vendor_headers = headers
+        return dispatch
+
+    def facts(self, gate, operation_id='op-1'):
+        entry = entry_of(gate, operation_id)
+        lines = [line for line in map(json.loads, filter(None, self.out.getvalue().splitlines()))
+                 if line.get('event') == 'preview_provider_paid_post' and line.get('operation_id') == operation_id]
+        keys = ('vendor_retry_after_seconds', 'vendor_rate_limit_headers', 'vendor_error')
+        self.assertEqual(len(lines), 1)
+        self.assertEqual({k: lines[0][k] for k in keys}, {k: entry[k] for k in keys})
+        return {k: entry[k] for k in keys}
+
+    def test_a_busy_529_keeps_retry_after_the_anthropic_rate_limit_names_and_the_error(self):
+        gate = self.ready()
+        headers = bridge.helper.vendor_headers([('retry-after', '17'), ('anthropic-ratelimit-requests-remaining', '0'),
+                                                ('request-id', 'req_synthetic')])
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            self.call(gate, dispatch=self.answering(529, {**self.BUSY, 'request_id': 'req_synthetic'}, headers))
+        self.assertEqual(self.facts(gate), {'vendor_retry_after_seconds': 17,
+                                            'vendor_rate_limit_headers': ['anthropic-ratelimit-requests-remaining'],
+                                            'vendor_error': {'type': 'overloaded_error', 'code': None, 'message': 'Overloaded'}})
+
+    def test_a_not_busy_unbilled_error_keeps_the_facts_and_never_cools_the_model(self):
+        gate = self.ready()
+        reply = {'type': 'error', 'error': {'type': 'api_error', 'message': 'Internal server error'}}
+        for operation_id in ('op-1', 'op-2'):
+            with self.refused('PROVIDER_ERROR_UNBILLED'):
+                self.call(gate, operation_id, dispatch=self.answering(500, reply, {'retry_after': '120', 'rate_limit_header_names': []}))
+        self.assertEqual(self.facts(gate, 'op-2'), {'vendor_retry_after_seconds': 120, 'vendor_rate_limit_headers': [],
+                                                    'vendor_error': {'type': 'api_error', 'code': None,
+                                                                     'message': 'Internal server error'}})
+        self.assertEqual(gate.status()['cooling'], {})
+
+
 if __name__ == '__main__':
     unittest.main()

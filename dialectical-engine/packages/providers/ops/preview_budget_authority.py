@@ -570,10 +570,12 @@ def cooling_wait(control, model, moment):
     return None
 
 
-def note_unbilled_refusal(control, model, entry_id, moment):
+def note_unbilled_refusal(control, model, entry_id, moment, retry_after=None):
     """One unbilled refusal for model: count it and, from COOL_OFF_AFTER_REFUSALS on, cool the model
     off. A refused trial doubles the window (up to COOL_OFF_MAX_SECONDS); a refusal of a call that was
-    already in flight restarts the current window from now without doubling it."""
+    already in flight restarts the current window from now without doubling it. 2026-10-12: when the
+    vendor named a Retry-After (whole seconds), the cool-off lasts max(window, retry_after), still never
+    more than COOL_OFF_MAX_SECONDS; the stored window (what a refused trial doubles) stays the gate's own."""
     if not isinstance(model, str):
         return
     cooling = control.setdefault('cooling', {})
@@ -589,7 +591,8 @@ def note_unbilled_refusal(control, model, entry_id, moment):
             window = min(COOL_OFF_MAX_SECONDS, record['window_seconds'] * 2)
         else:
             window = record['window_seconds']
-        until = moment + timedelta(seconds=window)
+        wait = window if not _int_in(retry_after, 0, 2 ** 31) else min(COOL_OFF_MAX_SECONDS, max(window, retry_after))
+        until = moment + timedelta(seconds=wait)
         if record['until_utc'] is not None:
             until = max(until, datetime.fromisoformat(record['until_utc']))
         record.update(window_seconds=window, until_utc=iso(until))
@@ -1025,10 +1028,34 @@ class UnbilledRefusal(Exception):
     released by release_unbilled, which keeps the entry at $0. busy (profile.busy_refusal): the
     vendor said it is busy (cools the model off) rather than another error (grows the unsent streak)."""
 
-    def __init__(self, status, busy):
+    def __init__(self, status, busy, facts=None):
         super().__init__('unbilled_refusal')
         self.status = status if type(status) is int else None
         self.busy = busy is True
+        self.facts = facts if isinstance(facts, dict) else no_vendor_facts()
+
+
+def no_vendor_facts():
+    return {'vendor_retry_after_seconds': None, 'vendor_rate_limit_headers': [], 'vendor_error': None}
+
+
+def vendor_refusal_facts(response, kept, moment):
+    """What an unbilled release keeps of the vendor's answer (2026-10-12), so the owner can tell an
+    account rate limit from a busy model: its Retry-After as whole seconds (0..3600, else None), the
+    names of its rate-limit headers (from the transport's vendor_headers; anything malformed is none),
+    and its error's type, code and short, redacted message (helper.vendor_error_summary of the
+    already-redacted answer). Never the request, never another header, never a rate-limit value."""
+    try:
+        kept = kept if isinstance(kept, dict) else {}
+        names = kept.get('rate_limit_header_names')
+        if not (isinstance(names, list) and all(isinstance(name, str) and helper.RATE_LIMIT_HEADER_NAME.fullmatch(name)
+                                                for name in names)):
+            names = []
+        return {'vendor_retry_after_seconds': helper.retry_after_seconds(kept.get('retry_after'), moment),
+                'vendor_rate_limit_headers': sorted(set(names))[:helper.MAX_RATE_LIMIT_HEADER_NAMES],
+                'vendor_error': helper.vendor_error_summary(response)}
+    except Exception:  # noqa: BLE001 - facts are a record only: a bad answer must never make the release uncertain
+        return no_vendor_facts()
 
 
 def release_unsent(private, entry_id, day, now):
@@ -1061,11 +1088,12 @@ def release_unsent(private, entry_id, day, now):
         return {'authority': control['state'], 'unsent_streak': streak}
 
 
-def release_unbilled(private, entry_id, day, http_status, now, busy=True):
+def release_unbilled(private, entry_id, day, http_status, now, busy=True, facts=None):
     """Lock, release the hold of a refusal the profile proved unbilled, unlock.
 
     Unlike a provably unsent call, the entry stays on its reservation day's ledger: state
-    'released_unbilled', held_usd "0", with the HTTP status, the reason and the time. There is no
+    'released_unbilled', held_usd "0", with the HTTP status, the reason, the time and the vendor's
+    facts (vendor_refusal_facts: Retry-After seconds, rate-limit header names, error). There is no
     daily ceiling (status shows the day's count; the halt watcher emails once a day past a threshold).
 
     busy (the profile's busy_refusal: DeepInfra's 429, Anthropic's 429 and 529) never halts the gate
@@ -1089,8 +1117,9 @@ def release_unbilled(private, entry_id, day, http_status, now, busy=True):
         if entry is None or entry['state'] != 'pending' or control['in_flight'].get(entry_id) != day:
             raise SafetyError('SETTLEMENT_STATE_INVALID')
         released = unbilled_releases(ledger) + 1
+        facts = facts if isinstance(facts, dict) else no_vendor_facts()
         if busy:
-            note_unbilled_refusal(control, entry.get('model'), entry_id, moment)
+            note_unbilled_refusal(control, entry.get('model'), entry_id, moment, facts.get('vendor_retry_after_seconds'))
         else:
             control['unsent_streak'] = control.get('unsent_streak', 0) + 1
             clear_trial(control, entry.get('model'), entry_id)
@@ -1098,7 +1127,7 @@ def release_unbilled(private, entry_id, day, http_status, now, busy=True):
                 _halt(control, 'provider_unreachable', moment, entry_id)
         store.save_control(control)
         entry.update(state='released_unbilled', held_usd='0', reason='unbilled_refusal',
-                     http_status=http_status if type(http_status) is int else None, released_at=iso(moment))
+                     http_status=http_status if type(http_status) is int else None, released_at=iso(moment), **facts)
         store.save_ledger(ledger)
         control['in_flight'].pop(entry_id, None)
         store.save_control(control)
@@ -1187,6 +1216,8 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
                                                      profile=profile, path=profile.path_for(row))
             status, raw_response = send(outgoing, key)
             raw_response = raw_response if isinstance(raw_response, dict) else {}
+            # 2026-10-12: what the transport kept of the answer's headers (Retry-After, rate-limit header names).
+            kept_headers = getattr(send, 'vendor_headers', None)
             # Owner ruling 5 (2026-10-10): a refusal the profile proves unbilled (DeepInfra: a 429
             # with an error and no usage, choices or cost anywhere) counts as not sent. It is judged
             # on the RAW reply: redaction drops whole subtrees (headers, secrets), which could hide a
@@ -1197,11 +1228,11 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             busy = bool(unbilled) and profile.busy_refusal(status, raw_response) is True
             response = helper.redact(raw_response, key, profile.redaction_patterns)
             if unbilled:
-                raise UnbilledRefusal(status, busy)
+                raise UnbilledRefusal(status, busy, vendor_refusal_facts(response, kept_headers, current(now)))
         except (helper.RequestNotSent, UnbilledRefusal) as unsent:
             try:
                 # Unsent: no entry kept. Unbilled: kept at $0 on the record, and cools its model off.
-                outcome = (release_unbilled(private, entry_id, day, unsent.status, now, unsent.busy)
+                outcome = (release_unbilled(private, entry_id, day, unsent.status, now, unsent.busy, unsent.facts)
                            if isinstance(unsent, UnbilledRefusal) else release_unsent(private, entry_id, day, now))
             except BaseException:
                 # The hold could not be released: treat it exactly like an uncertain call.
@@ -1212,7 +1243,7 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
                 raise SafetyError('NEW_CHARGE_UNCERTAIN') from None
             refused = isinstance(unsent, UnbilledRefusal)
             log_event({**event, 'status': 'not_sent', 'reason': 'unbilled_refusal' if refused else 'not_reached',
-                       **({'vendor_busy': unsent.busy} if refused else {}), **outcome})
+                       **({'vendor_busy': unsent.busy, **unsent.facts} if refused else {}), **outcome})
             if not refused:
                 raise CallNotSent('PROVIDER_NOT_REACHED') from None
             raise CallNotSent('PROVIDER_REFUSED_UNBILLED' if unsent.busy else 'PROVIDER_ERROR_UNBILLED') from None

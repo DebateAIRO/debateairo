@@ -23,9 +23,11 @@ import ssl
 import stat
 import threading
 import time
+import unicodedata
 from collections import namedtuple
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from email.utils import parsedate_to_datetime
 
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_TIMEOUT_SECONDS = 600
@@ -239,6 +241,105 @@ def redact(value, key, patterns=()):
             text = re.sub(pattern, '[REDACTED]', text)
         return text
     return value
+
+
+# What the gate keeps of a vendor answer it released unbilled (2026-10-12), so the owner can tell an
+# account rate limit from a busy model: the Retry-After value and the NAMES of rate-limit headers (never
+# their values, never any other header), and the error's type, code and a short, redacted message.
+MAX_RETRY_AFTER_CHARS = 64
+MAX_RETRY_AFTER_SECONDS = 3600
+MAX_RATE_LIMIT_HEADER_NAMES = 16
+RATE_LIMIT_HEADER_NAME = re.compile(r'(?:x-|anthropic-)?ratelimit-[a-z0-9-]{1,48}')
+VENDOR_LABEL = re.compile(r'[A-Za-z0-9_.:-]{1,64}')
+MAX_VENDOR_MESSAGE_CHARS = 200
+VENDOR_MESSAGE_SCAN_CHARS = 2000
+# Anything that may be a credential, an address or a link becomes [REDACTED] (in this order).
+VENDOR_MESSAGE_REDACTIONS = tuple(re.compile(pattern) for pattern in (
+    r'(?i)\b(?:[a-z][a-z0-9+.-]*)://\S+',                       # any URL
+    r'(?i)\bwww\.\S+',
+    r'[^\s@]+@[^\s@]+',                                       # an email (or any user@host)
+    r'(?i)\bbearer\s+\S+',
+    r'(?i)[\w.-]*(?:key|token|secret|passw|pwd|auth|credential|signature|session|cookie)[\w.-]*\s*[=:]\s*\S+',
+    r'\S*\?\S*=\S*',                                          # a path with a query
+    r'(?i)\b(?:sk|pk|rk|ak|key|tok|api)[-_][A-Za-z0-9_-]{6,}',   # prefixed key shapes (sk-..., tok_...)
+    r'(?=[A-Za-z0-9_+/=.-]*[0-9])(?=[A-Za-z0-9_+/=.-]*[A-Za-z])[A-Za-z0-9_+/=.-]{24,}'))  # long mixed tokens
+VENDOR_MESSAGE_SUSPECT = re.compile(r'(?i)@|://|bearer|[A-Za-z0-9_+/=.-]{40,}')
+
+
+def vendor_headers(items):
+    """What the gate keeps of an answer's headers: the first Retry-After value (trimmed, at most
+    MAX_RETRY_AFTER_CHARS) and the sorted, lower-case names of its rate-limit headers (x-ratelimit-*,
+    ratelimit-*, anthropic-ratelimit-*; at most MAX_RATE_LIMIT_HEADER_NAMES). No other header, and
+    no rate-limit value, is ever kept."""
+    retry_after, names = None, set()
+    for item in items if isinstance(items, (list, tuple)) else ():
+        if not (isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], str) and isinstance(item[1], str)):
+            continue
+        name = item[0].strip().lower()
+        if name == 'retry-after' and retry_after is None:
+            retry_after = item[1].strip()[:MAX_RETRY_AFTER_CHARS]
+        elif RATE_LIMIT_HEADER_NAME.fullmatch(name):
+            names.add(name)
+    return {'retry_after': retry_after, 'rate_limit_header_names': sorted(names)[:MAX_RATE_LIMIT_HEADER_NAMES]}
+
+
+def retry_after_seconds(value, moment):
+    """A Retry-After value as whole seconds from moment: delta-seconds (ASCII digits only) or an
+    HTTP-date (a part second counts as a whole one; a past date is 0), clamped to 0..3600. Anything
+    else (absent, empty, signed, decimal, junk) is None."""
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if re.fullmatch(r'[0-9]+', text):
+        return min(int(text[:12]), MAX_RETRY_AFTER_SECONDS)
+    if not text or not re.search(r'[A-Za-z]', text):
+        return None
+    try:
+        when = parsedate_to_datetime(text)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    seconds = (when - moment).total_seconds()
+    return max(0, min(MAX_RETRY_AFTER_SECONDS, int(-(-seconds // 1))))
+
+
+def safe_vendor_message(text):
+    """An error message fit to keep: control and format characters gone, whitespace collapsed,
+    anything like a key, token, email, address or link replaced by [REDACTED], then cut to
+    MAX_VENDOR_MESSAGE_CHARS. When in doubt (an address-like trace left after that) it is dropped."""
+    if not isinstance(text, str):
+        return None
+    text = ''.join(' ' if unicodedata.category(char)[0] == 'C' else char for char in text[:VENDOR_MESSAGE_SCAN_CHARS])
+    text = re.sub(r'\s+', ' ', text).strip()
+    for pattern in VENDOR_MESSAGE_REDACTIONS:
+        text = pattern.sub('[REDACTED]', text)
+    text = text[:MAX_VENDOR_MESSAGE_CHARS]
+    if not text or VENDOR_MESSAGE_SUSPECT.search(text):
+        return None
+    return text
+
+
+def _vendor_label(value):
+    if value is None:
+        return None
+    text = value if isinstance(value, str) else str(value) if type(value) is int else None
+    return text if text is not None and VENDOR_LABEL.fullmatch(text) else '(other)'
+
+
+def vendor_error_summary(response):
+    """From a (redacted) JSON answer only: its error's type and code (each a short label, else
+    "(other)") and safe_vendor_message of its message; a plain-text error is the message alone.
+    None when the answer has no error object or text."""
+    error = response.get('error') if isinstance(response, dict) else None
+    if isinstance(error, str):
+        return {'type': None, 'code': None, 'message': safe_vendor_message(error)}
+    if not isinstance(error, dict):
+        return None
+    return {'type': _vendor_label(error.get('type')), 'code': _vendor_label(error.get('code')),
+            'message': safe_vendor_message(error.get('message'))}
 
 
 # Any of these keys anywhere in a reply means it may have been billed (ruling 5 refuses to call it unsent).
@@ -823,6 +924,8 @@ class HttpsTransport:
         self.profile, self.path = profile, path
         self.max_response_bytes = min(max_response_bytes, MAX_RESPONSE_BYTES)
         self.timeout = min(timeout, MAX_TIMEOUT_SECONDS)
+        # After an answer: what vendor_headers kept of its headers (the gate reads it for an unbilled release).
+        self.vendor_headers = None
 
     def __call__(self, payload, key):
         # The gate checks and prices these exact bytes before it reserves; they are sent unchanged.
@@ -852,6 +955,8 @@ class HttpsTransport:
                                         'Accept': 'application/json'})
             remaining()
             response = connection.getresponse()
+            getheaders = getattr(response, 'getheaders', None)
+            self.vendor_headers = vendor_headers(getheaders() if callable(getheaders) else [])
             chunks, size = [], 0
             while True:
                 remaining()
