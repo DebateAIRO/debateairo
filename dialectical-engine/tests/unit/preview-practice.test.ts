@@ -974,6 +974,24 @@ describe("practice formats: busy retries end to end (unit, fake waits)", () => {
     expect(resumes).toEqual([`${GLM}|JUDGE_POSITION`, `${GLM}|JUDGE_POSITION`]);
   });
 
+  it("with --levels the busy-wait and trying-again lines name the run (final review fix 5); without, they are as before", async () => {
+    const progress = async (levels: string | null) => {
+      const observer = new PracticeGateObserver({ now: () => 0 });
+      const lines: string[] = [];
+      await runPracticeFormats({ config, targets: targets.filter((target) => target.model === GLM), ports: ports(observer, 2), observer,
+        lanes: ["JUDGE_POSITION"], samples: 1, gapMs: 0, pack, bounds, sleep: async () => undefined, parallel: true,
+        busyWaitMs: 30 * 60_000, random: () => 0, progress: (line) => lines.push(line),
+        ...(levels === null ? {} : { levels: parsePracticeLevels(levels, [GLM]) }) });
+      return lines.filter((line) => /busy|trying again/u.test(line));
+    };
+    expect(await progress(`${GLM}=high,low`)).toEqual([
+      `${GLM} is busy (refused, not billed): waiting 60s, then JUDGE_POSITION #1 high#1 again`,
+      `${GLM} JUDGE_POSITION #1 high#1: trying again after its wait`]);
+    expect(await progress(null)).toEqual([
+      `${GLM} is busy (refused, not billed): waiting 60s, then JUDGE_POSITION #1 again`,
+      `${GLM} JUDGE_POSITION #1: trying again after its wait`]);
+  });
+
   it("a cooling model waits the gate's retry_after", async () => {
     const observer = new PracticeGateObserver({ now: () => 0 });
     const waits: { waitMs: number; reason: string }[] = [];

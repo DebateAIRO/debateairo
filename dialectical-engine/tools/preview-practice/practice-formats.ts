@@ -313,11 +313,13 @@ export async function runPracticeFormats(input: Readonly<{
     const base = { model: target.model, providerRef: target.providerRef, gate, lane, sample, questionId: question.id,
       ...(run === undefined ? {} : { levelRun: run.run, thinkingLevel: run.level }) };
     const state = waitState(target.model);
+    // Spec 2026-10-12 §4.8 (final review fix 5): with --levels every line about this job names its run ("high#2").
+    const runTag = run === undefined ? "" : ` ${run.run}`;
     if (state.parked !== null) {
       const cancelled = input.observer.stopped(gate) !== null || input.shouldStop?.() === true;
       input.onResume?.(Object.freeze({ model: target.model, lane, sample, cancelled,
         waitedMs: Math.round(performance.now() - state.parked.since) }));
-      if (!cancelled) input.progress?.(`${target.model} ${lane} #${String(sample)}: trying again after its wait`);
+      if (!cancelled) input.progress?.(`${target.model} ${lane} #${String(sample)}${runTag}: trying again after its wait`);
       state.parked = null;
     }
     const skipped = (status: "SKIPPED_GATE_STOPPED" | "SKIPPED_MODEL_BUSY", errorCode: string) => {
@@ -421,7 +423,7 @@ export async function runPracticeFormats(input: Readonly<{
         state.inARow += 1;
         state.parked = { lane, sample, since: performance.now() };
         input.onBusyWait?.(Object.freeze({ model: target.model, lane, sample, wait: state.waits, waitMs, reason, retryAfterSeconds }));
-        input.progress?.(`${target.model} is busy (refused, not billed): waiting ${String(Math.round(waitMs / 1_000))}s, then ${lane} #${String(sample)} again`);
+        input.progress?.(`${target.model} is busy (refused, not billed): waiting ${String(Math.round(waitMs / 1_000))}s, then ${lane} #${String(sample)}${runTag} again`);
         return { retryAfterMs: waitMs };
       }
       if (!endedBusy) state.inARow = 0;
@@ -440,7 +442,7 @@ export async function runPracticeFormats(input: Readonly<{
         input.onBusy?.(target.model);
         input.progress?.(`${target.model} is busy (refused, not billed): its remaining jobs are skipped`);
       }
-      input.progress?.(`${target.model} ${lane} #${String(sample)}${run === undefined ? "" : ` ${run.run}`}: ${status} ${String(latencyMs)}ms`);
+      input.progress?.(`${target.model} ${lane} #${String(sample)}${runTag}: ${status} ${String(latencyMs)}ms`);
       return undefined;
     };
   };
