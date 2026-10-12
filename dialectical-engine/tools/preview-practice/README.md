@@ -344,6 +344,8 @@ Optional flags:
   `report.md` a "Thinking levels" table: per model and run, answered / jobs, first try, repaired, failed, cut off,
   thinking median, time median / p90, cost per job and over bar (this run alone over the slip bar; information only).
 
+To read the answers themselves, side by side: `node_modules/.bin/tsx tools/preview-practice/practice.ts report --side-by-side "$P/levels-step-b/samples.jsonl" --out "$P/levels-page"` writes `$P/levels-page/side-by-side.html` from a finished run's samples log, sending nothing and writing no report files. Open it in a browser. Each model has its own block, and each job a block per sample and question, with one labelled column per run: the accepted answer (or why there is none), then its status, thinking tokens, time, cost in US dollars, and "cut off" when a reply stopped at the length limit. Its header explains the labels: "high#2" is the same level run a second time, so you can see what changes by chance alone; "default" is the AI's own setting; "none" means thinking is switched off. The file holds the answers, so keep it in `$P` with the reports; it has no script, every value on it is escaped, and it is readable only by you.
+
 The tool does not count the testing day's budget itself: before a `--levels` run, read both gates' day spend (S-3)
 and keep the day's total under the owner's limits. The run can be stopped at any time with Ctrl-C (the report is
 still written).
@@ -406,7 +408,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
   `main.ts` files compose them on the preview. `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
 - `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode; `practice-levels.ts`: its `--levels`
-  plan. `practice-debate.ts`,
+  plan; `practice-side-by-side.ts`: the side-by-side page (`report --side-by-side`). `practice-debate.ts`,
   `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode; `practice-transcript.ts`: its
   `--transcript` file.
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
@@ -415,6 +417,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   `practice-questions.ts`.
 - `gate-relay.py` and `test_gate_relay.py` (run: `python3 tools/preview-practice/test_gate_relay.py`).
 - Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-levels.test.ts`,
+  `tests/unit/preview-practice-side-by-side.test.ts`,
   `tests/unit/preview-practice-transcript.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,
   `tests/integration/preview-practice-run.test.ts` (both modes against the scripted gate doubles in

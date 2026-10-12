@@ -16,7 +16,8 @@
  *  - debate:  one whole practice debate (depth 1 by default, 2 allowed) through the real ask path and the real runner.
  *             With --transcript it also writes <out>/transcript.json: every prompt and every reply, decrypted
  *             (practice-transcript.ts).
- *  - report:  builds report.json and report.md again from <out>/samples.jsonl (sends nothing, needs no gate).
+ *  - report:  builds report.json and report.md again from <out>/samples.jsonl (sends nothing, needs no gate). With
+ *             --side-by-side <samples.jsonl> it writes <out>/side-by-side.html instead (spec 2026-10-12 §4.8).
  *
  * The exact commands are in tools/preview-practice/README.md. Exit codes: 0 PASS, 10 PASS_WITH_WARNINGS, 20 FAIL,
  * 30 NOT_PROVEN, 40 HARNESS_ERROR, 50 ABORTED.
@@ -55,11 +56,13 @@ import {
   type PracticeReport
 } from "./practice-report.js";
 import {
+  parsePracticeSampleLog,
   PracticeSampleLog,
   practiceReportFromLog,
   readPracticeSampleLog,
   remainingLine
 } from "./practice-samples-log.js";
+import { writeSideBySideFile } from "./practice-side-by-side.js";
 import {
   assertGateStatusAllowsPractice,
   PracticeRefusal,
@@ -82,7 +85,8 @@ export function repositoryRoot(): string {
 type Args = Readonly<{ mode: "formats" | "debate" | "report"; flags: ReadonlyMap<string, string>; switches: ReadonlySet<string> }>;
 
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
-  "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels"]);
+  "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels",
+  "--side-by-side"]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript"]);
 
 export function parsePracticeArgs(argv: readonly string[]): Args {
@@ -202,9 +206,25 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     if (args.flags.has("--levels") && args.mode !== "formats") {
       throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--levels (formats mode only)");
     }
+    if (args.flags.has("--side-by-side") && args.mode !== "report") {
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--side-by-side (report mode only)");
+    }
     if (args.mode === "report") {
-      // Rebuilds the report from an existing samples log; nothing is sent. On a refusal nothing is written there.
       const folder = required(args, "--out");
+      const sideBySideLog = args.flags.get("--side-by-side");
+      if (sideBySideLog !== undefined) {
+        // Spec 2026-10-12 §4.8: the side-by-side page from the samples log named, nothing sent. Only the page is written
+        // (report.json and report.md in the folder are left as they are).
+        let lines;
+        try { lines = parsePracticeSampleLog(readFileSync(sideBySideLog, "utf8")); } catch (error) {
+          throw new PracticeRefusal(error instanceof Error && /^PRACTICE_/u.test(error.message) ? error.message : "PRACTICE_SAMPLES_LOG_UNREADABLE");
+        }
+        directory = assertOutsideRepository(folder, repositoryRoot());
+        const samples = lines.flatMap((line) => line.kind === "sample" ? [line.sample] : []);
+        log(`side-by-side: ${writeSideBySideFile(directory, samples)}`);
+        return Object.freeze({ exitCode: 0, report: practiceReportFromLog(lines), directory });
+      }
+      // Rebuilds the report from an existing samples log; nothing is sent. On a refusal nothing is written there.
       let lines;
       try { lines = readPracticeSampleLog(folder); } catch (error) {
         throw new PracticeRefusal(error instanceof Error && /^PRACTICE_/u.test(error.message) ? error.message : "PRACTICE_SAMPLES_LOG_UNREADABLE");
