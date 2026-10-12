@@ -1674,7 +1674,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     this.#options.assertNoOpenWriteTransaction();
     assertJsonObjectResponseCapability(this.#options);
     if(request.preferredResponseFormat!==undefined&&request.preferredResponseFormat!=="json_object") throw new TypedDomainError("PROVIDER_RESPONSE_FORMAT_INVALID","Unsupported preferred response format");
-    const responseFormat=request.lane==="story"&&request.preferredResponseFormat==="json_object"&&this.#options.supportsJsonObjectResponse===true?{type:"json_object"} as const:undefined;
+    // JSON mode only where the row allows it (supportsJsonObjectResponse), for a request that asks: the story calls, and
+    // (owner approval 2026-10-12) the preview's structured debate steps on the served lane. One value for the whole call,
+    // so the patch follow-up and the full re-ask carry the first POST's response_format.
+    const responseFormat=(request.lane==="story"||request.lane==="served")&&request.preferredResponseFormat==="json_object"&&this.#options.supportsJsonObjectResponse===true?{type:"json_object"} as const:undefined;
     if (!Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 1) {
       throw new TypeError("CallBound.maxAttempts must be a positive integer");
     }

@@ -571,3 +571,71 @@ describe("reviewed sampling: a row's own sampling settings, exactly, and none on
     expect(Buffer.byteLength(bodies[1]!)).toBeLessThanOrEqual(1024);
   });
 });
+
+/**
+ * JSON mode on every structured preview step (owner approval 2026-10-12, to fix MiMo's judging slips). On the preview,
+ * a served call that carries its own content check (the author legs incl. critic and cross-root, panel and review:
+ * JUDGE; the answer writer: SYNTHESIZER; the answer checker: EVALUATOR) asks for one JSON object when the target's row
+ * allows JSON mode (GLM, MiMo); the story calls keep asking as before. DeepSeek, Qwen and Haiku requests are unchanged.
+ */
+describe("JSON mode on every structured preview step, where the row allows it", () => {
+  const HAIKU = "claude-haiku-5-5";
+  const parsed = { parseStatus: "PARSED", parseError: null } as const;
+  const structured = (role: "JUDGE" | "SYNTHESIZER" | "EVALUATOR"): ProviderCallRequest => ({ ...RESULT_REQUEST, role,
+    bound: { maxAttempts: 3, tokenCeiling: 8192, deadlineMs: 5_000 },
+    classifyContent: () => parsed, buildRepairPacket: () => RESULT_REQUEST.packet });
+  const story = { ...RESULT_REQUEST, lane: "story" as const, callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER" as const,
+    preferredResponseFormat: "json_object" as const };
+  function policySees(model: string, request: ProviderCallRequest): ProviderCallRequest {
+    const seen: ProviderCallRequest[] = [];
+    const gateway = withPreviewProviderCallPolicy({ call: async (sent) => { seen.push(sent); return {} as never; } }, parse(MULTI)!, { model });
+    void gateway.call(request);
+    expect(seen).toHaveLength(1);
+    return seen[0]!;
+  }
+
+  it("the preview policy asks for JSON on every structured served step of a JSON row, and on no other request", () => {
+    for (const model of [GLM, DEEPSEEK, MIMO, QWEN, HAIKU]) {
+      const jsonRow = model === GLM || model === MIMO;
+      for (const role of ["JUDGE", "SYNTHESIZER", "EVALUATOR"] as const) {
+        expect(policySees(model, structured(role)).preferredResponseFormat, `${model} ${role}`).toBe(jsonRow ? "json_object" : undefined);
+        // A structured step whose sealed bound leaves no repair still expects one JSON object.
+        expect(policySees(model, { ...structured(role), bound: { maxAttempts: 1, tokenCeiling: 8192, deadlineMs: 5_000 } })
+          .preferredResponseFormat, `${model} ${role} bound 1`).toBe(jsonRow ? "json_object" : undefined);
+      }
+      // A call without its own content check, and a structured call off the served lane, are left as they were.
+      expect(Object.hasOwn(policySees(model, RESULT_REQUEST), "preferredResponseFormat"), model).toBe(false);
+      expect(Object.hasOwn(policySees(model, { ...structured("JUDGE"), lane: "evaluator" }), "preferredResponseFormat"), model).toBe(false);
+      // The story calls ask for themselves, unchanged.
+      expect(policySees(model, story).preferredResponseFormat).toBe("json_object");
+    }
+  });
+
+  it("GLM's and MiMo's structured bodies carry response_format last; DeepSeek's and Qwen's are byte for byte as before", async () => {
+    for (const model of [GLM, DEEPSEEK, MIMO, QWEN]) {
+      for (const role of ["JUDGE", "SYNTHESIZER", "EVALUATOR"] as const) {
+        const { executions, gateway } = previewGateway(model);
+        await gateway.call(structured(role));
+        const text = executions[0]!.requestBody;
+        const sent = JSON.parse(text) as { max_tokens: number; messages: unknown };
+        const row = previewModelRow(model)!;
+        expect(text, `${model} ${role}`).toBe(JSON.stringify({ model, max_tokens: sent.max_tokens,
+          ...(row.effort === null ? {} : { reasoning_effort: row.effort }), ...(row.sampling ?? {}), messages: sent.messages,
+          ...(row.jsonObject ? { response_format: { type: "json_object" } } : {}) }));
+        expect(Object.hasOwn(sent, "response_format")).toBe(model === GLM || model === MIMO);
+        expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(row, Buffer.byteLength(text))));
+      }
+    }
+  });
+
+  it("MiMo's full re-ask carries the same JSON mode and sampling, and the gate's check accepts both POSTs", async () => {
+    const { executions, gateway } = previewGateway(MIMO);
+    let replies = 0;
+    await gateway.call({ ...structured("JUDGE"),
+      classifyContent: () => (++replies === 1 ? { parseStatus: "PARSE_FAILED", parseError: "synthetic" } : parsed) });
+    expect(executions).toHaveLength(2);
+    for (const execution of executions) {
+      expect(JSON.parse(execution.requestBody)).toMatchObject({ ...MIMO_SAMPLING, response_format: { type: "json_object" } });
+    }
+  });
+});

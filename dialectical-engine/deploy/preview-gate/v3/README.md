@@ -46,8 +46,12 @@ What is new in v3:
 - MiMo's answer settings and JSON mode (owner approval 2026-10-12): every MiMo request carries
   `temperature` 1.0 and `top_p` 0.95, exactly, and no `top_k`; the gate refuses a MiMo request
   without them, with any other value, or with `top_k`. MiMo may also ask for JSON mode
-  (`response_format` `{"type":"json_object"}`), as GLM may; the app asks for it only on the story
-  writer's and checker's JSON requests, exactly as for GLM. Why: in a practice run MiMo closed
+  (`response_format` `{"type":"json_object"}`), as GLM may. On the preview the app asks for it, for
+  GLM and MiMo only, on every step that expects one JSON object: the debate's judging steps (author
+  legs incl. critic and cross-root, panel, review), the answer writer, the answer checker, and the
+  story writer and checker; a repair follow-up carries the same setting as the first request. The
+  gate needs no change for this (it already accepts JSON mode for a model that allows it). DeepSeek,
+  Qwen and Haiku requests never carry it. Why: in a practice run MiMo closed
   Romanian quotation marks („…) with a plain straight quote inside its JSON answer, nine times in
   one reply, so the answer could not be read. DeepInfra's MiMo page lists JSON among its features
   and recommends these two settings. (Every model's instructions also gained one fixed sentence

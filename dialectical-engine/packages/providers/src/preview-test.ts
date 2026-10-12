@@ -281,6 +281,17 @@ function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
   catch { return false; }
 }
 /**
+ * JSON mode on every structured preview step (owner approval 2026-10-12, to fix MiMo's judging slips): a debate step on
+ * the served lane (JUDGE: the author legs incl. critic and cross-root, panel and review; SYNTHESIZER: the answer writer;
+ * EVALUATOR: the answer checker) that carries its own content check expects one JSON object, so on a row that allows
+ * JSON mode (`jsonObject`: GLM, MiMo) it asks for it, as the story calls already do. Every other row's request, and every
+ * other request, is passed on as it came; the gateway still sends response_format only where the row allows it.
+ */
+function previewStructuredStep(request: ProviderCallRequest): boolean {
+  return request.lane === "served" && (request.role === "JUDGE" || request.role === "SYNTHESIZER" || request.role === "EVALUATOR")
+    && typeof request.classifyContent === "function";
+}
+/**
  * Story format robustness (2026-10-12), finding 1: the storyteller thinks before it writes, and on every reviewed row
  * that thinking counts toward max_tokens (DeepInfra reports it as reasoning tokens inside the completion; Anthropic
  * counts thinking as output). DeepSeek spent 11,317 of the sealed 12,000 thinking and its story was cut off. On the
@@ -400,13 +411,15 @@ export function withPreviewProviderCallPolicy(
       ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) }) : preview;
     const storyRepair = previewStoryRepairAllowed(request);
     const formatRepair = !storyRepair && previewFormatRepairAllowed(request);
+    const asksJson = reviewed.jsonObject && previewStructuredStep(request);
     // One explicit level replaces whatever the request carried: the configured level on an effort
     // row; DEFAULT_ONLY on a row without one, which the gateway treats exactly as "no level".
     // Run resilience (spec 2026-10-12, fix (b)): the step's allowance is this maker's own (`attemptScope`), so a
     // fallback that moves a call to another maker never finds the step spent by the makers it moved away from.
     const send = () => gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
       bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1, attemptScope: "actor",
-      ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
+      ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}),
+      ...(asksJson ? { preferredResponseFormat: "json_object" as const } : {}) });
     if (storyRepair) return send();
     return send().catch(async (error: unknown) => {
       if (!previewCallWasUnbilled(error)) throw error;

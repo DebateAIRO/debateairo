@@ -80,10 +80,20 @@ describe("story JSON mode is an effective, target-specific wire control", () => 
     expect(request.packet).not.toHaveProperty("response_format");
   });
 
+  it("a served (debate step) request that prefers JSON gets it too, as the preview's structured steps ask (2026-10-12)", async () => {
+    const { gateway, bodies } = harness();
+    await gateway.call({ ...high, lane: "served", preferredResponseFormat: "json_object" });
+    expect(JSON.parse(bodies[0]!)).toEqual({ model: MODEL, max_tokens: 12_000,
+      reasoning_effort: "high", messages: request.packet.messages, response_format: { type: "json_object" } });
+    const unsupported = harness({ supportsJsonObjectResponse: false });
+    await unsupported.gateway.call({ ...high, lane: "served", preferredResponseFormat: "json_object" });
+    expect(Object.hasOwn(JSON.parse(unsupported.bodies[0]!), "response_format")).toBe(false);
+  });
+
   it("leaves ordinary, unrequested, and unsupported calls byte-for-byte compatible", async () => {
     for (const variant of [
       { call: high, options: {} },
-      { call: { ...high, lane: "served" as const, preferredResponseFormat: "json_object" as const }, options: {} },
+      { call: { ...high, lane: "evaluator" as const, preferredResponseFormat: "json_object" as const }, options: {} },
       { call: { ...high, preferredResponseFormat: "json_object" as const }, options: { supportsJsonObjectResponse: false } },
       { call: { ...high, preferredResponseFormat: "json_object" as const }, options: { endpoint: "http://synthetic/v1" } }
     ]) {

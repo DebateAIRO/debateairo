@@ -70,6 +70,8 @@ function deepInfraHarness(script: Step[]) {
     assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined,
     persistRawArtifact: async (artifact) => { artifacts.push(artifact); return artifact.artifactId; },
     appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
+    // GLM's reviewed row allows JSON mode (providerTargetGatewayControls gives the runner's gateway this capability).
+    supportsJsonObjectResponse: true,
     ...previewTargetGatewayControls(CONFIG, { model: GLM })
   });
   const gateway = withPreviewProviderCallPolicy(native, CONFIG, { model: GLM }, { sleep: async (ms) => { slept.push(ms); } });
@@ -178,6 +180,24 @@ describe("the short follow-up on the preview's DeepInfra wire", () => {
     await expect(gateway.call({ ...positionRequest(), bound: { maxAttempts: 2, tokenCeiling: 8192, deadlineMs: 600_000 } }))
       .rejects.toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2 });
     expect(executions).toHaveLength(2);
+  });
+
+  it("every POST of a structured call asks for the same JSON mode: the first, the patch and the full re-ask", async () => {
+    // Owner approval 2026-10-12: a structured preview step asks for JSON mode on a row that allows it (GLM, MiMo), and
+    // its follow-ups carry the same response_format, so the cached prefix and the gate's body check match the first call.
+    const { gateway, executions } = deepInfraHarness([
+      { content: POSITION_SLIP }, { content: fixedPosition(true) }, { content: fixedPosition(true) }
+    ]);
+    await gateway.call(positionRequest());
+    expect(executions).toHaveLength(3);
+    for (const execution of executions) {
+      expect(JSON.parse(execution.requestBody).response_format).toEqual({ type: "json_object" });
+      expect(execution.requestBody.endsWith(',"response_format":{"type":"json_object"}}')).toBe(true);
+    }
+    // Byte for byte up to the first call's last message: the follow-ups only append turns, then the same JSON mode.
+    const first = executions[0]!.requestBody;
+    const head = first.slice(0, first.lastIndexOf('],"response_format"'));
+    for (const later of executions.slice(1)) expect(later.requestBody.startsWith(head)).toBe(true);
   });
 
   it("an unbilled refusal of the patch POST ends the call; the one 60-second resend starts again from the original packet", async () => {

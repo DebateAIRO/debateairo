@@ -183,8 +183,9 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
       outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false }),
     // Owner approval 2026-10-12: in a live practice run MiMo closed Romanian quotation marks („…) with a straight double
     // quote inside its JSON (nine times in one judging reply), then wrote a second JSON answer in the same reply. Its
-    // DeepInfra page lists JSON among its features and recommends temperature 1.0, top_p 0.95: JSON mode is allowed (sent
-    // on story JSON requests, exactly as for GLM) and every request carries those two sampling members (no top_k).
+    // DeepInfra page lists JSON among its features and recommends temperature 1.0, top_p 0.95: JSON mode is allowed (on
+    // the preview, sent on every structured step and the story calls, as for GLM) and every request carries those two
+    // sampling members (no top_k).
     row("deepinfra", { model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
       outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: true, sampling: { temperature: 1.0, top_p: 0.95 } }),
     // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
