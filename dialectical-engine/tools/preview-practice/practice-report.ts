@@ -478,7 +478,8 @@ export function reportMarkdown(report: PracticeReport): string {
     }
     lines.push("");
   }
-  const parallel = report.parallel as PracticeParallelBlock | undefined;
+  // Debate mode only: the formats report's own `parallel` is a yes/no (models at once, practice-samples-log.ts).
+  const parallel = typeof report.parallel === "object" && report.parallel !== null ? report.parallel as PracticeParallelBlock : undefined;
   if (parallel !== undefined) lines.push(...practiceParallelLines(parallel));
   const cache = report.cacheByModel as Readonly<Record<string, PracticeCacheBlock>> | undefined;
   if (cache !== undefined && Object.keys(cache).length > 0) {
