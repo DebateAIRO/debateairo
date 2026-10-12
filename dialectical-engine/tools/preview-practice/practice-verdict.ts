@@ -7,8 +7,8 @@
  *  - PASS_WITH_WARNINGS (exit 10): it worked, but some calls were refused as "too busy" before they recovered, or a
  *    model was slow (its 90th-percentile call took more than two minutes).
  *  - FAIL (exit 20): something a person would have seen went wrong.
- *  - NOT_PROVEN (exit 30): it worked, but a model sat out as busy (or a gate was paused because too many calls were
- *    refused as busy), so that model was not tested to the end.
+ *  - NOT_PROVEN (exit 30): it worked, but a model sat out as busy (its vendor refused it, or it was cooling off), or
+ *    the practice paused a gate itself after four connection failures in a row, so that model was not tested to the end.
  *  - HARNESS_ERROR (exit 40): the practice itself could not run (a start check refused, or the tool broke). No verdict
  *    about the release.
  * When several apply, the first in this order wins: HARNESS_ERROR, FAIL, NOT_PROVEN, PASS_WITH_WARNINGS, PASS.
@@ -42,10 +42,10 @@ export type PracticeVerdictInput = Readonly<{
   /** The practice's own brake stopped a gate for a gate refusal, a vendor error or an unreadable answer. */
   gateStopped: boolean;
   /**
-   * Gates the practice's brake paused for busy refusals only (four in a row, or the day's room used up): nothing
-   * failed, the models behind them were not exercised. Optional: none when absent.
+   * Gates the practice's brake paused itself for connection failures (four in a row): nothing failed, the models behind
+   * them were not exercised. Optional: none when absent.
    */
-  gateBusyPauses?: readonly string[];
+  gatePauses?: readonly string[];
   /** Models that sat out (busy at ask time) or were never exercised (formats: a gate stopped before them). */
   notExercisedModels: readonly string[];
   /**
@@ -53,7 +53,7 @@ export type PracticeVerdictInput = Readonly<{
    * of the debate (debate). Not a failure: NOT_PROVEN for that model. Optional: none when absent.
    */
   busyModels?: readonly string[];
-  /** Unbilled ("too busy") refusals seen during a practice that otherwise went through. */
+  /** Refusals the gate proved unbilled (vendor busy, model cooling off, not reached) during a practice that went through. */
   unbilledRefusals: number;
   /** Each model's 90th-percentile latency in ms. */
   p90ByModel: Readonly<Record<string, number>>;
@@ -83,7 +83,7 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
   const notProven = [
     ...busy.map((model) => `MODEL_BUSY:${model}`),
     ...[...new Set(input.notExercisedModels)].filter((model) => !busy.includes(model)).sort().map((model) => `MODEL_NOT_EXERCISED:${model}`),
-    ...[...(input.gateBusyPauses ?? [])].sort().map((pause) => `GATE_PAUSED_BUSY:${pause}`)
+    ...[...(input.gatePauses ?? [])].sort().map((pause) => `GATE_PAUSED:${pause}`)
   ];
   const warn: string[] = [];
   if (input.unbilledRefusals > 0) warn.push(`UNBILLED_REFUSALS:${String(input.unbilledRefusals)}`);

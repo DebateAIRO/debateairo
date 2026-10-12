@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import type { PracticeDebateResult } from "./practice-debate.js";
 import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
-import { practiceStopIsBusyPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
+import { practiceStopIsPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
 import { latencySummary, practiceVerdict, type PracticeVerdictResult } from "./practice-verdict.js";
 
 export const PRACTICE_REPORT_SCHEMA = "preview-practice-report-v1" as const;
@@ -87,19 +87,19 @@ function gateHalted(observer: PracticeGateObserver, after: Readonly<Record<Pract
   return refused || notActive;
 }
 
-/** The brake stopped a gate for a refusal, a vendor error or an unreadable answer (not the operator, not busy refusals). */
+/** The brake stopped a gate for a refusal, a vendor error or an unreadable answer (not the operator, not its own pauses). */
 function gateStopped(observer: PracticeGateObserver): boolean {
   return GATES.some((gate) => {
     const stop = observer.stopped(gate);
-    return stop !== null && !/^OPERATOR_/u.test(stop.reason) && !practiceStopIsBusyPause(stop);
+    return stop !== null && !/^OPERATOR_/u.test(stop.reason) && !practiceStopIsPause(stop);
   });
 }
 
-/** The gates the brake paused for busy refusals only, as `gate:reason`. */
-function gateBusyPauses(observer: PracticeGateObserver): readonly string[] {
+/** The gates the practice paused itself for connection failures in a row, as `gate:reason`. */
+function gatePauses(observer: PracticeGateObserver): readonly string[] {
   return GATES.flatMap((gate) => {
     const stop = observer.stopped(gate);
-    return practiceStopIsBusyPause(stop) ? [`${gate}:${stop!.reason}`] : [];
+    return practiceStopIsPause(stop) ? [`${gate}:${stop!.reason}`] : [];
   });
 }
 
@@ -131,7 +131,7 @@ export function formatsReport(input: Readonly<{
     failedCalls,
     gateHalted: gateHalted(input.observer, { deepinfra: input.remaining.deepinfra.after, anthropic: input.remaining.anthropic.after }),
     gateStopped: gateStopped(input.observer),
-    gateBusyPauses: gateBusyPauses(input.observer),
+    gatePauses: gatePauses(input.observer),
     notExercisedModels: input.result.models.filter((model) => !exercised.has(model)),
     busyModels: input.result.busyModels,
     unbilledRefusals: GATES.reduce((sum, gate) => sum + input.observer.summary(gate).unbilled, 0),
@@ -186,7 +186,7 @@ export function debateReport(input: Readonly<{
     failedCalls: r.failedCalls,
     gateHalted: gateHalted(input.observer, { deepinfra: r.remaining.deepinfra.after, anthropic: r.remaining.anthropic.after }),
     gateStopped: gateStopped(input.observer),
-    gateBusyPauses: gateBusyPauses(input.observer),
+    gatePauses: gatePauses(input.observer),
     notExercisedModels: r.admission.satOut.map((entry) => entry.model),
     busyModels: busyDuringRun,
     unbilledRefusals: GATES.reduce((sum, gate) => sum + input.observer.summary(gate).unbilled, 0),
@@ -240,8 +240,11 @@ export function reportMarkdown(report: PracticeReport): string {
     lines.push("Gates:", "");
     for (const [gate, block] of Object.entries(gates)) {
       const observed = (block.observed ?? block) as PracticeGateSummary;
-      lines.push(`- ${gate}: ${String(observed.calls)} calls, ${String(observed.unbilled)} refused as busy (unbilled), `
-        + `longest busy run ${String(observed.maxConsecutiveUnbilled)}, stopped: ${observed.stop === null ? "no" : observed.stop.reason}`
+      lines.push(`- ${gate}: ${String(observed.calls)} calls, ${String(observed.unbilled)} refused, not billed (vendor busy `
+        + `${String(observed.vendorRefused)}, cooling off ${String(observed.modelCooling)}, not reached ${String(observed.notReached)}), `
+        + `longest not-reached run ${String(observed.longestNotReachedRun)} (streak at start `
+        + `${observed.unsentStreakAtStart === null ? "unknown" : String(observed.unsentStreakAtStart)}), `
+        + `stopped: ${observed.stop === null ? "no" : observed.stop.reason}`
         + (block.spentUsdByRemaining === undefined || block.spentUsdByRemaining === null ? "" : `, spent by the gate's count $${block.spentUsdByRemaining}`));
     }
     lines.push("");

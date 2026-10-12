@@ -5,8 +5,8 @@
  *  - both forwarded gate sockets exist on this computer (PRACTICE_DEEPINFRA_SOCKET, PRACTICE_ANTHROPIC_SOCKET),
  *  - the operator has written PRACTICE_ACK=spends-real-money,
  *  - the live settings file holds only the allowed, non-secret runner/API settings and nothing key-shaped,
- *  - root's fresh `status` of each gate says it is active and has had at most 10 "too busy" refusals today
- *    (the gate halts at 20, and the live site needs the room).
+ *  - root's fresh `status` of each gate says it is active and has fewer than three connection failures in a row
+ *    (the gate halts at five). "Too busy" refusals and cool-offs do not count: the gate never halts on them.
  * The gates' read-only "what is left today" answer is checked separately, once the sockets are known to work.
  */
 import { lstatSync, readFileSync } from "node:fs";
@@ -17,8 +17,11 @@ import { redactKeyShapes } from "./practice-redaction.js";
 import type { PracticeRunnerSettings } from "./practice-runner-composition.js";
 
 export const PRACTICE_ACK_VALUE = "spends-real-money" as const;
-/** Root's `status` may show at most this many unbilled refusals today on a gate before a practice may start. */
-const PRACTICE_MAX_UNBILLED_TODAY = 10;
+/**
+ * A practice refuses to start on a gate whose connection-failure streak (root's `status` `unsent_streak`) has reached
+ * this many: the gate halts at five in a row, and the live site needs the room.
+ */
+const PRACTICE_REFUSE_UNSENT_STREAK_AT = 3;
 
 export class PracticeRefusal extends Error {
   constructor(readonly code: string, detail?: string) {
@@ -160,26 +163,29 @@ export function readPracticeSettings(path: string): PracticeSettings {
   return parsePracticeSettings(text);
 }
 
-export type PracticeGateStatus = Readonly<{ state: string; todayUnbilled: number; halts: number | null }>;
+export type PracticeGateStatus = Readonly<{ state: string; unsentStreak: number; halts: number | null }>;
 
-/** Root's `status` output of one gate (JSON). Only three members are read; the file is never copied into a report. */
+/**
+ * Root's `status` output of one gate (JSON). Only three members are read (state, unsent_streak, halts); the file is
+ * never copied into a report. The day's unbilled count is not read: the gate no longer halts on it.
+ */
 export function parseGateStatus(gate: string, text: string): PracticeGateStatus {
   let value: unknown;
   try { value = JSON.parse(text); } catch { throw new PracticeRefusal("PRACTICE_GATE_STATUS_INVALID", gate); }
   const row = (typeof value === "object" && value !== null ? value : {}) as Record<string, unknown>;
-  const unbilled = row.today_unbilled_releases;
-  if (typeof row.state !== "string" || typeof unbilled !== "number" || !Number.isSafeInteger(unbilled) || unbilled < 0) {
+  const streak = row.unsent_streak;
+  if (typeof row.state !== "string" || typeof streak !== "number" || !Number.isSafeInteger(streak) || streak < 0) {
     throw new PracticeRefusal("PRACTICE_GATE_STATUS_INVALID", gate);
   }
   const halts = typeof row.halts === "number" ? row.halts : Array.isArray(row.halts) ? row.halts.length : null;
-  return Object.freeze({ state: row.state, todayUnbilled: unbilled, halts });
+  return Object.freeze({ state: row.state, unsentStreak: streak, halts });
 }
 
-/** The start rule on root's status: active, and at most 10 unbilled refusals today. */
+/** The start rule on root's status: active, and fewer than three connection failures in a row (no daily cap). */
 export function assertGateStatusAllowsPractice(gate: string, status: PracticeGateStatus): void {
   if (status.state !== "active") throw new PracticeRefusal("PRACTICE_GATE_NOT_ACTIVE", `${gate}: ${status.state}`);
-  if (status.todayUnbilled > PRACTICE_MAX_UNBILLED_TODAY) {
-    throw new PracticeRefusal("PRACTICE_GATE_TOO_MANY_UNBILLED_TODAY", `${gate}: ${String(status.todayUnbilled)}`);
+  if (status.unsentStreak >= PRACTICE_REFUSE_UNSENT_STREAK_AT) {
+    throw new PracticeRefusal("PRACTICE_GATE_UNSENT_STREAK_TOO_HIGH", `${gate}: ${String(status.unsentStreak)}`);
   }
 }
 

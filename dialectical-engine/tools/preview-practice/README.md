@@ -49,29 +49,30 @@ The last line on the screen and the exit code say:
 | 0 | PASS | Everything worked. The upload may go ahead. |
 | 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes. Owner decides. |
 | 20 | FAIL | A reply had the wrong format, a call failed, the debate did not finish, no answer or no story, or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
-| 30 | NOT_PROVEN | It worked, but a model was busy (its call was refused as "too busy", not billed) and sat out the rest, or a gate was paused because too many calls were refused as busy, so some model was not tested to the end. Run again later, or owner decides. |
+| 30 | NOT_PROVEN | It worked, but a model was busy (the AI company refused its call as "too busy", not billed, or the model was cooling off) and sat out the rest, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, so some model was not tested to the end. Run again later, or owner decides. |
 | 40 | HARNESS_ERROR | The practice could not run (a start check refused, or the tool broke). Nothing about the release is known. |
 
 ## Safety rules built in
 
 - It refuses to start unless `PRACTICE_ACK=spends-real-money` is set and both forwarded sockets exist.
-- It refuses to start unless root's fresh `status` of each gate says `active` with at most 10 "too busy" refusals
-  today (the gate halts at 20, and the live site needs the room), and unless each gate's own read-only "what is left
-  today" answer says active and open.
+- It refuses to start unless root's fresh `status` of each gate says `active`, and unless each gate's count of
+  "could not reach the AI company" answers in a row (the status field `unsent_streak`) is below three; the refusal
+  prints the count it found. The gate itself halts at five. There is no daily cap: "too busy" refusals never stop a
+  start. It also refuses unless each gate's own read-only "what is left today" answer says active and open.
 - The settings file may hold only non-secret settings from an allow-list; a database address, a team list or
   anything key-shaped refuses.
 - A busy model: when the AI company refuses a model's call as "too busy" and refuses its one resend too (not
-  billed), that model is marked busy and its remaining jobs are skipped (`SKIPPED_MODEL_BUSY`; formats mode). The
-  other models, on the same gate too, go on. In debate mode the runner makes a busy model sit out by itself. Either
-  way the verdict for that model is NOT_PROVEN, not FAIL. The gate's own refusals ("too many calls at once", "could
-  not reach the AI company") never mark a model busy.
+  billed), or the model is cooling off after such refusals (the gate refuses that model for a while, without
+  contacting the AI company), that model is marked busy and its remaining jobs are skipped (`SKIPPED_MODEL_BUSY`;
+  formats mode). The other models, on the same gate too, go on, and the gate is not stopped for this. In debate mode
+  the runner makes a busy model sit out by itself. Either way the verdict for that model is NOT_PROVEN, not FAIL.
+  The gate's own refusal "too many calls at once" never marks a model busy.
 - The safety net on each gate, counted as the gate counts: the practice never sends to a gate again after 4
-  refusals in a row on it that were "too busy" or "could not reach the AI company" (any answer resets the count, as
-  the gate's own does; the gate itself halts at 5 in a row), or once the day's count of "too busy" refusals (root's
-  `status` at the start plus those seen in the practice) reaches 12 (the gate halts at 20 and the live site needs
-  the room), or after any other refusal from the gate. "Too many calls at once" moves neither count. Ctrl-C once: no
-  new calls are sent, the call in flight finishes; Ctrl-C twice quits at once (avoid: a call killed mid-flight can
-  halt the gate).
+  answers in a row on it that were "could not reach the AI company" (counting from the count the gate already had
+  at the start; the gate itself halts at 5 in a row). A vendor answer resets that count. "Too busy" refusals and
+  cool-offs neither add to it nor reset it, as the gate's own count works. A gate that refuses or halts for any other
+  reason also stops at once. "Too many calls at once" moves nothing. Ctrl-C once: no new calls are sent, the call in
+  flight finishes; Ctrl-C twice quits at once (avoid: a call killed mid-flight can halt the gate).
 - Calls go one at a time, with a 2-second gap between jobs in formats mode.
 
 ## Money and time (rough)

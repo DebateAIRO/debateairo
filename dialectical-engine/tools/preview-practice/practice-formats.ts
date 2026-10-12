@@ -13,7 +13,8 @@
  * order (job by job, the samples of a job together).
  *
  * A busy model: when a job's call ends in the vendor's refusal, not billed (the call and its one resend, the gate's
- * PROVIDER_REFUSED_UNBILLED), the model is marked busy and its remaining jobs are skipped (SKIPPED_MODEL_BUSY), read by
+ * PROVIDER_REFUSED_UNBILLED, or the model is cooling off as MODEL_COOLING), the model is marked busy and its remaining
+ * jobs are skipped (SKIPPED_MODEL_BUSY), read by
  * the runner's own predicate (providerCallEndedVendorRefusedUnbilled) on the job's gateway, as the runner's sit-out
  * book reads it on a member's gateway (apps/runner/src/run-sit-out.ts). The other models, on the same gate too, go
  * on. The gate's own refusals (too many calls in flight, vendor not reached) are the gate's, not the model's: they

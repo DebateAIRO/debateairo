@@ -108,7 +108,7 @@ async function scenario(override?: (request: GateRequest) => GateOverride | null
 beforeAll(async () => {
   folder = await mkdtemp(join(tmpdir(), "practice-it-"));
   await writeFile(join(folder, "settings.env"), settingsText());
-  await writeFile(join(folder, "status.json"), JSON.stringify({ state: "active", today_unbilled_releases: 2, halts: 0 }));
+  await writeFile(join(folder, "status.json"), JSON.stringify({ state: "active", unsent_streak: 0, today_unbilled_releases: 2, halts: 0 }));
   registerExportPath = join(folder, "register-export.json");
   await writeFile(registerExportPath, await exportedRegister());
 }, 600_000);
@@ -166,6 +166,29 @@ describe("preview practice: formats mode", () => {
     // GLM was asked once and resent once, never again; the DeepInfra gate was never stopped.
     expect(stubs.requests.filter((request) => request.model === GLM).map((request) => request.answer)).toEqual(["UNBILLED", "UNBILLED"]);
     expect(report.gates.deepinfra!.observed.stop).toBeNull();
+  }, 300_000);
+
+  it("GLM cools off at the gate (MODEL_COOLING): GLM SKIPPED_MODEL_BUSY after its first job, the other four all exercised, the gate never stopped: NOT_PROVEN (exit 30)", async () => {
+    const { stubs, env, common, quiet } = await scenario((request) => request.model === GLM ? { gateRefuses: "MODEL_COOLING" } : null);
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
+    const report = outcome.report as unknown as {
+      verdict: string; reasons: string[]; busyModels: string[];
+      byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[];
+      gates: Record<string, { observed: { stop: unknown; modelCooling: number; gateRefused: number } }>;
+    };
+    expect(report.verdict).toBe("NOT_PROVEN");
+    expect(outcome.exitCode).toBe(30);
+    expect(report.reasons).toContain(`MODEL_BUSY:${GLM}`);
+    expect(report.reasons.some((reason) => reason.startsWith("FORMAT_FAILED") || reason.startsWith("CALL_FAILED")
+      || reason.startsWith("GATE_"))).toBe(false);
+    expect(report.busyModels).toEqual([GLM]);
+    const glm = report.byModelAndLane.filter((row) => row.model === GLM);
+    expect(glm[0]!.statuses).toEqual({ UNBILLED_REFUSED: 1 });
+    for (const row of glm.slice(1)) expect(row.statuses).toEqual({ SKIPPED_MODEL_BUSY: 1 });
+    for (const row of report.byModelAndLane.filter((entry) => entry.model !== GLM)) expect(row.statuses).toEqual({ PARSED: 1 });
+    // GLM was asked once and resent once, both refused by the gate's cool-off; the vendor was never asked for GLM.
+    expect(stubs.requests.filter((request) => request.model === GLM).map((request) => request.answer)).toEqual(["COOLING", "COOLING"]);
+    expect(report.gates.deepinfra!.observed).toMatchObject({ stop: null, modelCooling: 2, gateRefused: 0 });
   }, 300_000);
 
   it("the answer-writer's draft citing the surviving objection is accepted (the old root-only citable set refused it): PASS", async () => {

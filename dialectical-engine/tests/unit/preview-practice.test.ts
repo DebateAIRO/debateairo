@@ -1,5 +1,5 @@
 // The preview practice tool's pure rules (tools/preview-practice): the verdict and its exit codes, the redaction of
-// reply text, the gate brake (stop after four unbilled refusals in a row, or once the day's count reaches twelve), the
+// reply text, the gate brake (stop after four connection failures in a row; vendor refusals and cool-offs never stop it), the
 // busy-model skip of the formats mode, and the start refusals.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -7,6 +7,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   PREVIEW_REVIEWED_PROVIDER_REFS,
   PreviewGateUnavailable,
+  PreviewModelCooling,
   PreviewUnbilledRefusal,
   PreviewVendorRefusedUnbilled,
   parsePreviewProviderTestConfig,
@@ -18,7 +19,7 @@ import {
 } from "@debateai/providers";
 import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
-import { PracticeGateObserver, PRACTICE_GATE_STOPPED, practiceStopIsBusyPause, vendorUsage } from "../../tools/preview-practice/practice-gate-observer.js";
+import { PracticeGateObserver, PRACTICE_GATE_STOPPED, practiceStopIsPause, vendorUsage } from "../../tools/preview-practice/practice-gate-observer.js";
 import { onePerModel, practiceTurnOrder, runPracticeFormats } from "../../tools/preview-practice/practice-formats.js";
 import { stubVendorReply } from "../support/preview-gate-stubs.js";
 import { issueListFromParseError, recheckReply, replyContentOf, callFamilyOf } from "../../tools/preview-practice/practice-lanes.js";
@@ -63,13 +64,13 @@ describe("practice verdict", () => {
       .toEqual({ verdict: "NOT_PROVEN", exitCode: 30, reasons: ["MODEL_BUSY:glm", "UNBILLED_REFUSALS:2"] });
     expect(practiceVerdict({ ...CLEAN, busyModels: ["glm"], formatFailures: 1 }).verdict).toBe("FAIL");
   });
-  it("NOT_PROVEN (30) for a gate the brake paused for busy refusals only; FAIL for any other brake stop", () => {
-    expect(practiceVerdict({ ...CLEAN, gateBusyPauses: ["deepinfra:UNBILLED_IN_A_ROW_4"] }))
-      .toEqual({ verdict: "NOT_PROVEN", exitCode: 30, reasons: ["GATE_PAUSED_BUSY:deepinfra:UNBILLED_IN_A_ROW_4"] });
-    expect(practiceStopIsBusyPause({ gate: "deepinfra", reason: "UNBILLED_IN_A_ROW_4", atSeq: 4 })).toBe(true);
-    expect(practiceStopIsBusyPause({ gate: "deepinfra", reason: "UNBILLED_TODAY_12", atSeq: 4 })).toBe(true);
-    expect(practiceStopIsBusyPause({ gate: "deepinfra", reason: "GATE_REFUSED_DAILY_COST_ENVELOPE_REACHED", atSeq: 1 })).toBe(false);
-    expect(practiceStopIsBusyPause(null)).toBe(false);
+  it("NOT_PROVEN (30) for a gate the practice paused itself after four connection failures in a row; FAIL for any other stop", () => {
+    expect(practiceVerdict({ ...CLEAN, gatePauses: ["deepinfra:NOT_REACHED_IN_A_ROW_4"] }))
+      .toEqual({ verdict: "NOT_PROVEN", exitCode: 30, reasons: ["GATE_PAUSED:deepinfra:NOT_REACHED_IN_A_ROW_4"] });
+    expect(practiceStopIsPause({ gate: "deepinfra", reason: "NOT_REACHED_IN_A_ROW_4", atSeq: 4 })).toBe(true);
+    expect(practiceStopIsPause({ gate: "deepinfra", reason: "GATE_REFUSED_DAILY_COST_ENVELOPE_REACHED", atSeq: 1 })).toBe(false);
+    expect(practiceStopIsPause({ gate: "deepinfra", reason: "GATE_REFUSED_PROVIDER_GATE_UNAVAILABLE", atSeq: 1 })).toBe(false);
+    expect(practiceStopIsPause(null)).toBe(false);
   });
   it("PASS_WITH_WARNINGS (10): a recovered busy refusal, or a p90 over 120 s (120 s itself is not slow)", () => {
     expect(practiceVerdict({ ...CLEAN, unbilledRefusals: 2 })).toEqual({ verdict: "PASS_WITH_WARNINGS", exitCode: 10, reasons: ["UNBILLED_REFUSALS:2"] });
@@ -126,14 +127,18 @@ describe("practice redaction", () => {
 describe("practice gate brake", () => {
   const body = (model: string) => JSON.stringify({ model, max_tokens: 1, messages: [] });
   const execution = (model: string) => ({ operationId: "op", requestBody: body(model), requestSha256: "0".repeat(64), reservedUsd: "0.1" });
-  function scriptedPort(steps: ("OK" | "UNBILLED" | "NOTREACHED" | "INFLIGHT" | "DAILY" | "HALTED")[]) {
+  type Step = "OK" | "UNBILLED" | "COOLING" | "NOTREACHED" | "INFLIGHT" | "DAILY" | "HALTED";
+  function scriptedPort(steps: Step[]) {
     let sent = 0;
     const port: PreviewBudgetPort = {
       async execute() {
         const step = steps[sent] ?? "OK";
         sent += 1;
-        // The vendor's PROVIDER_REFUSED_UNBILLED and the gate's PROVIDER_NOT_REACHED, as previewAuthorityRefusal maps them.
+        // The vendor's PROVIDER_REFUSED_UNBILLED, as previewAuthorityRefusal maps it.
         if (step === "UNBILLED") throw new PreviewVendorRefusedUnbilled();
+        // Gate v4's MODEL_COOLING: this one model cools off; nothing was reserved or sent.
+        if (step === "COOLING") throw new PreviewModelCooling(60);
+        // The gate's PROVIDER_NOT_REACHED (the connection failed before a byte was written), as previewAuthorityRefusal maps it.
         if (step === "NOTREACHED") throw new PreviewUnbilledRefusal();
         // The gate's own CONCURRENCY_LIMIT_REACHED, as previewAuthorityRefusal maps it.
         if (step === "INFLIGHT") throw new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight");
@@ -144,76 +149,84 @@ describe("practice gate brake", () => {
     };
     return { port, sent: () => sent };
   }
-  it("stops a gate after FOUR unbilled refusals in a row (the gate halts at five) and never sends to it again", async () => {
+  it("stops a gate after FOUR connection failures in a row (the gate halts at five) and never sends to it again", async () => {
     const observer = new PracticeGateObserver({ now: () => 0 });
-    const gate = scriptedPort(["UNBILLED", "UNBILLED", "UNBILLED", "UNBILLED", "OK"]);
+    const gate = scriptedPort(["NOTREACHED", "NOTREACHED", "NOTREACHED", "NOTREACHED", "OK"]);
     const watched = observer.wrap("deepinfra", gate.port);
     for (let index = 0; index < 3; index += 1) await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
     expect(observer.stopped("deepinfra")).toBeNull();
     await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
     await expect(watched.execute(execution("m"))).rejects.toMatchObject({ code: PRACTICE_GATE_STOPPED });
     expect(gate.sent()).toBe(4);
-    expect(observer.summary("deepinfra")).toMatchObject({ calls: 4, unbilled: 4, maxConsecutiveUnbilled: 4, stoppedLocally: 1,
-      stop: { reason: "UNBILLED_IN_A_ROW_4" } });
+    expect(observer.summary("deepinfra")).toMatchObject({ calls: 4, unbilled: 4, notReached: 4, longestNotReachedRun: 4,
+      stoppedLocally: 1, stop: { reason: "NOT_REACHED_IN_A_ROW_4" } });
     expect(observer.stopped("anthropic")).toBeNull();
   });
-  it("three in a row then an answer resets the run: no stop", async () => {
+  it("vendor refusals (429, not billed) never stop the gate, however many come in a row, and never count as connection failures", async () => {
     const observer = new PracticeGateObserver();
-    const gate = scriptedPort(["UNBILLED", "UNBILLED", "UNBILLED", "OK", "UNBILLED", "UNBILLED", "UNBILLED", "OK"]);
+    const gate = scriptedPort([...Array<Step>(12).fill("UNBILLED"), "OK"]);
+    const watched = observer.wrap("deepinfra", gate.port);
+    for (let index = 0; index < 12; index += 1) await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewVendorRefusedUnbilled);
+    await expect(watched.execute(execution("m"))).resolves.toMatchObject({ status: 200 });
+    expect(observer.stopped("deepinfra")).toBeNull();
+    expect(observer.summary("deepinfra")).toMatchObject({ calls: 13, unbilled: 12, vendorRefused: 12, notReached: 0,
+      longestNotReachedRun: 0, stop: null });
+  });
+  it("a model cooling off (MODEL_COOLING) never stops the gate: that model is busy, the other models go on", async () => {
+    const observer = new PracticeGateObserver();
+    const gate = scriptedPort([...Array<Step>(5).fill("COOLING"), "OK"]);
+    const watched = observer.wrap("deepinfra", gate.port);
+    for (let index = 0; index < 5; index += 1) await expect(watched.execute(execution("glm"))).rejects.toBeInstanceOf(PreviewModelCooling);
+    await expect(watched.execute(execution("qwen"))).resolves.toMatchObject({ status: 200 });
+    expect(observer.stopped("deepinfra")).toBeNull();
+    expect(observer.summary("deepinfra")).toMatchObject({ unbilled: 5, modelCooling: 5, notReached: 0, longestNotReachedRun: 0, stop: null });
+    expect(observer.modelsEndingBusy()).toEqual(["glm"]);
+  });
+  it("a vendor refusal or a cool-off in between neither adds to nor resets the connection-failure run (the gate's own rule)", async () => {
+    const observer = new PracticeGateObserver();
+    const gate = scriptedPort(["NOTREACHED", "UNBILLED", "NOTREACHED", "COOLING", "NOTREACHED", "NOTREACHED", "OK"]);
+    const watched = observer.wrap("deepinfra", gate.port);
+    for (let index = 0; index < 6; index += 1) await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
+    await expect(watched.execute(execution("m"))).rejects.toMatchObject({ code: PRACTICE_GATE_STOPPED });
+    expect(gate.sent()).toBe(6);
+    expect(observer.summary("deepinfra")).toMatchObject({ notReached: 4, vendorRefused: 1, modelCooling: 1, longestNotReachedRun: 4,
+      stop: { reason: "NOT_REACHED_IN_A_ROW_4" } });
+  });
+  it("an answer resets the connection-failure run: three, an answer, three more: no stop", async () => {
+    const observer = new PracticeGateObserver();
+    const gate = scriptedPort(["NOTREACHED", "NOTREACHED", "NOTREACHED", "OK", "NOTREACHED", "NOTREACHED", "NOTREACHED", "OK"]);
     const watched = observer.wrap("anthropic", gate.port);
     for (const expected of ["refused", "refused", "refused", "ok", "refused", "refused", "refused", "ok"]) {
       if (expected === "ok") await expect(watched.execute(execution("m"))).resolves.toMatchObject({ status: 200 });
       else await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
     }
     expect(observer.stopped("anthropic")).toBeNull();
-    expect(observer.summary("anthropic")).toMatchObject({ calls: 8, vendorOk: 2, unbilled: 6, maxConsecutiveUnbilled: 3 });
+    expect(observer.summary("anthropic")).toMatchObject({ calls: 8, vendorOk: 2, unbilled: 6, notReached: 6, longestNotReachedRun: 3 });
   });
   it("the gate's own in-flight limit moves neither count (the gate refuses it before reserving anything)", async () => {
-    const observer = new PracticeGateObserver({ unbilledTodayAtStart: { deepinfra: 11 } });
+    const observer = new PracticeGateObserver();
     const gate = scriptedPort(["INFLIGHT", "INFLIGHT", "INFLIGHT", "INFLIGHT", "INFLIGHT", "OK"]);
     const watched = observer.wrap("deepinfra", gate.port);
     for (let index = 0; index < 5; index += 1) await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
     await expect(watched.execute(execution("m"))).resolves.toMatchObject({ status: 200 });
     expect(observer.stopped("deepinfra")).toBeNull();
-    expect(observer.summary("deepinfra")).toMatchObject({ unbilled: 5, concurrencyLimit: 5, maxConsecutiveUnbilled: 0, unbilledCounted: 0 });
+    expect(observer.summary("deepinfra")).toMatchObject({ unbilled: 5, concurrencyLimit: 5, notReached: 0, longestNotReachedRun: 0 });
   });
-  it("stops a gate once root's count at the start plus the refusals seen reach twelve (the next would pass twelve)", async () => {
-    const observer = new PracticeGateObserver({ unbilledTodayAtStart: { deepinfra: 9 } });
-    const gate = scriptedPort(["UNBILLED", "OK", "UNBILLED", "OK", "UNBILLED", "OK"]);
+  it("a gate that starts with a connection-failure streak of two has two more before the brake; a gate at the limit sends nothing", async () => {
+    const observer = new PracticeGateObserver({ unsentStreakAtStart: { deepinfra: 2 } });
+    const gate = scriptedPort(["NOTREACHED", "NOTREACHED", "OK"]);
     const watched = observer.wrap("deepinfra", gate.port);
-    await expect(watched.execute(execution("a"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
-    await expect(watched.execute(execution("b"))).resolves.toMatchObject({ status: 200 });
-    await expect(watched.execute(execution("a"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
-    await expect(watched.execute(execution("b"))).resolves.toMatchObject({ status: 200 });
-    expect(observer.stopped("deepinfra")).toBeNull();
-    await expect(watched.execute(execution("a"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
-    expect(observer.summary("deepinfra")).toMatchObject({ unbilledTodayAtStart: 9, unbilledCounted: 3, stop: { reason: "UNBILLED_TODAY_12" } });
-    await expect(watched.execute(execution("b"))).rejects.toMatchObject({ code: PRACTICE_GATE_STOPPED });
-    expect(gate.sent()).toBe(5);
-    // The other gate keeps its own count.
-    expect(observer.stopped("anthropic")).toBeNull();
-    // A gate whose day is already at twelve is stopped before anything is sent.
-    const full = new PracticeGateObserver({ unbilledTodayAtStart: { anthropic: 12 } });
+    await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
+    await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
+    await expect(watched.execute(execution("m"))).rejects.toMatchObject({ code: PRACTICE_GATE_STOPPED });
+    expect(gate.sent()).toBe(2);
+    expect(observer.summary("deepinfra")).toMatchObject({ unsentStreakAtStart: 2, longestNotReachedRun: 4,
+      stop: { reason: "NOT_REACHED_IN_A_ROW_4" } });
+    const full = new PracticeGateObserver({ unsentStreakAtStart: { anthropic: 4 } });
     const untouched = scriptedPort(["OK"]);
     await expect(full.wrap("anthropic", untouched.port).execute(execution("m"))).rejects.toMatchObject({ code: PRACTICE_GATE_STOPPED });
     expect(untouched.sent()).toBe(0);
-    expect(full.stopped("anthropic")).toMatchObject({ reason: "UNBILLED_TODAY_12" });
-  });
-  it("'vendor not reached' counts in a row (as the gate's streak) but not toward the day (the gate keeps no entry)", async () => {
-    const observer = new PracticeGateObserver({ unbilledTodayAtStart: { deepinfra: 11 } });
-    const gate = scriptedPort(["NOTREACHED", "NOTREACHED", "NOTREACHED", "OK", "NOTREACHED", "NOTREACHED", "UNBILLED", "NOTREACHED"]);
-    const watched = observer.wrap("deepinfra", gate.port);
-    for (let index = 0; index < 3; index += 1) await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
-    await expect(watched.execute(execution("m"))).resolves.toMatchObject({ status: 200 });
-    expect(observer.stopped("deepinfra")).toBeNull();
-    for (let index = 0; index < 3; index += 1) await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
-    // Eleven at the start plus the one vendor refusal reach twelve (and the run is three in a row).
-    expect(observer.summary("deepinfra")).toMatchObject({ unbilledCounted: 1, maxConsecutiveUnbilled: 3, stop: { reason: "UNBILLED_TODAY_12" } });
-    await expect(watched.execute(execution("m"))).rejects.toMatchObject({ code: PRACTICE_GATE_STOPPED });
-    // Four "not reached" in a row on the other gate: the run stops it, the day's count does not move.
-    const notReached = observer.wrap("anthropic", scriptedPort(["NOTREACHED", "NOTREACHED", "NOTREACHED", "NOTREACHED"]).port);
-    for (let index = 0; index < 4; index += 1) await expect(notReached.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
-    expect(observer.summary("anthropic")).toMatchObject({ unbilledCounted: 0, stop: { reason: "UNBILLED_IN_A_ROW_4" } });
+    expect(full.stopped("anthropic")).toMatchObject({ reason: "NOT_REACHED_IN_A_ROW_4" });
   });
   it("names the models whose last call ended in the vendor's refusal (the debate's sit-outs), not the gate's own", async () => {
     const observer = new PracticeGateObserver();
@@ -269,13 +282,16 @@ describe("practice start refusals", () => {
     expect(() => practiceSocketsFromEnvironment({ ...sockets, PRACTICE_DEEPINFRA_SOCKET: "/y/none.sock" }, isSocket)).toThrow("PRACTICE_SOCKET_NOT_FOUND");
     expect(() => practiceSocketsFromEnvironment({ ...sockets, PRACTICE_ANTHROPIC_SOCKET: "/x/deepinfra.sock" }, isSocket)).toThrow("PRACTICE_SOCKETS_SAME");
   });
-  it("refuses a gate that is not active or has had more than 10 unbilled refusals today", () => {
-    expect(() => assertGateStatusAllowsPractice("deepinfra", parseGateStatus("deepinfra", JSON.stringify({ state: "active", today_unbilled_releases: 10 })))).not.toThrow();
-    expect(() => assertGateStatusAllowsPractice("deepinfra", parseGateStatus("deepinfra", JSON.stringify({ state: "active", today_unbilled_releases: 11 }))))
-      .toThrow("PRACTICE_GATE_TOO_MANY_UNBILLED_TODAY");
-    expect(() => assertGateStatusAllowsPractice("anthropic", parseGateStatus("anthropic", JSON.stringify({ state: "halted", today_unbilled_releases: 0 }))))
+  it("refuses a gate that is not active, or whose connection-failure streak is three or more; there is no daily cap", () => {
+    expect(parseGateStatus("deepinfra", JSON.stringify({ state: "active", unsent_streak: 2 }))).toMatchObject({ unsentStreak: 2 });
+    expect(() => assertGateStatusAllowsPractice("deepinfra", parseGateStatus("deepinfra", JSON.stringify({ state: "active", unsent_streak: 2, today_unbilled_releases: 500 }))))
+      .not.toThrow();
+    expect(() => assertGateStatusAllowsPractice("deepinfra", parseGateStatus("deepinfra", JSON.stringify({ state: "active", unsent_streak: 3, today_unbilled_releases: 0 }))))
+      .toThrow("PRACTICE_GATE_UNSENT_STREAK_TOO_HIGH: deepinfra: 3");
+    expect(() => assertGateStatusAllowsPractice("anthropic", parseGateStatus("anthropic", JSON.stringify({ state: "halted", unsent_streak: 0 }))))
       .toThrow("PRACTICE_GATE_NOT_ACTIVE");
     expect(() => parseGateStatus("anthropic", "{}")).toThrow("PRACTICE_GATE_STATUS_INVALID");
+    expect(() => parseGateStatus("anthropic", JSON.stringify({ state: "active" }))).toThrow("PRACTICE_GATE_STATUS_INVALID");
   });
   const config = JSON.stringify({ deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"],
     premium_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash", "claude-haiku-5-5"],
