@@ -9,12 +9,14 @@
 // before they answer, so calls overlap. Integration suites are skipped by the CI gate: run this file by hand.
 //
 // Task 10 (pipeline, part 1 of 3): the opening positions, their panels and their reviews run together and are saved
-// in today's order.
+// in today's order. Task 11 (part 2 of 3): the support/attack replies and the cross-exchanges start as soon as the
+// positions they answer exist, and a reply beyond a round boundary waits for that boundary's freeze/stop decision.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { createPool, migrate, type Pool } from "@debateai/db";
 import { PREVIEW_PROVIDER_REF_MODELS } from "@debateai/providers";
 import {
+  DEEPSEEK,
   FIVE_MAKER_REFS,
   HAIKU,
   INCIDENT_PIN,
@@ -26,6 +28,7 @@ import {
   type AdmittedRun
 } from "../support/preview-debate-harness.js";
 import type { GateArrival, GateOverride, GateRequest } from "../support/preview-gate-stubs.js";
+import { framedField, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { reviewArtifact, withRequestDerivedBearings } from "../support/reviewBearings.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -116,46 +119,28 @@ describe("parallel calls: the opening positions (Task 10)", () => {
    * owner's values and a different seeded random hold per call (5-200 ms), and once with the row ABSENT.
    */
   it("same answers, any finish order: three random finish orders and the serial run save the same debate", async () => {
-    await copyDatabase(MIGRATED_COPY, "parallel_calls_seed");
-    const seedPool = createPool(databaseUrl("parallel_calls_seed"));
-    let debate: AdmittedRun;
-    try {
-      debate = await previewDebateHarness({ pool: () => seedPool, stubClosers })
-        .admittedRun("same-answers", { panelRefs: PANEL_REFS, depth: 1 });
-    } finally {
-      await seedPool.end();
-    }
     const variants = [
       { name: "parallel-1", seed: 11, row: OWNER_CALL_CONCURRENCY },
       { name: "parallel-2", seed: 22, row: OWNER_CALL_CONCURRENCY },
       { name: "parallel-3", seed: 33, row: OWNER_CALL_CONCURRENCY },
       { name: "serial", seed: 44, row: undefined }
     ] as const;
-    const saved: unknown[] = [];
-    for (const variant of variants) {
-      const copy = `parallel_calls_${variant.name.replace("-", "_")}`;
-      await copyDatabase("parallel_calls_seed", copy);
-      const pool = createPool(databaseUrl(copy));
-      try {
-        const run = previewDebateHarness({ pool: () => pool, stubClosers });
-        const random = seededRandom(variant.seed);
-        const gates = await run.startGates({}, undefined, scriptedAnswers(debate.question), heldCalls(() => 5 + Math.floor(random() * 196)));
-        const composed = await run.previewRunner(gates, "resend", variant.row === undefined ? {} : { callConcurrency: variant.row });
-        const result = await run.completedRun(composed, debate, gates);
-        // The row decides how many calls overlap: several with it, never two without it.
-        if (variant.row === undefined) expect(gates.concurrency.most, variant.name).toBe(1);
-        else expect(gates.concurrency.most, variant.name).toBeGreaterThan(1);
-        saved.push(await savedDebate(pool, debate.runId, result.answerId));
-      } finally {
-        await pool.end();
-      }
-      await untilUnused(copy, 60_000);
-      await admin.query(`DROP DATABASE "${copy}"`);
-    }
-    await untilUnused("parallel_calls_seed", 60_000);
-    await admin.query(`DROP DATABASE "parallel_calls_seed"`);
+    const runs = await savedAcrossVariants("same_answers", { panelRefs: PANEL_REFS, depth: 1 }, variants, {});
 
-    const [first, ...rest] = saved as SavedDebate[];
+    for (const [index, run] of runs.entries()) {
+      const variant = variants[index]!;
+      // The row decides how many calls overlap: several with it, never two without it.
+      if (variant.row === undefined) {
+        expect(run.concurrencyMost, variant.name).toBe(1);
+        continue;
+      }
+      expect(run.concurrencyMost, variant.name).toBeGreaterThan(1);
+      // Task 11: EVERY phase runs together — a reply and a cross-exchange were each in flight with another call.
+      for (const leg of ["support", "attack", "cross-root"] as const) {
+        expect(run.legsInFlightWithAnother(leg), `${variant.name} ${leg}`).toBeGreaterThan(0);
+      }
+    }
+    const [first, ...rest] = runs.map((run) => run.saved);
     // A real debate was saved: four roots, their depth-1 replies and the cross-exchanges, each reviewed.
     expect(first!.nodes.length).toBeGreaterThanOrEqual(4 + 8 + 12);
     expect(first!.reviews.length).toBe(first!.nodes.length);
@@ -216,8 +201,9 @@ describe("parallel calls: the opening positions (Task 10)", () => {
    */
   it("a root halted by a billed failure ends the debate once the other chains have settled", async () => {
     const debate = await harness.admittedRun("root-halts", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN, depth: 1 });
+    const holds = legRecordingHolds(() => 50);
     const gates = await harness.startGates({}, { unbilled: [] },
-      (request) => request.model === QWEN && request.kind === "JUDGE" ? { vendorStatus: 500 } : null, heldCalls(() => 50));
+      (request) => request.model === QWEN && request.kind === "JUDGE" ? { vendorStatus: 500 } : null, holds.delayMs);
     const composed = await harness.previewRunner(gates, "resend", { callConcurrency: OWNER_CALL_CONCURRENCY });
     await expect(composed.runner.executeWorkItem(debate.workItemId)).rejects.toMatchObject({ code: "MAKER_POSITION_UNAVAILABLE" });
     const endedAt = performance.now();
@@ -228,13 +214,214 @@ describe("parallel calls: the opening positions (Task 10)", () => {
     const qwenRoot = calls.filter((call) => call.call_site_key === "JUDGE:root:2").map((call) => call.outcome);
     expect(qwenRoot.length).toBeGreaterThan(1);
     expect(qwenRoot.every((outcome) => outcome === "FAILED")).toBe(true);
-    expect(composed.holdWaits).toHaveLength(1);
+    // Qwen's root took one cooldown hold. Since Task 11 the replies to root 0 (its text exists from the start) are asked
+    // together with the roots: a reply Qwen writes fails the same way and may take the run's other hold (the cap is
+    // two per run, DEVELOPMENT_RUN_DEATH_POLICY) — never a third.
+    const qwenReplySites = new Set(calls.filter((call) => /^JUDGE:(defender|critic|cross-root)/u.test(call.call_site_key)
+      && call.actor_ref === "preview:qwen-3-8-flash" && call.outcome === "FAILED").map((call) => call.call_site_key));
+    expect(composed.holdWaits.length).toBeGreaterThanOrEqual(1);
+    expect(composed.holdWaits.length).toBeLessThanOrEqual(Math.min(2, 1 + qwenReplySites.size));
     // The other roots were asked together with it: their author calls arrived before Qwen's first one was answered.
-    const authors = arrivalsOf(gates.arrivals, "JUDGE");
-    const qwenFirst = authors.find((arrival) => arrival.model === QWEN)!;
-    expect(authors.slice(1).filter((arrival) => arrival.model !== QWEN && arrival.at < qwenFirst.answeredAt!)).toHaveLength(3);
+    const rootAuthors = gates.arrivals.filter((_arrival, index) => holds.legs[index] === "root");
+    const qwenFirst = rootAuthors.find((arrival) => arrival.model === QWEN)!;
+    expect(rootAuthors.slice(1).filter((arrival) => arrival.model !== QWEN && arrival.at < qwenFirst.answeredAt!)).toHaveLength(3);
   }, 300_000);
 });
+
+describe("parallel calls: replies and cross-exchanges (Task 11)", () => {
+  /**
+   * Spec §2.1: a support/attack reply's author call starts once its PARENT's author call has returned — it needs only
+   * the parent's text — never after the other positions' panels. Every panel call is held 800 ms, every other call
+   * 50 ms: root 0's first support reply is asked while every panel (root 3's among them) is still unanswered.
+   */
+  it("replies start before their siblings' panels end: root 0's support reply is asked before root 3's panel is answered", async () => {
+    const debate = await harness.admittedRun("replies-early", { panelRefs: PANEL_REFS, depth: 1 });
+    const holds = legRecordingHolds((request) => request.kind === "PANEL" ? 800 : 50);
+    const gates = await harness.startGates({}, undefined, undefined, holds.delayMs);
+    const composed = await harness.previewRunner(gates, "resend", { callConcurrency: OWNER_CALL_CONCURRENCY });
+    const result = await harness.completedRun(composed, debate, gates);
+
+    const firstSupport = gates.arrivals.find((_arrival, index) => holds.legs[index] === "support")!;
+    expect(firstSupport).toBeDefined();
+    // Root 3 is the last root asked; its panel's calls are the panel calls that arrived after its author call returned.
+    const rootAuthors = gates.arrivals.filter((_arrival, index) => holds.legs[index] === "root");
+    expect(rootAuthors).toHaveLength(4);
+    const lastRoot = rootAuthors.reduce((latest, arrival) => arrival.answeredAt! > latest.answeredAt! ? arrival : latest);
+    const lastRootPanel = arrivalsOf(gates.arrivals, "PANEL").filter((arrival) => arrival.at >= lastRoot.answeredAt!).slice(0, 3);
+    expect(lastRootPanel).toHaveLength(3);
+    expect(firstSupport.at, `support at ${String(firstSupport.at)}; panels ${JSON.stringify(lastRootPanel)}`)
+      .toBeLessThan(Math.min(...lastRootPanel.map((arrival) => arrival.answeredAt!)));
+    // Stronger still: it was asked before ANY panel call was answered.
+    expect(firstSupport.at).toBeLessThan(Math.min(...arrivalsOf(gates.arrivals, "PANEL").map((arrival) => arrival.answeredAt!)));
+
+    const { answer, workItem } = await harness.servedAnswer(debate, result.answerId);
+    expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
+    expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
+    expect(composed.holdWaits).toEqual([]);
+  }, 300_000);
+
+  /**
+   * Spec §2.1 (depth >= 2): a reply AFTER a global round boundary waits for that boundary's freeze/stop decision, which
+   * waits for every reply up to the boundary and their reviews — so the decision sees, and prevents, exactly what it
+   * does in the serial run. Two makers, depth 2, ε = 0.01: every review measures a support edge at 0 and an attack edge
+   * at 0.9, so a support branch moves no root (leverage 0 < ε) and freezes at the round-1 boundary; root 1's support
+   * branch is the one the decision can still prevent (root 0's round-2 replies come before the boundary in the plan).
+   */
+  it("depth 2, two makers: a branch frozen at the round-1 boundary is never expanded, and the debate saved equals the serial run's", async () => {
+    const twoMakers = [
+      PANEL_REFS.find((ref) => PREVIEW_PROVIDER_REF_MODELS[ref] === DEEPSEEK)!,
+      PANEL_REFS.find((ref) => PREVIEW_PROVIDER_REF_MODELS[ref] === HAIKU)!
+    ];
+    const variants = [
+      { name: "parallel-a", seed: 55, row: OWNER_CALL_CONCURRENCY },
+      { name: "parallel-b", seed: 66, row: OWNER_CALL_CONCURRENCY },
+      { name: "serial", seed: 77, row: undefined }
+    ] as const;
+    const runs = await savedAcrossVariants("frozen_branch", { panelRefs: twoMakers, depth: 2 }, variants,
+      { stoppingPolicy: { delta: 0, epsilon: 0.01 }, bearings: { support: 0, attack: 0.9 } });
+
+    // Root 1's round-1 branches are plan nodes 8 (its support reply) and 9 (its attack reply); their round-2 replies'
+    // call sites name them as parent (p8, p9).
+    const roundTwoBeneath = (keys: readonly string[], parent: number): readonly string[] => keys.filter((key) =>
+      new RegExp(`^JUDGE:(defender|critic):root1:r2:p${String(parent)}(:|$)`, "u").test(key));
+    for (const [index, run] of runs.entries()) {
+      const name = variants[index]!.name;
+      expect(roundTwoBeneath(run.callSiteKeys, 8), `${name}: the frozen support branch is never expanded`).toEqual([]);
+      expect(new Set(roundTwoBeneath(run.callSiteKeys, 9)).size, `${name}: the attack branch is expanded`).toBe(2);
+      // Root 0's round-2 replies came before the boundary in the plan: all four were asked.
+      expect(new Set(run.callSiteKeys.filter((key) => /^JUDGE:(defender|critic):root0:r2:/u.test(key))).size, name).toBe(4);
+      if (variants[index]!.row !== undefined) {
+        expect(run.legsInFlightWithAnother("support") + run.legsInFlightWithAnother("attack"), name).toBeGreaterThan(0);
+      }
+    }
+    const [first, ...rest] = runs.map((run) => run.saved);
+    // 2 roots, root 0's 2 + 4 replies, root 1's 2 + 2 (its support branch frozen), 2 cross-exchanges.
+    expect(first!.nodes).toHaveLength(2 + 6 + 4 + 2);
+    expect(first!.reviews).toHaveLength(first!.nodes.length);
+    for (const [index, other] of rest.entries()) {
+      expect(other, variants[index + 1]!.name).toEqual(first);
+    }
+  }, 900_000);
+
+  /**
+   * Spec §2.2 (Task 10 review carry): the reviewer turn is read off the ledger once PER REVIEW BATCH, as today's batch
+   * reads it, never carried over from an earlier batch's choices. Root 0's review is answered with a billed vendor 500
+   * every time, so it is hidden: the turn its reviewer was chosen with never reaches the ledger. The next batch (the
+   * replies) reviews nodes of root 0's maker again; today it reads the ledger, which holds no review of that maker, and
+   * so must the chains — a turn advanced in the roots' batch and kept would pick another reviewer.
+   */
+  it("a review hidden in one batch: the next batch reads the reviewer turn off the ledger again, as the serial run does", async () => {
+    const variants = [
+      { name: "parallel-a", seed: 88, row: OWNER_CALL_CONCURRENCY },
+      { name: "parallel-b", seed: 99, row: OWNER_CALL_CONCURRENCY },
+      { name: "serial", seed: 111, row: undefined }
+    ] as const;
+    const runs = await savedAcrossVariants("hidden_review", { panelRefs: PANEL_REFS, depth: 1 }, variants,
+      { answers: rootZeroReviewRefused });
+    for (const [index, run] of runs.entries()) {
+      // One node's review was hidden (every attempt refused): the others were all reviewed.
+      expect(run.saved.reviews.length, variants[index]!.name).toBe(run.saved.nodes.length - 1);
+    }
+    const [first, ...rest] = runs.map((run) => run.saved);
+    for (const [index, other] of rest.entries()) {
+      expect(other, variants[index + 1]!.name).toEqual(first);
+    }
+  }, 900_000);
+});
+
+/* ------------------------------------------------------------------ one admitted run, argued in several copies */
+
+/** Which authoring leg a JUDGE request is, by the code's own directive in its system message; null for any other call. */
+type JudgeLegKind = "root" | "support" | "attack" | "cross-root";
+function judgeLegOf(request: GateRequest): JudgeLegKind | null {
+  if (request.kind !== "JUDGE") return null;
+  const text = JSON.stringify(request.body);
+  if (text.includes("genuine supporting case")) return "support";
+  if (text.includes("strongest genuine counter-position")) return "attack";
+  if (text.includes("direct cross-root response")) return "cross-root";
+  return "root";
+}
+
+/**
+ * Holds every non-probe call `ms(request)`, and notes beside each arrival (same index: the doubles ask for the hold
+ * right after they log the arrival) which authoring leg it is.
+ */
+function legRecordingHolds(ms: (request: GateRequest) => number) {
+  const legs: (JudgeLegKind | null)[] = [];
+  return {
+    legs,
+    delayMs: (request: GateRequest): number => {
+      legs.push(judgeLegOf(request));
+      return request.kind === "PROBE" ? 0 : ms(request);
+    }
+  };
+}
+
+/**
+ * ONE admitted run copied (`CREATE DATABASE … TEMPLATE`) into a fresh database per variant — the reviewer turn is
+ * hashed off the run id, so the copies must share it — each argued with the scripted answers, its own seeded random
+ * holds (5-200 ms) and its own `callConcurrencyPolicy` row (absent: today's serial engine). Returns, per variant, what
+ * it saved, the call sites it asked, how many calls overlapped and how many authoring calls of a leg kind were in
+ * flight together with another call.
+ */
+async function savedAcrossVariants(
+  label: string,
+  admission: Readonly<{ panelRefs: readonly string[]; depth: number }>,
+  variants: readonly Readonly<{ name: string; seed: number; row: typeof OWNER_CALL_CONCURRENCY | undefined }>[],
+  options: Readonly<{
+    stoppingPolicy?: Readonly<{ delta: number; epsilon: number }>;
+    bearings?: Readonly<{ support: number; attack: number }>;
+    /** The gates' answers (default: `scriptedAnswers` with `bearings`). */
+    answers?: (question: string) => (request: GateRequest, chat: string) => GateOverride | null;
+  }>
+) {
+  const seedName = `parallel_calls_${label}_seed`;
+  await copyDatabase(MIGRATED_COPY, seedName);
+  const seedPool = createPool(databaseUrl(seedName));
+  let debate: AdmittedRun;
+  try {
+    debate = await previewDebateHarness({ pool: () => seedPool, stubClosers }).admittedRun(label, admission);
+  } finally {
+    await seedPool.end();
+  }
+  const runs: {
+    saved: SavedDebate; callSiteKeys: readonly string[]; concurrencyMost: number;
+    legsInFlightWithAnother: (leg: JudgeLegKind) => number;
+  }[] = [];
+  for (const variant of variants) {
+    const copy = `parallel_calls_${label}_${variant.name.replace("-", "_")}`;
+    await copyDatabase(seedName, copy);
+    const pool = createPool(databaseUrl(copy));
+    try {
+      const run = previewDebateHarness({ pool: () => pool, stubClosers });
+      const random = seededRandom(variant.seed);
+      const holds = legRecordingHolds(() => 5 + Math.floor(random() * 196));
+      const answers = options.answers?.(debate.question) ?? scriptedAnswers(debate.question, options.bearings);
+      const gates = await run.startGates({}, undefined, answers, holds.delayMs);
+      const composed = await run.previewRunner(gates, "resend", {
+        ...(variant.row === undefined ? {} : { callConcurrency: variant.row }),
+        ...(options.stoppingPolicy === undefined ? {} : { stoppingPolicy: options.stoppingPolicy })
+      });
+      const result = await run.completedRun(composed, debate, gates);
+      const arrivals = [...gates.arrivals];
+      const inFlightWithAnother = (index: number): boolean => arrivals.some((other, otherIndex) => otherIndex !== index
+        && other.kind !== "PROBE" && other.at < arrivals[index]!.answeredAt! && arrivals[index]!.at < other.answeredAt!);
+      runs.push({
+        saved: await savedDebate(pool, debate.runId, result.answerId),
+        callSiteKeys: (await run.modelCalls(debate.runId)).map((call) => call.call_site_key),
+        concurrencyMost: gates.concurrency.most,
+        legsInFlightWithAnother: (leg) => arrivals.filter((_arrival, index) => holds.legs[index] === leg && inFlightWithAnother(index)).length
+      });
+    } finally {
+      await pool.end();
+    }
+    await untilUnused(copy, 60_000);
+    await admin.query(`DROP DATABASE "${copy}"`);
+  }
+  await untilUnused(seedName, 60_000);
+  await admin.query(`DROP DATABASE "${seedName}"`);
+  return runs;
+}
 
 /* ------------------------------------------------------------------ scripted answers, keyed by what was asked */
 
@@ -248,7 +435,7 @@ const share = (hex: string): number => Math.round((Number.parseInt(hex.slice(0, 
  * the run's question, every random id (node, edge) and each prompt's random fence and canary taken out. A debate argued twice from the same run therefore
  * gets the same answer to the same call, whatever order the calls come in.
  */
-function scriptedAnswers(question: string) {
+function scriptedAnswers(question: string, bearings?: Readonly<{ support: number; attack: number }>) {
   return (request: GateRequest, chat: string): GateOverride | null => {
     const asked = chat.split(question).join("<question>").replace(UUID, "<id>")
       // Every framed prompt carries its own random fence and canary (the prompt-injection boundary): not what was asked.
@@ -270,10 +457,29 @@ function scriptedAnswers(question: string) {
       }) };
       case "REVIEW": return { content: withRequestDerivedBearings(reviewArtifact(
         level < 0.5 ? "agree" : "dispute", [`Review ${digest.slice(0, 12)}.`],
-        { support: share(digest.slice(16)), attack: share(digest.slice(24)) }
+        bearings ?? { support: share(digest.slice(16)), attack: share(digest.slice(24)) }
       ), chat) };
       default: return null;
     }
+  };
+}
+
+/**
+ * `scriptedAnswers`, except that every review of ROOT 0 (the node whose statement the first-position author call was
+ * given) is a billed vendor 500: its review is hidden. Root 0's statement is learnt from that author call's answer.
+ */
+function rootZeroReviewRefused(question: string) {
+  const scripted = scriptedAnswers(question);
+  let rootZero: string | null = null;
+  return (request: GateRequest, chat: string): GateOverride | null => {
+    const answer = scripted(request, chat);
+    if (request.kind === "JUDGE" && chat.includes("Author your position on the question under debate.")
+      && answer !== null && "content" in answer) {
+      rootZero = (JSON.parse(answer.content) as { statement: string }).statement;
+    }
+    if (request.kind === "REVIEW" && rootZero !== null
+      && framedField(readFramedMaterial(wirePacket(chat)), "statement") === rootZero) return { vendorStatus: 500 };
+    return answer;
   };
 }
 

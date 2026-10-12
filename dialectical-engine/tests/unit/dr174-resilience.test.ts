@@ -57,11 +57,14 @@ describe("RESIL-01 / DR-174 lifecycle mutation ledger", () => {
     // index 1 of that chain rather than a statement of its own. What this row is
     // about — that the secondary root goes through the leg's author call
     // (`authorAndPanel`), and so through the cooldown seam, under that call-site
-    // key with a null parent — is unchanged and is still pinned.
+    // key with a null parent — is unchanged and is still pinned. Task 11: the
+    // chain is told the root's statement as soon as its author call returned
+    // (its replies start from it), and the roots' chains are started together
+    // with the replies' and cross-exchanges' (`chains`).
     expect(source).toMatch(/const rootCallSiteKey = \(rootIndex: number\): string =>\s*rootIndex === 1 \? "JUDGE:root:secondary" : `JUDGE:root:\$\{String\(rootIndex\)\}`;/);
     expect(source).toMatch(/const ROOT_SAVE: Omit<SaveInput, "authorIndex"> = Object\.freeze\(\{\s*parentNodeId: null,/);
-    expect(source).toMatch(/const input: AuthorPositionInput = \{[\s\S]*?callSiteKey: rootCallSiteKey\(rootIndex\),[\s\S]*?\.\.\.ROOT_SAVE,[\s\S]*?authoredRoot = await authorAndPanel\(input\);/);
-    expect(source).toMatch(/for \(let rootIndex = 1; rootIndex < effectiveMakerCount; rootIndex \+= 1\) \{\s*rootChains\.push\(runChain\(\(stage\) => rootChain\(rootIndex, stage\)/);
+    expect(source).toMatch(/const input: AuthorPositionInput = \{[\s\S]*?callSiteKey: rootCallSiteKey\(rootIndex\),[\s\S]*?\.\.\.ROOT_SAVE,[\s\S]*?authoredRoot = await authorAndPanel\(input, \(statement\) => statements\[rootIndex\]!\.resolve\(statement\)\);/);
+    expect(source).toMatch(/for \(let rootIndex = 1; rootIndex < effectiveMakerCount; rootIndex \+= 1\) \{\s*chains\.push\(runChain\(\(stage\) => rootChain\(rootIndex, stage\)/);
     expect(source).toMatch(/const childAttempt = await cooldownAttempt\(\{[\s\S]*?failureScope: input\.parentNodeId === null \? "MAKER_POSITION" : "EXPANSION"/);
     expect(source).toContain("maxAttempts: this.settings.judgeBound.maxAttempts + (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0)");
   });

@@ -221,16 +221,33 @@ const RUN_BODY_STOP_SITES: readonly RunBodyStopSite[] = Object.freeze([
     guard: REVIEW_GUARD,
     assignment: "runBodyBudgetStop = outcome.stop;"
   },
+  // Parallel calls (Task 11, 2026-10-12): the replies and the cross-exchanges run in TWO forms — today's loops, kept
+  // call for call while the debate's lane admits one call (ruling R23), and one chain each when calls run together
+  // (`argueTogether`). Each form has its own catch, and each is pinned.
   {
-    site: "the expansion leg author",
-    anchor: "callSiteKey: `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`",
+    site: "the expansion leg author (today's loop)",
+    anchor: "explorationDecision: leg.polarity === \"support\" ? \"deepen\" : \"challenge\",",
     decides: "expansionPhaseStop(error)",
     guard: PHASE_GUARD,
     assignment: "runBodyBudgetStop = stop;"
   },
   {
-    site: "the cross-root response author",
-    anchor: "callSiteKey: `JUDGE:cross-root:${exchange.authorRootIndex}->${exchange.targetRootIndex}`",
+    site: "the expansion leg author (one chain each)",
+    anchor: "positionUnderDebate: parentStatement },",
+    decides: "expansionPhaseStop(error)",
+    guard: PHASE_GUARD,
+    assignment: "runBodyBudgetStop = stop;"
+  },
+  {
+    site: "the cross-root response author (today's loop)",
+    anchor: "otherMakersPosition: targetRoot.statement",
+    decides: "expansionPhaseStop(error)",
+    guard: PHASE_GUARD,
+    assignment: "runBodyBudgetStop = stop;"
+  },
+  {
+    site: "the cross-root response author (one chain each)",
+    anchor: "leg: { kind: \"cross-root\" as const, ownPosition, otherMakersPosition },",
     decides: "expansionPhaseStop(error)",
     guard: PHASE_GUARD,
     assignment: "runBodyBudgetStop = stop;"
@@ -272,9 +289,18 @@ const PANEL_PARTIAL_RULE = "else if (memberFailures.length > 0 || spendStop !== 
  * that stood in front of the secondary root.)
  */
 const CHAIN_STOP = "const arguingStopped = (): boolean => bodyFailed || runBodyBudgetStop !== null || tooFewLeftToArgue();";
-const ROOT_CHAIN = "const rootChain = async (rootIndex: number, stage: { rank: number }): Promise<void> => {";
+const ROOT_CHAIN = "const rootChain = async (rootIndex: number, stage: { rank: ChainRank }): Promise<void> => {";
 const ROOT_CHAIN_GUARD = "if (arguingStopped()) return;";
-const ROOT_AUTHOR_CALL = "authoredRoot = await authorAndPanel(input);";
+const ROOT_AUTHOR_CALL = "authoredRoot = await authorAndPanel(input, (statement) => statements[rootIndex]!.resolve(statement));";
+/**
+ * Parallel calls (Task 11, O6): a reply's chain and a cross-exchange's chain ask the stop right before their author
+ * call too — after any wait for a parent or a round boundary, which a stop may land during.
+ */
+const REPLY_CHAIN = "const legChain = async (legIndex: number, stage: { rank: ChainRank }): Promise<void> => {";
+const REPLY_CHAIN_GUARD = "// Spec §2.3 (O6): right before the reply's author call.\n        if (arguingStopped()) return;";
+const EXCHANGE_CHAIN = "const crossChain = async (exchangeIndex: number, stage: { rank: ChainRank }): Promise<void> => {";
+const EXCHANGE_CHAIN_GUARD = "// Spec §2.3 (O6): right before the exchange's author call.\n        if (arguingStopped()) return;";
+const CHAIN_AUTHOR_CALL = "authored = await authorAndPanel({ ...call,";
 const REVIEW_CHAIN = "const reviewInChain = async (slot: ReviewSlot, authoredNode: AuthoredDebateNode): Promise<void> => {";
 const REVIEW_CHAIN_GUARD = "if (arguingStopped()) {";
 const REVIEW_CHAIN_CALL = "const outcome = await callReview(authoredNode, reviewer);";
@@ -389,7 +415,7 @@ function assertRunBodyStopWiring(source: string): void {
 
   // Every assignment in the file belongs to one of the sites above, or to the
   // first root's panel record below.
-  expect(statementOccurrences(source, "runBodyBudgetStop = stop;"), "three `= stop`").toBe(3);
+  expect(statementOccurrences(source, "runBodyBudgetStop = stop;"), "five `= stop`").toBe(5);
   expect(statementOccurrences(source, "runBodyBudgetStop = outcome.stop;"), "one `= outcome.stop`").toBe(1);
 
   // 3. The first root's panel: the voices heard are kept, the stop is recorded,
@@ -424,6 +450,15 @@ function assertRunBodyStopWiring(source: string): void {
   const reviewCallAt = source.indexOf(REVIEW_CHAIN_CALL, reviewChainAt);
   expect(reviewCallAt, "the review chain's call").toBeGreaterThan(reviewChainAt);
   expect(statementOccurrences(source.slice(reviewChainAt, reviewCallAt), REVIEW_CHAIN_GUARD), "asked before a review call").toBe(1);
+  for (const [chain, guard] of [[REPLY_CHAIN, REPLY_CHAIN_GUARD], [EXCHANGE_CHAIN, EXCHANGE_CHAIN_GUARD]] as const) {
+    const chainAt = source.indexOf(chain);
+    expect(chainAt, chain).toBeGreaterThanOrEqual(0);
+    const authorAt = source.indexOf(CHAIN_AUTHOR_CALL, chainAt);
+    expect(authorAt, `${chain}: its author call`).toBeGreaterThan(chainAt);
+    expect(source.slice(chainAt, authorAt).split(guard), `${chain}: asked right before its author call`).toHaveLength(2);
+    expect(source.slice(source.indexOf(guard, chainAt) + guard.length, authorAt), `${chain}: nothing waits after it`)
+      .not.toContain("await");
+  }
   // Root 0's panel stop is recorded where the chains read it.
   expect(source.indexOf(ROOT_PANEL_RECORD), "recorded inside root 0's chain, after its panel")
     .toBeLessThan(source.indexOf(ROOT_CHAIN));
@@ -552,8 +587,11 @@ describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at every ca
       "const arguingStopped = (): boolean => bodyFailed || tooFewLeftToArgue();"],
     // ...or a root chain no longer asks before its author call (parallel calls, O6)...
     ["a root chain's author call is started after the arguing stopped", ROOT_CHAIN_GUARD, ""],
-    // ...or a review chain no longer asks before its review call.
+    // ...or a review chain no longer asks before its review call...
     ["a review chain's call is started after the arguing stopped", REVIEW_CHAIN_GUARD, "if (false) {"],
+    // ...or a reply's or a cross-exchange's chain no longer asks before its author call (Task 11).
+    ["a reply chain's author call is started after the arguing stopped", REPLY_CHAIN_GUARD, "// asked no more"],
+    ["an exchange chain's author call is started after the arguing stopped", EXCHANGE_CHAIN_GUARD, "// asked no more"],
     // A ceiling below the first call is an untyped failure again.
     ["the first-call failure is no longer typed", FIRST_CALL_FAILURE, "throw error;"],
     // The answer stops saying the debate was cut short.
@@ -581,7 +619,7 @@ describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at every ca
     ["the row no longer records the stop", BODY_FACTS_READ, "body: { bodyStop: null, pointsWithoutReview: null }"]
   ]);
 
-  it("fails when any one of twenty-three mutations is applied to that same source", async () => {
+  it("fails when any one of twenty-five mutations is applied to that same source", async () => {
     const source = await readFile(RUNNER, "utf8");
 
     for (const [name, from, to] of MUTATIONS) {

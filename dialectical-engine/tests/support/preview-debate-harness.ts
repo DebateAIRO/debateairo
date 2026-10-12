@@ -284,7 +284,11 @@ export function previewDebateHarness(input: Readonly<{
    */
   async function previewRunner(
     gates: Awaited<ReturnType<typeof startGates>>, claim: ClaimComposition,
-    options: Readonly<{ resilience?: typeof RUN_RESILIENCE; callConcurrency?: CallConcurrencyPolicy }> = {}
+    options: Readonly<{
+      resilience?: typeof RUN_RESILIENCE; callConcurrency?: CallConcurrencyPolicy;
+      /** The adaptive stopping row (δ, ε); absent, δ = ε = 0: nothing freezes, the requested depth is expanded in full. */
+      stoppingPolicy?: Readonly<{ delta: number; epsilon: number }>;
+    }> = {}
   ) {
     const probeSleeps: number[] = [];
     const callSleeps: number[] = [];
@@ -345,8 +349,12 @@ export function previewDebateHarness(input: Readonly<{
     // main.ts's boot checks: the six reviewed targets, and every role the register names is one of them.
     assertPreviewProviderTargets(PREVIEW, TARGETS);
     assertPreviewRoleTargets(PREVIEW, TARGETS, [SEALED_WRITER_REF, SEALED_CHECKER_REF, STORY_POLICY.storytellerRoleRef, STORY_POLICY.storyCheckerRoleRef]);
+    const fixture = fixtureSettings();
     const runner = new WalkingSkeletonRunner(pool(), topology.primary.provider, {
-      ...fixtureSettings(),
+      ...fixture,
+      ...(options.stoppingPolicy === undefined ? {} : {
+        stoppingPolicy: { ...fixture.stoppingPolicy!, delta: options.stoppingPolicy.delta, epsilon: options.stoppingPolicy.epsilon }
+      }),
       providerRef: topology.primary.providerRef, maker: topology.primary.maker,
       ...(topology.critique === undefined ? {} : { critique: topology.critique }),
       additionalMakers: topology.additionalMakers,
