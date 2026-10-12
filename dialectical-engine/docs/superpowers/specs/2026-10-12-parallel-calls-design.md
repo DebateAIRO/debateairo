@@ -88,7 +88,9 @@ Root 0 goes first (O9). Everything else in the body runs as soon as its inputs e
     (`selectDifferentMakerReviewer` + the latest reviewer per author maker, seeded once from the database per review
     batch, advanced locally) — identical to today whenever reviews land;
   - panel votes: members are called together and their results reduced in MEMBER order (author first, then the panel
-    book order), so `applyCorrelatedErrorDiscount`, `selectReducedJudgement`, marks and notes see today's order;
+    book order), so `applyCorrelatedErrorDiscount`, `selectReducedJudgement`, marks and notes see today's order. Only
+    when the debate's lane admits more than one call (`runJudgePanel`'s `askTogether`, ruling R32); with the row
+    absent the panel asks one member at a time, nobody after a spend stop, exactly as today;
   - every per-run record list (`panelDegradations`, `wayOfKnowingDowngrades`, `haltedExpansionRecords`,
     `hiddenReviewRecords`, `unassessedReviewRecords`, `branchFrozenRecords`) is appended by the recorders, in order;
   - the seat caller's lists (`backupAnswers`, `answered`, `switches`) are read in a canonical plan order.
@@ -98,6 +100,9 @@ Root 0 goes first (O9). Everything else in the body runs as soon as its inputs e
 - A backup-switch notice is told once per seat slot per pass even when two calls to that seat fail together.
 - The test of record: the same scripted answers delivered in several random finish orders produce byte-identical
   nodes, edges, reduced judgements, reviews, answer and fact bundle, and identical to the serial run (row absent).
+  It covers failure-free scripts (plus the named failure cases of `tests/integration/parallel-calls-debate.test.ts`):
+  when a member fails, WHEN it fails can change who answers another node (a member that sits out early is skipped by
+  a later plan), so a failure's timing is not promised to save the same debate in every finish order.
 
 ### 2.3 Stops and failures (O6)
 
@@ -108,13 +113,16 @@ Root 0 goes first (O9). Everything else in the body runs as soon as its inputs e
   and kept (their nodes are minted, their reviews recorded) — EXCEPT a node whose panel's stop is "TRAVEL"
   (today: the node is not minted) and children of a node that was never minted (no parent to attach to): those are
   paid and dropped, as today's rule already drops a stopped leg. The debate then goes on to its answer as today.
-- Root 0's panel keeps `RETURN_HEARD`: every member voice that came back is kept (all ran together).
+- Root 0's panel keeps `RETURN_HEARD`: every member voice that came back is kept (all ran together). With the row
+  absent the panel is today's: one member at a time, and nobody asked after the stop (ruling R32).
 - A failure that ends the debate today (`MAKER_POSITION_UNAVAILABLE`, `NODE_REVIEW_UNAVAILABLE`, a rethrown error):
   no new call starts; in-flight calls are awaited (so their receipts land before the terminal record); then the error
   is thrown as today.
 - Keep-alive stop (claim lost, time limit): no new call starts; in-flight calls are NOT awaited and their results are
   discarded (their receipts still land); the debate ends exactly as today (`RUNNER_CLAIM_LOST`,
-  `RUNNER_TIME_LIMIT_REACHED`). Every abandoned promise has a rejection handler.
+  `RUNNER_TIME_LIMIT_REACHED`). Every abandoned promise has a rejection handler. An abandoned chain whose call failed
+  can still write a `COOLDOWN_HOLD` progress event (its hold starts before the stop reaches it) after the work item
+  ended (ruling R29: receipts of abandoned calls land after the run ended); no node or review is saved by it.
 - `withCooldownRetry`'s run-wide hold cap counts holds started in this process for the run (an in-memory reservation
   taken before the `await`) plus the database count from earlier passes, so concurrent failures cannot pass the cap.
 
