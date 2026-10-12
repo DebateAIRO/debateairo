@@ -670,12 +670,13 @@ class AnthropicProfile:
     (cache_write_requested) reserves its WHOLE input at the step's 5-minute cache-write price (lower
     0.125, upper 0.625), the simplest safe rule: the write can never cover more than the input. So the
     dearest request is a full-size cached one, (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704, the
-    ceiling, under the $0.25 cap. Only its reply may report cache tokens; on any other call a non-zero
-    cache count is invalid (cache_counts: uncertain, and the gate halts). A reply that still costs more
-    than its hold (a 1-hour write, which no request can ask for) is charged in full and halts
-    (charge_overrun). Settlement: the real step (prompt total <= 100,000 tokens: the lower one), each
-    kind of input token at its own price: plain input, the 5-minute and 1-hour writes (a write reported
-    without its split is the 5-minute kind the request asked for), and reads. Anthropic reports no cost,
+    ceiling, under the $0.25 cap. A reply that reports cache tokens is settled at their own prices on
+    any call, marked or not (no new halt). A reply that still costs more than its hold (for example a
+    1-hour write, which no request can ask for, or a write on an unmarked call) is charged in full and
+    halts (charge_overrun). Settlement: the real step (prompt total <= 100,000 tokens: the lower one),
+    each kind of input token at its own price: plain input, the 5-minute and 1-hour writes, and reads; a
+    write reported without its split is the 5-minute kind on a marked call and is charged at the dearer
+    1-hour price on any other call (as before caching). Anthropic reports no cost,
     so the guard charge is that list-price charge. Any usage field this profile does not know, any
     server-tool use, another service tier or region, or a tool block makes the usage invalid: uncertain,
     and the gate halts.
@@ -798,8 +799,9 @@ class AnthropicProfile:
 
     def usage_check(self, response, cache_write=False):
         """(None, counts) for a reply whose usage this profile fully understands, else (the name of
-        the check it failed, None): the gate is then uncertain and halts. Cache tokens are understood
-        only on a call that asked for a cache write (cache_write=True)."""
+        the check it failed, None): the gate is then uncertain and halts. Cache tokens are settled on
+        every call; cache_write=True (the call carried the cache mark) only makes a write reported
+        without its split the 5-minute kind."""
         if not isinstance(response, dict) or response.get('type') != 'message':
             return 'not_a_message', None
         # A container or context editing (unless null: none used) may bill beyond the usage.
@@ -835,9 +837,6 @@ class AnthropicProfile:
         if not all(value is None or integer(value) for value in (creation, read)):
             return 'cache_counts', None
         creation, read = creation or 0, read or 0
-        # Only a request that carried the cache mark may come back with cache tokens.
-        if cache_write is not True and (creation or read):
-            return 'cache_counts', None
         tools = usage.get('server_tool_use')
         if tools is not None and not (isinstance(tools, dict) and all(type(v) is int and v == 0 for v in tools.values())):
             return 'server_tool_use', None
@@ -845,9 +844,10 @@ class AnthropicProfile:
             return 'service_tier', None
         if usage.get('inference_geo') not in (None, 'global'):
             return 'inference_geo', None
-        # A cache write reported without its 5-minute/1-hour split is the 5-minute kind: the only mark a
-        # request may carry (a split that names a 1-hour part is charged at the 1-hour price).
-        hour = 0
+        # A cache write reported without its 5-minute/1-hour split: on a call that carried the cache mark it
+        # is the 5-minute kind (the only mark a request may carry); on any other call it is charged at the
+        # dearer 1-hour price (a write the gate did not ask for is priced on the safe side). A split names each part.
+        hour = 0 if cache_write is True else creation
         split = usage.get('cache_creation')
         if split is not None:
             if not (isinstance(split, dict) and set(split) == ANTHROPIC_CACHE_SPLIT_KEYS

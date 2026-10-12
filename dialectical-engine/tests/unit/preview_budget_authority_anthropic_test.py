@@ -656,15 +656,15 @@ class SettlementTests(AnthropicTest):
 
     def test_a_1h_cache_write_above_the_hold_is_charged_and_halts_with_charge_overrun(self):
         # The ceiling (0.625 input, a 5-minute write) is not the dearest input price: a 1-hour cache write over
-        # 100,000 tokens is 1.00. A request can ask only for the 5-minute kind, but if Anthropic reports a 1-hour
-        # write anyway, the call is charged in full (no cap at the hold) and the gate halts with charge_overrun.
+        # 100,000 tokens is 1.00. No request can ask for one, but if Anthropic reports one anyway, the call is
+        # charged in full (no cap at the hold) and the gate halts with charge_overrun.
         hour = {'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 200000}
         reply = message(1000, 100, cache_creation_input_tokens=200000, cache_creation=hour)
         expected = cost(UPPER, 1000, write_1h=200000, output=100)
         self.assertEqual(expected, Decimal('0.20075'))
         gate = self.ready()
         with self.refused('SETTLED_INTO_HALT'):
-            self.call(gate, reply=reply, value=cached_request())
+            self.call(gate, reply=reply)
         entry = entry_of(gate)
         self.assertEqual((entry['state'], Decimal(entry['held_usd'])), ('settled', expected))
         self.assertGreater(Decimal(entry['held_usd']), Decimal(entry['reserved_usd']))
@@ -1192,7 +1192,7 @@ class VendorRefusalFactsTests(AnthropicTest):
 class PromptCachingTests(AnthropicTest):
     """Prompt caching (owner approval 2026-10-12, "caching before the upload"): a request may carry exactly one
     5-minute cache mark, on the first of exactly two system text blocks; it reserves its whole input at the step's
-    5-minute cache-write price, and only its reply may report cache tokens, settled at the write and read prices."""
+    5-minute cache-write price. Any reply's cache tokens are settled at the write and read prices (no new halt)."""
     FIXTURE = Path(__file__).resolve().parent / 'fixtures/anthropic-cache-bodies.json'
 
     def test_the_two_block_system_is_accepted_and_reserves_its_input_at_the_write_price(self):
@@ -1289,21 +1289,34 @@ class PromptCachingTests(AnthropicTest):
         self.assertNotIn('cache_write_requested', entry_of(gate, 'op-5'))
         self.assertEqual(entry_of(gate, 'op-5')['reserve_input_usd_per_m'], '0.10')
 
-    def test_cache_tokens_on_a_call_that_asked_for_none_halt_uncertain(self):
-        for name, usage in (('creation', {'cache_creation_input_tokens': 3000}),
-                            ('read', {'cache_read_input_tokens': 3000}),
-                            ('split_creation', {'cache_creation_input_tokens': 3000,
-                                                'cache_creation': {'ephemeral_5m_input_tokens': 3000, 'ephemeral_1h_input_tokens': 0}})):
+    def test_cache_tokens_on_an_unmarked_call_settle_at_their_prices_without_a_halt(self):
+        # Coordinator ruling 2026-10-12: no new halt reason. An unmarked call whose reply reports cache tokens is
+        # settled at their real prices (as before caching): a write without its split at the dearer 1-hour price.
+        five = {'ephemeral_5m_input_tokens': 3000, 'ephemeral_1h_input_tokens': 0}
+        hour = {'ephemeral_5m_input_tokens': 1000, 'ephemeral_1h_input_tokens': 2000}
+        for name, usage, expected in (
+                ('read', {'cache_read_input_tokens': 3000}, cost(LOWER, 200, read=3000, output=400)),
+                ('write_5m_split', {'cache_creation_input_tokens': 3000, 'cache_creation': five},
+                 cost(LOWER, 200, write_5m=3000, output=400)),
+                ('write_mixed_split', {'cache_creation_input_tokens': 3000, 'cache_read_input_tokens': 500, 'cache_creation': hour},
+                 cost(LOWER, 200, write_5m=1000, write_1h=2000, read=500, output=400)),
+                ('write_no_split', {'cache_creation_input_tokens': 3000}, cost(LOWER, 200, write_1h=3000, output=400))):
             with self.subTest(name):
                 reply = message(200, 400, **usage)
                 accounting = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)
-                self.assertEqual((accounting['usage_valid'], accounting['invalid_reason']), (False, 'cache_counts'))
-                self.assertTrue(ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None, cache_write=True)['usage_valid'])
+                self.assertEqual((accounting['usage_valid'], Decimal(accounting['guard_charge_usd'])), (True, expected))
+                self.assertNotIn('invalid_reason', accounting)
                 gate = self.ready()
-                with self.refused('NEW_CHARGE_UNCERTAIN'):
-                    self.call(gate, reply=reply)
-                self.assert_uncertain_halt(gate)
-                self.assertEqual(entry_of(gate)['accounting']['invalid_reason'], 'cache_counts')
+                self.call(gate, reply=reply)  # An unmarked request (a string system).
+                entry = entry_of(gate)
+                self.assertEqual((entry['state'], Decimal(entry['held_usd']), entry['reserve_input_usd_per_m']),
+                                 ('settled', expected, '0.10'))
+                self.assertNotIn('cache_write_requested', entry)
+                self.assertEqual(gate.status()['state'], 'active')
+        # 2000 x 0.10 + 3000 x 0.20 + 400 x 0.50 is the old no-split rule; a marked call says 5 minutes instead.
+        self.assertEqual(cost(LOWER, 200, write_1h=3000, output=400), Decimal('0.00082'))
+        marked = ANTHROPIC.account(message(200, 400, cache_creation_input_tokens=3000), ANTHROPIC.rows[HAIKU], None, cache_write=True)
+        self.assertEqual(Decimal(marked['guard_charge_usd']), cost(LOWER, 200, write_5m=3000, output=400))
 
     def test_a_cached_call_still_halts_on_every_cache_count_it_cannot_read(self):
         for name, usage in (('split_not_summing', {'cache_creation_input_tokens': 3000,
@@ -1315,6 +1328,7 @@ class PromptCachingTests(AnthropicTest):
             with self.subTest(name):
                 reply = message(200, 400, **usage)
                 self.assertFalse(ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None, cache_write=True)['usage_valid'])
+                self.assertFalse(ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)['usage_valid'])
                 gate = self.ready()
                 with self.refused('NEW_CHARGE_UNCERTAIN'):
                     self.call(gate, reply=reply, value=cached_request())

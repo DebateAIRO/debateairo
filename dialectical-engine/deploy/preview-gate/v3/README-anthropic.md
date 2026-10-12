@@ -65,18 +65,19 @@ cache reads.
   the largest question the gate accepts, cached, sets aside at most
   (264,192 x $0.625 + 32,768 x $2.50) / 1,000,000 = **$0.24704**, and an ordinary one about
   $0.017. No call may ever set aside more than **$0.25**; a test checks it.
-- **Only a call that asked for caching may report cache tokens.** If any other call's answer
-  reports cache writes or reads, the call is held in full and the gate halts. A 1-hour cache write
-  over 100,000 tokens costs $1.00 per million, more than the $0.625 set aside; no request can ask for
-  one, but if Anthropic ever reports a call costing more than its set-aside amount, that one call is
-  charged in full and the gate halts with `charge_overrun`.
+- **Cache tokens are always charged at their own prices, never a halt by themselves.** Whatever
+  call reports cache writes or reads (asked for or not), the gate charges them at the table's prices.
+  A 1-hour cache write over 100,000 tokens costs $1.00 per million, more than the $0.625 set aside; no
+  request can ask for one, but if Anthropic ever reports a call costing more than its set-aside amount,
+  that one call is charged in full and the gate halts with `charge_overrun`, as before.
 - **What a call is charged** (after the call): Anthropic's real token counts, each kind at its
   own price, at the step the question length falls in. Exactly 100,000 tokens is still the lower
   step; 100,001 is the upper one. Anthropic does not report a cost, so this list-price charge is
   what the pot records.
 - If Anthropic reports a cache write without saying whether it was the 5-minute or the 1-hour kind,
-  the gate charges it as the 5-minute kind: the only kind a request can ask for. When it says, each
-  part is charged at its own price.
+  the gate charges it as the 5-minute kind on a call that asked for caching (the only kind a request
+  can ask for), and at the dearer 1-hour price on any other call. When it says, each part is charged
+  at its own price.
 - **Answers the gate cannot price stop the gate.** Any usage field it does not know, any web
   search or other server tool, a region other than "global", a service tier other than
   "standard", a code container, context editing, token counts outside the usage block, or any
