@@ -45,14 +45,6 @@ export const ANTHROPIC_MESSAGES_PATH = "/messages" as const;
  */
 export const ANTHROPIC_EFFORT_LEVELS = Object.freeze(["high"] as const);
 /**
- * The discovery probe's default answer bound for this wire. Claude Haiku 5.5
- * thinks by default and its thinking counts against `max_tokens`, so the eight
- * tokens the OpenAI-compatible probe asks for could be spent before "OK" is
- * written. A caller that passes its own ceiling (the preview does) is unaffected.
- */
-const ANTHROPIC_PROBE_DEFAULT_MAX_TOKENS = 512;
-
-/**
  * The vendor declined to answer (`stop_reason: "refusal"`). Billed, not retried.
  * The same name the Gemini adapter uses for its safety blocks (lead, 2026-10-10).
  */
@@ -377,7 +369,8 @@ export function readAnthropicMessagesReply(decoded: unknown): AnthropicMessagesR
  */
 export function anthropicMessagesProbeRequest(input: Readonly<{
   model: string;
-  maxTokens: number | undefined;
+  /** Always given: the probe owns its default room (provider-probe.ts), one number for both wires. */
+  maxTokens: number;
   thinkingLevel: string | undefined;
   credential: string | undefined;
   prompt: string;
@@ -388,7 +381,7 @@ export function anthropicMessagesProbeRequest(input: Readonly<{
     headers: anthropicMessagesRequestHeaders(input.credential),
     body: anthropicMessagesRequestBody({
       model: input.model,
-      maxTokens: input.maxTokens ?? ANTHROPIC_PROBE_DEFAULT_MAX_TOKENS,
+      maxTokens: input.maxTokens,
       thinkingLevel: input.thinkingLevel ?? THINKING_LEVEL_DEFAULT_ONLY,
       messages: [{ role: "user", content: input.prompt }]
     })

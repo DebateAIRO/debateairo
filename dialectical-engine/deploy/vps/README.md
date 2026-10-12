@@ -1422,7 +1422,7 @@ answer, or any part of either.
 can start without answering the question. A production unit that omits it refuses with
 `DEPLOYMENT_MODE_UNRESOLVED`; a typo refuses with `DEPLOYMENT_MODE_INVALID`.
 
-The paid-vendor probe spends `max_tokens: 8` per target per staleness window; the window is the `panelDiscoveryPolicy` register row's `probe_freshness_ms`, validated only as a positive integer. The development seed publishes `600000`. Hosted mode enforces no minimum, so the number an operator publishes is the whole control. The hosted publish command (`pnpm register:publish-hosted`) publishes the code-owned `panelDiscoveryPolicy` row with `probe_freshness_ms` set to `600000`, and its file has no member to change it; a different window needs a code change.
+The paid-vendor probe spends at most `max_tokens: 512` per target per staleness window (a model that thinks before it answers spends its thinking out of that room; a model that does not answers in a token or two); the window is the `panelDiscoveryPolicy` register row's `probe_freshness_ms`, validated only as a positive integer. The development seed publishes `600000`. Hosted mode enforces no minimum, so the number an operator publishes is the whole control. The hosted publish command (`pnpm register:publish-hosted`) publishes the code-owned `panelDiscoveryPolicy` row with `probe_freshness_ms` set to `600000`, and its file has no member to change it; a different window needs a code change.
 
 ### What the hosted mode refuses, in code
 

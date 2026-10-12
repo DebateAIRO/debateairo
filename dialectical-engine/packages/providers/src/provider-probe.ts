@@ -12,6 +12,30 @@ import {
 const PROBE_PROMPT = "DR-181 discovery health probe. Reply exactly: OK";
 
 /**
+ * Probe answer fix (2026-10-12, practice debate 3): the answer room a probe asks for when its caller names none
+ * (hosted and local; the preview names its own, `previewProbeControls`). A model that thinks before it answers spends
+ * that thinking out of this room, so the old eight tokens could be gone before "OK" was written (GLM 5.3 Flash
+ * answered `content: ""` with 5 of its 8 tokens spent thinking: docs/missions/debate-tiers/00-intake-S03.md, F6).
+ * Both wires ask for the same room; a model that does not think answers in a token or two.
+ */
+const PROBE_DEFAULT_TOKEN_CEILING = 512;
+
+/**
+ * Probe answer fix (2026-10-12, practice debate 3): what counts as the model answering the probe. The word OK in any
+ * letter case and nothing else, give or take spaces and line breaks, quote, bold or code marks around it and full
+ * stops or exclamation marks after it; a finished thinking block before it is skipped. MiMo-V2.6-Pro answers at
+ * temperature 1.0 after thinking: a test of the exact bytes "OK" marked it ABSENT for a working answer such as "OK."
+ * or "\n\nOK", and with GLM busy the premium plan was refused (ASK_PLAN_TIER_MODEL_UNAVAILABLE). Still refused:
+ * an empty reply, an unfinished thinking block, and any other words ("Sure, OK", "OKAY", "NOT OK"). The echoed model
+ * id is NOT part of this: it is still compared byte for byte.
+ */
+const PROBE_FINISHED_THINKING = /^\s*<think>[\s\S]*?<\/think>/u;
+const PROBE_OK_ANSWER = /^[\s"'`*_“”„«»]*ok[\s"'`*_“”„«».!]*$/iu;
+function probeAnswerIsOk(text: unknown): boolean {
+  return typeof text === "string" && PROBE_OK_ANSWER.test(text.replace(PROBE_FINISHED_THINKING, ""));
+}
+
+/**
  * DR-181/DR-182 — the ONE provider health probe.
  *
  * PURE MOVE (ruling J21, S06/T3C F34) from `apps/api/src/provider-discovery.ts`.
@@ -91,11 +115,11 @@ export async function observeProviderTarget(input: Readonly<{
     if(input.tokenCeiling!==undefined&&(!Number.isSafeInteger(input.tokenCeiling)||input.tokenCeiling<1||input.tokenCeiling>(previewModelRow(input.target.model)?.outputBound??PREVIEW_MAX_OUTPUT_BOUND)))throw new TypeError("PROVIDER_PROBE_TOKEN_CEILING_INVALID");
     if(input.thinkingLevel!==undefined&&(!THINKING_LEVEL_TOKEN.test(input.thinkingLevel)||input.target.thinkingParameter===undefined||!input.target.thinkingLevels?.includes(input.thinkingLevel)))throw new TypeError("PROVIDER_PROBE_THINKING_INVALID");
     // Multi-model preview, PR B: a native target is probed on its own wire —
-    // the same question, the same "OK" and model-echo test, its own body.
+    // the same question, the same answer and model-echo test, its own body.
     if (input.target.adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) {
       const request = anthropicMessagesProbeRequest({
         model: input.target.model,
-        maxTokens: input.tokenCeiling,
+        maxTokens: input.tokenCeiling ?? PROBE_DEFAULT_TOKEN_CEILING,
         thinkingLevel: input.thinkingLevel,
         credential: input.target.authorizationHeader,
         prompt: PROBE_PROMPT
@@ -111,7 +135,7 @@ export async function observeProviderTarget(input: Readonly<{
         throw new TypeError("PROVIDER_PROBE_UNAVAILABLE");
       }
       const answer = anthropicMessagesProbeAnswer(JSON.parse(raw));
-      if (answer === null || answer.model !== input.target.model || answer.text !== "OK") {
+      if (answer === null || answer.model !== input.target.model || !probeAnswerIsOk(answer.text)) {
         throw new TypeError("PROVIDER_PROBE_RESPONSE_INVALID");
       }
       return Object.freeze({
@@ -136,7 +160,7 @@ export async function observeProviderTarget(input: Readonly<{
         signal: AbortSignal.timeout(input.timeoutMs),
         body: JSON.stringify({
           model: input.target.model,
-          max_tokens: input.tokenCeiling ?? 8,
+          max_tokens: input.tokenCeiling ?? PROBE_DEFAULT_TOKEN_CEILING,
           ...(input.thinkingLevel===undefined?{}:{[input.target.thinkingParameter!]:input.thinkingLevel}),
           // Reviewed sampling (2026-10-12): the probe asks as the debate calls do (none for any other target).
           ...previewSamplingMembers(input.target.baseUrl, input.target.model),
@@ -160,7 +184,7 @@ export async function observeProviderTarget(input: Readonly<{
     const content = typeof message === "object" && message !== null
       ? (message as Readonly<Record<string, unknown>>).content
       : undefined;
-    if (decoded.model !== input.target.model || content !== "OK") {
+    if (decoded.model !== input.target.model || !probeAnswerIsOk(content)) {
       throw new TypeError("PROVIDER_PROBE_RESPONSE_INVALID");
     }
     state = Object.freeze({
