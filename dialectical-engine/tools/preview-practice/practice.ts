@@ -393,7 +393,9 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       log(`practice broke midway: ${code}`);
       return abort(code);
     }
-    log(`practice could not run: ${code}`);
+    // A refusal's detail says why (flag names, key names, gate states, a bad table's model/step/level; never a secret);
+    // the report's reason keeps the code alone.
+    log(`practice could not run: ${error instanceof PracticeRefusal ? error.message : code}`);
     return finish(harnessErrorReport(mode, code, startedAt, observer));
   }
 }

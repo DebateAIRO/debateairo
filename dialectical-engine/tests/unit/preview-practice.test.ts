@@ -342,6 +342,21 @@ describe("practice start refusals", () => {
       ? 'PROVIDER_DISCOVERY_TARGETS_JSON=[{"authorization_file":"/x"}]' : line).join("\n"))).toThrow("PRACTICE_SETTINGS_VALUE_INVALID");
     expect(() => parsePracticeSettings(lines.filter((line) => !line.startsWith("CLAIM_MS=")).join("\n"))).toThrow("PRACTICE_SETTINGS_KEY_MISSING");
   });
+  it("a bad thinking table: the refusal keeps the parser's detail (spec 2026-10-12 §4.2, final review fix 1b)", () => {
+    const bad = JSON.stringify({ ...JSON.parse(config) as object, thinking_levels: { "zai-org/GLM-5.3-Flash": { level: "medium" } } });
+    expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("PREVIEW_PROVIDER_TEST_CONFIG_JSON=")
+      ? `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${bad}` : line).join("\n")))
+      .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW_THINKING_LEVELS_INVALID:level zai-org/GLM-5.3-Flash");
+    expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("PREVIEW_PROVIDER_TEST_CONFIG_JSON=")
+      ? "PREVIEW_PROVIDER_TEST_CONFIG_JSON={" : line).join("\n")))
+      .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+  });
+  it("a run that cannot start says why: the refusal's detail is in its log line", async () => {
+    const logged: string[] = [];
+    const outcome = await runPractice(["debate", "--levels", "zai-org/GLM-5.3-Flash=high"], {}, { log: (line) => logged.push(line) });
+    expect(outcome.report).toMatchObject({ reasons: ["HARNESS_ERROR:PRACTICE_FLAG_VALUE_INVALID"] });
+    expect(logged).toContain("practice could not run: PRACTICE_FLAG_VALUE_INVALID: --levels (formats mode only)");
+  });
   it("never writes its report inside the repository", () => {
     expect(() => assertOutsideRepository("/repo/root/out", "/repo/root")).toThrow("PRACTICE_REPORT_INSIDE_REPOSITORY");
     expect(assertOutsideRepository("/elsewhere/out", "/repo/root")).toBe("/elsewhere/out");
