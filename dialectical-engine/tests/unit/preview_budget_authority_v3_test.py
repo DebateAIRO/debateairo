@@ -1603,10 +1603,13 @@ class UnsentBurstTests(GateTest):
 
         def straggler(raw, key):
             # A call sent beside this one fails (counted), a later call settles, then this one fails.
+            # op-b is reserved a second AFTER op-a, so op-a's own failure counts only if the settled
+            # reply popped unsent_counted_at (else op-a, reserved before it, would read as in flight with it).
+            later(gate, 1)
             with self.refused('PROVIDER_NOT_REACHED'):
                 gate.call('op-b', dispatch=unreached)
             self.assertEqual((gate.status()['unsent_streak'], gate.control()['unsent_counted_at']),
-                             (1, '2026-10-08T09:00:00+00:00'))
+                             (1, '2026-10-08T09:00:01+00:00'))
             later(gate, 5)
             self.assertEqual(gate.call('op-c')['status'], 200)
             self.assertEqual(gate.status()['unsent_streak'], 0)
@@ -1617,7 +1620,7 @@ class UnsentBurstTests(GateTest):
             gate.call('op-a', dispatch=straggler)
         # It was in flight with op-b, but a settled reply came between: it starts a new streak.
         self.assertEqual((gate.status()['unsent_streak'], gate.control()['unsent_counted_at']),
-                         (1, '2026-10-08T09:00:10+00:00'))
+                         (1, '2026-10-08T09:00:11+00:00'))
 
     def test_not_busy_unbilled_errors_of_calls_in_flight_together_count_once(self):
         def failing(_raw, _key):
