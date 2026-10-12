@@ -119,8 +119,10 @@ describe("PR B — the Anthropic request on the wire", () => {
     });
     expect(sent[0]!.body).toBe(
       `{"model":"claude-haiku-5-5","max_tokens":64,"messages":[{"role":"user","content":${JSON.stringify(USER)}}],`
-      + `"system":${JSON.stringify(SYSTEM)}}`
+      + `"system":${JSON.stringify(anthropicCacheableSystem(SYSTEM))}}`
     );
+    // A framed system message ends with the per-call markers, so it goes out as the cached prefix plus the tail.
+    expect(Array.isArray(JSON.parse(sent[0]!.body).system)).toBe(true);
   });
 
   it("adds output_config.effort only when the high level is asked, and nothing at DEFAULT_ONLY", async () => {

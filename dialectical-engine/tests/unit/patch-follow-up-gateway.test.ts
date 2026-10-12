@@ -246,12 +246,13 @@ describe("the Anthropic gate accepts the follow-up shape: user, the model's own 
     const gateway = withPreviewProviderCallPolicy(native, CONFIG, target);
     const result = await gateway.call({ ...positionRequest(), providerRef: HAIKU_REF });
     expect(executions).toHaveLength(2);
-    const second = JSON.parse(executions[1]!.requestBody) as { system: string; messages: { role: string; content: string }[]; output_config: unknown };
+    const second = JSON.parse(executions[1]!.requestBody) as { system: unknown; messages: { role: string; content: string }[]; output_config: unknown };
     expect(second.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
     // Only the answer's text goes back, never its thinking; the gate's rule (text turns, alternating) holds.
     expect(second.messages[1]!.content).toBe(POSITION_SLIP);
     expect(second.output_config).toEqual({ effort: "high" });
-    expect(second.system).toBe(JSON.parse(executions[0]!.requestBody).system);
+    // The cached system prefix (and its per-call tail) is resent byte for byte.
+    expect(JSON.stringify(second.system)).toBe(JSON.stringify(JSON.parse(executions[0]!.requestBody).system));
     expect(JSON.parse(result.content)).toMatchObject({ value_laden: true });
   });
 });
