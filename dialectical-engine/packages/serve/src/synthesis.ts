@@ -919,16 +919,59 @@ export interface SynthesisLoopControls {
  * This is not MORE than the minimum payload — it is part of the minimum. A party
  * judged on agreement with the label needs to know it is judged on it.
  */
-export const SYNTHESIZER_INSTRUCTIONS =
+export const SYNTHESIZER_V2_INSTRUCTIONS =
   "Write the served statement from the digest below. Every load-bearing claim must trace to a "
   + "digest node. Do not overstate the evidence, and state the losing positions fairly. Your "
   + "statement must agree with the supplied code label, and must claim no more confidence than "
   + "that label carries.";
 
-export const EVALUATOR_INSTRUCTIONS =
+/**
+ * PRACTICE DEBATE 3 (2026-10-12) — THE ANSWER WRITER'S INSTRUCTION, v3 (owner
+ * approved 2026-10-12, "Approve as written"; the text below is that wording
+ * verbatim). The v1/v2 instruction above asked for "the served statement from
+ * the digest", traced "to a digest node" and bound to "the supplied code
+ * label": the writer did as told and printed the served strength and the
+ * engine's words, and the answer-text check (`synthesisWordingIndex`) refused
+ * DeepSeek's answer four times running in that debate. The owner's rule: an
+ * answer a person reads never shows a score, a threshold, a point number, a
+ * citation marker or the engine's mechanics. This instruction says so to the
+ * writer, and the code check stays exactly as strict.
+ *
+ * What its words name in the material (`toSynthesisPromptMaterial`, field
+ * names unchanged): "the material" is the fenced block — the `digest` and the
+ * `code_label` (and on a retry the checker's objection); "a point" is one of
+ * the digest's nodes, whose id or short ref `node_refs` copies; "the label in
+ * the material" is `code_label.verdictLabel`.
+ *
+ * The v1/v2 text stays above, byte for byte, as sealed history: register
+ * versions sealed before v3 carry its fingerprint.
+ */
+export const SYNTHESIZER_INSTRUCTIONS =
+  "Write the answer the person will read, from the material below. Every claim the answer rests on "
+  + "must come from a point in the material; list those points in node_refs, never in the text. Do not "
+  + "overstate the evidence, and describe the options that lost fairly. The answer must agree with the "
+  + "label in the material and must not sound more certain than that label allows. Write for the person "
+  + "who asked: never print a score, strength, margin, threshold or any other number taken from the "
+  + "material; never name the material, its fields, labels, marks or point ids; never describe how the "
+  + "debate, its judges or its checkers work. A figure that the question or an argument itself states "
+  + "may be repeated.";
+
+/** Shipped history: the checker's instruction of `serve.evaluator.v1`, byte for byte. */
+export const EVALUATOR_V1_INSTRUCTIONS =
   "Judge the candidate statement against the digest and the code label. Check fairness to the "
   + "losing positions, agreement between the statement and the code label, and overstatement. "
   + "Return an objection whenever you are not satisfied.";
+
+/**
+ * The checker's instruction of `serve.evaluator.v2` (owner approved
+ * 2026-10-12, verbatim): the same duties as v1, plus the reader's rule the
+ * writer is now bound by, so the checker grades what the writer was told.
+ */
+export const EVALUATOR_INSTRUCTIONS =
+  "Judge the candidate answer against the material and its label. Check that it is fair to the "
+  + "options that lost, agrees with the label, does not overstate, and speaks to the person: no score "
+  + "or other number taken from the material, no field names, labels, marks or point ids, and no "
+  + "description of how the debate was run. Return an objection whenever you are not satisfied.";
 
 /**
  * The synthesizer's recorded request. The key set IS the fresh-context
@@ -1281,10 +1324,14 @@ export interface SynthesisWordingIndex {
   readonly engineTokens: ReadonlySet<string>;
 }
 
-/** The one served-number slot the runner serves; the sealed answer form names it in its own words. */
+/**
+ * The one served-number slot the runner serves. The v2 answer form named it in
+ * its own words; v3 asks for no slot at all (`served_number_refs` is always []),
+ * and the slot stays an engine token: an answer text that names it is refused.
+ */
 export const SYNTHESIZER_SERVED_NUMBER_SLOT = "number:final-strength" as const;
 
-/** The answer form's identifiers that are code, not words (each named in `SYNTHESIZER_ANSWER_FORM`). */
+/** The answer form's identifiers that are code, not words (each named in `SYNTHESIZER_ANSWER_FORM` or, the slot, in v2's). */
 const SYNTHESIZER_FORM_TOKENS = Object.freeze([
   "segment_id", "node_refs", "served_number_refs", SYNTHESIZER_SERVED_NUMBER_SLOT
 ]);
@@ -1750,11 +1797,12 @@ export async function runSynthesisLoop<TCandidate>(
  * The SYNTHESIZER's contract ids. The answer form is code's half of the prompt
  * and is sealed by hash in the register row `composerContractHash`: once a form
  * has shipped, changing it is a NEW contract id, never an edit (the storyteller
- * v1 -> v2 precedent in `packages/story/src/contracts.ts`). v1 stays below as
- * shipped history, byte for byte; v2 is what the runner sends.
+ * v1 -> v2 precedent in `packages/story/src/contracts.ts`). v1 and v2 stay below
+ * as shipped history, byte for byte; v3 is what the runner sends.
  */
 export const SYNTHESIZER_V1_CONTRACT_ID = "serve.synthesizer.v1" as const;
-export const SYNTHESIZER_CONTRACT_ID = "serve.synthesizer.v2" as const;
+export const SYNTHESIZER_V2_CONTRACT_ID = "serve.synthesizer.v2" as const;
+export const SYNTHESIZER_CONTRACT_ID = "serve.synthesizer.v3" as const;
 
 /**
  * Shipped v1 history. Moved verbatim out of `apps/runner/src/index.ts`, where
@@ -1770,14 +1818,16 @@ export const SYNTHESIZER_V1_ANSWER_FORM =
   + "plan that would lift it.";
 
 /**
- * Current form (v2): v1's full contract plus the served-number reference
+ * Shipped v2 history: v1's full contract plus the served-number reference
  * format. On 2026-10-05 a real answer was refused because its
  * served_number_refs held values and prose instead of slot ids: v1 never named
  * the one slot the runner serves (`numberRef: "number:final-strength"` in
  * `apps/runner/src/index.ts`) nor the identifier grammar the runner's parser
- * enforces (`machineIdentifierSchema`). Both are stated here exactly.
+ * enforces (`machineIdentifierSchema`). Its fingerprint is the
+ * `composerContractHash` of every register version sealed from 2026-10-09 until
+ * v3 (the preview's versions 10 and 11 among them).
  */
-export const SYNTHESIZER_ANSWER_FORM = `${SYNTHESIZER_V1_ANSWER_FORM} `
+export const SYNTHESIZER_V2_ANSWER_FORM = `${SYNTHESIZER_V1_ANSWER_FORM} `
   + "segment_id and every node_refs or served_number_refs entry must be an ASCII identifier matching "
   + "^[A-Za-z0-9][A-Za-z0-9:._-]*$; copy digest node ids exactly and never translate identifiers. "
   + "served_number_refs identifies typed served-number slots, not the numeric values themselves. "
@@ -1785,6 +1835,41 @@ export const SYNTHESIZER_ANSWER_FORM = `${SYNTHESIZER_V1_ANSWER_FORM} `
   + "Include that exact ref when the segment asserts that served number. If a segment asserts no served number, use []. "
   + "Never invent a slot from other digest statistics or code_label.margin, and never put numeric values, "
   + "percentages, expressions, or citation labels in served_number_refs.";
+
+/**
+ * Current form (v3, owner-approved content, 2026-10-12). PRACTICE DEBATE 3:
+ * v2 told the writer to "include that exact ref when the segment asserts that
+ * served number" (so it asserted the number in the text) and v1's two-segment
+ * rule asked for "a hypothesis" and "the research plan" (so the model opened
+ * its segments with "Hypothesis:" and "Research plan:"). v3 keeps the JSON shape
+ * the runner parses (`compositionSchema`), the two-segment rule for an answer
+ * that rests on reasoning alone (serve reads it as the provisional answer and
+ * what would settle it, `HYPOTHESIS_WITH_RESEARCH_PLAN`) and v2's identifier
+ * grammar, and asks for no served number at all: `served_number_refs` is
+ * always []. No rule beyond the owner's content is added.
+ */
+export const SYNTHESIZER_ANSWER_FORM =
+  "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. "
+  + "node_refs lists the ids of the points whose facts the segment states, copied exactly. Add no facts. "
+  + "When the points a segment relies on rest on reasoning alone, with nothing measured or looked up behind them, "
+  + "return two segments in order: the first gives the provisional answer and says plainly that it is not yet "
+  + "settled; the second says what evidence would settle it. Never start a segment with a heading or a label. "
+  + "segment_id and every node_refs entry must be an ASCII identifier matching ^[A-Za-z0-9][A-Za-z0-9:._-]*$; "
+  + "copy ids exactly and never translate identifiers. served_number_refs is always [].";
+
+/** Shipped history, as sent: v1's contract (the v1/v2 instruction and the v1 form). */
+export const SYNTHESIZER_V1_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_V1_CONTRACT_ID,
+  instruction: SYNTHESIZER_V2_INSTRUCTIONS,
+  answerForm: SYNTHESIZER_V1_ANSWER_FORM
+});
+
+/** Shipped history, as sent: v2's contract (the same instruction as v1, the v2 form). */
+export const SYNTHESIZER_V2_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_V2_CONTRACT_ID,
+  instruction: SYNTHESIZER_V2_INSTRUCTIONS,
+  answerForm: SYNTHESIZER_V2_ANSWER_FORM
+});
 
 export const SYNTHESIZER_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: SYNTHESIZER_CONTRACT_ID,

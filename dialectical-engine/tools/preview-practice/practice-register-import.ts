@@ -14,16 +14,36 @@
  *    own architecture law), so such an export is refused (PRACTICE_REGISTER_PATH_UNSUPPORTED).
  * Every version's rows are hashed (the register's own snapshot hash) and compared with the export's recorded hash
  * before and after the import, so the practice provably runs on the live bytes.
+ *
+ * `--register-next` (2026-10-12, register 12): the owner's rule is that a practice debate with all real AIs passes
+ * BEFORE any upload, and an upload that brings new sealed prompts also needs a new register version, which only the
+ * server's publish operation makes. So the practice can make that version itself, in its throwaway database, the way
+ * the server will: `composePracticeNextRegisterVersion` runs the preview publish kit's own source build and composer
+ * (`buildPreviewSourceRowsV2`, `composePreviewSnapshotV2` in deploy/preview-auth-dev/v1/publish-register-v2.ts) on top
+ * of the exported newest version, with the newest version's own checker choice, role-rotation switch and measured
+ * runtime (read back from its rows), and `importPracticeRegister` publishes the result through the same general
+ * publication as one more version. The practice then runs on it, and its report names every row that changed, which
+ * is the delta the owner will be shown for approval on the server (the server re-measures only its runtime row).
  */
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import {
   computeRegisterSnapshotSha256,
   createPostgresRegisterPublicationPort,
+  loadBootstrapRegister,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
+  type BootstrapRegister,
   type RegisterPublicationRow
 } from "@debateai/register";
+import {
+  buildPreviewSourceRowsV2,
+  composePreviewSnapshotV2,
+  PREVIEW_DEEPSEEK_CHECKER_ROLE_REF,
+  PREVIEW_EVALUATOR_ROLE_REF,
+  type PreviewCheckerChoice,
+  type PreviewRoleRotationChoice
+} from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
 
 export const PRACTICE_REGISTER_EXPORT_SCHEMA = "preview-practice-register-export-v1" as const;
 
@@ -140,18 +160,88 @@ export type PracticeRegisterImportStep = Readonly<{
   registerVersion: string;
   rowCount: number;
   snapshotSha256: string;
-  path: "ALREADY_PRESENT" | "HISTORICAL_IMPORT" | "GENERAL_PUBLICATION";
+  path: "ALREADY_PRESENT" | "HISTORICAL_IMPORT" | "GENERAL_PUBLICATION" | "CODE_NEXT_VERSION";
+}>;
+
+/** The code's next version, composed by the preview publish kit on the exported newest version. */
+export type PracticeNextRegisterVersion = Readonly<{
+  baseRegisterVersion: string;
+  baseSnapshotSha256: string;
+  rows: readonly RegisterPublicationRow[];
+  snapshotSha256: string;
+  addedKeys: readonly string[];
+  changedKeys: readonly string[];
+  /** The delta's own hash, as the server's proposal prints it (`deltaSha256`); the server's differs by its runtime row. */
+  deltaSha256: string;
+  checker: "glm" | "deepseek";
+  roleRotation: PreviewRoleRotationChoice;
 }>;
 
 export type PracticeRegisterImportReceipt = Readonly<{
   registerVersion: string;
   steps: readonly PracticeRegisterImportStep[];
+  /** Present when the practice runs on the code's next version (`--register-next`): what that version changed. */
+  codeNext?: Readonly<{ baseRegisterVersion: string; addedKeys: readonly string[]; changedKeys: readonly string[]; deltaSha256: string }>;
 }>;
 
+/** The measured runtime the server's publish recorded in the base's `nodeRuntimeVersion` row (publish-register-v2.ts). */
+const NODE_RUNTIME_SOURCE_REF =
+  /^preview-auth-dev-v1 actual Node (v[0-9]+\.[0-9]+\.[0-9]+); measured ([^;]+); source ([0-9a-f]{40})\/([0-9a-f]{40}); operator sha256:([0-9a-f]{64})$/u;
+
 /**
- * Imports every exported version, in order, and proves each one.
+ * Composes the code's next preview register version on the exported newest version, exactly as the server's
+ * `native-plan --operation plan` composes the proposal (native-operator.mjs), with three inputs the server takes from
+ * the operator or the machine read back from the base instead, so the practice changes nothing the code does not:
+ *  - the checker choice: DeepSeek when the base's `evaluatorRoleRef` is DeepSeek's ref, GLM when it is GLM's second ref;
+ *  - the role-rotation switch: the base's `answerRoleRotationPolicy.enabled` ('on' when the base has no such row);
+ *  - the runtime observation: the base's `nodeRuntimeVersion` row and its source reference, and its `pnpmVersion` row.
+ * Anything else in the base that cannot be read that way refuses (PRACTICE_REGISTER_NEXT_UNSUPPORTED), and so does a
+ * code that changes no row (there is then no next version to practise).
  */
-export async function importPracticeRegister(pool: Pool, document: PracticeRegisterExport): Promise<PracticeRegisterImportReceipt> {
+export async function composePracticeNextRegisterVersion(
+  document: PracticeRegisterExport,
+  bootstrap?: BootstrapRegister
+): Promise<PracticeNextRegisterVersion> {
+  const unsupported = (detail: string): never => { throw new PracticeRegisterError("PRACTICE_REGISTER_NEXT_UNSUPPORTED", detail); };
+  const base = document.versions[document.versions.length - 1]!;
+  const baseRows = practiceVersionRows(document, base.register_version);
+  const row = (key: string): RegisterPublicationRow => baseRows.find((entry) => entry.rowKey === key) ?? unsupported(`base has no ${key}`);
+  const value = (key: string): unknown => JSON.parse(row(key).valueJsonText) as unknown;
+  const evaluator = value("evaluatorRoleRef") as { providerRef?: unknown } | null;
+  const checker: PreviewCheckerChoice = evaluator?.providerRef === PREVIEW_DEEPSEEK_CHECKER_ROLE_REF
+    ? Object.freeze({ checker: "deepseek" as const, deepseekEnabledOnGate: true as const })
+    : evaluator?.providerRef === PREVIEW_EVALUATOR_ROLE_REF ? Object.freeze({ checker: "glm" as const }) : unsupported("evaluatorRoleRef");
+  const rotationRow = baseRows.find((entry) => entry.rowKey === "answerRoleRotationPolicy");
+  const rotationEnabled = rotationRow === undefined ? true : (JSON.parse(rotationRow.valueJsonText) as { enabled?: unknown }).enabled;
+  if (typeof rotationEnabled !== "boolean") unsupported("answerRoleRotationPolicy");
+  const roleRotation: PreviewRoleRotationChoice = rotationEnabled === true ? "on" : "off";
+  const measured = NODE_RUNTIME_SOURCE_REF.exec(row("nodeRuntimeVersion").sourceRef) ?? unsupported("nodeRuntimeVersion source reference");
+  const pnpmVersion = value("pnpmVersion");
+  if (value("nodeRuntimeVersion") !== measured[1] || typeof pnpmVersion !== "string") unsupported("runtime rows");
+  const sourceRows = await buildPreviewSourceRowsV2(bootstrap ?? await loadBootstrapRegister(), {
+    nodeVersion: measured[1]!, pnpmVersion: pnpmVersion as string, observedAt: measured[2]!,
+    sourceRevision: measured[3]!, sourceTree: measured[4]!, operatorSha256: measured[5]!
+  }, checker, roleRotation);
+  const baseSnapshotSha256 = computeRegisterSnapshotSha256(baseRows);
+  const snapshot = composePreviewSnapshotV2({
+    sourceRows, baseRows, baseRegisterVersion: base.register_version, baseSnapshotSha256
+  });
+  if (snapshot.addedKeys.length === 0 && snapshot.changedKeys.length === 0) unsupported("the code changes no register row");
+  return Object.freeze({
+    baseRegisterVersion: base.register_version, baseSnapshotSha256,
+    rows: snapshot.rows, snapshotSha256: snapshot.snapshotSha256,
+    addedKeys: snapshot.addedKeys, changedKeys: snapshot.changedKeys, deltaSha256: snapshot.deltaSha256,
+    checker: checker.checker, roleRotation
+  });
+}
+
+/**
+ * Imports every exported version, in order, and proves each one. With `next` (the code's next version, from
+ * `composePracticeNextRegisterVersion` on this same export), it then publishes that version on top, through the same
+ * general publication, and the practice runs on it.
+ */
+export async function importPracticeRegister(pool: Pool, document: PracticeRegisterExport,
+  next: PracticeNextRegisterVersion | null = null): Promise<PracticeRegisterImportReceipt> {
   const port = createPostgresRegisterPublicationPort(pool);
   const steps: PracticeRegisterImportStep[] = [];
   for (const version of document.versions) {
@@ -200,5 +290,29 @@ export async function importPracticeRegister(pool: Pool, document: PracticeRegis
     steps.push(Object.freeze({ registerVersion: version.register_version, rowCount: rows.length, snapshotSha256, path }));
   }
   const last = document.versions[document.versions.length - 1]!;
-  return Object.freeze({ registerVersion: last.register_version, steps: Object.freeze(steps) });
+  if (next === null) return Object.freeze({ registerVersion: last.register_version, steps: Object.freeze(steps) });
+  if (next.baseRegisterVersion !== last.register_version || next.baseSnapshotSha256 !== steps[steps.length - 1]!.snapshotSha256) {
+    throw new PracticeRegisterError("PRACTICE_REGISTER_NEXT_UNSUPPORTED", "the next version was composed on another base");
+  }
+  const receipt = await port.publishGeneral({
+    publicationId: randomUUID(),
+    baseRegisterVersion: parseRegisterVersionText(next.baseRegisterVersion),
+    rows: next.rows,
+    sourceRef: `preview practice: this code's next version on top of live register version ${next.baseRegisterVersion}`,
+    deployment: "local"
+  });
+  if (BigInt(receipt.registerVersion) !== BigInt(next.baseRegisterVersion) + 1n) {
+    throw new PracticeRegisterError("PRACTICE_REGISTER_VERSION_DRIFT",
+      `expected ${String(BigInt(next.baseRegisterVersion) + 1n)}, the publication allocated ${receipt.registerVersion}`);
+  }
+  if (await databaseVersionSnapshotSha256(pool, receipt.registerVersion) !== next.snapshotSha256) {
+    throw new PracticeRegisterError("PRACTICE_REGISTER_HASH_MISMATCH", `version ${receipt.registerVersion} (the code's next) after import`);
+  }
+  steps.push(Object.freeze({ registerVersion: receipt.registerVersion, rowCount: next.rows.length, snapshotSha256: next.snapshotSha256,
+    path: "CODE_NEXT_VERSION" as const }));
+  return Object.freeze({
+    registerVersion: receipt.registerVersion, steps: Object.freeze(steps),
+    codeNext: Object.freeze({ baseRegisterVersion: next.baseRegisterVersion, addedKeys: next.addedKeys,
+      changedKeys: next.changedKeys, deltaSha256: next.deltaSha256 })
+  });
 }

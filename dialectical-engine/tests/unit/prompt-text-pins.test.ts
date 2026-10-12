@@ -7,13 +7,20 @@ import {
 } from "@debateai/judgement";
 import {
   EVALUATOR_INSTRUCTIONS,
+  EVALUATOR_V1_INSTRUCTIONS,
+  SYNTHESIZER_ANSWER_FORM,
   SYNTHESIZER_CONTRACT_ID,
   SYNTHESIZER_INSTRUCTIONS,
   SYNTHESIZER_PROMPT_CONTRACT,
   SYNTHESIZER_V1_ANSWER_FORM,
-  SYNTHESIZER_V1_CONTRACT_ID
+  SYNTHESIZER_V1_CONTRACT_ID,
+  SYNTHESIZER_V1_PROMPT_CONTRACT,
+  SYNTHESIZER_V2_ANSWER_FORM,
+  SYNTHESIZER_V2_CONTRACT_ID,
+  SYNTHESIZER_V2_INSTRUCTIONS,
+  SYNTHESIZER_V2_PROMPT_CONTRACT
 } from "@debateai/serve";
-import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
+import { EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import {
   BLIND_JUDGE_GRADE_PROMPT_CONTRACT,
   DOMAIN_TAGGER_PROMPT_CONTRACT
@@ -221,23 +228,43 @@ describe("REVIEW ITEM 4 — the serve prompts, exact shipped texts", () => {
    * therefore have edited either instruction and moved a SEALED register row
    * with zero tests red, which is the one thing constraint 5 exists to prevent.
    */
-  it("pins SYNTHESIZER_INSTRUCTIONS exactly — byte-identical to base", () => {
-    expect(SYNTHESIZER_INSTRUCTIONS).toBe(
+  /**
+   * PRACTICE DEBATE 3 (2026-10-12): the owner approved new wording for the answer writer and the
+   * answer checker ("Approve as written"). Each string below is that wording, verbatim, as ONE literal,
+   * so a reworded byte is red here. The texts they supersede stay pinned as history right after.
+   */
+  it("pins SYNTHESIZER_INSTRUCTIONS exactly — the owner-approved v3 wording, verbatim", () => {
+    expect(SYNTHESIZER_INSTRUCTIONS).toBe("Write the answer the person will read, from the material below. Every claim the answer rests on must come from a point in the material; list those points in node_refs, never in the text. Do not overstate the evidence, and describe the options that lost fairly. The answer must agree with the label in the material and must not sound more certain than that label allows. Write for the person who asked: never print a score, strength, margin, threshold or any other number taken from the material; never name the material, its fields, labels, marks or point ids; never describe how the debate, its judges or its checkers work. A figure that the question or an argument itself states may be repeated.");
+    expect(SYNTHESIZER_PROMPT_CONTRACT.instruction).toBe(SYNTHESIZER_INSTRUCTIONS);
+  });
+
+  it("keeps the v1/v2 synthesizer instruction as history, byte-identical to base", () => {
+    expect(SYNTHESIZER_V2_INSTRUCTIONS).toBe(
       "Write the served statement from the digest below. Every load-bearing claim must trace to a "
       + "digest node. Do not overstate the evidence, and state the losing positions fairly. Your "
       + "statement must agree with the supplied code label, and must claim no more confidence than "
       + "that label carries."
     );
-    expect(SYNTHESIZER_PROMPT_CONTRACT.instruction).toBe(SYNTHESIZER_INSTRUCTIONS);
+    expect(SYNTHESIZER_V1_PROMPT_CONTRACT.instruction).toBe(SYNTHESIZER_V2_INSTRUCTIONS);
+    expect(SYNTHESIZER_V2_PROMPT_CONTRACT.instruction).toBe(SYNTHESIZER_V2_INSTRUCTIONS);
   });
 
-  it("pins EVALUATOR_INSTRUCTIONS exactly — byte-identical to base", () => {
-    expect(EVALUATOR_INSTRUCTIONS).toBe(
+  it("pins EVALUATOR_INSTRUCTIONS exactly — the owner-approved serve.evaluator.v2 wording, verbatim", () => {
+    expect(EVALUATOR_INSTRUCTIONS).toBe("Judge the candidate answer against the material and its label. Check that it is fair to the options that lost, agrees with the label, does not overstate, and speaks to the person: no score or other number taken from the material, no field names, labels, marks or point ids, and no description of how the debate was run. Return an objection whenever you are not satisfied.");
+    expect(EVALUATOR_PROMPT_CONTRACT.instruction).toBe(EVALUATOR_INSTRUCTIONS);
+    expect(EVALUATOR_PROMPT_CONTRACT.contractId).toBe("serve.evaluator.v2");
+  });
+
+  it("keeps the serve.evaluator.v1 instruction as history, byte-identical to base", () => {
+    expect(EVALUATOR_V1_INSTRUCTIONS).toBe(
       "Judge the candidate statement against the digest and the code label. Check fairness to the "
       + "losing positions, agreement between the statement and the code label, and overstatement. "
       + "Return an objection whenever you are not satisfied."
     );
-    expect(EVALUATOR_PROMPT_CONTRACT.instruction).toBe(EVALUATOR_INSTRUCTIONS);
+    expect(EVALUATOR_V1_PROMPT_CONTRACT.contractId).toBe("serve.evaluator.v1");
+    expect(EVALUATOR_V1_PROMPT_CONTRACT.instruction).toBe(EVALUATOR_V1_INSTRUCTIONS);
+    // Only the instruction slot moved: the answer form (and so the verdict schema) is the same sealed text.
+    expect(EVALUATOR_V1_PROMPT_CONTRACT.answerForm).toBe(EVALUATOR_PROMPT_CONTRACT.answerForm);
   });
 
   const SYNTHESIZER_V1_FORM =
@@ -251,12 +278,14 @@ describe("REVIEW ITEM 4 — the serve prompts, exact shipped texts", () => {
   it("keeps the shipped v1 synthesizer answer form as history — the runner's base system string", () => {
     expect(SYNTHESIZER_V1_CONTRACT_ID).toBe("serve.synthesizer.v1");
     expect(SYNTHESIZER_V1_ANSWER_FORM).toBe(SYNTHESIZER_V1_FORM);
+    expect(SYNTHESIZER_V1_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v1");
+    expect(SYNTHESIZER_V1_PROMPT_CONTRACT.answerForm).toBe(SYNTHESIZER_V1_FORM);
   });
 
-  it("supersedes v1 with serve.synthesizer.v2: v1's form plus the served-number reference format", () => {
-    expect(SYNTHESIZER_CONTRACT_ID).toBe("serve.synthesizer.v2");
-    expect(SYNTHESIZER_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v2");
-    expect(SYNTHESIZER_PROMPT_CONTRACT.answerForm).toBe(
+  it("keeps serve.synthesizer.v2 as history: v1's form plus the served-number reference format", () => {
+    expect(SYNTHESIZER_V2_CONTRACT_ID).toBe("serve.synthesizer.v2");
+    expect(SYNTHESIZER_V2_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v2");
+    expect(SYNTHESIZER_V2_ANSWER_FORM).toBe(
       SYNTHESIZER_V1_FORM + " "
       + "segment_id and every node_refs or served_number_refs entry must be an ASCII identifier matching "
       + "^[A-Za-z0-9][A-Za-z0-9:._-]*$; copy digest node ids exactly and never translate identifiers. "
@@ -266,6 +295,26 @@ describe("REVIEW ITEM 4 — the serve prompts, exact shipped texts", () => {
       + "Never invent a slot from other digest statistics or code_label.margin, and never put numeric values, "
       + "percentages, expressions, or citation labels in served_number_refs."
     );
+    expect(SYNTHESIZER_V2_PROMPT_CONTRACT.answerForm).toBe(SYNTHESIZER_V2_ANSWER_FORM);
+  });
+
+  it("supersedes v2 with serve.synthesizer.v3: the owner-approved answer form, plain words, no served number", () => {
+    expect(SYNTHESIZER_CONTRACT_ID).toBe("serve.synthesizer.v3");
+    expect(SYNTHESIZER_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v3");
+    expect(SYNTHESIZER_ANSWER_FORM).toBe(
+      "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. "
+      + "node_refs lists the ids of the points whose facts the segment states, copied exactly. Add no facts. "
+      + "When the points a segment relies on rest on reasoning alone, with nothing measured or looked up behind them, "
+      + "return two segments in order: the first gives the provisional answer and says plainly that it is not yet "
+      + "settled; the second says what evidence would settle it. Never start a segment with a heading or a label. "
+      + "segment_id and every node_refs entry must be an ASCII identifier matching ^[A-Za-z0-9][A-Za-z0-9:._-]*$; "
+      + "copy ids exactly and never translate identifiers. served_number_refs is always []."
+    );
+    expect(SYNTHESIZER_PROMPT_CONTRACT.answerForm).toBe(SYNTHESIZER_ANSWER_FORM);
+    // The words that produced "Hypothesis:" / "Research plan:" headings and an asserted number are gone.
+    for (const gone of ["hypothesis", "research plan", "digest", "number:final-strength", "code_label", "served statement"]) {
+      expect(`${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_ANSWER_FORM}`.toLowerCase()).not.toContain(gone);
+    }
   });
 
   it("the evaluator's answer form is the sealed 339-byte contract text", () => {

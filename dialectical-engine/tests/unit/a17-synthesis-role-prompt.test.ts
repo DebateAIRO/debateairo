@@ -82,7 +82,8 @@ describe("A17 · buildSynthesisRolePrompt is the closures' builder, byte for byt
 
   it("frames the writer with the synthesizer contract and the checker with the runner's evaluator contract", () => {
     expect(buildSynthesisRolePrompt(REQUESTS[0]![1], LANGUAGE).contractId).toBe(SYNTHESIZER_PROMPT_CONTRACT.contractId);
-    expect(EVALUATOR_PROMPT_CONTRACT.contractId).toBe("serve.evaluator.v1");
+    // serve.evaluator.v2 (practice debate 3, 2026-10-12) superseded v1's instruction slot.
+    expect(EVALUATOR_PROMPT_CONTRACT.contractId).toBe("serve.evaluator.v2");
     expect(buildSynthesisRolePrompt(REQUESTS[2]![1], LANGUAGE).contractId).toBe(EVALUATOR_PROMPT_CONTRACT.contractId);
   });
 });

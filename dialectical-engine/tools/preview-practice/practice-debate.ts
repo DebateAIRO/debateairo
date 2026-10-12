@@ -33,6 +33,7 @@ import { practiceQuestion } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
 import {
   importPracticeRegister,
+  type PracticeNextRegisterVersion,
   type PracticeRegisterExport,
   type PracticeRegisterImportReceipt
 } from "./practice-register-import.js";
@@ -290,6 +291,11 @@ export async function runPracticeDebate(input: Readonly<{
   settings: PracticeSettings;
   sockets: PracticeSockets;
   register: PracticeRegisterExport;
+  /**
+   * `--register-next`: the code's next register version, composed on the export's newest version
+   * (`composePracticeNextRegisterVersion`); the practice publishes it on top and runs on it. Null: the live version.
+   */
+  registerNext?: PracticeNextRegisterVersion | null;
   /** The watched gate ports. */
   budgetPorts: PreviewBudgetPorts;
   observer: PracticeGateObserver;
@@ -314,19 +320,33 @@ export async function runPracticeDebate(input: Readonly<{
     const pool = database.pool;
     progress("practice database started; migrating");
     await migrate(pool);
-    const receipt = await importPracticeRegister(pool, input.register);
-    // Exactly the exported versions, no other: each version from 1 to one above the last, asked by its own number.
-    const exported = new Set(input.register.versions.map((version) => version.register_version));
+    const receipt = await importPracticeRegister(pool, input.register, input.registerNext ?? null);
+    // Exactly the exported versions (and the code's next one, with --register-next), no other: each version from 1 to
+    // one above the last, asked by its own number.
+    const exported = new Set([...input.register.versions.map((version) => version.register_version),
+      ...(receipt.codeNext === undefined ? [] : [receipt.registerVersion])]);
     for (let version = 1n; version <= BigInt(receipt.registerVersion) + 1n; version += 1n) {
       const found = (await pool.query("SELECT 1 FROM register.register_version WHERE register_version=$1", [String(version)])).rows.length === 1;
       if (found !== exported.has(String(version))) {
         throw Object.assign(new Error("PRACTICE_REGISTER_NOT_EXACT"), { code: "PRACTICE_REGISTER_NOT_EXACT" });
       }
     }
-    if (String(input.settings.runner.REGISTER_VERSION) !== receipt.registerVersion) {
+    // The settings file is the live runner's: its REGISTER_VERSION is the export's newest version, always.
+    const liveVersion = input.register.versions[input.register.versions.length - 1]!.register_version;
+    if (String(input.settings.runner.REGISTER_VERSION) !== liveVersion) {
       throw Object.assign(new Error("PRACTICE_REGISTER_VERSION_MISMATCH"), { code: "PRACTICE_REGISTER_VERSION_MISMATCH" });
     }
-    progress(`register imported up to version ${receipt.registerVersion}`);
+    // With --register-next the runner and the ask path read the code's next version instead (the live one plus one,
+    // which the import proved it allocated), as the server will once REGISTER_VERSION is repinned to it.
+    const nextVersion = input.settings.runner.REGISTER_VERSION + 1;
+    if (receipt.codeNext !== undefined && String(nextVersion) !== receipt.registerVersion) {
+      throw Object.assign(new Error("PRACTICE_REGISTER_VERSION_MISMATCH"), { code: "PRACTICE_REGISTER_VERSION_MISMATCH" });
+    }
+    const settings: PracticeSettings = receipt.codeNext === undefined ? input.settings
+      : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion }) });
+    progress(receipt.codeNext === undefined ? `register imported up to version ${receipt.registerVersion}`
+      : `register imported up to live version ${liveVersion}; practising on this code's next version ${receipt.registerVersion}`
+        + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
     // Content encryption ON, as on the live preview, with a key that lives only in this process.
     const users = new PracticeUserDekStore();
     configureContentEncryption(pool, new ContentCipher(new MemoryRunContentKeyStore(users, async (ownerRef) => {
@@ -354,10 +374,10 @@ export async function runPracticeDebate(input: Readonly<{
     const dispatched: { runId: string; workItemId: string }[] = [];
     const ask = await composePracticeAsk({
       pool, provisionPool: database.extraPool(), serverAdmissionPool: database.extraPool(), legacyAdmissionPool: database.extraPool(),
-      settings: input.settings, sockets: input.sockets, budgetPorts: input.budgetPorts, teamUserIds: [userId],
+      settings, sockets: input.sockets, budgetPorts: input.budgetPorts, teamUserIds: [userId],
       dispatcher: { dispatch: async (job) => { dispatched.push({ ...job }); } }, log: progress
     });
-    const runner = await composePracticeRunner({ pool, environment: input.settings.runner, budgetPorts: input.budgetPorts,
+    const runner = await composePracticeRunner({ pool, environment: settings.runner, budgetPorts: input.budgetPorts,
       ...(input.wait === undefined ? {} : { wait: input.wait }), ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
     const question = practiceQuestion(input.questionId);
     const request = {

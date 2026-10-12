@@ -45,6 +45,7 @@ import {
 } from "@debateai/providers";
 import { StoryWriter, loadStoryPack, resolveStoryPackDir, type StoryPack } from "@debateai/story";
 import {
+  assertRegisterPromptContractHashes,
   buildProviderPriceMap,
   createPostgresProviderGateway,
   logBodyCostFallback,
@@ -94,6 +95,8 @@ export async function composePracticeRunner(input: Readonly<{
   const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
   if (environment.DEPLOYMENT_MODE !== "local") throw new TypeError("PRACTICE_REQUIRES_LOCAL_MODE");
   const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);
+  // As main.ts: a register that does not carry this code's prompt fingerprints refuses the start.
+  assertRegisterPromptContractHashes(policy.hashes, environment.REGISTER_VERSION);
   const storyLog = input.storyLog ?? (() => undefined);
   const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
     .catch((error: unknown) => {
