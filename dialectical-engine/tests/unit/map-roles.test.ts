@@ -135,3 +135,63 @@ describe("map roles: angles with no list are dropped and named (controller rulin
     expect(mapDroppedAngles(four, [...succeeded, ...mapReassignLists(failed, finished, NONE)])).toEqual([]);
   });
 });
+
+describe("map roles: fix round 1 (gap makers, chooser spread, stable reassignment)", () => {
+  const A: MapSeat = { aiRef: "ai-a", maker: "m0" };
+  const A2: MapSeat = { aiRef: "ai-a2", maker: "m0" };
+  const B: MapSeat = { aiRef: "ai-b", maker: "m1" };
+  const B2: MapSeat = { aiRef: "ai-b2", maker: "m1" };
+  const C: MapSeat = { aiRef: "ai-c", maker: "m2" };
+  const D: MapSeat = { aiRef: "ai-d", maker: "m3" };
+  const gapRounds = (order: readonly MapSeat[], merger: MapSeat | null, writers: ReadonlySet<string>, rounds: number) =>
+    Array.from({ length: rounds }, (_unused, index) => mapPickGapSeat(order, NONE, merger, writers, index + 1)?.aiRef ?? null);
+
+  it("gap: the coordinator's example, where D's maker wrote nothing and A2 shares a maker that wrote", () => {
+    expect(gapRounds([A, A2, B, C, D], B, new Set(["ai-a", "ai-c"]), 2)).toEqual(["ai-d", "ai-a2"]);
+  });
+
+  it("gap: a rotated order where a no-list seat of a writing maker comes before the maker that wrote nothing", () => {
+    expect(gapRounds([B, A, A2, C, D], B, new Set(["ai-a", "ai-c"]), 2)).toEqual(["ai-d", "ai-a2"]);
+  });
+
+  it("chooser: a seat other than the planner's first, then a maker other than the planner's, never the merger's", () => {
+    const order = [A, A2, B, B2];
+    const merger = mapPickMerger(order, NONE);
+    expect(refs([mapPickPlanner(order, NONE), merger, mapPickChooser(order, NONE, merger)])).toEqual(["ai-a", "ai-b", "ai-a2"]);
+    expect(refs([mapPickChooser([A, B, A2, C], NONE, B)])).toEqual(["ai-c"]);
+  });
+
+  it("chooser after a failed merge starts after the seat the merge would have used, and never picks it when another seat is legal", () => {
+    expect(mapPickChooser(S, new Set(["ai-0"]), null)?.aiRef).toBe("ai-3");
+    expect(mapPickChooser(S, new Set(["ai-0", "ai-2"]), null)?.aiRef).toBe("ai-4");
+  });
+
+  it("reassignment does not depend on the order the failed lists are given in", () => {
+    const failed = [{ listIndex: 3, seat: S[4]!, angle: angle("d") }, { listIndex: 1, seat: S[2]!, angle: angle("b") }];
+    expect(mapReassignLists(failed, [S[0]!, S[3]!], NONE).map((entry) => `${String(entry.listIndex)}:${entry.seat.aiRef}`))
+      .toEqual(["1:ai-0", "3:ai-3"]);
+  });
+
+  it("a seat never takes back its own failed list", () => {
+    const failed = [{ listIndex: 1, seat: S[2]!, angle: angle("b") }];
+    expect(mapReassignLists(failed, [S[2]!, S[0]!, S[3]!], NONE).map((entry) => `${String(entry.listIndex)}:${entry.seat.aiRef}`))
+      .toEqual(["1:ai-0"]);
+  });
+
+  it("runs planner, merger, chooser and gap together on two makers, and on two makers of two seats each, and pins the result", () => {
+    const run = (order: readonly MapSeat[], writers: ReadonlySet<string>) => {
+      const merger = mapPickMerger(order, NONE);
+      return {
+        planner: mapPickPlanner(order, NONE)?.aiRef ?? null,
+        merger: merger?.aiRef ?? null,
+        chooser: mapPickChooser(order, NONE, merger)?.aiRef ?? null,
+        gap: gapRounds(order, merger, writers, 2)
+      };
+    };
+    expect(run([A, B], new Set(["ai-a", "ai-b"]))).toEqual({ planner: "ai-a", merger: "ai-b", chooser: "ai-a", gap: ["ai-a", "ai-a"] });
+    expect(run([A, A2, B, B2], new Set(["ai-a", "ai-a2", "ai-b", "ai-b2"])))
+      .toEqual({ planner: "ai-a", merger: "ai-b", chooser: "ai-a2", gap: ["ai-a", "ai-a2"] });
+    expect(run([A, A2, B, B2], new Set(["ai-a", "ai-b", "ai-b2"])))
+      .toEqual({ planner: "ai-a", merger: "ai-b", chooser: "ai-a2", gap: ["ai-a2", "ai-a"] });
+  });
+});

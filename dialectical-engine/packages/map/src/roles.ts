@@ -36,12 +36,6 @@ export function mapDistinctMakers(seats: readonly MapSeat[]): number {
   return new Set(seats.map((seat) => seat.maker)).size;
 }
 
-function mapCyclicFrom(order: readonly MapSeat[], start: number): readonly MapSeat[] {
-  if (order.length === 0) return [];
-  const at = ((start % order.length) + order.length) % order.length;
-  return [...order.slice(at), ...order.slice(0, at)];
-}
-
 const mapIndexOf = (order: readonly MapSeat[], seat: MapSeat): number => order.findIndex((entry) => entry.aiRef === seat.aiRef);
 
 export function mapPickPlanner(order: readonly MapSeat[], out: ReadonlySet<string>): MapSeat | null {
@@ -56,26 +50,40 @@ export function mapPickPlanner(order: readonly MapSeat[], out: ReadonlySet<strin
 export function mapPickMerger(order: readonly MapSeat[], out: ReadonlySet<string>): MapSeat | null {
   const planner = mapPickPlanner(order, out);
   if (planner === null) return null;
-  const after = mapCyclicFrom(order, mapIndexOf(order, planner) + 1).filter((seat) => !out.has(seat.aiRef));
+  const after = mapRotateSeats(order, mapIndexOf(order, planner) + 1).filter((seat) => !out.has(seat.aiRef));
   return after.find((seat) => seat.maker !== planner.maker) ?? after[0] ?? null;
 }
 
-/** After the merger, never of the merger's maker (spec §1.1). With no merger (merge failed), from the third seat on. */
+/**
+ * The chooser (spec §1.1): a seat that did not merge, never of the merger's maker. Among those, a seat other than the
+ * planner's comes first, then a maker other than the planner's (fix round 1: the answers are spread from the planner),
+ * the cyclic order from the merger breaking ties. With no merger (the merge failed) there is no maker to avoid, and the
+ * search starts after the seat the merge would have used (the planner's next available seat), so that seat is tried
+ * last. Task 9 calls it with the same `out` it used for the merge step.
+ */
 export function mapPickChooser(order: readonly MapSeat[], out: ReadonlySet<string>, merger: MapSeat | null): MapSeat | null {
-  const start = merger === null ? 2 : mapIndexOf(order, merger) + 1;
-  return mapCyclicFrom(order, start).find((seat) => !out.has(seat.aiRef) && (merger === null || seat.maker !== merger.maker)) ?? null;
+  const planner = mapPickPlanner(order, out);
+  const anchor = merger ?? mapPickMerger(order, out);
+  if (planner === null || anchor === null) return null;
+  const legal = mapRotateSeats(order, mapIndexOf(order, anchor) + 1)
+    .filter((seat) => !out.has(seat.aiRef) && (merger === null || seat.maker !== merger.maker));
+  const rank = (seat: MapSeat): number => (seat.aiRef === planner.aiRef ? 2 : 0) + (seat.maker === planner.maker ? 1 : 0);
+  return [...legal].sort((a, b) => rank(a) - rank(b))[0] ?? null;
 }
 
 /**
- * Round `round` (1-based) of the gap AI (spec §1.1): a maker that did not merge, rotating; a maker that wrote no list is
- * preferred when one exists.
+ * Round `round` (1-based) of the gap AI (spec §1.1): a maker that did not merge, rotating. A maker that wrote no list is
+ * preferred when one exists (fix round 1: a maker, not a seat). Three tiers, each in the cyclic order from the merger:
+ * a seat whose maker wrote no list; then a seat that wrote no list; then the rest. Never the merger's maker.
  */
 export function mapPickGapSeat(order: readonly MapSeat[], out: ReadonlySet<string>, merger: MapSeat | null,
   listWriters: ReadonlySet<string>, round: number): MapSeat | null {
   const start = merger === null ? 0 : mapIndexOf(order, merger) + 1;
-  const eligible = mapCyclicFrom(order, start).filter((seat) => !out.has(seat.aiRef) && (merger === null || seat.maker !== merger.maker));
-  const preferred = [...eligible.filter((seat) => !listWriters.has(seat.aiRef)), ...eligible.filter((seat) => listWriters.has(seat.aiRef))];
-  return preferred.length === 0 ? null : preferred[(Math.max(1, round) - 1) % preferred.length]!;
+  const eligible = mapRotateSeats(order, start).filter((seat) => !out.has(seat.aiRef) && (merger === null || seat.maker !== merger.maker));
+  const writerMakers = new Set(order.filter((seat) => listWriters.has(seat.aiRef)).map((seat) => seat.maker));
+  const tier = (seat: MapSeat): number => (!writerMakers.has(seat.maker) ? 0 : listWriters.has(seat.aiRef) ? 2 : 1);
+  const ranked = [...eligible].sort((a, b) => tier(a) - tier(b));
+  return ranked.length === 0 ? null : ranked[(Math.max(1, round) - 1) % ranked.length]!;
 }
 
 export type MapListAssignment = Readonly<{ listIndex: number; seat: MapSeat; angle: MapAngle | null }>;
@@ -89,11 +97,14 @@ export function mapListAssignments(angles: readonly MapAngle[], order: readonly 
 
 /**
  * Spec §1.2: a failed list's angle goes to the next map AI that has finished. Deterministic (as ruled): after the
- * first wave, failed lists in plan order go to the finished seats in plan order, one each; the rest are dropped.
+ * first wave, the failed lists go in listIndex order, whatever order the caller gives them in, to the finished seats in
+ * plan order, one each; a seat that itself failed never takes a list back, and the rest are dropped.
  */
 export function mapReassignLists(failed: readonly MapListAssignment[], finished: readonly MapSeat[], out: ReadonlySet<string>): readonly MapListAssignment[] {
-  const free = finished.filter((seat) => !out.has(seat.aiRef));
-  return Object.freeze(failed.slice(0, free.length).map((assignment, index) =>
+  const failedSeats = new Set(failed.map((entry) => entry.seat.aiRef));
+  const free = finished.filter((seat) => !out.has(seat.aiRef) && !failedSeats.has(seat.aiRef));
+  const inOrder = [...failed].sort((a, b) => a.listIndex - b.listIndex);
+  return Object.freeze(inOrder.slice(0, free.length).map((assignment, index) =>
     Object.freeze({ listIndex: assignment.listIndex, seat: free[index]!, angle: assignment.angle })));
 }
 
