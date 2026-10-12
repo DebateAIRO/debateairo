@@ -267,6 +267,11 @@ function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
  * the ledger (attemptScope "actor"), so the repair is billed and counted like any attempt and the sealed bound of three
  * leaves the runner's final retry its room. A transport failure still ends the call after one POST, and an unbilled
  * refusal still gets the one 60-second resend.
+ *
+ * Patch follow-up (owner design, 2026-10-12): that second POST is the SHORT follow-up whenever the refused reply decoded
+ * to an object refused at named members (the gateway decides; `planPatchFollowUp`), and a call whose second POST was a
+ * patch may send a third, the full re-ask, still within the sealed bound the counting gateway hands down as what is
+ * left (`remaining`), so it never meets a spent step. The story's sealed bound of two leaves the patch only.
  */
 function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
   if (request.lane !== "served" || (request.role !== "JUDGE" && request.role !== "SYNTHESIZER" && request.role !== "EVALUATOR")

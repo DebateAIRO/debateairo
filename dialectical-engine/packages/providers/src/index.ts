@@ -2,7 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { z } from "zod";
 import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
-import { assertFramedPrompt } from "./prompt-frame.js";
+import { assertFramedPrompt, buildFramedPatchPrompt } from "./prompt-frame.js";
+import { mergePatchReply, planPatchFollowUp, type PatchFollowUpPlan } from "./patch-follow-up.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
 import {
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
@@ -262,6 +263,13 @@ export interface ProviderCallResult {
    * builds its own result and leaves it out means 0.
    */
   readonly repairAttempts?: number;
+  /**
+   * Patch follow-up (owner design, 2026-10-12): the form of the follow-up the accepted reply answered — "PATCH" when
+   * it was the short follow-up and `content` is the first reply with the patch merged in, "FULL" when it was the
+   * step's full re-ask. Absent when the accepted reply answered the original packet (or a gateway or double builds
+   * its own result).
+   */
+  readonly repairForm?: "PATCH" | "FULL";
 }
 
 export interface ProviderGateway {
@@ -1285,6 +1293,8 @@ const MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024;
  * oversized packet is a refused attempt — recorded, never sent, never retried.
  */
 const MAX_PROVIDER_REQUEST_PACKET_BYTES = 256 * 1024;
+/** Patch follow-up: room left in the packet cap for the body's other members around the messages. */
+const PATCH_PACKET_HEADROOM_BYTES = 4 * 1024;
 /** L4-F8: bounded exponential backoff between HTTP attempts — 250 ms x 2^n, capped at 4 s. */
 const PROVIDER_BACKOFF_BASE_MS = 250;
 const PROVIDER_BACKOFF_CAP_MS = 4_000;
@@ -1635,6 +1645,31 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     this.#options = options;
   }
 
+  /**
+   * Patch follow-up: the short follow-up packet for a refused reply, or null when it cannot go out — the door or the
+   * builder refuses it (an answer that contains the boundary marker), the wire cannot say it, or it would not fit the
+   * packet cap or the declared window. Null means the step's full re-ask instead; nothing is sent or recorded here.
+   */
+  #patchPacket(
+    packet: PromptPacket, ownReply: string, plan: PatchFollowUpPlan, tokenCeiling: number, thinkingLevel: string,
+    fits: (packet: PromptPacket, tokenCeiling: number) => boolean
+  ): PromptPacket | null {
+    let patch: PromptPacket;
+    try {
+      patch = buildFramedPatchPrompt(packet, ownReply, plan.locator);
+      if (this.#anthropic) {
+        anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: tokenCeiling, thinkingLevel, messages: patch.messages });
+      }
+    } catch (error) {
+      if (error instanceof TypedDomainError) return null;
+      throw error;
+    }
+    return Buffer.byteLength(JSON.stringify(patch.messages), "utf8") + PATCH_PACKET_HEADROOM_BYTES <= MAX_PROVIDER_REQUEST_PACKET_BYTES
+      && fits(patch, tokenCeiling)
+      ? patch
+      : null;
+  }
+
   async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
     this.#options.assertNoOpenWriteTransaction();
     assertJsonObjectResponseCapability(this.#options);
@@ -1653,7 +1688,15 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * today; the field is also honoured when this gateway is called directly, without the counting
      * gateway in front.
      */
-    const callAttempts = Math.min(request.bound.maxAttempts, request.maxAttemptsThisCall ?? request.bound.maxAttempts);
+    /**
+     * Patch follow-up (owner design, 2026-10-12): a call whose SECOND POST was the short patch follow-up may send one
+     * more, for the full re-ask, still within `bound.maxAttempts` (on the preview the counting gateway's `remaining`,
+     * read off the ledger, so the counting gateway never meets a spent step for it). Hosted and local never set
+     * `maxAttemptsThisCall`, so for them this is the bound, as before.
+     */
+    let patchWasSecondPost = false;
+    const callAttempts = (): number => Math.min(request.bound.maxAttempts,
+      (request.maxAttemptsThisCall ?? request.bound.maxAttempts) + (patchWasSecondPost ? 1 : 0));
     /**
      * V-11 addendum, layer 1 — THE DOOR. Every hand-off in the engine passes
      * through this method, so holding the frame HERE is what makes "no call
@@ -1720,7 +1763,17 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       contextWindowTokens === undefined
         || estimateWindowTokens(packet.messages) + tokenCeiling <= contextWindowTokens;
 
-    for (let attempt = 1; attempt <= callAttempts; attempt += 1) {
+    /**
+     * Patch follow-up: the plan while `attemptPacket` is the patch packet (its reply is merged into the first reply
+     * before the step's classifier sees it); whether this call already sent one (one per call); and the first reply's
+     * refusal, which the full re-ask after a patch that did not do describes.
+     */
+    let patchPlan: PatchFollowUpPlan | null = null;
+    let patchTried = false;
+    let patchedRejection: RejectedProviderContent | null = null;
+    let repairForm: "PATCH" | "FULL" | undefined;
+
+    for (let attempt = 1; attempt <= callAttempts(); attempt += 1) {
       const attemptTokenCeiling = Math.min(
         lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures),
         this.#options.maxOutputTokens ?? Number.MAX_SAFE_INTEGER
@@ -1902,17 +1955,32 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         attemptThinkingLevel = thinkingLevelUsed;
         const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
+        const replyFacts: ModelReplyFacts = Object.freeze({ finishReason });
+        /**
+         * Patch follow-up: what this call hands back when the reply is accepted. The reply itself, except after a
+         * patch, where it is the first reply with the patch merged in (`mergePatchReply`) — the string the step's own
+         * classifier checked, so every caller that reads `content` again reads exactly what was accepted.
+         */
+        let acceptedContent = content;
         let classifiedContent: ContentClassification | {
           readonly parseStatus: "UNPARSED";
           readonly parseError: null;
         };
         try {
-          classifiedContent = content === null
-            ? { parseStatus: "UNPARSED", parseError: null }
-            : request.classifyContent?.(content, Object.freeze({ finishReason })) ?? {
-                parseStatus: contentParseStatus(content),
-                parseError: null
-              };
+          if (content !== null && patchPlan !== null && request.classifyContent !== undefined) {
+            const merged = mergePatchReply(patchPlan, content, replyFacts);
+            if (merged.ok) acceptedContent = merged.content;
+            classifiedContent = merged.ok
+              ? request.classifyContent(merged.content, replyFacts)
+              : { parseStatus: merged.parseStatus, parseError: merged.parseError };
+          } else {
+            classifiedContent = content === null
+              ? { parseStatus: "UNPARSED", parseError: null }
+              : request.classifyContent?.(content, replyFacts) ?? {
+                  parseStatus: contentParseStatus(content),
+                  parseError: null
+                };
+          }
         } catch (error) {
           classifiedContent = {
             parseStatus: "SCHEMA_FAILED",
@@ -2146,23 +2214,49 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // ORIGINAL packet under a raised bound.
             lengthFailures += 1;
             attemptPacket = request.packet;
+            patchPlan = null;
+            repairForm = undefined;
             // Role rotation, Task 12: the original packet goes out again, so a repair adopted before
             // it no longer describes the reply that is finally accepted. Count afresh from here.
             repairAttempts = 0;
-          } else if (attempt < callAttempts && request.buildRepairPacket !== undefined) {
-            const repair = request.buildRepairPacket({
-              // `content` is the strict parse's, or the raw body when the cut
-              // landed before one existed. Either way it is what arrived.
-              rawText: content ?? rawText,
-              parseStatus: contentRejection.parseStatus,
-              parseError: contentRejection.parseError
-            });
-            // The repair path is the one that used to carry the model's own
-            // rejected output back into the instruction compartment. It goes
-            // through the same door as the first packet, with no exception.
-            assertFramedPrompt(repair);
-            attemptPacket = repair;
-            repairAttempts += 1;
+          } else if (request.buildRepairPacket !== undefined) {
+            const answeredPatch = patchPlan !== null;
+            patchPlan = null;
+            /**
+             * Patch follow-up (owner design, 2026-10-12), step (2): a reply to the ORIGINAL packet that decoded to an
+             * object and failed its check at named members gets the short follow-up first — the same packet object,
+             * then the model's own answer as its own turn, then only the failing machine paths (once per call). A
+             * reply that cannot be patched, and a patch that did not do, get the step's full re-ask (step 3), which
+             * describes the first reply's refusal.
+             */
+            const plan = !patchTried && attemptPacket === request.packet && content !== null && attempt < callAttempts()
+              ? planPatchFollowUp({ content, reply: replyFacts, parseStatus: contentRejection.parseStatus, parseError: contentRejection.parseError })
+              : null;
+            const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, thinking.sent, fitsContextWindow);
+            if (plan !== null && patch !== null) {
+              attemptPacket = patch;
+              patchPlan = plan;
+              patchTried = true;
+              if (attempt === 1) patchWasSecondPost = true;
+              patchedRejection = { rawText: content!, parseStatus: contentRejection.parseStatus, parseError: contentRejection.parseError };
+              repairForm = "PATCH";
+              repairAttempts += 1;
+            } else if (attempt < callAttempts()) {
+              const repair = request.buildRepairPacket(answeredPatch && patchedRejection !== null ? patchedRejection : {
+                // `content` is the strict parse's, or the raw body when the cut
+                // landed before one existed. Either way it is what arrived.
+                rawText: content ?? rawText,
+                parseStatus: contentRejection.parseStatus,
+                parseError: contentRejection.parseError
+              });
+              // The repair path is the one that used to carry the model's own
+              // rejected output back into the instruction compartment. It goes
+              // through the same door as the first packet, with no exception.
+              assertFramedPrompt(repair);
+              attemptPacket = repair;
+              repairForm = "FULL";
+              repairAttempts += 1;
+            }
           }
           continue;
         }
@@ -2206,14 +2300,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         return {
           rawArtifactRef,
           ledgerEntryRef,
-          content: responseJson.choices[0]!.message.content,
+          // Patch follow-up: the merged answer after a patch; otherwise the reply, exactly as before.
+          content: acceptedContent ?? responseJson.choices[0]!.message.content,
           provider: this.#anthropic ? ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND : "openai-compatible-http",
           model: responseJson.model,
           maker: this.#options.maker,
           modelVersion: responseJson.model,
           thinkingLevel: thinkingLevelUsed,
           reasoningTokens,
-          repairAttempts
+          repairAttempts,
+          ...(repairAttempts > 0 && repairForm !== undefined ? { repairForm } : {})
         };
       } catch (error) {
         /**
@@ -2371,20 +2467,31 @@ export { CONTENT_RULE_ID, CONTENT_RULE_TEXT, CONTENT_RULE_HEADING } from "./cont
 
 export {
   FRAMED_MATERIAL_FORMAT,
+  PATCH_REPLY_FORM_SENTENCE,
+  PER_CALL_MARKERS_HEADING,
   PROMPT_FRAME_VERSION,
   appendFramedRejection,
   assertFramedPrompt,
+  buildFramedPatchPrompt,
   buildFramedPrompt,
   buildFramedRepairPrompt,
   promptContractFingerprintText,
   readPromptFrame,
   schemaFailureLocator,
+  splitCacheablePrefix,
   type FramedMaterialField,
   type FramedPrompt,
   type FramedRepairLocator,
   type PromptContract,
   type PromptFramePresence
 } from "./prompt-frame.js";
+
+// Patch follow-up (owner design, 2026-10-12): which refused replies get the short follow-up, and the merge.
+export {
+  mergePatchReply,
+  planPatchFollowUp,
+  schemaFailurePaths
+} from "./patch-follow-up.js";
 
 // V-11 addendum layer 5: tripwires — typed signals on the run, never gates.
 export {

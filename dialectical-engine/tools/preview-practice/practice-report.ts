@@ -15,10 +15,12 @@ import {
   latencySummary,
   practiceCallFacts,
   practiceModelCalls,
+  practiceRepairKindsByModel,
   practiceSlipRateExceeded,
   practiceVerdict,
   type PracticeBusyModelRun,
   type PracticeModelCalls,
+  type PracticeRepairKinds,
   type PracticeVerdictResult
 } from "./practice-verdict.js";
 
@@ -116,20 +118,65 @@ export type PracticeReport = Readonly<Record<string, unknown> & { verdict: Pract
 
 /**
  * Owner ruling 2026-10-12 ("Fixed slips = warning"): per AI, its answered calls, its slips (first reply refused by its
- * check), those the same call's second try fixed, those never fixed, whether its slip rate is over the rule
+ * check), those the same call's later try fixed, those never fixed, whether its slip rate is over the rule
  * (`practiceSlipRateExceeded`), and, as information only, the tolerant repairs its accepted replies needed, by code.
+ * Patch follow-up (owner design, 2026-10-12), information only: the fixed ones split by how they were fixed
+ * (`PracticeRepairKinds`: by the short patch follow-up, by the full re-ask, otherwise).
  */
-export type PracticeSlipBlock = PracticeModelCalls & Readonly<{ slipRateExceeded: boolean; jsonRepairs: Readonly<Record<string, number>> }>;
+export type PracticeSlipBlock = PracticeModelCalls & PracticeRepairKinds
+  & Readonly<{ slipRateExceeded: boolean; jsonRepairs: Readonly<Record<string, number>> }>;
 
-function slipBlocks(calls: Readonly<Record<string, PracticeModelCalls>>, repairs: readonly Readonly<{ model: string; repair: string }>[]):
-  Readonly<Record<string, PracticeSlipBlock>> {
+const NO_REPAIRS: PracticeRepairKinds = Object.freeze({ repairedByPatch: 0, repairedByFullAsk: 0, repairedOtherwise: 0 });
+
+function slipBlocks(calls: Readonly<Record<string, PracticeModelCalls>>, repairs: readonly Readonly<{ model: string; repair: string }>[],
+  kinds: Readonly<Record<string, PracticeRepairKinds>>): Readonly<Record<string, PracticeSlipBlock>> {
   const models = [...new Set([...Object.keys(calls), ...repairs.map((entry) => entry.model)])].sort();
   return Object.freeze(Object.fromEntries(models.map((model) => {
     const mine = calls[model] ?? { answered: 0, slips: 0, repaired: 0, unrecovered: 0 };
     const jsonRepairs: Record<string, number> = {};
     for (const entry of repairs) if (entry.model === model) jsonRepairs[entry.repair] = (jsonRepairs[entry.repair] ?? 0) + 1;
-    return [model, Object.freeze({ ...mine, slipRateExceeded: practiceSlipRateExceeded(mine), jsonRepairs: Object.freeze(jsonRepairs) })];
+    return [model, Object.freeze({ ...mine, ...(kinds[model] ?? NO_REPAIRS), slipRateExceeded: practiceSlipRateExceeded(mine),
+      jsonRepairs: Object.freeze(jsonRepairs) })];
   })));
+}
+
+/** The repaired calls of every AI by how they were fixed, added up (the report's totals). */
+function repairTotals(kinds: Readonly<Record<string, PracticeRepairKinds>>): Readonly<{
+  formatRepairedByPatch: number; formatRepairedByFullAsk: number; formatRepairedOtherwise: number;
+}> {
+  const all = Object.values(kinds);
+  return Object.freeze({
+    formatRepairedByPatch: all.reduce((sum, mine) => sum + mine.repairedByPatch, 0),
+    formatRepairedByFullAsk: all.reduce((sum, mine) => sum + mine.repairedByFullAsk, 0),
+    formatRepairedOtherwise: all.reduce((sum, mine) => sum + mine.repairedOtherwise, 0)
+  });
+}
+
+/**
+ * Per AI, its prompt cache as the vendors reported it (information only), from the gates' answers the observer saw:
+ * the calls the vendor answered, their input tokens (as the engine counts them, the cached part included), the part
+ * read from the vendor's cache, the calls whose answer reported a cached count at all, and the cached share of the
+ * input (null with no input tokens).
+ */
+export type PracticeCacheBlock = Readonly<{
+  calls: number; inputTokens: number; cachedInputTokens: number; callsReportingCache: number; cachedShare: number | null;
+}>;
+
+export function cacheByModel(observer: PracticeGateObserver): Readonly<Record<string, PracticeCacheBlock>> {
+  const out: Record<string, { calls: number; inputTokens: number; cachedInputTokens: number; callsReportingCache: number }> = {};
+  for (const event of observer.events) {
+    if (event.outcome !== "VENDOR_OK") continue;
+    const mine = out[event.model] ??= { calls: 0, inputTokens: 0, cachedInputTokens: 0, callsReportingCache: 0 };
+    mine.calls += 1;
+    mine.inputTokens += event.inputTokens ?? 0;
+    if (event.cachedInputTokens !== undefined) {
+      mine.cachedInputTokens += event.cachedInputTokens;
+      mine.callsReportingCache += 1;
+    }
+  }
+  return Object.freeze(Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)).map(([model, mine]) =>
+    [model, Object.freeze({ ...mine,
+      cachedShare: mine.inputTokens === 0 ? null : Math.round((mine.cachedInputTokens / mine.inputTokens) * 1_000) / 1_000 })])));
 }
 
 export function formatsReport(input: Readonly<{
@@ -150,6 +197,7 @@ export function formatsReport(input: Readonly<{
     .map((key) => Object.freeze({ model: sample.model, tries: sample.attempts.filter((attempt) => attempt.callSiteKey === key) }));
   const calls = samples.flatMap(callsOf);
   const callsByModel = practiceModelCalls(calls);
+  const repairKinds = practiceRepairKindsByModel(calls);
   // A failure: a call that never got an accepted reply after a refused one (at least one for a job whose status is still
   // a format status, as every such job of a log written before the REPAIRED status is), or a reply the runner's own
   // reading refused after the check.
@@ -197,6 +245,7 @@ export function formatsReport(input: Readonly<{
     const cost = mine.reduce((sum, sample) => sum + BigInt(sample.costNanoUsd ?? "0"), 0n);
     return Object.freeze({ model, lane, samples: mine.length, statuses, latencyMs: latencySummary(mine.map((sample) => sample.latencyMs)),
       inputTokens: mine.reduce((sum, sample) => sum + (sample.inputTokens ?? 0), 0),
+      cachedInputTokens: mine.reduce((sum, sample) => sum + (sample.cachedInputTokens ?? 0), 0),
       outputTokens: mine.reduce((sum, sample) => sum + (sample.outputTokens ?? 0), 0),
       costUsd: usd(cost), unbilledRefusals: mine.reduce((sum, sample) => sum + sample.unbilledRefusals, 0) });
   }));
@@ -205,7 +254,8 @@ export function formatsReport(input: Readonly<{
     startedAt: input.startedAt.toISOString(), finishedAt: input.finishedAt.toISOString(),
     wallSeconds: Math.round((input.finishedAt.getTime() - input.startedAt.getTime()) / 1000),
     models: input.result.models, lanes: input.result.lanes, busyModels: input.result.busyModels,
-    slipsByModel: slipBlocks(callsByModel, jsonRepairs),
+    slipsByModel: slipBlocks(callsByModel, jsonRepairs, repairKinds),
+    cacheByModel: cacheByModel(input.observer),
     byModelAndLane,
     gates: Object.fromEntries(GATES.map((gate) => [gate, gateBlock(input.observer, gate, input.remaining[gate])])),
     totals: Object.freeze({
@@ -213,6 +263,7 @@ export function formatsReport(input: Readonly<{
       costUsd: usd(samples.reduce((sum, sample) => sum + BigInt(sample.costNanoUsd ?? "0"), 0n)),
       formatFailures, failedCalls,
       formatRepaired: Object.values(callsByModel).reduce((sum, mine) => sum + mine.repaired, 0),
+      ...repairTotals(repairKinds),
       jsonRepairs: jsonRepairs.length
     }),
     failures: samples.filter((sample) => formatStatuses.has(sample.status) || sample.status === "CALL_FAILED"
@@ -266,7 +317,8 @@ export function debateReport(input: Readonly<{
     ask: Object.freeze({ questionId: r.questionId, depth: r.depth, planTier: "premium" }),
     admission: r.admission,
     busyDuringRun,
-    slipsByModel: slipBlocks(r.callsByModel ?? {}, r.jsonRepairs ?? []),
+    slipsByModel: slipBlocks(r.callsByModel ?? {}, r.jsonRepairs ?? [], r.repairKindsByModel ?? {}),
+    cacheByModel: cacheByModel(input.observer),
     run: r.run,
     probes: r.probes,
     byModelAndSite: r.byModelAndSite,
@@ -276,6 +328,7 @@ export function debateReport(input: Readonly<{
       costUsd: usd(r.byModelAndSite.reduce((sum, row) => sum + BigInt(row.costNanoUsd), 0n)),
       formatFailures: r.formatFailures, failedCalls: r.failedCalls, refusedCalls: r.refusedCalls,
       formatRepaired: Object.values(r.callsByModel ?? {}).reduce((sum, mine) => sum + mine.repaired, 0),
+      ...repairTotals(r.repairKindsByModel ?? {}),
       jsonRepairs: (r.jsonRepairs ?? []).length
     }),
     failures: r.failures
@@ -335,12 +388,25 @@ export function reportMarkdown(report: PracticeReport): string {
   }
   const slips = report.slipsByModel as Readonly<Record<string, PracticeSlipBlock>> | undefined;
   if (slips !== undefined && Object.keys(slips).length > 0) {
-    lines.push("Format slips per AI (a slip the same call's second try fixed is a warning; more than 1 slip in 10 answered calls, "
-      + "and more than one slip, fails; the tolerant repairs are information only):", "");
+    lines.push("Format slips per AI (a slip the same call's later try fixed is a warning, however it was fixed; more than 1 slip "
+      + "in 10 answered calls, and more than one slip, fails; how the slips were fixed and the tolerant repairs are information only):", "");
     for (const [model, entry] of Object.entries(slips)) {
       lines.push(`- ${model}: ${String(entry.answered)} answered calls, ${String(entry.slips)} slipped on the first try, `
-        + `${String(entry.repaired)} fixed by the same call, ${String(entry.unrecovered)} never fixed`
+        + `${String(entry.repaired)} fixed by the same call (by patch ${String(entry.repairedByPatch ?? 0)}, `
+        + `by full re-ask ${String(entry.repairedByFullAsk ?? 0)}, otherwise ${String(entry.repairedOtherwise ?? 0)}), `
+        + `${String(entry.unrecovered)} never fixed`
         + `${entry.slipRateExceeded ? " (over the slip rule)" : ""}; tolerant repairs ${JSON.stringify(entry.jsonRepairs)}`);
+    }
+    lines.push("");
+  }
+  const cache = report.cacheByModel as Readonly<Record<string, PracticeCacheBlock>> | undefined;
+  if (cache !== undefined && Object.keys(cache).length > 0) {
+    lines.push("Prompt cache per AI (as the vendors reported it; information only):", "");
+    for (const [model, entry] of Object.entries(cache)) {
+      lines.push(`- ${model}: ${String(entry.calls)} answered calls, ${String(entry.inputTokens)} input tokens, `
+        + `${String(entry.cachedInputTokens)} read from the cache`
+        + (entry.cachedShare === null ? "" : ` (${(entry.cachedShare * 100).toFixed(1)}%)`)
+        + (entry.callsReportingCache === entry.calls ? "" : `; ${String(entry.calls - entry.callsReportingCache)} call(s) reported no cache count`));
     }
     lines.push("");
   }

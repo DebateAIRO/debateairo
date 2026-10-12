@@ -9,6 +9,7 @@ import {
   previewTargetGatewayControls,
   readPromptFrame,
   schemaFailureLocator,
+  schemaFailurePaths,
   withPreviewProviderCallPolicy,
   type PreviewBudgetExecution,
   type ProviderCallRequest,
@@ -181,10 +182,16 @@ describe("preview storyteller v3 safe repair allowance", () => {
     expect(calls).toBe(0);
   });
 
+  // Patch follow-up (owner design, 2026-10-12): the repair POST is the short follow-up — the model's own story back as its
+  // turn and only the failing machine path asked for — so the model answers with the one corrected member.
   it("native gateway repairs a rejected story citation using only its schema locator", async () => {
     const rejected = story("P99");
     const accepted = story();
-    const { gateway, executions, artifacts, ledger } = nativeHarness([rejected, accepted]);
+    // Every member that cites P99 is refused at its own path; the patch answers each with the right ref.
+    const refused = classifyStoryContent(rejected, INDEX);
+    const paths = refused.parseStatus === "PARSED" ? [] : schemaFailurePaths(refused.parseError) ?? [];
+    expect(paths[0]).toBe("short.change.node_refs.0");
+    const { gateway, executions, artifacts, ledger } = nativeHarness([rejected, JSON.stringify(Object.fromEntries(paths.map(path => [path, "P1"])))]);
     const projections: unknown[] = [];
     const charges: unknown[] = [];
     let attempts = 0;
@@ -202,13 +209,17 @@ describe("preview storyteller v3 safe repair allowance", () => {
     for (const body of bodies) expect(body).toMatchObject({ model: MODEL, reasoning_effort: "high", max_tokens: STORYTELLER_CAP, response_format: { type: "json_object" } });
     const repaired = readPromptFrame({ messages: bodies[1].messages });
     expect(repaired.contractId).toBe("story.storyteller.v3");
-    expect(repaired.fields.slice(-2)).toEqual([
-      { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
-      { name: "machine_rejection_path", content: "short.change.node_refs.0" }
+    expect(repaired.fields.slice(-3)).toEqual([
+      // The issues' own engine code when they all name one (the full re-ask's locator keeps SCHEMA_FAILED).
+      { name: "machine_rejection_code", content: "STORY_UNKNOWN_NODE_REF" },
+      { name: "machine_rejection_paths", content: paths.join(",") },
+      { name: "machine_reply_form", content: "PATCH" }
     ]);
-    expect(bodies[1].messages[0]).toEqual(bodies[0].messages[0]);
-    expect(executions[1]?.requestBody).not.toContain(rejected);
-    expect(executions[1]?.requestBody).not.toContain("P99");
+    expect(bodies[1].messages.slice(0, 2)).toEqual(bodies[0].messages);
+    // The rejected story goes back only as the model's own turn: never in the instruction compartment or a block.
+    expect(bodies[1].messages[2]).toEqual({ role: "assistant", content: rejected });
+    expect(repaired.fields.some((field: { content: string }) => field.content.includes("P99"))).toBe(false);
+    expect(bodies[1].messages[0].content).not.toContain("P99");
     expect(new Set(executions.map(execution => execution.operationId)).size).toBe(2);
     for (const execution of executions) {
       expect(execution.requestSha256).toMatch(/^[0-9a-f]{64}$/u);
@@ -240,10 +251,13 @@ describe("preview storyteller v3 safe repair allowance", () => {
     expect(result.repairAttempts).toBe(0);
   });
 
+  // Patch follow-up: with the story's sealed bound of two, the short follow-up is the one permitted repair (a call whose
+  // second POST was a patch may send a third only within the bound; tests/unit/patch-follow-up-gateway.test.ts).
   it("native gateway stops after the one permitted repair and retains both failed charges", async () => {
     const { gateway, executions, artifacts, ledger } = nativeHarness([story("P99")]);
     const charges: unknown[] = [];
-    await expect(gateway.call({ ...storyRequest(), costEnvelope: {
+    const request = storyRequest();
+    await expect(gateway.call({ ...request, bound: { ...request.bound, maxAttempts: 2 }, costEnvelope: {
       assertCallAllowed: () => undefined, recordCall: charge => { charges.push(charge); }, assertUsageReported: () => undefined
     } })).rejects.toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2, lastParseStatus: "SCHEMA_FAILED" });
     expect(executions).toHaveLength(2);

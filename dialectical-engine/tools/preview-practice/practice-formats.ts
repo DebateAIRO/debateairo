@@ -49,6 +49,7 @@ import {
   issueListFromParseError,
   practiceFinishReasonOf,
   practiceJsonRepairOf,
+  practiceReplyFormOf,
   recheckReply,
   replyContentOf,
   runPracticeLane,
@@ -57,7 +58,7 @@ import {
 } from "./practice-lanes.js";
 import { PRACTICE_QUESTIONS } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
-import { practiceCallFacts } from "./practice-verdict.js";
+import { practiceCallFacts, practiceRepairKindOf, type PracticeRepairKind, type PracticeReplyForm } from "./practice-verdict.js";
 
 /**
  * REPAIRED (owner ruling 2026-10-12, "Fixed slips = warning"): every call of the job ended with an accepted reply, and
@@ -74,6 +75,12 @@ export type PracticeAttempt = Readonly<{
   latencyMs: number;
   /** Information only: for an accepted reply, the tolerant repair it needed (`practiceJsonRepairOf`); absent in older logs. */
   jsonRepair?: string | null;
+  /**
+   * Patch follow-up (owner design, 2026-10-12): what this try sent, read from its own prompt (`practiceReplyFormOf`):
+   * ORIGINAL, PATCH (the short follow-up) or FULL (the full re-ask). Null when no prompt was recorded for it (refused
+   * before it was sent); absent in older logs.
+   */
+  replyForm?: PracticeReplyForm | null;
 }>;
 
 export type PracticeSample = Readonly<{
@@ -89,8 +96,18 @@ export type PracticeSample = Readonly<{
   attempts: readonly PracticeAttempt[];
   inputTokens: number | null;
   outputTokens: number | null;
+  /**
+   * The part of `inputTokens` the vendor read from its prompt cache, over the job's calls that reported it (null when
+   * none did; absent in older logs).
+   */
+  cachedInputTokens?: number | null;
   costNanoUsd: string | null;
   unbilledRefusals: number;
+  /**
+   * For a REPAIRED job: how its slip was fixed (`PracticeRepairKind`: PATCH, FULL or RESEND), the first repaired call's;
+   * null otherwise, and for a repaired call whose accepted try's form is not known; absent in older logs.
+   */
+  repairKind?: PracticeRepairKind | null;
   /** For a reply that failed its format check: what the check said, as `code@path`, and the re-check of the stored text. */
   issues: readonly string[];
   recheckIssues: readonly string[];
@@ -105,7 +122,7 @@ function recordingGateway(input: Readonly<{
   target: ProviderDiscoveryTarget;
   config: PreviewProviderTestConfig;
   guardedFetch: typeof fetch;
-  sink: { artifacts: RawArtifactInput[]; ledger: ProviderLedgerInput[] };
+  sink: { artifacts: RawArtifactInput[]; ledger: ProviderLedgerInput[]; forms: Map<string, PracticeReplyForm | null> };
   sleep?: (milliseconds: number) => Promise<void>;
 }>): ProviderGateway {
   const http = new OpenAICompatibleProviderGateway({
@@ -117,7 +134,9 @@ function recordingGateway(input: Readonly<{
     ...previewTargetGatewayControls(input.config, input.target),
     assertNoOpenWriteTransaction: () => undefined,
     persistRawArtifact: async (artifact) => { input.sink.artifacts.push(artifact); return artifact.artifactId; },
-    appendLedgerEntry: async (entry) => { input.sink.ledger.push(entry); return randomUUID(); }
+    appendLedgerEntry: async (entry) => { input.sink.ledger.push(entry); return randomUUID(); },
+    // As the runner's gateway records each attempt's prompt (ledger.call_prompt), but only its form is kept here.
+    persistCallPrompt: async (prompt) => { input.sink.forms.set(prompt.attemptId, practiceReplyFormOf(prompt.messages)); }
   });
   return withPreviewProviderCallPolicy(http, input.config, input.target, input.sleep === undefined ? {} : { sleep: input.sleep });
 }
@@ -279,7 +298,7 @@ export async function runPracticeFormats(input: Readonly<{
     }
     const skipped = (status: "SKIPPED_GATE_STOPPED" | "SKIPPED_MODEL_BUSY", errorCode: string) => {
       record(Object.freeze({ ...base, status, latencyMs: 0, attempts: [],
-        inputTokens: null, outputTokens: null, costNanoUsd: null, unbilledRefusals: 0, issues: [], recheckIssues: [],
+        inputTokens: null, outputTokens: null, cachedInputTokens: null, costNanoUsd: null, repairKind: null, unbilledRefusals: 0, issues: [], recheckIssues: [],
         errorCode, replyText: null, detail: null }));
       return null;
     };
@@ -288,7 +307,7 @@ export async function runPracticeFormats(input: Readonly<{
     }
     if (busy.includes(target.model)) return skipped("SKIPPED_MODEL_BUSY", PRACTICE_MODEL_BUSY);
     return async () => {
-      const sink = { artifacts: [] as RawArtifactInput[], ledger: [] as ProviderLedgerInput[] };
+      const sink = { artifacts: [] as RawArtifactInput[], ledger: [] as ProviderLedgerInput[], forms: new Map<string, PracticeReplyForm | null>() };
       const recording = recordingGateway({ target, config: input.config, guardedFetch, sink,
         ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
       // The job's gateway, watched as the runner's sit-out book watches a member's (the story writer swallows its
@@ -324,6 +343,8 @@ export async function runPracticeFormats(input: Readonly<{
       const errorUnbilled = wire.filter((event) => event.unbilledKind === "VENDOR_ERROR_UNBILLED").length;
       const inputTokens = wire.reduce<number | null>((sum, event) => event.inputTokens === null ? sum : (sum ?? 0) + event.inputTokens, null);
       const outputTokens = wire.reduce<number | null>((sum, event) => event.outputTokens === null ? sum : (sum ?? 0) + event.outputTokens, null);
+      const cachedInputTokens = wire.reduce<number | null>((sum, event) =>
+        event.cachedInputTokens === undefined ? sum : (sum ?? 0) + event.cachedInputTokens, null);
       const row = previewModelRow(target.model);
       const costNanoUsd = row === undefined || inputTokens === null || outputTokens === null ? null
         : String(previewCallNanoUsd(row, BigInt(inputTokens), outputTokens));
@@ -332,15 +353,18 @@ export async function runPracticeFormats(input: Readonly<{
         return Object.freeze({ callSiteKey: entry.callSiteKey, outcome: entry.outcome, parseStatus: artifact?.parseStatus ?? null,
           latencyMs: entry.finishedAt.getTime() - entry.startedAt.getTime(),
           jsonRepair: artifact === null || entry.outcome !== "OK" ? null
-            : practiceJsonRepairOf(replyContentOf(artifact.rawText), practiceFinishReasonOf(artifact.metadata)) });
+            : practiceJsonRepairOf(replyContentOf(artifact.rawText), practiceFinishReasonOf(artifact.metadata)),
+          replyForm: sink.forms.get(entry.attemptId) ?? null });
       });
       // The real model's artifacts only (the story jobs' local stand-in records none).
       const failed = [...sink.artifacts].reverse().find((artifact) => artifact.parseStatus !== "PARSED") ?? null;
       const last = sink.artifacts.at(-1) ?? null;
       // Owner ruling 2026-10-12 ("Fixed slips = warning"): a slip the same call's second try fixed is REPAIRED; a call
       // that never got an accepted reply keeps the refused reply's status.
-      const callsOfJob = [...new Set(attempts.map((attempt) => attempt.callSiteKey))]
-        .map((key) => practiceCallFacts(attempts.filter((attempt) => attempt.callSiteKey === key)));
+      const triesOfJob = [...new Set(attempts.map((attempt) => attempt.callSiteKey))]
+        .map((key) => attempts.filter((attempt) => attempt.callSiteKey === key));
+      const callsOfJob = triesOfJob.map((tries) => practiceCallFacts(tries));
+      const repairKind = triesOfJob.map((tries) => practiceRepairKindOf(tries)).find((kind) => kind !== null) ?? null;
       let status: PracticeSampleStatus;
       if (last !== null && last.parseStatus !== "PARSED") status = last.parseStatus;
       else if (failed !== null && callsOfJob.some((call) => call.unrecovered)) status = failed.parseStatus;
@@ -353,7 +377,9 @@ export async function runPracticeFormats(input: Readonly<{
       else if (unbilled > 0 && last === null) status = "UNBILLED_REFUSED";
       else if (last !== null && errorCode !== null) status = "POST_CHECK_FAILED";
       else status = "CALL_FAILED";
-      const problem = failed ?? null;
+      // The slip itself for diagnosis: the FIRST refused reply (a refused patch reply after it carries only the members
+      // it was asked for, and the full re-ask's reply comes after that).
+      const problem = sink.artifacts.find((artifact) => artifact.parseStatus !== "PARSED") ?? null;
       const content = problem === null ? null : replyContentOf(problem.rawText);
       const issues = problem === null ? [] : issueListFromParseError(problem.parseError ?? null);
       const recheck = problem === null || content === null ? [] : recheckReply(attempts.find((attempt) => attempt.parseStatus !== "PARSED")?.callSiteKey
@@ -379,8 +405,8 @@ export async function runPracticeFormats(input: Readonly<{
       const markedBusy = endedBusy && !busy.includes(target.model);
       if (markedBusy) busy.push(target.model);
       record(Object.freeze({
-        ...base, status, latencyMs, attempts: Object.freeze(attempts), inputTokens, outputTokens, costNanoUsd,
-        unbilledRefusals: unbilled, issues, recheckIssues: recheck,
+        ...base, status, latencyMs, attempts: Object.freeze(attempts), inputTokens, outputTokens, cachedInputTokens, costNanoUsd,
+        unbilledRefusals: unbilled, repairKind: status === "REPAIRED" ? repairKind : null, issues, recheckIssues: recheck,
         errorCode: postCheckError ?? errorCode,
         replyText: content === null ? null : reportableReplyText(content),
         detail

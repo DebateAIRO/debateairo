@@ -26,7 +26,8 @@ import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployme
 import { runPractice, type PracticeControl } from "../../tools/preview-practice/practice.js";
 import { practiceDebateGraph } from "../../tools/preview-practice/practice-lanes.js";
 import { PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
-import { startPreviewGateStubs, type GateOverride, type GateRequest } from "../support/preview-gate-stubs.js";
+import { startPreviewGateStubs, stubChatBody, type GateOverride, type GateRequest } from "../support/preview-gate-stubs.js";
+import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { existsSync, readFileSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -51,6 +52,30 @@ const BAD_PANEL = JSON.stringify({
 });
 const mimoPanelBad = (request: GateRequest): GateOverride | null =>
   request.model === MIMO && request.kind === "PANEL" ? { content: BAD_PANEL } : null;
+/**
+ * Patch follow-up (owner design, 2026-10-12): a request that is the short follow-up, read through the frame (the one
+ * reader): its last block's `machine_reply_form` is PATCH.
+ */
+const isPatchRequest = (request: GateRequest): boolean => {
+  // A claim probe is not framed (and an unknown request is no step's): neither is a follow-up.
+  if (request.kind === "PROBE" || request.kind === "UNKNOWN") return false;
+  const last = readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body))).fields.at(-1);
+  return last?.name === "machine_reply_form" && last.content === "PATCH";
+};
+/** The patch that fixes BAD_PANEL: only the member it was asked for, at the stand-in panel's own value. */
+const PANEL_PATCH = JSON.stringify({ "steelman.fidelity": 0 });
+/**
+ * MiMo's first panel reply breaks the schema; MiMo answers the patch follow-up with the patch (`patch: true`) or, as a
+ * model that ignores the requested form, with its whole answer again (the stand-in's own valid panel reply), which is
+ * refused as a patch so the call goes on to the full re-ask.
+ */
+function mimoFirstPanelSlips(options: Readonly<{ patch: boolean }>): (request: GateRequest) => GateOverride | null {
+  let mimoPanels = 0;
+  return (request) => {
+    if (request.model === MIMO && isPatchRequest(request)) return options.patch ? { content: PANEL_PATCH } : null;
+    return request.model === MIMO && request.kind === "PANEL" && ++mimoPanels === 1 ? { content: BAD_PANEL } : null;
+  };
+}
 
 let folder: string;
 let registerExportPath: string;
@@ -155,27 +180,51 @@ describe("preview practice: formats mode", () => {
     expect(stubs.requests.filter((request) => request.kind === "STORY_CHECKER")).toHaveLength(5);
   }, 300_000);
 
-  it("owner ruling 2026-10-12 (\"Fixed slips = warning\"): MiMo's first panel reply breaks the schema, the same call's repair is accepted: REPAIRED, PASS_WITH_WARNINGS (exit 10)", async () => {
-    let mimoPanels = 0;
-    const once = (request: GateRequest): GateOverride | null =>
-      request.model === MIMO && request.kind === "PANEL" && ++mimoPanels === 1 ? { content: BAD_PANEL } : null;
-    const { stubs, env, common, quiet } = await scenario(once);
+  type RepairReport = {
+    verdict: string; reasons: string[];
+    totals: { formatFailures: number; formatRepaired: number; formatRepairedByPatch: number; formatRepairedByFullAsk: number };
+    slipsByModel: Record<string, { answered: number; slips: number; repaired: number; unrecovered: number; slipRateExceeded: boolean;
+      repairedByPatch: number; repairedByFullAsk: number }>;
+    failures: { model: string; lane: string; status: string; issues: string[]; repairKind: string | null;
+      attempts: { outcome: string; parseStatus: string | null; replyForm: string | null }[] }[];
+    byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[];
+  };
+
+  it("owner ruling 2026-10-12 (\"Fixed slips = warning\") and the patch follow-up: MiMo's first panel reply breaks the schema, the short patch follow-up fixes it: REPAIRED by PATCH, PASS_WITH_WARNINGS (exit 10)", async () => {
+    const { stubs, env, common, quiet, out } = await scenario(mimoFirstPanelSlips({ patch: true }));
     const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
-    const report = outcome.report as unknown as {
-      verdict: string; reasons: string[]; totals: { formatFailures: number; formatRepaired: number };
-      slipsByModel: Record<string, { answered: number; slips: number; repaired: number; unrecovered: number; slipRateExceeded: boolean }>;
-      failures: { model: string; lane: string; status: string; issues: string[] }[];
-      byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[];
-    };
+    const report = outcome.report as unknown as RepairReport;
     expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS_WITH_WARNINGS", reasons: [`FORMAT_REPAIRED:${MIMO}:1`] });
     expect(outcome.exitCode).toBe(10);
-    // The second try is the app's own: the repair went to the gate as MiMo's second PANEL request of the same job.
-    expect(stubs.requests.filter((request) => request.model === MIMO && request.kind === "PANEL")).toHaveLength(2);
+    // The second try is the app's own: the short follow-up went to the gate as MiMo's second PANEL request of the job.
+    const mimoPanel = stubs.requests.filter((request) => request.model === MIMO && request.kind === "PANEL");
+    expect(mimoPanel.map((request) => isPatchRequest(request))).toEqual([false, true]);
     expect(report.byModelAndLane.find((row) => row.model === MIMO && row.lane === "PANEL")?.statuses).toEqual({ REPAIRED: 1 });
-    expect(report.slipsByModel[MIMO]).toMatchObject({ slips: 1, repaired: 1, unrecovered: 0, slipRateExceeded: false });
-    expect(report.totals).toMatchObject({ formatFailures: 0, formatRepaired: 1 });
-    // The slip's text and its code@path stay in the report for diagnosis.
-    expect(report.failures).toEqual([expect.objectContaining({ model: MIMO, lane: "PANEL", status: "REPAIRED", issues: ["invalid_type@steelman.fidelity"] })]);
+    expect(report.slipsByModel[MIMO]).toMatchObject({ slips: 1, repaired: 1, unrecovered: 0, slipRateExceeded: false,
+      repairedByPatch: 1, repairedByFullAsk: 0 });
+    expect(report.totals).toMatchObject({ formatFailures: 0, formatRepaired: 1, formatRepairedByPatch: 1, formatRepairedByFullAsk: 0 });
+    // The slip's text and its code@path stay in the report for diagnosis, with how it was fixed.
+    expect(report.failures).toEqual([expect.objectContaining({ model: MIMO, lane: "PANEL", status: "REPAIRED", repairKind: "PATCH",
+      issues: ["invalid_type@steelman.fidelity"] })]);
+    expect(report.failures[0]!.attempts.map((attempt) => [attempt.outcome, attempt.parseStatus, attempt.replyForm]))
+      .toEqual([["FAILED", "SCHEMA_FAILED", "ORIGINAL"], ["OK", "PARSED", "PATCH"]]);
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain("1 fixed by the same call (by patch 1, by full re-ask 0, otherwise 0)");
+  }, 300_000);
+
+  it("the patch follow-up answered with the whole answer again is refused as a patch; the full re-ask fixes it: REPAIRED by FULL (three tries), PASS_WITH_WARNINGS (exit 10)", async () => {
+    const { stubs, env, common, quiet } = await scenario(mimoFirstPanelSlips({ patch: false }));
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
+    const report = outcome.report as unknown as RepairReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS_WITH_WARNINGS", reasons: [`FORMAT_REPAIRED:${MIMO}:1`] });
+    expect(outcome.exitCode).toBe(10);
+    expect(stubs.requests.filter((request) => request.model === MIMO && request.kind === "PANEL").map((request) => isPatchRequest(request)))
+      .toEqual([false, true, false]);
+    expect(report.slipsByModel[MIMO]).toMatchObject({ slips: 1, repaired: 1, repairedByPatch: 0, repairedByFullAsk: 1 });
+    expect(report.totals).toMatchObject({ formatFailures: 0, formatRepaired: 1, formatRepairedByPatch: 0, formatRepairedByFullAsk: 1 });
+    // The diagnosis is the slip itself (the first reply), not the refused patch.
+    expect(report.failures).toEqual([expect.objectContaining({ model: MIMO, lane: "PANEL", status: "REPAIRED", repairKind: "FULL",
+      issues: ["invalid_type@steelman.fidelity"] })]);
+    expect(report.failures[0]!.attempts.map((attempt) => attempt.replyForm)).toEqual(["ORIGINAL", "PATCH", "FULL"]);
   }, 300_000);
 
   it("--busy-wait-minutes 0 (the old rule): GLM refused as busy every time: GLM SKIPPED_MODEL_BUSY after its first job, the other four all exercised: NOT_PROVEN (exit 30)", async () => {
@@ -547,23 +596,27 @@ describe("preview practice: debate mode", () => {
     expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
   }, 600_000);
 
-  it("owner ruling 2026-10-12 (\"Fixed slips = warning\"): MiMo's first panel reply breaks the schema and its repair is accepted: PASS_WITH_WARNINGS (exit 10)", async () => {
-    let mimoPanels = 0;
-    const once = (request: GateRequest): GateOverride | null =>
-      request.model === MIMO && request.kind === "PANEL" && ++mimoPanels === 1 ? { content: BAD_PANEL } : null;
-    const { env, common, quiet } = await scenario(once);
+  it("owner ruling 2026-10-12 (\"Fixed slips = warning\") and the patch follow-up: MiMo's first panel reply breaks the schema and the short patch follow-up fixes it: PASS_WITH_WARNINGS (exit 10), repaired by PATCH", async () => {
+    const { env, common, quiet } = await scenario(mimoFirstPanelSlips({ patch: true }));
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1"], env, quiet);
     const report = outcome.report as unknown as {
-      verdict: string; reasons: string[]; totals: { formatFailures: number; formatRepaired: number };
+      verdict: string; reasons: string[];
+      totals: { formatFailures: number; formatRepaired: number; formatRepairedByPatch: number; formatRepairedByFullAsk: number };
+      slipsByModel: Record<string, { repaired: number; repairedByPatch: number; repairedByFullAsk: number; repairedOtherwise: number }>;
       run: { workItemOutcome: string; answer: { served: boolean }; story: { outcome: string } };
-      failures: { model: string; callSiteKey: string; parseStatus: string; fixedBySameCall: boolean }[];
+      failures: { model: string; callSiteKey: string; parseStatus: string; fixedBySameCall: boolean; replyForm: string | null }[];
+      cacheByModel: Record<string, { calls: number }>;
     };
     expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS_WITH_WARNINGS", reasons: [`FORMAT_REPAIRED:${MIMO}:1`] });
     expect(outcome.exitCode).toBe(10);
     expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
-    expect(report.totals).toMatchObject({ formatFailures: 0, formatRepaired: 1 });
-    expect(report.failures).toEqual([expect.objectContaining({ model: MIMO, parseStatus: "SCHEMA_FAILED", fixedBySameCall: true })]);
+    // The kind is read from the prompts the runner stored for each try (ledger.call_prompt in the practice database).
+    expect(report.totals).toMatchObject({ formatFailures: 0, formatRepaired: 1, formatRepairedByPatch: 1, formatRepairedByFullAsk: 0 });
+    expect(report.slipsByModel[MIMO]).toMatchObject({ repaired: 1, repairedByPatch: 1, repairedByFullAsk: 0, repairedOtherwise: 0 });
+    expect(report.failures).toEqual([expect.objectContaining({ model: MIMO, parseStatus: "SCHEMA_FAILED", fixedBySameCall: true, replyForm: "ORIGINAL" })]);
     expect(report.failures[0]!.callSiteKey.startsWith("PANEL:")).toBe(true);
+    // The prompt cache block is there for every AI that answered (the stand-in reports no cached count).
+    expect(Object.keys(report.cacheByModel).sort()).toEqual([...FIVE].sort());
   }, 600_000);
 
   it("MiMo answers a panel seat with a schema-breaking reply: FAIL (exit 20), with MiMo's reply text and code@path", async () => {
@@ -571,18 +624,27 @@ describe("preview practice: debate mode", () => {
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath], env, quiet);
     const report = outcome.report as unknown as {
       verdict: string; reasons: string[];
-      failures: { model: string; callSiteKey: string; parseStatus: string; issues: string[]; recheckIssues: string[]; replyText: string }[];
+      failures: { model: string; callSiteKey: string; parseStatus: string; issues: string[]; recheckIssues: string[]; replyText: string;
+        replyForm: string | null }[];
     };
     expect(report.verdict).toBe("FAIL");
     expect(outcome.exitCode).toBe(20);
     expect(report.reasons.some((reason) => reason.startsWith("FORMAT_FAILED"))).toBe(true);
     expect(report.failures.length).toBeGreaterThan(0);
     for (const failure of report.failures) {
-      expect(failure).toMatchObject({ model: MIMO, parseStatus: "SCHEMA_FAILED", recheckIssues: ["invalid_type@steelman.fidelity"] });
       expect(failure.callSiteKey.startsWith("PANEL:")).toBe(true);
-      expect(failure.issues).toContain("invalid_type@steelman.fidelity");
+      expect(failure).toMatchObject({ model: MIMO, parseStatus: "SCHEMA_FAILED" });
       expect(failure.replyText).toContain("\"fidelity\":\"high\"");
+      if (failure.replyForm === "PATCH") {
+        // The patch follow-up answered with the whole wrong answer again: refused as a patch, not re-checked.
+        expect(failure).toMatchObject({ issues: ["PATCH_KEY_NOT_REQUESTED@$"], recheckIssues: [] });
+      } else {
+        expect(failure).toMatchObject({ recheckIssues: ["invalid_type@steelman.fidelity"] });
+        expect(failure.issues).toContain("invalid_type@steelman.fidelity");
+      }
     }
+    // Every refused call went first, then the patch follow-up, then the full re-ask.
+    expect(new Set(report.failures.map((failure) => failure.replyForm))).toEqual(new Set(["ORIGINAL", "PATCH", "FULL"]));
   }, 600_000);
 
   it("refuses to start (HARNESS_ERROR, exit 40) without the acknowledgement, and sends nothing", async () => {

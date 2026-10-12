@@ -70,8 +70,9 @@ import { TypedDomainError, exhaustive, type WayOfKnowing } from "@debateai/kerne
 // The runner's own story snapshot builder (not on the runner package's export list; practice.ts reads the runner's
 // dev register module the same way).
 import { buildStoryRunSnapshot } from "../../apps/runner/src/story-snapshot.js";
-import { readPromptFrame } from "@debateai/providers";
+import { readPromptFrame, type PromptPacket } from "@debateai/providers";
 import type { PracticeQuestion } from "./practice-questions.js";
+import type { PracticeReplyForm } from "./practice-verdict.js";
 
 export const PRACTICE_LANES = [
   "JUDGE_POSITION", "JUDGE_ATTACK", "JUDGE_CROSS", "PANEL", "REVIEW", "SYNTHESIZER", "EVALUATOR", "STORYTELLER", "STORY_CHECKER"
@@ -147,6 +148,24 @@ export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
 export function practiceJsonRepairOf(content: string, finishReason: unknown): string | null {
   const decoded = decodeModelJson(content, { finishReason: typeof finishReason === "string" ? finishReason : null });
   return decoded.ok ? decoded.repair : null;
+}
+
+/**
+ * Patch follow-up (owner design, 2026-10-12): which form one attempt sent (`PracticeReplyForm`), read from the attempt's
+ * own recorded prompt (the `messages` the gateway hands `persistCallPrompt` just before it sends, the same value
+ * ledger.call_prompt keeps), through the frame reader the gateway's door runs:
+ *  - an answer turn (role "assistant") is the short patch follow-up: the door admits one only in the patch shape;
+ *  - else a material block naming a refusal (`machine_rejection_code`) is the full re-ask;
+ *  - else the step's own packet.
+ * Null when the frame cannot be read (never the case for a prompt the gateway sent).
+ */
+export function practiceReplyFormOf(messages: PromptPacket["messages"]): PracticeReplyForm | null {
+  if (messages.some((message) => message.role === "assistant")) return "PATCH";
+  try {
+    return readPromptFrame({ messages }).fields.some((field) => field.name === "machine_rejection_code") ? "FULL" : "ORIGINAL";
+  } catch {
+    return null;
+  }
 }
 
 /** The finish reason a stored artifact's metadata recorded (W10/1), or null. */

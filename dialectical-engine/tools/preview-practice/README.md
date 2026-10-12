@@ -59,19 +59,48 @@ The last line on the screen and the exit code say:
 | Exit | Verdict | Meaning |
 |---|---|---|
 | 0 | PASS | Everything worked. The upload may go ahead. |
-| 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes, or an AI's reply had the wrong format and the same call's second try fixed it (`FORMAT_REPAIRED:<model>:<how many>`, owner ruling 2026-10-12 "Fixed slips = warning"), or an AI was busy and sat out the rest after giving at least one accepted answer (`MODEL_BUSY_PARTLY:<model>:answered=<n>:skipped=<m>`, owner ruling 2026-10-12 "Keep GLM, it sits out"). Owner decides. |
+| 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes, or an AI's reply had the wrong format and a later try of the same call fixed it, by the short follow-up or the full re-ask (`FORMAT_REPAIRED:<model>:<how many>`, owner ruling 2026-10-12 "Fixed slips = warning"), or an AI was busy and sat out the rest after giving at least one accepted answer (`MODEL_BUSY_PARTLY:<model>:answered=<n>:skipped=<m>`, owner ruling 2026-10-12 "Keep GLM, it sits out"). Owner decides. |
 | 20 | FAIL | A call ended without an accepted reply after its tries because of its format (`FORMAT_FAILED`), or one AI's first tries had the wrong format too often (`SLIP_RATE:<model>:<slips>/<answered calls>`: more than 1 in 10 of its answered calls, one slip always allowed), a call failed, the debate did not finish, no answer or no story (anything but READY, so READY_WITH_RESERVATION too), or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
 | 30 | NOT_PROVEN | It worked, but a model stayed busy (the AI company kept refusing its call as "too busy", not billed, or the model kept cooling off) and sat out before it gave a single accepted answer, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, or the operator pressed Ctrl-C once, so some model was not tested to the end. Run again later, or owner decides. |
 
-The format rule in plain words (owner ruling 2026-10-12, "Fixed slips = warning"): on the preview every step that
-must answer in a fixed form gets one second try in the same call when its reply has the wrong form (the app tells the
-AI exactly which part to fix). A slip that second try fixes is a warning, listed per AI. A call whose tries all had the
-wrong form fails. Each AI may slip on its first try at most once, or at most 1 in 10 of its answered calls when it
-answered more than 10: FAIL when slips > max(1, floor(answered / 10)). The small repairs the app makes itself when it
-reads a reply (a code fence, prose around the answer, a straight quote inside a text, a missing closing bracket at the
-very end of a reply that finished normally) are counted in the report as information, never as slips.
 | 40 | HARNESS_ERROR | The practice could not run (a start check refused, or the tool broke). Nothing about the release is known. |
 | 50 | ABORTED | The practice started but did not reach its end (Ctrl-C a second time, or the tool broke midway). The report holds every job that finished, and lists whatever else it found. Run again. |
+
+The format rule in plain words (owner ruling 2026-10-12, "Fixed slips = warning"): on the preview every step that
+must answer in a fixed form gets a second try in the same call when its reply has the wrong form (the app tells the
+AI exactly which part to fix). A slip a later try of the same call fixes is a warning, listed per AI. A call whose tries
+all had the wrong form fails. Each AI may slip on its first try at most once, or at most 1 in 10 of its answered calls
+when it answered more than 10: FAIL when slips > max(1, floor(answered / 10)). The small repairs the app makes itself
+when it reads a reply (a code fence, prose around the answer, a straight quote inside a text, a missing closing bracket
+at the very end of a reply that finished normally) are counted in the report as information, never as slips.
+
+How a slip was fixed (patch follow-up, owner design 2026-10-12; information only, the verdict is the same either way).
+When a reply was a readable answer with only some parts wrong, the app first sends a SHORT follow-up: the AI gets its
+own answer back and is asked only for the wrong parts (for example `{"value_laden": true}`), which the app puts into
+its answer and checks again. Only when that does not work (or the reply could not be read at all) does it ask the whole
+question again (the full re-ask), which may take a third try. The report says which it was:
+
+- each job (formats) or call (debate) try carries `replyForm`: `ORIGINAL` (the question itself), `PATCH` (the short
+  follow-up) or `FULL` (the full re-ask), read from the exact prompt the app sent for that try (formats: as the app hands
+  it over just before sending; debate: the prompt the runner stored for that try in the practice database);
+- a REPAIRED job (formats) carries `repairKind`: `PATCH`, `FULL`, or `RESEND` (the question sent again unchanged, e.g.
+  after a reply cut off for length);
+- `slipsByModel.<model>` has `repairedByPatch`, `repairedByFullAsk` and `repairedOtherwise` (they add up to
+  `repaired`), and `totals` has `formatRepairedByPatch`, `formatRepairedByFullAsk` and `formatRepairedOtherwise`
+  (adding up to `formatRepaired`); report.md says "fixed by the same call (by patch n, by full re-ask m, otherwise k)".
+  The warning keeps its form, `FORMAT_REPAIRED:<model>:<how many>`.
+- In `failures`, a refused reply to the short follow-up (e.g. the AI sent its whole answer again: `PATCH_KEY_NOT_REQUESTED`)
+  is listed too (debate: with `replyForm` `PATCH` and no re-check, since it holds only the parts asked for); formats
+  shows each job's first wrong reply, the slip itself.
+
+The prompt cache (information only): the start of each prompt now stays the same from call to call, so the AI
+companies can reuse it from their cache, cheaper and faster. `cacheByModel.<model>` (both modes) gives the calls each AI answered,
+their input tokens, the part read from the cache (`cachedInputTokens`, as DeepInfra's `cached_tokens` and Anthropic's
+`cache_read_input_tokens` report it), `callsReportingCache` (answers that reported a cached count at all) and
+`cachedShare` (cached / input); report.md has one line per AI. Formats also shows `cachedInputTokens` per job and per
+model and job. Input tokens count the way the app counts them: for Anthropic its cache reads and cache writes are
+included (Anthropic's own `input_tokens` leaves them out). The database keeps no cached count (only four counters are
+stored per call), so it is read from the gates' answers as the practice watches them.
 
 ## Safety rules built in
 

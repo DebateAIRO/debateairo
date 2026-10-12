@@ -489,6 +489,12 @@ describe("the preview's one format repair through the real counting gateway (all
   /** The reviewer's reply leaving out its required edge bearings, then the same reply with them. */
   const missingField: Step = { answer: JSON.stringify({ outcome: "agree", reasons: ["Fares fund frequency."] }) };
   const fixedReply: Step = { answer: JSON.stringify({ outcome: "agree", reasons: ["Fares fund frequency."], edge_bearings: [0.8] }) };
+  /**
+   * Patch follow-up (owner design, 2026-10-12): the short follow-up's answer, only the member it was asked for. The
+   * reply above, refused at one member, now gets this follow-up first; a whole reply sent back to it is refused as a
+   * patch, and the full re-ask (a third POST, within the sealed bound of three) follows.
+   */
+  const patchReply: Step = { answer: JSON.stringify({ edge_bearings: [0.8] }) };
 
   const review = (gateway: ProviderGateway, work: Readonly<{ runId: string; workItemId: string }>, maxAttempts: number = POLICY.bounds.JUDGE.maxAttempts) =>
     new Judge(gateway).review({ runId: work.runId, subjectItemId: work.workItemId, callSiteKey: REVIEW_SITE,
@@ -508,14 +514,17 @@ describe("the preview's one format repair through the real counting gateway (all
   it("a reply missing a field, then the fixed reply: PARSED on the second POST of the same call, both rows counted", async () => {
     const work = await createRunWork("format-repair");
     const waits: number[] = [];
-    const { port, sent } = await scriptedGate([missingField, fixedReply]);
+    const { port, sent } = await scriptedGate([missingField, patchReply]);
     const reviewed = await review(previewGateway(port, waits), work);
     expect(reviewed.edgeMeasurements).toEqual([{ edgeId: "edge:all-steps", bearing: 0.8 }]);
     expect(sent).toHaveLength(2);
     expect(waits).toEqual([]);
-    // The repair packet names the member to fix (its machine path), never the model's words.
-    const repairMessages = JSON.stringify((JSON.parse(sent[1]!) as { messages: unknown }).messages);
-    expect(repairMessages).toContain("edge_bearings");
+    // The follow-up is the first call's messages, the model's own answer as its turn, and the machine path to fix.
+    const [firstMessages, patchMessages] = sent.map((body) => (JSON.parse(body) as { messages: { role: string; content: string }[] }).messages);
+    expect(patchMessages!.slice(0, firstMessages!.length)).toEqual(firstMessages);
+    expect(patchMessages!.map((message) => message.role)).toEqual(["system", "user", "assistant", "user"]);
+    expect(patchMessages![3]!.content).toContain("edge_bearings");
+    expect(patchMessages![3]!.content).toContain("PATCH");
     expect(await siteOutcomes(work.runId)).toEqual(["FAILED", "OK"]);
     const artifacts = (await database.pool.query<{ parse_status: string }>(
       `SELECT a.parse_status FROM ledger.ledger_entry e JOIN ledger.raw_artifact a ON a.raw_artifact_id = e.raw_artifact_ref
@@ -557,15 +566,48 @@ describe("the preview's one format repair through the real counting gateway (all
     expect(await siteBilled(work)).toBe(3);
   });
 
-  it("two refused replies end the call as a content refusal after two counted POSTs (the runner's fallback takes it)", async () => {
+  it("a patch refused as a patch, then the full re-ask: three counted POSTs in one call, never CALL_BUDGET_EXHAUSTED", async () => {
+    const work = await createRunWork("format-patch-then-full");
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([missingField, fixedReply, fixedReply]);
+    const reviewed = await review(previewGateway(port, waits), work);
+    expect(reviewed.edgeMeasurements).toEqual([{ edgeId: "edge:all-steps", bearing: 0.8 }]);
+    expect(sent).toHaveLength(3);
+    expect(waits).toEqual([]);
+    // The third POST is the full re-ask: the original messages and one machine block, no answer turn.
+    const roles = (JSON.parse(sent[2]!) as { messages: { role: string }[] }).messages.map((message) => message.role);
+    expect(roles).toEqual(["system", "user", "user"]);
+    expect(await siteOutcomes(work.runId)).toEqual(["FAILED", "FAILED", "OK"]);
+    expect(await siteBilled(work)).toBe(3);
+  });
+
+  it("a patch refused, then a billed timeout on the full re-ask: the review's final retry is sent and answered", async () => {
+    const work = await createRunWork("format-patch-then-timeout");
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([missingField, fixedReply, timeout, fixedReply]);
+    const gateway = previewGateway(port, waits);
+    const { events, hold } = recordingHold(waits);
+    const result = await withCooldownRetry({
+      runId: work.runId, callSiteKey: REVIEW_SITE, parentNodeId: null, plannedLegCount: 1,
+      baseMaxAttempts: POLICY.bounds.JUDGE.maxAttempts, failureScope: "REVIEW", policy: DEATH, hold,
+      attempt: (maxAttempts) => review(gateway, work, maxAttempts)
+    });
+    expect(result.kind).toBe("AUTHORED");
+    expect(sent).toHaveLength(4);
+    expect(events).toEqual([]);
+    expect(await siteOutcomes(work.runId)).toEqual(["FAILED", "FAILED", "TIMED_OUT", "OK"]);
+    expect(await siteBilled(work)).toBe(4);
+  });
+
+  it("first reply, patch and full re-ask all refused: a content refusal after three counted POSTs (the runner's fallback takes it)", async () => {
     const work = await createRunWork("format-twice");
     const waits: number[] = [];
-    const { port, sent } = await scriptedGate([missingField, missingField]);
+    const { port, sent } = await scriptedGate([missingField, missingField, missingField]);
     await expect(review(previewGateway(port, waits), work)).rejects.toMatchObject({ code: "NODE_REVIEW_SCHEMA_FAILURE" });
-    expect(sent).toHaveLength(2);
+    expect(sent).toHaveLength(3);
     expect(waits).toEqual([]);
-    expect(await siteOutcomes(work.runId)).toEqual(["FAILED", "FAILED"]);
-    expect(await siteBilled(work)).toBe(2);
+    expect(await siteOutcomes(work.runId)).toEqual(["FAILED", "FAILED", "FAILED"]);
+    expect(await siteBilled(work)).toBe(3);
     // Another maker at the same site still has its whole allowance (run resilience fix (b)): nothing is exhausted.
     expect(await new LedgerRepository(database.pool).countModelAttempts({ runId: work.runId, workItemId: work.workItemId,
       contractHash: CONTRACT, callSiteKey: REVIEW_SITE, actorRef: OTHER_MAKERS[0]! })).toBe(0);

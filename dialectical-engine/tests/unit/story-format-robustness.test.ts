@@ -296,25 +296,34 @@ describe("D — on the preview the story checker gets the storyteller's one form
     expect((await forwarded({ ...checkerCall(), bound: { maxAttempts: 1, tokenCeiling: 2048, deadlineMs: 1 } })).maxAttemptsThisCall).toBe(1);
   });
 
+  // Patch follow-up (owner design, 2026-10-12): the one more POST is the short follow-up — the model's own verdict back,
+  // only `criteria` asked for — and the sealed bound of two leaves no full re-ask after it.
   it("the real MiMo/DeepSeek slip (no criteria) is repaired by one more POST, with a code and a path only", async () => {
     const slip = fixture("deepseek-checker-ro-no-criteria.txt");
-    const { gateway, executions, artifacts, ledger, sleeps } = nativeHarness([slip, VERDICT]);
+    const { gateway, executions, artifacts, ledger, sleeps } = nativeHarness([slip, JSON.stringify({ criteria: CRITERIA })]);
     const charges: unknown[] = [];
     const result = await gateway.call({ ...checkerCall(), costEnvelope: { ...freeEnvelope, recordCall: (charge: unknown) => { charges.push(charge); } } });
-    expect(result.content).toBe(VERDICT);
+    // The accepted verdict is the model's own first verdict with the criteria it was asked for merged in.
+    const verdict = parseCheckerVerdict(result.content, STOP);
+    expect(verdict).toMatchObject({ satisfied: false, criteria: CRITERIA });
+    expect(verdict.objection).toContain("Fate-urile");
     expect(result.repairAttempts).toBe(1);
+    expect(result.repairForm).toBe("PATCH");
     expect(executions).toHaveLength(2);
     expect(charges).toHaveLength(2);
     expect(sleeps).toEqual([]);
     expect(artifacts.map((artifact) => artifact.parseStatus)).toEqual(["SCHEMA_FAILED", "PARSED"]);
     expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "OK"]);
-    const repaired = readPromptFrame({ messages: JSON.parse(executions[1]!.requestBody).messages });
+    const messages = JSON.parse(executions[1]!.requestBody).messages as { role: string; content: string }[];
+    const repaired = readPromptFrame({ messages: messages as never });
     expect(repaired.contractId).toBe("story.checker.v2");
-    expect(repaired.fields.slice(-2)).toEqual([
+    expect(repaired.fields.slice(-3)).toEqual([
       { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
-      { name: "machine_rejection_path", content: "criteria" }
+      { name: "machine_rejection_paths", content: "criteria" },
+      { name: "machine_reply_form", content: "PATCH" }
     ]);
-    expect(executions[1]!.requestBody).not.toContain("Fate-urile");
+    // The model's words go back only as its own turn, never as material or instruction.
+    expect(messages.filter((message) => message.content.includes("Fate-urile")).map((message) => message.role)).toEqual(["assistant"]);
   });
 
   it("stops after that one repair", async () => {
