@@ -11,6 +11,8 @@
  *  - formats: every model asked to do every job a few times; each reply checked by that job's real format check. The
  *    models work at the same time (one call each at a time); --sequential sends one call at a time. Every finished job
  *    is written to <out>/samples.jsonl at once (practice-samples-log.ts), and the report is built from it.
+ *    With --levels (spec 2026-10-12 §4.8, practice-levels.ts) the listed models do every job once per listed
+ *    thinking level, the runs taking turns, and the report gets a levels table.
  *  - debate:  one whole practice debate (depth 1 by default, 2 allowed) through the real ask path and the real runner.
  *             With --transcript it also writes <out>/transcript.json: every prompt and every reply, decrypted
  *             (practice-transcript.ts).
@@ -39,6 +41,7 @@ import { practiceRemainingPorts } from "./practice-ask-composition.js";
 import { runPracticeDebate } from "./practice-debate.js";
 import { onePerModel, PRACTICE_FORMATS_DEFAULTS, runPracticeFormats } from "./practice-formats.js";
 import { PracticeGateObserver, type PracticeGateName } from "./practice-gate-observer.js";
+import { parsePracticeLevels, type PracticeLevelPlan } from "./practice-levels.js";
 import { practiceInterruptGate, takeOverSignals } from "./practice-interrupt.js";
 import { PRACTICE_LANES, type PracticeLane } from "./practice-lanes.js";
 import { parsePracticeRegisterExport, PracticeRegisterError } from "./practice-register-import.js";
@@ -79,7 +82,7 @@ export function repositoryRoot(): string {
 type Args = Readonly<{ mode: "formats" | "debate" | "report"; flags: ReadonlyMap<string, string>; switches: ReadonlySet<string> }>;
 
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
-  "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes"]);
+  "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels"]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript"]);
 
 export function parsePracticeArgs(argv: readonly string[]): Args {
@@ -196,6 +199,9 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     if (args.switches.has("--transcript") && args.mode !== "debate") {
       throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--transcript (debate mode only)");
     }
+    if (args.flags.has("--levels") && args.mode !== "formats") {
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--levels (formats mode only)");
+    }
     if (args.mode === "report") {
       // Rebuilds the report from an existing samples log; nothing is sent. On a refusal nothing is written there.
       const folder = required(args, "--out");
@@ -209,6 +215,14 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     directory = assertOutsideRepository(args.flags.get("--out") ?? defaultReportDirectory(mode, startedAt), repositoryRoot());
     const sockets = practiceSocketsFromEnvironment(env);
     const settings = readPracticeSettings(required(args, "--settings"));
+    // Formats: the models of this run, and (spec 2026-10-12 §4.8) the --levels plan, checked before any gate is asked.
+    const wanted = args.flags.get("--models")?.split(",").map((model) => model.trim()).filter((model) => model !== "")
+      ?? [...settings.previewConfig.premium_model_ids];
+    if (mode === "formats" && wanted.some((model) => !settings.previewConfig.premium_model_ids.includes(model))) {
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--models (not in the preview's roster)");
+    }
+    const levelsText = args.flags.get("--levels");
+    const levels: PracticeLevelPlan | undefined = levelsText === undefined ? undefined : parsePracticeLevels(levelsText, wanted);
     const unsentStreakAtStart: Record<PracticeGateName, number> = { deepinfra: 0, anthropic: 0 };
     const gateLimits: Record<PracticeGateName, number> = { ...PRACTICE_FORMATS_DEFAULTS.gateLimits };
     for (const gate of ["deepinfra", "anthropic"] as const) {
@@ -245,11 +259,6 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       before[gate] = answer;
     }
     if (mode === "formats") {
-      const wanted = args.flags.get("--models")?.split(",").map((model) => model.trim()).filter((model) => model !== "")
-        ?? [...settings.previewConfig.premium_model_ids];
-      if (wanted.some((model) => !settings.previewConfig.premium_model_ids.includes(model))) {
-        throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--models (not in the preview's roster)");
-      }
       const lanes = (args.flags.get("--lanes")?.split(",").map((lane) => lane.trim()) ?? [...PRACTICE_LANES]) as PracticeLane[];
       if (lanes.length === 0 || lanes.some((lane) => !(PRACTICE_LANES as readonly string[]).includes(lane))) {
         throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--lanes");
@@ -286,12 +295,16 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       const sampleLog = samplesLog;
       sampleLog.append({ kind: "start", schema: "preview-practice-samples-v1", mode: "formats", startedAt: startedAt.toISOString(),
         models: targets.map((target) => target.model), lanes, samples, parallel, busyWaitMs, unsentStreakAtStart,
-        remainingBefore: { deepinfra: remainingLine(before.deepinfra), anthropic: remainingLine(before.anthropic) } });
+        remainingBefore: { deepinfra: remainingLine(before.deepinfra), anthropic: remainingLine(before.anthropic) },
+        ...(levels === undefined ? {} : { levels: Object.fromEntries(Object.entries(levels).map(([model, runs]) => [model, runs.map((run) => run.run)])) }) });
       observer.listen({ event: (event) => sampleLog.append({ kind: "wire", event }), stop: (gateStop) => sampleLog.append({ kind: "stop", stop: gateStop }) });
       log(`samples: ${sampleLog.path}`);
       log(parallel
         ? `formats: ${String(targets.length)} models at once, one call each at a time (at once at most: deepinfra ${String(gateLimits.deepinfra)}, anthropic ${String(gateLimits.anthropic)}, all ${String(maxInFlight)})`
         : "formats: one call at a time (--sequential)");
+      for (const [model, runs] of Object.entries(levels ?? {})) {
+        log(`levels: ${model}: ${runs.map((run) => run.run).join(", ")} (each job once per run, the runs taking turns)`);
+      }
       await runPracticeFormats({
         config: settings.previewConfig,
         targets,
@@ -315,7 +328,8 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         busyWaitMs,
         onBusyWait: (wait) => sampleLog.append({ kind: "busy-wait", ...wait }),
         onResume: (resume) => sampleLog.append({ kind: "resume", ...resume }),
-        stopSignal: interrupted.signal
+        stopSignal: interrupted.signal,
+        ...(levels === undefined ? {} : { levels })
       });
       if (settled !== null) return settled;
       const after = {

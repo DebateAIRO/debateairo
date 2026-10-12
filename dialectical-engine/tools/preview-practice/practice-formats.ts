@@ -14,6 +14,10 @@
  * models taking turns, one job each (round-robin by model), the Anthropic model between the DeepInfra ones. Either way
  * each model's own jobs keep their order (job by job, the samples of a job together).
  *
+ * Thinking levels (spec 2026-10-12 §4.8, `levels`): a model in the plan does each job once per run, its runs taking
+ * turns per job (practice-levels.ts) and one after another, never at once, each with a config naming only that run's
+ * level. A busy model parks all its runs. A model not in the plan runs as before and its samples carry no level fields.
+ *
  * A busy model: when a job's call ends in the vendor's refusal, not billed (the call and its one resend, the gate's
  * PROVIDER_REFUSED_UNBILLED, or the model is cooling off as MODEL_COOLING), only that model is parked: it waits out its
  * cool-off (the gate's retry_after when it named one, else 60 s doubling up to 600 s, up to a quarter longer) while the
@@ -35,6 +39,7 @@ import {
   withPreviewProviderCallPolicy,
   createPreviewGuardedFetch,
   type PreviewBudgetPorts,
+  type PreviewEffort,
   type PreviewProviderTestConfig,
   type ProviderDiscoveryTarget,
   type ProviderGateway,
@@ -44,7 +49,7 @@ import {
 import type { StoryPack } from "@debateai/story";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
 import { limitPort, PracticeSemaphore, runModelQueues, type PracticePreparedJob } from "./practice-concurrency.js";
-import type { PracticeGateName, PracticeGateObserver, PracticeUnbilledKind } from "./practice-gate-observer.js";
+import type { PracticeGateName, PracticeGateObserver, PracticeUnbilledKind, PracticeWireEvent } from "./practice-gate-observer.js";
 import {
   issueListFromParseError,
   practiceFinishReasonOf,
@@ -56,6 +61,7 @@ import {
   type PracticeLane,
   type PracticeLaneBounds
 } from "./practice-lanes.js";
+import { practiceLevelConfig, practiceLevelJobs, practiceRunOfJob, type PracticeLevelJob, type PracticeLevelPlan } from "./practice-levels.js";
 import { PRACTICE_QUESTIONS } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
 import { practiceCallFacts, practiceRepairKindOf, type PracticeRepairKind, type PracticeReplyForm } from "./practice-verdict.js";
@@ -115,6 +121,16 @@ export type PracticeSample = Readonly<{
   /** Only for a non-PARSED reply: the reply text, key-shaped strings blanked, at most 64 KiB. */
   replyText: string | null;
   detail: string | null;
+  /**
+   * Spec 2026-10-12 §4.8, only in a `--levels` run (absent otherwise and in older logs): the run ("high#1") and level
+   * the job was asked at, its thinking tokens as the vendor reported them (null when none did), whether any reply of
+   * it stopped at max_tokens, and its accepted answer (key-shaped strings blanked, at most 64 KiB; null without one).
+   */
+  levelRun?: string;
+  thinkingLevel?: PreviewEffort;
+  reasoningTokens?: number | null;
+  cutOff?: boolean;
+  answerText?: string | null;
 }>;
 
 /** The gateway one target uses, built exactly as the runner builds it on the preview, but recording in memory. */
@@ -257,6 +273,8 @@ export async function runPracticeFormats(input: Readonly<{
   onResume?: (resume: PracticeBusyResume) => void;
   /** Aborted by the operator's interrupt: cuts the busy waits short. */
   stopSignal?: AbortSignal;
+  /** Spec 2026-10-12 §4.8 (`--levels`): each listed model's runs; a model not listed runs once, as without it. */
+  levels?: PracticeLevelPlan;
 }>): Promise<PracticeFormatsResult> {
   const budgetMs = input.busyWaitMs ?? 0;
   // Each model's waits: the time used of its budget, its waits so far and in a row, and the wait it is parked in.
@@ -282,12 +300,18 @@ export async function runPracticeFormats(input: Readonly<{
   const busy: string[] = [];
   const record = (sample: PracticeSample) => { samples.push(sample); input.onSample?.(sample); };
   const order = practiceTurnOrder(input.targets);
-  const jobs = input.lanes.flatMap((lane) => Array.from({ length: input.samples }, (_unused, index) => ({ lane, sample: index + 1 })));
-  const prepare = (target: ProviderDiscoveryTarget, job: Readonly<{ lane: PracticeLane; sample: number }>): PracticePreparedJob => {
+  // Spec 2026-10-12 §4.8: with --levels each job is asked once per run of a model, its runs one after another (so one
+  // model never has two calls at once, and the per-model slice of the gate's events below stays this job's own).
+  const jobs = practiceLevelJobs(input.lanes, input.samples, input.levels);
+  const prepare = (target: ProviderDiscoveryTarget, job: PracticeLevelJob): PracticePreparedJob => {
+    const run = practiceRunOfJob(input.levels, target.model, job);
+    // A slot this model has no run for (it has fewer runs than the longest plan): nothing to do, nothing recorded.
+    if (run === null) return null;
     const { lane, sample } = job;
     const gate = gateOf(target.model);
     const question = PRACTICE_QUESTIONS[(sample - 1) % PRACTICE_QUESTIONS.length]!;
-    const base = { model: target.model, providerRef: target.providerRef, gate, lane, sample, questionId: question.id };
+    const base = { model: target.model, providerRef: target.providerRef, gate, lane, sample, questionId: question.id,
+      ...(run === undefined ? {} : { levelRun: run.run, thinkingLevel: run.level }) };
     const state = waitState(target.model);
     if (state.parked !== null) {
       const cancelled = input.observer.stopped(gate) !== null || input.shouldStop?.() === true;
@@ -299,7 +323,7 @@ export async function runPracticeFormats(input: Readonly<{
     const skipped = (status: "SKIPPED_GATE_STOPPED" | "SKIPPED_MODEL_BUSY", errorCode: string) => {
       record(Object.freeze({ ...base, status, latencyMs: 0, attempts: [],
         inputTokens: null, outputTokens: null, cachedInputTokens: null, costNanoUsd: null, repairKind: null, unbilledRefusals: 0, issues: [], recheckIssues: [],
-        errorCode, replyText: null, detail: null }));
+        errorCode, replyText: null, detail: null, ...(run === undefined ? {} : { reasoningTokens: null, cutOff: false, answerText: null }) }));
       return null;
     };
     if (input.observer.stopped(gate) !== null || input.shouldStop?.() === true) {
@@ -308,7 +332,7 @@ export async function runPracticeFormats(input: Readonly<{
     if (busy.includes(target.model)) return skipped("SKIPPED_MODEL_BUSY", PRACTICE_MODEL_BUSY);
     return async () => {
       const sink = { artifacts: [] as RawArtifactInput[], ledger: [] as ProviderLedgerInput[], forms: new Map<string, PracticeReplyForm | null>() };
-      const recording = recordingGateway({ target, config: input.config, guardedFetch, sink,
+      const recording = recordingGateway({ target, config: run === undefined ? input.config : practiceLevelConfig(input.config, run), guardedFetch, sink,
         ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
       // The job's gateway, watched as the runner's sit-out book watches a member's (the story writer swallows its
       // calls' failures, so the job's own outcome cannot say it).
@@ -409,13 +433,14 @@ export async function runPracticeFormats(input: Readonly<{
         unbilledRefusals: unbilled, repairKind: status === "REPAIRED" ? repairKind : null, issues, recheckIssues: recheck,
         errorCode: postCheckError ?? errorCode,
         replyText: content === null ? null : reportableReplyText(content),
-        detail
+        detail,
+        ...(run === undefined ? {} : levelFacts(wire, sink))
       }));
       if (markedBusy) {
         input.onBusy?.(target.model);
         input.progress?.(`${target.model} is busy (refused, not billed): its remaining jobs are skipped`);
       }
-      input.progress?.(`${target.model} ${lane} #${String(sample)}: ${status} ${String(latencyMs)}ms`);
+      input.progress?.(`${target.model} ${lane} #${String(sample)}${run === undefined ? "" : ` ${run.run}`}: ${status} ${String(latencyMs)}ms`);
       return undefined;
     };
   };
@@ -424,6 +449,21 @@ export async function runPracticeFormats(input: Readonly<{
     ...(input.stopSignal === undefined ? {} : { signal: input.stopSignal }) });
   return Object.freeze({ samples: Object.freeze(samples), models: Object.freeze(input.targets.map((target) => target.model)),
     lanes: Object.freeze([...input.lanes]), busyModels: Object.freeze([...busy]) });
+}
+
+/**
+ * Spec 2026-10-12 §4.8: what a `--levels` job adds: its thinking tokens (summed over its calls that reported them), cut
+ * off (any reply stopped at max_tokens), and its last accepted answer, through the same blanking and cut as replyText.
+ */
+function levelFacts(wire: readonly PracticeWireEvent[], sink: Readonly<{ artifacts: readonly RawArtifactInput[]; ledger: readonly ProviderLedgerInput[] }>):
+  Readonly<{ reasoningTokens: number | null; cutOff: boolean; answerText: string | null }> {
+  const accepted = [...sink.artifacts].reverse().find((artifact) => artifact.parseStatus === "PARSED"
+    && sink.ledger.some((entry) => entry.attemptId === artifact.attemptId && entry.outcome === "OK")) ?? null;
+  return Object.freeze({
+    reasoningTokens: wire.reduce<number | null>((sum, event) => event.reasoningTokens === null ? sum : (sum ?? 0) + event.reasoningTokens, null),
+    cutOff: sink.artifacts.some((artifact) => ["length", "max_tokens"].includes(practiceFinishReasonOf(artifact.metadata) ?? "")),
+    answerText: accepted === null ? null : reportableReplyText(replyContentOf(accepted.rawText))
+  });
 }
 
 /** One target per reviewed model: the first declared target of each model, in declaration order. */

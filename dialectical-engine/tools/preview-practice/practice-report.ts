@@ -13,6 +13,7 @@ import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.j
 import { practiceStopIsPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
 import {
   latencySummary,
+  percentile,
   practiceCallFacts,
   practiceModelCalls,
   practiceRepairKindsByModel,
@@ -179,6 +180,67 @@ export function cacheByModel(observer: PracticeGateObserver): Readonly<Record<st
       cachedShare: mine.inputTokens === 0 ? null : Math.round((mine.cachedInputTokens / mine.inputTokens) * 1_000) / 1_000 })])));
 }
 
+/**
+ * Spec 2026-10-12 §4.8: one model's one level run, as the levels table shows it. `jobs` counts every job of the run,
+ * `answered` those not skipped; `firstTry` the PARSED ones, `repaired` the REPAIRED ones (fixed by the same call's
+ * later try), `failed` the rest of the answered ones; `cutOff` the jobs with a reply stopped at max_tokens. Thinking,
+ * time and cost are over the answered jobs (medians and p90 by nearest rank; null with nothing to measure).
+ * `slipsOverBar`: the run's own slips over the practice rule (slips > max(1, floor(answered calls / 10))).
+ */
+export type PracticeLevelRunBlock = Readonly<{
+  jobs: number; answered: number; firstTry: number; repaired: number; failed: number; cutOff: number;
+  reasoningMedian: number | null; reasoningTotal: number | null; latencyMedianMs: number | null; latencyP90Ms: number | null;
+  costPerJobUsd: string | null; costTotalUsd: string; slipsOverBar: boolean;
+}>;
+
+/** Spec 2026-10-12 §4.8: model -> run -> its block, runs in the order they first appear (the plan's order); null without level runs. */
+export function levelsBlock(samples: readonly PracticeSample[]): Readonly<Record<string, Readonly<Record<string, PracticeLevelRunBlock>>>> | null {
+  const levelled = samples.filter((sample) => sample.levelRun !== undefined);
+  if (levelled.length === 0) return null;
+  const out: Record<string, Record<string, PracticeLevelRunBlock>> = {};
+  for (const model of new Set(levelled.map((sample) => sample.model))) {
+    const mine = levelled.filter((sample) => sample.model === model);
+    out[model] = {};
+    for (const run of new Set(mine.map((sample) => sample.levelRun!))) {
+      const jobs = mine.filter((sample) => sample.levelRun === run);
+      const answered = jobs.filter((sample) => sample.status !== "SKIPPED_GATE_STOPPED" && sample.status !== "SKIPPED_MODEL_BUSY");
+      const thinking = answered.flatMap((sample) => typeof sample.reasoningTokens === "number" ? [sample.reasoningTokens] : []);
+      const latencies = answered.map((sample) => sample.latencyMs);
+      const cost = answered.reduce((sum, sample) => sum + BigInt(sample.costNanoUsd ?? "0"), 0n);
+      const calls = practiceModelCalls(answered.flatMap((sample) => [...new Set(sample.attempts.map((attempt) => attempt.callSiteKey))]
+        .map((key) => ({ model, tries: sample.attempts.filter((attempt) => attempt.callSiteKey === key) }))))[model];
+      const firstTry = answered.filter((sample) => sample.status === "PARSED").length;
+      const repaired = answered.filter((sample) => sample.status === "REPAIRED").length;
+      out[model][run] = Object.freeze({
+        jobs: jobs.length, answered: answered.length, firstTry, repaired, failed: answered.length - firstTry - repaired,
+        cutOff: jobs.filter((sample) => sample.cutOff === true).length,
+        reasoningMedian: percentile(thinking, 50), reasoningTotal: thinking.length === 0 ? null : thinking.reduce((sum, value) => sum + value, 0),
+        latencyMedianMs: percentile(latencies, 50), latencyP90Ms: percentile(latencies, 90),
+        costPerJobUsd: answered.length === 0 ? null : usd(cost / BigInt(answered.length)), costTotalUsd: usd(cost),
+        slipsOverBar: calls === undefined ? false : practiceSlipRateExceeded(calls)
+      });
+    }
+    Object.freeze(out[model]);
+  }
+  return Object.freeze(out);
+}
+
+/**
+ * Spec 2026-10-12 §6 (the noise band): for a model with a level run twice (`<level>#1` and `<level>#2`, the first such
+ * level), the gaps between the two runs, as one line under its rows; null when it has none.
+ */
+function chanceBandLine(model: string, runs: Readonly<Record<string, PracticeLevelRunBlock>>): string | null {
+  const level = Object.keys(runs).find((run) => run.endsWith("#1") && Object.hasOwn(runs, run.replace(/#1$/u, "#2")));
+  if (level === undefined) return null;
+  const [one, two] = [runs[level]!, runs[level.replace(/#1$/u, "#2")]!];
+  const gap = (a: number | null, b: number | null, show: (value: number) => string) => a === null || b === null ? "-" : show(Math.abs(a - b));
+  const nano = (value: string | null) => value === null ? null : Number(value.replace(".", ""));
+  return `${model} chance band (${level} vs ${level.replace(/#1$/u, "#2")}): first try ±${String(Math.abs(one.firstTry - two.firstTry))}, `
+    + `thinking median ±${gap(one.reasoningMedian, two.reasoningMedian, String)}, `
+    + `time median ±${gap(one.latencyMedianMs, two.latencyMedianMs, (value) => `${(value / 1_000).toFixed(1)} s`)}, `
+    + `cost per job ±${gap(nano(one.costPerJobUsd), nano(two.costPerJobUsd), (value) => `$${usd(BigInt(value))}`)}`;
+}
+
 export function formatsReport(input: Readonly<{
   result: PracticeFormatsResult;
   observer: PracticeGateObserver;
@@ -249,6 +311,7 @@ export function formatsReport(input: Readonly<{
       outputTokens: mine.reduce((sum, sample) => sum + (sample.outputTokens ?? 0), 0),
       costUsd: usd(cost), unbilledRefusals: mine.reduce((sum, sample) => sum + sample.unbilledRefusals, 0) });
   }));
+  const levels = levelsBlock(samples);
   return Object.freeze({
     schema: PRACTICE_REPORT_SCHEMA, mode: "formats", ...verdict,
     startedAt: input.startedAt.toISOString(), finishedAt: input.finishedAt.toISOString(),
@@ -257,6 +320,8 @@ export function formatsReport(input: Readonly<{
     slipsByModel: slipBlocks(callsByModel, jsonRepairs, repairKinds),
     cacheByModel: cacheByModel(input.observer),
     byModelAndLane,
+    // Spec 2026-10-12 §4.8: only in a --levels run.
+    ...(levels === null ? {} : { levels }),
     gates: Object.fromEntries(GATES.map((gate) => [gate, gateBlock(input.observer, gate, input.remaining[gate])])),
     totals: Object.freeze({
       samples: samples.length,
@@ -422,6 +487,24 @@ export function reportMarkdown(report: PracticeReport): string {
         + `${JSON.stringify(row.outcomes ?? row.statuses)} | ${JSON.stringify(row.parse ?? "")} | ${s(latency.p50)} | ${s(latency.p90)} | ${s(latency.max)} |`);
     }
     lines.push("");
+  }
+  const levels = report.levels as Readonly<Record<string, Readonly<Record<string, PracticeLevelRunBlock>>>> | undefined;
+  if (levels !== undefined) {
+    lines.push("Thinking levels (spec 2026-10-12 §4.8; the chance band is the gap between two runs of the same level):", "",
+      "| model | run | jobs | first try | repaired | failed | cut off | thinking median | time median / p90 | cost per job |",
+      "|---|---|---|---|---|---|---|---|---|---|");
+    const bands: string[] = [];
+    for (const [model, runs] of Object.entries(levels)) {
+      const s = (value: number | null) => value === null ? "-" : (value / 1000).toFixed(1);
+      for (const [run, entry] of Object.entries(runs)) {
+        lines.push(`| ${model} | ${run} | ${String(entry.jobs)} | ${String(entry.firstTry)} | ${String(entry.repaired)} | ${String(entry.failed)} | `
+          + `${String(entry.cutOff)} | ${entry.reasoningMedian === null ? "-" : String(entry.reasoningMedian)} | `
+          + `${s(entry.latencyMedianMs)} / ${s(entry.latencyP90Ms)} s | ${entry.costPerJobUsd === null ? "-" : `$${entry.costPerJobUsd}`} |`);
+      }
+      const band = chanceBandLine(model, runs);
+      if (band !== null) bands.push(band);
+    }
+    lines.push("", ...bands.map((band) => `- ${band}`), ...(bands.length === 0 ? [] : [""]));
   }
   const failures = report.failures as readonly unknown[] | undefined;
   lines.push(`Wrong-format replies, fixed by their call or not: ${String(failures?.length ?? 0)} (their text and the exact problems are in report.json, "failures").`, "");

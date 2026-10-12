@@ -317,6 +317,35 @@ describe("preview practice: formats mode", () => {
     expect(report.byModelAndLane.map((row) => row.statuses)).toEqual(FIVE.map(() => ({ PARSED: 1 })));
     expect(stubs.requests.filter((request) => request.kind === "COMPOSE")).toHaveLength(5);
   }, 300_000);
+
+  it("--levels (spec 2026-10-12 §4.8): each job once per run, each body carrying its run's effort; the log names the runs, the report a levels table", async () => {
+    const { stubs, env, common, quiet, out } = await scenario();
+    const logged: string[] = [];
+    const outcome = await runPractice(["formats", ...common, "--samples", "2", "--gap-ms", "0", "--models", `${GLM},${DEEPSEEK}`,
+      "--lanes", "PANEL", "--levels", `${GLM}=high,low`], env, { ...quiet, log: (line: string) => logged.push(line) });
+    expect({ exitCode: outcome.exitCode, verdict: outcome.report.verdict }).toEqual({ exitCode: 0, verdict: "PASS" });
+    // GLM: the runs take turns per job (high, low, then low, high); DeepSeek, not in the plan, runs once at the server's level.
+    expect(stubs.requests.filter((request) => request.model === GLM).map((request) => request.body.reasoning_effort)).toEqual(["high", "low", "low", "high"]);
+    expect(stubs.requests.filter((request) => request.model === DEEPSEEK).map((request) => request.body.reasoning_effort)).toEqual(["high", "high"]);
+    expect(logged).toContain(`levels: ${GLM}: high#1, low#1 (each job once per run, the runs taking turns)`);
+    const lines = readFileSync(join(out, "samples.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(lines[0]).toMatchObject({ kind: "start", levels: { [GLM]: ["high#1", "low#1"] } });
+    const samples = lines.filter((line) => line.kind === "sample").map((line) => line.sample as Record<string, unknown>);
+    expect(samples.filter((sample) => sample.model === GLM).map((sample) => sample.levelRun)).toEqual(["high#1", "low#1", "low#1", "high#1"]);
+    expect(samples.filter((sample) => sample.model === DEEPSEEK).every((sample) => !("levelRun" in sample) && !("answerText" in sample))).toBe(true);
+    const report = outcome.report as unknown as { plannedSamples: number; levels: Record<string, Record<string, { jobs: number; firstTry: number }>> };
+    expect(report.plannedSamples).toBe(6);
+    expect(report.levels).toEqual({ [GLM]: { "high#1": expect.objectContaining({ jobs: 2, firstTry: 2 }), "low#1": expect.objectContaining({ jobs: 2, firstTry: 2 }) } });
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain(`| ${GLM} | high#1 | 2 | 2 | 0 | 0 | 0 |`);
+  }, 300_000);
+
+  it("--levels off a model's menu refuses before any gate is asked (HARNESS_ERROR, PRACTICE_LEVELS_INVALID)", async () => {
+    const { stubs, env, common, quiet } = await scenario();
+    const outcome = await runPractice(["formats", ...common, "--levels", `${GLM}=medium`], env, quiet);
+    expect(outcome.report).toMatchObject({ verdict: "HARNESS_ERROR", reasons: ["HARNESS_ERROR:PRACTICE_LEVELS_INVALID"] });
+    expect(stubs.requests).toEqual([]);
+    expect(stubs.remainingReads).toEqual([]);
+  }, 300_000);
 });
 
 /**
