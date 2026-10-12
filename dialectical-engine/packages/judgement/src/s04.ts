@@ -479,24 +479,32 @@ const LEFT_OUT_SEAT_SPEND_CODES: ReadonlyMap<string, string> = new Map([
  * Engine money rule (spec §14.4.1), Task M2 — what the panel does when a
  * run-level spend stop arrives.
  *
- * Parallel calls (spec 2026-10-12 §2.2/§2.3, owner ruling O6): the members are
- * asked TOGETHER — every member that is not the author's own seat has its call
- * started at once, in member order — and their results are read afterwards IN
- * MEMBER ORDER, with the per-member rules below, so the panel's outcome is the
- * same whatever order the answers arrive in. "No further member is asked after
- * a stop" is therefore now "every member was asked at once": a stop cannot
- * un-send a call already sent, and per O6 calls already sent finish and are
- * kept. The panel always waits for every member to settle before it answers.
+ * Two ways of asking (ruling R32), chosen by `askTogether`:
  *
- *  · "RETHROW" (the default): once every member has settled, the FIRST stop in
- *    member order leaves the panel exactly as it arrived, and whatever the
- *    panel had gathered is dropped with it — the caller's phase discards the
- *    node anyway.
+ *  · One at a time (the default; the runner's serial path, when the debate's
+ *    lane admits one call — hosted and local today): today's loop, each member
+ *    awaited before the next is asked. No further member is asked after a
+ *    stop: every further member is another call for a run that has just been
+ *    told it cannot make one.
+ *  · Together (`askTogether: true`; parallel calls, spec 2026-10-12 §2.2/§2.3,
+ *    owner ruling O6): every member that is not the author's own seat has its
+ *    call started at once, in member order, and their results are read
+ *    afterwards IN MEMBER ORDER, with the per-member rules below, so the
+ *    panel's outcome is the same whatever order the answers arrive in. A stop
+ *    cannot un-send a call already sent, and per O6 calls already sent finish
+ *    and are kept; the panel waits for every member to settle, and the FIRST
+ *    stop in member order is the panel's stop.
+ *
+ * Either way:
+ *
+ *  · "RETHROW" (the default): the stop leaves the panel exactly as it arrived,
+ *    and whatever the panel had gathered is dropped with it — the caller's
+ *    phase discards the node anyway.
  *  · "RETURN_HEARD": the panel RETURNS what it gathered — the author, every
- *    member voice that came back (paid for) and every note — with the FIRST
- *    stop in member order as `stoppedBy`, so the caller can keep those voices.
- *    A stop is the run's, never a member's note. The runner asks for it on the
- *    first root's panel only.
+ *    member voice already heard (paid for) and every note — with the stop as
+ *    `stoppedBy`, so the caller can keep those voices. A stop is the run's,
+ *    never a member's note. The runner asks for it on the first root's panel
+ *    only.
  *
  * B9 (budget spec §2.9, the Panel seats row): `leaveOutMoneyRefusedSeats`
  * changes this for MONEY alone — the run's ceiling for arguing, the site's day
@@ -540,6 +548,12 @@ export async function runJudgePanel(input: {
   }[];
   readonly onRunLevelSpendStop?: PanelRunLevelSpendStopRule;
   readonly leaveOutMoneyRefusedSeats?: boolean;
+  /**
+   * Ruling R32: true asks every member at once (the runner passes it only when
+   * the debate's lane admits more than one call); absent or false is today's
+   * loop, one member at a time, byte for byte.
+   */
+  readonly askTogether?: boolean;
 }): Promise<{
   readonly judgements: readonly { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string; readonly actorRef: string; readonly contractHash: string | null }[];
   readonly notes: readonly PanelNote[];
@@ -558,88 +572,121 @@ export async function runJudgePanel(input: {
   // is still the author's maker, and the author's route is the author.
   const isTheAuthor = (actorRef: string, memberRole: string): boolean =>
     actorRef === input.artifactProducerRef || memberRole === input.primary.memberRole;
-  // Parallel calls (spec 2026-10-12 §2.2): every member that is not refused
-  // before its call is STARTED here, synchronously and in member order — so a
-  // scheduler sees them queued in member order — and only then awaited
-  // together. A judge that throws synchronously becomes that member's rejected
-  // call, as it was a caught member failure when each was awaited in turn.
-  // `Promise.allSettled` observes every call, so none can reject unhandled.
-  const asked = input.members.map((member) => ({
-    member,
-    call: isTheAuthor(member.actorRef, member.memberRole) ? null : startMemberCall(member.judge)
-  }));
-  const settled = await Promise.allSettled(asked.map((entry) => entry.call ?? NOT_CALLED));
-  // Read in MEMBER order, with exactly the per-member rules of the serial panel.
-  let firstStop: { readonly error: unknown } | null = null;
-  for (const [index, { member, call }] of asked.entries()) {
-    if (call === null) {
-      notes.push({ memberRole: member.memberRole, contractHash: member.contractHash, kind: "PRODUCER_GRADING_FORBIDDEN", failureKind: "PRODUCER_GRADING_FORBIDDEN", reason: "FX-HR-H6" });
-      continue;
-    }
-    const outcome = settled[index]!;
-    try {
-      if (outcome.status === "rejected") throw outcome.reason;
-      const judged = outcome.value as Awaited<ReturnType<typeof member.judge>>;
-      const actorRef = judged.actorRef ?? member.actorRef;
-      const memberRole = judged.memberRole ?? member.memberRole;
-      // FX-HR-H6 holds for WHOEVER answered: a backup on the author's route or
-      // of the author's maker is refused as the author's own seat is. It is not
-      // the expected skip above — a call was made and a voice was lost — so it
-      // has its own kind, naming the seat AND the maker that answered.
-      if (isTheAuthor(actorRef, memberRole)) {
-        notes.push({
-          memberRole: member.memberRole,
-          answeringMemberRole: memberRole,
-          contractHash: member.contractHash,
-          kind: "PRODUCER_GRADING_REFUSED_AFTER_CALL",
-          failureKind: "PRODUCER_GRADING_FORBIDDEN",
-          reason: "FX-HR-H6"
-        });
-        continue;
-      }
-      judgements.push({
-        judgementRef: judged.judgementRef,
-        assessment: judged.assessment,
-        memberRole,
-        actorRef,
-        contractHash: member.contractHash
-      });
-    } catch (error) {
-      // V-28: a RUN-LEVEL spend stop is not this member's failure, it is the
-      // run's: it is never noted as a member failure (a money ceiling is not a
-      // transport fault), and it leaves untouched, keeping the code that says
-      // which control spoke. Every member was asked at once (spec 2026-10-12
-      // §2.3), so the FIRST stop in member order is kept and acted on once
-      // every member has been read: rethrown, or — Task M2, when the caller
-      // asks — returned beside every voice that came back.
-      if (isRunLevelSpendStop(error)) {
-        // B9: with the setting, a seat refused for MONEY is left out, as a failed
-        // seat is, and the panel carries on. `code` is read once; the reason is
-        // this module's own literal.
-        const code: unknown = (error as { readonly code?: unknown }).code;
-        const leftOut = input.leaveOutMoneyRefusedSeats === true && typeof code === "string"
-          ? LEFT_OUT_SEAT_SPEND_CODES.get(code)
-          : undefined;
-        if (leftOut !== undefined) {
-          notes.push({
-            memberRole: member.memberRole,
-            contractHash: member.contractHash,
-            kind: "MEMBER_FAILED",
-            failureKind: "SPEND_REFUSED",
-            reason: leftOut
-          });
-          continue;
-        }
-        if (firstStop === null) firstStop = { error };
-        continue;
-      }
+  type Member = (typeof input.members)[number];
+  const forbidden = (member: Member): void => {
+    notes.push({ memberRole: member.memberRole, contractHash: member.contractHash, kind: "PRODUCER_GRADING_FORBIDDEN", failureKind: "PRODUCER_GRADING_FORBIDDEN", reason: "FX-HR-H6" });
+  };
+  /** One member's answer, read with the per-member rules (inside the member's try, as it always was). */
+  const heard = (member: Member, judged: Awaited<ReturnType<Member["judge"]>>): void => {
+    const actorRef = judged.actorRef ?? member.actorRef;
+    const memberRole = judged.memberRole ?? member.memberRole;
+    // FX-HR-H6 holds for WHOEVER answered: a backup on the author's route or
+    // of the author's maker is refused as the author's own seat is. It is not
+    // the expected skip above — a call was made and a voice was lost — so it
+    // has its own kind, naming the seat AND the maker that answered.
+    if (isTheAuthor(actorRef, memberRole)) {
       notes.push({
         memberRole: member.memberRole,
+        answeringMemberRole: memberRole,
         contractHash: member.contractHash,
-        kind: "MEMBER_FAILED",
-        failureKind: error instanceof PanelMemberFailure ? error.failureKind : "PROVIDER_ERROR",
-        reason: boundedMemberFailureReason(error)
+        kind: "PRODUCER_GRADING_REFUSED_AFTER_CALL",
+        failureKind: "PRODUCER_GRADING_FORBIDDEN",
+        reason: "FX-HR-H6"
       });
+      return;
+    }
+    judgements.push({
+      judgementRef: judged.judgementRef,
+      assessment: judged.assessment,
+      memberRole,
+      actorRef,
+      contractHash: member.contractHash
+    });
+  };
+  /**
+   * One member's failure, read with the per-member rules. "STOP" is a run-level
+   * spend stop: the run's, not this member's.
+   *
+   * V-28: a RUN-LEVEL spend stop is not this member's failure, it is the run's:
+   * it is never noted as a member failure (a money ceiling is not a transport
+   * fault), and it leaves untouched, keeping the code that says which control
+   * spoke. Asked one at a time, nobody is asked after it; asked together, the
+   * FIRST stop in member order is kept and acted on once every member has been
+   * read. Either way it is rethrown, or — Task M2, when the caller asks —
+   * returned beside every voice already heard.
+   */
+  const failed = (member: Member, error: unknown): "STOP" | "NOTED" => {
+    if (isRunLevelSpendStop(error)) {
+      // B9: with the setting, a seat refused for MONEY is left out, as a failed
+      // seat is, and the panel carries on. `code` is read once; the reason is
+      // this module's own literal.
+      const code: unknown = (error as { readonly code?: unknown }).code;
+      const leftOut = input.leaveOutMoneyRefusedSeats === true && typeof code === "string"
+        ? LEFT_OUT_SEAT_SPEND_CODES.get(code)
+        : undefined;
+      if (leftOut !== undefined) {
+        notes.push({
+          memberRole: member.memberRole,
+          contractHash: member.contractHash,
+          kind: "MEMBER_FAILED",
+          failureKind: "SPEND_REFUSED",
+          reason: leftOut
+        });
+        return "NOTED";
+      }
+      return "STOP";
+    }
+    notes.push({
+      memberRole: member.memberRole,
+      contractHash: member.contractHash,
+      kind: "MEMBER_FAILED",
+      failureKind: error instanceof PanelMemberFailure ? error.failureKind : "PROVIDER_ERROR",
+      reason: boundedMemberFailureReason(error)
+    });
+    return "NOTED";
+  };
+  let firstStop: { readonly error: unknown } | null = null;
+  if (input.askTogether === true) {
+    // Parallel calls (spec 2026-10-12 §2.2): every member that is not refused
+    // before its call is STARTED here, synchronously and in member order — so a
+    // scheduler sees them queued in member order — and only then awaited
+    // together. A judge that throws synchronously becomes that member's rejected
+    // call, as it was a caught member failure when each was awaited in turn.
+    // `Promise.allSettled` observes every call, so none can reject unhandled.
+    const asked = input.members.map((member) => ({
+      member,
+      call: isTheAuthor(member.actorRef, member.memberRole) ? null : startMemberCall(member.judge)
+    }));
+    const settled = await Promise.allSettled(asked.map((entry) => entry.call ?? NOT_CALLED));
+    // Read in MEMBER order, with exactly the per-member rules of the serial panel.
+    for (const [index, { member, call }] of asked.entries()) {
+      if (call === null) {
+        forbidden(member);
+        continue;
+      }
+      const outcome = settled[index]!;
+      try {
+        if (outcome.status === "rejected") throw outcome.reason;
+        heard(member, outcome.value as Awaited<ReturnType<Member["judge"]>>);
+      } catch (error) {
+        if (failed(member, error) === "STOP" && firstStop === null) firstStop = { error };
+      }
+    }
+  } else {
+    // Today's loop (ruling R32): one member at a time, nobody after a stop.
+    for (const member of input.members) {
+      if (isTheAuthor(member.actorRef, member.memberRole)) {
+        forbidden(member);
+        continue;
+      }
+      try {
+        heard(member, await member.judge());
+      } catch (error) {
+        if (failed(member, error) === "STOP") {
+          firstStop = { error };
+          break;
+        }
+      }
     }
   }
   if (firstStop !== null && input.onRunLevelSpendStop !== "RETURN_HEARD") throw firstStop.error;

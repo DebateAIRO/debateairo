@@ -234,7 +234,7 @@ describe("B9c · a panel seat refused for money is left out, as a failed seat is
   });
   const panel = (
     firstSeat: Error,
-    options: Readonly<{ leaveOutMoneyRefusedSeats?: boolean; onRunLevelSpendStop?: "RETHROW" | "RETURN_HEARD" }>
+    options: Readonly<{ leaveOutMoneyRefusedSeats?: boolean; onRunLevelSpendStop?: "RETHROW" | "RETURN_HEARD"; askTogether?: boolean }>
   ) => runJudgePanel({
     artifactProducerRef: "actor:author",
     primary: { judgementRef: "judgement:author", assessment, memberRole: "author" },
@@ -262,10 +262,15 @@ describe("B9c · a panel seat refused for money is left out, as a failed seat is
       await expect(panel(stop, { leaveOutMoneyRefusedSeats: true }), code).rejects.toBe(stop);
       const heard = await panel(stop, { leaveOutMoneyRefusedSeats: true, onRunLevelSpendStop: "RETURN_HEARD" });
       expect(heard.stoppedBy, code).toBe(stop);
-      // Never a SPEND_REFUSED note. Parallel calls (spec 2026-10-12 §2.3, O6):
+      expect(heard.judgements.map((entry) => entry.judgementRef), code).toEqual(["judgement:author"]);
+      // Asked together (parallel calls, spec 2026-10-12 §2.3, O6; ruling R32):
       // the next seat was asked at once, and its voice is kept beside the stop.
-      expect(heard.notes, code).toEqual([]);
-      expect(heard.judgements.map((entry) => entry.judgementRef), code).toEqual(["judgement:author", "judgement:heard"]);
+      // Never a SPEND_REFUSED note either way.
+      await expect(panel(stop, { leaveOutMoneyRefusedSeats: true, askTogether: true }), code).rejects.toBe(stop);
+      const together = await panel(stop, { leaveOutMoneyRefusedSeats: true, onRunLevelSpendStop: "RETURN_HEARD", askTogether: true });
+      expect(together.stoppedBy, code).toBe(stop);
+      expect(together.notes, code).toEqual([]);
+      expect(together.judgements.map((entry) => entry.judgementRef), code).toEqual(["judgement:author", "judgement:heard"]);
     }
   });
 

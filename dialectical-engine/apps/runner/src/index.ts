@@ -461,9 +461,13 @@ export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
  * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — WHAT A NODE'S PANEL DOES WITH A
  * STOP RAISED BY ONE OF ITS MEMBERS.
  *
- * A run-level spend stop is never noted as a member failure (C2(b)): the panel
- * asks no further member. Since the M2 polish that includes the attempt ceiling,
- * which used to be noted as a PROVIDER_ERROR member failure.
+ * A run-level spend stop is never noted as a member failure (C2(b)). Since the
+ * M2 polish that includes the attempt ceiling, which used to be noted as a
+ * PROVIDER_ERROR member failure. On today's serial path (the debate's lane
+ * admits one call) the panel asks its members one at a time and asks no
+ * further member after the stop; when the debate's calls run together
+ * (`askTogether`, ruling R32) every member was already asked at once, and the
+ * first stop in member order is the panel's stop once every member settled.
  *
  *  · "TRAVEL" — every node but the first root: the panel rethrows the stop, and
  *    the phase catch that authored the node records it (the node is not
@@ -4706,6 +4710,14 @@ export class WalkingSkeletonRunner {
      */
     const callScheduler = this.settings.callScheduler;
     const callLane = callScheduler === undefined ? undefined : callScheduler.openLane(claimedRunId);
+    /**
+     * WHETHER THIS DEBATE'S CALLS RUN TOGETHER: only when its lane admits more than one call at a time (the register's
+     * `callConcurrencyPolicy` row, set above one per debate). With the row absent — or no scheduler at all — the debate
+     * runs today's engine call for call: the opening positions one after another, then today's review pass, and every judge panel asks its members one at a time (ruling R32). So hosted
+     * and local behave byte for byte as today (global constraints), the same calls meet the same ceilings, and a stop
+     * lands exactly where it lands today (ruling R2: the serial run's saved content is the reference).
+     */
+    const callsRunTogether = callLane !== undefined && callLane.callsAtOnce > 1;
     const callSubjects = this.settings.callSubjects;
     /**
      * Spec §2.3 (Task 12): told of every failed call of this debate's lane BEFORE its slot frees (`laneGateway`'s
@@ -5733,6 +5745,11 @@ export class WalkingSkeletonRunner {
      * so the FX-HR-H6 producer bulkhead is exercised by the code that owns it
      * and leaves a recorded note, rather than being pre-filtered away here.
      *
+     * Ruling R32: the members are asked one at a time — today's panel, byte
+     * for byte — unless this debate's calls run together (`callsRunTogether`:
+     * its lane admits more than one call), when every member is asked at once
+     * and the answers are read in member order.
+     *
      * S4-1: this is node-local and is NOT the cross-maker review call — the
      * review leg (edge measurement) stays exactly where it was.
      *
@@ -5928,6 +5945,9 @@ export class WalkingSkeletonRunner {
           memberRole: input.authorMaker
         },
         members: panelMembers,
+        // Ruling R32: one member at a time on today's serial path; all at once
+        // only when this debate's lane admits more than one call.
+        askTogether: callsRunTogether,
         // Task M2: only the first root's panel keeps the voices it heard when a
         // spend stop cuts it short; every other panel lets the stop travel.
         onRunLevelSpendStop: input.onSpendStop === "AUTHOR_ONLY" ? "RETURN_HEARD" : "RETHROW",
@@ -5942,9 +5962,10 @@ export class WalkingSkeletonRunner {
       /**
        * Task M2 — THE FIRST ROOT'S PANEL, CUT SHORT BY A SPEND STOP.
        *
-       * The panel ended where it stood and returned what it had gathered: the
-       * author, every member voice already heard (and paid for), and every
-       * note. They go through the SAME reduction as any panel whose remaining
+       * The panel returned what it had gathered: the author, every member
+       * voice already heard (and paid for), and every note — asked one at a
+       * time, it ended where the stop stood; asked together (ruling R32), every
+       * voice that came back around the stop is kept. They go through the SAME reduction as any panel whose remaining
        * members could not speak, so the disclosure is the existing one:
        *
        *  · one or more member voices heard -> selection over the author and
@@ -6393,14 +6414,6 @@ export class WalkingSkeletonRunner {
     // root-major plan, so a change in it is not a boundary; round k completes at
     // the LAST leg carrying round k, when every root has finished round k.
     const globalRoundCompletions = deriveGlobalRoundCompletions(expansionPlan);
-    /**
-     * WHETHER THIS DEBATE'S CALLS RUN TOGETHER: only when its lane admits more than one call at a time (the register's
-     * `callConcurrencyPolicy` row, set above one per debate). With the row absent — or no scheduler at all — the debate
-     * runs today's engine call for call: the opening positions one after another, then today's review pass. So hosted
-     * and local behave byte for byte as today (global constraints), the same calls meet the same ceilings, and a stop
-     * lands exactly where it lands today (ruling R2: the serial run's saved content is the reference).
-     */
-    const callsRunTogether = callLane !== undefined && callLane.callsAtOnce > 1;
     /** A promise and the function that settles it, for a result another chain waits on (first settle wins). */
     const settable = <T>() => {
       let resolve!: (value: T) => void;
