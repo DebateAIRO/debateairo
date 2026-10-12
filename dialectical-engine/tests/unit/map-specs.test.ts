@@ -22,8 +22,10 @@ import {
 } from "@debateai/map";
 
 const CTX: MapSpecContext = { questionLine: "Should a city make its central buses free to ride?", languageName: "English", languageTag: "en" };
+const RO: MapSpecContext = { ...CTX, languageName: "Romanian", languageTag: "ro" };
 const S1: MapSeat = { aiRef: "AIREF-SENTINEL-1", maker: "MAKER-SENTINEL-1" };
 const S2: MapSeat = { aiRef: "AIREF-SENTINEL-2", maker: "MAKER-SENTINEL-2" };
+const S3: MapSeat = { aiRef: "AIREF-SENTINEL-3", maker: "MAKER-SENTINEL-3" };
 const drafts: MapItemDraft[] = [
   { kind: "POINT", seat: S1, origin: "BLIND", angleId: "opp", angleKind: "OPPOSITE_CASE", listIndex: 0, position: 0,
     claim: "Fares pay for repairs.", whyItMatters: "Without them the buses get worse.", leans: "against_some_answer" },
@@ -31,6 +33,9 @@ const drafts: MapItemDraft[] = [
     claim: "Fares pay for repairs.", whyItMatters: "The budget has no other source.", leans: "against_some_answer" },
   { kind: "POINT", seat: S2, origin: "BLIND", angleId: null, angleKind: null, listIndex: 1, position: 1,
     claim: "Free rides cut car traffic.", whyItMatters: "Less traffic helps everyone.", leans: "for_some_answer" },
+  // A third maker raises the same point again in a gap round: counted in its makers, never in its blind makers.
+  { kind: "POINT", seat: S3, origin: "GAP", angleId: null, angleKind: null, listIndex: 2, position: 0,
+    claim: "Free rides cut car traffic.", whyItMatters: "Fewer cars means less noise.", leans: "for_some_answer" },
   { kind: "ANSWER", seat: S1, origin: "BLIND", angleId: "opp", angleKind: "OPPOSITE_CASE", listIndex: 0, position: 0, answer: "No, keep the fares." },
   { kind: "ANSWER", seat: S2, origin: "BLIND", angleId: null, angleKind: null, listIndex: 1, position: 0, answer: "Yes, make them free." }
 ];
@@ -50,6 +55,29 @@ const ANGLE = { angleId: "opp", kind: "OPPOSITE_CASE" as const, label: "The othe
 const ALL: readonly MapStepSpec<unknown>[] = [mapAnglesSpec(CTX), mapListSpec(CTX, ANGLE), mapListSpec(CTX, null), mapSnowballSpec(CTX, points),
   mapMergeSpec(CTX, items), mapGapSpec(CTX, keyPoints, answers), mapChooseSpec(CTX, keyPoints, answers)];
 const field = (spec: MapStepSpec<unknown>, name: string) => spec.material.find((entry) => entry.name === name)?.content ?? "";
+
+const STOP = { finishReason: "stop" };
+const EN_WHY = "It could change the answer.";
+const EN_POINTS = [
+  { claim: "The cost of the change is high and the state should pay it.", why_it_matters: EN_WHY, leans: "context" },
+  { claim: "The people who use it most are poor.", why_it_matters: EN_WHY, leans: "for_some_answer" },
+  { claim: "The change can be undone later if it fails.", why_it_matters: EN_WHY, leans: "context" }
+];
+const EN_ANSWER = "Yes, the change should go ahead, but only with clear conditions on who pays for it.";
+const RO_WHY = "Ar putea schimba răspunsul la întrebare.";
+const RO_POINTS = [
+  { claim: "Costul schimbării este mare și statul ar trebui să îl plătească.", why_it_matters: RO_WHY, leans: "context" },
+  { claim: "Cei care îl folosesc cel mai mult sunt săraci.", why_it_matters: RO_WHY, leans: "for_some_answer" },
+  { claim: "Schimbarea poate fi anulată mai târziu dacă nu merge.", why_it_matters: RO_WHY, leans: "context" }
+];
+const RO_ANSWER = "Da, cu condiții.";
+
+/** The check's refusals as `MESSAGE@path` (the code and the machine path), or [] when nothing was refused. */
+function refusals(spec: MapStepSpec<unknown>, content: string): string[] {
+  const out = spec.classify(content, STOP);
+  if (out.parseError === null) return [];
+  return (JSON.parse(out.parseError) as { message: string; path: (string | number)[] }[]).map((issue) => `${issue.message}@${issue.path.join(".")}`);
+}
 
 describe("map specs: what each step sends", () => {
   it("uses the right contract and material fields for each step", () => {
@@ -75,11 +103,22 @@ describe("map specs: what each step sends", () => {
   });
 
   it("merge sees each item's id, claim and reason, in id order, and nothing about its origin", () => {
-    const sent = JSON.parse(field(mapMergeSpec(CTX, items), "points")) as Record<string, string>[];
-    expect(sent.map((entry) => Object.keys(entry).join(","))).toEqual(["item_id,claim,why_it_matters", "item_id,claim,why_it_matters",
-      "item_id,claim,why_it_matters"]);
-    expect(sent.map((entry) => entry.item_id)).toEqual([...sent.map((entry) => entry.item_id!)].sort());
-    expect(JSON.parse(field(mapMergeSpec(CTX, items), "candidate_answers"))).toHaveLength(2);
+    // The items are given reversed, so only the spec's own sort can put the ids in order.
+    const reversed = [...items].reverse();
+    const sent = JSON.parse(field(mapMergeSpec(CTX, reversed), "points")) as Record<string, string>[];
+    expect(sent.map((entry) => Object.keys(entry).join(","))).toEqual(Array.from({ length: points.length }, () => "item_id,claim,why_it_matters"));
+    expect(sent.map((entry) => entry.item_id)).toEqual(points.map((point) => point.itemId).sort());
+    const sentAnswers = JSON.parse(field(mapMergeSpec(CTX, reversed), "candidate_answers")) as Record<string, string>[];
+    expect(sentAnswers.map((entry) => entry.item_id)).toEqual(items.filter((item) => item.kind === "ANSWER").map((item) => item.itemId).sort());
+    expect(sentAnswers).toHaveLength(2);
+  });
+
+  it("snowball lists the claims so far in id order, whatever order it is given", () => {
+    const reversed = [...points].reverse();
+    const inIdOrder = [...points].sort((a, b) => a.itemId.localeCompare(b.itemId)).map((point) => point.claim);
+    // The guard: the reversed claims must differ from the id order, or this check could not tell the sort from none.
+    expect(reversed.map((point) => point.claim)).not.toEqual(inIdOrder);
+    expect(JSON.parse(field(mapSnowballSpec(CTX, reversed), "points_so_far"))).toEqual(inIdOrder);
   });
 
   it("gap sees plain labels only: no ids, no counts", () => {
@@ -89,6 +128,8 @@ describe("map specs: what each step sends", () => {
   });
 
   it("choose sees each key point tagged by code: blind makers and fixed angle kind", () => {
+    // The guard: a gap maker raised kp02 too, so its makers count is 2 while its blind count stays 1.
+    expect(keyPoints[1]!.makers).toHaveLength(2);
     expect(JSON.parse(field(mapChooseSpec(CTX, keyPoints, answers), "key_points"))).toEqual([
       { key_point_id: "kp01", claim: "Fares pay for repairs.", raised_by: 2, angle_kind: "OPPOSITE_CASE" },
       { key_point_id: "kp02", claim: "Free rides cut car traffic.", raised_by: 1, angle_kind: null }
@@ -117,5 +158,46 @@ describe("map specs: what each step sends", () => {
     const romanian = mapMergeSpec({ ...CTX, languageName: "Romanian", languageTag: "ro" }, items);
     expect(romanian.classify(englishClaim, { finishReason: "stop" }).parseError).toContain("MAP_WRONG_LANGUAGE");
     expect(mapMergeSpec(CTX, items).classify(englishClaim, { finishReason: "stop" }).parseStatus).toBe("PARSED");
+  });
+});
+
+describe("map specs: each field's language follows the question's tag", () => {
+  it("list (open and with an angle) refuses English points and English candidate answers for a Romanian question", () => {
+    for (const spec of [mapListSpec(RO, null), mapListSpec(RO, ANGLE)]) {
+      expect(refusals(spec, JSON.stringify({ points: EN_POINTS, candidate_answers: [RO_ANSWER] }))).toEqual(["MAP_WRONG_LANGUAGE@points"]);
+      expect(refusals(spec, JSON.stringify({ points: RO_POINTS, candidate_answers: [EN_ANSWER] }))).toEqual(["MAP_WRONG_LANGUAGE@candidate_answers"]);
+    }
+    for (const spec of [mapListSpec(CTX, null), mapListSpec(CTX, ANGLE)]) {
+      expect(spec.classify(JSON.stringify({ points: EN_POINTS, candidate_answers: [EN_ANSWER] }), STOP).parseStatus).toBe("PARSED");
+    }
+  });
+
+  it("snowball refuses English points and English candidate answers for a Romanian question", () => {
+    expect(refusals(mapSnowballSpec(RO, points), JSON.stringify({ points: EN_POINTS, candidate_answers: [RO_ANSWER] })))
+      .toEqual(["MAP_WRONG_LANGUAGE@points"]);
+    expect(refusals(mapSnowballSpec(RO, points), JSON.stringify({ points: RO_POINTS, candidate_answers: [EN_ANSWER] })))
+      .toEqual(["MAP_WRONG_LANGUAGE@candidate_answers"]);
+    expect(mapSnowballSpec(CTX, points).classify(JSON.stringify({ points: EN_POINTS, candidate_answers: [EN_ANSWER] }), STOP).parseStatus).toBe("PARSED");
+  });
+
+  it("gap refuses English new points for a Romanian question, and accepts Romanian ones there", () => {
+    expect(refusals(mapGapSpec(RO, keyPoints, answers), JSON.stringify({ new_points: EN_POINTS, framing_challenges: [] })))
+      .toEqual(["MAP_WRONG_LANGUAGE@new_points"]);
+    expect(mapGapSpec(RO, keyPoints, answers).classify(JSON.stringify({ new_points: RO_POINTS, framing_challenges: [] }), STOP).parseStatus).toBe("PARSED");
+    expect(mapGapSpec(CTX, keyPoints, answers).classify(JSON.stringify({ new_points: EN_POINTS, framing_challenges: [] }), STOP).parseStatus).toBe("PARSED");
+  });
+
+  it("choose refuses an English statement for a Romanian question, at its own answers path", () => {
+    const body = (statement: string) => JSON.stringify({ answers: [{ answer_id: "a1", statement, for: ["kp01"], against: ["kp02"], strongest_rival: null }] });
+    expect(refusals(mapChooseSpec(RO, keyPoints, answers), body(EN_ANSWER))).toEqual(["MAP_WRONG_LANGUAGE@answers.0.statement"]);
+    expect(mapChooseSpec(RO, keyPoints, answers).classify(body(RO_ANSWER), STOP).parseStatus).toBe("PARSED");
+    expect(mapChooseSpec(CTX, keyPoints, answers).classify(body(EN_ANSWER), STOP).parseStatus).toBe("PARSED");
+  });
+
+  it("the gateway's pieces refuse a wrong-language choose reply: a refused classification, and no accepted value", () => {
+    const pieces = mapProviderPieces(mapChooseSpec(RO, keyPoints, answers));
+    const refused = JSON.stringify({ answers: [{ answer_id: "a1", statement: EN_ANSWER, for: ["kp01"], against: [], strongest_rival: null }] });
+    expect(pieces.classifyContent(refused, STOP).parseStatus).toBe("SCHEMA_FAILED");
+    expect(() => pieces.readAccepted(refused)).toThrow("MAP_REPLY_UNREADABLE");
   });
 });
