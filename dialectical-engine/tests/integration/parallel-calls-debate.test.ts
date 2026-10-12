@@ -17,7 +17,7 @@ import { createHash } from "node:crypto";
 import { createPool, migrate, type Pool } from "@debateai/db";
 import { JudgementRepository } from "@debateai/judgement";
 import { TypedDomainError } from "@debateai/kernel";
-import { PREVIEW_PROVIDER_REF_MODELS } from "@debateai/providers";
+import { PREVIEW_PROVIDER_REF_MODELS, readPromptFrame } from "@debateai/providers";
 import {
   DEEPSEEK,
   FIVE_MAKER_REFS,
@@ -907,6 +907,15 @@ async function savedAcrossVariants(
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
 const digestOf = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
+/** The call's own fence and canary, as the provider door reads them; null for a packet with no frame. */
+function framedTokensOf(chat: string): Readonly<{ fence: string; canary: string }> | null {
+  try {
+    const frame = readPromptFrame(wirePacket(chat));
+    return { fence: frame.fence, canary: frame.canary };
+  } catch {
+    return null;
+  }
+}
 /** A number in [0, 1] with two decimals, from 8 hex digits of a digest. */
 const share = (hex: string): number => Math.round((Number.parseInt(hex.slice(0, 8), 16) / 0xffffffff) * 100) / 100;
 
@@ -917,9 +926,12 @@ const share = (hex: string): number => Math.round((Number.parseInt(hex.slice(0, 
  */
 function scriptedAnswers(question: string, bearings?: Readonly<{ support: number; attack: number }>) {
   return (request: GateRequest, chat: string): GateOverride | null => {
-    const asked = chat.split(question).join("<question>").replace(UUID, "<id>")
-      // Every framed prompt carries its own random fence and canary (the prompt-injection boundary): not what was asked.
-      .replace(/DEBATEAI-FENCE-[0-9a-f]+/gu, "<fence>").replace(/DBAI-CANARY-[0-9a-z]+/giu, "<canary>");
+    // Every framed prompt carries its own random fence and canary (the prompt-injection boundary): not what was asked.
+    // They are read through the frame's own reader (never a hand-rolled pattern) and masked in every message.
+    const frame = framedTokensOf(chat);
+    const unframed = frame === null ? chat
+      : chat.split(frame.fence).join("#|<fence>|#").split(frame.canary).join("<canary>");
+    const asked = unframed.split(question).join("<question>").replace(UUID, "<id>");
     const digest = digestOf(`${request.model}\n${request.kind}\n${asked}`);
     const level = share(digest);
     switch (request.kind) {
