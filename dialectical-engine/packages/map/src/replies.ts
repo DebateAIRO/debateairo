@@ -145,6 +145,12 @@ export function mapMergeCheck(pointIds: ReadonlySet<string>, answerIds: Readonly
         usedItems.add(id);
       });
     };
+    // A merge that places no item at all, while there are items to place, is refused at both lists so the repair path
+    // asks again (a code merge would otherwise stand in for a reply that merged nothing).
+    if (value.key_points.length === 0 && value.answers.length === 0 && pointIds.size + answerIds.size > 0) {
+      if (pointIds.size > 0) issues.push({ path: ["key_points"], code: "MAP_MERGE_EMPTY" });
+      if (answerIds.size > 0) issues.push({ path: ["answers"], code: "MAP_MERGE_EMPTY" });
+    }
     value.key_points.forEach((group, index) => visit("key_points", index, group.key_point_id, "key_point_id", group.member_item_ids, pointIds));
     value.answers.forEach((group, index) => visit("answers", index, group.answer_id, "answer_id", group.member_item_ids, answerIds));
     value.key_points.forEach((group, index) => issues.push(...mapLanguageIssues([group.claim], languageTag, ["key_points", index, "claim"])));

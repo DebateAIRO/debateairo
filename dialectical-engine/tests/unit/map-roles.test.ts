@@ -161,9 +161,14 @@ describe("map roles: fix round 1 (gap makers, chooser spread, stable reassignmen
     expect(refs([mapPickChooser([A, B, A2, C], NONE, B)])).toEqual(["ai-c"]);
   });
 
-  it("chooser after a failed merge starts after the seat the merge would have used, and never picks it when another seat is legal", () => {
+  it("chooser after a failed merge starts after the seat the merge would have used, so that seat comes last among equal ranks", () => {
     expect(mapPickChooser(S, new Set(["ai-0"]), null)?.aiRef).toBe("ai-3");
     expect(mapPickChooser(S, new Set(["ai-0", "ai-2"]), null)?.aiRef).toBe("ai-4");
+  });
+
+  it("chooser with no merger anchors on mapPickMerger's would-be merger (another maker first), not on the planner's next seat (T8-M1)", () => {
+    // The would-be merger is B (the first seat of another maker after A); the search starts after B, so C, not B or A2.
+    expect(mapPickChooser([A, A2, B, C], NONE, null)?.aiRef).toBe("ai-c");
   });
 
   it("reassignment does not depend on the order the failed lists are given in", () => {

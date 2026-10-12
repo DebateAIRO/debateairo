@@ -133,6 +133,18 @@ describe("map replies: merge check: unknown, reused and wrong-kind ids", () => {
     ]);
   });
 
+  it("refuses a merge that places no item at all, at both lists, so the repair path asks again", () => {
+    const content = merge([], []);
+    const out = mapClassifyReply(content, STOP, mapMergeReplySchema, check);
+    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`))
+      .toEqual(["MAP_MERGE_EMPTY@key_points", "MAP_MERGE_EMPTY@answers"]);
+    if (out.classification.parseStatus !== "SCHEMA_FAILED") throw new Error("unreachable");
+    const plan = planPatchFollowUp({ content, reply: STOP, parseStatus: out.classification.parseStatus, parseError: out.classification.parseError });
+    expect(plan?.locator).toEqual({ code: "MAP_MERGE_EMPTY", paths: ["key_points", "answers"] });
+    // With nothing to place, empty lists stay acceptable.
+    expect(mapClassifyReply(content, STOP, mapMergeReplySchema, mapMergeCheck(new Set(), new Set(), "en")).classification.parseStatus).toBe("PARSED");
+  });
+
   it("refuses a merged claim written in the wrong language at its key_points path", () => {
     const roCheck = mapMergeCheck(new Set(["pt01", "pt02", "pt03"]), new Set(["ca01"]), "ro");
     const content = merge([{ key_point_id: "k1", claim: "The cost of the change is high and the state should pay it.", member_item_ids: ["pt01"] }],

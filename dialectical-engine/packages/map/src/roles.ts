@@ -57,9 +57,10 @@ export function mapPickMerger(order: readonly MapSeat[], out: ReadonlySet<string
 /**
  * The chooser (spec §1.1): a seat that did not merge, never of the merger's maker. Among those, a seat other than the
  * planner's comes first, then a maker other than the planner's (fix round 1: the answers are spread from the planner),
- * the cyclic order from the merger breaking ties. With no merger (the merge failed) there is no maker to avoid, and the
- * search starts after the seat the merge would have used (the planner's next available seat), so that seat is tried
- * last. Task 9 calls it with the same `out` it used for the merge step.
+ * the cyclic order from the merger breaking ties. With no merger (arm A, or the merge failed) there is no maker to avoid,
+ * and the search anchors on the would-be merger seat from mapPickMerger (the planner's next available seat of another
+ * maker, else its next available seat): the cyclic order starts after it, so that seat comes last among equal ranks.
+ * Task 9 calls it with the same `out` it used for the merge step.
  */
 export function mapPickChooser(order: readonly MapSeat[], out: ReadonlySet<string>, merger: MapSeat | null): MapSeat | null {
   const planner = mapPickPlanner(order, out);
