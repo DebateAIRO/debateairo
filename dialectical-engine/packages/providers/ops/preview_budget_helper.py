@@ -419,6 +419,12 @@ class DeepInfraProfile:
                                          any size, so the dearest prices the size could need)
       ceiling_prices(row) -> (in, out)   the highest prices the row can ever reserve at (worst cases)
       account(response, row, moment) -> dict  usage and guard charge (see account_response's keys)
+      cache_write_requested(body) -> bool  OPTIONAL (2026-10-12): True when an accepted request asks the
+                                         vendor for a prompt-cache write. A profile without it never
+                                         caches. Only when it says True does the core call
+                                         reservation_prices(..., cache_write=True) and
+                                         account(..., cache_write=True), so a profile that has it
+                                         takes that keyword on both (AnthropicProfile)
       reply_model(response) -> str|None  where the reply names the model that answered
       unbilled_refusal(status, response) -> bool  a refusal that provably billed nothing (the gate
                                          keeps a $0 'released_unbilled' entry)
@@ -655,15 +661,25 @@ class AnthropicProfile:
     token. When that count is above the lower step's 100,000 tokens the call reserves at the UPPER
     step's prices (input 0.50, output 2.50); otherwise the prompt cannot reach the upper step, and
     it reserves at the lower step's (0.10, 0.50), the row's own prices. A full 256 KiB request
-    reserves (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016, under the $0.25 cap. A request
-    cannot ask for caching (body_valid refuses cache_control), so no cache write is priced; a reply
-    that still costs more than its hold (for example a cache write) is charged in full and halts
+    reserves (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016.
+
+    Prompt caching (owner approval 2026-10-12, "caching before the upload"): a request may carry ONE
+    cache mark, {"type": "ephemeral"} (5 minutes, no ttl), on the first of exactly two system text
+    blocks (the app's adapter puts the engine's stable instruction and safety frame in the first block
+    and the per-call markers in the second; nothing else anywhere may carry a mark). Such a request
+    (cache_write_requested) reserves its WHOLE input at the step's 5-minute cache-write price (lower
+    0.125, upper 0.625), the simplest safe rule: the write can never cover more than the input. So the
+    dearest request is a full-size cached one, (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704, the
+    ceiling, under the $0.25 cap. Only its reply may report cache tokens; on any other call a non-zero
+    cache count is invalid (cache_counts: uncertain, and the gate halts). A reply that still costs more
+    than its hold (a 1-hour write, which no request can ask for) is charged in full and halts
     (charge_overrun). Settlement: the real step (prompt total <= 100,000 tokens: the lower one), each
-    kind of input token at its own price. Anthropic reports no cost, so the guard charge is that
-    list-price charge. Any usage field this profile does not know, any server-tool use, another
-    service tier or region, or a tool block makes the usage invalid: uncertain, and the gate halts.
-    A cache write reported without its 5-minute/1-hour split is charged at the 1-hour
-    price (the dearer one). A reply with a container or context editing (a null one means none was
+    kind of input token at its own price: plain input, the 5-minute and 1-hour writes (a write reported
+    without its split is the 5-minute kind the request asked for), and reads. Anthropic reports no cost,
+    so the guard charge is that list-price charge. Any usage field this profile does not know, any
+    server-tool use, another service tier or region, or a tool block makes the usage invalid: uncertain,
+    and the gate halts.
+    A reply with a container or context editing (a null one means none was
     used), usage or token counts outside `usage`, or a content block other than text or thinking is
     invalid too. An invalid reply's ledger entry names the check it failed and keeps an outline of
     the reply (field names and kinds only: reply_outline).
@@ -685,8 +701,10 @@ class AnthropicProfile:
     settlement_steps = (
         PriceStep('up_to_100k', 100000, Decimal('0.10'), Decimal('0.125'), Decimal('0.20'), Decimal('0.01'), Decimal('0.50')),
         PriceStep('over_100k', None, Decimal('0.50'), Decimal('0.625'), Decimal('1.00'), Decimal('0.05'), Decimal('2.50')))
-    # Request fields beyond these are refused (no thinking, tools, stream, sampling, cache_control...).
+    # Request fields beyond these are refused (no thinking, tools, stream, sampling, top-level cache_control...).
     BODY_FIELDS = frozenset({'model', 'max_tokens', 'messages', 'system', 'output_config'})
+    # The one cache mark a request may carry, on the first of its two system blocks: 5 minutes (no ttl).
+    CACHE_MARK = {'type': 'ephemeral'}
 
     def path_for(self, row):
         return self.path
@@ -698,31 +716,57 @@ class AnthropicProfile:
     # RESERVATION_OVERHEAD_BYTES; the app adds the same).
     RESERVATION_OVERHEAD_BYTES = 2048
 
-    def reservation_prices(self, row, moment, request_bytes=None):
+    def reservation_prices(self, row, moment, request_bytes=None, cache_write=False):
         """Anthropic's list prices do not change with the date. (request bytes + 2048) above the
         lower step's 100,000 tokens, or an unknown size: the upper step's input and output prices;
-        otherwise the row's own (the lower step's). See the class docstring."""
-        lower = self.settlement_steps[0]
-        if (type(request_bytes) is int and request_bytes >= 0
-                and request_bytes + self.RESERVATION_OVERHEAD_BYTES <= lower.prompt_tokens_up_to):
+        otherwise the row's own (the lower step's). A request that asks for a cache write
+        (cache_write=True) reserves its input at that step's 5-minute cache-write price instead.
+        See the class docstring."""
+        lower, upper = self.settlement_steps
+        small = (type(request_bytes) is int and request_bytes >= 0
+                 and request_bytes + self.RESERVATION_OVERHEAD_BYTES <= lower.prompt_tokens_up_to)
+        if cache_write is True:
+            step = lower if small else upper
+            return step.cache_write_5m_usd_per_m, step.output_usd_per_m
+        if small:
             return row.input_usd_per_m, row.output_usd_per_m
-        return self.ceiling_prices(row)
+        return upper.input_usd_per_m, upper.output_usd_per_m
 
     def ceiling_prices(self, row):
-        """The upper step's input and output prices: the dearest any accepted request reserves at."""
+        """The upper step's 5-minute cache-write input price and its output price: the dearest any
+        accepted request (a cached one above the step) reserves at."""
         upper = self.settlement_steps[1]
-        return upper.input_usd_per_m, upper.output_usd_per_m
+        return upper.cache_write_5m_usd_per_m, upper.output_usd_per_m
 
     def requested_model(self, body):
         return body.get('model') if isinstance(body, dict) else None
 
+    def system_valid(self, system):
+        """A system text that is not only whitespace, or exactly two text blocks whose texts are not only
+        whitespace: the first exactly {type, text, cache_control: {"type": "ephemeral"}}, the second exactly
+        {type, text}. No ttl, no other key, no third block, no mark on the second (prompt caching, 2026-10-12)."""
+        if isinstance(system, str):
+            return bool(system.strip(JS_WHITESPACE))
+        if not (isinstance(system, list) and len(system) == 2 and all(isinstance(block, dict) for block in system)):
+            return False
+        first, second = system
+        return (set(first) == {'type', 'text', 'cache_control'} and set(second) == {'type', 'text'}
+                and all(block['type'] == 'text' and isinstance(block['text'], str) and block['text'].strip(JS_WHITESPACE)
+                        for block in system)
+                and isinstance(first['cache_control'], dict) and first['cache_control'] == self.CACHE_MARK)
+
+    def cache_write_requested(self, body):
+        """True exactly for a body whose system is the accepted two-block form (its one cache mark)."""
+        return bool(isinstance(body, dict) and isinstance(body.get('system'), list) and self.system_valid(body['system']))
+
     def body_valid(self, body, row):
-        """Exactly model, max_tokens and messages, an optional system string, and output_config
-        {"effort": "high"} iff the row says so (then required). Nothing else anywhere
-        (contract-BC-wire, Anthropic). It mirrors what the app's adapter (anthropic-messages.ts) can
-        send, no more: text content that is not only whitespace (JavaScript's trim set), roles alternating user/assistant starting AND ending
-        with a user turn (the adapter joins same-role turns and refuses a final assistant turn), and
-        a system text that is not only whitespace when present."""
+        """Exactly model, max_tokens and messages, an optional system (system_valid: a string, or the two
+        blocks that carry the one cache mark), and output_config {"effort": "high"} iff the row says so
+        (then required). Nothing else anywhere (contract-BC-wire, Anthropic). It mirrors what the app's
+        adapter (anthropic-messages.ts) can send, no more: text content that is not only whitespace
+        (JavaScript's trim set), roles alternating user/assistant starting AND ending with a user turn
+        (the adapter joins same-role turns and refuses a final assistant turn), and a system whose text is
+        not only whitespace when present."""
         if not isinstance(body, dict) or body.get('model') != row.model:
             return False
         required = {'model', 'max_tokens', 'messages'} | ({'output_config'} if row.effort else set())
@@ -734,7 +778,7 @@ class AnthropicProfile:
             if not (isinstance(config, dict) and set(config) == {'effort'} and isinstance(config['effort'], str)
                     and config['effort'] == row.effort):
                 return False
-        if 'system' in body and not (isinstance(body['system'], str) and body['system'].strip(JS_WHITESPACE)):
+        if 'system' in body and not self.system_valid(body['system']):
             return False
         messages = body['messages']
         return (type(body['max_tokens']) is int and 1 <= body['max_tokens'] <= row.output_bound
@@ -747,14 +791,15 @@ class AnthropicProfile:
     def request_bytes(self, body):
         return canonical(body)
 
-    def usage_counts(self, response):
+    def usage_counts(self, response, cache_write=False):
         """(input, cache creation, cache read, 1-hour part of the creation, output) from a reply
         whose usage this profile fully understands, else None (uncertain)."""
-        return self.usage_check(response)[1]
+        return self.usage_check(response, cache_write)[1]
 
-    def usage_check(self, response):
+    def usage_check(self, response, cache_write=False):
         """(None, counts) for a reply whose usage this profile fully understands, else (the name of
-        the check it failed, None): the gate is then uncertain and halts."""
+        the check it failed, None): the gate is then uncertain and halts. Cache tokens are understood
+        only on a call that asked for a cache write (cache_write=True)."""
         if not isinstance(response, dict) or response.get('type') != 'message':
             return 'not_a_message', None
         # A container or context editing (unless null: none used) may bill beyond the usage.
@@ -790,6 +835,9 @@ class AnthropicProfile:
         if not all(value is None or integer(value) for value in (creation, read)):
             return 'cache_counts', None
         creation, read = creation or 0, read or 0
+        # Only a request that carried the cache mark may come back with cache tokens.
+        if cache_write is not True and (creation or read):
+            return 'cache_counts', None
         tools = usage.get('server_tool_use')
         if tools is not None and not (isinstance(tools, dict) and all(type(v) is int and v == 0 for v in tools.values())):
             return 'server_tool_use', None
@@ -797,9 +845,9 @@ class AnthropicProfile:
             return 'service_tier', None
         if usage.get('inference_geo') not in (None, 'global'):
             return 'inference_geo', None
-        # A cache write reported without its 5-minute/1-hour split is charged at the dearer 1-hour
-        # price (the gate never asks for caching; a write it cannot place is priced on the safe side).
-        hour = creation
+        # A cache write reported without its 5-minute/1-hour split is the 5-minute kind: the only mark a
+        # request may carry (a split that names a 1-hour part is charged at the 1-hour price).
+        hour = 0
         split = usage.get('cache_creation')
         if split is not None:
             if not (isinstance(split, dict) and set(split) == ANTHROPIC_CACHE_SPLIT_KEYS
@@ -813,8 +861,8 @@ class AnthropicProfile:
         lower, upper = self.settlement_steps
         return lower if prompt_total <= lower.prompt_tokens_up_to else upper
 
-    def account(self, response, row, moment):
-        reason, counts = self.usage_check(response)
+    def account(self, response, row, moment, cache_write=False):
+        reason, counts = self.usage_check(response, cache_write)
         if counts is None:
             # The check that failed and an outline of the reply (names and kinds only) stay in the
             # ledger entry, so the operator can see why without the reply's text or numbers.

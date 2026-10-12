@@ -2428,13 +2428,16 @@ export {
   ANTHROPIC_MESSAGES_BASE_URL,
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
   ANTHROPIC_MESSAGES_PATH,
+  ANTHROPIC_PER_CALL_MARKERS_SEPARATOR,
   PROVIDER_CONTENT_REFUSED,
   PROVIDER_PACKET_UNSUPPORTED,
   PROVIDER_REPLY_UNSUPPORTED,
+  anthropicCacheableSystem,
   anthropicMessagesRequestBody,
   anthropicUsageAsEngineUsage,
   readAnthropicMessagesReply,
-  type AnthropicMessagesReply
+  type AnthropicMessagesReply,
+  type AnthropicSystemBlocks
 } from "./anthropic-messages.js";
 export * from "./preview-models.js";
 export * from "./preview-remaining.js";

@@ -368,6 +368,13 @@ def reservation_for(request_bytes, row, prices):
             + Decimal(row.output_bound) * output_price) / Decimal(1000000)
 
 
+def cache_write_of(profile, body):
+    """Whether an accepted request asks its provider for a prompt-cache write: the profile's optional
+    cache_write_requested(body) (a profile without it never caches). Only an exact True counts."""
+    asks = getattr(profile, 'cache_write_requested', None)
+    return asks is not None and asks(body) is True
+
+
 def worst_case_reservation(profile, row):
     """A full-size request at the highest prices the row can ever reserve at (ceiling_prices):
     one figure for the per-call cap, the activate check and /remaining, whatever the date."""
@@ -879,7 +886,11 @@ def validate_request(input, go, probe=False, moment=None):
         raise SafetyError('REQUEST_INVALID') from None
     if not isinstance(outgoing, bytes) or len(outgoing) > len(raw):
         raise SafetyError('REQUEST_INVALID')
-    prices, ceiling = profile.reservation_prices(row, moment or helper.utc_now(), len(raw)), profile.ceiling_prices(row)
+    # A request that asks for a cache write reserves at the profile's cache-write prices (never above the ceiling).
+    moment = moment or helper.utc_now()
+    prices = (profile.reservation_prices(row, moment, len(raw), cache_write=True) if cache_write_of(profile, body)
+              else profile.reservation_prices(row, moment, len(raw)))
+    ceiling = profile.ceiling_prices(row)
     if not prices_ok(prices) or prices[0] > ceiling[0] or prices[1] > ceiling[1] \
             or not helper.path_valid(profile.path_for(row)):
         raise SafetyError('REQUEST_INVALID')  # Cannot happen for a reviewed profile; checked anyway.
@@ -919,9 +930,11 @@ class ModelCooling(SafetyError):
         self.retry_after = retry_after
 
 
-def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now, probe=False, prices=None):
+def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now, probe=False, prices=None,
+                 cache_write=False):
     """Lock, check state, today's team limits and the model's cool-off, durably write the pending
-    hold, unlock. A halted gate refuses AUTHORITY_HALTED here, before anything is reserved."""
+    hold, unlock. A halted gate refuses AUTHORITY_HALTED here, before anything is reserved. A call that
+    asked for a cache write says so in its entry (cache_write_requested: '5m')."""
     prices = (row.input_usd_per_m, row.output_usd_per_m) if prices is None else prices
     with TeamStore(private) as store:
         control = store.control()
@@ -968,6 +981,7 @@ def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now,
                                        'reserve_input_usd_per_m': str(prices[0]), 'reserve_output_usd_per_m': str(prices[1]),
                                        'output_bound': row.output_bound,
                                        'requested_effort': row.effort or 'none', 'peer_uid': peer_uid,
+                                       **({'cache_write_requested': '5m'} if cache_write else {}),
                                        **({'probe': True} if probe else {})}
         data = helper.encode_json(ledger)
         if len(data) > DAY_LEDGER_RESERVE_BYTES:
@@ -1187,6 +1201,8 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
     go, go_sha = load_go(go_path)
     profile = profile_of(go['provider'])
     outgoing, reserved, row, prices = validate_request(input, go, probe=probe, moment=current(now))
+    # validate_request accepted these exact bytes, so they parse; its reservation already priced the write.
+    cache_write = cache_write_of(profile, json.loads(input['requestBody']))
     host, platform = host or socket.gethostname(), platform or sys.platform
     if platform != 'linux' or host != go['target_host'] or type(peer_uid) is not int \
             or not (peer_uid in go['allowed_peer_uids'] or probe and peer_uid == 0):
@@ -1205,7 +1221,9 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             raise SafetyError('KEY_SHAPE_INVALID')
         if slots.tripped:
             raise SafetyError('AUTHORITY_STOPPED')
-        entry_id, day = reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now, probe, prices)
+        # The keyword only when it is True, as for the profile calls: every other call keeps its old shape.
+        entry_id, day = reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now, probe, prices,
+                                     **({'cache_write': True} if cache_write else {}))
         if on_reserved is not None:
             on_reserved(entry_id)
         budget, started = Decimal(go['daily_budget_usd']), time.monotonic()
@@ -1257,7 +1275,7 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         elapsed = round(time.monotonic() - started, 6)
         try:
             changes, halt_reason, charge, reply = assess_reply(status, response, reserved, elapsed, profile, row,
-                                                               current(now))
+                                                               current(now), cache_write=cache_write)
         except BaseException:
             # Paid but unaccountable: keep the full hold and stop, as for a transport failure.
             changes, halt_reason, charge, reply = ({'state': 'uncertain', 'held_usd': str(reserved),
@@ -1284,11 +1302,13 @@ def bounded_model_name(value):
     return value if isinstance(value, str) and len(value) <= 128 else None
 
 
-def assess_reply(status, response, reserved, elapsed, profile, row, moment):
+def assess_reply(status, response, reserved, elapsed, profile, row, moment, cache_write=False):
     """Ledger changes, halt reason, guard charge and caller reply for one redacted provider reply.
     Settled at the profile's prices for this row and moment (recorded in the entry); the reply
-    must name this call's own model, not just any reviewed or enabled one."""
-    accounting = bounded_accounting(profile.account(response, row, moment))
+    must name this call's own model, not just any reviewed or enabled one. Only a call that asked for
+    a cache write is settled with cache_write=True (its reply's cache tokens are then understood)."""
+    accounting = bounded_accounting(profile.account(response, row, moment, cache_write=True) if cache_write
+                                    else profile.account(response, row, moment))
     charge = accounting.get('guard_charge_usd')
     named = profile.reply_model(response)
     changes = {'accounting': accounting, 'elapsed_seconds': elapsed, 'http_status': status if type(status) is int else None,

@@ -144,12 +144,16 @@ const PROBE_QUESTION = "Reply exactly: OK";
 
 /**
  * The OpenAI-shaped body the frame reader reads: an Anthropic Messages body carries the system text beside its
- * turns, so it is put back in front of them (the adapter only lifted it out).
+ * turns, so it is put back in front of them (the adapter only lifted it out). Prompt caching (2026-10-12): a system
+ * sent as the two cache blocks is their texts joined, which is the system text byte for byte.
  */
 export function stubChatBody(provider: GateProvider, body: Readonly<Record<string, unknown>>): string {
   if (provider === "deepinfra") return JSON.stringify(body);
   const turns = Array.isArray(body.messages) ? body.messages : [];
-  return JSON.stringify({ messages: typeof body.system === "string" ? [{ role: "system", content: body.system }, ...turns] : turns });
+  const system = typeof body.system === "string" ? body.system
+    : Array.isArray(body.system) ? body.system.map((block: { text?: unknown }) => typeof block?.text === "string" ? block.text : "").join("")
+      : undefined;
+  return JSON.stringify({ messages: system !== undefined ? [{ role: "system", content: system }, ...turns] : turns });
 }
 
 /** Which contract a request is for: the probe by its question, the story by its contract id, the debate by structural keys. */

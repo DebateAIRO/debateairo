@@ -1015,11 +1015,15 @@ describe("what one debate is estimated at with today's register (realistic worst
   /** The DeepInfra gate's /remaining figures under the owner's GO: 10 at once x MiMo's worst case (the largest of the four). */
   const HOLD = 10n * MIMO_LARGEST;
   /**
-   * The Anthropic gate's (PR #126): 2 at once x Claude Haiku's worst case at its upper price step ($0.50 / $2.50):
-   * (262,144 + 2,048) x 500 + 32,768 x 2,500 nano-USD each.
+   * The Anthropic gate's (PR #126): 2 at once x Claude Haiku's worst case at its upper price step. Prompt caching
+   * (2026-10-12): a full-size CACHED call, its input at the 5-minute write price ($0.625 / $2.50):
+   * (262,144 + 2,048) x 625 + 32,768 x 2,500 nano-USD each (it was 500 for input before).
    */
-  const ANTHROPIC_HOLD = 2n * (264_192n * 500n + 32_768n * 2500n);
-  /** Claude Haiku in the estimate: the lower price step ($0.10 / $0.50), the same realistic sizes as every row. */
+  const ANTHROPIC_HOLD = 2n * (264_192n * 625n + 32_768n * 2500n);
+  /**
+   * Claude Haiku in the estimate: the lower price step ($0.10 / $0.50), the same realistic sizes as every row. Prompt
+   * caching (2026-10-12) leaves it there: only the cached system prefix pays the write premium, and reads cost a tenth.
+   */
   const haikuCall = (type: string): bigint => type === "PROBE" ? 3072n * 100n + 8192n * 500n : IN * 100n + 8192n * 500n;
   /**
    * One debate's need of each gate at the largest story size: calls x 1.15 + calls in flight (10 DeepInfra, 2 Anthropic),
@@ -1061,7 +1065,7 @@ describe("what one debate is estimated at with today's register (realistic worst
     const [free] = estimatePreviewGateNeeds({ basis: basisFor(2, 2), panel: FREE, roleModels, roleProviderRefs, storyRounds: 2,
       callOutputTokens: sent, askProbeModelIds: ASK_PROBE_MODELS, maxCooldownHoldsPerRun: 2 });
     expect(free!.callsNanoUsd + HOLD).toBe(gateFigures(FREE, 2).deepinfra.nanoUsd);
-    expect([HOLD, ANTHROPIC_HOLD]).toEqual([1_421_107_200n, 428_032_000n]);
+    expect([HOLD, ANTHROPIC_HOLD]).toEqual([1_421_107_200n, 494_080_000n]);
     // Premium, depth 1: 24 nodes, each reviewed once; every review is priced on MiMo, the dearest of the four.
     const premiumCalls = callsBy(previewCallShares({ basis: basisFor(4, 1), panel: PREMIUM, roleModels, roleProviderRefs, storyRounds: 2,
       maxCooldownHoldsPerRun: 2, askProbeModelIds: ASK_PROBE_MODELS }));
@@ -1077,10 +1081,12 @@ describe("what one debate is estimated at with today's register (realistic worst
     // Story format robustness (2026-10-12): the storyteller at its row's cap and the checker's priced repair add
     // $0.08 to each DeepInfra column (the story roles are GLM's here); the calls do not change.
     // Before: [1.97, 3.34, 4.05, 0.92], [2.21, 4.38, 5.35, 1.18], [2.69, 6.45, 7.93, 1.71].
+    // Prompt caching (2026-10-12): the Anthropic gate's in-flight hold is 2 x $0.24704 (a cached full-size call) instead
+    // of 2 x $0.214016, so its column rises by $0.066048 (0.92 / 1.18 / 1.71 before); its calls and DeepInfra's do not move.
     expect(table).toEqual([
-      [[2.05, 112], [3.42, 344], [4.14, 470], [0.92, 154]],
-      [[2.29, 167], [4.46, 528], [5.43, 700], [1.18, 237]],
-      [[2.77, 277], [6.53, 896], [8.01, 1160], [1.71, 403]]
+      [[2.05, 112], [3.42, 344], [4.14, 470], [0.98, 154]],
+      [[2.29, 167], [4.46, 528], [5.43, 700], [1.25, 237]],
+      [[2.77, 277], [6.53, 896], [8.01, 1160], [1.77, 403]]
     ]);
     // PR B: the real estimate gives each gate exactly its share (the Anthropic gate's hold from its own /remaining).
     for (const depth of [1, 2, 3]) {
@@ -1120,7 +1126,7 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
     premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN] }))!;
   const sent = previewCallOutputTokens(config, { debate: [2048, 2048, 2048, 2048, 2048], story: { storyteller: 12_000, checker: 2048 } });
   const HOLD = 10n * MIMO_LARGEST;
-  const ANTHROPIC_HOLD = 2n * (264_192n * 500n + 32_768n * 2500n);
+  const ANTHROPIC_HOLD = 2n * (264_192n * 625n + 32_768n * 2500n); // A cached full-size call each (2026-10-12).
   const needs = (panel: readonly { provider_ref: string; model_id: string }[], depth: number, rotated: boolean) =>
     estimatePreviewGateNeeds({ basis: basisFor(panel.length, depth), panel, roleModels, roleProviderRefs, storyRounds: 2, callOutputTokens: sent,
       askProbeModelIds: [...ASK_PROBE_MODELS, ...(panel.some((entry) => entry.model_id === HAIKU) ? [HAIKU] : [])], maxCooldownHoldsPerRun: 2, rotated });
@@ -1173,10 +1179,13 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
     // Computed 2026-10-11 by the spec's scratch run of the same rule (spec Part 5); re-pinned 2026-10-12 (story format
     // robustness: the storyteller at its row's cap, the checker's repair priced). Calls unchanged; before:
     // [1.98, 3.56, 4.27, 1.07], [2.22, 4.59, 5.56, 1.33], [2.71, 6.66, 8.15, 1.85].
+    // Prompt caching (2026-10-12): the Anthropic gate's hold is 2 x $0.24704 now (+$0.066048 on its column: 1.14 / 1.4 /
+    // 1.93 before). Depth 3 still fits its $2.00 by under a cent, which is why the estimate keeps Haiku's input at its
+    // plain price: priced at the 5-minute write price as well, all five rotated at depth 3 would need $2.12.
     expect(table).toEqual([
-      [[2.08, 106], [3.73, 338], [4.44, 465], [1.14, 177]],
-      [[2.33, 161], [4.77, 522], [5.74, 695], [1.4, 260]],
-      [[2.81, 272], [6.83, 890], [8.32, 1155], [1.93, 426]]
+      [[2.08, 106], [3.73, 338], [4.44, 465], [1.2, 177]],
+      [[2.33, 161], [4.77, 522], [5.74, 695], [1.47, 260]],
+      [[2.81, 272], [6.83, 890], [8.32, 1155], [1.99, 426]]
     ]);
     for (const [free, premium, fiveDeepinfra, fiveAnthropic] of table) {
       for (const [dollars, calls] of [free!, premium!, fiveDeepinfra!]) { expect(dollars).toBeLessThanOrEqual(10); expect(calls).toBeLessThanOrEqual(2000); }

@@ -51,22 +51,32 @@ cache reads.
   the question, plus 2,048, counts as a token. If that count is 100,000 or less, the question
   cannot reach the upper step, so the call sets aside at the lower step's prices ($0.10 per
   million in, $0.50 out). Above 100,000 it sets aside at the upper step's ($0.50 in, $2.50 out).
-  The answer is counted at its longest allowed length (32,768 tokens). So the largest question the
-  gate accepts (256 KiB) sets aside at most (264,192 x $0.50 + 32,768 x $2.50) / 1,000,000 =
-  **$0.214016**, and an ordinary question (a few KB) about $0.017. No call may ever set aside more
-  than **$0.25**; a test checks it.
-- **Cache writes are never set aside for.** A 1-hour cache write over 100,000 tokens costs $1.00
-  per million, more than $0.50. The gate still does not set aside for it because a request through
-  the gate cannot ask for caching at all (caching marks are refused), so a cache write should never
-  happen. If Anthropic ever reports a call costing more than its set-aside amount (for example a
-  large cache write), that one call is charged in full and the gate halts with `charge_overrun`.
+  The answer is counted at its longest allowed length (32,768 tokens). So the largest question
+  without caching (256 KiB) sets aside at most (264,192 x $0.50 + 32,768 x $2.50) / 1,000,000 =
+  $0.214016, and an ordinary question (a few KB) about $0.017.
+- **Caching (owner's approval, 2026-10-12).** The app may ask Anthropic to keep the start of its
+  system text (the step's instructions and safety rules, the same on every call of that step) for
+  5 minutes, so the next call of that step reads it at a tenth of the price. It asks in exactly one
+  way: the system text sent as two text parts, the first marked `{"type": "ephemeral"}` (5 minutes,
+  never 1 hour), the second (the call's own random markers) unmarked. Any other caching mark, a
+  1-hour mark, a mark on a message, or a third part is refused before anything is set aside. A call
+  that asks for caching sets aside its whole question at the 5-minute cache-write price ($0.125 per
+  million, or $0.625 above 100,000), because the write can never be bigger than the question. So
+  the largest question the gate accepts, cached, sets aside at most
+  (264,192 x $0.625 + 32,768 x $2.50) / 1,000,000 = **$0.24704**, and an ordinary one about
+  $0.017. No call may ever set aside more than **$0.25**; a test checks it.
+- **Only a call that asked for caching may report cache tokens.** If any other call's answer
+  reports cache writes or reads, the call is held in full and the gate halts. A 1-hour cache write
+  over 100,000 tokens costs $1.00 per million, more than the $0.625 set aside; no request can ask for
+  one, but if Anthropic ever reports a call costing more than its set-aside amount, that one call is
+  charged in full and the gate halts with `charge_overrun`.
 - **What a call is charged** (after the call): Anthropic's real token counts, each kind at its
   own price, at the step the question length falls in. Exactly 100,000 tokens is still the lower
   step; 100,001 is the upper one. Anthropic does not report a cost, so this list-price charge is
   what the pot records.
-- The app never asks for caching, so cache writes should never appear. If Anthropic reports a
-  cache write without saying whether it was the 5-minute or the 1-hour kind, the gate charges all
-  of it at the dearer 1-hour price.
+- If Anthropic reports a cache write without saying whether it was the 5-minute or the 1-hour kind,
+  the gate charges it as the 5-minute kind: the only kind a request can ask for. When it says, each
+  part is charged at its own price.
 - **Answers the gate cannot price stop the gate.** Any usage field it does not know, any web
   search or other server tool, a region other than "global", a service tier other than
   "standard", a code container, context editing, token counts outside the usage block, or any
@@ -85,8 +95,9 @@ cache reads.
 
 - **The gate refuses anything but a plain text question.** The request may carry only the model,
   the answer length, the messages (text only, the first one from the user), an optional system
-  text, and the thinking setting "high". Anything else (tools, streaming, caching marks,
-  temperature, a region or service tier, and so on) is refused before anything is set aside.
+  text (or the two parts that carry its one 5-minute caching mark, see "Caching" above), and the
+  thinking setting "high". Anything else (tools, streaming, any other caching mark, temperature, a
+  region or service tier, and so on) is refused before anything is set aside.
 - **Anything in Anthropic's answer the gate does not understand halts.** Usage fields it does not
   know, any use of Anthropic's server tools (web search and the like), a service tier other than
   "standard", a region other than "global", or a tool block in the answer: the cost is then
@@ -147,9 +158,9 @@ cache reads.
   addresses. Unlike DeepInfra, there is no address list to update: if Anthropic ever announces a
   new range, that is a reviewed change of the unit file and of `anthropic_addresses.py`.
 - **2 calls at the same time.** Before a debate starts, the app sets aside room for the calls that
-  may be running at once: calls in flight x the largest one-call hold, 2 x $0.214016 = $0.428032.
-  A fresh $2.00 pot then still has about $1.57 for the debates' own calls. A bigger pot allows more
-  calls in flight (each one needs $0.214016 of room).
+  may be running at once: calls in flight x the largest one-call hold, 2 x $0.24704 = $0.49408
+  (a cached full-size call; since caching, 2026-10-12). A fresh $2.00 pot then still has about $1.51
+  for the debates' own calls. A bigger pot allows more calls in flight (each one needs $0.24704 of room).
 - **The DeepInfra gate keeps its own copy of the code.** This gate's folder gets the new
   `preview_budget_helper.py` (the one that knows Anthropic). The DeepInfra gate's GO binds the
   hash of its own copy, so it keeps running unchanged. Updating the DeepInfra folder to this
@@ -302,7 +313,7 @@ own folder.
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
 
 When the gate is opened (`activate`), it checks once more that the calls in flight, each setting
-aside the largest worst case, fit in the pot: 2 x $0.214016 = $0.428032, inside $2.00.
+aside the largest worst case, fit in the pot: 2 x $0.24704 = $0.49408, inside $2.00.
 
 ```sh
 G=/opt/debateai-v3-preview/operator/anthropic-budget-v1

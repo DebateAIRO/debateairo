@@ -32,8 +32,14 @@ OTHER_SHAPE = 'sk-' + 'ant-' + 'api03-LEAKED_value-42'  # Any other string of th
 # the row holds the lower step's prices (0.10 / 0.50), bound 32768; a request whose bytes + 2048 are
 # above 100,000 reserves at the upper step's (0.50 / 2.50), the ceiling (owner ruling 2026-10-10, evening).
 PRICE_IN, PRICE_OUT, BOUND = Decimal('0.10'), Decimal('0.50'), 32768
-CEIL_IN, CEIL_OUT = Decimal('0.50'), Decimal('2.50')
+CEIL_IN, CEIL_OUT = Decimal('0.50'), Decimal('2.50')  # The upper step's plain input and output prices.
 STEP_TOKENS = 100000
+# Prompt caching (owner approval 2026-10-12): a request whose system is the two-block form (the cache mark
+# on the first block) reserves its whole input at the step's 5-minute cache-write price instead.
+WRITE_IN, UPPER_WRITE_IN = Decimal('0.125'), Decimal('0.625')
+# The dearest any accepted request reserves at: a cached request at the upper step (0.625 in, 2.50 out).
+CEILING = (UPPER_WRITE_IN, CEIL_OUT)
+CACHE_MARK = {'type': 'ephemeral'}
 LOWER = {'input': Decimal('0.10'), 'write_5m': Decimal('0.125'), 'write_1h': Decimal('0.20'), 'read': Decimal('0.01'),
          'output': Decimal('0.50')}
 UPPER = {'input': Decimal('0.50'), 'write_5m': Decimal('0.625'), 'write_1h': Decimal('1.00'), 'read': Decimal('0.05'),
@@ -57,9 +63,32 @@ def without(name, value=None):
     return {k: v for k, v in (value or request()).items() if k != name}
 
 
+def cached_system(prefix='Offline synthetic instruction and safety frame\n\n',
+                  tail='--- PER-CALL MARKERS (engine) ---\nBoundary marker: f00d\nCanary: c0de\n--- END PER-CALL MARKERS ---'):
+    """The two-block system the app's adapter sends when the frame carries its per-call marker tail."""
+    return [{'type': 'text', 'text': prefix, 'cache_control': dict(CACHE_MARK)}, {'type': 'text', 'text': tail}]
+
+
+def cached_request(**changes):
+    return request(**{'system': cached_system(), **changes})
+
+
+def is_cached(value):
+    return isinstance(value, dict) and isinstance(value.get('system'), list)
+
+
 def reservation_of(raw):
+    """Written out independently of the gate: the step by the request's size, the input at the step's
+    5-minute cache-write price when the request carries the two-block system, else at its input price."""
     tokens = len(raw.encode()) + 2048
-    price_in, price_out = (PRICE_IN, PRICE_OUT) if tokens <= STEP_TOKENS else (CEIL_IN, CEIL_OUT)
+    try:
+        cached = is_cached(json.loads(raw))
+    except ValueError:
+        cached = False
+    if tokens <= STEP_TOKENS:
+        price_in, price_out = (WRITE_IN if cached else PRICE_IN), PRICE_OUT
+    else:
+        price_in, price_out = (UPPER_WRITE_IN if cached else CEIL_IN), CEIL_OUT
     return (Decimal(tokens) * price_in + Decimal(BOUND) * price_out) / Decimal(1000000)
 
 
@@ -75,8 +104,8 @@ def envelope_text(raw, operation_id='op-1'):
             'requestSha256': hashlib.sha256(raw.encode()).hexdigest(), 'reservedUsd': str(reservation_of(raw))}
 
 
-def sized(size):
-    value = request(messages=[{'role': 'user', 'content': ''}])
+def sized(size, cached=False):
+    value = (cached_request if cached else request)(messages=[{'role': 'user', 'content': ''}])
     value['messages'][0]['content'] = 'x' * (size - len(json.dumps(value).encode()))
     assert len(json.dumps(value).encode()) == size
     return value
@@ -158,8 +187,12 @@ class ParityAndReservationTests(AnthropicTest):
                           'output_usd_per_m': str(row.output_usd_per_m),
                           'input_nano_usd_per_token': int(row.input_usd_per_m * 1000),
                           'output_nano_usd_per_token': int(row.output_usd_per_m * 1000),
+                          'cache_write_5m_input_usd_per_m': str(ANTHROPIC.settlement_steps[0].cache_write_5m_usd_per_m),
+                          'cache_write_5m_input_nano_usd_per_token': int(ANTHROPIC.settlement_steps[0].cache_write_5m_usd_per_m * 1000),
                           'output_bound': row.output_bound, 'effort': row.effort, 'json_object': row.json_object,
-                          'worst_case_reservation_usd': '%.9f' % bridge.worst_case_reservation(ANTHROPIC, row)},
+                          'worst_case_reservation_usd': '%.9f' % bridge.worst_case_reservation(ANTHROPIC, row),
+                          'worst_case_uncached_reservation_usd': '%.9f' % bridge.reservation_for(
+                              ANTHROPIC.max_request_bytes, row, ANTHROPIC.reservation_prices(row, None, ANTHROPIC.max_request_bytes))},
                          parity['rows'][0])
         self.assertEqual([{'prompt_tokens_up_to': step.prompt_tokens_up_to, 'input_usd_per_m': str(step.input_usd_per_m),
                            'cache_write_5m_usd_per_m': str(step.cache_write_5m_usd_per_m),
@@ -175,15 +208,18 @@ class ParityAndReservationTests(AnthropicTest):
                           lower.cache_read_usd_per_m, lower.output_usd_per_m), tuple(LOWER.values()))
         self.assertEqual((upper.input_usd_per_m, upper.cache_write_5m_usd_per_m, upper.cache_write_1h_usd_per_m,
                           upper.cache_read_usd_per_m, upper.output_usd_per_m), tuple(UPPER.values()))
-        # The row is the lower step; the ceiling is the upper step's plain input and output prices
-        # (no accepted request can ask for a cache write, so its prices are never reserved at).
+        # The row is the lower step; the ceiling is the upper step's 5-minute cache-write input price and its
+        # output price (a cached request at the upper step: the dearest any accepted request reserves at).
         self.assertEqual((PRICE_IN, PRICE_OUT), (lower.input_usd_per_m, lower.output_usd_per_m))
-        self.assertEqual(ANTHROPIC.ceiling_prices(row), (CEIL_IN, CEIL_OUT))
+        self.assertEqual(ANTHROPIC.ceiling_prices(row), CEILING)
         self.assertEqual((CEIL_IN, CEIL_OUT), (upper.input_usd_per_m, upper.output_usd_per_m))
+        self.assertEqual((WRITE_IN, UPPER_WRITE_IN), (lower.cache_write_5m_usd_per_m, upper.cache_write_5m_usd_per_m))
         self.assertEqual(ANTHROPIC.RESERVATION_OVERHEAD_BYTES, bridge.RESERVATION_OVERHEAD_BYTES)
-        self.assertEqual((parity['reservation']['step_tokens'], Decimal(parity['reservation']['ceiling_input_usd_per_m']),
-                          Decimal(parity['reservation']['ceiling_output_usd_per_m'])),
-                         (lower.prompt_tokens_up_to, CEIL_IN, CEIL_OUT))
+        reservation = parity['reservation']
+        self.assertEqual((reservation['step_tokens'], Decimal(reservation['upper_input_usd_per_m']),
+                          Decimal(reservation['upper_output_usd_per_m']), Decimal(reservation['ceiling_input_usd_per_m']),
+                          Decimal(reservation['ceiling_output_usd_per_m'])),
+                         (lower.prompt_tokens_up_to, CEIL_IN, CEIL_OUT) + CEILING)
 
     def test_the_reservation_step_follows_the_request_size(self):
         # bytes + 2048 up to 100,000: the prompt cannot reach the upper step, so the lower prices;
@@ -195,6 +231,10 @@ class ParityAndReservationTests(AnthropicTest):
         for size in (edge + 1, 256 * 1024, None, -1, True, 1.0):
             with self.subTest(size=size):
                 self.assertEqual(ANTHROPIC.reservation_prices(row, now, size), (CEIL_IN, CEIL_OUT))
+                self.assertEqual(ANTHROPIC.reservation_prices(row, now, size, cache_write=True), CEILING)
+        # A cached request: the same step rule, its input at the step's 5-minute cache-write price.
+        self.assertEqual(ANTHROPIC.reservation_prices(row, now, edge, cache_write=True), (WRITE_IN, PRICE_OUT))
+        self.assertEqual(ANTHROPIC.reservation_prices(row, now, edge, cache_write=False), (PRICE_IN, PRICE_OUT))
         go = bridge.read_go(self.gate().go_path)
         for size, prices in ((edge, (PRICE_IN, PRICE_OUT)), (edge + 1, (CEIL_IN, CEIL_OUT))):
             with self.subTest(body_bytes=size):
@@ -209,19 +249,25 @@ class ParityAndReservationTests(AnthropicTest):
     def test_worst_case_is_pinned_under_the_per_call_cap(self):
         row = ANTHROPIC.rows[HAIKU]
         self.assertEqual((ANTHROPIC.per_call_cap_usd, ANTHROPIC.max_request_bytes), (Decimal('0.25'), 256 * 1024))
-        self.assertEqual(bridge.worst_case_reservation(ANTHROPIC, row), Decimal('0.214016'))
+        # Prompt caching (2026-10-12): a full-size CACHED request is the worst case now,
+        # (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704 (an uncached one stays $0.214016).
+        self.assertEqual(bridge.worst_case_reservation(ANTHROPIC, row), Decimal('0.24704'))
+        self.assertEqual((Decimal(264192) * UPPER_WRITE_IN + Decimal(32768) * CEIL_OUT) / Decimal(1000000), Decimal('0.24704'))
         self.assertEqual((Decimal(264192) * CEIL_IN + Decimal(32768) * CEIL_OUT) / Decimal(1000000), Decimal('0.214016'))
         self.assertTrue(bridge.row_reviewed(ANTHROPIC, HAIKU, row))
         self.assertIs(bridge.profile_of('anthropic'), ANTHROPIC)
         go = bridge.read_go(self.gate().go_path)
         _, reserved, _, prices = bridge.validate_request(envelope(sized(ANTHROPIC.max_request_bytes)), go)
         self.assertEqual((reserved, prices), (Decimal('0.214016'), (CEIL_IN, CEIL_OUT)))
+        _, reserved, _, prices = bridge.validate_request(envelope(sized(ANTHROPIC.max_request_bytes, cached=True)), go)
+        self.assertEqual((reserved, prices), (Decimal('0.24704'), CEILING))
         with self.refused('REQUEST_SCOPE_INVALID'):
             bridge.validate_request(envelope(sized(ANTHROPIC.max_request_bytes + 1)), go)
-        # A row whose full-size request would pass the cap (47,162 x 2.50 tips it over) is not reviewed, and its GO is refused.
-        with patch.object(ANTHROPIC, 'rows', {HAIKU: row._replace(output_bound=47161)}):
+        # A row whose full-size cached request would pass the cap is not reviewed, and its GO is refused:
+        # 264,192 x 0.625 = 165,120, so 33,952 x 2.50 = 84,880 reaches the $0.25 exactly and 33,953 tips it over.
+        with patch.object(ANTHROPIC, 'rows', {HAIKU: row._replace(output_bound=33952)}):
             self.assertIs(bridge.profile_of('anthropic'), ANTHROPIC)
-        with patch.object(ANTHROPIC, 'rows', {HAIKU: row._replace(output_bound=47162)}):
+        with patch.object(ANTHROPIC, 'rows', {HAIKU: row._replace(output_bound=33953)}):
             self.assertIsNone(bridge.profile_of('anthropic'))
 
     def test_a_small_request_reserves_exactly_and_the_app_nano_usd_form_is_accepted(self):
@@ -280,9 +326,9 @@ class GoAndActivateTests(AnthropicTest):
                                                                  **changes}))
 
     def test_activate_checks_the_calls_in_flight_times_the_worst_case_against_the_pot(self):
-        # The proposed GO: 2 x 0.214016 = 0.428032 fits $2.00. 4 x 0.214016 = 0.856064.
-        for budget, calls, ok in (('2.00', 2, True), ('0.43', 2, True), ('0.42', 2, False),
-                                  ('0.85', 4, False), ('0.86', 4, True), ('0.21', 1, False), ('0.22', 1, True)):
+        # The proposed GO: 2 x 0.24704 = 0.49408 fits $2.00. 4 x 0.24704 = 0.98816 (a cached full-size request).
+        for budget, calls, ok in (('2.00', 2, True), ('0.50', 2, True), ('0.49', 2, False),
+                                  ('0.98', 4, False), ('0.99', 4, True), ('0.24', 1, False), ('0.25', 1, True)):
             with self.subTest(budget=budget, calls=calls):
                 gate = self.gate(daily_budget_usd=budget, max_concurrent_calls=calls)
                 gate.init()
@@ -301,8 +347,12 @@ class SettlementTests(AnthropicTest):
         usage = reply.get('usage') if isinstance(reply.get('usage'), dict) else {}
         prompt = sum(value for value in (usage.get('input_tokens'), usage.get('cache_creation_input_tokens'),
                                          usage.get('cache_read_input_tokens')) if type(value) is int)
+        # A reply reporting cache tokens needs a request that asked for caching (the two-block system).
+        cached = any(type(usage.get(name)) is int and usage[name] > 0
+                     for name in ('cache_creation_input_tokens', 'cache_read_input_tokens'))
         gate = gate or self.ready()
-        result = self.call(gate, operation_id, reply=reply, value=sized(120000) if prompt > 50000 else None)
+        value = sized(120000, cached) if prompt > 50000 else cached_request() if cached else None
+        result = self.call(gate, operation_id, reply=reply, value=value)
         self.assertEqual(result['status'], 200)
         return gate, entry_of(gate, operation_id)
 
@@ -332,8 +382,9 @@ class SettlementTests(AnthropicTest):
                                                         'reserve_output_usd_per_m', 'output_bound', 'requested_effort',
                                                         'reply_model')},
                                  {'provider': 'anthropic', 'model': HAIKU, 'maker': 'Anthropic',
-                                  # The reservation follows the REQUEST's size: a reply this large needed a large request.
-                                  'reserve_input_usd_per_m': '0.10' if name == 'small' else '0.50',
+                                  # The reservation follows the REQUEST's size: a reply this large needed a large request,
+                                  # and a reply with cache tokens a cached one (its input at the 5-minute write price).
+                                  'reserve_input_usd_per_m': '0.10' if name == 'small' else '0.625' if name.startswith('mixed') else '0.50',
                                   'reserve_output_usd_per_m': '0.50' if name == 'small' else '2.50',
                                   'output_bound': 32768, 'requested_effort': 'high', 'reply_model': HAIKU})
                 self.assertEqual((Decimal(entry['settle_input_usd_per_m']), Decimal(entry['settle_output_usd_per_m'])),
@@ -359,9 +410,9 @@ class SettlementTests(AnthropicTest):
         # 90000 x 0.50 + 4000 x 0.625 + 2000 x 1.00 + 5000 x 0.05 + 2000 x 2.50 = 54750 -> $0.05475
         self.assertEqual(cost(UPPER, 90000, 4000, 2000, 5000, 2000), Decimal('0.05475'))
         no_split = message(2000, 100, cache_creation_input_tokens=3000, cache_read_input_tokens=4000)
-        # Without its split, the whole write is charged at the dearer 1-hour price:
-        # 2000 x 0.10 + 3000 x 0.20 + 4000 x 0.01 + 100 x 0.50 = 890 -> $0.00089
-        self.assertEqual(cost(LOWER, 2000, 0, 3000, 4000, 100), Decimal('0.00089'))
+        # Without its split, the write a cached request asked for is the 5-minute kind (the only mark it may carry):
+        # 2000 x 0.10 + 3000 x 0.125 + 4000 x 0.01 + 100 x 0.50 = 665 -> $0.000665
+        self.assertEqual(cost(LOWER, 2000, 3000, 0, 4000, 100), Decimal('0.000665'))
         documented = message(2000, 100, cache_creation_input_tokens=0, cache_read_input_tokens=0,
                              cache_creation={'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0},
                              server_tool_use={'web_search_requests': 0, 'web_fetch_requests': 0},
@@ -381,7 +432,7 @@ class SettlementTests(AnthropicTest):
         thinking_all = message(2000, 100, output_tokens_details={'thinking_tokens': 100})
         for name, reply, expected, step, hour in (('lower', lower, Decimal('0.000815'), 'up_to_100k', 2000),
                                                   ('upper', upper, Decimal('0.05475'), 'over_100k', 2000),
-                                                  ('no_split', no_split, Decimal('0.00089'), 'up_to_100k', 3000),
+                                                  ('no_split', no_split, Decimal('0.000665'), 'up_to_100k', 0),
                                                   ('documented_zeros', documented, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
                                                   ('nulls', nulls, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
                                                   ('documented_thinking_split', thinking, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
@@ -604,16 +655,16 @@ class SettlementTests(AnthropicTest):
         self.assertEqual((entry_of(gate)['state'], gate.status()['reason']), ('settled', 'provider_error_or_model_identity'))
 
     def test_a_1h_cache_write_above_the_hold_is_charged_and_halts_with_charge_overrun(self):
-        # The ceiling (0.50 input) is not the dearest input price: a 1-hour cache write over 100,000
-        # tokens is 1.00. The request cannot ask for caching, but if Anthropic reports such a write
-        # anyway, the call is charged in full (no cap at the hold) and the gate halts with charge_overrun.
+        # The ceiling (0.625 input, a 5-minute write) is not the dearest input price: a 1-hour cache write over
+        # 100,000 tokens is 1.00. A request can ask only for the 5-minute kind, but if Anthropic reports a 1-hour
+        # write anyway, the call is charged in full (no cap at the hold) and the gate halts with charge_overrun.
         hour = {'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 200000}
         reply = message(1000, 100, cache_creation_input_tokens=200000, cache_creation=hour)
         expected = cost(UPPER, 1000, write_1h=200000, output=100)
         self.assertEqual(expected, Decimal('0.20075'))
         gate = self.ready()
         with self.refused('SETTLED_INTO_HALT'):
-            self.call(gate, reply=reply)
+            self.call(gate, reply=reply, value=cached_request())
         entry = entry_of(gate)
         self.assertEqual((entry['state'], Decimal(entry['held_usd'])), ('settled', expected))
         self.assertGreater(Decimal(entry['held_usd']), Decimal(entry['reserved_usd']))
@@ -1042,7 +1093,7 @@ class RemainingAndProbeTests(AnthropicTest):
                          {'state': 'active', 'window_open': True, 'remaining_calls': 599, 'max_concurrent_calls': 2,
                           'enabled_models': [HAIKU]})
         self.assertEqual((Decimal(report['remaining_usd']), Decimal(report['largest_reservation_usd'])),
-                         (Decimal('1.99965'), Decimal('0.214016')))
+                         (Decimal('1.99965'), Decimal('0.24704')))
 
     def test_probe_sends_the_tiny_request_and_reports_what_it_measured(self):
         gate = self.ready()
@@ -1136,6 +1187,145 @@ class VendorRefusalFactsTests(AnthropicTest):
                                                                      'message': 'Internal server error'}})
         self.assertEqual(gate.status()['cooling'], {})
 
+
+
+class PromptCachingTests(AnthropicTest):
+    """Prompt caching (owner approval 2026-10-12, "caching before the upload"): a request may carry exactly one
+    5-minute cache mark, on the first of exactly two system text blocks; it reserves its whole input at the step's
+    5-minute cache-write price, and only its reply may report cache tokens, settled at the write and read prices."""
+    FIXTURE = Path(__file__).resolve().parent / 'fixtures/anthropic-cache-bodies.json'
+
+    def test_the_two_block_system_is_accepted_and_reserves_its_input_at_the_write_price(self):
+        go = bridge.read_go(self.gate().go_path)
+        value = cached_request()
+        self.assertTrue(ANTHROPIC.body_valid(value, ANTHROPIC.rows[HAIKU]))
+        self.assertIs(ANTHROPIC.cache_write_requested(value), True)
+        raw = json.dumps(value, separators=(',', ':'))
+        outgoing, reserved, row, prices = bridge.validate_request(envelope_text(raw), go)
+        # ((bytes + 2048) x 0.125 + 32768 x 0.50) / 1e6: the lower step, its input at the 5-minute write price.
+        self.assertEqual((json.loads(outgoing), row.model, prices), (value, HAIKU, (WRITE_IN, PRICE_OUT)))
+        self.assertEqual(reserved, (Decimal(len(raw.encode()) + 2048) * WRITE_IN + Decimal(BOUND) * PRICE_OUT) / Decimal(1000000))
+        self.assertEqual(reserved, reservation_of(raw))
+        # The same body priced as an uncached one is a mismatch (the app must reserve the write premium).
+        plain = (Decimal(len(raw.encode()) + 2048) * PRICE_IN + Decimal(BOUND) * PRICE_OUT) / Decimal(1000000)
+        with self.refused('RESERVATION_MISMATCH'):
+            bridge.validate_request({**envelope_text(raw), 'reservedUsd': str(plain)}, go)
+        # A string system asks for no cache write; neither does the probe's body or a DeepInfra body.
+        self.assertIs(ANTHROPIC.cache_write_requested(request()), False)
+        self.assertIs(ANTHROPIC.cache_write_requested(ANTHROPIC.probe_body(ANTHROPIC.rows[HAIKU])), False)
+        self.assertIs(bridge.cache_write_of(ANTHROPIC, value), True)
+        self.assertIs(bridge.cache_write_of(ANTHROPIC, request()), False)
+        self.assertIs(bridge.cache_write_of(bridge.helper.PROFILES['deepinfra'], value), False)
+
+    def test_a_large_cached_request_reserves_at_the_upper_steps_write_price(self):
+        go = bridge.read_go(self.gate().go_path)
+        edge = STEP_TOKENS - 2048
+        for size, prices in ((edge, (WRITE_IN, PRICE_OUT)), (edge + 1, CEILING)):
+            with self.subTest(body_bytes=size):
+                _, reserved, _, used = bridge.validate_request(envelope(sized(size, cached=True)), go)
+                self.assertEqual(used, prices)
+                self.assertEqual(reserved, (Decimal(size + 2048) * prices[0] + Decimal(BOUND) * prices[1]) / Decimal(1000000))
+        # At the edge: (100,000 x 0.125 + 32,768 x 0.50) / 1e6 = $0.028884; one byte more:
+        # (100,001 x 0.625 + 32,768 x 2.50) / 1e6 = $0.144420625.
+        self.assertEqual(reservation_of(json.dumps(sized(edge, cached=True))), Decimal('0.028884'))
+        self.assertEqual(reservation_of(json.dumps(sized(edge + 1, cached=True))), Decimal('0.144420625'))
+
+    def test_every_body_in_the_shared_fixture_is_accepted_at_its_reservation_or_refused(self):
+        fixture = json.loads(self.FIXTURE.read_text())
+        self.assertEqual(fixture['schema'], 'anthropic-cache-bodies-v1')
+        self.assertEqual(fixture['separator'], '\n\n--- PER-CALL MARKERS (engine) ---')
+        self.assertGreaterEqual((len(fixture['sent']), len(fixture['refused'])), (3, 20))
+        go = bridge.read_go(self.gate().go_path)
+        for case in fixture['sent']:
+            with self.subTest(sent=case['name']):
+                body = json.loads(case['body'])
+                self.assertTrue(ANTHROPIC.body_valid(body, ANTHROPIC.rows[HAIKU]))
+                self.assertEqual(Decimal(case['reservedUsd']), reservation_of(case['body']))
+                # The app's nano-USD text, to the digit (validate_request checks equality).
+                outgoing, reserved, _, prices = bridge.validate_request({**envelope_text(case['body']),
+                                                                         'reservedUsd': case['reservedUsd']}, go)
+                self.assertEqual((json.loads(outgoing), reserved, prices), (body, Decimal(case['reservedUsd']), (WRITE_IN, PRICE_OUT)))
+                self.assertLessEqual(len(outgoing), len(case['body'].encode()))
+                # The two texts join back into the system text the frame wrote, the marker line first in the tail.
+                first, second = body['system']
+                self.assertTrue(first['text'].endswith('\n\n') and second['text'].startswith(fixture['separator'][2:] + '\n'))
+                self.assertEqual((first['text'] + second['text']).count(fixture['separator']), 1)
+        for case in fixture['refused']:
+            with self.subTest(refused=case['name']):
+                self.assertFalse(ANTHROPIC.body_valid(json.loads(case['body']), ANTHROPIC.rows[HAIKU]))
+                with self.refused('REQUEST_PARAMETERS_INVALID'):
+                    bridge.validate_request(envelope_text(case['body']), go)
+
+    def test_a_cached_call_settles_its_write_and_read_at_their_own_prices(self):
+        gate = self.ready()
+        five = {'ephemeral_5m_input_tokens': 3000, 'ephemeral_1h_input_tokens': 0}
+        reply = message(200, 400, cache_creation_input_tokens=3000, cache_read_input_tokens=0, cache_creation=five)
+        self.call(gate, reply=reply, value=cached_request())
+        entry = entry_of(gate)
+        # 200 x 0.10 + 3000 x 0.125 + 400 x 0.50 = 595 -> $0.000595
+        expected = cost(LOWER, 200, write_5m=3000, output=400)
+        self.assertEqual(expected, Decimal('0.000595'))
+        self.assertEqual((entry['state'], Decimal(entry['held_usd']), entry['reserve_input_usd_per_m'], entry['cache_write_requested']),
+                         ('settled', expected, '0.125', '5m'))
+        accounting = entry['accounting']
+        self.assertEqual((accounting['cache_write_5m_tokens'], accounting['cache_write_1h_tokens'], accounting['cache_read_input_tokens'],
+                          accounting['prompt_tokens']), (3000, 0, 0, 3200))
+        # The next call reads it: 200 x 0.10 + 3000 x 0.01 + 400 x 0.50 = 250 -> $0.00025.
+        self.call(gate, 'op-2', reply=message(200, 400, cache_creation_input_tokens=0, cache_read_input_tokens=3000),
+                  value=cached_request())
+        self.assertEqual(Decimal(entry_of(gate, 'op-2')['held_usd']), cost(LOWER, 200, read=3000, output=400))
+        self.assertEqual(cost(LOWER, 200, read=3000, output=400), Decimal('0.00025'))
+        # A write reported without its split is the 5-minute kind the request asked for.
+        self.call(gate, 'op-3', reply=message(200, 400, cache_creation_input_tokens=3000), value=cached_request())
+        self.assertEqual(Decimal(entry_of(gate, 'op-3')['held_usd']), expected)
+        # A prefix under the model's cacheable minimum writes nothing: plain prices, still settled.
+        self.call(gate, 'op-4', reply=message(200, 400, cache_creation_input_tokens=0, cache_read_input_tokens=0,
+                                                  cache_creation={'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0}),
+                  value=cached_request())
+        self.assertEqual(Decimal(entry_of(gate, 'op-4')['held_usd']), cost(LOWER, 200, output=400))
+        self.assertEqual(gate.status()['state'], 'active')
+        # An uncached call's entry says nothing about caching and reserves at the plain input price.
+        self.call(gate, 'op-5')
+        self.assertNotIn('cache_write_requested', entry_of(gate, 'op-5'))
+        self.assertEqual(entry_of(gate, 'op-5')['reserve_input_usd_per_m'], '0.10')
+
+    def test_cache_tokens_on_a_call_that_asked_for_none_halt_uncertain(self):
+        for name, usage in (('creation', {'cache_creation_input_tokens': 3000}),
+                            ('read', {'cache_read_input_tokens': 3000}),
+                            ('split_creation', {'cache_creation_input_tokens': 3000,
+                                                'cache_creation': {'ephemeral_5m_input_tokens': 3000, 'ephemeral_1h_input_tokens': 0}})):
+            with self.subTest(name):
+                reply = message(200, 400, **usage)
+                accounting = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)
+                self.assertEqual((accounting['usage_valid'], accounting['invalid_reason']), (False, 'cache_counts'))
+                self.assertTrue(ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None, cache_write=True)['usage_valid'])
+                gate = self.ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    self.call(gate, reply=reply)
+                self.assert_uncertain_halt(gate)
+                self.assertEqual(entry_of(gate)['accounting']['invalid_reason'], 'cache_counts')
+
+    def test_a_cached_call_still_halts_on_every_cache_count_it_cannot_read(self):
+        for name, usage in (('split_not_summing', {'cache_creation_input_tokens': 3000,
+                                                   'cache_creation': {'ephemeral_5m_input_tokens': 1000, 'ephemeral_1h_input_tokens': 1000}}),
+                            ('split_without_total', {'cache_creation': {'ephemeral_5m_input_tokens': 5, 'ephemeral_1h_input_tokens': 0}}),
+                            ('read_negative', {'cache_read_input_tokens': -1}),
+                            ('creation_text', {'cache_creation_input_tokens': '10'}),
+                            ('creation_float', {'cache_creation_input_tokens': Decimal('10.0')})):
+            with self.subTest(name):
+                reply = message(200, 400, **usage)
+                self.assertFalse(ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None, cache_write=True)['usage_valid'])
+                gate = self.ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    self.call(gate, reply=reply, value=cached_request())
+                self.assert_uncertain_halt(gate)
+
+    def test_a_1h_write_on_a_cached_call_is_charged_at_the_1h_price(self):
+        hour = {'ephemeral_5m_input_tokens': 1000, 'ephemeral_1h_input_tokens': 2000}
+        reply = message(200, 400, cache_creation_input_tokens=3000, cache_creation=hour)
+        accounting = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None, cache_write=True)
+        self.assertEqual(Decimal(accounting['guard_charge_usd']), cost(LOWER, 200, write_5m=1000, write_1h=2000, output=400))
+        self.assertEqual((accounting['cache_write_5m_tokens'], accounting['cache_write_1h_tokens']), (1000, 2000))
 
 if __name__ == '__main__':
     unittest.main()

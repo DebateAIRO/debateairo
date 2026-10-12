@@ -446,12 +446,36 @@ function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
     && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
     && Array.isArray(body.messages);
 }
+/** A text block of exactly `keys`, whose text is not only whitespace. */
+function isTextBlock(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+  return isPlainObject(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key))
+    && value.type === "text" && typeof value.text === "string" && value.text.trim().length > 0;
+}
+/**
+ * Prompt caching (owner approval 2026-10-12): the Anthropic `system` is either a text that is not only whitespace,
+ * or exactly the adapter's two text blocks (anthropicCacheableSystem): the first exactly {type, text, cache_control}
+ * with cache_control exactly {"type": "ephemeral"} (no ttl), the second exactly {type, text}. The gate's
+ * AnthropicProfile.system_valid is the same rule (tests/unit/fixtures/anthropic-cache-bodies.json).
+ */
+function anthropicSystemAccepted(system: unknown): boolean {
+  if (typeof system === "string") return system.trim().length > 0;
+  if (!Array.isArray(system) || system.length !== 2) return false;
+  const [first, second] = system as unknown[];
+  if (!isTextBlock(first, ["type", "text", "cache_control"]) || !isTextBlock(second, ["type", "text"])) return false;
+  const mark = first.cache_control;
+  return isPlainObject(mark) && Object.keys(mark).length === 1 && mark.type === "ephemeral";
+}
+/** An accepted Anthropic body asks for a cache write exactly when its system is the two-block form. */
+function anthropicBodyAsksCacheWrite(body: Record<string, unknown>): boolean {
+  return Array.isArray(body.system) && anthropicSystemAccepted(body.system);
+}
 /**
  * PR B, the wire contract's Anthropic body, exactly as the Anthropic gate checks it: `model`,
  * `max_tokens` (1..the row's bound), `messages` (each exactly {role, content: non-empty text},
  * roles alternating user/assistant, first and last a user turn, as the adapter builds them), an
- * optional non-empty `system` text, and `output_config` {"effort": "high"} exactly when the row
- * has an effort switch. Nothing else, anywhere.
+ * optional `system` (a non-empty text, or the two blocks carrying the one cache mark:
+ * anthropicSystemAccepted), and `output_config` {"effort": "high"} exactly when the row has an
+ * effort switch. Nothing else, anywhere.
  */
 function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
   if (reviewed.provider !== "anthropic") return false;
@@ -461,7 +485,7 @@ function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
   const effort = body.output_config;
   return Object.keys(body).length === required.length + optional
     && required.every(key => Object.hasOwn(body, key))
-    && (optional === 0 || (typeof body.system === "string" && body.system.trim().length > 0))
+    && (optional === 0 || anthropicSystemAccepted(body.system))
     && (reviewed.effort === null || (isPlainObject(effort) && Object.keys(effort).length === 1 && effort.effort === reviewed.effort))
     && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
     && Array.isArray(messages) && messages.length % 2 === 1
@@ -481,7 +505,8 @@ function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
  * gate, Anthropic Messages to the Anthropic gate), so a call can only ever reach its own provider's
  * socket. It sends only a body that gate accepts for that body's reviewed row of THAT provider
  * (exact keys, the row's effort and JSON switches and its reviewed sampling, 1 <= max_tokens <= the row's bound, at most
- * 256 KiB), never a key header, and reserves at that row's price.
+ * 256 KiB), never a key header, and reserves at that row's price (an Anthropic body carrying the one cache
+ * mark: its input at the step's 5-minute cache-write price, 2026-10-12).
  */
 export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudgetPorts): typeof fetch {
   const byProvider: PreviewBudgetPorts = typeof (ports as PreviewBudgetPort).execute === "function"
@@ -503,8 +528,10 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
       throw new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate for this provider is not configured");
     }
     const body = init!.body as string;
-    // UTF-8 bytes + template allowance; the row's full output bound, including hidden reasoning.
-    const reserved = previewReservationNanoUsd(reviewed, Buffer.byteLength(body, "utf8"));
+    // UTF-8 bytes + template allowance; the row's full output bound, including hidden reasoning. A body carrying the
+    // cache mark reserves its whole input at the step's cache-write price, as the gate does.
+    const reserved = previewReservationNanoUsd(reviewed, Buffer.byteLength(body, "utf8"),
+      { cacheWrite: provider === "anthropic" && anthropicBodyAsksCacheWrite(decoded) });
     const result = await port.execute({ operationId: randomUUID(), requestBody: body,
       requestSha256: createHash("sha256").update(body).digest("hex"), reservedUsd: previewNanoUsdText(reserved) }, init!.signal ?? undefined);
     return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });

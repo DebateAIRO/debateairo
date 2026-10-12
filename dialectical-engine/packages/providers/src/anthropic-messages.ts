@@ -16,6 +16,10 @@ import type { PromptPacket } from "./index.js";
  * bytes it priced. So this file never adds a body member that is not listed
  * there: `model`, `max_tokens`, `messages`, optional `system`, and
  * `output_config: {"effort":"high"}` when the high thinking level is asked.
+ * Prompt caching (owner approval 2026-10-12): `system` is either the one string,
+ * or, when the engine's framed system text carries its per-call marker tail,
+ * exactly two text blocks with the one 5-minute cache mark on the first
+ * (anthropicCacheableSystem). Nothing else anywhere carries a cache mark.
  *
  * It imports NO value from ./index.ts on purpose: index.ts imports this file,
  * and a value cycle would be read before it is initialised.
@@ -67,6 +71,44 @@ export const PROVIDER_REPLY_UNSUPPORTED = "PROVIDER_REPLY_UNSUPPORTED" as const;
 export const PROVIDER_PACKET_UNSUPPORTED = "PROVIDER_PACKET_UNSUPPORTED" as const;
 
 const MAX_USAGE_COUNTER = 2 ** 31 - 1;
+
+/**
+ * Prompt caching (owner approval 2026-10-12, "caching before the upload"). The engine's framed system message
+ * puts its per-call random values (the boundary fence, the canary) LAST, after a tail whose first line is exactly
+ * `--- PER-CALL MARKERS (engine) ---` (contract with the prompt frame, branch fix/2026-10-12-patch-follow-up). This
+ * file splits on its own copy of that separator; the frame's shared splitter replaces it when that branch lands.
+ */
+export const ANTHROPIC_PER_CALL_MARKERS_SEPARATOR = "\n\n--- PER-CALL MARKERS (engine) ---" as const;
+/** The one cache mark this wire sends: 5 minutes (no ttl), on the first system block only. */
+const ANTHROPIC_CACHE_MARK = Object.freeze({ type: "ephemeral" } as const);
+/** The cached form of `system`: the stable prefix (marked) and the per-call tail (unmarked). */
+export type AnthropicSystemBlocks = readonly [
+  Readonly<{ type: "text"; text: string; cache_control: Readonly<{ type: "ephemeral" }> }>,
+  Readonly<{ type: "text"; text: string }>
+];
+
+/**
+ * `system` as the wire sends it. With the per-call marker line in it, exactly two text blocks: everything up to
+ * and including the blank line before the FIRST marker line (the instruction and safety frame, identical across
+ * calls of one step, so the vendor can serve it from its cache), with the 5-minute cache mark; then the tail from
+ * the marker line on (the per-call values), with none. Joining the two texts gives back `system` byte for byte.
+ * Without the marker line, or when the prefix would be only whitespace, the one string, as before. A prefix under
+ * the model's cacheable minimum (512 tokens on Claude Haiku 5.5) is simply not cached by the vendor: no error,
+ * no write. Never a mark on the messages: their content changes on every call, so a mark there would only pay
+ * the write premium.
+ */
+export function anthropicCacheableSystem(system: string): string | AnthropicSystemBlocks {
+  const at = system.indexOf(ANTHROPIC_PER_CALL_MARKERS_SEPARATOR);
+  if (at < 0) return system;
+  // The separator's leading blank line stays with the prefix, so the tail's first line is the marker line.
+  const cut = at + 2;
+  const prefix = system.slice(0, cut);
+  if (prefix.trim() === "") return system;
+  return Object.freeze([
+    Object.freeze({ type: "text" as const, text: prefix, cache_control: ANTHROPIC_CACHE_MARK }),
+    Object.freeze({ type: "text" as const, text: system.slice(cut) })
+  ] as const);
+}
 
 type WireRole = "user" | "assistant";
 
@@ -141,7 +183,7 @@ export function anthropicMessagesRequestBody(input: Readonly<{
     model: input.model,
     max_tokens: input.maxTokens,
     messages: turns,
-    ...(system === null ? {} : { system }),
+    ...(system === null ? {} : { system: anthropicCacheableSystem(system) }),
     ...effortMember(input.thinkingLevel)
   });
 }

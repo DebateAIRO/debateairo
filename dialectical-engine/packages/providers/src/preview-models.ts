@@ -58,7 +58,19 @@ export type PreviewModelRow = Readonly<{
    * own (owner ruling 2026-10-10, evening). The gate applies the same rule (reservation_prices).
    */
   upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string;
-    inputNanoUsdPerToken: bigint; outputNanoUsdPerToken: bigint }>;
+    inputNanoUsdPerToken: bigint; outputNanoUsdPerToken: bigint;
+    /** The upper step's 5-minute cache-write price, on a row that may cache (Anthropic: 0.625). */
+    cacheWriteInputUsdPerM?: string; cacheWriteInputNanoUsdPerToken?: bigint }>;
+  /**
+   * Prompt caching (owner approval 2026-10-12), Anthropic only: the vendor's 5-minute cache-write price for this
+   * row's own (lower) step. A request that asks for a cache write (its system is the two-block form with the one
+   * cache mark) reserves its WHOLE input at this price, or at its upper step's when it is above that step, exactly as
+   * the gate does. The start-of-debate estimate keeps the plain input price (only the cached system prefix pays the
+   * write premium, and reads cost a tenth); it sees the cached worst case through the gate's in-flight hold.
+   * Absent: the row never caches.
+   */
+  cacheWriteInputUsdPerM?: string;
+  cacheWriteInputNanoUsdPerToken?: bigint;
   /** The same prices as whole nano-USD per token (USD per million x 1000), for BigInt arithmetic. */
   inputNanoUsdPerToken: bigint;
   outputNanoUsdPerToken: bigint;
@@ -110,8 +122,9 @@ const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 type RowInput = Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;
   outputBound: number; effort: "high" | null; jsonObject: boolean; contextWindowTokens?: number;
-  upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string }>;
+  upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string; cacheWriteInputUsdPerM?: string }>;
   sampling?: PreviewSampling;
+  cacheWriteInputUsdPerM?: string;
 }>;
 const PROVIDER_CONNECTIONS = Object.freeze({
   deepinfra: Object.freeze({ provider: "deepinfra", baseUrl: PREVIEW_DEEPINFRA_BASE_URL,
@@ -128,7 +141,12 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
   };
   const inputNanoUsdPerToken = nano(input.inputUsdPerM);
   const outputNanoUsdPerToken = nano(input.outputUsdPerM);
-  const { upperStep, sampling, ...plain } = input;
+  const { upperStep, sampling, cacheWriteInputUsdPerM, ...plain } = input;
+  // Only the Anthropic wire (and its gate) can carry a cache mark; a row that caches has the price on every step.
+  if (cacheWriteInputUsdPerM !== undefined ? provider !== "anthropic" || (upperStep !== undefined && upperStep.cacheWriteInputUsdPerM === undefined)
+    : upperStep?.cacheWriteInputUsdPerM !== undefined) {
+    throw new TypeError("PREVIEW_MODEL_ROW_CACHE_INVALID");
+  }
   // Only the DeepInfra wire (and its gate) knows sampling; each member is a reviewed key with a finite number, kept
   // in PREVIEW_SAMPLING_KEYS order so every body says them the same way.
   if (sampling !== undefined && (provider !== "deepinfra" || Object.keys(sampling).length === 0
@@ -142,7 +160,9 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
     ...(sampling === undefined ? {} : { sampling: Object.freeze(Object.fromEntries(
       PREVIEW_SAMPLING_KEYS.filter(key => Object.hasOwn(sampling, key)).map(key => [key, sampling[key]!]))) as PreviewSampling }),
     ...(upperStep === undefined ? {} : { upperStep: Object.freeze({ ...upperStep,
-      inputNanoUsdPerToken: nano(upperStep.inputUsdPerM), outputNanoUsdPerToken: nano(upperStep.outputUsdPerM) }) }),
+      inputNanoUsdPerToken: nano(upperStep.inputUsdPerM), outputNanoUsdPerToken: nano(upperStep.outputUsdPerM),
+      ...(upperStep.cacheWriteInputUsdPerM === undefined ? {} : { cacheWriteInputNanoUsdPerToken: nano(upperStep.cacheWriteInputUsdPerM) }) }) }),
+    ...(cacheWriteInputUsdPerM === undefined ? {} : { cacheWriteInputUsdPerM, cacheWriteInputNanoUsdPerToken: nano(cacheWriteInputUsdPerM) }),
     contextWindowTokens: input.contextWindowTokens ?? PROVIDER_CONNECTIONS[provider].contextWindowTokens,
     inputNanoUsdPerToken,
     outputNanoUsdPerToken,
@@ -172,13 +192,16 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
       sampling: { temperature: 0.6, top_p: 0.95, top_k: 20 } })
   ]),
   // PR B, owner ruling 2026-10-10 (evening). Estimate and reserve at the lower step ($0.10 / $0.50);
-  // a call whose bytes + 2048 are above 100,000 reserves at the upper step ($0.50 / $2.50), so a
-  // 256 KiB call holds at most (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016. A request cannot
-  // ask for caching; the gate settles at the real step and halts on an overrun (charge_overrun).
+  // a call whose bytes + 2048 are above 100,000 reserves at the upper step ($0.50 / $2.50), so an
+  // uncached 256 KiB call holds at most (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016.
+  // Prompt caching (owner approval 2026-10-12): a request carrying the one cache mark reserves its
+  // whole input at the step's 5-minute cache-write price ($0.125 / $0.625), so a cached 256 KiB call
+  // holds at most (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704, under the gate's $0.25 cap.
+  // The gate settles at the real step and halts on an overrun (charge_overrun).
   anthropic: Object.freeze([
     row("anthropic", { model: "claude-haiku-5-5", maker: "Anthropic", inputUsdPerM: "0.10", outputUsdPerM: "0.50",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false,
-      upperStep: { aboveChargedInputTokens: 100_000, inputUsdPerM: "0.50", outputUsdPerM: "2.50" } })
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false, cacheWriteInputUsdPerM: "0.125",
+      upperStep: { aboveChargedInputTokens: 100_000, inputUsdPerM: "0.50", outputUsdPerM: "2.50", cacheWriteInputUsdPerM: "0.625" } })
   ])
 });
 /** Every reviewed row, providers in the order above. */
@@ -279,12 +302,18 @@ export function previewChargedInputTokens(bodyBytes: number): bigint {
 /**
  * Contract A §3: ((body bytes + 2048) x input + output_bound x output), in nano-USD, at the row's
  * prices, or at its upper step's when the charged input tokens are above that step's threshold.
+ * Prompt caching (2026-10-12): a request that asks for a cache write (`cacheWrite`, only ever on a row
+ * that may cache) prices its whole input at that step's 5-minute cache-write price instead, exactly as
+ * the gate's AnthropicProfile.reservation_prices does (tests/unit/fixtures/anthropic-cache-bodies.json).
  */
-export function previewReservationNanoUsd(reviewed: PreviewModelRow, bodyBytes: number): bigint {
+export function previewReservationNanoUsd(reviewed: PreviewModelRow, bodyBytes: number,
+  options: Readonly<{ cacheWrite?: boolean }> = {}): bigint {
   const tokens = previewChargedInputTokens(bodyBytes);
   const step = reviewed.upperStep !== undefined && tokens > BigInt(reviewed.upperStep.aboveChargedInputTokens)
     ? reviewed.upperStep : reviewed;
-  return tokens * step.inputNanoUsdPerToken + BigInt(reviewed.outputBound) * step.outputNanoUsdPerToken;
+  const input = options.cacheWrite === true ? step.cacheWriteInputNanoUsdPerToken : step.inputNanoUsdPerToken;
+  if (input === undefined) throw new TypeError("PREVIEW_MODEL_ROW_CANNOT_CACHE");
+  return tokens * input + BigInt(reviewed.outputBound) * step.outputNanoUsdPerToken;
 }
 
 /** The reviewed row for a target's own base URL and model name, if any (any provider). */
