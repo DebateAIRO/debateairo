@@ -2,7 +2,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import type { PromptPacket } from "@debateai/providers";
+import { anthropicCacheableSystem, type PromptPacket } from "@debateai/providers";
 import { readCustodyAuthorizationHeader } from "../../packages/crypto/src/index.js";
 import {
   AnthropicMessagesAdapter,
@@ -153,12 +153,18 @@ describe("support chat on Claude Haiku 5.5 — the call", () => {
     expect(headers["anthropic-version"]).toBe("2023-06-01");
     expect(headers["x-api-key"]).toBe(BARE_FIXTURE);
     const [system, user] = request.packet.messages;
-    expect(JSON.parse(String(fetchRecord.calls[0]?.init.body))).toEqual({
+    const body = JSON.parse(String(fetchRecord.calls[0]?.init.body));
+    // Prompt caching (R14, 2026-10-12): the framed system goes out as the cached stable prefix plus the per-call tail,
+    // exactly as on the debate path; joined, the two blocks are the framed system byte for byte.
+    expect(body).toEqual({
       model: "claude-haiku-5-5",
       max_tokens: 16_000,
       messages: [{ role: "user", content: user!.content }],
-      system: system!.content
+      system: anthropicCacheableSystem(system!.content)
     });
+    expect(body.system).toHaveLength(2);
+    expect(body.system[0].cache_control).toEqual({ type: "ephemeral" });
+    expect(body.system.map((block: { text: string }) => block.text).join("")).toBe(system!.content);
   });
 
   it("treats a max_tokens stop as a truncated answer, never serving the fragment", async () => {
