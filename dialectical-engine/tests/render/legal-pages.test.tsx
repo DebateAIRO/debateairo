@@ -599,7 +599,7 @@ describe("the US consumer health data page", () => {
 });
 
 describe("the footers (15a full, 15b one line)", () => {
-  it("the one-line footer carries the seven legal links and cookie preferences", () => {
+  it("the one-line footer carries the seven legal links, cookie preferences and ANPC's SAL badge", () => {
     const requests: Array<HTMLElement | null> = [];
     const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
     try {
@@ -607,7 +607,7 @@ describe("the footers (15a full, 15b one line)", () => {
       const footer = view.querySelector("footer.siteFooterLine");
       expect(footer).not.toBeNull();
       expect([...(footer?.querySelectorAll("a") ?? [])].map((link) => link.getAttribute("href")))
-        .toEqual(LEGAL_PAGES.map(({ href }) => href));
+        .toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://anpc.ro/ce-este-sal/"]);
       const button = footer?.querySelector("button");
       expect(button?.textContent).toBe(chromeEnglish["chrome.footer.cookiePreferences"]);
       act(() => button?.click());

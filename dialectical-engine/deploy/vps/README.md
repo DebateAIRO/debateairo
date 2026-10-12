@@ -2518,9 +2518,10 @@ true:
 
 - NETOPIA's mark and the Visa and Mastercard marks (above), and the sentence on the checkout that payment happens on
   NETOPIA Payments' secure page;
-- the consumer-protection link the law asks for: ANPC's dispute resolution page (SAL), which the legal notice
-  (`/legal`) links today. The EU's online dispute platform (SOL) closed on 20 July 2025, so the site deliberately does
-  not link it. If NETOPIA asks for the ANPC links in the footer, that is a code change too;
+- the consumer-protection link the law asks for: ANPC's dispute resolution badge (SAL), which the footer of every page
+  shows and links to ANPC's page (`https://anpc.ro/ce-este-sal/`). Its artwork is in the repository at
+  `apps/ui/public/consumer-protection/anpc-sal.png`, so nothing needs copying. The EU's online dispute platform (SOL)
+  closed on 20 July 2025, so the site deliberately does not link it;
 - the Terms (prices, the monthly renewal, the 14-day withdrawal), the Privacy Policy naming NETOPIA Payments, and the
   cancellation rules, each reachable from every page;
 - the company details on the legal notice (above);
