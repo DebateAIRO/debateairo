@@ -59,6 +59,9 @@ const NOT_AN_ANSWER = [
   "I cannot help with that.", "The user asks me to reply OK", "<think>The user wants exactly OK.", "<think>OK</think>",
   "<think>OK</think>\n\nSure", "OK</think>", "..OK", "{\"answer\":\"OK\"}"
 ] as const;
+/** Of those, the replies with no words at all (probe failure reasons, 2026-10-12): the rest are other words. */
+const EMPTY_ANSWERS: readonly string[] = ["", " ", "\n\n", "<think>OK</think>"];
+const refusedAs = (answer: string) => EMPTY_ANSWERS.includes(answer) ? "PROVIDER_PROBE_ANSWER_EMPTY" : "PROVIDER_PROBE_ANSWER_NOT_OK";
 
 describe("the probe accepts a working answer in its harmless variants (both wires)", () => {
   for (const answer of WORKING_ANSWERS) {
@@ -77,11 +80,11 @@ describe("the probe still refuses a reply that is not a working answer", () => {
   for (const answer of NOT_AN_ANSWER) {
     it(`OpenAI-compatible: ABSENT on ${JSON.stringify(answer)}`, async () => {
       const { observation } = await probe(MIMO, completion(MIMO.model, answer), previewProbeControls(MIMO));
-      expect(observation).toMatchObject({ state: "ABSENT", modelId: null, failureCode: "PROVIDER_PROBE_FAILED" });
+      expect(observation).toMatchObject({ state: "ABSENT", modelId: null, failureCode: refusedAs(answer) });
     });
     it(`Anthropic Messages: ABSENT on ${JSON.stringify(answer)}`, async () => {
       const { observation } = await probe(HAIKU, messages(HAIKU.model, answer));
-      expect(observation).toMatchObject({ state: "ABSENT", modelId: null, failureCode: "PROVIDER_PROBE_FAILED" });
+      expect(observation).toMatchObject({ state: "ABSENT", modelId: null, failureCode: refusedAs(answer) });
     });
   }
   for (const [label, content] of [["no content", null], ["a content array", [{ type: "text", text: "OK" }]], ["a number", 0]] as const) {
@@ -91,7 +94,7 @@ describe("the probe still refuses a reply that is not a working answer", () => {
   }
   it("thinking that spent the whole allowance is no answer: ABSENT (empty content, finish_reason length)", async () => {
     const { observation } = await probe(MIMO, completion(MIMO.model, "", "length"), previewProbeControls(MIMO));
-    expect(observation).toMatchObject({ state: "ABSENT", failureCode: "PROVIDER_PROBE_FAILED" });
+    expect(observation).toMatchObject({ state: "ABSENT", failureCode: "PROVIDER_PROBE_ANSWER_CUT_OFF" });
   });
   it("Anthropic Messages: an \"OK.\" cut off at max_tokens is still refused", async () => {
     expect((await probe(HAIKU, messages(HAIKU.model, "OK.", "max_tokens"))).observation.state).toBe("ABSENT");

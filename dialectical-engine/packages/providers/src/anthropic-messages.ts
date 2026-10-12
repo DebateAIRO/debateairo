@@ -388,13 +388,20 @@ export function anthropicMessagesProbeRequest(input: Readonly<{
   });
 }
 
-/** The probe's reading of a reply: the echoed model and the answer text, or null when unusable. */
-export function anthropicMessagesProbeAnswer(decoded: unknown): Readonly<{ model: unknown; text: string }> | null {
+/**
+ * The probe's reading of a reply: the echoed model, the answer text, how it ended ("length" when cut off at
+ * max_tokens) and whether the model declined; null when the reply is not a message this wire can use. Probe failure
+ * reasons (2026-10-12): the probe records which of these ended it (provider-probe.ts).
+ */
+export function anthropicMessagesProbeAnswer(decoded: unknown): Readonly<{
+  model: unknown; text: string; finishReason: string | null; refused: boolean;
+}> | null {
   const reply = readAnthropicMessagesReply(decoded);
-  if (reply.failure !== null || !isRecord(reply.normalized)) return null;
+  if (!isRecord(reply.normalized)) return null;
+  const refused = reply.failure?.code === PROVIDER_CONTENT_REFUSED;
+  if (reply.failure !== null && !refused) return null;
   const choices = reply.normalized.choices;
   if (!Array.isArray(choices) || choices.length !== 1) return null;
   const choice = choices[0] as Readonly<{ message: { content: string }; finish_reason: string | null }>;
-  if (choice.finish_reason === "length") return null;
-  return Object.freeze({ model: reply.normalized.model, text: choice.message.content });
+  return Object.freeze({ model: reply.normalized.model, text: choice.message.content, finishReason: choice.finish_reason, refused });
 }
