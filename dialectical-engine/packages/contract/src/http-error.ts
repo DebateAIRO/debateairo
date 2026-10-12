@@ -34,8 +34,7 @@ export class ContractHttpError extends Error {
      * `Retry-After`, in milliseconds), or null when it named no time. Set on any refused
      * response that carries the header — the admission gate's 429 always does.
      */
-    readonly retryAfterMs: number | null = null,
-    readonly retryAfterSeconds: number | null = null
+    readonly retryAfterMs: number | null = null
   ) {
     super(message);
     this.name = "ContractHttpError";
