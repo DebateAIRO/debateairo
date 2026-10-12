@@ -58,11 +58,11 @@ async function setup(options: FakeNetopiaOptions = {}) {
   const payments = createNetopiaPayments({ baseUrl: fake.baseUrl, apiKey: fake.apiKey, posSignature: fake.posSignature });
   const trust = Object.freeze({ posSignature: fake.posSignature, keys: loadTrustedKeys(fake.trustedKeysPem) });
   const startOf = (orderId: string, amountMicros = 24_200_000): HostedPaymentStart => Object.freeze({
-    orderId, amountMicros, currency: "USD", description: "DebateAI Plus, one month", payer: PAYER, clientId: CLIENT,
+    orderId, amountMicros, currency: "USD", description: "Dialectical Engine Plus, one month", payer: PAYER, clientId: CLIENT,
     returnUrl: `https://debateai.test/checkout/return?charge=${orderId}`, notifyUrl: sink.url, language: "ro"
   });
   const chargeOf = (orderId: string, token: string, amountMicros = 24_200_000): SavedCardCharge => Object.freeze({
-    orderId, amountMicros, currency: "USD", description: "DebateAI Plus, one month", payer: PAYER, cardToken: createSecretToken(token),
+    orderId, amountMicros, currency: "USD", description: "Dialectical Engine Plus, one month", payer: PAYER, cardToken: createSecretToken(token),
     payerIp: "203.0.113.7", returnUrl: `https://debateai.test/checkout/return?charge=${orderId}`, notifyUrl: sink.url, language: "ro"
   });
   /** A started order paid on the fake's page, its first message delivered: the token the fake issued is returned. */
@@ -398,7 +398,7 @@ describe("N5 — the signed-notice helper, against the real verifier (spec §2.4
 /** The two input builders without a fake (the stub's tests need no server). */
 async function setupless() {
   const startOf = (orderId: string): HostedPaymentStart => Object.freeze({
-    orderId, amountMicros: 24_200_000, currency: "USD", description: "DebateAI Plus, one month", payer: PAYER, clientId: CLIENT,
+    orderId, amountMicros: 24_200_000, currency: "USD", description: "Dialectical Engine Plus, one month", payer: PAYER, clientId: CLIENT,
     returnUrl: `https://debateai.test/checkout/return?charge=${orderId}`, notifyUrl: "https://debateai.test/api/v1/billing/netopia/notify", language: "ro"
   });
   const chargeOf = (orderId: string): SavedCardCharge => Object.freeze({

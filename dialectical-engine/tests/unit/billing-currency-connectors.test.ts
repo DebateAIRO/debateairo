@@ -85,7 +85,7 @@ const saleIn = (currency: PriceCurrency, chargeId: string, transactionId: string
   netMicros: number; taxMicros: number; taxRateBasisPoints: number;
 }>, customer: SaleRecord["customer"]): SaleRecord => ({
   chargeId, transactionId, issuedOn: new Date("2026-10-10T08:00:00Z"), currency, customer,
-  lines: [{ description: "DebateAI Plus, October 2026", ...line }],
+  lines: [{ description: "Dialectical Engine Plus, October 2026", ...line }],
   taxCode: "saas", evidence: { billingCountry: customer.country, ipAddress: "203.0.113.10", bankCountry: customer.country },
   processor: "netopia"
 });
@@ -98,7 +98,7 @@ describe("Quaderno records every sale and refund in the charge's currency", () =
     const refund: RefundRecord = {
       chargeId, transactionId: "8801", issuedOn: new Date("2026-10-12T08:00:00Z"), currency: "EUR",
       refundTotalMicros: 23_800_000, original: { documentId: document.documentId, number: document.number },
-      description: "Rückerstattung DebateAI Plus", processor: "netopia"
+      description: "Rückerstattung Dialectical Engine Plus", processor: "netopia"
     };
     await engine.recordRefund(refund);
     expect(fake.sales.find((recorded) => recorded.processor_id === "8801")).toMatchObject({ type: "sale", currency: "EUR" });
@@ -138,7 +138,7 @@ describe("SmartBill invoices in the charge's currency, never with an exchange ra
     const partial = await issuer.creditPartial({
       chargeId, transactionId: "8813", issuedOn: new Date("2026-10-12T08:00:00Z"), currency: "RON",
       refundTotalMicros: 60_500_000, original: { documentId: original.externalRef, number: original.number },
-      description: "Rambursare DebateAI Plus", processor: "netopia",
+      description: "Rambursare Dialectical Engine Plus", processor: "netopia",
       series: original.series, number: original.number, taxRateBasisPoints: 2100, customer: ROMANIAN_BUYER
     });
     const body = smartBill.invoices.get(partial.externalRef)!.body;

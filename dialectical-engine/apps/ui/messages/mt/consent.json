@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Privatezza",
-  "consent.settings.hint": "Dan il-browser iżomm biss dak li DebateAI jeħtieġ biex jaħdem. Ara l-lista sħiħa hawn f’kull ħin.",
+  "consent.settings.hint": "Dan il-browser iżomm biss dak li Dialectical Engine jeħtieġ biex jaħdem. Ara l-lista sħiħa hawn f’kull ħin.",
   "consent.settings.button": "X’naħżnu",
   "consent.bar.label": "Avviż dwar il-cookies",
   "consent.bar.eyebrow": "ID-DATA TIEGĦEK, FUQ IR-REKORD",
   "consent.bar.title": "Naħżnu biss dak li jżomm il-bord jaħdem.",
-  "consent.bar.body": "Erba’ cookies u erba’ oġġetti fil-ħażna tal-browser tiegħek, kull wieħed meħtieġ biex DebateAI jaħdem. Xejn mhu fakultattiv, u xejn ma jinqasam ma’ ħaddieħor.",
+  "consent.bar.body": "Erba’ cookies u erba’ oġġetti fil-ħażna tal-browser tiegħek, kull wieħed meħtieġ biex Dialectical Engine jaħdem. Xejn mhu fakultattiv, u xejn ma jinqasam ma’ ħaddieħor.",
   "consent.bar.acknowledge": "Fhimt",
   "consent.bar.whatWeStore": "X’naħżnu",
   "consent.link.cookiePolicy": "Politika dwar il-cookies",

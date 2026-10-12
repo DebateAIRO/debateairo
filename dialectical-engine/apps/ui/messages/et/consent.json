@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Privaatsus",
-  "consent.settings.hint": "See brauser säilitab ainult seda, mida DebateAI töötamiseks vajab. Täieliku loendi leiate siit igal ajal.",
+  "consent.settings.hint": "See brauser säilitab ainult seda, mida Dialectical Engine töötamiseks vajab. Täieliku loendi leiate siit igal ajal.",
   "consent.settings.button": "Mida me salvestame",
   "consent.bar.label": "Küpsiseteade",
   "consent.bar.eyebrow": "TEIE ANDMED, AMETLIKULT KIRJAS",
   "consent.bar.title": "Talletame ainult teenuse tööks vajaliku.",
-  "consent.bar.body": "Neli küpsist ja neli kirjet teie brauseri mälus, igaüks vajalik, et DebateAI töötaks. Midagi valikulist pole ja midagi ei jagata kellegi teisega.",
+  "consent.bar.body": "Neli küpsist ja neli kirjet teie brauseri mälus, igaüks vajalik, et Dialectical Engine töötaks. Midagi valikulist pole ja midagi ei jagata kellegi teisega.",
   "consent.bar.acknowledge": "Selge",
   "consent.bar.whatWeStore": "Mida me salvestame",
   "consent.link.cookiePolicy": "Küpsisepoliitika",

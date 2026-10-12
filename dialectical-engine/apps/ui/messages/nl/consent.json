@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Privacy",
-  "consent.settings.hint": "Deze browser bewaart alleen wat DebateAI nodig heeft om te werken. Bekijk hier op elk moment de volledige lijst.",
+  "consent.settings.hint": "Deze browser bewaart alleen wat Dialectical Engine nodig heeft om te werken. Bekijk hier op elk moment de volledige lijst.",
   "consent.settings.button": "Wat we opslaan",
   "consent.bar.label": "Cookiemelding",
   "consent.bar.eyebrow": "UW GEGEVENS, VASTGELEGD",
   "consent.bar.title": "Wij slaan alleen op wat nodig is om het panel te laten werken.",
-  "consent.bar.body": "Vier cookies en vier items in de opslag van uw browser, elk nodig om DebateAI te laten werken. Niets optioneel, niets gedeeld met anderen.",
+  "consent.bar.body": "Vier cookies en vier items in de opslag van uw browser, elk nodig om Dialectical Engine te laten werken. Niets optioneel, niets gedeeld met anderen.",
   "consent.bar.acknowledge": "Begrepen",
   "consent.bar.whatWeStore": "Wat we opslaan",
   "consent.link.cookiePolicy": "Cookiebeleid",

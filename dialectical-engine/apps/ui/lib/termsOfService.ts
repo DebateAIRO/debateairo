@@ -28,7 +28,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "In short",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "You must be 18 or over. DebateAI builds arguments with AI models and everything it generates may be wrong — it is not advice. Your debates are private unless you publish them; if you publish, anyone can read them. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you." }
+      { kind: "p", text: "You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. Your debates are private unless you publish them; if you publish, anyone can read them. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you." }
     ]
   },
   {
@@ -36,7 +36,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Who we are and how to reach us",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI is operated by DMS Merchandise Shop S.R.L., a company registered in Romania." },
+      { kind: "p", text: "Dialectical Engine is operated by DMS Merchandise Shop S.R.L., a company registered in Romania." },
       {
         kind: "list",
         items: [
@@ -59,10 +59,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "02",
-    title: "Where we offer DebateAI",
+    title: "Where we offer Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "We offer DebateAI to people who live in the European Union (27 countries) and the European Economic Area (Norway, Iceland and Liechtenstein), Switzerland, Moldova, the United States (except Tennessee), Canada, Australia, New Zealand, Singapore, Japan, South Korea and Taiwan. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
+      { kind: "p", text: "We offer Dialectical Engine to people who live in the European Union (27 countries) and the European Economic Area (Norway, Iceland and Liechtenstein), Switzerland, Moldova, the United States (except Tennessee), Canada, Australia, New Zealand, Singapore, Japan, South Korea and Taiwan. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
     ]
   },
   {
@@ -77,22 +77,22 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "04",
-    title: "Who may use DebateAI",
+    title: "Who may use Dialectical Engine",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "You must be 18 or over to create an account, and you confirm this when you register. DebateAI is not directed at children and we do not knowingly provide it to anyone under 18. If we learn that an account belongs to someone under 18, we close it. Some regions require more than a confirmation; Annex A says what applies where." },
-      { kind: "p", text: "You must have the legal capacity to enter into this contract. If you use DebateAI on behalf of an organisation, you confirm you are authorised to bind it, and \"you\" then means that organisation." },
+      { kind: "p", text: "You must be 18 or over to create an account, and you confirm this when you register. Dialectical Engine is not directed at children and we do not knowingly provide it to anyone under 18. If we learn that an account belongs to someone under 18, we close it. Some regions require more than a confirmation; Annex A says what applies where." },
+      { kind: "p", text: "You must have the legal capacity to enter into this contract. If you use Dialectical Engine on behalf of an organisation, you confirm you are authorised to bind it, and \"you\" then means that organisation." },
       { kind: "p", text: "Anyone may read a debate that has been published. Reading does not require an account, but it is use of the service, and sections 7, 15, 16 and 18 apply to it." }
     ]
   },
   {
     no: "05",
-    title: "What DebateAI does, and what it is not",
+    title: "What Dialectical Engine does, and what it is not",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "You submit a question or a claim. DebateAI sends it to several third-party AI models, which build an argument graph around it: claims, counter-claims, critiques, evidence references, scores, and a verdict with a confidence band. You can challenge individual claims, ask for a point to be investigated further, and decide whether to publish the result." },
+      { kind: "p", text: "You submit a question or a claim. Dialectical Engine sends it to several third-party AI models, which build an argument graph around it: claims, counter-claims, critiques, evidence references, scores, and a verdict with a confidence band. You can challenge individual claims, ask for a point to be investigated further, and decide whether to publish the result." },
       { kind: "p", text: "Everything in a debate is generated by AI. The arguments, critiques, evidence references, scores, verdicts and the support assistant's replies are machine-generated. They may be wrong, incomplete, out of date, or confidently mistaken, and they may reflect biases in the models. No person reviews them before they are shown to you or published, and no named person holds editorial responsibility for them. Generated content is labelled as AI-generated in the product, on published pages, and in exports." },
-      { kind: "p", text: "DebateAI is not advice. It is not legal, medical, financial, tax, psychological, safety or other professional advice, and a verdict is not a finding of fact. Do not use a debate as the basis for a decision that matters to your health, safety, money, legal position or the wellbeing of others without checking primary sources and, where appropriate, a qualified professional. A high confidence band means the models found the reading well-settled on the material they saw; it is not a guarantee that it is true." },
+      { kind: "p", text: "Dialectical Engine is not advice. It is not legal, medical, financial, tax, psychological, safety or other professional advice, and a verdict is not a finding of fact. Do not use a debate as the basis for a decision that matters to your health, safety, money, legal position or the wellbeing of others without checking primary sources and, where appropriate, a qualified professional. A high confidence band means the models found the reading well-settled on the material they saw; it is not a guarantee that it is true." },
       { kind: "p", text: "What we do commit to. We will provide the service with reasonable care and skill and in line with the description we publish. Where the law gives you a guarantee that the service conforms to its description and is fit for its ordinary purpose, that guarantee applies and nothing in these Terms removes it. What we do not promise is that any particular output is accurate: that is a property of the generated content, not of whether the service works." },
       { kind: "p", text: "Models change. We may add, remove or replace the AI models we use and change how the engine composes an answer. Section 14 explains when a change gives you rights." }
     ]
@@ -114,13 +114,13 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--gold",
     blocks: [
       { kind: "p", text: "These rules apply to what you submit, how you use the service, and what you publish." },
-      { kind: "p", text: "Do not submit personal data about other people. Ask about issues, arguments and public questions rather than about identifiable private individuals. Do not include names, contact details, identification numbers, images, health, financial or other details that identify someone, and do not use DebateAI to build a case, profile or dossier about a person. Questions about public figures acting in their public role are acceptable; questions targeting a private individual are not. If you do submit such data, you are responsible for it, and we may remove the content." },
+      { kind: "p", text: "Do not submit personal data about other people. Ask about issues, arguments and public questions rather than about identifiable private individuals. Do not include names, contact details, identification numbers, images, health, financial or other details that identify someone, and do not use Dialectical Engine to build a case, profile or dossier about a person. Questions about public figures acting in their public role are acceptable; questions targeting a private individual are not. If you do submit such data, you are responsible for it, and we may remove the content." },
       { kind: "p", text: "Your own sensitive information. Questions you ask may touch on your own health, beliefs, politics or other sensitive matters. You consent to that on a separate screen before your first debate. If you live somewhere with specific rules on health data, Annex A may point you to a separate notice." },
       { kind: "p", text: "Do not submit or publish unlawful content, including content that is defamatory, incites violence or hatred, harasses or threatens, is intimate imagery shared without consent, infringes intellectual property or confidentiality, discloses trade secrets, constitutes child sexual abuse material, or breaches sanctions or export controls." },
-      { kind: "p", text: "Do not use DebateAI to deceive. Do not present generated output as human-written where that would mislead, strip the AI-generated label from it, or use it to manufacture apparent consensus, fake evidence or impersonation." },
+      { kind: "p", text: "Do not use Dialectical Engine to deceive. Do not present generated output as human-written where that would mislead, strip the AI-generated label from it, or use it to manufacture apparent consensus, fake evidence or impersonation." },
       { kind: "p", text: "Do not attack the service. Except for ordinary indexing by search engines, do not access the service automatically, scrape, crawl or bulk-extract published debates without our written permission; do not circumvent rate limits, authentication or publication controls; do not try to extract prompts or system instructions; do not use prompt injection to make the engine ignore its constraints; and do not probe or load-test the service without our written permission." },
       { kind: "p", text: "Do not resell or rebrand the service, or use it to build a competing engine, including by using outputs as training data, without our written agreement." },
-      { kind: "p", text: "Do not use DebateAI for decisions about a person's health, safety, legal rights, employment, credit, housing or immigration status. It is not built for that and its outputs are not a safe basis for it." },
+      { kind: "p", text: "Do not use Dialectical Engine for decisions about a person's health, safety, legal rights, employment, credit, housing or immigration status. It is not built for that and its outputs are not a safe basis for it." },
       { kind: "p", text: "Local law where you publish. You are responsible for making sure that anything you publish complies with the law of the country you are in. We may restrict publication of certain topics in certain regions." },
       { kind: "p", text: "If you are unsure whether something is allowed, ask us before you post it." }
     ]
@@ -146,8 +146,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Debates are private by default. Nothing you create is visible to anyone else unless you publish it." },
       { kind: "p", text: "What publishing does. Publishing is a deliberate, separately confirmed action. When you publish, we take a frozen snapshot of the debate and make it readable by anyone, without an account. Search engines may index it. The snapshot shows your pseudonym, your question as you wrote it, the argument tree, the scores, the verdict and the confidence band, and carries a visible label that the content is AI-generated. It does not show your email address, your session records or your account history." },
-      { kind: "p", text: "Publishing is effectively irreversible in practice. Once a debate is public, other people can read, quote, screenshot, archive and cache it. Unpublishing removes it from DebateAI and destroys the key to our copy, but cannot reach copies that already exist elsewhere. Do not publish anything you would be unwilling to have permanently associated with your pseudonym." },
-      { kind: "p", text: "Published debates when you close your account. When you schedule the closure of your account, you choose what happens to the debates you published. If you tick \"Also delete my public debates\", we remove each of them from DebateAI and destroy the key to our copy when the closure runs, as unpublishing does, unless the law requires us to retain a specific item. If you leave the box unticked, they stay public under your retired pseudonym. Copies that others made before removal are outside our control. If you want a debate you remove to stay available to you, download it first." },
+      { kind: "p", text: "Publishing is effectively irreversible in practice. Once a debate is public, other people can read, quote, screenshot, archive and cache it. Unpublishing removes it from Dialectical Engine and destroys the key to our copy, but cannot reach copies that already exist elsewhere. Do not publish anything you would be unwilling to have permanently associated with your pseudonym." },
+      { kind: "p", text: "Published debates when you close your account. When you schedule the closure of your account, you choose what happens to the debates you published. If you tick \"Also delete my public debates\", we remove each of them from Dialectical Engine and destroy the key to our copy when the closure runs, as unpublishing does, unless the law requires us to retain a specific item. If you leave the box unticked, they stay public under your retired pseudonym. Copies that others made before removal are outside our control. If you want a debate you remove to stay available to you, download it first." },
       { kind: "p", text: "We can always take published content down. We may remove or restrict access to a published debate where the law requires it, where a court or competent authority orders it, or where it breaches these Terms or is illegal. Nothing in this section prevents us from acting on a valid notice under section 10, and nothing in it is a promise that a published debate will remain available." },
       { kind: "p", text: "Licence for published content. Publishing grants us a non-exclusive, worldwide, royalty-free licence to host, store, reproduce, display and make the snapshot publicly available, and to allow others to read and quote it, for as long as it remains published. This licence exists so we can operate the public pages; it does not let us sell your content or license it for someone else's product." },
       { kind: "p", text: "If a debate is about you. If a published debate contains personal data about you, or is defamatory or otherwise unlawful, you can ask for it to be removed whether or not you have an account, through section 10 or at privacy@dezbatere.ro. We act on substantiated requests and do not require you to sign up to make one." }
@@ -172,7 +172,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Complaining about a decision. If you disagree with a moderation decision, reply to the statement of reasons or write to office@dezbatere.ro within six months. A person who was not involved in the original decision reviews it, and we tell you the outcome with reasons. This does not affect your right to go to court or to use alternative dispute resolution under section 18. The complaints route also accepts complaints that we have failed to act on a report, that content was wrongly removed, that an account was wrongly restricted, or that an automated tool wrongly affected your content." },
       { kind: "p", text: "Out-of-court dispute settlement. If you are in the European Union, you may take a dispute about one of our moderation decisions to an out-of-court dispute settlement body certified under Article 21 of the EU Digital Services Act (Regulation (EU) 2022/2065). This covers a decision about your content or your account, and our decision on a report you made. You choose the body from the list the European Commission publishes at digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, and you do not have to use our complaints route first. We take part in good faith, and we decline only if the same dispute, about the same content and on the same grounds, has already been settled. The body's decision does not bind either of us, and you keep your right to go to court. The body may charge you a small fee or nothing. If it decides in your favour, we pay its fees and repay your reasonable expenses; if it decides in ours, you do not pay our fees or expenses unless the body finds that you acted manifestly in bad faith." },
       { kind: "p", text: "Contacting a human. Our support assistant is an AI system and says so. You can ask to speak to a person at any time, and every support conversation offers that route. We do not rely on automated tools alone to communicate with you." },
-      { kind: "p", text: "Terrorist content. Terrorist content is illegal and is not allowed on DebateAI (section 7). Competent authorities in the European Union can send us removal orders under Regulation (EU) 2021/784 at the contact point in section 1. When we receive one, we remove the content, or block access to it in every EU country, within one hour. We tell the person who published it that it was removed and, if they ask, why and how to challenge the order, unless the authority decides that public security requires silence for a limited period. As the Regulation requires, we keep the removed content and the related data for six months, so that the removal can be reviewed and, if it was wrong, reversed. The person who published the content can challenge the order in the courts of the country whose authority issued it, and can also use our complaints route. No authority has required us to take specific measures against terrorist content under the Regulation; if one does, we will describe those measures here, including any automated tools." },
+      { kind: "p", text: "Terrorist content. Terrorist content is illegal and is not allowed on Dialectical Engine (section 7). Competent authorities in the European Union can send us removal orders under Regulation (EU) 2021/784 at the contact point in section 1. When we receive one, we remove the content, or block access to it in every EU country, within one hour. We tell the person who published it that it was removed and, if they ask, why and how to challenge the order, unless the authority decides that public security requires silence for a limited period. As the Regulation requires, we keep the removed content and the related data for six months, so that the removal can be reviewed and, if it was wrong, reversed. The person who published the content can challenge the order in the courts of the country whose authority issued it, and can also use our complaints route. No authority has required us to take specific measures against terrorist content under the Regulation; if one does, we will describe those measures here, including any automated tools." },
       { kind: "p", text: "Serious risk to life or safety. If we become aware of information suggesting a criminal offence involving a threat to someone's life or safety, we inform the competent authorities." }
     ]
   },
@@ -195,7 +195,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "DebateAI offers a free plan. A paid Premium plan will be available, which unlocks the full model roster and lets you set the debate gauges yourself." },
+      { kind: "p", text: "Dialectical Engine offers a free plan. A paid Premium plan will be available, which unlocks the full model roster and lets you set the debate gauges yourself." },
       { kind: "p", text: "Before you pay we show you, directly above the payment button: the plan; the total price including applicable tax; the billing period; that the plan renews automatically until cancelled; the date any free trial ends and what you will then be charged; and how to cancel. You confirm the renewal terms by ticking a separate box. The button reads Subscribe and pay (in Romanian, Comandă cu obligație de plată). We send you a confirmation on a durable medium containing the same information, these Terms, and the withdrawal form." },
       { kind: "p", text: "Reminders. We email you at least 5 days before a free trial converts to a paid plan; at least once a year for continuing plans; and between 30 and 45 days before any renewal of a term of twelve months or more. Every reminder includes the price, the date, and a cancellation link." },
       { kind: "p", text: "Cancelling. Cancel at any time from Settings → Subscription with one confirmation click, or through the cancellation page at dezbatere.ro/cancel, which does not require you to log in. Cancellation takes effect at the end of the current billing period, and you keep access until then. We will not make cancelling harder than subscribing was." },
@@ -221,9 +221,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Changes to the service and to these Terms",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "To the service. We develop DebateAI continuously, and routine improvements, fixes and model-roster changes happen without notice. Where we make a change that goes beyond keeping the service working as described, we do it only for one of these reasons: to comply with a legal or regulatory requirement; to respond to a security or abuse problem; because a model provider changes, restricts or withdraws a model or feature we depend on; to adapt to a technical environment we do not control; or to add, improve or retire a feature in a way that adds no cost to you." },
+      { kind: "p", text: "To the service. We develop Dialectical Engine continuously, and routine improvements, fixes and model-roster changes happen without notice. Where we make a change that goes beyond keeping the service working as described, we do it only for one of these reasons: to comply with a legal or regulatory requirement; to respond to a security or abuse problem; because a model provider changes, restricts or withdraws a model or feature we depend on; to adapt to a technical environment we do not control; or to add, improve or retire a feature in a way that adds no cost to you." },
       { kind: "p", text: "We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within 30 days of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period." },
-      { kind: "p", text: "To these Terms. We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least 30 days before it takes effect; continuing to use DebateAI after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions." }
+      { kind: "p", text: "To these Terms. We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least 30 days before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions." }
     ]
   },
   {
@@ -243,9 +243,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Intellectual property",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "The service itself — the software, the engine, the scoring method, the interface, the names DebateAI and DebateAIRO and our logos — belongs to us or our licensors. These Terms give you permission to use the service, not ownership of it." },
-      { kind: "p", text: "You may quote and link to published debates with attribution to DebateAI and a link to the original page. Bulk copying, systematic reproduction of the public corpus, and use of published debates as training data are not permitted without our written agreement." },
-      { kind: "p", text: "Section 8 covers your content and the status of generated outputs. If you believe something on DebateAI infringes your intellectual property, use the reporting route in section 10." }
+      { kind: "p", text: "The service itself — the software, the engine, the scoring method, the interface, the names Dialectical Engine and DebateAIRO and our logos — belongs to us or our licensors. These Terms give you permission to use the service, not ownership of it." },
+      { kind: "p", text: "You may quote and link to published debates with attribution to Dialectical Engine and a link to the original page. Bulk copying, systematic reproduction of the public corpus, and use of published debates as training data are not permitted without our written agreement." },
+      { kind: "p", text: "Section 8 covers your content and the status of generated outputs. If you believe something on Dialectical Engine infringes your intellectual property, use the reporting route in section 10." }
     ]
   },
   {
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Personal data",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "How we handle personal data is set out in the Privacy Policy at dezbatere.ro/privacy. It explains what we collect, the legal basis for each purpose, how long we keep things, who receives data, the transfers involved, and how to exercise your rights. Three points belong here as well. Section 7 asks you not to put other people's personal data into a question; if you do, you are responsible for that, and we may remove the content. If a debate published on DebateAI contains personal data about you, you can ask us to remove it without holding an account (section 9). And we keep a record of your acceptance of these Terms — version, time, and the technical details of the session — as evidence of the contract, as the Privacy Policy explains." }
+      { kind: "p", text: "How we handle personal data is set out in the Privacy Policy at dezbatere.ro/privacy. It explains what we collect, the legal basis for each purpose, how long we keep things, who receives data, the transfers involved, and how to exercise your rights. Three points belong here as well. Section 7 asks you not to put other people's personal data into a question; if you do, you are responsible for that, and we may remove the content. If a debate published on Dialectical Engine contains personal data about you, you can ask us to remove it without holding an account (section 9). And we keep a record of your acceptance of these Terms — version, time, and the technical details of the session — as evidence of the contract, as the Privacy Policy explains." }
     ]
   },
   {
@@ -302,7 +302,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "United States",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Tennessee. We do not offer DebateAI to people who live in Tennessee." },
+      { kind: "p", text: "Tennessee. We do not offer Dialectical Engine to people who live in Tennessee." },
       { kind: "p", text: "Notices and takedowns. Non-consensual intimate imagery may be reported by email to abuse@dezbatere.ro, without an account, and is removed within 48 hours of a valid request. Copyright complaints go through the reporting route in section 10." },
       { kind: "p", text: "State-specific. California: the automatic-renewal terms in section 12 apply; you may cancel online at any time; we retain your consent to renewal terms for at least three years. New York: you may cancel within 14 days of any charge at an increased price and receive a pro-rata refund. Texas and Nebraska: we do not sell sensitive personal data. Washington: our Consumer Health Data Privacy Notice at dezbatere.ro/privacy/us-health-data applies to health-related information. Colorado: nothing in the service makes consequential decisions about you. Our Privacy Policy, Annex B.2, covers your data and your state privacy rights." }
     ]
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "fcffb706c7ab2dcbfa09594dd5b0686e274cc5ba3e3a4377573f5b771c07a660",
+  sha256: "982a39b7457f6518cf460ddb0a501dfa1a2a4f39ccdc9fd7890d99fc0c5969cc",
   eyebrow: "TERMS OF SERVICE · v2.2 · EFFECTIVE 12 OCTOBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",

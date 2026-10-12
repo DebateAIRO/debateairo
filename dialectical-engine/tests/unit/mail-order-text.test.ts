@@ -37,11 +37,11 @@ describe("P17 the order and invoice sentences (D6a's orderText port)", () => {
 
   it("speaks the buyer's language, keeps the product names, and falls back to English", () => {
     const romanian = renderOrderText("ORDER_PLAN", "ro", { plan: "Plus" });
-    expect(romanian).not.toBe("DebateAI Plus monthly plan");
-    expect(romanian).toContain("DebateAI");
+    expect(romanian).not.toBe("Dialectical Engine Plus monthly plan");
+    expect(romanian).toContain("Dialectical Engine");
     expect(romanian).toContain("Plus");
     expect(renderOrderText("INVOICE_LINE", "de", PARAMS.INVOICE_LINE)).toContain("October 1, 2026");
-    expect(renderOrderText("CARD_CHECK", "xx", {})).toBe("DebateAI card check");
+    expect(renderOrderText("CARD_CHECK", "xx", {})).toBe("Dialectical Engine card check");
   });
 
   it("refuses a missing, unknown or multi-line param, and an unknown kind, with a code and no value", () => {

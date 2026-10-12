@@ -1,4 +1,4 @@
-# DebateAI — Hizmet Koşulları
+# Dialectical Engine — Hizmet Koşulları
 
 <!-- legal-chrome
 summaryTitle: Kısaca
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
-**In short.** En az 18 yaşında olmalısınız. DebateAI, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
+**In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
 ## 1. Biz kimiz ve bize nasıl ulaşabilirsiniz
 
-DebateAI, Romanya'da tescilli bir şirket olan **DMS Merchandise Shop S.R.L.** tarafından işletilmektedir.
+Dialectical Engine, Romanya'da tescilli bir şirket olan **DMS Merchandise Shop S.R.L.** tarafından işletilmektedir.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ DebateAI, Romanya'da tescilli bir şirket olan **DMS Merchandise Shop S.R.L.** t
 
 Bu bilgiler ayrıca dezbatere.ro/legal adresindeki sitede kalıcı olarak gösterilir. Yalnızca asistanımıza değil, her zaman bir kişiye ulaşabilirsiniz; bunun nasıl yapılacağı 10. bölümde açıklanmıştır.
 
-## 2. DebateAI'ı nerelerde sunuyoruz
+## 2. Dialectical Engine'i nerelerde sunuyoruz
 
-DebateAI'ı Avrupa Birliği'nde (27 ülke) ve Avrupa Ekonomik Alanı'nda (Norveç, İzlanda, Lihtenştayn), İsviçre'de, Moldova'da, Amerika Birleşik Devletleri'nde (Tennessee hariç), Kanada'da, Avustralya'da, Yeni Zelanda'da, Singapur'da, Japonya'da, Güney Kore'de ve Tayvan'da yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir.
+Dialectical Engine'i Avrupa Birliği'nde (27 ülke) ve Avrupa Ekonomik Alanı'nda (Norveç, İzlanda, Lihtenştayn), İsviçre'de, Moldova'da, Amerika Birleşik Devletleri'nde (Tennessee hariç), Kanada'da, Avustralya'da, Yeni Zelanda'da, Singapur'da, Japonya'da, Güney Kore'de ve Tayvan'da yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir.
 
 ## 3. Bu Koşulların kabulü
 
@@ -58,21 +58,21 @@ dezbatere.ro/privacy adresindeki **Gizlilik Politikamız**, kişisel verileri na
 
 Bizimle elektronik ortamda herhangi bir sözleşme kurmadan önce arayüz, ilgili adımları size gösterir, göndermeden önce girdiğiniz bilgileri inceleyip düzeltmenize olanak tanır ve sözleşmenin hangi dillerde kurulabileceğini bildirir. Bu Koşullar, kaydedebileceğiniz ve yazdırabileceğiniz bir biçimde sunulur; ücretli bir plan satın aldığınızda kabul ettiğiniz sürümü size e-postayla göndeririz ve istediğiniz zaman bir kopyasını talep edebilirsiniz. Bu Koşullardaki hiçbir hüküm, Romanya veya AB tüketici hukukundan ya da yaşadığınız ülkenin hukukundan doğan ve sözleşmeyle sınırlandırılamayan haklarınızı sınırlandırmaz.
 
-## 4. DebateAI'ı kimler kullanabilir
+## 4. Dialectical Engine'i kimler kullanabilir
 
-Hesap oluşturmak için **18 yaşında veya daha büyük** olmalısınız ve kayıt olurken bunu teyit edersiniz. DebateAI çocuklara yönelik değildir ve 18 yaşından küçük hiç kimseye bilerek sunulmaz. Bir hesabın 18 yaşından küçük bir kişiye ait olduğunu öğrenirsek hesabı kapatırız. Bazı bölgelerde salt teyitten fazlası gerekir; nerede hangi kuralların uygulandığı Ek A'da belirtilmiştir.
+Hesap oluşturmak için **18 yaşında veya daha büyük** olmalısınız ve kayıt olurken bunu teyit edersiniz. Dialectical Engine çocuklara yönelik değildir ve 18 yaşından küçük hiç kimseye bilerek sunulmaz. Bir hesabın 18 yaşından küçük bir kişiye ait olduğunu öğrenirsek hesabı kapatırız. Bazı bölgelerde salt teyitten fazlası gerekir; nerede hangi kuralların uygulandığı Ek A'da belirtilmiştir.
 
-Bu sözleşmeyi kurmak için hukuki ehliyete sahip olmalısınız. DebateAI'ı bir kuruluş adına kullanıyorsanız, o kuruluşu bağlamaya yetkili olduğunuzu teyit etmiş olursunuz ve bu durumda "siz" söz konusu kuruluş anlamına gelir.
+Bu sözleşmeyi kurmak için hukuki ehliyete sahip olmalısınız. Dialectical Engine'i bir kuruluş adına kullanıyorsanız, o kuruluşu bağlamaya yetkili olduğunuzu teyit etmiş olursunuz ve bu durumda "siz" söz konusu kuruluş anlamına gelir.
 
 Yayımlanmış bir tartışmayı herkes okuyabilir. Okumak için hesap gerekmez; ancak bu da hizmetin kullanımıdır ve 7, 15, 16 ve 18. bölümler buna uygulanır.
 
-## 5. DebateAI ne yapar ve ne değildir
+## 5. Dialectical Engine ne yapar ve ne değildir
 
-Bir soru veya iddia gönderirsiniz. DebateAI bunu, çevresinde iddialar, karşı iddialar, eleştiriler, kanıt atıfları, puanlar ve güven aralığı içeren bir hükümden oluşan bir argüman grafiği kuran çeşitli üçüncü taraf yapay zekâ modellerine gönderir. Tek tek iddialara itiraz edebilir, bir hususun daha ayrıntılı incelenmesini isteyebilir ve sonucu yayımlayıp yayımlamamaya karar verebilirsiniz.
+Bir soru veya iddia gönderirsiniz. Dialectical Engine bunu, çevresinde iddialar, karşı iddialar, eleştiriler, kanıt atıfları, puanlar ve güven aralığı içeren bir hükümden oluşan bir argüman grafiği kuran çeşitli üçüncü taraf yapay zekâ modellerine gönderir. Tek tek iddialara itiraz edebilir, bir hususun daha ayrıntılı incelenmesini isteyebilir ve sonucu yayımlayıp yayımlamamaya karar verebilirsiniz.
 
 **Bir tartışmadaki her şey yapay zekâ tarafından üretilir.** Argümanlar, eleştiriler, kanıt atıfları, puanlar, hükümler ve destek asistanının yanıtları makine tarafından üretilir. Bunlar yanlış, eksik, güncelliğini yitirmiş veya kendinden emin biçimde hatalı olabilir ve modellerdeki önyargıları yansıtabilir. Size gösterilmeden veya yayımlanmadan önce hiçbir kişi bunları incelemez ve adı belirtilmiş hiçbir kişi bunlar için editoryal sorumluluk taşımaz. Üretilen içerik; ürün içinde, yayımlanan sayfalarda ve dışa aktarımlarda yapay zekâ tarafından üretilmiş olarak etiketlenir.
 
-**DebateAI tavsiye değildir.** Hukuki, tıbbi, mali, vergisel, psikolojik, güvenlikle ilgili veya başka türde mesleki tavsiye değildir; bir hüküm de maddi vakıa tespiti değildir. Bir tartışmayı, birincil kaynakları ve uygun olduğu durumlarda yetkin bir uzmanı kontrol etmeksizin sağlığınız, güvenliğiniz, paranız, hukuki durumunuz veya başkalarının esenliği açısından önem taşıyan bir kararın dayanağı olarak kullanmayın. Yüksek güven aralığı, modellerin gördükleri materyal temelinde yorumun yerleşik olduğunu saptadığı anlamına gelir; bunun doğru olduğuna dair güvence değildir.
+**Dialectical Engine tavsiye değildir.** Hukuki, tıbbi, mali, vergisel, psikolojik, güvenlikle ilgili veya başka türde mesleki tavsiye değildir; bir hüküm de maddi vakıa tespiti değildir. Bir tartışmayı, birincil kaynakları ve uygun olduğu durumlarda yetkin bir uzmanı kontrol etmeksizin sağlığınız, güvenliğiniz, paranız, hukuki durumunuz veya başkalarının esenliği açısından önem taşıyan bir kararın dayanağı olarak kullanmayın. Yüksek güven aralığı, modellerin gördükleri materyal temelinde yorumun yerleşik olduğunu saptadığı anlamına gelir; bunun doğru olduğuna dair güvence değildir.
 
 **Taahhüt ettiğimiz hususlar.** Hizmeti makul özen ve yetkinlikle ve yayımladığımız açıklamaya uygun olarak sunacağız. Hukukun, hizmetin açıklamasına uygun ve olağan amacı bakımından elverişli olduğuna dair bir güvence tanıdığı durumlarda bu güvence geçerlidir ve bu Koşullardaki hiçbir hüküm onu ortadan kaldırmaz. Herhangi bir çıktının doğru olacağını ise taahhüt etmiyoruz: bu, hizmetin çalışıp çalışmadığının değil, üretilen içeriğin bir özelliğidir.
 
@@ -92,19 +92,19 @@ Hesabınızı istediğiniz zaman **Ayarlar → Hesap** bölümünden kapatabilir
 
 Bu kurallar gönderdiklerinize, hizmeti kullanma biçiminize ve yayımladıklarınıza uygulanır.
 
-**Başka kişiler hakkında kişisel veri göndermeyin.** Kimliği belirli özel kişiler yerine meseleler, argümanlar ve kamusal konular hakkında soru sorun. Bir kişiyi belirleyen adları, iletişim bilgilerini, kimlik numaralarını, görüntüleri, sağlık, mali veya diğer bilgileri dahil etmeyin ve DebateAI'ı bir kişi hakkında dosya, profil veya bilgi derlemesi oluşturmak için kullanmayın. Kamusal görevleri kapsamında hareket eden tanınmış kişiler hakkındaki sorular kabul edilebilir; özel bir kişiyi hedef alan sorular kabul edilemez. Böyle bir veri gönderirseniz bundan siz sorumlu olursunuz ve içeriği kaldırabiliriz.
+**Başka kişiler hakkında kişisel veri göndermeyin.** Kimliği belirli özel kişiler yerine meseleler, argümanlar ve kamusal konular hakkında soru sorun. Bir kişiyi belirleyen adları, iletişim bilgilerini, kimlik numaralarını, görüntüleri, sağlık, mali veya diğer bilgileri dahil etmeyin ve Dialectical Engine'i bir kişi hakkında dosya, profil veya bilgi derlemesi oluşturmak için kullanmayın. Kamusal görevleri kapsamında hareket eden tanınmış kişiler hakkındaki sorular kabul edilebilir; özel bir kişiyi hedef alan sorular kabul edilemez. Böyle bir veri gönderirseniz bundan siz sorumlu olursunuz ve içeriği kaldırabiliriz.
 
 **Kendinize ait hassas bilgiler.** Sorduğunuz sorular kendi sağlığınız, inançlarınız, siyasi görüşleriniz veya diğer hassas konularla ilgili olabilir. Buna, ilk tartışmanızdan önce ayrı bir ekranda rıza verirsiniz. Sağlık verilerine ilişkin özel kuralları olan bir yerde yaşıyorsanız Ek A sizi ayrı bir bildirime yönlendirebilir.
 
 İftira niteliğinde olan, şiddet veya nefrete teşvik eden, taciz veya tehdit içeren, rıza olmaksızın paylaşılan mahrem görüntülerden oluşan, fikrî mülkiyeti veya gizliliği ihlal eden, ticari sırları açıklayan, çocukların cinsel istismarına ilişkin materyal teşkil eden ya da yaptırımları veya ihracat kontrollerini ihlal eden içerikler dahil olmak üzere **hukuka aykırı içerik göndermeyin veya yayımlamayın**.
 
-**DebateAI'ı aldatma amacıyla kullanmayın.** Yanıltıcı olacağı durumlarda üretilen çıktıyı insan tarafından yazılmış gibi sunmayın, yapay zekâ tarafından üretildiği etiketini kaldırmayın ve görünürde uzlaşma, sahte kanıt veya kimliğe bürünme oluşturmak için kullanmayın.
+**Dialectical Engine'i aldatma amacıyla kullanmayın.** Yanıltıcı olacağı durumlarda üretilen çıktıyı insan tarafından yazılmış gibi sunmayın, yapay zekâ tarafından üretildiği etiketini kaldırmayın ve görünürde uzlaşma, sahte kanıt veya kimliğe bürünme oluşturmak için kullanmayın.
 
 **Hizmete saldırmayın.** Arama motorları yayımlanmış tartışmaları olağan şekilde dizine ekleyebilir. Bunlara başka türlü otomatik erişim, veri kazıma, tarama veya toplu çıkarım için yazılı iznimiz gerekir. Hız sınırlarını, kimlik doğrulamayı veya yayımlama kontrollerini aşmayın; istemleri ya da sistem talimatlarını çıkarmaya çalışmayın; motorun kısıtlarını aşması için istem enjeksiyonu yapmayın; yazılı iznimiz olmadan yoklama veya yük testi gerçekleştirmeyin.
 
 Yazılı mutabakatımız olmadan hizmeti **yeniden satmayın veya başka bir markayla sunmayın** ya da çıktıları eğitim verisi olarak kullanmak dahil, rakip bir motor geliştirmek için kullanmayın.
 
-DebateAI'ı bir kişinin sağlığı, güvenliği, yasal hakları, istihdamı, kredisi, barınması veya göçmenlik statüsü hakkında **karar vermek için kullanmayın**. Bu amaçla geliştirilmemiştir ve çıktıları bu tür kararlar için güvenli bir dayanak değildir.
+Dialectical Engine'i bir kişinin sağlığı, güvenliği, yasal hakları, istihdamı, kredisi, barınması veya göçmenlik statüsü hakkında **karar vermek için kullanmayın**. Bu amaçla geliştirilmemiştir ve çıktıları bu tür kararlar için güvenli bir dayanak değildir.
 
 **Yayımladığınız yerdeki yerel hukuk.** Yayımladığınız her şeyin bulunduğunuz ülkenin hukukuna uygun olmasını sağlamak sizin sorumluluğunuzdadır. Belirli bölgelerde belirli konulardaki yayımları kısıtlayabiliriz.
 
@@ -132,9 +132,9 @@ Tartışmalar **varsayılan olarak özeldir**. Oluşturduğunuz hiçbir şey, si
 
 **Yayımlama ne yapar.** Yayımlama, ayrı olarak teyit edilen bilinçli bir işlemdir. Yayımladığınızda tartışmanın sabit bir anlık görüntüsünü alır ve hesap gerekmeksizin herkesin okuyabileceği hâle getiririz. Arama motorları bunu dizine ekleyebilir. Anlık görüntü; **takma adınızı**, sorunuzu yazdığınız şekliyle, argüman ağacını, puanları, hükmü ve güven aralığını gösterir ve içeriğin yapay zekâ tarafından üretildiğine ilişkin görünür bir etiket taşır. E-posta adresinizi, oturum kayıtlarınızı veya hesap geçmişinizi göstermez.
 
-**Yayımlama uygulamada fiilen geri alınamaz.** Bir tartışma kamuya açıldığında başkaları onu okuyabilir, alıntılayabilir, ekran görüntüsünü alabilir, arşivleyebilir ve önbelleğe kaydedebilir. Yayımdan kaldırmak, içeriği DebateAI'dan kaldırır ve bizdeki kopyanın anahtarını yok eder; ancak başka yerlerde hâlihazırda bulunan kopyalara ulaşamaz. Takma adınızla kalıcı olarak ilişkilendirilmesini istemeyeceğiniz hiçbir şeyi yayımlamayın.
+**Yayımlama uygulamada fiilen geri alınamaz.** Bir tartışma kamuya açıldığında başkaları onu okuyabilir, alıntılayabilir, ekran görüntüsünü alabilir, arşivleyebilir ve önbelleğe kaydedebilir. Yayımdan kaldırmak, içeriği Dialectical Engine'den kaldırır ve bizdeki kopyanın anahtarını yok eder; ancak başka yerlerde hâlihazırda bulunan kopyalara ulaşamaz. Takma adınızla kalıcı olarak ilişkilendirilmesini istemeyeceğiniz hiçbir şeyi yayımlamayın.
 
-**Hesabınızı kapattığınızda yayımlanmış tartışmalar.** Hesabınızın kapatılmasını planladığınızda yayımladığınız tartışmalara ne olacağını seçersiniz. **"Herkese açık tartışmalarımı da sil"** kutusunu işaretlerseniz, kapatma işlemi yapıldığında her birini DebateAI’dan kaldırır ve tıpkı yayından kaldırmada olduğu gibi kopyamızın anahtarını yok ederiz; yasaların belirli bir öğeyi saklamamızı gerektirmesi bunun istisnasıdır. Kutuyu işaretlemezseniz tartışmalar kullanımdan kaldırılmış takma adınız altında herkese açık kalır. Kaldırılmadan önce başkalarının yaptığı kopyalar kontrolümüz dışındadır. Kaldırdığınız bir tartışmaya erişiminiz sürsün istiyorsanız önce indirin.
+**Hesabınızı kapattığınızda yayımlanmış tartışmalar.** Hesabınızın kapatılmasını planladığınızda yayımladığınız tartışmalara ne olacağını seçersiniz. **"Herkese açık tartışmalarımı da sil"** kutusunu işaretlerseniz, kapatma işlemi yapıldığında her birini Dialectical Engine’den kaldırır ve tıpkı yayından kaldırmada olduğu gibi kopyamızın anahtarını yok ederiz; yasaların belirli bir öğeyi saklamamızı gerektirmesi bunun istisnasıdır. Kutuyu işaretlemezseniz tartışmalar kullanımdan kaldırılmış takma adınız altında herkese açık kalır. Kaldırılmadan önce başkalarının yaptığı kopyalar kontrolümüz dışındadır. Kaldırdığınız bir tartışmaya erişiminiz sürsün istiyorsanız önce indirin.
 
 **Yayımlanmış içeriği her zaman kaldırabiliriz.** Hukukun gerektirdiği, bir mahkemenin veya yetkili makamın emrettiği ya da içeriğin bu Koşulları ihlal ettiği veya hukuka aykırı olduğu durumlarda yayımlanmış bir tartışmayı kaldırabilir veya erişimi kısıtlayabiliriz. Bu bölümdeki hiçbir hüküm, 10. bölüm kapsamındaki geçerli bir bildirim üzerine işlem yapmamızı engellemez ve yayımlanmış bir tartışmanın erişilebilir kalacağına dair taahhüt oluşturmaz.
 
@@ -161,7 +161,7 @@ Her bildirimi gereksiz gecikme olmaksızın aldığımızı teyit ederiz. Bildir
 
 **Bir kişiyle iletişim kurma.** Destek asistanımız bir yapay zekâ sistemidir ve bunu belirtir. İstediğiniz zaman bir kişiyle görüşmeyi talep edebilirsiniz ve her destek görüşmesi bu yolu sunar. Sizinle iletişim kurarken yalnızca otomatik araçlara dayanmayız.
 
-**Terör içeriği.** Terör içeriği hukuka aykırıdır ve DebateAI'da buna izin verilmez (7. bölüm). Avrupa Birliği'ndeki yetkili makamlar, 2021/784 sayılı (AB) Tüzük kapsamında kaldırma emirlerini 1. bölümde belirtilen irtibat noktamız aracılığıyla bize gönderebilir. Böyle bir emir aldığımızda bir saat içinde içeriği kaldırır veya tüm AB ülkelerinde içeriğe erişimi engelleriz. İçeriği yayımlayan kişiye içeriğin kaldırıldığını ve talep etmesi hâlinde nedenini ve emre nasıl itiraz edebileceğini bildiririz; makamın, kamu güvenliğinin sınırlı bir süre için bilgi verilmemesini gerektirdiğine karar vermesi hâli bunun dışındadır. Tüzüğün gerektirdiği üzere, kaldırmanın gözden geçirilebilmesi ve hatalı olması hâlinde geri alınabilmesi için kaldırılan içeriği ve ilgili verileri altı ay süreyle saklarız. İçeriği yayımlayan kişi, emri veren makamın bulunduğu ülkenin mahkemelerinde itiraz edebilir ve ayrıca şikâyet yolumuzu kullanabilir. Hiçbir makam, Tüzük kapsamında bizi terör içeriğine karşı belirli tedbirler almakla yükümlü tutmamıştır; bir makam bunu yaparsa, otomatik araçlar dahil bu tedbirleri burada açıklayacağız.
+**Terör içeriği.** Terör içeriği hukuka aykırıdır ve Dialectical Engine'de buna izin verilmez (7. bölüm). Avrupa Birliği'ndeki yetkili makamlar, 2021/784 sayılı (AB) Tüzük kapsamında kaldırma emirlerini 1. bölümde belirtilen irtibat noktamız aracılığıyla bize gönderebilir. Böyle bir emir aldığımızda bir saat içinde içeriği kaldırır veya tüm AB ülkelerinde içeriğe erişimi engelleriz. İçeriği yayımlayan kişiye içeriğin kaldırıldığını ve talep etmesi hâlinde nedenini ve emre nasıl itiraz edebileceğini bildiririz; makamın, kamu güvenliğinin sınırlı bir süre için bilgi verilmemesini gerektirdiğine karar vermesi hâli bunun dışındadır. Tüzüğün gerektirdiği üzere, kaldırmanın gözden geçirilebilmesi ve hatalı olması hâlinde geri alınabilmesi için kaldırılan içeriği ve ilgili verileri altı ay süreyle saklarız. İçeriği yayımlayan kişi, emri veren makamın bulunduğu ülkenin mahkemelerinde itiraz edebilir ve ayrıca şikâyet yolumuzu kullanabilir. Hiçbir makam, Tüzük kapsamında bizi terör içeriğine karşı belirli tedbirler almakla yükümlü tutmamıştır; bir makam bunu yaparsa, otomatik araçlar dahil bu tedbirleri burada açıklayacağız.
 
 **Yaşam veya güvenlik açısından ciddi risk.** Bir kişinin yaşamına veya güvenliğine yönelik tehdit içeren bir suça işaret eden bilgiden haberdar olursak yetkili makamları bilgilendiririz.
 
@@ -183,7 +183,7 @@ Hizmeti tamamen kapatırsak veya ülkenizden çekersek en az **30 gün önceden 
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI ücretsiz bir plan sunar. Model listesinin tamamının kilidini açan ve tartışma göstergelerini kendiniz belirlemenize olanak tanıyan ücretli bir **Premium** plan sunulacaktır.
+Dialectical Engine ücretsiz bir plan sunar. Model listesinin tamamının kilidini açan ve tartışma göstergelerini kendiniz belirlemenize olanak tanıyan ücretli bir **Premium** plan sunulacaktır.
 
 **Ödeme yapmadan önce** size ödeme düğmesinin hemen üzerinde şunları gösteririz: planı; geçerli vergiler dahil toplam fiyatı; faturalandırma dönemini; planın iptal edilene kadar otomatik yenileneceğini; varsa ücretsiz denemenin sona ereceği tarihi ve sonrasında tahsil edilecek tutarı ve nasıl iptal edileceğini. Ayrı bir kutuyu işaretleyerek yenileme koşullarını teyit edersiniz. Düğmenin üzerinde **Abone ol ve öde** (Romence, *Comandă cu obligație de plată*) yazar. Aynı bilgileri, bu Koşulları ve cayma formunu içeren bir teyidi kalıcı veri saklayıcısıyla size göndeririz.
 
@@ -211,11 +211,11 @@ Başka bir yerde yaşıyorsanız bölgenizde geçerli olan cayma veya vazgeçme 
 
 ## 14. Hizmette ve bu Koşullarda yapılacak değişiklikler
 
-**Hizmette.** DebateAI'ı sürekli geliştiririz; rutin iyileştirmeler, düzeltmeler ve model listesi değişiklikleri bildirimsiz yapılır. Hizmeti açıklandığı şekilde çalışır tutmanın ötesine geçen bir değişiklik yaptığımızda bunu yalnızca şu nedenlerden biriyle yaparız: hukuki veya düzenleyici bir gerekliliğe uymak; bir güvenlik veya kötüye kullanım sorununa müdahale etmek; bir model sağlayıcısının bağlı olduğumuz bir modeli veya özelliği değiştirmesi, kısıtlaması veya geri çekmesi; denetlemediğimiz teknik bir ortama uyum sağlamak ya da size ek maliyet getirmeyecek şekilde bir özellik eklemek, iyileştirmek veya kullanımdan kaldırmak.
+**Hizmette.** Dialectical Engine'i sürekli geliştiririz; rutin iyileştirmeler, düzeltmeler ve model listesi değişiklikleri bildirimsiz yapılır. Hizmeti açıklandığı şekilde çalışır tutmanın ötesine geçen bir değişiklik yaptığımızda bunu yalnızca şu nedenlerden biriyle yaparız: hukuki veya düzenleyici bir gerekliliğe uymak; bir güvenlik veya kötüye kullanım sorununa müdahale etmek; bir model sağlayıcısının bağlı olduğumuz bir modeli veya özelliği değiştirmesi, kısıtlaması veya geri çekmesi; denetlemediğimiz teknik bir ortama uyum sağlamak ya da size ek maliyet getirmeyecek şekilde bir özellik eklemek, iyileştirmek veya kullanımdan kaldırmak.
 
 Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren **30 gün içinde** ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz.
 
-**Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra DebateAI'ı kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
+**Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
 
 ## 15. Sorumluluk
 
@@ -231,15 +231,15 @@ Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildirir
 
 ## 16. Fikrî mülkiyet
 
-Hizmetin kendisi — yazılım, motor, puanlama yöntemi, arayüz, DebateAI ve DebateAIRO adları ve logolarımız — bize veya lisans verenlerimize aittir. Bu Koşullar size hizmeti kullanma izni verir; hizmet üzerinde mülkiyet hakkı vermez.
+Hizmetin kendisi — yazılım, motor, puanlama yöntemi, arayüz, Dialectical Engine ve DebateAIRO adları ve logolarımız — bize veya lisans verenlerimize aittir. Bu Koşullar size hizmeti kullanma izni verir; hizmet üzerinde mülkiyet hakkı vermez.
 
-Yayımlanmış tartışmalardan, DebateAI'a atıfta bulunarak ve özgün sayfaya bağlantı vererek alıntı yapabilir ve bağlantı paylaşabilirsiniz. Kamusal külliyatın toplu kopyalanmasına, sistematik biçimde çoğaltılmasına ve yayımlanmış tartışmaların eğitim verisi olarak kullanılmasına yazılı mutabakatımız olmadan izin verilmez.
+Yayımlanmış tartışmalardan, Dialectical Engine'e atıfta bulunarak ve özgün sayfaya bağlantı vererek alıntı yapabilir ve bağlantı paylaşabilirsiniz. Kamusal külliyatın toplu kopyalanmasına, sistematik biçimde çoğaltılmasına ve yayımlanmış tartışmaların eğitim verisi olarak kullanılmasına yazılı mutabakatımız olmadan izin verilmez.
 
-8. bölüm içeriğinizi ve üretilen çıktıların statüsünü düzenler. DebateAI'daki bir içeriğin fikrî mülkiyetinizi ihlal ettiğine inanıyorsanız 10. bölümdeki bildirim yolunu kullanın.
+8. bölüm içeriğinizi ve üretilen çıktıların statüsünü düzenler. Dialectical Engine'deki bir içeriğin fikrî mülkiyetinizi ihlal ettiğine inanıyorsanız 10. bölümdeki bildirim yolunu kullanın.
 
 ## 17. Kişisel veriler
 
-Kişisel verileri nasıl işlediğimiz dezbatere.ro/privacy adresindeki **Gizlilik Politikası**'nda açıklanmıştır. Bu politika; neleri topladığımızı, her amaç için hukuki dayanağı, verileri ne kadar süreyle sakladığımızı, verilerin kimlere aktarıldığını, söz konusu aktarımları ve haklarınızı nasıl kullanacağınızı açıklar. Üç husus burada da belirtilmelidir. 7. bölüm, başka kişilere ait kişisel verileri bir soruya dahil etmemenizi ister; bunu yaparsanız sorumluluk size aittir ve içeriği kaldırabiliriz. DebateAI'da yayımlanan bir tartışma hakkınızda kişisel veri içeriyorsa hesap sahibi olmadan kaldırılmasını isteyebilirsiniz (9. bölüm). Ayrıca Gizlilik Politikası'nda açıklandığı üzere, sözleşmenin kanıtı olarak bu Koşulları kabulünüze ilişkin sürüm, zaman ve oturumun teknik ayrıntılarından oluşan bir kayıt tutarız.
+Kişisel verileri nasıl işlediğimiz dezbatere.ro/privacy adresindeki **Gizlilik Politikası**'nda açıklanmıştır. Bu politika; neleri topladığımızı, her amaç için hukuki dayanağı, verileri ne kadar süreyle sakladığımızı, verilerin kimlere aktarıldığını, söz konusu aktarımları ve haklarınızı nasıl kullanacağınızı açıklar. Üç husus burada da belirtilmelidir. 7. bölüm, başka kişilere ait kişisel verileri bir soruya dahil etmemenizi ister; bunu yaparsanız sorumluluk size aittir ve içeriği kaldırabiliriz. Dialectical Engine'de yayımlanan bir tartışma hakkınızda kişisel veri içeriyorsa hesap sahibi olmadan kaldırılmasını isteyebilirsiniz (9. bölüm). Ayrıca Gizlilik Politikası'nda açıklandığı üzere, sözleşmenin kanıtı olarak bu Koşulları kabulünüze ilişkin sürüm, zaman ve oturumun teknik ayrıntılarından oluşan bir kayıt tutarız.
 
 ## 18. Uygulanacak hukuk ve uyuşmazlıkların görüleceği yer
 
@@ -277,7 +277,7 @@ Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: ya�
 
 ### A.2 Amerika Birleşik Devletleri
 
-**Tennessee.** DebateAI'ı Tennessee'de yaşayan kişilere sunmuyoruz.
+**Tennessee.** Dialectical Engine'i Tennessee'de yaşayan kişilere sunmuyoruz.
 
 **Bildirimler ve kaldırmalar.** Rıza olmaksızın paylaşılan mahrem görüntüler, hesap olmaksızın abuse@dezbatere.ro adresine e-posta ile bildirilebilir ve geçerli bir talebin ardından 48 saat içinde kaldırılır. Telif hakkı şikâyetleri 10. bölümdeki bildirim yolu üzerinden iletilir.
 

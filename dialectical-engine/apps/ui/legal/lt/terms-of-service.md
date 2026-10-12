@@ -1,4 +1,4 @@
-# DebateAI — Paslaugų teikimo sąlygos
+# Dialectical Engine — Paslaugų teikimo sąlygos
 
 <!-- legal-chrome
 summaryTitle: Trumpai
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
-**In short.** Turite būti ne jaunesni kaip 18 metų. DebateAI kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
+**In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
 ## 1. Kas mes esame ir kaip su mumis susisiekti
 
-DebateAI valdo Rumunijoje registruota bendrovė **DMS Merchandise Shop S.R.L.**
+Dialectical Engine valdo Rumunijoje registruota bendrovė **DMS Merchandise Shop S.R.L.**
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ DebateAI valdo Rumunijoje registruota bendrovė **DMS Merchandise Shop S.R.L.**
 
 Šie duomenys taip pat nuolat skelbiami svetainėje adresu dezbatere.ro/legal. Visada galite susisiekti su žmogumi, ne tik su mūsų asistentu; kaip tai padaryti, paaiškinta 10 skyriuje.
 
-## 2. Kur siūlome DebateAI
+## 2. Kur siūlome Dialectical Engine
 
-DebateAI siūlome žmonėms, gyvenantiems Europos Sąjungoje (27 valstybės) ir Europos ekonominėje erdvėje (Norvegijoje, Islandijoje ir Lichtenšteine), Šveicarijoje, Moldovoje, Jungtinėse Amerikos Valstijose (išskyrus Tenesį), Kanadoje, Australijoje, Naujojoje Zelandijoje, Singapūre, Japonijoje, Pietų Korėjoje ir Taivane. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione.
+Dialectical Engine siūlome žmonėms, gyvenantiems Europos Sąjungoje (27 valstybės) ir Europos ekonominėje erdvėje (Norvegijoje, Islandijoje ir Lichtenšteine), Šveicarijoje, Moldovoje, Jungtinėse Amerikos Valstijose (išskyrus Tenesį), Kanadoje, Australijoje, Naujojoje Zelandijoje, Singapūre, Japonijoje, Pietų Korėjoje ir Taivane. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione.
 
 ## 3. Sutikimas su šiomis Sąlygomis
 
@@ -58,21 +58,21 @@ Mūsų **Privatumo politikoje** adresu dezbatere.ro/privacy paaiškinta, kaip tv
 
 Prieš jums elektroniniu būdu sudarant sutartį su mumis, sąsajoje parodomi atliekami veiksmai, prieš pateikiant informaciją leidžiama ją peržiūrėti ir ištaisyti bei nurodomos kalbos, kuriomis galima sudaryti sutartį. Šios Sąlygos pateikiamos forma, kurią galite išsaugoti ir atsispausdinti, kai įsigyjate mokamą planą, el. paštu atsiunčiame versiją, su kuria sutikote, o jos kopijos galite paprašyti bet kada. Jokia šių Sąlygų nuostata neapriboja pagal Rumunijos ar ES vartotojų teisę arba jūsų gyvenamosios šalies teisę turimų teisių, kurių negalima apriboti sutartimi.
 
-## 4. Kas gali naudotis DebateAI
+## 4. Kas gali naudotis Dialectical Engine
 
-Kad galėtumėte sukurti paskyrą, turite būti **ne jaunesni kaip 18 metų**, ir registruodamiesi tai patvirtinate. DebateAI nėra skirta vaikams, ir sąmoningai neteikiame jos jaunesniems nei 18 metų asmenims. Sužinoję, kad paskyra priklauso jaunesniam nei 18 metų asmeniui, ją uždarome. Kai kuriuose regionuose vien patvirtinimo nepakanka; kas taikoma konkrečiose vietose, nurodyta A priede.
+Kad galėtumėte sukurti paskyrą, turite būti **ne jaunesni kaip 18 metų**, ir registruodamiesi tai patvirtinate. Dialectical Engine nėra skirta vaikams, ir sąmoningai neteikiame jos jaunesniems nei 18 metų asmenims. Sužinoję, kad paskyra priklauso jaunesniam nei 18 metų asmeniui, ją uždarome. Kai kuriuose regionuose vien patvirtinimo nepakanka; kas taikoma konkrečiose vietose, nurodyta A priede.
 
-Turite būti teisiškai veiksnūs sudaryti šią sutartį. Jei DebateAI naudojate organizacijos vardu, patvirtinate, kad esate įgalioti ją įpareigoti, o „jūs“ tuomet reiškia tą organizaciją.
+Turite būti teisiškai veiksnūs sudaryti šią sutartį. Jei Dialectical Engine naudojate organizacijos vardu, patvirtinate, kad esate įgalioti ją įpareigoti, o „jūs“ tuomet reiškia tą organizaciją.
 
 Paskelbtus debatus gali skaityti bet kas. Norint juos skaityti paskyros nereikia, tačiau tai yra naudojimasis paslauga, todėl jam taikomi 7, 15, 16 ir 18 skyriai.
 
-## 5. Ką DebateAI daro ir ko ji nedaro
+## 5. Ką Dialectical Engine daro ir ko ji nedaro
 
-Jūs pateikiate klausimą arba teiginį. DebateAI siunčia jį keliems trečiųjų šalių DI modeliams, kurie aplink jį sudaro argumentų schemą: teiginius, kontrargumentus, kritiką, nuorodas į įrodymus, įverčius ir verdiktą su pasitikėjimo lygiu. Galite ginčyti atskirus teiginius, prašyti išsamiau ištirti konkretų klausimą ir nuspręsti, ar paskelbti rezultatą.
+Jūs pateikiate klausimą arba teiginį. Dialectical Engine siunčia jį keliems trečiųjų šalių DI modeliams, kurie aplink jį sudaro argumentų schemą: teiginius, kontrargumentus, kritiką, nuorodas į įrodymus, įverčius ir verdiktą su pasitikėjimo lygiu. Galite ginčyti atskirus teiginius, prašyti išsamiau ištirti konkretų klausimą ir nuspręsti, ar paskelbti rezultatą.
 
 **Visas debatų turinys sugeneruotas DI.** Argumentai, kritika, nuorodos į įrodymus, įverčiai, verdiktai ir pagalbos asistento atsakymai sugeneruoti mašinos. Jie gali būti neteisingi, neišsamūs ar pasenę, taip pat klaidingi, nors ir pateikti užtikrintai, be to, gali atspindėti modelių šališkumą. Prieš parodant jums ar paskelbiant jų neperžiūri joks žmogus, ir joks įvardytas asmuo už juos neprisiima redakcinės atsakomybės. Sugeneruotas turinys produkte, paskelbtuose puslapiuose ir eksportuotuose duomenyse pažymimas kaip sugeneruotas DI.
 
-**DebateAI nėra konsultacija.** Ji nėra teisinė, medicininė, finansinė, mokestinė, psichologinė, saugumo ar kitokia profesinė konsultacija, o verdiktas nėra fakto nustatymas. Nenaudokite debatų kaip pagrindo sprendimui, svarbiam jūsų ar kitų asmenų sveikatai, saugumui, finansams, teisinei padėčiai ar gerovei, nepatikrinę pirminių šaltinių ir, kai tinkama, nepasikonsultavę su kvalifikuotu specialistu. Aukštas pasitikėjimo lygis reiškia, kad modeliai, remdamiesi matyta medžiaga, vertinimą laikė tvirtai pagrįstu; tai nėra jo teisingumo garantija.
+**Dialectical Engine nėra konsultacija.** Ji nėra teisinė, medicininė, finansinė, mokestinė, psichologinė, saugumo ar kitokia profesinė konsultacija, o verdiktas nėra fakto nustatymas. Nenaudokite debatų kaip pagrindo sprendimui, svarbiam jūsų ar kitų asmenų sveikatai, saugumui, finansams, teisinei padėčiai ar gerovei, nepatikrinę pirminių šaltinių ir, kai tinkama, nepasikonsultavę su kvalifikuotu specialistu. Aukštas pasitikėjimo lygis reiškia, kad modeliai, remdamiesi matyta medžiaga, vertinimą laikė tvirtai pagrįstu; tai nėra jo teisingumo garantija.
 
 **Ką įsipareigojame daryti.** Paslaugą teiksime pakankamai rūpestingai bei profesionaliai ir pagal mūsų paskelbtą aprašymą. Kai teisės aktai suteikia garantiją, kad paslauga atitiks jos aprašymą ir bus tinkama įprastai paskirčiai, ši garantija taikoma ir jokia šių Sąlygų nuostata jos nepanaikina. Negarantuojame, kad kuris nors konkretus rezultatas bus tikslus: tikslumas yra sugeneruoto turinio savybė, o ne požymis, rodantis, ar paslauga veikia.
 
@@ -92,19 +92,19 @@ Savo paskyrą galite bet kada uždaryti pasirinkę **Nustatymai → Paskyra**. U
 
 Šios taisyklės taikomos jūsų pateikiamai informacijai, naudojimuisi paslauga ir skelbiamam turiniui.
 
-**Nepateikite kitų žmonių asmens duomenų.** Klauskite apie problemas, argumentus ir visuomenei svarbius klausimus, o ne apie privačius asmenis, kurių tapatybę galima nustatyti. Nenurodykite vardų, kontaktinių duomenų, identifikacinių numerių, atvaizdų, sveikatos, finansinių ar kitų duomenų, pagal kuriuos galima nustatyti asmens tapatybę, ir nenaudokite DebateAI bylai, profiliui ar dosjė apie asmenį sudaryti. Klausimai apie viešus asmenis, veikiančius pagal savo viešą vaidmenį, yra priimtini; klausimai, nukreipti į privatų asmenį, nėra priimtini. Jei tokius duomenis vis dėlto pateikiate, už juos atsakote, o mes galime turinį pašalinti.
+**Nepateikite kitų žmonių asmens duomenų.** Klauskite apie problemas, argumentus ir visuomenei svarbius klausimus, o ne apie privačius asmenis, kurių tapatybę galima nustatyti. Nenurodykite vardų, kontaktinių duomenų, identifikacinių numerių, atvaizdų, sveikatos, finansinių ar kitų duomenų, pagal kuriuos galima nustatyti asmens tapatybę, ir nenaudokite Dialectical Engine bylai, profiliui ar dosjė apie asmenį sudaryti. Klausimai apie viešus asmenis, veikiančius pagal savo viešą vaidmenį, yra priimtini; klausimai, nukreipti į privatų asmenį, nėra priimtini. Jei tokius duomenis vis dėlto pateikiate, už juos atsakote, o mes galime turinį pašalinti.
 
 **Jūsų pačių neskelbtina informacija.** Jūsų klausimai gali būti susiję su jūsų pačių sveikata, įsitikinimais, politinėmis pažiūromis ar kitais neskelbtinais dalykais. Su tuo sutinkate atskirame ekrane prieš pirmuosius savo debatus. Jei gyvenate vietoje, kurioje sveikatos duomenims taikomos specialios taisyklės, A priede gali būti pateikta nuoroda į atskirą pranešimą.
 
 **Nepateikite ir neskelbkite neteisėto turinio**, įskaitant šmeižikišką, smurtą ar neapykantą kurstantį, priekabiaujantį ar grasinantį turinį, be sutikimo bendrinamus intymius atvaizdus, intelektinę nuosavybę ar konfidencialumą pažeidžiantį turinį, komercines paslaptis atskleidžiantį turinį, seksualinės prievartos prieš vaikus medžiagą arba sankcijas ar eksporto kontrolę pažeidžiantį turinį.
 
-**Nenaudokite DebateAI apgaulei.** Nepateikite sugeneruoto rezultato kaip parašyto žmogaus, kai tai klaidintų, nepašalinkite žymos, kad turinys sugeneruotas DI, ir nenaudokite jo tariamam sutarimui, melagingiems įrodymams ar apsimetimui kitu asmeniu sukurti.
+**Nenaudokite Dialectical Engine apgaulei.** Nepateikite sugeneruoto rezultato kaip parašyto žmogaus, kai tai klaidintų, nepašalinkite žymos, kad turinys sugeneruotas DI, ir nenaudokite jo tariamam sutarimui, melagingiems įrodymams ar apsimetimui kitu asmeniu sukurti.
 
 **Neatakuokite paslaugos.** Įprastas paieškos sistemų vykdomas paskelbtų debatų indeksavimas leidžiamas, tačiau kitai automatizuotai prieigai, duomenų rinkimui, naršymui robotais ar masiniam išgavimui reikia mūsų rašytinio leidimo; draudžiama apeiti dažnio ribojimą, autentifikavimą ar paskelbimo kontrolės priemones; bandyti išgauti raginimus ar sistemos nurodymus; naudoti raginimų injekciją siekiant priversti variklį nepaisyti apribojimų; be rašytinio mūsų leidimo ieškoti pažeidžiamumų ar atlikti apkrovos bandymus.
 
 **Neperparduokite paslaugos ir nekeiskite jos prekės ženklo**, taip pat be rašytinio mūsų sutikimo nenaudokite jos konkuruojančiam varikliui kurti, įskaitant rezultatų naudojimą mokymo duomenims.
 
-**Nenaudokite DebateAI sprendimams dėl asmens** sveikatos, saugumo, teisių, darbo, kredito, būsto ar imigracijos statuso priimti. Ji tam nesukurta, o jos rezultatai nėra saugus tokių sprendimų pagrindas.
+**Nenaudokite Dialectical Engine sprendimams dėl asmens** sveikatos, saugumo, teisių, darbo, kredito, būsto ar imigracijos statuso priimti. Ji tam nesukurta, o jos rezultatai nėra saugus tokių sprendimų pagrindas.
 
 **Vietos, kurioje skelbiate, teisė.** Atsakote už tai, kad viskas, ką skelbiate, atitiktų šalies, kurioje esate, teisę. Tam tikruose regionuose galime riboti tam tikrų temų skelbimą.
 
@@ -132,9 +132,9 @@ Pagal numatytuosius nustatymus debatai yra **privatūs**. Niekas, ką sukuriate,
 
 **Kas nutinka paskelbus.** Paskelbimas yra sąmoningas, atskirai patvirtinamas veiksmas. Kai paskelbiate, sukuriame nekintamą debatų momentinę kopiją ir leidžiame ją skaityti visiems be paskyros. Paieškos sistemos gali ją indeksuoti. Momentinėje kopijoje rodomas jūsų **slapyvardis**, jūsų klausimas toks, kokį jį parašėte, argumentų medis, įverčiai, verdiktas ir pasitikėjimo lygis bei aiškiai nurodoma, kad turinį sugeneravo DI. Joje nerodomas jūsų el. pašto adresas, seansų įrašai ar paskyros istorija.
 
-**Praktiškai paskelbimo beveik neįmanoma atšaukti.** Kai debatai tampa vieši, kiti žmonės gali juos skaityti, cituoti, daryti ekrano kopijas, archyvuoti ir išsaugoti podėlyje. Atšaukus paskelbimą debatai pašalinami iš DebateAI ir sunaikinamas mūsų kopijos raktas, tačiau kitur jau esančių kopijų pasiekti neįmanoma. Neskelbkite nieko, ko nenorėtumėte visam laikui susieti su savo slapyvardžiu.
+**Praktiškai paskelbimo beveik neįmanoma atšaukti.** Kai debatai tampa vieši, kiti žmonės gali juos skaityti, cituoti, daryti ekrano kopijas, archyvuoti ir išsaugoti podėlyje. Atšaukus paskelbimą debatai pašalinami iš Dialectical Engine ir sunaikinamas mūsų kopijos raktas, tačiau kitur jau esančių kopijų pasiekti neįmanoma. Neskelbkite nieko, ko nenorėtumėte visam laikui susieti su savo slapyvardžiu.
 
-**Paskelbti debatai, kai uždarote paskyrą.** Planuodami paskyros uždarymą pasirenkate, kas nutiks jūsų paskelbtiems debatams. Jei pažymėsite **„Taip pat ištrinti mano viešus debatus“**, uždarymo metu kiekvienus iš jų pašalinsime iš DebateAI ir sunaikinsime savo kopijos raktą, kaip atšaukiant paskelbimą, nebent įstatymai įpareigoja išsaugoti konkretų elementą. Jei langelio nepažymėsite, debatai liks vieši su jūsų nebenaudojamu slapyvardžiu. Kitų asmenų iki pašalinimo padarytų kopijų nekontroliuojame. Jei norite išsaugoti šalinamus debatus sau, pirmiausia juos atsisiųskite.
+**Paskelbti debatai, kai uždarote paskyrą.** Planuodami paskyros uždarymą pasirenkate, kas nutiks jūsų paskelbtiems debatams. Jei pažymėsite **„Taip pat ištrinti mano viešus debatus“**, uždarymo metu kiekvienus iš jų pašalinsime iš Dialectical Engine ir sunaikinsime savo kopijos raktą, kaip atšaukiant paskelbimą, nebent įstatymai įpareigoja išsaugoti konkretų elementą. Jei langelio nepažymėsite, debatai liks vieši su jūsų nebenaudojamu slapyvardžiu. Kitų asmenų iki pašalinimo padarytų kopijų nekontroliuojame. Jei norite išsaugoti šalinamus debatus sau, pirmiausia juos atsisiųskite.
 
 **Paskelbtą turinį visada galime pašalinti.** Galime pašalinti paskelbtus debatus arba apriboti prieigą prie jų, kai to reikalauja teisės aktai, kai taip nurodo teismas ar kompetentinga institucija arba kai jie pažeidžia šias Sąlygas ar yra neteisėti. Jokia šio skyriaus nuostata netrukdo mums imtis veiksmų gavus pagrįstą pranešimą pagal 10 skyrių ir nežada, kad paskelbti debatai liks prieinami.
 
@@ -161,7 +161,7 @@ Apie kiekvieno pranešimo gavimą patvirtiname nepagrįstai nedelsdami. Praneši
 
 **Susisiekimas su žmogumi.** Mūsų pagalbos asistentas yra DI sistema ir apie tai informuoja. Bet kada galite paprašyti pasikalbėti su žmogumi, ir ši galimybė siūloma kiekviename pagalbos pokalbyje. Bendraudami su jumis nepasikliaujame vien automatizuotomis priemonėmis.
 
-**Teroristinis turinys.** Teroristinis turinys yra neteisėtas ir DebateAI jo skelbti neleidžiama (7 skyrius). Europos Sąjungos kompetentingos institucijos per 1 skyriuje nurodytą kontaktinį punktą gali mums siųsti nurodymus pašalinti turinį pagal Reglamentą (ES) 2021/784. Gavę tokį nurodymą, per vieną valandą pašaliname turinį arba panaikiname prieigą prie jo visose ES šalyse. Turinį paskelbusiam asmeniui pranešame, kad turinys buvo pašalintas, o jam paprašius — kodėl ir kaip galima apskųsti nurodymą, išskyrus atvejus, kai institucija nusprendžia, kad dėl visuomenės saugumo informacija ribotą laiką neturi būti atskleidžiama. Kaip reikalauja Reglamentas, pašalintą turinį ir susijusius duomenis saugome šešis mėnesius, kad pašalinimą būtų galima peržiūrėti ir, jei jis buvo neteisingas, atšaukti. Turinį paskelbęs asmuo gali apskųsti nurodymą tos šalies, kurios institucija jį išdavė, teismuose, taip pat gali pasinaudoti mūsų skundų teikimo tvarka. Jokia institucija nėra pareikalavusi, kad pagal šį Reglamentą imtumės konkrečių priemonių kovai su teroristiniu turiniu; jei kuri nors institucija to pareikalaus, šias priemones, įskaitant bet kokius automatizuotus įrankius, aprašysime čia.
+**Teroristinis turinys.** Teroristinis turinys yra neteisėtas ir Dialectical Engine jo skelbti neleidžiama (7 skyrius). Europos Sąjungos kompetentingos institucijos per 1 skyriuje nurodytą kontaktinį punktą gali mums siųsti nurodymus pašalinti turinį pagal Reglamentą (ES) 2021/784. Gavę tokį nurodymą, per vieną valandą pašaliname turinį arba panaikiname prieigą prie jo visose ES šalyse. Turinį paskelbusiam asmeniui pranešame, kad turinys buvo pašalintas, o jam paprašius — kodėl ir kaip galima apskųsti nurodymą, išskyrus atvejus, kai institucija nusprendžia, kad dėl visuomenės saugumo informacija ribotą laiką neturi būti atskleidžiama. Kaip reikalauja Reglamentas, pašalintą turinį ir susijusius duomenis saugome šešis mėnesius, kad pašalinimą būtų galima peržiūrėti ir, jei jis buvo neteisingas, atšaukti. Turinį paskelbęs asmuo gali apskųsti nurodymą tos šalies, kurios institucija jį išdavė, teismuose, taip pat gali pasinaudoti mūsų skundų teikimo tvarka. Jokia institucija nėra pareikalavusi, kad pagal šį Reglamentą imtumės konkrečių priemonių kovai su teroristiniu turiniu; jei kuri nors institucija to pareikalaus, šias priemones, įskaitant bet kokius automatizuotus įrankius, aprašysime čia.
 
 **Didelis pavojus gyvybei ar saugumui.** Sužinoję informaciją, leidžiančią manyti, kad daroma nusikalstama veika, kelianti grėsmę kieno nors gyvybei ar saugumui, informuojame kompetentingas institucijas.
 
@@ -183,7 +183,7 @@ Nutraukus sutartį toliau taikomi 8 skyrius (jau paskelbtam turiniui), 15, 16 ir
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI siūlo nemokamą planą. Mokamas planas **Premium** bus prieinamas; jis suteikia prieigą prie viso modelių sąrašo ir leidžia patiems nustatyti debatų parametrus.
+Dialectical Engine siūlo nemokamą planą. Mokamas planas **Premium** bus prieinamas; jis suteikia prieigą prie viso modelių sąrašo ir leidžia patiems nustatyti debatų parametrus.
 
 **Prieš jums mokant** tiesiai virš mokėjimo mygtuko parodome: planą; bendrą kainą su taikomais mokesčiais; atsiskaitymo laikotarpį; tai, kad planas automatiškai atnaujinamas, kol jo neatšaukiate; nemokamo bandomojo laikotarpio pabaigos datą ir po jos mokėtiną sumą; ir kaip atšaukti planą. Atnaujinimo sąlygas patvirtinate pažymėdami atskirą langelį. Ant mygtuko parašyta **Prenumeruoti ir mokėti** (rumunų kalba — *Comandă cu obligație de plată*). Patvariojoje laikmenoje atsiunčiame patvirtinimą su ta pačia informacija, šiomis Sąlygomis ir sutarties atsisakymo forma.
 
@@ -211,11 +211,11 @@ Jei gyvenate kitur, A priede nurodyta jūsų regione taikoma teisė atsisakyti s
 
 ## 14. Paslaugos ir šių Sąlygų pakeitimai
 
-**Paslaugos pakeitimai.** Nuolat tobuliname DebateAI, todėl apie įprastus patobulinimus, pataisas ir modelių sąrašo pakeitimus nepranešame. Pakeitimus, kuriais ne vien palaikomas aprašytas paslaugos veikimas, atliekame tik dėl vienos iš šių priežasčių: kad įvykdytume teisinį ar reguliavimo reikalavimą; reaguotume į saugumo ar piktnaudžiavimo problemą; kai modelio teikėjas pakeičia, apriboja ar pašalina modelį ar funkciją, nuo kurių priklausome; kad prisitaikytume prie mūsų nekontroliuojamos techninės aplinkos; arba kad pridėtume, patobulintume ar pašalintume funkciją taip, kad jums neatsirastų papildomų išlaidų.
+**Paslaugos pakeitimai.** Nuolat tobuliname Dialectical Engine, todėl apie įprastus patobulinimus, pataisas ir modelių sąrašo pakeitimus nepranešame. Pakeitimus, kuriais ne vien palaikomas aprašytas paslaugos veikimas, atliekame tik dėl vienos iš šių priežasčių: kad įvykdytume teisinį ar reguliavimo reikalavimą; reaguotume į saugumo ar piktnaudžiavimo problemą; kai modelio teikėjas pakeičia, apriboja ar pašalina modelį ar funkciją, nuo kurių priklausome; kad prisitaikytume prie mūsų nekontroliuojamos techninės aplinkos; arba kad pridėtume, patobulintume ar pašalintume funkciją taip, kad jums neatsirastų papildomų išlaidų.
 
 Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitimas turi didesnį nei nedidelį neigiamą poveikį jūsų prieigai prie paslaugos ar naudojimuisi ja, galite nemokamai nutraukti sutartį per **30 dienų** nuo pranešimo gavimo arba pakeitimo įsigaliojimo dienos, atsižvelgiant į tai, kuri data vėlesnė, o mes grąžinsime visas iš anksto už nepanaudotą laikotarpį sumokėtas sumas.
 
-**Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės DebateAI, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
+**Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
 
 ## 15. Atsakomybė
 
@@ -231,15 +231,15 @@ Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitima
 
 ## 16. Intelektinė nuosavybė
 
-Pati paslauga — programinė įranga, variklis, vertinimo metodas, sąsaja, pavadinimai DebateAI ir DebateAIRO bei mūsų logotipai — priklauso mums arba mūsų licencijų davėjams. Šios Sąlygos suteikia jums leidimą naudotis paslauga, o ne nuosavybės teisę į ją.
+Pati paslauga — programinė įranga, variklis, vertinimo metodas, sąsaja, pavadinimai Dialectical Engine ir DebateAIRO bei mūsų logotipai — priklauso mums arba mūsų licencijų davėjams. Šios Sąlygos suteikia jums leidimą naudotis paslauga, o ne nuosavybės teisę į ją.
 
-Galite cituoti paskelbtus debatus ir pateikti nuorodas į juos, nurodydami DebateAI kaip šaltinį ir pateikdami nuorodą į pradinį puslapį. Be rašytinio mūsų sutikimo draudžiama masiškai kopijuoti, sistemingai atgaminti viešą turinio rinkinį ir naudoti paskelbtus debatus kaip mokymo duomenis.
+Galite cituoti paskelbtus debatus ir pateikti nuorodas į juos, nurodydami Dialectical Engine kaip šaltinį ir pateikdami nuorodą į pradinį puslapį. Be rašytinio mūsų sutikimo draudžiama masiškai kopijuoti, sistemingai atgaminti viešą turinio rinkinį ir naudoti paskelbtus debatus kaip mokymo duomenis.
 
-Jūsų turinys ir sugeneruotų rezultatų statusas aptarti 8 skyriuje. Jei manote, kad kas nors DebateAI pažeidžia jūsų intelektinę nuosavybę, naudokite 10 skyriuje nurodytą pranešimų teikimo tvarką.
+Jūsų turinys ir sugeneruotų rezultatų statusas aptarti 8 skyriuje. Jei manote, kad kas nors Dialectical Engine pažeidžia jūsų intelektinę nuosavybę, naudokite 10 skyriuje nurodytą pranešimų teikimo tvarką.
 
 ## 17. Asmens duomenys
 
-Kaip tvarkome asmens duomenis, nustatyta **Privatumo politikoje** adresu dezbatere.ro/privacy. Joje paaiškinta, ką renkame, koks yra kiekvieno tikslo teisinis pagrindas, kiek laiko saugome duomenis, kas juos gauna, kokie perdavimai atliekami ir kaip pasinaudoti savo teisėmis. Čia taip pat svarbūs trys dalykai. 7 skyriuje prašome į klausimą neįtraukti kitų asmenų duomenų; jei juos vis dėlto įtraukiate, už tai atsakote, o mes galime turinį pašalinti. Jei DebateAI paskelbtuose debatuose yra jūsų asmens duomenų, galite prašyti juos pašalinti neturėdami paskyros (9 skyrius). Be to, saugome jūsų sutikimo su šiomis Sąlygomis įrašą — versiją, laiką ir techninius seanso duomenis — kaip sutarties įrodymą, kaip paaiškinta Privatumo politikoje.
+Kaip tvarkome asmens duomenis, nustatyta **Privatumo politikoje** adresu dezbatere.ro/privacy. Joje paaiškinta, ką renkame, koks yra kiekvieno tikslo teisinis pagrindas, kiek laiko saugome duomenis, kas juos gauna, kokie perdavimai atliekami ir kaip pasinaudoti savo teisėmis. Čia taip pat svarbūs trys dalykai. 7 skyriuje prašome į klausimą neįtraukti kitų asmenų duomenų; jei juos vis dėlto įtraukiate, už tai atsakote, o mes galime turinį pašalinti. Jei Dialectical Engine paskelbtuose debatuose yra jūsų asmens duomenų, galite prašyti juos pašalinti neturėdami paskyros (9 skyrius). Be to, saugome jūsų sutikimo su šiomis Sąlygomis įrašą — versiją, laiką ir techninius seanso duomenis — kaip sutarties įrodymą, kaip paaiškinta Privatumo politikoje.
 
 ## 18. Taikytina teisė ir ginčų nagrinėjimo vieta
 
@@ -277,7 +277,7 @@ Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą ša
 
 ### A.2 Jungtinės Amerikos Valstijos
 
-**Tenesis.** DebateAI nesiūlome žmonėms, gyvenantiems Tenesyje.
+**Tenesis.** Dialectical Engine nesiūlome žmonėms, gyvenantiems Tenesyje.
 
 **Pranešimai ir turinio pašalinimas.** Apie be sutikimo bendrinamus intymius atvaizdus galima pranešti el. paštu abuse@dezbatere.ro, neturint paskyros; gavus pagrįstą prašymą jie pašalinami per 48 valandas. Skundai dėl autorių teisių teikiami 10 skyriuje nustatyta pranešimų teikimo tvarka.
 

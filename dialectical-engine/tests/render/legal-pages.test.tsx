@@ -173,7 +173,7 @@ describe("the legal notice states the company and seller details from one consta
     expect(factCell(view, "legal.notice.company.representative")?.textContent).toBe(COMPANY.representative);
     expect(factCell(view, "legal.notice.contact.phone")?.textContent).toBe(COMPANY.phone);
     expect(view.querySelector(".legalSection p")?.textContent).toBe(
-      `${COMPANY.tradingNames[0]} (also called ${COMPANY.tradingNames[1]}) is run by ${COMPANY.legalName}, a company registered in Romania.`
+      `${COMPANY.tradingNames[0]} is run by ${COMPANY.legalName}, a company registered in Romania.`
     );
     for (const address of Object.values(COMPANY.emails)) expect(view.textContent).toContain(address);
     // No catalogue in any locale may carry a company fact: filling COMPANY once must update all 35.
@@ -336,7 +336,7 @@ describe("the cookie policy describes the cookies the product really sets", () =
   const INV_STORAGE = ["debateai.consent", "debateai.mode", "debateai.languageOffer.dismissed", "debateai.support.conversation.v2", "debateai.phone-completion-draft.v1", "debateai.exportPending", "debateai.exportLinkOutcome"];
   const EN_KIND = ["Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Local storage", "Local storage", "Session storage", "Session storage", "Session storage", "Session storage", "Session storage"];
   const EN_LIFE = ["14 days", "14 days", "30 days", "1 year", "Up to 8 hours; 15-minute idle expiry", "Up to 8 hours; 15-minute idle expiry", "Up to 30 minutes", "Up to 30 minutes", "Up to 299 seconds", "Up to 299 seconds", "Up to 5 minutes", "Up to 5 minutes", "Up to 5 minutes", "Until you clear it", "Until you clear it", "Until you close the tab", "Until you close the tab", "15 minutes or until earlier clearing", "Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result", "Until tab close, sign-out, or a new link"];
-  const EN_RECIPIENT = [...Array(13).fill("DebateAI's server only"), ...Array(5).fill("stays in your browser"), "DebateAI's server only", "stays in your browser"];
+  const EN_RECIPIENT = [...Array(13).fill("Dialectical Engine's server only"), ...Array(5).fill("stays in your browser"), "Dialectical Engine's server only", "stays in your browser"];
   const english = legalEnglish as Record<string, string>;
   const INV_IDS = ["session", "csrf", "ageRefusal", "locale", "staff", "staff", "passwordReset", "passwordReset", "mfaRecovery", "mfaRecovery", "social", "social", "social", "consent", "mode", "languageOffer", "supportConversation", "phoneDraft", "exportPending", "exportLinkOutcome"];
 
@@ -443,7 +443,7 @@ describe("the cookie policy describes the cookies the product really sets", () =
     expect(typeof refuse).toBe("string");
     expect(typeof effect).toBe("string");
     expect(view.textContent).not.toMatch(/two choices/i);
-    // REV-S01 p1 SD-N1: help-chat text is posted to DebateAI's help (Assistant.tsx sendMessage), so the storage intro
+    // REV-S01 p1 SD-N1: help-chat text is posted to Dialectical Engine's help (Assistant.tsx sendMessage), so the storage intro
     // makes no claim that nothing in the browser's storage was ever sent.
     expect(english["legal.cookies.storageIntro"]).not.toMatch(/none of them is sent/i);
     expect(view.textContent).toContain(refuse);

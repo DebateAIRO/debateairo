@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Ochrana soukromí",
-  "consent.settings.hint": "Tento prohlížeč uchovává jen to, co DebateAI potřebuje ke svému fungování. Úplný seznam najdete zde kdykoli.",
+  "consent.settings.hint": "Tento prohlížeč uchovává jen to, co Dialectical Engine potřebuje ke svému fungování. Úplný seznam najdete zde kdykoli.",
   "consent.settings.button": "Co ukládáme",
   "consent.bar.label": "Oznámení o souborech cookie",
   "consent.bar.eyebrow": "VAŠE ÚDAJE, OTEVŘENĚ A JASNĚ",
   "consent.bar.title": "Ukládáme jen to, co je nezbytné pro fungování panelu.",
-  "consent.bar.body": "Čtyři soubory cookie a čtyři položky v úložišti vašeho prohlížeče, každá nezbytná pro fungování DebateAI. Nic volitelného, nic sdíleného s nikým dalším.",
+  "consent.bar.body": "Čtyři soubory cookie a čtyři položky v úložišti vašeho prohlížeče, každá nezbytná pro fungování Dialectical Engine. Nic volitelného, nic sdíleného s nikým dalším.",
   "consent.bar.acknowledge": "Rozumím",
   "consent.bar.whatWeStore": "Co ukládáme",
   "consent.link.cookiePolicy": "Zásady používání souborů cookie",

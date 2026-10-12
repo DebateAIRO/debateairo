@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Confidențialitate",
-  "consent.settings.hint": "Acest browser păstrează doar ce îi trebuie lui DebateAI ca să funcționeze. Lista completă o găsiți aici oricând.",
+  "consent.settings.hint": "Acest browser păstrează doar ce îi trebuie lui Dialectical Engine ca să funcționeze. Lista completă o găsiți aici oricând.",
   "consent.settings.button": "Ce stocăm",
   "consent.bar.label": "Notificare privind modulele cookie",
   "consent.bar.eyebrow": "DATELE DUMNEAVOASTRĂ, CONSEMNATE CLAR",
   "consent.bar.title": "Stocăm doar ceea ce menține platforma în funcțiune.",
-  "consent.bar.body": "Patru module cookie și patru elemente în spațiul de stocare al browserului dvs., fiecare necesar pentru funcționarea DebateAI. Nimic opțional, nimic partajat cu altcineva.",
+  "consent.bar.body": "Patru module cookie și patru elemente în spațiul de stocare al browserului dvs., fiecare necesar pentru funcționarea Dialectical Engine. Nimic opțional, nimic partajat cu altcineva.",
   "consent.bar.acknowledge": "Am înțeles",
   "consent.bar.whatWeStore": "Ce stocăm",
   "consent.link.cookiePolicy": "Politica privind modulele cookie",
