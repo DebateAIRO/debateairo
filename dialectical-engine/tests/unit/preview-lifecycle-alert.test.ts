@@ -680,4 +680,44 @@ describe('spending-gate notices', () => {
       expect(h.sent).toEqual([]);
     });
   });
+
+  // Owner ruling 2026-10-12 ("Book max cost, keep going"): a call whose vendor connection failed or timed out after it
+  // was sent is booked at its full reservation and the gate keeps working; the owner gets one email per new booking.
+  describe('booked-at-maximum alert', () => {
+    const deepinfra = 'debateai-preview-notice@gate-booked-1_2026_10_12.service';
+    const anthropic = 'debateai-preview-notice@anthropic-booked-2_2026_10_12.service';
+
+    it('takes only <count>_<YYYY>_<MM>_<DD> codes for the two booked kinds, and none for Google', () => {
+      expect(alert.parseAlertArgs(['--notice', 'gate-booked-1_2026_10_12'])).toEqual({ unit: deepinfra, test: false, notice: { kind: 'gate-booked', code: '1_2026_10_12', unit: deepinfra } });
+      expect(alert.parseAlertArgs(['--notice', 'anthropic-booked-2_2026_10_12'])).toEqual({ unit: anthropic, test: false, notice: { kind: 'anthropic-booked', code: '2_2026_10_12', unit: anthropic } });
+      for (const name of ['gate-booked-1', 'gate-booked-transport_failure', 'gate-booked-0_2026_10_12', 'gate-booked-01_2026_10_12',
+        'gate-booked-1_2026_02_31', 'gate-booked-1_2026_10_12_x', 'google-booked-1_2026_10_12', 'anthropic-booked-x_2026_10_12', 'gate-booked-']) {
+        expect(alert.parseAlertArgs(['--notice', name]), name).toBeNull();
+      }
+    });
+
+    it('the DeepInfra email says the call was booked at its maximum, the gate keeps working, and gives the read-only status command', async () => {
+      const layout = server();
+      const h = harness(layout, { ...notMe, readJournal: async () => { throw new Error('a booked notice reads no journal'); } });
+      await expect(alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'gate-booked-1_2026_10_12']), layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_SENT', unit: deepinfra });
+      const mail = h.sent[0]!;
+      expect(mail).toContain('Subject: Preview: DeepInfra gate: 1 call booked at its maximum today (2026-10-12)');
+      expect(mail).toContain('Nothing was halted');
+      expect(mail).toContain('settled_reserved_max');
+      expect(mail).toContain("DeepInfra's billing page");
+      expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3');
+      expect(mail).not.toContain(' activate ');
+      expect(mail).not.toMatch(/\$|usd|anthropic/i);
+    });
+
+    it('the Anthropic email names its own gate; two bookings read as two calls', async () => {
+      const layout = server();
+      const h = harness(layout, { ...notMe, readJournal: async () => { throw new Error('a booked notice reads no journal'); } });
+      await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'anthropic-booked-2_2026_10_12']), layout, deps: h.deps });
+      const mail = h.sent[0]!;
+      expect(mail).toContain('Subject: Preview: Anthropic gate: 2 calls booked at their maximum today (2026-10-12)');
+      expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1');
+      expect(mail).not.toMatch(/\$|usd|deepinfra/i);
+    });
+  });
 });

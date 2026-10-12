@@ -23,6 +23,12 @@
 // --unbilled-alert-at threshold. The email names the gate, the count and the day, says nothing was
 // halted, asks the owner to check that vendor's billing page, and gives the gate's read-only
 // `status` command. Google (parked) has none.
+// Booked-at-maximum alert (owner ruling 2026-10-12, "Book max cost, keep going"):
+// "gate-booked-<count>_<YYYY>_<MM>_<DD>" (DeepInfra) and "anthropic-booked-<count>_<YYYY>_<MM>_<DD>", queued
+// by the halt watcher whenever status's today_booked_max rises: a call was sent, the vendor connection then
+// failed or timed out, and the gate booked the call's full reservation as its charge and kept working. The
+// email names the gate, the day's count and the day, says nothing was halted, and gives the read-only
+// `status` command. Google has none.
 import { constants } from 'node:fs';
 import { link, lstat, open, unlink } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
@@ -35,7 +41,7 @@ export const ALERT_WINDOW_MS = 30 * 60 * 1000;
 const UNIT = /^[A-Za-z0-9][A-Za-z0-9:_.@\\-]{0,200}\.(service|socket|timer|target|mount|path)$/;
 const ADDRESS = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,24}$/;
 
-const NOTICE = /^(gate-halted|gate-addresses|gate-unbilled|google-halted|google-addresses)-([a-z0-9_]{1,64})$/;
+const NOTICE = /^(gate-halted|gate-addresses|gate-unbilled|gate-booked|google-halted|google-addresses)-([a-z0-9_]{1,64})$/;
 // An unbilled notice's code: the count (no leading zero) and the gate's Bucharest day.
 const UNBILLED_CODE = /^([1-9][0-9]{0,8})_([0-9]{4})_([0-9]{2})_([0-9]{2})$/;
 /** '<count>_<YYYY>_<MM>_<DD>' -> { count, day: 'YYYY-MM-DD' } for a real calendar day; anything else null. */
@@ -58,6 +64,18 @@ const unbilledNotice = (vendor, folder, privateDir, lookAt) => code => {
     lookAt, journal: null
   };
 };
+/** The fixed wording of one gate's booked-at-maximum alert (same <count>_<YYYY>_<MM>_<DD> code as the unbilled one). */
+const bookedNotice = (vendor, folder, privateDir, lookAt) => code => {
+  const { count, day } = unbilledCode(code);
+  const calls = count === 1 ? '1 call booked at its maximum' : `${count} calls booked at their maximum`;
+  return {
+    subject: `Preview: ${vendor} gate: ${calls} today (${day})`,
+    lead: `Today (${day}, Bucharest day) ${count === 1 ? 'one model call' : `${count} model calls`} through the ${vendor} gate ${count === 1 ? 'was' : 'were'} sent, but the connection to ${vendor} then failed or timed out before an answer came back (usually a model that was too slow: the gate waits up to 20 minutes). The real charge is unknown, so the gate booked the most such a call can cost (its full reservation) as its charge, counted it in today's budget, and kept working. Nothing was halted: this is only a warning. In the gate's records these calls have the state settled_reserved_max; status counts them as today_booked_max (the read-only command below). If you want, compare with ${vendor}'s billing page: the real charge is at most what was booked. You get one email each time the count goes up.`,
+    commandIntro: 'To see the count (read-only, as root on the server):',
+    command: `/usr/bin/python3 -I ${folder}/preview_budget_authority.py status --private ${privateDir}`,
+    lookAt, journal: null
+  };
+};
 // The DeepInfra spending gate v3 (deploy/preview-gate/v3): its folder, state and GO.
 const GATE_FOLDER = '/opt/debateai-v3-preview/operator/deepinfra-budget-v3';
 const GATE_UNIT = 'debateai-preview-provider-budget.service';
@@ -75,6 +93,7 @@ const NOTICES = Object.freeze({
     lookAt: GATE_UNIT, journal: null
   }),
   'gate-unbilled': unbilledNotice('DeepInfra', GATE_FOLDER, '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', GATE_UNIT),
+  'gate-booked': bookedNotice('DeepInfra', GATE_FOLDER, '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', GATE_UNIT),
   'gate-addresses': code => ({
     subject: `Preview: spending gate address list needs an update (${code})`,
     lead: 'The hourly address check of the spending gate failed. Usually the addresses of api.deepinfra.com no longer match the gate\'s allow-list, and paid calls can fail until it is updated; the journal lines below say which case it is (DEEPINFRA_ADDRESSES_CHANGED, or another error such as an unreadable list). This email blanks addresses; to see the new ones, run the journalctl line under "What to look at" and check that they are DeepInfra\'s. Then run the one command below. It adds today\'s DNS answer to the list and restarts the gate.',
@@ -94,17 +113,17 @@ const NOTICES = Object.freeze({
     lookAt: GOOGLE_ADDRESS_UNIT, journal: GOOGLE_ADDRESS_UNIT
   })
 });
-/** `<kind>-<code>` -> { kind, code, unit } for the notice kinds; anything else null (an unbilled kind needs a valid count and day). */
+/** `<kind>-<code>` -> { kind, code, unit } for the notice kinds; anything else null (an unbilled or booked kind needs a valid count and day). */
 export function parseNotice(text) {
   const match = typeof text === 'string' ? (NOTICE.exec(text) ?? ANTHROPIC_NOTICE.exec(text)) : null;
-  if (match && match[1].endsWith('-unbilled') && unbilledCode(match[2]) === null) return null;
+  if (match && (match[1].endsWith('-unbilled') || match[1].endsWith('-booked')) && unbilledCode(match[2]) === null) return null;
   return match ? { kind: match[1], code: match[2], unit: `debateai-preview-notice@${text}.service` } : null;
 }
 
 // The Anthropic spending gate (deploy/preview-gate/v3/README-anthropic.md, PR B): its own two
 // notices, kept apart from the DeepInfra and Google ones above so each gate's email names its own
 // unit and its own re-open command.
-const ANTHROPIC_NOTICE = /^(anthropic-halted|anthropic-addresses|anthropic-unbilled)-([a-z0-9_]{1,64})$/;
+const ANTHROPIC_NOTICE = /^(anthropic-halted|anthropic-addresses|anthropic-unbilled|anthropic-booked)-([a-z0-9_]{1,64})$/;
 const ANTHROPIC_FOLDER = '/opt/debateai-v3-preview/operator/anthropic-budget-v1';
 const ANTHROPIC_UNIT = 'debateai-preview-anthropic-budget.service';
 const ANTHROPIC_ADDRESS_UNIT = 'debateai-preview-anthropic-addresses.service';
@@ -116,6 +135,7 @@ const ANTHROPIC_NOTICES = Object.freeze({
     lookAt: ANTHROPIC_UNIT, journal: null
   }),
   'anthropic-unbilled': unbilledNotice('Anthropic', ANTHROPIC_FOLDER, '/var/lib/debateai-v3-preview/provider-anthropic-authority-v1', ANTHROPIC_UNIT),
+  'anthropic-booked': bookedNotice('Anthropic', ANTHROPIC_FOLDER, '/var/lib/debateai-v3-preview/provider-anthropic-authority-v1', ANTHROPIC_UNIT),
   'anthropic-addresses': code => ({
     subject: `Preview: Anthropic gate addresses are outside its allowed range (${code})`,
     lead: 'The hourly address check of the Anthropic spending gate failed. Usually api.anthropic.com now answers with an address outside the published range the gate may reach (160.79.104.0/23), so Claude calls fail as not sent until this is fixed; the journal lines below say which case it is (ANTHROPIC_ADDRESSES_OUTSIDE_RANGE, or DNS trouble). This email blanks addresses. The range is written in the reviewed code, so there is no update command: run the check below to see the current answer, compare it with Anthropic\'s published list (platform.claude.com/docs/en/api/ip-addresses), and if the range really changed, the new range is a reviewed code change (README-anthropic.md, "Addresses").',

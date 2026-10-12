@@ -6,7 +6,11 @@ The spending gate is the only program on the preview server that holds the DeepI
 works as v2 did: the website (API) and the runner ask it for each model call through a local
 socket file; it sets aside the call's worst-case cost from today's pot, makes the call, records
 what it really cost, and answers. If anything about a call is unclear, it stops ("halts") until
-root opens it again with `activate`, and the owner gets one email.
+root opens it again with `activate`, and the owner gets one email. One exception (owner ruling of
+2026-10-12, "Book max cost, keep going"): when a model is so slow that DeepInfra's connection times
+out after the call was sent (the gate waits up to 20 minutes), or the connection breaks, the gate
+charges that call the most it could cost and keeps working; the owner gets an email ("Slow or cut-off
+answers" below).
 
 What is new in v3:
 
@@ -233,6 +237,36 @@ The smallest pot that passes with all four switched on is $1.43.
   cool-off. Over a whole day, the only hard limit on their number is the size of the day's record
   (about 15 MiB; past it the gate refuses every new call). Each one stays on that record, and the
   daily email above tells you when the count gets large. Nothing is halted for them.
+- **Slow or cut-off answers: booked at their maximum, never a halt** (owner ruling of 2026-10-12,
+  "Book max cost, keep going"). The gate now waits up to **20 minutes** (1,200 seconds, was 10) for
+  a model's answer; the app waits 21 minutes (1,260 seconds), so the gate, not the app, decides. If
+  the connection to DeepInfra times out or breaks AFTER the call was sent (for example MiMo writing a
+  long verdict story at 17 tokens a second), nobody knows what DeepInfra will charge. But the amount
+  the gate set aside for that call is already the most it can cost: every byte of the question
+  counted as a token, plus the longest answer the model may write, at that model's price. So the
+  gate:
+  - charges exactly that amount: the call's entry gets the state `settled_reserved_max`
+    (`held_usd` equal to `reserved_usd`), with the reason `transport_failure`, the kind of error and
+    how long it took;
+  - counts it like any paid call: in today's spend, the pot, the 2,000 calls a day and
+    `today_by_model`;
+  - keeps working: no halt, nothing to re-open. That call alone fails, and the app sees
+    `PROVIDER_CHARGE_BOOKED_MAX`. It neither adds to nor resets the "never reached" count below, and
+    it never cools a model off;
+  - writes one journal line with `"alert": "charge_booked_at_reservation"`, and `status` shows the
+    day's number and total (`today_booked_max`, `today_booked_max_usd`);
+  - emails the owner: the halt watcher (every minute) sends one email each time `today_booked_max`
+    goes up (several in one minute share one email, with the day's count). It records the day and
+    count first, in `/var/lib/debateai-preview-gate-watch/announced-booked.json` (root-only, next to
+    the halt marker), so a failed email is not retried.
+
+  DeepInfra's real charge for such a call can only be lower, so the pot stays safe; DeepInfra's
+  billing page shows the real figure. Everything else that is unclear still halts exactly as
+  before: an answer without token counts (also when DeepInfra answers with its own timeout error),
+  an answer that costs more than was set aside (`charge_overrun`), an answer from another model or
+  with another status than 200, an answer too large to read, a fault in the gate's own sending
+  code, a key or set-up problem, a lost answer, or a call cut off by a crash or restart of the gate
+  (a booked call that was not yet fully written halts at the next start, as a normal call does).
 - **Five in a row that never reached DeepInfra halt the gate** with `provider_unreachable`. "Never
   reached" means the connection failed before anything was sent. A "too many requests" answer in
   between neither adds to that count nor resets it. (For Anthropic, its not-busy error answers, 400,
@@ -246,6 +280,9 @@ The smallest pot that passes with all four switched on is $1.43.
   - `MODEL_COOLING`, with `retry_after` (in seconds): this one model is cooling off. Nothing was
     set aside and DeepInfra was not contacted. The other models are not affected.
   - `PROVIDER_NOT_REACHED`: the connection failed before anything was sent. Nothing was charged.
+  - `PROVIDER_CHARGE_BOOKED_MAX`: the call was sent, then the connection timed out or broke. The
+    call was charged the most it could cost; the gate keeps working ("Slow or cut-off answers"
+    above).
   - `AUTHORITY_HALTED`: the gate is halted, so nothing was set aside. The app shows that the gate
     is unavailable, not that the money ran out, and does not ask `/remaining`.
   - `PREVIEW_TEST_AUTHORITY_STOPPED`: any other refusal, for example a call that was already sent
@@ -576,6 +613,27 @@ so it accepts only a `glm-only` website.
 To go back, walk the same steps backwards: the website's list first (a `glm-only` build), then the
 app's model lists and a register version without `--checker`, then the GO.
 
+## Slow answers (2026-10-12): installing this change
+
+This release changes the gate's two code files (so their hashes, and the GO, change), the halt
+watcher (`gate_watch.py`), the alert script (`alert.mjs`) and the gate's unit file
+(`TimeoutStopSec=1300`). Do it when no debate is running: the restart waits for calls already on
+their way, up to about 22 minutes. In this order, for this gate (and the same for the Anthropic
+gate with its own README's steps):
+1. Copy the files with install step 1 (`R` set to this release), and the unit file
+   `debateai-preview-provider-budget.service` from `$R/deploy/preview-gate/v3/systemd/` to
+   `/etc/systemd/system/`; then `systemctl daemon-reload`.
+2. Write the GO again with install step 4 (the new `bridge_sha256` and `helper_sha256`; nothing else
+   changes).
+3. `systemctl restart debateai-preview-provider-budget.service`, then re-open with `activate`
+   ("Re-open after a halt", step 5; owner's yes): the gate refuses calls under a GO it was not
+   activated with.
+4. Refresh the alert script and run the halt watcher once by hand (install step 9). It must print
+   `{"status": "ok", "state": "active"}`.
+5. The app must come with the same release: it now waits 1,260 seconds and understands
+   `PROVIDER_CHARGE_BOOKED_MAX`. An older app gives up after 600 seconds and reads that answer as
+   "money ran out" (the call is still booked correctly by the gate).
+
 ## Before the Anthropic gate: re-install this gate's units first
 
 The Anthropic gate (README-anthropic.md, install step 3a) adds a second key to this server. This
@@ -595,6 +653,7 @@ the daily split (owner's ruling, 2026-10-10 evening) is DeepInfra $10.00 and Ant
 - `today_spend_usd` and `remaining_today_usd` (the day is the Bucharest day);
 - `today_by_model`: spend and number of calls per model today;
 - `today_unbilled_releases`: today's "too many requests" answers kept at $0 (no limit; they never halt the gate; the halt watcher emails once a day when the count reaches its threshold);
+- `today_booked_max` and `today_booked_max_usd`: today's calls whose connection timed out or broke after they were sent, each charged the most it could cost (state `settled_reserved_max`; already inside `today_spend_usd`; never a halt; one email each time the number goes up);
 - `cooling`: per model, the short cool-off after such answers (`refusals`, `window_seconds`, `until_utc`, `trial`, `cooling_now`). A model is listed after its first such answer; `cooling_now` is true while it waits. `activate` does not clear it: the wait runs on after a re-open, and only a normal answer from that model (or the wait running out, then a trial) ends it;
 - `state`, `reason` and `halts`;
 - `window_open` and `open_until_utc`;
@@ -608,7 +667,8 @@ the daily split (owner's ruling, 2026-10-10 evening) is DeepInfra $10.00 and Ant
 1. Read `reason` and `halts` in `status` first.
 2. If a call was uncertain (`uncertain_charge`, `interrupted_call_uncertain`), check the
    DeepInfra billing page for that time before re-opening. Its full worst-case cost stays
-   counted in that day's pot.
+   counted in that day's pot. (A call that only timed out or lost its connection after it was sent
+   no longer halts: it is booked at its maximum, `settled_reserved_max`, and needs no re-open.)
 3. If the reason is `provider_error_or_model_identity`, the entry's `reply_model` in that day's
    record shows which model the answer named.
 4. A gate halted with `unbilled_release_ceiling` was halted by the code before 2026-10-12 (that
@@ -627,7 +687,8 @@ the daily split (owner's ruling, 2026-10-10 evening) is DeepInfra $10.00 and Ant
 The running gate picks this up on the next call. No restart is needed.
 
 **Emergency off.** Two levels, as in v2. Level 1 is instant (no new paid call starts; re-open with
-`activate`). Level 2 stops the service (up to about 11 minutes).
+`activate`). Level 2 stops the service (up to about 22 minutes: a call already running may take
+its whole 20 minutes; `TimeoutStopSec=1300`).
 
 ```sh
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py stop --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3

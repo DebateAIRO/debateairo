@@ -103,9 +103,10 @@ The gate's own code is not here. It is `packages/providers/ops/preview_budget_au
   - only `activate` (root) re-opens a halted gate.
 
   So a restart only brings the socket back. A clean stop exits 0 and is not restarted.
-- **Stop can take up to about 11 minutes.** On `systemctl stop` the gate reserves nothing more
-  at once. A call already running may take up to 600 s, and its answer then gets 30 s to be
-  taken (otherwise the gate halts, as for any lost answer). So `TimeoutStopSec=700`. If systemd
+- **Stop can take up to about 22 minutes.** On `systemctl stop` the gate reserves nothing more
+  at once. A call already running may take up to 1,200 s (600 s before the owner ruling of
+  2026-10-12 on slow answers), and its answer then gets 30 s to be taken (otherwise the gate halts,
+  as for any lost answer). So `TimeoutStopSec=1300` (was 700). If systemd
   has to kill it after that, the next start halts on the interrupted call (fail closed).
 - **Only the API and the runner get a connection.** Anyone may connect to the socket (`666`),
   but a caller whose account is not in `allowed_peer_uids` is closed at once. It never gets a

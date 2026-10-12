@@ -11,6 +11,10 @@
 # which says nothing was halted and to check Anthropic's billing page. The day is recorded first in
 # announced-unbilled.json next to the --state file (this unit's StateDirectory). Change the
 # threshold here, then `systemctl daemon-reload`.
+# Booked-at-maximum alert (owner ruling 2026-10-12: alert, never halt): each time status's
+# today_booked_max goes up (a call sent, then its connection timed out or broke, booked at its
+# full reservation), it queues debateai-preview-notice@anthropic-booked-<count>_<YYYY>_<MM>_<DD>.service;
+# the day and count are recorded first in announced-booked.json next to the --state file.
 # Root only because the gate's private folder is root-only; the key file is hidden from it, and it
 # has no network at all (systemctl talks to systemd over a local socket).
 [Unit]

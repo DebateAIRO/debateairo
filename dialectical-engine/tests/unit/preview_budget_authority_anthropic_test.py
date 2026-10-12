@@ -879,13 +879,36 @@ class UnbilledAndUnsentTests(AnthropicTest):
         self.assertEqual((gate.status()['state'], gate.status()['unsent_streak'], gate.status()['in_flight']), ('active', 1, 0))
         self.assertEqual(gate.day(DAY)['entries'], {})
 
-    def test_a_failure_after_the_connect_is_uncertain_and_halts(self):
+    def test_a_connection_failure_after_the_send_is_booked_at_the_reservation_and_the_gate_stays_active(self):
+        # Owner ruling 2026-10-12 ("Book max cost, keep going"), both profiles: the reservation bounds the bill.
         gate = self.ready()
 
         def lost(_sent, _key):
             raise TimeoutError('read timed out')
-        with self.refused('NEW_CHARGE_UNCERTAIN'):
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
             self.call(gate, dispatch=lost)
+        entry, = gate.day(DAY)['entries'].values()
+        self.assertEqual((entry['state'], entry['reason'], entry['error_class'], entry['held_usd']),
+                         ('settled_reserved_max', 'transport_failure', 'TimeoutError', entry['reserved_usd']))
+        status = gate.status()
+        self.assertEqual((status['state'], status['in_flight'], status['today_booked_max']), ('active', 0, 1))
+        self.assertEqual(Decimal(status['today_spend_usd']), Decimal(entry['reserved_usd']))
+        self.assertEqual(self.call(gate, 'op-2')['status'], 200)
+
+    def test_a_failure_after_the_connect_that_is_not_a_connection_failure_is_uncertain_and_halts(self):
+        gate = self.ready()
+
+        def broken(_sent, _key):
+            raise RuntimeError('synthetic')
+        with self.refused('NEW_CHARGE_UNCERTAIN'):
+            self.call(gate, dispatch=broken)
+        self.assert_uncertain_halt(gate)
+
+    def test_anthropics_own_504_timeout_answer_still_halts(self):
+        # A vendor answer is judged as before: 504 timeout_error is not provably unbilled and carries no usage.
+        gate = self.ready()
+        with self.refused('NEW_CHARGE_UNCERTAIN'):
+            self.call(gate, reply={'type': 'error', 'error': {'type': 'timeout_error', 'message': 'timed out'}}, status=504)
         self.assert_uncertain_halt(gate)
 
 
