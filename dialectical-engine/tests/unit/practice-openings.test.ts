@@ -152,6 +152,30 @@ describe("practice openings: arm C through the real gateway path", () => {
   });
 });
 
+describe("practice openings: the merge and choose calls get the full answer room (controller ruling R-1)", () => {
+  it("MAP:merge and MAP:choose ask for 32,768 tokens; the angle, list and gap calls and arm T ask for the judge bound", async () => {
+    // Each request as the scripted gate reads it: the contract the step carries and the max_tokens its body asks for.
+    const asked: { contract: string; maxTokens: number }[] = [];
+    const reading: Wrap = (port) => ({ execute: async (input, signal) => {
+      const body = JSON.parse(input.requestBody) as { max_tokens?: unknown };
+      asked.push({ contract: readPromptFrame(openingsDryPacket(input.requestBody).packet).contractId, maxTokens: Number(body.max_tokens) });
+      return port.execute(input, signal);
+    } });
+    await run("ro-euro", "T,C", reading);
+    const judgeRoom = policy.bounds.JUDGE.tokenCeiling;
+    const answerRoom = 32_768;
+    expect(judgeRoom).toBeLessThan(answerRoom);
+    const longSteps = [MAP_CONTRACT_IDS.merge, MAP_CONTRACT_IDS.choose];
+    const sentLong = asked.filter((request) => longSteps.includes(request.contract));
+    expect(new Set(sentLong.map((request) => request.contract))).toEqual(new Set(longSteps));
+    expect(sentLong.every((request) => request.maxTokens === answerRoom)).toBe(true);
+    const others = asked.filter((request) => !longSteps.includes(request.contract));
+    expect(others.map((request) => request.contract)).toEqual(expect.arrayContaining([MAP_CONTRACT_IDS.angles, MAP_CONTRACT_IDS.listAngle, MAP_CONTRACT_IDS.gap]));
+    expect(others.some((request) => request.contract.startsWith("judge."))).toBe(true);
+    expect(others.every((request) => request.maxTokens === judgeRoom)).toBe(true);
+  });
+});
+
 describe("practice openings: repairs and busy AIs", () => {
   it("a slip fixed by the patch follow-up is REPAIRED, its accepted form PATCH", async () => {
     const result = await run("en-four-day-week", "B");

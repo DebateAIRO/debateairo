@@ -127,6 +127,19 @@ function openingsAssertArms(arms: readonly OpeningsArm[]): void {
   }
 }
 
+/**
+ * Controller ruling R-1: a merge or choose reply is a long structured list, and a thinking model spends its thinking
+ * inside the same bound (a real run's merge used the whole judge bound on thinking and was cut off, then fell back to
+ * the code merge). Those two steps get the preview's own per-call answer cap (preview-models.ts).
+ */
+const OPENINGS_LONG_STEP_TOKEN_CEILING = 32_768;
+
+/** The bound a map step is sent under: MERGE and CHOOSE get the answer room; every other step keeps the judge bound. */
+function openingsStepBound(bound: CallBound, step: OpeningsStep): CallBound {
+  if (step !== "MERGE" && step !== "CHOOSE") return bound;
+  return Object.freeze({ ...bound, tokenCeiling: Math.max(bound.tokenCeiling, OPENINGS_LONG_STEP_TOKEN_CEILING) });
+}
+
 export async function runPracticeOpenings(input: OpeningsRunInput): Promise<OpeningsRunResult> {
   // The whole selection first: nothing is sent for a run that would refuse midway.
   const rotations = openingsQuestionRotations(input.questions);
@@ -245,7 +258,7 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
         async (gateway) => {
           const pieces = mapProviderPieces(request.spec);
           const response = await gateway.call({ runId, subjectItemId: randomUUID(), callSiteKey: request.callSiteKey, role: "JUDGE", lane: "served",
-            bound: input.bound, contractHash: input.contractHashes.map, providerRef: target.providerRef, packet: pieces.framed.packet,
+            bound: openingsStepBound(input.bound, request.step), contractHash: input.contractHashes.map, providerRef: target.providerRef, packet: pieces.framed.packet,
             classifyContent: pieces.classifyContent, buildRepairPacket: pieces.buildRepairPacket });
           return pieces.readAccepted(response.content);
         });
