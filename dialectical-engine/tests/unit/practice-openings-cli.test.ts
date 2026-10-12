@@ -16,7 +16,7 @@ import {
 import { practiceRemainingPorts } from "../../tools/preview-practice/practice-ask-composition.js";
 import { OPENINGS_DRY_MODELS, openingsDryPorts } from "../../tools/preview-practice/practice-openings-dry.js";
 import { practiceSocketsFromEnvironment } from "../../tools/preview-practice/practice-settings.js";
-import { parsePracticeArgs, repositoryRoot, runPractice } from "../../tools/preview-practice/practice.js";
+import { parsePracticeArgs, practiceFinishedUnit, repositoryRoot, runPractice } from "../../tools/preview-practice/practice.js";
 
 vi.mock("@debateai/providers", async (importOriginal) => {
   const real = await importOriginal<typeof import("@debateai/providers")>();
@@ -123,6 +123,47 @@ describe("practice openings: the command line", () => {
     }
     const unknownArm = await runPractice(["openings", "--dry", "--arms", "X", "--out", freshOut()], {}, quiet);
     expect(unknownArm.report.reasons[0]).toMatch(/^HARNESS_ERROR:PRACTICE_FLAG_VALUE_INVALID/u);
+  });
+
+  // A flag openings does not read would be ignored silently: a typo (--question for --questions) would start the full
+  // paid comparison. Each is refused, before anything is written, sent or read.
+  for (const [extra, label] of [
+    [["--question", "en-rent-caps"], "--question"], [["--models", HAIKU], "--models"], [["--lanes", "PANEL"], "--lanes"],
+    [["--samples", "1"], "--samples"], [["--gap-ms", "0"], "--gap-ms"], [["--depth", "1"], "--depth"],
+    [["--register-export", "/x/register.json"], "--register-export"], [["--sequential"], "--sequential"], [["--transcript"], "--transcript"]
+  ] as const) {
+    for (const dry of [true, false]) {
+      it(`refuses ${label} in openings${dry ? " --dry" : ""}, before anything is written or sent`, async () => {
+        const out = freshOut();
+        const result = await runPractice(["openings", ...(dry ? ["--dry"] : []), "--arms", "T", ...extra, "--out", out], {}, quiet);
+        expect([result.report.verdict, result.exitCode]).toEqual(["HARNESS_ERROR", 40]);
+        expect(result.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_FLAG_VALUE_INVALID"]);
+        expect(existsSync(out)).toBe(false);
+      });
+    }
+  }
+
+  for (const [extra, label] of [
+    [["--settings", "/x/settings.env"], "--settings"], [["--gate-status-deepinfra", "/x/status.json"], "--gate-status-deepinfra"],
+    [["--gate-status-anthropic", "/x/status.json"], "--gate-status-anthropic"]
+  ] as const) {
+    it(`refuses the real-run-only ${label} with --dry (a dry run reads no setting and no gate status)`, async () => {
+      const out = freshOut();
+      const result = await runPractice(["openings", "--dry", "--arms", "T", ...extra, "--out", out], {}, quiet);
+      expect(result.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_FLAG_VALUE_INVALID"]);
+      expect(existsSync(out)).toBe(false);
+    });
+  }
+
+  it("still accepts every flag openings reads (dry: --busy-wait-minutes, --max-in-flight)", async () => {
+    const result = await runPractice(["openings", "--dry", "--questions", "en-rent-caps", "--arms", "T", "--busy-wait-minutes", "0",
+      "--max-in-flight", "3", "--out", freshOut()], {}, quiet);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("the interrupt messages name the finished calls in openings, the finished samples elsewhere", () => {
+    expect(practiceFinishedUnit("openings")).toBe("calls");
+    for (const mode of ["formats", "debate", "report", undefined]) expect(practiceFinishedUnit(mode)).toBe("samples");
   });
 
   it("a real openings run passes the same start checks as formats (here: the acknowledgement)", async () => {

@@ -235,12 +235,11 @@ stored per call), so it is read from the gates' answers as the practice watches 
   it takes about as long as the slowest model's 18 jobs: about 15 to 50 minutes (GLM, Qwen and MiMo take 30 to 170
   seconds a call), plus up to `--busy-wait-minutes` (default 30) when a model is busy. With `--sequential`, about 1
   to 2 hours, plus the same.
-- openings, all 12 questions and all four arms: about 350 calls, roughly $0.5 to $1 within the test budget ($5
-  DeepInfra and $1 Haiku). The steps of one arm go one after another, so it takes several hours (the slow models take
-  30 to 170 seconds a call). The relay of S-4 ends by itself after 8 hours: for a longer run, split it with
-  `--questions` into two runs (for example the 6 Romanian, then the 6 English questions), each with its own `--out`
-  folder. The AIs are seated by each question's fixed place, so a split run seats them as the full run would.
-  `--dry` spends nothing.
+- openings, all 12 questions and all four arms: about 350 calls. Cost: roughly $0.5 to $1 in all, a planning
+  estimate, not yet measured (the first real run's report gives the real figure). The tighter pot is Haiku's: the test
+  budget is $5 a day for DeepInfra but only $1 a day for Haiku, so check Haiku's share in the first run's report before
+  running again the same day. The steps of one arm go one after another, so it takes several hours (the slow models
+  take 30 to 170 seconds a call). That is why S-6 runs it in two halves (see there). `--dry` spends nothing.
 - debate, depth 1: up to about 230 calls, about $0.15 to $0.70, about 1 to 2 hours. Depth 2: about 350 calls, up to
   about 3 hours. The start-of-debate estimate needs much more room left in the pots than is actually spent (about
   $4 DeepInfra and $0.90 Anthropic left for depth 1), so run early in the Bucharest day.
@@ -359,12 +358,26 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
 echo "exit: $?"
 ```
 
-The openings comparison (it spends real money from the test budget; see "Money and time"): one run, all five AIs,
-after a fresh S-3 gate status and the two status files copied down again. Run it dry first (see "The openings record"):
+The openings comparison (it spends real money from the test budget; see "Money and time"), all five AIs, in two
+runs: first the 6 Romanian questions, then the 6 English ones, each into its own `--out` folder. Why two: the whole
+comparison takes several hours and may outlast the relay, which S-4 starts with an 8-hour lifetime. Each half seats the
+AIs exactly as one full run would (by each question's fixed place). Run it dry first (see "The openings record").
+
+Before each half: repeat S-3 (fresh gate status) and copy the two status files down again. The Romanian half:
 
 ```sh
 scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts openings --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/openings-report"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts openings --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --questions ro-euro,ro-autobuze,ro-final-viata,ro-ciuperci,ro-strainatate,ro-hpv --out "$P/openings-report-ro"
+echo "exit: $?"
+```
+
+Then the English half, after S-3 again. If the relay has ended meanwhile, start it again with S-4's `systemd-run`
+line, then run only the `ssh -N` line of S-5 again (it puts the two sockets back in the same `D`; leave `D` and `P` as
+they are):
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts openings --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --questions en-nuclear,en-four-day-week,en-phones-school,en-retirement-age,en-social-media-age,en-rent-caps --out "$P/openings-report-en"
 echo "exit: $?"
 ```
 
@@ -382,6 +395,8 @@ Optional flags:
   (default all four; they always run in the order T, A, B, C), `--busy-wait-minutes N` and `--max-in-flight N` as in
   formats (with `--dry` a busy AI sits out at once unless `--busy-wait-minutes` is given). The questions themselves
   are fixed in the code and never read from the command line; a refused value is never repeated in the output.
+  Any other flag is refused in openings (for example `--question`, `--models` or `--samples`), and `--settings` and
+  the two `--gate-status-*` flags are refused with `--dry`, so a mistyped flag can never start the paid run.
 - report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/samples.jsonl.
 - debate: `--depth 1|2`, `--question ro|en`, `--transcript` (also write `transcript.json`: every prompt and every
   answer, see "The whole debate, word for word" above). The register is copied only through the register's own publication

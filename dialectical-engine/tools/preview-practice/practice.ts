@@ -101,6 +101,19 @@ const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-d
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--questions", "--arms"]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry"]);
 
+/**
+ * The flags openings reads; every other flag is refused there, so a typo (--question for --questions) can never start
+ * the full paid comparison. A dry run reads no settings and no gate status, so those are refused with --dry.
+ */
+const OPENINGS_FLAGS: ReadonlySet<string> = new Set(["--out", "--questions", "--arms", "--busy-wait-minutes", "--max-in-flight", "--dry",
+  "--settings", "--gate-status-deepinfra", "--gate-status-anthropic"]);
+const OPENINGS_REAL_RUN_ONLY: ReadonlySet<string> = new Set(["--settings", "--gate-status-deepinfra", "--gate-status-anthropic"]);
+
+/** What the interrupt messages say the report is written from: openings' finished calls, the other modes' samples. */
+export function practiceFinishedUnit(mode: string | undefined): "calls" | "samples" {
+  return mode === "openings" ? "calls" : "samples";
+}
+
 export function parsePracticeArgs(argv: readonly string[]): Args {
   const [mode, ...rest] = argv;
   if (mode !== "formats" && mode !== "debate" && mode !== "openings" && mode !== "report") {
@@ -310,10 +323,19 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     for (const flag of ["--questions", "--arms"]) {
       if (args.flags.has(flag) && args.mode !== "openings") throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (openings mode only)`);
     }
+    if (args.mode === "openings") {
+      // The other way round: a flag only another mode reads is refused here (its value is never repeated).
+      const dryRun = args.switches.has("--dry");
+      for (const flag of [...args.flags.keys(), ...args.switches]) {
+        if (!OPENINGS_FLAGS.has(flag)) throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (not read by openings)`);
+        if (dryRun && OPENINGS_REAL_RUN_ONLY.has(flag)) throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (not read by openings --dry)`);
+      }
+    }
     // Only fixed ids are accepted, each checked with its seat rotation before anything else (ruling T11-m6); the text of
     // a refused value is never repeated (practice-openings-questions.ts).
     const openingsQuestions = args.mode === "openings" ? openingsQuestionsFromFlag(args.flags.get("--questions")) : [];
     const openingsArms = args.mode === "openings" ? openingsArmsFromFlag(args.flags.get("--arms")) : [];
+    // Checked here so a bad selection writes nothing; checked again by the engine before the first call.
     openingsQuestionRotations(openingsQuestions);
     if (args.mode === "report") {
       // Rebuilds the report from an existing samples log; nothing is sent. On a refusal nothing is written there.
@@ -497,6 +519,7 @@ const invokedDirectly = process.argv[1] !== undefined && import.meta.url === pat
 if (invokedDirectly) {
   let control: PracticeControl | null = null;
   const interrupts = practiceInterruptGate();
+  const finished = practiceFinishedUnit(process.argv[2]);
   const quit = (code: string): never => {
     let exitCode = 50;
     try { exitCode = control?.abort(code) ?? 50; } catch { /* exit below all the same */ }
@@ -508,18 +531,18 @@ if (invokedDirectly) {
     if (action === "REPEAT_IGNORED") return;
     if (action === "FIRST") {
       process.stderr.write("interrupt: no new calls will be sent; waiting for the calls in flight, then the report is written "
-        + "(press again after two seconds to quit at once; the report is still written from the finished samples)\n");
+        + `(press again after two seconds to quit at once; the report is still written from the finished ${finished})\n`);
       control?.stop();
       return;
     }
-    process.stderr.write("interrupt again: quitting now; writing the report from the finished samples\n");
+    process.stderr.write(`interrupt again: quitting now; writing the report from the finished ${finished}\n`);
     quit("OPERATOR_SECOND_INTERRUPT");
   };
   const onStopFromOutside = (signal: string) => () => {
     // pnpm answers a terminal Ctrl-C by sending its child SIGTERM and quitting itself: within two seconds of the first
     // interrupt that is the same key press, so the calls in flight still finish and the report is still written.
     if (interrupts.justInterrupted()) return;
-    process.stderr.write(`${signal}: quitting now; writing the report from the finished samples\n`);
+    process.stderr.write(`${signal}: quitting now; writing the report from the finished ${finished}\n`);
     quit(`OPERATOR_${signal}`);
   };
   // Ours alone: a library's own listener (embedded-postgres's async-exit-hook) would quit with 130 before the report.
