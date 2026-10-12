@@ -45,6 +45,7 @@ const WIDE = Object.freeze({ perDebate: 10, perModelPerDebate: 10, perModelPerRu
 function recordingLane(): DebateCallLane & { tickets: CallTicket[] } {
   const tickets: CallTicket[] = [];
   return Object.assign({
+    callsAtOnce: 1,
     run: <T>(ticket: CallTicket, call: () => Promise<T>) => { tickets.push(ticket); return call(); },
     stop: () => undefined, drained: async () => undefined, close: () => undefined,
     stats: () => ({ peakInFlight: 0, peakByModel: {}, waitedMsByModel: {}, calls: 0 })

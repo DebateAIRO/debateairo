@@ -109,7 +109,9 @@ describe("V-28 round 4 — the post-authoring serve decision is one function, ca
  *
  * C1 is a five-site invariant: a spend refusal raised while authoring the
  * secondary root, an additional root, an expansion leg or a cross-root
- * response, or while reviewing, must STOP the phase by writing
+ * response, or while reviewing, must STOP the phase by writing (since parallel
+ * calls the secondary and the additional roots share one catch, `rootChain`'s,
+ * so four catches hold the five sites)
  * `runBodyBudgetStop` — never by letting the refusal travel. Travelling is the
  * exact defect rounds 2 to 4 fixed three times: a money refusal on root 1
  * discards a root 0 that was already minted, panelled and PAID FOR, and the run
@@ -198,21 +200,16 @@ interface RunBodyStopSite {
   readonly assignment: string;
 }
 
-/** The four author catches share one guard; the review catch has its own. */
+/** The three author catches share one guard; the review catch has its own. */
 const PHASE_GUARD = "if (stop === null) throw error;";
 const REVIEW_GUARD = "if (outcome.kind === \"RETHROW\") throw error;";
 
 const RUN_BODY_STOP_SITES: readonly RunBodyStopSite[] = Object.freeze([
   {
-    site: "the secondary root author",
-    anchor: "callSiteKey: \"JUDGE:root:secondary\"",
-    decides: "expansionPhaseStop(error)",
-    guard: PHASE_GUARD,
-    assignment: "runBodyBudgetStop = stop;"
-  },
-  {
-    site: "each additional root author",
-    anchor: "callSiteKey: `JUDGE:root:${makerIndex}`",
+    // Parallel calls (Task 10, 2026-10-12): the secondary and every additional root are ONE chain each, all started
+    // together (`rootChain`), so their two catches became this one.
+    site: "every root after the first (one chain each)",
+    anchor: "callSiteKey: rootCallSiteKey(rootIndex),",
     decides: "expansionPhaseStop(error)",
     guard: PHASE_GUARD,
     assignment: "runBodyBudgetStop = stop;"
@@ -267,8 +264,20 @@ const PANEL_STOP_MAPPING = "onRunLevelSpendStop: input.onSpendStop === \"AUTHOR_
 const PANEL_STOP_DECISION = "? panelSpendStop(panel.stoppedBy, input.onSpendStop)";
 const PANEL_STOP_GUARD = "if (Object.hasOwn(panel, \"stoppedBy\") && spendStop === null) throw panel.stoppedBy;";
 const PANEL_PARTIAL_RULE = "else if (memberFailures.length > 0 || spendStop !== null) marks.push(PANEL_PARTIAL_MARK);";
-/** Task M2: nothing more is argued after a stop on the first root's panel. */
-const SECONDARY_GUARD = "if (effectiveMakerCount > 1 && runBodyBudgetStop === null) {";
+/**
+ * Task M2: nothing more is argued after a stop on the first root's panel. Parallel calls (Task 10, spec 2026-10-12
+ * §2.3, O6): root 0's panel now runs TOGETHER with the other roots' author calls, so the stop can no longer come before
+ * them; instead every chain asks this, right before its author call and right before its review call, and starts
+ * neither once a stop is recorded. (It replaced the guard `if (effectiveMakerCount > 1 && runBodyBudgetStop === null) {`
+ * that stood in front of the secondary root.)
+ */
+const CHAIN_STOP = "const arguingStopped = (): boolean => bodyFailed || runBodyBudgetStop !== null || tooFewLeftToArgue();";
+const ROOT_CHAIN = "const rootChain = async (rootIndex: number, stage: { rank: number }): Promise<void> => {";
+const ROOT_CHAIN_GUARD = "if (arguingStopped()) return;";
+const ROOT_AUTHOR_CALL = "authoredRoot = await authorAndPanel(input);";
+const REVIEW_CHAIN = "const reviewInChain = async (slot: ReviewSlot, authoredNode: AuthoredDebateNode): Promise<void> => {";
+const REVIEW_CHAIN_GUARD = "if (arguingStopped()) {";
+const REVIEW_CHAIN_CALL = "const outcome = await callReview(authoredNode, reviewer);";
 /** The serve gate: the envelope question, asked on the attempt count alone. */
 const EVALUATE_DEFINITION = "const evaluateEnvelope = (";
 const EVALUATE_DEFAULT = "forceHardStop = false\n    ): Promise<BudgetPressureDecision> =>";
@@ -380,7 +389,7 @@ function assertRunBodyStopWiring(source: string): void {
 
   // Every assignment in the file belongs to one of the sites above, or to the
   // first root's panel record below.
-  expect(statementOccurrences(source, "runBodyBudgetStop = stop;"), "four `= stop`").toBe(4);
+  expect(statementOccurrences(source, "runBodyBudgetStop = stop;"), "three `= stop`").toBe(3);
   expect(statementOccurrences(source, "runBodyBudgetStop = outcome.stop;"), "one `= outcome.stop`").toBe(1);
 
   // 3. The first root's panel: the voices heard are kept, the stop is recorded,
@@ -402,11 +411,22 @@ function assertRunBodyStopWiring(source: string): void {
   expect(statementOccurrences(source, ROOT_PANEL_RECORD), ROOT_PANEL_RECORD).toBe(1);
   expect(source.indexOf(ROOT_PANEL_RECORD), "recorded after the first root's panel")
     .toBeGreaterThan(source.indexOf(ROOT_PANEL_CALL));
-  expect(statementOccurrences(source, SECONDARY_GUARD), SECONDARY_GUARD).toBe(1);
-  expect(source.indexOf(ROOT_PANEL_RECORD), "recorded before the secondary root is considered")
-    .toBeLessThan(source.indexOf(SECONDARY_GUARD));
-  expect(source.indexOf(SECONDARY_GUARD), "the guard stands in front of the secondary root")
-    .toBeLessThan(source.indexOf(RUN_BODY_STOP_SITES[0]!.anchor));
+  // Parallel calls (O6): every root chain and every review chain asks the stop right before its call.
+  expect(statementOccurrences(source, CHAIN_STOP), CHAIN_STOP).toBe(1);
+  const rootChainAt = source.indexOf(ROOT_CHAIN);
+  expect(rootChainAt, "the root chain").toBeGreaterThanOrEqual(0);
+  const rootAuthorAt = source.indexOf(ROOT_AUTHOR_CALL, rootChainAt);
+  expect(rootAuthorAt, "the root chain's author call").toBeGreaterThan(rootChainAt);
+  expect(statementOccurrences(source.slice(rootChainAt, rootAuthorAt), ROOT_CHAIN_GUARD), "asked before a root's author call").toBe(1);
+  expect(source.indexOf(ROOT_CHAIN_GUARD, rootChainAt), "the root chain's guard").toBeLessThan(source.indexOf(RUN_BODY_STOP_SITES[0]!.anchor));
+  const reviewChainAt = source.indexOf(REVIEW_CHAIN);
+  expect(reviewChainAt, "the review chain").toBeGreaterThanOrEqual(0);
+  const reviewCallAt = source.indexOf(REVIEW_CHAIN_CALL, reviewChainAt);
+  expect(reviewCallAt, "the review chain's call").toBeGreaterThan(reviewChainAt);
+  expect(statementOccurrences(source.slice(reviewChainAt, reviewCallAt), REVIEW_CHAIN_GUARD), "asked before a review call").toBe(1);
+  // Root 0's panel stop is recorded where the chains read it.
+  expect(source.indexOf(ROOT_PANEL_RECORD), "recorded inside root 0's chain, after its panel")
+    .toBeLessThan(source.indexOf(ROOT_CHAIN));
 
   // 4. The author's own first call: a ceiling below it is the typed
   //    configuration failure, on the root-0 author call and nowhere else.
@@ -527,9 +547,13 @@ describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at every ca
     ["the first root's panel lets the stop travel", ROOT_PANEL_RULE, CHILD_PANEL_RULE],
     // ...or keeps the author's judgement but forgets the stop.
     ["the first root's panel stop is not recorded", ROOT_PANEL_RECORD, `// ${ROOT_PANEL_RECORD}`],
-    // ...or goes on arguing after it.
-    ["the secondary root is authored after a stop on the first root's panel", SECONDARY_GUARD,
-      "if (effectiveMakerCount > 1) {"],
+    // ...or goes on arguing after it: the chains no longer read the recorded stop...
+    ["a root or review chain starts its call after a stop on the first root's panel", CHAIN_STOP,
+      "const arguingStopped = (): boolean => bodyFailed || tooFewLeftToArgue();"],
+    // ...or a root chain no longer asks before its author call (parallel calls, O6)...
+    ["a root chain's author call is started after the arguing stopped", ROOT_CHAIN_GUARD, ""],
+    // ...or a review chain no longer asks before its review call.
+    ["a review chain's call is started after the arguing stopped", REVIEW_CHAIN_GUARD, "if (false) {"],
     // A ceiling below the first call is an untyped failure again.
     ["the first-call failure is no longer typed", FIRST_CALL_FAILURE, "throw error;"],
     // The answer stops saying the debate was cut short.
@@ -557,7 +581,7 @@ describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at every ca
     ["the row no longer records the stop", BODY_FACTS_READ, "body: { bodyStop: null, pointsWithoutReview: null }"]
   ]);
 
-  it("fails when any one of twenty-one mutations is applied to that same source", async () => {
+  it("fails when any one of twenty-three mutations is applied to that same source", async () => {
     const source = await readFile(RUNNER, "utf8");
 
     for (const [name, from, to] of MUTATIONS) {

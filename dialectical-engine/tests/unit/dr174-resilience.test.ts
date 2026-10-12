@@ -51,13 +51,17 @@ describe("RESIL-01 / DR-174 lifecycle mutation ledger", () => {
     expect(source).toContain('export const FIRST_POSITION_CALL_SITE_KEY = "JUDGE" as const;');
     // V-28 (task 11) changed the DECLARATION, not the routing: the secondary
     // root is authored inside a try/catch that turns a spend refusal into a
-    // clean stop instead of discarding an already-minted root 0, so `secondary`
-    // is a `let` assigned in the try rather than a `const`. What this row is
-    // about — that the secondary root goes through `authorPosition`, and so
-    // through the cooldown seam, under that call-site key with a null parent —
-    // is unchanged and is still pinned, declaration included.
-    expect(source).toMatch(/let secondary: Awaited<ReturnType<typeof authorPosition>> \| null = null;/);
-    expect(source).toMatch(/secondary = await authorPosition\(\{[\s\S]*?callSiteKey: "JUDGE:root:secondary",[\s\S]*?parentNodeId: null/);
+    // clean stop instead of discarding an already-minted root 0. Parallel calls
+    // (Task 10, 2026-10-12) changed it again: every root after the first is one
+    // chain (`rootChain`), all started together, so the secondary root is root
+    // index 1 of that chain rather than a statement of its own. What this row is
+    // about — that the secondary root goes through the leg's author call
+    // (`authorAndPanel`), and so through the cooldown seam, under that call-site
+    // key with a null parent — is unchanged and is still pinned.
+    expect(source).toMatch(/const rootCallSiteKey = \(rootIndex: number\): string =>\s*rootIndex === 1 \? "JUDGE:root:secondary" : `JUDGE:root:\$\{String\(rootIndex\)\}`;/);
+    expect(source).toMatch(/const ROOT_SAVE: Omit<SaveInput, "authorIndex"> = Object\.freeze\(\{\s*parentNodeId: null,/);
+    expect(source).toMatch(/const input: AuthorPositionInput = \{[\s\S]*?callSiteKey: rootCallSiteKey\(rootIndex\),[\s\S]*?\.\.\.ROOT_SAVE,[\s\S]*?authoredRoot = await authorAndPanel\(input\);/);
+    expect(source).toMatch(/for \(let rootIndex = 1; rootIndex < effectiveMakerCount; rootIndex \+= 1\) \{\s*rootChains\.push\(runChain\(\(stage\) => rootChain\(rootIndex, stage\)/);
     expect(source).toMatch(/const childAttempt = await cooldownAttempt\(\{[\s\S]*?failureScope: input\.parentNodeId === null \? "MAKER_POSITION" : "EXPANSION"/);
     expect(source).toContain("maxAttempts: this.settings.judgeBound.maxAttempts + (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0)");
   });

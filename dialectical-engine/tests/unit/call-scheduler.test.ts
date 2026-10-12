@@ -20,6 +20,10 @@ describe("call scheduler", () => {
     gates.forEach((g) => g.resolve("ok")); await Promise.all(calls);
     expect(lane.stats().peakInFlight).toBe(3);
   });
+  it("tells each lane how many of its debate's calls may run at once (Task 10: the runner reads it to run calls together)", () => {
+    expect(createCallScheduler({ policy }).openLane("d1").callsAtOnce).toBe(3);
+    expect(createCallScheduler({ policy: { ...policy, perDebate: 1 } }).openLane("d1").callsAtOnce).toBe(1);
+  });
   it("orders waiting calls by priority then arrival", async () => {
     const s = createCallScheduler({ policy: { ...policy, perDebate: 1 } }); const lane = s.openLane("d1");
     const order: string[] = []; const first = deferred();

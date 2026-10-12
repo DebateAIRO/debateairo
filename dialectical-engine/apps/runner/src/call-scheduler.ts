@@ -41,6 +41,8 @@ export interface SchedulerStats {
   readonly peakByModel: Readonly<Record<string, number>>;
 }
 export interface DebateCallLane {
+  /** How many of this debate's calls may run at once (the policy's `perDebate`): 1 is one call at a time. */
+  readonly callsAtOnce: number;
   /** Waits for a slot under every limit, runs `call`, always releases. Rejects with TypedDomainError CALL_LANE_STOPPED if the lane is stopped while waiting. */
   run<T>(ticket: CallTicket, call: () => Promise<T>): Promise<T>;
   /** No new call starts; queued calls reject CALL_LANE_STOPPED; running calls are not touched. Idempotent. */
@@ -247,6 +249,7 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     };
 
     return Object.freeze({
+      callsAtOnce: policy.perDebate,
       run<T>(ticket: CallTicket, call: () => Promise<T>): Promise<T> {
         if (lane.stopped) return Promise.reject(laneStoppedError(lane.debateId));
         return new Promise<T>((resolve, reject) => {
