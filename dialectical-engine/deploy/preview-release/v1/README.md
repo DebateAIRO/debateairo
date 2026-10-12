@@ -294,38 +294,70 @@ cp -a "$NP" "$S/native-plan.before.json"
    `PREVIEW_REGISTER_BASE_NOT_CURRENT: …` means a version newer than the plan's base exists: plan
    again (step 1) from the verify plan that names the newest publication.
 
-4. **Verify the new publication and make launch plans that carry it:**
+4. **Verify the new publication and make launch plans that carry it**, for the API, the website
+   and the runner. The runner reads the register too (its call limits among other rows), so it
+   needs its own plan with the new publication. `OLDR` is the runner plan the lifecycle lock names
+   (as `OLDA` and `OLDU` in step 7). If the lock has no runner yet, `jq` prints `null` and the
+   next line uses the API plan instead, as step 7 explains for the first runner plan.
 
    ```sh
    rel native-plan --operation verify --from "$ART/native-plan-publish.json" --publication "$ART/register-published.json" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-verify.json"
    put "$ART/native-plan-verify.json" && nat "$ART/native-first-verify.json"
    rel launch-plan --service api --from "$OLDA" --root "$CAPI" --source-manifest "$ART/candidate-api-source.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/api-launch.json"
    rel launch-plan --service ui --from "$OLDU" --root "$CUI" --source-manifest "$ART/candidate-ui-source.json" --ui-build "$ART/candidate-ui-build.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/ui-launch.json"
+   OLDR=$(jq -r .services.runner.basePlan.path /etc/debateai-v3-preview/lifecycle/release-lock.json); echo "$OLDR"
+   if [ "$OLDR" = null ]; then OLDR=$OLDA; fi
+   rel launch-plan --service runner --from "$OLDR" --root "$CRUN" --source-manifest "$ART/candidate-runner-source.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/runner-launch.json"
    ```
 
-5. **Point both environment files at the new version.** In `api.env`, and in the runner's
-   environment file if this preview has one, replace the `REGISTER_VERSION=` line with `$V`.
-   (The runner is masked on the preview, and `/etc/debateai-v3-preview/auth-dev-v1` holds no
-   `runner.env` today. If the runner is ever unmasked, its own launch plan needs the same
-   `--publication`.) The edit does not print the file:
+5. **Point both environment files at the new version.** In `api.env` and in the runner's
+   `runner.env` (`deploy/preview-auth-dev/v1/README.md` "runner.env recipe"), replace the
+   `REGISTER_VERSION=` line with `$V`. Each launcher refuses to start unless that line equals
+   its plan's publication. The edit does not print the files:
 
    ```sh
    sed -i "s/^REGISTER_VERSION=.*/REGISTER_VERSION=$V/" /etc/debateai-v3-preview/auth-dev-v1/api.env
    grep -c "^REGISTER_VERSION=$V\$" /etc/debateai-v3-preview/auth-dev-v1/api.env   # must print 1
+   sed -i "s/^REGISTER_VERSION=.*/REGISTER_VERSION=$V/" /etc/debateai-v3-preview/auth-dev-v1/runner.env
+   grep -c "^REGISTER_VERSION=$V\$" /etc/debateai-v3-preview/auth-dev-v1/runner.env   # must print 1
    ```
 
-6. **Pin and restart together.** Follow `deploy/preview-lifecycle/v1/README.md` §"Pinning a NEW
-   release": `prestart.mjs pin --from "$ART/api-launch.json"` and the same for the UI; regenerate
-   both drop-ins; `daemon-reload`; then restart the API and the UI (and the runner, if it is
-   active) in one step. Each start's prestart re-verifies natively against the verify plan of
-   step 4. The API refuses to start if `REGISTER_VERSION` differs from the pinned publication.
+6. **Pin all three, then restart the API, the website, then the runner.** This follows
+   `deploy/preview-lifecycle/v1/README.md` §"Pinning a NEW release", with the runner added: pin
+   the three plans first, then regenerate the three release drop-ins from the finished lock,
+   `daemon-reload`, and restart in that order. Each start's prestart re-verifies natively against
+   the verify plan of step 4. The API and the runner each refuse to start if `REGISTER_VERSION`
+   differs from their pinned publication. The runner is never restarted automatically, so the
+   last command restarts it by hand; `try-restart` restarts it only if it is running, so a runner
+   stopped on purpose stays stopped and its next start by hand uses the new version. The `&&`
+   chain stops at the first refusal, so nothing restarts on a half-pinned lock.
+
+   ```sh
+   L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
+   N=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node
+   $N $L/prestart.mjs pin --from "$ART/api-launch.json" \
+     && $N $L/prestart.mjs pin --from "$ART/ui-launch.json" \
+     && $N $L/prestart.mjs pin --from "$ART/runner-launch.json" \
+     && $N $L/prestart.mjs dropin --service api > /etc/systemd/system/debateai-preview-api.service.d/zzzzzzzzzz-lifecycle-release.conf \
+     && $N $L/prestart.mjs dropin --service ui > /etc/systemd/system/debateai-preview-ui.service.d/zzzzzzzzzz-lifecycle-release.conf \
+     && $N $L/prestart.mjs dropin --service runner > /etc/systemd/system/debateai-preview-runner.service.d/zzzzzzzzzz-lifecycle-release.conf \
+     && systemctl daemon-reload \
+     && systemctl restart debateai-preview-api \
+     && systemctl restart debateai-preview-ui \
+     && systemctl try-restart debateai-preview-runner
+   ```
+
+   Each `pin` prints one `PREVIEW_LIFECYCLE_RELEASE_PINNED` line naming the new register version.
 
 **Publishing the call-concurrency row.** The register row `callConcurrencyPolicy` says how many AI
 calls a debate may run at the same time (spec 2026-10-12, parallel calls; values and bounds in
 `deploy/vps/register/README.md`, "The call-concurrency setting"). To publish it, add one option to
 step 1's `plan` command and follow the same steps 1 to 6: the plan carries the policy, the owner
 sees `callConcurrencyPolicy` in the delta (`added` the first time, `changed` for a new value),
-`publish` copies it from the plan, and the API and the runner restart on the new version. Give the
+`publish` copies it from the plan. The runner is the only reader of this row, so do not skip
+the runner's lines: step 4 makes its launch plan with the new publication, step 5 points
+`runner.env` at the new version, and step 6 pins it and restarts it after the API and the
+website. Until the runner restarts on the new version, it keeps the old limits. Give the
 three values without the row kind, in single quotes, with no line break. The owner's start values:
 
 ```sh
