@@ -70,7 +70,8 @@ function deepInfraHarness(script: Step[]) {
     assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined,
     persistRawArtifact: async (artifact) => { artifacts.push(artifact); return artifact.artifactId; },
     appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
-    // GLM's reviewed row allows JSON mode (providerTargetGatewayControls gives the runner's gateway this capability).
+    // GLM's reviewed row allows JSON mode (providerTargetGatewayControls gives the runner's gateway this capability);
+    // only its story calls ask for it.
     supportsJsonObjectResponse: true,
     ...previewTargetGatewayControls(CONFIG, { model: GLM })
   });
@@ -182,22 +183,15 @@ describe("the short follow-up on the preview's DeepInfra wire", () => {
     expect(executions).toHaveLength(2);
   });
 
-  it("every POST of a structured call asks for the same JSON mode: the first, the patch and the full re-ask", async () => {
-    // Owner approval 2026-10-12: a structured preview step asks for JSON mode on a row that allows it (today GLM), and
-    // its follow-ups carry the same response_format, so the cached prefix and the gate's body check match the first call.
+  it("a judging call never asks for JSON mode, on GLM either: not the first POST, the patch or the full re-ask", async () => {
+    // 2026-10-12: JSON mode on the debate steps was tried and withdrawn the same day (GLM answered a judging call with
+    // "{}" in JSON mode); only the story calls ask for it.
     const { gateway, executions } = deepInfraHarness([
       { content: POSITION_SLIP }, { content: fixedPosition(true) }, { content: fixedPosition(true) }
     ]);
     await gateway.call(positionRequest());
     expect(executions).toHaveLength(3);
-    for (const execution of executions) {
-      expect(JSON.parse(execution.requestBody).response_format).toEqual({ type: "json_object" });
-      expect(execution.requestBody.endsWith(',"response_format":{"type":"json_object"}}')).toBe(true);
-    }
-    // Byte for byte up to the first call's last message: the follow-ups only append turns, then the same JSON mode.
-    const first = executions[0]!.requestBody;
-    const head = first.slice(0, first.lastIndexOf('],"response_format"'));
-    for (const later of executions.slice(1)) expect(later.requestBody.startsWith(head)).toBe(true);
+    for (const execution of executions) expect(Object.hasOwn(JSON.parse(execution.requestBody), "response_format")).toBe(false);
   });
 
   it("an unbilled refusal of the patch POST ends the call; the one 60-second resend starts again from the original packet", async () => {
@@ -229,6 +223,17 @@ describe("the story checker's sealed bound of two: the patch only, then the call
     expect(executions).toHaveLength(2);
     expect(JSON.parse(result.content)).toMatchObject({ satisfied: false, criteria: CRITERIA });
     expect(result.repairForm).toBe("PATCH");
+  });
+
+  it("the patch POST carries the first POST's JSON mode, after the first call's messages byte for byte", async () => {
+    const { gateway, executions } = deepInfraHarness([{ content: CHECKER_SLIP }, { content: JSON.stringify({ criteria: CRITERIA }) }]);
+    await gateway.call(checkerRequest());
+    expect(executions).toHaveLength(2);
+    for (const execution of executions) {
+      expect(execution.requestBody.endsWith(',"response_format":{"type":"json_object"}}')).toBe(true);
+    }
+    const first = executions[0]!.requestBody;
+    expect(executions[1]!.requestBody.startsWith(first.slice(0, first.lastIndexOf('],"response_format"')))).toBe(true);
   });
 
   it("a patch that does not do ends the call after two POSTs (no third)", async () => {
