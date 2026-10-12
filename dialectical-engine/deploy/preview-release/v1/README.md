@@ -327,10 +327,8 @@ cp -a "$NP" "$S/native-plan.before.json"
    the three plans first, then regenerate the three release drop-ins from the finished lock,
    `daemon-reload`, and restart in that order. Each start's prestart re-verifies natively against
    the verify plan of step 4. The API and the runner each refuse to start if `REGISTER_VERSION`
-   differs from their pinned publication. The runner is never restarted automatically, so the
-   last command restarts it by hand; `try-restart` restarts it only if it is running, so a runner
-   stopped on purpose stays stopped and its next start by hand uses the new version. The `&&`
-   chain stops at the first refusal, so nothing restarts on a half-pinned lock.
+   differs from their pinned publication. The `&&` chain stops at the first refusal, so nothing
+   restarts on a half-pinned lock.
 
    ```sh
    L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
@@ -344,15 +342,52 @@ cp -a "$NP" "$S/native-plan.before.json"
      && systemctl daemon-reload \
      && systemctl restart debateai-preview-api \
      && systemctl restart debateai-preview-ui \
-     && systemctl try-restart debateai-preview-runner
+     && echo "pinned; API and website restarted"
    ```
 
    Each `pin` prints one `PREVIEW_LIFECYCLE_RELEASE_PINNED` line naming the new register version.
 
+   **Then the runner, only when no debate is running.** Restarting the runner in the middle of a
+   debate cuts that debate off; another copy may later pick it up again and pay for calls twice. So
+   the next lines first count the debates the runner is working on right now (`CLAIMED`), and
+   restart the runner only when that count is 0. If they print a number above 0, nothing is
+   restarted: wait a few minutes and paste the same lines again. If the number stays above 0 for
+   more than 30 minutes, stop and ask. The runner is never restarted automatically;
+   `try-restart` restarts it only if it is running, so a runner stopped on purpose stays stopped
+   and its next start by hand uses the new version.
+
+   ```sh
+   RUNNING=$(runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc "SELECT count(*) FROM core.work_item WHERE state = 'CLAIMED'"); echo "debates running now: $RUNNING"
+   [ "$RUNNING" = 0 ] && systemctl try-restart debateai-preview-runner && echo "runner restarted (if it was running)"
+   ```
+
 **Publishing the call-concurrency row.** The register row `callConcurrencyPolicy` says how many AI
 calls a debate may run at the same time (spec 2026-10-12, parallel calls; values and bounds in
-`deploy/vps/register/README.md`, "The call-concurrency setting"). To publish it, add one option to
-step 1's `plan` command and follow the same steps 1 to 6: the plan carries the policy, the owner
+`deploy/vps/register/README.md`, "The call-concurrency setting").
+
+**Step 0, before anything else: redeploy BOTH spending gates.** With many calls on their way at
+once, the old gate code counts one short network blip as many failures, and five of them halt the
+gate (`provider_unreachable`). The new gate code counts calls that were on their way together once.
+So, first, redeploy the DeepInfra gate and the Anthropic gate exactly as
+`deploy/preview-gate/v3/README.md` §"Redeploy (2026-10-12): calls on their way together count once"
+says (stop, install the gate files from this release, write the GO again, restart the gate's
+service, `activate` with the owner's yes). The gate file in this release already holds the
+thinking-levels gate changes from dev (#149): one redeploy covers both, and it is needed even if the
+thinking-levels redeploy was done before, because the file's hash changed again. Then check both
+gates. Each `GO` line must say `matches`, and each `state` line must say `active`:
+
+```sh
+G=/opt/debateai-v3-preview/operator/deepinfra-budget-v3; GO=/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
+if [ "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" = "$(jq -r .bridge_sha256 "$GO")" ]; then echo "deepinfra GO matches"; else echo "deepinfra GO does NOT match: stop"; fi
+echo "deepinfra state $(/usr/bin/python3 -I "$G/preview_budget_authority.py" status --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 | jq -r .state)"
+G=/opt/debateai-v3-preview/operator/anthropic-budget-v1; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json
+if [ "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" = "$(jq -r .bridge_sha256 "$GO")" ]; then echo "anthropic GO matches"; else echo "anthropic GO does NOT match: stop"; fi
+echo "anthropic state $(/usr/bin/python3 -I "$G/preview_budget_authority.py" status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 | jq -r .state)"
+```
+
+Anything else means stop: do not publish the row until both gates run the new code.
+
+Then add one option to step 1's `plan` command and follow the same steps 1 to 6: the plan carries the policy, the owner
 sees `callConcurrencyPolicy` in the delta (`added` the first time, `changed` for a new value),
 `publish` copies it from the plan. The runner is the only reader of this row, so do not skip
 the runner's lines: step 4 makes its launch plan with the new publication, step 5 points
