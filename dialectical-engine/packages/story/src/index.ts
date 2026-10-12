@@ -20,12 +20,15 @@ export {
   storyContractInArgumentLanguage
 } from "./contracts.js";
 export {
+  STORY_BODY_PROSE,
+  STORY_CHECKER_PROSE,
   StoryCheckerVerdictSchema,
   classifyCheckerContent,
   classifyStoryContent,
   parseCheckerVerdict,
   parseStoryBody,
   type StoryCheckerVerdict,
+  type StoryLanguageCheck,
   type StoryMaterialIndex
 } from "./validate.js";
 export {

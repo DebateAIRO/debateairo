@@ -1,5 +1,5 @@
 import { randomBytes as cryptoRandomBytes } from "node:crypto";
-import { TypedDomainError } from "@debateai/kernel";
+import { TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError } from "@debateai/kernel";
 import type { PromptPacket } from "./index.js";
 import { CONTENT_RULE_HEADING, CONTENT_RULE_TEXT } from "./content-rule.js";
 
@@ -411,12 +411,16 @@ export function schemaFailureLocator(rejected: {
   readonly parseStatus: string;
   readonly parseError: string;
 }): FramedRepairLocator {
-  const code = REPAIR_CODE.test(rejected.parseStatus) ? rejected.parseStatus : "CONTENT_REJECTED";
+  let code = REPAIR_CODE.test(rejected.parseStatus) ? rejected.parseStatus : "CONTENT_REJECTED";
   let segments: readonly unknown[];
   try {
-    const issues = JSON.parse(rejected.parseError) as readonly { readonly path?: readonly unknown[] }[];
+    const issues = JSON.parse(rejected.parseError) as readonly { readonly path?: readonly unknown[]; readonly message?: unknown }[];
     const first = Array.isArray(issues) ? issues[0] : undefined;
     segments = Array.isArray(first?.path) ? first.path : [];
+    // Reply language (2026-10-12): a reply refused only for its language is re-asked under that code, the engine's
+    // constant, so the full re-ask says what to fix as the short follow-up does (`planPatchFollowUp`).
+    if (rejected.parseStatus === "SCHEMA_FAILED" && Array.isArray(issues) && issues.length > 0
+      && issues.every((issue) => issue?.message === TEXT_NOT_IN_QUESTION_LANGUAGE)) code = TEXT_NOT_IN_QUESTION_LANGUAGE;
   } catch {
     segments = judgeIssueListPath(rejected.parseError);
   }

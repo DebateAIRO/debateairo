@@ -153,8 +153,17 @@ describe("practice formats: the second try is the app's own (same preview call p
     locator: null, restatement_text: "Should central buses be free?", restatement_status: "PASS", value_laden: true, claim_type: "normative",
     steelman: { summary: "Fares are a barrier.", fidelity: 0.8 }, critic: { summary: "Lost fares cut service.", counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" },
     evidence: { quality: 0.4, relevance: 0.8 }, context: { fit: 0.8, ambiguityFlags: [] }, fallacy: { severity: 0.1, fatalFlags: [] } });
-  const { value_laden: _left, ...withoutValueLaden } = JSON.parse(GOOD) as Record<string, unknown>;
-  const MISSING_FIELD = JSON.stringify(withoutValueLaden);
+  // Reply language (2026-10-12): the Romanian practice question is answered in Romanian, or the engine re-asks it.
+  const GOOD_RO = JSON.stringify({ ...JSON.parse(GOOD) as object,
+    statement: "Liniile centrale gratuite merită dacă bani noi le plătesc.",
+    restatement_text: "Ar trebui ca autobuzele centrale să fie gratuite?",
+    steelman: { summary: "Prețul biletului este o barieră.", fidelity: 0.8 },
+    critic: { summary: "Banii pierduți din bilete reduc serviciul.", counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" } });
+  const goodFor = (requestBody: string): string => requestBody.includes("Ar trebui un ") ? GOOD_RO : GOOD;
+  const withoutValueLaden = (good: string): string => {
+    const { value_laden: _left, ...rest } = JSON.parse(good) as Record<string, unknown>;
+    return JSON.stringify(rest);
+  };
 
   /** The patch follow-up's answer when it does its job: only the member it was asked for. */
   const PATCH = JSON.stringify({ value_laden: true });
@@ -185,9 +194,10 @@ describe("practice formats: the second try is the app's own (same preview call p
       id += 1;
       const form = requestForm(provider, input.requestBody);
       if (model === MIMO) forms.push(form);
-      let content = GOOD;
+      const good = goodFor(input.requestBody);
+      let content = good;
       if (model === MIMO && form === "PATCH") content = patchAnswer;
-      else if (model === MIMO && form === "ORIGINAL" && slips.remaining > 0) { slips.remaining -= 1; content = MISSING_FIELD; }
+      else if (model === MIMO && form === "ORIGINAL" && slips.remaining > 0) { slips.remaining -= 1; content = withoutValueLaden(good); }
       return { status: 200, body: stubVendorReply(provider, model, content, `slip-${String(id)}`) };
     } };
   }
@@ -250,7 +260,7 @@ describe("practice formats: the second try is the app's own (same preview call p
     const observer = new PracticeGateObserver({ now: () => 0 });
     const always: PreviewBudgetPort = { async execute(input) {
       const model = String((JSON.parse(input.requestBody) as { model: unknown }).model);
-      return { status: 200, body: stubVendorReply("deepinfra", model, model === MIMO ? MISSING_FIELD : GOOD, "x") };
+      return { status: 200, body: stubVendorReply("deepinfra", model, model === MIMO ? withoutValueLaden(GOOD) : GOOD, "x") };
     } };
     const ports = { deepinfra: observer.wrap("deepinfra", always), anthropic: observer.wrap("anthropic", port("anthropic", { remaining: 0 }, [])) };
     const result = await runPracticeFormats({ config, targets, ports, observer, lanes: ["JUDGE_POSITION"], samples: 1, gapMs: 0, pack, bounds,
@@ -273,7 +283,7 @@ describe("practice formats: the second try is the app's own (same preview call p
     const busyAfterOne: PreviewBudgetPort = { async execute(input) {
       const model = String((JSON.parse(input.requestBody) as { model: unknown }).model);
       if (model === GLM && ++glmCalls > 1) throw new PreviewVendorRefusedUnbilled();
-      return { status: 200, body: stubVendorReply("deepinfra", model, GOOD, "x") };
+      return { status: 200, body: stubVendorReply("deepinfra", model, goodFor(input.requestBody), "x") };
     } };
     const ports = { deepinfra: observer.wrap("deepinfra", busyAfterOne), anthropic: observer.wrap("anthropic", port("anthropic", { remaining: 0 }, [])) };
     const result = await runPracticeFormats({ config, targets, ports, observer, lanes: ["JUDGE_POSITION"], samples: 4, gapMs: 0, pack, bounds,

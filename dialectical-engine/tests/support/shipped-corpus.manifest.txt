@@ -919,6 +919,7 @@ packages/kernel/src/mail-address.ts
 packages/kernel/src/manualPhone.ts
 packages/kernel/src/provider-funding.ts
 packages/kernel/src/region.ts
+packages/kernel/src/reply-language.ts
 packages/kernel/src/staff-access.ts
 packages/kernel/src/support-credentials.ts
 packages/kernel/src/support-text-views.ts

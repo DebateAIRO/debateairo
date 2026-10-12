@@ -57,7 +57,7 @@ const LATIN_FUNCTION_WORDS: Readonly<Record<KnownArgumentLanguageTag, readonly s
   cs: ["a", "ale", "by", "byl", "byla", "je", "jsou", "když", "má", "měl", "měla", "měli", "mělo", "mohou", "nebo", "pro", "protože", "se", "své", "že"],
   da: ["af", "at", "bør", "de", "den", "det", "en", "er", "for", "fordi", "ikke", "kan", "med", "når", "og", "på", "som", "til"],
   de: ["aber", "als", "das", "den", "der", "die", "ein", "eine", "für", "ist", "kann", "können", "mit", "nicht", "sollte", "sollten", "und", "weil", "wenn", "zu"],
-  en: ["and", "are", "because", "can", "for", "from", "government", "it", "of", "should", "that", "the", "their", "they", "to", "when", "with"],
+  en: ["and", "are", "be", "because", "been", "can", "could", "does", "for", "from", "government", "has", "have", "if", "it", "its", "more", "not", "of", "or", "should", "than", "that", "the", "their", "these", "they", "this", "to", "when", "which", "will", "with", "would"],
   es: ["cuando", "de", "debería", "deberían", "el", "en", "es", "la", "las", "los", "para", "porque", "pueden", "que", "sus", "una", "y"],
   et: ["aga", "et", "ja", "kas", "kui", "ning", "oma", "on", "peaks", "peaksid", "saavad", "see", "sest", "seal", "või"],
   fi: ["että", "ja", "jos", "koska", "kun", "mutta", "ne", "on", "pitäisi", "se", "tai", "voi", "voivat"],

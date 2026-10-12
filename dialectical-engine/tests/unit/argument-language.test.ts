@@ -248,6 +248,11 @@ describe("detectArgumentLanguage", () => {
     expect(detectArgumentLanguage(text)).toMatchObject({ tag, confidence: "high" });
   });
 
+  it("detects the 2026-10-12 practice question as English (it was \"und\", so every step was told \"the same language as the question\")", () => {
+    expect(detectArgumentLanguage("Should a mid-sized city make its central bus lines free to ride?"))
+      .toEqual({ tag: "en", nameEn: "English", confidence: "high" });
+  });
+
   it("detects the packet's short Russian sentence at high confidence", () => {
     expect(detectArgumentLanguage("Следует ли отменить субсидии на топливо?"))
       .toMatchObject({ tag: "ru", confidence: "high" });
