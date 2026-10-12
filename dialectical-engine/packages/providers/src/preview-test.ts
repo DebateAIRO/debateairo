@@ -240,14 +240,32 @@ export function previewRunnerPolicy<T extends { bounds: Readonly<Record<"JUDGE" 
   if (config === undefined) return policy;
   return { ...policy, bounds: { JUDGE: previewCallBound(policy.bounds.JUDGE, config), COMPOSER: previewCallBound(policy.bounds.COMPOSER, config), CONFORMANCE: previewCallBound(policy.bounds.CONFORMANCE, config) }, synthesisRolePolicy: { ...policy.synthesisRolePolicy, synthesizerBound: previewCallBound(policy.synthesisRolePolicy.synthesizerBound, config), evaluatorBound: previewCallBound(policy.synthesisRolePolicy.evaluatorBound, config) } };
 }
-/** Only the current native storyteller request may keep one safe locator repair. */
+/** A story call site on the story lane, by its own role: the storyteller (SYNTHESIZER) or the story checker (EVALUATOR). */
+function previewStorySite(request: ProviderCallRequest, site: "STORYTELLER" | "CHECKER"): boolean {
+  return request.lane === "story" && (site === "STORYTELLER"
+    ? request.role === "SYNTHESIZER" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey)
+    : request.role === "EVALUATOR" && /^STORY:CHECKER:[1-8]$/u.test(request.callSiteKey));
+}
+/**
+ * Only the current native storyteller and story checker requests may keep one safe locator repair (story format
+ * robustness, 2026-10-12: the checker too, so one format slip no longer costs the story its check).
+ */
 function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
-  if (request.lane !== "story" || request.role !== "SYNTHESIZER"
-    || !/^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey)
-    || !Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 2
+  const site = previewStorySite(request, "STORYTELLER") ? "STORYTELLER" : previewStorySite(request, "CHECKER") ? "CHECKER" : null;
+  if (site === null || !Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 2
     || typeof request.classifyContent !== "function" || typeof request.buildRepairPacket !== "function") return false;
-  try { return assertFramedPrompt(request.packet).contractId === "story.storyteller.v2"; }
+  try { return assertFramedPrompt(request.packet).contractId === (site === "STORYTELLER" ? "story.storyteller.v3" : "story.checker.v2"); }
   catch { return false; }
+}
+/**
+ * Story format robustness (2026-10-12), finding 1: the storyteller thinks before it writes, and on every reviewed row
+ * that thinking counts toward max_tokens (DeepInfra reports it as reasoning tokens inside the completion; Anthropic
+ * counts thinking as output). DeepSeek spent 11,317 of the sealed 12,000 thinking and its story was cut off. On the
+ * preview only, the storyteller's call asks for its row's whole answer cap, which the gate already reserves for every
+ * call (previewReservationNanoUsd). The sealed register row is untouched; every other call keeps previewCallBound.
+ */
+export function previewStorytellerTokenCeiling(reviewed: Readonly<{ outputBound: number }>): number {
+  return reviewed.outputBound;
 }
 /**
  * Owner ruling 5 (2026-10-10): how long the preview waits before its one retry of a call the gate
@@ -326,15 +344,16 @@ function previewCallWasUnbilled(error: unknown): boolean {
  * for one is refused before anything is sent.
  *
  * Preview retry fix, option B (spec 2026-10-11 §1.1, owner ruling R1): the request's lifetime bound
- * passes through (token floor and deadline applied, `maxAttempts` kept), and each call may send ONE
- * POST (`maxAttemptsThisCall`; the storyteller's repair call two). The counting gateway behind this
+ * passes through (token floor and deadline applied, `maxAttempts` kept; the storyteller's token ceiling is
+ * its row's bound), and each call may send ONE POST (`maxAttemptsThisCall`; the storyteller's and the story
+ * checker's repair calls two). The counting gateway behind this
  * wrapper reads the step's allowance off the ledger, where an unbilled refusal is a REFUSED row it
  * does not count.
  *
  * Owner ruling 5: a call the gate proves was never billed is sent ONCE more after
  * PREVIEW_UNBILLED_RETRY_COOLDOWN_MS. Only those refusals (R4: the gate's own concurrency refusal too);
- * never a second retry; never on the storyteller, whose two attempts already include one after any
- * failure. The start-of-debate estimate counts this retry. The runner's own cooldown and final retry
+ * never a second retry; never on the storyteller or the story checker, whose two attempts already include
+ * one after any failure. The start-of-debate estimate counts this retry. The runner's own cooldown and final retry
  * still follow a failure this wrapper passes up.
  */
 export function withPreviewProviderCallPolicy(
@@ -352,7 +371,9 @@ export function withPreviewProviderCallPolicy(
         ? "The private preview connection for this model has no thinking level"
         : "The private preview connection is configured for high only");
     }
-    const bound = previewCallBound(request.bound, config);
+    const preview = previewCallBound(request.bound, config);
+    const bound = previewStorySite(request, "STORYTELLER")
+      ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) }) : preview;
     const storyRepair = previewStoryRepairAllowed(request);
     // One explicit level replaces whatever the request carried: the configured level on an effort
     // row; DEFAULT_ONLY on a row without one, which the gateway treats exactly as "no level".

@@ -948,6 +948,7 @@ packages/propagation/src/index.ts
 packages/providers/src/anthropic-messages.ts
 packages/providers/src/content-rule.ts
 packages/providers/src/index.ts
+packages/providers/src/model-json.ts
 packages/providers/src/preview-models.ts
 packages/providers/src/preview-remaining.ts
 packages/providers/src/preview-test.ts

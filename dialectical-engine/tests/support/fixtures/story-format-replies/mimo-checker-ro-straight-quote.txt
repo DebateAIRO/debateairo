@@ -1,0 +1,14 @@
+{
+  "satisfied": false,
+  "objection": "Povestea nu poate fi acceptată în forma aceasta. În primul rând, soarta celor două poziții nu urmează pragurile: finalul lui P1 este 0.61 și cel al lui P2 este 0.48, adică ambele între 0.35 și 0.7, deci ambele ar trebui PARTLY_HELD, nu HELD_UP. Titlul „The position held up, with one open question." prezintă deznodământul ca fiind sigur sub o etichetă de tip apropiat și nici măcar nu dă răspunsul la întrebare (că da, liniile centrale gratis); în plus, povestea nu spune cât de strâns a fost apelul (eticheta CONTESTED vine din faptul că măsura dezacordului dintre evaluatori nu a putut fi calculată). În al doilea rând, linia pentru P2 nu susține nimic despre această poziție: nu redă ideea ei (frecvență mai bună și autobuze punctuale atrag mai mulți călători decât un bilet gratuit) și nici de ce a pierdut – P2 însuși recunoaște că nu există cifre care să compare cele două opțiuni. În al treilea rând, secțiunile versiunii lungi conțin doar „Our reading.", „The verdict." și „What would change it.", fără nicio lămurire: cititorul nu află cum citim întrebarea lui (oraș de mărime medie, ce înseamnă „linii centrale") și de ce acesta e răspunsul nostru, deși aceste paragrafe sunt citate la P1. Notați și faptul că textul e în engleză, iar întrebarea e în română.",
+  "criteria": {
+    "faithful_to_material": true,
+    "agrees_with_label": false,
+    "fair_to_losing_paths": false,
+    "no_overstatement": true,
+    "citations_correct": false,
+    "reviewer_note_separate": true,
+    "goal_marked_as_reading": false,
+    "speaks_to_the_person": false
+  }
+}

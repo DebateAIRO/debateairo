@@ -6,6 +6,7 @@ import {
   buildFramedRepairPrompt,
   createPreviewGuardedFetch,
   parsePreviewProviderTestConfig,
+  previewTargetGatewayControls,
   readPromptFrame,
   schemaFailureLocator,
   withPreviewProviderCallPolicy,
@@ -42,7 +43,7 @@ function story(ref = "P1"): string {
     reviewer_note: null
   });
 }
-function storyRequest(contractId = "story.storyteller.v2"): ProviderCallRequest {
+function storyRequest(contractId = "story.storyteller.v3"): ProviderCallRequest {
   const framed = buildFramedPrompt({
     contract: { contractId, instruction: "Write the synthetic policy story.", answerForm: "Return one JSON object." },
     material: [{ name: "story_material", content: "One policy position, cited as P1." }]
@@ -81,19 +82,24 @@ function nativeHarness(contents: readonly string[], finishReasons: readonly stri
     thinking: { parameter: "reasoning_effort", levels: ["high"] }, fetchImplementation: fetcher,
     assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined,
     persistRawArtifact: async artifact => { artifacts.push(artifact); return artifact.artifactId; },
-    appendLedgerEntry: async entry => { ledger.push(entry); return entry.attemptId; }
+    appendLedgerEntry: async entry => { ledger.push(entry); return entry.attemptId; },
+    // As the runner builds a preview target: max_tokens is clamped to the row's bound, length retries included.
+    ...previewTargetGatewayControls(CONFIG, { model: MODEL })
   });
   return { gateway: withPreviewProviderCallPolicy(native, CONFIG, { model: MODEL }), executions, artifacts, ledger };
 }
 
 // Preview retry fix, option B (spec 2026-10-11 §1.1): the writer's bound is its LIFETIME allowance and passes
 // through (token floor and deadline applied); the attempts of ONE call are `maxAttemptsThisCall`.
-describe("preview storyteller v2 safe repair allowance", () => {
+// Story format robustness (2026-10-12): the current storyteller contract is v3, and on the preview the
+// storyteller's call asks for its row's whole answer cap (32,768 on every reviewed row), room to think.
+const STORYTELLER_CAP = 32_768;
+describe("preview storyteller v3 safe repair allowance", () => {
   it.each([2, 3, 8])("permits two attempts per call when the writer's original allowance is %i", async maxAttempts => {
     const request = storyRequest();
     const effective = await forwarded({ ...request, bound: { ...request.bound, maxAttempts } });
     expect(effective.maxAttemptsThisCall).toBe(2);
-    expect(effective.bound).toEqual({ maxAttempts, tokenCeiling: 8192, deadlineMs: 600000 });
+    expect(effective.bound).toEqual({ maxAttempts, tokenCeiling: STORYTELLER_CAP, deadlineMs: 600000 });
     expect(effective.thinkingLevel).toBe("high");
   });
 
@@ -101,16 +107,16 @@ describe("preview storyteller v2 safe repair allowance", () => {
     const request = storyRequest();
     const effective = await forwarded({ ...request, bound: { ...request.bound, maxAttempts: 1 } });
     expect(effective.maxAttemptsThisCall).toBe(1);
-    expect(effective.bound).toEqual({ maxAttempts: 1, tokenCeiling: 8192, deadlineMs: 600000 });
+    expect(effective.bound).toEqual({ maxAttempts: 1, tokenCeiling: STORYTELLER_CAP, deadlineMs: 600000 });
   });
 
-  it("preserves the larger output bound and all caller admission seams", async () => {
+  it("asks for the row's whole cap and keeps all caller admission seams", async () => {
     const request = storyRequest();
     const assertAttemptAllowed = () => undefined;
     const costEnvelope = { assertCallAllowed: () => undefined, recordCall: () => undefined, assertUsageReported: () => undefined };
     const effective = await forwarded({ ...request, bound: { ...request.bound, tokenCeiling: 12000 }, assertAttemptAllowed, costEnvelope });
     expect(effective.maxAttemptsThisCall).toBe(2);
-    expect(effective.bound).toEqual({ maxAttempts: 3, tokenCeiling: 12000, deadlineMs: 600000 });
+    expect(effective.bound).toEqual({ maxAttempts: 3, tokenCeiling: STORYTELLER_CAP, deadlineMs: 600000 });
     expect(effective.packet).toBe(request.packet);
     expect(effective.providerRef).toBe("preview:fixture-a");
     expect(effective.contractHash).toBe("contract:synthetic-story");
@@ -138,8 +144,10 @@ describe("preview storyteller v2 safe repair allowance", () => {
       `callsite ${callSiteKey}`, () => ({ ...storyRequest(), callSiteKey })
     ] as const),
     ["old storyteller v1 contract", () => storyRequest("story.storyteller.v1")],
+    ["previous storyteller v2 contract", () => storyRequest("story.storyteller.v2")],
     ["checker contract", () => storyRequest("story.checker.v1")],
-    ["unknown storyteller version", () => storyRequest("story.storyteller.v3")],
+    ["current checker contract on the storyteller's site", () => storyRequest("story.checker.v2")],
+    ["unknown storyteller version", () => storyRequest("story.storyteller.v4")],
     ...[undefined, null, "classifier"].map(classifyContent => [
       `noncallable classifier ${String(classifyContent)}`,
       () => ({ ...storyRequest(), classifyContent } as unknown as ProviderCallRequest)
@@ -159,7 +167,9 @@ describe("preview storyteller v2 safe repair allowance", () => {
     const request = makeRequest();
     const effective = await forwarded(request);
     expect(effective.maxAttemptsThisCall).toBe(1);
-    expect(effective.bound).toEqual({ maxAttempts: request.bound.maxAttempts, tokenCeiling: 8192, deadlineMs: 600000 });
+    // Only the storyteller's own site (story lane, SYNTHESIZER, STORY:STORYTELLER:1-8) asks for the whole cap.
+    const storytellerSite = request.lane === "story" && request.role === "SYNTHESIZER" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey);
+    expect(effective.bound).toEqual({ maxAttempts: request.bound.maxAttempts, tokenCeiling: storytellerSite ? STORYTELLER_CAP : 8192, deadlineMs: 600000 });
   });
 
   it("still refuses a weaker thinking request before forwarding", async () => {
@@ -187,9 +197,9 @@ describe("preview storyteller v2 safe repair allowance", () => {
     expect(projections).toHaveLength(2);
     expect(charges).toHaveLength(2);
     const bodies = executions.map(execution => JSON.parse(execution.requestBody));
-    for (const body of bodies) expect(body).toMatchObject({ model: MODEL, reasoning_effort: "high", max_tokens: 8192, response_format: { type: "json_object" } });
+    for (const body of bodies) expect(body).toMatchObject({ model: MODEL, reasoning_effort: "high", max_tokens: STORYTELLER_CAP, response_format: { type: "json_object" } });
     const repaired = readPromptFrame({ messages: bodies[1].messages });
-    expect(repaired.contractId).toBe("story.storyteller.v2");
+    expect(repaired.contractId).toBe("story.storyteller.v3");
     expect(repaired.fields.slice(-2)).toEqual([
       { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
       { name: "machine_rejection_path", content: "short.change.node_refs.0" }
@@ -220,10 +230,11 @@ describe("preview storyteller v2 safe repair allowance", () => {
     const result = await gateway.call({ ...storyRequest(), costEnvelope: {
       assertCallAllowed: () => undefined, recordCall: () => undefined, assertUsageReported: () => undefined } });
     expect(artifacts.map(artifact => artifact.parseStatus)).toEqual(["PARSE_FAILED", "PARSED"]);
-    // The W10 length retry: the ORIGINAL packet under a raised bound, never the repair packet.
+    // The W10 length retry: the ORIGINAL packet, never the repair packet. The first attempt already asked for
+    // the row's whole cap, so the raised bound is held to it, exactly as on the preview.
     const bodies = executions.map(execution => JSON.parse(execution.requestBody));
     expect(bodies[1].messages).toEqual(bodies[0].messages);
-    expect(bodies[1].max_tokens).toBe(bodies[0].max_tokens * 2);
+    expect([bodies[0].max_tokens, bodies[1].max_tokens]).toEqual([STORYTELLER_CAP, STORYTELLER_CAP]);
     expect(result.repairAttempts).toBe(0);
   });
 
