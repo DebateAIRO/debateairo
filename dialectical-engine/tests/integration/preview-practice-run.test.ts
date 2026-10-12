@@ -277,6 +277,31 @@ describe("preview practice: formats mode", () => {
     expect(report.gates.deepinfra!.observed).toMatchObject({ stop: null, modelCooling: 2, gateRefused: 0 });
   }, 300_000);
 
+  it("slow answer (owner ruling 2026-10-12): MiMo's story call is booked at its maximum by the gate (PROVIDER_CHARGE_BOOKED_MAX): that job fails as a billed call, the gate is never stopped, every other job runs, and the report says so", async () => {
+    const { stubs, env, common, quiet, out } = await scenario((request) => request.model === MIMO && request.kind === "STORYTELLER"
+      ? { gateRefuses: "PROVIDER_CHARGE_BOOKED_MAX" } : null);
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
+    const report = outcome.report as unknown as {
+      verdict: string; reasons: string[];
+      byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[];
+      gates: Record<string, { observed: { stop: unknown; bookedMax: number; unbilled: number; transportFailed: number; gateRefused: number } }>;
+    };
+    // Each of MiMo's story POSTs reached the vendor and was booked; nothing else was refused.
+    const booked = stubs.requests.filter((request) => request.answer === "BOOKED_MAX");
+    expect(booked.length).toBeGreaterThanOrEqual(1);
+    expect(booked.every((request) => request.model === MIMO && request.kind === "STORYTELLER")).toBe(true);
+    expect(report.gates.deepinfra!.observed).toMatchObject({ stop: null, bookedMax: booked.length, unbilled: 0, transportFailed: 0, gateRefused: 0 });
+    // A billed failed call: never read as money, a halted gate, or a busy model.
+    expect(report.reasons.some((reason) => reason.startsWith("GATE_") || reason.startsWith("MODEL_BUSY"))).toBe(false);
+    const story = report.byModelAndLane.find((row) => row.model === MIMO && row.lane === "STORYTELLER")!;
+    expect(Object.keys(story.statuses)).not.toContain("PARSED");
+    for (const row of report.byModelAndLane.filter((entry) => !(entry.model === MIMO && entry.lane === "STORYTELLER"))) {
+      expect(row.statuses).toEqual({ PARSED: 1 });
+    }
+    expect(report.verdict).toBe("FAIL");
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain(`${String(booked.length)} booked at their maximum (sent, then timed out or cut off`);
+  }, 300_000);
+
   it("the answer-writer's draft citing the surviving objection is accepted (the old root-only citable set refused it): PASS", async () => {
     const graph = practiceDebateGraph(PRACTICE_QUESTIONS[0]!);
     const objection = graph.authored.find((node) => !graph.positionNodeIds.has(node.nodeId))!.nodeId;

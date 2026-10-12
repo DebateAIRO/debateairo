@@ -194,6 +194,8 @@ describe("C — the checker's answer form says criteria are always required and 
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
 const HAIKU = "claude-haiku-5-5";
 const GLM = "zai-org/GLM-5.3-Flash";
+const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
+const QWEN = "Qwen/Qwen3.8-Flash";
 const ENDPOINT = "https://api.deepinfra.com/v1/openai";
 const CONFIG = parsePreviewProviderTestConfig(JSON.stringify({
   deployment: "v3-preview", free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, HAIKU], requested_thinking_level: "high",
@@ -228,41 +230,44 @@ async function forwarded(request: ProviderCallRequest, model = DEEPSEEK): Promis
   if (received === undefined) throw new Error("PREVIEW_REQUEST_NOT_FORWARDED");
   return received;
 }
-/** The preview's real gateway stack for DeepSeek, as the runner builds it: guarded fetch, the row's output clamp, the call policy. */
-function nativeHarness(contents: readonly string[], finishReasons: readonly string[] = []) {
+/** The preview's real gateway stack for a DeepInfra row (DeepSeek unless named), as the runner builds it: guarded fetch, the row's output clamp, the call policy. */
+function nativeHarness(contents: readonly string[], finishReasons: readonly string[] = [], model = DEEPSEEK) {
   const executions: PreviewBudgetExecution[] = [];
   const artifacts: RawArtifactInput[] = [];
   const ledger: ProviderLedgerInput[] = [];
   const sleeps: number[] = [];
   const fetcher = createPreviewGuardedFetch({ execute: async (input) => {
     executions.push(input);
-    return { status: 200, body: JSON.stringify({ id: `fixture-${executions.length}`, model: DEEPSEEK,
+    return { status: 200, body: JSON.stringify({ id: `fixture-${executions.length}`, model,
       choices: [{ message: { content: contents[executions.length - 1] ?? contents.at(-1)! }, finish_reason: finishReasons[executions.length - 1] ?? "stop" }],
       usage: { prompt_tokens: 10, completion_tokens: 20 } }) };
   } });
+  const row = rowOf(model);
   const native = new OpenAICompatibleProviderGateway({
-    endpoint: ENDPOINT, model: DEEPSEEK, maker: "DeepSeek",
-    thinking: { parameter: "reasoning_effort", levels: ["high"] }, fetchImplementation: fetcher,
+    endpoint: ENDPOINT, model, maker: row.maker,
+    ...(row.effort === null ? {} : { thinking: { parameter: "reasoning_effort", levels: ["high"] } }), fetchImplementation: fetcher,
     assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined,
     persistRawArtifact: async (artifact) => { artifacts.push(artifact); return artifact.artifactId; },
     appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
-    ...previewTargetGatewayControls(CONFIG, { model: DEEPSEEK })
+    ...previewTargetGatewayControls(CONFIG, { model })
   });
-  const gateway = withPreviewProviderCallPolicy(native, CONFIG, { model: DEEPSEEK }, { sleep: async (milliseconds) => { sleeps.push(milliseconds); } });
+  const gateway = withPreviewProviderCallPolicy(native, CONFIG, { model }, { sleep: async (milliseconds) => { sleeps.push(milliseconds); } });
   return { gateway, executions, artifacts, ledger, sleeps };
 }
 const freeEnvelope = { assertCallAllowed: () => undefined, recordCall: () => undefined, assertUsageReported: () => undefined };
 
-describe("A — on the preview the storyteller asks for its row's whole answer cap, room to think", () => {
-  it("raises the storyteller's max_tokens to the row's bound (DeepInfra and Anthropic rows alike), never above it", async () => {
-    for (const model of [DEEPSEEK, GLM, HAIKU]) {
+describe("A — on the preview the storyteller asks for its row's own story allowance, room to think", () => {
+  // Slow answer (owner ruling 2026-10-12): the row's whole answer cap only on the fast rows (DeepSeek, Claude Haiku);
+  // 16,384 on the slower ones (MiMo, Qwen, GLM), whose story at 17 tokens a second could otherwise outrun the gate.
+  it("raises the storyteller's max_tokens to the row's story allowance (DeepInfra and Anthropic rows alike), never above its bound", async () => {
+    for (const [model, tokenCeiling] of [[DEEPSEEK, 32_768], [HAIKU, 32_768], [GLM, 16_384], [MIMO, 16_384], [QWEN, 16_384]] as const) {
       const effective = await forwarded(storytellerCall(), model);
-      expect(effective.bound).toEqual({ maxAttempts: 2, tokenCeiling: 32_768, deadlineMs: 600_000 });
+      expect(effective.bound, model).toEqual({ maxAttempts: 2, tokenCeiling, deadlineMs: 1_260_000 });
     }
   });
 
   it("leaves every other call where previewCallBound puts it", async () => {
-    expect((await forwarded(checkerCall())).bound).toEqual({ maxAttempts: 2, tokenCeiling: 8192, deadlineMs: 600_000 });
+    expect((await forwarded(checkerCall())).bound).toEqual({ maxAttempts: 2, tokenCeiling: 8192, deadlineMs: 1_260_000 });
     const notStory = { ...storytellerCall(), lane: "served", callSiteKey: "COMPOSER:1" } as ProviderCallRequest;
     expect((await forwarded(notStory)).bound.tokenCeiling).toBe(12_000);
     const wrongRole = { ...storytellerCall(), role: "EVALUATOR" } as ProviderCallRequest;
@@ -275,8 +280,19 @@ describe("A — on the preview the storyteller asks for its row's whole answer c
     expect(JSON.parse(executions[0]!.requestBody)).toMatchObject({ model: DEEPSEEK, max_tokens: 32_768, reasoning_effort: "high" });
   });
 
-  it("the start-of-debate estimate prices the storyteller at what is sent: each row's bound", () => {
+  it("sends max_tokens 16,384 for MiMo's storyteller, and its length retry twice that, held to the row's 32,768", async () => {
+    const { gateway, executions } = nativeHarness([VERDICT.slice(0, -1), VERDICT], ["length", "stop"], MIMO);
+    // A story cut off at its allowance is refused, so the call's second POST is the length retry.
+    const cutIsRefused = storyCall("STORYTELLER", "story.storyteller.v3", (_content, reply) => reply?.finishReason === "length"
+      ? { parseStatus: "PARSE_FAILED", parseError: "cut off at max_tokens" } : { parseStatus: "PARSED", parseError: null });
+    await gateway.call({ ...cutIsRefused, costEnvelope: freeEnvelope });
+    expect(executions.map((execution) => JSON.parse(execution.requestBody).max_tokens)).toEqual([16_384, 32_768]);
+    expect(JSON.parse(executions[0]!.requestBody)).toMatchObject({ model: MIMO, temperature: 1.0, top_p: 0.95 });
+  });
+
+  it("the start-of-debate estimate prices the storyteller at what is sent: each row's own story allowance", () => {
     const sent = previewCallOutputTokens(CONFIG, { debate: [2048, 2048], story: { storyteller: 12_000, checker: 2048 } });
+    // The largest any row's storyteller asks for; each row is priced at its own allowance below.
     expect(sent).toEqual({ debate: 8192, storyteller: 32_768, storytellerRetry: 65_536, storyChecker: 8192 });
     const strict = strictUpperBoundPricer(sent);
     const deepseek = { inputNanoUsdPerToken: 200n, outputNanoUsdPerToken: 600n };
@@ -284,6 +300,11 @@ describe("A — on the preview the storyteller asks for its row's whole answer c
     for (const type of ["STORYTELLER", "STORYTELLER_RETRY"] as const) {
       expect(strict(rowOf(DEEPSEEK), type)).toBe(264_192n * deepseek.inputNanoUsdPerToken + 32_768n * deepseek.outputNanoUsdPerToken);
     }
+    // MiMo asks 16,384 first; its length retry asks twice that, which its 32,768 bound holds.
+    expect(strict(rowOf(MIMO), "STORYTELLER")).toBe(264_192n * 430n + 16_384n * 870n);
+    expect(strict(rowOf(MIMO), "STORYTELLER_RETRY")).toBe(264_192n * 430n + 32_768n * 870n);
+    expect(strict(rowOf(QWEN), "STORYTELLER")).toBe(264_192n * 113n + 16_384n * 382n);
+    expect(strict(rowOf(GLM), "STORYTELLER")).toBe(264_192n * 150n + 16_384n * 500n);
   });
 });
 

@@ -213,7 +213,9 @@ for d in node_modules/.pnpm/@embedded-postgres+darwin-arm64@*/node_modules/@embe
 shasum -a 256 tools/preview-practice/gate-relay.py
 ```
 
-Copy the relay to the server (the server checks the same digest in S-4):
+The digest printed must be `356f35eaf28764a3e17c2af5e2ec25360405c775331323177aac4e12ab409ce0` (the relay of the slow-answer ruling, 2026-10-12: it keeps a quiet connection
+open 1,500 s and lets an in-flight call finish for up to 1,500 s, past the gate's 1,200 s vendor deadline and the app's
+1,290 s socket timeout). Copy the relay to the server (the server checks the same digest in S-4):
 
 ```sh
 scp tools/preview-practice/gate-relay.py "$PREVIEW_SSH:/home/ubuntu/gate-relay.py"
@@ -260,15 +262,16 @@ getent group debateai-practice || groupadd --system debateai-practice
 gpasswd -a ubuntu debateai-practice
 ```
 
-Each time: install the relay (compare the digest with the one printed on the Mac in S-0), then start it as the
-runner account, sandboxed: no network but unix sockets, read-only system, no new privileges, ends by itself after
-8 hours.
+Each time: install the relay (the digest printed must be `356f35eaf28764a3e17c2af5e2ec25360405c775331323177aac4e12ab409ce0`, the one printed on the Mac in S-0), then start it
+as the runner account, sandboxed: no network but unix sockets, read-only system, no new privileges, ends by itself
+after 8 hours. It closes a connection only after 1,500 s with no bytes either way, and at its end (or a stop) lets a
+call in flight finish for up to 1,500 s: a model call may take up to the gate's 1,200 s (slow answer, 2026-10-12).
 
 ```sh
 install -d -o root -g root -m 0755 /usr/local/lib/debateai-practice
 install -o root -g root -m 0644 /home/ubuntu/gate-relay.py /usr/local/lib/debateai-practice/gate-relay.py
 sha256sum /usr/local/lib/debateai-practice/gate-relay.py
-systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=debateai-practice -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30000 -p TimeoutStopSec=960 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group debateai-practice --mode 0660 --max-connections 8 --lifetime-seconds 28800 --drain-seconds 900
+systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=debateai-practice -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30600 -p TimeoutStopSec=1560 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group debateai-practice --mode 0660 --max-connections 8 --lifetime-seconds 28800 --drain-seconds 1500 --idle-timeout-seconds 1500
 systemctl status debateai-preview-practice-relay --no-pager
 journalctl -u debateai-preview-practice-relay -o cat --no-pager
 ls -l /run/debateai-practice

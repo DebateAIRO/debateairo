@@ -11,6 +11,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   PREVIEW_REVIEWED_PROVIDER_REFS,
   createPreviewBudgetRpcPort,
+  PreviewChargeBookedMax,
   PreviewGateUnavailable,
   PreviewModelCooling,
   PreviewUnbilledRefusal,
@@ -38,6 +39,7 @@ import {
   type PracticeLogLine
 } from "../../tools/preview-practice/practice-samples-log.js";
 import { stubVendorReply } from "../support/preview-gate-stubs.js";
+import { reportMarkdown } from "../../tools/preview-practice/practice-report.js";
 import { issueListFromParseError, recheckReply, replyContentOf, callFamilyOf } from "../../tools/preview-practice/practice-lanes.js";
 import { capReplyText, redactKeyShapes, reportableReplyText } from "../../tools/preview-practice/practice-redaction.js";
 import { parsePracticeRegisterExport } from "../../tools/preview-practice/practice-register-import.js";
@@ -501,6 +503,46 @@ describe("practice gate status: the gate's own limit of calls at once", () => {
     expect(parseGateStatus("anthropic", JSON.stringify({ state: "active", unsent_streak: 0, limits: { max_concurrent_calls: 2 } })).maxConcurrentCalls).toBe(2);
     expect(parseGateStatus("anthropic", JSON.stringify({ state: "active", unsent_streak: 0 })).maxConcurrentCalls).toBeNull();
     expect(parseGateStatus("anthropic", JSON.stringify({ state: "active", unsent_streak: 0, max_concurrent_calls: 0 })).maxConcurrentCalls).toBeNull();
+  });
+});
+
+describe("practice gate: a call the gate booked at its maximum (slow answer, owner ruling 2026-10-12)", () => {
+  const body = (model: string) => JSON.stringify({ model, max_tokens: 1, messages: [] });
+  const execution = (model: string) => ({ operationId: "op", requestBody: body(model), requestSha256: "0".repeat(64), reservedUsd: "0.1" });
+
+  it("PROVIDER_CHARGE_BOOKED_MAX (through the app's real port) is its own billed outcome: the gate is never braked and the run is untouched", async () => {
+    const folder = mkdtempSync(join(tmpdir(), "pp-booked-"));
+    const socket = join(folder, "gate.sock");
+    let sent = 0;
+    const server = createServer((request, response) => {
+      request.resume();
+      request.on("end", () => {
+        sent += 1;
+        response.writeHead(409, { "content-type": "application/json" }).end(JSON.stringify({ error: "PROVIDER_CHARGE_BOOKED_MAX" }));
+      });
+    });
+    await new Promise<void>((done) => server.listen(socket, done));
+    try {
+      const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"],
+        premium_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash"],
+        requested_thinking_level: "high", budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock", scope_id: "preview-practice-unit" }))!;
+      const observer = new PracticeGateObserver({ now: () => 0 });
+      const watched = observer.wrap("deepinfra", createPreviewBudgetRpcPort(config, socket));
+      for (let index = 0; index < 6; index += 1) {
+        await expect(watched.execute(execution("XiaomiMiMo/MiMo-V2.6-Pro"))).rejects.toBeInstanceOf(PreviewChargeBookedMax);
+      }
+      expect(sent).toBe(6);  // Never braked: every call was sent.
+      expect(observer.events.map((event) => [event.outcome, event.refusalCode, event.unbilledKind]))
+        .toEqual(Array(6).fill(["BOOKED_MAX", "PROVIDER_CHARGE_BOOKED_MAX", null]));
+      expect(observer.summary("deepinfra")).toMatchObject({ calls: 6, bookedMax: 6, unbilled: 0, transportFailed: 0, gateRefused: 0,
+        longestNotReachedRun: 0, stop: null });
+      const markdown = reportMarkdown({ mode: "debate", verdict: "FAIL", exitCode: 1, startedAt: "s", finishedAt: "f", reasons: [],
+        gates: { deepinfra: { observed: observer.summary("deepinfra") } } } as never);
+      expect(markdown).toContain("6 booked at their maximum (sent, then timed out or cut off; the gate charged each its full reservation and kept going)");
+    } finally {
+      await new Promise<void>((done) => server.close(() => done()));
+      rmSync(folder, { recursive: true, force: true });
+    }
   });
 });
 
