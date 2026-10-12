@@ -138,9 +138,19 @@ export const judgeArtifactSchema = z.object({
 /**
  * Judge nested fields (2026-10-12): how the author legs and the panel read their artifact. The NESTED_FIELDS repair
  * (MiMo-V2.6-Pro's flattened steelman and critic) applies to those two only; the review and the runner's readers do
- * not ask for it.
+ * not ask for it. MiMo salvage (owner ruling 2026-10-12, "Salvage in code"): they also take a misnamed object member
+ * back under its own name (RENAMED_MEMBER, `"critique"` for `"critic"`) and drop root keys never asked for
+ * (UNASKED_KEYS, a stray `"way_of_kooking"`), each only when the result passes the full schema.
  */
-export const JUDGE_ARTIFACT_READING: StructuredReadingOptions = Object.freeze({ nestedFields: true });
+export const JUDGE_ARTIFACT_READING: StructuredReadingOptions = Object.freeze({ nestedFields: true, renamedMembers: true, unaskedKeys: true });
+
+/**
+ * MiMo salvage (owner ruling 2026-10-12, "Salvage in code"): how the review reads its artifact. Root keys never asked
+ * for are dropped (UNASKED_KEYS), and a missing `edge_bearings` is read as [] ONLY when the node sources no edges, so the
+ * schema pins the list to 0 entries and [] is the one value it admits (EMPTY_LIST). A node with edges never gets one:
+ * its bearings are measurements nobody may guess.
+ */
+export const REVIEW_ARTIFACT_READING: StructuredReadingOptions = Object.freeze({ unaskedKeys: true, emptyLists: true });
 
 /**
  * T5 / S3-1 — the review artifact carries the edge measurements.
@@ -590,7 +600,8 @@ export class Judge {
     const packet = framed.packet;
     // All-steps format robustness (2026-10-12): the tolerant reading, remembered so the accepted reply is read again
     // exactly as the classifier read it (the last repair depends on how the reply ended).
-    const reading = rememberingAcceptedReply((content, reply) => classifyStructuredArtifact(content, schema, reply));
+    // MiMo salvage (2026-10-12): the review's shape repairs (REVIEW_ARTIFACT_READING); the re-read below uses the same.
+    const reading = rememberingAcceptedReply((content, reply) => classifyStructuredArtifact(content, schema, reply, REVIEW_ARTIFACT_READING));
     let response;
     try {
       response = await this.provider.call({
@@ -613,7 +624,7 @@ export class Judge {
       }
       throw error;
     }
-    const parsed = parseStructuredArtifact(response.content, schema, reading.acceptedAs(response.content).reply);
+    const parsed = parseStructuredArtifact(response.content, schema, reading.acceptedAs(response.content).reply, REVIEW_ARTIFACT_READING);
     if (parsed.kind === "PARSE_FAILURE") throw new TypedDomainError("NODE_REVIEW_PARSE_FAILURE", parsed.message);
     if (parsed.kind === "SCHEMA_FAILURE") throw new TypedDomainError("NODE_REVIEW_SCHEMA_FAILURE", parsed.message);
     const bearings = parsed.value.edge_bearings;

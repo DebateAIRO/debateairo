@@ -26,6 +26,7 @@ import {
   practiceFinishReasonOf,
   practiceJsonRepairOf,
   practiceReplyFormOf,
+  practiceReviewEdgeCountOf,
   recheckReply,
   replyContentOf
 } from "./practice-lanes.js";
@@ -200,12 +201,22 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
    * (ledger.call_prompt, written by the runner's gateway just before it sent the attempt, decrypted with the run's key).
    * Null when the attempt has no recorded prompt (refused before it was sent).
    */
-  const replyFormOf = async (attemptId: string | null): Promise<PracticeReplyForm | null> => {
+  const promptMessagesOf = async (attemptId: string | null): Promise<Parameters<typeof practiceReplyFormOf>[0] | null> => {
     if (attemptId === null) return null;
     const prompt = await readCallPrompt(pool, attemptId);
     if (prompt === null) return null;
     const messages = JSON.parse(prompt.promptText) as unknown;
-    return Array.isArray(messages) ? practiceReplyFormOf(messages as Parameters<typeof practiceReplyFormOf>[0]) : null;
+    return Array.isArray(messages) ? messages as Parameters<typeof practiceReplyFormOf>[0] : null;
+  };
+  const replyFormOf = async (attemptId: string | null): Promise<PracticeReplyForm | null> => {
+    const messages = await promptMessagesOf(attemptId);
+    return messages === null ? null : practiceReplyFormOf(messages);
+  };
+  /** MiMo salvage (2026-10-12): a review's edge count, from its own prompt, so the recheck knows when [] is the answer. */
+  const reviewEdgeCountOf = async (attemptId: string | null, callSiteKey: string): Promise<number | null> => {
+    if (callFamilyOf(callSiteKey) !== "REVIEW") return null;
+    const messages = await promptMessagesOf(attemptId);
+    return messages === null ? null : practiceReviewEdgeCountOf(messages);
   };
   for (const entry of entries) {
     const model = modelOfRef(entry.actor_ref);
@@ -238,7 +249,7 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     call.tries.push(Object.freeze({ outcome: entry.outcome, parseStatus: artifact === undefined ? null : parseStatus, replyForm }));
     if (entry.outcome === "OK" && artifact !== undefined) {
       const stored = await readContent(entry.raw_artifact_ref!, artifact);
-      const repair = practiceJsonRepairOf(replyContentOf(stored.rawText), practiceFinishReasonOf(artifact.metadata_json));
+      const repair = practiceJsonRepairOf(replyContentOf(stored.rawText), practiceFinishReasonOf(artifact.metadata_json), entry.call_site_key);
       if (repair !== null) jsonRepairs.push(Object.freeze({ model, repair }));
     }
     if (formatFailed && artifact !== undefined) {
@@ -247,7 +258,7 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
       failures.push(Object.freeze({
         sequence: Number(entry.sequence), model, providerRef: entry.actor_ref, callSiteKey: entry.call_site_key, parseStatus,
         issues: issueListFromParseError(stored.parseErrorDetail),
-        recheckIssues: replyForm === "PATCH" ? [] : recheckReply(entry.call_site_key, content).issues,
+        recheckIssues: replyForm === "PATCH" ? [] : recheckReply(entry.call_site_key, content, await reviewEdgeCountOf(entry.attempt_id, entry.call_site_key)).issues,
         replyForm, latencyMs, replyText: reportableReplyText(content), fixedBySameCall: false
       }));
     }

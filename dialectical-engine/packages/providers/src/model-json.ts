@@ -24,16 +24,29 @@ export interface ModelReplyFacts {
  *  · CODE_FENCE — the body of one code fence;
  *  · OUTERMOST_OBJECT — the one top-level object when prose stands before or after it;
  *  · INNER_QUOTE — a straight double quote inside a string value that cannot be that string's end, read as escaped;
+ *  · STRAY_QUOTE — one straight double quote standing after the last complete value, with only closing brackets after
+ *    it (MiMo-V2.6-Pro, 2026-10-12: `…}]}"}`), dropped;
  *  · CLOSING_BRACKETS — the brackets still open at the very end appended, only for a reply that finished normally.
  */
-const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INNER_QUOTE", "CLOSING_BRACKETS"] as const);
+const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INNER_QUOTE", "STRAY_QUOTE", "CLOSING_BRACKETS"] as const);
 /**
- * The repair codes a classification can name (`ContentClassification.jsonRepair`): this file's four decode repairs and
- * NESTED_FIELDS, the judge's one SHAPE repair (judge nested fields, 2026-10-12: `packages/judgement/src/s04.ts`
- * `nestedFieldsPlan`), made only after a decoded object failed the judge artifact's or the panel assessment's schema. `decodeModelJson` never
- * makes NESTED_FIELDS: it does not know any schema.
+ * The judge's SHAPE repairs (`packages/judgement/src/s04.ts`), each made only after a decoded object failed its step's
+ * schema, and each accepted only when the repaired object then passes that full schema:
+ *  · NESTED_FIELDS (judge nested fields, 2026-10-12, `nestedFieldsPlan`): a flattened member nested again;
+ *  · RENAMED_MEMBER (MiMo salvage, 2026-10-12): the one missing object member found under one key the schema never
+ *    asked for, whose value passes that member's own schema exactly ("critique" for "critic");
+ *  · UNASKED_KEYS (MiMo salvage, 2026-10-12): root keys the schema never asked for dropped, every asked member present
+ *    and valid ("way_of_kooking" beside "way_of_knowing");
+ *  · EMPTY_LIST (MiMo salvage, 2026-10-12): a missing root list the schema pins to exactly 0 entries (a review of a node
+ *    with no edges: `edge_bearings` can only be []) filled with the one value it admits.
+ * `decodeModelJson` never makes them: it does not know any schema.
  */
-export type ModelJsonRepair = typeof MODEL_JSON_REPAIRS[number] | "NESTED_FIELDS";
+const MODEL_JSON_SHAPE_REPAIRS = Object.freeze(["NESTED_FIELDS", "RENAMED_MEMBER", "UNASKED_KEYS", "EMPTY_LIST"] as const);
+/**
+ * The repair codes a classification can name (`ContentClassification.jsonRepair`): this file's five decode repairs and
+ * the judge's shape repairs (`MODEL_JSON_SHAPE_REPAIRS`).
+ */
+export type ModelJsonRepair = typeof MODEL_JSON_REPAIRS[number] | typeof MODEL_JSON_SHAPE_REPAIRS[number];
 
 export type ModelJsonDecoded =
   | { readonly ok: true; readonly value: unknown; readonly repair: typeof MODEL_JSON_REPAIRS[number] | null }
@@ -233,19 +246,47 @@ function closeOpenBrackets(text: string): string | null {
 }
 
 /**
- * The two late repairs, (iv) then (v), on one candidate text: the body of one code fence when there is one, else
- * the whole reply, trimmed. (v) is tried only when the reply finished normally. Null when neither decodes. Shared by
+ * (v) MiMo salvage (2026-10-12, debate 2 seq 437): a reply that is one complete object except for ONE straight double
+ * quote standing right after a closed object or list, with nothing but closing brackets (and blanks) after it to the
+ * very end — `…"description":"…instead."}]}"}`. Outside a string, a quote right after a value can only start a key,
+ * and a key needs a comma before it and a colon after it: here there is neither, so it can be nothing but a stray
+ * character. The text without it is returned; the caller accepts it only if it then decodes in full as one object.
+ * Null when the end does not have exactly that form. Linear, from the end (model text is untrusted, CI-1b).
+ */
+function dropStrayClosingQuote(text: string): string | null {
+  let index = text.length - 1;
+  let closers = 0;
+  while (index >= 0 && (isBlank(text[index]) || text[index] === "}" || text[index] === "]")) {
+    if (!isBlank(text[index])) closers += 1;
+    index -= 1;
+  }
+  if (closers === 0 || index < 0 || text[index] !== "\"") return null;
+  const quote = index;
+  index -= 1;
+  while (index >= 0 && isBlank(text[index])) index -= 1;
+  if (index < 0 || (text[index] !== "}" && text[index] !== "]")) return null;
+  return `${text.slice(0, quote)}${text.slice(quote + 1)}`;
+}
+
+/**
+ * The three late repairs, (iv), (v) then (vi), on one candidate text: the body of one code fence when there is one,
+ * else the whole reply, trimmed. (vi) is tried only when the reply finished normally. Null when none decodes. Shared by
  * `decodeModelJson` and the judge's parsing strategies (`packages/judgement/src/s04.ts`, all-steps format
- * robustness, 2026-10-12), so every structured step gets exactly the same two repairs.
+ * robustness, 2026-10-12), so every structured step gets exactly the same late repairs.
  */
 export function modelJsonLateRepair(content: string, reply?: ModelReplyFacts):
-  { readonly value: unknown; readonly repair: "INNER_QUOTE" | "CLOSING_BRACKETS" } | null {
+  { readonly value: unknown; readonly repair: "INNER_QUOTE" | "STRAY_QUOTE" | "CLOSING_BRACKETS" } | null {
   if (reply?.finishReason === TRUNCATED_FINISH_REASON) return null;
   const base = (modelJsonFenceBody(content) ?? content).trim();
   const quoted = escapeInnerQuotes(base);
   if (quoted !== null) {
     const repaired = parsed(quoted);
     if (repaired !== null) return Object.freeze({ value: repaired.value, repair: "INNER_QUOTE" as const });
+  }
+  const unstrayed = dropStrayClosingQuote(base);
+  if (unstrayed !== null) {
+    const repaired = parsed(unstrayed);
+    if (repaired !== null && isPlainObject(repaired.value)) return Object.freeze({ value: repaired.value, repair: "STRAY_QUOTE" as const });
   }
   if (modelReplyFinishedNormally(reply)) {
     const closed = closeOpenBrackets(base);
@@ -260,8 +301,9 @@ export function modelJsonLateRepair(content: string, reply?: ModelReplyFacts):
 /**
  * THE TOLERANT DECODE. In order: (i) strict JSON; (ii) the body of one code fence; (iii) the outermost object
  * when prose stands around it; (iv) the straight quotes inside string values that cannot end them, escaped;
- * (v) only when the reply finished normally, the brackets still open at the very end, closed. (iv) and (v)
- * read the fence's body when there is one (`modelJsonLateRepair`). One repair at most; the first that decodes
+ * (v) one stray straight quote before the final closing brackets, dropped; (vi) only when the reply finished
+ * normally, the brackets still open at the very end, closed. (iv) to (vi) read the fence's body when there is one
+ * (`modelJsonLateRepair`). One repair at most; the first that decodes
  * wins. A reply cut off at its token ceiling (`length`) is decoded strictly or not at all. A failure carries the
  * strict parser's own error, as before this decode existed.
  */
