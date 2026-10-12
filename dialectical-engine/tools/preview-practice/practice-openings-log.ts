@@ -14,8 +14,9 @@ import { join } from "node:path";
 import type { MapMarkRecord, MapNoteRecord, MapResult, MapStep } from "@debateai/map";
 import type { PracticeAttempt } from "./practice-formats.js";
 import type { PracticeGateName } from "./practice-gate-observer.js";
-import type { OpeningsArm } from "./practice-openings-questions.js";
+import type { OpeningsArm, OpeningsQuestionDigest } from "./practice-openings-questions.js";
 import { GATES, gateHalted, gatePauses, gateStopped, p90ByModel, PRACTICE_REPORT_SCHEMA, usd, type PracticeReport } from "./practice-report.js";
+import { reportableReplyText } from "./practice-redaction.js";
 import {
   isPracticeLogCommonLine,
   parseJsonlLines,
@@ -96,13 +97,24 @@ export type OpeningsBusyWait = Readonly<{
 
 export type OpeningsLogLine =
   | Readonly<{ kind: "start"; schema: typeof OPENINGS_SCHEMA; mode: "openings"; dry: boolean; startedAt: string;
-    models: readonly string[]; questions: readonly string[]; arms: readonly OpeningsArm[]; busyWaitMs: number;
+    models: readonly string[]; questions: readonly string[];
+    /** Each asked question's id and the digest of its question line: a later rewording shows across runs. */
+    questionDigests: readonly OpeningsQuestionDigest[]; arms: readonly OpeningsArm[]; busyWaitMs: number;
     unsentStreakAtStart: Readonly<Record<PracticeGateName, number>>;
     remainingBefore: Readonly<Record<PracticeGateName, PracticeRemainingLine | null>> }>
   | PracticeLogCommonLine
   | Readonly<{ kind: "call"; call: OpeningsCall }>
   | Readonly<{ kind: "arm"; arm: OpeningsArmLine }>
   | (Readonly<{ kind: "busy-wait" }> & OpeningsBusyWait);
+
+/**
+ * The line as it is written: a call's reply text is redacted and capped by the rule every report uses (key-shaped
+ * strings blanked, at most 64 KiB), whatever the caller passed. Applying it twice changes nothing.
+ */
+function redactedForLog(line: OpeningsLogLine): OpeningsLogLine {
+  if (line.kind !== "call" || line.call.replyText === null) return line;
+  return { kind: "call", call: { ...line.call, replyText: reportableReplyText(line.call.replyText) } };
+}
 
 /** Appends one line at a time and pushes each to the disk before returning. One writer per log. */
 export class OpeningsLog {
@@ -119,7 +131,7 @@ export class OpeningsLog {
     return new OpeningsLog(PracticeJsonlWriter.create(directory, OPENINGS_FILE, "PRACTICE_OUT_ALREADY_HOLDS_OPENINGS"));
   }
 
-  append(line: OpeningsLogLine): void { this.#writer.append(line); }
+  append(line: OpeningsLogLine): void { this.#writer.append(redactedForLog(line)); }
 
   close(): void { this.#writer.close(); }
 }
@@ -145,6 +157,10 @@ function openingsCount(values: readonly string[]): Readonly<Record<string, numbe
 }
 
 const openingsAnswered = (call: OpeningsCall): boolean => call.status === "ACCEPTED" || call.status === "REPAIRED";
+
+/** A call the report lists as wrong-format: it failed, or one of its tries came back with a reply that failed its check. */
+const openingsWrongFormat = (call: OpeningsCall): boolean => call.status === "FORMAT_FAILED" || call.status === "CALL_FAILED"
+  || call.attempts.some((attempt) => attempt.parseStatus !== null && attempt.parseStatus !== "PARSED");
 
 /**
  * The report from the log alone, with the tool's own verdict (practice-verdict.ts): a log with an end line gives the
@@ -213,7 +229,7 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     schema: PRACTICE_REPORT_SCHEMA, mode: "openings", dry: start.dry, ...verdict,
     startedAt: start.startedAt, finishedAt: ending.finishedAt.toISOString(),
     wallSeconds: Math.round((ending.finishedAt.getTime() - Date.parse(start.startedAt)) / 1_000),
-    models: start.models, questions: start.questions, arms: start.arms, busyModels: busy,
+    models: start.models, questions: start.questions, questionDigests: start.questionDigests, arms: start.arms, busyModels: busy,
     callsByModel, repairKindsByModel: practiceRepairKindsByModel(tries),
     byArm,
     gates: Object.fromEntries(GATES.map((gate) => [gate, Object.freeze({ observed: ending.observer.summary(gate),
@@ -227,6 +243,8 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
       marks: armLines.reduce((sum, line) => sum + line.marks.length, 0),
       notes: armLines.reduce((sum, line) => sum + line.notes.length, 0)
     }),
-    failures: calls.filter((call) => call.status === "FORMAT_FAILED" || call.status === "CALL_FAILED")
+    // The formats report's rule: a call that failed, or one of whose tries came back with a reply that failed its check
+    // (fixed or not). Its reply text is kept only for a format failure; the text of any other failure is left out.
+    failures: calls.filter(openingsWrongFormat).map((call) => call.status === "FORMAT_FAILED" ? call : { ...call, replyText: null })
   });
 }

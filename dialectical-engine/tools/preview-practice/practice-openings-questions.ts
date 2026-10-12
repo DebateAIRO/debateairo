@@ -5,6 +5,7 @@
  * questions are our own, fixed here, plain and neutral; never read from the command line. --questions and --arms only
  * choose among these fixed ids and arm letters: anything else is refused, and the refusal never repeats what was typed.
  */
+import { createHash } from "node:crypto";
 import { PracticeRefusal } from "./practice-settings.js";
 
 export type OpeningsCategory = "PUBLIC_POLICY" | "ETHICS" | "HEALTH_PRACTICAL" | "PERSONAL_DECISION" | "CONTESTED_FACT";
@@ -41,6 +42,20 @@ export const OPENINGS_QUESTIONS: readonly OpeningsQuestion[] = Object.freeze([
 export const OPENINGS_ARMS = Object.freeze(["T", "A", "B", "C"] as const);
 /** T: today's opening. A: snowball. B: blind lists. C: the angle map. */
 export type OpeningsArm = typeof OPENINGS_ARMS[number];
+
+/** A question as the log pins it: its id and the first 12 hex characters of the SHA-256 of its question line. */
+export type OpeningsQuestionDigest = Readonly<{ id: string; sha256: string }>;
+
+/**
+ * The digests of the questions a run asks, in the order given. A later rewording of a question line changes its digest,
+ * so two runs can be compared question by question (the start line of openings.jsonl and the report carry them).
+ */
+export function openingsQuestionDigests(questions: readonly OpeningsQuestion[]): readonly OpeningsQuestionDigest[] {
+  return Object.freeze(questions.map((question) => Object.freeze({
+    id: question.id,
+    sha256: createHash("sha256").update(question.questionLine, "utf8").digest("hex").slice(0, 12)
+  })));
+}
 
 function openingsIds(value: string): readonly string[] | null {
   const ids = value.split(",").map((id) => id.trim()).filter((id) => id !== "");
