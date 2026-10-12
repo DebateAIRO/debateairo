@@ -176,7 +176,7 @@ function schemaFailureMessage(error: z.ZodError): string {
     : rendered;
 }
 
-/** How a step asks its reply to be read. `nestedFields`: the one shape repair (`nestedFieldsPlan`), judge author legs only. */
+/** How a step asks its reply to be read. `nestedFields`: the one shape repair (`nestedFieldsPlan`), the judge's author legs and panel only. */
 export interface StructuredReadingOptions {
   readonly nestedFields?: boolean;
 }
@@ -271,7 +271,7 @@ function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, sc
  * still passes the full schema; the stored artifact stays the vendor's bytes.
  * Without `reply` the ending is unknown and the last repair is not made.
  *
- * Judge nested fields (2026-10-12): with `options.nestedFields` (the judge's author legs), an object that decoded but
+ * Judge nested fields (2026-10-12): with `options.nestedFields` (the judge's author legs and panel), an object that decoded but
  * failed the schema is tried once more with its flattened members nested (`nestFlattenedMembers`, the plan read off
  * the schema by `nestedFieldsPlan`); it is accepted only if the result passes the full schema, as NESTED_FIELDS, and
  * otherwise the original refusal stands. The step re-reads its accepted content with the same options, so every

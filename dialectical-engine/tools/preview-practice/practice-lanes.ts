@@ -199,7 +199,7 @@ export function recheckReply(callSiteKey: string, content: string): Readonly<{ f
   const family = callFamilyOf(callSiteKey);
   switch (family) {
     case "JUDGE": return { family, issues: fromStructured(parseStructuredArtifact(content, judgeArtifactSchema, undefined, JUDGE_ARTIFACT_READING)) };
-    case "PANEL": return { family, issues: fromStructured(parseStructuredArtifact(content, judgeAssessmentSchema)) };
+    case "PANEL": return { family, issues: fromStructured(parseStructuredArtifact(content, judgeAssessmentSchema, undefined, JUDGE_ARTIFACT_READING)) };
     case "REVIEW": {
       let edges = 0;
       try {

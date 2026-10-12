@@ -136,8 +136,9 @@ export const judgeArtifactSchema = z.object({
 }).strict();
 
 /**
- * Judge nested fields (2026-10-12): how the author legs read their artifact. The NESTED_FIELDS repair applies here
- * only (MiMo-V2.6-Pro's flattened steelman and critic); the panel, the review and the runner's readers do not ask for it.
+ * Judge nested fields (2026-10-12): how the author legs and the panel read their artifact. The NESTED_FIELDS repair
+ * (MiMo-V2.6-Pro's flattened steelman and critic) applies to those two only; the review and the runner's readers do
+ * not ask for it.
  */
 export const JUDGE_ARTIFACT_READING: StructuredReadingOptions = Object.freeze({ nestedFields: true });
 
@@ -660,7 +661,10 @@ export class Judge {
     const packet = framed.packet;
     // All-steps format robustness (2026-10-12): the tolerant reading, remembered so the accepted reply is read again
     // exactly as the classifier read it (the last repair depends on how the reply ended).
-    const reading = rememberingAcceptedReply((content, reply) => classifyStructuredArtifact(content, judgeAssessmentSchema, reply));
+    // Judge nested fields (2026-10-12): the panel reads its assessment as the author legs do (NESTED_FIELDS), and the
+    // re-read below uses the same options.
+    const reading = rememberingAcceptedReply((content, reply) =>
+      classifyStructuredArtifact(content, judgeAssessmentSchema, reply, JUDGE_ARTIFACT_READING));
     let response;
     try {
       response = await this.provider.call({
@@ -703,7 +707,7 @@ export class Judge {
         { cause: error }
       );
     }
-    const parsed = parseStructuredArtifact(response.content, judgeAssessmentSchema, reading.acceptedAs(response.content).reply);
+    const parsed = parseStructuredArtifact(response.content, judgeAssessmentSchema, reading.acceptedAs(response.content).reply, JUDGE_ARTIFACT_READING);
     if (parsed.kind === "PARSE_FAILURE") throw new PanelMemberFailure("PARSE_FAILURE", parsed.message);
     if (parsed.kind === "SCHEMA_FAILURE") throw new PanelMemberFailure("SCHEMA_FAILURE", parsed.message);
     return Object.freeze({

@@ -30,7 +30,7 @@ const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INN
 /**
  * The repair codes a classification can name (`ContentClassification.jsonRepair`): this file's four decode repairs and
  * NESTED_FIELDS, the judge's one SHAPE repair (judge nested fields, 2026-10-12: `packages/judgement/src/s04.ts`
- * `nestedFieldsPlan`), made only after a decoded object failed the judge artifact's schema. `decodeModelJson` never
+ * `nestedFieldsPlan`), made only after a decoded object failed the judge artifact's or the panel assessment's schema. `decodeModelJson` never
  * makes NESTED_FIELDS: it does not know any schema.
  */
 export type ModelJsonRepair = typeof MODEL_JSON_REPAIRS[number] | "NESTED_FIELDS";
