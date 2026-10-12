@@ -1148,6 +1148,8 @@ describe("practice report: the thinking levels table (spec 2026-10-12 §4.8)", (
       ? [{ callSiteKey: "PANEL:x", outcome: "FAILED" as const, parseStatus: "SCHEMA_FAILED" as const, latencyMs: 1 },
         { callSiteKey: "PANEL:x", outcome: "OK" as const, parseStatus: "PARSED" as const, latencyMs: 1 }]
       : shape.status === "PARSED" ? [{ callSiteKey: "PANEL:x", outcome: "OK" as const, parseStatus: "PARSED" as const, latencyMs: 1 }]
+        : ["CALL_FAILED", "UNBILLED_REFUSED", "VENDOR_ERROR_UNBILLED"].includes(shape.status)
+          ? [{ callSiteKey: "PANEL:x", outcome: "FAILED" as const, parseStatus: null, latencyMs: 1 }]
         : skipped ? [] : [{ callSiteKey: "PANEL:x", outcome: "FAILED" as const, parseStatus: "PARSE_FAILED" as const, latencyMs: 1 },
           { callSiteKey: "PANEL:x", outcome: "FAILED" as const, parseStatus: "PARSE_FAILED" as const, latencyMs: 1 }];
     return { kind: "sample", sample: { model: GLM, providerRef: "preview:glm", gate: "deepinfra", lane: "PANEL", sample: index, questionId: "en",
@@ -1163,13 +1165,27 @@ describe("practice report: the thinking levels table (spec 2026-10-12 §4.8)", (
     sample(3, { run: "high#1", status: "SKIPPED_MODEL_BUSY", latencyMs: 0, reasoning: null, cost: null }),
     end];
 
-  it("lists per model and run: jobs, first try, repaired, failed, cut off, thinking, time, cost, slips over the bar", () => {
+  it("lists per model and run: jobs, first try, repaired, format failed, call failed, cut off, thinking, time, cost, slips over the bar", () => {
     const report = practiceReportFromLog(lines) as unknown as { levels: Record<string, Record<string, unknown>> };
     expect(report.levels).toEqual({ [GLM]: {
-      "high#1": { jobs: 3, answered: 2, firstTry: 1, repaired: 0, failed: 1, cutOff: 0, reasoningMedian: 100, reasoningTotal: 400,
+      "high#1": { jobs: 3, answered: 2, firstTry: 1, repaired: 0, formatFailed: 1, callFailed: 0, cutOff: 0, reasoningMedian: 100, reasoningTotal: 400,
         latencyMedianMs: 10_000, latencyP90Ms: 20_000, costPerJobUsd: "0.002000000", costTotalUsd: "0.004000000", slipsOverBar: false },
-      "high#2": { jobs: 2, answered: 2, firstTry: 1, repaired: 1, failed: 0, cutOff: 1, reasoningMedian: 500, reasoningTotal: 1_200,
+      "high#2": { jobs: 2, answered: 2, firstTry: 1, repaired: 1, formatFailed: 0, callFailed: 0, cutOff: 1, reasoningMedian: 500, reasoningTotal: 1_200,
         latencyMedianMs: 12_000, latencyP90Ms: 30_000, costPerJobUsd: "0.005000000", costTotalUsd: "0.010000000", slipsOverBar: false } } });
+  });
+
+  it("a call that failed (CALL_FAILED, UNBILLED_REFUSED, VENDOR_ERROR_UNBILLED) is counted apart from a reply in the wrong format", () => {
+    const report = practiceReportFromLog([start,
+      sample(1, { run: "none#1", status: "PARSED", latencyMs: 1, reasoning: null, cost: "1" }),
+      sample(2, { run: "none#1", status: "PARSE_FAILED", latencyMs: 1, reasoning: null, cost: "1" }),
+      sample(3, { run: "none#1", status: "POST_CHECK_FAILED", latencyMs: 1, reasoning: null, cost: "1" }),
+      sample(4, { run: "none#1", status: "CALL_FAILED", latencyMs: 1, reasoning: null, cost: null }),
+      sample(5, { run: "none#1", status: "UNBILLED_REFUSED", latencyMs: 1, reasoning: null, cost: null }),
+      sample(6, { run: "none#1", status: "VENDOR_ERROR_UNBILLED", latencyMs: 1, reasoning: null, cost: null }), end]);
+    const levels = (report as unknown as { levels: Record<string, Record<string, unknown>> }).levels;
+    expect(levels[GLM]!["none#1"]).toMatchObject({ answered: 6, firstTry: 1, repaired: 0, formatFailed: 2, callFailed: 3 });
+    expect(Object.keys(levels[GLM]!["none#1"]!)).not.toContain("failed");
+    expect(reportMarkdown(report)).toContain(`| ${GLM} | none#1 | 6/6 | 1 | 0 | 2 | 3 | 0 | - | - |`);
   });
 
   it("over the slip bar: more slips than max(1, floor(answered / 10))", () => {
@@ -1177,15 +1193,16 @@ describe("practice report: the thinking levels table (spec 2026-10-12 §4.8)", (
       sample(1, { run: "low#1", status: "REPAIRED", latencyMs: 1, reasoning: 1, cost: "1" }),
       sample(2, { run: "low#1", status: "REPAIRED", latencyMs: 1, reasoning: 1, cost: "1" }), end]) as unknown as { levels: Record<string, Record<string, { slipsOverBar: boolean }>> };
     expect(report.levels[GLM]!["low#1"]!.slipsOverBar).toBe(true);
-    expect(reportMarkdown(report as unknown as Parameters<typeof reportMarkdown>[0])).toContain(`| ${GLM} | low#1 | 2/2 | 0 | 2 | 0 | 0 | 1 |`);
+    expect(reportMarkdown(report as unknown as Parameters<typeof reportMarkdown>[0])).toContain(`| ${GLM} | low#1 | 2/2 | 0 | 2 | 0 | 0 | 0 | 1 | 2 |`);
     expect(reportMarkdown(report as unknown as Parameters<typeof reportMarkdown>[0])).toMatch(/\| low#1 \| .* \| yes \|$/mu);
   });
 
   it("the markdown has one row per model and run, and the chance band of a level run twice", () => {
     const markdown = reportMarkdown(practiceReportFromLog(lines));
-    expect(markdown).toContain("| model | run | answered / jobs | first try | repaired | failed | cut off | thinking median | time median / p90 | cost per job | over bar |");
-    expect(markdown).toContain(`| ${GLM} | high#1 | 2/3 | 1 | 0 | 1 | 0 | 100 | 10.0 / 20.0 s | $0.002000000 | no |`);
-    expect(markdown).toContain(`| ${GLM} | high#2 | 2/2 | 1 | 1 | 0 | 1 | 500 | 12.0 / 30.0 s | $0.005000000 | no |`);
+    expect(markdown).toContain("| model | run | answered / jobs | first try | repaired | format failed | call failed | cut off | thinking median | "
+      + "thinking total | time median / p90 | cost per job | cost total | over bar |");
+    expect(markdown).toContain(`| ${GLM} | high#1 | 2/3 | 1 | 0 | 1 | 0 | 0 | 100 | 400 | 10.0 / 20.0 s | $0.002000000 | $0.004000000 | no |`);
+    expect(markdown).toContain(`| ${GLM} | high#2 | 2/2 | 1 | 1 | 0 | 0 | 1 | 500 | 1200 | 12.0 / 30.0 s | $0.005000000 | $0.010000000 | no |`);
     expect(markdown).toContain(`${GLM} chance band (high#1 vs high#2): first try ±0, thinking median ±400, time median ±2.0 s, cost per job ±$0.003000000`);
   });
 

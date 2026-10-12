@@ -183,15 +183,22 @@ export function cacheByModel(observer: PracticeGateObserver): Readonly<Record<st
 /**
  * Spec 2026-10-12 §4.8: one model's one level run, as the levels table shows it. `jobs` counts every job of the run,
  * `answered` those not skipped; `firstTry` the PARSED ones, `repaired` the REPAIRED ones (fixed by the same call's
- * later try), `failed` the rest of the answered ones; `cutOff` the jobs with a reply stopped at max_tokens. Thinking,
+ * later try); of the rest, `formatFailed` those whose reply had the wrong format or content for good (PARSE_FAILED,
+ * SCHEMA_FAILED, UNPARSED, POST_CHECK_FAILED) and `callFailed` those whose call itself failed (CALL_FAILED,
+ * UNBILLED_REFUSED, VENDOR_ERROR_UNBILLED), so a level's format trouble is not mixed with a vendor's bad hour (final
+ * review fix 3); `cutOff` the jobs with a reply stopped at max_tokens. Thinking,
  * time and cost are over the answered jobs (medians and p90 by nearest rank; null with nothing to measure).
  * `slipsOverBar`: the run's own slips over the practice rule (slips > max(1, floor(answered calls / 10))).
  */
 export type PracticeLevelRunBlock = Readonly<{
-  jobs: number; answered: number; firstTry: number; repaired: number; failed: number; cutOff: number;
+  jobs: number; answered: number; firstTry: number; repaired: number; formatFailed: number; callFailed: number; cutOff: number;
   reasoningMedian: number | null; reasoningTotal: number | null; latencyMedianMs: number | null; latencyP90Ms: number | null;
   costPerJobUsd: string | null; costTotalUsd: string; slipsOverBar: boolean;
 }>;
+
+/** A job's reply in the wrong format or content for good, and a job whose call itself failed (final review fix 3). */
+const LEVEL_FORMAT_FAILED: ReadonlySet<string> = new Set(["PARSE_FAILED", "SCHEMA_FAILED", "UNPARSED", "POST_CHECK_FAILED"]);
+const LEVEL_CALL_FAILED: ReadonlySet<string> = new Set(["CALL_FAILED", "UNBILLED_REFUSED", "VENDOR_ERROR_UNBILLED"]);
 
 /** Spec 2026-10-12 §4.8: model -> run -> its block, runs in the order they first appear (the plan's order); null without level runs. */
 export function levelsBlock(samples: readonly PracticeSample[]): Readonly<Record<string, Readonly<Record<string, PracticeLevelRunBlock>>>> | null {
@@ -212,7 +219,9 @@ export function levelsBlock(samples: readonly PracticeSample[]): Readonly<Record
       const firstTry = answered.filter((sample) => sample.status === "PARSED").length;
       const repaired = answered.filter((sample) => sample.status === "REPAIRED").length;
       out[model][run] = Object.freeze({
-        jobs: jobs.length, answered: answered.length, firstTry, repaired, failed: answered.length - firstTry - repaired,
+        jobs: jobs.length, answered: answered.length, firstTry, repaired,
+        formatFailed: answered.filter((sample) => LEVEL_FORMAT_FAILED.has(sample.status)).length,
+        callFailed: answered.filter((sample) => LEVEL_CALL_FAILED.has(sample.status)).length,
         cutOff: jobs.filter((sample) => sample.cutOff === true).length,
         reasoningMedian: percentile(thinking, 50), reasoningTotal: thinking.length === 0 ? null : thinking.reduce((sum, value) => sum + value, 0),
         latencyMedianMs: percentile(latencies, 50), latencyP90Ms: percentile(latencies, 90),
@@ -495,16 +504,19 @@ export function reportMarkdown(report: PracticeReport): string {
     lines.push("Thinking levels (spec 2026-10-12 §4.8; the chance band is the gap between two runs of the same level; "
       + "\"over bar\": this run alone has more than 1 slip in 10 answered calls, for the comparison only, the verdict counts "
       + "all of a model's runs together):", "",
-      "| model | run | answered / jobs | first try | repaired | failed | cut off | thinking median | time median / p90 | cost per job | over bar |",
-      "|---|---|---|---|---|---|---|---|---|---|---|");
+      "| model | run | answered / jobs | first try | repaired | format failed | call failed | cut off | thinking median | "
+        + "thinking total | time median / p90 | cost per job | cost total | over bar |",
+      "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
     const bands: string[] = [];
     for (const [model, runs] of Object.entries(levels)) {
       const s = (value: number | null) => value === null ? "-" : (value / 1000).toFixed(1);
       for (const [run, entry] of Object.entries(runs)) {
-        lines.push(`| ${model} | ${run} | ${String(entry.answered)}/${String(entry.jobs)} | ${String(entry.firstTry)} | ${String(entry.repaired)} | ${String(entry.failed)} | `
+        lines.push(`| ${model} | ${run} | ${String(entry.answered)}/${String(entry.jobs)} | ${String(entry.firstTry)} | ${String(entry.repaired)} | `
+          + `${String(entry.formatFailed)} | ${String(entry.callFailed)} | `
           + `${String(entry.cutOff)} | ${entry.reasoningMedian === null ? "-" : String(entry.reasoningMedian)} | `
+          + `${entry.reasoningTotal === null ? "-" : String(entry.reasoningTotal)} | `
           + `${s(entry.latencyMedianMs)} / ${s(entry.latencyP90Ms)} s | ${entry.costPerJobUsd === null ? "-" : `$${entry.costPerJobUsd}`} | `
-          + `${entry.slipsOverBar ? "yes" : "no"} |`);
+          + `$${entry.costTotalUsd} | ${entry.slipsOverBar ? "yes" : "no"} |`);
       }
       const band = chanceBandLine(model, runs);
       if (band !== null) bands.push(band);

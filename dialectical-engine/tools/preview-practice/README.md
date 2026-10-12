@@ -341,8 +341,10 @@ Optional flags:
   once, at the server's levels, as without `--levels`;
 - each sample in `samples.jsonl` also carries its run, level, thinking tokens, whether a reply stopped at max_tokens,
   and its accepted answer (key-shaped strings blanked, at most 64 KiB). `report.json` gets a `levels` block and
-  `report.md` a "Thinking levels" table: per model and run, answered / jobs, first try, repaired, failed, cut off,
-  thinking median, time median / p90, cost per job and over bar (this run alone over the slip bar; information only).
+  `report.md` a "Thinking levels" table: per model and run, answered / jobs, first try, repaired, format failed (a reply
+  in the wrong format for good), call failed (the call itself failed or was refused, not billed), cut off, thinking
+  median and total, time median / p90, cost per job and total, and over bar (this run alone over the slip bar;
+  information only).
 
 To read the answers themselves, side by side: `node_modules/.bin/tsx tools/preview-practice/practice.ts report --side-by-side "$P/levels-step-b/samples.jsonl" --out "$P/levels-page"` writes `$P/levels-page/side-by-side.html` from a finished run's samples log, sending nothing and writing no report files. Open it in a browser. It shows the four chosen jobs only (PANEL, SYNTHESIZER, STORYTELLER, REVIEW); `--lanes PANEL,SYNTHESIZER` names other jobs, checked the same way as in formats mode. Each model has its own block, and each job a block per sample and question, with one labelled column per run: the accepted answer (or why there is none), then its status, thinking tokens, time, cost in US dollars, and "cut off" when a reply stopped at the length limit. Its header explains the labels: "high#2" is the same level run a second time, so you can see what changes by chance alone; "default" is the AI's own setting; "none" means thinking is switched off. The file holds the answers, so keep it in `$P` with the reports; it has no script, every value on it is escaped, and it is readable only by you.
 
