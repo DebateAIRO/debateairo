@@ -45,7 +45,10 @@ What is new in v3:
   or DeepSeek. "none" asks DeepInfra to switch thinking off. The first level is what the app sends
   when the owner has not chosen one: exactly the request of before. The day ledger's
   `requested_effort` names the level the request carried ("default" for none sent), and the
-  money set aside does not depend on it. A menu change is a reviewed row change (new helper hash,
+  money set aside does not depend on it. That word, and the probe summary's `sent.effort`, changed
+  meaning at the gate update of 2026-10-12 14:06 UTC: in entries written before it, "none" means no
+  `reasoning_effort` was sent; from it on, "default" means none was sent and "none" means thinking
+  was switched off. A menu change is a reviewed row change (new helper hash,
   GO rewrite, restart).
 
 - The prices are DeepInfra's list prices. GLM and DeepSeek are on promotion today (50% and 30%

@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Judge, classifyStructuredArtifact, judgeArtifactSchema } from "@debateai/judgement";
 import {
-  OpenAICompatibleProviderGateway, PREVIEW_REVIEWED_PROVIDER_REFS, PreviewVendorRefusedUnbilled, buildFramedPrompt,
+  ANTHROPIC_PER_CALL_MARKERS_SEPARATOR, OpenAICompatibleProviderGateway, PREVIEW_REVIEWED_PROVIDER_REFS, PreviewVendorRefusedUnbilled, buildFramedPrompt,
   buildFramedRepairPrompt, createPreviewGuardedFetch, parsePreviewProviderTestConfig, parseProviderDiscoveryTargets,
   previewModelRow, previewTargetGatewayControls, previewTargetJsonRow, providerTargetGatewayControls, schemaFailureLocator, schemaFailurePaths,
   withPreviewProviderCallPolicy, type PreviewBudgetExecution, type ProviderCallRequest, type ProviderDiscoveryTarget,
@@ -175,9 +175,17 @@ describe("each call runs at the level the owner's table picks for its step", () 
     const { gateway, target, executions } = harness(DEEPSEEK);
     await gateway.call(plainRequest(target, "PANEL:root", "served"));
     expect(executions[0]!.requestBody).toBe(JSON.stringify({ model: DEEPSEEK, max_tokens: 8192, reasoning_effort: "high", messages: PACKET.messages }));
+    // Haiku too, byte for byte (final review fix 6): the Anthropic wire's own body, the system frame split at the
+    // per-call markers with the cache mark on its first block, then today's level, high.
     const haiku = harness(HAIKU);
     await haiku.gateway.call(plainRequest(haiku.target, "PANEL:root", "served"));
-    expect(bodies(haiku.executions)[0]).toMatchObject({ output_config: { effort: "high" } });
+    const [system, user] = PACKET.messages;
+    const cut = system!.content.indexOf(ANTHROPIC_PER_CALL_MARKERS_SEPARATOR) + 2;
+    expect(haiku.executions[0]!.requestBody).toBe(JSON.stringify({ model: HAIKU, max_tokens: 8192,
+      messages: [{ role: "user", content: user!.content }],
+      system: [{ type: "text", text: system!.content.slice(0, cut), cache_control: { type: "ephemeral" } },
+        { type: "text", text: system!.content.slice(cut) }],
+      output_config: { effort: "high" } }));
   });
 
   it("the unbilled refusal's one resend carries the same level (Review Focus 3)", async () => {
