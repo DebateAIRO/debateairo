@@ -433,6 +433,10 @@ function offPanelRoleRefs(panel: readonly PreviewPanelMember[], roleProviderRefs
  * preview (`previewFormatRepairAllowed`, providers/preview-test.ts): a second, billed POST in the same call, sent only
  * after the step's reply failed its check. Like the final retry it is the exception, left to the margin; the gate still
  * reserves each POST at its row's whole bound before sending it, so it can never spend what the gate has not allowed.
+ * The same holds for the patch follow-up (owner design, 2026-10-12): that second POST is now usually the SHORT one (the
+ * model's own answer back, only the failing members asked for, mostly served from the vendor's prompt cache), and a
+ * call whose second POST was a patch may send a third, the full re-ask, within the sealed bound. Each step is still
+ * counted once here (owner ruling); the gate's per-POST reservation is unchanged, so no estimate number moved.
  */
 export function previewExpectedCalls(input: Readonly<{
   basis: Readonly<Record<string, unknown>>;

@@ -5,7 +5,7 @@
  * gate's own local protocol. This wraps the real gate port the app already uses (createPreviewBudgetRpcPort), so
  * nothing about the request or the gate's answer changes. It only watches: which model was asked, how long the gate
  * took, whether the vendor answered, whether the gate refused the call as "not billed", and the token counts the
- * vendor reported. It keeps no request or reply text.
+ * vendor reported (with the part read from the vendor's prompt cache). It keeps no request or reply text.
  *
  * It is also the brake, a safety net behind the per-model rule (formats: a model whose call ends refused as busy is
  * skipped for the rest of the practice; debate: the runner makes it sit out). The live gate halts on its own at five
@@ -95,6 +95,12 @@ export type PracticeWireEvent = Readonly<{
   inputTokens: number | null;
   outputTokens: number | null;
   reasoningTokens: number | null;
+  /**
+   * The input tokens the vendor read from its prompt cache (DeepInfra: usage.prompt_tokens_details.cached_tokens;
+   * Anthropic: usage.cache_read_input_tokens), part of `inputTokens`. Present only when the vendor reported it (absent
+   * in logs written before it was recorded). The gateway does not keep it in the stored artifact (four counters only).
+   */
+  cachedInputTokens?: number;
 }>;
 
 export type PracticeGateStop = Readonly<{ gate: PracticeGateName; reason: string; atSeq: number }>;
@@ -169,24 +175,46 @@ function count(value: unknown): number | null {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
-/** The vendor's own usage block, read leniently (DeepInfra: OpenAI-shaped; Anthropic: Messages-shaped). */
+/**
+ * The vendor's own usage block, read leniently (DeepInfra: OpenAI-shaped; Anthropic: Messages-shaped).
+ *
+ * Input tokens are counted as the engine counts them (packages/providers/src/anthropic-messages.ts
+ * anthropicUsageAsEngineUsage): for Anthropic `input_tokens` + `cache_creation_input_tokens` + `cache_read_input_tokens`
+ * (Anthropic's own `input_tokens` leaves the cached part out); for DeepInfra `prompt_tokens`, which already holds it.
+ * `cachedInputTokens` is the part read from the vendor's prompt cache (Anthropic `cache_read_input_tokens`, DeepInfra
+ * `prompt_tokens_details.cached_tokens`, else a top-level `cached_tokens`, as the gate's helper reads it), null when the
+ * vendor did not report it.
+ */
 export function vendorUsage(gate: PracticeGateName, vendorBody: string): Readonly<{
-  inputTokens: number | null; outputTokens: number | null; reasoningTokens: number | null;
+  inputTokens: number | null; outputTokens: number | null; reasoningTokens: number | null; cachedInputTokens: number | null;
 }> {
+  const none = { inputTokens: null, outputTokens: null, reasoningTokens: null, cachedInputTokens: null };
   let parsed: unknown;
-  try { parsed = JSON.parse(vendorBody); } catch { return { inputTokens: null, outputTokens: null, reasoningTokens: null }; }
+  try { parsed = JSON.parse(vendorBody); } catch { return none; }
   const usage = typeof parsed === "object" && parsed !== null ? (parsed as { usage?: unknown }).usage : undefined;
-  if (typeof usage !== "object" || usage === null) return { inputTokens: null, outputTokens: null, reasoningTokens: null };
+  if (typeof usage !== "object" || usage === null) return none;
   const row = usage as Record<string, unknown>;
   if (gate === "anthropic") {
-    return { inputTokens: count(row.input_tokens), outputTokens: count(row.output_tokens), reasoningTokens: null };
+    const input = count(row.input_tokens);
+    const absentOrCount = (value: unknown) => value === undefined || value === null || count(value) !== null;
+    const cacheWrite = count(row.cache_creation_input_tokens) ?? 0;
+    const cacheRead = count(row.cache_read_input_tokens);
+    return {
+      inputTokens: input === null || !absentOrCount(row.cache_creation_input_tokens) || !absentOrCount(row.cache_read_input_tokens)
+        ? null : input + cacheWrite + (cacheRead ?? 0),
+      outputTokens: count(row.output_tokens), reasoningTokens: null, cachedInputTokens: cacheRead
+    };
   }
   const details = row.completion_tokens_details;
+  const promptDetails = row.prompt_tokens_details;
+  const cachedInDetails = typeof promptDetails === "object" && promptDetails !== null
+    ? count((promptDetails as Record<string, unknown>).cached_tokens) : null;
   return {
     inputTokens: count(row.prompt_tokens),
     outputTokens: count(row.completion_tokens),
     reasoningTokens: typeof details === "object" && details !== null
-      ? count((details as Record<string, unknown>).reasoning_tokens) : null
+      ? count((details as Record<string, unknown>).reasoning_tokens) : null,
+    cachedInputTokens: cachedInDetails ?? count(row.cached_tokens)
   };
 }
 
@@ -386,8 +414,9 @@ export class PracticeGateObserver {
         try {
           const result = await port.execute(input, signal);
           const latencyMs = Math.round(this.#now() - started);
+          const { cachedInputTokens, ...usage } = vendorUsage(gate, result.body);
           this.#record({ ...base, latencyMs, outcome: result.status === 200 ? "VENDOR_OK" : "VENDOR_ERROR",
-            vendorStatus: result.status, refusalCode: null, ...vendorUsage(gate, result.body) });
+            vendorStatus: result.status, refusalCode: null, ...usage, ...(cachedInputTokens === null ? {} : { cachedInputTokens }) });
           return result;
         } catch (error: unknown) {
           const latencyMs = Math.round(this.#now() - started);

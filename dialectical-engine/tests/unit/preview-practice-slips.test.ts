@@ -4,6 +4,9 @@
 //    tries slip more than 1 in 10 of its answered calls fails (one slip always allowed: slips > max(1, floor(answered/10))).
 //  - "Keep GLM, it sits out": a busy model that gave at least one accepted answer is a warning (MODEL_BUSY_PARTLY), not
 //    NOT_PROVEN; a busy model with no accepted answer stays NOT_PROVEN.
+// Patch follow-up (owner design, 2026-10-12): a slip whose reply decoded to an object is first answered by the SHORT
+// follow-up (the model's own answer back, only the failing paths asked for); a patch that does not do falls back to the
+// full re-ask (a third POST). The practice reports which one fixed it (information only; the verdict is unchanged).
 import { describe, expect, it } from "vitest";
 import {
   PREVIEW_REVIEWED_PROVIDER_REFS,
@@ -17,13 +20,16 @@ import {
 } from "@debateai/providers";
 import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
-import { stubVendorReply } from "../support/preview-gate-stubs.js";
-import { PracticeGateObserver } from "../../tools/preview-practice/practice-gate-observer.js";
+import { stubChatBody, stubVendorReply } from "../support/preview-gate-stubs.js";
+import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
+import { PracticeGateObserver, vendorUsage } from "../../tools/preview-practice/practice-gate-observer.js";
 import { onePerModel, runPracticeFormats } from "../../tools/preview-practice/practice-formats.js";
-import { formatsReport } from "../../tools/preview-practice/practice-report.js";
+import { cacheByModel, formatsReport, reportMarkdown } from "../../tools/preview-practice/practice-report.js";
 import {
   practiceCallFacts,
   practiceModelCalls,
+  practiceRepairKindOf,
+  practiceRepairKindsByModel,
   practiceSlipRateExceeded,
   practiceVerdict,
   type PracticeVerdictInput
@@ -79,6 +85,25 @@ describe("practice verdict: fixed slips are a warning (owner ruling 2026-10-12)"
     ])).toEqual({ m: { answered: 2, slips: 1, repaired: 1, unrecovered: 0 }, n: { answered: 0, slips: 1, repaired: 0, unrecovered: 1 } });
   });
 
+  it("how a repaired call was fixed: the accepted try's form (PATCH, FULL, or RESEND for the original sent again); information only", () => {
+    const slip = { outcome: "FAILED", parseStatus: "SCHEMA_FAILED", replyForm: "ORIGINAL" } as const;
+    expect(practiceRepairKindOf([slip, { outcome: "OK", parseStatus: "PARSED", replyForm: "PATCH" }])).toBe("PATCH");
+    expect(practiceRepairKindOf([slip, { outcome: "FAILED", parseStatus: "SCHEMA_FAILED", replyForm: "PATCH" },
+      { outcome: "OK", parseStatus: "PARSED", replyForm: "FULL" }])).toBe("FULL");
+    expect(practiceRepairKindOf([slip, { outcome: "OK", parseStatus: "PARSED", replyForm: "ORIGINAL" }])).toBe("RESEND");
+    // Not repaired, or the form not recorded (an older log): no kind.
+    expect(practiceRepairKindOf([{ outcome: "OK", parseStatus: "PARSED", replyForm: "ORIGINAL" }])).toBeNull();
+    expect(practiceRepairKindOf([{ outcome: "FAILED", parseStatus: "SCHEMA_FAILED" }, { outcome: "OK", parseStatus: "PARSED" }])).toBeNull();
+    expect(practiceRepairKindsByModel([
+      { model: "m", tries: [slip, { outcome: "OK", parseStatus: "PARSED", replyForm: "PATCH" }] },
+      { model: "m", tries: [slip, { outcome: "OK", parseStatus: "PARSED", replyForm: "FULL" }] },
+      { model: "m", tries: [{ outcome: "FAILED", parseStatus: "SCHEMA_FAILED" }, { outcome: "OK", parseStatus: "PARSED" }] },
+      { model: "n", tries: [{ outcome: "OK", parseStatus: "PARSED", replyForm: "ORIGINAL" }] }
+    ])).toEqual({ m: { repairedByPatch: 1, repairedByFullAsk: 1, repairedOtherwise: 1 } });
+    // The verdict reads none of it: FORMAT_REPAIRED counts a repaired call whichever way it was fixed.
+    expect(practiceVerdict({ ...CLEAN, callsByModel: { m: calls(20, 2) } }).reasons).toEqual(["FORMAT_REPAIRED:m:2"]);
+  });
+
   it("the story's outcome stays as it was: anything but READY fails, READY_WITH_RESERVATION too", () => {
     expect(practiceVerdict({ ...CLEAN, storyOutcome: "READY_WITH_RESERVATION" }).reasons).toEqual(["STORY_NOT_READY:READY_WITH_RESERVATION"]);
   });
@@ -129,46 +154,88 @@ describe("practice formats: the second try is the app's own (same preview call p
   const { value_laden: _left, ...withoutValueLaden } = JSON.parse(GOOD) as Record<string, unknown>;
   const MISSING_FIELD = JSON.stringify(withoutValueLaden);
 
+  /** The patch follow-up's answer when it does its job: only the member it was asked for. */
+  const PATCH = JSON.stringify({ value_laden: true });
+
+  /**
+   * What a request asks, read through the frame (the one reader): the step's own packet, the short patch follow-up
+   * (its last block's `machine_reply_form` is PATCH), or the full re-ask (a block naming the refusal).
+   */
+  function requestForm(provider: "deepinfra" | "anthropic", requestBody: string): "ORIGINAL" | "PATCH" | "FULL" {
+    const fields = readFramedMaterial(wirePacket(stubChatBody(provider, JSON.parse(requestBody) as Record<string, unknown>))).fields;
+    const last = fields.at(-1);
+    if (last?.name === "machine_reply_form" && last.content === "PATCH") return "PATCH";
+    return fields.some((field) => field.name === "machine_rejection_code") ? "FULL" : "ORIGINAL";
+  }
+
   /**
    * Every model answers well, except MiMo's first reply of its first `slips.remaining` jobs, which leaves out a
-   * required field (its requests 1, 3, 5 … are each a job's first try while every repair is answered well).
+   * required field. MiMo answers a patch follow-up with `patchAnswer`: the patch itself (the default), or its whole
+   * answer again (refused as a patch, so the call goes on to the full re-ask, which is answered well).
    */
-  function port(provider: "deepinfra" | "anthropic", slips: { remaining: number }, sent: string[]): PreviewBudgetPort {
+  function port(provider: "deepinfra" | "anthropic", slips: { remaining: number }, sent: string[],
+    patchAnswer: string = PATCH, forms: string[] = []): PreviewBudgetPort {
     let id = 0;
-    let mimo = 0;
     return { async execute(input) {
       const body = JSON.parse(input.requestBody) as { model: unknown };
       const model = String(body.model);
       sent.push(model);
       id += 1;
-      const slipNow = model === MIMO && ++mimo % 2 === 1 && (mimo + 1) / 2 <= slips.remaining;
-      const content = slipNow ? MISSING_FIELD : GOOD;
+      const form = requestForm(provider, input.requestBody);
+      if (model === MIMO) forms.push(form);
+      let content = GOOD;
+      if (model === MIMO && form === "PATCH") content = patchAnswer;
+      else if (model === MIMO && form === "ORIGINAL" && slips.remaining > 0) { slips.remaining -= 1; content = MISSING_FIELD; }
       return { status: 200, body: stubVendorReply(provider, model, content, `slip-${String(id)}`) };
     } };
   }
   const remaining = { deepinfra: { before: null, after: null }, anthropic: { before: null, after: null } };
 
-  async function run(slipCount: number, samples: number) {
+  async function run(slipCount: number, samples: number, patchAnswer: string = PATCH) {
     const observer = new PracticeGateObserver({ now: () => 0 });
     const sent: string[] = [];
+    const forms: string[] = [];
     const slips = { remaining: slipCount };
-    const ports = { deepinfra: observer.wrap("deepinfra", port("deepinfra", slips, sent)), anthropic: observer.wrap("anthropic", port("anthropic", slips, sent)) };
+    const ports = { deepinfra: observer.wrap("deepinfra", port("deepinfra", slips, sent, patchAnswer, forms)),
+      anthropic: observer.wrap("anthropic", port("anthropic", slips, sent, patchAnswer, forms)) };
     const result = await runPracticeFormats({ config, targets, ports, observer, lanes: ["JUDGE_POSITION"], samples, gapMs: 0, pack, bounds,
       sleep: async () => undefined });
     const report = formatsReport({ result, observer, remaining, startedAt: new Date(0), finishedAt: new Date(1), interrupted: false });
-    return { result, report, sent };
+    return { result, report, sent, forms };
   }
 
-  it("MiMo leaves out a field once, the same call's repair fixes it: REPAIRED, PASS_WITH_WARNINGS with FORMAT_REPAIRED", async () => {
-    const { result, report, sent } = await run(1, 2);
+  it("MiMo leaves out a field once, the short patch follow-up fixes it: REPAIRED by PATCH, PASS_WITH_WARNINGS with FORMAT_REPAIRED", async () => {
+    const { result, report, sent, forms } = await run(1, 2);
     const mimo = result.samples.filter((sample) => sample.model === MIMO);
     expect(mimo.map((sample) => sample.status)).toEqual(["REPAIRED", "PARSED"]);
     expect(mimo[0]!.attempts.map((attempt) => [attempt.outcome, attempt.parseStatus])).toEqual([["FAILED", "SCHEMA_FAILED"], ["OK", "PARSED"]]);
+    expect(mimo[0]!.attempts.map((attempt) => attempt.replyForm)).toEqual(["ORIGINAL", "PATCH"]);
+    expect(mimo.map((sample) => sample.repairKind)).toEqual(["PATCH", null]);
     expect(mimo[0]!.issues).toEqual(["invalid_type@value_laden"]);
+    // The second POST was the patch follow-up, as the gate saw it; the next job started afresh.
+    expect(forms).toEqual(["ORIGINAL", "PATCH", "ORIGINAL"]);
     expect(sent.filter((model) => model === MIMO)).toHaveLength(3);
     expect(report).toMatchObject({ verdict: "PASS_WITH_WARNINGS", exitCode: 10, reasons: [`FORMAT_REPAIRED:${MIMO}:1`] });
-    expect((report.slipsByModel as Record<string, unknown>)[MIMO]).toMatchObject({ answered: 2, slips: 1, repaired: 1, unrecovered: 0, slipRateExceeded: false });
-    expect(report.totals).toMatchObject({ formatFailures: 0, formatRepaired: 1 });
+    expect((report.slipsByModel as Record<string, unknown>)[MIMO]).toMatchObject({ answered: 2, slips: 1, repaired: 1, unrecovered: 0,
+      repairedByPatch: 1, repairedByFullAsk: 0, repairedOtherwise: 0, slipRateExceeded: false });
+    expect(report.totals).toMatchObject({ formatFailures: 0, formatRepaired: 1, formatRepairedByPatch: 1, formatRepairedByFullAsk: 0,
+      formatRepairedOtherwise: 0 });
+    expect(reportMarkdown(report)).toContain("1 fixed by the same call (by patch 1, by full re-ask 0, otherwise 0)");
+  });
+
+  it("MiMo answers the patch follow-up with its whole answer again (refused as a patch), the full re-ask fixes it: REPAIRED by FULL, three tries", async () => {
+    const { result, report, forms } = await run(1, 1, GOOD);
+    const mimo = result.samples.find((sample) => sample.model === MIMO)!;
+    expect(mimo.status).toBe("REPAIRED");
+    expect(mimo.attempts.map((attempt) => [attempt.outcome, attempt.parseStatus, attempt.replyForm])).toEqual([
+      ["FAILED", "SCHEMA_FAILED", "ORIGINAL"], ["FAILED", "SCHEMA_FAILED", "PATCH"], ["OK", "PARSED", "FULL"]]);
+    expect(forms).toEqual(["ORIGINAL", "PATCH", "FULL"]);
+    expect(mimo.repairKind).toBe("FULL");
+    // The diagnosis is the slip itself (the first reply), not the refused patch.
+    expect(mimo.issues).toEqual(["invalid_type@value_laden"]);
+    expect(report).toMatchObject({ verdict: "PASS_WITH_WARNINGS", reasons: [`FORMAT_REPAIRED:${MIMO}:1`] });
+    expect((report.slipsByModel as Record<string, unknown>)[MIMO]).toMatchObject({ repaired: 1, repairedByPatch: 0, repairedByFullAsk: 1 });
+    expect(report.totals).toMatchObject({ formatRepaired: 1, formatRepairedByPatch: 0, formatRepairedByFullAsk: 1 });
   });
 
   it("MiMo slips twice in its two jobs, each fixed: over the slip rule, FAIL", async () => {
@@ -177,7 +244,7 @@ describe("practice formats: the second try is the app's own (same preview call p
     expect(report.reasons).toEqual([`SLIP_RATE:${MIMO}:2/2`, `FORMAT_REPAIRED:${MIMO}:2`]);
   });
 
-  it("MiMo's repair is refused too: the call ends without an accepted reply, FAIL (FORMAT_FAILED)", async () => {
+  it("MiMo's patch and full re-ask are refused too: the call ends without an accepted reply after three tries, FAIL (FORMAT_FAILED)", async () => {
     const observer = new PracticeGateObserver({ now: () => 0 });
     const always: PreviewBudgetPort = { async execute(input) {
       const model = String((JSON.parse(input.requestBody) as { model: unknown }).model);
@@ -188,10 +255,13 @@ describe("practice formats: the second try is the app's own (same preview call p
       sleep: async () => undefined });
     const mimo = result.samples.find((sample) => sample.model === MIMO)!;
     expect(mimo.status).toBe("SCHEMA_FAILED");
-    expect(mimo.attempts).toHaveLength(2);
+    // First try, the patch follow-up (answered with the whole object again: refused), the full re-ask.
+    expect(mimo.attempts.map((attempt) => [attempt.outcome, attempt.replyForm])).toEqual([["FAILED", "ORIGINAL"], ["FAILED", "PATCH"], ["FAILED", "FULL"]]);
+    expect(mimo.repairKind).toBeNull();
     const report = formatsReport({ result, observer, remaining, startedAt: new Date(0), finishedAt: new Date(1), interrupted: false });
     expect(report.verdict).toBe("FAIL");
     expect(report.reasons).toContain("FORMAT_FAILED:1");
+    expect(report.totals).toMatchObject({ formatRepaired: 0, formatRepairedByPatch: 0, formatRepairedByFullAsk: 0 });
   });
 
   it("a busy GLM that answered one job and then sat out: MODEL_BUSY_PARTLY, a warning", async () => {
@@ -211,5 +281,39 @@ describe("practice formats: the second try is the app's own (same preview call p
     expect(report.verdict).toBe("PASS_WITH_WARNINGS");
     expect(report.reasons).toContain(`MODEL_BUSY_PARTLY:${GLM}:answered=1:skipped=3`);
     expect(report.reasons.some((reason) => reason.startsWith("MODEL_BUSY:"))).toBe(false);
+  });
+
+  it("the prompt cache as the vendors report it: per call on the wire, per job, and one line per AI (information only)", async () => {
+    const observer = new PracticeGateObserver({ now: () => 0 });
+    const cached = (provider: "deepinfra" | "anthropic"): PreviewBudgetPort => ({ async execute(input) {
+      const model = String((JSON.parse(input.requestBody) as { model: unknown }).model);
+      const reply = JSON.parse(stubVendorReply(provider, model, GOOD, "c")) as Record<string, unknown>;
+      // DeepInfra: prompt_tokens holds the cached part; Anthropic: input_tokens leaves the cache reads and writes out.
+      reply.usage = provider === "anthropic"
+        ? { input_tokens: 10, output_tokens: 50, cache_read_input_tokens: 80, cache_creation_input_tokens: 10 }
+        : model === MIMO ? { prompt_tokens: 100, completion_tokens: 50 }
+          : { prompt_tokens: 100, completion_tokens: 50, prompt_tokens_details: { cached_tokens: 60 } };
+      return { status: 200, body: JSON.stringify(reply) };
+    } });
+    const ports = { deepinfra: observer.wrap("deepinfra", cached("deepinfra")), anthropic: observer.wrap("anthropic", cached("anthropic")) };
+    const result = await runPracticeFormats({ config, targets, ports, observer, lanes: ["JUDGE_POSITION"], samples: 1, gapMs: 0, pack, bounds,
+      sleep: async () => undefined });
+    const byModel = Object.fromEntries(result.samples.map((sample) => [sample.model, sample]));
+    expect(byModel[FIVE[0]!]).toMatchObject({ inputTokens: 100, cachedInputTokens: 60 });
+    expect(byModel[MIMO]).toMatchObject({ inputTokens: 100, cachedInputTokens: null });
+    expect(byModel["claude-haiku-5-5"]).toMatchObject({ inputTokens: 100, cachedInputTokens: 80 });
+    expect(observer.events.find((event) => event.model === MIMO)).not.toHaveProperty("cachedInputTokens");
+    expect(cacheByModel(observer)).toMatchObject({
+      [FIVE[0]!]: { calls: 1, inputTokens: 100, cachedInputTokens: 60, callsReportingCache: 1, cachedShare: 0.6 },
+      [MIMO]: { calls: 1, inputTokens: 100, cachedInputTokens: 0, callsReportingCache: 0, cachedShare: 0 },
+      "claude-haiku-5-5": { calls: 1, inputTokens: 100, cachedInputTokens: 80, callsReportingCache: 1, cachedShare: 0.8 }
+    });
+    const report = formatsReport({ result, observer, remaining, startedAt: new Date(0), finishedAt: new Date(1), interrupted: false });
+    expect(report.verdict).toBe("PASS");
+    expect(report.cacheByModel).toEqual(cacheByModel(observer));
+    expect(reportMarkdown(report)).toContain(`- ${FIVE[0]!}: 1 answered calls, 100 input tokens, 60 read from the cache (60.0%)`);
+    expect(reportMarkdown(report)).toContain(`- ${MIMO}: 1 answered calls, 100 input tokens, 0 read from the cache (0.0%); 1 call(s) reported no cache count`);
+    expect(vendorUsage("deepinfra", JSON.stringify({ usage: { prompt_tokens: 7, completion_tokens: 1, cached_tokens: 3 } })))
+      .toEqual({ inputTokens: 7, outputTokens: 1, reasoningTokens: null, cachedInputTokens: 3 });
   });
 });

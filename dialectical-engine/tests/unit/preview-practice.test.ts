@@ -283,7 +283,7 @@ describe("practice gate brake", () => {
       inputTokens: 10, outputTokens: 4 })]);
     expect(JSON.stringify(observer.events)).not.toContain("messages");
     expect(vendorUsage("anthropic", JSON.stringify({ usage: { input_tokens: 3, output_tokens: 2 } })))
-      .toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: null });
+      .toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: null, cachedInputTokens: null });
   });
 });
 

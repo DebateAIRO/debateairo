@@ -220,10 +220,12 @@ describe("2. on the preview every structured step gets the story's one repair tr
     expect(effective.retryOnlyAfterContentRejection).toBeUndefined();
   });
 
+  // Patch follow-up (owner design, 2026-10-12): the second POST of this call is now the short follow-up (the model's own
+  // answer back, only the failing path asked for), so the fixed reply is the patch; the full re-ask is covered in
+  // tests/unit/patch-follow-up-gateway.test.ts.
   it("the real MiMo position without value_laden, then a fixed reply: PARSED on the second POST of the same call", async () => {
     const first = fixture("mimo-judge-position-ro-no-value-laden.txt");
-    const body = JSON.parse(first.replace(/^```json\n/u, "").replace(/\n```$/u, "")) as Record<string, unknown>;
-    const fixed = JSON.stringify({ ...body, value_laden: true });
+    const fixed = JSON.stringify({ value_laden: true });
     const { gateway, executions, artifacts, ledger, slept } = harness([{ content: first }, { content: fixed }]);
     const judged = await new Judge(gateway).judge({ runId: "run:synthetic", subjectItemId: "node:synthetic", callSiteKey: "JUDGE",
       questionLine: "Ar trebui un oraș de mărime medie să facă gratuite liniile centrale de autobuz?", argumentLanguageName: "Romanian",
@@ -234,13 +236,17 @@ describe("2. on the preview every structured step gets the story's one repair tr
     expect(slept).toEqual([]);
     expect(artifacts.map((artifact) => artifact.parseStatus)).toEqual(["SCHEMA_FAILED", "PARSED"]);
     expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "OK"]);
-    // The repair packet names the issue by its machine path only, never the model's words.
-    const repaired = readPromptFrame({ messages: JSON.parse(executions[1]!.requestBody).messages });
-    expect(repaired.fields.slice(-2)).toEqual([
+    // The follow-up names the issue by its machine path only; the model's words go back only as its own turn.
+    const messages = JSON.parse(executions[1]!.requestBody).messages as { role: string; content: string }[];
+    const repaired = readPromptFrame({ messages: messages as never });
+    expect(repaired.fields.slice(-3)).toEqual([
       { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
-      { name: "machine_rejection_path", content: "value_laden" }
+      { name: "machine_rejection_paths", content: "value_laden" },
+      { name: "machine_reply_form", content: "PATCH" }
     ]);
-    expect(executions[1]!.requestBody).not.toContain("gratuitatea pe liniile centrale de autobuz nu este");
+    expect(messages.map((message) => message.role)).toEqual(["system", "user", "assistant", "user"]);
+    expect(messages.filter((message) => message.content.includes("gratuitatea pe liniile centrale de autobuz nu este"))
+      .map((message) => message.role)).toEqual(["assistant"]);
   });
 
   it("two refused replies end the call as a content refusal after two POSTs (the runner's fallback takes it from there)", async () => {

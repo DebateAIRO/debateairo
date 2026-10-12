@@ -55,8 +55,28 @@ export function practiceSlipRateExceeded(calls: Readonly<{ answered: number; sli
 /** The replies a format or content check refused: the gateway's two statuses, and a reply with no content at all. */
 const PRACTICE_FORMAT_STATUSES: ReadonlySet<string> = new Set(["PARSE_FAILED", "SCHEMA_FAILED", "UNPARSED"]);
 
-/** One try of a call, as the ledger (debate) or the formats mode's in-memory record keeps it, in order. */
-export type PracticeCallTry = Readonly<{ outcome: string; parseStatus: string | null }>;
+/**
+ * Patch follow-up (owner design, 2026-10-12): what one try of a call sent, read from its own recorded prompt
+ * (`practiceReplyFormOf`, practice-lanes.ts):
+ *  - ORIGINAL: the step's own packet (the first try, a resend after an unbilled refusal, a cut-off reply's resend);
+ *  - PATCH: the short follow-up (the model's own first answer as its own turn, then only the failing machine paths);
+ *  - FULL: the step's full re-ask (the original packet and one block naming the refusal).
+ */
+export type PracticeReplyForm = "ORIGINAL" | "PATCH" | "FULL";
+
+/**
+ * How a repaired call (a slip a later try of the same call fixed) was fixed: the accepted try's form. PATCH and FULL as
+ * above; RESEND when the accepted try sent the original packet again (a cut-off reply's resend, the runner's final
+ * retry). Information only: the verdict counts a repaired call the same whichever way it was fixed.
+ */
+export type PracticeRepairKind = "PATCH" | "FULL" | "RESEND";
+
+/**
+ * One try of a call, as the ledger (debate) or the formats mode's in-memory record keeps it, in order. `replyForm` is
+ * absent (or null) when the try's prompt was not recorded (a log written before it existed, an attempt refused before
+ * it was sent).
+ */
+export type PracticeCallTry = Readonly<{ outcome: string; parseStatus: string | null; replyForm?: PracticeReplyForm | null }>;
 
 /**
  * What one call's tries say for the slip rule. Its first REPLY is its first try that came back with a body (an
@@ -80,6 +100,36 @@ export function practiceModelCalls(calls: readonly Readonly<{ model: string; tri
     if (facts.slip) mine.slips += 1;
     if (facts.repaired) mine.repaired += 1;
     if (facts.unrecovered) mine.unrecovered += 1;
+  }
+  return Object.freeze(Object.fromEntries(Object.entries(out).map(([model, mine]) => [model, Object.freeze(mine)])));
+}
+
+/**
+ * How a repaired call was fixed (`PracticeRepairKind`): the form of its first accepted try. Null for a call that was not
+ * repaired, and for a repaired call whose accepted try's form is not known.
+ */
+export function practiceRepairKindOf(tries: readonly PracticeCallTry[]): PracticeRepairKind | null {
+  if (!practiceCallFacts(tries).repaired) return null;
+  const form = tries.find((attempt) => attempt.outcome === "OK")?.replyForm ?? null;
+  return form === "PATCH" ? "PATCH" : form === "FULL" ? "FULL" : form === "ORIGINAL" ? "RESEND" : null;
+}
+
+/**
+ * Per AI, its repaired calls by how they were fixed: by the short patch follow-up, by the full re-ask, and otherwise
+ * (a resend of the original packet, or a form not recorded). The three add up to `PracticeModelCalls.repaired`.
+ */
+export type PracticeRepairKinds = Readonly<{ repairedByPatch: number; repairedByFullAsk: number; repairedOtherwise: number }>;
+
+export function practiceRepairKindsByModel(calls: readonly Readonly<{ model: string; tries: readonly PracticeCallTry[] }>[]):
+  Readonly<Record<string, PracticeRepairKinds>> {
+  const out: Record<string, { repairedByPatch: number; repairedByFullAsk: number; repairedOtherwise: number }> = {};
+  for (const call of calls) {
+    if (!practiceCallFacts(call.tries).repaired) continue;
+    const mine = out[call.model] ??= { repairedByPatch: 0, repairedByFullAsk: 0, repairedOtherwise: 0 };
+    const kind = practiceRepairKindOf(call.tries);
+    if (kind === "PATCH") mine.repairedByPatch += 1;
+    else if (kind === "FULL") mine.repairedByFullAsk += 1;
+    else mine.repairedOtherwise += 1;
   }
   return Object.freeze(Object.fromEntries(Object.entries(out).map(([model, mine]) => [model, Object.freeze(mine)])));
 }

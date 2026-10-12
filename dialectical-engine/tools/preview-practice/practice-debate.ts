@@ -12,7 +12,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import type { AskRequest } from "@debateai/contract";
 import { ContentCipher, generateDek, MemoryRunContentKeyStore, type KeyDestroyResult, type ReadableUserDekStore } from "@debateai/crypto";
-import { configureContentEncryption, decryptContentForRun, migrate } from "@debateai/db";
+import { configureContentEncryption, decryptContentForRun, migrate, readCallPrompt } from "@debateai/db";
 import type { Session } from "@debateai/contract";
 import { PREVIEW_PROVIDER_REF_MODELS, previewModelRow, type PreviewBudgetPorts, type PreviewGateRemaining } from "@debateai/providers";
 import { ServeRepository } from "@debateai/serve";
@@ -25,6 +25,7 @@ import {
   issueListFromParseError,
   practiceFinishReasonOf,
   practiceJsonRepairOf,
+  practiceReplyFormOf,
   recheckReply,
   replyContentOf
 } from "./practice-lanes.js";
@@ -42,9 +43,12 @@ import {
   latencySummary,
   practiceCallFacts,
   practiceModelCalls,
+  practiceRepairKindsByModel,
   type LatencySummary,
   type PracticeCallTry,
-  type PracticeModelCalls
+  type PracticeModelCalls,
+  type PracticeRepairKinds,
+  type PracticeReplyForm
 } from "./practice-verdict.js";
 
 /** The practice's one throwaway person's DEK lives only in memory, for this process. */
@@ -90,8 +94,13 @@ export type PracticeFailure = Readonly<{
   parseStatus: string;
   /** What the format check said at call time, as `code@path`. */
   issues: readonly string[];
-  /** The same reply re-checked now by the job's own check. */
+  /**
+   * The same reply re-checked now by the job's own check. Empty for a reply to the patch follow-up: it holds only the
+   * members it was asked for, so the whole answer's check says nothing about it (its `issues` say why it was refused).
+   */
   recheckIssues: readonly string[];
+  /** Patch follow-up (owner design, 2026-10-12): what the try that got this reply sent (null when not recorded). */
+  replyForm: PracticeReplyForm | null;
   latencyMs: number;
   replyText: string;
   /** Owner ruling 2026-10-12 ("Fixed slips = warning"): a later try of the SAME call (same step, same maker) was accepted. */
@@ -124,6 +133,8 @@ export type PracticeDebateResult = Readonly<{
   formatFailures: number;
   /** Each AI's calls for the slip rule. */
   callsByModel: Readonly<Record<string, PracticeModelCalls>>;
+  /** Information only: each AI's repaired calls by how they were fixed (patch follow-up, full re-ask, otherwise). */
+  repairKindsByModel?: Readonly<Record<string, PracticeRepairKinds>>;
   /** Each AI's calls that ended with an accepted reply, and those that ended without one (any reason). */
   answersByModel: Readonly<Record<string, Readonly<{ answered: number; unanswered: number }>>>;
   /** Information only: each accepted reply that needed a tolerant repair, by model and code. */
@@ -154,10 +165,10 @@ async function readRemaining(port: (signal?: AbortSignal) => Promise<PreviewGate
 
 /** What happened, read from the throwaway database after the debate. */
 async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateResult, "byModelAndSite" | "failures" | "formatFailures"
-  | "callsByModel" | "answersByModel" | "jsonRepairs" | "failedCalls" | "refusedCalls">> {
-  const entries = (await pool.query<{ sequence: string; call_site_key: string; actor_ref: string; outcome: string;
+  | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs" | "failedCalls" | "refusedCalls">> {
+  const entries = (await pool.query<{ sequence: string; attempt_id: string | null; call_site_key: string; actor_ref: string; outcome: string;
     started_at: Date; finished_at: Date; raw_artifact_ref: string | null }>(
-    `SELECT sequence::text, call_site_key, actor_ref, outcome, started_at, finished_at, raw_artifact_ref::text
+    `SELECT sequence::text, attempt_id::text, call_site_key, actor_ref, outcome, started_at, finished_at, raw_artifact_ref::text
        FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL' ORDER BY sequence`, [runId])).rows;
   const artifacts = new Map((await pool.query<{ raw_artifact_id: string; parse_status: string; metadata_json: unknown;
     raw_text: string; content_ciphertext: unknown }>(
@@ -177,6 +188,18 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     const stored = await decryptContentForRun<{ rawText: string; parseErrorDetail: string | null }>(pool, runId, "ledger.raw_artifact",
       rawArtifactRef, (artifact.content_ciphertext ?? null) as never, { rawText: artifact.raw_text, parseErrorDetail: null });
     return stored;
+  };
+  /**
+   * Patch follow-up (owner design, 2026-10-12): what an attempt sent, read from its own recorded prompt
+   * (ledger.call_prompt, written by the runner's gateway just before it sent the attempt, decrypted with the run's key).
+   * Null when the attempt has no recorded prompt (refused before it was sent).
+   */
+  const replyFormOf = async (attemptId: string | null): Promise<PracticeReplyForm | null> => {
+    if (attemptId === null) return null;
+    const prompt = await readCallPrompt(pool, attemptId);
+    if (prompt === null) return null;
+    const messages = JSON.parse(prompt.promptText) as unknown;
+    return Array.isArray(messages) ? practiceReplyFormOf(messages as Parameters<typeof practiceReplyFormOf>[0]) : null;
   };
   for (const entry of entries) {
     const model = modelOfRef(entry.actor_ref);
@@ -205,7 +228,8 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     const callKey = `${entry.actor_ref}\u0000${entry.call_site_key}`;
     const call = calls.get(callKey) ?? { model, tries: [] };
     calls.set(callKey, call);
-    call.tries.push(Object.freeze({ outcome: entry.outcome, parseStatus: artifact === undefined ? null : parseStatus }));
+    const replyForm = await replyFormOf(entry.attempt_id);
+    call.tries.push(Object.freeze({ outcome: entry.outcome, parseStatus: artifact === undefined ? null : parseStatus, replyForm }));
     if (entry.outcome === "OK" && artifact !== undefined) {
       const stored = await readContent(entry.raw_artifact_ref!, artifact);
       const repair = practiceJsonRepairOf(replyContentOf(stored.rawText), practiceFinishReasonOf(artifact.metadata_json));
@@ -216,8 +240,9 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
       const content = replyContentOf(stored.rawText);
       failures.push(Object.freeze({
         sequence: Number(entry.sequence), model, providerRef: entry.actor_ref, callSiteKey: entry.call_site_key, parseStatus,
-        issues: issueListFromParseError(stored.parseErrorDetail), recheckIssues: recheckReply(entry.call_site_key, content).issues,
-        latencyMs, replyText: reportableReplyText(content), fixedBySameCall: false
+        issues: issueListFromParseError(stored.parseErrorDetail),
+        recheckIssues: replyForm === "PATCH" ? [] : recheckReply(entry.call_site_key, content).issues,
+        replyForm, latencyMs, replyText: reportableReplyText(content), fixedBySameCall: false
       }));
     }
   }
@@ -243,6 +268,7 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     }));
   return { byModelAndSite: Object.freeze(byModelAndSite), failures: Object.freeze(fixed), formatFailures,
     callsByModel: practiceModelCalls(callList.map(([, call]) => call)),
+    repairKindsByModel: practiceRepairKindsByModel(callList.map(([, call]) => call)),
     answersByModel: Object.freeze(Object.fromEntries(Object.entries(answersByModel).map(([model, mine]) => [model, Object.freeze(mine)]))),
     jsonRepairs: Object.freeze(jsonRepairs), failedCalls, refusedCalls };
 }
@@ -356,7 +382,7 @@ export async function runPracticeDebate(input: Readonly<{
         register: receipt, questionId: question.id, depth: input.depth,
         admission: { admitted: false, refusalCode: refusalCode ?? "NOT_DISPATCHED", panel: [], satOut: [], rotation: null },
         run: { runId: null, workItemOutcome: null, failureCode: null, answer: null, story: null },
-        byModelAndSite: [], probes, failures: [], formatFailures: 0, callsByModel: {}, answersByModel: {}, jsonRepairs: [],
+        byModelAndSite: [], probes, failures: [], formatFailures: 0, callsByModel: {}, repairKindsByModel: {}, answersByModel: {}, jsonRepairs: [],
         failedCalls: 0, refusedCalls: 0,
         remaining, seconds: { admission: admissionSeconds, debate: 0 }
       });
