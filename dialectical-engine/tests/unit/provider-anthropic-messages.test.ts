@@ -48,7 +48,7 @@ function gatewayWith(
 ) {
   const sent: Sent[] = [];
   const ledger: Array<{ outcome: string }> = [];
-  const artifacts: Array<{ provider: string; rawText: string; metadata: Readonly<Record<string, unknown>> }> = [];
+  const artifacts: Array<{ provider: string; rawText: string; thinkingTokens?: number | null; metadata: Readonly<Record<string, unknown>> }> = [];
   const gateway = new AnthropicMessagesProviderGateway({
     endpoint: BASE_URL, model: MODEL, maker: "Anthropic",
     fetchImplementation: async (url, init) => {
@@ -280,6 +280,17 @@ describe("PR B — reading the Anthropic reply", () => {
     expect(artifacts[0]!.rawText).toBe(JSON.stringify(body));
     expect(artifacts[0]!.metadata).toMatchObject({ finish_reason: "end_turn" });
     expect(ledger.map((row) => row.outcome)).toEqual(["OK"]);
+  });
+
+  it("records Haiku's thinking tokens on the artifact, and bills the same counts as before (spec 2026-10-12 §4.6)", async () => {
+    const body = message({ usage: { input_tokens: 10, output_tokens: 500, output_tokens_details: { thinking_tokens: 320 } } });
+    const { gateway, artifacts } = gatewayWith(() => reply(body));
+    const spy = chargeSpy();
+    const result = await gateway.call(request({ costEnvelope: spy.costEnvelope }));
+    expect(result).toMatchObject({ reasoningTokens: 320 });
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0]!.thinkingTokens).toBe(320);
+    expect(spy.charges).toStrictEqual([{ prompt_tokens: 10, completion_tokens: 500, total_tokens: 510 }]);
   });
 
   for (const [label, body, code] of [

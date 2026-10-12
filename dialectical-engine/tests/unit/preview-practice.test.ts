@@ -287,6 +287,11 @@ describe("practice gate brake", () => {
     expect(vendorUsage("anthropic", JSON.stringify({ usage: { input_tokens: 3, output_tokens: 2 } })))
       .toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: null, cachedInputTokens: null });
   });
+  it("reads Haiku's thinking tokens off the Anthropic usage block (spec 2026-10-12 §4.6)", () => {
+    expect(vendorUsage("anthropic", JSON.stringify({ usage: { input_tokens: 3, output_tokens: 500,
+      output_tokens_details: { thinking_tokens: 320 } } })))
+      .toEqual({ inputTokens: 3, outputTokens: 500, reasoningTokens: 320, cachedInputTokens: null });
+  });
 });
 
 describe("practice start refusals", () => {

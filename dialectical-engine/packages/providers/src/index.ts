@@ -1346,17 +1346,24 @@ export function estimateWindowTokens(messages: PromptPacket["messages"]): number
 /**
  * Model scorecard §2.3 — the thinking tokens the vendor reported, read
  * LENIENTLY off the RAW usage block: OpenAI's spelling
- * `completion_tokens_details.reasoning_tokens`, which the relays adopt. `null`
- * means not reported: never a guess and never a default zero, because a vendor
- * that says nothing has not said "none".
+ * `completion_tokens_details.reasoning_tokens` (DeepInfra, and the relays,
+ * which adopt it), else Anthropic's `output_tokens_details.thinking_tokens`
+ * (Haiku, spec 2026-10-12 §4.6). Thinking is already inside `output_tokens` /
+ * `completion_tokens`, so reading it changes no charge. `null` means not
+ * reported: never a guess and never a default zero, because a vendor that says
+ * nothing has not said "none".
  */
 export function reportedReasoningTokens(rawUsage: unknown): number | null {
   if (typeof rawUsage !== "object" || rawUsage === null || Array.isArray(rawUsage)) return null;
-  const details = (rawUsage as Readonly<Record<string, unknown>>).completion_tokens_details;
-  if (typeof details !== "object" || details === null || Array.isArray(details)) return null;
-  const value = (details as Readonly<Record<string, unknown>>).reasoning_tokens;
-  return typeof value === "number" && Number.isSafeInteger(value)
-    && value >= 0 && value <= MAX_USAGE_COUNTER ? value : null;
+  const usage = rawUsage as Readonly<Record<string, unknown>>;
+  const read = (details: unknown, key: string): number | null => {
+    if (typeof details !== "object" || details === null || Array.isArray(details)) return null;
+    const value = (details as Readonly<Record<string, unknown>>)[key];
+    return typeof value === "number" && Number.isSafeInteger(value)
+      && value >= 0 && value <= MAX_USAGE_COUNTER ? value : null;
+  };
+  return read(usage.completion_tokens_details, "reasoning_tokens")
+    ?? read(usage.output_tokens_details, "thinking_tokens");
 }
 
 /**
@@ -1931,6 +1938,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         }
         // PR B: the Anthropic reply is read into the shape every line below
         // already reads; `rawText` (the artifact) keeps the vendor's own bytes.
+        // Spec 2026-10-12 §4.6: the reader keeps only the engine's three
+        // counters, so the vendor's own usage block is kept first, for the
+        // thinking-token read below (the charge keeps reading the reshaped one).
+        const vendorUsageBlock: unknown = typeof decoded === "object" && decoded !== null && !Array.isArray(decoded)
+          ? (decoded as Readonly<Record<string, unknown>>).usage
+          : undefined;
         const nativeReply = this.#anthropic ? readAnthropicMessagesReply(decoded) : null;
         if (nativeReply !== null) decoded = nativeReply.normalized;
         const candidate = z.object({ id: z.string(), model: modelIdSchema }).passthrough().safeParse(decoded);
@@ -1967,7 +1980,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         // four-counter parse above (and every test pinning it) is untouched.
         const echoedLevel = echoedThinkingLevel(decoded);
         const thinkingLevelUsed = echoedLevel ?? attemptThinking.sent;
-        const reasoningTokens = reportedReasoningTokens(rawUsage);
+        const reasoningTokens = reportedReasoningTokens(vendorUsageBlock);
         attemptThinkingLevel = thinkingLevelUsed;
         const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
