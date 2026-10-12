@@ -330,9 +330,16 @@ function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCall
     // The checker's one repair try, at most its length-retry ceiling (a format repair asks for its ceiling, a length retry twice it).
     STORY_CHECKER_RETRY: lengthRetryTokenCeiling(output.storyChecker, 1)
   };
+  // Slow answer (owner ruling 2026-10-12): the storyteller asks for its OWN row's story allowance, and its length retry
+  // twice that (the clamp in previewCallNanoUsd holds it to the row's bound, as the gateway does), never more than
+  // `output` says any storyteller is sent (none, when the register has no story).
+  const storyteller = (row: PreviewModelRow, type: "STORYTELLER" | "STORYTELLER_RETRY"): number => {
+    const own = previewStorytellerTokenCeiling(row);
+    return Math.min(sent[type], type === "STORYTELLER" ? own : lengthRetryTokenCeiling(own, 1));
+  };
   return (row, type) => type === "PROBE"
     ? previewCallNanoUsd(row, PREVIEW_STRICT_PROBE_INPUT_TOKENS, PREVIEW_GLM_GENERATION_TOKEN_FLOOR)
-    : previewCallNanoUsd(row, inputTokens[type], sent[type]);
+    : previewCallNanoUsd(row, inputTokens[type], type === "STORYTELLER" || type === "STORYTELLER_RETRY" ? storyteller(row, type) : sent[type]);
 }
 const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens, STORY_CHECKER_RETRY: tokens });
 /**
@@ -1062,10 +1069,11 @@ async function readOrganTokenCeilings(pool: Pool, registerVersion: number): Prom
  * Pure: the max_tokens each kind of call sends on the preview, from the register's token ceilings:
  * previewCallBound's ceiling (never below the generation floor) for every debate call (the largest
  * of the three organ bounds and the two synthesis bounds), the story checker at its ceiling. The
- * storyteller (story format robustness, 2026-10-12) asks for its row's whole answer cap
+ * storyteller (story format robustness, 2026-10-12) asks for its row's story allowance
  * (previewStorytellerTokenCeiling), whatever the register seals: this is the largest of them, and the
- * pricer's clamp to each row's own bound gives every row exactly what it is sent. Its second attempt is
- * at the length-retry ceiling, which the same clamp holds to the row's bound, as the gateway does.
+ * pricer prices every row at its own allowance (slow answer, owner ruling 2026-10-12: 16,384 on MiMo, Qwen
+ * and GLM), so each row is priced at exactly what it is sent. Its second attempt is at the length-retry
+ * ceiling of the row's own allowance, which the row's bound holds, as the gateway does.
  */
 export function previewCallOutputTokens(config: PreviewProviderTestConfig, ceilings: Readonly<{
   debate: readonly number[]; story: Readonly<{ storyteller: number; checker: number }> | null;

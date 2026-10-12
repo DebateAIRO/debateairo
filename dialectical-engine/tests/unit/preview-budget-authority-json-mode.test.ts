@@ -30,7 +30,7 @@ describe('production preview spending guard optional JSON mode', () => {
     // last test that ran, a traceback, the summary) comes first, on one line.
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
-    expect(result.stderr).toContain('Ran 103 tests');
+    expect(result.stderr).toContain('Ran 113 tests');
     const summary = summaryLine(result.stderr);
     const skips = [...result.stderr.matchAll(/ skipped '([^']*)'/g)].map(match => match[1]);
     expect(summary === 'OK' || summary === `OK (skipped=${skips.length})`, String(summary)).toBe(true);
@@ -39,7 +39,7 @@ describe('production preview spending guard optional JSON mode', () => {
   it('checks the reviewed gate v2 systemd files and the DeepInfra address check offline', () => {
     const result = runPython('tests/unit/preview_gate_v2_unit_test.py', 10000);
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain('Ran 33 tests');
+    expect(result.stderr).toContain('Ran 38 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('runs the v3 model table, /remaining and probe behaviors offline', () => {
@@ -59,7 +59,7 @@ describe('production preview spending guard optional JSON mode', () => {
     const result = runPython('tests/unit/preview_budget_authority_anthropic_test.py', 30000);
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
-    expect(result.stderr).toContain('Ran 59 tests');
+    expect(result.stderr).toContain('Ran 61 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the Anthropic gate systemd files and its address check offline', () => {

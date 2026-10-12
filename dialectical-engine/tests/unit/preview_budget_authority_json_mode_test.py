@@ -98,7 +98,7 @@ class RequestModeTests(unittest.TestCase):
         gate.ready()
 
         def broken(_body, _key):
-            raise TimeoutError('synthetic')
+            raise RuntimeError('synthetic')  # Uncertain (a timeout after the send is booked at the reservation).
         with contextlib.redirect_stdout(io.StringIO()):
             with self.assertRaisesRegex(SafetyError, '^NEW_CHARGE_UNCERTAIN$'):
                 gate.call('prior', dispatch=broken)

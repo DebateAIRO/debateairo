@@ -370,6 +370,8 @@ export function reportMarkdown(report: PracticeReport): string {
       lines.push(`- ${gate}: ${String(observed.calls)} calls, ${String(observed.unbilled)} refused, not billed (vendor busy `
         + `${String(observed.vendorRefused)}, cooling off ${String(observed.modelCooling)}, not reached ${String(observed.notReached)}, `
         + `vendor error not billed ${String(observed.vendorErrorUnbilled ?? 0)}), `
+        + (observed.bookedMax ? `${String(observed.bookedMax)} booked at their maximum (sent, then timed out or cut off; `
+          + "the gate charged each its full reservation and kept going), " : "")
         + `longest not-reached run ${String(observed.longestNotReachedRun)} (streak at start `
         + `${observed.unsentStreakAtStart === null ? "unknown" : String(observed.unsentStreakAtStart)}), `
         + `stopped: ${observed.stop === null ? "no" : observed.stop.reason}`

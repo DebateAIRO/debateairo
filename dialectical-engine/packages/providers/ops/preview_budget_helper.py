@@ -30,7 +30,7 @@ from decimal import Decimal, InvalidOperation
 from email.utils import parsedate_to_datetime
 
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
-MAX_TIMEOUT_SECONDS = 600
+MAX_TIMEOUT_SECONDS = 1200  # The gate's CALL_DEADLINE_SECONDS (owner ruling 2026-10-12: 20 minutes, was 600).
 CONNECT_TIMEOUT_SECONDS = 15  # TCP connect + TLS handshake; a black-holed address fails (unsent) fast.
 
 

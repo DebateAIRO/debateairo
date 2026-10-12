@@ -16,7 +16,7 @@ type Rule = Readonly<{ kind: string; pattern: RegExp }>;
  * Order matters: the specific shapes first, so a PEM block or a bearer header is named for what it is before the
  * generic long-run rule could catch part of it.
  */
-const RULES: readonly Rule[] = Object.freeze([
+const SPECIFIC_RULES: readonly Rule[] = Object.freeze([
   { kind: "pem", pattern: /-----BEGIN [A-Z0-9 ]{1,64}-----[\s\S]*?-----END [A-Z0-9 ]{1,64}-----/gu },
   { kind: "bearer", pattern: /\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gu },
   { kind: "authorization", pattern: /\b(?:Authorization|x-api-key|x-goog-api-key)\s*[:=]\s*[^\s"',;]{4,}/giu },
@@ -25,16 +25,40 @@ const RULES: readonly Rule[] = Object.freeze([
   {
     kind: "named-secret",
     pattern: /\b(?:api[_-]?key|access[_-]?token|auth[_-]?token|token|secret|password|passwd)\b\s*["']?\s*[:=]\s*["']?[^\s"',;]{4,}/giu
-  },
+  }
+]);
+
+/** Any long unbroken run: catches an unknown key shape, but also every UUID and fingerprint. */
+const GENERIC_RULES: readonly Rule[] = Object.freeze([
   { kind: "long-run", pattern: /[A-Za-z0-9_-]{32,}/gu },
   { kind: "long-hex", pattern: /\b[0-9a-fA-F]{32,}\b/gu }
 ]);
+
+const RULES: readonly Rule[] = Object.freeze([...SPECIFIC_RULES, ...GENERIC_RULES]);
 
 /** Blanks every key-shaped string. Ordinary prose, model ids and short identifiers are left as they are. */
 export function redactKeyShapes(text: string): string {
   let out = text;
   for (const rule of RULES) out = out.replace(rule.pattern, `[REDACTED:${rule.kind}]`);
   return out;
+}
+
+/**
+ * The transcript's safety net (practice-transcript.ts): blanks only the named key shapes (PEM block, bearer header,
+ * authorization header, vendor key, JWT, `secret=`-style pair) and counts what it blanked, by kind. The two generic
+ * rules are left out on purpose: a transcript is made of run, attempt and node ids (UUIDs) and prompt fingerprints,
+ * and those rules would blank every one of them, so they would say "changed" on every file and hide a real hit.
+ */
+export function redactNamedKeyShapes(text: string): Readonly<{ text: string; blanked: Readonly<Record<string, number>> }> {
+  let out = text;
+  const blanked: Record<string, number> = {};
+  for (const rule of SPECIFIC_RULES) {
+    out = out.replace(rule.pattern, () => {
+      blanked[rule.kind] = (blanked[rule.kind] ?? 0) + 1;
+      return `[REDACTED:${rule.kind}]`;
+    });
+  }
+  return Object.freeze({ text: out, blanked: Object.freeze(blanked) });
 }
 
 /** Keeps at most `capBytes` UTF-8 bytes: the head and the tail, with a marker naming how much was left out. */

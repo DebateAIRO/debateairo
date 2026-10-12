@@ -277,6 +277,31 @@ describe("preview practice: formats mode", () => {
     expect(report.gates.deepinfra!.observed).toMatchObject({ stop: null, modelCooling: 2, gateRefused: 0 });
   }, 300_000);
 
+  it("slow answer (owner ruling 2026-10-12): MiMo's story call is booked at its maximum by the gate (PROVIDER_CHARGE_BOOKED_MAX): that job fails as a billed call, the gate is never stopped, every other job runs, and the report says so", async () => {
+    const { stubs, env, common, quiet, out } = await scenario((request) => request.model === MIMO && request.kind === "STORYTELLER"
+      ? { gateRefuses: "PROVIDER_CHARGE_BOOKED_MAX" } : null);
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
+    const report = outcome.report as unknown as {
+      verdict: string; reasons: string[];
+      byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[];
+      gates: Record<string, { observed: { stop: unknown; bookedMax: number; unbilled: number; transportFailed: number; gateRefused: number } }>;
+    };
+    // Each of MiMo's story POSTs reached the vendor and was booked; nothing else was refused.
+    const booked = stubs.requests.filter((request) => request.answer === "BOOKED_MAX");
+    expect(booked.length).toBeGreaterThanOrEqual(1);
+    expect(booked.every((request) => request.model === MIMO && request.kind === "STORYTELLER")).toBe(true);
+    expect(report.gates.deepinfra!.observed).toMatchObject({ stop: null, bookedMax: booked.length, unbilled: 0, transportFailed: 0, gateRefused: 0 });
+    // A billed failed call: never read as money, a halted gate, or a busy model.
+    expect(report.reasons.some((reason) => reason.startsWith("GATE_") || reason.startsWith("MODEL_BUSY"))).toBe(false);
+    const story = report.byModelAndLane.find((row) => row.model === MIMO && row.lane === "STORYTELLER")!;
+    expect(Object.keys(story.statuses)).not.toContain("PARSED");
+    for (const row of report.byModelAndLane.filter((entry) => !(entry.model === MIMO && entry.lane === "STORYTELLER"))) {
+      expect(row.statuses).toEqual({ PARSED: 1 });
+    }
+    expect(report.verdict).toBe("FAIL");
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain(`${String(booked.length)} booked at their maximum (sent, then timed out or cut off`);
+  }, 300_000);
+
   it("the answer-writer's draft citing the surviving objection is accepted (the old root-only citable set refused it): PASS", async () => {
     const graph = practiceDebateGraph(PRACTICE_QUESTIONS[0]!);
     const objection = graph.authored.find((node) => !graph.positionNodeIds.has(node.nodeId))!.nodeId;
@@ -574,7 +599,7 @@ describe("preview practice: formats mode, models at once", () => {
 
 describe("preview practice: debate mode", () => {
   it("a clean script: all five admitted, a served answer, a READY story, no format failure: PASS (exit 0)", async () => {
-    const { stubs, env, common, quiet } = await scenario();
+    const { stubs, env, common, quiet, out } = await scenario();
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1"], env, quiet);
     const report = outcome.report as unknown as {
       verdict: string; reasons: string[]; admission: { admitted: boolean; panel: { modelId: string }[]; satOut: unknown[]; rotation: unknown };
@@ -594,6 +619,54 @@ describe("preview practice: debate mode", () => {
       expect(report.byModelAndSite.some((row) => row.model === model && row.site === "PANEL")).toBe(true);
     }
     expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    // Without --transcript nothing but the two report files.
+    expect(existsSync(join(out, "transcript.json"))).toBe(false);
+  }, 600_000);
+
+  it("--transcript: transcript.json holds every model call of the ledger in order, with the prompts the gates received and the replies they gave, decrypted", async () => {
+    const { stubs, env, common, quiet, out } = await scenario(mimoFirstPanelSlips({ patch: true }));
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1", "--transcript"], env, quiet);
+    const report = outcome.report as unknown as { verdict: string; totals: { calls: number }; run: { runId: string } };
+    // The report is the same as without the flag (owner ruling: fixed slip, a warning).
+    expect(report.verdict).toBe("PASS_WITH_WARNINGS");
+    const text = readFileSync(join(out, "transcript.json"), "utf8");
+    const transcript = JSON.parse(text) as {
+      schema: string; run: { runId: string; question: { id: string; text: string }; registerVersion: string; panel: unknown[];
+        workItemOutcome: string; story: { outcome: string } };
+      totals: { attempts: number; withPrompt: number; withReply: number };
+      attempts: { sequence: number; providerRef: string; model: string; maker: string | null; family: string; outcome: string;
+        replyForm: string | null; prompt: { messages: unknown[] } | null; reply: { content: string } | null;
+        parse: { status: string | null } }[];
+      structure: { answer: { nodes?: unknown[] } | null; story: { outcome: string } | null };
+      unavailable: string[];
+    };
+    expect(transcript.schema).toBe("preview-practice-transcript-v1");
+    expect(transcript.run).toMatchObject({ runId: report.run.runId, question: { id: "ro", text: PRACTICE_QUESTIONS.find((question) => question.id === "ro")!.questionLine },
+      registerVersion: "5", workItemOutcome: "COMPLETED", story: { outcome: "READY" } });
+    expect(transcript.run.panel).toHaveLength(5);
+    // As many calls as the ledger (the report counts the same rows), in ledger order, each with its maker.
+    expect(transcript.attempts).toHaveLength(report.totals.calls);
+    expect(transcript.totals.attempts).toBe(report.totals.calls);
+    const sequences = transcript.attempts.map((attempt) => attempt.sequence);
+    expect(sequences).toEqual([...sequences].sort((a, b) => a - b));
+    for (const attempt of transcript.attempts) expect(attempt.maker).not.toBeNull();
+    // Every prompt a DeepInfra gate answered is in the transcript exactly as the gate received it.
+    const prompts = new Set(transcript.attempts.flatMap((attempt) => attempt.prompt === null ? [] : [JSON.stringify(attempt.prompt.messages)]));
+    const answered = stubs.requests.filter((request) => request.provider === "deepinfra" && request.answer === "OK" && request.kind !== "PROBE");
+    expect(answered.length).toBeGreaterThan(0);
+    for (const request of answered) expect(prompts.has(JSON.stringify(request.body.messages))).toBe(true);
+    // MiMo's schema-breaking panel reply and its patch, word for word, with the forms the runner sent.
+    const mimoPanel = transcript.attempts.filter((attempt) => attempt.model === MIMO && attempt.family === "PANEL");
+    expect(mimoPanel.find((attempt) => attempt.parse.status === "SCHEMA_FAILED")).toMatchObject({ replyForm: "ORIGINAL", reply: { content: BAD_PANEL } });
+    expect(mimoPanel.find((attempt) => attempt.replyForm === "PATCH")).toMatchObject({ reply: { content: PANEL_PATCH } });
+    expect(transcript.totals.withReply).toBeGreaterThan(0);
+    // The debate as served and the story as stored.
+    expect(transcript.structure.answer?.nodes?.length ?? 0).toBeGreaterThan(0);
+    expect(transcript.structure.story).toMatchObject({ outcome: "READY" });
+    // Nothing of the settings file or the sockets is written.
+    expect(text).not.toContain(env.PRACTICE_DEEPINFRA_SOCKET);
+    expect(text).not.toContain(env.PRACTICE_ANTHROPIC_SOCKET);
+    expect(text).not.toContain("REDACTED");
   }, 600_000);
 
   it("owner ruling 2026-10-12 (\"Fixed slips = warning\") and the patch follow-up: MiMo's first panel reply breaks the schema and the short patch follow-up fixes it: PASS_WITH_WARNINGS (exit 10), repaired by PATCH", async () => {
