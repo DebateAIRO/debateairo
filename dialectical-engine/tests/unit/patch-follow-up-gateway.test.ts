@@ -129,9 +129,23 @@ describe("the short follow-up on the preview's DeepInfra wire", () => {
     expect(classifyStructuredArtifact(result.content, judgeArtifactSchema)).toEqual({ parseStatus: "PARSED", parseError: null });
   });
 
-  it("a patch with a key outside the request is refused; the full re-ask is the third POST and is accepted", async () => {
+  it("owner ruling 2026-10-12: a whole answer sent back to the patch request is checked as a whole answer and accepted on the patch POST when it passes", async () => {
+    const { gateway, executions, artifacts, ledger } = deepInfraHarness([{ content: POSITION_SLIP }, { content: fixedPosition(true) }]);
+    const result = await gateway.call(positionRequest());
+    expect(executions).toHaveLength(2);
+    expect(result.repairForm).toBe("PATCH");
+    expect(result.repairAttempts).toBe(1);
+    // The reply itself is the answer: nothing is merged into the first reply.
+    expect(result.content).toBe(fixedPosition(true));
+    expect(artifacts.map((artifact) => [artifact.parseStatus, artifact.parseError])).toEqual([
+      ["SCHEMA_FAILED", "invalid_type@value_laden"], ["PARSED", null]
+    ]);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "OK"]);
+  });
+
+  it("a whole answer sent back to the patch request that still fails the step's check is refused as a patch; the full re-ask is the third POST and is accepted", async () => {
     const { gateway, executions, artifacts, ledger } = deepInfraHarness([
-      { content: POSITION_SLIP }, { content: fixedPosition(true) }, { content: fixedPosition(true) }
+      { content: POSITION_SLIP }, { content: POSITION_SLIP }, { content: fixedPosition(true) }
     ]);
     const result = await gateway.call(positionRequest());
     expect(executions).toHaveLength(3);
@@ -183,11 +197,46 @@ describe("the short follow-up on the preview's DeepInfra wire", () => {
     expect(executions).toHaveLength(2);
   });
 
+  it("a patch that cannot be merged as the call's last POST changes nothing: the call's refusal is still the first reply's", async () => {
+    // The steps read the refusal's code (the runner's writer: a citation code ends the round with no draft, never a
+    // FAILED run). A patch reply that was not merged left the first reply standing, so its refusal is the call's; each
+    // try's own record keeps its own code.
+    const unmergeable = [
+      [POSITION_SLIP, "SCHEMA_FAILED", "PATCH_KEY_NOT_REQUESTED@$"],
+      ["{}", "SCHEMA_FAILED", "PATCH_EMPTY@$"],
+      ["I cannot add that.", "PARSE_FAILED", "PATCH_NOT_AN_OBJECT@$"]
+    ] as const;
+    for (const [patchReply, patchStatus, patchError] of unmergeable) {
+      const { gateway, executions, artifacts } = deepInfraHarness([{ content: POSITION_SLIP }, { content: patchReply }]);
+      const refusal: unknown = await gateway.call({ ...positionRequest(), bound: { maxAttempts: 2, tokenCeiling: 8192, deadlineMs: 600_000 } })
+        .then(() => null, (error: unknown) => error);
+      expect(refusal).toMatchObject({
+        code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2,
+        lastParseStatus: "SCHEMA_FAILED", lastParseError: "invalid_type@value_laden", lastRawArtifactRef: artifacts[0]!.artifactId
+      });
+      expect(executions).toHaveLength(2);
+      expect(artifacts.map((artifact) => [artifact.parseStatus, artifact.parseError])).toEqual([
+        ["SCHEMA_FAILED", "invalid_type@value_laden"], [patchStatus, patchError]
+      ]);
+    }
+  });
+
+  it("a patch that was merged but still fails the step's check, as the call's last POST: the call's refusal is the merged answer's", async () => {
+    const { gateway, artifacts } = deepInfraHarness([{ content: POSITION_SLIP }, { content: "{\"value_laden\": \"no\"}" }]);
+    const refusal: unknown = await gateway.call({ ...positionRequest(), bound: { maxAttempts: 2, tokenCeiling: 8192, deadlineMs: 600_000 } })
+      .then(() => null, (error: unknown) => error);
+    expect(artifacts).toHaveLength(2);
+    expect(refusal).toMatchObject({
+      code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2,
+      lastParseStatus: "SCHEMA_FAILED", lastParseError: artifacts[1]!.parseError, lastRawArtifactRef: artifacts[1]!.artifactId
+    });
+  });
+
   it("a judging call never asks for JSON mode, on GLM either: not the first POST, the patch or the full re-ask", async () => {
     // 2026-10-12: JSON mode on the debate steps was tried and withdrawn the same day (GLM answered a judging call with
     // "{}" in JSON mode); only the story calls ask for it.
     const { gateway, executions } = deepInfraHarness([
-      { content: POSITION_SLIP }, { content: fixedPosition(true) }, { content: fixedPosition(true) }
+      { content: POSITION_SLIP }, { content: POSITION_SLIP }, { content: fixedPosition(true) }
     ]);
     await gateway.call(positionRequest());
     expect(executions).toHaveLength(3);
