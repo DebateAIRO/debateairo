@@ -2553,3 +2553,5 @@ export {
 } from "./anthropic-messages.js";
 export * from "./preview-models.js";
 export * from "./preview-remaining.js";
+// Spec 2026-10-12 §4.2–§4.4: the owner's thinking-level table, the step names and the level lookup.
+export * from "./preview-thinking.js";

@@ -11,6 +11,7 @@ import {
   previewModelRow, previewModelRowForRef, previewNanoUsdText, previewRefsAreReviewedSet, previewReservationNanoUsd,
   previewRostersHonourMakerRule, type PreviewModelRow, type PreviewProviderName
 } from "./preview-models.js";
+import { parsePreviewThinkingLevels, type PreviewThinkingLevels } from "./preview-thinking.js";
 
 export const PREVIEW_GLM_MODEL = "zai-org/GLM-5.3-Flash" as const;
 export const PREVIEW_GLM_PROVIDER_REF = "preview:fixture-a" as const;
@@ -41,6 +42,9 @@ export const PREVIEW_GLM_TARGET = Object.freeze({
  * PR B: the six-key form may also carry `anthropic_budget_socket`, the Anthropic gate's socket (same
  * folder and pattern, never the DeepInfra socket). A roster naming an Anthropic model requires it.
  * `budget_socket` stays the DeepInfra gate's. Every gate is asked with the one `scope_id`.
+ *
+ * Spec 2026-10-12 §4.2: either form may also carry the optional `thinking_levels` table (the owner's levels per AI and
+ * per step, preview-thinking.ts). It is absent in today's configuration, and then every request is today's.
  */
 export interface PreviewProviderTestConfig {
   readonly deployment: "v3-preview";
@@ -50,6 +54,8 @@ export interface PreviewProviderTestConfig {
   readonly budget_socket: string;
   readonly scope_id: string;
   readonly anthropic_budget_socket?: string;
+  /** Spec 2026-10-12 §4.2: the owner's thinking-level table, keyed by reviewed model id; absent = every row's default. */
+  readonly thinking_levels?: PreviewThinkingLevels;
 }
 /** Each non-DeepInfra provider's optional socket key (a later provider adds its own key here). */
 export const PREVIEW_PROVIDER_SOCKET_KEYS: Readonly<Record<Exclude<PreviewProviderName, "deepinfra">, "anthropic_budget_socket">> =
@@ -75,10 +81,12 @@ export function parsePreviewProviderTestConfig(source: string | undefined): Prev
   let value: unknown; try { value = JSON.parse(source); } catch { return refused(); }
   if (typeof value !== "object" || value === null || Array.isArray(value)) return refused();
   const row = value as Record<string, unknown>;
-  const keys = Object.keys(row).sort().join(",");
+  // Spec 2026-10-12 §4.2: `thinking_levels` is an optional key on both forms, so the key checks look past it.
+  const own = Object.keys(row).filter(key => key !== "thinking_levels");
+  const keys = [...own].sort().join(",");
   const legacy = keys === LEGACY_CONFIG_KEYS.join(",");
-  const socketKeys = Object.keys(row).filter(key => OPTIONAL_SOCKET_KEYS.includes(key));
-  const baseKeys = Object.keys(row).filter(key => !OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(",");
+  const socketKeys = own.filter(key => OPTIONAL_SOCKET_KEYS.includes(key));
+  const baseKeys = own.filter(key => !OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(",");
   if ((!legacy && baseKeys !== CONFIG_KEYS.join(",")) || row.deployment !== "v3-preview" || row.requested_thinking_level !== "high"
     || typeof row.budget_socket !== "string" || !PREVIEW_SOCKET_PATTERN.test(row.budget_socket)
     || typeof row.scope_id !== "string" || !/^[a-z0-9][a-z0-9-]{0,95}$/u.test(row.scope_id)) return refused();
@@ -90,9 +98,11 @@ export function parsePreviewProviderTestConfig(source: string | undefined): Prev
   const free = reviewedRoster(row.free_model_ids);
   const premium = legacy ? free : reviewedRoster(row.premium_model_ids);
   if (!previewRostersHonourMakerRule(free, premium)) return refused();
+  // Spec 2026-10-12 §4.2: a bad table throws PREVIEW_THINKING_LEVELS_INVALID from the parser, unwrapped, so the boot error names it.
   const config: PreviewProviderTestConfig = Object.freeze({ deployment: "v3-preview", free_model_ids: free, premium_model_ids: premium,
     requested_thinking_level: "high", budget_socket: row.budget_socket, scope_id: row.scope_id,
-    ...Object.fromEntries(socketKeys.sort().map(key => [key, row[key] as string])) });
+    ...Object.fromEntries(socketKeys.sort().map(key => [key, row[key] as string])),
+    ...(row.thinking_levels === undefined ? {} : { thinking_levels: parsePreviewThinkingLevels(row.thinking_levels) }) });
   // A roster model whose provider has no gate socket here could never be called: refuse to boot.
   if ([...free, ...premium].some(id => previewProviderSocket(config, previewModelRow(id)!.provider) === undefined)) return refused();
   return config;

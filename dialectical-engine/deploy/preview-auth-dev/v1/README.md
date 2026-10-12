@@ -87,6 +87,18 @@ The unit template is `debateai-preview-runner.service`; its release lines come f
 
 Team rule at start: on the preview, before the worker exists, every claimable run job (READY, or CLAIMED with a lapsed claim: exactly what `claimById` takes) that no listed team member owns (the API's `PREVIEW_TEAM_RUNS_SQL`) is recorded FAILED with `RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY`, one content-free `PREVIEW_TEAM_ONLY` line each; the write is guarded on that same condition, so it never overwrites a job that became DONE or FAILED meanwhile. An outsider's job with a LIVE claim refuses the start without writing anything (some runner is executing it; find that runner, then start again after the claim lapses). An empty team list, more than 100 open jobs, or a refusal that cannot be recorded also refuses the start. The runbook's read-only queue SELECT still belongs before the first start, to know what will be refused.
 
+### The optional `thinking_levels` table (spec 2026-10-12 §4.2–§4.3)
+
+`PREVIEW_PROVIDER_TEST_CONFIG_JSON` may carry one more optional key beside today's keys (`requested_thinking_level: "high"` stays): `thinking_levels`. Absent means every request is today's. Shape:
+
+`"thinking_levels": {"<reviewed model id>": {"level": "<word>", "steps": {"<step name>": "<word>"}}}`
+
+- Each entry needs `level`, `steps`, or both, and no other key. An empty object or empty `steps` is refused.
+- Level words: `default`, `none`, `low`, `medium`, `high`. Only a word on that AI's reviewed menu is allowed: GLM high, low; DeepSeek high, low, none; MiMo default, none; Qwen default, low, medium, none; Haiku high, medium, low.
+- Step names: `opening`, `pros_cons`, `cross_exchange`, `judge_panel`, `reviewer`, `answer_writer`, `answer_checker`, `story_writer`, `story_checker`, `slip_fix` (`slip_fix` = a repair POST inside a call).
+- A call runs at its step's level if the table sets one, else its AI's `level` if the table sets one, else the row's default (its first menu word, which is today's request). A model the table leaves out runs at its default.
+- The API and the runner read the same value. A bad table (an unknown model, step or level, or any other key) stops the API and the runner at boot with `PREVIEW_THINKING_LEVELS_INVALID:<detail>`; the detail names the problem.
+
 ### runner.env recipe (names and sources only; never print a value)
 
 Root `install -o root -g debateai-preview-runner -m 0640` to `/etc/debateai-v3-preview/auth-dev-v1/runner.env`. One `KEY=value` per line, no quotes, no `export`, no `$(`, no blank values; only keys of the release's `RUNNER_ENVIRONMENT_KEYS` (anything else refuses). Start from the runner's existing env file and change only these:
