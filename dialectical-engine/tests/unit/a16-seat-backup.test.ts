@@ -402,7 +402,8 @@ describe("A16 · callSeat — R3's 80-20 split, a pure function of the site (car
     const share = answered.filter((label) => label === "b").length / sites.length;
     expect(share).toBeGreaterThan(0.12);
     expect(share).toBeLessThan(0.28);
-    expect(caller.answered("JUDGE" satisfies DebateRole)).toEqual(answered.map((label) => `provider:${label}`));
+    // Parallel calls (O7): one route per answer, in a fixed (sorted) order, never the finish order.
+    expect(caller.answered("JUDGE" satisfies DebateRole)).toEqual(answered.map((label) => `provider:${label}`).sort());
     // Splitting is not a switch: nothing failed.
     expect(caller.switches()).toEqual([]);
   });
@@ -818,5 +819,112 @@ describe("A16 · carry 1 in the runner — its one seat caller salts every site'
     expect(built).toEqual([
       "assigned: seatBook.assigned, runId: run.runId, claimSwitches: assignedSeats?.claimSwitches ?? [], onSwitch: (record) => announceSwitch(backupSwitchEventValue(record))"
     ]);
+  });
+});
+
+/**
+ * Parallel calls, task 6 (owner ruling O7) — calls on one seat may be in flight
+ * together. Two of them can fail on the main at once: the switch is still made,
+ * recorded and announced ONCE per seat slot, and the caller's record lists come
+ * back in a fixed order, never the order the calls happened to finish in.
+ */
+function gate(): { readonly promise: Promise<void>; readonly open: () => void } {
+  let open!: () => void;
+  const promise = new Promise<void>((resolve) => { open = resolve; });
+  return { promise, open };
+}
+const settle = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 0); });
+
+/** Two JUDGE seats, each with a backup-only runner-up: seat 0 is a → b, seat 1 is c → d. */
+function twoJudgeSeats(): readonly [RunSeat, RunSeat] {
+  const assignment: RoleAssignment = {
+    scorecardVersion: 7,
+    strength: "BALANCED",
+    roles: {
+      POSITION: [pinned(0, "e", null)], SUPPORT_ATTACK: [], CROSS_EXCHANGE: [],
+      JUDGE: [pinned(0, "a", "b", 0), pinned(1, "c", "d", 0)], REVIEWER: [],
+      ANSWER_WRITER: [pinned(0, "e", null)], ANSWER_CHECKER: [pinned(0, "f", null)]
+    }
+  };
+  const book = buildAssignedRunSeatBook({
+    assignment,
+    configured: makers(...["a", "b", "c", "d", "e", "f"].map((label) => configured(label))),
+    routeHealth: healthy("a", "b", "c", "d", "e", "f")
+  }).book;
+  return [book.judge[0]!, book.judge[1]!];
+}
+
+describe("Parallel calls · task 6 — the seat caller with calls in flight together (O7)", () => {
+  it("announces a switch ONCE when two calls in flight on one seat both fail on the main; both are answered by the runner-up", async () => {
+    const seat = backupOnlySeat();
+    const announced: BackupSwitchRecord[] = [];
+    const caller = createSeatCaller({ assigned: true, onSwitch: async (record) => { announced.push(record); } });
+    const script = scripted({ "provider:a": throws(transportFailure), "provider:b": answers("b") });
+    const [first, second] = await Promise.all([
+      caller.callSeat({ seat, callSiteKey: "PANEL:x", call: script.call }),
+      caller.callSeat({ seat, callSiteKey: "PANEL:y", call: script.call })
+    ]);
+    expect([first.member.providerRef, second.member.providerRef]).toEqual(["provider:b", "provider:b"]);
+    expect([first.callSiteKey, second.callSiteKey]).toEqual(["PANEL:x:seat:runnerUp", "PANEL:y:seat:runnerUp"]);
+    // Both mains were already in flight, so both were called; the switch is one record, announced once.
+    expect(script.calls.filter((entry) => entry.startsWith("provider:a"))).toHaveLength(2);
+    expect(announced).toHaveLength(1);
+    expect(caller.switches()).toEqual(announced);
+    expect(announced[0]).toMatchObject({ fromProviderRef: "provider:a", toProviderRef: "provider:b", cause: "TRANSPORT_FAILURE" });
+    expect(caller.backupAnswers()).toHaveLength(2);
+  });
+
+  it("holds the second call's backup until the one announcement has been awaited (R4: no backup answers undisclosed)", async () => {
+    const seat = backupOnlySeat();
+    const events: string[] = [];
+    const announcement = gate();
+    const caller = createSeatCaller({
+      assigned: true,
+      onSwitch: async () => { events.push("announce:start"); await announcement.promise; events.push("announce:done"); }
+    });
+    const call = async (member: SeatMember, callSiteKey: string): Promise<string> => {
+      events.push(`${member.providerRef}@${callSiteKey}`);
+      if (member.providerRef === "provider:a") throw transportFailure();
+      return callSiteKey;
+    };
+    const both = Promise.all([
+      caller.callSeat({ seat, callSiteKey: "PANEL:x", call }),
+      caller.callSeat({ seat, callSiteKey: "PANEL:y", call })
+    ]);
+    await settle();
+    expect(events.filter((entry) => entry.startsWith("provider:b"))).toEqual([]);
+    announcement.open();
+    await both;
+    expect(events.indexOf("announce:done")).toBeLessThan(events.findIndex((entry) => entry.startsWith("provider:b")));
+    expect(events.filter((entry) => entry === "announce:start")).toHaveLength(1);
+  });
+
+  it("returns switches, backup answers and answered routes in one fixed order, whichever call finishes first", async () => {
+    const run = async (finishFirst: "seat0" | "seat1") => {
+      const [seat0, seat1] = twoJudgeSeats();
+      const gates = { seat0: gate(), seat1: gate() };
+      const caller = createSeatCaller({ assigned: true });
+      const call = async (member: SeatMember, callSiteKey: string): Promise<string> => {
+        if (member.providerRef === "provider:a") { await gates.seat0.promise; throw transportFailure(); }
+        if (member.providerRef === "provider:c") { await gates.seat1.promise; throw transportFailure(); }
+        return callSiteKey;
+      };
+      const both = Promise.all([
+        caller.callSeat({ seat: seat0, callSiteKey: "PANEL:root", call }),
+        caller.callSeat({ seat: seat1, callSiteKey: "PANEL:root", call })
+      ]);
+      const order = finishFirst === "seat0" ? [gates.seat0, gates.seat1] : [gates.seat1, gates.seat0];
+      for (const next of order) { next.open(); await settle(); }
+      await both;
+      return { switches: caller.switches(), backupAnswers: caller.backupAnswers(), answered: caller.answered("JUDGE") };
+    };
+    const seat0First = await run("seat0");
+    const seat1First = await run("seat1");
+    expect(seat1First).toEqual(seat0First);
+    expect(seat0First.switches.map((record) => [record.seatIndex, record.fromProviderRef, record.toProviderRef]))
+      .toEqual([[0, "provider:a", "provider:b"], [1, "provider:c", "provider:d"]]);
+    expect(seat0First.backupAnswers.map((answer) => [answer.seatIndex, answer.providerRef]))
+      .toEqual([[0, "provider:b"], [1, "provider:d"]]);
+    expect(seat0First.answered).toEqual(["provider:b", "provider:d"]);
   });
 });
