@@ -6416,6 +6416,13 @@ export class WalkingSkeletonRunner {
       return 0;
     };
     const bodyFailures: { readonly rank: ChainRank; readonly error: unknown }[] = [];
+    /**
+     * Ruling R26 — WHERE IN TODAY'S ORDER EACH SPEND STOP WAS RAISED: the rank of the chain step that set
+     * `runBodyBudgetStop`. A round boundary's decision (no model call) runs exactly where today's loop still reaches it:
+     * when no stop was raised before that boundary's own review pass (`spendStoppedFrom`).
+     */
+    const spendStopRanks: ChainRank[] = [];
+    const noteSpendStop = (rank: ChainRank): void => { spendStopRanks.push(rank); };
     /** Spec §2.3 (O6): no chain starts an AUTHOR or a REVIEW call once this is true. */
     const arguingStopped = (): boolean => bodyFailed || runBodyBudgetStop !== null || tooFewLeftToArgue();
     /**
@@ -7085,6 +7092,8 @@ export class WalkingSkeletonRunner {
       readonly choices: PositionRecorder;
       readonly reviews: PositionRecorder;
       readonly batch: ReviewBatch;
+      /** The review's place in today's order (`ChainRank`). */
+      readonly rank: ChainRank;
     }
     /** One node's review chain: the ordered choice, the call (spec §2.3: never started once the arguing stopped), the ordered record. */
     const reviewInChain = async (slot: ReviewSlot, authoredNode: AuthoredDebateNode): Promise<void> => {
@@ -7108,6 +7117,7 @@ export class WalkingSkeletonRunner {
         return;
       }
       const outcome = await callReview(authoredNode, reviewer);
+      if (outcome.kind === "STOPPED") noteSpendStop(slot.rank);
       await slot.reviews.commit(slot.position, async () => {
         // Spec §2.3: once a failure ends the debate, nothing more is recorded.
         if (outcome.kind === "STOPPED" || bodyFailed) return;
@@ -7134,7 +7144,7 @@ export class WalkingSkeletonRunner {
           latest: new Map<string, string | null>(), ready: Promise.resolve(), givenBack: [] as AuthoredDebateNode[]
         });
         await Promise.allSettled(pending.map((authoredNode, position) => runChain(
-          () => reviewInChain({ position, choices, reviews, batch }, authoredNode),
+          () => reviewInChain({ position, choices, reviews, batch, rank: [...rank, pass, position] }, authoredNode),
           [...rank, pass, position],
           () => { choices.skip(position); reviews.skip(position); }
         )));
@@ -7156,7 +7166,8 @@ export class WalkingSkeletonRunner {
     /** The review batches, set up when the arguing runs together (`argueTogether`); a node's review slot is in one. */
     let reviewBatches: readonly { readonly batch: ReviewBatch; readonly done: Promise<void> }[] = [];
     const reviewSlot = (position: number): ReviewSlot => Object.freeze({
-      position, choices: reviewChoices, reviews: reviewRecorder, batch: reviewBatches[reviewBatchOf(position)]!.batch
+      position, choices: reviewChoices, reviews: reviewRecorder, batch: reviewBatches[reviewBatchOf(position)]!.batch,
+      rank: reviewRank(position)
     });
     /** A chain gives up whatever it did not commit at its position, so no later position waits on it. */
     const releaseAt = (position: number) => (): void => {
@@ -7210,6 +7221,7 @@ export class WalkingSkeletonRunner {
       // (single voice), and the stop ends the arguing: no chain starts another
       // author or review call, and the run goes on to its answer.
       if (selection.spendStop !== null) runBodyBudgetStop = selection.spendStop;
+      if (selection.spendStop !== null) noteSpendStop(stage.rank);
       rootZeroPanel.selection = selection;
       // Spec §2.3: once a failure ends the debate, nothing more is saved (its turn still passes, so no later save waits).
       const authoredRoot = await nodeRecorder.commit(0, async () => bodyFailed ? null : saveAuthored(0, { ...ROOT_SAVE, authorIndex: 0 }, {
@@ -7244,6 +7256,7 @@ export class WalkingSkeletonRunner {
         // Root 0 is authored, so the run HAS something to serve. Stopping here
         // keeps it; throwing would discard it.
         runBodyBudgetStop = stop;
+        noteSpendStop(stage.rank);
         return;
       }
       if (authoredRoot.kind === "HALTED") {
@@ -7432,6 +7445,9 @@ export class WalkingSkeletonRunner {
         }, [batchIndex, 2], () => undefined);
         return Object.freeze({ batch, done: earlierBatches });
       }));
+      /** Ruling R26: every spend stop raised so far comes at or after `rank` in today's order. */
+      const spendStoppedFrom = (rank: ChainRank): boolean =>
+        spendStopRanks.length > 0 && spendStopRanks.every((stopRank) => compareRanks(stopRank, rank) >= 0);
       // The global round boundaries, one decision after another.
       const boundaryDecisions: (readonly [number, Promise<void>])[] = [];
       let earlierDecisions: Promise<void> = Promise.resolve();
@@ -7444,9 +7460,12 @@ export class WalkingSkeletonRunner {
           // Every node up to the boundary saved or given up, and reviewed: its review batch ends at the boundary.
           await nodeRecorder.through(boundaryEnd);
           await reviewBatches[batchIndex]!.done;
-          // Today's loop never reached this boundary: a spend stop, too few members left, a failure, or the adaptive
-          // rule's stop at an earlier boundary.
-          if (stoppedByAdaptiveRule || arguingStopped()) return;
+          // Today's loop never reached this boundary: a failure, the adaptive rule's stop at an earlier boundary, too
+          // few members left, or a spend stop raised BEFORE this boundary's own review pass. Ruling R26: a spend stop
+          // raised BY that pass (or by a step today's order puts after the boundary, a cross-exchange) still lets
+          // today's loop decide the round — pure code and one PROPAGATION row — so the chains decide it too.
+          if (stoppedByAdaptiveRule || bodyFailed || tooFewLeftToArgue()) return;
+          if (runBodyBudgetStop !== null && !spendStoppedFrom([batchIndex, 1])) return;
           stoppedByAdaptiveRule = await closeGlobalRound(completedRound, boundaryLegIndex);
         }, [batchIndex, 3], () => undefined);
         boundaryDecisions.push([boundaryLegIndex, earlierDecisions] as const);
@@ -7492,6 +7511,7 @@ export class WalkingSkeletonRunner {
           const stop = expansionPhaseStop(error);
           if (stop === null) throw error;
           runBodyBudgetStop = stop;
+          noteSpendStop(stage.rank);
           return;
         }
         if (authored.kind === "HALTED") {
@@ -7552,6 +7572,7 @@ export class WalkingSkeletonRunner {
           const stop = expansionPhaseStop(error);
           if (stop === null) throw error;
           runBodyBudgetStop = stop;
+          noteSpendStop(stage.rank);
           return;
         }
         // In today's order every cross-exchange comes after the expansion and its last round decision.

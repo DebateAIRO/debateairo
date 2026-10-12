@@ -82,7 +82,12 @@ export type GateOverride = Readonly<{ content: string }> | Readonly<{ unbilled: 
    */
   | Readonly<{ gateRefuses: "CONCURRENCY_LIMIT_REACHED" | "PROVIDER_NOT_REACHED" | "PROVIDER_ERROR_UNBILLED" }>
   /** Gate v4's own refusals: this model cooling off (COOLING, with retry_after 60), or the gate halted (HALTED). */
-  | Readonly<{ gateRefuses: "MODEL_COOLING" | "AUTHORITY_HALTED" }>;
+  | Readonly<{ gateRefuses: "MODEL_COOLING" | "AUTHORITY_HALTED" }>
+  /**
+   * The gate's STOPPED refusal for this one call while the gate itself stays active (its /remaining says so): the runner
+   * reads it as the run's money ceiling, a spend stop (parallel calls, Task 11 fix round 1).
+   */
+  | Readonly<{ gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" }>;
 
 /* ------------------------------------------------------------------ the doubles' answers */
 
@@ -373,6 +378,7 @@ export async function startPreviewGateStubs(input: Readonly<{
             if (override.gateRefuses === "MODEL_COOLING") { coolingRefusal(); return; }
             if (override.gateRefuses === "AUTHORITY_HALTED") { record("HALTED"); refuse("AUTHORITY_HALTED"); return; }
             if (override.gateRefuses === "PROVIDER_ERROR_UNBILLED") { record("ERROR_UNBILLED"); refuse("PROVIDER_ERROR_UNBILLED"); return; }
+            if (override.gateRefuses === "PREVIEW_TEST_AUTHORITY_STOPPED") { record("STOPPED"); refuse("PREVIEW_TEST_AUTHORITY_STOPPED"); return; }
             record("GATE_REFUSED"); refuse(override.gateRefuses); return;
           }
           if ("vendorStatus" in override) {

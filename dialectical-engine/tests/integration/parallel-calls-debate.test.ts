@@ -29,7 +29,7 @@ import {
 } from "../support/preview-debate-harness.js";
 import type { GateArrival, GateOverride, GateRequest } from "../support/preview-gate-stubs.js";
 import { framedField, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
-import { reviewArtifact, withRequestDerivedBearings } from "../support/reviewBearings.js";
+import { requestedReviewEdges, reviewArtifact, withRequestDerivedBearings } from "../support/reviewBearings.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -304,6 +304,41 @@ describe("parallel calls: replies and cross-exchanges (Task 11)", () => {
   }, 900_000);
 
   /**
+   * Ruling R26 (Task 11 fix round 1): a round boundary's freeze/stop decision is pure code and one PROPAGATION row — no
+   * model call — so wherever today's loop reaches it, the chains reach it too. Today's loop reaches it when the boundary's
+   * OWN review pass raised a spend stop (`reviewPendingAuthoredNodes` returns, then `closeGlobalRound` runs). Depth 2,
+   * two makers, the freezing bearings of the case above; the review of root 1's attack reply (node 9, the last node of
+   * the round-1 boundary's review batch) is refused by the gate as the run's money ceiling. The serial run records
+   * round 1's decision (its STOPPING:round:1 row, the frozen support branch's BRANCH-FROZEN record) and stops arguing;
+   * the parallel runs record the same decision. (What else they save differs, as stop paths may: replies and exchanges
+   * already sent are kept.)
+   */
+  it("a spend stop raised by a boundary's own reviews: the round decision is still recorded, as the serial run records it", async () => {
+    const twoMakers = [
+      PANEL_REFS.find((ref) => PREVIEW_PROVIDER_REF_MODELS[ref] === DEEPSEEK)!,
+      PANEL_REFS.find((ref) => PREVIEW_PROVIDER_REF_MODELS[ref] === HAIKU)!
+    ];
+    const variants = [
+      { name: "parallel-a", seed: 121, row: OWNER_CALL_CONCURRENCY },
+      { name: "parallel-b", seed: 131, row: OWNER_CALL_CONCURRENCY },
+      { name: "serial", seed: 141, row: undefined }
+    ] as const;
+    const runs = await savedAcrossVariants("boundary_stop", { panelRefs: twoMakers, depth: 2 }, variants, {
+      stoppingPolicy: { delta: 0, epsilon: 0.01 }, answers: rootOneAttackReviewStopped
+    });
+    const decisions = runs.map((run) => ({ stopping: run.stoppingRows, frozen: branchFrozenFacts(run.saved) }));
+    const serial = decisions[2]!;
+    // The serial run: round 1 decided (and nothing after it: the stop ended the arguing), one branch frozen.
+    expect(serial.stopping).toEqual([{ call_site_key: "STOPPING:round:1", outcome: "OK" }]);
+    expect(serial.frozen.length).toBeGreaterThan(0);
+    for (const [index, decision] of decisions.entries()) {
+      expect(decision, variants[index]!.name).toEqual(serial);
+      // No reply beyond the boundary was asked: the stop ended the arguing.
+      expect(runs[index]!.callSiteKeys.filter((key) => /^JUDGE:(defender|critic):root1:r2:/u.test(key)), variants[index]!.name).toEqual([]);
+    }
+  }, 900_000);
+
+  /**
    * Spec §2.2 (Task 10 review carry): the reviewer turn is read off the ledger once PER REVIEW BATCH, as today's batch
    * reads it, never carried over from an earlier batch's choices. Root 0's review is answered with a billed vendor 500
    * every time, so it is hidden: the turn its reviewer was chosen with never reaches the ledger. The next batch (the
@@ -386,6 +421,8 @@ async function savedAcrossVariants(
   }
   const runs: {
     saved: SavedDebate; callSiteKeys: readonly string[]; concurrencyMost: number;
+    /** The round decisions' PROPAGATION rows (STOPPING:round:k), in ledger order. */
+    stoppingRows: readonly { call_site_key: string; outcome: string }[];
     legsInFlightWithAnother: (leg: JudgeLegKind) => number;
   }[] = [];
   for (const variant of variants) {
@@ -409,6 +446,9 @@ async function savedAcrossVariants(
       runs.push({
         saved: await savedDebate(pool, debate.runId, result.answerId),
         callSiteKeys: (await run.modelCalls(debate.runId)).map((call) => call.call_site_key),
+        stoppingRows: (await pool.query<{ call_site_key: string; outcome: string }>(
+          `SELECT call_site_key, outcome FROM ledger.ledger_entry WHERE run_id=$1 AND call_site_key LIKE 'STOPPING:%' ORDER BY sequence`,
+          [debate.runId])).rows,
         concurrencyMost: gates.concurrency.most,
         legsInFlightWithAnother: (leg) => arrivals.filter((_arrival, index) => holds.legs[index] === leg && inFlightWithAnother(index)).length
       });
@@ -481,6 +521,50 @@ function rootZeroReviewRefused(question: string) {
       && framedField(readFramedMaterial(wirePacket(chat)), "statement") === rootZero) return { vendorStatus: 500 };
     return answer;
   };
+}
+
+/**
+ * `scriptedAnswers` with the freezing bearings (support 0, attack 0.9), except that the review of ROOT 1's attack
+ * reply — a review offering exactly one edge, an attack on root 1's statement (a cross-exchange offers two) — is the
+ * gate's STOPPED refusal: the run's money ceiling. Root 1's statement is learnt from its author call's answer.
+ */
+function rootOneAttackReviewStopped(question: string) {
+  const scripted = scriptedAnswers(question, { support: 0, attack: 0.9 });
+  let rootOne: string | null = null;
+  return (request: GateRequest, chat: string): GateOverride | null => {
+    const answer = scripted(request, chat);
+    if (request.kind === "JUDGE" && chat.includes("Independently author your own position") && answer !== null && "content" in answer) {
+      rootOne = (JSON.parse(answer.content) as { statement: string }).statement;
+    }
+    if (request.kind === "REVIEW" && rootOne !== null) {
+      const edges = requestedReviewEdges(chat);
+      if (edges.length === 1 && edges[0]!.relation === "attack" && edges[0]!.target_statement === rootOne) {
+        return { gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" };
+      }
+    }
+    return answer;
+  };
+}
+
+/** Every BRANCH-FROZEN fact a run saved (answer, composed text, fact bundle), ids named: the smallest object carrying one. */
+function branchFrozenFacts(saved: SavedDebate): readonly string[] {
+  const facts: string[] = [];
+  const walk = (value: unknown): void => {
+    if (typeof value === "string") {
+      if (value.includes("BRANCH-FROZEN")) facts.push(value);
+      return;
+    }
+    if (Array.isArray(value)) { value.forEach(walk); return; }
+    if (value === null || typeof value !== "object") return;
+    const fields = Object.values(value as Record<string, unknown>);
+    if (fields.some((field) => typeof field === "string" && field.includes("BRANCH-FROZEN"))) {
+      facts.push(JSON.stringify(value));
+      return;
+    }
+    fields.forEach(walk);
+  };
+  walk([saved.answer, saved.composed, saved.factBundle]);
+  return facts;
 }
 
 /** mulberry32: a small seeded generator, so each variant's holds are random but reproducible. */
