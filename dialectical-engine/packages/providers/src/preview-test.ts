@@ -6,6 +6,7 @@ import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderG
 import { assertFramedPrompt } from "./prompt-frame.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import { createPreviewRemainingRpcPort, type PreviewRemainingPort } from "./preview-remaining.js";
+import { NO_BUSY_COORDINATION, type PreviewBusyCoordinator } from "./preview-busy.js";
 import {
   PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
   previewModelRow, previewModelRowForRef, previewNanoUsdText, previewRefsAreReviewedSet, previewReservationNanoUsd,
@@ -321,11 +322,24 @@ export class PreviewUnbilledRefusal extends ProviderUnbilledRefusal {
  * `PreviewUnbilledRefusal`s: its slots were full (CONCURRENCY_LIMIT_REACHED), the vendor was never reached
  * (PROVIDER_NOT_REACHED), or the vendor answered with an error that bills nothing but is not "busy"
  * (PROVIDER_ERROR_UNBILLED, review 2026-10-12: Anthropic's 400/404/413/500, which a resend of the same request would
- * meet again); they are still REFUSED rows with the one 60-second resend, but they say nothing about the model being
+ * meet again; these last two are `PreviewGateUnsent` since parallel calls §3.4); they are still REFUSED rows with the one 60-second resend, but they say nothing about the model being
  * busy, so they never make it sit out (`providerCallEndedVendorRefusedUnbilled`, read by the runner's sit-out book).
  */
 export class PreviewVendorRefusedUnbilled extends PreviewUnbilledRefusal {
   constructor(message = "Private preview vendor refused the call unbilled") { super(message); }
+}
+/**
+ * Parallel calls (spec 2026-10-12-parallel-calls-design.md §3.4, owner ruling O8): the gate proved the call unbilled
+ * because it could not reach the vendor (PROVIDER_NOT_REACHED) or the vendor answered an unbilled error
+ * (PROVIDER_ERROR_UNBILLED). Still a plain unbilled refusal for every reader (a REFUSED row, the one 60-second resend)
+ * and never "the model is busy", so it never makes a model sit out; named so a later step can let only one call through
+ * that gate until one settles with an answer. CONCURRENCY_LIMIT_REACHED (the gate's own slots) is NOT one.
+ */
+export class PreviewGateUnsent extends PreviewUnbilledRefusal {}
+/** True for PreviewGateUnsent itself or a PROVIDER_CALL_FAILED whose cause is one. */
+export function providerCallGateUnsent(error: unknown): boolean {
+  return error instanceof PreviewGateUnsent || (error instanceof TypedDomainError && error.code === "PROVIDER_CALL_FAILED"
+    && (error as { cause?: unknown }).cause instanceof PreviewGateUnsent);
 }
 /** The longest cool-off the gate ever names (preview_budget_authority.py COOL_OFF_MAX_SECONDS: 60 s doubling to 600 s). */
 const PREVIEW_MODEL_COOLING_MAX_SECONDS = 600;
@@ -357,9 +371,21 @@ export function providerCallEndedVendorRefusedUnbilled(error: unknown): boolean 
     && (error as { cause?: unknown }).cause instanceof PreviewVendorRefusedUnbilled;
 }
 /** The refusal itself, or the gateway's PROVIDER_CALL_FAILED wrapping it as its cause. */
+function previewRefusalOf<T>(error: unknown, kind: abstract new (...args: never[]) => T): T | undefined {
+  if (error instanceof kind) return error;
+  const cause = typeof error === "object" && error !== null ? (error as { cause?: unknown }).cause : undefined;
+  return cause instanceof kind ? cause : undefined;
+}
 function previewCallWasUnbilled(error: unknown): boolean {
-  return error instanceof PreviewUnbilledRefusal || (typeof error === "object" && error !== null
-    && (error as { cause?: unknown }).cause instanceof PreviewUnbilledRefusal);
+  return previewRefusalOf(error, PreviewUnbilledRefusal) !== undefined;
+}
+/** The model is busy: the vendor's own unbilled refusal, or the gate's cool-off for it (MODEL_COOLING). */
+function previewCallWasVendorBusy(error: unknown): boolean {
+  return previewRefusalOf(error, PreviewVendorRefusedUnbilled) !== undefined;
+}
+/** The gate's named wait, when the busy refusal was its cool-off and it named one. */
+function retryAfterOf(error: unknown): number | undefined {
+  return previewRefusalOf(error, PreviewModelCooling)?.retryAfterSeconds;
 }
 /**
  * The preview's per-call policy for ONE target. A row with an effort switch runs every call at the
@@ -379,13 +405,20 @@ function previewCallWasUnbilled(error: unknown): boolean {
  * never a second retry; never on the storyteller or the story checker, whose two attempts already include
  * one after any failure. The start-of-debate estimate counts this retry. The runner's own cooldown and final retry
  * still follow a failure this wrapper passes up.
+ *
+ * Parallel calls §3.3 (owner ruling O4): `options.busy`, one coordinator shared by every call of the runner, makes
+ * exactly ONE call of a busy model (the first refused one) the probe: it waits (60 s, or the gate's longer cool-off)
+ * and resends once; the model's other refused calls wait for its outcome and then resend once (answered, or any other
+ * outcome) or end with their own refusal (busy again), and its calls not yet sent wait before their first send. The
+ * default `NO_BUSY_COORDINATION` makes every refused call its own probe: today's behaviour, unchanged.
  */
 export function withPreviewProviderCallPolicy(
   gateway: ProviderGateway, config: PreviewProviderTestConfig, target: Readonly<{ model: string }>,
-  options: Readonly<{ sleep?: (milliseconds: number) => Promise<void> }> = {}
+  options: Readonly<{ sleep?: (milliseconds: number) => Promise<void>; busy?: PreviewBusyCoordinator }> = {}
 ): ProviderGateway {
   const reviewed = previewModelRow(target.model) ?? refused();
   const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => { setTimeout(resolve, milliseconds); }));
+  const busy = options.busy ?? NO_BUSY_COORDINATION;
   return Object.freeze({ call(request: ProviderCallRequest) {
     // A row with no effort switch runs at the vendor default, so "DEFAULT_ONLY" asks for exactly that.
     const asksNoLevel = request.thinkingLevel === undefined
@@ -407,11 +440,44 @@ export function withPreviewProviderCallPolicy(
     const send = () => gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
       bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1, attemptScope: "actor",
       ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
-    if (storyRepair) return send();
-    return send().catch(async (error: unknown) => {
+    /** The first send, after the coordinator admits it; an answer tells the coordinator. */
+    const firstSend = async () => {
+      await busy.admit(reviewed.model);
+      const result = await send();
+      busy.answered(reviewed.model);
+      return result;
+    };
+    if (storyRepair) return firstSend();
+    return firstSend().catch(async (error: unknown) => {
       if (!previewCallWasUnbilled(error)) throw error;
+      if (previewCallWasVendorBusy(error)) {
+        const turn = await busy.refusedBusy(reviewed.model, retryAfterOf(error));
+        if (turn === "GIVE_UP") throw error;
+        if (turn === "PROBE") {
+          // Every way out of the probe reports its outcome, so the model's waiters are always released.
+          let outcome: Readonly<{ kind: "ANSWERED" | "BUSY" | "OTHER"; retryAfter?: number | undefined }> = { kind: "OTHER" };
+          try {
+            await sleep(Math.max(PREVIEW_UNBILLED_RETRY_COOLDOWN_MS, (retryAfterOf(error) ?? 0) * 1000));
+            const result = await send();
+            outcome = { kind: "ANSWERED" };
+            return result;
+          } catch (probeError: unknown) {
+            outcome = previewCallWasVendorBusy(probeError) ? { kind: "BUSY", retryAfter: retryAfterOf(probeError) } : { kind: "OTHER" };
+            throw probeError;
+          } finally {
+            busy.probeOutcome(reviewed.model, outcome.kind, outcome.retryAfter);
+          }
+        }
+        // RESEND: the probe was answered (or ended another way); this is this call's one resend.
+        const result = await send();
+        busy.answered(reviewed.model);
+        return result;
+      }
+      // The gate's own unbilled refusals (its slots, or the vendor unreached / an unbilled error): today's path.
       await sleep(PREVIEW_UNBILLED_RETRY_COOLDOWN_MS);
-      return send();
+      const result = await send();
+      busy.answered(reviewed.model);
+      return result;
     });
   } });
 }
@@ -579,10 +645,10 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
     if (code === "PROVIDER_REFUSED_UNBILLED") return new PreviewVendorRefusedUnbilled();
     // Gate v4: the gate's cool-off for one busy model is the same "this model is busy" as the vendor's refusal.
     if (code === "MODEL_COOLING") return new PreviewModelCooling((row as Record<string, unknown>).retry_after);
-    if (code === "PROVIDER_ERROR_UNBILLED") return new PreviewUnbilledRefusal("Private preview vendor answered with an error that was not billed");
-    return code === "CONCURRENCY_LIMIT_REACHED"
-      ? new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight")
-      : new PreviewUnbilledRefusal();
+    // Parallel calls §3.4: the gate could not get an answer out of the vendor (never reached, or an unbilled error).
+    if (code === "PROVIDER_ERROR_UNBILLED") return new PreviewGateUnsent("Private preview vendor answered with an error that was not billed");
+    if (code === "PROVIDER_NOT_REACHED") return new PreviewGateUnsent();
+    return new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight");
   }
   // Gate v4: the gate says outright that it was already halted when the call arrived, before reserving anything.
   if (code === "AUTHORITY_HALTED") return new PreviewGateUnavailable();

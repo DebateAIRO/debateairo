@@ -2532,6 +2532,8 @@ export {
   type ModelReplyFacts
 } from "./model-json.js";
 export * from "./preview-test.js";
+// Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.
+export * from "./preview-busy.js";
 
 // Multi-model preview, PR B: the native Anthropic Messages wire.
 export {
