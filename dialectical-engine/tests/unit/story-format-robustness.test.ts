@@ -397,6 +397,51 @@ describe("D — the start-of-debate estimate counts the checker's repair as a bi
   });
 });
 
+describe("E — story wording (practice debate 2, 2026-10-12): MiMo's story checker gets room to finish its thinking", () => {
+  // At 8,192 MiMo's thinking stopped at exactly 4,916 reasoning tokens on both of its checks; on the second, its
+  // unfinished thinking ran on in the answer after the JSON verdict until max_tokens (finish "length").
+  const verdictThenThinking = `${VERDICT}\n\nHmm, wait. Let me reconsider before finalizing. The objection above is wrong.`;
+
+  it("MiMo's checker asks for 16,384; every other row's checker keeps previewCallBound's 8,192", async () => {
+    expect(rowOf(MIMO).storyCheckerTokenCeiling).toBe(16_384);
+    expect((await forwarded(checkerCall(), MIMO)).bound).toEqual({ maxAttempts: 2, tokenCeiling: 16_384, deadlineMs: 1_260_000 });
+    for (const model of [DEEPSEEK, GLM, QWEN, HAIKU]) {
+      expect(rowOf(model).storyCheckerTokenCeiling, model).toBe(8192);
+      expect((await forwarded(checkerCall(), model)).bound.tokenCeiling, model).toBe(8192);
+    }
+  });
+
+  it("never lowers what previewCallBound gives the checker", async () => {
+    const larger = { ...checkerCall(), bound: { maxAttempts: 2, tokenCeiling: 20_000, deadlineMs: 180_000 } };
+    expect((await forwarded(larger, MIMO)).bound.tokenCeiling).toBe(20_000);
+  });
+
+  it("sends 16,384 on the wire, and after a verdict cut off at max_tokens its length retry twice that, held to the row's cap", async () => {
+    const { gateway, executions } = nativeHarness([verdictThenThinking, VERDICT], ["length", "stop"], MIMO);
+    const result = await gateway.call({ ...checkerCall(), costEnvelope: freeEnvelope });
+    expect(executions.map((execution) => JSON.parse(execution.requestBody).max_tokens)).toEqual([16_384, 32_768]);
+    expect(result.content).toBe(VERDICT);
+  });
+
+  it("still never salvages the first JSON of a reply cut off at max_tokens: its own text may overturn it", () => {
+    expect(classifyCheckerContent(verdictThenThinking, { finishReason: "length" }).parseStatus).not.toBe("PARSED");
+  });
+
+  it("the start-of-debate estimate prices MiMo's checker at what is sent, and every other row's as before", () => {
+    const sent = previewCallOutputTokens(CONFIG, { debate: [2048], story: { storyteller: 12_000, checker: 2048 } });
+    expect(sent.storyChecker).toBe(8192);
+    const strict = strictUpperBoundPricer(sent);
+    const mimo = rowOf(MIMO);
+    expect(strict(mimo, "STORY_CHECKER") - strict(mimo, "DEBATE")).toBe(8192n * mimo.outputNanoUsdPerToken);
+    expect(strict(mimo, "STORY_CHECKER_RETRY")).toBe(strict(mimo, "DEBATE") + (32_768n - 8192n) * mimo.outputNanoUsdPerToken);
+    const deepseek = rowOf(DEEPSEEK);
+    expect(strict(deepseek, "STORY_CHECKER")).toBe(strict(deepseek, "DEBATE"));
+    // None, when the register has no story.
+    const none = strictUpperBoundPricer(previewCallOutputTokens(CONFIG, { debate: [2048], story: null }));
+    expect(none(mimo, "STORY_CHECKER")).toBe(none(mimo, "DEBATE") - 8192n * mimo.outputNanoUsdPerToken);
+  });
+});
+
 function rowOf(model: string) {
   const row = previewModelRow(model);
   if (row === undefined) throw new Error("unreviewed");

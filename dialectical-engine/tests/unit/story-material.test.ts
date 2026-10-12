@@ -241,10 +241,11 @@ describe("verdict story — the material fields", () => {
       .toEqual({ parseStatus: "PARSED", parseError: null });
   });
 
-  it("lists the positions strongest first, with their author, final score and whether they won", () => {
+  it("lists the positions strongest first, with their place, author, final score and whether they won", () => {
+    // P2 finished 0.21 behind, outside the tie margin of 0.05: no within_tie_margin.
     expect(field(fields, "positions") as StoryMaterialPosition[]).toEqual([
-      { id: "P1", claim: "The city should fund it.", author: "model:alpha", final: 0.6123, won: true },
-      { id: "P2", claim: "The city should not fund it.", author: "model:beta", final: 0.4, won: false }
+      { id: "P1", place: 1, claim: "The city should fund it.", author: "model:alpha", final: 0.6123, won: true },
+      { id: "P2", place: 2, claim: "The city should not fund it.", author: "model:beta", final: 0.4, won: false }
     ]);
   });
 
@@ -277,7 +278,7 @@ describe("verdict story — the material fields", () => {
     const point = pointFor(result, "point:d");
     expect(point.objection).toBe("Overruns were priced into the budget.");
     expect(point.best_case).toBeUndefined();
-    expect(point).toMatchObject({ attacks: ["P1"], supports: ["P2"] });
+    expect(point).toMatchObject({ attacks: ["P1"], supports: ["P2"], objection_to: "P1" });
   });
 
   it("drops arrows onto edges and onto nodes outside the debate", () => {
@@ -670,7 +671,7 @@ describe("verdict story — the rule that decided, in words", () => {
     [{ label: "UNSUPPORTED", rung: 1, trigger: "BELOW_LOW_CUT", winner_strength: 0.3 },
       "The label is UNSUPPORTED because the strongest position finished at 0.3, below the low cut of 0.35."],
     [{ label: "CONTESTED", rung: 2, trigger: "MARGIN_WITHIN_GAMMA", winner_strength: 0.62, runner_up_strength: 0.58, margin: 0.04 },
-      "The label is CONTESTED because the strongest position (0.62) led the runner-up (0.58) by only 0.04, within the tie margin of 0.05."],
+      "The label is CONTESTED because the strongest position P1 (0.62) led the runner-up P2 (0.58) by only 0.04, within the tie margin of 0.05."],
     [{ label: "CONTESTED", rung: 2, trigger: "DISAGREEMENT_AT_THRESHOLD", disagreement: 0.31 },
       "The label is CONTESTED because the judges' disagreement about the strongest position (0.31) reached the disagreement threshold of 0.25."],
     [{ label: "SUPPORTED", rung: 3, trigger: "AT_OR_ABOVE_HIGH_CUT", winner_strength: 0.81 },
@@ -706,6 +707,99 @@ describe("verdict story — the rule that decided, in words", () => {
     expect(verdict).toMatchObject({ winner_id: "P1", runner_up_id: null, runner_up_final: null, margin: null, positions_argued: 1 });
     expect([...result.index.positionIds]).toEqual(["P1"]);
     expect(result.index.positionOrder).toEqual(["P1"]);
+  });
+});
+
+/**
+ * Practice debate 2 (2026-10-12), four positions finishing 0.96, 0.9301, 0.92 and 0.9001, labelled a close call
+ * because the first two finished within the tie margin of 0.05. The story named the THIRD as the close rival, and
+ * called the counter a supporter of the fourth had written against it that position's "own admission". The material
+ * now says who finished where, which options were within the tie margin, and what each objection argues against.
+ */
+describe("verdict story — who finished where, and what each objection argues against (story wording, 2026-10-12)", () => {
+  const debate2Basis: StoryVerdictBasis = {
+    ...BASIS, label: "CONTESTED", rung: 2, trigger: "MARGIN_WITHIN_GAMMA",
+    winner_node_id: "position:one", winner_strength: 0.9600034199999999,
+    runner_up_node_id: "position:two", runner_up_strength: 0.9300543760000001, margin: 0.02994904399999987, disagreement: 0.11
+  };
+  const debate2 = snapshot({
+    verdictBasis: debate2Basis,
+    nodes: [
+      node({ nodeId: "position:four", isPosition: true, claim: "Free only with stable funding and better service.", finalStrength: 0.9001259752,
+        criticSummary: "A plausible counter: the conditions may never all be met." }),
+      node({ nodeId: "position:three", isPosition: true, claim: "Keep fares; give targeted passes.", finalStrength: 0.92 }),
+      node({ nodeId: "position:two", isPosition: true, claim: "Free, from a dedicated source.", finalStrength: 0.9300543760000001 }),
+      node({ nodeId: "position:one", isPosition: true, claim: "Free, as a package from the general budget.", finalStrength: 0.9600034199999999 }),
+      node({ nodeId: "point:backs-four", claim: "Free only if the conditions hold.",
+        criticSummary: "A plausible counter: the conditions may amount to a quiet rejection." }),
+      node({ nodeId: "point:backs-one", claim: "The fare is a regressive barrier.",
+        criticSummary: "General-budget money competes with police, housing and debt service." }),
+      node({ nodeId: "point:cross", claim: "Targeted passes beat the package.",
+        criticSummary: "The package concedes the general budget must pay." }),
+      node({ nodeId: "point:orphan", claim: "A point with no arrow.", criticSummary: "Its own counter." })
+    ],
+    arrows: [
+      { sourceNodeId: "point:backs-four", targetNodeId: "position:four", polarity: "support" },
+      { sourceNodeId: "point:backs-one", targetNodeId: "position:one", polarity: "support" },
+      { sourceNodeId: "point:cross", targetNodeId: "position:three", polarity: "support" },
+      { sourceNodeId: "point:cross", targetNodeId: "position:one", polarity: "attack" }
+    ],
+    sensitivity: [], setAside: []
+  });
+  const result = built(buildStoryMaterial({ snapshot: debate2, enrichment: new Map(), budgetBytes: LOW_BUDGET, shapeIds: SHAPES }));
+  const fields = toStoryPromptMaterial(result.material, null);
+  const positions = field(fields, "positions") as StoryMaterialPosition[];
+
+  it("gives every position its place, and marks the losing ones within the tie margin of the winner", () => {
+    expect(positions.map((position) => [position.id, position.place, position.won, position.within_tie_margin ?? false])).toEqual([
+      ["P1", 1, true, false],
+      ["P2", 2, false, true],
+      ["P3", 3, false, true],
+      ["P4", 4, false, false]
+    ]);
+    expect(refFor(result, "position:two")).toBe("P2");
+  });
+
+  it("names the winner and the runner-up by reference in the rule, and says which others also finished that close", () => {
+    const verdict = field(fields, "verdict") as StoryMaterialVerdict;
+    expect(verdict.runner_up_id).toBe("P2");
+    expect(verdict.rule_in_words).toBe(
+      "The label is CONTESTED because the strongest position P1 (0.96) led the runner-up P2 (0.9301) by only 0.0299, "
+        + "within the tie margin of 0.05. P3 also finished within the tie margin of the strongest position, behind the "
+        + "runner-up P2, which finished closest."
+    );
+  });
+
+  it("says what each objection argues against: a position's itself, else the point it attacks, else the one it supports", () => {
+    expect(pointFor(result, "position:four")).toMatchObject({ objection_to: "P4" });
+    // The counter a supporter of P4 wrote is against P4, never P4's admission and never what the supporter argues.
+    expect(pointFor(result, "point:backs-four")).toMatchObject({ supports: ["P4"], objection_to: "P4" });
+    // The words a supporter of P1 wrote against P1 belong to that supporter's record, aimed at P1.
+    expect(pointFor(result, "point:backs-one")).toMatchObject({ supports: ["P1"], objection_to: "P1" });
+    // A reply that supports its own position and attacks another: its objection is against the one it attacks.
+    expect(pointFor(result, "point:cross")).toMatchObject({ supports: ["P3"], attacks: ["P1"], objection_to: "P1" });
+    // A point that argues with nothing names no target, and a point with no objection carries no objection_to.
+    expect(pointFor(result, "point:orphan").objection_to).toBeUndefined();
+    expect(pointFor(result, "position:three").objection_to).toBeUndefined();
+  });
+
+  it("refuses the new keys as words of a story, like every underscore key", () => {
+    expect(STORY_ENGINE_TOKENS).toEqual(expect.arrayContaining(["objection_to", "within_tie_margin"]));
+    expect(result.index.engineTokens.has("within_tie_margin")).toBe(true);
+  });
+
+  it("names no other position when only the runner-up is within the tie margin", () => {
+    const closeOnlySecond = snapshot({
+      ...debate2,
+      nodes: debate2.nodes.map((entry) => entry.nodeId === "position:three" ? { ...entry, finalStrength: 0.85 } : entry)
+    });
+    const verdict = field(toStoryPromptMaterial(built(buildStoryMaterial({
+      snapshot: closeOnlySecond, enrichment: new Map(), budgetBytes: LOW_BUDGET, shapeIds: SHAPES
+    })).material, null), "verdict") as StoryMaterialVerdict;
+    expect(verdict.rule_in_words).toBe(
+      "The label is CONTESTED because the strongest position P1 (0.96) led the runner-up P2 (0.9301) by only 0.0299, "
+        + "within the tie margin of 0.05."
+    );
   });
 });
 

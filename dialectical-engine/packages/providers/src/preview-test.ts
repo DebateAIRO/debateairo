@@ -302,6 +302,14 @@ export function previewStorytellerTokenCeiling(reviewed: Readonly<{ storytellerT
   return reviewed.storytellerTokenCeiling;
 }
 /**
+ * Story wording (practice debate 2, 2026-10-12): the least max_tokens the preview's story checker asks for on its row
+ * (PreviewModelRow.storyCheckerTokenCeiling: the generation floor, 16,384 on MiMo, whose thinking otherwise ran out
+ * and spilled into its answer). The checker asks for the larger of this and previewCallBound's ceiling, never less.
+ */
+export function previewStoryCheckerTokenCeiling(reviewed: Readonly<{ storyCheckerTokenCeiling: number }>): number {
+  return reviewed.storyCheckerTokenCeiling;
+}
+/**
  * Owner ruling 5 (2026-10-10): how long the preview waits before its one retry of a call the gate
  * proved was never billed (PROVIDER_NOT_REACHED, PROVIDER_REFUSED_UNBILLED, and by owner ruling R4 of
  * 2026-10-11 its own CONCURRENCY_LIMIT_REACHED).
@@ -408,7 +416,10 @@ export function withPreviewProviderCallPolicy(
     }
     const preview = previewCallBound(request.bound, config);
     const bound = previewStorySite(request, "STORYTELLER")
-      ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) }) : preview;
+      ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) })
+      : previewStorySite(request, "CHECKER")
+        ? Object.freeze({ ...preview, tokenCeiling: Math.max(preview.tokenCeiling, previewStoryCheckerTokenCeiling(reviewed)) })
+        : preview;
     const storyRepair = previewStoryRepairAllowed(request);
     const formatRepair = !storyRepair && previewFormatRepairAllowed(request);
     // One explicit level replaces whatever the request carried: the configured level on an effort
