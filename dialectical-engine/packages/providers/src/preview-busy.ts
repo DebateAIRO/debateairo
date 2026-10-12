@@ -26,7 +26,10 @@ export interface PreviewBusyCoordinator {
   refusedBusy(model: string, retryAfterSeconds: number | undefined): Promise<BusyTurn>;
   /** The probe's resend: answered → CLOSED; busy → CONFIRMED_BUSY for max(60 s, retryAfter); any other outcome → CLOSED. */
   probeOutcome(model: string, outcome: "ANSWERED" | "BUSY" | "OTHER", retryAfterSeconds?: number): void;
-  /** Any send of this model answered: CONFIRMED_BUSY or OPEN without a probe in flight → CLOSED. */
+  /**
+   * Any send of this model answered: CONFIRMED_BUSY → CLOSED. While OPEN it changes nothing: an OPEN model always has
+   * its probe in flight, and only the probe's outcome ends the spell (spec §3.3: "Probe answered → CLOSED").
+   */
   answered(model: string): void;
 }
 
