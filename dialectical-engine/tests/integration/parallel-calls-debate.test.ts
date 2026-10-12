@@ -373,6 +373,73 @@ describe("parallel calls: replies and cross-exchanges (Task 11)", () => {
   }, 900_000);
 
   /**
+   * Review fix round 3: a HALTED reply, with calls together, saves what the serial run saves. Depth 2, two makers: every
+   * author call of root 0's support reply (node 2) is a billed vendor 500 — the judge bound's attempts, the one cooldown
+   * hold, the final retry, then the halt. Its hold and halt records name its parent (root 0, saved later than the reply's
+   * call started: `LaterParentNode`), its EXPANSION_HALTED record is in the run's halted list, and nothing beneath it is
+   * asked; the whole saved debate and every hold/halt record equal the serial run's.
+   */
+  it("a halted reply: its halt names its parent, its branch is never asked, and the debate saved equals the serial run's", async () => {
+    const twoMakers = [
+      PANEL_REFS.find((ref) => PREVIEW_PROVIDER_REF_MODELS[ref] === DEEPSEEK)!,
+      PANEL_REFS.find((ref) => PREVIEW_PROVIDER_REF_MODELS[ref] === HAIKU)!
+    ];
+    const variants = [
+      { name: "parallel-a", seed: 181, row: OWNER_CALL_CONCURRENCY },
+      { name: "parallel-b", seed: 191, row: OWNER_CALL_CONCURRENCY },
+      { name: "serial", seed: 201, row: undefined }
+    ] as const;
+    const runs = await savedAcrossVariants("halted_reply", { panelRefs: twoMakers, depth: 2 }, variants,
+      { answers: (question) => rootZeroSupportReplyFails(question) });
+    const serial = runs[2]!;
+    // The serial run: the reply halted after one hold — its hold, its retry and its halt name root 0 (node#0).
+    expect(serial.holdRecords).toEqual([
+      expect.objectContaining({ state: "COOLDOWN_HOLD", callSiteKey: "JUDGE:defender:root0:r1:p0", parentNodeId: "node#0" }),
+      expect.objectContaining({ state: "COOLDOWN_RETRY", callSiteKey: "JUDGE:defender:root0:r1:p0", parentNodeId: "node#0" }),
+      expect.objectContaining({ state: "EXPANSION_HALTED", callSiteKey: "JUDGE:defender:root0:r1:p0", parentNodeId: "node#0" })
+    ]);
+    // 2 roots, root 0's attack reply and its 2 replies (its support branch halted), root 1's 2 + 4, 2 cross-exchanges.
+    expect(serial.saved.nodes).toHaveLength(2 + 3 + 6 + 2);
+    for (const [index, run] of runs.entries()) {
+      const name = variants[index]!.name;
+      // Nothing beneath the halted reply was asked.
+      expect(run.callSiteKeys.filter((key) => /^JUDGE:(defender|critic):root0:r2:p2(:|$)/u.test(key)), name).toEqual([]);
+      expect(run.holdRecords, name).toEqual(serial.holdRecords);
+      expect(run.saved, name).toEqual(serial.saved);
+    }
+  }, 900_000);
+
+  /**
+   * Review fix round 3: a root whose member sits out, with calls together, saves what the serial run saves. Four makers,
+   * depth 1, run resilience on: the member that writes the LAST root is busy from the start — every call to it is the
+   * vendor's gate-proven unbilled refusal, answered at once (the others are held 20-100 ms, so it sits out before any
+   * reply to another root could be planned onto it). Its root is dropped, so are its replies and its cross-exchanges;
+   * the debate saved equals the serial run's.
+   */
+  it("a root whose member sits out: its replies and exchanges are never asked, and the debate saved equals the serial run's", async () => {
+    const variants = [
+      { name: "parallel-a", seed: 211, row: OWNER_CALL_CONCURRENCY },
+      { name: "parallel-b", seed: 221, row: OWNER_CALL_CONCURRENCY },
+      { name: "serial", seed: 231, row: undefined }
+    ] as const;
+    const runs = await savedAcrossVariants("root_sits_out", { panelRefs: PANEL_REFS, depth: 1 }, variants, {
+      resilience: RUN_RESILIENCE,
+      answers: (question, debate) => modelBusyFromTheStart(question, debate.rotated.eligibleModelIds.at(-1)!),
+      holdMs: (request, random, debate) => request.model === debate.rotated.eligibleModelIds.at(-1) ? 0 : 20 + Math.floor(random() * 81)
+    });
+    const serial = runs[2]!;
+    // Three roots; the replies of roots 0 and 1 (root 2's replies were planned onto the member that sat out: halted
+    // without a call); the cross-exchanges among the three roots (3 x 2 ordered pairs).
+    expect(serial.saved.nodes).toHaveLength(3 + 4 + 6);
+    for (const [index, run] of runs.entries()) {
+      const name = variants[index]!.name;
+      // The dropped root (root 3) has no replies and no exchanges: none was ever asked.
+      expect(run.callSiteKeys.filter((key) => /^JUDGE:(defender|critic):root3:|^JUDGE:cross-root:(3->|\d->3)/u.test(key)), name).toEqual([]);
+      expect(run.saved, name).toEqual(serial.saved);
+    }
+  }, 900_000);
+
+  /**
    * Spec §2.2 (Task 10 review carry): the reviewer turn is read off the ledger once PER REVIEW BATCH, as today's batch
    * reads it, never carried over from an earlier batch's choices. Root 0's review is answered with a billed vendor 500
    * every time, so it is hidden: the turn its reviewer was chosen with never reaches the ledger. The next batch (the
@@ -443,7 +510,9 @@ async function savedAcrossVariants(
     resilience?: typeof RUN_RESILIENCE;
     bearings?: Readonly<{ support: number; attack: number }>;
     /** The gates' answers (default: `scriptedAnswers` with `bearings`). */
-    answers?: (question: string) => (request: GateRequest, chat: string) => GateOverride | null;
+    answers?: (question: string, debate: AdmittedRun) => (request: GateRequest, chat: string) => GateOverride | null;
+    /** Each non-probe call's hold, from the variant's seeded `random` (default: 5-200 ms). */
+    holdMs?: (request: GateRequest, random: () => number, debate: AdmittedRun) => number;
   }>
 ) {
   const seedName = `parallel_calls_${label}_seed`;
@@ -459,6 +528,8 @@ async function savedAcrossVariants(
     saved: SavedDebate; callSiteKeys: readonly string[]; concurrencyMost: number;
     /** The round decisions' PROPAGATION rows (STOPPING:round:k), in ledger order. */
     stoppingRows: readonly { call_site_key: string; outcome: string }[];
+    /** The run's hold and halt records, the parent named by save order (`node#k`), the clock left out. */
+    holdRecords: readonly unknown[];
     legsInFlightWithAnother: (leg: JudgeLegKind) => number;
   }[] = [];
   for (const variant of variants) {
@@ -468,8 +539,8 @@ async function savedAcrossVariants(
     try {
       const run = previewDebateHarness({ pool: () => pool, stubClosers });
       const random = seededRandom(variant.seed);
-      const holds = legRecordingHolds(() => 5 + Math.floor(random() * 196));
-      const answers = options.answers?.(debate.question) ?? scriptedAnswers(debate.question, options.bearings);
+      const holds = legRecordingHolds((request) => options.holdMs?.(request, random, debate) ?? 5 + Math.floor(random() * 196));
+      const answers = options.answers?.(debate.question, debate) ?? scriptedAnswers(debate.question, options.bearings);
       const gates = await run.startGates({}, undefined, answers, holds.delayMs);
       const composed = await run.previewRunner(gates, "resend", {
         ...(variant.row === undefined ? {} : { callConcurrency: variant.row }),
@@ -483,6 +554,7 @@ async function savedAcrossVariants(
       runs.push({
         saved: await savedDebate(pool, debate.runId, result.answerId),
         callSiteKeys: (await run.modelCalls(debate.runId)).map((call) => call.call_site_key),
+        holdRecords: await namedHoldRecords(pool, debate.runId, composed.holdRecords),
         stoppingRows: (await pool.query<{ call_site_key: string; outcome: string }>(
           `SELECT call_site_key, outcome FROM ledger.ledger_entry WHERE run_id=$1 AND call_site_key LIKE 'STOPPING:%' ORDER BY sequence`,
           [debate.runId])).rows,
@@ -603,6 +675,44 @@ function branchFrozenFacts(saved: SavedDebate): readonly string[] {
   };
   walk([saved.answer, saved.composed, saved.factBundle]);
   return facts;
+}
+
+/**
+ * `scriptedAnswers`, except that every author call of ROOT 0's support reply — the support directive with root 0's
+ * statement as its position under debate — is a billed vendor 500. Root 0's statement is learnt from its author call.
+ */
+function rootZeroSupportReplyFails(question: string) {
+  const scripted = scriptedAnswers(question);
+  let rootZero: string | null = null;
+  return (request: GateRequest, chat: string): GateOverride | null => {
+    const answer = scripted(request, chat);
+    if (request.kind === "JUDGE" && chat.includes("Author your position on the question under debate.")
+      && answer !== null && "content" in answer) {
+      rootZero = (JSON.parse(answer.content) as { statement: string }).statement;
+    }
+    if (request.kind === "JUDGE" && rootZero !== null && chat.includes("genuine supporting case")
+      && framedField(readFramedMaterial(wirePacket(chat)), "position_under_debate") === rootZero) return { vendorStatus: 500 };
+    return answer;
+  };
+}
+
+/** `scriptedAnswers`, except that every call to `model` (never its claim probe) is the vendor's unbilled refusal: busy. */
+function modelBusyFromTheStart(question: string, model: string) {
+  const scripted = scriptedAnswers(question);
+  return (request: GateRequest, chat: string): GateOverride | null =>
+    request.kind !== "PROBE" && request.model === model ? { unbilled: true } : scripted(request, chat);
+}
+
+/** A run's hold and halt records, the parent node named by its save order (`node#k`) and the clock left out. */
+async function namedHoldRecords(
+  pool: Pool, runId: string, records: readonly Readonly<{ parentNodeId: string | null; holdUntil: string | null }>[]
+): Promise<readonly unknown[]> {
+  const nodes = (await pool.query<{ node_id: string }>(
+    `SELECT node_id::text FROM core.node WHERE run_id=$1 ORDER BY created_at_seq`, [runId])).rows.map((row) => row.node_id);
+  return records.map(({ holdUntil: _holdUntil, parentNodeId, ...record }) => ({
+    ...record,
+    parentNodeId: parentNodeId === null ? null : `node#${String(nodes.indexOf(parentNodeId))}`
+  }));
 }
 
 /** mulberry32: a small seeded generator, so each variant's holds are random but reproducible. */

@@ -293,6 +293,8 @@ export function previewDebateHarness(input: Readonly<{
     const probeSleeps: number[] = [];
     const callSleeps: number[] = [];
     const holdWaits: number[] = [];
+    /** Every hold and halt record the run made (COOLDOWN_HOLD / COOLDOWN_RETRY / *_HALTED), in the order made. */
+    const holdRecords: Parameters<NonNullable<WalkingSkeletonSettings["holdRecorder"]>["record"]>[0][] = [];
     const gatewayInFlight = createRunInFlight();
     const callScheduler = createCallScheduler({
       policy: effectiveCallConcurrency(options.callConcurrency === undefined
@@ -368,11 +370,11 @@ export function previewDebateHarness(input: Readonly<{
       callSubjects: previewCallSubjects(PREVIEW),
       holdRecorder: {
         countCooldownHolds: async () => holdWaits.length,
-        record: async () => undefined,
+        record: async (event) => { holdRecords.push(event); },
         wait: async (cooldownMs) => { holdWaits.push(cooldownMs); }
       }
     });
-    return { runner, topology, probeSleeps, callSleeps, holdWaits, callScheduler };
+    return { runner, topology, probeSleeps, callSleeps, holdWaits, holdRecords, callScheduler };
   }
 
   const panelMember = (providerRef: string, asOf: string): DiscoveredPanelMember => Object.freeze({
