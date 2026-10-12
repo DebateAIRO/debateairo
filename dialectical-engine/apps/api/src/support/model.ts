@@ -1,9 +1,17 @@
-import { TypedDomainError } from "@debateai/kernel";
+import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel";
 import type { SupportLanguage } from "@debateai/support-kb/catalog";
 import {
+  ANTHROPIC_API_HOST,
+  ANTHROPIC_MESSAGES_BASE_URL,
+  ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  ANTHROPIC_MESSAGES_PATH,
+  anthropicMessagesRequestBody,
+  anthropicMessagesRequestHeaders,
+  assertAnthropicCredentialShape,
   assertDeploymentProviderTargets,
   assertFramedPrompt,
   parseProviderDiscoveryTargets,
+  readAnthropicMessagesReply,
   resolveProviderTargetCredentials,
   scanPromptTripwires,
   type PromptFramePresence,
@@ -15,8 +23,19 @@ import type { DeploymentMode } from "@debateai/register";
 const MAX_RELAY_RESPONSE_BYTES = 256 * 1024;
 const MAX_COMPLETION_CODE_POINTS = 16_000;
 const DEFAULT_RELAY_TIMEOUT_MS = 180_000;
-export const SUPPORT_HERMES_PROVIDER_REF = "development:hermes-glm-5.3-flash" as const;
-export const SUPPORT_HERMES_MODEL = "z-ai/glm-5.3-flash" as const;
+/**
+ * The support chat's model is Claude Haiku 5.5 (V, 2026-10-12). Locally it is
+ * reached through the Claude CLI relay asked for `--model haiku`, which reports
+ * this id; hosted reaches the same model on Anthropic's own API.
+ */
+export const SUPPORT_RELAY_PROVIDER_REF = "development:claude-haiku-5.5" as const;
+export const SUPPORT_RELAY_MODEL = "claude-haiku-5-5" as const;
+/**
+ * The Anthropic wire requires an answer bound. Claude Haiku 5.5 thinks by
+ * default and its thinking counts against it, so the bound sits well above the
+ * longest answer this module accepts (`MAX_COMPLETION_CODE_POINTS`).
+ */
+const SUPPORT_ANTHROPIC_MAX_TOKENS = 16_000;
 
 /**
  * V-30 / task 12. The support chat calls ONE model, so its target set has one
@@ -57,7 +76,8 @@ export type SupportModelDeployment = Readonly<{
  * - a vendor's `https:` API, whose credential is DECLARED as an absolute path
  *   and resolved once, in memory, by `createSupportModelAdapter`. A local user
  *   may instead declare their own key inline, exactly as the debate path lets
- *   them (V-9(c)).
+ *   them (V-9(c)). A target on Anthropic's API host carries `adapterKind`: it
+ *   is spoken over the native Messages wire, never the OpenAI-compatible one.
  */
 export type SupportModelTarget = Readonly<{
   providerRef: string;
@@ -65,6 +85,7 @@ export type SupportModelTarget = Readonly<{
   model: string;
   authorizationHeader?: string;
   authorizationFile?: string;
+  adapterKind?: typeof ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND;
 }>;
 
 export type SupportModelUsage = Readonly<{
@@ -149,10 +170,11 @@ function decodeTargetRow(source: string): Readonly<Record<string,unknown>> {
 }
 
 /**
- * The relay target, pinned exactly as it has always been: the one ratified
- * loopback Hermes GLM relay, its bearer inline. Byte-for-byte the checks this
- * function has always made — it returns `undefined` instead of throwing only so
- * that a row which is not this shape can be tried as a vendor API below.
+ * The relay target: the one ratified loopback relay, its bearer inline. Since
+ * 2026-10-12 that relay is the Claude CLI asked for Claude Haiku 5.5 (it was the
+ * Hermes GLM 5.3 Flash relay); the shape checks are the ones this function has
+ * always made. It returns `undefined` instead of throwing only so that a row
+ * which is not this shape can be tried as a vendor API below.
  */
 function ratifiedRelayTarget(
   row: Readonly<Record<string,unknown>>
@@ -169,8 +191,8 @@ function ratifiedRelayTarget(
   if (Object.keys(row).sort().join("\0") !== expectedKeys.sort().join("\0")) {
     return undefined;
   }
-  if (row.provider_ref !== SUPPORT_HERMES_PROVIDER_REF
-    || row.model !== SUPPORT_HERMES_MODEL
+  if (row.provider_ref !== SUPPORT_RELAY_PROVIDER_REF
+    || row.model !== SUPPORT_RELAY_MODEL
     || typeof row.base_url !== "string"
     || typeof row.authorization_header !== "string") {
     return undefined;
@@ -193,10 +215,10 @@ function ratifiedRelayTarget(
     return undefined;
   }
   return Object.freeze({
-    providerRef: SUPPORT_HERMES_PROVIDER_REF,
+    providerRef: SUPPORT_RELAY_PROVIDER_REF,
     maker: SUPPORT_MODEL_MAKER,
     baseUrl: url.toString().replace(/\/$/u,""),
-    model: SUPPORT_HERMES_MODEL,
+    model: SUPPORT_RELAY_MODEL,
     authorizationHeader: row.authorization_header
   });
 }
@@ -222,6 +244,27 @@ function isApiShaped(baseUrl: unknown): boolean {
   }
 }
 
+/** Anthropic's API host, compared the way the providers package compares it. */
+function isAnthropicApiHost(url: URL): boolean {
+  return url.hostname.toLowerCase().replace(/\.$/u,"") === ANTHROPIC_API_HOST;
+}
+
+/**
+ * The debate path takes a target's wire from its register row. The support chat
+ * has no such row, so the wire follows the host: Anthropic's host is only ever
+ * spoken natively (the package ties the two both ways), so a row on that host
+ * is parsed as the Messages wire and must name exactly its one base URL, or the
+ * parser refuses with `PROVIDER_ADAPTER_HOST_MISMATCH`.
+ */
+function namesAnthropicApi(baseUrl: unknown): boolean {
+  if (typeof baseUrl !== "string") return false;
+  try {
+    return isAnthropicApiHost(new URL(baseUrl));
+  } catch {
+    return false;
+  }
+}
+
 function apiVendorTarget(
   row: Readonly<Record<string,unknown>>,
   source: string
@@ -235,9 +278,11 @@ function apiVendorTarget(
   const apiShaped = isApiShaped(row.base_url);
   let parsed: readonly ProviderDiscoveryTarget[];
   try {
-    parsed = parseProviderDiscoveryTargets(`[${source}]`, [
-      { providerRef: row.provider_ref, maker: SUPPORT_MODEL_MAKER }
-    ]);
+    parsed = parseProviderDiscoveryTargets(`[${source}]`, [{
+      providerRef: row.provider_ref,
+      maker: SUPPORT_MODEL_MAKER,
+      ...(namesAnthropicApi(row.base_url) ? { adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND } : {})
+    }]);
   } catch (error) {
     if (apiShaped) throw error;
     return undefined;
@@ -260,7 +305,8 @@ function supportTarget(target: ProviderDiscoveryTarget): SupportModelTarget {
     ...(target.authorizationHeader === undefined
       ? {} : { authorizationHeader: target.authorizationHeader }),
     ...(target.authorizationFile === undefined
-      ? {} : { authorizationFile: target.authorizationFile })
+      ? {} : { authorizationFile: target.authorizationFile }),
+    ...(target.adapterKind === undefined ? {} : { adapterKind: target.adapterKind })
   });
 }
 
@@ -365,9 +411,70 @@ export type SupportModelAdapterInput = Readonly<{
 }>;
 
 /**
- * What a transport accepts, and nothing else about it. The two shipped
- * transports differ ONLY here; everything below — the bounded body, the bounded
- * response, the truncation check, the usage read — is one implementation.
+ * How one call is said and how its reply is read. The two wires differ ONLY
+ * here; the door, the post itself, the bounded response, the truncation check,
+ * the usage read and the tripwires are one implementation (`SupportHttpAdapter`).
+ * The endpoint path is named at the post, in `complete()`, beside the door —
+ * where the architecture scan (`support-posts-through-the-door`) looks for it.
+ *
+ * `reply` hands back the body in the chat-completions shape the shared reading
+ * takes (`choices[0].message.content`, `choices[0].finish_reason`, `usage`).
+ */
+type SupportWire = Readonly<{
+  anthropic: boolean;
+  request(input: Readonly<{
+    credential: string;
+    model: string;
+    packet: PromptPacket;
+  }>): Readonly<{ headers: Record<string,string>; body: string }>;
+  reply(decoded: unknown): unknown;
+}>;
+
+/** The OpenAI-compatible wire: the relay and every vendor before Anthropic. */
+const CHAT_COMPLETIONS_WIRE: SupportWire = Object.freeze({
+  anthropic: false,
+  request: ({ credential, model, packet }) => Object.freeze({
+    headers: { "content-type": "application/json", authorization: credential },
+    // The packet the door just accepted, on the wire verbatim. Nothing is
+    // appended, re-ordered or re-labelled here: the bytes a test reads off
+    // this body are the bytes `buildFramedPrompt` produced.
+    body: JSON.stringify({ model, stream: false, messages: packet.messages })
+  }),
+  reply: (decoded) => decoded
+});
+
+/**
+ * Anthropic's native Messages wire, the one the debate path's
+ * `AnthropicMessagesProviderGateway` speaks: the body, the headers (`x-api-key`
+ * carries the bare key) and the reply reading are the providers package's own,
+ * so the support chat cannot say this wire differently. The packet's system
+ * message becomes `system`; its user turn is sent unchanged. No level is asked,
+ * so Claude Haiku 5.5 thinks at its own default. A refusal, a tool call or an
+ * unknown stop is an answer this chat cannot serve: UNAVAILABLE. A `max_tokens`
+ * stop arrives as the `length` finish reason and takes the shared truncation path.
+ */
+const ANTHROPIC_MESSAGES_WIRE: SupportWire = Object.freeze({
+  anthropic: true,
+  request: ({ credential, model, packet }) => Object.freeze({
+    headers: anthropicMessagesRequestHeaders(credential),
+    body: anthropicMessagesRequestBody({
+      model,
+      maxTokens: SUPPORT_ANTHROPIC_MAX_TOKENS,
+      thinkingLevel: THINKING_LEVEL_DEFAULT_ONLY,
+      messages: packet.messages
+    })
+  }),
+  reply: (decoded) => {
+    const reply = readAnthropicMessagesReply(decoded);
+    if (reply.failure !== null) unavailable();
+    return reply.normalized;
+  }
+});
+
+/**
+ * What a transport accepts and which wire it speaks, and nothing else about it.
+ * The shipped transports differ ONLY here; everything else is one
+ * implementation.
  *
  * `reportsCost` says whether a reply from this transport is EXPECTED to carry
  * the money a call cost. The relay reports it; a vendor API usually does not,
@@ -378,6 +485,7 @@ type SupportTransportPolicy = Readonly<{
   acceptsUrl(url: URL): boolean;
   acceptsHeader(value: string): boolean;
   reportsCost: boolean;
+  wire: SupportWire;
 }>;
 
 /** The path a chat-completions base URL must carry. */
@@ -393,7 +501,8 @@ const RELAY_TRANSPORT: SupportTransportPolicy = Object.freeze({
     && url.hostname === "127.0.0.1"
     && normalizedPath(url) === CHAT_COMPLETIONS_PATH,
   acceptsHeader: (value: string) => RELAY_BEARER_LINE.test(value),
-  reportsCost: true
+  reportsCost: true,
+  wire: CHAT_COMPLETIONS_WIRE
 });
 
 /**
@@ -406,15 +515,41 @@ const RELAY_TRANSPORT: SupportTransportPolicy = Object.freeze({
  * that the path BE `/v1` locked out every vendor whose OpenAI-compatible
  * endpoint sits under a prefix — `openrouter.ai/api/v1`, `api.groq.com/openai/v1`
  * — after they had passed the parser and the hosted assertion.
+ *
+ * Never Anthropic's host: an Anthropic key is only ever sent over the native
+ * wire below, exactly as the debate path ties the two.
  */
 const API_TRANSPORT: SupportTransportPolicy = Object.freeze({
   acceptsUrl: (url: URL) => url.protocol === "https:"
-    && normalizedPath(url).endsWith(CHAT_COMPLETIONS_PATH),
+    && normalizedPath(url).endsWith(CHAT_COMPLETIONS_PATH)
+    && !isAnthropicApiHost(url),
   acceptsHeader: (value: string) => PRINTABLE_HEADER_LINE.test(value) && value === value.trim(),
-  reportsCost: false
+  reportsCost: false,
+  wire: CHAT_COMPLETIONS_WIRE
 });
 
-class SupportChatCompletionsAdapter implements SupportModelPort {
+function isBareAnthropicKey(value: string): boolean {
+  try {
+    assertAnthropicCredentialShape(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Anthropic's API (Claude Haiku 5.5): exactly its one base URL, and a credential
+ * that is the bare key — a value still carrying a scheme word ("Bearer …") is a
+ * file written for the other wire. Anthropic reports tokens and no money.
+ */
+const ANTHROPIC_TRANSPORT: SupportTransportPolicy = Object.freeze({
+  acceptsUrl: (url: URL) => `${url.origin}${normalizedPath(url)}` === ANTHROPIC_MESSAGES_BASE_URL,
+  acceptsHeader: isBareAnthropicKey,
+  reportsCost: false,
+  wire: ANTHROPIC_MESSAGES_WIRE
+});
+
+class SupportHttpAdapter implements SupportModelPort {
   readonly #baseUrl: string;
   readonly #authorizationHeader: string;
   readonly #model: string;
@@ -527,25 +662,25 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
       const timeoutSignal = AbortSignal.timeout(this.#timeoutMs);
       const signal = input.signal === undefined
         ? timeoutSignal : AbortSignal.any([input.signal,timeoutSignal]);
-      const response = await this.#fetch(`${this.#baseUrl}/chat/completions`,{
+      const wire = this.#transport.wire;
+      const request = wire.request({
+        credential: this.#authorizationHeader,
+        model: this.#model,
+        packet: input.packet
+      });
+      const response = await this.#fetch(wire.anthropic
+        ? `${this.#baseUrl}${ANTHROPIC_MESSAGES_PATH}`
+        : `${this.#baseUrl}/chat/completions`,{
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: this.#authorizationHeader
-        },
+        headers: request.headers,
         signal,
-        // The packet the door just accepted, on the wire verbatim. Nothing is
-        // appended, re-ordered or re-labelled here: the bytes a test reads off
-        // this body are the bytes `buildFramedPrompt` produced.
-        body: JSON.stringify({
-          model: this.#model,
-          stream: false,
-          messages: input.packet.messages
-        })
+        body: request.body
       });
       if (!response.ok) unavailable();
       const raw = await readBoundedResponse(response);
-      const decoded = JSON.parse(raw) as Readonly<Record<string, unknown>>;
+      const replied = wire.reply(JSON.parse(raw));
+      if (typeof replied !== "object" || replied === null || Array.isArray(replied)) unavailable();
+      const decoded = replied as Readonly<Record<string, unknown>>;
       const choices = decoded.choices;
       const first = Array.isArray(choices) ? choices[0] : undefined;
       const message = typeof first === "object" && first !== null
@@ -554,8 +689,9 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
         ? (message as Readonly<Record<string, unknown>>).content : undefined;
       // W10: read BEFORE the content checks. A truncated answer is a non-empty
       // string of the right length, so every check below passes and the fragment
-      // is served as a complete answer. This adapter also sends no `max_tokens`,
-      // so the cap that produces it is the relay's own and invisible from here —
+      // is served as a complete answer. The chat-completions wire sends no
+      // `max_tokens`, so the cap that produces it is the relay's own and invisible
+      // from here; the Anthropic wire's own bound arrives as the same `length` —
       // the finish reason is the only signal that it happened.
       const finishReason = typeof first === "object" && first !== null
         ? (first as Readonly<Record<string, unknown>>).finish_reason : undefined;
@@ -579,7 +715,7 @@ class SupportChatCompletionsAdapter implements SupportModelPort {
 }
 
 /** Today's local-mode transport: the ratified loopback relay, unchanged. */
-export class RelayAdapter extends SupportChatCompletionsAdapter {
+export class RelayAdapter extends SupportHttpAdapter {
   constructor(input: SupportModelAdapterInput) {
     super(input,RELAY_TRANSPORT);
   }
@@ -590,9 +726,16 @@ export class RelayAdapter extends SupportChatCompletionsAdapter {
  * deployment can reach a support model through. It supersedes the dormant
  * `KeyBasedAdapter` seam, which existed to refuse this path until it was ruled.
  */
-export class ApiVendorAdapter extends SupportChatCompletionsAdapter {
+export class ApiVendorAdapter extends SupportHttpAdapter {
   constructor(input: SupportModelAdapterInput) {
     super(input,API_TRANSPORT);
+  }
+}
+
+/** The paid vendor API on Anthropic's native wire: Claude Haiku 5.5 (V, 2026-10-12). */
+export class AnthropicMessagesAdapter extends SupportHttpAdapter {
+  constructor(input: SupportModelAdapterInput) {
+    super(input,ANTHROPIC_TRANSPORT);
   }
 }
 
@@ -632,8 +775,13 @@ export function createSupportModelAdapter(
     ...(options.reportDiagnostic === undefined
       ? {} : { reportDiagnostic: options.reportDiagnostic })
   };
-  // The transport follows the target's own protocol, which the parse and the
-  // mode decision above have already ruled lawful for this deployment.
-  return new URL(target.baseUrl).protocol === "https:"
-    ? new ApiVendorAdapter(input) : new RelayAdapter(input);
+  // The transport follows the target's own protocol and wire, which the parse
+  // and the mode decision above have already ruled lawful for this deployment.
+  if (new URL(target.baseUrl).protocol !== "https:") return new RelayAdapter(input);
+  if (target.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) return new ApiVendorAdapter(input);
+  // The debate path's own refusal for a key file written for the other wire
+  // ("Bearer …"): named here, at start-up, rather than as an unratified path or
+  // as a 401 on every visitor's question. It names nothing of the value.
+  assertAnthropicCredentialShape(authorizationHeader);
+  return new AnthropicMessagesAdapter(input);
 }

@@ -30,7 +30,7 @@ import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
   type DevelopmentProviderPanel
 } from "./dev-provider-panel.js";
-import { startHermesSupportRelay } from "../../../acceptance/hermes-relay.js";
+import { startClaudeSupportRelay } from "../../../acceptance/claude-relay.js";
 import type { DevelopmentDeploymentRegisterMachineReceiptV1 } from "./dev-deployment-register.js";
 import {
   createDevTlsReadinessOperations,
@@ -54,7 +54,7 @@ type UiHandle = Stoppable & Readonly<{ exited: Promise<DevelopmentUiChildExit> }
 type RunnerHandle = Stoppable & Readonly<{ exited: Promise<DevelopmentRunnerChildExit> }>;
 type SupportModelRelayHandle = Stoppable & Readonly<{
   targetJson: string;
-  providerRef: "development:hermes-glm-5.3-flash";
+  providerRef: "development:claude-haiku-5.5";
 }>;
 
 export type DevelopmentAuthStackOperations = Readonly<{
@@ -91,7 +91,7 @@ export type DevelopmentAuthStack = Readonly<{
     ui: "DENY_DEFAULT_PROXY";
     tls: "SYSTEM_TRUST";
     providers: "CLI_HANDSHAKE";
-    supportModel: "HERMES_GLM_5_3_FLASH";
+    supportModel: "CLAUDE_HAIKU_5_5";
     healthyProviderRefs: readonly string[];
     runner: "REGISTERED";
   }>;
@@ -475,7 +475,7 @@ export async function startDevelopmentAuthStack(
         ui: "DENY_DEFAULT_PROXY",
         tls: "SYSTEM_TRUST",
         providers: "CLI_HANDSHAKE",
-        supportModel: "HERMES_GLM_5_3_FLASH",
+        supportModel: "CLAUDE_HAIKU_5_5",
         healthyProviderRefs: providerPanel.healthyProviderRefs,
         runner: "REGISTERED"
       }),
@@ -531,7 +531,7 @@ export function createDevelopmentAuthStackOperations(
     isPublicPortOccupied: () => tlsOperations.isPublicPortOccupied(),
     startProviderPanel: () => startDevelopmentCliProviderPanel(undefined, profile),
     async startSupportModelRelay() {
-      const relay = await startHermesSupportRelay({
+      const relay = await startClaudeSupportRelay({
         port: profile.supportModelPort,
         timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
         ...(profile.name === "support-preview"

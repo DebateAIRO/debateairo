@@ -2377,8 +2377,11 @@ export {
 export { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 export * from "./preview-test.js";
 
-// Multi-model preview, PR B: the native Anthropic Messages wire.
+// Multi-model preview, PR B: the native Anthropic Messages wire. The support chat
+// speaks it too (Claude Haiku 5.5), so the host, the headers and the key-shape
+// rule are exported from the one file that owns them.
 export {
+  ANTHROPIC_API_HOST,
   ANTHROPIC_API_VERSION,
   ANTHROPIC_EFFORT_LEVELS,
   ANTHROPIC_MESSAGES_BASE_URL,
@@ -2388,7 +2391,9 @@ export {
   PROVIDER_PACKET_UNSUPPORTED,
   PROVIDER_REPLY_UNSUPPORTED,
   anthropicMessagesRequestBody,
+  anthropicMessagesRequestHeaders,
   anthropicUsageAsEngineUsage,
+  assertAnthropicCredentialShape,
   readAnthropicMessagesReply,
   type AnthropicMessagesReply
 } from "./anthropic-messages.js";

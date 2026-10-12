@@ -44,8 +44,12 @@ import { describe, expect, it } from "vitest";
 
 const SUPPORT_ROOT = "apps/api/src/support";
 
-/** The one URL suffix a vendor chat completion is posted to. */
-const VENDOR_POST = /chat\/completions/u;
+/**
+ * The URL suffixes a vendor completion is posted to: the OpenAI-compatible
+ * `chat/completions`, and since 2026-10-12 Anthropic's Messages endpoint
+ * (Claude Haiku 5.5), which the support transport names by its constant.
+ */
+const VENDOR_POST = /chat\/completions|ANTHROPIC_MESSAGES_PATH/u;
 
 /** The door, and the reader that IS the door (`readPromptFrame` calls it). */
 const DOOR_NAMES = new Set(["assertFramedPrompt", "readPromptFrame"]);
