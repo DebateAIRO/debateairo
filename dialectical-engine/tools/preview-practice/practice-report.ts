@@ -111,7 +111,10 @@ export function formatsReport(input: Readonly<{
   remaining: Readonly<Record<PracticeGateName, Readonly<{ before: import("@debateai/providers").PreviewGateRemaining | null; after: import("@debateai/providers").PreviewGateRemaining | null }>>>;
   startedAt: Date;
   finishedAt: Date;
+  /** The operator interrupted once: the calls in flight finished, the rest were skipped (NOT_PROVEN). */
   interrupted: boolean;
+  /** The practice did not reach its end (a second interrupt, a crash midway): the code (ABORTED). */
+  aborted?: string | null;
 }>): PracticeReport {
   const samples = input.result.samples;
   const formatStatuses = new Set(["PARSE_FAILED", "SCHEMA_FAILED", "UNPARSED", "POST_CHECK_FAILED"]);
@@ -119,12 +122,15 @@ export function formatsReport(input: Readonly<{
   const formatFailures = samples.reduce((sum, sample) => sum + sample.attempts.filter((attempt) =>
     attempt.parseStatus === "PARSE_FAILED" || attempt.parseStatus === "SCHEMA_FAILED" || attempt.parseStatus === "UNPARSED").length
     + (sample.status === "POST_CHECK_FAILED" ? 1 : 0), 0);
-  const failedCalls = samples.filter((sample) => sample.status === "CALL_FAILED").length;
+  // A vendor error that was not billed and is not "busy" (PROVIDER_ERROR_UNBILLED, e.g. Anthropic's 400) is a failed call.
+  const failedCalls = samples.filter((sample) => sample.status === "CALL_FAILED" || sample.status === "VENDOR_ERROR_UNBILLED").length;
   const exercised = new Set(samples.filter((sample) => sample.status !== "SKIPPED_GATE_STOPPED" && sample.status !== "UNBILLED_REFUSED"
     && sample.status !== "SKIPPED_MODEL_BUSY").map((sample) => sample.model));
   const verdict = practiceVerdict({
     harnessError: null,
-    completed: !input.interrupted,
+    completed: true,
+    interrupted: input.interrupted,
+    aborted: input.aborted ?? null,
     servedAnswer: null,
     storyOutcome: null,
     formatFailures,
@@ -161,6 +167,7 @@ export function formatsReport(input: Readonly<{
       formatFailures, failedCalls
     }),
     failures: samples.filter((sample) => formatStatuses.has(sample.status) || sample.status === "CALL_FAILED"
+      || sample.status === "VENDOR_ERROR_UNBILLED"
       || sample.attempts.some((attempt) => attempt.parseStatus !== null && attempt.parseStatus !== "PARSED"))
       .map((sample: PracticeSample) => sample)
   });
@@ -218,6 +225,16 @@ export function debateReport(input: Readonly<{
   });
 }
 
+/** A practice that did not reach its end and has no samples log (debate mode): the verdict ABORTED and the gates' counts. */
+export function abortedReport(mode: string, code: string, startedAt: Date, observer: PracticeGateObserver | null): PracticeReport {
+  const verdict = practiceVerdict({ harnessError: null, aborted: code, completed: false, servedAnswer: null, storyOutcome: null,
+    formatFailures: 0, failedCalls: 0, gateHalted: false, gateStopped: observer === null ? false : gateStopped(observer),
+    gatePauses: observer === null ? [] : gatePauses(observer), notExercisedModels: [], unbilledRefusals: 0, p90ByModel: {} });
+  return Object.freeze({ schema: PRACTICE_REPORT_SCHEMA, mode, ...verdict, startedAt: startedAt.toISOString(),
+    finishedAt: new Date().toISOString(),
+    ...(observer === null ? {} : { gates: Object.fromEntries(GATES.map((gate) => [gate, gateBlock(observer, gate)])) }) });
+}
+
 export function harnessErrorReport(mode: string, code: string, startedAt: Date, observer: PracticeGateObserver | null): PracticeReport {
   const verdict = practiceVerdict({ harnessError: code, completed: false, servedAnswer: null, storyOutcome: null, formatFailures: 0,
     failedCalls: 0, gateHalted: false, gateStopped: false, notExercisedModels: [], unbilledRefusals: 0, p90ByModel: {} });
@@ -241,7 +258,8 @@ export function reportMarkdown(report: PracticeReport): string {
     for (const [gate, block] of Object.entries(gates)) {
       const observed = (block.observed ?? block) as PracticeGateSummary;
       lines.push(`- ${gate}: ${String(observed.calls)} calls, ${String(observed.unbilled)} refused, not billed (vendor busy `
-        + `${String(observed.vendorRefused)}, cooling off ${String(observed.modelCooling)}, not reached ${String(observed.notReached)}), `
+        + `${String(observed.vendorRefused)}, cooling off ${String(observed.modelCooling)}, not reached ${String(observed.notReached)}, `
+        + `vendor error not billed ${String(observed.vendorErrorUnbilled ?? 0)}), `
         + `longest not-reached run ${String(observed.longestNotReachedRun)} (streak at start `
         + `${observed.unsentStreakAtStart === null ? "unknown" : String(observed.unsentStreakAtStart)}), `
         + `stopped: ${observed.stop === null ? "no" : observed.stop.reason}`

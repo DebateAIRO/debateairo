@@ -23,14 +23,19 @@ import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
 import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, publishPreviewRegisterV2, readSealedSnapshot } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
 import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
-import { runPractice } from "../../tools/preview-practice/practice.js";
+import { runPractice, type PracticeControl } from "../../tools/preview-practice/practice.js";
 import { practiceDebateGraph } from "../../tools/preview-practice/practice-lanes.js";
 import { PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
 import { startPreviewGateStubs, type GateOverride, type GateRequest } from "../support/preview-gate-stubs.js";
+import { readFileSync } from "node:fs";
 import { startTestDatabase } from "../support/testDatabase.js";
 
 const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
 const GLM = "zai-org/GLM-5.3-Flash";
+const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
+const HAIKU = "claude-haiku-5-5";
+/** A formats progress line for one finished job: `<model> <lane> #<n>: <status> <ms>ms`. */
+const FINISHED_JOB = /^\S+ [A-Z_]+ #\d+: [A-Z_]+ \d+ms$/u;
 const FIVE = ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", MIMO, "Qwen/Qwen3.8-Flash", "claude-haiku-5-5"];
 const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
 const OBSERVATION = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
@@ -93,8 +98,9 @@ function settingsText(): string {
   ].join("\n");
 }
 
-async function scenario(override?: (request: GateRequest) => GateOverride | null) {
-  const stubs = await startPreviewGateStubs({ storyDefaultShape: PACK.defaultShape, ...(override === undefined ? {} : { override }) });
+async function scenario(override?: (request: GateRequest) => GateOverride | null, delayMs?: (request: GateRequest) => number) {
+  const stubs = await startPreviewGateStubs({ storyDefaultShape: PACK.defaultShape, ...(override === undefined ? {} : { override }),
+    ...(delayMs === undefined ? {} : { delayMs }) });
   closers.push(stubs.close);
   const env = { PRACTICE_ACK: "spends-real-money", PRACTICE_DEEPINFRA_SOCKET: stubs.sockets.deepinfra,
     PRACTICE_ANTHROPIC_SOCKET: stubs.sockets.anthropic };
@@ -102,8 +108,14 @@ async function scenario(override?: (request: GateRequest) => GateOverride | null
   const common = ["--settings", join(folder, "settings.env"), "--gate-status-deepinfra", join(folder, "status.json"),
     "--gate-status-anthropic", join(folder, "status.json"), "--out", out];
   const quiet = { sleep: async () => undefined, wait: async () => undefined, log: () => undefined };
-  return { stubs, env, common, quiet };
+  return { stubs, env, common, quiet, out };
 }
+
+type SamplesReport = { verdict: string; exitCode: number; reasons: string[]; totals: { samples: number };
+  byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[] };
+const readReport = (out: string) => JSON.parse(readFileSync(join(out, "report.json"), "utf8")) as SamplesReport;
+const sampleLines = (out: string) => readFileSync(join(out, "samples.jsonl"), "utf8").trim().split("\n")
+  .map((line) => JSON.parse(line) as { kind: string; sample?: { status: string } }).filter((line) => line.kind === "sample");
 
 beforeAll(async () => {
   folder = await mkdtemp(join(tmpdir(), "practice-it-"));
@@ -205,6 +217,121 @@ describe("preview practice: formats mode", () => {
     expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
     expect(report.byModelAndLane.map((row) => row.statuses)).toEqual(FIVE.map(() => ({ PARSED: 1 })));
     expect(stubs.requests.filter((request) => request.kind === "COMPOSE")).toHaveLength(5);
+  }, 300_000);
+});
+
+describe("preview practice: formats mode, never losing a finished sample", () => {
+  it("one interrupt after three finished jobs: the calls in flight finish, the rest are skipped, report.json is written from samples.jsonl: NOT_PROVEN (exit 30)", async () => {
+    const { env, common, quiet, out } = await scenario();
+    const at: { control: PracticeControl | null } = { control: null };
+    let finished = 0;
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, { ...quiet,
+      onControl: (given) => { at.control = given; },
+      log: (line) => { if (FINISHED_JOB.test(line) && ++finished === 3) at.control!.stop(); } });
+    const report = readReport(out);
+    expect(outcome.exitCode).toBe(30);
+    expect(report).toMatchObject({ verdict: "NOT_PROVEN", exitCode: 30 });
+    expect(report.reasons).toContain("RUN_INTERRUPTED");
+    expect(report.reasons.some((reason) => reason.startsWith("FORMAT_FAILED") || reason.startsWith("CALL_FAILED"))).toBe(false);
+    // Every planned job is in the log and the report: the finished ones, then the skipped rest.
+    const lines = sampleLines(out);
+    expect(lines).toHaveLength(45);
+    expect(report.totals.samples).toBe(45);
+    const sent = lines.filter((line) => line.sample!.status !== "SKIPPED_GATE_STOPPED");
+    expect(sent.length).toBeGreaterThanOrEqual(3);
+    expect(sent.length).toBeLessThan(45);
+    expect(sent.every((line) => line.sample!.status === "PARSED")).toBe(true);
+  }, 300_000);
+
+  it("a second interrupt quits at once: report.json is ABORTED (exit 50) with the samples finished so far, and `report --out` builds the same again", async () => {
+    const { env, common, quiet, out } = await scenario();
+    const at: { control: PracticeControl | null; exit: number | null; report: SamplesReport | null } = { control: null, exit: null, report: null };
+    let finished = 0;
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, { ...quiet,
+      onControl: (given) => { at.control = given; },
+      log: (line) => {
+        if (FINISHED_JOB.test(line) && ++finished === 3) {
+          at.exit = at.control!.abort("OPERATOR_SECOND_INTERRUPT");
+          // On the disk before the quit.
+          at.report = readReport(out);
+        }
+      } });
+    const aborted = at.report!;
+    expect(at.exit).toBe(50);
+    expect(aborted).toMatchObject({ verdict: "ABORTED", exitCode: 50 });
+    expect(aborted.reasons[0]).toBe("ABORTED:OPERATOR_SECOND_INTERRUPT");
+    expect(aborted.totals.samples).toBeGreaterThanOrEqual(3);
+    expect(aborted.totals.samples).toBe(sampleLines(out).length);
+    // The run, carried on in-process here (the command quits), never writes over the aborted report.
+    expect(outcome.exitCode).toBe(50);
+    expect(readReport(out)).toEqual(aborted);
+    const rebuilt = await runPractice(["report", "--out", out], {}, quiet);
+    expect(rebuilt.exitCode).toBe(50);
+    expect(readReport(out)).toMatchObject({ verdict: "ABORTED", reasons: aborted.reasons, totals: aborted.totals });
+  }, 300_000);
+
+  it("refuses an --out folder that already holds a samples log, sending nothing and leaving its report alone", async () => {
+    const { stubs, env, common, quiet, out } = await scenario();
+    await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0", "--models", DEEPSEEK, "--lanes", "PANEL"], env, quiet);
+    const before = readFileSync(join(out, "report.json"), "utf8");
+    const sentBefore = stubs.requests.length;
+    const again = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0", "--models", DEEPSEEK, "--lanes", "PANEL"], env, quiet);
+    expect(again.exitCode).toBe(40);
+    expect(again.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_OUT_ALREADY_HOLDS_SAMPLES"]);
+    expect(stubs.requests.length).toBe(sentBefore);
+    expect(readFileSync(join(out, "report.json"), "utf8")).toBe(before);
+  }, 300_000);
+});
+
+describe("preview practice: formats mode, models at once", () => {
+  // A slow vendor: long enough that calls sent together are held together (the counters prove the overlap, not a clock).
+  const slow = () => 150;
+  it("two slow models overlap (one call each at a time), where --sequential never has two calls at once", async () => {
+    const parallel = await scenario(undefined, slow);
+    const args = ["--samples", "2", "--gap-ms", "0", "--models", `${GLM},${DEEPSEEK}`, "--lanes", "JUDGE_POSITION,PANEL"];
+    const first = await runPractice(["formats", ...parallel.common, ...args], parallel.env, parallel.quiet);
+    expect(first.report.verdict).toBe("PASS");
+    expect(parallel.stubs.concurrency.mostByProvider.deepinfra).toBe(2);
+    expect(parallel.stubs.concurrency.mostByModel).toEqual({ [GLM]: 1, [DEEPSEEK]: 1 });
+    expect(parallel.stubs.requests.filter((request) => request.answer === "OK")).toHaveLength(8);
+
+    const sequential = await scenario(undefined, slow);
+    const second = await runPractice(["formats", ...sequential.common, ...args, "--sequential"], sequential.env, sequential.quiet);
+    expect(second.report.verdict).toBe("PASS");
+    expect(sequential.stubs.concurrency.most).toBe(1);
+    expect(sequential.stubs.requests.filter((request) => request.answer === "OK")).toHaveLength(8);
+  }, 300_000);
+
+  it("keeps to the gate's own limit from root's status (max_concurrent_calls 1): the DeepInfra models take turns at the gate", async () => {
+    const { stubs, env, quiet, out } = await scenario(undefined, slow);
+    const limited = join(folder, `status-limited-${randomUUID()}.json`);
+    await writeFile(limited, JSON.stringify({ state: "active", unsent_streak: 0, halts: 0, max_concurrent_calls: 1 }));
+    const outcome = await runPractice(["formats", "--settings", join(folder, "settings.env"), "--gate-status-deepinfra", limited,
+      "--gate-status-anthropic", join(folder, "status.json"), "--out", out, "--samples", "2", "--gap-ms", "0",
+      "--models", `${GLM},${DEEPSEEK},${HAIKU}`, "--lanes", "JUDGE_POSITION"], env, quiet);
+    expect(outcome.report.verdict).toBe("PASS");
+    expect(stubs.concurrency.mostByProvider.deepinfra).toBe(1);
+    // Haiku, on the other gate, still went beside them.
+    expect(stubs.concurrency.most).toBe(2);
+  }, 300_000);
+
+  it("Haiku's vendor error that was not billed (PROVIDER_ERROR_UNBILLED): never busy, counted in the Anthropic gate's run until the brake stops it at four; a failed call: FAIL (exit 20)", async () => {
+    const { stubs, env, common, quiet } = await scenario((request) => request.model === HAIKU ? { gateRefuses: "PROVIDER_ERROR_UNBILLED" } : null);
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0", "--lanes", "JUDGE_POSITION,PANEL,REVIEW"], env, quiet);
+    const report = outcome.report as unknown as {
+      verdict: string; reasons: string[]; busyModels: string[];
+      byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[];
+      gates: Record<string, { observed: { stop: { reason: string } | null; vendorErrorUnbilled: number; vendorRefused: number } }>;
+    };
+    expect(outcome.exitCode).toBe(20);
+    expect(report.reasons).toContain("CALL_FAILED:2");
+    expect(report.busyModels).toEqual([]);
+    expect(report.byModelAndLane.filter((row) => row.model === HAIKU).map((row) => row.statuses))
+      .toEqual([{ VENDOR_ERROR_UNBILLED: 1 }, { VENDOR_ERROR_UNBILLED: 1 }, { SKIPPED_GATE_STOPPED: 1 }]);
+    expect(report.gates.anthropic!.observed).toMatchObject({ vendorErrorUnbilled: 4, vendorRefused: 0, stop: { reason: "NOT_REACHED_IN_A_ROW_4" } });
+    expect(report.gates.deepinfra!.observed.stop).toBeNull();
+    expect(stubs.requests.filter((request) => request.model === HAIKU).map((request) => request.answer)).toEqual(Array(4).fill("ERROR_UNBILLED"));
+    for (const row of report.byModelAndLane.filter((entry) => entry.model !== HAIKU)) expect(row.statuses).toEqual({ PARSED: 1 });
   }, 300_000);
 });
 

@@ -8,17 +8,20 @@
  *    model was slow (its 90th-percentile call took more than two minutes).
  *  - FAIL (exit 20): something a person would have seen went wrong.
  *  - NOT_PROVEN (exit 30): it worked, but a model sat out as busy (its vendor refused it, or it was cooling off), or
- *    the practice paused a gate itself after four connection failures in a row, so that model was not tested to the end.
+ *    the practice paused a gate itself after four connection failures in a row, or the operator interrupted it once
+ *    (the calls in flight finished, the rest were skipped), so some model was not tested to the end.
  *  - HARNESS_ERROR (exit 40): the practice itself could not run (a start check refused, or the tool broke). No verdict
  *    about the release.
- * When several apply, the first in this order wins: HARNESS_ERROR, FAIL, NOT_PROVEN, PASS_WITH_WARNINGS, PASS.
+ *  - ABORTED (exit 50): the practice started but did not get to its end (a second interrupt, or the tool broke midway).
+ *    The report holds every sample that finished, and every other rule that applied is listed after the abort.
+ * When several apply, the first in this order wins: HARNESS_ERROR, ABORTED, FAIL, NOT_PROVEN, PASS_WITH_WARNINGS, PASS.
  */
 
-export const PRACTICE_VERDICTS = ["PASS", "PASS_WITH_WARNINGS", "FAIL", "NOT_PROVEN", "HARNESS_ERROR"] as const;
+export const PRACTICE_VERDICTS = ["PASS", "PASS_WITH_WARNINGS", "FAIL", "NOT_PROVEN", "HARNESS_ERROR", "ABORTED"] as const;
 export type PracticeVerdict = typeof PRACTICE_VERDICTS[number];
 
 export const PRACTICE_EXIT_CODES: Readonly<Record<PracticeVerdict, number>> = Object.freeze({
-  PASS: 0, PASS_WITH_WARNINGS: 10, FAIL: 20, NOT_PROVEN: 30, HARNESS_ERROR: 40
+  PASS: 0, PASS_WITH_WARNINGS: 10, FAIL: 20, NOT_PROVEN: 30, HARNESS_ERROR: 40, ABORTED: 50
 });
 
 /** A model whose 90th-percentile call took longer than this is slow (a warning). */
@@ -29,6 +32,13 @@ export type PracticeVerdictInput = Readonly<{
   harnessError: string | null;
   /** Debate: the work item ended COMPLETED. Formats: every planned sample was sent or deliberately skipped. */
   completed: boolean;
+  /**
+   * Formats: the operator interrupted once; the calls in flight finished and the rest were skipped. Not a failure on its
+   * own: NOT_PROVEN. Optional: false when absent.
+   */
+  interrupted?: boolean;
+  /** Set when the practice started but did not reach its end (a second interrupt, a crash midway): the code. */
+  aborted?: string | null;
   /** Debate only: an answer was served. Null in formats mode. */
   servedAnswer: boolean | null;
   /** Debate only: the story's outcome (READY, FAILED, ...). Null in formats mode. */
@@ -85,13 +95,15 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
     ...[...new Set(input.notExercisedModels)].filter((model) => !busy.includes(model)).sort().map((model) => `MODEL_NOT_EXERCISED:${model}`),
     ...[...(input.gatePauses ?? [])].sort().map((pause) => `GATE_PAUSED:${pause}`)
   ];
+  if (input.interrupted === true) notProven.push("RUN_INTERRUPTED");
   const warn: string[] = [];
   if (input.unbilledRefusals > 0) warn.push(`UNBILLED_REFUSALS:${String(input.unbilledRefusals)}`);
   for (const [model, p90] of Object.entries(input.p90ByModel).sort(([a], [b]) => a.localeCompare(b))) {
     if (p90 > PRACTICE_SLOW_P90_MS) warn.push(`SLOW_P90:${model}:${String(Math.round(p90 / 1000))}s`);
   }
-  const reasons = Object.freeze([...fail, ...notProven, ...warn]);
-  const verdict: PracticeVerdict = fail.length > 0 ? "FAIL"
+  const aborted = input.aborted === undefined || input.aborted === null ? [] : [`ABORTED:${input.aborted}`];
+  const reasons = Object.freeze([...aborted, ...fail, ...notProven, ...warn]);
+  const verdict: PracticeVerdict = aborted.length > 0 ? "ABORTED" : fail.length > 0 ? "FAIL"
     : notProven.length > 0 ? "NOT_PROVEN"
       : warn.length > 0 ? "PASS_WITH_WARNINGS" : "PASS";
   return Object.freeze({ verdict, exitCode: PRACTICE_EXIT_CODES[verdict], reasons });

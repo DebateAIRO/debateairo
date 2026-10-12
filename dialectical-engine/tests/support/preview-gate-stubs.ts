@@ -28,14 +28,15 @@ export type GateRequest = Readonly<{ provider: GateProvider; model: string; kind
  * vendor 429 (UNBILLED, 409 PROVIDER_REFUSED_UNBILLED), the gate's OWN unbilled refusal (GATE_REFUSED, 409
  * CONCURRENCY_LIMIT_REACHED or PROVIDER_NOT_REACHED: never one of its unbilled releases), a model the gate lets cool
  * off (COOLING, 409 MODEL_COOLING with retry_after: gate v4, nothing reserved, the vendor not contacted), a halted gate
- * (STOPPED, 409 PREVIEW_TEST_AUTHORITY_STOPPED; or HALTED, gate v4's 409 AUTHORITY_HALTED), a
+ * (STOPPED, 409 PREVIEW_TEST_AUTHORITY_STOPPED; or HALTED, gate v4's 409 AUTHORITY_HALTED), a vendor error the gate
+ * released unbilled and not as "busy" (ERROR_UNBILLED, 409 PROVIDER_ERROR_UNBILLED, review 2026-10-12), a
  * billed vendor error (BILLED_500 for a refused model; VENDOR_ERROR for a scenario's vendor status), or a request no
  * contract answers (UNEXPECTED, a billed vendor 500 too). Only OK, UNBILLED, BILLED_500, VENDOR_ERROR and UNEXPECTED
  * stand for a request that reached the vendor.
  */
-export type GateAnswer = "OK" | "UNBILLED" | "GATE_REFUSED" | "COOLING" | "STOPPED" | "HALTED" | "BILLED_500" | "VENDOR_ERROR" | "UNEXPECTED";
+export type GateAnswer = "OK" | "UNBILLED" | "ERROR_UNBILLED" | "GATE_REFUSED" | "COOLING" | "STOPPED" | "HALTED" | "BILLED_500" | "VENDOR_ERROR" | "UNEXPECTED";
 /** The answers that stand for a request the vendor received (the rest were refused by the gate itself). */
-export const GATE_ANSWERS_REACHING_VENDOR: ReadonlySet<GateAnswer> = new Set<GateAnswer>(["OK", "UNBILLED", "BILLED_500", "VENDOR_ERROR", "UNEXPECTED"]);
+export const GATE_ANSWERS_REACHING_VENDOR: ReadonlySet<GateAnswer> = new Set<GateAnswer>(["OK", "UNBILLED", "ERROR_UNBILLED", "BILLED_500", "VENDOR_ERROR", "UNEXPECTED"]);
 /** The retry_after a stand-in cool-off names: the real gate's first window (COOL_OFF_FIRST_SECONDS). */
 export const STUB_COOL_OFF_RETRY_AFTER_SECONDS = 60;
 /** A recorded /complete request: the request and how it was answered, in arrival order. */
@@ -74,8 +75,12 @@ export type GateDebateScripts = Readonly<{
 export type GateHalt = { unbilledReleases: number; haltedAt: number | null; firstStoppedAt: number | null };
 /** What a scenario may answer instead of the contract's valid reply. */
 export type GateOverride = Readonly<{ content: string }> | Readonly<{ unbilled: true }> | Readonly<{ vendorStatus: number }>
-  /** The gate's own unbilled refusal (review amendment R-d, 2026-10-12): its slots full, or the vendor not reached. */
-  | Readonly<{ gateRefuses: "CONCURRENCY_LIMIT_REACHED" | "PROVIDER_NOT_REACHED" }>
+  /**
+   * The gate's own unbilled refusal (review amendment R-d, 2026-10-12): its slots full, or the vendor not reached; or the
+   * vendor's error that was not billed and is not "busy" (PROVIDER_ERROR_UNBILLED, review 2026-10-12: Anthropic's
+   * 400/404/413/500, released at $0 and counted in the gate's streak).
+   */
+  | Readonly<{ gateRefuses: "CONCURRENCY_LIMIT_REACHED" | "PROVIDER_NOT_REACHED" | "PROVIDER_ERROR_UNBILLED" }>
   /** Gate v4's own refusals: this model cooling off (COOLING, with retry_after 60), or the gate halted (HALTED). */
   | Readonly<{ gateRefuses: "MODEL_COOLING" | "AUTHORITY_HALTED" }>;
 
@@ -175,7 +180,17 @@ export function stubVendorReply(provider: GateProvider, model: string, content: 
 
 /* ------------------------------------------------------------------ the gates */
 
+/** How many /complete requests the doubles held at once: now, the most ever, and the most per gate and per model. */
+export type GateConcurrency = {
+  now: number;
+  most: number;
+  mostByProvider: Record<GateProvider, number>;
+  mostByModel: Record<string, number>;
+};
+
 export type PreviewGateStubs = Readonly<{
+  /** The /complete requests in flight at once (they overlap only when `delayMs` holds them). */
+  concurrency: Readonly<GateConcurrency>;
   /** Every /complete request, in arrival order, with how it was answered. */
   requests: GateRecord[];
   /** Every /remaining read, in arrival order. */
@@ -213,7 +228,12 @@ export async function startPreviewGateStubs(input: Readonly<{
   override?: (request: GateRequest, chat: string) => GateOverride | null;
   enabledModels?: Readonly<Record<GateProvider, readonly string[]>>;
   remainingState?: "active" | "halted";
+  /** Holds each /complete request this long before answering it (a slow vendor), so calls can overlap. */
+  delayMs?: (request: GateRequest) => number;
 }>): Promise<PreviewGateStubs> {
+  const concurrency: GateConcurrency = { now: 0, most: 0, mostByProvider: { deepinfra: 0, anthropic: 0 }, mostByModel: {} };
+  const holding = { deepinfra: 0, anthropic: 0 } as Record<GateProvider, number>;
+  const holdingByModel = new Map<string, number>();
   const requests: GateRecord[] = [];
   const remainingReads: GateRemainingRead[] = [];
   const queues = new Map<string, ("OK" | "UNBILLED")[]>(Object.entries(input.probeScripts ?? {}).map(([model, steps]) => [model, [...steps]]));
@@ -269,6 +289,25 @@ export async function startPreviewGateStubs(input: Readonly<{
         let kind: GateRequestKind | "UNKNOWN";
         try { kind = classifyGateRequest(chat); } catch { kind = "UNKNOWN"; }
         const seen: GateRequest = Object.freeze({ provider, model, kind, body });
+        const delay = input.delayMs?.(seen) ?? 0;
+        if (delay <= 0) { answer(seen, chat); return; }
+        concurrency.now += 1;
+        holding[provider] += 1;
+        holdingByModel.set(model, (holdingByModel.get(model) ?? 0) + 1);
+        concurrency.most = Math.max(concurrency.most, concurrency.now);
+        concurrency.mostByProvider[provider] = Math.max(concurrency.mostByProvider[provider], holding[provider]);
+        concurrency.mostByModel[model] = Math.max(concurrency.mostByModel[model] ?? 0, holdingByModel.get(model)!);
+        setTimeout(() => {
+          concurrency.now -= 1;
+          holding[provider] -= 1;
+          holdingByModel.set(model, holdingByModel.get(model)! - 1);
+          answer(seen, chat);
+        }, delay);
+      });
+      const answer = (seen: GateRequest, chat: string): void => {
+        // Answered now (at once, or after the scenario's delay); `provider` is this socket's.
+        const { model, kind } = seen;
+        const json = (status: number, payload: string) => response.writeHead(status, { "content-type": "application/json" }).end(payload);
         const record = (answer: GateAnswer): number => {
           // A settled reply of a model ends its run of unbilled refusals (the real gate's clear_cooling).
           if (answer === "OK") unbilledRun.delete(model);
@@ -316,6 +355,7 @@ export async function startPreviewGateStubs(input: Readonly<{
           if ("gateRefuses" in override) {
             if (override.gateRefuses === "MODEL_COOLING") { coolingRefusal(); return; }
             if (override.gateRefuses === "AUTHORITY_HALTED") { record("HALTED"); refuse("AUTHORITY_HALTED"); return; }
+            if (override.gateRefuses === "PROVIDER_ERROR_UNBILLED") { record("ERROR_UNBILLED"); refuse("PROVIDER_ERROR_UNBILLED"); return; }
             record("GATE_REFUSED"); refuse(override.gateRefuses); return;
           }
           if ("vendorStatus" in override) {
@@ -332,7 +372,7 @@ export async function startPreviewGateStubs(input: Readonly<{
         if (content === null) { record("UNEXPECTED"); reply(500, JSON.stringify({ error: { message: "unexpected test request" } })); return; }
         record("OK");
         reply(200, stubVendorReply(provider, model, content, `practice-stub-${String(served)}`));
-      });
+      };
     });
     servers.push(server);
     await new Promise<void>((done) => server.listen(socket, done));
@@ -344,6 +384,7 @@ export async function startPreviewGateStubs(input: Readonly<{
     remainingReads,
     halt,
     cooling,
+    concurrency,
     sockets,
     async close() {
       await Promise.all(servers.splice(0).map((server) => new Promise<void>((done) => server.close(() => done()))));

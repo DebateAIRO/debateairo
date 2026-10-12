@@ -19,15 +19,22 @@
  * Nothing else stops a gate. A vendor refusal, not billed (the vendor's 429 or 529), and a model's cool-off
  * (MODEL_COOLING, gate v4) mark only that model busy (modelsEndingBusy); the gate itself keeps going. The gate's own
  * "too many calls in flight" refusal (CONCURRENCY_LIMIT_REACHED) is refused before the gate reserves anything, so it
- * moves nothing here either. The run is counted the way the gate counts its streak: a vendor answer resets it; a
- * vendor refusal or a cool-off neither adds to it nor resets it.
+ * moves nothing here either. The run is counted the way the gate counts its streak (preview_budget_authority.py
+ * release_unsent and release_unbilled with busy=False): a vendor answer resets it; a connection failure or a vendor
+ * error that was not billed and is not "busy" adds to it; a vendor refusal or a cool-off neither adds to it nor resets it.
+ *
+ * Under concurrency (formats mode sends to several models at once) the run is counted in completion order, and a call
+ * is only sent while the run plus the calls already in flight on that gate stays under the brake: if every call in
+ * flight came back "not reached", the gate's own count would still stay under its five. A call that would break that
+ * waits until a call in flight settles.
  *
  * The unbilled refusals the app's port tells apart (packages/providers/src/preview-test.ts previewAuthorityRefusal):
  *  - the vendor refused, not billed (PROVIDER_REFUSED_UNBILLED, PreviewVendorRefusedUnbilled): the model is busy;
  *  - the model is cooling off (MODEL_COOLING, PreviewModelCooling): the model is busy;
- *  - the vendor was not reached (PROVIDER_NOT_REACHED): counts in the run only; the Anthropic gate's not-busy error
- *    answers (PROVIDER_ERROR_UNBILLED, review 2026-10-12: 400/404/413/500) arrive as the same plain refusal and are
- *    counted the same way (the gate adds them to its streak too, and keeps a $0 entry);
+ *  - the vendor was not reached (PROVIDER_NOT_REACHED): counts in the run;
+ *  - the vendor answered with an error that was not billed and is not "busy" (PROVIDER_ERROR_UNBILLED, review
+ *    2026-10-12: Anthropic's 400/404/413/500; a plain PreviewUnbilledRefusal): counts in the run, as the gate counts
+ *    it (release_unbilled busy=False grows unsent_streak); never "busy";
  *  - the gate's own "too many calls in flight" (CONCURRENCY_LIMIT_REACHED): neither.
  */
 import { TypedDomainError } from "@debateai/kernel";
@@ -52,7 +59,10 @@ export type PracticeWireOutcome =
   | "VENDOR_OK"
   /** The gate returned a vendor answer with another status (in real life the gate halts on this). */
   | "VENDOR_ERROR"
-  /** The gate proved the call was never billed (vendor 429/529, a model cooling off, not reached, or the gate's own concurrency limit). */
+  /**
+   * The gate proved the call was never billed (vendor 429/529, a model cooling off, not reached, a vendor error that was
+   * not billed, or the gate's own concurrency limit).
+   */
   | "UNBILLED"
   /**
    * The gate refused for money, or stopped (halted or refused the request). A halted gate reaches the app as
@@ -87,19 +97,28 @@ export type PracticeWireEvent = Readonly<{
 
 export type PracticeGateStop = Readonly<{ gate: PracticeGateName; reason: string; atSeq: number }>;
 
-/** The vendor refused, not billed; the model is cooling off; the vendor was not reached; the gate's own in-flight limit. */
-export type PracticeUnbilledKind = "VENDOR_REFUSED" | "MODEL_COOLING" | "NOT_REACHED" | "GATE_IN_FLIGHT";
+/**
+ * The vendor refused, not billed (busy); the model is cooling off (busy); the vendor was not reached; the vendor answered
+ * with an error that was not billed and is not "busy" (PROVIDER_ERROR_UNBILLED); the gate's own in-flight limit.
+ */
+export type PracticeUnbilledKind = "VENDOR_REFUSED" | "MODEL_COOLING" | "NOT_REACHED" | "VENDOR_ERROR_UNBILLED" | "GATE_IN_FLIGHT";
+
+/** The unbilled refusals the gate adds to its own streak (unsent_streak): they count in the brake's run. */
+const COUNTED_IN_THE_RUN: ReadonlySet<PracticeUnbilledKind> = new Set<PracticeUnbilledKind>(["NOT_REACHED", "VENDOR_ERROR_UNBILLED"]);
 
 /** Which unbilled refusal an error is, read as the app's port raises them. */
 export function practiceUnbilledKind(error: PreviewUnbilledRefusal): PracticeUnbilledKind {
   // PreviewModelCooling is a PreviewVendorRefusedUnbilled too, so it is tested first.
   if (error instanceof PreviewModelCooling) return "MODEL_COOLING";
   if (error instanceof PreviewVendorRefusedUnbilled) return "VENDOR_REFUSED";
-  return /calls in flight/u.test(error.message) ? "GATE_IN_FLIGHT" : "NOT_REACHED";
+  if (/calls in flight/u.test(error.message)) return "GATE_IN_FLIGHT";
+  // PROVIDER_ERROR_UNBILLED: the port's plain refusal with its own words (previewAuthorityRefusal).
+  return /answered with an error/u.test(error.message) ? "VENDOR_ERROR_UNBILLED" : "NOT_REACHED";
 }
 
 /**
- * A stop the practice made itself for connection failures in a row: the gate was not halted and nothing was billed,
+ * A stop the practice made itself for connection failures in a row (and unbilled vendor errors, which the gate counts
+ * in the same run): the gate was not halted and nothing was billed,
  * but the models behind it were not exercised, so the verdict is NOT_PROVEN, never FAIL. Any other stop (a gate
  * refusal, a vendor error, an unreadable answer) is a failure to investigate.
  */
@@ -119,11 +138,16 @@ export type PracticeGateSummary = Readonly<{
   modelCooling: number;
   /** The connection failed before anything was sent: these count in a row toward the brake. */
   notReached: number;
+  /** The vendor answered with an error that was not billed and is not "busy" (PROVIDER_ERROR_UNBILLED): these count in the run too. */
+  vendorErrorUnbilled: number;
   concurrencyLimit: number;
   gateRefused: number;
   transportFailed: number;
   stoppedLocally: number;
-  /** The longest run of connection failures in a row, counting the run the gate already had at the start. */
+  /**
+   * The longest run of connection failures (and unbilled vendor errors) in a row, counting the run the gate already had
+   * at the start.
+   */
   longestNotReachedRun: number;
   /** Root's `status` `unsent_streak` (connection failures in a row) at the start (null when not given). */
   unsentStreakAtStart: number | null;
@@ -164,6 +188,12 @@ export function vendorUsage(gate: PracticeGateName, vendorBody: string): Readonl
   };
 }
 
+/** What a listener hears: every recorded event and every stop, in the order they happen (the samples log, practice.ts). */
+export type PracticeObserverListener = Readonly<{
+  event?: (event: PracticeWireEvent) => void;
+  stop?: (stop: PracticeGateStop) => void;
+}>;
+
 export class PracticeGateObserver {
   readonly #maxConsecutiveNotReached: number;
   readonly #atStart: Readonly<Partial<Record<PracticeGateName, number>>>;
@@ -172,6 +202,9 @@ export class PracticeGateObserver {
   readonly #consecutive = new Map<PracticeGateName, number>();
   readonly #maxConsecutive = new Map<PracticeGateName, number>();
   readonly #stops = new Map<PracticeGateName, PracticeGateStop>();
+  readonly #inFlight = new Map<PracticeGateName, number>();
+  readonly #waiting = new Map<PracticeGateName, Set<() => void>>();
+  readonly #listeners: PracticeObserverListener[] = [];
   #seq = 0;
 
   constructor(options: Readonly<{
@@ -198,6 +231,35 @@ export class PracticeGateObserver {
 
   get events(): readonly PracticeWireEvent[] { return this.#events; }
 
+  /** The calls sent to a gate that have not settled yet. */
+  inFlight(gate: PracticeGateName): number { return this.#inFlight.get(gate) ?? 0; }
+
+  /** Hears every later event and stop; the stops already made are told at once. Returns the way to stop listening. */
+  listen(listener: PracticeObserverListener): () => void {
+    this.#listeners.push(listener);
+    for (const stop of this.#stops.values()) listener.stop?.(stop);
+    return () => { const at = this.#listeners.indexOf(listener); if (at >= 0) this.#listeners.splice(at, 1); };
+  }
+
+  /**
+   * A fresh observer with recorded events and stops played back in their order (the report rebuilt from the samples
+   * log): the brake's counts and stops come out as they were.
+   */
+  static replay(lines: Iterable<Readonly<{ event: PracticeWireEvent } | { stop: PracticeGateStop }>>,
+    options: ConstructorParameters<typeof PracticeGateObserver>[0] = {}): PracticeGateObserver {
+    const observer = new PracticeGateObserver(options);
+    for (const line of lines) {
+      if ("event" in line) {
+        const { seq, ...event } = line.event;
+        void seq; // renumbered in the replay, in the same order
+        observer.#record(event);
+      } else {
+        observer.stop(line.stop.gate, line.stop.reason);
+      }
+    }
+    return observer;
+  }
+
   /**
    * The models whose LAST call through the gates ended refused by the vendor, not billed, or cooling off: in a finished
    * debate, the members the runner made sit out for being busy (apps/runner/src/run-sit-out.ts reads the same refusals,
@@ -215,7 +277,44 @@ export class PracticeGateObserver {
 
   /** Stops one gate by hand (e.g. the operator's interrupt): no later call is sent to it. */
   stop(gate: PracticeGateName, reason: string): void {
-    if (!this.#stops.has(gate)) this.#stops.set(gate, Object.freeze({ gate, reason, atSeq: this.#seq }));
+    if (this.#stops.has(gate)) return;
+    const stop: PracticeGateStop = Object.freeze({ gate, reason, atSeq: this.#seq });
+    this.#stops.set(gate, stop);
+    for (const listener of [...this.#listeners]) listener.stop?.(stop);
+    this.#wake(gate);
+  }
+
+  #wake(gate: PracticeGateName): void {
+    for (const wake of [...this.#waiting.get(gate) ?? []]) wake();
+  }
+
+  /**
+   * Waits until one more call fits under the brake: the run so far plus the calls in flight on the gate (each could
+   * still come back "not reached") plus this one stays within the brake. On true the call is counted in flight at once
+   * (in the same step as the check, so calls arriving together cannot all pass it); false means the gate is stopped
+   * (the caller then records the stop). One call at a time never waits here.
+   */
+  async #admit(gate: PracticeGateName, signal?: AbortSignal): Promise<boolean> {
+    for (;;) {
+      if (this.#stops.has(gate)) return false;
+      if ((this.#consecutive.get(gate) ?? 0) + this.inFlight(gate) + 1 <= this.#maxConsecutiveNotReached) {
+        this.#inFlight.set(gate, this.inFlight(gate) + 1);
+        return true;
+      }
+      if (signal?.aborted === true) throw signal.reason ?? new Error("PRACTICE_CALL_ABORTED");
+      await new Promise<void>((resolve) => {
+        const waiting = this.#waiting.get(gate) ?? new Set<() => void>();
+        this.#waiting.set(gate, waiting);
+        const done = () => { waiting.delete(done); signal?.removeEventListener("abort", done); resolve(); };
+        waiting.add(done);
+        signal?.addEventListener("abort", done, { once: true });
+      });
+    }
+  }
+
+  #leave(gate: PracticeGateName): void {
+    this.#inFlight.set(gate, this.inFlight(gate) - 1);
+    this.#wake(gate);
   }
 
   summary(gate: PracticeGateName): PracticeGateSummary {
@@ -230,6 +329,7 @@ export class PracticeGateObserver {
       vendorRefused: kind("VENDOR_REFUSED"),
       modelCooling: kind("MODEL_COOLING"),
       notReached: kind("NOT_REACHED"),
+      vendorErrorUnbilled: kind("VENDOR_ERROR_UNBILLED"),
       concurrencyLimit: mine.filter((event) => event.concurrencyLimit).length,
       gateRefused: of("GATE_REFUSED"),
       transportFailed: of("TRANSPORT_FAILED"),
@@ -242,13 +342,16 @@ export class PracticeGateObserver {
 
   #record(event: Omit<PracticeWireEvent, "seq">): void {
     this.#seq += 1;
-    this.#events.push(Object.freeze({ seq: this.#seq, ...event }));
+    const recorded: PracticeWireEvent = Object.freeze({ seq: this.#seq, ...event });
+    this.#events.push(recorded);
+    for (const listener of [...this.#listeners]) listener.event?.(recorded);
     const gate = event.gate;
     if (event.outcome === "STOPPED") return;
     if (event.outcome === "UNBILLED") {
-      // Only "not reached" counts in the run, as the gate's own streak does. A vendor refusal and a model's cool-off
-      // neither add to the run nor reset it; the gate's own in-flight limit is refused before it reserves anything.
-      if (event.unbilledKind !== "NOT_REACHED") return;
+      // Only "not reached" and a vendor error that was not billed (not busy) count in the run, as the gate's own streak
+      // does. A vendor refusal and a model's cool-off neither add to the run nor reset it; the gate's own in-flight limit
+      // is refused before it reserves anything.
+      if (event.unbilledKind === null || !COUNTED_IN_THE_RUN.has(event.unbilledKind)) return;
       const run = (this.#consecutive.get(gate) ?? 0) + 1;
       this.#consecutive.set(gate, run);
       this.#maxConsecutive.set(gate, Math.max(run, this.#maxConsecutive.get(gate) ?? 0));
@@ -267,10 +370,13 @@ export class PracticeGateObserver {
     return Object.freeze({
       execute: async (input: PreviewBudgetExecution, signal?: AbortSignal) => {
         const model = modelOf(input.requestBody);
+        let admitted = await this.#admit(gate, signal);
+        // A stop made while this call waited for its turn: it is not sent.
+        if (admitted && this.#stops.has(gate)) { this.#leave(gate); admitted = false; }
         const startedAt = new Date().toISOString();
         const base = { gate, model, startedAt, concurrencyLimit: false, unbilledKind: null,
           inputTokens: null, outputTokens: null, reasoningTokens: null } as const;
-        if (this.#stops.has(gate)) {
+        if (!admitted) {
           this.#record({ ...base, latencyMs: 0, outcome: "STOPPED", vendorStatus: null, refusalCode: PRACTICE_GATE_STOPPED });
           throw new TypedDomainError(PRACTICE_GATE_STOPPED, `The practice stopped sending to the ${gate} gate`);
         }
@@ -295,6 +401,8 @@ export class PracticeGateObserver {
             this.#record({ ...base, latencyMs, outcome: "TRANSPORT_FAILED", vendorStatus: null, refusalCode: code });
           }
           throw error;
+        } finally {
+          this.#leave(gate);
         }
       }
     });

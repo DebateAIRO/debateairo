@@ -3,14 +3,16 @@
  * engine's own format check.
  *
  * Plain words: for each of the five models and each job (lane), the real prompt is built from synthetic practice
- * material and sent N times (default 3, the two practice questions taken in turn) through exactly the gateway the
+ * material and sent N times (default 2, the two practice questions taken in turn) through exactly the gateway the
  * runner uses on the preview (the guarded fetch over the gate's own protocol, the preview call policy, the model's
- * reviewed controls, effort "high" where the model has it). Each reply is checked by that job's real check. Calls go
- * one at a time with a polite gap. Nothing is stored anywhere but in memory and the report.
+ * reviewed controls, effort "high" where the model has it). Each reply is checked by that job's real check. Nothing is
+ * stored anywhere but in memory, the samples log (practice-samples-log.ts) and the report.
  *
- * Order: the models take turns, one job each (round-robin by model), the Anthropic model between the DeepInfra ones,
- * so one busy model's 60-second resend wait never holds the others back for long. Each model's own jobs keep their
- * order (job by job, the samples of a job together).
+ * Order (practice-concurrency.ts): by default the models work at the same time, each on its own jobs one after another
+ * (one call in flight per model, a small jittered gap between its calls), within each gate's limit of calls at once and
+ * the overall limit. With `parallel: false` (the command's --sequential) calls go one at a time with a polite gap, the
+ * models taking turns, one job each (round-robin by model), the Anthropic model between the DeepInfra ones. Either way
+ * each model's own jobs keep their order (job by job, the samples of a job together).
  *
  * A busy model: when a job's call ends in the vendor's refusal, not billed (the call and its one resend, the gate's
  * PROVIDER_REFUSED_UNBILLED, or the model is cooling off as MODEL_COOLING), the model is marked busy and its remaining
@@ -38,6 +40,7 @@ import {
 } from "@debateai/providers";
 import type { StoryPack } from "@debateai/story";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
+import { limitPort, PracticeSemaphore, runModelQueues, type PracticePreparedJob } from "./practice-concurrency.js";
 import type { PracticeGateName, PracticeGateObserver } from "./practice-gate-observer.js";
 import {
   issueListFromParseError,
@@ -52,7 +55,7 @@ import { reportableReplyText } from "./practice-redaction.js";
 
 export type PracticeSampleStatus =
   | "PARSED" | "PARSE_FAILED" | "SCHEMA_FAILED" | "UNPARSED" | "POST_CHECK_FAILED"
-  | "CALL_FAILED" | "UNBILLED_REFUSED" | "SKIPPED_GATE_STOPPED" | "SKIPPED_MODEL_BUSY";
+  | "CALL_FAILED" | "UNBILLED_REFUSED" | "VENDOR_ERROR_UNBILLED" | "SKIPPED_GATE_STOPPED" | "SKIPPED_MODEL_BUSY";
 
 export type PracticeAttempt = Readonly<{
   callSiteKey: string;
@@ -150,6 +153,14 @@ export function practiceTurnOrder(targets: readonly ProviderDiscoveryTarget[]): 
   return Object.freeze(order);
 }
 
+/**
+ * The formats mode's defaults for calls at once: each gate's when root's status does not name the gate's
+ * max_concurrent_calls, and all together (one per model for the five models; the relay must accept a few more
+ * connections, README S-4).
+ */
+export const PRACTICE_FORMATS_DEFAULTS: Readonly<{ gateLimits: Readonly<Record<PracticeGateName, number>>; maxInFlight: number }> =
+  Object.freeze({ gateLimits: Object.freeze({ deepinfra: 4, anthropic: 1 }), maxInFlight: 5 });
+
 export async function runPracticeFormats(input: Readonly<{
   config: PreviewProviderTestConfig;
   /** One target per model (the first declared target of each model). */
@@ -167,35 +178,49 @@ export async function runPracticeFormats(input: Readonly<{
   progress?: (line: string) => void;
   /** Set to stop between jobs (the operator's interrupt). */
   shouldStop?: () => boolean;
+  /** Models at once (default false: one call at a time, the old order). */
+  parallel?: boolean;
+  /** Each gate's calls at once (default PRACTICE_FORMATS_DEFAULTS.gateLimits). */
+  gateLimits?: Readonly<Partial<Record<PracticeGateName, number>>>;
+  /** Calls at once in all (default PRACTICE_FORMATS_DEFAULTS.maxInFlight). */
+  maxInFlight?: number;
+  /** Test seam for the jittered gap. */
+  random?: () => number;
+  /** Told each finished (or skipped) job at once: the samples log. */
+  onSample?: (sample: PracticeSample) => void;
+  /** Told each model marked busy at once. */
+  onBusy?: (model: string) => void;
 }>): Promise<PracticeFormatsResult> {
-  const guardedFetch = createPreviewGuardedFetch(input.ports);
+  // Each call takes a place at its gate, then one overall (always in that order), before the brake looks at it.
+  const overall = new PracticeSemaphore(input.maxInFlight ?? PRACTICE_FORMATS_DEFAULTS.maxInFlight);
+  const limited = Object.fromEntries(Object.entries(input.ports).map(([provider, port]) => {
+    const gate: PracticeGateName = provider === "anthropic" ? "anthropic" : "deepinfra";
+    const perGate = new PracticeSemaphore(input.gateLimits?.[gate] ?? PRACTICE_FORMATS_DEFAULTS.gateLimits[gate]);
+    return [provider, port === undefined ? port : limitPort(port, [perGate, overall])];
+  })) as PreviewBudgetPorts;
+  const guardedFetch = createPreviewGuardedFetch(limited);
   const sleep = input.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
   const samples: PracticeSample[] = [];
   const busy: string[] = [];
-  let first = true;
+  const record = (sample: PracticeSample) => { samples.push(sample); input.onSample?.(sample); };
   const order = practiceTurnOrder(input.targets);
   const jobs = input.lanes.flatMap((lane) => Array.from({ length: input.samples }, (_unused, index) => ({ lane, sample: index + 1 })));
-  for (const job of jobs) {
-    for (const target of order) {
-      const { lane, sample } = job;
-      const gate = gateOf(target.model);
-      const question = PRACTICE_QUESTIONS[(sample - 1) % PRACTICE_QUESTIONS.length]!;
-      const base = { model: target.model, providerRef: target.providerRef, gate, lane, sample, questionId: question.id };
-      const skipped = (status: "SKIPPED_GATE_STOPPED" | "SKIPPED_MODEL_BUSY", errorCode: string) => {
-        samples.push(Object.freeze({ ...base, status, latencyMs: 0, attempts: [],
-          inputTokens: null, outputTokens: null, costNanoUsd: null, unbilledRefusals: 0, issues: [], recheckIssues: [],
-          errorCode, replyText: null, detail: null }));
-      };
-      if (input.observer.stopped(gate) !== null || input.shouldStop?.() === true) {
-        skipped("SKIPPED_GATE_STOPPED", input.observer.stopped(gate)?.reason ?? "PRACTICE_INTERRUPTED");
-        continue;
-      }
-      if (busy.includes(target.model)) {
-        skipped("SKIPPED_MODEL_BUSY", PRACTICE_MODEL_BUSY);
-        continue;
-      }
-      if (!first && input.gapMs > 0) await sleep(input.gapMs);
-      first = false;
+  const prepare = (target: ProviderDiscoveryTarget, job: Readonly<{ lane: PracticeLane; sample: number }>): PracticePreparedJob => {
+    const { lane, sample } = job;
+    const gate = gateOf(target.model);
+    const question = PRACTICE_QUESTIONS[(sample - 1) % PRACTICE_QUESTIONS.length]!;
+    const base = { model: target.model, providerRef: target.providerRef, gate, lane, sample, questionId: question.id };
+    const skipped = (status: "SKIPPED_GATE_STOPPED" | "SKIPPED_MODEL_BUSY", errorCode: string) => {
+      record(Object.freeze({ ...base, status, latencyMs: 0, attempts: [],
+        inputTokens: null, outputTokens: null, costNanoUsd: null, unbilledRefusals: 0, issues: [], recheckIssues: [],
+        errorCode, replyText: null, detail: null }));
+      return null;
+    };
+    if (input.observer.stopped(gate) !== null || input.shouldStop?.() === true) {
+      return skipped("SKIPPED_GATE_STOPPED", input.observer.stopped(gate)?.reason ?? "PRACTICE_INTERRUPTED");
+    }
+    if (busy.includes(target.model)) return skipped("SKIPPED_MODEL_BUSY", PRACTICE_MODEL_BUSY);
+    return async () => {
       const sink = { artifacts: [] as RawArtifactInput[], ledger: [] as ProviderLedgerInput[] };
       const recording = recordingGateway({ target, config: input.config, guardedFetch, sink,
         ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
@@ -226,8 +251,10 @@ export async function runPracticeFormats(input: Readonly<{
         errorCode = errorCodeOf(error);
       }
       const latencyMs = Math.round(performance.now() - started);
-      const wire = input.observer.events.slice(eventsBefore);
+      // This model's own calls only: with the models at once, the others' calls land in between.
+      const wire = input.observer.events.slice(eventsBefore).filter((event) => event.model === target.model);
       const unbilled = wire.filter((event) => event.outcome === "UNBILLED").length;
+      const errorUnbilled = wire.filter((event) => event.unbilledKind === "VENDOR_ERROR_UNBILLED").length;
       const inputTokens = wire.reduce<number | null>((sum, event) => event.inputTokens === null ? sum : (sum ?? 0) + event.inputTokens, null);
       const outputTokens = wire.reduce<number | null>((sum, event) => event.outputTokens === null ? sum : (sum ?? 0) + event.outputTokens, null);
       const row = previewModelRow(target.model);
@@ -246,6 +273,8 @@ export async function runPracticeFormats(input: Readonly<{
       else if (failed !== null) status = failed.parseStatus; // a repair fixed it, but the first reply had the wrong format
       else if (postCheckError !== null) status = "POST_CHECK_FAILED";
       else if (last !== null && errorCode === null) status = "PARSED";
+      // The vendor answered with an error it did not bill and that is not "busy" (e.g. Anthropic's 400): a failed call.
+      else if (errorUnbilled > 0 && last === null) status = "VENDOR_ERROR_UNBILLED";
       else if (unbilled > 0 && last === null) status = "UNBILLED_REFUSED";
       else if (last !== null && errorCode !== null) status = "POST_CHECK_FAILED";
       else status = "CALL_FAILED";
@@ -254,21 +283,25 @@ export async function runPracticeFormats(input: Readonly<{
       const issues = problem === null ? [] : issueListFromParseError(problem.parseError ?? null);
       const recheck = problem === null || content === null ? [] : recheckReply(attempts.find((attempt) => attempt.parseStatus !== "PARSED")?.callSiteKey
         ?? attempts[0]?.callSiteKey ?? "UNMAPPED", content).issues;
-      samples.push(Object.freeze({
+      // A call ended in the vendor's refusal, not billed: the model sits out the rest (marked before the sample is told).
+      const markedBusy = endedBusy && !busy.includes(target.model);
+      if (markedBusy) busy.push(target.model);
+      record(Object.freeze({
         ...base, status, latencyMs, attempts: Object.freeze(attempts), inputTokens, outputTokens, costNanoUsd,
         unbilledRefusals: unbilled, issues, recheckIssues: recheck,
         errorCode: postCheckError ?? errorCode,
         replyText: content === null ? null : reportableReplyText(content),
         detail
       }));
-      // A call ended in the vendor's refusal, not billed: the model sits out the rest.
-      if (endedBusy && !busy.includes(target.model)) {
-        busy.push(target.model);
+      if (markedBusy) {
+        input.onBusy?.(target.model);
         input.progress?.(`${target.model} is busy (refused, not billed): its remaining jobs are skipped`);
       }
       input.progress?.(`${target.model} ${lane} #${String(sample)}: ${status} ${String(latencyMs)}ms`);
-    }
-  }
+    };
+  };
+  await runModelQueues({ models: order, jobs, parallel: input.parallel === true, gapMs: input.gapMs, prepare, sleep,
+    ...(input.random === undefined ? {} : { random: input.random }) });
   return Object.freeze({ samples: Object.freeze(samples), models: Object.freeze(input.targets.map((target) => target.model)),
     lanes: Object.freeze([...input.lanes]), busyModels: Object.freeze([...busy]) });
 }

@@ -26,8 +26,10 @@ Two modes:
   of material the real debate gives it: the answer writer may cite every argued point, not only the winning one; the
   story covers two positions; the answer checker and the story read a written answer; the reviewer is asked about
   no link, one link and two links in turn. Each reply is checked by the job's own format check. It is fast to read:
-  which model fails which job, and the exact problem. The models take turns, one job each, with Claude Haiku
-  between the DeepInfra models, so one busy model does not hold the others back.
+  which model fails which job, and the exact problem. The five models work at the same time, each on its own jobs
+  one after another (one call per model at a time, about a second apart), so a slow model no longer holds the others
+  back: the run takes about as long as the slowest model's own jobs. `--sequential` sends one call at a time instead
+  (the models taking turns, one job each), as before.
 - **debate**: one whole practice debate (depth 1 by default, 2 allowed). It goes through the real ask path (health
   check of each model, start-of-debate estimate against what each gate says is left, role rotation, admission) and
   then the real runner, on the live register's exact settings. At the end: served answer, story, and every call's
@@ -39,8 +41,18 @@ Run **formats** first, then **debate**. Both must PASS.
 
 Each run writes `report.json` (everything, including the text of every reply that failed its format check, with
 anything key-shaped blanked, at most 64 KiB each) and `report.md` (a short summary with no reply text) into the folder
-given by `--out`. The folder must be outside the repository; the tool refuses a folder inside it. Without `--out` it
-makes a fresh folder under the system temp folder and prints its path.
+given by `--out`. The folder must be outside the repository; the tool refuses a folder inside it, and (formats) a folder
+that already holds another run's `samples.jsonl`. Without `--out` it makes a fresh folder under the system temp folder
+and prints its path.
+
+Formats mode never loses a finished job: each one is written to `samples.jsonl` in the same folder the moment it
+finishes (with the same content the report holds), and the report is built from that file at the end, and on every
+other way out too (Ctrl-C, Ctrl-C again, the tool breaking midway). To build `report.json` and `report.md` again from
+a folder's `samples.jsonl` (nothing is sent; no socket or acknowledgement needed):
+
+```sh
+pnpm exec tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
+```
 
 The last line on the screen and the exit code say:
 
@@ -49,8 +61,9 @@ The last line on the screen and the exit code say:
 | 0 | PASS | Everything worked. The upload may go ahead. |
 | 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes. Owner decides. |
 | 20 | FAIL | A reply had the wrong format, a call failed, the debate did not finish, no answer or no story, or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
-| 30 | NOT_PROVEN | It worked, but a model was busy (the AI company refused its call as "too busy", not billed, or the model was cooling off) and sat out the rest, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, so some model was not tested to the end. Run again later, or owner decides. |
+| 30 | NOT_PROVEN | It worked, but a model was busy (the AI company refused its call as "too busy", not billed, or the model was cooling off) and sat out the rest, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, or the operator pressed Ctrl-C once, so some model was not tested to the end. Run again later, or owner decides. |
 | 40 | HARNESS_ERROR | The practice could not run (a start check refused, or the tool broke). Nothing about the release is known. |
+| 50 | ABORTED | The practice started but did not reach its end (Ctrl-C a second time, or the tool broke midway). The report holds every job that finished, and lists whatever else it found. Run again. |
 
 ## Safety rules built in
 
@@ -68,16 +81,31 @@ The last line on the screen and the exit code say:
   the runner makes a busy model sit out by itself. Either way the verdict for that model is NOT_PROVEN, not FAIL.
   The gate's own refusal "too many calls at once" never marks a model busy.
 - The safety net on each gate, counted as the gate counts: the practice never sends to a gate again after 4
-  answers in a row on it that were "could not reach the AI company" (counting from the count the gate already had
-  at the start; the gate itself halts at 5 in a row). A vendor answer resets that count. "Too busy" refusals and
-  cool-offs neither add to it nor reset it, as the gate's own count works. A gate that refuses or halts for any other
-  reason also stops at once. "Too many calls at once" moves nothing. Ctrl-C once: no new calls are sent, the call in
-  flight finishes; Ctrl-C twice quits at once (avoid: a call killed mid-flight can halt the gate).
-- Calls go one at a time, with a 2-second gap between jobs in formats mode.
+  answers in a row on it that were "could not reach the AI company" or an error the AI company answered without
+  billing it and without saying it is busy (the gate's PROVIDER_ERROR_UNBILLED, e.g. Anthropic's 400, 404, 413 or 500:
+  the gate counts both in the same run), counting from the count the gate already had at the start; the gate itself
+  halts at 5 in a row. A vendor answer resets that count. "Too busy" refusals and cool-offs neither add to it nor reset
+  it, as the gate's own count works. A gate that refuses or halts for any other reason also stops at once. "Too many
+  calls at once" moves nothing. With several calls at once, a call is only sent while that count plus the calls still
+  in flight on the gate stays within 4 (if every one of them failed, the gate would still not halt); otherwise it waits
+  for one to come back. In formats mode a job whose calls all ended in such an unbilled error is a failed call (FAIL),
+  never "busy".
+- Ctrl-C once: no new calls are sent, the calls in flight finish, the report is written (NOT_PROVEN unless something
+  failed). Ctrl-C again within two seconds counts as the same press (pnpm and tsx pass the key press on again). Ctrl-C
+  again later quits at once and still writes the report from the finished jobs (ABORTED); avoid it: a call killed
+  mid-flight can halt the gate.
+- Formats mode: one call at a time per model, about a second apart (a slightly random gap, `--gap-ms`, default 1000),
+  at most the gate's own number of calls at once per gate (root's status `max_concurrent_calls` when it names it, else
+  4 for DeepInfra and 1 for Anthropic), and at most 5 calls at once in all (`--max-in-flight`). The relay must accept
+  at least 3 more connections than `--max-in-flight` (S-4 starts it with `--max-connections 8`); a relay that refuses a
+  connection makes that call fail and stops the gate. `--sequential`: one call at a time, a 2-second gap. Debate mode
+  is unchanged: the runner sends one call at a time.
 
 ## Money and time (rough)
 
-- formats, default (5 models x 9 jobs x 3 samples): 135 calls, about $0.15 to $0.40, about 1 to 2 hours.
+- formats, default (5 models x 9 jobs x 2 samples): 90 jobs, about $0.10 to $0.30. The models go at the same time, so
+  it takes about as long as the slowest model's 18 jobs: about 15 to 50 minutes (GLM, Qwen and MiMo take 30 to 170
+  seconds a call). With `--sequential`, about 1 to 2 hours.
 - debate, depth 1: up to about 230 calls, about $0.15 to $0.70, about 1 to 2 hours. Depth 2: about 350 calls, up to
   about 3 hours. The start-of-debate estimate needs much more room left in the pots than is actually spent (about
   $4 DeepInfra and $0.90 Anthropic left for depth 1), so run early in the Bucharest day.
@@ -153,7 +181,7 @@ runner account, sandboxed: no network but unix sockets, read-only system, no new
 install -d -o root -g root -m 0755 /usr/local/lib/debateai-practice
 install -o root -g root -m 0644 /home/ubuntu/gate-relay.py /usr/local/lib/debateai-practice/gate-relay.py
 sha256sum /usr/local/lib/debateai-practice/gate-relay.py
-systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=debateai-practice -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30000 -p TimeoutStopSec=960 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group debateai-practice --mode 0660 --max-connections 4 --lifetime-seconds 28800 --drain-seconds 900
+systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=debateai-practice -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30000 -p TimeoutStopSec=960 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group debateai-practice --mode 0660 --max-connections 8 --lifetime-seconds 28800 --drain-seconds 900
 systemctl status debateai-preview-practice-relay --no-pager
 journalctl -u debateai-preview-practice-relay -o cat --no-pager
 ls -l /run/debateai-practice
@@ -195,9 +223,11 @@ echo "exit: $?"
 
 Optional flags:
 
-- formats: `--samples N` (1 to 10, default 3), `--gap-ms MS` (default 2000), `--models a,b` (model ids from the
-  preview's roster), `--lanes JUDGE_POSITION,PANEL,...` (default all nine: JUDGE_POSITION, JUDGE_ATTACK, JUDGE_CROSS,
-  PANEL, REVIEW, SYNTHESIZER, EVALUATOR, STORYTELLER, STORY_CHECKER).
+- formats: `--samples N` (1 to 10, default 2), `--gap-ms MS` (between one model's calls, default 1000; with
+  `--sequential` between all calls, default 2000), `--max-in-flight N` (1 to 20, default 5), `--sequential`,
+  `--models a,b` (model ids from the preview's roster), `--lanes JUDGE_POSITION,PANEL,...` (default all nine:
+  JUDGE_POSITION, JUDGE_ATTACK, JUDGE_CROSS, PANEL, REVIEW, SYNTHESIZER, EVALUATOR, STORYTELLER, STORY_CHECKER).
+- report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/samples.jsonl.
 - debate: `--depth 1|2`, `--question ro|en`. The register is copied only through the register's own publication
   paths; an export holding a support-configuration version refuses (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
 
@@ -230,7 +260,9 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode. `practice-debate.ts`,
   `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode.
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
-  `practice-redaction.ts`, `practice-settings.ts`, `practice-questions.ts`.
+  `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (models at once,
+  the per-gate and overall limits), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
+  `practice-questions.ts`.
 - `gate-relay.py` and `test_gate_relay.py` (run: `python3 tools/preview-practice/test_gate_relay.py`).
 - Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-wiring-drift.test.ts`,
   `tests/integration/preview-practice-run.test.ts` (both modes against the scripted gate doubles in

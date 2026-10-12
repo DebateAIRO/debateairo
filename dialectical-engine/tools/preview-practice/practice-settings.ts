@@ -163,11 +163,18 @@ export function readPracticeSettings(path: string): PracticeSettings {
   return parsePracticeSettings(text);
 }
 
-export type PracticeGateStatus = Readonly<{ state: string; unsentStreak: number; halts: number | null }>;
+export type PracticeGateStatus = Readonly<{
+  state: string;
+  unsentStreak: number;
+  halts: number | null;
+  /** The gate's own limit of calls at once, when the status names it (top level or under `limits`); else null. */
+  maxConcurrentCalls: number | null;
+}>;
 
 /**
- * Root's `status` output of one gate (JSON). Only three members are read (state, unsent_streak, halts); the file is
- * never copied into a report. The day's unbilled count is not read: the gate no longer halts on it.
+ * Root's `status` output of one gate (JSON). Only four members are read (state, unsent_streak, halts,
+ * max_concurrent_calls); the file is never copied into a report. The day's unbilled count is not read: the gate no
+ * longer halts on it.
  */
 export function parseGateStatus(gate: string, text: string): PracticeGateStatus {
   let value: unknown;
@@ -178,7 +185,10 @@ export function parseGateStatus(gate: string, text: string): PracticeGateStatus 
     throw new PracticeRefusal("PRACTICE_GATE_STATUS_INVALID", gate);
   }
   const halts = typeof row.halts === "number" ? row.halts : Array.isArray(row.halts) ? row.halts.length : null;
-  return Object.freeze({ state: row.state, unsentStreak: streak, halts });
+  const limits = typeof row.limits === "object" && row.limits !== null ? row.limits as Record<string, unknown> : {};
+  const named = row.max_concurrent_calls ?? limits.max_concurrent_calls;
+  const maxConcurrentCalls = typeof named === "number" && Number.isSafeInteger(named) && named >= 1 ? named : null;
+  return Object.freeze({ state: row.state, unsentStreak: streak, halts, maxConcurrentCalls });
 }
 
 /** The start rule on root's status: active, and fewer than three connection failures in a row (no daily cap). */

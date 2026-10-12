@@ -1,11 +1,16 @@
 // The preview practice tool's pure rules (tools/preview-practice): the verdict and its exit codes, the redaction of
 // reply text, the gate brake (stop after four connection failures in a row; vendor refusals and cool-offs never stop it), the
-// busy-model skip of the formats mode, and the start refusals.
-import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+// busy-model skip of the formats mode, the start refusals, the samples log and its rebuilt report, the interrupt
+// debounce, the per-gate limit and the one-call-per-model rule of the parallel formats mode.
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   PREVIEW_REVIEWED_PROVIDER_REFS,
+  createPreviewBudgetRpcPort,
   PreviewGateUnavailable,
   PreviewModelCooling,
   PreviewUnbilledRefusal,
@@ -20,7 +25,17 @@ import {
 import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
 import { PracticeGateObserver, PRACTICE_GATE_STOPPED, practiceStopIsPause, vendorUsage } from "../../tools/preview-practice/practice-gate-observer.js";
-import { onePerModel, practiceTurnOrder, runPracticeFormats } from "../../tools/preview-practice/practice-formats.js";
+import { onePerModel, practiceTurnOrder, runPracticeFormats, type PracticeSample } from "../../tools/preview-practice/practice-formats.js";
+import { jitteredGap, limitPort, PracticeSemaphore, runModelQueues } from "../../tools/preview-practice/practice-concurrency.js";
+import { practiceInterruptGate } from "../../tools/preview-practice/practice-interrupt.js";
+import {
+  parsePracticeSampleLog,
+  PracticeSampleLog,
+  practiceReportFromLog,
+  PRACTICE_LOG_HAS_NO_END,
+  readPracticeSampleLog,
+  type PracticeLogLine
+} from "../../tools/preview-practice/practice-samples-log.js";
 import { stubVendorReply } from "../support/preview-gate-stubs.js";
 import { issueListFromParseError, recheckReply, replyContentOf, callFamilyOf } from "../../tools/preview-practice/practice-lanes.js";
 import { capReplyText, redactKeyShapes, reportableReplyText } from "../../tools/preview-practice/practice-redaction.js";
@@ -440,5 +455,323 @@ describe("practice formats: a busy model sits out, the others go on, in turns", 
         evaluator: policy.synthesisRolePolicy.evaluatorBound }, sleep: async () => undefined });
     expect(result.busyModels).toEqual([]);
     expect(result.samples.find((sample) => sample.model === GLM)?.status).toBe("UNBILLED_REFUSED");
+  });
+
+  it("parallel: the same busy-model rule, each sample counts only its own model's calls, every sample is told at once", async () => {
+    const observer = new PracticeGateObserver({ now: () => 0 });
+    const seen: string[] = [];
+    const ports = { deepinfra: observer.wrap("deepinfra", gatePort("deepinfra", [GLM], seen)),
+      anthropic: observer.wrap("anthropic", gatePort("anthropic", [GLM], seen)) };
+    const told: string[] = [];
+    const result = await runPracticeFormats({ config, targets, ports, observer, lanes: ["JUDGE_POSITION", "PANEL"], samples: 2, gapMs: 0,
+      pack, bounds: { judge: policy.bounds.JUDGE, synthesizer: policy.synthesisRolePolicy.synthesizerBound,
+        evaluator: policy.synthesisRolePolicy.evaluatorBound }, sleep: async () => undefined, parallel: true,
+      onSample: (sample) => told.push(`${sample.model}|${sample.lane}|${String(sample.sample)}`), onBusy: (model) => told.push(`busy:${model}`) });
+    expect(result.samples.filter((sample) => sample.model === GLM).map((sample) => sample.status))
+      .toEqual(["UNBILLED_REFUSED", "SKIPPED_MODEL_BUSY", "SKIPPED_MODEL_BUSY", "SKIPPED_MODEL_BUSY"]);
+    expect(result.busyModels).toEqual([GLM]);
+    expect(seen.filter((model) => model === GLM)).toHaveLength(2);
+    // Each of the other models' samples counted only its own calls (no other model's refusals or tokens).
+    for (const sample of result.samples.filter((entry) => entry.model !== GLM)) {
+      expect(sample.attempts.length).toBeGreaterThan(0);
+      expect(sample).toMatchObject({ unbilledRefusals: 0, inputTokens: 100 * sample.attempts.length, outputTokens: 50 * sample.attempts.length });
+    }
+    expect(told.filter((entry) => !entry.startsWith("busy:"))).toHaveLength(20);
+    expect(told).toContain(`busy:${GLM}`);
+  });
+});
+
+describe("practice verdict: an interrupted or aborted run", () => {
+  it("one interrupt (the calls in flight finished, the rest skipped) is NOT_PROVEN, never FAIL on its own", () => {
+    expect(practiceVerdict({ ...CLEAN, interrupted: true }))
+      .toEqual({ verdict: "NOT_PROVEN", exitCode: 30, reasons: ["RUN_INTERRUPTED"] });
+    expect(practiceVerdict({ ...CLEAN, interrupted: true, formatFailures: 1 }).verdict).toBe("FAIL");
+  });
+  it("ABORTED (50) outranks FAIL and lists every other rule after the abort; HARNESS_ERROR still outranks it", () => {
+    expect(practiceVerdict({ ...CLEAN, aborted: "OPERATOR_SECOND_INTERRUPT", formatFailures: 1 }))
+      .toEqual({ verdict: "ABORTED", exitCode: 50, reasons: ["ABORTED:OPERATOR_SECOND_INTERRUPT", "FORMAT_FAILED:1"] });
+    expect(practiceVerdict({ ...CLEAN, aborted: "X", harnessError: "Y" }).verdict).toBe("HARNESS_ERROR");
+  });
+});
+
+describe("practice gate status: the gate's own limit of calls at once", () => {
+  it("reads max_concurrent_calls at the top level or under limits; null when absent or invalid", () => {
+    expect(parseGateStatus("deepinfra", JSON.stringify({ state: "active", unsent_streak: 0, max_concurrent_calls: 10 })).maxConcurrentCalls).toBe(10);
+    expect(parseGateStatus("anthropic", JSON.stringify({ state: "active", unsent_streak: 0, limits: { max_concurrent_calls: 2 } })).maxConcurrentCalls).toBe(2);
+    expect(parseGateStatus("anthropic", JSON.stringify({ state: "active", unsent_streak: 0 })).maxConcurrentCalls).toBeNull();
+    expect(parseGateStatus("anthropic", JSON.stringify({ state: "active", unsent_streak: 0, max_concurrent_calls: 0 })).maxConcurrentCalls).toBeNull();
+  });
+});
+
+describe("practice gate brake: PROVIDER_ERROR_UNBILLED and calls at once", () => {
+  const body = (model: string) => JSON.stringify({ model, max_tokens: 1, messages: [] });
+  const execution = (model: string) => ({ operationId: "op", requestBody: body(model), requestSha256: "0".repeat(64), reservedUsd: "0.1" });
+
+  it("the gate's PROVIDER_ERROR_UNBILLED (through the app's real port) counts in the run like 'not reached', never as busy", async () => {
+    const folder = mkdtempSync(join(tmpdir(), "pp-err-"));
+    const socket = join(folder, "gate.sock");
+    let sent = 0;
+    const server = createServer((request, response) => {
+      request.resume();
+      request.on("end", () => {
+        sent += 1;
+        response.writeHead(409, { "content-type": "application/json" }).end(JSON.stringify({ error: "PROVIDER_ERROR_UNBILLED" }));
+      });
+    });
+    await new Promise<void>((done) => server.listen(socket, done));
+    try {
+      const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"],
+        premium_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash", "claude-haiku-5-5"],
+        requested_thinking_level: "high", budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock",
+        anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock", scope_id: "preview-practice-unit" }))!;
+      const observer = new PracticeGateObserver({ now: () => 0 });
+      const watched = observer.wrap("anthropic", createPreviewBudgetRpcPort(config, socket));
+      for (let index = 0; index < 4; index += 1) await expect(watched.execute(execution("claude-haiku-5-5"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
+      await expect(watched.execute(execution("claude-haiku-5-5"))).rejects.toMatchObject({ code: PRACTICE_GATE_STOPPED });
+      expect(sent).toBe(4);
+      expect(observer.events.slice(0, 4).map((event) => event.unbilledKind)).toEqual(Array(4).fill("VENDOR_ERROR_UNBILLED"));
+      expect(observer.summary("anthropic")).toMatchObject({ unbilled: 4, vendorErrorUnbilled: 4, notReached: 0, vendorRefused: 0,
+        longestNotReachedRun: 4, stop: { reason: "NOT_REACHED_IN_A_ROW_4" } });
+      expect(observer.modelsEndingBusy()).toEqual([]);
+    } finally {
+      await new Promise<void>((done) => server.close(() => done()));
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  it("under concurrency a call is only sent while the run plus the calls in flight stays under the brake", async () => {
+    const observer = new PracticeGateObserver({ now: () => 0 });
+    const pending: ((fail: boolean) => void)[] = [];
+    let sent = 0;
+    const port: PreviewBudgetPort = { execute: () => new Promise((resolve, reject) => {
+      sent += 1;
+      pending.push((fail) => fail ? reject(new PreviewUnbilledRefusal()) : resolve({ status: 200, body: "{}" }));
+    }) };
+    const watched = observer.wrap("deepinfra", port);
+    const settle = async (fail: boolean) => { pending.shift()!(fail); await new Promise((resolve) => setImmediate(resolve)); };
+    // Two connection failures so far.
+    const first = [watched.execute(execution("a")).catch(() => "x"), watched.execute(execution("b")).catch(() => "x")];
+    await new Promise((resolve) => setImmediate(resolve));
+    await settle(true); await settle(true);
+    await Promise.all(first);
+    // Run 2: two more may go at once (2 + 2 = 4, the brake); the third waits.
+    const calls = [watched.execute(execution("a")).catch(() => "x"), watched.execute(execution("b")).catch(() => "x"),
+      watched.execute(execution("c")).catch((error: unknown) => error)];
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(sent).toBe(4);
+    expect(observer.inFlight("deepinfra")).toBe(2);
+    // Both in flight fail: the run reaches four, the brake stops the gate, and the waiting call is never sent.
+    await settle(true); await settle(true);
+    expect(await calls[2]).toMatchObject({ code: PRACTICE_GATE_STOPPED });
+    expect(sent).toBe(4);
+    expect(observer.summary("deepinfra")).toMatchObject({ longestNotReachedRun: 4, stop: { reason: "NOT_REACHED_IN_A_ROW_4" } });
+  });
+
+  it("the waiting call goes as soon as a call in flight comes back with an answer (the run resets)", async () => {
+    const observer = new PracticeGateObserver({ unsentStreakAtStart: { deepinfra: 3 }, now: () => 0 });
+    const pending: (() => void)[] = [];
+    let sent = 0;
+    const port: PreviewBudgetPort = { execute: () => new Promise((resolve) => {
+      sent += 1;
+      pending.push(() => resolve({ status: 200, body: "{}" }));
+    }) };
+    const watched = observer.wrap("deepinfra", port);
+    const one = watched.execute(execution("a"));
+    const two = watched.execute(execution("b"));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(sent).toBe(1); // 3 at the start + 1 in flight = 4: the second waits
+    pending.shift()!();
+    await one;
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(sent).toBe(2);
+    pending.shift()!();
+    await two;
+    expect(observer.stopped("deepinfra")).toBeNull();
+  });
+});
+
+describe("practice concurrency", () => {
+  it("a gate's semaphore never lets more than its limit through, in arrival order; an abort leaves the queue", async () => {
+    const semaphore = new PracticeSemaphore(2);
+    const order: number[] = [];
+    const releases = await Promise.all([semaphore.acquire(), semaphore.acquire()]);
+    const third = semaphore.acquire().then((release) => { order.push(3); return release; });
+    const controller = new AbortController();
+    const aborted = semaphore.acquire(controller.signal).catch(() => "aborted");
+    const fifth = semaphore.acquire().then((release) => { order.push(5); return release; });
+    expect(semaphore.held).toBe(2);
+    controller.abort();
+    expect(await aborted).toBe("aborted");
+    releases[0]!();
+    (await third)();
+    releases[1]!();
+    (await fifth)();
+    expect(order).toEqual([3, 5]);
+    expect(semaphore.most).toBe(2);
+    expect(semaphore.held).toBe(0);
+  });
+
+  it("a limited port holds every semaphore it is given while the call runs, and gives them back when it fails too", async () => {
+    const gate = new PracticeSemaphore(1);
+    const overall = new PracticeSemaphore(3);
+    let inside = 0;
+    let most = 0;
+    const port: PreviewBudgetPort = { async execute(input) {
+      inside += 1; most = Math.max(most, inside);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inside -= 1;
+      if (input.operationId === "fail") throw new Error("boom");
+      return { status: 200, body: "{}" };
+    } };
+    const limited = limitPort(port, [gate, overall]);
+    const run = (operationId: string) => limited.execute({ operationId, requestBody: "{}", requestSha256: "0".repeat(64), reservedUsd: "0" });
+    await Promise.allSettled([run("a"), run("fail"), run("b")]);
+    expect(most).toBe(1);
+    expect(gate.held + overall.held).toBe(0);
+  });
+
+  it("the jittered gap stays within 75% to 125% of the gap", () => {
+    expect(jitteredGap(1_000, () => 0)).toBe(750);
+    expect(jitteredGap(1_000, () => 1)).toBe(1_250);
+    expect(jitteredGap(0, () => 0.5)).toBe(0);
+  });
+
+  /** Fake jobs: each holds its model's slot until released by hand; records what was in flight at once. */
+  function fakeJobs(models: readonly string[]) {
+    const inFlight = new Map<string, number>();
+    const mostByModel = new Map<string, number>();
+    let now = 0;
+    let most = 0;
+    const started: string[] = [];
+    const prepare = (model: string, job: number) => async () => {
+      started.push(`${model}#${String(job)}`);
+      inFlight.set(model, (inFlight.get(model) ?? 0) + 1);
+      mostByModel.set(model, Math.max(mostByModel.get(model) ?? 0, inFlight.get(model)!));
+      now += 1; most = Math.max(most, now);
+      await new Promise((resolve) => setTimeout(resolve, model === models[0] ? 3 : 1));
+      inFlight.set(model, inFlight.get(model)! - 1);
+      now -= 1;
+    };
+    return { prepare, started, mostByModel, most: () => most };
+  }
+
+  it("parallel: every model at once, but never two calls of one model at once; each model's jobs keep their order", async () => {
+    const models = ["glm", "haiku", "qwen"];
+    const fake = fakeJobs(models);
+    const gaps: number[] = [];
+    await runModelQueues({ models, jobs: [1, 2, 3], parallel: true, gapMs: 1_000, prepare: fake.prepare,
+      sleep: async (milliseconds) => { gaps.push(milliseconds); }, random: () => 0.5 });
+    expect(fake.most()).toBe(3);
+    expect([...fake.mostByModel.values()]).toEqual([1, 1, 1]);
+    for (const model of models) expect(fake.started.filter((entry) => entry.startsWith(model))).toEqual([`${model}#1`, `${model}#2`, `${model}#3`]);
+    // A gap before each model's calls but its first.
+    expect(gaps).toEqual(Array(6).fill(1_000));
+  });
+
+  it("sequential: one call at a time, the models taking turns, job by job", async () => {
+    const models = ["glm", "haiku"];
+    const fake = fakeJobs(models);
+    await runModelQueues({ models, jobs: [1, 2], parallel: false, gapMs: 0, prepare: fake.prepare, sleep: async () => undefined });
+    expect(fake.most()).toBe(1);
+    expect(fake.started).toEqual(["glm#1", "haiku#1", "glm#2", "haiku#2"]);
+  });
+
+  it("a skipped job costs no call and no gap", async () => {
+    const gaps: number[] = [];
+    const sent: number[] = [];
+    await runModelQueues({ models: ["m"], jobs: [1, 2, 3, 4], parallel: true, gapMs: 100,
+      prepare: (_model, job) => job === 2 || job === 3 ? null : async () => { sent.push(job); },
+      sleep: async (milliseconds) => { gaps.push(milliseconds); }, random: () => 0.5 });
+    expect(sent).toEqual([1, 4]);
+    expect(gaps).toEqual([100]);
+  });
+});
+
+describe("practice interrupt", () => {
+  it("interrupts within two seconds of the first are the same interrupt; a later one quits", () => {
+    let clock = 1_000;
+    const gate = practiceInterruptGate({ now: () => clock });
+    expect(gate.signal()).toBe("FIRST");
+    clock += 5; expect(gate.signal()).toBe("REPEAT_IGNORED");
+    clock += 1_990; expect(gate.signal()).toBe("REPEAT_IGNORED");
+    clock += 5; expect(gate.signal()).toBe("QUIT");
+    expect(gate.signal()).toBe("QUIT");
+  });
+});
+
+describe("practice samples log", () => {
+  const start: PracticeLogLine = { kind: "start", schema: "preview-practice-samples-v1", mode: "formats", startedAt: "2026-10-12T00:00:00.000Z",
+    models: ["glm", "haiku"], lanes: ["PANEL"], samples: 2, parallel: true, unsentStreakAtStart: { deepinfra: 0, anthropic: 0 },
+    remainingBefore: { deepinfra: null, anthropic: null } };
+  const sample = (model: string, sampleNo: number, status: PracticeSample["status"], replyText: string | null = null): PracticeSample => ({
+    model, providerRef: `preview:${model}`, gate: model === "haiku" ? "anthropic" : "deepinfra", lane: "PANEL", sample: sampleNo,
+    questionId: "en", status, latencyMs: 1_000, attempts: [{ callSiteKey: "PANEL:x", outcome: "OK", parseStatus: status === "PARSED" ? "PARSED" : "SCHEMA_FAILED", latencyMs: 1_000 }],
+    inputTokens: 10, outputTokens: 5, costNanoUsd: "100", unbilledRefusals: 0, issues: replyText === null ? [] : ["invalid_type@x"],
+    recheckIssues: [], errorCode: null, replyText, detail: null });
+  const wire = (seq: number, model: string) => ({ kind: "wire", event: { seq, gate: model === "haiku" ? "anthropic" : "deepinfra", model,
+    startedAt: "2026-10-12T00:00:01.000Z", latencyMs: 1_000, outcome: "VENDOR_OK", vendorStatus: 200, refusalCode: null, concurrencyLimit: false,
+    unbilledKind: null, inputTokens: 10, outputTokens: 5, reasoningTokens: null } }) as PracticeLogLine;
+  const folders: string[] = [];
+  const folder = () => { const made = mkdtempSync(join(tmpdir(), "pp-log-")); folders.push(made); return made; };
+  afterEach(() => { for (const made of folders.splice(0)) rmSync(made, { recursive: true, force: true }); });
+
+  it("appends each line at once and rebuilds the run's own report from the lines alone", () => {
+    const directory = folder();
+    const log = PracticeSampleLog.create(directory);
+    log.append(start);
+    log.append(wire(1, "glm"));
+    log.append({ kind: "sample", sample: sample("glm", 1, "PARSED") });
+    // Readable on the disk before the run ends.
+    expect(readPracticeSampleLog(directory).filter((line) => line.kind === "sample")).toHaveLength(1);
+    log.append(wire(2, "haiku"));
+    log.append({ kind: "sample", sample: sample("haiku", 1, "SCHEMA_FAILED", "{\"x\":\"high\"}") });
+    log.append({ kind: "end", finishedAt: "2026-10-12T00:10:00.000Z", interrupted: false, remainingAfter: { deepinfra: null, anthropic: null } });
+    log.close();
+    const report = practiceReportFromLog(readPracticeSampleLog(directory)) as unknown as {
+      verdict: string; exitCode: number; reasons: string[]; totals: { samples: number }; failures: PracticeSample[];
+      gates: Record<string, { observed: { calls: number } }>; plannedSamples: number; wallSeconds: number };
+    expect(report).toMatchObject({ verdict: "FAIL", exitCode: 20, totals: { samples: 2 }, plannedSamples: 4, wallSeconds: 600 });
+    expect(report.reasons[0]).toBe("FORMAT_FAILED:1");
+    expect(report.failures.map((failure) => failure.replyText)).toEqual(["{\"x\":\"high\"}"]);
+    expect(report.gates.deepinfra!.observed.calls).toBe(1);
+    expect(report.gates.anthropic!.observed.calls).toBe(1);
+  });
+
+  it("an aborted run (or one killed outright, with no end line) is ABORTED (exit 50) with every finished sample", () => {
+    const lines: PracticeLogLine[] = [start, wire(1, "glm"), { kind: "sample", sample: sample("glm", 1, "PARSED") },
+      { kind: "abort", at: "2026-10-12T00:05:00.000Z", code: "OPERATOR_SECOND_INTERRUPT" }];
+    const aborted = practiceReportFromLog(lines) as unknown as { verdict: string; exitCode: number; reasons: string[]; totals: { samples: number } };
+    expect(aborted).toMatchObject({ verdict: "ABORTED", exitCode: 50, totals: { samples: 1 } });
+    expect(aborted.reasons[0]).toBe("ABORTED:OPERATOR_SECOND_INTERRUPT");
+    const killed = practiceReportFromLog(lines.slice(0, 3)) as unknown as { reasons: string[]; exitCode: number };
+    expect(killed.exitCode).toBe(50);
+    expect(killed.reasons[0]).toBe(`ABORTED:${PRACTICE_LOG_HAS_NO_END}`);
+  });
+
+  it("an interrupted run that ended its log is NOT_PROVEN with the samples it finished", () => {
+    const lines: PracticeLogLine[] = [start, wire(1, "glm"), { kind: "sample", sample: sample("glm", 1, "PARSED") },
+      { kind: "stop", stop: { gate: "deepinfra", reason: "OPERATOR_INTERRUPT", atSeq: 1 } },
+      { kind: "stop", stop: { gate: "anthropic", reason: "OPERATOR_INTERRUPT", atSeq: 1 } },
+      { kind: "sample", sample: { ...sample("haiku", 1, "PARSED"), status: "SKIPPED_GATE_STOPPED", attempts: [] } },
+      { kind: "end", finishedAt: "2026-10-12T00:05:00.000Z", interrupted: true, remainingAfter: { deepinfra: null, anthropic: null } }];
+    const report = practiceReportFromLog(lines) as unknown as { verdict: string; reasons: string[] };
+    expect(report.verdict).toBe("NOT_PROVEN");
+    expect(report.reasons).toContain("RUN_INTERRUPTED");
+    expect(report.reasons).toContain("MODEL_NOT_EXERCISED:haiku");
+  });
+
+  it("a last line cut short is left out; any other unreadable line, or a log without its start line, refuses", () => {
+    const text = [start, wire(1, "glm")].map((line) => JSON.stringify(line)).join("\n");
+    expect(parsePracticeSampleLog(`${text}\n{"kind":"sam`)).toHaveLength(2);
+    expect(() => parsePracticeSampleLog(`${text}\n{"kind":"sam\n${JSON.stringify(wire(2, "glm"))}\n`)).toThrow("PRACTICE_SAMPLES_LOG_INVALID");
+    expect(() => parsePracticeSampleLog(`${JSON.stringify(wire(1, "glm"))}\n`)).toThrow("PRACTICE_SAMPLES_LOG_INVALID");
+  });
+
+  it("refuses a folder that already holds a samples log (another run's), and leaves it as it was", () => {
+    const directory = folder();
+    writeFileSync(join(directory, "samples.jsonl"), `${JSON.stringify(start)}\n`);
+    appendFileSync(join(directory, "samples.jsonl"), `${JSON.stringify(wire(1, "glm"))}\n`);
+    expect(() => PracticeSampleLog.create(directory)).toThrow("PRACTICE_OUT_ALREADY_HOLDS_SAMPLES");
+    expect(readPracticeSampleLog(directory)).toHaveLength(2);
   });
 });
