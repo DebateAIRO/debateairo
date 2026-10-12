@@ -25,7 +25,7 @@ import {
 } from "./practice-verdict.js";
 
 export const PRACTICE_REPORT_SCHEMA = "preview-practice-report-v1" as const;
-const GATES: readonly PracticeGateName[] = ["deepinfra", "anthropic"];
+export const GATES: readonly PracticeGateName[] = ["deepinfra", "anthropic"];
 
 /** The default report folder: a fresh folder under the system temp folder. */
 export function defaultReportDirectory(mode: string, now: Date = new Date()): string {
@@ -57,7 +57,7 @@ type GateBlock = Readonly<{
   spentUsdByRemaining: string | null;
 }>;
 
-function usd(nano: bigint): string {
+export function usd(nano: bigint): string {
   const sign = nano < 0n ? "-" : "";
   const abs = nano < 0n ? -nano : nano;
   return `${sign}${String(abs / 1_000_000_000n)}.${String(abs % 1_000_000_000n).padStart(9, "0")}`;
@@ -79,7 +79,7 @@ function gateBlock(observer: PracticeGateObserver, gate: PracticeGateName,
   });
 }
 
-function p90ByModel(rows: readonly Readonly<{ model: string; latencies: readonly number[] }>[]): Record<string, number> {
+export function p90ByModel(rows: readonly Readonly<{ model: string; latencies: readonly number[] }>[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const model of new Set(rows.map((row) => row.model))) {
     const all = rows.filter((row) => row.model === model).flatMap((row) => [...row.latencies]);
@@ -89,7 +89,7 @@ function p90ByModel(rows: readonly Readonly<{ model: string; latencies: readonly
   return out;
 }
 
-function gateHalted(observer: PracticeGateObserver, after: Readonly<Record<PracticeGateName, unknown>> | null): boolean {
+export function gateHalted(observer: PracticeGateObserver, after: Readonly<Record<PracticeGateName, unknown>> | null): boolean {
   const refused = GATES.some((gate) => observer.summary(gate).gateRefused > 0 || observer.summary(gate).vendorError > 0);
   const notActive = after === null ? false : GATES.some((gate) => {
     const value = after[gate] as { state?: string } | null;
@@ -99,7 +99,7 @@ function gateHalted(observer: PracticeGateObserver, after: Readonly<Record<Pract
 }
 
 /** The brake stopped a gate for a refusal, a vendor error or an unreadable answer (not the operator, not its own pauses). */
-function gateStopped(observer: PracticeGateObserver): boolean {
+export function gateStopped(observer: PracticeGateObserver): boolean {
   return GATES.some((gate) => {
     const stop = observer.stopped(gate);
     return stop !== null && !/^OPERATOR_/u.test(stop.reason) && !practiceStopIsPause(stop);
@@ -107,7 +107,7 @@ function gateStopped(observer: PracticeGateObserver): boolean {
 }
 
 /** The gates the practice paused itself for connection failures in a row, as `gate:reason`. */
-function gatePauses(observer: PracticeGateObserver): readonly string[] {
+export function gatePauses(observer: PracticeGateObserver): readonly string[] {
   return GATES.flatMap((gate) => {
     const stop = observer.stopped(gate);
     return practiceStopIsPause(stop) ? [`${gate}:${stop!.reason}`] : [];
@@ -398,6 +398,17 @@ export function reportMarkdown(report: PracticeReport): string {
         + `by full re-ask ${String(entry.repairedByFullAsk ?? 0)}, otherwise ${String(entry.repairedOtherwise ?? 0)}), `
         + `${String(entry.unrecovered)} never fixed`
         + `${entry.slipRateExceeded ? " (over the slip rule)" : ""}; tolerant repairs ${JSON.stringify(entry.jsonRepairs)}`);
+    }
+    lines.push("");
+  }
+  const byArm = report.byArm as readonly Readonly<{ arm: string; questions: number; calls: number; costUsd: string; wallSeconds: number;
+    unavailable: number; statuses: Record<string, number>; marks: Record<string, number>; notes: Record<string, number> }>[] | undefined;
+  if (byArm !== undefined && byArm.length > 0) {
+    lines.push("Openings per arm (counts, cost and time only; T today's opening, A snowball, B blind lists, C angle map):", "",
+      "| arm | questions | calls | statuses | cost $ | time s | map unavailable | marks | notes |", "|---|---|---|---|---|---|---|---|---|");
+    for (const row of byArm) {
+      lines.push(`| ${row.arm} | ${String(row.questions)} | ${String(row.calls)} | ${JSON.stringify(row.statuses)} | ${row.costUsd} | `
+        + `${String(row.wallSeconds)} | ${String(row.unavailable)} | ${JSON.stringify(row.marks)} | ${JSON.stringify(row.notes)} |`);
     }
     lines.push("");
   }
