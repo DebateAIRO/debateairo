@@ -575,6 +575,9 @@ describe("verdict story — end to end, after the debate is settled", () => {
       expect(material.length).toBeGreaterThan(0);
       for (const content of material) expect(content).not.toMatch(UUID_SHAPED);
       expect(material.join("\n")).not.toContain(rootNodeId);
+      // The judge's own best case reaches the storyteller (fix 2026-10-12): the gateway stored the vendor's WHOLE
+      // reply as the judge's artifact, and the story reads the judgement out of it, never off the envelope.
+      expect(material.join("\n")).toContain("\"best_case\":\"The strongest case for it.\"");
       expect(await new BudgetRepository(database.pool).countRunModelAttempts(debate.runId))
         .toBe(await nonStoryAttempts(debate.runId));
       const workItem = await database.pool.query<{ state: string }>(
