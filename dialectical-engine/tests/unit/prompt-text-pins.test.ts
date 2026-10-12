@@ -61,6 +61,12 @@ import {
   loadStoryPack,
   resolveStoryPackDir
 } from "@debateai/story";
+import {
+  STORYTELLER_V2_ANSWER_FORM,
+  STORYTELLER_V2_CONTRACT_ID,
+  STORY_CHECKER_V1_ANSWER_FORM,
+  STORY_CHECKER_V1_CONTRACT_ID
+} from "../../packages/story/src/contracts.js";
 
 /** The shipped shape pack, read from the repository the way the runner reads it. */
 const STORY_PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
@@ -552,8 +558,8 @@ short.paths has one entry per position in the positions field, each position exa
 Every text speaks to the person about their question, never about how the debate was run: no internal ids and no engine words such as judge, evaluator, checker, reviewer, runner-up, margin, band or rung. No text contains a score or a threshold from the material, in any form such as 0.64, 0,64 or 0,7: say in words what it means. The headline and the summary always state the best answer to the question plainly, even when it is a close call or rests on weak evidence, and never say that the debate did not settle it. short.confidence is one sentence saying how sure we are and what that rests on in this debate, never surer than the label and the confidence band allow.`);
   });
 
-  it("pins the checker's answer form byte for byte", () => {
-    expect(STORY_CHECKER_ANSWER_FORM).toBe(`Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence:
+  it("pins the checker's shipped v1 answer form byte for byte", () => {
+    expect(STORY_CHECKER_V1_ANSWER_FORM).toBe(`Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence:
 {
   "satisfied": boolean,
   "objection": null | non-empty string of at most 2000 characters,
@@ -571,10 +577,42 @@ Every text speaks to the person about their question, never about how the debate
 When satisfied is true, every criterion must be true. When satisfied is false, objection must be a non-empty string. In the objection, refer to points by their ids, such as P7.`);
   });
 
+  // Story format robustness (2026-10-12): checker v2 and storyteller v3 add how to quote (and, for the checker,
+  // that the criteria are always required) after real preview replies lost a verdict to each.
+  it("pins the checker's current v2 answer form byte for byte", () => {
+    expect(STORY_CHECKER_ANSWER_FORM).toBe(`Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence:
+{
+  "satisfied": boolean,
+  "objection": null | non-empty string of at most 2000 characters,
+  "criteria": {
+    "faithful_to_material": boolean,
+    "agrees_with_label": boolean,
+    "fair_to_losing_paths": boolean,
+    "no_overstatement": boolean,
+    "citations_correct": boolean,
+    "reviewer_note_separate": boolean,
+    "goal_marked_as_reading": boolean,
+    "speaks_to_the_person": boolean
+  }
+}
+When satisfied is true, every criterion must be true. When satisfied is false, objection must be a non-empty string. In the objection, refer to points by their ids, such as P7.
+The criteria object is always required, with all eight booleans, whether satisfied is true or false. No text contains a straight double quote ("): to quote words, use typographic quotes such as „ ” or « », or escape the straight quote as \\".`);
+  });
+
+  it("pins the storyteller's current v3 answer form: v2 byte for byte, then the quote sentence", () => {
+    expect(STORYTELLER_ANSWER_FORM).toBe(`${STORYTELLER_V2_ANSWER_FORM}
+No text contains a straight double quote ("): to quote words, use typographic quotes such as „ ” or « », or escape the straight quote as \\".`);
+    expect(STORYTELLER_V2_ANSWER_FORM).toBe(`${STORYTELLER_V1_ANSWER_FORM}
+
+Write the short version compactly. Aim for about 500 characters in short.summary and about 200 characters in short.change.text, including spaces and punctuation. These are writing targets, not new limits: every hard limit and rule above still applies. Keep the headline, confidence sentence and each path line concise. Put supporting detail in why and long.`);
+  });
+
   it("carries each form into its contract, under a new contract id", () => {
     expect(STORYTELLER_V1_CONTRACT_ID).toBe("story.storyteller.v1");
-    expect(STORYTELLER_CONTRACT_ID).toBe("story.storyteller.v2");
-    expect(STORY_CHECKER_CONTRACT_ID).toBe("story.checker.v1");
+    expect(STORYTELLER_V2_CONTRACT_ID).toBe("story.storyteller.v2");
+    expect(STORYTELLER_CONTRACT_ID).toBe("story.storyteller.v3");
+    expect(STORY_CHECKER_V1_CONTRACT_ID).toBe("story.checker.v1");
+    expect(STORY_CHECKER_CONTRACT_ID).toBe("story.checker.v2");
     expect(buildStorytellerContract(STORY_PACK).answerForm).toBe(STORYTELLER_ANSWER_FORM);
     expect(buildStoryCheckerContract(STORY_PACK).answerForm).toBe(STORY_CHECKER_ANSWER_FORM);
   });

@@ -9,7 +9,7 @@ No retries, external packages, environment proxies, redirects, or credential art
 A provider profile is everything the gate knows about one vendor: its host and path, its auth
 header, the exact request shape it forwards (and the bytes it sends), how a reply's usage is
 priced, where a reply names its model, extra key shapes to blank, and its reviewed model rows
-(prices, output bound, effort, JSON mode). The GO names one profile (`provider`) and the rows it
+(prices, output bound, effort, JSON mode, sampling). The GO names one profile (`provider`) and the rows it
 enables; the GO binds this file's hash, so it binds every profile and every row too. A price
 change is a reviewed code change here (plus the app's parity fixture), never a GO edit. Adding a
 vendor means adding one profile class to PROFILES; the gate's core does not change.
@@ -23,12 +23,14 @@ import ssl
 import stat
 import threading
 import time
+import unicodedata
 from collections import namedtuple
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from email.utils import parsedate_to_datetime
 
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
-MAX_TIMEOUT_SECONDS = 600
+MAX_TIMEOUT_SECONDS = 1200  # The gate's CALL_DEADLINE_SECONDS (owner ruling 2026-10-12: 20 minutes, was 600).
 CONNECT_TIMEOUT_SECONDS = 15  # TCP connect + TLS handshake; a black-holed address fails (unsent) fast.
 
 
@@ -241,6 +243,105 @@ def redact(value, key, patterns=()):
     return value
 
 
+# What the gate keeps of a vendor answer it released unbilled (2026-10-12), so the owner can tell an
+# account rate limit from a busy model: the Retry-After value and the NAMES of rate-limit headers (never
+# their values, never any other header), and the error's type, code and a short, redacted message.
+MAX_RETRY_AFTER_CHARS = 64
+MAX_RETRY_AFTER_SECONDS = 3600
+MAX_RATE_LIMIT_HEADER_NAMES = 16
+RATE_LIMIT_HEADER_NAME = re.compile(r'(?:x-|anthropic-)?ratelimit-[a-z0-9-]{1,48}')
+VENDOR_LABEL = re.compile(r'[A-Za-z0-9_.:-]{1,64}')
+MAX_VENDOR_MESSAGE_CHARS = 200
+VENDOR_MESSAGE_SCAN_CHARS = 2000
+# Anything that may be a credential, an address or a link becomes [REDACTED] (in this order).
+VENDOR_MESSAGE_REDACTIONS = tuple(re.compile(pattern) for pattern in (
+    r'(?i)\b(?:[a-z][a-z0-9+.-]*)://\S+',                       # any URL
+    r'(?i)\bwww\.\S+',
+    r'[^\s@]+@[^\s@]+',                                       # an email (or any user@host)
+    r'(?i)\bbearer\s+\S+',
+    r'(?i)[\w.-]*(?:key|token|secret|passw|pwd|auth|credential|signature|session|cookie)[\w.-]*\s*[=:]\s*\S+',
+    r'\S*\?\S*=\S*',                                          # a path with a query
+    r'(?i)\b(?:sk|pk|rk|ak|key|tok|api)[-_][A-Za-z0-9_-]{6,}',   # prefixed key shapes (sk-..., tok_...)
+    r'(?=[A-Za-z0-9_+/=.-]*[0-9])(?=[A-Za-z0-9_+/=.-]*[A-Za-z])[A-Za-z0-9_+/=.-]{24,}'))  # long mixed tokens
+VENDOR_MESSAGE_SUSPECT = re.compile(r'(?i)@|://|bearer|[A-Za-z0-9_+/=.-]{40,}')
+
+
+def vendor_headers(items):
+    """What the gate keeps of an answer's headers: the first Retry-After value (trimmed, at most
+    MAX_RETRY_AFTER_CHARS) and the sorted, lower-case names of its rate-limit headers (x-ratelimit-*,
+    ratelimit-*, anthropic-ratelimit-*; at most MAX_RATE_LIMIT_HEADER_NAMES). No other header, and
+    no rate-limit value, is ever kept."""
+    retry_after, names = None, set()
+    for item in items if isinstance(items, (list, tuple)) else ():
+        if not (isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], str) and isinstance(item[1], str)):
+            continue
+        name = item[0].strip().lower()
+        if name == 'retry-after' and retry_after is None:
+            retry_after = item[1].strip()[:MAX_RETRY_AFTER_CHARS]
+        elif RATE_LIMIT_HEADER_NAME.fullmatch(name):
+            names.add(name)
+    return {'retry_after': retry_after, 'rate_limit_header_names': sorted(names)[:MAX_RATE_LIMIT_HEADER_NAMES]}
+
+
+def retry_after_seconds(value, moment):
+    """A Retry-After value as whole seconds from moment: delta-seconds (ASCII digits only) or an
+    HTTP-date (a part second counts as a whole one; a past date is 0), clamped to 0..3600. Anything
+    else (absent, empty, signed, decimal, junk) is None."""
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if re.fullmatch(r'[0-9]+', text):
+        return min(int(text[:12]), MAX_RETRY_AFTER_SECONDS)
+    if not text or not re.search(r'[A-Za-z]', text):
+        return None
+    try:
+        when = parsedate_to_datetime(text)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    seconds = (when - moment).total_seconds()
+    return max(0, min(MAX_RETRY_AFTER_SECONDS, int(-(-seconds // 1))))
+
+
+def safe_vendor_message(text):
+    """An error message fit to keep: control and format characters gone, whitespace collapsed,
+    anything like a key, token, email, address or link replaced by [REDACTED], then cut to
+    MAX_VENDOR_MESSAGE_CHARS. When in doubt (an address-like trace left after that) it is dropped."""
+    if not isinstance(text, str):
+        return None
+    text = ''.join(' ' if unicodedata.category(char)[0] == 'C' else char for char in text[:VENDOR_MESSAGE_SCAN_CHARS])
+    text = re.sub(r'\s+', ' ', text).strip()
+    for pattern in VENDOR_MESSAGE_REDACTIONS:
+        text = pattern.sub('[REDACTED]', text)
+    text = text[:MAX_VENDOR_MESSAGE_CHARS]
+    if not text or VENDOR_MESSAGE_SUSPECT.search(text):
+        return None
+    return text
+
+
+def _vendor_label(value):
+    if value is None:
+        return None
+    text = value if isinstance(value, str) else str(value) if type(value) is int else None
+    return text if text is not None and VENDOR_LABEL.fullmatch(text) else '(other)'
+
+
+def vendor_error_summary(response):
+    """From a (redacted) JSON answer only: its error's type and code (each a short label, else
+    "(other)") and safe_vendor_message of its message; a plain-text error is the message alone.
+    None when the answer has no error object or text."""
+    error = response.get('error') if isinstance(response, dict) else None
+    if isinstance(error, str):
+        return {'type': None, 'code': None, 'message': safe_vendor_message(error)}
+    if not isinstance(error, dict):
+        return None
+    return {'type': _vendor_label(error.get('type')), 'code': _vendor_label(error.get('code')),
+            'message': safe_vendor_message(error.get('message'))}
+
+
 # Any of these keys anywhere in a reply means it may have been billed (ruling 5 refuses to call it unsent).
 BILLED_KEYS = ('usage', 'choices', 'estimated_cost', 'cost', 'inference_status')
 
@@ -277,8 +378,11 @@ def names_any_key(value, names):
 # (the careful side while a vendor runs a promotion); the gate reserves and settles with them.
 # output_bound is both the max_tokens ceiling and what a call reserves for output. effort is
 # 'high' (the request must carry the profile's effort field with exactly that value) or None (the
-# request must not carry it at all). json_object says whether JSON mode may be asked for.
-ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound effort json_object')
+# request must not carry it at all). json_object says whether JSON mode may be asked for. sampling
+# (reviewed 2026-10-12) is None (the request must carry none of the profile's sampling_keys) or a tuple
+# of (name, number) pairs: the request must carry exactly those members with exactly those values.
+ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound effort json_object sampling',
+                      defaults=(None,))
 
 
 PATH_PATTERN = re.compile(r'/[A-Za-z0-9._~:/-]{0,511}')
@@ -303,6 +407,8 @@ class DeepInfraProfile:
                                          gate refuses any other key before a reservation, so a
                                          key of another provider in this gate's folder is never sent
       rows {model: ModelRow}             the reviewed models
+      sampling_keys (tuple of str)       the sampling members a row of this profile may set (row.sampling);
+                                         empty or absent: no row of the profile may set any
       path_for(row) -> str               the POST path (checked: no '?', starts with '/')
       auth_headers(key) -> dict          the header(s) carrying the key
       requested_model(body) -> str|None  where the request names its model
@@ -313,10 +419,20 @@ class DeepInfraProfile:
                                          any size, so the dearest prices the size could need)
       ceiling_prices(row) -> (in, out)   the highest prices the row can ever reserve at (worst cases)
       account(response, row, moment) -> dict  usage and guard charge (see account_response's keys)
+      cache_write_requested(body) -> bool  OPTIONAL (2026-10-12): True when an accepted request asks the
+                                         vendor for a prompt-cache write. A profile without it never
+                                         caches. Only when it says True does the core call
+                                         reservation_prices(..., cache_write=True) and
+                                         account(..., cache_write=True), so a profile that has it
+                                         takes that keyword on both (AnthropicProfile)
       reply_model(response) -> str|None  where the reply names the model that answered
       unbilled_refusal(status, response) -> bool  a refusal that provably billed nothing (the gate
-                                         keeps a $0 'released_unbilled' entry, capped per day)
-      probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024)
+                                         keeps a $0 'released_unbilled' entry)
+      busy_refusal(status, response) -> bool  asked only of an unbilled refusal: True when it says
+                                         the vendor is busy (the gate cools that model off and
+                                         never halts for it); False for any other unbilled error
+                                         (counted toward the unsent streak, never cools the model)
+      probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024), with the row's sampling
       reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
     """
     name = 'deepinfra'
@@ -335,13 +451,24 @@ class DeepInfraProfile:
     redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
     # No fixed shape either, but never another provider's key (Anthropic sk-ant-, Google AIza).
     key_pattern = r'(?!sk-ant-|AIza)[!-~]{16,512}'
+    # Reviewed sampling (2026-10-12): the members a row may set, in the order the app's body carries them.
+    sampling_keys = ('temperature', 'top_p', 'top_k')
     rows = {row.model: row for row in (
         ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 32768, 'high', True),
         ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 32768, 'high', False),
-        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 32768, None, False),
+        # Owner approval 2026-10-12: MiMo closed Romanian quotation marks with a straight double quote inside its JSON
+        # in a live practice run. Its DeepInfra page recommends temperature 1.0 and top_p 0.95: every request carries
+        # exactly those two (no top_k). JSON mode was tried the same day and withdrawn: DeepInfra's JSON constraint
+        # turned that slip into garbage, which the app's reader repairs when JSON mode is off.
+        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 32768, None, False,
+                 (('temperature', 1.0), ('top_p', 0.95))),
         # Owner swap 2026-10-10 (Qwen in place of Gemini): flat list price over the whole 1M window,
         # no promotion, no tiers; reasoning_effort is not listed, so none is sent.
-        ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 32768, None, False))}
+        # Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid
+        # mid-answer into random multilingual tokens (a live practice run, 2 of its first 4 calls). It thinks by
+        # default, so it runs at its makers' thinking-mode settings.
+        ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 32768, None, False,
+                 (('temperature', 0.6), ('top_p', 0.95), ('top_k', 20))))}
 
     def path_for(self, row):
         return self.path
@@ -361,11 +488,13 @@ class DeepInfraProfile:
         return body.get('model') if isinstance(body, dict) else None
 
     def body_valid(self, body, row):
-        """Exactly model, max_tokens and messages; reasoning_effort "high" iff the row says so; an
-        optional response_format {"type": "json_object"} only for a row that allows it."""
+        """Exactly model, max_tokens and messages; reasoning_effort "high" iff the row says so; the
+        row's reviewed sampling members with exactly its numbers iff it has one (none of them
+        otherwise); an optional response_format {"type": "json_object"} only for a row that allows it."""
         if not isinstance(body, dict) or body.get('model') != row.model:
             return False
-        fields = {'model', 'max_tokens', 'messages'} | ({'reasoning_effort'} if row.effort else set())
+        sampling = dict(row.sampling or ())
+        fields = {'model', 'max_tokens', 'messages'} | ({'reasoning_effort'} if row.effort else set()) | set(sampling)
         extra = set(body) - fields
         if not fields <= set(body) or extra - {'response_format'}:
             return False
@@ -374,6 +503,9 @@ class DeepInfraProfile:
             if not row.json_object or not (isinstance(mode, dict) and set(mode) == {'type'} and mode['type'] == 'json_object'):
                 return False
         if row.effort and body['reasoning_effort'] != row.effort:
+            return False
+        # The same number exactly (20 and 20.0 are one JSON number to the app too); never a bool, text or null.
+        if any(type(body[name]) not in (int, float) or body[name] != value for name, value in sampling.items()):
             return False
         return (type(body['max_tokens']) is int and 1 <= body['max_tokens'] <= row.output_bound
                 and isinstance(body['messages'], list) and bool(body['messages'])
@@ -395,18 +527,23 @@ class DeepInfraProfile:
         """True only for a refusal that provably billed nothing (owner ruling 5, 2026-10-10): HTTP
         429, a JSON object with an error field, and no usage, choices, cost, estimated_cost,
         inference_status (DeepInfra's native cost block) or tokens_* key at any depth. The gate then
-        releases the hold, keeps the entry at $0 as 'released_unbilled' (so it stays on the record),
-        counts it toward the unsent streak and toward the daily ceiling UNBILLED_RELEASES_PER_DAY.
-        Anything else is accounted (and halts) as before."""
+        releases the hold, keeps the entry at $0 as 'released_unbilled' (so it stays on the record)
+        and counts it toward that model's cool-off (never a gate halt; 2026-10-12). Anything else is
+        accounted (and halts) as before."""
         return (status == 429 and isinstance(response, dict) and bool(response.get('error'))
                 and not names_any_key(response, BILLED_KEYS)
                 and not names_any_key_prefixed(response, 'tokens_'))
+
+    def busy_refusal(self, status, response):
+        """DeepInfra's only unbilled refusal is its 429 ("too many requests"): always busy."""
+        return status == 429
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
                 'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}]}
         if row.effort:
             body['reasoning_effort'] = row.effort
+        body.update(row.sampling or ())  # The probe asks as the app's calls do: the row's own sampling, if any.
         return body
 
     def reply_text(self, response):
@@ -529,15 +666,26 @@ class AnthropicProfile:
     token. When that count is above the lower step's 100,000 tokens the call reserves at the UPPER
     step's prices (input 0.50, output 2.50); otherwise the prompt cannot reach the upper step, and
     it reserves at the lower step's (0.10, 0.50), the row's own prices. A full 256 KiB request
-    reserves (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016, under the $0.25 cap. A request
-    cannot ask for caching (body_valid refuses cache_control), so no cache write is priced; a reply
-    that still costs more than its hold (for example a cache write) is charged in full and halts
-    (charge_overrun). Settlement: the real step (prompt total <= 100,000 tokens: the lower one), each
-    kind of input token at its own price. Anthropic reports no cost, so the guard charge is that
-    list-price charge. Any usage field this profile does not know, any server-tool use, another
-    service tier or region, or a tool block makes the usage invalid: uncertain, and the gate halts.
-    A cache write reported without its 5-minute/1-hour split is charged at the 1-hour
-    price (the dearer one). A reply with a container or context editing (a null one means none was
+    reserves (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016.
+
+    Prompt caching (owner approval 2026-10-12, "caching before the upload"): a request may carry ONE
+    cache mark, {"type": "ephemeral"} (5 minutes, no ttl), on the first of exactly two system text
+    blocks (the app's adapter puts the engine's stable instruction and safety frame in the first block
+    and the per-call markers in the second; nothing else anywhere may carry a mark). Such a request
+    (cache_write_requested) reserves its WHOLE input at the step's 5-minute cache-write price (lower
+    0.125, upper 0.625), the simplest safe rule: the write can never cover more than the input. So the
+    dearest request is a full-size cached one, (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704, the
+    ceiling, under the $0.25 cap. A reply that reports cache tokens is settled at their own prices on
+    any call, marked or not (no new halt). A reply that still costs more than its hold (for example a
+    1-hour write, which no request can ask for, or a write on an unmarked call) is charged in full and
+    halts (charge_overrun). Settlement: the real step (prompt total <= 100,000 tokens: the lower one),
+    each kind of input token at its own price: plain input, the 5-minute and 1-hour writes, and reads; a
+    write reported without its split is the 5-minute kind on a marked call and is charged at the dearer
+    1-hour price on any other call (as before caching). Anthropic reports no cost,
+    so the guard charge is that list-price charge. Any usage field this profile does not know, any
+    server-tool use, another service tier or region, or a tool block makes the usage invalid: uncertain,
+    and the gate halts.
+    A reply with a container or context editing (a null one means none was
     used), usage or token counts outside `usage`, or a content block other than text or thinking is
     invalid too. An invalid reply's ledger entry names the check it failed and keeps an outline of
     the reply (field names and kinds only: reply_outline).
@@ -559,8 +707,10 @@ class AnthropicProfile:
     settlement_steps = (
         PriceStep('up_to_100k', 100000, Decimal('0.10'), Decimal('0.125'), Decimal('0.20'), Decimal('0.01'), Decimal('0.50')),
         PriceStep('over_100k', None, Decimal('0.50'), Decimal('0.625'), Decimal('1.00'), Decimal('0.05'), Decimal('2.50')))
-    # Request fields beyond these are refused (no thinking, tools, stream, sampling, cache_control...).
+    # Request fields beyond these are refused (no thinking, tools, stream, sampling, top-level cache_control...).
     BODY_FIELDS = frozenset({'model', 'max_tokens', 'messages', 'system', 'output_config'})
+    # The one cache mark a request may carry, on the first of its two system blocks: 5 minutes (no ttl).
+    CACHE_MARK = {'type': 'ephemeral'}
 
     def path_for(self, row):
         return self.path
@@ -572,31 +722,57 @@ class AnthropicProfile:
     # RESERVATION_OVERHEAD_BYTES; the app adds the same).
     RESERVATION_OVERHEAD_BYTES = 2048
 
-    def reservation_prices(self, row, moment, request_bytes=None):
+    def reservation_prices(self, row, moment, request_bytes=None, cache_write=False):
         """Anthropic's list prices do not change with the date. (request bytes + 2048) above the
         lower step's 100,000 tokens, or an unknown size: the upper step's input and output prices;
-        otherwise the row's own (the lower step's). See the class docstring."""
-        lower = self.settlement_steps[0]
-        if (type(request_bytes) is int and request_bytes >= 0
-                and request_bytes + self.RESERVATION_OVERHEAD_BYTES <= lower.prompt_tokens_up_to):
+        otherwise the row's own (the lower step's). A request that asks for a cache write
+        (cache_write=True) reserves its input at that step's 5-minute cache-write price instead.
+        See the class docstring."""
+        lower, upper = self.settlement_steps
+        small = (type(request_bytes) is int and request_bytes >= 0
+                 and request_bytes + self.RESERVATION_OVERHEAD_BYTES <= lower.prompt_tokens_up_to)
+        if cache_write is True:
+            step = lower if small else upper
+            return step.cache_write_5m_usd_per_m, step.output_usd_per_m
+        if small:
             return row.input_usd_per_m, row.output_usd_per_m
-        return self.ceiling_prices(row)
+        return upper.input_usd_per_m, upper.output_usd_per_m
 
     def ceiling_prices(self, row):
-        """The upper step's input and output prices: the dearest any accepted request reserves at."""
+        """The upper step's 5-minute cache-write input price and its output price: the dearest any
+        accepted request (a cached one above the step) reserves at."""
         upper = self.settlement_steps[1]
-        return upper.input_usd_per_m, upper.output_usd_per_m
+        return upper.cache_write_5m_usd_per_m, upper.output_usd_per_m
 
     def requested_model(self, body):
         return body.get('model') if isinstance(body, dict) else None
 
+    def system_valid(self, system):
+        """A system text that is not only whitespace, or exactly two text blocks whose texts are not only
+        whitespace: the first exactly {type, text, cache_control: {"type": "ephemeral"}}, the second exactly
+        {type, text}. No ttl, no other key, no third block, no mark on the second (prompt caching, 2026-10-12)."""
+        if isinstance(system, str):
+            return bool(system.strip(JS_WHITESPACE))
+        if not (isinstance(system, list) and len(system) == 2 and all(isinstance(block, dict) for block in system)):
+            return False
+        first, second = system
+        return (set(first) == {'type', 'text', 'cache_control'} and set(second) == {'type', 'text'}
+                and all(block['type'] == 'text' and isinstance(block['text'], str) and block['text'].strip(JS_WHITESPACE)
+                        for block in system)
+                and isinstance(first['cache_control'], dict) and first['cache_control'] == self.CACHE_MARK)
+
+    def cache_write_requested(self, body):
+        """True exactly for a body whose system is the accepted two-block form (its one cache mark)."""
+        return bool(isinstance(body, dict) and isinstance(body.get('system'), list) and self.system_valid(body['system']))
+
     def body_valid(self, body, row):
-        """Exactly model, max_tokens and messages, an optional system string, and output_config
-        {"effort": "high"} iff the row says so (then required). Nothing else anywhere
-        (contract-BC-wire, Anthropic). It mirrors what the app's adapter (anthropic-messages.ts) can
-        send, no more: text content that is not only whitespace (JavaScript's trim set), roles alternating user/assistant starting AND ending
-        with a user turn (the adapter joins same-role turns and refuses a final assistant turn), and
-        a system text that is not only whitespace when present."""
+        """Exactly model, max_tokens and messages, an optional system (system_valid: a string, or the two
+        blocks that carry the one cache mark), and output_config {"effort": "high"} iff the row says so
+        (then required). Nothing else anywhere (contract-BC-wire, Anthropic). It mirrors what the app's
+        adapter (anthropic-messages.ts) can send, no more: text content that is not only whitespace
+        (JavaScript's trim set), roles alternating user/assistant starting AND ending with a user turn
+        (the adapter joins same-role turns and refuses a final assistant turn), and a system whose text is
+        not only whitespace when present."""
         if not isinstance(body, dict) or body.get('model') != row.model:
             return False
         required = {'model', 'max_tokens', 'messages'} | ({'output_config'} if row.effort else set())
@@ -608,7 +784,7 @@ class AnthropicProfile:
             if not (isinstance(config, dict) and set(config) == {'effort'} and isinstance(config['effort'], str)
                     and config['effort'] == row.effort):
                 return False
-        if 'system' in body and not (isinstance(body['system'], str) and body['system'].strip(JS_WHITESPACE)):
+        if 'system' in body and not self.system_valid(body['system']):
             return False
         messages = body['messages']
         return (type(body['max_tokens']) is int and 1 <= body['max_tokens'] <= row.output_bound
@@ -621,14 +797,16 @@ class AnthropicProfile:
     def request_bytes(self, body):
         return canonical(body)
 
-    def usage_counts(self, response):
+    def usage_counts(self, response, cache_write=False):
         """(input, cache creation, cache read, 1-hour part of the creation, output) from a reply
         whose usage this profile fully understands, else None (uncertain)."""
-        return self.usage_check(response)[1]
+        return self.usage_check(response, cache_write)[1]
 
-    def usage_check(self, response):
+    def usage_check(self, response, cache_write=False):
         """(None, counts) for a reply whose usage this profile fully understands, else (the name of
-        the check it failed, None): the gate is then uncertain and halts."""
+        the check it failed, None): the gate is then uncertain and halts. Cache tokens are settled on
+        every call; cache_write=True (the call carried the cache mark) only makes a write reported
+        without its split the 5-minute kind."""
         if not isinstance(response, dict) or response.get('type') != 'message':
             return 'not_a_message', None
         # A container or context editing (unless null: none used) may bill beyond the usage.
@@ -671,9 +849,10 @@ class AnthropicProfile:
             return 'service_tier', None
         if usage.get('inference_geo') not in (None, 'global'):
             return 'inference_geo', None
-        # A cache write reported without its 5-minute/1-hour split is charged at the dearer 1-hour
-        # price (the gate never asks for caching; a write it cannot place is priced on the safe side).
-        hour = creation
+        # A cache write reported without its 5-minute/1-hour split: on a call that carried the cache mark it
+        # is the 5-minute kind (the only mark a request may carry); on any other call it is charged at the
+        # dearer 1-hour price (a write the gate did not ask for is priced on the safe side). A split names each part.
+        hour = 0 if cache_write is True else creation
         split = usage.get('cache_creation')
         if split is not None:
             if not (isinstance(split, dict) and set(split) == ANTHROPIC_CACHE_SPLIT_KEYS
@@ -687,8 +866,8 @@ class AnthropicProfile:
         lower, upper = self.settlement_steps
         return lower if prompt_total <= lower.prompt_tokens_up_to else upper
 
-    def account(self, response, row, moment):
-        reason, counts = self.usage_check(response)
+    def account(self, response, row, moment, cache_write=False):
+        reason, counts = self.usage_check(response, cache_write)
         if counts is None:
             # The check that failed and an outline of the reply (names and kinds only) stay in the
             # ledger entry, so the operator can see why without the reply's text or numbers.
@@ -720,7 +899,9 @@ class AnthropicProfile:
 
     # Anthropic's well-formed error answers that bill nothing, by HTTP status: the error types each
     # status may carry (platform.claude.com, API Errors page, read 2026-10-10). Judge round on PR B:
-    # the same released_unbilled entry and daily ceiling as DeepInfra's 429s. Never here, so they halt:
+    # the same released_unbilled entry as DeepInfra's 429s. Only the busy ones (BUSY_STATUSES: 429 and
+    # 529) cool the model off like DeepInfra's 429s; 400, 404, 413 and 500 are not busy (review
+    # 2026-10-12): they count toward the gate-wide unsent streak as before gate v4. Never here, so they halt:
     # 401 authentication_error and 403 permission_error (the key is wrong: root must look),
     # 402 billing_error, 504 timeout_error (the work may have run), and any other status or type.
     UNBILLED_ERRORS = {
@@ -731,6 +912,7 @@ class AnthropicProfile:
         500: frozenset({'api_error'}),
         529: frozenset({'rate_limit_error', 'overloaded_error'}),
     }
+    BUSY_STATUSES = frozenset({429, 529})  # rate_limit_error / overloaded_error: the vendor is busy.
 
     def unbilled_refusal(self, status, response):
         """True only for Anthropic's own well-formed error answers that bill nothing (owner ruling 5,
@@ -738,8 +920,9 @@ class AnthropicProfile:
         type "error", error (and an optional request_id string), an error type that status may
         carry, and no usage, content or model key, no other billed key (BILLED_KEYS) and no
         tokens_* or *_tokens key at any depth. The core passes the RAW reply (before redaction
-        drops any subtree), releases the hold and keeps a $0 'released_unbilled' entry (the daily
-        ceiling and the unsent streak count it). Anything else is accounted (and halts) as before."""
+        drops any subtree), releases the hold and keeps a $0 'released_unbilled' entry (a busy one
+        counts toward that model's cool-off, any other toward the unsent streak: busy_refusal).
+        Anything else is accounted (and halts) as before."""
         if status not in self.UNBILLED_ERRORS or not isinstance(response, dict):
             return False
         if set(response) not in ({'type', 'error'}, {'type', 'error', 'request_id'}):
@@ -751,6 +934,13 @@ class AnthropicProfile:
                 and not names_any_key(response, BILLED_KEYS + ('content', 'model'))
                 and not names_any_key_prefixed(response, 'tokens_')
                 and not names_any_key_suffixed(response, '_tokens'))
+
+    def busy_refusal(self, status, response):
+        """Of the unbilled errors above, only 429 and 529 (rate_limit_error, overloaded_error) say the
+        vendor is busy. 400 invalid_request_error, 404 not_found_error and 413 request_too_large
+        are deterministic for that request, and 500 api_error is Anthropic's own fault: none of them
+        is a reason to sit the model out, so the gate counts them toward the unsent streak instead."""
+        return status in self.BUSY_STATUSES
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
@@ -787,6 +977,8 @@ class HttpsTransport:
         self.profile, self.path = profile, path
         self.max_response_bytes = min(max_response_bytes, MAX_RESPONSE_BYTES)
         self.timeout = min(timeout, MAX_TIMEOUT_SECONDS)
+        # After an answer: what vendor_headers kept of its headers (the gate reads it for an unbilled release).
+        self.vendor_headers = None
 
     def __call__(self, payload, key):
         # The gate checks and prices these exact bytes before it reserves; they are sent unchanged.
@@ -816,6 +1008,8 @@ class HttpsTransport:
                                         'Accept': 'application/json'})
             remaining()
             response = connection.getresponse()
+            getheaders = getattr(response, 'getheaders', None)
+            self.vendor_headers = vendor_headers(getheaders() if callable(getheaders) else [])
             chunks, size = [], 0
             while True:
                 remaining()

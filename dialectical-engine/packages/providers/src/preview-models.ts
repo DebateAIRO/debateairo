@@ -14,10 +14,23 @@
  * (tests/unit/fixtures/preview-model-rows.json for DeepInfra, preview-model-rows-anthropic.json for
  * Anthropic). A later provider is one more key there and one more parity file.
  *
+ * Reviewed sampling (2026-10-12): a DeepInfra row may carry its own `sampling` settings, which every request for that
+ * row sends and both the app's guarded fetch and the gate require exactly. Qwen and (since the owner's approval of
+ * 2026-10-12) MiMo have one; a later row's is one more `sampling` entry here, in the gate's row and in the parity file.
+ *
  * No imports on purpose: index.ts, preview-test.ts and provider-probe.ts all read these rows.
  */
 /** The providers the preview has a reviewed root gate for. */
 export type PreviewProviderName = "deepinfra" | "anthropic";
+
+/**
+ * The sampling members a reviewed row may set, in the order a request body carries them (the gate's
+ * DeepInfraProfile.sampling_keys holds the same three).
+ */
+export const PREVIEW_SAMPLING_KEYS = Object.freeze(["temperature", "top_p", "top_k"] as const);
+export type PreviewSamplingKey = typeof PREVIEW_SAMPLING_KEYS[number];
+/** A row's reviewed sampling: the exact members and values its every request carries. */
+export type PreviewSampling = Readonly<Partial<Record<PreviewSamplingKey, number>>>;
 
 export type PreviewModelRow = Readonly<{
   /** The provider (and so the root gate) this row's calls go through. */
@@ -45,7 +58,19 @@ export type PreviewModelRow = Readonly<{
    * own (owner ruling 2026-10-10, evening). The gate applies the same rule (reservation_prices).
    */
   upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string;
-    inputNanoUsdPerToken: bigint; outputNanoUsdPerToken: bigint }>;
+    inputNanoUsdPerToken: bigint; outputNanoUsdPerToken: bigint;
+    /** The upper step's 5-minute cache-write price, on a row that may cache (Anthropic: 0.625). */
+    cacheWriteInputUsdPerM?: string; cacheWriteInputNanoUsdPerToken?: bigint }>;
+  /**
+   * Prompt caching (owner approval 2026-10-12), Anthropic only: the vendor's 5-minute cache-write price for this
+   * row's own (lower) step. A request that asks for a cache write (its system is the two-block form with the one
+   * cache mark) reserves its WHOLE input at this price, or at its upper step's when it is above that step, exactly as
+   * the gate does. The start-of-debate estimate keeps the plain input price (only the cached system prefix pays the
+   * write premium, and reads cost a tenth); it sees the cached worst case through the gate's in-flight hold.
+   * Absent: the row never caches.
+   */
+  cacheWriteInputUsdPerM?: string;
+  cacheWriteInputNanoUsdPerToken?: bigint;
   /** The same prices as whole nano-USD per token (USD per million x 1000), for BigInt arithmetic. */
   inputNanoUsdPerToken: bigint;
   outputNanoUsdPerToken: bigint;
@@ -55,12 +80,27 @@ export type PreviewModelRow = Readonly<{
   /** Largest max_tokens ever sent, and the output side of every reservation. */
   outputBound: number;
   /**
+   * The max_tokens the preview's storyteller asks for on its first attempt (previewStorytellerTokenCeiling); its length
+   * retry asks twice it, held to `outputBound`. Never above `outputBound`, never below the generation floor (8,192).
+   * Slow answer (owner ruling 2026-10-12): the whole cap on the fast rows (DeepSeek, Claude Haiku); 16,384 on the slower
+   * ones (MiMo, Qwen, GLM), whose story at 17 tokens a second could otherwise run past the gate's 1,200 s. App only: the
+   * gate checks max_tokens against `outputBound` alone, so the gate's parity files do not carry it.
+   */
+  storytellerTokenCeiling: number;
+  /**
    * "high": the body carries exactly the provider's effort member with "high" (DeepInfra
    * `reasoning_effort`, Anthropic `output_config.effort`); null: the body never carries it.
    */
   effort: "high" | null;
   /** Whether response_format {"type":"json_object"} may be sent. */
   jsonObject: boolean;
+  /**
+   * Reviewed sampling (2026-10-12), DeepInfra rows only: when present, every request for this row carries exactly
+   * these members with exactly these values (after max_tokens and any effort member, before messages), and the
+   * guarded fetch and the gate refuse a body that differs. Absent: the body carries none of PREVIEW_SAMPLING_KEYS and
+   * the vendor's defaults apply.
+   */
+  sampling?: PreviewSampling;
 }>;
 
 /** The DeepInfra connection's base URL and window, shared by every DeepInfra row. */
@@ -80,17 +120,24 @@ export const PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS = 1_000_000 as const;
 export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
 /**
  * Owner ruling 2026-10-10: every reviewed row's answer cap (its max_tokens ceiling and the output side
- * of every reservation). No call the app makes asks for more than 24,000 today (debate calls and health
- * checks 8,192, the storyteller 12,000 then 24,000 on its retry).
+ * of every reservation). Debate calls and health checks ask for 8,192; the storyteller asks for its row's story
+ * allowance (storytellerTokenCeiling: this whole cap on the fast rows, PREVIEW_SLOW_STORY_TOKENS on the slower ones,
+ * slow answer, owner ruling 2026-10-12), and its retry is held to this cap.
  */
 const PREVIEW_ANSWER_CAP_TOKENS = 32_768;
+/** Slow answer (owner ruling 2026-10-12): the slower rows' story allowance, half the answer cap. */
+const PREVIEW_SLOW_STORY_TOKENS = 16_384;
+/** The preview's generation floor (preview-test.ts PREVIEW_GLM_GENERATION_TOKEN_FLOOR): no story allowance below it. */
+const PREVIEW_STORY_TOKENS_FLOOR = 8192;
 /** Template allowance added to the body's bytes on the input side of a reservation (contract A §3). */
 const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 
 type RowInput = Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;
-  outputBound: number; effort: "high" | null; jsonObject: boolean; contextWindowTokens?: number;
-  upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string }>;
+  outputBound: number; storytellerTokenCeiling: number; effort: "high" | null; jsonObject: boolean; contextWindowTokens?: number;
+  upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string; cacheWriteInputUsdPerM?: string }>;
+  sampling?: PreviewSampling;
+  cacheWriteInputUsdPerM?: string;
 }>;
 const PROVIDER_CONNECTIONS = Object.freeze({
   deepinfra: Object.freeze({ provider: "deepinfra", baseUrl: PREVIEW_DEEPINFRA_BASE_URL,
@@ -107,12 +154,34 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
   };
   const inputNanoUsdPerToken = nano(input.inputUsdPerM);
   const outputNanoUsdPerToken = nano(input.outputUsdPerM);
-  const { upperStep, ...plain } = input;
+  const { upperStep, sampling, cacheWriteInputUsdPerM, ...plain } = input;
+  // The storyteller's allowance is a whole number of tokens within the row's own cap (the guarded fetch and the gate
+  // refuse a max_tokens above it) and not below the generation floor every preview call keeps.
+  if (!Number.isSafeInteger(input.storytellerTokenCeiling) || input.storytellerTokenCeiling > input.outputBound
+    || input.storytellerTokenCeiling < PREVIEW_STORY_TOKENS_FLOOR) {
+    throw new TypeError("PREVIEW_MODEL_ROW_STORYTELLER_CEILING_INVALID");
+  }
+  // Only the Anthropic wire (and its gate) can carry a cache mark; a row that caches has the price on every step.
+  if (cacheWriteInputUsdPerM !== undefined ? provider !== "anthropic" || (upperStep !== undefined && upperStep.cacheWriteInputUsdPerM === undefined)
+    : upperStep?.cacheWriteInputUsdPerM !== undefined) {
+    throw new TypeError("PREVIEW_MODEL_ROW_CACHE_INVALID");
+  }
+  // Only the DeepInfra wire (and its gate) knows sampling; each member is a reviewed key with a finite number, kept
+  // in PREVIEW_SAMPLING_KEYS order so every body says them the same way.
+  if (sampling !== undefined && (provider !== "deepinfra" || Object.keys(sampling).length === 0
+    || Object.keys(sampling).some(key => !(PREVIEW_SAMPLING_KEYS as readonly string[]).includes(key))
+    || Object.values(sampling).some(value => typeof value !== "number" || !Number.isFinite(value)))) {
+    throw new TypeError("PREVIEW_MODEL_ROW_SAMPLING_INVALID");
+  }
   return Object.freeze({
     ...PROVIDER_CONNECTIONS[provider],
     ...plain,
+    ...(sampling === undefined ? {} : { sampling: Object.freeze(Object.fromEntries(
+      PREVIEW_SAMPLING_KEYS.filter(key => Object.hasOwn(sampling, key)).map(key => [key, sampling[key]!]))) as PreviewSampling }),
     ...(upperStep === undefined ? {} : { upperStep: Object.freeze({ ...upperStep,
-      inputNanoUsdPerToken: nano(upperStep.inputUsdPerM), outputNanoUsdPerToken: nano(upperStep.outputUsdPerM) }) }),
+      inputNanoUsdPerToken: nano(upperStep.inputUsdPerM), outputNanoUsdPerToken: nano(upperStep.outputUsdPerM),
+      ...(upperStep.cacheWriteInputUsdPerM === undefined ? {} : { cacheWriteInputNanoUsdPerToken: nano(upperStep.cacheWriteInputUsdPerM) }) }) }),
+    ...(cacheWriteInputUsdPerM === undefined ? {} : { cacheWriteInputUsdPerM, cacheWriteInputNanoUsdPerToken: nano(cacheWriteInputUsdPerM) }),
     contextWindowTokens: input.contextWindowTokens ?? PROVIDER_CONNECTIONS[provider].contextWindowTokens,
     inputNanoUsdPerToken,
     outputNanoUsdPerToken,
@@ -128,23 +197,39 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
 export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName, readonly PreviewModelRow[]>> = Object.freeze({
   deepinfra: Object.freeze([
     row("deepinfra", { model: "zai-org/GLM-5.3-Flash", maker: "Z.AI", inputUsdPerM: "0.15", outputUsdPerM: "0.50",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: true }),
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, effort: "high", jsonObject: true }),
     row("deepinfra", { model: "deepseek-ai/DeepSeek-V4.1-Flash", maker: "DeepSeek", inputUsdPerM: "0.20", outputUsdPerM: "0.60",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false }),
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false }),
+    // Owner approval 2026-10-12: in a live practice run MiMo closed Romanian quotation marks („…) with a straight double
+    // quote inside its JSON (nine times in one judging reply), then wrote a second JSON answer in the same reply. Its
+    // DeepInfra page recommends temperature 1.0, top_p 0.95: every request carries those two sampling members (no top_k).
+    // JSON mode was tried the same day and withdrawn (owner, 2026-10-12): when MiMo closed a „ quote with a straight
+    // double quote, DeepInfra's JSON constraint ended the string there and forced the rest into garbage (a 141-character
+    // reply with 11 issues), while without JSON mode the engine's reader (INNER_QUOTE) repairs that exact slip with no call.
     row("deepinfra", { model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false }),
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, effort: null, jsonObject: false,
+      sampling: { temperature: 1.0, top_p: 0.95 } }),
     // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
+    // Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid mid-answer into
+    // random multilingual tokens in a live practice run (2 of its first 4 calls unreadable). It thinks by default, so
+    // it runs at its makers' thinking-mode settings: temperature 0.6, top_p 0.95, top_k 20.
     row("deepinfra", { model: "Qwen/Qwen3.8-Flash", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 })
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, effort: null, jsonObject: false,
+      contextWindowTokens: 1_000_000,
+      sampling: { temperature: 0.6, top_p: 0.95, top_k: 20 } })
   ]),
   // PR B, owner ruling 2026-10-10 (evening). Estimate and reserve at the lower step ($0.10 / $0.50);
-  // a call whose bytes + 2048 are above 100,000 reserves at the upper step ($0.50 / $2.50), so a
-  // 256 KiB call holds at most (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016. A request cannot
-  // ask for caching; the gate settles at the real step and halts on an overrun (charge_overrun).
+  // a call whose bytes + 2048 are above 100,000 reserves at the upper step ($0.50 / $2.50), so an
+  // uncached 256 KiB call holds at most (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016.
+  // Prompt caching (owner approval 2026-10-12): a request carrying the one cache mark reserves its
+  // whole input at the step's 5-minute cache-write price ($0.125 / $0.625), so a cached 256 KiB call
+  // holds at most (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704, under the gate's $0.25 cap.
+  // The gate settles at the real step and halts on an overrun (charge_overrun).
   anthropic: Object.freeze([
     row("anthropic", { model: "claude-haiku-5-5", maker: "Anthropic", inputUsdPerM: "0.10", outputUsdPerM: "0.50",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false,
-      upperStep: { aboveChargedInputTokens: 100_000, inputUsdPerM: "0.50", outputUsdPerM: "2.50" } })
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false,
+      cacheWriteInputUsdPerM: "0.125",
+      upperStep: { aboveChargedInputTokens: 100_000, inputUsdPerM: "0.50", outputUsdPerM: "2.50", cacheWriteInputUsdPerM: "0.625" } })
   ])
 });
 /** Every reviewed row, providers in the order above. */
@@ -245,18 +330,33 @@ export function previewChargedInputTokens(bodyBytes: number): bigint {
 /**
  * Contract A §3: ((body bytes + 2048) x input + output_bound x output), in nano-USD, at the row's
  * prices, or at its upper step's when the charged input tokens are above that step's threshold.
+ * Prompt caching (2026-10-12): a request that asks for a cache write (`cacheWrite`, only ever on a row
+ * that may cache) prices its whole input at that step's 5-minute cache-write price instead, exactly as
+ * the gate's AnthropicProfile.reservation_prices does (tests/unit/fixtures/anthropic-cache-bodies.json).
  */
-export function previewReservationNanoUsd(reviewed: PreviewModelRow, bodyBytes: number): bigint {
+export function previewReservationNanoUsd(reviewed: PreviewModelRow, bodyBytes: number,
+  options: Readonly<{ cacheWrite?: boolean }> = {}): bigint {
   const tokens = previewChargedInputTokens(bodyBytes);
   const step = reviewed.upperStep !== undefined && tokens > BigInt(reviewed.upperStep.aboveChargedInputTokens)
     ? reviewed.upperStep : reviewed;
-  return tokens * step.inputNanoUsdPerToken + BigInt(reviewed.outputBound) * step.outputNanoUsdPerToken;
+  const input = options.cacheWrite === true ? step.cacheWriteInputNanoUsdPerToken : step.inputNanoUsdPerToken;
+  if (input === undefined) throw new TypeError("PREVIEW_MODEL_ROW_CANNOT_CACHE");
+  return tokens * input + BigInt(reviewed.outputBound) * step.outputNanoUsdPerToken;
 }
 
 /** The reviewed row for a target's own base URL and model name, if any (any provider). */
 export function previewModelRowForEndpoint(baseUrl: string, model: string): PreviewModelRow | undefined {
   const reviewed = previewModelRow(model);
   return reviewed !== undefined && reviewed.baseUrl === baseUrl ? reviewed : undefined;
+}
+
+/**
+ * Reviewed sampling (2026-10-12): the sampling members an OpenAI-compatible request to this exact base URL and model
+ * carries — the reviewed row's `sampling`, else none (an empty object, so every other body stays byte for byte what
+ * it was). Row-driven like JSON mode: it follows the endpoint and model, on the preview or off it.
+ */
+export function previewSamplingMembers(baseUrl: string, model: string): PreviewSampling {
+  return previewModelRowForEndpoint(baseUrl, model)?.sampling ?? Object.freeze({});
 }
 
 /** The two-maker rule (contract A §6/§7): with two or more makers in the union, each roster names two or more. */

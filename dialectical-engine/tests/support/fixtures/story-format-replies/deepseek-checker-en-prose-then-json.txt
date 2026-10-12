@@ -1,0 +1,18 @@
+I need to evaluate the candidate story against the material.
+
+**Material key facts:**
+- Verdict: CONTESTED (trigger BASIS_INCOMPLETE — the disagreement couldn't be measured), winner P1 (0.61), runner-up P2 (0.48), thresholds low_cut 0.35, high_cut 0.7, tie_margin 0.05.
+- P1 final 0.61 → falls in the PARTLY_HELD band (0.35–0.7).
+- P2 final 0.48 → also in the PARTLY_HELD band.
+- P3 (attacks P1) is the hinge, the cost objection.
+
+**Story problems:**
+1. Both path lines are labelled HELD_UP, but neither P1 (0.61) nor P2 (0.48) reaches high_cut 0.7. The correct fate for both is PARTLY_HELD. This also means the words don't explain why a "close call" produced a "held up" line.
+2. P2 is the losing position, yet it gets the same fate as the winner and its line ("The other position was argued too") never says why it lost.
+3. The headline "The position held up" presents a basis-incomplete Close call as a clear hold, and doesn't state the answer to the question.
+4. The long version's three sections are empty placeholders ("Our reading." / "The verdict." / "What would change it."), each citing P1 while saying nothing about it — they explain nothing to the reader.
+
+Let me write the JSON verdict.{
+  "satisfied": false,
+  "objection": "The path fates are wrong and the words around them don't explain the call. P1 finished in the middle band (below the high cut) and P2 likewise, so both lines should read PARTLY_HELD, not \"held up\"; as written, a Close call is presented as a clear hold. The first path line (P1) and the headline \"The position held up\" both overstate what P1's result supports. The second path line (P2) is the losing position, yet it is given the same fate as the winner and never says why better frequency and reliability lost, so the losing path is not fairly stated. Also, the long version's three sections are empty placeholders (\"Our reading.\", \"The verdict.\", \"What would change it.\"), each citing P1 while saying nothing about it; they give the reader no account of the reading, no explanation of the unresolved cost objection (P3), and no plain-words note that a key part of the call could not be fully settled. Fix the fates to match the bands, state why P2 lost, and fill in the long sections with what the cited points actually say."
+}

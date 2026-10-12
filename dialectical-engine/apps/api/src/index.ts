@@ -265,6 +265,10 @@ import {
   type BillingRoutePath
 } from "./billing/index.js";
 import type { BillingErasureHook } from "./billing/erasure-hook.js";
+import {
+  RUN_EVENT_HEARTBEAT_FRAME, snapshotRunEventItems, tailRunEvents,
+  type RunEventMark, type RunEventTailClock, type RunEventTailTiming
+} from "./run-event-tail.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator" | "staff";
 type RouteOriginPolicy = "trusted";
@@ -659,6 +663,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PROMPT_FRAME_MATERIAL_MALFORMED",
   "PROMPT_INSTRUCTION_RESERVED_TOKEN",
   "PROMPT_MATERIAL_FIELD_NAME_INVALID",
+  "PROMPT_PATCH_NOT_APPLICABLE",
   "PROMPT_REPAIR_NOT_A_LOCATOR",
   "PROPAGATION_MAGNITUDE_INVALID",
   "PROPAGATION_RECEIPT_INVALID",
@@ -1583,6 +1588,12 @@ export interface AskApplication {
   unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null>;
   readDeployment(session: Session): Promise<Deployment>;
   events(runId: string, session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): AsyncIterable<unknown>;
+  /**
+   * Live run events (2026-10-11): one cheap owner-gated read whose mark moves with any new event of
+   * the run, and whether all its work is finished; null when the run is not the caller's. With it the
+   * events route follows the run on one open stream; without it the route answers the snapshot alone.
+   */
+  eventMark?(runId: string, session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): Promise<RunEventMark | null>;
 }
 
 export type AskPrincipal =
@@ -1691,6 +1702,11 @@ export interface ApiOptions {
   /** B10 admission budgets; optional for test compositions, always supplied by main. */
   readonly admission?: AdmissionLimiter;
   readonly admissionClock?: () => Date;
+  /**
+   * Live run events (2026-10-11): the stream's poll, heartbeat and life timings and its clock.
+   * Absent in production (run-event-tail.ts RUN_EVENT_TAIL_TIMING); tests shorten them.
+   */
+  readonly runEventTail?: Partial<RunEventTailTiming> & { readonly clock?: RunEventTailClock };
   /** Budget spec §2.7 (B7a): the room read. Absent (local mode, or no band) answers FITS. */
   readonly askRoom?: AskRoomReader;
   /**
@@ -3622,14 +3638,32 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
       connection: "keep-alive"
     });
+    // Live run events (2026-10-11): one admission (above) buys one long-lived stream that
+    // replays the stored events, then follows the run until its terminal event.
+    const application = options.application;
+    const snapshot = (signal: AbortSignal) => options.application.events(runId.data, request.session, ownership, signal);
     await streamAuthorizedEvents({
-      events: signal => options.application.events(runId.data, request.session, ownership, signal),
+      events: signal => application.eventMark === undefined
+        ? snapshotRunEventItems(snapshot(signal))
+        : tailRunEvents({
+          snapshot,
+          mark: markSignal => application.eventMark === undefined
+            ? Promise.resolve(null)
+            : application.eventMark(runId.data, request.session, ownership, markSignal),
+          signal,
+          ...(options.runEventTail === undefined ? {} : { timing: options.runEventTail }),
+          ...(options.runEventTail?.clock === undefined ? {} : { clock: options.runEventTail.clock })
+        }),
       check: async signal => {
         if (request.authenticatedSession === undefined || options.sessions?.assertCurrent === undefined) throw new Error("SESSION_REQUIRED");
         await options.sessions.assertCurrent(request.authenticatedSession, signal);
       },
-      write: candidate => {
-        const event = RunEventSchema.parse(candidate);
+      write: item => {
+        if (item.kind === "heartbeat") {
+          reply.raw.write(RUN_EVENT_HEARTBEAT_FRAME);
+          return;
+        }
+        const event = RunEventSchema.parse(item.event);
         reply.raw.write(`id: ${event.event_id}\nevent: ${event.event_type}\ndata: ${JSON.stringify(event)}\n\n`);
       },
       close: () => { if (!reply.raw.destroyed) reply.raw.end(); }, peer: reply.raw
@@ -5396,5 +5430,40 @@ export class PostgresAskApplication implements AskApplication {
       }))
     ].sort((left, right) => left.at_sequence - right.at_sequence);
     for (const event of events) { if (signal?.aborted) return; yield event; }
+  }
+
+  /**
+   * Live run events (2026-10-11): ONE owner-gated statement over every source the events snapshot
+   * reads — stored progress events, failed (and unfinished) work items, spawned nodes and their
+   * edges, judgement ledger entries, propagation runs. Its mark moves whenever the snapshot could
+   * hold a new event; the stream reads the snapshot again only then. No content, no key work.
+   */
+  async eventMark(runId: string, _session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): Promise<RunEventMark | null> {
+    if (signal?.aborted) return null;
+    const result = await queryPrivateSnapshot<{
+      progress: string; failed: string; settled: boolean; nodes: string; pending: string;
+      edges: string; judged: string; propagated: string;
+    }>(this.pool,
+      `SELECT
+         COALESCE((SELECT max(event.at_seq) FROM core.run_progress_event AS event WHERE event.run_id = run.run_id), 0)::text AS progress,
+         (SELECT count(*) FROM core.work_item AS work WHERE work.run_id = run.run_id AND work.state = 'FAILED')::text AS failed,
+         COALESCE((SELECT bool_and(work.state IN ('DONE','FAILED')) FROM core.work_item AS work WHERE work.run_id = run.run_id), false) AS settled,
+         COALESCE((SELECT max(node.created_at_seq) FROM core.node AS node WHERE node.run_id = run.run_id), 0)::text AS nodes,
+         (SELECT count(*) FROM core.node AS node WHERE node.run_id = run.run_id AND node.generation_status = 'pending')::text AS pending,
+         COALESCE((SELECT max(edge.created_at_seq) FROM core.edge AS edge WHERE edge.run_id = run.run_id), 0)::text AS edges,
+         COALESCE((SELECT max(entry.sequence) FROM ledger.ledger_entry AS entry
+                   WHERE entry.run_id = run.run_id AND entry.action_kind = 'JUDGEMENT_SCHEDULED'), 0)::text AS judged,
+         COALESCE((SELECT max(propagation.at_seq) FROM ledger.propagation_run AS propagation
+                   WHERE propagation.run_id = run.run_id), 0)::text AS propagated
+       FROM core.run AS run
+       WHERE run.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)`,
+      [runId, ownership.ownerRef, ownership.legacyAskerId], signal
+    );
+    const row = result.rows[0];
+    if (row === undefined) return null;
+    return Object.freeze({
+      mark: [row.progress, row.failed, row.nodes, row.pending, row.edges, row.judged, row.propagated].join(":"),
+      settled: row.settled === true
+    });
   }
 }

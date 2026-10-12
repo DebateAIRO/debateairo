@@ -28,6 +28,11 @@ ROWS = {MODEL: ('Z.AI', '0.15', '0.50', 32768, 'high', True),
         DEEPSEEK: ('DeepSeek', '0.20', '0.60', 32768, 'high', False),
         MIMO: ('Xiaomi', '0.43', '0.87', 32768, None, False),
         QWEN: ('Alibaba', '0.113', '0.382', 32768, None, False)}
+# The reviewed sampling (2026-10-12), written out independently of the gate: model -> the exact keys and
+# values its request must carry. A row not listed carries none of them. MiMo's (owner approval 2026-10-12) are
+# DeepInfra's recommended temperature 1.0 and top_p 0.95, with no top_k.
+SAMPLING = {MIMO: {'temperature': 1.0, 'top_p': 0.95},
+            QWEN: {'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}}
 HOST = 'synthetic-host'
 SCOPE = 'preview-team-synthetic'
 # A made-up test value, not a key. Built from pieces so a secret scanner does not read it as one
@@ -85,11 +90,12 @@ def go_document(**changes):
 
 
 def body(**changes):
-    """A valid request for changes['model'] (GLM by default), with that row's effort rule."""
+    """A valid request for changes['model'] (GLM by default), with that row's effort and sampling rules."""
     model = changes.get('model', MODEL)
     value = {'model': model, 'max_tokens': 8192, 'messages': [{'role': 'user', 'content': 'Offline synthetic test'}]}
     if ROWS.get(model, (None,) * 5)[4] == 'high' or model not in ROWS:
         value['reasoning_effort'] = 'high'
+    value.update(SAMPLING.get(model, {}))
     value.update(changes)
     return value
 

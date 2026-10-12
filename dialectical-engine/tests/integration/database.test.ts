@@ -1170,7 +1170,10 @@ describe("LOAD-01 run projection ownership boundary", () => {
     );
     const api = buildApi({
       application,
-      sessions:testSessionApplication([identity]),allowedOrigin:TEST_APP_ORIGIN
+      sessions:testSessionApplication([identity]),allowedOrigin:TEST_APP_ORIGIN,
+      // Live run events (2026-10-11): this run is still RUNNING, so the stream would follow it; a
+      // zero life ends it right after the replay this test reads.
+      runEventTail:{ maxLifeMs:0 }
     });
     try {
       const response = await api.inject({

@@ -47,6 +47,7 @@ import {
   previewModelRow,
   previewModelRowForRef,
   previewProviderSocket,
+  previewStorytellerTokenCeiling,
   type PreviewGateRemaining,
   type PreviewModelRow,
   type PreviewProviderName,
@@ -232,8 +233,10 @@ function roleModelList(roles: PreviewRoleModels): readonly string[] {
 /**
  * The kinds of call one debate makes, as the estimate prices them. UNBILLED_RETRY is owner ruling 5's
  * one retry of a call the gate proved unbilled: it counts against the gate's calls and costs nothing.
+ * STORY_CHECKER_RETRY (story format robustness, 2026-10-12) is the story checker's one repair try, a
+ * billed call like the storyteller's STORYTELLER_RETRY.
  */
-export type PreviewCallType = "DEBATE" | "STORYTELLER" | "STORYTELLER_RETRY" | "STORY_CHECKER" | "PROBE" | "UNBILLED_RETRY";
+export type PreviewCallType = "DEBATE" | "STORYTELLER" | "STORYTELLER_RETRY" | "STORY_CHECKER" | "STORY_CHECKER_RETRY" | "PROBE" | "UNBILLED_RETRY";
 export type PreviewBilledCallType = Exclude<PreviewCallType, "UNBILLED_RETRY">;
 
 /**
@@ -254,7 +257,7 @@ export type PreviewBudgetGateSettings = Readonly<{
   roleModels: PreviewRoleModels;
   /** The same roles as provider refs; the runner health-checks those not on the panel at every pickup. */
   roleProviderRefs: readonly string[];
-  /** Rounds the verdict story may run: per round the storyteller twice (one repair) and the story checker once. */
+  /** Rounds the verdict story may run: per round the storyteller twice and the story checker twice (one repair each). */
   storyRounds: number;
   /** The max_tokens of each kind of call (see PreviewCallOutputTokens). */
   callOutputTokens: PreviewCallOutputTokens;
@@ -323,13 +326,22 @@ export function calibratedEstimatePricer(measured: PreviewMeasuredCallUsage): Pr
 function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, bigint>>,
   output: PreviewCallOutputTokens): PreviewCallPricer {
   const sent: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, number>> = {
-    DEBATE: output.debate, STORYTELLER: output.storyteller, STORYTELLER_RETRY: output.storytellerRetry, STORY_CHECKER: output.storyChecker
+    DEBATE: output.debate, STORYTELLER: output.storyteller, STORYTELLER_RETRY: output.storytellerRetry, STORY_CHECKER: output.storyChecker,
+    // The checker's one repair try, at most its length-retry ceiling (a format repair asks for its ceiling, a length retry twice it).
+    STORY_CHECKER_RETRY: lengthRetryTokenCeiling(output.storyChecker, 1)
+  };
+  // Slow answer (owner ruling 2026-10-12): the storyteller asks for its OWN row's story allowance, and its length retry
+  // twice that (the clamp in previewCallNanoUsd holds it to the row's bound, as the gateway does), never more than
+  // `output` says any storyteller is sent (none, when the register has no story).
+  const storyteller = (row: PreviewModelRow, type: "STORYTELLER" | "STORYTELLER_RETRY"): number => {
+    const own = previewStorytellerTokenCeiling(row);
+    return Math.min(sent[type], type === "STORYTELLER" ? own : lengthRetryTokenCeiling(own, 1));
   };
   return (row, type) => type === "PROBE"
     ? previewCallNanoUsd(row, PREVIEW_STRICT_PROBE_INPUT_TOKENS, PREVIEW_GLM_GENERATION_TOKEN_FLOOR)
-    : previewCallNanoUsd(row, inputTokens[type], sent[type]);
+    : previewCallNanoUsd(row, inputTokens[type], type === "STORYTELLER" || type === "STORYTELLER_RETRY" ? storyteller(row, type) : sent[type]);
 }
-const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens });
+const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens, STORY_CHECKER_RETRY: tokens });
 /**
  * STRICT_BOUND (6f62b6ba3): every call at its most, input at the largest body the gate accepts,
  * output at the max_tokens that call sends, clamped to the row; a health check at its fixed body and
@@ -348,8 +360,9 @@ export function strictUpperBoundPricer(output: PreviewCallOutputTokens): Preview
 export function realisticWorstCasePricer(output: PreviewCallOutputTokens, storyTier: PreviewStoryTier = PREVIEW_STORY_TIER_FALLBACK): PreviewCallPricer {
   const story = PREVIEW_STORY_REQUEST_BYTES[previewStoryTierOf(storyTier)];
   const storyteller = previewEstimateInputTokens(story.storyteller);
+  const storyChecker = previewEstimateInputTokens(story.storyChecker);
   return sentOutputPricer({ DEBATE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, STORYTELLER: storyteller, STORYTELLER_RETRY: storyteller,
-    STORY_CHECKER: previewEstimateInputTokens(story.storyChecker) }, output);
+    STORY_CHECKER: storyChecker, STORY_CHECKER_RETRY: storyChecker }, output);
 }
 
 export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" | "STRICT_BOUND";
@@ -408,19 +421,29 @@ function offPanelRoleRefs(panel: readonly PreviewPanelMember[], roleProviderRefs
  * - debate: PER_STEP (the active mode's count), one call per site (`expectedCallsByRoleFromBasis`);
  *   BASIS_CEILING, the larger of that and the basis's own ceiling `max_model_attempts`, which counts
  *   every repeat attempt per site (a basis without a split is always counted at its ceiling);
- * - story: per round, the storyteller twice and the story checker once;
+ * - story: per round, the storyteller twice and the story checker twice (each one repair try; story format
+ *   robustness, 2026-10-12: the checker's second try replaced its unbilled 60-second resend, so the calls are
+ *   as many as before and the second one is priced);
  * - probes: the runner's paid health checks at every pickup, one per panel member plus one per role
  *   ref not on the panel, times (1 + the hold cap: `hold_cap` on the basis, else the register's,
  *   + PREVIEW_ESTIMATE_RESTART_PICKUPS);
  * - askProbes: the API's health checks of this ask (one per target, the careful side);
  * - unbilledRetries: owner ruling 5's one retry of a call the gate proved unbilled, at most one per
- *   one-attempt call (every debate call and every story check). It is counted against the gate's
- *   calls; it costs no money (the gate released that call's hold).
+ *   one-attempt call (every debate call; the story's two calls have their own second try instead). It is
+ *   counted against the gate's calls; it costs no money (the gate released that call's hold).
  *
  * Not counted, by owner ruling R3 (2026-10-11, "keep each step once"): the runner's final retry after
  * a cooldown at the author and reviewer steps. Since the preview retry fix (option B) that paid try can
  * happen on the preview too (the preview keeps the sealed lifetime bound and one POST per call); it is
  * left to the 15% margin, like a re-claim's repeat attempts. These numbers did not change.
+ * Nor, by the same ruling (all-steps format robustness, 2026-10-12), a debate step's one format repair try on the
+ * preview (`previewFormatRepairAllowed`, providers/preview-test.ts): a second, billed POST in the same call, sent only
+ * after the step's reply failed its check. Like the final retry it is the exception, left to the margin; the gate still
+ * reserves each POST at its row's whole bound before sending it, so it can never spend what the gate has not allowed.
+ * The same holds for the patch follow-up (owner design, 2026-10-12): that second POST is now usually the SHORT one (the
+ * model's own answer back, only the failing members asked for, mostly served from the vendor's prompt cache), and a
+ * call whose second POST was a patch may send a third, the full re-ask, within the sealed bound. Each step is still
+ * counted once here (owner ruling); the gate's per-POST reservation is unchanged, so no estimate number moved.
  */
 export function previewExpectedCalls(input: Readonly<{
   basis: Readonly<Record<string, unknown>>;
@@ -442,8 +465,8 @@ export function previewExpectedCalls(input: Readonly<{
   if (debate < 1) throw new TypeError("PREVIEW_BASIS_HAS_NO_CALL_COUNT");
   const probes = previewPickups(input.basis, input.maxCooldownHoldsPerRun)
     * (input.panel.length + offPanelRoleRefs(input.panel, input.roleProviderRefs).length);
-  const story = 3 * input.storyRounds;
-  const unbilledRetries = debate + input.storyRounds;
+  const story = 4 * input.storyRounds;
+  const unbilledRetries = debate;
   return Object.freeze({ debate, story, probes, askProbes, unbilledRetries, total: debate + story + probes + askProbes + unbilledRetries });
 }
 
@@ -487,13 +510,14 @@ type PreviewRotatedRoleKind = "ANSWER" | "STORYTELLER" | "STORY_CHECKER";
 /**
  * Spec 2026-10-11 Part 5: of one gate's panel models, the one whose call of this role kind costs the
  * most at `pricer` (DEBATE for the answer roles; STORYTELLER + STORYTELLER_RETRY for the storyteller;
- * STORY_CHECKER for the story checker). The first in panel order wins a tie.
+ * STORY_CHECKER + STORY_CHECKER_RETRY for the story checker). The first in panel order wins a tie.
  */
 function dearestByPricer(pricer: PreviewCallPricer, rowOf: (model: string) => PreviewModelRow) {
   const cost = (model: string, role: PreviewRotatedRoleKind): bigint => {
     const row = rowOf(model);
     return role === "ANSWER" ? pricer(row, "DEBATE")
-      : role === "STORYTELLER" ? pricer(row, "STORYTELLER") + pricer(row, "STORYTELLER_RETRY") : pricer(row, "STORY_CHECKER");
+      : role === "STORYTELLER" ? pricer(row, "STORYTELLER") + pricer(row, "STORYTELLER_RETRY")
+        : pricer(row, "STORY_CHECKER") + pricer(row, "STORY_CHECKER_RETRY");
   };
   return (models: readonly string[], role: PreviewRotatedRoleKind): string =>
     models.reduce((best, model) => cost(model, role) > cost(best, role) ? model : best);
@@ -510,10 +534,10 @@ export type PreviewCallShares = Readonly<{ denominator: bigint; shares: readonly
  *   evenly by the panel's members; the answer writer's and checker's sites on those roles' models;
  *   the repeat attempts the basis's ceiling adds over one call per site in the same proportions
  *   (a basis without a split puts every debate call on the panel);
- * - the storyteller's two attempts and the story check per round on the story roles' models;
+ * - the storyteller's two attempts and the story checker's two per round on the story roles' models;
  * - the runner's health checks at every pickup on each panel member's model and each off-panel role's
  *   (`roleModelOfRef`), and this ask's own health checks on the models of `askProbeModelIds`;
- * - one unbilled retry per debate call (same split) and per story check.
+ * - one unbilled retry per debate call (same split); the story's calls have their second try instead.
  * `storyOnly` keeps only the story's part (a debate whose answer is served and story not yet written).
  * `rotated` (spec 2026-10-11, Part 5): the four roles are panel members, so each role's calls go on
  * every gate that has a panel member, at that gate's `dearestFor` member, and no off-panel role ref
@@ -612,7 +636,7 @@ export function previewCallShares(input: Readonly<{
     }
     for (const model of checkers) {
       add(model, "STORY_CHECKER", rounds);
-      add(model, "UNBILLED_RETRY", rounds);
+      add(model, "STORY_CHECKER_RETRY", rounds);
     }
   }
   return Object.freeze({ denominator, shares: Object.freeze(shares) });
@@ -1044,15 +1068,20 @@ async function readOrganTokenCeilings(pool: Pool, registerVersion: number): Prom
 /**
  * Pure: the max_tokens each kind of call sends on the preview, from the register's token ceilings:
  * previewCallBound's ceiling (never below the generation floor) for every debate call (the largest
- * of the three organ bounds and the two synthesis bounds), the storyteller's first attempt at its
- * ceiling and its second at the length-retry ceiling, the story checker at its ceiling.
+ * of the three organ bounds and the two synthesis bounds), the story checker at its ceiling. The
+ * storyteller (story format robustness, 2026-10-12) asks for its row's story allowance
+ * (previewStorytellerTokenCeiling), whatever the register seals: this is the largest of them, and the
+ * pricer prices every row at its own allowance (slow answer, owner ruling 2026-10-12: 16,384 on MiMo, Qwen
+ * and GLM), so each row is priced at exactly what it is sent. Its second attempt is at the length-retry
+ * ceiling of the row's own allowance, which the row's bound holds, as the gateway does.
  */
 export function previewCallOutputTokens(config: PreviewProviderTestConfig, ceilings: Readonly<{
   debate: readonly number[]; story: Readonly<{ storyteller: number; checker: number }> | null;
 }>): PreviewCallOutputTokens {
   if (ceilings.debate.length === 0 || !ceilings.debate.every(positiveInteger)) throw new TypeError("PREVIEW_CALL_CEILINGS_INVALID");
   const sent = (tokenCeiling: number) => previewCallBound({ maxAttempts: 1, tokenCeiling, deadlineMs: 1 }, config).tokenCeiling;
-  const storyteller = ceilings.story === null ? 0 : sent(ceilings.story.storyteller);
+  const storyteller = ceilings.story === null ? 0
+    : Math.max(...Object.values(PREVIEW_MODEL_ROWS_BY_PROVIDER).flat().map(previewStorytellerTokenCeiling));
   return Object.freeze({
     debate: Math.max(...ceilings.debate.map(sent)),
     storyteller,

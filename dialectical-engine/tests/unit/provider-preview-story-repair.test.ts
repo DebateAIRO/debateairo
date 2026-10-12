@@ -6,8 +6,10 @@ import {
   buildFramedRepairPrompt,
   createPreviewGuardedFetch,
   parsePreviewProviderTestConfig,
+  previewTargetGatewayControls,
   readPromptFrame,
   schemaFailureLocator,
+  schemaFailurePaths,
   withPreviewProviderCallPolicy,
   type PreviewBudgetExecution,
   type ProviderCallRequest,
@@ -42,7 +44,7 @@ function story(ref = "P1"): string {
     reviewer_note: null
   });
 }
-function storyRequest(contractId = "story.storyteller.v2"): ProviderCallRequest {
+function storyRequest(contractId = "story.storyteller.v3"): ProviderCallRequest {
   const framed = buildFramedPrompt({
     contract: { contractId, instruction: "Write the synthetic policy story.", answerForm: "Return one JSON object." },
     material: [{ name: "story_material", content: "One policy position, cited as P1." }]
@@ -81,19 +83,25 @@ function nativeHarness(contents: readonly string[], finishReasons: readonly stri
     thinking: { parameter: "reasoning_effort", levels: ["high"] }, fetchImplementation: fetcher,
     assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined,
     persistRawArtifact: async artifact => { artifacts.push(artifact); return artifact.artifactId; },
-    appendLedgerEntry: async entry => { ledger.push(entry); return entry.attemptId; }
+    appendLedgerEntry: async entry => { ledger.push(entry); return entry.attemptId; },
+    // As the runner builds a preview target: max_tokens is clamped to the row's bound, length retries included.
+    ...previewTargetGatewayControls(CONFIG, { model: MODEL })
   });
   return { gateway: withPreviewProviderCallPolicy(native, CONFIG, { model: MODEL }), executions, artifacts, ledger };
 }
 
 // Preview retry fix, option B (spec 2026-10-11 §1.1): the writer's bound is its LIFETIME allowance and passes
 // through (token floor and deadline applied); the attempts of ONE call are `maxAttemptsThisCall`.
-describe("preview storyteller v2 safe repair allowance", () => {
+// Story format robustness (2026-10-12): the current storyteller contract is v3, and on the preview the
+// storyteller's call asks for its row's whole answer cap, room to think. Slow-answer ruling (2026-10-12): the cap is
+// per row, 16,384 on GLM (this fixture's model), MiMo and Qwen, 32,768 on DeepSeek and Haiku; the deadline is 1,260 s.
+const STORYTELLER_CAP = 16_384;
+describe("preview storyteller v3 safe repair allowance", () => {
   it.each([2, 3, 8])("permits two attempts per call when the writer's original allowance is %i", async maxAttempts => {
     const request = storyRequest();
     const effective = await forwarded({ ...request, bound: { ...request.bound, maxAttempts } });
     expect(effective.maxAttemptsThisCall).toBe(2);
-    expect(effective.bound).toEqual({ maxAttempts, tokenCeiling: 8192, deadlineMs: 600000 });
+    expect(effective.bound).toEqual({ maxAttempts, tokenCeiling: STORYTELLER_CAP, deadlineMs: 1260000 });
     expect(effective.thinkingLevel).toBe("high");
   });
 
@@ -101,16 +109,16 @@ describe("preview storyteller v2 safe repair allowance", () => {
     const request = storyRequest();
     const effective = await forwarded({ ...request, bound: { ...request.bound, maxAttempts: 1 } });
     expect(effective.maxAttemptsThisCall).toBe(1);
-    expect(effective.bound).toEqual({ maxAttempts: 1, tokenCeiling: 8192, deadlineMs: 600000 });
+    expect(effective.bound).toEqual({ maxAttempts: 1, tokenCeiling: STORYTELLER_CAP, deadlineMs: 1260000 });
   });
 
-  it("preserves the larger output bound and all caller admission seams", async () => {
+  it("asks for the row's whole cap and keeps all caller admission seams", async () => {
     const request = storyRequest();
     const assertAttemptAllowed = () => undefined;
     const costEnvelope = { assertCallAllowed: () => undefined, recordCall: () => undefined, assertUsageReported: () => undefined };
     const effective = await forwarded({ ...request, bound: { ...request.bound, tokenCeiling: 12000 }, assertAttemptAllowed, costEnvelope });
     expect(effective.maxAttemptsThisCall).toBe(2);
-    expect(effective.bound).toEqual({ maxAttempts: 3, tokenCeiling: 12000, deadlineMs: 600000 });
+    expect(effective.bound).toEqual({ maxAttempts: 3, tokenCeiling: STORYTELLER_CAP, deadlineMs: 1260000 });
     expect(effective.packet).toBe(request.packet);
     expect(effective.providerRef).toBe("preview:fixture-a");
     expect(effective.contractHash).toBe("contract:synthetic-story");
@@ -127,7 +135,9 @@ describe("preview storyteller v2 safe repair allowance", () => {
   });
 
   const oneAttemptCases: ReadonlyArray<readonly [string, () => ProviderCallRequest]> = [
-    ...["served", "uniform-panel", "critic-exempt", "evaluator"].map(lane => [
+    // All-steps format robustness (2026-10-12): on the served lane the same request is the answer writer's, which has
+    // its own one repair try (tests/unit/all-steps-format-robustness.test.ts), so it is not listed here.
+    ...["uniform-panel", "critic-exempt", "evaluator"].map(lane => [
       `nonstory lane ${lane}`, () => ({ ...storyRequest(), lane } as ProviderCallRequest)
     ] as const),
     ...["JUDGE", "COMPOSER", "CONFORMANCE", "CLASSIFIER", "EVALUATOR"].map(role => [
@@ -138,8 +148,10 @@ describe("preview storyteller v2 safe repair allowance", () => {
       `callsite ${callSiteKey}`, () => ({ ...storyRequest(), callSiteKey })
     ] as const),
     ["old storyteller v1 contract", () => storyRequest("story.storyteller.v1")],
+    ["previous storyteller v2 contract", () => storyRequest("story.storyteller.v2")],
     ["checker contract", () => storyRequest("story.checker.v1")],
-    ["unknown storyteller version", () => storyRequest("story.storyteller.v3")],
+    ["current checker contract on the storyteller's site", () => storyRequest("story.checker.v2")],
+    ["unknown storyteller version", () => storyRequest("story.storyteller.v4")],
     ...[undefined, null, "classifier"].map(classifyContent => [
       `noncallable classifier ${String(classifyContent)}`,
       () => ({ ...storyRequest(), classifyContent } as unknown as ProviderCallRequest)
@@ -159,7 +171,9 @@ describe("preview storyteller v2 safe repair allowance", () => {
     const request = makeRequest();
     const effective = await forwarded(request);
     expect(effective.maxAttemptsThisCall).toBe(1);
-    expect(effective.bound).toEqual({ maxAttempts: request.bound.maxAttempts, tokenCeiling: 8192, deadlineMs: 600000 });
+    // Only the storyteller's own site (story lane, SYNTHESIZER, STORY:STORYTELLER:1-8) asks for the whole cap.
+    const storytellerSite = request.lane === "story" && request.role === "SYNTHESIZER" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey);
+    expect(effective.bound).toEqual({ maxAttempts: request.bound.maxAttempts, tokenCeiling: storytellerSite ? STORYTELLER_CAP : 8192, deadlineMs: 1260000 });
   });
 
   it("still refuses a weaker thinking request before forwarding", async () => {
@@ -169,10 +183,16 @@ describe("preview storyteller v2 safe repair allowance", () => {
     expect(calls).toBe(0);
   });
 
+  // Patch follow-up (owner design, 2026-10-12): the repair POST is the short follow-up — the model's own story back as its
+  // turn and only the failing machine path asked for — so the model answers with the one corrected member.
   it("native gateway repairs a rejected story citation using only its schema locator", async () => {
     const rejected = story("P99");
     const accepted = story();
-    const { gateway, executions, artifacts, ledger } = nativeHarness([rejected, accepted]);
+    // Every member that cites P99 is refused at its own path; the patch answers each with the right ref.
+    const refused = classifyStoryContent(rejected, INDEX);
+    const paths = refused.parseStatus === "PARSED" ? [] : schemaFailurePaths(refused.parseError) ?? [];
+    expect(paths[0]).toBe("short.change.node_refs.0");
+    const { gateway, executions, artifacts, ledger } = nativeHarness([rejected, JSON.stringify(Object.fromEntries(paths.map(path => [path, "P1"])))]);
     const projections: unknown[] = [];
     const charges: unknown[] = [];
     let attempts = 0;
@@ -187,16 +207,20 @@ describe("preview storyteller v2 safe repair allowance", () => {
     expect(projections).toHaveLength(2);
     expect(charges).toHaveLength(2);
     const bodies = executions.map(execution => JSON.parse(execution.requestBody));
-    for (const body of bodies) expect(body).toMatchObject({ model: MODEL, reasoning_effort: "high", max_tokens: 8192, response_format: { type: "json_object" } });
+    for (const body of bodies) expect(body).toMatchObject({ model: MODEL, reasoning_effort: "high", max_tokens: STORYTELLER_CAP, response_format: { type: "json_object" } });
     const repaired = readPromptFrame({ messages: bodies[1].messages });
-    expect(repaired.contractId).toBe("story.storyteller.v2");
-    expect(repaired.fields.slice(-2)).toEqual([
-      { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
-      { name: "machine_rejection_path", content: "short.change.node_refs.0" }
+    expect(repaired.contractId).toBe("story.storyteller.v3");
+    expect(repaired.fields.slice(-3)).toEqual([
+      // The issues' own engine code when they all name one (the full re-ask's locator keeps SCHEMA_FAILED).
+      { name: "machine_rejection_code", content: "STORY_UNKNOWN_NODE_REF" },
+      { name: "machine_rejection_paths", content: paths.join(",") },
+      { name: "machine_reply_form", content: "PATCH" }
     ]);
-    expect(bodies[1].messages[0]).toEqual(bodies[0].messages[0]);
-    expect(executions[1]?.requestBody).not.toContain(rejected);
-    expect(executions[1]?.requestBody).not.toContain("P99");
+    expect(bodies[1].messages.slice(0, 2)).toEqual(bodies[0].messages);
+    // The rejected story goes back only as the model's own turn: never in the instruction compartment or a block.
+    expect(bodies[1].messages[2]).toEqual({ role: "assistant", content: rejected });
+    expect(repaired.fields.some((field: { content: string }) => field.content.includes("P99"))).toBe(false);
+    expect(bodies[1].messages[0].content).not.toContain("P99");
     expect(new Set(executions.map(execution => execution.operationId)).size).toBe(2);
     for (const execution of executions) {
       expect(execution.requestSha256).toMatch(/^[0-9a-f]{64}$/u);
@@ -220,17 +244,21 @@ describe("preview storyteller v2 safe repair allowance", () => {
     const result = await gateway.call({ ...storyRequest(), costEnvelope: {
       assertCallAllowed: () => undefined, recordCall: () => undefined, assertUsageReported: () => undefined } });
     expect(artifacts.map(artifact => artifact.parseStatus)).toEqual(["PARSE_FAILED", "PARSED"]);
-    // The W10 length retry: the ORIGINAL packet under a raised bound, never the repair packet.
+    // The W10 length retry: the ORIGINAL packet, never the repair packet. On this slow row the first attempt asks for
+    // the 16,384 story allowance; the retry asks twice that, which is exactly the row's whole answer cap (32,768).
     const bodies = executions.map(execution => JSON.parse(execution.requestBody));
     expect(bodies[1].messages).toEqual(bodies[0].messages);
-    expect(bodies[1].max_tokens).toBe(bodies[0].max_tokens * 2);
+    expect([bodies[0].max_tokens, bodies[1].max_tokens]).toEqual([STORYTELLER_CAP, 2 * STORYTELLER_CAP]);
     expect(result.repairAttempts).toBe(0);
   });
 
+  // Patch follow-up: with the story's sealed bound of two, the short follow-up is the one permitted repair (a call whose
+  // second POST was a patch may send a third only within the bound; tests/unit/patch-follow-up-gateway.test.ts).
   it("native gateway stops after the one permitted repair and retains both failed charges", async () => {
     const { gateway, executions, artifacts, ledger } = nativeHarness([story("P99")]);
     const charges: unknown[] = [];
-    await expect(gateway.call({ ...storyRequest(), costEnvelope: {
+    const request = storyRequest();
+    await expect(gateway.call({ ...request, bound: { ...request.bound, maxAttempts: 2 }, costEnvelope: {
       assertCallAllowed: () => undefined, recordCall: charge => { charges.push(charge); }, assertUsageReported: () => undefined
     } })).rejects.toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2, lastParseStatus: "SCHEMA_FAILED" });
     expect(executions).toHaveLength(2);

@@ -32,8 +32,14 @@ OTHER_SHAPE = 'sk-' + 'ant-' + 'api03-LEAKED_value-42'  # Any other string of th
 # the row holds the lower step's prices (0.10 / 0.50), bound 32768; a request whose bytes + 2048 are
 # above 100,000 reserves at the upper step's (0.50 / 2.50), the ceiling (owner ruling 2026-10-10, evening).
 PRICE_IN, PRICE_OUT, BOUND = Decimal('0.10'), Decimal('0.50'), 32768
-CEIL_IN, CEIL_OUT = Decimal('0.50'), Decimal('2.50')
+CEIL_IN, CEIL_OUT = Decimal('0.50'), Decimal('2.50')  # The upper step's plain input and output prices.
 STEP_TOKENS = 100000
+# Prompt caching (owner approval 2026-10-12): a request whose system is the two-block form (the cache mark
+# on the first block) reserves its whole input at the step's 5-minute cache-write price instead.
+WRITE_IN, UPPER_WRITE_IN = Decimal('0.125'), Decimal('0.625')
+# The dearest any accepted request reserves at: a cached request at the upper step (0.625 in, 2.50 out).
+CEILING = (UPPER_WRITE_IN, CEIL_OUT)
+CACHE_MARK = {'type': 'ephemeral'}
 LOWER = {'input': Decimal('0.10'), 'write_5m': Decimal('0.125'), 'write_1h': Decimal('0.20'), 'read': Decimal('0.01'),
          'output': Decimal('0.50')}
 UPPER = {'input': Decimal('0.50'), 'write_5m': Decimal('0.625'), 'write_1h': Decimal('1.00'), 'read': Decimal('0.05'),
@@ -57,9 +63,32 @@ def without(name, value=None):
     return {k: v for k, v in (value or request()).items() if k != name}
 
 
+def cached_system(prefix='Offline synthetic instruction and safety frame\n\n',
+                  tail='--- PER-CALL MARKERS (engine) ---\nBoundary marker: f00d\nCanary: c0de\n--- END PER-CALL MARKERS ---'):
+    """The two-block system the app's adapter sends when the frame carries its per-call marker tail."""
+    return [{'type': 'text', 'text': prefix, 'cache_control': dict(CACHE_MARK)}, {'type': 'text', 'text': tail}]
+
+
+def cached_request(**changes):
+    return request(**{'system': cached_system(), **changes})
+
+
+def is_cached(value):
+    return isinstance(value, dict) and isinstance(value.get('system'), list)
+
+
 def reservation_of(raw):
+    """Written out independently of the gate: the step by the request's size, the input at the step's
+    5-minute cache-write price when the request carries the two-block system, else at its input price."""
     tokens = len(raw.encode()) + 2048
-    price_in, price_out = (PRICE_IN, PRICE_OUT) if tokens <= STEP_TOKENS else (CEIL_IN, CEIL_OUT)
+    try:
+        cached = is_cached(json.loads(raw))
+    except ValueError:
+        cached = False
+    if tokens <= STEP_TOKENS:
+        price_in, price_out = (WRITE_IN if cached else PRICE_IN), PRICE_OUT
+    else:
+        price_in, price_out = (UPPER_WRITE_IN if cached else CEIL_IN), CEIL_OUT
     return (Decimal(tokens) * price_in + Decimal(BOUND) * price_out) / Decimal(1000000)
 
 
@@ -75,8 +104,8 @@ def envelope_text(raw, operation_id='op-1'):
             'requestSha256': hashlib.sha256(raw.encode()).hexdigest(), 'reservedUsd': str(reservation_of(raw))}
 
 
-def sized(size):
-    value = request(messages=[{'role': 'user', 'content': ''}])
+def sized(size, cached=False):
+    value = (cached_request if cached else request)(messages=[{'role': 'user', 'content': ''}])
     value['messages'][0]['content'] = 'x' * (size - len(json.dumps(value).encode()))
     assert len(json.dumps(value).encode()) == size
     return value
@@ -158,8 +187,12 @@ class ParityAndReservationTests(AnthropicTest):
                           'output_usd_per_m': str(row.output_usd_per_m),
                           'input_nano_usd_per_token': int(row.input_usd_per_m * 1000),
                           'output_nano_usd_per_token': int(row.output_usd_per_m * 1000),
+                          'cache_write_5m_input_usd_per_m': str(ANTHROPIC.settlement_steps[0].cache_write_5m_usd_per_m),
+                          'cache_write_5m_input_nano_usd_per_token': int(ANTHROPIC.settlement_steps[0].cache_write_5m_usd_per_m * 1000),
                           'output_bound': row.output_bound, 'effort': row.effort, 'json_object': row.json_object,
-                          'worst_case_reservation_usd': '%.9f' % bridge.worst_case_reservation(ANTHROPIC, row)},
+                          'worst_case_reservation_usd': '%.9f' % bridge.worst_case_reservation(ANTHROPIC, row),
+                          'worst_case_uncached_reservation_usd': '%.9f' % bridge.reservation_for(
+                              ANTHROPIC.max_request_bytes, row, ANTHROPIC.reservation_prices(row, None, ANTHROPIC.max_request_bytes))},
                          parity['rows'][0])
         self.assertEqual([{'prompt_tokens_up_to': step.prompt_tokens_up_to, 'input_usd_per_m': str(step.input_usd_per_m),
                            'cache_write_5m_usd_per_m': str(step.cache_write_5m_usd_per_m),
@@ -175,15 +208,18 @@ class ParityAndReservationTests(AnthropicTest):
                           lower.cache_read_usd_per_m, lower.output_usd_per_m), tuple(LOWER.values()))
         self.assertEqual((upper.input_usd_per_m, upper.cache_write_5m_usd_per_m, upper.cache_write_1h_usd_per_m,
                           upper.cache_read_usd_per_m, upper.output_usd_per_m), tuple(UPPER.values()))
-        # The row is the lower step; the ceiling is the upper step's plain input and output prices
-        # (no accepted request can ask for a cache write, so its prices are never reserved at).
+        # The row is the lower step; the ceiling is the upper step's 5-minute cache-write input price and its
+        # output price (a cached request at the upper step: the dearest any accepted request reserves at).
         self.assertEqual((PRICE_IN, PRICE_OUT), (lower.input_usd_per_m, lower.output_usd_per_m))
-        self.assertEqual(ANTHROPIC.ceiling_prices(row), (CEIL_IN, CEIL_OUT))
+        self.assertEqual(ANTHROPIC.ceiling_prices(row), CEILING)
         self.assertEqual((CEIL_IN, CEIL_OUT), (upper.input_usd_per_m, upper.output_usd_per_m))
+        self.assertEqual((WRITE_IN, UPPER_WRITE_IN), (lower.cache_write_5m_usd_per_m, upper.cache_write_5m_usd_per_m))
         self.assertEqual(ANTHROPIC.RESERVATION_OVERHEAD_BYTES, bridge.RESERVATION_OVERHEAD_BYTES)
-        self.assertEqual((parity['reservation']['step_tokens'], Decimal(parity['reservation']['ceiling_input_usd_per_m']),
-                          Decimal(parity['reservation']['ceiling_output_usd_per_m'])),
-                         (lower.prompt_tokens_up_to, CEIL_IN, CEIL_OUT))
+        reservation = parity['reservation']
+        self.assertEqual((reservation['step_tokens'], Decimal(reservation['upper_input_usd_per_m']),
+                          Decimal(reservation['upper_output_usd_per_m']), Decimal(reservation['ceiling_input_usd_per_m']),
+                          Decimal(reservation['ceiling_output_usd_per_m'])),
+                         (lower.prompt_tokens_up_to, CEIL_IN, CEIL_OUT) + CEILING)
 
     def test_the_reservation_step_follows_the_request_size(self):
         # bytes + 2048 up to 100,000: the prompt cannot reach the upper step, so the lower prices;
@@ -195,6 +231,10 @@ class ParityAndReservationTests(AnthropicTest):
         for size in (edge + 1, 256 * 1024, None, -1, True, 1.0):
             with self.subTest(size=size):
                 self.assertEqual(ANTHROPIC.reservation_prices(row, now, size), (CEIL_IN, CEIL_OUT))
+                self.assertEqual(ANTHROPIC.reservation_prices(row, now, size, cache_write=True), CEILING)
+        # A cached request: the same step rule, its input at the step's 5-minute cache-write price.
+        self.assertEqual(ANTHROPIC.reservation_prices(row, now, edge, cache_write=True), (WRITE_IN, PRICE_OUT))
+        self.assertEqual(ANTHROPIC.reservation_prices(row, now, edge, cache_write=False), (PRICE_IN, PRICE_OUT))
         go = bridge.read_go(self.gate().go_path)
         for size, prices in ((edge, (PRICE_IN, PRICE_OUT)), (edge + 1, (CEIL_IN, CEIL_OUT))):
             with self.subTest(body_bytes=size):
@@ -209,19 +249,25 @@ class ParityAndReservationTests(AnthropicTest):
     def test_worst_case_is_pinned_under_the_per_call_cap(self):
         row = ANTHROPIC.rows[HAIKU]
         self.assertEqual((ANTHROPIC.per_call_cap_usd, ANTHROPIC.max_request_bytes), (Decimal('0.25'), 256 * 1024))
-        self.assertEqual(bridge.worst_case_reservation(ANTHROPIC, row), Decimal('0.214016'))
+        # Prompt caching (2026-10-12): a full-size CACHED request is the worst case now,
+        # (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704 (an uncached one stays $0.214016).
+        self.assertEqual(bridge.worst_case_reservation(ANTHROPIC, row), Decimal('0.24704'))
+        self.assertEqual((Decimal(264192) * UPPER_WRITE_IN + Decimal(32768) * CEIL_OUT) / Decimal(1000000), Decimal('0.24704'))
         self.assertEqual((Decimal(264192) * CEIL_IN + Decimal(32768) * CEIL_OUT) / Decimal(1000000), Decimal('0.214016'))
         self.assertTrue(bridge.row_reviewed(ANTHROPIC, HAIKU, row))
         self.assertIs(bridge.profile_of('anthropic'), ANTHROPIC)
         go = bridge.read_go(self.gate().go_path)
         _, reserved, _, prices = bridge.validate_request(envelope(sized(ANTHROPIC.max_request_bytes)), go)
         self.assertEqual((reserved, prices), (Decimal('0.214016'), (CEIL_IN, CEIL_OUT)))
+        _, reserved, _, prices = bridge.validate_request(envelope(sized(ANTHROPIC.max_request_bytes, cached=True)), go)
+        self.assertEqual((reserved, prices), (Decimal('0.24704'), CEILING))
         with self.refused('REQUEST_SCOPE_INVALID'):
             bridge.validate_request(envelope(sized(ANTHROPIC.max_request_bytes + 1)), go)
-        # A row whose full-size request would pass the cap (47,162 x 2.50 tips it over) is not reviewed, and its GO is refused.
-        with patch.object(ANTHROPIC, 'rows', {HAIKU: row._replace(output_bound=47161)}):
+        # A row whose full-size cached request would pass the cap is not reviewed, and its GO is refused:
+        # 264,192 x 0.625 = 165,120, so 33,952 x 2.50 = 84,880 reaches the $0.25 exactly and 33,953 tips it over.
+        with patch.object(ANTHROPIC, 'rows', {HAIKU: row._replace(output_bound=33952)}):
             self.assertIs(bridge.profile_of('anthropic'), ANTHROPIC)
-        with patch.object(ANTHROPIC, 'rows', {HAIKU: row._replace(output_bound=47162)}):
+        with patch.object(ANTHROPIC, 'rows', {HAIKU: row._replace(output_bound=33953)}):
             self.assertIsNone(bridge.profile_of('anthropic'))
 
     def test_a_small_request_reserves_exactly_and_the_app_nano_usd_form_is_accepted(self):
@@ -280,9 +326,9 @@ class GoAndActivateTests(AnthropicTest):
                                                                  **changes}))
 
     def test_activate_checks_the_calls_in_flight_times_the_worst_case_against_the_pot(self):
-        # The proposed GO: 2 x 0.214016 = 0.428032 fits $2.00. 4 x 0.214016 = 0.856064.
-        for budget, calls, ok in (('2.00', 2, True), ('0.43', 2, True), ('0.42', 2, False),
-                                  ('0.85', 4, False), ('0.86', 4, True), ('0.21', 1, False), ('0.22', 1, True)):
+        # The proposed GO: 2 x 0.24704 = 0.49408 fits $2.00. 4 x 0.24704 = 0.98816 (a cached full-size request).
+        for budget, calls, ok in (('2.00', 2, True), ('0.50', 2, True), ('0.49', 2, False),
+                                  ('0.98', 4, False), ('0.99', 4, True), ('0.24', 1, False), ('0.25', 1, True)):
             with self.subTest(budget=budget, calls=calls):
                 gate = self.gate(daily_budget_usd=budget, max_concurrent_calls=calls)
                 gate.init()
@@ -301,8 +347,12 @@ class SettlementTests(AnthropicTest):
         usage = reply.get('usage') if isinstance(reply.get('usage'), dict) else {}
         prompt = sum(value for value in (usage.get('input_tokens'), usage.get('cache_creation_input_tokens'),
                                          usage.get('cache_read_input_tokens')) if type(value) is int)
+        # A reply reporting cache tokens needs a request that asked for caching (the two-block system).
+        cached = any(type(usage.get(name)) is int and usage[name] > 0
+                     for name in ('cache_creation_input_tokens', 'cache_read_input_tokens'))
         gate = gate or self.ready()
-        result = self.call(gate, operation_id, reply=reply, value=sized(120000) if prompt > 50000 else None)
+        value = sized(120000, cached) if prompt > 50000 else cached_request() if cached else None
+        result = self.call(gate, operation_id, reply=reply, value=value)
         self.assertEqual(result['status'], 200)
         return gate, entry_of(gate, operation_id)
 
@@ -332,8 +382,9 @@ class SettlementTests(AnthropicTest):
                                                         'reserve_output_usd_per_m', 'output_bound', 'requested_effort',
                                                         'reply_model')},
                                  {'provider': 'anthropic', 'model': HAIKU, 'maker': 'Anthropic',
-                                  # The reservation follows the REQUEST's size: a reply this large needed a large request.
-                                  'reserve_input_usd_per_m': '0.10' if name == 'small' else '0.50',
+                                  # The reservation follows the REQUEST's size: a reply this large needed a large request,
+                                  # and a reply with cache tokens a cached one (its input at the 5-minute write price).
+                                  'reserve_input_usd_per_m': '0.10' if name == 'small' else '0.625' if name.startswith('mixed') else '0.50',
                                   'reserve_output_usd_per_m': '0.50' if name == 'small' else '2.50',
                                   'output_bound': 32768, 'requested_effort': 'high', 'reply_model': HAIKU})
                 self.assertEqual((Decimal(entry['settle_input_usd_per_m']), Decimal(entry['settle_output_usd_per_m'])),
@@ -359,9 +410,9 @@ class SettlementTests(AnthropicTest):
         # 90000 x 0.50 + 4000 x 0.625 + 2000 x 1.00 + 5000 x 0.05 + 2000 x 2.50 = 54750 -> $0.05475
         self.assertEqual(cost(UPPER, 90000, 4000, 2000, 5000, 2000), Decimal('0.05475'))
         no_split = message(2000, 100, cache_creation_input_tokens=3000, cache_read_input_tokens=4000)
-        # Without its split, the whole write is charged at the dearer 1-hour price:
-        # 2000 x 0.10 + 3000 x 0.20 + 4000 x 0.01 + 100 x 0.50 = 890 -> $0.00089
-        self.assertEqual(cost(LOWER, 2000, 0, 3000, 4000, 100), Decimal('0.00089'))
+        # Without its split, the write a cached request asked for is the 5-minute kind (the only mark it may carry):
+        # 2000 x 0.10 + 3000 x 0.125 + 4000 x 0.01 + 100 x 0.50 = 665 -> $0.000665
+        self.assertEqual(cost(LOWER, 2000, 3000, 0, 4000, 100), Decimal('0.000665'))
         documented = message(2000, 100, cache_creation_input_tokens=0, cache_read_input_tokens=0,
                              cache_creation={'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0},
                              server_tool_use={'web_search_requests': 0, 'web_fetch_requests': 0},
@@ -381,7 +432,7 @@ class SettlementTests(AnthropicTest):
         thinking_all = message(2000, 100, output_tokens_details={'thinking_tokens': 100})
         for name, reply, expected, step, hour in (('lower', lower, Decimal('0.000815'), 'up_to_100k', 2000),
                                                   ('upper', upper, Decimal('0.05475'), 'over_100k', 2000),
-                                                  ('no_split', no_split, Decimal('0.00089'), 'up_to_100k', 3000),
+                                                  ('no_split', no_split, Decimal('0.000665'), 'up_to_100k', 0),
                                                   ('documented_zeros', documented, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
                                                   ('nulls', nulls, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
                                                   ('documented_thinking_split', thinking, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
@@ -589,7 +640,7 @@ class SettlementTests(AnthropicTest):
         for named in ('claude-haiku-5-5-20261001', 'claude-sonnet-5-5', 'Claude-Haiku-5-5', HAIKU + ' ', None, 7):
             with self.subTest(named=named):
                 gate = self.ready()
-                with self.refused('AUTHORITY_HALTED'):
+                with self.refused('SETTLED_INTO_HALT'):
                     self.call(gate, reply=message(model=named))
                 entry = entry_of(gate)
                 self.assertEqual((entry['state'], Decimal(entry['held_usd'])), ('settled', Decimal('0.00035')))
@@ -599,20 +650,20 @@ class SettlementTests(AnthropicTest):
 
     def test_an_error_status_with_valid_usage_settles_and_halts(self):
         gate = self.ready()
-        with self.refused('AUTHORITY_HALTED'):
+        with self.refused('SETTLED_INTO_HALT'):
             self.call(gate, reply=message(), status=500)
         self.assertEqual((entry_of(gate)['state'], gate.status()['reason']), ('settled', 'provider_error_or_model_identity'))
 
     def test_a_1h_cache_write_above_the_hold_is_charged_and_halts_with_charge_overrun(self):
-        # The ceiling (0.50 input) is not the dearest input price: a 1-hour cache write over 100,000
-        # tokens is 1.00. The request cannot ask for caching, but if Anthropic reports such a write
-        # anyway, the call is charged in full (no cap at the hold) and the gate halts with charge_overrun.
+        # The ceiling (0.625 input, a 5-minute write) is not the dearest input price: a 1-hour cache write over
+        # 100,000 tokens is 1.00. No request can ask for one, but if Anthropic reports one anyway, the call is
+        # charged in full (no cap at the hold) and the gate halts with charge_overrun.
         hour = {'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 200000}
         reply = message(1000, 100, cache_creation_input_tokens=200000, cache_creation=hour)
         expected = cost(UPPER, 1000, write_1h=200000, output=100)
         self.assertEqual(expected, Decimal('0.20075'))
         gate = self.ready()
-        with self.refused('AUTHORITY_HALTED'):
+        with self.refused('SETTLED_INTO_HALT'):
             self.call(gate, reply=reply)
         entry = entry_of(gate)
         self.assertEqual((entry['state'], Decimal(entry['held_usd'])), ('settled', expected))
@@ -637,7 +688,7 @@ class UnbilledAndUnsentTests(AnthropicTest):
                     self.call(gate, reply=reply, status=status)
                 status_now = gate.status()
                 self.assertEqual((status_now['state'], status_now['unsent_streak'], status_now['today_posts'],
-                                  status_now['today_spend_usd'], status_now['in_flight']), ('active', 1, 0, '0', 0))
+                                  status_now['today_spend_usd'], status_now['in_flight']), ('active', 0, 0, '0', 0))
                 # A's machinery: the entry stays on the record at $0 as 'released_unbilled'.
                 entries = gate.day(DAY)['entries']
                 self.assertEqual([(e['state'], e['held_usd'], e['http_status'], e['reason']) for e in entries.values()],
@@ -651,23 +702,105 @@ class UnbilledAndUnsentTests(AnthropicTest):
     def error(kind, **extra):
         return {'type': 'error', 'error': {'type': kind, 'message': 'synthetic'}, **extra}
 
+    NOT_BUSY = ((400, 'invalid_request_error'), (404, 'not_found_error'), (413, 'request_too_large'), (500, 'api_error'))
+
     def test_other_well_formed_non_billing_errors_are_released_on_the_same_ledger_entry(self):
         # Judge round on PR B: Anthropic's own error answers that bill nothing go through A's
-        # released_unbilled machinery (a $0 entry kept on the record, the daily ceiling, the streak).
-        for status, kind in ((400, 'invalid_request_error'), (404, 'not_found_error'),
-                             (413, 'request_too_large'), (500, 'api_error')):
+        # released_unbilled machinery (a $0 entry kept on the record). Review 2026-10-12: only 429/529
+        # say the model is busy; these four are not busy, so they count toward the gate-wide unsent
+        # streak exactly as before gate v4, never cool the model, and the caller sees
+        # PROVIDER_ERROR_UNBILLED (the app's plain unbilled refusal, never the busy one).
+        for status, kind in self.NOT_BUSY:
             with self.subTest(status=status):
                 reply = self.error(kind, request_id='req_synthetic')
                 self.assertTrue(ANTHROPIC.unbilled_refusal(status, reply))
+                self.assertFalse(ANTHROPIC.busy_refusal(status, reply))
                 gate = self.ready()
-                with self.refused('PROVIDER_REFUSED_UNBILLED'):
+                with self.refused('PROVIDER_ERROR_UNBILLED'):
                     self.call(gate, reply=reply, status=status)
                 entries = list(gate.day(DAY)['entries'].values())
                 self.assertEqual([(e['state'], e['held_usd'], e['http_status']) for e in entries],
                                  [('released_unbilled', '0', status)])
                 now = gate.status()
-                self.assertEqual((now['state'], now['today_spend_usd'], now['today_unbilled_releases'], now['in_flight']),
-                                 ('active', '0', 1, 0))
+                self.assertEqual((now['state'], now['today_spend_usd'], now['today_unbilled_releases'], now['in_flight'],
+                                  now['unsent_streak'], now['cooling']), ('active', '0', 1, 0, 1, {}))
+        self.assertEqual(json.loads(bridge.refusal_body(bridge.CallNotSent('PROVIDER_ERROR_UNBILLED'))),
+                         {'error': 'PROVIDER_ERROR_UNBILLED'})
+
+    def test_only_429_and_529_are_busy(self):
+        for status, reply in ((429, self.RATE), (429, self.BUSY), (529, self.BUSY), (529, self.RATE)):
+            with self.subTest(status=status, kind=reply['error']['type']):
+                self.assertTrue(ANTHROPIC.unbilled_refusal(status, reply))
+                self.assertTrue(ANTHROPIC.busy_refusal(status, reply))
+        for status, kind in self.NOT_BUSY:
+            self.assertFalse(ANTHROPIC.busy_refusal(status, self.error(kind)))
+
+    def test_five_404s_in_a_row_halt_provider_unreachable(self):
+        # As before gate v4: five not-busy unbilled errors with no settled reply between halt the gate
+        # (the halt watcher then emails), and the model is never cooled on the way.
+        gate = self.ready()
+        missing = self.error('not_found_error')
+        for number in range(1, 5):
+            with self.refused('PROVIDER_ERROR_UNBILLED'):
+                self.call(gate, 'op-%d' % number, reply=missing, status=404)
+            self.assertEqual((gate.status()['state'], gate.status()['unsent_streak'], gate.status()['cooling']),
+                             ('active', number, {}))
+        with self.refused('PROVIDER_ERROR_UNBILLED'):
+            self.call(gate, 'op-5', reply=missing, status=404)
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason'], status['unsent_streak'], status['today_unbilled_releases'],
+                          status['today_spend_usd'], status['in_flight']), ('halted', 'provider_unreachable', 5, 5, '0', 0))
+        sent = []
+        with self.refused('AUTHORITY_HALTED'):
+            self.call(gate, 'op-6', dispatch=lambda *args: sent.append(args))
+        self.assertEqual(sent, [])
+
+    def test_a_settled_reply_resets_the_not_busy_streak_and_busy_refusals_neither_grow_nor_reset_it(self):
+        gate = self.ready()
+        for number in range(1, 5):
+            with self.refused('PROVIDER_ERROR_UNBILLED'):
+                self.call(gate, 'bad-%d' % number, reply=self.error('invalid_request_error'), status=400)
+        self.call(gate, 'ok-1')
+        self.assertEqual(gate.status()['unsent_streak'], 0)
+        for number in range(1, 4):
+            with self.refused('PROVIDER_ERROR_UNBILLED'):
+                self.call(gate, 'big-%d' % number, reply=self.error('request_too_large'), status=413)
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            self.call(gate, 'busy-1', reply=self.BUSY, status=529)
+        status = gate.status()
+        self.assertEqual((status['state'], status['unsent_streak'], status['cooling'][HAIKU]['refusals'],
+                          status['cooling'][HAIKU]['cooling_now']), ('active', 3, 1, False))
+
+    def test_400_and_413_never_cool_the_model(self):
+        gate = self.ready()
+        replies = ((400, self.error('invalid_request_error')), (413, self.error('request_too_large')),
+                   (400, self.error('invalid_request_error')), (413, self.error('request_too_large')))
+        for number, (status, reply) in enumerate(replies, start=1):
+            with self.refused('PROVIDER_ERROR_UNBILLED'):
+                self.call(gate, 'op-%d' % number, reply=reply, status=status)
+        self.assertEqual((gate.status()['state'], gate.status()['cooling'], gate.status()['unsent_streak']), ('active', {}, 4))
+        sent = []
+
+        def answered(raw, _key):
+            sent.append(raw)
+            return 200, json.loads(json.dumps(message()))
+        self.call(gate, 'op-5', dispatch=answered)  # Not refused MODEL_COOLING: the vendor is asked.
+        self.assertEqual((len(sent), gate.status()['unsent_streak']), (1, 0))
+
+    def test_a_not_busy_answer_to_a_cooling_trial_neither_doubles_nor_extends_the_window(self):
+        gate = self.ready()
+        for number in (1, 2):
+            with self.refused('PROVIDER_REFUSED_UNBILLED'):
+                self.call(gate, 'busy-%d' % number, reply=self.RATE, status=429)
+        before = dict(gate.control()['cooling'][HAIKU])
+        gate.clock.set('2026-10-08T09:01:00+00:00')  # The first window has run out: this call is the trial.
+        with self.refused('PROVIDER_ERROR_UNBILLED'):
+            self.call(gate, 'trial', reply=self.error('invalid_request_error'), status=400)
+        after = gate.control()['cooling'][HAIKU]
+        self.assertEqual(after, {**before, 'trial': None})
+        self.assertEqual(gate.status()['unsent_streak'], 1)
+        self.call(gate, 'next')  # The next call is the trial; its answer ends the cool-off.
+        self.assertEqual(gate.status()['cooling'], {})
 
     def test_key_billing_and_timeout_errors_and_mismatched_types_still_halt(self):
         cases = {'401_authentication': (401, self.error('authentication_error')),
@@ -686,12 +819,23 @@ class UnbilledAndUnsentTests(AnthropicTest):
                     self.call(gate, reply=reply, status=status)
                 self.assert_uncertain_halt(gate)
 
-    def test_five_unbilled_in_a_row_halt_as_unreachable(self):
+    def test_overloaded_answers_never_halt_the_gate_they_cool_the_model_off(self):
+        # Owner direction 2026-10-11: 429/529 prove Anthropic is reachable; busy-ness is per model.
         gate = self.ready()
-        for number in range(1, 6):
+        for number in (1, 2):
             with self.refused('PROVIDER_REFUSED_UNBILLED'):
-                self.call(gate, 'op-%d' % number, reply=self.RATE, status=429)
-        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'provider_unreachable'))
+                self.call(gate, 'op-%d' % number, reply=self.BUSY, status=529)
+        for number in range(3, 8):
+            sent = []
+            with self.refused('MODEL_COOLING'):
+                self.call(gate, 'op-%d' % number, dispatch=lambda *args: sent.append(args))
+            self.assertEqual(sent, [])
+        status = gate.status()
+        self.assertEqual((status['state'], status['unsent_streak'], status['today_unbilled_releases'],
+                          status['cooling'][HAIKU]['cooling_now']), ('active', 0, 2, True))
+        gate.clock.set('2026-10-08T09:01:00+00:00')  # The first window (60 s) has run out: one trial goes through.
+        self.call(gate, 'op-8', reply=message())
+        self.assertEqual(gate.status()['cooling'], {})
 
     def test_anything_else_stays_uncertain_and_halts(self):
         cases = {
@@ -735,13 +879,36 @@ class UnbilledAndUnsentTests(AnthropicTest):
         self.assertEqual((gate.status()['state'], gate.status()['unsent_streak'], gate.status()['in_flight']), ('active', 1, 0))
         self.assertEqual(gate.day(DAY)['entries'], {})
 
-    def test_a_failure_after_the_connect_is_uncertain_and_halts(self):
+    def test_a_connection_failure_after_the_send_is_booked_at_the_reservation_and_the_gate_stays_active(self):
+        # Owner ruling 2026-10-12 ("Book max cost, keep going"), both profiles: the reservation bounds the bill.
         gate = self.ready()
 
         def lost(_sent, _key):
             raise TimeoutError('read timed out')
-        with self.refused('NEW_CHARGE_UNCERTAIN'):
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
             self.call(gate, dispatch=lost)
+        entry, = gate.day(DAY)['entries'].values()
+        self.assertEqual((entry['state'], entry['reason'], entry['error_class'], entry['held_usd']),
+                         ('settled_reserved_max', 'transport_failure', 'TimeoutError', entry['reserved_usd']))
+        status = gate.status()
+        self.assertEqual((status['state'], status['in_flight'], status['today_booked_max']), ('active', 0, 1))
+        self.assertEqual(Decimal(status['today_spend_usd']), Decimal(entry['reserved_usd']))
+        self.assertEqual(self.call(gate, 'op-2')['status'], 200)
+
+    def test_a_failure_after_the_connect_that_is_not_a_connection_failure_is_uncertain_and_halts(self):
+        gate = self.ready()
+
+        def broken(_sent, _key):
+            raise RuntimeError('synthetic')
+        with self.refused('NEW_CHARGE_UNCERTAIN'):
+            self.call(gate, dispatch=broken)
+        self.assert_uncertain_halt(gate)
+
+    def test_anthropics_own_504_timeout_answer_still_halts(self):
+        # A vendor answer is judged as before: 504 timeout_error is not provably unbilled and carries no usage.
+        gate = self.ready()
+        with self.refused('NEW_CHARGE_UNCERTAIN'):
+            self.call(gate, reply={'type': 'error', 'error': {'type': 'timeout_error', 'message': 'timed out'}}, status=504)
         self.assert_uncertain_halt(gate)
 
 
@@ -949,7 +1116,7 @@ class RemainingAndProbeTests(AnthropicTest):
                          {'state': 'active', 'window_open': True, 'remaining_calls': 599, 'max_concurrent_calls': 2,
                           'enabled_models': [HAIKU]})
         self.assertEqual((Decimal(report['remaining_usd']), Decimal(report['largest_reservation_usd'])),
-                         (Decimal('1.99965'), Decimal('0.214016')))
+                         (Decimal('1.99965'), Decimal('0.24704')))
 
     def test_probe_sends_the_tiny_request_and_reports_what_it_measured(self):
         gate = self.ready()
@@ -982,11 +1149,11 @@ class RemainingAndProbeTests(AnthropicTest):
                           summary['halt_reason'], summary['authority']),
                          (False, 'claude-haiku-5-5-20261001', False, 'provider_error_or_model_identity', 'halted'))
         # A well-formed 400 (Anthropic refused the request's shape) bills nothing: the probe is refused
-        # PROVIDER_REFUSED_UNBILLED and the day's record keeps the $0 entry with its HTTP status (the
-        # README's probe step says: that means stop and report).
+        # PROVIDER_ERROR_UNBILLED (not busy) and the day's record keeps the $0 entry with its HTTP
+        # status (the README's probe step says: that means stop and report).
         gate = self.ready()
         rejected = {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'output_config:\nunknown field'}}
-        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+        with self.refused('PROVIDER_ERROR_UNBILLED'):
             self.probe(gate, lambda _r, _k: (400, rejected))
         self.assertEqual([(e['state'], e['http_status']) for e in gate.day(DAY)['entries'].values()],
                          [('released_unbilled', 400)])
@@ -999,6 +1166,203 @@ class RemainingAndProbeTests(AnthropicTest):
                          (401, 'uncertain', 'uncertain_charge', 'invalid x-api-key'))
         self.assertEqual(gate.status()['state'], 'halted')
 
+
+
+class VendorRefusalFactsTests(AnthropicTest):
+    """2026-10-12: an answer released unbilled keeps the vendor's Retry-After, its rate-limit header NAMES and the
+    error's type, code and a short redacted message, on the entry and the journal line (both profiles)."""
+    BUSY = UnbilledAndUnsentTests.BUSY
+
+    @staticmethod
+    def answering(status, reply, headers):
+        def dispatch(_sent, _key):
+            return status, json.loads(json.dumps(reply))
+        dispatch.vendor_headers = headers
+        return dispatch
+
+    def facts(self, gate, operation_id='op-1'):
+        entry = entry_of(gate, operation_id)
+        lines = [line for line in map(json.loads, filter(None, self.out.getvalue().splitlines()))
+                 if line.get('event') == 'preview_provider_paid_post' and line.get('operation_id') == operation_id]
+        keys = ('vendor_retry_after_seconds', 'vendor_rate_limit_headers', 'vendor_error')
+        self.assertEqual(len(lines), 1)
+        self.assertEqual({k: lines[0][k] for k in keys}, {k: entry[k] for k in keys})
+        return {k: entry[k] for k in keys}
+
+    def test_a_busy_529_keeps_retry_after_the_anthropic_rate_limit_names_and_the_error(self):
+        gate = self.ready()
+        headers = bridge.helper.vendor_headers([('retry-after', '17'), ('anthropic-ratelimit-requests-remaining', '0'),
+                                                ('request-id', 'req_synthetic')])
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            self.call(gate, dispatch=self.answering(529, {**self.BUSY, 'request_id': 'req_synthetic'}, headers))
+        self.assertEqual(self.facts(gate), {'vendor_retry_after_seconds': 17,
+                                            'vendor_rate_limit_headers': ['anthropic-ratelimit-requests-remaining'],
+                                            'vendor_error': {'type': 'overloaded_error', 'code': None, 'message': 'Overloaded'}})
+
+    def test_a_not_busy_unbilled_error_keeps_the_facts_and_never_cools_the_model(self):
+        gate = self.ready()
+        reply = {'type': 'error', 'error': {'type': 'api_error', 'message': 'Internal server error'}}
+        for operation_id in ('op-1', 'op-2'):
+            with self.refused('PROVIDER_ERROR_UNBILLED'):
+                self.call(gate, operation_id, dispatch=self.answering(500, reply, {'retry_after': '120', 'rate_limit_header_names': []}))
+        self.assertEqual(self.facts(gate, 'op-2'), {'vendor_retry_after_seconds': 120, 'vendor_rate_limit_headers': [],
+                                                    'vendor_error': {'type': 'api_error', 'code': None,
+                                                                     'message': 'Internal server error'}})
+        self.assertEqual(gate.status()['cooling'], {})
+
+
+
+class PromptCachingTests(AnthropicTest):
+    """Prompt caching (owner approval 2026-10-12, "caching before the upload"): a request may carry exactly one
+    5-minute cache mark, on the first of exactly two system text blocks; it reserves its whole input at the step's
+    5-minute cache-write price. Any reply's cache tokens are settled at the write and read prices (no new halt)."""
+    FIXTURE = Path(__file__).resolve().parent / 'fixtures/anthropic-cache-bodies.json'
+
+    def test_the_two_block_system_is_accepted_and_reserves_its_input_at_the_write_price(self):
+        go = bridge.read_go(self.gate().go_path)
+        value = cached_request()
+        self.assertTrue(ANTHROPIC.body_valid(value, ANTHROPIC.rows[HAIKU]))
+        self.assertIs(ANTHROPIC.cache_write_requested(value), True)
+        raw = json.dumps(value, separators=(',', ':'))
+        outgoing, reserved, row, prices = bridge.validate_request(envelope_text(raw), go)
+        # ((bytes + 2048) x 0.125 + 32768 x 0.50) / 1e6: the lower step, its input at the 5-minute write price.
+        self.assertEqual((json.loads(outgoing), row.model, prices), (value, HAIKU, (WRITE_IN, PRICE_OUT)))
+        self.assertEqual(reserved, (Decimal(len(raw.encode()) + 2048) * WRITE_IN + Decimal(BOUND) * PRICE_OUT) / Decimal(1000000))
+        self.assertEqual(reserved, reservation_of(raw))
+        # The same body priced as an uncached one is a mismatch (the app must reserve the write premium).
+        plain = (Decimal(len(raw.encode()) + 2048) * PRICE_IN + Decimal(BOUND) * PRICE_OUT) / Decimal(1000000)
+        with self.refused('RESERVATION_MISMATCH'):
+            bridge.validate_request({**envelope_text(raw), 'reservedUsd': str(plain)}, go)
+        # A string system asks for no cache write; neither does the probe's body or a DeepInfra body.
+        self.assertIs(ANTHROPIC.cache_write_requested(request()), False)
+        self.assertIs(ANTHROPIC.cache_write_requested(ANTHROPIC.probe_body(ANTHROPIC.rows[HAIKU])), False)
+        self.assertIs(bridge.cache_write_of(ANTHROPIC, value), True)
+        self.assertIs(bridge.cache_write_of(ANTHROPIC, request()), False)
+        self.assertIs(bridge.cache_write_of(bridge.helper.PROFILES['deepinfra'], value), False)
+
+    def test_a_large_cached_request_reserves_at_the_upper_steps_write_price(self):
+        go = bridge.read_go(self.gate().go_path)
+        edge = STEP_TOKENS - 2048
+        for size, prices in ((edge, (WRITE_IN, PRICE_OUT)), (edge + 1, CEILING)):
+            with self.subTest(body_bytes=size):
+                _, reserved, _, used = bridge.validate_request(envelope(sized(size, cached=True)), go)
+                self.assertEqual(used, prices)
+                self.assertEqual(reserved, (Decimal(size + 2048) * prices[0] + Decimal(BOUND) * prices[1]) / Decimal(1000000))
+        # At the edge: (100,000 x 0.125 + 32,768 x 0.50) / 1e6 = $0.028884; one byte more:
+        # (100,001 x 0.625 + 32,768 x 2.50) / 1e6 = $0.144420625.
+        self.assertEqual(reservation_of(json.dumps(sized(edge, cached=True))), Decimal('0.028884'))
+        self.assertEqual(reservation_of(json.dumps(sized(edge + 1, cached=True))), Decimal('0.144420625'))
+
+    def test_every_body_in_the_shared_fixture_is_accepted_at_its_reservation_or_refused(self):
+        fixture = json.loads(self.FIXTURE.read_text())
+        self.assertEqual(fixture['schema'], 'anthropic-cache-bodies-v1')
+        self.assertEqual(fixture['separator'], '\n\n--- PER-CALL MARKERS (engine) ---')
+        self.assertGreaterEqual((len(fixture['sent']), len(fixture['refused'])), (3, 20))
+        go = bridge.read_go(self.gate().go_path)
+        for case in fixture['sent']:
+            with self.subTest(sent=case['name']):
+                body = json.loads(case['body'])
+                self.assertTrue(ANTHROPIC.body_valid(body, ANTHROPIC.rows[HAIKU]))
+                self.assertEqual(Decimal(case['reservedUsd']), reservation_of(case['body']))
+                # The app's nano-USD text, to the digit (validate_request checks equality).
+                outgoing, reserved, _, prices = bridge.validate_request({**envelope_text(case['body']),
+                                                                         'reservedUsd': case['reservedUsd']}, go)
+                self.assertEqual((json.loads(outgoing), reserved, prices), (body, Decimal(case['reservedUsd']), (WRITE_IN, PRICE_OUT)))
+                self.assertLessEqual(len(outgoing), len(case['body'].encode()))
+                # The two texts join back into the system text the frame wrote, the marker line first in the tail.
+                first, second = body['system']
+                self.assertTrue(first['text'].endswith('\n\n') and second['text'].startswith(fixture['separator'][2:] + '\n'))
+                self.assertEqual((first['text'] + second['text']).count(fixture['separator']), 1)
+        for case in fixture['refused']:
+            with self.subTest(refused=case['name']):
+                self.assertFalse(ANTHROPIC.body_valid(json.loads(case['body']), ANTHROPIC.rows[HAIKU]))
+                with self.refused('REQUEST_PARAMETERS_INVALID'):
+                    bridge.validate_request(envelope_text(case['body']), go)
+
+    def test_a_cached_call_settles_its_write_and_read_at_their_own_prices(self):
+        gate = self.ready()
+        five = {'ephemeral_5m_input_tokens': 3000, 'ephemeral_1h_input_tokens': 0}
+        reply = message(200, 400, cache_creation_input_tokens=3000, cache_read_input_tokens=0, cache_creation=five)
+        self.call(gate, reply=reply, value=cached_request())
+        entry = entry_of(gate)
+        # 200 x 0.10 + 3000 x 0.125 + 400 x 0.50 = 595 -> $0.000595
+        expected = cost(LOWER, 200, write_5m=3000, output=400)
+        self.assertEqual(expected, Decimal('0.000595'))
+        self.assertEqual((entry['state'], Decimal(entry['held_usd']), entry['reserve_input_usd_per_m'], entry['cache_write_requested']),
+                         ('settled', expected, '0.125', '5m'))
+        accounting = entry['accounting']
+        self.assertEqual((accounting['cache_write_5m_tokens'], accounting['cache_write_1h_tokens'], accounting['cache_read_input_tokens'],
+                          accounting['prompt_tokens']), (3000, 0, 0, 3200))
+        # The next call reads it: 200 x 0.10 + 3000 x 0.01 + 400 x 0.50 = 250 -> $0.00025.
+        self.call(gate, 'op-2', reply=message(200, 400, cache_creation_input_tokens=0, cache_read_input_tokens=3000),
+                  value=cached_request())
+        self.assertEqual(Decimal(entry_of(gate, 'op-2')['held_usd']), cost(LOWER, 200, read=3000, output=400))
+        self.assertEqual(cost(LOWER, 200, read=3000, output=400), Decimal('0.00025'))
+        # A write reported without its split is the 5-minute kind the request asked for.
+        self.call(gate, 'op-3', reply=message(200, 400, cache_creation_input_tokens=3000), value=cached_request())
+        self.assertEqual(Decimal(entry_of(gate, 'op-3')['held_usd']), expected)
+        # A prefix under the model's cacheable minimum writes nothing: plain prices, still settled.
+        self.call(gate, 'op-4', reply=message(200, 400, cache_creation_input_tokens=0, cache_read_input_tokens=0,
+                                                  cache_creation={'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0}),
+                  value=cached_request())
+        self.assertEqual(Decimal(entry_of(gate, 'op-4')['held_usd']), cost(LOWER, 200, output=400))
+        self.assertEqual(gate.status()['state'], 'active')
+        # An uncached call's entry says nothing about caching and reserves at the plain input price.
+        self.call(gate, 'op-5')
+        self.assertNotIn('cache_write_requested', entry_of(gate, 'op-5'))
+        self.assertEqual(entry_of(gate, 'op-5')['reserve_input_usd_per_m'], '0.10')
+
+    def test_cache_tokens_on_an_unmarked_call_settle_at_their_prices_without_a_halt(self):
+        # Coordinator ruling 2026-10-12: no new halt reason. An unmarked call whose reply reports cache tokens is
+        # settled at their real prices (as before caching): a write without its split at the dearer 1-hour price.
+        five = {'ephemeral_5m_input_tokens': 3000, 'ephemeral_1h_input_tokens': 0}
+        hour = {'ephemeral_5m_input_tokens': 1000, 'ephemeral_1h_input_tokens': 2000}
+        for name, usage, expected in (
+                ('read', {'cache_read_input_tokens': 3000}, cost(LOWER, 200, read=3000, output=400)),
+                ('write_5m_split', {'cache_creation_input_tokens': 3000, 'cache_creation': five},
+                 cost(LOWER, 200, write_5m=3000, output=400)),
+                ('write_mixed_split', {'cache_creation_input_tokens': 3000, 'cache_read_input_tokens': 500, 'cache_creation': hour},
+                 cost(LOWER, 200, write_5m=1000, write_1h=2000, read=500, output=400)),
+                ('write_no_split', {'cache_creation_input_tokens': 3000}, cost(LOWER, 200, write_1h=3000, output=400))):
+            with self.subTest(name):
+                reply = message(200, 400, **usage)
+                accounting = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)
+                self.assertEqual((accounting['usage_valid'], Decimal(accounting['guard_charge_usd'])), (True, expected))
+                self.assertNotIn('invalid_reason', accounting)
+                gate = self.ready()
+                self.call(gate, reply=reply)  # An unmarked request (a string system).
+                entry = entry_of(gate)
+                self.assertEqual((entry['state'], Decimal(entry['held_usd']), entry['reserve_input_usd_per_m']),
+                                 ('settled', expected, '0.10'))
+                self.assertNotIn('cache_write_requested', entry)
+                self.assertEqual(gate.status()['state'], 'active')
+        # 2000 x 0.10 + 3000 x 0.20 + 400 x 0.50 is the old no-split rule; a marked call says 5 minutes instead.
+        self.assertEqual(cost(LOWER, 200, write_1h=3000, output=400), Decimal('0.00082'))
+        marked = ANTHROPIC.account(message(200, 400, cache_creation_input_tokens=3000), ANTHROPIC.rows[HAIKU], None, cache_write=True)
+        self.assertEqual(Decimal(marked['guard_charge_usd']), cost(LOWER, 200, write_5m=3000, output=400))
+
+    def test_a_cached_call_still_halts_on_every_cache_count_it_cannot_read(self):
+        for name, usage in (('split_not_summing', {'cache_creation_input_tokens': 3000,
+                                                   'cache_creation': {'ephemeral_5m_input_tokens': 1000, 'ephemeral_1h_input_tokens': 1000}}),
+                            ('split_without_total', {'cache_creation': {'ephemeral_5m_input_tokens': 5, 'ephemeral_1h_input_tokens': 0}}),
+                            ('read_negative', {'cache_read_input_tokens': -1}),
+                            ('creation_text', {'cache_creation_input_tokens': '10'}),
+                            ('creation_float', {'cache_creation_input_tokens': Decimal('10.0')})):
+            with self.subTest(name):
+                reply = message(200, 400, **usage)
+                self.assertFalse(ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None, cache_write=True)['usage_valid'])
+                self.assertFalse(ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)['usage_valid'])
+                gate = self.ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    self.call(gate, reply=reply, value=cached_request())
+                self.assert_uncertain_halt(gate)
+
+    def test_a_1h_write_on_a_cached_call_is_charged_at_the_1h_price(self):
+        hour = {'ephemeral_5m_input_tokens': 1000, 'ephemeral_1h_input_tokens': 2000}
+        reply = message(200, 400, cache_creation_input_tokens=3000, cache_creation=hour)
+        accounting = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None, cache_write=True)
+        self.assertEqual(Decimal(accounting['guard_charge_usd']), cost(LOWER, 200, write_5m=1000, write_1h=2000, output=400))
+        self.assertEqual((accounting['cache_write_5m_tokens'], accounting['cache_write_1h_tokens']), (1000, 2000))
 
 if __name__ == '__main__':
     unittest.main()

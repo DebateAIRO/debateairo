@@ -26,6 +26,7 @@ import {
   parseProviderDiscoveryTargets,
   PREVIEW_GLM_TARGET,
   previewRunnerPolicy,
+  previewRunResilience,
   previewTargetGatewayControls,
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
@@ -35,7 +36,9 @@ import {
   type ProviderGateway
 } from "@debateai/providers";
 import { createPostgresProviderGateway, withCooldownRetry, type HoldProgressEvent } from "@debateai/runner";
+import { Judge } from "@debateai/judgement";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS, DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
+import { createRunSitOutBook } from "../../apps/runner/src/run-sit-out.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { framedFixturePacket } from "../support/framed-packet.js";
@@ -121,6 +124,7 @@ async function refusingGate(code: string): Promise<PreviewBudgetPort> {
 type Step = Readonly<{ refuse: string }> | Readonly<{ throws: () => unknown }> | Readonly<{ answer: string }>;
 const unbilled: Step = { refuse: "PROVIDER_REFUSED_UNBILLED" };
 const busyGate: Step = { refuse: "CONCURRENCY_LIMIT_REACHED" };
+const notReached: Step = { refuse: "PROVIDER_NOT_REACHED" };
 const answer: Step = { answer: "{\"statement\":\"Synthetic answer.\"}" };
 /** The fetch's own deadline firing: a billed transport failure (TIMED_OUT), never an unbilled refusal. */
 const timeout: Step = { throws: () => new DOMException("The operation was aborted due to timeout", "TimeoutError") };
@@ -299,6 +303,150 @@ describe("the preview's unbilled resend through the real counting gateway (owner
   });
 });
 
+/**
+ * Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, fix (b), test T3). On
+ * 2026-10-11 the serve fallback walked GLM, MiMo and Qwen at ONE call site, each hop writing one FAILED row under
+ * `COMPOSER:SYNTHESIZER:INITIAL:1`; the count was per call-site key, so the fourth maker (whose gate was open) was
+ * refused CALL_BUDGET_EXHAUSTED before it sent a byte. On the preview the step's allowance is now each MAKER's: the
+ * preview call policy asks for `attemptScope: "actor"`, the counting gateway counts the asking maker's rows only, and
+ * the re-claim check groups by maker (`byActor`).
+ */
+const OTHER_MAKERS = Object.freeze(["preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro", "preview:qwen-3-8-flash"]);
+
+/** One counted FAILED attempt by `actorRef` at the root site, as a hop of the incident wrote it. */
+async function failedRowBy(work: Readonly<{ runId: string; workItemId: string }>, actorRef: string): Promise<void> {
+  await new LedgerRepository(database.pool).append({
+    runId: work.runId, attemptId: randomUUID(), actionKind: "MODEL_CALL", callSiteKey: "JUDGE",
+    subjectItemId: work.workItemId, stanceAtAction: "UNASSIGNED", outcome: "FAILED", actorRef,
+    inputHash: "input:preview-run-resilience", contractHash: CONTRACT, rawArtifactRef: null,
+    startedAt: new Date(), finishedAt: new Date()
+  });
+}
+
+describe("run resilience (b): on the preview a step's allowance is each maker's own (T3)", () => {
+  it("three FAILED rows by three other makers at one key: a fourth maker still sends, and its count is its own", async () => {
+    const work = await createRunWork("t3-send");
+    for (const actorRef of OTHER_MAKERS) await failedRowBy(work, actorRef);
+    // The site holds the sealed JUDGE bound's worth of counted rows: the incident's state.
+    expect(await billedAttempts(work)).toBe(POLICY.bounds.JUDGE.maxAttempts);
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([answer]);
+    await expect(previewGateway(port, waits).call(rootRequest(work))).resolves.toMatchObject({ model: MODEL });
+    expect(sent).toHaveLength(1);
+    expect(await outcomes(work.runId)).toEqual(["FAILED", "FAILED", "FAILED", "OK"]);
+    const ledger = new LedgerRepository(database.pool);
+    expect(await ledger.countModelAttempts({
+      runId: work.runId, workItemId: work.workItemId, contractHash: CONTRACT, callSiteKey: "JUDGE", actorRef: REF
+    })).toBe(1);
+    expect(await ledger.countModelAttempts({
+      runId: work.runId, workItemId: work.workItemId, contractHash: CONTRACT, callSiteKey: "JUDGE", actorRef: OTHER_MAKERS[0]!
+    })).toBe(1);
+  });
+
+  it("the re-claim check reads per maker: three makers with one FAILED row each never exhaust the site", async () => {
+    const work = await createRunWork("t3-reclaim");
+    for (const actorRef of OTHER_MAKERS) await failedRowBy(work, actorRef);
+    const ledger = new LedgerRepository(database.pool);
+    const maxAttempts = POLICY.bounds.JUDGE.maxAttempts;
+    await expect(ledger.findExhaustedModelAttempt({
+      runId: work.runId, workItemId: work.workItemId, contractHash: CONTRACT, maxAttempts, byActor: true
+    })).resolves.toBeNull();
+    // One maker at its own bound is still found, per maker.
+    for (let index = 1; index < maxAttempts; index += 1) await failedRowBy(work, OTHER_MAKERS[1]!);
+    await expect(ledger.findExhaustedModelAttempt({
+      runId: work.runId, workItemId: work.workItemId, contractHash: CONTRACT, maxAttempts, byActor: true
+    })).resolves.toMatchObject({ callSiteKey: "JUDGE", outcome: "FAILED" });
+  });
+
+  it("the SENDING maker's own rows at its bound: refused CALL_BUDGET_EXHAUSTED before a byte is sent", async () => {
+    // Review 2026-10-12, test gap (d): the per-maker count still bounds the maker that asks. Its own FAILED rows, as
+    // many as the sealed JUDGE bound, spend its allowance at this step even though no other maker wrote any.
+    const work = await createRunWork("t3-own");
+    for (let index = 0; index < POLICY.bounds.JUDGE.maxAttempts; index += 1) await failedRowBy(work, REF);
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([answer]);
+    await expect(previewGateway(port, waits).call(rootRequest(work))).rejects.toMatchObject({ code: "CALL_BUDGET_EXHAUSTED" });
+    expect(sent).toHaveLength(0);
+    expect(waits).toEqual([]);
+    expect(await outcomes(work.runId)).toEqual(["FAILED", "FAILED", "FAILED"]);
+  });
+
+  it("T5: without the per-maker read (hosted and local), the same rows exhaust the site exactly as before", async () => {
+    const work = await createRunWork("t3-hosted");
+    for (const actorRef of OTHER_MAKERS) await failedRowBy(work, actorRef);
+    const ledger = new LedgerRepository(database.pool);
+    await expect(ledger.findExhaustedModelAttempt({
+      runId: work.runId, workItemId: work.workItemId, contractHash: CONTRACT, maxAttempts: POLICY.bounds.JUDGE.maxAttempts
+    })).resolves.toMatchObject({ callSiteKey: "JUDGE", outcome: "FAILED" });
+    // The counting gateway with no preview policy counts the whole site and refuses before sending.
+    let posts = 0;
+    const hosted = createPostgresProviderGateway(database.pool, {
+      fetchImplementation: async () => { posts += 1; throw new Error("test: nothing may be sent"); },
+      endpoint: "http://127.0.0.1:9", model: "test-layer/model", maker: "test-layer", sleepImplementation: async () => undefined
+    });
+    await expect(hosted.call({ ...rootRequest(work), providerRef: "provider:test-layer" }))
+      .rejects.toMatchObject({ code: "CALL_BUDGET_EXHAUSTED" });
+    expect(posts).toBe(0);
+  });
+});
+
+/**
+ * Review amendment R-d (orchestrator, 2026-10-12), through the real counting gateway, the real gate protocol and the
+ * runner's sit-out book composed as the runner composes it (the book wraps the maker's gateway; `withCooldownRetry`
+ * reads the book's `haltsAtOnce`). Only the VENDOR's gate-proven unbilled refusal makes a model sit out; the gate's
+ * own — its slots full, the vendor never reached — keep the ten-minute hold and the final retry.
+ */
+describe("run resilience R-d: only a vendor's unbilled refusal makes a model sit out", () => {
+  const RESILIENCE = previewRunResilience(PREVIEW)!;
+
+  it.each([
+    ["CONCURRENCY_LIMIT_REACHED", busyGate],
+    ["PROVIDER_NOT_REACHED", notReached]
+  ] as const)("a call ending in two %s refusals: REFUSED rows, no sit-out, the hold happens and the final retry sends", async (_code, step) => {
+    const work = await createRunWork(`rd-${_code}`);
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([step, step, answer]);
+    const book = createRunSitOutBook(RESILIENCE);
+    const gateway = book.gateway(REF, previewGateway(port, waits));
+    const { events, hold } = recordingHold(waits);
+    const result = await withCooldownRetry({
+      runId: work.runId, callSiteKey: "JUDGE", parentNodeId: null, plannedLegCount: 1,
+      baseMaxAttempts: POLICY.bounds.JUDGE.maxAttempts, failureScope: "MAKER_POSITION", policy: DEATH, hold,
+      haltsAtOnce: book.haltsAtOnce,
+      attempt: (maxAttempts) => gateway.call(rootRequest(work, maxAttempts))
+    });
+    expect(result.kind).toBe("AUTHORED");
+    expect(sent).toHaveLength(3);
+    expect(waits).toEqual([UNBILLED_RESEND_MS, DEATH.cooldownMs]);
+    expect(events.map((event) => event.state)).toEqual(["COOLDOWN_HOLD", "COOLDOWN_RETRY"]);
+    expect(await outcomes(work.runId)).toEqual(["REFUSED", "REFUSED", "OK"]);
+    expect(book.sitsOut(REF)).toBe(false);
+    expect(book.reasonOf(REF)).toBeNull();
+  });
+
+  it("a call ending in two PROVIDER_REFUSED_UNBILLED refusals: the model sits out at once, no hold, no final retry", async () => {
+    const work = await createRunWork("rd-vendor");
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([unbilled, unbilled, answer]);
+    const book = createRunSitOutBook(RESILIENCE);
+    const gateway = book.gateway(REF, previewGateway(port, waits));
+    const { events, hold } = recordingHold(waits);
+    const result = await withCooldownRetry({
+      runId: work.runId, callSiteKey: "JUDGE", parentNodeId: null, plannedLegCount: 1,
+      baseMaxAttempts: POLICY.bounds.JUDGE.maxAttempts, failureScope: "MAKER_POSITION", policy: DEATH, hold,
+      haltsAtOnce: book.haltsAtOnce,
+      attempt: (maxAttempts) => gateway.call(rootRequest(work, maxAttempts))
+    });
+    expect(result.kind).toBe("HALTED");
+    expect(sent).toHaveLength(2);
+    expect(waits).toEqual([UNBILLED_RESEND_MS]);
+    expect(events.map((event) => event.state)).toEqual(["MAKER_POSITION_HALTED"]);
+    expect(await outcomes(work.runId)).toEqual(["REFUSED", "REFUSED"]);
+    expect(book.sitsOut(REF)).toBe(true);
+    expect(book.reasonOf(REF)).toBe("PROVIDER_BUSY");
+  });
+});
+
 describe("R9: hosted and local wiring (no preview config) are unchanged", () => {
   it("(f) maxAttempts 3 and three transport failures: three POSTs inside one call, three counted FAILED rows", async () => {
     const work = await createRunWork("f");
@@ -326,5 +474,142 @@ describe("R9: hosted and local wiring (no preview config) are unchanged", () => 
     expect(posts).toBe(3);
     expect(await outcomes(work.runId)).toEqual(["FAILED", "FAILED", "FAILED"]);
     expect(await billedAttempts(work)).toBe(3);
+  });
+});
+
+/**
+ * All-steps format robustness (2026-10-12). On the preview a structured step (here the reviewer, the real Judge) may
+ * send ONE repair POST in the same call when its reply fails its check, through the same counting gateway and ledger:
+ * the refused reply is a counted FAILED row (it was billed), the repaired reply the OK row, and the sealed JUDGE bound of
+ * three leaves the runner's final retry and the one unbilled resend their room, so neither ever meets
+ * CALL_BUDGET_EXHAUSTED.
+ */
+describe("the preview's one format repair through the real counting gateway (all-steps format robustness)", () => {
+  const REVIEW_SITE = "JUDGE:review:all-steps";
+  /** The reviewer's reply leaving out its required edge bearings, then the same reply with them. */
+  const missingField: Step = { answer: JSON.stringify({ outcome: "agree", reasons: ["Fares fund frequency."] }) };
+  const fixedReply: Step = { answer: JSON.stringify({ outcome: "agree", reasons: ["Fares fund frequency."], edge_bearings: [0.8] }) };
+  /**
+   * Patch follow-up (owner design, 2026-10-12): the short follow-up's answer, only the member it was asked for. The
+   * reply above, refused at one member, now gets this follow-up first; a whole reply sent back to it is refused as a
+   * patch, and the full re-ask (a third POST, within the sealed bound of three) follows.
+   */
+  const patchReply: Step = { answer: JSON.stringify({ edge_bearings: [0.8] }) };
+
+  const review = (gateway: ProviderGateway, work: Readonly<{ runId: string; workItemId: string }>, maxAttempts: number = POLICY.bounds.JUDGE.maxAttempts) =>
+    new Judge(gateway).review({ runId: work.runId, subjectItemId: work.workItemId, callSiteKey: REVIEW_SITE,
+      questionLine: "Should a mid-sized city make its central bus lines free?", argumentLanguageName: "English",
+      statement: "Lost fare income must be paid from the city budget.", authorMaker: "other-maker", providerRef: REF,
+      contractHash: CONTRACT, bound: { ...POLICY.bounds.JUDGE, maxAttempts },
+      edges: [{ edgeId: "edge:all-steps", targetStatement: "Free lines cost little.", polarity: "attack" }] });
+  async function siteOutcomes(runId: string): Promise<string[]> {
+    return (await database.pool.query<{ outcome: string }>(
+      `SELECT outcome FROM ledger.ledger_entry
+       WHERE run_id = $1 AND action_kind = 'MODEL_CALL' AND call_site_key = $2 ORDER BY sequence`, [runId, REVIEW_SITE]
+    )).rows.map((row) => row.outcome);
+  }
+  const siteBilled = (work: Readonly<{ runId: string; workItemId: string }>) => new LedgerRepository(database.pool).countModelAttempts({
+    runId: work.runId, workItemId: work.workItemId, contractHash: CONTRACT, callSiteKey: REVIEW_SITE, actorRef: REF });
+
+  it("a reply missing a field, then the fixed reply: PARSED on the second POST of the same call, both rows counted", async () => {
+    const work = await createRunWork("format-repair");
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([missingField, patchReply]);
+    const reviewed = await review(previewGateway(port, waits), work);
+    expect(reviewed.edgeMeasurements).toEqual([{ edgeId: "edge:all-steps", bearing: 0.8 }]);
+    expect(sent).toHaveLength(2);
+    expect(waits).toEqual([]);
+    // The follow-up is the first call's messages, the model's own answer as its turn, and the machine path to fix.
+    const [firstMessages, patchMessages] = sent.map((body) => (JSON.parse(body) as { messages: { role: string; content: string }[] }).messages);
+    expect(patchMessages!.slice(0, firstMessages!.length)).toEqual(firstMessages);
+    expect(patchMessages!.map((message) => message.role)).toEqual(["system", "user", "assistant", "user"]);
+    expect(patchMessages![3]!.content).toContain("edge_bearings");
+    expect(patchMessages![3]!.content).toContain("PATCH");
+    expect(await siteOutcomes(work.runId)).toEqual(["FAILED", "OK"]);
+    const artifacts = (await database.pool.query<{ parse_status: string }>(
+      `SELECT a.parse_status FROM ledger.ledger_entry e JOIN ledger.raw_artifact a ON a.raw_artifact_id = e.raw_artifact_ref
+       WHERE e.run_id = $1 AND e.call_site_key = $2 ORDER BY e.sequence`, [work.runId, REVIEW_SITE])).rows.map((row) => row.parse_status);
+    expect(artifacts).toEqual(["SCHEMA_FAILED", "PARSED"]);
+    expect(await siteBilled(work)).toBe(2);
+    expect(await new BudgetRepository(database.pool).countRunModelAttempts(work.runId)).toBe(2);
+  });
+
+  it("a refused reply, then an unbilled refusal: the one 60-second resend is sent within the allowance and answered", async () => {
+    const work = await createRunWork("format-then-unbilled");
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([missingField, unbilled, fixedReply]);
+    const reviewed = await review(previewGateway(port, waits), work);
+    expect(reviewed.edgeMeasurements).toHaveLength(1);
+    expect(sent).toHaveLength(3);
+    expect(waits).toEqual([UNBILLED_RESEND_MS]);
+    expect(await siteOutcomes(work.runId)).toEqual(["FAILED", "REFUSED", "OK"]);
+    expect(await siteBilled(work)).toBe(2);
+  });
+
+  it("a refused reply, then a billed timeout: the review's final retry is sent and answered, never CALL_BUDGET_EXHAUSTED", async () => {
+    const work = await createRunWork("format-then-timeout");
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([missingField, timeout, fixedReply]);
+    const gateway = previewGateway(port, waits);
+    const { events, hold } = recordingHold(waits);
+    const result = await withCooldownRetry({
+      runId: work.runId, callSiteKey: REVIEW_SITE, parentNodeId: null, plannedLegCount: 1,
+      baseMaxAttempts: POLICY.bounds.JUDGE.maxAttempts, failureScope: "REVIEW", policy: DEATH, hold,
+      attempt: (maxAttempts) => review(gateway, work, maxAttempts)
+    });
+    expect(result.kind).toBe("AUTHORED");
+    expect(sent).toHaveLength(3);
+    // DR-186(8): a review gets its final retry at once, without the cooldown hold.
+    expect(waits).toEqual([]);
+    expect(events).toEqual([]);
+    expect(await siteOutcomes(work.runId)).toEqual(["FAILED", "TIMED_OUT", "OK"]);
+    expect(await siteBilled(work)).toBe(3);
+  });
+
+  it("a patch refused as a patch, then the full re-ask: three counted POSTs in one call, never CALL_BUDGET_EXHAUSTED", async () => {
+    const work = await createRunWork("format-patch-then-full");
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([missingField, fixedReply, fixedReply]);
+    const reviewed = await review(previewGateway(port, waits), work);
+    expect(reviewed.edgeMeasurements).toEqual([{ edgeId: "edge:all-steps", bearing: 0.8 }]);
+    expect(sent).toHaveLength(3);
+    expect(waits).toEqual([]);
+    // The third POST is the full re-ask: the original messages and one machine block, no answer turn.
+    const roles = (JSON.parse(sent[2]!) as { messages: { role: string }[] }).messages.map((message) => message.role);
+    expect(roles).toEqual(["system", "user", "user"]);
+    expect(await siteOutcomes(work.runId)).toEqual(["FAILED", "FAILED", "OK"]);
+    expect(await siteBilled(work)).toBe(3);
+  });
+
+  it("a patch refused, then a billed timeout on the full re-ask: the review's final retry is sent and answered", async () => {
+    const work = await createRunWork("format-patch-then-timeout");
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([missingField, fixedReply, timeout, fixedReply]);
+    const gateway = previewGateway(port, waits);
+    const { events, hold } = recordingHold(waits);
+    const result = await withCooldownRetry({
+      runId: work.runId, callSiteKey: REVIEW_SITE, parentNodeId: null, plannedLegCount: 1,
+      baseMaxAttempts: POLICY.bounds.JUDGE.maxAttempts, failureScope: "REVIEW", policy: DEATH, hold,
+      attempt: (maxAttempts) => review(gateway, work, maxAttempts)
+    });
+    expect(result.kind).toBe("AUTHORED");
+    expect(sent).toHaveLength(4);
+    expect(events).toEqual([]);
+    expect(await siteOutcomes(work.runId)).toEqual(["FAILED", "FAILED", "TIMED_OUT", "OK"]);
+    expect(await siteBilled(work)).toBe(4);
+  });
+
+  it("first reply, patch and full re-ask all refused: a content refusal after three counted POSTs (the runner's fallback takes it)", async () => {
+    const work = await createRunWork("format-twice");
+    const waits: number[] = [];
+    const { port, sent } = await scriptedGate([missingField, missingField, missingField]);
+    await expect(review(previewGateway(port, waits), work)).rejects.toMatchObject({ code: "NODE_REVIEW_SCHEMA_FAILURE" });
+    expect(sent).toHaveLength(3);
+    expect(waits).toEqual([]);
+    expect(await siteOutcomes(work.runId)).toEqual(["FAILED", "FAILED", "FAILED"]);
+    expect(await siteBilled(work)).toBe(3);
+    // Another maker at the same site still has its whole allowance (run resilience fix (b)): nothing is exhausted.
+    expect(await new LedgerRepository(database.pool).countModelAttempts({ runId: work.runId, workItemId: work.workItemId,
+      contractHash: CONTRACT, callSiteKey: REVIEW_SITE, actorRef: OTHER_MAKERS[0]! })).toBe(0);
   });
 });

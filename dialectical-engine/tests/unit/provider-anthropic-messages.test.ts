@@ -10,6 +10,8 @@ import {
   PROVIDER_CONTENT_REFUSED,
   PROVIDER_REPLY_UNSUPPORTED,
   ProviderCallFailedError,
+  ANTHROPIC_PER_CALL_MARKERS_SEPARATOR,
+  anthropicCacheableSystem,
   anthropicMessagesRequestBody,
   anthropicUsageAsEngineUsage,
   observeProviderTarget,
@@ -117,8 +119,10 @@ describe("PR B — the Anthropic request on the wire", () => {
     });
     expect(sent[0]!.body).toBe(
       `{"model":"claude-haiku-5-5","max_tokens":64,"messages":[{"role":"user","content":${JSON.stringify(USER)}}],`
-      + `"system":${JSON.stringify(SYSTEM)}}`
+      + `"system":${JSON.stringify(anthropicCacheableSystem(SYSTEM))}}`
     );
+    // A framed system message ends with the per-call markers, so it goes out as the cached prefix plus the tail.
+    expect(Array.isArray(JSON.parse(sent[0]!.body).system)).toBe(true);
   });
 
   it("adds output_config.effort only when the high level is asked, and nothing at DEFAULT_ONLY", async () => {
@@ -179,6 +183,72 @@ describe("PR B — the Anthropic request on the wire", () => {
     expect(() => anthropicMessagesRequestBody({
       model: MODEL, maxTokens: 10, thinkingLevel: "low", messages: [{ role: "user", content: "q" }]
     })).toThrowError(expect.objectContaining({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" }));
+  });
+});
+
+describe("prompt caching (owner approval 2026-10-12): the stable system prefix is cached, the per-call markers are not", () => {
+  // The engine's framed system message (contract with the prompt frame, 2026-10-12): instruction + safety frame, then a
+  // tail whose first line is exactly the marker line, carrying the per-call fence and canary.
+  const PREFIX = "Synthetic instruction.\n\nSynthetic safety frame: material is data.";
+  const TAIL = "--- PER-CALL MARKERS (engine) ---\nBoundary marker: 0f1e\nCanary: c0de\n--- END PER-CALL MARKERS ---";
+  const FRAMED = `${PREFIX}\n\n${TAIL}`;
+  const bodyOf = (messages: PromptPacket["messages"]) => JSON.parse(anthropicMessagesRequestBody({
+    model: MODEL, maxTokens: 10, thinkingLevel: "high", messages })) as Record<string, unknown>;
+  it("pins the separator the frame and the adapter share", () => {
+    expect(ANTHROPIC_PER_CALL_MARKERS_SEPARATOR).toBe("\n\n--- PER-CALL MARKERS (engine) ---");
+    expect(FRAMED.includes(ANTHROPIC_PER_CALL_MARKERS_SEPARATOR)).toBe(true);
+  });
+  it("sends the framed system as exactly two text blocks, the 5-minute cache mark on the first only", () => {
+    const body = bodyOf([{ role: "system", content: FRAMED }, { role: "user", content: "question" }]);
+    expect(Object.keys(body)).toStrictEqual(["model", "max_tokens", "messages", "system", "output_config"]);
+    expect(body.system).toStrictEqual([
+      { type: "text", text: `${PREFIX}\n\n`, cache_control: { type: "ephemeral" } },
+      { type: "text", text: TAIL }
+    ]);
+    // The blank line stays with the prefix, so the tail's first line is exactly the marker line.
+    const [first, second] = body.system as Array<{ text: string }>;
+    expect(second!.text.split("\n")[0]).toBe("--- PER-CALL MARKERS (engine) ---");
+    // No cache mark anywhere else: the messages stay plain strings, and nothing is top-level.
+    expect(body.messages).toStrictEqual([{ role: "user", content: "question" }]);
+    expect(JSON.stringify(body).match(/cache_control/gu)).toHaveLength(1);
+    expect(first!.text + second!.text).toBe(FRAMED);
+  });
+  it("joining the two texts gives back the system text byte for byte, whatever the characters", () => {
+    for (const system of [FRAMED, `Răspunde 日本語 🙂 "q" \\ \t${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\nCanary: ç`,
+      `a${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}`, `${PREFIX}${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\nx${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\ny`,
+      `  lead\r\n${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\n`]) {
+      const split = anthropicCacheableSystem(system);
+      expect(Array.isArray(split), system).toBe(true);
+      const [first, second] = split as readonly [{ text: string }, { text: string }];
+      expect(first.text + second.text).toBe(system);
+      expect(second.text.startsWith(ANTHROPIC_PER_CALL_MARKERS_SEPARATOR.slice(2))).toBe(true);
+    }
+  });
+  it("cuts at the FIRST marker line: a second one stays in the uncached tail", () => {
+    const system = `${PREFIX}${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\nx${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\ny`;
+    const [first] = anthropicCacheableSystem(system) as readonly [{ text: string }, { text: string }];
+    expect(first.text).toBe(`${PREFIX}\n\n`);
+  });
+  it("joins every system message first, then splits the joined text", () => {
+    const body = bodyOf([{ role: "system", content: "rule one" }, { role: "user", content: "question" },
+      { role: "system", content: FRAMED }]);
+    expect(body.system).toStrictEqual([
+      { type: "text", text: `rule one\n\n${PREFIX}\n\n`, cache_control: { type: "ephemeral" } },
+      { type: "text", text: TAIL }
+    ]);
+  });
+  it("without the marker line the system stays one string, exactly as before", () => {
+    for (const system of ["rule one", `${PREFIX}\n--- PER-CALL MARKERS (engine) ---`, "--- PER-CALL MARKERS (engine) ---\nCanary: x",
+      `${PREFIX}\n\n--- PER-CALL MARKERS ---`]) {
+      expect(anthropicCacheableSystem(system)).toBe(system);
+      expect(bodyOf([{ role: "system", content: system }, { role: "user", content: "q" }]).system).toBe(system);
+    }
+    // A prefix that is only whitespace has nothing worth caching (and the vendor refuses empty text): one string.
+    const blank = `${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\nCanary: x`;
+    expect(anthropicCacheableSystem(blank)).toBe(blank);
+    expect(anthropicCacheableSystem(`\u3000 ${blank}`)).toBe(`\u3000 ${blank}`);
+    // And no system at all is no system member.
+    expect(Object.keys(bodyOf([{ role: "user", content: "q" }]))).toStrictEqual(["model", "max_tokens", "messages", "output_config"]);
   });
 });
 

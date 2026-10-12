@@ -15,6 +15,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { isRunLevelSpendStop } from "@debateai/kernel";
 import {
+  buildFramedPrompt,
+  buildFramedRepairPrompt,
+  schemaFailureLocator,
+  type ProviderCallRequest,
   createPreviewBudgetRpcPort,
   createPreviewGuardedFetch,
   OpenAICompatibleProviderGateway,
@@ -23,9 +27,16 @@ import {
   PROVIDER_COST_ENVELOPE_REFUSAL_CODES,
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
+  PreviewChargeBookedMax,
+  PreviewGateUnavailable,
+  PreviewModelCooling,
   PreviewUnbilledRefusal,
+  PreviewVendorRefusedUnbilled,
+  providerCallEndedVendorRefusedUnbilled,
+  providerCallGateUnavailable,
   ProviderUnbilledRefusal,
   type PreviewBudgetPort,
+  type PreviewGateRemaining,
   type PreviewProviderTestConfig,
   type ProviderLedgerInput
 } from "@debateai/providers";
@@ -92,13 +103,19 @@ describe("the preview spending gate's 409 refusal body", () => {
     }
   );
 
-  it.each(["PREVIEW_TEST_AUTHORITY_STOPPED", "SOMETHING_NEW"])(
-    "%s keeps today's per-run money refusal",
-    async (code) => {
-      const { port } = await gate({ status: 409, body: JSON.stringify({ error: code }) });
-      await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
-    }
-  );
+  it("SOMETHING_NEW (a code the app does not know) keeps today's per-run money refusal", async () => {
+    const { port, received } = await gate({ status: 409, body: JSON.stringify({ error: "SOMETHING_NEW" }) });
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+  });
+
+  it("PREVIEW_TEST_AUTHORITY_STOPPED whose /remaining read fails keeps today's per-run money refusal", async () => {
+    // Run resilience (c): STOPPED asks /remaining; this stand-in answers every path with the same 409, so the read
+    // fails and the mapping falls back to today's money code. A halted /remaining is pinned in the describe below.
+    const { port, received } = await gate({ status: 409, body: JSON.stringify({ error: "PREVIEW_TEST_AUTHORITY_STOPPED" }) });
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete", "/remaining"]);
+  });
 
   it.each([
     ["an array", "[\"TEAM_DAILY_BUDGET_REACHED\"]"],
@@ -110,7 +127,7 @@ describe("the preview spending gate's 409 refusal body", () => {
     await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
   });
 
-  it.each(["PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"])(
+  it.each(["PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED", "PROVIDER_ERROR_UNBILLED"])(
     "owner ruling 5: %s (a provably unbilled call, hold released) is the transient retry path, never a money stop",
     async (code) => {
       const { port } = await gate({ status: 409, body: JSON.stringify({ error: code }) });
@@ -132,6 +149,9 @@ describe("the preview spending gate's 409 refusal body", () => {
     // Owner ruling R4 (2026-10-11): nothing was reserved or sent, so it is an unbilled refusal too.
     expect(refusal).toBeInstanceOf(PreviewUnbilledRefusal);
     expect(refusal).toBeInstanceOf(ProviderUnbilledRefusal);
+    // Review amendment R-d (2026-10-12): the gate's OWN refusal says nothing about the model, so it is never the
+    // vendor's unbilled refusal that makes a model sit out the rest of a run.
+    expect(refusal).not.toBeInstanceOf(PreviewVendorRefusedUnbilled);
     expect(isRunLevelSpendStop(refusal)).toBe(false);
     expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
   });
@@ -168,15 +188,23 @@ describe("the preview spending gate's 409 refusal body", () => {
     expect(isRunLevelSpendStop(busy)).toBe(false);
     // Owner ruling R4 (2026-10-11): a busy gate is unbilled, so it gets the one resend after the cooldown.
     expect(slept).toEqual([COOLDOWN_MS]);
-    for (const unsent of ["PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"]) {
+    // Review amendment R-d (2026-10-12): only the vendor's unbilled refusal ends a call as "the model is busy".
+    expect(providerCallEndedVendorRefusedUnbilled(busy)).toBe(false);
+    expect(busy).toMatchObject({ cause: expect.any(PreviewUnbilledRefusal) });
+    // Review 2026-10-12: PROVIDER_ERROR_UNBILLED (a vendor error that bills nothing but is not "busy", e.g.
+    // Anthropic's 400/404/413/500) is the plain unbilled refusal, as before gate v4: the model never sits out for it.
+    for (const [unsent, vendorBusy] of [["PROVIDER_NOT_REACHED", false], ["PROVIDER_REFUSED_UNBILLED", true],
+      ["PROVIDER_ERROR_UNBILLED", false]] as const) {
       const refusal = await call(unsent);
-      expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+      expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: expect.any(PreviewUnbilledRefusal) });
       expect(isRunLevelSpendStop(refusal)).toBe(false);
+      expect(providerCallEndedVendorRefusedUnbilled(refusal), unsent).toBe(vendorBusy);
+      expect((refusal as { cause: unknown }).cause instanceof PreviewVendorRefusedUnbilled, unsent).toBe(vendorBusy);
     }
     // Owner ruling 5: each unbilled refusal is sent once more after the cooldown, and only once.
-    expect(slept).toEqual([COOLDOWN_MS, COOLDOWN_MS, COOLDOWN_MS]);
+    expect(slept).toEqual([COOLDOWN_MS, COOLDOWN_MS, COOLDOWN_MS, COOLDOWN_MS]);
     await expect(call("PREVIEW_TEST_AUTHORITY_STOPPED")).resolves.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
-    expect(slept).toHaveLength(3);
+    expect(slept).toHaveLength(4);
   });
 
   describe("owner ruling 5: one retry after the cooldown, only for a call the gate proved unbilled", () => {
@@ -280,6 +308,276 @@ describe("the preview spending gate's 409 refusal body", () => {
   });
 });
 
+/**
+ * Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, fix (c), test T4). On
+ * 2026-10-11 the DeepInfra gate reached its daily unbilled ceiling and halted; the resend that followed was refused
+ * PREVIEW_TEST_AUTHORITY_STOPPED, which the app read as the run's money ceiling (preview-test.ts previewAuthorityRefusal)
+ * although the preview has no run money seam. A STOPPED refusal now asks the same gate's read-only `/remaining`: a gate
+ * that is not active, or whose window is shut, is UNAVAILABLE (a non-money PROVIDER_GATE_UNAVAILABLE, never resent);
+ * any other answer, and any failure to read one, keeps today's mapping.
+ */
+describe("run resilience (c): a halted gate is unavailable, not money", () => {
+  type Remaining = Readonly<{ state: "active" | "initialized" | "halted"; window_open: boolean }>;
+  /** The /remaining reply of Contract A §5, with the given state and window. */
+  const remainingReply = (remaining: Remaining): string => JSON.stringify({
+    enabled_models: ["zai-org/GLM-5.3-Flash"], largest_reservation_usd: "0.080000000", max_concurrent_calls: 10,
+    remaining_calls: 1980, remaining_usd: "9.500000000", state: remaining.state, window_open: remaining.window_open
+  });
+  /** One gate socket: /complete refuses STOPPED, /remaining answers `remaining` (a status and body). */
+  async function stoppedGate(remaining: Reply) {
+    return answeringByPath((path, response) => {
+      if (path === "/remaining") {
+        response.writeHead(remaining.status, { "content-type": "application/json" });
+        response.end(remaining.body);
+        return;
+      }
+      response.writeHead(409, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "PREVIEW_TEST_AUTHORITY_STOPPED" }));
+    });
+  }
+
+  it.each([
+    ["halted", { state: "halted", window_open: true }],
+    ["initialized", { state: "initialized", window_open: true }],
+    ["active but with its window shut", { state: "active", window_open: false }]
+  ] as const)("STOPPED from a gate that reads %s is PROVIDER_GATE_UNAVAILABLE, never a spend stop", async (_name, state) => {
+    const { port, received } = await stoppedGate({ status: 200, body: remainingReply(state) });
+    const refusal: unknown = await port.execute(execution).then(() => null, (error: unknown) => error);
+    expect(refusal).toMatchObject({ code: "PROVIDER_GATE_UNAVAILABLE" });
+    expect(providerCallGateUnavailable(refusal)).toBe(true);
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
+    // One /complete, then one read-only /remaining on the same socket with the scope only.
+    expect(received).toEqual([
+      `POST /complete ${JSON.stringify({ scope_id: "fixture-scope", ...execution })}`,
+      `POST /remaining ${JSON.stringify({ scope_id: "fixture-scope" })}`
+    ]);
+  });
+
+  it("STOPPED from a gate that still reads active and open keeps today's money mapping", async () => {
+    const { port } = await stoppedGate({ status: 200, body: remainingReply({ state: "active", window_open: true }) });
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+  });
+
+  it.each([
+    ["a refusal", { status: 409, body: JSON.stringify({ error: "PREVIEW_TEST_AUTHORITY_STOPPED" }) }],
+    ["a reply of another shape", { status: 200, body: JSON.stringify({ state: "halted" }) }]
+  ])("STOPPED with /remaining answering %s keeps today's money mapping", async (_name, reply) => {
+    const { port } = await stoppedGate(reply);
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+  });
+
+  it("only STOPPED asks /remaining: every other refusal keeps its own mapping and reads nothing more", async () => {
+    for (const code of ["TEAM_DAILY_BUDGET_REACHED", "PROVIDER_REFUSED_UNBILLED", "SOMETHING_NEW"]) {
+      const { port, received } = await answeringByPath((_path, response) => {
+        response.writeHead(409, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: code }));
+      });
+      await port.execute(execution).catch(() => undefined);
+      expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+    }
+  });
+
+  it("through the native gateway: one POST, no resend, a FAILED row, and PROVIDER_CALL_FAILED caused by the unavailable gate", async () => {
+    const MODEL = "zai-org/GLM-5.3-Flash";
+    const REF = "preview:fixture-a";
+    const target = parseProviderDiscoveryTargets(JSON.stringify([{
+      provider_ref: REF, base_url: "https://api.deepinfra.com/v1/openai", model: MODEL,
+      input_price_micros_per_million: 150000, output_price_micros_per_million: 500000,
+      thinking_parameter: "reasoning_effort", thinking_levels: ["high"], context_window_tokens: 1048576
+    }]), [{ providerRef: REF, maker: "Z.AI" }])[0]!;
+    const preview = parsePreviewProviderTestConfig(JSON.stringify({
+      deployment: "v3-preview", free_model_ids: [MODEL], requested_thinking_level: "high",
+      budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture-scope"
+    }))!;
+    const { port, received } = await stoppedGate({ status: 200, body: remainingReply({ state: "halted", window_open: true }) });
+    const slept: number[] = [];
+    const ledger: ProviderLedgerInput[] = [];
+    const gateway = withPreviewProviderCallPolicy(new OpenAICompatibleProviderGateway({
+      endpoint: target.baseUrl, model: target.model, maker: target.maker, ...providerTargetGatewayControls(target),
+      fetchImplementation: createPreviewGuardedFetch(port),
+      persistRawArtifact: async (artifact) => artifact.artifactId,
+      appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
+      assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
+    }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); } });
+    const refusal: unknown = await gateway.call({
+      runId: "run:synthetic", subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
+      bound: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 5000 }, contractHash: "contract:test", providerRef: REF,
+      packet: framedFixturePacket("Synthetic school phone policy; no personal data.")
+    }).then(() => null, (error: unknown) => error);
+    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: { code: "PROVIDER_GATE_UNAVAILABLE" } });
+    expect(providerCallGateUnavailable(refusal)).toBe(true);
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    // Never resent: the 60-second resend is for unbilled refusals only, and a halted gate stays halted.
+    expect(slept).toEqual([]);
+    expect(received.filter((line) => line.startsWith("POST /complete"))).toHaveLength(1);
+    // The FAILED row is kept (a counted attempt of THIS maker only, fix (b)).
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+  });
+});
+
+/**
+ * Gate v4 (gate fix 2026-10-12, preview_budget_authority.py): the gate answers two new public refusals.
+ * MODEL_COOLING (with retry_after whole seconds, 1..600): ONE model is cooling off after two or more vendor-unbilled
+ * refusals in a row; the gate refused before reserving anything and never contacted the vendor. It is read exactly like
+ * the vendor's own unbilled refusal (the model is busy): a REFUSED row, the one 60-second resend, and the model sits
+ * out. AUTHORITY_HALTED: the gate was already halted when the call arrived (found before any reservation); it is the
+ * unavailable gate of fix (c) straight away, with no /remaining read and no resend. STOPPED keeps its /remaining read.
+ */
+describe("gate v4: MODEL_COOLING is a busy model, AUTHORITY_HALTED is an unavailable gate", () => {
+  const MODEL = "zai-org/GLM-5.3-Flash";
+  const REF = "preview:fixture-a";
+  /** One gate socket answering every /complete with `body` (a 409), and recording whether /remaining is ever asked. */
+  const refusingGate = (body: string) => answeringByPath((_path, response) => {
+    response.writeHead(409, { "content-type": "application/json" });
+    response.end(body);
+  });
+  const refusalOf = (port: PreviewBudgetPort): Promise<unknown> => port.execute(execution).then(() => null, (error: unknown) => error);
+
+  it.each([
+    ["with retry_after", { error: "MODEL_COOLING", retry_after: 120 }, 120],
+    ["without retry_after", { error: "MODEL_COOLING" }, undefined],
+    ["with a retry_after over the 600 s ceiling", { error: "MODEL_COOLING", retry_after: 601 }, undefined],
+    ["with a zero retry_after", { error: "MODEL_COOLING", retry_after: 0 }, undefined],
+    ["with a fractional retry_after", { error: "MODEL_COOLING", retry_after: 1.5 }, undefined],
+    ["with a text retry_after", { error: "MODEL_COOLING", retry_after: "60" }, undefined]
+  ] as const)("MODEL_COOLING %s is the vendor's busy refusal, unbilled, never money", async (_name, body, retryAfter) => {
+    const { port, received } = await refusingGate(JSON.stringify(body));
+    const refusal = await refusalOf(port);
+    expect(refusal).toBeInstanceOf(PreviewModelCooling);
+    expect(refusal).toBeInstanceOf(PreviewVendorRefusedUnbilled);
+    expect(refusal).toBeInstanceOf(PreviewUnbilledRefusal);
+    expect(refusal).toBeInstanceOf(ProviderUnbilledRefusal);
+    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+    expect((refusal as PreviewModelCooling).retryAfterSeconds).toBe(retryAfter);
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
+    expect(providerCallGateUnavailable(refusal)).toBe(false);
+    // Only STOPPED asks /remaining.
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+  });
+
+  it("AUTHORITY_HALTED is PROVIDER_GATE_UNAVAILABLE at once: /remaining is never asked, never money", async () => {
+    const { port, received } = await refusingGate(JSON.stringify({ error: "AUTHORITY_HALTED" }));
+    const refusal = await refusalOf(port);
+    expect(refusal).toBeInstanceOf(PreviewGateUnavailable);
+    expect(refusal).toMatchObject({ code: "PROVIDER_GATE_UNAVAILABLE" });
+    expect(refusal).not.toBeInstanceOf(ProviderUnbilledRefusal);
+    expect(providerCallGateUnavailable(refusal)).toBe(true);
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+  });
+
+  /** A gate socket refusing every /complete with {"error": code}, its port built with a /remaining port that records each ask. */
+  const withRecordedRemaining = async (code: string) => {
+    const asked: string[] = [];
+    const directory = await mkdtemp(join(tmpdir(), "pvg-"));
+    directories.push(directory);
+    const socket = join(directory, "gate.sock");
+    const server = createServer((request, response) => {
+      request.resume();
+      request.on("end", () => {
+        response.writeHead(409, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: code }));
+      });
+    });
+    servers.push(server);
+    await new Promise<void>((done) => server.listen(socket, done));
+    const config = Object.freeze({
+      deployment: "v3-preview", free_model_ids: [MODEL], requested_thinking_level: "high", budget_socket: socket, scope_id: "fixture-scope"
+    }) as unknown as PreviewProviderTestConfig;
+    const halted: PreviewGateRemaining = { state: "halted", windowOpen: true } as unknown as PreviewGateRemaining;
+    const port = createPreviewBudgetRpcPort(config, socket, { remaining: async () => { asked.push("remaining"); return halted; } });
+    return { port, asked };
+  };
+
+  it("AUTHORITY_HALTED never asks an injected /remaining port either", async () => {
+    const { port, asked } = await withRecordedRemaining("AUTHORITY_HALTED");
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "PROVIDER_GATE_UNAVAILABLE" });
+    expect(asked).toEqual([]);
+  });
+
+  it("STOPPED still asks the injected /remaining port, as before", async () => {
+    const { port, asked } = await withRecordedRemaining("PREVIEW_TEST_AUTHORITY_STOPPED");
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "PROVIDER_GATE_UNAVAILABLE" });
+    expect(asked).toEqual(["remaining"]);
+  });
+
+  it("through the native gateway: MODEL_COOLING gets the one resend and ends the call as the vendor's busy refusal", async () => {
+    const target = parseProviderDiscoveryTargets(JSON.stringify([{
+      provider_ref: REF, base_url: "https://api.deepinfra.com/v1/openai", model: MODEL,
+      input_price_micros_per_million: 150000, output_price_micros_per_million: 500000,
+      thinking_parameter: "reasoning_effort", thinking_levels: ["high"], context_window_tokens: 1048576
+    }]), [{ providerRef: REF, maker: "Z.AI" }])[0]!;
+    const preview = parsePreviewProviderTestConfig(JSON.stringify({
+      deployment: "v3-preview", free_model_ids: [MODEL], requested_thinking_level: "high",
+      budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture-scope"
+    }))!;
+    const call = async (body: string) => {
+      const { port, received } = await refusingGate(body);
+      const slept: number[] = [];
+      const ledger: ProviderLedgerInput[] = [];
+      const gateway = withPreviewProviderCallPolicy(new OpenAICompatibleProviderGateway({
+        endpoint: target.baseUrl, model: target.model, maker: target.maker, ...providerTargetGatewayControls(target),
+        fetchImplementation: createPreviewGuardedFetch(port),
+        persistRawArtifact: async (artifact) => artifact.artifactId,
+        appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
+        assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
+      }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); } });
+      const refusal: unknown = await gateway.call({
+        runId: "run:synthetic", subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
+        bound: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 5000 }, contractHash: "contract:test", providerRef: REF,
+        packet: framedFixturePacket("Synthetic school phone policy; no personal data.")
+      }).then(() => null, (error: unknown) => error);
+      return { refusal, slept, ledger, received };
+    };
+    const cooling = await call(JSON.stringify({ error: "MODEL_COOLING", retry_after: 60 }));
+    expect(cooling.refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: expect.any(PreviewModelCooling) });
+    expect(providerCallEndedVendorRefusedUnbilled(cooling.refusal)).toBe(true);
+    expect(providerCallGateUnavailable(cooling.refusal)).toBe(false);
+    expect(isRunLevelSpendStop(cooling.refusal)).toBe(false);
+    // The one resend after the cooldown, like PROVIDER_REFUSED_UNBILLED; two REFUSED rows, nothing counted.
+    expect(cooling.slept).toEqual([COOLDOWN_MS]);
+    expect(cooling.received.filter((line) => line.startsWith("POST /complete"))).toHaveLength(2);
+    expect(cooling.ledger.map((entry) => entry.outcome)).toEqual(["REFUSED", "REFUSED"]);
+
+    const halted = await call(JSON.stringify({ error: "AUTHORITY_HALTED" }));
+    expect(halted.refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: { code: "PROVIDER_GATE_UNAVAILABLE" } });
+    expect(providerCallGateUnavailable(halted.refusal)).toBe(true);
+    expect(providerCallEndedVendorRefusedUnbilled(halted.refusal)).toBe(false);
+    expect(isRunLevelSpendStop(halted.refusal)).toBe(false);
+    // Never resent, never a /remaining read; the FAILED row is kept (this maker's own, fix (b)).
+    expect(halted.slept).toEqual([]);
+    expect(halted.received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+    expect(halted.ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+  });
+});
+
+/** Like `answering`, with the request's path handed to `answer`, so /complete and /remaining can answer apart. */
+async function answeringByPath(
+  answer: (path: string, response: ServerResponse) => void
+): Promise<Readonly<{ port: ReturnType<typeof createPreviewBudgetRpcPort>; received: string[] }>> {
+  const directory = await mkdtemp(join(tmpdir(), "pvg-"));
+  directories.push(directory);
+  const socket = join(directory, "gate.sock");
+  const received: string[] = [];
+  const server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => {
+      received.push(`${request.method} ${request.url} ${Buffer.concat(chunks).toString("utf8")}`);
+      answer(request.url ?? "", response);
+    });
+  });
+  servers.push(server);
+  await new Promise<void>((done) => server.listen(socket, done));
+  const config = Object.freeze({
+    deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash"], requested_thinking_level: "high",
+    budget_socket: socket, scope_id: "fixture-scope"
+  }) as unknown as PreviewProviderTestConfig;
+  return Object.freeze({ port: createPreviewBudgetRpcPort(config), received });
+}
+
 /** The port's promise, or a test failure if it has not settled within `ms`: a reply that never settles hangs a debate. */
 function settledWithin<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
@@ -308,5 +606,94 @@ describe("the preview spending gate's reply always settles", () => {
       setTimeout(() => response.socket?.destroy(), 20);
     });
     await expect(settledWithin(port.execute(execution), 5_000)).rejects.toMatchObject({ code: "PROVIDER_USAGE_UNREPORTED" });
+  });
+});
+
+/**
+ * Slow answer (owner ruling 2026-10-12): the gate's new public refusal PROVIDER_CHARGE_BOOKED_MAX. The call was reserved
+ * and SENT; the vendor connection then failed or ran past the gate's 1,200 s deadline; the gate booked the call's whole
+ * reservation as its charge and stays active. Until now the gate answered such a call PREVIEW_TEST_AUTHORITY_STOPPED,
+ * which the app read (after a /remaining read) as the run's money ceiling. It is the app's own sent-and-failed
+ * transport failure: billed (never REFUSED, never the unbilled 60-second resend), never money, never "gate unavailable".
+ */
+describe("PROVIDER_CHARGE_BOOKED_MAX: a sent call the gate charged at its reservation is a billed transport failure", () => {
+  const booked = { status: 409, body: JSON.stringify({ error: "PROVIDER_CHARGE_BOOKED_MAX" }) };
+
+  it("the port reads it as a billed transport failure, without asking /remaining", async () => {
+    const { port, received } = await gate(booked);
+    const refusal: unknown = await port.execute(execution).then(() => null, (error: unknown) => error);
+    expect(refusal).toBeInstanceOf(PreviewChargeBookedMax);
+    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+    expect(refusal).not.toBeInstanceOf(ProviderUnbilledRefusal);
+    expect(refusal).not.toBeInstanceOf(PreviewGateUnavailable);
+    expect(providerCallGateUnavailable(refusal)).toBe(false);
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+  });
+
+  const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
+  const REF = "preview:mimo-v2-6-pro";
+  const preview = parsePreviewProviderTestConfig(JSON.stringify({
+    deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"],
+    premium_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", MIMO], requested_thinking_level: "high",
+    budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture-scope"
+  }))!;
+  const gatewayFor = (port: PreviewBudgetPort, slept: number[], ledger: ProviderLedgerInput[], sent: string[]) => {
+    const target = parseProviderDiscoveryTargets(JSON.stringify([{
+      provider_ref: REF, base_url: "https://api.deepinfra.com/v1/openai", model: MIMO,
+      input_price_micros_per_million: 430000, output_price_micros_per_million: 870000, context_window_tokens: 1048576
+    }]), [{ providerRef: REF, maker: "Xiaomi" }])[0]!;
+    const recording: PreviewBudgetPort = { execute: (input, signal) => { sent.push(input.requestBody); return port.execute(input, signal); } };
+    return withPreviewProviderCallPolicy(new OpenAICompatibleProviderGateway({
+      endpoint: target.baseUrl, model: target.model, maker: target.maker, ...providerTargetGatewayControls(target),
+      fetchImplementation: createPreviewGuardedFetch(recording),
+      persistRawArtifact: async (artifact) => artifact.artifactId,
+      appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
+      assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
+    }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); } });
+  };
+
+  it("through the native gateway a debate call records ONE billed FAILED attempt, is not resent, and leaves as PROVIDER_CALL_FAILED", async () => {
+    const { port, received } = await gate(booked);
+    const slept: number[] = [];
+    const ledger: ProviderLedgerInput[] = [];
+    const sent: string[] = [];
+    const failure: unknown = await gatewayFor(port, slept, ledger, sent).call({
+      runId: "run:synthetic", subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
+      bound: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 5000 }, contractHash: "contract:test", providerRef: REF,
+      packet: framedFixturePacket("Synthetic school phone policy; no personal data.")
+    }).then(() => null, (error: unknown) => error);
+    expect(failure).toMatchObject({ code: "PROVIDER_CALL_FAILED", lastOutcome: "FAILED", cause: expect.any(PreviewChargeBookedMax) });
+    expect(isRunLevelSpendStop(failure)).toBe(false);
+    expect(providerCallGateUnavailable(failure)).toBe(false);
+    expect(providerCallEndedVendorRefusedUnbilled(failure)).toBe(false);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+    expect(sent).toHaveLength(1);
+    expect(slept).toEqual([]);
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+  });
+
+  it("the storyteller's call uses its second POST at the same 16,384 allowance (MiMo), each a billed FAILED attempt", async () => {
+    const { port } = await gate(booked);
+    const slept: number[] = [];
+    const ledger: ProviderLedgerInput[] = [];
+    const sent: string[] = [];
+    const framed = buildFramedPrompt({
+      contract: { contractId: "story.storyteller.v3", instruction: "Do the synthetic story step.", answerForm: "Return one JSON object." },
+      material: [{ name: "story_material", content: "One policy position, cited as P1." }]
+    });
+    const storyteller: ProviderCallRequest = {
+      runId: "run:synthetic", subjectItemId: "story:synthetic", callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER", lane: "story",
+      bound: { maxAttempts: 2, tokenCeiling: 12_000, deadlineMs: 300_000 }, contractHash: "contract:synthetic-STORYTELLER",
+      providerRef: REF, packet: framed.packet, preferredResponseFormat: "json_object",
+      classifyContent: () => ({ parseStatus: "PARSED", parseError: null }),
+      buildRepairPacket: (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))
+    };
+    const failure: unknown = await gatewayFor(port, slept, ledger, sent).call(storyteller).then(() => null, (error: unknown) => error);
+    expect(failure).toMatchObject({ code: "PROVIDER_CALL_FAILED", lastOutcome: "FAILED", cause: expect.any(PreviewChargeBookedMax) });
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED"]);
+    expect(sent.map((body) => JSON.parse(body).max_tokens)).toEqual([16_384, 16_384]);
+    expect(slept).toEqual([]);
   });
 });

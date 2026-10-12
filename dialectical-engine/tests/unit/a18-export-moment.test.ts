@@ -272,7 +272,9 @@ function attemptSource(key: string, modelRole: DebateRole | null, attempts: read
 function drifted(packet: PromptPacket): PromptPacket {
   const [opening, ...rest] = packet.messages;
   return Object.freeze({
-    messages: [{ ...opening!, content: `${opening!.content}\nOne more sentence the live builder never writes.` }, ...rest]
+    // Before the instruction text: since the per-call markers close the system message (caching before the upload,
+    // 2026-10-12), a sentence after them is refused by the door itself, before this self-check could speak.
+    messages: [{ ...opening!, content: `One more sentence the live builder never writes.\n${opening!.content}` }, ...rest]
   });
 }
 

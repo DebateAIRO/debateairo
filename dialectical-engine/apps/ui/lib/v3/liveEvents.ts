@@ -1,4 +1,4 @@
-import { InvestigationGapSchema, type EventType, type InvestigationGap, type RunEvent } from "@debateai/contract";
+import { ContractHttpError, InvestigationGapSchema, type EventType, type InvestigationGap, type RunEvent } from "@debateai/contract";
 import type { DebateNode, Generation } from "../types.js";
 import composeEnglish from "../../messages/en/compose.json" with { type: "json" };
 import { t, type MessageCatalog } from "../i18n/translate.js";
@@ -81,6 +81,124 @@ export function refreshTriggeredBy(eventType: EventType): boolean {
     eventType === "serve.recompose_or_defect" ||
     eventType === "honesty.staleness_trigger_fired"
   );
+}
+
+/**
+ * Live run events (2026-10-11). The server keeps one stream open and replays
+ * the stored events first, so every reconnect repeats history. The page
+ * applies each event once: this gate remembers the event ids it has let
+ * through and answers false for a replayed one.
+ */
+export type LiveEventGate = Readonly<{ admit(event: RunEvent): boolean }>;
+
+export function createLiveEventGate(): LiveEventGate {
+  const seen = new Set<string>();
+  return Object.freeze({
+    admit(event: RunEvent): boolean {
+      if (seen.has(event.event_id)) return false;
+      seen.add(event.event_id);
+      return true;
+    }
+  });
+}
+
+/**
+ * Reconnect timing. Before 2026-10-11 the page reconnected about once a second and one tab spent its
+ * address's whole `publicReads` admission budget in about two minutes. A clean close of a live run now
+ * waits at least 5 s, doubling to 60 s, until a NEW event arrives; a 429 waits at least the server's
+ * `Retry-After` (a minute when it names none), and never more than `capMs` (15 minutes).
+ */
+export const LIVE_STREAM_RECONNECT = Object.freeze({
+  minGapMs: 5_000,
+  maxGapMs: 60_000,
+  rateLimitedFloorMs: 60_000,
+  /** The longest any wait may be, whatever the server asked: setTimeout above ~24.8 days fires after 1 ms. */
+  capMs: 900_000
+});
+
+export function liveReconnectDelay(attempt: number, failure: unknown): number {
+  const backoff = Math.min(LIVE_STREAM_RECONNECT.maxGapMs, LIVE_STREAM_RECONNECT.minGapMs * 2 ** Math.max(0, attempt));
+  const rateLimited = failure instanceof ContractHttpError && failure.code === "RATE_LIMITED";
+  const floor = rateLimited ? failure.retryAfterMs ?? LIVE_STREAM_RECONNECT.rateLimitedFloorMs : 0;
+  return Math.min(LIVE_STREAM_RECONNECT.capMs, Math.max(backoff, floor));
+}
+
+export type LiveStreamStatus = Readonly<{ status: "connecting" | "live" | "reconnecting"; retryInMs?: number }>;
+
+/**
+ * The debate page's live-stream loop (the page wires it; tests drive it with fake timers):
+ * open one stream, apply only NEW events (a new event resets the back-off), re-read the
+ * page once when a stream closes, stop on a terminal run, reconnect with back-off otherwise.
+ * Returns the stop function.
+ */
+export function startLiveEventStream(input: Readonly<{
+  /** Opens one stream; resolves on a clean close, rejects on a refusal or a network failure. */
+  open: (emit: (event: RunEvent) => void, signal: AbortSignal) => Promise<void>;
+  /** Applies a NEW event; the page's consumer re-reads the settled projection for the events that call for it. */
+  consume: (event: RunEvent) => void;
+  refresh: (answerExpected?: boolean) => void;
+  isTerminal: () => boolean;
+  onStatus: (status: LiveStreamStatus) => void;
+  /** The first event of a connection arrived: a stale transient error may be cleared. */
+  onLive?: () => void;
+  /** True when the failure ends the live view for good (the page shows it); no reconnect then. */
+  onFatal: (failure: unknown) => boolean;
+  gate?: LiveEventGate;
+}>): () => void {
+  const gate = input.gate ?? createLiveEventGate();
+  const controller = new AbortController();
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let attempt = 0;
+
+  const scheduleReconnect = (failure: unknown) => {
+    if (stopped || timer !== null) return;
+    const delay = liveReconnectDelay(attempt, failure);
+    attempt += 1;
+    input.onStatus({ status: "reconnecting", retryInMs: delay });
+    timer = setTimeout(connect, delay);
+  };
+
+  function connect() {
+    timer = null;
+    if (stopped) return;
+    input.onStatus({ status: "connecting" });
+    let opened = false;
+    input.open((event) => {
+      if (stopped) return;
+      if (!opened) {
+        opened = true;
+        input.onStatus({ status: "live" });
+        input.onLive?.();
+      }
+      // A replayed event is history the page already holds: not applied again, no
+      // re-read, and no back-off reset (that reset made the page reconnect every second).
+      if (!gate.admit(event)) return;
+      attempt = 0;
+      input.consume(event);
+    }, controller.signal).then(() => {
+      if (stopped) return;
+      // The stream closed. A terminal run is done: re-read the settled answer.
+      if (input.isTerminal()) {
+        input.refresh(true);
+        return;
+      }
+      input.refresh();
+      scheduleReconnect(null);
+    }, (failure: unknown) => {
+      if (stopped || controller.signal.aborted) return;
+      if (input.onFatal(failure)) return;
+      input.refresh();
+      scheduleReconnect(failure);
+    });
+  }
+
+  connect();
+  return () => {
+    stopped = true;
+    controller.abort();
+    if (timer !== null) clearTimeout(timer);
+  };
 }
 
 export function applyRunEvent(state: LiveRunState, event: RunEvent): LiveRunState {

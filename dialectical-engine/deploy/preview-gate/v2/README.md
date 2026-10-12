@@ -32,7 +32,7 @@ This folder holds:
 | `systemd/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf` | The list of DeepInfra internet addresses the gate may reach (measured 2026-10-09). |
 | `deepinfra_addresses.py` | Checks that list against DeepInfra's current addresses, and writes a fresh list. |
 | `systemd/debateai-preview-gate-addresses.{service,timer}` | Runs that check every hour; emails the owner once per change. |
-| `gate_watch.py`, `systemd/debateai-preview-gate-halt-watch.{service,timer}` | Every minute: if the gate halted, emails the owner once per halt. |
+| `gate_watch.py`, `systemd/debateai-preview-gate-halt-watch.{service,timer}` | Every minute: if the gate halted, emails the owner once per halt. Also emails once a day if many calls were refused unbilled (see below). |
 
 Both emails go through the lifecycle alert (`deploy/preview-lifecycle/v1/alert.mjs --notice`,
 unit `debateai-preview-notice@.service`), the same owner-only mail path as the failure emails.
@@ -103,9 +103,10 @@ The gate's own code is not here. It is `packages/providers/ops/preview_budget_au
   - only `activate` (root) re-opens a halted gate.
 
   So a restart only brings the socket back. A clean stop exits 0 and is not restarted.
-- **Stop can take up to about 11 minutes.** On `systemctl stop` the gate reserves nothing more
-  at once. A call already running may take up to 600 s, and its answer then gets 30 s to be
-  taken (otherwise the gate halts, as for any lost answer). So `TimeoutStopSec=700`. If systemd
+- **Stop can take up to about 22 minutes.** On `systemctl stop` the gate reserves nothing more
+  at once. A call already running may take up to 1,200 s (600 s before the owner ruling of
+  2026-10-12 on slow answers), and its answer then gets 30 s to be taken (otherwise the gate halts,
+  as for any lost answer). So `TimeoutStopSec=1300` (was 700). If systemd
   has to kill it after that, the next start halts on the interrupted call (fail closed).
 - **Only the API and the runner get a connection.** Anyone may connect to the socket (`666`),
   but a caller whose account is not in `allowed_peer_uids` is closed at once. It never gets a
@@ -121,6 +122,13 @@ The gate's own code is not here. It is `packages/providers/ops/preview_budget_au
   - The alert sends at most one email per reason every 30 minutes, so a second halt with the
     same reason within 30 minutes shows only in `status`.
   - If the watcher itself breaks, the normal failure email says so.
+- **One warning a day for many unbilled refusals (owner ruling 2026-10-12: alert, never halt).**
+  The same watcher reads `today_unbilled_releases` from `status` (calls the vendor refused
+  without billing them: busy or rejected). When it reaches `--unbilled-alert-at` (default 100,
+  1 to 100000), the owner gets one email for that gate and Bucharest day: the count, the day,
+  "nothing was halted", and a request to check the vendor's billing page. The day is recorded
+  first in `announced-unbilled.json`, next to the halt watcher's `--state` file, so a failed
+  email is not retried that day. A gate whose `status` has no such count is skipped quietly.
 - **"Not sent" is proven precisely (owner ruling).** Only a failure of the TCP connect or the
   TLS handshake counts. These happen before the gate asks for even one byte of the request to
   be written, so the key and the question never left the server. Anything later (while writing
@@ -353,7 +361,8 @@ four things:
 3. Show its last journal lines.
 4. Start both timers.
 
-The halt watcher should print `{"status": "ok", "state": "active"}`. The address watcher should
+The halt watcher should print `{"status": "ok", "state": "active"}` (plus `"unbilled"` fields on
+a day with many unbilled refusals). The address watcher should
 print `"status": "ok"`. The lifecycle target `Wants=` both timers, so from then on they start
 with the preview at every boot.
 

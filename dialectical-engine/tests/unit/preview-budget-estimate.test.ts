@@ -100,22 +100,28 @@ const PANEL = Object.freeze([
   { provider_ref: "preview:fixture-a", model_id: GLM },
   { provider_ref: "preview:deepseek-v4-1-flash", model_id: DEEPSEEK }
 ]);
-/** The max_tokens each call sends on the preview with today's register bounds (all organ and synthesis bounds 2,048 -> the 8,192 floor). */
-const OUTPUT: PreviewCallOutputTokens = Object.freeze({ debate: 8192, storyteller: 12_000, storytellerRetry: 24_000, storyChecker: 8192 });
+/**
+ * The max_tokens each call sends on the preview with today's register bounds (all organ and synthesis bounds 2,048 -> the 8,192 floor).
+ * Story format robustness (2026-10-12): the storyteller asks for its row's whole answer cap (32,768 on every row), and its retry is
+ * held to that cap by each row's clamp; the story checker's repair try asks for at most twice its 8,192 (16,384).
+ */
+const OUTPUT: PreviewCallOutputTokens = Object.freeze({ debate: 8192, storyteller: 32_768, storytellerRetry: 65_536, storyChecker: 8192 });
 /** Every role on GLM; the five declared targets (two GLM refs, DeepSeek, MiMo, Qwen) are health-checked at ask time. */
 const ROLE_MODELS = Object.freeze({ answerWriter: GLM, answerChecker: GLM, storyteller: GLM, storyChecker: GLM });
 const ASK_PROBE_MODELS = Object.freeze([GLM, GLM, DEEPSEEK, MIMO, QWEN]);
 // THE ACTIVE MODE (realistic worst case, owner ruling 2026-10-10), calls: debate 30 (each of the basis's
-// 30 sites once, not its ceiling of 120 repeat attempts); story 2 rounds x 3 = 6; pickup health checks
-// (1 + hold_cap 2 + 2 restarts) x (2 panel members + fixture-b, the checker, off the panel) = 15; this
-// ask's own health checks 5; one unbilled retry per one-attempt call 30 + 2 = 32. Total 88.
+// 30 sites once, not its ceiling of 120 repeat attempts); story 2 rounds x 4 = 8 (the storyteller and the
+// checker each with one repair try, 2026-10-12); pickup health checks (1 + hold_cap 2 + 2 restarts) x
+// (2 panel members + fixture-b, the checker, off the panel) = 15; this ask's own health checks 5; one
+// unbilled retry per one-attempt debate call 30. Total 88 (the checker's repair took its unbilled retry's place).
 const EXPECTED_CALLS = 88;
 // With the 15% margin: ceil(101.2) = 102; plus 4 in flight = 106 calls needed.
 const CALLS_NEEDED = 106;
 // One call at the realistic worst case, in nano-USD. Owner rulings 2026-10-10: request sizes become tokens at
 // 3 bytes per token (the gate itself keeps bytes = tokens). A debate call's prompt is 64 KiB: (65,536 + 2,048)
 // / 3 = 22,528 tokens; a story call's is its story size's largest measured request (+ 2,048) / 3; the answer
-// is the call's own max_tokens (debate 8,192; storyteller 12,000, its retry 24,000; story check 8,192); a
+// is the call's own max_tokens (debate 8,192; storyteller its row's story allowance, GLM 16,384 (slow answer, owner ruling
+// 2026-10-12), its length retry twice that, held to the row's 32,768; story check 8,192, its repair 16,384); a
 // health check is its one-line body (1,024 + 2,048 in, bytes as tokens) and 8,192 out.
 const IN = 22_528n;
 const STORY_IN = Object.freeze({
@@ -128,9 +134,10 @@ const REAL = Object.freeze({
   PROBE_GLM: 3072n * 150n + 8192n * 500n, PROBE_DEEPSEEK: 3072n * 200n + 8192n * 600n,
   PROBE_MIMO: 3072n * 430n + 8192n * 870n, PROBE_QWEN: 3072n * 113n + 8192n * 382n,
   // The test ask's story size is "high" (the largest; also what an unknown size is held at).
-  STORYTELLER_GLM: STORY_IN.high.storyteller * 150n + 12_000n * 500n,
-  STORYTELLER_RETRY_GLM: STORY_IN.high.storyteller * 150n + 24_000n * 500n,
-  STORY_CHECKER_GLM: STORY_IN.high.storyChecker * 150n + 8192n * 500n
+  STORYTELLER_GLM: STORY_IN.high.storyteller * 150n + 16_384n * 500n,
+  STORYTELLER_RETRY_GLM: STORY_IN.high.storyteller * 150n + 32_768n * 500n,
+  STORY_CHECKER_GLM: STORY_IN.high.storyChecker * 150n + 8192n * 500n,
+  STORY_CHECKER_RETRY_GLM: STORY_IN.high.storyChecker * 150n + 16_384n * 500n
 });
 /** x 1.15, rounded up, as the estimate does. */
 const margin = (value: bigint) => (value * 115n + 99n) / 100n;
@@ -140,10 +147,13 @@ const margin = (value: bigint) => (value * 115n + 99n) / 100n;
 // seat and fixture-b, 2 at ask time), 2 story rounds; DeepSeek: 8 + 8 = 16 debate, 6 checks; MiMo and Qwen
 // one ask-time check each. Unbilled retries cost nothing.
 // 14 x 7,475,200 + 16 x 9,420,800 + 12 x 4,556,800 + 6 x 5,529,600 + 8,448,000 + 3,476,480
-//   + 2 x (17,008,050 + 23,008,050 + 16,332,850) = 467,867,180; x 1.15 = 538,047,257 (rounded up; $0.54).
+//   + 2 x (19,200,050 + 27,392,050 + 16,332,850 + 20,428,850) = 521,876,880; x 1.15 = 600,158,412 (rounded up; $0.60).
+// Before the slow-answer ruling (2026-10-12; GLM's storyteller asked 32,768): 2 x (27,392,050 + 27,392,050 + ...),
+// 538,260,880, x 1.15 = 619,000,012 ($0.62).
+// Before story format robustness (2026-10-12): 2 x (17,008,050 + 23,008,050 + 16,332,850), 538,047,257 ($0.54).
 const CALLS_BASE = 14n * REAL.GLM + 16n * REAL.DEEPSEEK + 12n * REAL.PROBE_GLM + 6n * REAL.PROBE_DEEPSEEK + REAL.PROBE_MIMO + REAL.PROBE_QWEN
-  + 2n * (REAL.STORYTELLER_GLM + REAL.STORYTELLER_RETRY_GLM + REAL.STORY_CHECKER_GLM);
-const CALLS_NANO = 538_047_257n;
+  + 2n * (REAL.STORYTELLER_GLM + REAL.STORYTELLER_RETRY_GLM + REAL.STORY_CHECKER_GLM + REAL.STORY_CHECKER_RETRY_GLM);
+const CALLS_NANO = 600_158_412n;
 /** The gate's largest worst-case reservation under the hard caps with GLM and DeepSeek switched on (DeepSeek, 256 KiB). */
 const LARGEST = 72_499_200n;
 const ESTIMATE = CALLS_NANO + 4n * LARGEST;
@@ -155,10 +165,10 @@ const MIMO_LARGEST = 142_110_720n;
 const CALIBRATED = Object.freeze({ debateCallCount: "BASIS_CEILING" as const, pricer: calibratedEstimatePricer([]) });
 const CAL_EXPECTED_CALLS = 268;
 const AVG = Object.freeze({ GLM: 1_200_000n, DEEPSEEK: 1_520_000n, MIMO: 2_764_000n, QWEN: 910_400n });
-// GLM: 32 + 12 + 12 debate, 12 checks, 6 story = 74 calls; DeepSeek: 32 + 32 reviews debate, 6 checks = 70;
-// MiMo, Qwen 1 each. 74 x 1,200,000 + 70 x 1,520,000 + 2,764,000 + 910,400 = 198,874,400; x 1.15 = 228,705,560.
-const CAL_BASE = 198_874_400n;
-const CAL_CALLS_NANO = 228_705_560n;
+// GLM: 32 + 12 + 12 debate, 12 checks, 8 story = 76 calls; DeepSeek: 32 + 32 reviews debate, 6 checks = 70;
+// MiMo, Qwen 1 each. 76 x 1,200,000 + 70 x 1,520,000 + 2,764,000 + 910,400 = 201,274,400; x 1.15 = 231,465,560.
+const CAL_BASE = 201_274_400n;
+const CAL_CALLS_NANO = 231_465_560n;
 const UNAVAILABLE = "ASK_MODEL_CANDIDATE_UNAVAILABLE";
 
 function remainingWith(patch: Partial<PreviewGateRemaining> = {}): PreviewGateRemaining {
@@ -219,10 +229,10 @@ const sample = (model: string, bucket: "DEBATE" | "STORY", calls: number, input:
 describe("the start-of-debate estimate is a realistic worst case, per gate (pure)", () => {
   it("counts each debate step once, the story with its repair, every pickup and ask health check, and the unbilled retries", () => {
     expect(previewExpectedCalls({ basis: basis(2), panel: PANEL, ...ROLES, askProbeTargets: 5 }))
-      .toEqual({ debate: 30, story: 6, probes: 15, askProbes: 5, unbilledRetries: 32, total: EXPECTED_CALLS });
+      .toEqual({ debate: 30, story: 8, probes: 15, askProbes: 5, unbilledRetries: 30, total: EXPECTED_CALLS });
     // The calibrated mode counted the basis's ceiling of every repeat attempt instead.
     expect(previewExpectedCalls({ basis: basis(2), panel: PANEL, ...ROLES, askProbeTargets: 5, debateCallCount: "BASIS_CEILING" }))
-      .toEqual({ debate: 120, story: 6, probes: 15, askProbes: 5, unbilledRetries: 122, total: CAL_EXPECTED_CALLS });
+      .toEqual({ debate: 120, story: 8, probes: 15, askProbes: 5, unbilledRetries: 120, total: CAL_EXPECTED_CALLS });
     // A basis without a per-site split is counted at its ceiling in either mode.
     expect(previewExpectedCalls({ basis: { panel_size: 2, max_model_attempts: 10 }, panel: PANEL, ...ROLES }).debate).toBe(10);
     const [need] = estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES });
@@ -235,16 +245,16 @@ describe("the start-of-debate estimate is a realistic worst case, per gate (pure
   it("puts each call on the model that makes it: the panel's sites shared by the panel, the answer roles' on their models", () => {
     const calls = previewCallShares({ basis: basis(2), panel: PANEL, ...ROLES });
     expect(callsBy(calls)).toEqual({
-      [`${GLM} DEBATE`]: 14, [`${GLM} UNBILLED_RETRY`]: 16, [`${DEEPSEEK} DEBATE`]: 16, [`${DEEPSEEK} UNBILLED_RETRY`]: 16,
+      [`${GLM} DEBATE`]: 14, [`${GLM} UNBILLED_RETRY`]: 14, [`${DEEPSEEK} DEBATE`]: 16, [`${DEEPSEEK} UNBILLED_RETRY`]: 16,
       [`${GLM} PROBE`]: 12, [`${DEEPSEEK} PROBE`]: 6, [`${MIMO} PROBE`]: 1, [`${QWEN} PROBE`]: 1,
-      [`${GLM} STORYTELLER`]: 2, [`${GLM} STORYTELLER_RETRY`]: 2, [`${GLM} STORY_CHECKER`]: 2
+      [`${GLM} STORYTELLER`]: 2, [`${GLM} STORYTELLER_RETRY`]: 2, [`${GLM} STORY_CHECKER`]: 2, [`${GLM} STORY_CHECKER_RETRY`]: 2
     });
     // The shares add up to the count exactly.
     const total = calls.shares.reduce((sum, share) => sum + share.numerator, 0n);
     expect(total).toBe(BigInt(EXPECTED_CALLS) * calls.denominator);
     // The basis's ceiling (the calibrated mode) splits its 120 calls in the same proportions.
     expect(callsBy(previewCallShares({ basis: basis(2), panel: PANEL, ...ROLES, debateCallCount: "BASIS_CEILING" }))).toMatchObject({
-      [`${GLM} DEBATE`]: 56, [`${GLM} UNBILLED_RETRY`]: 58, [`${DEEPSEEK} DEBATE`]: 64, [`${DEEPSEEK} UNBILLED_RETRY`]: 64 });
+      [`${GLM} DEBATE`]: 56, [`${GLM} UNBILLED_RETRY`]: 56, [`${DEEPSEEK} DEBATE`]: 64, [`${DEEPSEEK} UNBILLED_RETRY`]: 64 });
     // The reviews (the basis's 8 REVIEWER sites) go to each gate's dearest panel member, here DeepSeek: a
     // node's review goes to another maker in a fixed order (apps/runner/src/index.ts:834), not evenly.
     // The answer checker on MiMo moves its 3 debate calls (and their retries) there, and only those.
@@ -261,8 +271,8 @@ describe("the start-of-debate estimate is a realistic worst case, per gate (pure
   it("each gate is charged only for its own models' calls, each at its own row: a dearer answer checker costs exactly its calls", () => {
     const [need] = estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES, roleModels: { ...ROLE_MODELS, answerChecker: MIMO } });
     // 3 checker calls move from GLM to MiMo: + 3 x (16,814,080 - 7,475,200) = 28,016,640 before the margin.
-    expect(need).toMatchObject({ modelIds: [GLM, DEEPSEEK, MIMO], callsNanoUsd: 570_266_393n });
-    expect(margin(CALLS_BASE + 3n * (REAL.MIMO - REAL.GLM))).toBe(570_266_393n);
+    expect(need).toMatchObject({ modelIds: [GLM, DEEPSEEK, MIMO], callsNanoUsd: 632_377_548n });
+    expect(margin(CALLS_BASE + 3n * (REAL.MIMO - REAL.GLM))).toBe(632_377_548n);
     expect(() => estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES, roleModels: { ...ROLE_MODELS, answerWriter: "other/model" } })).toThrow();
     expect(() => estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES, roleProviderRefs: ["preview:unknown"] })).toThrow("PREVIEW_MODEL_UNREVIEWED");
   });
@@ -292,6 +302,7 @@ describe("the start-of-debate estimate is a realistic worst case, per gate (pure
     expect(realistic(previewModelRow(GLM)!, "STORYTELLER")).toBe(REAL.STORYTELLER_GLM);
     expect(realistic(previewModelRow(GLM)!, "STORYTELLER_RETRY")).toBe(REAL.STORYTELLER_RETRY_GLM);
     expect(realistic(previewModelRow(GLM)!, "STORY_CHECKER")).toBe(REAL.STORY_CHECKER_GLM);
+    expect(realistic(previewModelRow(GLM)!, "STORY_CHECKER_RETRY")).toBe(REAL.STORY_CHECKER_RETRY_GLM);
     expect(realistic(previewModelRow(MIMO)!, "PROBE")).toBe(REAL.PROBE_MIMO);
     expect(realistic(previewModelRow(QWEN)!, "DEBATE")).toBe(REAL.QWEN);
     // A call that asks for more than the row's answer cap is priced at the cap (32,768).
@@ -308,18 +319,19 @@ describe("the start-of-debate estimate is a realistic worst case, per gate (pure
       const pricer = realisticWorstCasePricer(OUTPUT, tier);
       expect(previewEstimateInputTokens(PREVIEW_STORY_REQUEST_BYTES[tier].storyteller)).toBe(STORY_IN[tier].storyteller);
       expect(previewEstimateInputTokens(PREVIEW_STORY_REQUEST_BYTES[tier].storyChecker)).toBe(STORY_IN[tier].storyChecker);
-      expect(pricer(glm, "STORYTELLER")).toBe(STORY_IN[tier].storyteller * 150n + 12_000n * 500n);
-      expect(pricer(glm, "STORYTELLER_RETRY")).toBe(STORY_IN[tier].storyteller * 150n + 24_000n * 500n);
+      expect(pricer(glm, "STORYTELLER")).toBe(STORY_IN[tier].storyteller * 150n + 16_384n * 500n);
+      expect(pricer(glm, "STORYTELLER_RETRY")).toBe(STORY_IN[tier].storyteller * 150n + 32_768n * 500n);
       expect(pricer(glm, "STORY_CHECKER")).toBe(STORY_IN[tier].storyChecker * 150n + 8192n * 500n);
+      expect(pricer(glm, "STORY_CHECKER_RETRY")).toBe(STORY_IN[tier].storyChecker * 150n + 16_384n * 500n);
       expect([pricer(glm, "DEBATE"), pricer(glm, "PROBE")]).toEqual([REAL.GLM, REAL.PROBE_GLM]);
     }
     // An unknown size (and the default) is the largest.
     expect(PREVIEW_STORY_TIER_FALLBACK).toBe("high");
     expect(realisticWorstCasePricer(OUTPUT)(glm, "STORY_CHECKER")).toBe(REAL.STORY_CHECKER_GLM);
-    // The same debate by story size: low 487,646,092; medium 508,253,632; high 529,097,497 (x 1.15, rounded up).
+    // The same debate by story size: low 544,811,442; medium 572,366,592; high 600,158,412 (x 1.15, rounded up).
     const needAt = (tier: "low" | "medium" | "high") =>
       estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES, pricer: realisticWorstCasePricer(OUTPUT, tier) })[0]!.callsNanoUsd;
-    expect([needAt("low"), needAt("medium"), needAt("high")]).toEqual([496_595_852n, 517_203_392n, CALLS_NANO]);
+    expect([needAt("low"), needAt("medium"), needAt("high")]).toEqual([544_811_442n, 572_366_592n, CALLS_NANO]);
   });
 
   it("the app's own measured average replaces the default once it has 20 calls of that kind by that model, at today's prices", () => {
@@ -334,8 +346,8 @@ describe("the start-of-debate estimate is a realistic worst case, per gate (pure
     // Per kind and per model: DeepSeek's story calls and GLM's debate calls keep the default.
     expect(previewCallAverage(DEEPSEEK, "STORYTELLER", measured).measured).toBe(false);
     expect(previewCallAverage(GLM, "DEBATE", measured).measured).toBe(false);
-    // The story bucket calibrates the storyteller, its repair and the story check; health checks never.
-    for (const type of ["STORYTELLER", "STORYTELLER_RETRY", "STORY_CHECKER"] as const) {
+    // The story bucket calibrates the storyteller, the story check and each one's repair; health checks never.
+    for (const type of ["STORYTELLER", "STORYTELLER_RETRY", "STORY_CHECKER", "STORY_CHECKER_RETRY"] as const) {
       expect(previewCallAverage(GLM, type, measured)).toEqual({ inputTokens: 6_000n, outputTokens: 2_001n, measured: true });
     }
     expect(previewCallAverage(GLM, "PROBE", [...measured, sample(GLM, "DEBATE", 50, 9, 9)]).measured).toBe(false);
@@ -385,7 +397,8 @@ describe("the start-of-debate estimate is a realistic worst case, per gate (pure
     expect(PREVIEW_STRICT_INPUT_TOKENS_PER_CALL).toBe(262_144n + 2048n);
     expect(PREVIEW_STRICT_PROBE_INPUT_TOKENS).toBe(1024n + 2048n);
     expect(strict(deepseek, "DEBATE")).toBe(264_192n * 200n + 8192n * 600n);
-    expect(strict(deepseek, "STORYTELLER_RETRY")).toBe(264_192n * 200n + 24_000n * 600n);
+    expect(strict(deepseek, "STORYTELLER_RETRY")).toBe(264_192n * 200n + 32_768n * 600n);
+    expect(strict(deepseek, "STORY_CHECKER_RETRY")).toBe(264_192n * 200n + 16_384n * 600n);
     expect(strict(deepseek, "PROBE")).toBe(3072n * 200n + 8192n * 600n);
     expect(strictUpperBoundPricer(OUTPUT)(deepseek, "STORY_CHECKER")).toBe(strict(deepseek, "DEBATE"));
     // Per call: the calibrated average < the realistic worst case < the strict bound.
@@ -398,29 +411,29 @@ describe("the start-of-debate estimate is a realistic worst case, per gate (pure
 
   it("an unfinished debate holds its whole estimate but its ask's probes; an older model off the rows is priced at the dearest row", () => {
     const [hold] = estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL }, ROLES);
-    // Without this ask's five health checks (2 x GLM, DeepSeek, MiMo, Qwen: 26,567,680): 655,622,400 x 1.15.
+    // Without this ask's five health checks (2 x GLM, DeepSeek, MiMo, Qwen: 26,567,680): 495,309,200 x 1.15.
     const askChecks = 2n * REAL.PROBE_GLM + REAL.PROBE_DEEPSEEK + REAL.PROBE_MIMO + REAL.PROBE_QWEN;
     expect(askChecks).toBe(26_567_680n);
     expect(hold).toEqual({ gate: "deepinfra", modelIds: [GLM, DEEPSEEK], expectedCalls: EXPECTED_CALLS - 5, callsWithMargin: 96,
-      callsNanoUsd: 507_494_425n });
-    expect(margin(CALLS_BASE - askChecks)).toBe(507_494_425n);
+      callsNanoUsd: 569_605_580n });
+    expect(margin(CALLS_BASE - askChecks)).toBe(569_605_580n);
     const old = estimateUnfinishedRunHolds({ basis: basis(2), panel: [{ provider_ref: "preview:other", model_id: "old/model" }] }, ROLES);
     const asMimo = estimateUnfinishedRunHolds({ basis: basis(2), panel: [{ provider_ref: "preview:other", model_id: MIMO }] }, ROLES);
     expect(old[0]!.callsNanoUsd).toBe(asMimo[0]!.callsNanoUsd);
     // The same pricing as the new debate: a measured average applies to the held debate too.
     const measuredPricer = calibratedEstimatePricer([sample(DEEPSEEK, "DEBATE", 20, 10_000, 3_000)]);
     expect(estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL }, ROLES, measuredPricer, "BASIS_CEILING")[0]!.callsNanoUsd)
-      .toBe((191_280_000n + 64n * (3_800_000n - 1_520_000n)) * 115n / 100n);
+      .toBe((193_680_000n + 64n * (3_800_000n - 1_520_000n)) * 115n / 100n);
   });
 
-  it("a debate only writing its story holds the story's calls: 3 per round plus the checker's retry", () => {
+  it("a debate only writing its story holds the story's calls: 4 per round, the storyteller's and the checker's repair included", () => {
     const [story] = estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL, phase: "STORY" }, ROLES);
-    // 2 rounds x (storyteller 17,008,050, its repair 23,008,050, the check 16,332,850) on GLM at the largest
-    // story size (the run row carries none here) = 112,697,900; x 1.15, rounded up.
-    expect(story).toMatchObject({ gate: "deepinfra", expectedCalls: 8, callsWithMargin: 10, callsNanoUsd: 129_602_585n });
+    // 2 rounds x (storyteller 19,200,050 at GLM's 16,384 story allowance, its repair 27,392,050, the check 16,332,850,
+    // its repair 20,428,850) on GLM at the largest story size (the run row carries none here) = 166,707,600; x 1.15, rounded up.
+    expect(story).toMatchObject({ gate: "deepinfra", expectedCalls: 8, callsWithMargin: 10, callsNanoUsd: 191_713_740n });
     // A run whose ask chose the low story size is held at that size.
     expect(estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL, phase: "STORY" }, ROLES, realisticWorstCasePricer(OUTPUT, "low"))[0])
-      .toMatchObject({ callsNanoUsd: 88_151_180n });
+      .toMatchObject({ callsNanoUsd: 136_366_770n });
     expect(estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL, phase: "STORY" }, { ...ROLES, storyRounds: 0 })[0])
       .toMatchObject({ expectedCalls: 0, callsNanoUsd: 0n });
   });
@@ -431,14 +444,15 @@ describe("the start-of-debate estimate is a realistic worst case, per gate (pure
     const input = { ...ROLES, basis: basis(1), panel: [{ provider_ref: "preview:qwen-3-8-flash", model_id: QWEN }],
       roleModels: qwenRoles, roleProviderRefs: ["preview:qwen-3-8-flash"], askProbeModelIds: [QWEN] };
     // A one-model panel is never reviewed (the runner reviews only across makers), so of the fixture's 30
-    // sites its 8 reviews drop: 22 debate calls x 5,675,008 + 6 health checks x 3,476,480 + 2 story rounds at
-    // the largest story size = 231,079,522; x 1.15, rounded up. Calls: 22 + 5 + 1 + 6 + 24 unbilled retries = 58.
+    // sites its 8 reviews drop: 22 debate calls x 5,675,008 + 6 health checks x 3,476,480 + 2 story rounds (4 calls each) at
+    // the largest story size (its storyteller at Qwen's 16,384 story allowance) = 272,081,880; x 1.15, rounded up.
+    // Calls: 22 + 8 + 6 + 22 unbilled retries = 58.
     expect(estimatePreviewGateNeeds(input)).toEqual([{ gate: "deepinfra", modelIds: [QWEN], expectedCalls: 58, callsWithMargin: 67,
-      callsNanoUsd: 265_741_451n }]);
+      callsNanoUsd: 312_894_162n }]);
     // At the calibrated average (the basis's ceiling of 120, its 32 reviews dropped; 4,000 in / 1,200 out):
-    // 88 + 5 + 1 + 6 = 100 billed calls x 910,400 = 91,040,000; x 1.15. Calls: 100 + 90 unbilled retries = 190.
+    // 88 + 8 + 6 = 102 billed calls x 910,400 = 92,860,800; x 1.15. Calls: 102 + 88 unbilled retries = 190.
     expect(estimatePreviewGateNeeds({ ...input, ...CALIBRATED })).toEqual([{ gate: "deepinfra", modelIds: [QWEN], expectedCalls: 190,
-      callsWithMargin: 219, callsNanoUsd: 104_696_000n }]);
+      callsWithMargin: 219, callsNanoUsd: 106_789_920n }]);
     // On the four-maker Premium panel it is one more model on the same gate.
     const premium = [...PANEL, { provider_ref: "preview:mimo-v2-6-pro", model_id: MIMO }, { provider_ref: "preview:qwen-3-8-flash", model_id: QWEN }];
     expect(estimatePreviewGateNeeds({ basis: basis(4), panel: premium, ...ROLES })).toEqual([
@@ -469,8 +483,8 @@ describe("evaluateAskAdmission on the preview asks the gate before any run exist
 
   it("debates still running hold their estimate: a pot that fits one debate refuses the second", async () => {
     const counters = { probes: 0, remaining: 0 };
-    // A running debate holds its estimate without its own ask's health checks: 507,494,425 and 96 calls.
-    const pot = remainingWith({ remainingNanoUsd: ESTIMATE + 507_494_425n - 1n });
+    // A running debate holds its estimate without its own ask's health checks: 588,447,180 and 96 calls.
+    const pot = remainingWith({ remainingNanoUsd: ESTIMATE + 569_605_580n - 1n });
     const running = [{ basis: basis(2), panel: PANEL }];
     await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => pot) }), ASK)).resolves.toBeDefined();
     await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => pot, running) }), ASK))
@@ -731,11 +745,11 @@ describe("one ask at a time is estimated and started on the preview (review find
     expect(unlocked).toEqual(["admitted", "admitted"]);
   });
 
-  it("the output ceilings: the preview floor, the storyteller's retry at twice its ceiling, no story means none", () => {
+  it("the output ceilings: the preview floor, the storyteller at its row's cap (2026-10-12) and its retry at twice that, no story means none", () => {
     const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
       budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture", free_model_ids: [GLM] }))!;
     expect(previewCallOutputTokens(config, { debate: [2048, 16_000], story: { storyteller: 12_000, checker: 2048 } }))
-      .toEqual({ debate: 16_000, storyteller: 12_000, storytellerRetry: 24_000, storyChecker: 8192 });
+      .toEqual({ debate: 16_000, storyteller: 32_768, storytellerRetry: 65_536, storyChecker: 8192 });
     expect(previewCallOutputTokens(config, { debate: [2048], story: null })).toEqual({ debate: 8192, storyteller: 0, storytellerRetry: 0, storyChecker: 0 });
     const invalid = "PREVIEW_CALL_CEILINGS_INVALID";
     expect(() => previewCallOutputTokens(config, { debate: [], story: null })).toThrow(invalid);
@@ -1005,11 +1019,15 @@ describe("what one debate is estimated at with today's register (realistic worst
   /** The DeepInfra gate's /remaining figures under the owner's GO: 10 at once x MiMo's worst case (the largest of the four). */
   const HOLD = 10n * MIMO_LARGEST;
   /**
-   * The Anthropic gate's (PR #126): 2 at once x Claude Haiku's worst case at its upper price step ($0.50 / $2.50):
-   * (262,144 + 2,048) x 500 + 32,768 x 2,500 nano-USD each.
+   * The Anthropic gate's (PR #126): 2 at once x Claude Haiku's worst case at its upper price step. Prompt caching
+   * (2026-10-12): a full-size CACHED call, its input at the 5-minute write price ($0.625 / $2.50):
+   * (262,144 + 2,048) x 625 + 32,768 x 2,500 nano-USD each (it was 500 for input before).
    */
-  const ANTHROPIC_HOLD = 2n * (264_192n * 500n + 32_768n * 2500n);
-  /** Claude Haiku in the estimate: the lower price step ($0.10 / $0.50), the same realistic sizes as every row. */
+  const ANTHROPIC_HOLD = 2n * (264_192n * 625n + 32_768n * 2500n);
+  /**
+   * Claude Haiku in the estimate: the lower price step ($0.10 / $0.50), the same realistic sizes as every row. Prompt
+   * caching (2026-10-12) leaves it there: only the cached system prefix pays the write premium, and reads cost a tenth.
+   */
   const haikuCall = (type: string): bigint => type === "PROBE" ? 3072n * 100n + 8192n * 500n : IN * 100n + 8192n * 500n;
   /**
    * One debate's need of each gate at the largest story size: calls x 1.15 + calls in flight (10 DeepInfra, 2 Anthropic),
@@ -1035,8 +1053,9 @@ describe("what one debate is estimated at with today's register (realistic worst
     return { deepinfra: figure(sums.deepinfra, 10, HOLD), ...(hasHaiku ? { anthropic: figure(sums.anthropic, 2, ANTHROPIC_HOLD) } : {}) };
   };
   it("no call the app makes asks for more than the 32,768-token answer cap (owner ruling, 2026-10-10)", () => {
-    expect(sent).toEqual({ debate: 8192, storyteller: 12_000, storytellerRetry: 24_000, storyChecker: 8192 });
-    for (const tokens of Object.values(sent)) expect(tokens).toBeLessThanOrEqual(32_768);
+    expect(sent).toEqual({ debate: 8192, storyteller: 32_768, storytellerRetry: 65_536, storyChecker: 8192 });
+    // The storyteller's retry (twice its 32,768) is held to the cap by the row's clamp below, as the gateway holds it.
+    for (const tokens of [sent.debate, sent.storyteller, sent.storyChecker]) expect(tokens).toBeLessThanOrEqual(32_768);
     // Even a register ceiling above the cap is clamped by each row's bound before it is priced (and the
     // gateway clamps what is sent, preview-multi-model.test.ts).
     for (const row of [GLM, DEEPSEEK, MIMO, QWEN].map((model) => previewModelRow(model)!)) {
@@ -1050,7 +1069,7 @@ describe("what one debate is estimated at with today's register (realistic worst
     const [free] = estimatePreviewGateNeeds({ basis: basisFor(2, 2), panel: FREE, roleModels, roleProviderRefs, storyRounds: 2,
       callOutputTokens: sent, askProbeModelIds: ASK_PROBE_MODELS, maxCooldownHoldsPerRun: 2 });
     expect(free!.callsNanoUsd + HOLD).toBe(gateFigures(FREE, 2).deepinfra.nanoUsd);
-    expect([HOLD, ANTHROPIC_HOLD]).toEqual([1_421_107_200n, 428_032_000n]);
+    expect([HOLD, ANTHROPIC_HOLD]).toEqual([1_421_107_200n, 494_080_000n]);
     // Premium, depth 1: 24 nodes, each reviewed once; every review is priced on MiMo, the dearest of the four.
     const premiumCalls = callsBy(previewCallShares({ basis: basisFor(4, 1), panel: PREMIUM, roleModels, roleProviderRefs, storyRounds: 2,
       maxCooldownHoldsPerRun: 2, askProbeModelIds: ASK_PROBE_MODELS }));
@@ -1063,10 +1082,18 @@ describe("what one debate is estimated at with today's register (realistic worst
     });
     // Checked against an independent computation of the same rule. Rows: depth 1, 2, 3; columns: free, premium,
     // all five (DeepInfra's share), all five (Anthropic's share); each [dollars, calls].
+    // Story format robustness (2026-10-12): the storyteller at its row's cap and the checker's priced repair add
+    // $0.08 to each DeepInfra column (the story roles are GLM's here); the calls do not change.
+    // Before: [1.97, 3.34, 4.05, 0.92], [2.21, 4.38, 5.35, 1.18], [2.69, 6.45, 7.93, 1.71].
+    // Prompt caching (2026-10-12): the Anthropic gate's in-flight hold is 2 x $0.24704 (a cached full-size call) instead
+    // of 2 x $0.214016, so its column rises by $0.066048 (0.92 / 1.18 / 1.71 before); its calls and DeepInfra's do not move.
+    // Slow answer (owner ruling 2026-10-12): GLM's storyteller asks 16,384, not 32,768: 2 rounds x 16,384 x $0.50/M x 1.15
+    // = $0.0188416 less on each DeepInfra column; calls and the Anthropic column do not move.
+    // Before: [2.05, 3.42, 4.14], [2.29, 4.46, 5.43], [2.77, 6.53, 8.01].
     expect(table).toEqual([
-      [[1.97, 112], [3.34, 344], [4.05, 470], [0.92, 154]],
-      [[2.21, 167], [4.38, 528], [5.35, 700], [1.18, 237]],
-      [[2.69, 277], [6.45, 896], [7.93, 1160], [1.71, 403]]
+      [[2.03, 112], [3.41, 344], [4.12, 470], [0.98, 154]],
+      [[2.27, 167], [4.44, 528], [5.41, 700], [1.25, 237]],
+      [[2.75, 277], [6.51, 896], [7.99, 1160], [1.77, 403]]
     ]);
     // PR B: the real estimate gives each gate exactly its share (the Anthropic gate's hold from its own /remaining).
     for (const depth of [1, 2, 3]) {
@@ -1106,7 +1133,7 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
     premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN] }))!;
   const sent = previewCallOutputTokens(config, { debate: [2048, 2048, 2048, 2048, 2048], story: { storyteller: 12_000, checker: 2048 } });
   const HOLD = 10n * MIMO_LARGEST;
-  const ANTHROPIC_HOLD = 2n * (264_192n * 500n + 32_768n * 2500n);
+  const ANTHROPIC_HOLD = 2n * (264_192n * 625n + 32_768n * 2500n); // A cached full-size call each (2026-10-12).
   const needs = (panel: readonly { provider_ref: string; model_id: string }[], depth: number, rotated: boolean) =>
     estimatePreviewGateNeeds({ basis: basisFor(panel.length, depth), panel, roleModels, roleProviderRefs, storyRounds: 2, callOutputTokens: sent,
       askProbeModelIds: [...ASK_PROBE_MODELS, ...(panel.some((entry) => entry.model_id === HAIKU) ? [HAIKU] : [])], maxCooldownHoldsPerRun: 2, rotated });
@@ -1156,11 +1183,20 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
       });
     });
     // Rows: depth 1, 2, 3; columns: free, premium, all five (DeepInfra), all five (Anthropic); each [dollars, calls].
-    // Computed 2026-10-11 by the spec's scratch run of the same rule (spec Part 5).
+    // Computed 2026-10-11 by the spec's scratch run of the same rule (spec Part 5); re-pinned 2026-10-12 (story format
+    // robustness: the storyteller at its row's cap, the checker's repair priced). Calls unchanged; before:
+    // [1.98, 3.56, 4.27, 1.07], [2.22, 4.59, 5.56, 1.33], [2.71, 6.66, 8.15, 1.85].
+    // Prompt caching (2026-10-12): the Anthropic gate's hold is 2 x $0.24704 now (+$0.066048 on its column: 1.14 / 1.4 /
+    // 1.93 before). Depth 3 still fits its $2.00 by under a cent, which is why the estimate keeps Haiku's input at its
+    // plain price: priced at the 5-minute write price as well, all five rotated at depth 3 would need $2.12.
+    // Slow answer (owner ruling 2026-10-12): the rotated storyteller on premium and all five is MiMo, which now asks
+    // 16,384: 2 rounds x 16,384 x $0.87/M x 1.15 = $0.0327844 less on those DeepInfra columns. Free's dearest storyteller
+    // is DeepSeek (still 32,768) and Anthropic's is Haiku (still 32,768): unchanged. Before: premium 3.73 / 4.77 / 6.83,
+    // all five 4.44 / 5.74 / 8.32.
     expect(table).toEqual([
-      [[1.98, 106], [3.56, 338], [4.27, 465], [1.07, 177]],
-      [[2.22, 161], [4.59, 522], [5.56, 695], [1.33, 260]],
-      [[2.71, 272], [6.66, 890], [8.15, 1155], [1.85, 426]]
+      [[2.08, 106], [3.7, 338], [4.41, 465], [1.2, 177]],
+      [[2.33, 161], [4.73, 522], [5.7, 695], [1.47, 260]],
+      [[2.81, 272], [6.8, 890], [8.29, 1155], [1.99, 426]]
     ]);
     for (const [free, premium, fiveDeepinfra, fiveAnthropic] of table) {
       for (const [dollars, calls] of [free!, premium!, fiveDeepinfra!]) { expect(dollars).toBeLessThanOrEqual(10); expect(calls).toBeLessThanOrEqual(2000); }

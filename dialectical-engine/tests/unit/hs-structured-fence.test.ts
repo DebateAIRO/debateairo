@@ -77,7 +77,8 @@ function refusalCodeOf(read: () => unknown): string | null {
 describe("FIX-HS1-eval-fence — the evaluator reads a fenced verdict the way the judge path does", () => {
   it("accepts the live shape: one ```json fence around a schema-valid verdict", () => {
     const reply = fenced(JSON.stringify(VERDICT, null, 2));
-    expect(classifyEvaluatorContent(reply)).toEqual({ parseStatus: "PARSED", parseError: null });
+    // All-steps format robustness (2026-10-12): the classification names the repair the reading needed.
+    expect(classifyEvaluatorContent(reply)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "CODE_FENCE" });
     expect(parseEvaluatorOutput(reply)).toEqual(VERDICT);
   });
 
@@ -87,14 +88,14 @@ describe("FIX-HS1-eval-fence — the evaluator reads a fenced verdict the way th
       fenced(JSON.stringify(VERDICT), "JSON"),
       `\n  ${fenced(JSON.stringify(VERDICT))}  \n`
     ]) {
-      expect(classifyEvaluatorContent(reply), reply).toEqual({ parseStatus: "PARSED", parseError: null });
+      expect(classifyEvaluatorContent(reply), reply).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "CODE_FENCE" });
       expect(parseEvaluatorOutput(reply), reply).toEqual(VERDICT);
     }
   });
 
   it("accepts a verdict with prose around it, as the judge path's balanced-object reading does", () => {
     const reply = `Here is my verdict:\n${JSON.stringify(VERDICT)}\nThat is all.`;
-    expect(classifyEvaluatorContent(reply)).toEqual({ parseStatus: "PARSED", parseError: null });
+    expect(classifyEvaluatorContent(reply)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "OUTERMOST_OBJECT" });
     expect(parseEvaluatorOutput(reply)).toEqual(VERDICT);
   });
 
@@ -124,7 +125,7 @@ describe("FIX-HS1-eval-fence — the composer reads a fenced draft the way the j
 
   it("classifies a fenced clean draft PARSED (the classifier's own re-read of the draft included)", () => {
     expect(classifyComposedContent(fenced(composition("The answer holds.")), citation))
-      .toEqual({ parseStatus: "PARSED", parseError: null });
+      .toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "CODE_FENCE" });
   });
 
   it("still runs the citation check on a fenced draft: a node id in the prose is re-asked, not thrown", () => {
@@ -206,7 +207,9 @@ describe("FIX-HS1-eval-fence-r1 — a reply holding two or more objects is refus
       fenced(JSON.stringify({ ...FAIL_VERDICT, objection: "Braces {like these} and a quote \" stay inside the string." })),
       `Verdict: ${JSON.stringify({ ...FAIL_VERDICT, objection: "A lone } closes nothing and a lone { opens nothing." })}`
     ]) {
-      expect(classifyEvaluatorContent(reply), reply).toEqual({ parseStatus: "PARSED", parseError: null });
+      // All-steps format robustness (2026-10-12): PARSED, naming the repair (none for the raw one).
+      expect(classifyEvaluatorContent(reply), reply).toMatchObject({ parseStatus: "PARSED", parseError: null });
+      expect("jsonRepair" in classifyEvaluatorContent(reply), reply).toBe(reply !== PASS);
       expect(parseEvaluatorOutput(reply).satisfied, reply).toBe(reply === PASS);
     }
     expect(parseComposerOutput(`Draft:\n${DRAFT_TWO}\nEnd.`).segments[0]?.text).toBe("Second draft differs.");

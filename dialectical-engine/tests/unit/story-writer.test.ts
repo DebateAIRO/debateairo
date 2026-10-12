@@ -949,3 +949,45 @@ describe("StoryWriter — the storyteller's repair count (role rotation)", () =>
     expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_WRITE_REJECTED", rounds: 0, storytellerRepairs: null });
   });
 });
+
+/**
+ * Story format robustness (2026-10-12): a reply the tolerant decode had to repair is accepted as it arrived and
+ * the repair is counted in the log, by its code only, so the owners can see how often each one is needed.
+ */
+describe("StoryWriter — a repaired reply is logged by its repair code", () => {
+  function finishingNormally(answer: (request: ProviderCallRequest) => string): ProviderGateway {
+    let calls = 0;
+    return {
+      async call(request) {
+        calls += 1;
+        const content = answer(request);
+        const classified = request.classifyContent?.(content, { finishReason: "stop" });
+        if (classified !== undefined && classified.parseStatus !== "PARSED") {
+          throw new ProviderContentUnacceptedError(1, classified.parseStatus, classified.parseError, "artifact:rejected", "ledger:rejected");
+        }
+        return { rawArtifactRef: `artifact:${String(calls)}`, ledgerEntryRef: `ledger:${String(calls)}`, content,
+          provider: "openai-compatible-http", model: "unit/model", maker: "unit-maker", modelVersion: "unit/model" };
+      }
+    };
+  }
+
+  it("logs the storyteller's closing brace and the checker's prose, and stores the story", async () => {
+    const provider = finishingNormally((request) => (isStoryteller(request)
+      ? story().slice(0, -1)
+      : `I checked the story against the material. ${CHECKER_SATISFIED}`));
+    const { writer, inserted, details } = harness(providing(provider));
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", rounds: 1 });
+    expect(details.filter((detail) => detail.event === "STORY_REPLY_REPAIRED")).toEqual([
+      { event: "STORY_REPLY_REPAIRED", answerId: SNAPSHOT.answerId, answerVersion: 1, round: 1, site: "STORYTELLER", repair: "CLOSING_BRACKETS" },
+      { event: "STORY_REPLY_REPAIRED", answerId: SNAPSHOT.answerId, answerVersion: 1, round: 1, site: "CHECKER", repair: "OUTERMOST_OBJECT" }
+    ]);
+  });
+
+  it("logs nothing for strict replies", async () => {
+    const { writer, inserted, events } = harness(providing(finishingNormally(byContract)));
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]).toMatchObject({ outcome: "READY" });
+    expect(events).not.toContain("STORY_REPLY_REPAIRED");
+  });
+});

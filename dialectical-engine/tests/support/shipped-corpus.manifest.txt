@@ -138,6 +138,7 @@ apps/api/src/recovery.ts
 apps/api/src/registration.ts
 apps/api/src/retention-purge.ts
 apps/api/src/risk-signal-identity.ts
+apps/api/src/run-event-tail.ts
 apps/api/src/sessions.ts
 apps/api/src/social-auth.ts
 apps/api/src/social-providers/hashes.ts
@@ -339,6 +340,7 @@ apps/runner/src/rotate-kek-cli.ts
 apps/runner/src/rotate-kek.ts
 apps/runner/src/run-keep-alive.ts
 apps/runner/src/run-seats.ts
+apps/runner/src/run-sit-out.ts
 apps/runner/src/runner-preview-team-gate.ts
 apps/runner/src/runner-ready.ts
 apps/runner/src/runner-startup-reconciliation.ts
@@ -964,6 +966,8 @@ packages/propagation/src/index.ts
 packages/providers/src/anthropic-messages.ts
 packages/providers/src/content-rule.ts
 packages/providers/src/index.ts
+packages/providers/src/model-json.ts
+packages/providers/src/patch-follow-up.ts
 packages/providers/src/preview-models.ts
 packages/providers/src/preview-remaining.ts
 packages/providers/src/preview-test.ts

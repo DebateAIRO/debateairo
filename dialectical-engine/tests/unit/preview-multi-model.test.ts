@@ -25,6 +25,15 @@ const QWEN = "Qwen/Qwen3.8-Flash";
 const SHARED_WINDOW = { context_window_tokens: 1_048_576 };
 /** A request body with no effort switch and no JSON switch. */
 const BARE_BODY = ["max" + "_tokens", "messages", "model"];
+/** Qwen's reviewed sampling (2026-10-12): Qwen's own thinking-mode settings, so its JSON does not slide into noise. */
+const QWEN_SAMPLING = { temperature: 0.6, top_p: 0.95, top_k: 20 };
+/**
+ * MiMo's reviewed sampling (owner approval 2026-10-12): DeepInfra's MiMo page recommends temperature 1.0 and top_p 0.95.
+ * JSON mode was tried the same day and withdrawn: when MiMo closed a Romanian quote („…) with a straight double quote,
+ * DeepInfra's JSON constraint ended the string there and forced the rest into garbage, which the engine's reader
+ * (INNER_QUOTE) repairs without any call when JSON mode is off. MiMo's row allows no JSON mode.
+ */
+const MIMO_SAMPLING = { temperature: 1.0, top_p: 0.95 };
 const DEFAULT_LEVEL = "DEFAULT_ONLY";
 const URL_COMPLETIONS = "https://api.deepinfra.com/v1/openai/chat/completions";
 const BASE = { deployment: "v3-preview", requested_thinking_level: "high",
@@ -35,7 +44,7 @@ const parse = (value: unknown) => parsePreviewProviderTestConfig(JSON.stringify(
 const messages = [{ role: "user", content: "synthetic" }];
 
 type FixtureRow = { model: string; maker: string; input_usd_per_m: string; output_usd_per_m: string; output_bound: number;
-  effort: "high" | null; json_object: boolean; worst_case_reservation_usd: string;
+  effort: "high" | null; json_object: boolean; sampling: Record<string, number> | null; worst_case_reservation_usd: string;
   input_nano_usd_per_token: number; output_nano_usd_per_token: number };
 /** The gate's parity file (schema preview-model-rows-v1): the Python gate asserts the same rows. */
 const fixtureFile = JSON.parse(readFileSync(new URL("./fixtures/preview-model-rows.json", import.meta.url), "utf8")) as {
@@ -61,7 +70,8 @@ function recordingFetch() {
 describe("the reviewed rows equal the shared parity file (contract A §1, §3)", () => {
   it("has exactly the four rows, in order, field for field", () => {
     expect(PREVIEW_MODEL_ROWS.map(row => ({ model: row.model, maker: row.maker, input_usd_per_m: row.inputUsdPerM,
-      output_usd_per_m: row.outputUsdPerM, output_bound: row.outputBound, effort: row.effort, json_object: row.jsonObject })))
+      output_usd_per_m: row.outputUsdPerM, output_bound: row.outputBound, effort: row.effort, json_object: row.jsonObject,
+      sampling: row.sampling ?? null })))
       .toEqual(fixtureRows.map(({ worst_case_reservation_usd: _worst, input_nano_usd_per_token: _in, output_nano_usd_per_token: _out, ...row }) => row));
     expect(fixtureFile.schema).toBe("preview-model-rows-v1");
     expect(fixtureFile.provider).toBe("deepinfra");
@@ -186,6 +196,8 @@ describe("the guarded fetch sends only what the gate accepts for the body's row 
       { model: MIMO, reasoning_effort: "high", max_tokens: 8, messages },
       { model: DEEPSEEK, reasoning_effort: "high", max_tokens: 8, messages, response_format: { type: "json_object" } },
       { model: MIMO, max_tokens: 8, messages, response_format: { type: "json_object" } },
+      { model: MIMO, max_tokens: 8, ...MIMO_SAMPLING, messages, response_format: { type: "json_schema" } },
+      { model: MIMO, max_tokens: 8, ...MIMO_SAMPLING, messages, response_format: { type: "json_object" } },
       { model: DEEPSEEK, max_tokens: 8, messages },
       { model: DEEPSEEK, reasoning_effort: "medium", max_tokens: 8, messages },
       { model: MIMO, max_tokens: 0, messages },
@@ -200,7 +212,7 @@ describe("the guarded fetch sends only what the gate accepts for the body's row 
     const bodies = [
       { model: GLM, reasoning_effort: "high", max_tokens: 32_768, messages, response_format: { type: "json_object" } },
       { model: DEEPSEEK, reasoning_effort: "high", max_tokens: 32_768, messages },
-      { model: MIMO, max_tokens: 32_768, messages }
+      { model: MIMO, max_tokens: 32_768, ...MIMO_SAMPLING, messages }
     ];
     for (const body of bodies) await post(body);
     expect(executions).toHaveLength(3);
@@ -249,7 +261,7 @@ describe("each target's gateway sends a request its row accepts", () => {
   it("never sends a thinking level to MiMo, and refuses a request that asks for one before sending", async () => {
     const { executions, gateway } = previewGateway(MIMO);
     await gateway.call(RESULT_REQUEST);
-    expect(Object.keys(JSON.parse(executions[0]!.requestBody)).sort()).toEqual(["max_tokens", "messages", "model"]);
+    expect(Object.keys(JSON.parse(executions[0]!.requestBody)).sort()).toEqual(["max_tokens", "messages", "model", "temperature", "top_p"]);
     await expect((async () => gateway.call({ ...RESULT_REQUEST, thinkingLevel: "high" }))()).rejects.toMatchObject({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" });
     expect(executions).toHaveLength(1);
   });
@@ -362,10 +374,11 @@ describe("role rotation, Task 11/12: a sealed answer role may stand in for an un
 });
 
 describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 32768, its own window", () => {
-  const body = (change: Record<string, unknown> = {}) => ({ model: QWEN, max_tokens: 32_768, messages, ...change });
+  const body = (change: Record<string, unknown> = {}) => ({ model: QWEN, max_tokens: 32_768, ...QWEN_SAMPLING, messages, ...change });
   it("its reviewed row, ref and target row", () => {
     expect(previewModelRow(QWEN)).toMatchObject({ maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
-      inputNanoUsdPerToken: 113n, outputNanoUsdPerToken: 382n, outputBound: 32_768, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 });
+      inputNanoUsdPerToken: 113n, outputNanoUsdPerToken: 382n, outputBound: 32_768, effort: null, jsonObject: false, contextWindowTokens: 1_000_000,
+      sampling: QWEN_SAMPLING });
     expect(PREVIEW_REVIEWED_PROVIDER_REFS).toEqual(["preview:fixture-a", "preview:fixture-b", "preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro", "preview:qwen-3-8-flash",
       "preview:claude-haiku-5-5"]); // PR B: Anthropic's ref after DeepInfra's.
     expect(previewTargetJsonRow("preview:qwen-3-8-flash")).toEqual({ provider_ref: "preview:qwen-3-8-flash",
@@ -397,7 +410,7 @@ describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 32768
     await expect(post(over)).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
     expect(executions).toHaveLength(1);
   });
-  it("the gateway clamps every attempt's answer size to 32768, length retries included, and never sends a level or JSON", async () => {
+  it("the gateway clamps every attempt's answer size to 32768, length retries included, and never sends a level or JSON (only its sampling)", async () => {
     const target = targets(PREVIEW_REVIEWED_PROVIDER_REFS)[4]!;
     const executions: PreviewBudgetExecution[] = [];
     const replies = ["length", "length", "stop"];
@@ -420,13 +433,16 @@ describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 32768
       bound: { maxAttempts: 3, tokenCeiling: 24_000, deadlineMs: 5_000 }, classifyContent: classifyContent as never });
     const sent = executions.map(execution => JSON.parse(execution.requestBody));
     expect(sent.map(request => request.max_tokens)).toEqual([24_000, 32_768, 32_768]);
-    for (const request of sent) expect(Object.keys(request).sort()).toEqual(BARE_BODY);
+    for (const request of sent) {
+      expect(Object.keys(request).sort()).toEqual([...BARE_BODY, ...Object.keys(QWEN_SAMPLING)].sort());
+      expect(request).toMatchObject(QWEN_SAMPLING);
+    }
   });
   it("the preview policy never sends a level to Qwen and takes DEFAULT_ONLY as none", async () => {
     const { executions, gateway } = previewGateway(QWEN);
     const bound = { maxAttempts: 1, tokenCeiling: 200_000, deadlineMs: 5_000 };
     await gateway.call({ ...RESULT_REQUEST, thinkingLevel: DEFAULT_LEVEL, bound });
-    expect(JSON.parse(executions[0]!.requestBody)).toEqual({ model: QWEN, max_tokens: 32_768, messages: expect.any(Array) });
+    expect(JSON.parse(executions[0]!.requestBody)).toEqual({ model: QWEN, max_tokens: 32_768, ...QWEN_SAMPLING, messages: expect.any(Array) });
     await expect((async () => gateway.call({ ...RESULT_REQUEST, thinkingLevel: "high" }))()).rejects.toMatchObject({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" });
     expect(executions).toHaveLength(1);
     expect(previewProbeControls({ model: QWEN })).toEqual({ tokenCeiling: 8192 });
@@ -438,5 +454,186 @@ describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 32768
     for (const change of [{ maker: "Qwen" }, { context_window_tokens: 1_048_576 }, { input_price_micros_per_million: 14_000 },
       { thinking_parameter: "reasoning_effort", thinking_levels: ["high"] }, { model: "Qwen/Qwen3.8" }])
       expect(() => gateHostedRoster(broker(change))).toThrow();
+  });
+});
+
+/**
+ * Reviewed sampling (2026-10-12). A live practice run saw Qwen3.8-Flash, at DeepInfra's defaults (temperature 1,
+ * top_p 1, top_k off), slide mid-answer into random multilingual tokens, so its JSON could not be read. A reviewed
+ * row may now carry its own sampling settings; Qwen's are its makers' thinking-mode ones. The body carries exactly
+ * those keys with exactly those values, and every other row's body stays byte for byte what it was.
+ */
+const samplingBodies = JSON.parse(readFileSync(new URL("./fixtures/deepinfra-sampling-bodies.json", import.meta.url), "utf8")) as {
+  schema: string; sent: { name: string; body: string; reservedUsd: string }[]; refused: { name: string; body: string }[] };
+describe("reviewed sampling: a row's own sampling settings, exactly, and none on any other row", () => {
+  it("only MiMo and Qwen carry sampling, and their values are the reviewed ones", () => {
+    expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.map(row => [row.model, row.sampling ?? null]))
+      .toEqual([[GLM, null], [DEEPSEEK, null], [MIMO, MIMO_SAMPLING], [QWEN, QWEN_SAMPLING]]);
+    expect(Object.keys(previewModelRow(MIMO)!.sampling!)).toEqual(["temperature", "top_p"]);
+    expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.map(row => [row.model, row.jsonObject]))
+      .toEqual([[GLM, true], [DEEPSEEK, false], [MIMO, false], [QWEN, false]]);
+    expect(Object.isFrozen(previewModelRow(MIMO)!.sampling)).toBe(true);
+    expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.anthropic.every(row => row.sampling === undefined)).toBe(true);
+    expect(Object.isFrozen(previewModelRow(QWEN)!.sampling)).toBe(true);
+  });
+  it("the guarded fetch accepts every body the shared file says is sent, at exactly its reservation, and refuses the rest", async () => {
+    expect(samplingBodies.schema).toBe("deepinfra-sampling-bodies-v1");
+    expect(samplingBodies.sent.length).toBeGreaterThanOrEqual(5);
+    expect(samplingBodies.refused.length).toBeGreaterThanOrEqual(15);
+    const { executions, fetcher } = recordingFetch();
+    for (const sent of samplingBodies.sent) await fetcher(URL_COMPLETIONS, { method: "POST", body: sent.body });
+    expect(executions.map(execution => [execution.requestBody, execution.reservedUsd]))
+      .toEqual(samplingBodies.sent.map(sent => [sent.body, sent.reservedUsd]));
+    for (const refused of samplingBodies.refused) {
+      await expect(fetcher(URL_COMPLETIONS, { method: "POST", body: refused.body }), refused.name)
+        .rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+    }
+    expect(executions).toHaveLength(samplingBodies.sent.length);
+  });
+  it("Qwen's gateway body is the old body with its three sampling keys after max_tokens, in the shared file's key order", async () => {
+    for (const request of [RESULT_REQUEST, { ...RESULT_REQUEST, lane: "story" as const, callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER" as const,
+      preferredResponseFormat: "json_object" as const }]) {
+      const { executions, gateway } = previewGateway(QWEN);
+      await gateway.call(request);
+      const text = executions[0]!.requestBody;
+      const sent = JSON.parse(text) as { max_tokens: number; messages: unknown };
+      expect(text).toBe(JSON.stringify({ model: QWEN, max_tokens: sent.max_tokens, ...QWEN_SAMPLING, messages: sent.messages }));
+      expect(Object.keys(sent)).toEqual(Object.keys(JSON.parse(samplingBodies.sent[0]!.body)));
+      expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(QWEN)!, Buffer.byteLength(text))));
+    }
+  });
+  it("MiMo's gateway body carries its two sampling keys after max_tokens and never JSON mode, a story JSON request included", async () => {
+    const story = { ...RESULT_REQUEST, lane: "story" as const, callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER" as const,
+      preferredResponseFormat: "json_object" as const };
+    const mimoSent = samplingBodies.sent.filter(sent => JSON.parse(sent.body).model === MIMO);
+    expect(mimoSent.length).toBeGreaterThanOrEqual(2);
+    for (const request of [RESULT_REQUEST, story]) {
+      const { executions, gateway } = previewGateway(MIMO);
+      await gateway.call(request);
+      const text = executions[0]!.requestBody;
+      const sent = JSON.parse(text) as { max_tokens: number; messages: unknown };
+      // The judging (served) call and the story call alike: sampling, and no JSON mode (MiMo's row allows none).
+      expect(text).toBe(JSON.stringify({ model: MIMO, max_tokens: sent.max_tokens, ...MIMO_SAMPLING, messages: sent.messages }));
+      expect(text).toContain('"temperature":1,"top_p":0.95,"messages":');
+      expect(Object.keys(sent)).toEqual(Object.keys(JSON.parse(mimoSent[0]!.body)));
+      expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(MIMO)!, Buffer.byteLength(text))));
+    }
+  });
+  it("GLM's and DeepSeek's gateway bodies are byte for byte what they were before sampling existed", async () => {
+    const story = { ...RESULT_REQUEST, lane: "story" as const, callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER" as const,
+      preferredResponseFormat: "json_object" as const };
+    for (const model of [GLM, DEEPSEEK]) {
+      for (const request of [RESULT_REQUEST, story]) {
+        const { executions, gateway } = previewGateway(model);
+        await gateway.call(request);
+        const text = executions[0]!.requestBody;
+        const sent = JSON.parse(text) as { max_tokens: number; messages: unknown };
+        const row = previewModelRow(model)!;
+        // The body exactly as the gateway built it before 2026-10-12: model, max_tokens, the effort member, messages,
+        // and response_format only for a story JSON request on a JSON row.
+        expect(text, model).toBe(JSON.stringify({ model, max_tokens: sent.max_tokens,
+          ...(row.effort === null ? {} : { reasoning_effort: row.effort }), messages: sent.messages,
+          ...(request === story && row.jsonObject ? { response_format: { type: "json_object" } } : {}) }));
+        for (const key of Object.keys(QWEN_SAMPLING)) expect(Object.hasOwn(sent, key)).toBe(false);
+      }
+    }
+  });
+  it("the sampling follows the reviewed endpoint and model, as JSON mode does: Qwen anywhere else sends none", async () => {
+    const bodies: string[] = [];
+    const fetchImplementation = (async (_url: string, init?: RequestInit) => {
+      bodies.push(String(init?.body));
+      return new Response(JSON.stringify({ id: "synthetic", model: QWEN, choices: [{ message: { content: "{}" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 10, completion_tokens: 20 } }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    for (const endpoint of ["https://api.deepinfra.com/v1/openai", "https://other.example/v1/openai"]) {
+      const native = new OpenAICompatibleProviderGateway({ endpoint, model: QWEN, maker: "Alibaba", fetchImplementation,
+        persistRawArtifact: async artifact => artifact.artifactId, appendLedgerEntry: async entry => entry.attemptId,
+        assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined });
+      await native.call({ ...RESULT_REQUEST, providerRef: "preview:qwen-3-8-flash", bound: { maxAttempts: 1, tokenCeiling: 8192, deadlineMs: 5_000 } });
+    }
+    expect(JSON.parse(bodies[0]!)).toMatchObject(QWEN_SAMPLING);
+    expect(Object.keys(JSON.parse(bodies[1]!)).sort()).toEqual(BARE_BODY);
+  });
+  it("Qwen's and MiMo's health probes carry their own sampling and pass the guarded fetch", async () => {
+    const all = targets(PREVIEW_REVIEWED_PROVIDER_REFS);
+    const bodies: string[] = [];
+    for (const [target, model] of [[all[4]!, QWEN], [all[3]!, MIMO]] as const) {
+      const fetcher = createPreviewGuardedFetch({ execute: async input => { bodies.push(input.requestBody);
+        return { status: 200, body: JSON.stringify({ model, choices: [{ message: { content: "OK" } }] }) }; } });
+      const observed = await observeProviderTarget({ target, timeoutMs: 5_000, clock: () => new Date(), fetchImplementation: fetcher,
+        ...previewProbeControls(target) });
+      expect(observed.state, model).toBe("HEALTHY");
+    }
+    const [qwen, mimo] = bodies.map(text => JSON.parse(text) as { messages: unknown });
+    expect(bodies[0]).toBe(JSON.stringify({ model: QWEN, max_tokens: 8192, ...QWEN_SAMPLING, messages: qwen!.messages }));
+    expect(bodies[1]).toBe(JSON.stringify({ model: MIMO, max_tokens: 8192, ...MIMO_SAMPLING, messages: mimo!.messages }));
+    // The start-of-debate estimate prices a health check as a body of at most 1,024 bytes.
+    expect(Buffer.byteLength(bodies[0]!)).toBeLessThanOrEqual(1024);
+    expect(Buffer.byteLength(bodies[1]!)).toBeLessThanOrEqual(1024);
+  });
+});
+
+/**
+ * JSON mode is the story calls' alone (owner, 2026-10-12). Asking for it on every structured debate step was tried and
+ * withdrawn the same day: GLM in JSON mode answered a judging call with "{}", and MiMo's quote slip became garbage. The
+ * preview policy adds no JSON preference to any request; a served (debate) step goes out without response_format on
+ * every row, GLM included, exactly as before; the story calls keep asking for it themselves.
+ */
+describe("JSON mode stays on the story calls: no debate step asks for it", () => {
+  const HAIKU = "claude-haiku-5-5";
+  const parsed = { parseStatus: "PARSED", parseError: null } as const;
+  const structured = (role: "JUDGE" | "SYNTHESIZER" | "EVALUATOR"): ProviderCallRequest => ({ ...RESULT_REQUEST, role,
+    bound: { maxAttempts: 3, tokenCeiling: 8192, deadlineMs: 5_000 },
+    classifyContent: () => parsed, buildRepairPacket: () => RESULT_REQUEST.packet });
+  const story = { ...RESULT_REQUEST, lane: "story" as const, callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER" as const,
+    preferredResponseFormat: "json_object" as const };
+  function policySees(model: string, request: ProviderCallRequest): ProviderCallRequest {
+    const seen: ProviderCallRequest[] = [];
+    const gateway = withPreviewProviderCallPolicy({ call: async (sent) => { seen.push(sent); return {} as never; } }, parse(MULTI)!, { model });
+    void gateway.call(request);
+    expect(seen).toHaveLength(1);
+    return seen[0]!;
+  }
+
+  it("the preview policy adds no JSON preference to any request, on any row", () => {
+    for (const model of [GLM, DEEPSEEK, MIMO, QWEN, HAIKU]) {
+      for (const role of ["JUDGE", "SYNTHESIZER", "EVALUATOR"] as const) {
+        expect(Object.hasOwn(policySees(model, structured(role)), "preferredResponseFormat"), `${model} ${role}`).toBe(false);
+      }
+      expect(Object.hasOwn(policySees(model, RESULT_REQUEST), "preferredResponseFormat"), model).toBe(false);
+      expect(Object.hasOwn(policySees(model, { ...structured("JUDGE"), lane: "evaluator" }), "preferredResponseFormat"), model).toBe(false);
+      // The story calls ask for themselves, unchanged.
+      expect(policySees(model, story).preferredResponseFormat).toBe("json_object");
+    }
+  });
+
+  it("every row's structured debate bodies carry no response_format, GLM's included (byte for byte as before)", async () => {
+    for (const model of [GLM, DEEPSEEK, MIMO, QWEN]) {
+      for (const role of ["JUDGE", "SYNTHESIZER", "EVALUATOR"] as const) {
+        const { executions, gateway } = previewGateway(model);
+        await gateway.call(structured(role));
+        const text = executions[0]!.requestBody;
+        const sent = JSON.parse(text) as { max_tokens: number; messages: unknown };
+        const row = previewModelRow(model)!;
+        expect(text, `${model} ${role}`).toBe(JSON.stringify({ model, max_tokens: sent.max_tokens,
+          ...(row.effort === null ? {} : { reasoning_effort: row.effort }), ...(row.sampling ?? {}), messages: sent.messages }));
+        expect(Object.hasOwn(sent, "response_format")).toBe(false);
+        expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(row, Buffer.byteLength(text))));
+      }
+    }
+  });
+
+  it("a judging full re-ask carries no JSON mode either (GLM), and MiMo's keeps its sampling; the gate's check accepts both POSTs", async () => {
+    for (const model of [GLM, MIMO]) {
+      const { executions, gateway } = previewGateway(model);
+      let replies = 0;
+      await gateway.call({ ...structured("JUDGE"),
+        classifyContent: () => (++replies === 1 ? { parseStatus: "PARSE_FAILED", parseError: "synthetic" } : parsed) });
+      expect(executions).toHaveLength(2);
+      for (const execution of executions) {
+        expect(JSON.parse(execution.requestBody)).toMatchObject(model === MIMO ? MIMO_SAMPLING : {});
+        expect(Object.hasOwn(JSON.parse(execution.requestBody), "response_format"), model).toBe(false);
+      }
+    }
   });
 });

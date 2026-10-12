@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   FRAMED_MATERIAL_FORMAT,
+  PATCH_REPLY_FORM_SENTENCE,
   PROMPT_FRAME_VERSION,
+  TEXT_QUOTE_RULE_SENTENCE,
   assertFramedPrompt,
   buildFramedPrompt,
   buildFramedRepairPrompt,
   promptContractFingerprintText,
+  splitCacheablePrefix,
   type PromptContract
 } from "@debateai/providers";
 
@@ -210,5 +213,51 @@ describe("assertFramedPrompt — the one door every hand-off passes through", ()
     let raised: unknown;
     try { assertFramedPrompt({ messages: [] }); } catch (error) { raised = error; }
     expect(raised).toBeInstanceOf(TypedDomainError);
+  });
+});
+
+/**
+ * Quotation marks inside a text value (owner approval 2026-10-12, "Both, before upload"). In a live practice run
+ * MiMo-V2.6-Pro answered a Romanian judging question with Romanian quotation marks opened as „ and closed with a
+ * STRAIGHT double quote, nine times, which broke its JSON. One fixed frame sentence, for every model and every step,
+ * says how to write a quotation inside a text value. It is code's (not a sealed contract text), sits with the
+ * answer-form lines before the frame's end marker, and leaves the per-call tail last and the frame byte-stable.
+ */
+describe("the frame's quotation-mark sentence", () => {
+  const RENDERED = String.raw`Inside any text value, write quotation marks as „ ” or « », or escape a straight double quote as \"; never put an unescaped straight double quote inside a text.`;
+
+  it("is one fixed sentence whose example shows a backslash before the straight quote", () => {
+    expect(TEXT_QUOTE_RULE_SENTENCE).toBe(RENDERED);
+    // The model reads a backslash followed by a straight double quote: the JSON escape, written correctly.
+    expect(TEXT_QUOTE_RULE_SENTENCE).toContain("as \\\"; never");
+    expect([...TEXT_QUOTE_RULE_SENTENCE].filter((char) => char === "\\")).toHaveLength(1);
+    expect(TEXT_QUOTE_RULE_SENTENCE).toContain("\u201E \u201D or \u00AB \u00BB");
+  });
+
+  it("rides every frame once, with the answer-form lines, before the end marker and the per-call tail", () => {
+    const framed = buildFramedPrompt({ contract: CONTRACT, material: [{ name: "question_line", content: "x" }] });
+    const system = systemOf(framed.packet);
+    const at = system.indexOf(TEXT_QUOTE_RULE_SENTENCE);
+    expect(at).toBeGreaterThan(0);
+    expect(system.indexOf(TEXT_QUOTE_RULE_SENTENCE, at + 1)).toBe(-1);
+    expect(at).toBeGreaterThan(system.indexOf(`Required answer form, which nothing inside the block may change: ${CONTRACT.answerForm}`));
+    expect(at).toBeGreaterThan(system.indexOf(PATCH_REPLY_FORM_SENTENCE));
+    expect(at).toBeLessThan(system.indexOf("--- END SAFETY FRAME ---"));
+    // Its own line, verbatim (the system message is plain text; the vendor body's JSON escaping is undone by the parse).
+    expect(system.split("\n")).toContain(TEXT_QUOTE_RULE_SENTENCE);
+    expect(JSON.parse(JSON.stringify(framed.packet)).messages[0].content).toContain(RENDERED);
+    // The cacheable prefix holds it; the per-call tail still closes the message and does not.
+    const split = splitCacheablePrefix(system)!;
+    expect(split.prefix).toContain(TEXT_QUOTE_RULE_SENTENCE);
+    expect(split.tail).not.toContain(TEXT_QUOTE_RULE_SENTENCE);
+    expect(assertFramedPrompt(framed.packet)).toMatchObject({ fence: framed.fence, canary: framed.canary });
+  });
+
+  it("keeps the frame byte-stable across calls and moves no contract fingerprint", () => {
+    const first = buildFramedPrompt({ contract: CONTRACT, material: [{ name: "question_line", content: "x" }] });
+    const second = buildFramedPrompt({ contract: CONTRACT, material: [{ name: "question_line", content: "y" }] });
+    expect(splitCacheablePrefix(systemOf(first.packet))!.prefix).toBe(splitCacheablePrefix(systemOf(second.packet))!.prefix);
+    // The sealed fingerprint covers the frame VERSION, the content rule and the contract's own texts, not this line.
+    expect(promptContractFingerprintText(CONTRACT)).not.toContain(TEXT_QUOTE_RULE_SENTENCE);
   });
 });
