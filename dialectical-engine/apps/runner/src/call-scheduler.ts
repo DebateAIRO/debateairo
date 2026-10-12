@@ -15,9 +15,12 @@ import type { CallConcurrencyPolicy } from "@debateai/register";
  *    (ONE while the gate cannot reach its vendor, spec §3.4).
  *
  * Waiting calls of a debate go author first, then panel, then review, then the
- * rest, each kind in arrival order. When a shared slot frees, debates take
- * turns (round robin) so one debate cannot starve another; a call held back
- * only by its own debate's limits never holds back another debate's call.
+ * rest, each kind in arrival order. Debates take turns (round robin) on each
+ * SHARED slot — a model's runner-wide slots, a gate's slots — separately: the
+ * debate served longest ago on the slot that is tightest for its call goes
+ * first, so one debate cannot starve another however busy a third debate is
+ * elsewhere. A call held back only by its own debate's limits never holds back
+ * another debate's call.
  *
  * The scheduler knows nothing about debate shape and touches no database.
  */
@@ -87,6 +90,8 @@ type Lane = {
   readonly peakByModel: Map<string, number>;
   readonly waitedMsByModel: Map<string, number>;
   calls: number;
+  /** Shared slot ("model:…" / "gate:…") → the serve tick of this lane's latest call that took it. */
+  readonly lastServedOn: Map<string, number>;
 };
 
 function bump(counts: Map<string, number>, key: string): number {
@@ -118,7 +123,7 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
   const now = input.now ?? (() => performance.now());
 
   const lanes: Lane[] = [];
-  let lastServed: Lane | null = null;
+  let serveTick = 0;
 
   const runnerRunningByModel = new Map<string, number>();
   const runnerPeakByModel = new Map<string, number>();
@@ -141,6 +146,28 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     && (runnerRunningByModel.get(ticket.model) ?? 0) < runnerCapFor(ticket.vendor)
     && (ticket.gate === null || (gateRunning.get(ticket.gate) ?? 0) < gateLimitFor(ticket.gate));
 
+  type SharedSlot = Readonly<{ key: string; headroom: number }>;
+  const sharedSlotsOf = (ticket: CallTicket): SharedSlot[] => {
+    const slots: SharedSlot[] = [{
+      key: `model:${ticket.model}`,
+      headroom: runnerCapFor(ticket.vendor) - (runnerRunningByModel.get(ticket.model) ?? 0)
+    }];
+    if (ticket.gate !== null) {
+      slots.push({ key: `gate:${ticket.gate}`, headroom: gateLimitFor(ticket.gate) - (gateRunning.get(ticket.gate) ?? 0) });
+    }
+    return slots;
+  };
+
+  /**
+   * Whose turn it is: when this lane was last served on the shared slot its call is shortest of (the most recent such
+   * serve when two are equally short). Never served = -1. Lower goes first.
+   */
+  const turnOf = (lane: Lane, ticket: CallTicket): number => {
+    const slots = sharedSlotsOf(ticket);
+    const tightest = Math.min(...slots.map((slot) => slot.headroom));
+    return Math.max(...slots.filter((slot) => slot.headroom === tightest).map((slot) => lane.lastServedOn.get(slot.key) ?? -1));
+  };
+
   const start = (lane: Lane, index: number): void => {
     const [entry] = lane.waiting.splice(index, 1);
     const { model, gate } = entry!.ticket;
@@ -151,6 +178,8 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     raisePeak(runnerPeakByModel, model, bump(runnerRunningByModel, model));
     if (gate !== null) raisePeak(gatePeak, gate, bump(gateRunning, gate));
     lane.calls += 1;
+    serveTick += 1;
+    for (const slot of sharedSlotsOf(entry!.ticket)) lane.lastServedOn.set(slot.key, serveTick);
     lane.waitedMsByModel.set(model, (lane.waitedMsByModel.get(model) ?? 0) + Math.max(0, now() - entry!.queuedAt));
 
     let released = false;
@@ -167,33 +196,28 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     entry!.launch(release);
   };
 
-  /** Starts, round robin over lanes, the first admissible waiting call of each lane until none fits. Re-entrant calls fold into the running pass. */
+  /**
+   * Starts admissible waiting calls one at a time until none fits: each lane offers its first admissible call (priority,
+   * then arrival); the lane whose turn it is (`turnOf`, then the older lane) starts it. A call started here may call back
+   * into the scheduler; that re-entrant `pump` returns at once and the next scan of this loop sees what it changed.
+   */
   let pumping = false;
-  let pumpAgain = false;
   const pump = (): void => {
-    if (pumping) {
-      pumpAgain = true;
-      return;
-    }
+    if (pumping) return;
     pumping = true;
     try {
-      do {
-        pumpAgain = false;
-        let progressed = true;
-        while (progressed) {
-          progressed = false;
-          const from = lastServed === null ? 0 : lanes.indexOf(lastServed) + 1;
-          const order = [...lanes.slice(from), ...lanes.slice(0, from)];
-          for (const lane of order) {
-            if (lane.stopped) continue;
-            const index = lane.waiting.findIndex((entry) => admissible(lane, entry.ticket));
-            if (index < 0) continue;
-            lastServed = lane;
-            start(lane, index);
-            progressed = true;
-          }
+      for (;;) {
+        let chosen: Readonly<{ lane: Lane; index: number; turn: number }> | null = null;
+        for (const lane of lanes) {
+          if (lane.stopped) continue;
+          const index = lane.waiting.findIndex((entry) => admissible(lane, entry.ticket));
+          if (index < 0) continue;
+          const turn = turnOf(lane, lane.waiting[index]!.ticket);
+          if (chosen === null || turn < chosen.turn) chosen = { lane, index, turn };
         }
-      } while (pumpAgain);
+        if (chosen === null) return;
+        start(chosen.lane, chosen.index);
+      }
     } finally {
       pumping = false;
     }
@@ -210,7 +234,8 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
       peakInFlight: 0,
       peakByModel: new Map(),
       waitedMsByModel: new Map(),
-      calls: 0
+      calls: 0,
+      lastServedOn: new Map()
     };
     lanes.push(lane);
 
@@ -258,7 +283,6 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
         stop();
         const index = lanes.indexOf(lane);
         if (index >= 0) lanes.splice(index, 1);
-        if (lastServed === lane) lastServed = index > 0 ? lanes[index - 1]! : null;
       },
       stats(): LaneStats {
         return Object.freeze({

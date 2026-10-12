@@ -39,6 +39,38 @@ describe("call scheduler", () => {
     gs[1]!.resolve("ok"); await flush(); expect(started.at(-1)).toBe("x2");
     gs.forEach((g) => g.resolve("ok")); await Promise.all(runs);
   });
+  it("hands a shared slot to the debate that waited longest for it, whatever other debates start meanwhile", async () => {
+    const s = createCallScheduler({ policy: { perDebate: 10, perModelPerDebate: 10, perModelPerRunner: { default: 10, x: 1 } } });
+    const lanes = [s.openLane("d1"), s.openLane("d2"), s.openLane("d3")];
+    const started: string[] = []; const gates = new Map<string, ReturnType<typeof deferred>>();
+    const runs = [0, 1].flatMap((l) => Array.from({ length: 5 }, (_, i) => {
+      const name = `L${l + 1}-M${i}`; const g = deferred(); gates.set(name, g);
+      return lanes[l]!.run(t("M", "AUTHOR", null, "x"), () => { started.push(name); return g.promise; });
+    }));
+    const cheap: Promise<string>[] = [];
+    for (let k = 0; k < 9; k++) {
+      cheap.push(lanes[2]!.run(t("N", "AUTHOR", null, "y"), async () => "ok")); // d3 starts something else before each release
+      gates.get(started.at(-1)!)!.resolve("ok"); await flush();
+    }
+    expect(started).toEqual(["L1-M0", "L2-M0", "L1-M1", "L2-M1", "L1-M2", "L2-M2", "L1-M3", "L2-M3", "L1-M4", "L2-M4"]);
+    gates.forEach((g) => g.resolve("ok")); await Promise.all([...runs, ...cheap]);
+  });
+  it("takes turns on a gate's slots per gate, whatever model each debate asks for", async () => {
+    const s = createCallScheduler({ policy: { perDebate: 10, perModelPerDebate: 10, perModelPerRunner: { default: 10 } } });
+    s.setGateCapacity("g", 1); const lanes = [s.openLane("d1"), s.openLane("d2"), s.openLane("d3")];
+    const started: string[] = []; const gates = new Map<string, ReturnType<typeof deferred>>();
+    const runs = [0, 1].flatMap((l) => Array.from({ length: 3 }, (_, i) => {
+      const name = `L${l + 1}-${i}`; const g = deferred(); gates.set(name, g);
+      return lanes[l]!.run(t(`M${l}${i}`, "AUTHOR", "g", "x"), () => { started.push(name); return g.promise; });
+    }));
+    const cheap: Promise<string>[] = [];
+    for (let k = 0; k < 5; k++) {
+      cheap.push(lanes[2]!.run(t("N", "AUTHOR", "other", "y"), async () => "ok"));
+      gates.get(started.at(-1)!)!.resolve("ok"); await flush();
+    }
+    expect(started).toEqual(["L1-0", "L2-0", "L1-1", "L2-1", "L1-2", "L2-2"]);
+    gates.forEach((g) => g.resolve("ok")); await Promise.all([...runs, ...cheap]);
+  });
   it("limits a gate to its capacity and to one call while unhealthy", async () => {
     const s = createCallScheduler({ policy: { perDebate: 10, perModelPerDebate: 10, perModelPerRunner: { default: 10 } } });
     s.setGateCapacity("g", 2); const lane = s.openLane("d1"); const started: number[] = [];
