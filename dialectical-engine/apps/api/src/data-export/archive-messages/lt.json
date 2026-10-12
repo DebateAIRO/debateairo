@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Jūsų „Dialectical Engine“ duomenys",
+  "archive.generated": "Parengta {time} naudotojui {pseudonym}.",
+  "archive.accountHeading": "Paskyra",
+  "archive.email": "El. paštas",
+  "archive.memberSince": "Narys nuo",
+  "archive.debatesHeading": "Jūsų debatai ({count})",
+  "archive.question": "Klausimas",
+  "archive.verdict": "Verdiktas",
+  "archive.verdictSupported": "Pagrįstas",
+  "archive.verdictContested": "Ginčijamas",
+  "archive.verdictUnsupported": "Nepagrįstas",
+  "archive.story": "Debatai trumpai",
+  "archive.arguments": "Argumentai",
+  "archive.visibilityPublic": "Paskelbta",
+  "archive.visibilityPrivate": "Privatu",
+  "archive.unreadable": "Šių debatų turinio nebegalima perskaityti, nes jų raktas sunaikintas.",
+  "archive.noDebates": "Neturite debatų.",
+  "archive.filesNote": "Šio ZIP archyvo JSON failuose tie patys duomenys pateikti kompiuterio skaitomu formatu; jie išvardyti README.txt."
+}

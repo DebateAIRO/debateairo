@@ -12,7 +12,7 @@ import { seedDevLineage108 } from '../support/devLineage108.js';
 import { identifyLineage,loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
 import { createPreviewRecoveryApiFixture } from '../support/previewRecoveryPrincipal.js';
 const native=await import('../../deploy/'+'preview-auth-dev/v1/native-peer.mjs');
-const observation={nodeVersion:process.version,pnpmVersion:'11.20.0',sourceRevision:'a'.repeat(40),sourceTree:'b'.repeat(40),operatorSha256:'c'.repeat(64),observedAt:'2026-10-06T12:00:00.000Z'};
+const observation={nodeVersion:'v26.8.2',pnpmVersion:'11.20.0',sourceRevision:'a'.repeat(40),sourceTree:'b'.repeat(40),operatorSha256:'c'.repeat(64),observedAt:'2026-10-06T12:00:00.000Z'};
 describe('isolated PG18 stage metadata principals',()=>{
  it('keeps protected metadata denied to the restricted API while checking creator identity and native ownership',async()=>{
   const db=await startTestDatabase();let selected:pg.Pool|undefined;const clients:pg.Client[]=[];
@@ -155,7 +155,8 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
  // Each ends with 0108, 0110, 0111 and the auth DB batch (0112) applied: the live preview's shape after apply-and-plan, which must not be refused.
  const lineages:ReadonlyArray<readonly [string,(pool:pg.Pool)=>Promise<void>]>=[
   ['integrated-original-108',seedDevLineage108],['integrated-compatibility-108',seedInstalledAuth106],['integrated-fresh-resolutions-108',async()=>{}]];
- for(const [lineage,seed] of lineages)it(`resolves on a complete ${lineage} database, and refuses naming 0110 and 0111 when the ledger lacks them without changing it`,async()=>{
+ it('resolves on every complete 0108 lineage and refuses missing forward steps without changing the ledger',async()=>{
+ for(const [lineage,seed] of lineages){
   const db=await startTestDatabase();
   try{
    const plan=await loadMigrationPlan(),pending=[plan.forward110.name,...plan.forwardChain.map(step=>step.name)];
@@ -164,7 +165,8 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
     '0111_billing_netopia.sql',
     '0112_auth_db_batch.sql',
     '0113_billing_price_currencies.sql',
-    '0114_role_rotation.sql'
+    '0114_role_rotation.sql',
+    '0115_data_export.sql'
    ]);
    const ledger=async(client:{query:pg.Pool['query']}=db.pool)=>(await client.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
    const resolutionTable=async()=>(await db.pool.query("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0].present as boolean;
@@ -198,5 +200,6 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
    }finally{await client.query('ROLLBACK');client.release();}
    expect(await ledger()).toEqual(complete);
   }finally{await db.stop();}
+ }
  },180000);
 });

@@ -1,0 +1,17 @@
+{
+  "version": "data-export-forward115-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0114_role_rotation.sql",
+    "manifestSha256": "549b679ae45d831552f2d30ce828584168c2d9bfa4e91a96877a18b82ef4f4c0",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0115_data_export.sql",
+    "sha256": "fd47b13b422112d7dd71e866a9c38901e7c5cae9d899e255b1d35b180dd245d5"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  }
+}

@@ -2,6 +2,7 @@ import { ContractHttpError, type ContractClient } from '@debateai/contract';
 import { clearPhoneCompletionDraft } from './phoneCompletionDraft';
 import { announceSessionChange } from '../components/support/sessionChange';
 import { clearStoredSupportConversation } from '../components/support/conversation';
+import { clearPendingExport } from './dataExportPending';
 export type EndSessionClient = Pick<ContractClient, 'logout'> & Partial<Pick<ContractClient, 'revokeAllSessions'>>;
 /**
  * The server answers a logout whose session it no longer has (expired, or revoked from another device)
@@ -18,6 +19,7 @@ const flights = new WeakMap<object, Partial<Record<'logout' | 'all', Promise<voi
 /** Called only after the server has ended the current session. Rotation uses the same legacy event without this detail. */
 export function finishSessionCleanup(redirectTo: string | null = '/login'): void {
     clearStoredSupportConversation();
+    clearPendingExport();
     announceSessionChange();
     clearPhoneCompletionDraft();
     if (typeof window !== 'undefined') {

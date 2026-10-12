@@ -1,4 +1,5 @@
 import { contractClient } from "../../lib/api.js";
+import { clearPendingExport } from "../../lib/dataExportPending.js";
 import {
   browserSupportConversationStorage,
   clearStoredSupportConversation,
@@ -225,6 +226,7 @@ export function installSessionChangeReceiver(): () => void {
   const onMessage = (event: Event) => {
     if (!isSessionChangeMessage((event as MessageEvent).data)) return;
     clearStoredSupportConversation();
+    clearPendingExport();
     generation += 1;
     notifyReset("session-change");
   };

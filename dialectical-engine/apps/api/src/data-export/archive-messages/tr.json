@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Dialectical Engine'deki verileriniz",
+  "archive.generated": "{pseudonym} için {time} tarihinde hazırlandı.",
+  "archive.accountHeading": "Hesap",
+  "archive.email": "E-posta",
+  "archive.memberSince": "Üyelik tarihi",
+  "archive.debatesHeading": "Tartışmalarınız ({count})",
+  "archive.question": "Soru",
+  "archive.verdict": "Karar",
+  "archive.verdictSupported": "Destekleniyor",
+  "archive.verdictContested": "Tartışmalı",
+  "archive.verdictUnsupported": "Desteklenmiyor",
+  "archive.story": "Tartışmanın özeti",
+  "archive.arguments": "Görüşler",
+  "archive.visibilityPublic": "Yayımlandı",
+  "archive.visibilityPrivate": "Özel",
+  "archive.unreadable": "Bu tartışmanın anahtarı yok edildiği için içeriği artık okunamıyor.",
+  "archive.noDebates": "Henüz tartışmanız yok.",
+  "archive.filesNote": "Bu ZIP arşivindeki JSON dosyaları aynı verileri makine tarafından okunabilir biçimde içerir; dosyaların listesi README.txt içindedir."
+}

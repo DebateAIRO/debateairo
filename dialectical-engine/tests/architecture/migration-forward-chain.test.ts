@@ -50,13 +50,15 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains 0111 to the recipe, to 0110's manifest and to the verifier in force after 0110 (the sealed one)", async () => {
     const plan = await loadMigrationPlan();
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
-    // The auth DB batch (0112) follows 0111, Part C's 0113 follows it, and role rotation's 0114 follows 0113
+    // The auth DB batch (0112) follows 0111, Part C's 0113 follows it, role rotation's 0114 follows 0113, and the data
+    // export's 0115 follows 0114 (V-41)
     // (migrations/lineage/README.md).
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
       "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql"
+      "0114_role_rotation.sql",
+      "0115_data_export.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -101,7 +103,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
       "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql"
+      "0114_role_rotation.sql",
+      "0115_data_export.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -140,7 +143,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
       "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql"
+      "0114_role_rotation.sql",
+      "0115_data_export.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));

@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Os seus dados no Dialectical Engine",
+  "archive.generated": "Preparado em {time} para {pseudonym}.",
+  "archive.accountHeading": "Conta",
+  "archive.email": "E-mail",
+  "archive.memberSince": "Membro desde",
+  "archive.debatesHeading": "Os seus debates ({count})",
+  "archive.question": "Pergunta",
+  "archive.verdict": "Veredito",
+  "archive.verdictSupported": "Sustentado",
+  "archive.verdictContested": "Contestado",
+  "archive.verdictUnsupported": "Não sustentado",
+  "archive.story": "O debate em resumo",
+  "archive.arguments": "Argumentos",
+  "archive.visibilityPublic": "Publicado",
+  "archive.visibilityPrivate": "Privado",
+  "archive.unreadable": "O conteúdo deste debate já não pode ser lido porque a respetiva chave foi destruída.",
+  "archive.noDebates": "Não tem debates.",
+  "archive.filesNote": "Os ficheiros JSON neste arquivo ZIP contêm os mesmos dados num formato legível por máquina; o README.txt apresenta a lista."
+}

@@ -24,9 +24,9 @@ const REGISTER_RECEIPT = createDevelopmentDeploymentRegisterMachineReceipt({
   snapshotSha256: "a".repeat(64)
 });
 const SUPPORT_MODEL_TARGET = JSON.stringify({
-  provider_ref: "development:hermes-glm-5.3-flash",
+  provider_ref: "development:claude-haiku-5.5",
   base_url: "http://127.0.0.1:8794/v1",
-  model: "z-ai/glm-5.3-flash",
+  model: "claude-haiku-5-5",
   authorization_header: "Bearer support-only"
 });
 
@@ -81,7 +81,7 @@ function operations(input: Readonly<{
       fail("support_model");
       return Object.freeze({
         targetJson: SUPPORT_MODEL_TARGET,
-        providerRef: "development:hermes-glm-5.3-flash" as const,
+        providerRef: "development:claude-haiku-5.5" as const,
         stop: vi.fn(async () => { calls.push("support:stop"); })
       });
     }),
@@ -308,7 +308,7 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
       ui: "DENY_DEFAULT_PROXY",
       tls: "SYSTEM_TRUST",
       providers: "CLI_HANDSHAKE",
-      supportModel: "HERMES_GLM_5_3_FLASH",
+      supportModel: "CLAUDE_HAIKU_5_5",
       healthyProviderRefs: [
         "development:codex-cli",
         "development:codex-premium-cli",

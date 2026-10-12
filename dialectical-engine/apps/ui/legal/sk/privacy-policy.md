@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.3 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/privacy/versions · Prevádzkovateľ: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
-**In short.** Zhromažďujeme údaje potrebné pre účet a to, čo sa rozhodnete napísať. Vaše otázky sa odosielajú poskytovateľom umelej inteligencie uvedeným v našom registri; nepoužívajú sa na trénovanie modelov. Debaty sú súkromné, pokiaľ ich nezverejníte. Odstránením účtu sa zničia kľúče k vašim súkromným údajom; pri plánovaní odstránenia si zvolíte, či sa odstránia aj vaše zverejnené debaty, alebo zostanú verejné pod vaším vyradeným pseudonymom. Môžete nás kontaktovať na privacy@dezbatere.ro a osoby uvedené v debate môžu požiadať o odstránenie aj bez účtu.
+**In short.** Zhromažďujeme údaje potrebné pre účet a to, čo sa rozhodnete napísať. Vaše otázky sa odosielajú poskytovateľom umelej inteligencie uvedeným v našom registri; nepoužívajú sa na trénovanie modelov. Náš poskytovateľ hostingu uchováva váš účet a vaše debaty v Londýne vo Spojenom kráľovstve; časť 5 uvádza, kam ďalej putujú vaše údaje. Debaty sú súkromné, pokiaľ ich nezverejníte. Odstránením účtu sa zničia kľúče k vašim súkromným údajom; pri plánovaní odstránenia si zvolíte, či sa odstránia aj vaše zverejnené debaty, alebo zostanú verejné pod vaším vyradeným pseudonymom. Môžete nás kontaktovať na privacy@dezbatere.ro a osoby uvedené v debate môžu požiadať o odstránenie aj bez účtu.
 
 ## 1. Kto zodpovedá za vaše údaje
 
@@ -95,6 +95,8 @@ Nevytvárame váš profil, nepoužívame vaše údaje na reklamu a nepredávame 
 
 **Iní príjemcovia.** Okrem poskytovateľov umelej inteligencie pre nás údaje spracúvajú títo sprostredkovatelia. Náš poskytovateľ hostingu, OVHcloud, uchováva a prevádzkuje službu vo svojom dátovom centre v Londýne vo Spojenom kráľovstve. Európska komisia rozhodla, že Spojené kráľovstvo zabezpečuje primeranú úroveň ochrany osobných údajov (jej rozhodnutie o primeranosti platí do decembra 2031), preto tento prenos nevyžaduje ďalšie záruky. Cloudflare doručuje naše stránky, prenáša prevádzku medzi vami a službou a vykonáva kontrolu proti robotom (časť 2); je americkou spoločnosťou certifikovanou podľa rámca ochrany osobných údajov medzi EÚ a USA a jej zmluva s nami ako záložné riešenie dopĺňa štandardné zmluvné doložky EÚ. Náš e-mailový sprostredkovateľ, Amazon Simple Email Service, na základe našej zmluvy so spoločnosťou Amazon Web Services EMEA SARL v Luxembursku odosiela e-maily týkajúce sa účtu; ak Amazon tieto údaje spracúva v Spojených štátoch, prenos sa opiera o štandardné zmluvné doložky EÚ v podmienkach spracúvania údajov spoločnosti Amazon. Platby prebiehajú prostredníctvom nášho poskytovateľa platobných služieb, NETOPIA Payments, po spustení platených programov. Každý koná podľa našich zdokumentovaných pokynov na základe zmluvy o spracúvaní údajov so zárukami vyžadovanými článkom 28. Žiadnemu sprostredkovateľovi nedovoľujeme používať vaše údaje na vlastné účely. Ak by tak poskytovateľ konal, bol by samostatným prevádzkovateľom a vaše údaje mu neposielame.
 
+**Kde sú vaše údaje.** Váš účet a vaše debaty sú uchovávané vo Spojenom kráľovstve, na serveroch nášho poskytovateľa hostingu v Londýne. Cloudflare prenáša prevádzku prostredníctvom vlastnej siete a Amazon môže spracúvať e-maily týkajúce sa účtu v Spojených štátoch. Každý poskytovateľ umelej inteligencie spracúva text, ktorý dostane, v krajinách, ktoré pre neho uvádza register, väčšinou v Spojených štátoch.
+
 **Orgány verejnej moci.** Osobné údaje poskytujeme súdom, regulačným orgánom alebo orgánom presadzovania práva, ak to vyžaduje zákon, a informujeme vás o tom, pokiaľ nám to zákon nezakazuje.
 
 ## 6. Zverejňovanie a viditeľnosť
@@ -148,12 +150,12 @@ Ktorékoľvek z týchto práv môžete bezplatne uplatniť napísaním na **priv
 
 | Právo | Čo tu znamená |
 | --- | --- |
-| **Prístup** (Art. 15) | Kópia osobných údajov, ktoré o vás uchovávame, a tieto informácie. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.] |
+| **Prístup** (Art. 15) | Kópia osobných údajov, ktoré o vás uchovávame, a tieto informácie. V Nastaveniach vyberte Exportovať údaje: pripravíme súbor ZIP so súbormi JSON a jednou stránkou, ktorú otvoríte v ľubovoľnom prehliadači, a e-mailom vám pošleme odkaz na stiahnutie platný 24 hodín len vtedy, keď ste prihlásení do svojho účtu. |
 | **Oprava** (Art. 16) | V Nastaveniach môžete opraviť svoj e-mail alebo e-mail na obnovenie. Váš pseudonym nemožno zmeniť z dôvodov uvedených v podmienkach; účet môžete odstrániť a otvoriť si nový |
 | **Vymazanie** (Art. 17) | Súkromnú debatu môžete kedykoľvek odstrániť na jej stránke. Účet môžete odstrániť v Nastaveniach; časť 7 presne vysvetľuje účinky. Môžete nás požiadať o odstránenie zverejnenej debaty obsahujúcej vaše údaje bez ohľadu na to, či ste jej autorom |
 | **Obmedzenie** (Art. 18) | Môžete nás požiadať, aby sme prestali spracúvať konkrétne údaje, kým sa nevyrieši spor o ne |
 | **Námietka** (Art. 21) | Môžete namietať proti spracúvaniu založenému na oprávnených záujmoch — bezpečnostnému a auditnému spracúvaniu podľa časti 4 — a my ho zastavíme, ak nepreukážeme závažné dôvody. Proti marketingu môžete namietať kedykoľvek a my ho zastavíme |
-| **Prenosnosť** (Art. 20) | Vaše debaty a údaje účtu v bežne používanom, strojovo čitateľnom formáte. [Pending: same export as Access.] Neosobný obsah, ktorý ste vytvorili, napríklad vaše otázky, vám na požiadanie vrátime po skončení zmluvy |
+| **Prenosnosť** (Art. 20) | Vaše debaty a údaje účtu v bežne používanom, strojovo čitateľnom formáte. Použite Exportovať údaje v Nastaveniach: súbor ZIP obsahuje vaše údaje v strojovo čitateľných súboroch JSON a jednu čitateľnú stránku; odkaz zaslaný e-mailom platí 24 hodín len vtedy, keď ste prihlásení do svojho účtu. Neosobný obsah, ktorý ste vytvorili, napríklad vaše otázky, vám na požiadanie vrátime po skončení zmluvy |
 | **Odvolanie súhlasu** (Art. 7(3)) | Marketingový súhlas môžete odvolať v ktoromkoľvek e-maile alebo v Nastaveniach; súhlas s citlivými údajmi odvoláte odstránením účtu v Nastaveniach (také údaje tiež nemusíte uviesť alebo môžete odstrániť debatu, ktorá ich obsahuje). Odvolanie nemá vplyv na spracúvanie, ktoré sa už uskutočnilo |
 | **Sťažnosť** | Rumunskému dozornému orgánu **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukurešť, <anspdcp@dataprotection.ro>, alebo orgánu v krajine, v ktorej žijete. Uprednostňujeme, aby ste sa najskôr obrátili na nás |
 
@@ -174,7 +176,7 @@ Dialectical Engine je určená dospelým. Pri registrácii potvrdzujete, že má
 ## 13. Súbory cookie
 
 
-Dialectical Engine používa 18 položiek, pričom všetky sú nevyhnutne potrebné pre službu, o ktorú ste požiadali, a všetky nastavuje výlučne Dialectical Engine: 13 súborov cookie a 5 záznamov v úložisku vášho prehliadača. Nenastavujeme analytické, reklamné ani sledovacie súbory cookie. **Zásady používania súborov cookie** na dezbatere.ro/cookies ich uvádzajú spolu s tým, na čo každá položka slúži a kto ju dostáva, a zmenia sa skôr, než sa pridá čokoľvek ďalšie.
+Dialectical Engine používa 20 položiek, pričom všetky sú nevyhnutne potrebné pre službu, o ktorú ste požiadali, a všetky nastavuje výlučne Dialectical Engine: 13 súborov cookie a 7 záznamov v úložisku vášho prehliadača. Nenastavujeme analytické, reklamné ani sledovacie súbory cookie. **Zásady používania súborov cookie** na dezbatere.ro/cookies ich uvádzajú spolu s tým, na čo každá položka slúži a kto ju dostáva, a zmenia sa skôr, než sa pridá čokoľvek ďalšie.
 
 | Názov | Typ | Účel | Platnosť |
 |---|---|---|---|
@@ -196,6 +198,8 @@ Dialectical Engine používa 18 položiek, pričom všetky sú nevyhnutne potreb
 | `debateai.languageOffer.dismissed` | Úložisko relácie | Pamätá si pre túto kartu, že ste odmietli ponuku zobraziť debatu v inom jazyku. | Do zatvorenia karty |
 | `debateai.support.conversation.v2` | Úložisko relácie | Drží vašu konverzáciu s chatom pomoci na obrazovke, kým je karta otvorená. Vymaže sa, keď sa na tejto karte ktokoľvek prihlási alebo odhlási. | Do zatvorenia karty |
 | `debateai.phone-completion-draft.v1` | Úložisko relácie | Nedokončená otázka počas telefonického kroku; odstránená pri zmene relácie, odhlásení alebo zmene vlastníka | 15 minút alebo do skoršieho vymazania |
+| `debateai.exportPending` | Úložisko relácie | Uchováva odkaz na export z e-mailu na tejto karte na prihlásenie a opakovaný pokus. | Do zatvorenia karty, odhlásenia, nového odkazu, prvého úspešného stiahnutia alebo výsledku neplatného odkazu či nesprávneho účtu |
+| `debateai.exportLinkOutcome` | Úložisko relácie | Pamätá si, ktoré hlásenie o odkaze na stiahnutie sa má na tejto karte zobraziť. | Do zatvorenia karty, odhlásenia alebo nového odkazu |
 
 Žiadna iná strana prostredníctvom Dialectical Engine nezhromažďuje informácie o vašich online aktivitách v priebehu času a naprieč webovými stránkami.
 
@@ -229,7 +233,7 @@ Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpo
 
 ### B.4 Austrália a Nový Zéland
 
-**Austrália.** Zahraničnými príjemcami vašich osobných informácií sú poskytovatelia umelej inteligencie a sprostredkovatelia uvedení v registri so sídlom v Spojených štátoch a v Európskej únii; prijímame primerané opatrenia, aby s nimi zaobchádzali v súlade s austrálskymi zásadami ochrany súkromia. **Automatizované rozhodnutia:** od 10. decembra 2026 tieto zásady identifikujú druhy rozhodnutí prijímaných počítačovými programami, ktoré významne ovplyvňujú vaše práva alebo záujmy — žiadne také nie sú; hodnotenia a verdikty sa týkajú argumentov, nie vás — a osobné informácie, ktoré sa pri nich používajú. Sťažnosti možno podať **Úradu austrálskeho komisára pre informácie**. **Nový Zéland.** Našou zodpovednou osobou pre ochranu osobných údajov je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Ak o vás zhromažďujeme osobné informácie nepriamo — pretože ich iný používateľ uviedol v otázke — tieto zásady a časť 11 predstavujú oznámenie, ktoré vám poskytujeme. Poskytovateľom umelej inteligencie uvedeným v registri ich poskytujeme ako našim zástupcom na základe zmlúv vyžadujúcich porovnateľné záruky. Sťažnosti možno podať **Úradu komisára pre ochranu súkromia**.
+**Austrália.** Zahraničnými príjemcami vašich osobných informácií sú sprostredkovatelia uvedení v časti 5, vrátane nášho poskytovateľa hostingu v Londýne vo Spojenom kráľovstve, a poskytovatelia umelej inteligencie uvedení v registri. Nachádzajú sa vo Spojenom kráľovstve, v Spojených štátoch a v Európskej únii a register uvádza krajiny každého poskytovateľa umelej inteligencie; prijímame primerané opatrenia, aby s nimi zaobchádzali v súlade s austrálskymi zásadami ochrany súkromia. **Automatizované rozhodnutia:** od 10. decembra 2026 tieto zásady identifikujú druhy rozhodnutí prijímaných počítačovými programami, ktoré významne ovplyvňujú vaše práva alebo záujmy — žiadne také nie sú; hodnotenia a verdikty sa týkajú argumentov, nie vás — a osobné informácie, ktoré sa pri nich používajú. Sťažnosti možno podať **Úradu austrálskeho komisára pre informácie**. **Nový Zéland.** Našou zodpovednou osobou pre ochranu osobných údajov je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Ak o vás zhromažďujeme osobné informácie nepriamo — pretože ich iný používateľ uviedol v otázke — tieto zásady a časť 11 predstavujú oznámenie, ktoré vám poskytujeme. Poskytovateľom umelej inteligencie uvedeným v registri ich poskytujeme ako našim zástupcom na základe zmlúv vyžadujúcich porovnateľné záruky. Sťažnosti možno podať **Úradu komisára pre ochranu súkromia**.
 
 ### B.5 Švajčiarsko
 

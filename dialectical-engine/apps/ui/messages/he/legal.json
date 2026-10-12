@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "עד 30 דקות",
   "legal.cookies.mfaRecovery.life": "עד 299 שניות",
   "legal.cookies.social.life": "עד 5 דקות",
-  "legal.cookies.phoneDraft.life": "15 דקות או עד למחיקה מוקדמת"
+  "legal.cookies.phoneDraft.life": "15 דקות או עד למחיקה מוקדמת",
+  "legal.cookies.exportPending.purpose": "שומר את קישור הייצוא שנשלח בדוא״ל בלשונית זו לצורך כניסה וניסיון חוזר.",
+  "legal.cookies.exportLinkOutcome.purpose": "זוכר איזו הודעה על קישור ההורדה להציג בלשונית זו.",
+  "legal.cookies.exportPending.life": "עד לסגירת הלשונית, יציאה מהחשבון, קישור חדש, ההורדה המוצלחת הראשונה או תוצאה של קישור לא תקין או חשבון שגוי",
+  "legal.cookies.exportLinkOutcome.life": "עד לסגירת הלשונית, יציאה מהחשבון או קישור חדש"
 }

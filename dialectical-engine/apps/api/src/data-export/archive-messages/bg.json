@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Вашите данни в Dialectical Engine",
+  "archive.generated": "Подготвено на {time} за {pseudonym}.",
+  "archive.accountHeading": "Профил",
+  "archive.email": "Имейл",
+  "archive.memberSince": "Член от",
+  "archive.debatesHeading": "Вашите дебати ({count})",
+  "archive.question": "Въпрос",
+  "archive.verdict": "Оценка",
+  "archive.verdictSupported": "Подкрепено",
+  "archive.verdictContested": "Оспорено",
+  "archive.verdictUnsupported": "Неподкрепено",
+  "archive.story": "Дебатът накратко",
+  "archive.arguments": "Аргументи",
+  "archive.visibilityPublic": "Публикувано",
+  "archive.visibilityPrivate": "Лично",
+  "archive.unreadable": "Съдържанието на този дебат вече не може да бъде прочетено, защото ключът му е унищожен.",
+  "archive.noDebates": "Нямате дебати.",
+  "archive.filesNote": "JSON файловете в този ZIP архив съдържат същите данни в машинночетим вид; те са изброени в README.txt."
+}

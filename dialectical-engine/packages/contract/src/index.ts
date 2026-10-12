@@ -749,10 +749,10 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("REMOVE_AUTH_METHOD"), target_factor_id: z.uuid() }).strict(),
   z.object({ action: z.enum(["LINK_PROVIDER", "UNLINK_PROVIDER"]), target_provider: z.enum(["google", "apple", "facebook", "x"]) }).strict(),
   z.object({ action: z.literal("CHANGE_EMAIL") }).strict(),
-  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP", "REGENERATE_RECOVERY_CODES"]) }).strict(),
+  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP", "REGENERATE_RECOVERY_CODES", "EXPORT_DATA"]) }).strict(),
   z.object({ action: z.literal("WITHDRAW_SUBSCRIPTION") }).strict()
 ]);
-const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
+export const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({ token:z.string().regex(/^[A-Za-z0-9_-]{43}$/), action:z.literal("REMOVE_AUTH_METHOD"), target_factor_id:z.uuid(), expires_at:z.iso.datetime() }).strict(),
   z.object({ token:z.string().regex(/^[A-Za-z0-9_-]{43}$/), action:z.enum(["LINK_PROVIDER","UNLINK_PROVIDER"]), target_provider:z.enum(["google","apple","facebook","x"]), expires_at:z.iso.datetime() }).strict(),
   z.object({
@@ -768,7 +768,7 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   }).strict(),
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-    action: z.enum(["CHANGE_EMAIL", "READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP", "REGENERATE_RECOVERY_CODES"]),
+    action: z.enum(["CHANGE_EMAIL", "READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP", "REGENERATE_RECOVERY_CODES", "EXPORT_DATA"]),
     expires_at: z.iso.datetime()
   }).strict(),
   z.object({
@@ -786,6 +786,27 @@ export const StepUpResponseSchema = z.object({
 
 export type StepUpAuthorizationRequest = z.infer<typeof StepUpAuthorizationRequestSchema>;
 export type StepUpResponse = z.infer<typeof StepUpResponseSchema>;
+export const DATA_EXPORT_LOCALES = [
+  "ar", "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "ga", "he", "hi", "hr", "hu", "id", "it",
+  "ja", "ko", "lt", "lv", "mt", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "vi", "zh"
+] as const;
+const DataExportTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+export const DataExportRequestSchema = z.object({
+  step_up_grant: DataExportTokenSchema,
+  locale: z.enum(DATA_EXPORT_LOCALES)
+}).strict();
+export const DataExportStatusSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("NONE") }).strict(),
+  z.object({ status: z.literal("PREPARING"), requested_at: z.iso.datetime() }).strict(),
+  z.object({ status: z.literal("SENT"), requested_at: z.iso.datetime(), expires_at: z.iso.datetime() }).strict(),
+  z.object({ status: z.literal("FAILED"), requested_at: z.iso.datetime() }).strict()
+]);
+export type DataExportStatus = z.infer<typeof DataExportStatusSchema>;
+export const DataExportDownloadRequestSchema = z.object({ token: DataExportTokenSchema }).strict();
+export const DATA_EXPORT_ERROR_CODES = [
+  "EXPORT_UNAVAILABLE", "EXPORT_EMAIL_REQUIRED", "EXPORT_ACCOUNT_ERASING", "EXPORT_ACCOUNT_HELD",
+  "EXPORT_IN_PROGRESS", "EXPORT_RATE_LIMITED", "EXPORT_WRONG_ACCOUNT", "EXPORT_LINK_INVALID"
+] as const;
 export const BeginSocialStepUpRequestSchema = z.object({authorization:StepUpAuthorizationRequestSchema,next:z.enum(['/','/new','/settings','/settings/security','/account']).optional()}).strict();
 export const SocialStepUpStatusRequestSchema = z.object({continuation_token:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
 export const SocialStepUpStatusResponseSchema = z.object({authorization:StepUpAuthorizationRequestSchema,expires_at:z.iso.datetime(),available_methods:z.array(z.enum(['passkey','totp','recovery_code']))}).strict();
@@ -1471,6 +1492,9 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/account",
     "GET /v1/account/erasure",
     "POST /v1/account/erasure/cancel",
+    "GET /v1/account/export",
+    "POST /v1/account/export",
+    "POST /v1/account/export/download",
     "GET /v1/account/legal-status",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
@@ -1557,6 +1581,7 @@ export const contractInventory = Object.freeze({
     SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
     BeginSocialStepUpRequestSchema,SocialStepUpStatusRequestSchema,SocialStepUpStatusResponseSchema,CompleteSocialStepUpRequestSchema,StepUpAuthorizationRequestSchema, StepUpResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, AuthMethodsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, RecoveryCodesResponseSchema, MfaRecoveryPendingResponseSchema, MfaRecoveryPendingCancelRequestSchema, MfaRecoveryPendingCancelledSchema,
+    DataExportRequestSchema, DataExportStatusSchema, DataExportDownloadRequestSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,

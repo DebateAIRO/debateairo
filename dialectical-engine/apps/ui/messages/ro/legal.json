@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Cel mult 30 de minute",
   "legal.cookies.mfaRecovery.life": "Cel mult 299 de secunde",
   "legal.cookies.social.life": "Cel mult 5 minute",
-  "legal.cookies.phoneDraft.life": "15 minute sau până la ștergere"
+  "legal.cookies.phoneDraft.life": "15 minute sau până la ștergere",
+  "legal.cookies.exportPending.purpose": "Păstrează în această filă linkul de export primit prin e-mail pentru autentificare și reîncercare.",
+  "legal.cookies.exportLinkOutcome.purpose": "Reține ce mesaj despre linkul de descărcare trebuie afișat în această filă.",
+  "legal.cookies.exportPending.life": "Până la închiderea filei, deconectare, un link nou, prima descărcare reușită sau un rezultat de link invalid ori cont greșit",
+  "legal.cookies.exportLinkOutcome.life": "Până la închiderea filei, deconectare sau un link nou"
 }
