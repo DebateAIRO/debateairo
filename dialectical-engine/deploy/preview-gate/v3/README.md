@@ -237,10 +237,10 @@ The smallest pot that passes with all four switched on is $1.43.
   reached" means the connection failed before anything was sent. A "too many requests" answer in
   between neither adds to that count nor resets it. (For Anthropic, its not-busy error answers, 400,
   404, 413 and 500, do add to that count, as before 2026-10-12: README-anthropic.md.) A normal answer, or `activate`, resets it.
+  Such a failed connection leaves no entry: nothing was sent, so there is nothing DeepInfra could bill.
   Calls that were on their way at the same time count once (since 2026-10-12): one short network
   blip that fails 10 calls at once adds 1 to the count, not 10. Calls sent one after another still
-  add 1 each. Such
-  a failed connection leaves no entry: nothing was sent, so there is nothing DeepInfra could bill.
+  add 1 each.
 - **What the app sees when a call is refused, in plain words.**
   - `PROVIDER_REFUSED_UNBILLED`: DeepInfra's "too many requests" answer. Nothing was charged.
   - `PROVIDER_ERROR_UNBILLED`: only from the Anthropic gate: Anthropic answered with an error that

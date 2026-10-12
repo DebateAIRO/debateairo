@@ -133,6 +133,9 @@ cache reads.
   Five in a row of "never reached Anthropic" (the connection failed before anything was sent) or
   not-busy answers, with no normal answer in between, halt the gate with `provider_unreachable`,
   and the halt watcher emails. A normal answer, or `activate`, resets that count.
+  Calls that were on their way at the same time count once (since 2026-10-12): one short network
+  blip that fails 10 calls at once adds 1 to the count, not 10. Calls sent one after another still
+  add 1 each. This covers the connection failures and the not-busy answers above alike.
 - **The daily unbilled email.** Once a day, the Anthropic halt watcher also warns about unbilled
   refusals: when `status` shows `today_unbilled_releases` (calls Anthropic refused without billing
   them, busy or not) at or above the threshold, the owner gets one email for that Bucharest day
