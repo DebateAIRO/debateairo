@@ -429,6 +429,10 @@ function offPanelRoleRefs(panel: readonly PreviewPanelMember[], roleProviderRefs
  * a cooldown at the author and reviewer steps. Since the preview retry fix (option B) that paid try can
  * happen on the preview too (the preview keeps the sealed lifetime bound and one POST per call); it is
  * left to the 15% margin, like a re-claim's repeat attempts. These numbers did not change.
+ * Nor, by the same ruling (all-steps format robustness, 2026-10-12), a debate step's one format repair try on the
+ * preview (`previewFormatRepairAllowed`, providers/preview-test.ts): a second, billed POST in the same call, sent only
+ * after the step's reply failed its check. Like the final retry it is the exception, left to the margin; the gate still
+ * reserves each POST at its row's whole bound before sending it, so it can never spend what the gate has not allowed.
  */
 export function previewExpectedCalls(input: Readonly<{
   basis: Readonly<Record<string, unknown>>;

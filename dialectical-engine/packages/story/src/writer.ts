@@ -5,6 +5,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
+  rememberingAcceptedReply,
   schemaFailureLocator,
   type CallBound,
   type ContentClassification,
@@ -232,25 +233,6 @@ function lineageOf(result: ProviderCallResult, providerRef: string): MakerLineag
     model_id: result.model,
     transport: result.provider,
     provider_ref: providerRef
-  });
-}
-
-/**
- * Story format robustness (2026-10-12): the classifier a story call hands the gateway, remembering how the
- * reply it accepted ended and which repair the tolerant decode needed. The writer then reads the accepted
- * content exactly as the classifier read it (the last repair depends on how the reply ended) and logs the
- * repair by its code. A gateway that never classifies leaves nothing remembered: the content is read strictly.
- */
-function rememberingAcceptedReply(classify: (content: string, reply: ModelReplyFacts | undefined) => ContentClassification) {
-  let accepted: Readonly<{ content: string; reply: ModelReplyFacts | undefined; repair: ModelJsonRepair | null }> | null = null;
-  return Object.freeze({
-    classifyContent: (content: string, reply?: ModelReplyFacts): ContentClassification => {
-      const classified = classify(content, reply);
-      if (classified.parseStatus === "PARSED") accepted = Object.freeze({ content, reply, repair: classified.jsonRepair ?? null });
-      return classified;
-    },
-    acceptedAs: (content: string): Readonly<{ reply: ModelReplyFacts | undefined; repair: ModelJsonRepair | null }> =>
-      accepted !== null && accepted.content === content ? accepted : Object.freeze({ reply: undefined, repair: null })
   });
 }
 

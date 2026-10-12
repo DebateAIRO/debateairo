@@ -20,7 +20,14 @@ import { StoryRepository } from "@debateai/story";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
 import { composePracticeAsk, practiceRemainingPorts } from "./practice-ask-composition.js";
 import type { PracticeGateName, PracticeGateObserver } from "./practice-gate-observer.js";
-import { callFamilyOf, issueListFromParseError, recheckReply, replyContentOf } from "./practice-lanes.js";
+import {
+  callFamilyOf,
+  issueListFromParseError,
+  practiceFinishReasonOf,
+  practiceJsonRepairOf,
+  recheckReply,
+  replyContentOf
+} from "./practice-lanes.js";
 import { practiceQuestion } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
 import {
@@ -31,7 +38,14 @@ import {
 import { composePracticeRunner } from "./practice-runner-composition.js";
 import type { PracticeSettings, PracticeSockets } from "./practice-settings.js";
 import { startPracticeDatabase, type PracticeDatabase } from "./practice-throwaway-db.js";
-import { latencySummary, type LatencySummary } from "./practice-verdict.js";
+import {
+  latencySummary,
+  practiceCallFacts,
+  practiceModelCalls,
+  type LatencySummary,
+  type PracticeCallTry,
+  type PracticeModelCalls
+} from "./practice-verdict.js";
 
 /** The practice's one throwaway person's DEK lives only in memory, for this process. */
 class PracticeUserDekStore implements ReadableUserDekStore {
@@ -80,6 +94,8 @@ export type PracticeFailure = Readonly<{
   recheckIssues: readonly string[];
   latencyMs: number;
   replyText: string;
+  /** Owner ruling 2026-10-12 ("Fixed slips = warning"): a later try of the SAME call (same step, same maker) was accepted. */
+  fixedBySameCall: boolean;
 }>;
 
 export type PracticeDebateResult = Readonly<{
@@ -104,7 +120,14 @@ export type PracticeDebateResult = Readonly<{
   byModelAndSite: readonly PracticeCallRow[];
   probes: readonly Readonly<{ providerRef: string; state: string; failureCode: string | null; count: number }>[];
   failures: readonly PracticeFailure[];
+  /** Calls (one step on one maker, all its tries) that ended without an accepted reply after a refused one. */
   formatFailures: number;
+  /** Each AI's calls for the slip rule. */
+  callsByModel: Readonly<Record<string, PracticeModelCalls>>;
+  /** Each AI's calls that ended with an accepted reply, and those that ended without one (any reason). */
+  answersByModel: Readonly<Record<string, Readonly<{ answered: number; unanswered: number }>>>;
+  /** Information only: each accepted reply that needed a tolerant repair, by model and code. */
+  jsonRepairs: readonly Readonly<{ model: string; repair: string }>[];
   failedCalls: number;
   refusedCalls: number;
   remaining: Readonly<Record<PracticeGateName, Readonly<{ before: PreviewGateRemaining | null; after: PreviewGateRemaining | null }>>>;
@@ -130,7 +153,8 @@ async function readRemaining(port: (signal?: AbortSignal) => Promise<PreviewGate
 }
 
 /** What happened, read from the throwaway database after the debate. */
-async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateResult, "byModelAndSite" | "failures" | "formatFailures" | "failedCalls" | "refusedCalls">> {
+async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateResult, "byModelAndSite" | "failures" | "formatFailures"
+  | "callsByModel" | "answersByModel" | "jsonRepairs" | "failedCalls" | "refusedCalls">> {
   const entries = (await pool.query<{ sequence: string; call_site_key: string; actor_ref: string; outcome: string;
     started_at: Date; finished_at: Date; raw_artifact_ref: string | null }>(
     `SELECT sequence::text, call_site_key, actor_ref, outcome, started_at, finished_at, raw_artifact_ref::text
@@ -143,9 +167,17 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     parse: Record<string, number>; latencies: number[]; input: number; output: number; cost: bigint };
   const buckets = new Map<string, Bucket>();
   const failures: PracticeFailure[] = [];
-  let formatFailures = 0;
   let failedCalls = 0;
   let refusedCalls = 0;
+  // Owner ruling 2026-10-12 ("Fixed slips = warning"): a call is one step on one maker (its call-site key and its actor)
+  // with all its tries, in ledger order: its format repair, its one resend after an unbilled refusal, the final retry.
+  const calls = new Map<string, { model: string; tries: PracticeCallTry[] }>();
+  const jsonRepairs: { model: string; repair: string }[] = [];
+  const readContent = async (rawArtifactRef: string, artifact: { raw_text: string; content_ciphertext: unknown }) => {
+    const stored = await decryptContentForRun<{ rawText: string; parseErrorDetail: string | null }>(pool, runId, "ledger.raw_artifact",
+      rawArtifactRef, (artifact.content_ciphertext ?? null) as never, { rawText: artifact.raw_text, parseErrorDetail: null });
+    return stored;
+  };
   for (const entry of entries) {
     const model = modelOfRef(entry.actor_ref);
     const site = callFamilyOf(entry.call_site_key);
@@ -167,21 +199,39 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
       const row = previewModelRow(model);
       if (row !== undefined) bucket.cost += previewCallNanoUsd(row, BigInt(usage.input), usage.output);
     }
-    const formatFailed = parseStatus === "PARSE_FAILED" || parseStatus === "SCHEMA_FAILED";
+    const formatFailed = parseStatus === "PARSE_FAILED" || parseStatus === "SCHEMA_FAILED" || parseStatus === "UNPARSED";
     if (entry.outcome === "REFUSED") refusedCalls += 1;
     else if (entry.outcome !== "OK" && !formatFailed) failedCalls += 1;
+    const callKey = `${entry.actor_ref}\u0000${entry.call_site_key}`;
+    const call = calls.get(callKey) ?? { model, tries: [] };
+    calls.set(callKey, call);
+    call.tries.push(Object.freeze({ outcome: entry.outcome, parseStatus: artifact === undefined ? null : parseStatus }));
+    if (entry.outcome === "OK" && artifact !== undefined) {
+      const stored = await readContent(entry.raw_artifact_ref!, artifact);
+      const repair = practiceJsonRepairOf(replyContentOf(stored.rawText), practiceFinishReasonOf(artifact.metadata_json));
+      if (repair !== null) jsonRepairs.push(Object.freeze({ model, repair }));
+    }
     if (formatFailed && artifact !== undefined) {
-      formatFailures += 1;
-      const stored = await decryptContentForRun<{ rawText: string; parseErrorDetail: string | null }>(pool, runId, "ledger.raw_artifact",
-        entry.raw_artifact_ref!, (artifact.content_ciphertext ?? null) as never, { rawText: artifact.raw_text, parseErrorDetail: null });
+      const stored = await readContent(entry.raw_artifact_ref!, artifact);
       const content = replyContentOf(stored.rawText);
       failures.push(Object.freeze({
         sequence: Number(entry.sequence), model, providerRef: entry.actor_ref, callSiteKey: entry.call_site_key, parseStatus,
         issues: issueListFromParseError(stored.parseErrorDetail), recheckIssues: recheckReply(entry.call_site_key, content).issues,
-        latencyMs, replyText: reportableReplyText(content)
+        latencyMs, replyText: reportableReplyText(content), fixedBySameCall: false
       }));
     }
   }
+  const callList = [...calls.entries()];
+  const formatFailures = callList.filter(([, call]) => practiceCallFacts(call.tries).unrecovered).length;
+  const answersByModel: Record<string, { answered: number; unanswered: number }> = {};
+  for (const [, call] of callList) {
+    const mine = answersByModel[call.model] ??= { answered: 0, unanswered: 0 };
+    if (practiceCallFacts(call.tries).answered) mine.answered += 1; else mine.unanswered += 1;
+  }
+  // A wrong-format reply whose call was answered later (same step, same maker): fixed by the same call.
+  const answeredKeys = new Set(callList.filter(([, call]) => practiceCallFacts(call.tries).answered).map(([key]) => key));
+  const fixed = failures.map((failure) => Object.freeze({ ...failure,
+    fixedBySameCall: answeredKeys.has(`${failure.providerRef}\u0000${failure.callSiteKey}`) }));
   const byModelAndSite = [...buckets.values()]
     .sort((a, b) => a.model.localeCompare(b.model) || a.providerRef.localeCompare(b.providerRef)
       || ROSTER_ORDER.indexOf(a.site) - ROSTER_ORDER.indexOf(b.site))
@@ -191,7 +241,10 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
       latencyMs: latencySummary(bucket.latencies), inputTokens: bucket.input, outputTokens: bucket.output,
       costNanoUsd: String(bucket.cost)
     }));
-  return { byModelAndSite: Object.freeze(byModelAndSite), failures: Object.freeze(failures), formatFailures, failedCalls, refusedCalls };
+  return { byModelAndSite: Object.freeze(byModelAndSite), failures: Object.freeze(fixed), formatFailures,
+    callsByModel: practiceModelCalls(callList.map(([, call]) => call)),
+    answersByModel: Object.freeze(Object.fromEntries(Object.entries(answersByModel).map(([model, mine]) => [model, Object.freeze(mine)]))),
+    jsonRepairs: Object.freeze(jsonRepairs), failedCalls, refusedCalls };
 }
 
 function codeOf(error: unknown): string {
@@ -303,7 +356,8 @@ export async function runPracticeDebate(input: Readonly<{
         register: receipt, questionId: question.id, depth: input.depth,
         admission: { admitted: false, refusalCode: refusalCode ?? "NOT_DISPATCHED", panel: [], satOut: [], rotation: null },
         run: { runId: null, workItemOutcome: null, failureCode: null, answer: null, story: null },
-        byModelAndSite: [], probes, failures: [], formatFailures: 0, failedCalls: 0, refusedCalls: 0,
+        byModelAndSite: [], probes, failures: [], formatFailures: 0, callsByModel: {}, answersByModel: {}, jsonRepairs: [],
+        failedCalls: 0, refusedCalls: 0,
         remaining, seconds: { admission: admissionSeconds, debate: 0 }
       });
     }

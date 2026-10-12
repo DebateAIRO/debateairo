@@ -47,6 +47,8 @@ import { limitPort, PracticeSemaphore, runModelQueues, type PracticePreparedJob 
 import type { PracticeGateName, PracticeGateObserver, PracticeUnbilledKind } from "./practice-gate-observer.js";
 import {
   issueListFromParseError,
+  practiceFinishReasonOf,
+  practiceJsonRepairOf,
   recheckReply,
   replyContentOf,
   runPracticeLane,
@@ -55,9 +57,14 @@ import {
 } from "./practice-lanes.js";
 import { PRACTICE_QUESTIONS } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
+import { practiceCallFacts } from "./practice-verdict.js";
 
+/**
+ * REPAIRED (owner ruling 2026-10-12, "Fixed slips = warning"): every call of the job ended with an accepted reply, and
+ * at least one of them only on its second try, after its first reply failed its format or content check.
+ */
 export type PracticeSampleStatus =
-  | "PARSED" | "PARSE_FAILED" | "SCHEMA_FAILED" | "UNPARSED" | "POST_CHECK_FAILED"
+  | "PARSED" | "REPAIRED" | "PARSE_FAILED" | "SCHEMA_FAILED" | "UNPARSED" | "POST_CHECK_FAILED"
   | "CALL_FAILED" | "UNBILLED_REFUSED" | "VENDOR_ERROR_UNBILLED" | "SKIPPED_GATE_STOPPED" | "SKIPPED_MODEL_BUSY";
 
 export type PracticeAttempt = Readonly<{
@@ -65,6 +72,8 @@ export type PracticeAttempt = Readonly<{
   outcome: ProviderLedgerInput["outcome"];
   parseStatus: RawArtifactInput["parseStatus"] | null;
   latencyMs: number;
+  /** Information only: for an accepted reply, the tolerant repair it needed (`practiceJsonRepairOf`); absent in older logs. */
+  jsonRepair?: string | null;
 }>;
 
 export type PracticeSample = Readonly<{
@@ -321,15 +330,23 @@ export async function runPracticeFormats(input: Readonly<{
       const attempts = sink.ledger.map((entry): PracticeAttempt => {
         const artifact = sink.artifacts.find((candidate) => candidate.attemptId === entry.attemptId) ?? null;
         return Object.freeze({ callSiteKey: entry.callSiteKey, outcome: entry.outcome, parseStatus: artifact?.parseStatus ?? null,
-          latencyMs: entry.finishedAt.getTime() - entry.startedAt.getTime() });
+          latencyMs: entry.finishedAt.getTime() - entry.startedAt.getTime(),
+          jsonRepair: artifact === null || entry.outcome !== "OK" ? null
+            : practiceJsonRepairOf(replyContentOf(artifact.rawText), practiceFinishReasonOf(artifact.metadata)) });
       });
       // The real model's artifacts only (the story jobs' local stand-in records none).
       const failed = [...sink.artifacts].reverse().find((artifact) => artifact.parseStatus !== "PARSED") ?? null;
       const last = sink.artifacts.at(-1) ?? null;
+      // Owner ruling 2026-10-12 ("Fixed slips = warning"): a slip the same call's second try fixed is REPAIRED; a call
+      // that never got an accepted reply keeps the refused reply's status.
+      const callsOfJob = [...new Set(attempts.map((attempt) => attempt.callSiteKey))]
+        .map((key) => practiceCallFacts(attempts.filter((attempt) => attempt.callSiteKey === key)));
       let status: PracticeSampleStatus;
       if (last !== null && last.parseStatus !== "PARSED") status = last.parseStatus;
-      else if (failed !== null) status = failed.parseStatus; // a repair fixed it, but the first reply had the wrong format
+      else if (failed !== null && callsOfJob.some((call) => call.unrecovered)) status = failed.parseStatus;
       else if (postCheckError !== null) status = "POST_CHECK_FAILED";
+      else if (failed !== null && errorCode === null) status = "REPAIRED";
+      else if (failed !== null) status = failed.parseStatus;
       else if (last !== null && errorCode === null) status = "PARSED";
       // The vendor answered with an error it did not bill and that is not "busy" (e.g. Anthropic's 400): a failed call.
       else if (errorUnbilled > 0 && last === null) status = "VENDOR_ERROR_UNBILLED";

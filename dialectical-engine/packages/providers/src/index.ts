@@ -163,6 +163,15 @@ export interface ProviderCallRequest {
    */
   readonly maxAttemptsThisCall?: number;
   /**
+   * All-steps format robustness (2026-10-12): true when the POSTs of THIS call after its first may be spent only on a
+   * reply this call's classifier refused (a repair packet, or a length retry): a transport failure (a timeout, a vendor
+   * error, the gate's refusal, billed or not) ends the call after its row, as a one-POST call would. Set only by the
+   * preview's call policy for a structured step's one repair try, so its one 60-second resend after an unbilled refusal
+   * stays the one resend. Absent: every failure may use the call's attempts, which is hosted and local byte for byte.
+   * Never sent.
+   */
+  readonly retryOnlyAfterContentRejection?: boolean;
+  /**
    * Run resilience (spec 2026-10-12, fix (b)): whose attempts the step's allowance counts. "actor" — set only by
    * the preview's call policy (`withPreviewProviderCallPolicy`) — counts the asking maker's own rows
    * (`providerRef`), so each maker that a fallback moves a call to has its own allowance at the call site. Absent
@@ -2300,6 +2309,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          */
         if (error instanceof TypedDomainError
           && (error.code === PROVIDER_CONTENT_REFUSED || error.code === PROVIDER_REPLY_UNSUPPORTED)) break;
+        // All-steps format robustness (2026-10-12): a call whose later POSTs are for content repairs only ends here.
+        if (request.retryOnlyAfterContentRejection === true) break;
       }
       // L4-F2: an oversized packet is deterministic — resending it would burn the ceiling for
       // an identical refusal, so the loop stops on the attempt that refused it.
@@ -2401,7 +2412,9 @@ export { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 export {
   decodeModelJson,
   modelJsonFenceBody,
+  modelJsonLateRepair,
   modelJsonObjectSpans,
+  rememberingAcceptedReply,
   type ModelJsonDecoded,
   type ModelJsonRepair,
   type ModelReplyFacts

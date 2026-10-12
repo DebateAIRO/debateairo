@@ -11,7 +11,16 @@ import { join, resolve, sep } from "node:path";
 import type { PracticeDebateResult } from "./practice-debate.js";
 import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
 import { practiceStopIsPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
-import { latencySummary, practiceVerdict, type PracticeVerdictResult } from "./practice-verdict.js";
+import {
+  latencySummary,
+  practiceCallFacts,
+  practiceModelCalls,
+  practiceSlipRateExceeded,
+  practiceVerdict,
+  type PracticeBusyModelRun,
+  type PracticeModelCalls,
+  type PracticeVerdictResult
+} from "./practice-verdict.js";
 
 export const PRACTICE_REPORT_SCHEMA = "preview-practice-report-v1" as const;
 const GATES: readonly PracticeGateName[] = ["deepinfra", "anthropic"];
@@ -105,6 +114,24 @@ function gatePauses(observer: PracticeGateObserver): readonly string[] {
 
 export type PracticeReport = Readonly<Record<string, unknown> & { verdict: PracticeVerdictResult["verdict"]; exitCode: number; reasons: readonly string[] }>;
 
+/**
+ * Owner ruling 2026-10-12 ("Fixed slips = warning"): per AI, its answered calls, its slips (first reply refused by its
+ * check), those the same call's second try fixed, those never fixed, whether its slip rate is over the rule
+ * (`practiceSlipRateExceeded`), and, as information only, the tolerant repairs its accepted replies needed, by code.
+ */
+export type PracticeSlipBlock = PracticeModelCalls & Readonly<{ slipRateExceeded: boolean; jsonRepairs: Readonly<Record<string, number>> }>;
+
+function slipBlocks(calls: Readonly<Record<string, PracticeModelCalls>>, repairs: readonly Readonly<{ model: string; repair: string }>[]):
+  Readonly<Record<string, PracticeSlipBlock>> {
+  const models = [...new Set([...Object.keys(calls), ...repairs.map((entry) => entry.model)])].sort();
+  return Object.freeze(Object.fromEntries(models.map((model) => {
+    const mine = calls[model] ?? { answered: 0, slips: 0, repaired: 0, unrecovered: 0 };
+    const jsonRepairs: Record<string, number> = {};
+    for (const entry of repairs) if (entry.model === model) jsonRepairs[entry.repair] = (jsonRepairs[entry.repair] ?? 0) + 1;
+    return [model, Object.freeze({ ...mine, slipRateExceeded: practiceSlipRateExceeded(mine), jsonRepairs: Object.freeze(jsonRepairs) })];
+  })));
+}
+
 export function formatsReport(input: Readonly<{
   result: PracticeFormatsResult;
   observer: PracticeGateObserver;
@@ -118,10 +145,27 @@ export function formatsReport(input: Readonly<{
 }>): PracticeReport {
   const samples = input.result.samples;
   const formatStatuses = new Set(["PARSE_FAILED", "SCHEMA_FAILED", "UNPARSED", "POST_CHECK_FAILED"]);
-  // Every attempt counts: a repair that fixed the reply still means the first reply had the wrong format.
-  const formatFailures = samples.reduce((sum, sample) => sum + sample.attempts.filter((attempt) =>
-    attempt.parseStatus === "PARSE_FAILED" || attempt.parseStatus === "SCHEMA_FAILED" || attempt.parseStatus === "UNPARSED").length
+  // Owner ruling 2026-10-12 ("Fixed slips = warning"): each job's calls by call-site key, each with all its tries.
+  const callsOf = (sample: PracticeSample) => [...new Set(sample.attempts.map((attempt) => attempt.callSiteKey))]
+    .map((key) => Object.freeze({ model: sample.model, tries: sample.attempts.filter((attempt) => attempt.callSiteKey === key) }));
+  const calls = samples.flatMap(callsOf);
+  const callsByModel = practiceModelCalls(calls);
+  // A failure: a call that never got an accepted reply after a refused one (at least one for a job whose status is still
+  // a format status, as every such job of a log written before the REPAIRED status is), or a reply the runner's own
+  // reading refused after the check.
+  const formatFailures = samples.reduce((sum, sample) => sum + Math.max(
+    callsOf(sample).filter((call) => practiceCallFacts(call.tries).unrecovered).length,
+    sample.status === "PARSE_FAILED" || sample.status === "SCHEMA_FAILED" || sample.status === "UNPARSED" ? 1 : 0)
     + (sample.status === "POST_CHECK_FAILED" ? 1 : 0), 0);
+  // Owner ruling 2026-10-12 ("Keep GLM, it sits out"): what each busy model answered (jobs with an accepted reply) and skipped.
+  const busyRuns: Record<string, PracticeBusyModelRun> = {};
+  for (const model of input.result.busyModels) {
+    const mine = samples.filter((sample) => sample.model === model);
+    const answered = mine.filter((sample) => sample.attempts.some((attempt) => attempt.outcome === "OK")).length;
+    busyRuns[model] = Object.freeze({ answered, skipped: mine.length - answered });
+  }
+  const jsonRepairs = samples.flatMap((sample) => sample.attempts.flatMap((attempt) =>
+    typeof attempt.jsonRepair === "string" ? [{ model: sample.model, repair: attempt.jsonRepair }] : []));
   // A vendor error that was not billed and is not "busy" (PROVIDER_ERROR_UNBILLED, e.g. Anthropic's 400) is a failed call.
   const failedCalls = samples.filter((sample) => sample.status === "CALL_FAILED" || sample.status === "VENDOR_ERROR_UNBILLED").length;
   const exercised = new Set(samples.filter((sample) => sample.status !== "SKIPPED_GATE_STOPPED" && sample.status !== "UNBILLED_REFUSED"
@@ -134,6 +178,8 @@ export function formatsReport(input: Readonly<{
     servedAnswer: null,
     storyOutcome: null,
     formatFailures,
+    callsByModel,
+    busyRuns,
     failedCalls,
     gateHalted: gateHalted(input.observer, { deepinfra: input.remaining.deepinfra.after, anthropic: input.remaining.anthropic.after }),
     gateStopped: gateStopped(input.observer),
@@ -159,12 +205,15 @@ export function formatsReport(input: Readonly<{
     startedAt: input.startedAt.toISOString(), finishedAt: input.finishedAt.toISOString(),
     wallSeconds: Math.round((input.finishedAt.getTime() - input.startedAt.getTime()) / 1000),
     models: input.result.models, lanes: input.result.lanes, busyModels: input.result.busyModels,
+    slipsByModel: slipBlocks(callsByModel, jsonRepairs),
     byModelAndLane,
     gates: Object.fromEntries(GATES.map((gate) => [gate, gateBlock(input.observer, gate, input.remaining[gate])])),
     totals: Object.freeze({
       samples: samples.length,
       costUsd: usd(samples.reduce((sum, sample) => sum + BigInt(sample.costNanoUsd ?? "0"), 0n)),
-      formatFailures, failedCalls
+      formatFailures, failedCalls,
+      formatRepaired: Object.values(callsByModel).reduce((sum, mine) => sum + mine.repaired, 0),
+      jsonRepairs: jsonRepairs.length
     }),
     failures: samples.filter((sample) => formatStatuses.has(sample.status) || sample.status === "CALL_FAILED"
       || sample.status === "VENDOR_ERROR_UNBILLED"
@@ -184,12 +233,17 @@ export function debateReport(input: Readonly<{
   // beside those that sat out at the ask: not exercised to the end, so NOT_PROVEN, never FAIL on their own.
   const satOutAtAsk = new Set(r.admission.satOut.map((entry) => entry.model));
   const busyDuringRun = input.observer.modelsEndingBusy().filter((model) => !satOutAtAsk.has(model));
+  // Owner ruling 2026-10-12 ("Keep GLM, it sits out"): a member that sat out after at least one accepted answer is a warning.
+  const busyRuns = Object.fromEntries(busyDuringRun.map((model) => [model, Object.freeze({
+    answered: r.answersByModel?.[model]?.answered ?? 0, skipped: r.answersByModel?.[model]?.unanswered ?? 0 })]));
   const verdict = practiceVerdict({
     harnessError: null,
     completed: r.admission.admitted && r.run.workItemOutcome === "COMPLETED",
     servedAnswer: r.run.answer?.served ?? false,
     storyOutcome: r.run.story?.outcome ?? "MISSING",
     formatFailures: r.formatFailures,
+    callsByModel: r.callsByModel ?? {},
+    busyRuns,
     failedCalls: r.failedCalls,
     gateHalted: gateHalted(input.observer, { deepinfra: r.remaining.deepinfra.after, anthropic: r.remaining.anthropic.after }),
     gateStopped: gateStopped(input.observer),
@@ -212,6 +266,7 @@ export function debateReport(input: Readonly<{
     ask: Object.freeze({ questionId: r.questionId, depth: r.depth, planTier: "premium" }),
     admission: r.admission,
     busyDuringRun,
+    slipsByModel: slipBlocks(r.callsByModel ?? {}, r.jsonRepairs ?? []),
     run: r.run,
     probes: r.probes,
     byModelAndSite: r.byModelAndSite,
@@ -219,7 +274,9 @@ export function debateReport(input: Readonly<{
     totals: Object.freeze({
       calls: r.byModelAndSite.reduce((sum, row) => sum + row.calls, 0),
       costUsd: usd(r.byModelAndSite.reduce((sum, row) => sum + BigInt(row.costNanoUsd), 0n)),
-      formatFailures: r.formatFailures, failedCalls: r.failedCalls, refusedCalls: r.refusedCalls
+      formatFailures: r.formatFailures, failedCalls: r.failedCalls, refusedCalls: r.refusedCalls,
+      formatRepaired: Object.values(r.callsByModel ?? {}).reduce((sum, mine) => sum + mine.repaired, 0),
+      jsonRepairs: (r.jsonRepairs ?? []).length
     }),
     failures: r.failures
   });
@@ -276,6 +333,17 @@ export function reportMarkdown(report: PracticeReport): string {
     }
     lines.push("");
   }
+  const slips = report.slipsByModel as Readonly<Record<string, PracticeSlipBlock>> | undefined;
+  if (slips !== undefined && Object.keys(slips).length > 0) {
+    lines.push("Format slips per AI (a slip the same call's second try fixed is a warning; more than 1 slip in 10 answered calls, "
+      + "and more than one slip, fails; the tolerant repairs are information only):", "");
+    for (const [model, entry] of Object.entries(slips)) {
+      lines.push(`- ${model}: ${String(entry.answered)} answered calls, ${String(entry.slips)} slipped on the first try, `
+        + `${String(entry.repaired)} fixed by the same call, ${String(entry.unrecovered)} never fixed`
+        + `${entry.slipRateExceeded ? " (over the slip rule)" : ""}; tolerant repairs ${JSON.stringify(entry.jsonRepairs)}`);
+    }
+    lines.push("");
+  }
   const rows = (report.byModelAndSite ?? report.byModelAndLane) as readonly Record<string, unknown>[] | undefined;
   if (rows !== undefined && rows.length > 0) {
     lines.push("| model | step | calls | outcomes / statuses | format | p50 s | p90 s | max s |", "|---|---|---|---|---|---|---|---|");
@@ -288,7 +356,7 @@ export function reportMarkdown(report: PracticeReport): string {
     lines.push("");
   }
   const failures = report.failures as readonly unknown[] | undefined;
-  lines.push(`Wrong-format replies: ${String(failures?.length ?? 0)} (their text and the exact problems are in report.json, "failures").`, "");
+  lines.push(`Wrong-format replies, fixed by their call or not: ${String(failures?.length ?? 0)} (their text and the exact problems are in report.json, "failures").`, "");
   return lines.join("\n");
 }
 

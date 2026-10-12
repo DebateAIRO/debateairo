@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { ABSTENTION_KINDS, CLAIM_TYPES, isRunLevelSpendStop, type AbstentionKind, type ClaimType } from "@debateai/kernel";
 import type { CompositionMapRegisterRow } from "@debateai/register";
-import { modelJsonFenceBody, modelJsonObjectSpans } from "@debateai/providers";
+import {
+  modelJsonFenceBody,
+  modelJsonLateRepair,
+  modelJsonObjectSpans,
+  type ContentClassification,
+  type ModelJsonRepair,
+  type ModelReplyFacts
+} from "@debateai/providers";
 
 export { CLAIM_TYPES };
 export type { ClaimType };
@@ -118,13 +125,29 @@ export const judgeAssessmentSchema = z.object({
 }).strict();
 export type JudgeAssessment = z.infer<typeof judgeAssessmentSchema>;
 
+/**
+ * How a structured reply was read. All-steps format robustness (2026-10-12): after the judge's own three, the two late
+ * repairs the story's tolerant decode makes (`modelJsonLateRepair`): INNER_QUOTE (a straight double quote inside a text
+ * that cannot end it, read as escaped) and, only for a reply that finished normally, CLOSING_BRACKETS.
+ */
+export type StructuredParseStrategy = "RAW" | "ONE_FENCE" | "BRACE_BALANCED" | "INNER_QUOTE" | "CLOSING_BRACKETS";
+
+const STRUCTURED_PARSE_REPAIRS: Readonly<Record<StructuredParseStrategy, ModelJsonRepair | null>> = Object.freeze({
+  RAW: null, ONE_FENCE: "CODE_FENCE", BRACE_BALANCED: "OUTERMOST_OBJECT", INNER_QUOTE: "INNER_QUOTE", CLOSING_BRACKETS: "CLOSING_BRACKETS"
+});
+
+/** The repair code a strategy is counted under (`ContentClassification.jsonRepair`); RAW needed none. */
+export function structuredParseRepair(strategy: StructuredParseStrategy): ModelJsonRepair | null {
+  return STRUCTURED_PARSE_REPAIRS[strategy];
+}
+
 export type ParseStructuredArtifactResult<T> =
-  | { readonly kind: "PARSED"; readonly strategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED"; readonly value: T }
+  | { readonly kind: "PARSED"; readonly strategy: StructuredParseStrategy; readonly value: T }
   | { readonly kind: "PARSE_FAILURE"; readonly message: string }
   | { readonly kind: "SCHEMA_FAILURE"; readonly message: string };
 
 export type ParseJudgeAssessmentResult =
-  | { readonly kind: "PARSED"; readonly strategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED"; readonly assessment: JudgeAssessment }
+  | { readonly kind: "PARSED"; readonly strategy: StructuredParseStrategy; readonly assessment: JudgeAssessment }
   | { readonly kind: "PARSE_FAILURE"; readonly message: string }
   | { readonly kind: "SCHEMA_FAILURE"; readonly message: string };
 
@@ -152,7 +175,7 @@ function schemaFailureMessage(error: z.ZodError): string {
     : rendered;
 }
 
-function schemaResult<T>(decoded: unknown, strategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED", schema: z.ZodType<T>): ParseStructuredArtifactResult<T> {
+function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, schema: z.ZodType<T>): ParseStructuredArtifactResult<T> {
   const parsed = schema.safeParse(decoded);
   return parsed.success
     ? Object.freeze({ kind: "PARSED", strategy, value: parsed.data })
@@ -164,8 +187,17 @@ function schemaResult<T>(decoded: unknown, strategy: "RAW" | "ONE_FENCE" | "BRAC
  * (`modelJsonFenceBody`, packages/providers/src/model-json.ts), which carries
  * CI-1b's account of why it is not a regular expression (CodeQL
  * js/polynomial-redos, PR #8). The story's tolerant decode reads fences with it too.
+ *
+ * All-steps format robustness (2026-10-12): when none of the three decodes, the
+ * story's two late repairs are tried, from the same shared code
+ * (`modelJsonLateRepair`): straight quotes inside a text that cannot end it, read
+ * as escaped (a Romanian „…" closed with a straight quote), and, only when `reply`
+ * says the reply finished normally, the brackets still open at the very end
+ * closed. A reply cut off at its token ceiling is never repaired. Whatever decodes
+ * still passes the full schema; the stored artifact stays the vendor's bytes.
+ * Without `reply` the ending is unknown and the last repair is not made.
  */
-export function parseStructuredArtifact<T>(content: string, schema: z.ZodType<T>): ParseStructuredArtifactResult<T> {
+export function parseStructuredArtifact<T>(content: string, schema: z.ZodType<T>, reply?: ModelReplyFacts): ParseStructuredArtifactResult<T> {
   try { return schemaResult(JSON.parse(content), "RAW", schema); } catch { /* advance only on parse failure */ }
   const fenced = modelJsonFenceBody(content);
   if (fenced !== null) {
@@ -173,13 +205,28 @@ export function parseStructuredArtifact<T>(content: string, schema: z.ZodType<T>
   }
   const balanced = firstBalancedObject(content);
   if (balanced !== null) {
-    try { return schemaResult(JSON.parse(balanced), "BRACE_BALANCED", schema); } catch { /* typed below */ }
+    try { return schemaResult(JSON.parse(balanced), "BRACE_BALANCED", schema); } catch { /* next strategy */ }
   }
+  const late = modelJsonLateRepair(content, reply);
+  if (late !== null) return schemaResult(late.value, late.repair, schema);
   return Object.freeze({ kind: "PARSE_FAILURE", message: "No parsing strategy produced a JSON object" });
 }
 
-export function parseJudgeAssessment(content: string): ParseJudgeAssessmentResult {
-  const result = parseStructuredArtifact(content, judgeAssessmentSchema);
+/**
+ * The content classifier every judge-family call hands the gateway (author legs, review, panel): the same reading as
+ * `parseStructuredArtifact`, with the repair it needed as `jsonRepair` (all-steps format robustness, 2026-10-12).
+ */
+export function classifyStructuredArtifact<T>(content: string, schema: z.ZodType<T>, reply?: ModelReplyFacts): ContentClassification {
+  const outcome = parseStructuredArtifact(content, schema, reply);
+  if (outcome.kind === "PARSED") {
+    const repair = structuredParseRepair(outcome.strategy);
+    return repair === null ? { parseStatus: "PARSED", parseError: null } : { parseStatus: "PARSED", parseError: null, jsonRepair: repair };
+  }
+  return { parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED", parseError: outcome.message };
+}
+
+export function parseJudgeAssessment(content: string, reply?: ModelReplyFacts): ParseJudgeAssessmentResult {
+  const result = parseStructuredArtifact(content, judgeAssessmentSchema, reply);
   return result.kind === "PARSED"
     ? Object.freeze({ kind: "PARSED", strategy: result.strategy, assessment: Object.freeze(result.value) })
     : result;

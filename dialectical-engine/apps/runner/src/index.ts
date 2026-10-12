@@ -36,6 +36,7 @@ import {
   measureDispersion,
   parseStructuredArtifact,
   reduceAssessment,
+  structuredParseRepair,
   runJudgePanel,
   selectReducedJudgement,
   type ClaimType,
@@ -101,8 +102,11 @@ import {
   ProviderContentUnacceptedError,
   lengthRetryTokenCeiling,
   providerTargetPrice,
+  rememberingAcceptedReply,
   type CallBound,
   type ContentClassification,
+  type ModelJsonRepair,
+  type ModelReplyFacts,
   type OpenAICompatibleGatewayOptions,
   type PromptPacket,
   type ProviderCallRequest,
@@ -666,10 +670,10 @@ export function buildSynthesisRolePrompt(
 }
 
 /** A17: the classification a live synthesis call applies, exported for replay. */
-export function classifySynthesisRoleContent(role: SynthesisRoleName, content: string): ContentClassification {
+export function classifySynthesisRoleContent(role: SynthesisRoleName, content: string, reply?: ModelReplyFacts): ContentClassification {
   return role === "SYNTHESIZER"
-    ? classifyStructuredContent(content, compositionSchema)
-    : classifyStructuredContent(content, evaluatorVerdictSchema);
+    ? classifyStructuredContent(content, compositionSchema, reply)
+    : classifyStructuredContent(content, evaluatorVerdictSchema, reply);
 }
 
 /**
@@ -2188,7 +2192,7 @@ function hash(value: unknown): string {
  * refused before any strategy runs — the pre-fix refusal, re-asked as before.
  */
 type DecodedReply =
-  | { readonly decoded: true; readonly value: unknown }
+  | { readonly decoded: true; readonly value: unknown; readonly repair: ModelJsonRepair | null }
   | { readonly decoded: false; readonly message: string };
 
 /**
@@ -2219,19 +2223,27 @@ function topLevelObjectsOpened(content: string): number {
   return opened;
 }
 
-function decodeStructuredReply(content: string): DecodedReply {
+/**
+ * All-steps format robustness (2026-10-12): the judge path's strategies now end with the story's two late repairs
+ * (straight quotes inside a text escaped; only for a reply that finished normally, closing brackets), so `ending` —
+ * how the reply ended, as the gateway saw it — is passed through. Without it the ending is unknown and the last repair
+ * is not made. The decoded reply names the repair it needed (`jsonRepair` on the classification).
+ */
+function decodeStructuredReply(content: string, ending?: ModelReplyFacts): DecodedReply {
   try {
-    return { decoded: true, value: JSON.parse(content) };
+    return { decoded: true, value: JSON.parse(content), repair: null };
   } catch (error) {
     const refused: DecodedReply = { decoded: false, message: error instanceof Error ? error.message : String(error) };
     if (topLevelObjectsOpened(content) > 1) return refused;
-    const tolerant = parseStructuredArtifact(content, z.unknown());
-    return tolerant.kind === "PARSED" ? { decoded: true, value: tolerant.value } : refused;
+    const tolerant = parseStructuredArtifact(content, z.unknown(), ending);
+    return tolerant.kind === "PARSED"
+      ? { decoded: true, value: tolerant.value, repair: structuredParseRepair(tolerant.strategy) }
+      : refused;
   }
 }
 
-function parseContent<T>(content: string, schema: z.ZodType<T>, code: string): T {
-  const reply = decodeStructuredReply(content);
+function parseContent<T>(content: string, schema: z.ZodType<T>, code: string, ending?: ModelReplyFacts): T {
+  const reply = decodeStructuredReply(content, ending);
   if (!reply.decoded) throw new TypedDomainError(code, reply.message);
   try {
     return schema.parse(reply.value);
@@ -2240,13 +2252,15 @@ function parseContent<T>(content: string, schema: z.ZodType<T>, code: string): T
   }
 }
 
-function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>): ContentClassification {
-  const reply = decodeStructuredReply(content);
+function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>, ending?: ModelReplyFacts): ContentClassification {
+  const reply = decodeStructuredReply(content, ending);
   if (!reply.decoded) return { parseStatus: "PARSE_FAILED", parseError: reply.message };
   const parsed = schema.safeParse(reply.value);
-  return parsed.success
-    ? { parseStatus: "PARSED", parseError: null }
-    : { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message };
+  return !parsed.success
+    ? { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message }
+    : reply.repair === null
+      ? { parseStatus: "PARSED", parseError: null }
+      : { parseStatus: "PARSED", parseError: null, jsonRepair: reply.repair };
 }
 
 /**
@@ -2256,7 +2270,9 @@ function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>): Co
  * fenced block carrying the typed code and the schema path, and
  * `buildFramedRepairPrompt` refuses anything that is not a machine locator.
  */
-function buildSchemaRepairPacket(framed: FramedPrompt, rejected: {
+// Exported (all-steps format robustness, 2026-10-12) so the preview practice's formats lanes hand the gateway the same
+// repair packet the runner does (tools/preview-practice/practice-lanes.ts).
+export function buildSchemaRepairPacket(framed: FramedPrompt, rejected: {
   readonly parseStatus: string;
   readonly parseError: string;
 }): PromptPacket {
@@ -2317,10 +2333,10 @@ interface ComposedCitationContext {
  * question or a node's full statement already states is exempt from the prose
  * check (review round 2). Deterministic, and it never throws on model content.
  */
-export function classifyComposedContent(content: string, citation: ComposedCitationContext): ContentClassification {
-  const structured = classifyStructuredContent(content, compositionSchema);
+export function classifyComposedContent(content: string, citation: ComposedCitationContext, reply?: ModelReplyFacts): ContentClassification {
+  const structured = classifyStructuredContent(content, compositionSchema, reply);
   if (structured.parseStatus !== "PARSED") return structured;
-  const composed = parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
+  const composed = parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR", reply);
   const issues: ComposedCitationIssue[] = [];
   for (const [segmentIndex, segment] of composed.segments.entries()) {
     if (nodeIdsNamedInText(citation.digest, segment.text, citation.exemptTokens).length > 0) {
@@ -2333,7 +2349,7 @@ export function classifyComposedContent(content: string, citation: ComposedCitat
     }
   }
   return issues.length === 0
-    ? { parseStatus: "PARSED", parseError: null }
+    ? structured
     : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
 }
 
@@ -2357,7 +2373,8 @@ export function composedCitationRejectionOf(parseError: string): ComposedCitatio
  * to fix) in place of the generic `SCHEMA_FAILED`. Anything else is the shared
  * schema repair, unchanged.
  */
-function buildComposedRepairPacket(framed: FramedPrompt, rejected: {
+// Exported for the same reason as `buildSchemaRepairPacket`.
+export function buildComposedRepairPacket(framed: FramedPrompt, rejected: {
   readonly parseStatus: string;
   readonly parseError: string;
 }): PromptPacket {
@@ -3235,18 +3252,19 @@ export function logServeDisclosure(event: string, detail: Readonly<Record<string
   console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_SERVE_DISCLOSURE", event }));
 }
 
-export function parseComposerOutput(content: string): z.infer<typeof compositionSchema> {
-  return parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
+/** `reply`: how the accepted reply ended (`rememberingAcceptedReply`), so it is read exactly as its classifier read it. */
+export function parseComposerOutput(content: string, reply?: ModelReplyFacts): z.infer<typeof compositionSchema> {
+  return parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR", reply);
 }
 
-/** The evaluator's verdict as the engine reads it (the parser of the EVALUATOR call). */
-export function parseEvaluatorOutput(content: string): z.infer<typeof evaluatorVerdictSchema> {
-  return parseContent(content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
+/** The evaluator's verdict as the engine reads it (the parser of the EVALUATOR call); `reply` as for `parseComposerOutput`. */
+export function parseEvaluatorOutput(content: string, reply?: ModelReplyFacts): z.infer<typeof evaluatorVerdictSchema> {
+  return parseContent(content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR", reply);
 }
 
 /** The EVALUATOR call's content classifier: the same reading as `parseEvaluatorOutput`. */
-export function classifyEvaluatorContent(content: string): ContentClassification {
-  return classifyStructuredContent(content, evaluatorVerdictSchema);
+export function classifyEvaluatorContent(content: string, reply?: ModelReplyFacts): ContentClassification {
+  return classifyStructuredContent(content, evaluatorVerdictSchema, reply);
 }
 
 export interface DebateExpansionLeg {
@@ -7886,8 +7904,15 @@ export class WalkingSkeletonRunner {
          * reading refuses is that maker's content failure (`fallbackContentRefusal`).
          * For the planned maker nothing changes: the same codes end the run.
          */
+        // All-steps format robustness (2026-10-12): the writer's classifier, remembered, so its accepted draft is read
+        // again exactly as the classifier read it (the last tolerant repair depends on how the reply ended).
+        const writerReading = rememberingAcceptedReply((content, reply) => classifyComposedContent(content, {
+          digest: request.digest,
+          servedNodes,
+          exemptTokens: personIdTokens
+        }, reply));
         const composedSegmentsOf = (content: string): readonly ComposedSegment[] => {
-          const parsed = parseComposerOutput(content);
+          const parsed = parseComposerOutput(content, writerReading.acceptedAs(content).reply);
           const segments = parsed.segments.map((segment) => {
             if (segment.segment_id === "memory:disclosure") {
               throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "The memory disclosure segment id is reserved for the typed renderer");
@@ -7985,11 +8010,7 @@ export class WalkingSkeletonRunner {
             providerRef: planned.providerRef,
             packet,
             // Task M4 review fix I-1: the schema, then the prose and the cited refs.
-            classifyContent: (content) => classifyComposedContent(content, {
-              digest: request.digest,
-              servedNodes,
-              exemptTokens: personIdTokens
-            }),
+            classifyContent: writerReading.classifyContent,
             buildRepairPacket: (rejected) => buildComposedRepairPacket(framed, rejected)
           }
         }));
@@ -8054,8 +8075,10 @@ export class WalkingSkeletonRunner {
          * each maker makes, like the writer's draft, so a cheaper checker whose
          * verdict this reading refuses has left nothing to serve.
          */
+        // All-steps format robustness (2026-10-12): remembered as the writer's is.
+        const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply));
         const evaluatorVerdictOf = (content: string): EvaluatorVerdict => {
-          const parsed = parseEvaluatorOutput(content);
+          const parsed = parseEvaluatorOutput(content, checkerReading.acceptedAs(content).reply);
           return assertEvaluatorVerdict(Object.freeze({
             satisfied: parsed.satisfied,
             objection: parsed.objection,
@@ -8116,7 +8139,7 @@ export class WalkingSkeletonRunner {
             contractHash: this.settings.conformanceContractHash,
             providerRef: planned.providerRef,
             packet,
-            classifyContent: classifyEvaluatorContent,
+            classifyContent: checkerReading.classifyContent,
             buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
           }
         }));

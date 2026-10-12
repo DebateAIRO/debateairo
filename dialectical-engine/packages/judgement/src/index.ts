@@ -18,6 +18,7 @@ import {
   buildFramedRepairPrompt,
   lengthRetryTokenCeiling,
   providerTargetPrice,
+  rememberingAcceptedReply,
   schemaFailureLocator,
   type CallBound,
   type FramedPrompt,
@@ -47,8 +48,10 @@ import {
 import {
   PanelMemberFailure,
   classifyClaimText,
+  classifyStructuredArtifact,
   judgeAssessmentSchema,
   parseStructuredArtifact,
+  type StructuredParseStrategy,
   resolveClaimType,
   type JudgeAssessment,
   type NormalizedClaim
@@ -245,7 +248,7 @@ export interface JudgedNode {
   readonly valueLaden: boolean;
   readonly assessment: JudgeAssessment;
   readonly normalizedClaim: NormalizedClaim;
-  readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
+  readonly parseStrategy: StructuredParseStrategy;
 }
 
 export interface JudgeSubjectInput {
@@ -290,7 +293,7 @@ export interface PanelAssessment {
   readonly judgementRef: string;
   readonly assessment: JudgeAssessment;
   readonly providerLedgerRef: string;
-  readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
+  readonly parseStrategy: StructuredParseStrategy;
 }
 
 /** One edge's measured bearing, or `null` where the reviewer cannot assess it. */
@@ -304,7 +307,7 @@ export interface ReviewedNode {
   readonly reasons: readonly string[];
   readonly provenanceRef: string;
   readonly providerLedgerRef: string;
-  readonly parseStrategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED";
+  readonly parseStrategy: StructuredParseStrategy;
   /** One entry per supplied edge, in the order supplied (S3-1). */
   readonly edgeMeasurements: readonly ReviewedEdgeMeasurement[];
 }
@@ -478,6 +481,9 @@ export class Judge {
       codeClaim.claimType === "unknown" ? "unknown" : "resolved"
     );
     const packet = framed.packet;
+    // All-steps format robustness (2026-10-12): the tolerant reading, remembered so the accepted reply is read again
+    // exactly as the classifier read it (the last repair depends on how the reply ended).
+    const reading = rememberingAcceptedReply((content, reply) => classifyStructuredArtifact(content, judgeArtifactSchema, reply));
     let response;
     try {
       response = await this.provider.call({
@@ -492,14 +498,7 @@ export class Judge {
         providerRef: input.providerRef,
         packet,
         buildRepairPacket: (rejected) => buildContentRepairPacket(framed, rejected),
-        classifyContent: (content) => {
-          const outcome = parseStructuredArtifact(content, judgeArtifactSchema);
-          if (outcome.kind === "PARSED") return { parseStatus: "PARSED", parseError: null };
-          return {
-            parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED",
-            parseError: outcome.message
-          };
-        }
+        classifyContent: reading.classifyContent
       });
     } catch (error) {
       if (error instanceof ProviderContentUnacceptedError) {
@@ -507,7 +506,7 @@ export class Judge {
       }
       throw error;
     }
-    const parsed = parseStructuredArtifact(response.content, judgeArtifactSchema);
+    const parsed = parseStructuredArtifact(response.content, judgeArtifactSchema, reading.acceptedAs(response.content).reply);
     if (parsed.kind === "PARSE_FAILURE") throw new TypedDomainError("JUDGE_PARSE_FAILURE", parsed.message);
     if (parsed.kind === "SCHEMA_FAILURE") throw new TypedDomainError("JUDGE_SCHEMA_FAILURE", parsed.message);
     let normalizedClaim: NormalizedClaim;
@@ -578,6 +577,9 @@ export class Judge {
       ]
     });
     const packet = framed.packet;
+    // All-steps format robustness (2026-10-12): the tolerant reading, remembered so the accepted reply is read again
+    // exactly as the classifier read it (the last repair depends on how the reply ended).
+    const reading = rememberingAcceptedReply((content, reply) => classifyStructuredArtifact(content, schema, reply));
     let response;
     try {
       response = await this.provider.call({
@@ -592,14 +594,7 @@ export class Judge {
         providerRef: input.providerRef,
         packet,
         buildRepairPacket: (rejected) => buildContentRepairPacket(framed, rejected),
-        classifyContent: (content) => {
-          const outcome = parseStructuredArtifact(content, schema);
-          if (outcome.kind === "PARSED") return { parseStatus: "PARSED", parseError: null };
-          return {
-            parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED",
-            parseError: outcome.message
-          };
-        }
+        classifyContent: reading.classifyContent
       });
     } catch (error) {
       if (error instanceof ProviderContentUnacceptedError) {
@@ -607,7 +602,7 @@ export class Judge {
       }
       throw error;
     }
-    const parsed = parseStructuredArtifact(response.content, schema);
+    const parsed = parseStructuredArtifact(response.content, schema, reading.acceptedAs(response.content).reply);
     if (parsed.kind === "PARSE_FAILURE") throw new TypedDomainError("NODE_REVIEW_PARSE_FAILURE", parsed.message);
     if (parsed.kind === "SCHEMA_FAILURE") throw new TypedDomainError("NODE_REVIEW_SCHEMA_FAILURE", parsed.message);
     const bearings = parsed.value.edge_bearings;
@@ -653,6 +648,9 @@ export class Judge {
       ]
     });
     const packet = framed.packet;
+    // All-steps format robustness (2026-10-12): the tolerant reading, remembered so the accepted reply is read again
+    // exactly as the classifier read it (the last repair depends on how the reply ended).
+    const reading = rememberingAcceptedReply((content, reply) => classifyStructuredArtifact(content, judgeAssessmentSchema, reply));
     let response;
     try {
       response = await this.provider.call({
@@ -667,14 +665,7 @@ export class Judge {
         providerRef: input.providerRef,
         packet,
         buildRepairPacket: (rejected) => buildContentRepairPacket(framed, rejected),
-        classifyContent: (content) => {
-          const outcome = parseStructuredArtifact(content, judgeAssessmentSchema);
-          if (outcome.kind === "PARSED") return { parseStatus: "PARSED", parseError: null };
-          return {
-            parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED",
-            parseError: outcome.message
-          };
-        }
+        classifyContent: reading.classifyContent
       });
     } catch (error) {
       if (error instanceof ProviderContentUnacceptedError) {
@@ -702,7 +693,7 @@ export class Judge {
         { cause: error }
       );
     }
-    const parsed = parseStructuredArtifact(response.content, judgeAssessmentSchema);
+    const parsed = parseStructuredArtifact(response.content, judgeAssessmentSchema, reading.acceptedAs(response.content).reply);
     if (parsed.kind === "PARSE_FAILURE") throw new PanelMemberFailure("PARSE_FAILURE", parsed.message);
     if (parsed.kind === "SCHEMA_FAILURE") throw new PanelMemberFailure("SCHEMA_FAILURE", parsed.message);
     return Object.freeze({

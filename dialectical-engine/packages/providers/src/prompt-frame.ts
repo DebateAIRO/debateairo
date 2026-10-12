@@ -331,24 +331,37 @@ export function appendFramedRejection(packet: PromptPacket, locator: FramedRepai
  * the engine's do — they are all `.strict()`) could not smuggle text out
  * through the locator.
  */
+/**
+ * All-steps format robustness (2026-10-12): the judge family's own refusal form (DL4-F1,
+ * `packages/judgement/src/s04.ts` schemaFailureMessage) is `code@path,code@path`, schema codes and
+ * names only ($ for the root), not zod's JSON. Its first path is read so the judge's repair packet
+ * names the member to fix as every other step's does; it was always empty before. The segments pass
+ * the same whitelist below. Anything else (a plain parse error) gives no path.
+ */
+function judgeIssueListPath(parseError: string): readonly string[] {
+  const first = /^[A-Za-z_]+@([A-Za-z0-9_.$]{1,200})(?:,|$)/u.exec(parseError.trim());
+  if (first === null || first[1] === "$") return [];
+  return first[1]!.split(".");
+}
+
 export function schemaFailureLocator(rejected: {
   readonly parseStatus: string;
   readonly parseError: string;
 }): FramedRepairLocator {
   const code = REPAIR_CODE.test(rejected.parseStatus) ? rejected.parseStatus : "CONTENT_REJECTED";
-  let path = "";
+  let segments: readonly unknown[];
   try {
     const issues = JSON.parse(rejected.parseError) as readonly { readonly path?: readonly unknown[] }[];
     const first = Array.isArray(issues) ? issues[0] : undefined;
-    const segments = Array.isArray(first?.path) ? first.path : [];
-    path = segments
-      .map((segment: unknown) => String(segment))
-      .filter((segment: string) => /^[A-Za-z0-9_]{1,40}$/u.test(segment))
-      .slice(0, 8)
-      .join(".");
+    segments = Array.isArray(first?.path) ? first.path : [];
   } catch {
-    path = "";
+    segments = judgeIssueListPath(rejected.parseError);
   }
+  const path = segments
+    .map((segment: unknown) => String(segment))
+    .filter((segment: string) => /^[A-Za-z0-9_]{1,40}$/u.test(segment))
+    .slice(0, 8)
+    .join(".");
   return Object.freeze({ code, path });
 }
 

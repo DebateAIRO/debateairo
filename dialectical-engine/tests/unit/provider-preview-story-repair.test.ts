@@ -133,7 +133,9 @@ describe("preview storyteller v3 safe repair allowance", () => {
   });
 
   const oneAttemptCases: ReadonlyArray<readonly [string, () => ProviderCallRequest]> = [
-    ...["served", "uniform-panel", "critic-exempt", "evaluator"].map(lane => [
+    // All-steps format robustness (2026-10-12): on the served lane the same request is the answer writer's, which has
+    // its own one repair try (tests/unit/all-steps-format-robustness.test.ts), so it is not listed here.
+    ...["uniform-panel", "critic-exempt", "evaluator"].map(lane => [
       `nonstory lane ${lane}`, () => ({ ...storyRequest(), lane } as ProviderCallRequest)
     ] as const),
     ...["JUDGE", "COMPOSER", "CONFORMANCE", "CLASSIFIER", "EVALUATOR"].map(role => [

@@ -3,13 +3,19 @@
  *
  * Plain words: a practice ends with one word the release steps can read.
  *  - PASS (exit 0): everything worked: the debate finished, an answer was served, the story is ready, every reply had
- *    the right format, no call failed, no gate stopped.
+ *    the right format the first time, no call failed, no gate stopped.
  *  - PASS_WITH_WARNINGS (exit 10): it worked, but some calls were refused as "too busy" before they recovered, or a
- *    model was slow (its 90th-percentile call took more than two minutes).
- *  - FAIL (exit 20): something a person would have seen went wrong.
- *  - NOT_PROVEN (exit 30): it worked, but a model sat out as busy (its vendor refused it, or it was cooling off), or
- *    the practice paused a gate itself after four connection failures in a row, or the operator interrupted it once
- *    (the calls in flight finished, the rest were skipped), so some model was not tested to the end.
+ *    model was slow (its 90th-percentile call took more than two minutes), or (owner ruling 2026-10-12, "Fixed slips =
+ *    warning") a reply had the wrong format and the SAME call's second try fixed it (FORMAT_REPAIRED:<model>:<n>), or
+ *    (owner ruling 2026-10-12, "Keep GLM, it sits out") a model was busy and sat out the rest after giving at least one
+ *    accepted answer (MODEL_BUSY_PARTLY:<model>:answered=<n>:skipped=<m>).
+ *  - FAIL (exit 20): something a person would have seen went wrong: among others a call that ended without an accepted
+ *    reply after its tries because of its format (FORMAT_FAILED), or one AI whose first tries slipped too often
+ *    (SLIP_RATE:<model>:<slips>/<answered>, `practiceSlipRateExceeded`).
+ *  - NOT_PROVEN (exit 30): it worked, but a model sat out as busy (its vendor refused it, or it was cooling off) before
+ *    it gave a single accepted answer, or the practice paused a gate itself after four connection failures in a row, or
+ *    the operator interrupted it once (the calls in flight finished, the rest were skipped), so some model was not
+ *    tested to the end.
  *  - HARNESS_ERROR (exit 40): the practice itself could not run (a start check refused, or the tool broke). No verdict
  *    about the release.
  *  - ABORTED (exit 50): the practice started but did not get to its end (a second interrupt, or the tool broke midway).
@@ -27,6 +33,60 @@ export const PRACTICE_EXIT_CODES: Readonly<Record<PracticeVerdict, number>> = Ob
 /** A model whose 90th-percentile call took longer than this is slow (a warning). */
 const PRACTICE_SLOW_P90_MS = 120_000;
 
+/**
+ * One AI's calls, for the slip rule (owner ruling 2026-10-12, "Fixed slips = warning"). A call is one step asked of one
+ * model with all its tries (its format repair, its one resend after an unbilled refusal, the runner's final retry).
+ *  - answered: calls that ended with an accepted reply;
+ *  - slips: calls whose FIRST reply failed its format or content check;
+ *  - repaired: slips the same call's later try fixed (a warning);
+ *  - unrecovered: calls with a reply that failed its check and no accepted reply after all their tries (a failure).
+ */
+export type PracticeModelCalls = Readonly<{ answered: number; slips: number; repaired: number; unrecovered: number }>;
+
+/**
+ * The slip rule: one AI fails when its slips are more than 1 in 10 of its answered calls, except that ONE slip is always
+ * allowed (a short practice has few calls). Exactly: FAIL when slips > max(1, floor(answered / 10)), which is the same
+ * as slips >= 2 and slips x 10 > answered. So 1 slip in 3 passes, 2 in 10 fail, 2 in 20 pass, 3 in 25 fail.
+ */
+export function practiceSlipRateExceeded(calls: Readonly<{ answered: number; slips: number }>): boolean {
+  return calls.slips > 1 && calls.slips * 10 > calls.answered;
+}
+
+/** The replies a format or content check refused: the gateway's two statuses, and a reply with no content at all. */
+const PRACTICE_FORMAT_STATUSES: ReadonlySet<string> = new Set(["PARSE_FAILED", "SCHEMA_FAILED", "UNPARSED"]);
+
+/** One try of a call, as the ledger (debate) or the formats mode's in-memory record keeps it, in order. */
+export type PracticeCallTry = Readonly<{ outcome: string; parseStatus: string | null }>;
+
+/**
+ * What one call's tries say for the slip rule. Its first REPLY is its first try that came back with a body (an
+ * unbilled refusal or a timeout has none); a call is answered when one of its tries ended OK.
+ */
+export function practiceCallFacts(tries: readonly PracticeCallTry[]): Readonly<{ answered: boolean; slip: boolean; repaired: boolean; unrecovered: boolean }> {
+  const answered = tries.some((attempt) => attempt.outcome === "OK");
+  const firstReply = tries.find((attempt) => attempt.parseStatus !== null);
+  const slip = firstReply !== undefined && PRACTICE_FORMAT_STATUSES.has(firstReply.parseStatus!);
+  const refused = tries.some((attempt) => attempt.parseStatus !== null && PRACTICE_FORMAT_STATUSES.has(attempt.parseStatus));
+  return Object.freeze({ answered, slip, repaired: slip && answered, unrecovered: refused && !answered });
+}
+
+/** Each AI's calls (`PracticeModelCalls`) from its calls' tries. */
+export function practiceModelCalls(calls: readonly Readonly<{ model: string; tries: readonly PracticeCallTry[] }>[]): Readonly<Record<string, PracticeModelCalls>> {
+  const out: Record<string, { answered: number; slips: number; repaired: number; unrecovered: number }> = {};
+  for (const call of calls) {
+    const facts = practiceCallFacts(call.tries);
+    const mine = out[call.model] ??= { answered: 0, slips: 0, repaired: 0, unrecovered: 0 };
+    if (facts.answered) mine.answered += 1;
+    if (facts.slip) mine.slips += 1;
+    if (facts.repaired) mine.repaired += 1;
+    if (facts.unrecovered) mine.unrecovered += 1;
+  }
+  return Object.freeze(Object.fromEntries(Object.entries(out).map(([model, mine]) => [model, Object.freeze(mine)])));
+}
+
+/** A busy model's run (owner ruling 2026-10-12, "Keep GLM, it sits out"): what it answered, what it skipped. */
+export type PracticeBusyModelRun = Readonly<{ answered: number; skipped: number }>;
+
 export type PracticeVerdictInput = Readonly<{
   /** Set when the practice could not run at all: the refusal or failure code. */
   harnessError: string | null;
@@ -43,8 +103,19 @@ export type PracticeVerdictInput = Readonly<{
   servedAnswer: boolean | null;
   /** Debate only: the story's outcome (READY, FAILED, ...). Null in formats mode. */
   storyOutcome: string | null;
-  /** Replies that failed their format check (PARSE_FAILED or SCHEMA_FAILED), any model, any step, any attempt. */
+  /**
+   * Calls that ended without an accepted reply after all their tries, with a reply that failed its format or content
+   * check (PARSE_FAILED, SCHEMA_FAILED, UNPARSED; formats: also a reply the runner's own reading refused after the
+   * check). A slip the same call's second try fixed is not counted here (`callsByModel`).
+   */
   formatFailures: number;
+  /** Each AI's calls for the slip rule (`PracticeModelCalls`). Optional: no slip rule and no warning when absent. */
+  callsByModel?: Readonly<Record<string, PracticeModelCalls>>;
+  /**
+   * For each busy model: its jobs (formats) or calls (debate) that got an accepted answer, and those skipped or ended
+   * without one. A busy model with at least one is a warning, not NOT_PROVEN. Optional: absent means none.
+   */
+  busyRuns?: Readonly<Record<string, PracticeBusyModelRun>>;
   /** Calls that ended FAILED, TIMED_OUT or BLOCKED (debate), or that failed for a reason other than format (formats). */
   failedCalls: number;
   /** A gate's state after the practice is not active, or a gate refused or halted during it. */
@@ -86,17 +157,28 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
   if (input.servedAnswer === false) fail.push("NO_SERVED_ANSWER");
   if (input.storyOutcome !== null && input.storyOutcome !== "READY") fail.push(`STORY_NOT_READY:${input.storyOutcome}`);
   if (input.formatFailures > 0) fail.push(`FORMAT_FAILED:${String(input.formatFailures)}`);
+  const calls = Object.entries(input.callsByModel ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  for (const [model, mine] of calls) {
+    if (practiceSlipRateExceeded(mine)) fail.push(`SLIP_RATE:${model}:${String(mine.slips)}/${String(mine.answered)}`);
+  }
   if (input.failedCalls > 0) fail.push(`CALL_FAILED:${String(input.failedCalls)}`);
   if (input.gateHalted) fail.push("GATE_HALTED");
   if (input.gateStopped) fail.push("GATE_STOPPED_BY_PRACTICE");
   const busy = [...new Set(input.busyModels ?? [])].sort();
+  // Owner ruling 2026-10-12 ("Keep GLM, it sits out"): a busy model that gave at least one accepted answer is a warning.
+  const answeredOf = (model: string) => input.busyRuns?.[model]?.answered ?? 0;
+  const partlyBusy = busy.filter((model) => answeredOf(model) >= 1);
   const notProven = [
-    ...busy.map((model) => `MODEL_BUSY:${model}`),
+    ...busy.filter((model) => answeredOf(model) < 1).map((model) => `MODEL_BUSY:${model}`),
     ...[...new Set(input.notExercisedModels)].filter((model) => !busy.includes(model)).sort().map((model) => `MODEL_NOT_EXERCISED:${model}`),
     ...[...(input.gatePauses ?? [])].sort().map((pause) => `GATE_PAUSED:${pause}`)
   ];
   if (input.interrupted === true) notProven.push("RUN_INTERRUPTED");
   const warn: string[] = [];
+  for (const model of partlyBusy) {
+    warn.push(`MODEL_BUSY_PARTLY:${model}:answered=${String(answeredOf(model))}:skipped=${String(input.busyRuns?.[model]?.skipped ?? 0)}`);
+  }
+  for (const [model, mine] of calls) if (mine.repaired > 0) warn.push(`FORMAT_REPAIRED:${model}:${String(mine.repaired)}`);
   if (input.unbilledRefusals > 0) warn.push(`UNBILLED_REFUSALS:${String(input.unbilledRefusals)}`);
   for (const [model, p90] of Object.entries(input.p90ByModel).sort(([a], [b]) => a.localeCompare(b))) {
     if (p90 > PRACTICE_SLOW_P90_MS) warn.push(`SLOW_P90:${model}:${String(Math.round(p90 / 1000))}s`);

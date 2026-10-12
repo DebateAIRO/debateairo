@@ -9,8 +9,10 @@
  * checks on it, and the stored artifact stays the vendor's own bytes.
  *
  * The fence reader and the object scanner are shared with the judge's parsing strategies
- * (`packages/judgement/src/s04.ts` parseStructuredArtifact), which keep their own order and names.
+ * (`packages/judgement/src/s04.ts` parseStructuredArtifact), which keep their own order and names; since all-steps
+ * format robustness (2026-10-12) its last two strategies are this file's two late repairs (`modelJsonLateRepair`).
  */
+import type { ContentClassification } from "./index.js";
 
 /** How a reply ended, as the gateway observed it (`choices[0].finish_reason`; Anthropic's stop reason, normalised). */
 export interface ModelReplyFacts {
@@ -225,12 +227,37 @@ function closeOpenBrackets(text: string): string | null {
 }
 
 /**
+ * The two late repairs, (iv) then (v), on one candidate text: the body of one code fence when there is one, else
+ * the whole reply, trimmed. (v) is tried only when the reply finished normally. Null when neither decodes. Shared by
+ * `decodeModelJson` and the judge's parsing strategies (`packages/judgement/src/s04.ts`, all-steps format
+ * robustness, 2026-10-12), so every structured step gets exactly the same two repairs.
+ */
+export function modelJsonLateRepair(content: string, reply?: ModelReplyFacts):
+  { readonly value: unknown; readonly repair: "INNER_QUOTE" | "CLOSING_BRACKETS" } | null {
+  if (reply?.finishReason === TRUNCATED_FINISH_REASON) return null;
+  const base = (modelJsonFenceBody(content) ?? content).trim();
+  const quoted = escapeInnerQuotes(base);
+  if (quoted !== null) {
+    const repaired = parsed(quoted);
+    if (repaired !== null) return Object.freeze({ value: repaired.value, repair: "INNER_QUOTE" as const });
+  }
+  if (modelReplyFinishedNormally(reply)) {
+    const closed = closeOpenBrackets(base);
+    if (closed !== null) {
+      const repaired = parsed(closed);
+      if (repaired !== null) return Object.freeze({ value: repaired.value, repair: "CLOSING_BRACKETS" as const });
+    }
+  }
+  return null;
+}
+
+/**
  * THE TOLERANT DECODE. In order: (i) strict JSON; (ii) the body of one code fence; (iii) the outermost object
  * when prose stands around it; (iv) the straight quotes inside string values that cannot end them, escaped;
  * (v) only when the reply finished normally, the brackets still open at the very end, closed. (iv) and (v)
- * read the fence's body when there is one. One repair at most; the first that decodes wins. A reply cut off at
- * its token ceiling (`length`) is decoded strictly or not at all. A failure carries the strict parser's own
- * error, as before this decode existed.
+ * read the fence's body when there is one (`modelJsonLateRepair`). One repair at most; the first that decodes
+ * wins. A reply cut off at its token ceiling (`length`) is decoded strictly or not at all. A failure carries the
+ * strict parser's own error, as before this decode existed.
  */
 export function decodeModelJson(content: string, reply?: ModelReplyFacts): ModelJsonDecoded {
   let strictError: string;
@@ -249,18 +276,27 @@ export function decodeModelJson(content: string, reply?: ModelReplyFacts): Model
   }
   const outermost = outermostObject(content);
   if (outermost !== null) return accept(outermost.value, "OUTERMOST_OBJECT");
-  const base = (fenced ?? content).trim();
-  const quoted = escapeInnerQuotes(base);
-  if (quoted !== null) {
-    const repaired = parsed(quoted);
-    if (repaired !== null) return accept(repaired.value, "INNER_QUOTE");
-  }
-  if (modelReplyFinishedNormally(reply)) {
-    const closed = closeOpenBrackets(base);
-    if (closed !== null) {
-      const repaired = parsed(closed);
-      if (repaired !== null) return accept(repaired.value, "CLOSING_BRACKETS");
-    }
-  }
-  return failed;
+  const late = modelJsonLateRepair(content, reply);
+  return late === null ? failed : accept(late.value, late.repair);
+}
+
+/**
+ * Story format robustness (2026-10-12), shared by every structured step since all-steps format robustness
+ * (2026-10-12): the classifier a call hands the gateway, remembering how the reply it accepted ended and which
+ * repair the tolerant decode needed (`jsonRepair` on its classification). The caller then reads the accepted
+ * content exactly as the classifier read it (the last repair depends on how the reply ended). A gateway that never
+ * classifies leaves nothing remembered: the content is then read with the ending unknown, so the last repair is
+ * never made for it.
+ */
+export function rememberingAcceptedReply(classify: (content: string, reply: ModelReplyFacts | undefined) => ContentClassification) {
+  let accepted: Readonly<{ content: string; reply: ModelReplyFacts | undefined; repair: ModelJsonRepair | null }> | null = null;
+  return Object.freeze({
+    classifyContent: (content: string, reply?: ModelReplyFacts): ContentClassification => {
+      const classified = classify(content, reply);
+      if (classified.parseStatus === "PARSED") accepted = Object.freeze({ content, reply, repair: classified.jsonRepair ?? null });
+      return classified;
+    },
+    acceptedAs: (content: string): Readonly<{ reply: ModelReplyFacts | undefined; repair: ModelJsonRepair | null }> =>
+      accepted !== null && accepted.content === content ? accepted : Object.freeze({ reply: undefined, repair: null })
+  });
 }

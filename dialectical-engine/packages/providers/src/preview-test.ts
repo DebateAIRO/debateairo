@@ -258,6 +258,24 @@ function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
   catch { return false; }
 }
 /**
+ * All-steps format robustness (2026-10-12): every other structured step gets the story's one repair try on the preview.
+ * A debate step on the served lane (the author legs incl. critic and cross-root, panel and review: JUDGE; the answer
+ * writer: SYNTHESIZER; the answer checker: EVALUATOR) whose request carries its own content check and repair packet, with
+ * a framed prompt and a sealed lifetime bound of at least two, may send a second POST in the same call, and only after
+ * its reply was refused by that check (`retryOnlyAfterContentRejection`): the repair packet names the issues, exactly as
+ * hosted and local repair within the sealed bound. The counting gateway still reads the step's allowance per maker off
+ * the ledger (attemptScope "actor"), so the repair is billed and counted like any attempt and the sealed bound of three
+ * leaves the runner's final retry its room. A transport failure still ends the call after one POST, and an unbilled
+ * refusal still gets the one 60-second resend.
+ */
+function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
+  if (request.lane !== "served" || (request.role !== "JUDGE" && request.role !== "SYNTHESIZER" && request.role !== "EVALUATOR")
+    || !Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 2
+    || typeof request.classifyContent !== "function" || typeof request.buildRepairPacket !== "function") return false;
+  try { assertFramedPrompt(request.packet); return true; }
+  catch { return false; }
+}
+/**
  * Story format robustness (2026-10-12), finding 1: the storyteller thinks before it writes, and on every reviewed row
  * that thinking counts toward max_tokens (DeepInfra reports it as reasoning tokens inside the completion; Anthropic
  * counts thinking as output). DeepSeek spent 11,317 of the sealed 12,000 thinking and its story was cut off. On the
@@ -346,7 +364,8 @@ function previewCallWasUnbilled(error: unknown): boolean {
  * Preview retry fix, option B (spec 2026-10-11 §1.1, owner ruling R1): the request's lifetime bound
  * passes through (token floor and deadline applied, `maxAttempts` kept; the storyteller's token ceiling is
  * its row's bound), and each call may send ONE POST (`maxAttemptsThisCall`; the storyteller's and the story
- * checker's repair calls two). The counting gateway behind this
+ * checker's repair calls two; every other structured step's two, the second only to repair a refused reply:
+ * `previewFormatRepairAllowed`, all-steps format robustness, 2026-10-12). The counting gateway behind this
  * wrapper reads the step's allowance off the ledger, where an unbilled refusal is a REFUSED row it
  * does not count.
  *
@@ -375,12 +394,14 @@ export function withPreviewProviderCallPolicy(
     const bound = previewStorySite(request, "STORYTELLER")
       ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) }) : preview;
     const storyRepair = previewStoryRepairAllowed(request);
+    const formatRepair = !storyRepair && previewFormatRepairAllowed(request);
     // One explicit level replaces whatever the request carried: the configured level on an effort
     // row; DEFAULT_ONLY on a row without one, which the gateway treats exactly as "no level".
     // Run resilience (spec 2026-10-12, fix (b)): the step's allowance is this maker's own (`attemptScope`), so a
     // fallback that moves a call to another maker never finds the step spent by the makers it moved away from.
     const send = () => gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
-      bound, maxAttemptsThisCall: storyRepair ? 2 : 1, attemptScope: "actor" });
+      bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1, attemptScope: "actor",
+      ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
     if (storyRepair) return send();
     return send().catch(async (error: unknown) => {
       if (!previewCallWasUnbilled(error)) throw error;

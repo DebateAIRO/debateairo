@@ -195,7 +195,8 @@ describe("preview practice lanes: the jobs see the runner's context", () => {
 
   it("the runner builds the writer's citable set with buildDigestFollowingServeNodes and hands that set to its classifier", () => {
     expect(RUNNER).toMatch(/const servedNodes = buildDigestFollowingServeNodes\(\{\s*authored: authoredNodeList,\s*servedRootNodeId: servedRoot\.nodeId\s*\}\)/u);
-    expect(RUNNER).toMatch(/classifyContent: \(content\) => classifyComposedContent\(content, \{\s*digest: request\.digest,\s*servedNodes,/u);
+    // All-steps format robustness (2026-10-12): the classifier is remembered (rememberingAcceptedReply), with the same set.
+    expect(RUNNER).toMatch(/rememberingAcceptedReply\(\(content, reply\) => classifyComposedContent\(content, \{\s*digest: request\.digest,\s*servedNodes,/u);
     // The practice takes the same function, never a hand-written set.
     expect(LANES).toContain("buildDigestFollowingServeNodes({");
     expect(LANES).not.toMatch(/servedNodes: \[/u);
@@ -264,8 +265,23 @@ describe("preview practice lanes: the jobs see the runner's context", () => {
     };
     expect(mapping(LANES, "export function practiceEvaluatorVerdictOf"))
       .toBe(mapping(RUNNER, "const evaluatorVerdictOf = (content: string): EvaluatorVerdict =>"));
-    expect(RUNNER).toMatch(/const evaluatorVerdictOf = \(content: string\): EvaluatorVerdict => \{\s*const parsed = parseEvaluatorOutput\(content\);\s*return assertEvaluatorVerdict\(/u);
-    expect(LANES).toMatch(/const parsed = parseEvaluatorOutput\(content\);\s*assertEvaluatorVerdict\(/u);
+    // All-steps format robustness (2026-10-12): both read the accepted reply as its classifier read it.
+    expect(RUNNER).toMatch(/const evaluatorVerdictOf = \(content: string\): EvaluatorVerdict => \{\s*const parsed = parseEvaluatorOutput\(content, checkerReading\.acceptedAs\(content\)\.reply\);\s*return assertEvaluatorVerdict\(/u);
+    expect(LANES).toMatch(/const parsed = parseEvaluatorOutput\(content, reply\);\s*assertEvaluatorVerdict\(/u);
+    expect(LANES).toContain("practiceEvaluatorVerdictOf(response.content, reading.acceptedAs(response.content).reply)");
+  });
+
+  it("the answer writer's and checker's calls carry the runner's own classifier and repair packet (all-steps format robustness)", () => {
+    // The preview's one repair try is given only to a call with its own content check AND repair packet: without the
+    // runner's packet the practice would never exercise the second try the app makes.
+    expect(RUNNER).toContain("classifyContent: writerReading.classifyContent,\n            buildRepairPacket: (rejected) => buildComposedRepairPacket(framed, rejected)");
+    expect(RUNNER).toContain("classifyContent: checkerReading.classifyContent,\n            buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)");
+    expect(LANES).toContain("classifyContent: reading.classifyContent,\n        buildRepairPacket: (rejected) => buildComposedRepairPacket(framed, rejected)");
+    expect(LANES).toContain("classifyContent: reading.classifyContent,\n        buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)");
+    expect(RUNNER).toMatch(/const writerReading = rememberingAcceptedReply\(\(content, reply\) => classifyComposedContent\(content, \{/u);
+    expect(LANES).toMatch(/const reading = rememberingAcceptedReply\(\(content, reply\) => classifyComposedContent\(content, \{/u);
+    expect(RUNNER).toContain("const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply));");
+    expect(LANES).toContain("const reading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply));");
   });
 
   it("the story snapshot comes from the runner's own builder, and the story must give each position its own path", () => {

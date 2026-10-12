@@ -23,16 +23,21 @@ import {
   type JudgeLeg
 } from "@debateai/judgement";
 import {
+  decodeModelJson,
   promptContractFingerprintText,
+  rememberingAcceptedReply,
   type CallBound,
   type ContentClassification,
+  type ModelReplyFacts,
   type ProviderCallRequest,
   type ProviderGateway
 } from "@debateai/providers";
 import { buildStoryRegisterRows, readStoryPolicy, type StoryPolicy } from "@debateai/register";
 import {
   EVALUATOR_PROMPT_CONTRACT,
+  buildComposedRepairPacket,
   buildDigestFollowingServeNodes,
+  buildSchemaRepairPacket,
   buildSynthesisRolePrompt,
   classifyComposedContent,
   classifyEvaluatorContent,
@@ -131,6 +136,23 @@ export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
   if (callSiteKey.startsWith("JUDGE:review:")) return "REVIEW";
   if (callSiteKey === "JUDGE" || callSiteKey.startsWith("JUDGE:")) return "JUDGE";
   return "UNMAPPED";
+}
+
+/**
+ * Information only (all-steps format robustness, 2026-10-12): which tolerant repair an ACCEPTED reply needed, read by
+ * the shared decode (`decodeModelJson`) with how the reply ended (`finish_reason` as the gateway recorded it). Null for
+ * strict JSON. The judge's own reading takes the FIRST of several objects where this takes the last, so for such a reply
+ * the code may differ; the counts are shown in the report, never a reason for a verdict.
+ */
+export function practiceJsonRepairOf(content: string, finishReason: unknown): string | null {
+  const decoded = decodeModelJson(content, { finishReason: typeof finishReason === "string" ? finishReason : null });
+  return decoded.ok ? decoded.repair : null;
+}
+
+/** The finish reason a stored artifact's metadata recorded (W10/1), or null. */
+export function practiceFinishReasonOf(metadata: unknown): string | null {
+  const value = typeof metadata === "object" && metadata !== null ? (metadata as { finish_reason?: unknown }).finish_reason : null;
+  return typeof value === "string" ? value : null;
 }
 
 function fromZod(result: { success: true } | { success: false; error: { issues: readonly { code: string; path: readonly PropertyKey[] }[] } }): readonly string[] {
@@ -449,9 +471,11 @@ function synthesisInputs(question: PracticeQuestion) {
  */
 export function practiceComposedPostCheck(content: string, context: Readonly<{
   digest: SynthesisDigest; servedRootNodeId: string; servedNodes: readonly Readonly<{ nodeId: string }>[];
+  /** How the accepted reply ended, as its classifier saw it (the runner's `writerReading`). */
+  reply?: ModelReplyFacts | undefined;
 }>): string | null {
   try {
-    const parsed = parseComposerOutput(content);
+    const parsed = parseComposerOutput(content, context.reply);
     const ids = parsed.segments.map((segment) => {
       if (segment.segment_id === "memory:disclosure") {
         throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "The memory disclosure segment id is reserved for the typed renderer");
@@ -471,8 +495,8 @@ export function practiceComposedPostCheck(content: string, context: Readonly<{
  * the same mapping, the same coherence assertion. tests/unit/preview-practice-wiring-drift.test.ts pins the mapping to
  * the runner's text.
  */
-export function practiceEvaluatorVerdictOf(content: string): void {
-  const parsed = parseEvaluatorOutput(content);
+export function practiceEvaluatorVerdictOf(content: string, reply?: ModelReplyFacts): void {
+  const parsed = parseEvaluatorOutput(content, reply);
   assertEvaluatorVerdict(Object.freeze({
     satisfied: parsed.satisfied,
     objection: parsed.objection,
@@ -529,35 +553,42 @@ export async function runPracticeLane(context: PracticeLaneContext): Promise<Pra
       const { graph, digest, servedNodes, controls, codeLabel } = synthesisInputs(q);
       const request = buildSynthesizerRequest({ controls, round: 1, digest, codeLabel, prior: null });
       const framed = buildSynthesisRolePrompt(request, q.languageName);
+      // As the runner's writerReading: the accepted draft is read again exactly as its classifier read it.
+      const reading = rememberingAcceptedReply((content, reply) => classifyComposedContent(content, {
+        digest: request.digest,
+        servedNodes,
+        exemptTokens: idShapedTokensIn([q.questionLine, ...graph.authored.map((node) => node.statement)])
+      }, reply));
       const response = await context.gateway.call({
         runId: context.runId, subjectItemId: context.workItemId,
         callSiteKey: synthesisCallSiteKey({ role: "SYNTHESIZER", stage: "INITIAL", round: 1 }),
         role: "SYNTHESIZER", lane: "served", modelRole: "ANSWER_WRITER", bound: context.bounds.synthesizer,
         contractHash: PRACTICE_CONTRACT_HASHES.composer, providerRef: context.providerRef, packet: framed.packet,
-        // The runner's own classifier with the runner's own citable set (every argued point; only the root served).
-        classifyContent: (content) => classifyComposedContent(content, {
-          digest: request.digest,
-          servedNodes,
-          exemptTokens: idShapedTokensIn([q.questionLine, ...graph.authored.map((node) => node.statement)])
-        })
+        // The runner's own classifier with the runner's own citable set (every argued point; only the root served),
+        // and the runner's own repair packet, so the preview's one repair try is exercised as in a debate.
+        classifyContent: reading.classifyContent,
+        buildRepairPacket: (rejected) => buildComposedRepairPacket(framed, rejected)
       });
       return { postCheckError: practiceComposedPostCheck(response.content,
-        { digest: request.digest, servedRootNodeId: graph.servedRootNodeId, servedNodes }), detail: null };
+        { digest: request.digest, servedRootNodeId: graph.servedRootNodeId, servedNodes,
+          reply: reading.acceptedAs(response.content).reply }), detail: null };
     }
     case "EVALUATOR": {
       const { digest, controls, codeLabel } = synthesisInputs(q);
       const request = buildEvaluatorRequest({ controls, round: 1, digest, codeLabel, candidateStatement: practiceCandidateStatement(q) });
       const framed = buildSynthesisRolePrompt(request, q.languageName);
+      const reading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply));
       const response = await context.gateway.call({
         runId: context.runId, subjectItemId: context.workItemId,
         callSiteKey: synthesisCallSiteKey({ role: "EVALUATOR", round: 1 }),
         role: "EVALUATOR", lane: "served", modelRole: "ANSWER_CHECKER", bound: context.bounds.evaluator,
         contractHash: PRACTICE_CONTRACT_HASHES.conformance, providerRef: context.providerRef, packet: framed.packet,
-        classifyContent: classifyEvaluatorContent
+        classifyContent: reading.classifyContent,
+        buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
       });
       // The runner's own check after the format check (an objection must come with "not satisfied").
       try {
-        practiceEvaluatorVerdictOf(response.content);
+        practiceEvaluatorVerdictOf(response.content, reading.acceptedAs(response.content).reply);
       } catch (error) {
         return { postCheckError: error instanceof Error && "code" in error ? String((error as { code: unknown }).code) : "EVALUATOR_VERDICT_INVALID",
           detail: null };

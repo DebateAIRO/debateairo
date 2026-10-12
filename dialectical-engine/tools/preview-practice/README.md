@@ -59,9 +59,17 @@ The last line on the screen and the exit code say:
 | Exit | Verdict | Meaning |
 |---|---|---|
 | 0 | PASS | Everything worked. The upload may go ahead. |
-| 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes. Owner decides. |
-| 20 | FAIL | A reply had the wrong format, a call failed, the debate did not finish, no answer or no story, or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
-| 30 | NOT_PROVEN | It worked, but a model stayed busy (the AI company kept refusing its call as "too busy", not billed, or the model kept cooling off) until its waiting time ran out (formats) and sat out the rest, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, or the operator pressed Ctrl-C once, so some model was not tested to the end. Run again later, or owner decides. |
+| 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes, or an AI's reply had the wrong format and the same call's second try fixed it (`FORMAT_REPAIRED:<model>:<how many>`, owner ruling 2026-10-12 "Fixed slips = warning"), or an AI was busy and sat out the rest after giving at least one accepted answer (`MODEL_BUSY_PARTLY:<model>:answered=<n>:skipped=<m>`, owner ruling 2026-10-12 "Keep GLM, it sits out"). Owner decides. |
+| 20 | FAIL | A call ended without an accepted reply after its tries because of its format (`FORMAT_FAILED`), or one AI's first tries had the wrong format too often (`SLIP_RATE:<model>:<slips>/<answered calls>`: more than 1 in 10 of its answered calls, one slip always allowed), a call failed, the debate did not finish, no answer or no story (anything but READY, so READY_WITH_RESERVATION too), or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
+| 30 | NOT_PROVEN | It worked, but a model stayed busy (the AI company kept refusing its call as "too busy", not billed, or the model kept cooling off) and sat out before it gave a single accepted answer, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, or the operator pressed Ctrl-C once, so some model was not tested to the end. Run again later, or owner decides. |
+
+The format rule in plain words (owner ruling 2026-10-12, "Fixed slips = warning"): on the preview every step that
+must answer in a fixed form gets one second try in the same call when its reply has the wrong form (the app tells the
+AI exactly which part to fix). A slip that second try fixes is a warning, listed per AI. A call whose tries all had the
+wrong form fails. Each AI may slip on its first try at most once, or at most 1 in 10 of its answered calls when it
+answered more than 10: FAIL when slips > max(1, floor(answered / 10)). The small repairs the app makes itself when it
+reads a reply (a code fence, prose around the answer, a straight quote inside a text, a missing closing bracket at the
+very end of a reply that finished normally) are counted in the report as information, never as slips.
 | 40 | HARNESS_ERROR | The practice could not run (a start check refused, or the tool broke). Nothing about the release is known. |
 | 50 | ABORTED | The practice started but did not reach its end (Ctrl-C a second time, or the tool broke midway). The report holds every job that finished, and lists whatever else it found. Run again. |
 
@@ -81,11 +89,14 @@ The last line on the screen and the exit code say:
   own cool-off steps, a little longer at
   random), then the same job is tried again; the other models, on the same gate too, go on meanwhile, and the gate is
   not stopped for this. Each model may wait at most `--busy-wait-minutes` in all (default 30). Only when that time is
-  used up is the model marked busy and its remaining jobs skipped (`SKIPPED_MODEL_BUSY`): NOT_PROVEN, not FAIL. A
+  used up is the model marked busy and its remaining jobs skipped (`SKIPPED_MODEL_BUSY`): a warning
+  (`MODEL_BUSY_PARTLY`, PASS_WITH_WARNINGS) when it gave at least one accepted answer in the run, NOT_PROVEN when it
+  gave none (owner ruling 2026-10-12, "Keep GLM, it sits out"); never FAIL. A
   model that came back and did all its jobs is proven; its refusals stay a warning (PASS_WITH_WARNINGS). The report
   lists per model how often it waited, how long in all, and whether it recovered. `--busy-wait-minutes 0` is the old
   rule: skip the rest at once. Ctrl-C cuts a wait short. In debate mode the runner makes a busy model sit out by
-  itself (NOT_PROVEN for that model). The gate's own refusal "too many calls at once" never marks a model busy.
+  itself (a warning when it gave at least one accepted answer before, NOT_PROVEN when it gave none or sat out from the
+  start). The gate's own refusal "too many calls at once" never marks a model busy.
 - The safety net on each gate, counted as the gate counts: the practice never sends to a gate again after 4
   answers in a row on it that were "could not reach the AI company" or an error the AI company answered without
   billing it and without saying it is busy (the gate's PROVIDER_ERROR_UNBILLED, e.g. Anthropic's 400, 404, 413 or 500:
