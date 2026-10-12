@@ -3,11 +3,13 @@
  * on one static page the owner can read and judge.
  *
  * Plain words: `practice report --side-by-side <samples.jsonl> --out DIR` writes DIR/side-by-side.html from a samples
- * log, sending nothing. Each model has its own block. Inside it each lane (a kind of job) has one block per sample and
- * question, and in that block one column per run ("high#1", "high#2", "low#1", ...), the runs in the order they first
- * appear in the samples. A column shows the accepted answer, or why there is none, and under it its run, status,
- * thinking tokens, time, cost in US dollars, and "cut off" when a reply stopped at the length limit. The page has no
- * script, so it can be published as a private page, and every value on it is escaped.
+ * log, sending nothing. Only the chosen jobs are shown: the four the owner reads (PANEL, SYNTHESIZER, STORYTELLER,
+ * REVIEW), or the ones `--lanes` names; the other jobs' answers are left out. Each model has its own block. Inside it
+ * each lane (a kind of job) has one block per sample and question, and in that block one column per run ("high#1",
+ * "high#2", "low#1", ...), the runs in the order they first appear in the samples. A column shows the accepted answer,
+ * or why there is none, and under it its run, status, thinking tokens, time, cost in US dollars, and "cut off" when a
+ * reply stopped at the length limit. The page has no script, so it can be published as a private page, and every value
+ * on it is escaped.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -16,7 +18,10 @@ import type { PracticeLane } from "./practice-lanes.js";
 
 export const PRACTICE_SIDE_BY_SIDE_FILE = "side-by-side.html" as const;
 
-/** The lanes shown first, in this order, unless the caller names others (any other lane in the samples follows them). */
+/**
+ * The chosen jobs (spec 2026-10-12 §4.8: the judge panel, the answer writer, the story writer, the reviewer), in this
+ * order, unless the caller names others. Only these lanes are shown; the other jobs' answers are left out.
+ */
 const DEFAULT_LANES: readonly PracticeLane[] = ["PANEL", "SYNTHESIZER", "STORYTELLER", "REVIEW"];
 
 /** What each lane's job is, in plain words (as the practice's README names them, in the lanes' own order). */
@@ -166,8 +171,8 @@ dd { margin: 0; overflow-wrap: anywhere; }
 export function practiceSideBySideHtml(samples: readonly PracticeSample[],
   options: Readonly<{ lanes?: readonly PracticeLane[]; generatedAt?: Date }> = {}): string {
   const generatedAt = options.generatedAt ?? new Date();
-  // The lanes named (default: the four the owner reads), then any other lane the samples hold, so no answer is hidden.
-  const laneOrder = [...new Set<PracticeLane>([...(options.lanes ?? DEFAULT_LANES), ...samples.map((sample) => sample.lane)])];
+  // Only the lanes named (default: the four chosen jobs), in that order; a sample of any other lane is left out.
+  const laneOrder = [...new Set<PracticeLane>(options.lanes ?? DEFAULT_LANES)];
   const models = [...new Set(samples.map((sample) => sample.model))];
   const modelBlocks = models.map((model) => {
     const mine = samples.filter((sample) => sample.model === model);
@@ -203,9 +208,10 @@ ${body}
 }
 
 /** Writes DIR/side-by-side.html (made private, as report.json is), creating DIR if needed; returns the file's path. */
-export function writeSideBySideFile(directory: string, samples: readonly PracticeSample[]): string {
+export function writeSideBySideFile(directory: string, samples: readonly PracticeSample[],
+  options: Readonly<{ lanes?: readonly PracticeLane[] }> = {}): string {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const path = join(directory, PRACTICE_SIDE_BY_SIDE_FILE);
-  writeFileSync(path, practiceSideBySideHtml(samples), { mode: 0o600 });
+  writeFileSync(path, practiceSideBySideHtml(samples, options), { mode: 0o600 });
   return path;
 }

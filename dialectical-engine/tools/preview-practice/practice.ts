@@ -112,6 +112,17 @@ function required(args: Args, flag: string): string {
   return value;
 }
 
+/** The jobs a `--lanes` value names: each must be a practice lane (formats and report mode check it alike); undefined without the flag. */
+function lanesOf(args: Args): PracticeLane[] | undefined {
+  const text = args.flags.get("--lanes");
+  if (text === undefined) return undefined;
+  const lanes = text.split(",").map((lane) => lane.trim()) as PracticeLane[];
+  if (lanes.some((lane) => !(PRACTICE_LANES as readonly string[]).includes(lane))) {
+    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--lanes");
+  }
+  return lanes;
+}
+
 function wholeNumber(args: Args, flag: string, fallback: number, minimum: number, maximum: number): number {
   const text = args.flags.get(flag);
   if (text === undefined) return fallback;
@@ -214,14 +225,15 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       const sideBySideLog = args.flags.get("--side-by-side");
       if (sideBySideLog !== undefined) {
         // Spec 2026-10-12 §4.8: the side-by-side page from the samples log named, nothing sent. Only the page is written
-        // (report.json and report.md in the folder are left as they are).
+        // (report.json and report.md in the folder are left as they are). `--lanes` names the jobs it shows.
+        const lanes = lanesOf(args);
         let lines;
         try { lines = parsePracticeSampleLog(readFileSync(sideBySideLog, "utf8")); } catch (error) {
           throw new PracticeRefusal(error instanceof Error && /^PRACTICE_/u.test(error.message) ? error.message : "PRACTICE_SAMPLES_LOG_UNREADABLE");
         }
         directory = assertOutsideRepository(folder, repositoryRoot());
         const samples = lines.flatMap((line) => line.kind === "sample" ? [line.sample] : []);
-        log(`side-by-side: ${writeSideBySideFile(directory, samples)}`);
+        log(`side-by-side: ${writeSideBySideFile(directory, samples, lanes === undefined ? {} : { lanes })}`);
         return Object.freeze({ exitCode: 0, report: practiceReportFromLog(lines), directory });
       }
       // Rebuilds the report from an existing samples log; nothing is sent. On a refusal nothing is written there.
@@ -279,10 +291,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       before[gate] = answer;
     }
     if (mode === "formats") {
-      const lanes = (args.flags.get("--lanes")?.split(",").map((lane) => lane.trim()) ?? [...PRACTICE_LANES]) as PracticeLane[];
-      if (lanes.length === 0 || lanes.some((lane) => !(PRACTICE_LANES as readonly string[]).includes(lane))) {
-        throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--lanes");
-      }
+      const lanes = lanesOf(args) ?? [...PRACTICE_LANES];
       for (const model of wanted) {
         const gate = previewModelRow(model)?.provider === "anthropic" ? "anthropic" : "deepinfra";
         if (!before[gate]!.enabledModels.includes(model)) throw new PracticeRefusal("PRACTICE_MODEL_NOT_ENABLED_AT_GATE", model);

@@ -73,11 +73,20 @@ describe("the side-by-side page: what each answer shows (spec 2026-10-12 §4.8)"
     expect(html.indexOf("panel high")).toBeLessThan(html.indexOf("panel low"));
     expect(html.indexOf("PANEL")).toBeLessThan(html.indexOf("REVIEW"));
   });
-  it("the lanes option sets the order, and a lane it does not list is still shown, after the listed ones", () => {
+  it("the lanes option sets which jobs are shown and their order: a lane it does not list is left out", () => {
     const html = practiceSideBySideHtml([sample({ lane: "JUDGE_POSITION", levelRun: "high#1", thinkingLevel: "high", answerText: "judge answer" }),
-      sample({ lane: "REVIEW", levelRun: "high#1", thinkingLevel: "high", answerText: "review answer" })] as never, { lanes: ["REVIEW"] });
-    expect(html.indexOf("review answer")).toBeLessThan(html.indexOf("judge answer"));
-    expect(html).toContain("judge answer");
+      sample({ lane: "PANEL", levelRun: "high#1", thinkingLevel: "high", answerText: "panel answer" }),
+      sample({ lane: "REVIEW", levelRun: "high#1", thinkingLevel: "high", answerText: "review answer" })] as never, { lanes: ["REVIEW", "PANEL"] });
+    expect(html.indexOf("review answer")).toBeLessThan(html.indexOf("panel answer"));
+    expect(html).not.toContain("judge answer");
+    expect(html).not.toContain("JUDGE_POSITION");
+  });
+  it("by default only the four chosen jobs are shown", () => {
+    const html = practiceSideBySideHtml([sample({ lane: "JUDGE_ATTACK", levelRun: "high#1", thinkingLevel: "high", answerText: "attack answer" }),
+      sample({ lane: "STORYTELLER", levelRun: "high#1", thinkingLevel: "high", answerText: "story answer" })] as never);
+    expect(html).toContain("story answer");
+    expect(html).not.toContain("attack answer");
+    expect(html).not.toContain("JUDGE_ATTACK");
   });
   it("a run with no level label shows as the server's setting", () => {
     const html = practiceSideBySideHtml([sample({ answerText: "server answer" })] as never);
@@ -144,5 +153,21 @@ describe("practice report --side-by-side (spec 2026-10-12 §4.8)", () => {
     expect(outcome.report).toMatchObject({ verdict: "HARNESS_ERROR", reasons: ["HARNESS_ERROR:PRACTICE_REPORT_INSIDE_REPOSITORY"] });
     expect(outcome.directory).toBeNull();
     expect(existsSync(out)).toBe(false);
+  });
+  it("--lanes names the jobs the page shows, checked as formats mode checks them; an unknown job is refused", async () => {
+    const file = samplesFile(
+      sample({ model: GLM, lane: "PANEL", levelRun: "high#1", thinkingLevel: "high", answerText: "panel answer" }),
+      sample({ model: GLM, lane: "REVIEW", levelRun: "high#1", thinkingLevel: "high", answerText: "review answer" }));
+    const out = join(freshFolder(), "out");
+    const outcome = await runPractice(["report", "--side-by-side", file, "--lanes", "PANEL", "--out", out], {}, { log: () => undefined });
+    expect(outcome.exitCode).toBe(0);
+    const html = readFileSync(join(out, "side-by-side.html"), "utf8");
+    expect(html).toContain("panel answer");
+    expect(html).not.toContain("review answer");
+    expect(html).not.toContain("REVIEW");
+    const refused = join(freshFolder(), "refused");
+    const bad = await runPractice(["report", "--side-by-side", file, "--lanes", "PANEL,NOT_A_JOB", "--out", refused], {}, { log: () => undefined });
+    expect(bad.report).toMatchObject({ verdict: "HARNESS_ERROR", reasons: ["HARNESS_ERROR:PRACTICE_FLAG_VALUE_INVALID"] });
+    expect(existsSync(refused)).toBe(false);
   });
 });
