@@ -205,7 +205,11 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
   const fail: string[] = [];
   if (!input.completed) fail.push("RUN_NOT_COMPLETED");
   if (input.servedAnswer === false) fail.push("NO_SERVED_ANSWER");
-  if (input.storyOutcome !== null && input.storyOutcome !== "READY") fail.push(`STORY_NOT_READY:${input.storyOutcome}`);
+  // Owner ruling 2026-10-12 ("fix the story but go with Option 1"): a story served with the checker's reservation is a
+  // warning (STORY_RESERVED below); any other story that is not READY fails.
+  if (input.storyOutcome !== null && input.storyOutcome !== "READY" && input.storyOutcome !== "READY_WITH_RESERVATION") {
+    fail.push(`STORY_NOT_READY:${input.storyOutcome}`);
+  }
   if (input.formatFailures > 0) fail.push(`FORMAT_FAILED:${String(input.formatFailures)}`);
   const calls = Object.entries(input.callsByModel ?? {}).sort(([a], [b]) => a.localeCompare(b));
   for (const [model, mine] of calls) {
@@ -229,6 +233,7 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
     warn.push(`MODEL_BUSY_PARTLY:${model}:answered=${String(answeredOf(model))}:skipped=${String(input.busyRuns?.[model]?.skipped ?? 0)}`);
   }
   for (const [model, mine] of calls) if (mine.repaired > 0) warn.push(`FORMAT_REPAIRED:${model}:${String(mine.repaired)}`);
+  if (input.storyOutcome === "READY_WITH_RESERVATION") warn.push("STORY_RESERVED");
   if (input.unbilledRefusals > 0) warn.push(`UNBILLED_REFUSALS:${String(input.unbilledRefusals)}`);
   for (const [model, p90] of Object.entries(input.p90ByModel).sort(([a], [b]) => a.localeCompare(b))) {
     if (p90 > PRACTICE_SLOW_P90_MS) warn.push(`SLOW_P90:${model}:${String(Math.round(p90 / 1000))}s`);
