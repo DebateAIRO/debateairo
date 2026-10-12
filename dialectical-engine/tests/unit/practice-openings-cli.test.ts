@@ -161,6 +161,26 @@ describe("practice openings: the command line", () => {
     expect(result.exitCode).toBe(0);
   });
 
+  it("`report --out` rebuilds report.json and report.md from openings.jsonl when the folder holds one (F-I4)", async () => {
+    const out = freshOut();
+    const first = await runPractice(["openings", "--dry", "--questions", "en-rent-caps", "--arms", "T,B", "--out", out], {}, quiet);
+    const markdown = readFileSync(join(out, "report.md"), "utf8");
+    const before = report(out);
+    rmSync(join(out, "report.json"));
+    rmSync(join(out, "report.md"));
+    const rebuilt = await runPractice(["report", "--out", out], {}, quiet);
+    expect([rebuilt.report.mode, rebuilt.report.verdict, rebuilt.exitCode]).toEqual(["openings", first.report.verdict, first.exitCode]);
+    expect(report(out).byArm).toEqual(before.byArm);
+    expect(report(out).totals).toEqual(before.totals);
+    expect(readFileSync(join(out, "report.md"), "utf8")).toBe(markdown);
+    expect(existsSync(join(out, "samples.jsonl"))).toBe(false);
+  });
+
+  it("`report --out` on a folder with neither log still refuses as the formats rebuild does", async () => {
+    const result = await runPractice(["report", "--out", freshFolder()], {}, quiet);
+    expect(result.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SAMPLES_LOG_MISSING"]);
+  });
+
   it("the interrupt messages name the finished calls in openings, the finished samples elsewhere", () => {
     expect(practiceFinishedUnit("openings")).toBe("calls");
     for (const mode of ["formats", "debate", "report", undefined]) expect(practiceFinishedUnit(mode)).toBe("samples");

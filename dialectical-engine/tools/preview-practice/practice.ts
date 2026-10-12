@@ -18,14 +18,15 @@
  *             B blind lists, C the angle map) on 12 fixed questions; every finished call goes to <out>/openings.jsonl at
  *             once (practice-openings-log.ts) and the report is built from it, on every way out. --dry answers from a
  *             script (practice-openings-dry.ts): no settings, no socket, no gate port is built, nothing is spent.
- *  - report:  builds report.json and report.md again from <out>/samples.jsonl (sends nothing, needs no gate).
+ *  - report:  builds report.json and report.md again from <out>/openings.jsonl when the folder holds one, else from
+ *             <out>/samples.jsonl (sends nothing, needs no gate).
  *
  * The exact commands are in tools/preview-practice/README.md. Exit codes: 0 PASS, 10 PASS_WITH_WARNINGS, 20 FAIL,
  * 30 NOT_PROVEN, 40 HARNESS_ERROR, 50 ABORTED.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mapPromptContractHash } from "@debateai/map";
 import {
@@ -51,7 +52,7 @@ import { PracticeGateObserver, type PracticeGateName } from "./practice-gate-obs
 import { practiceInterruptGate, takeOverSignals } from "./practice-interrupt.js";
 import { PRACTICE_CONTRACT_HASHES, PRACTICE_LANES, type PracticeLane } from "./practice-lanes.js";
 import { openingsDryConfig, openingsDryPorts, openingsDryTargets } from "./practice-openings-dry.js";
-import { OPENINGS_SCHEMA, OpeningsLog, openingsReportFromLog, readOpeningsLog } from "./practice-openings-log.js";
+import { OPENINGS_FILE, OPENINGS_SCHEMA, OpeningsLog, openingsReportFromLog, readOpeningsLog } from "./practice-openings-log.js";
 import {
   openingsArmsFromFlag,
   openingsQuestionDigests,
@@ -338,8 +339,17 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     // Checked here so a bad selection writes nothing; checked again by the engine before the first call.
     openingsQuestionRotations(openingsQuestions);
     if (args.mode === "report") {
-      // Rebuilds the report from an existing samples log; nothing is sent. On a refusal nothing is written there.
+      // Rebuilds the report from an existing log; nothing is sent. On a refusal nothing is written there. A folder that
+      // holds openings.jsonl is an openings run (F-I4: insurance for a long run whose report was never written).
       const folder = required(args, "--out");
+      if (existsSync(join(folder, OPENINGS_FILE))) {
+        let openingsLines;
+        try { openingsLines = readOpeningsLog(folder); } catch (error) {
+          throw new PracticeRefusal(error instanceof Error && /^PRACTICE_/u.test(error.message) ? error.message : "PRACTICE_OPENINGS_LOG_UNREADABLE");
+        }
+        directory = assertOutsideRepository(folder, repositoryRoot());
+        return finish(openingsReportFromLog(openingsLines));
+      }
       let lines;
       try { lines = readPracticeSampleLog(folder); } catch (error) {
         throw new PracticeRefusal(error instanceof Error && /^PRACTICE_/u.test(error.message) ? error.message : "PRACTICE_SAMPLES_LOG_UNREADABLE");

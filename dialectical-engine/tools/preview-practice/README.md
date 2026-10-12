@@ -83,6 +83,9 @@ Ctrl-C again, the tool breaking midway), as formats builds its report from `samp
 time, slips and fallbacks per arm. They never hold a quality score: the comparison is the owners' own method, outside
 this repository. When a gate stops or halts (or Ctrl-C is pressed once), the arm in progress finishes, it gets a
 `STOPPED` note (its unsent calls are the stop, not the AIs' own fallbacks), and no new arm or question starts.
+To build `report.json` and `report.md` again from a folder's `openings.jsonl` (nothing is sent; no socket or
+acknowledgement needed), run `report --out` on that folder exactly as for formats: it reads `openings.jsonl` when the
+folder holds one.
 
 Before the real run, run it dry. `--dry` answers from a script: no socket, no settings, no acknowledgement, no
 connection to a gate at all, and nothing is spent. It goes through every arm of all 12 questions in a few seconds,
@@ -397,7 +400,8 @@ Optional flags:
   are fixed in the code and never read from the command line; a refused value is never repeated in the output.
   Any other flag is refused in openings (for example `--question`, `--models` or `--samples`), and `--settings` and
   the two `--gate-status-*` flags are refused with `--dry`, so a mistyped flag can never start the paid run.
-- report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/samples.jsonl.
+- report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/openings.jsonl when DIR holds one
+  (an openings run), else from DIR/samples.jsonl.
 - debate: `--depth 1|2`, `--question ro|en`, `--transcript` (also write `transcript.json`: every prompt and every
   answer, see "The whole debate, word for word" above). The register is copied only through the register's own publication
   paths; an export holding a support-configuration version refuses (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
