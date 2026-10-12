@@ -166,21 +166,41 @@ The smallest pot that passes with all four switched on is $1.43.
     documentation-only one that leads nowhere).
 - **The halt email names the v3 command.** The lifecycle alert (`alert.mjs`) now gives the v3
   `activate` command. Step 9 installs the new copy.
-- **DeepInfra saying "too many requests" no longer halts.** Owner ruling of 2026-10-10: an answer
-  429 that carries an error and no token counts, no answer and no cost anywhere is treated as not
-  billed. Nothing is charged, that call alone fails, and the app may try again later. Any other
-  error answer still halts. Two limits keep this safe in case DeepInfra did bill such answers
-  after all:
+- **DeepInfra saying "too many requests" never halts the gate.** Owner ruling of 2026-10-10,
+  changed 2026-10-11 and built 2026-10-12: an answer 429 that carries an error and no token
+  counts, no answer and no cost anywhere is treated as not billed. Nothing is charged, that call
+  alone fails (`PROVIDER_REFUSED_UNBILLED`), and the app may try again later. Any other error
+  answer still halts. Two limits keep this safe in case DeepInfra did bill such answers after all:
   - Each one stays in the day's record with $0 charged, its status (429), the reason and the
     time, so it can be checked against DeepInfra's billing page. `status` shows today's number
-    (`today_unbilled_releases`). They do not count toward the 2,000 calls a day.
-  - At most 20 a day. The 20th on one Bucharest day halts the gate
-    (`unbilled_release_ceiling`). A normal answer in between does not reset that count; only the
-    next Bucharest day starts again at 0.
-  - Also, five in a row (or mixed with calls that never reached DeepInfra) halt with
-    `provider_unreachable`; a normal answer resets that one.
-  - A call that never reached DeepInfra at all (the connection failed before anything was sent)
-    leaves no entry: nothing was sent, so there is nothing DeepInfra could bill.
+    (`today_unbilled_releases`). There is no limit on that number, and these answers do not count
+    toward the 2,000 calls a day.
+  - A cool-off for one model (`MODEL_COOLING`). After 2 such answers for one model with no normal
+    answer from that model in between (in real use: one call, then the app's one resend 60 seconds
+    later), the gate refuses new calls for that model only. It sets aside no money and does not
+    contact DeepInfra. The first wait is 60 seconds. When it ends, ONE call for that model goes
+    through as a trial; the others are still refused while it is out. If the trial is refused the
+    same way, the wait doubles: 120, 240, 480, then 600 seconds (10 minutes at most). A call that
+    was already on its way when the cool-off began, and comes back refused, restarts the current
+    wait without doubling it. A normal answer from that model ends its cool-off. The other models
+    are never affected. Nothing needs re-opening: the cool-off ends by itself, and `status` shows
+    it under `cooling`.
+
+  Together these mean that even if DeepInfra did bill such answers, it could not drain the pot
+  quickly or unseen. Check the billing page if `today_unbilled_releases` looks large.
+- **Five in a row that never reached DeepInfra halt the gate** with `provider_unreachable`. "Never
+  reached" means the connection failed before anything was sent. A "too many requests" answer in
+  between neither adds to that count nor resets it. A normal answer, or `activate`, resets it. Such
+  a failed connection leaves no entry: nothing was sent, so there is nothing DeepInfra could bill.
+- **What the app sees when a call is refused, in plain words.**
+  - `PROVIDER_REFUSED_UNBILLED`: DeepInfra's "too many requests" answer. Nothing was charged.
+  - `MODEL_COOLING`, with `retry_after` (in seconds): this one model is cooling off. Nothing was
+    set aside and DeepInfra was not contacted. The other models are not affected.
+  - `PROVIDER_NOT_REACHED`: the connection failed before anything was sent. Nothing was charged.
+  - `AUTHORITY_HALTED`: the gate is halted, so nothing was set aside. The app shows that the gate
+    is unavailable, not that the money ran out, and does not ask `/remaining`.
+  - `PREVIEW_TEST_AUTHORITY_STOPPED`: any other refusal, for example a call that was already sent
+    when the gate halted. The app is not told why.
 - **The model check script has no custody check of its own.** Like the address script, it is
   protected only by being root-owned in the root-owned gate folder (step 1 checks that with
   `namei`). It never reads the key.
@@ -525,7 +545,8 @@ the daily split (owner's ruling, 2026-10-10 evening) is DeepInfra $10.00 and Ant
 **How much did we spend today? Is the gate open?** This only reads; it writes nothing. Look at:
 - `today_spend_usd` and `remaining_today_usd` (the day is the Bucharest day);
 - `today_by_model`: spend and number of calls per model today;
-- `today_unbilled_releases`: today's "too many requests" answers kept at $0 (the gate halts at 20);
+- `today_unbilled_releases`: today's "too many requests" answers kept at $0 (no limit; they never halt the gate);
+- `cooling`: per model, the short cool-off after such answers (`refusals`, `window_seconds`, `until_utc`, `trial`, `cooling_now`). A model is listed after its first such answer; `cooling_now` is true while it waits;
 - `state`, `reason` and `halts`;
 - `window_open` and `open_until_utc`;
 - `enabled_models`.
@@ -541,11 +562,13 @@ the daily split (owner's ruling, 2026-10-10 evening) is DeepInfra $10.00 and Ant
    counted in that day's pot.
 3. If the reason is `provider_error_or_model_identity`, the entry's `reply_model` in that day's
    record shows which model the answer named.
-4. If the reason is `unbilled_release_ceiling`, DeepInfra refused 20 calls today with "too many
-   requests". Each one is in the day's record (`released_unbilled`, with its time). Check on
-   DeepInfra's billing page that they really cost nothing. If they were billed, do not re-open:
-   tell the reviewers. Re-opening the same day is possible, but the next such refusal halts again
-   at once; the count starts at 0 on the next Bucharest day.
+4. A gate halted with `unbilled_release_ceiling` was halted by the code before 2026-10-12 (that
+   halt no longer exists). Check on DeepInfra's billing page that those `released_unbilled`
+   entries (in that day's record, each with its time) really cost nothing. If they were billed, do
+   not re-open: tell the reviewers. If they cost nothing, install the new gate files (install step
+   1), write the GO again (install step 4: its hashes must match the new files), restart the
+   service (`systemctl restart debateai-preview-provider-budget.service`) so the running gate loads
+   the new code, and then re-open with `activate` (step 5 below).
 5. Then run this (owner's yes):
 
 ```sh
@@ -572,7 +595,8 @@ systemctl stop debateai-preview-provider-budget
    `SERVE_RESTART_REQUIRED` until you do.
 
 Until step 2, calls refuse ("stopped") and `/remaining` answers `window_open: false`: the gate
-only spends under the GO it was activated with.
+only spends under the GO it was activated with. From the stop in step 2 until `activate` runs, a
+new call gets `AUTHORITY_HALTED` instead.
 
 **DeepInfra moved (the hourly check emailed, or a start refused with
 `DEEPINFRA_ADDRESSES_CHANGED`).** As in v2, with the v3 folder:

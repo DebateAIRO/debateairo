@@ -204,8 +204,9 @@ class GateUnitTests(unittest.TestCase):
                      'claude-haiku-5-5', '0.214016', '0.428032', '160.79.104.0/23', 'getent ahostsv4 api.anthropic.com',
                      'preview_key.py install anthropic', 'probe', '--model claude-haiku-5-5', 'model_echoed_exactly',
                      'completion_within_max_tokens', 'anthropic_budget_socket', '429', '529', UNIT.name, HALT_TIMER.name,
-                     CHECK_TIMER.name, TARGET_DROPIN.name):
+                     CHECK_TIMER.name, TARGET_DROPIN.name, 'MODEL_COOLING', 'AUTHORITY_HALTED'):
             self.assertIn(name, readme)
+        self.assertNotIn('the 20th on one day halts', readme)  # The daily unbilled ceiling is gone (2026-10-12).
         self.assertIn('README-anthropic.md', (V3 / 'README.md').read_text())
 
 
