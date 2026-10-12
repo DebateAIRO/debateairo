@@ -301,7 +301,12 @@ export function detectArgumentLanguage(text: string): ArgumentLanguageDetection 
   return scriptDetection(matrix) ?? latinDetection(matrix);
 }
 
+/**
+ * Reply language (owner approval 2026-10-12): a named language is called the question's, and every language holds
+ * where the material quotes another one; the fallback already says "the same language as the question".
+ */
 export function argumentLanguageDirective(name: string): string {
   const language = name.trim() || FALLBACK.nameEn;
-  return `Write every natural-language field in ${language}. Keep JSON keys, enum tokens, JSON literals (null, true, false), and identifier-shaped values (including claim_type, basis, outcome, fatalFlags[].type, segment_id, node_refs, and served_number_refs) in English exactly as specified; never translate an identifier or literal.`;
+  const named = language === FALLBACK.nameEn ? `${language},` : `${language}, the language of the question,`;
+  return `Write every natural-language field in ${named} even where the material quotes another language. Keep JSON keys, enum tokens, JSON literals (null, true, false), and identifier-shaped values (including claim_type, basis, outcome, fatalFlags[].type, segment_id, node_refs, and served_number_refs) in English exactly as specified; never translate an identifier or literal.`;
 }

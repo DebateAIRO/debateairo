@@ -172,8 +172,13 @@ export const PATCH_REPLY_FORM_SENTENCE = "A later block may instead carry machin
  * was seen in its review and story-checker replies). The model reads the example as a backslash followed by a straight
  * double quote: the JSON escape, written correctly. Code's, like the rest of the frame: no sealed contract text, register
  * value or contract fingerprint (`promptContractFingerprintText`) changes.
+ *
+ * Reply language (owner approval 2026-10-12): the sentence used to offer only „ ” and « », the quotation marks of
+ * Polish, German and Romanian and of French, Spanish, Portuguese and Catalan; every language MiMo slipped into in the
+ * English practice debates but Chinese was one of those. It now points at the question's own language, with the
+ * English marks as the example.
  */
-export const TEXT_QUOTE_RULE_SENTENCE = "Inside any text value, write quotation marks as \u201E \u201D or \u00AB \u00BB, or escape a straight double quote as \\\"; never put an unescaped straight double quote inside a text." as const;
+export const TEXT_QUOTE_RULE_SENTENCE = "Inside any text value, write quotation marks the way the question's language writes them (for English \u201C \u201D or \u2018 \u2019), or escape a straight double quote as \\\"; never put an unescaped straight double quote inside a text." as const;
 
 /**
  * The safety frame, verbatim. Everything in it is code's. It refers to the fence and the per-call canary, which the

@@ -71,7 +71,7 @@ describe("the question's language: the root cause", () => {
     expect(QUESTION).toBe("Should a mid-sized city make its central bus lines free to ride?");
     expect(detectArgumentLanguage(QUESTION)).toEqual({ tag: "en", nameEn: "English", confidence: "high" });
     expect(argumentLanguageDirective(detectArgumentLanguage(QUESTION).nameEn))
-      .toMatch(/^Write every natural-language field in English\. /u);
+      .toMatch(/^Write every natural-language field in English, the language of the question, even where the material quotes another language\. /u);
     expect(replyLanguageExpectation(QUESTION)).toEqual(EN);
   });
 
@@ -163,7 +163,7 @@ describe("the real practice replies", () => {
     }
   });
 
-  it("English with Polish-style quotation marks (the frame's own „ ” advice) is English", () => {
+  it("English with Polish-style quotation marks (the frame's former „ ” advice) is English", () => {
     const reply = byId("debate-2#490");
     expect(reply.content).toContain("„");
     expect(issuePaths(reply)).toEqual([]);

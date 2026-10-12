@@ -287,7 +287,7 @@ describe("A — on the preview the storyteller asks for its row's own story allo
       ? { parseStatus: "PARSE_FAILED", parseError: "cut off at max_tokens" } : { parseStatus: "PARSED", parseError: null });
     await gateway.call({ ...cutIsRefused, costEnvelope: freeEnvelope });
     expect(executions.map((execution) => JSON.parse(execution.requestBody).max_tokens)).toEqual([16_384, 32_768]);
-    expect(JSON.parse(executions[0]!.requestBody)).toMatchObject({ model: MIMO, temperature: 1.0, top_p: 0.95 });
+    expect(JSON.parse(executions[0]!.requestBody)).toMatchObject({ model: MIMO, temperature: 0.7, top_p: 0.95 });
   });
 
   it("the start-of-debate estimate prices the storyteller at what is sent: each row's own story allowance", () => {

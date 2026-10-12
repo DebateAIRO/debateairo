@@ -1,6 +1,6 @@
 {
   "schema": "deepinfra-sampling-bodies-v1",
-  "about": "DeepInfra request bodies for the reviewed sampling rule (2026-10-12). A row with a reviewed `sampling` (Qwen/Qwen3.8-Flash: temperature 0.6, top_p 0.95, top_k 20; XiaomiMiMo/MiMo-V2.6-Pro since 2026-10-12: temperature 1.0, top_p 0.95, no top_k, written 1 by the app's serializer; MiMo's row allows no JSON mode) must carry exactly those keys with exactly those values; a row without one must carry none of them. `sent` bodies are in the app's own key order and serializer (JSON.stringify), each with the reservation the app computes for its exact bytes; `refused` bodies break the rule. The app's guarded fetch (tests/unit/preview-multi-model.test.ts) and the gate's DeepInfraProfile.body_valid and validate_request (tests/unit/preview_budget_authority_v3_test.py) must accept every `sent` body at exactly its reservedUsd and refuse every `refused` one.",
+  "about": "DeepInfra request bodies for the reviewed sampling rule (2026-10-12). A row with a reviewed `sampling` (Qwen/Qwen3.8-Flash: temperature 0.6, top_p 0.95, top_k 20; XiaomiMiMo/MiMo-V2.6-Pro since 2026-10-12: top_p 0.95 and, by the owner's ruling the same day (reply language), temperature 0.7 in place of 1.0, no top_k; MiMo's row allows no JSON mode) must carry exactly those keys with exactly those values; a row without one must carry none of them. `sent` bodies are in the app's own key order and serializer (JSON.stringify), each with the reservation the app computes for its exact bytes; `refused` bodies break the rule. The app's guarded fetch (tests/unit/preview-multi-model.test.ts) and the gate's DeepInfraProfile.body_valid and validate_request (tests/unit/preview_budget_authority_v3_test.py) must accept every `sent` body at exactly its reservedUsd and refuse every `refused` one.",
   "sent": [
     {
       "name": "Qwen: its reviewed sampling after max_tokens",
@@ -14,13 +14,13 @@
     },
     {
       "name": "MiMo: its reviewed sampling after max_tokens, no JSON mode",
-      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"top_p\":0.95,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}",
-      "reservedUsd": "0.029452010"
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":0.7,\"top_p\":0.95,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}",
+      "reservedUsd": "0.029452870"
     },
     {
       "name": "MiMo: its sampling, a system turn and non-ASCII text, the full answer cap (a story call: still no JSON mode)",
-      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":32768,\"temperature\":1,\"top_p\":0.95,\"messages\":[{\"role\":\"system\",\"content\":\"Răspunde doar cu JSON.\"},{\"role\":\"user\",\"content\":\"Întrebare sintetică: „da” sau „nu”?\"}]}",
-      "reservedUsd": "0.029485550"
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":32768,\"temperature\":0.7,\"top_p\":0.95,\"messages\":[{\"role\":\"system\",\"content\":\"Răspunde doar cu JSON.\"},{\"role\":\"user\",\"content\":\"Întrebare sintetică: „da” sau „nu”?\"}]}",
+      "reservedUsd": "0.029486410"
     },
     {
       "name": "GLM: effort and JSON mode, no sampling, the body as before",
@@ -91,20 +91,24 @@
       "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
     },
     {
+      "name": "MiMo at temperature 1, its setting before the owner's 0.7 (2026-10-12)",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"top_p\":0.95,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
       "name": "MiMo without top_p",
-      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":0.7,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
     },
     {
       "name": "MiMo with DeepInfra's default top_p",
-      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"top_p\":1,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":0.7,\"top_p\":1,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
     },
     {
       "name": "MiMo with a top_k",
-      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":0.7,\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
     },
     {
       "name": "MiMo with JSON mode and its sampling (JSON mode withdrawn 2026-10-12)",
-      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"top_p\":0.95,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}],\"response_format\":{\"type\":\"json_object\"}}"
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":0.7,\"top_p\":0.95,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}],\"response_format\":{\"type\":\"json_object\"}}"
     },
     {
       "name": "MiMo with JSON mode but no sampling",
@@ -112,7 +116,7 @@
     },
     {
       "name": "MiMo with another response format",
-      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"top_p\":0.95,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}],\"response_format\":{\"type\":\"json_schema\"}}"
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":0.7,\"top_p\":0.95,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}],\"response_format\":{\"type\":\"json_schema\"}}"
     },
     {
       "name": "MiMo with a temperature",

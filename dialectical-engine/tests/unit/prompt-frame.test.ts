@@ -224,14 +224,15 @@ describe("assertFramedPrompt — the one door every hand-off passes through", ()
  * answer-form lines before the frame's end marker, and leaves the per-call tail last and the frame byte-stable.
  */
 describe("the frame's quotation-mark sentence", () => {
-  const RENDERED = String.raw`Inside any text value, write quotation marks as „ ” or « », or escape a straight double quote as \"; never put an unescaped straight double quote inside a text.`;
+  // Reply language (owner approval 2026-10-12): the question's own marks, English “ ” or ‘ ’ as the example.
+  const RENDERED = String.raw`Inside any text value, write quotation marks the way the question's language writes them (for English “ ” or ‘ ’), or escape a straight double quote as \"; never put an unescaped straight double quote inside a text.`;
 
   it("is one fixed sentence whose example shows a backslash before the straight quote", () => {
     expect(TEXT_QUOTE_RULE_SENTENCE).toBe(RENDERED);
     // The model reads a backslash followed by a straight double quote: the JSON escape, written correctly.
     expect(TEXT_QUOTE_RULE_SENTENCE).toContain("as \\\"; never");
     expect([...TEXT_QUOTE_RULE_SENTENCE].filter((char) => char === "\\")).toHaveLength(1);
-    expect(TEXT_QUOTE_RULE_SENTENCE).toContain("\u201E \u201D or \u00AB \u00BB");
+    expect(TEXT_QUOTE_RULE_SENTENCE).toContain("the way the question's language writes them (for English \u201C \u201D or \u2018 \u2019)");
   });
 
   it("rides every frame once, with the answer-form lines, before the end marker and the per-call tail", () => {

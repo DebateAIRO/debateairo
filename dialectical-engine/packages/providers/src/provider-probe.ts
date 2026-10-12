@@ -24,8 +24,8 @@ const PROBE_DEFAULT_TOKEN_CEILING = 512;
 /**
  * Probe answer fix (2026-10-12, practice debate 3): what counts as the model answering the probe. The word OK in any
  * letter case and nothing else, give or take spaces and line breaks, quote, bold or code marks around it and full
- * stops or exclamation marks after it; a finished thinking block before it is skipped. MiMo-V2.6-Pro answers at
- * temperature 1.0 after thinking: a test of the exact bytes "OK" marked it ABSENT for a working answer such as "OK."
+ * stops or exclamation marks after it; a finished thinking block before it is skipped. MiMo-V2.6-Pro answered at
+ * temperature 1.0 (its setting then) after thinking: a test of the exact bytes "OK" marked it ABSENT for a working answer such as "OK."
  * or "\n\nOK", and with GLM busy the premium plan was refused (ASK_PLAN_TIER_MODEL_UNAVAILABLE). Still refused:
  * an empty reply, an unfinished thinking block, and any other words ("Sure, OK", "OKAY", "NOT OK"). The echoed model
  * id is NOT part of this: it is still compared byte for byte.
