@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -22,7 +22,7 @@ import {
   type OpeningsCall,
   type OpeningsLogLine
 } from "../../tools/preview-practice/practice-openings-log.js";
-import { reportMarkdown } from "../../tools/preview-practice/practice-report.js";
+import { reportMarkdown, type PracticeReport } from "../../tools/preview-practice/practice-report.js";
 import { reportableReplyText } from "../../tools/preview-practice/practice-redaction.js";
 
 const T0 = "2026-10-12T10:00:00.000Z";
@@ -143,6 +143,21 @@ describe("practice openings: openings.jsonl", () => {
     expect(Buffer.byteLength(long!.replyText!, "utf8")).toBeLessThanOrEqual(64 * 1024);
     expect(long!.replyText).toContain("bytes left out");
   });
+
+  it("an arm line's map is redacted on disk: a key-shaped string anywhere in the model-written map is blanked, ordinary text stays", () => {
+    const folder = fresh();
+    const key = "sk-ant-api03-ABCDEFGH12345678";
+    const map = { arm: "C", kind: "MAP", angles: [], items: [], keyPoints: [{ id: "k1", claim: `Cost ${key}` }], mergedAnswers: [],
+      framingChallenges: [`Ask ${key}`], choice: null, marks: [], notes: [] } as unknown as NonNullable<OpeningsArmLine["map"]>;
+    const log = OpeningsLog.create(folder);
+    log.append(start);
+    log.append({ kind: "arm", arm: { ...armLine, map } });
+    log.close();
+    const text = readFileSync(join(folder, OPENINGS_FILE), "utf8");
+    expect(text).not.toContain(key);
+    expect(text).toContain("Cost [REDACTED:vendor-key]");
+    expect(text).toContain("Ask [REDACTED:vendor-key]");
+  });
 });
 
 describe("practice openings: the report", () => {
@@ -192,7 +207,38 @@ describe("practice openings: the report", () => {
     const report = openingsReportFromLog([start, { kind: "call", call: call() }, { kind: "call", call: repaired },
       { kind: "call", call: callFailed }, { kind: "call", call: formatFailed }, end]);
     expect((report.failures as readonly unknown[]).length).toBe(3);
-    expect(reportMarkdown(report)).toContain("Wrong-format replies, fixed by their call or not: 3");
+    expect(reportMarkdown(report)).toContain("Wrong-format or failed calls: 3 (the exact problems are in report.json; "
+      + "reply text only for calls that never got an accepted reply).");
+  });
+
+  it("report.md says what the openings failures hold: the openings wording, not the formats one", () => {
+    const callFailed = call({ model: "m-2", status: "CALL_FAILED", errorCode: "PROVIDER_CALL_FAILED", replyForm: null, replyText: null,
+      attempts: [{ callSiteKey: "MAP:merge", outcome: "FAILED", parseStatus: null, latencyMs: 900, jsonRepair: null, replyForm: null }] });
+    const formatFailed = call({ status: "FORMAT_FAILED", errorCode: "PROVIDER_CONTENT_UNACCEPTED", replyForm: null, replyText: "FORMAT-REPLY-TEXT",
+      attempts: [{ callSiteKey: "MAP:merge", outcome: "FAILED", parseStatus: "SCHEMA_FAILED", latencyMs: 900, jsonRepair: null, replyForm: "ORIGINAL" }] });
+    const markdown = reportMarkdown(openingsReportFromLog([start, { kind: "call", call: callFailed }, { kind: "call", call: formatFailed }, end]));
+    expect(markdown).toContain("Wrong-format or failed calls: 2 (the exact problems are in report.json; "
+      + "reply text only for calls that never got an accepted reply).");
+    expect(markdown).not.toContain("their text and the exact problems are in report.json");
+  });
+
+  it("report.md keeps the formats wording byte-identical for a formats report", () => {
+    const report = { schema: "preview-practice-report-v1", mode: "formats", verdict: "PASS", exitCode: 0, reasons: [],
+      startedAt: "2026-10-12T10:00:00.000Z", finishedAt: "2026-10-12T10:00:02.000Z", failures: [] } as unknown as PracticeReport;
+    expect(reportMarkdown(report)).toContain(
+      "Wrong-format replies, fixed by their call or not: 0 (their text and the exact problems are in report.json, \"failures\").");
+  });
+
+  it("a kept format-failure reply text is redacted in the report even when the lines were built in memory, never written", () => {
+    const key = "sk-ant-api03-ABCDEFGH12345678";
+    const formatFailed = call({ status: "FORMAT_FAILED", errorCode: "PROVIDER_CONTENT_UNACCEPTED", replyForm: null,
+      replyText: `reply with ${key} in it`, attempts: [
+        { callSiteKey: "MAP:merge", outcome: "FAILED", parseStatus: "SCHEMA_FAILED", latencyMs: 900, jsonRepair: null, replyForm: "ORIGINAL" }] });
+    const report = openingsReportFromLog([start, { kind: "call", call: formatFailed }, end]);
+    const [failure] = report.failures as readonly Pick<OpeningsCall, "replyText">[];
+    expect(failure!.replyText).not.toContain(key);
+    expect(failure!.replyText).toContain("[REDACTED:vendor-key]");
+    expect(reportableReplyText(failure!.replyText!)).toBe(failure!.replyText);
   });
 
   it("is ABORTED when the run did not reach its end", () => {

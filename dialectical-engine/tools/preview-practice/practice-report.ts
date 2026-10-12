@@ -435,7 +435,11 @@ export function reportMarkdown(report: PracticeReport): string {
     lines.push("");
   }
   const failures = report.failures as readonly unknown[] | undefined;
-  lines.push(`Wrong-format replies, fixed by their call or not: ${String(failures?.length ?? 0)} (their text and the exact problems are in report.json, "failures").`, "");
+  // Openings keep reply text in "failures" only for a call that never got an accepted reply; the formats wording is unchanged.
+  lines.push(report.mode === "openings"
+    ? `Wrong-format or failed calls: ${String(failures?.length ?? 0)} (the exact problems are in report.json; `
+      + "reply text only for calls that never got an accepted reply)."
+    : `Wrong-format replies, fixed by their call or not: ${String(failures?.length ?? 0)} (their text and the exact problems are in report.json, "failures").`, "");
   return lines.join("\n");
 }
 

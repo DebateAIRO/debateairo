@@ -16,7 +16,7 @@ import type { PracticeAttempt } from "./practice-formats.js";
 import type { PracticeGateName } from "./practice-gate-observer.js";
 import type { OpeningsArm, OpeningsQuestionDigest } from "./practice-openings-questions.js";
 import { GATES, gateHalted, gatePauses, gateStopped, p90ByModel, PRACTICE_REPORT_SCHEMA, usd, type PracticeReport } from "./practice-report.js";
-import { reportableReplyText } from "./practice-redaction.js";
+import { redactKeyShapes, reportableReplyText } from "./practice-redaction.js";
 import {
   isPracticeLogCommonLine,
   parseJsonlLines,
@@ -108,12 +108,31 @@ export type OpeningsLogLine =
   | (Readonly<{ kind: "busy-wait" }> & OpeningsBusyWait);
 
 /**
- * The line as it is written: a call's reply text is redacted and capped by the rule every report uses (key-shaped
- * strings blanked, at most 64 KiB), whatever the caller passed. Applying it twice changes nothing.
+ * Every string value inside a model-written structure, key-shape redacted (no cap: a map is short, and every field the
+ * model wrote is held to the same rule as a reply). Object keys and non-string values are left as they are.
+ */
+function redactedStrings<T>(value: T): T {
+  if (typeof value === "string") return redactKeyShapes(value) as T;
+  if (Array.isArray(value)) return value.map((item: unknown) => redactedStrings(item)) as T;
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redactedStrings(item)])) as T;
+  }
+  return value;
+}
+
+/**
+ * The line as it is written, whatever the caller passed, with the rules every report uses: a call's reply text is
+ * redacted and capped (key-shaped strings blanked, at most 64 KiB), and an arm line's map has every string key-shape
+ * redacted (the map is model-written). Applying it twice changes nothing.
  */
 function redactedForLog(line: OpeningsLogLine): OpeningsLogLine {
-  if (line.kind !== "call" || line.call.replyText === null) return line;
-  return { kind: "call", call: { ...line.call, replyText: reportableReplyText(line.call.replyText) } };
+  if (line.kind === "call" && line.call.replyText !== null) {
+    return { kind: "call", call: { ...line.call, replyText: reportableReplyText(line.call.replyText) } };
+  }
+  if (line.kind === "arm" && line.arm.map !== null) {
+    return { kind: "arm", arm: { ...line.arm, map: redactedStrings(line.arm.map) } };
+  }
+  return line;
 }
 
 /** Appends one line at a time and pushes each to the disk before returning. One writer per log. */
@@ -244,7 +263,9 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
       notes: armLines.reduce((sum, line) => sum + line.notes.length, 0)
     }),
     // The formats report's rule: a call that failed, or one of whose tries came back with a reply that failed its check
-    // (fixed or not). Its reply text is kept only for a format failure; the text of any other failure is left out.
-    failures: calls.filter(openingsWrongFormat).map((call) => call.status === "FORMAT_FAILED" ? call : { ...call, replyText: null })
+    // (fixed or not). Its reply text is kept only for a format failure, redacted again here (the lines may be in memory).
+    failures: calls.filter(openingsWrongFormat).map((call) => call.status === "FORMAT_FAILED"
+      ? { ...call, replyText: call.replyText === null ? null : reportableReplyText(call.replyText) }
+      : { ...call, replyText: null })
   });
 }
