@@ -28,8 +28,12 @@
 import { randomUUID } from "node:crypto";
 import {
   OpenAICompatibleProviderGateway,
+  parseProviderDiscoveryTargets,
   previewModelRow,
+  previewRunnerPolicy,
   previewTargetGatewayControls,
+  previewTargetJsonRow,
+  PREVIEW_REVIEWED_PROVIDER_REFS,
   providerCallEndedVendorRefusedUnbilled,
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
@@ -43,8 +47,9 @@ import {
 } from "@debateai/providers";
 import type { StoryPack } from "@debateai/story";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
+import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
 import { limitPort, PracticeSemaphore, runModelQueues, type PracticePreparedJob } from "./practice-concurrency.js";
-import type { PracticeGateName, PracticeGateObserver, PracticeUnbilledKind } from "./practice-gate-observer.js";
+import type { PracticeGateName, PracticeGateObserver, PracticeUnbilledKind, PracticeWireEvent } from "./practice-gate-observer.js";
 import {
   issueListFromParseError,
   practiceFinishReasonOf,
@@ -117,12 +122,15 @@ export type PracticeSample = Readonly<{
   detail: string | null;
 }>;
 
+/** What one job's gateway recorded in memory: its stored replies, its ledger rows, and each try's reply form. */
+export type PracticeSink = { artifacts: RawArtifactInput[]; ledger: ProviderLedgerInput[]; forms: Map<string, PracticeReplyForm | null> };
+
 /** The gateway one target uses, built exactly as the runner builds it on the preview, but recording in memory. */
 function recordingGateway(input: Readonly<{
   target: ProviderDiscoveryTarget;
   config: PreviewProviderTestConfig;
   guardedFetch: typeof fetch;
-  sink: { artifacts: RawArtifactInput[]; ledger: ProviderLedgerInput[]; forms: Map<string, PracticeReplyForm | null> };
+  sink: PracticeSink;
   sleep?: (milliseconds: number) => Promise<void>;
 }>): ProviderGateway {
   const http = new OpenAICompatibleProviderGateway({
@@ -141,14 +149,113 @@ function recordingGateway(input: Readonly<{
   return withPreviewProviderCallPolicy(http, input.config, input.target, input.sleep === undefined ? {} : { sleep: input.sleep });
 }
 
+/**
+ * One job's gateway (formats: a job; openings: one call of a step), recording in memory, and watched as the runner's
+ * sit-out book watches a member's (apps/runner/src/run-sit-out.ts): `endedBusy()` says whether a call through it ended in
+ * the vendor's refusal, not billed (providerCallEndedVendorRefusedUnbilled). A caller that swallows its calls' failures
+ * (the story writer) cannot say it itself.
+ */
+export function practiceJobGateway(input: Readonly<{
+  target: ProviderDiscoveryTarget;
+  config: PreviewProviderTestConfig;
+  guardedFetch: typeof fetch;
+  sleep?: (milliseconds: number) => Promise<void>;
+}>): Readonly<{ gateway: ProviderGateway; sink: PracticeSink; endedBusy: () => boolean }> {
+  const sink: PracticeSink = { artifacts: [], ledger: [], forms: new Map<string, PracticeReplyForm | null>() };
+  const recording = recordingGateway({ target: input.target, config: input.config, guardedFetch: input.guardedFetch, sink,
+    ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
+  let endedBusy = false;
+  const gateway: ProviderGateway = Object.freeze({
+    call: async (request: Parameters<ProviderGateway["call"]>[0]) => {
+      try {
+        return await recording.call(request);
+      } catch (error) {
+        if (providerCallEndedVendorRefusedUnbilled(error)) endedBusy = true;
+        throw error;
+      }
+    }
+  });
+  return Object.freeze({ gateway, sink, endedBusy: () => endedBusy });
+}
+
+/** Each try of a job, in order, from what its gateway recorded (`PracticeAttempt`). */
+export function practiceAttemptsOf(sink: PracticeSink): readonly PracticeAttempt[] {
+  return Object.freeze(sink.ledger.map((entry): PracticeAttempt => {
+    const artifact = sink.artifacts.find((candidate) => candidate.attemptId === entry.attemptId) ?? null;
+    return Object.freeze({ callSiteKey: entry.callSiteKey, outcome: entry.outcome, parseStatus: artifact?.parseStatus ?? null,
+      latencyMs: entry.finishedAt.getTime() - entry.startedAt.getTime(),
+      jsonRepair: artifact === null || entry.outcome !== "OK" ? null
+        : practiceJsonRepairOf(replyContentOf(artifact.rawText), practiceFinishReasonOf(artifact.metadata)),
+      replyForm: sink.forms.get(entry.attemptId) ?? null });
+  }));
+}
+
+/**
+ * A job's tokens, summed over its own model's gate calls (`wire`: the gate watch's events since the job began, for that
+ * model only), and their cost at the model's preview price. Each count is null when no call reported it.
+ */
+export function practiceWireUsage(model: string, wire: readonly PracticeWireEvent[]): Readonly<{
+  inputTokens: number | null; outputTokens: number | null; reasoningTokens: number | null; cachedInputTokens: number | null;
+  costNanoUsd: string | null;
+}> {
+  const total = (pick: (event: PracticeWireEvent) => number | null | undefined) => wire.reduce<number | null>((sum, event) => {
+    const value = pick(event);
+    return value === null || value === undefined ? sum : (sum ?? 0) + value;
+  }, null);
+  const inputTokens = total((event) => event.inputTokens);
+  const outputTokens = total((event) => event.outputTokens);
+  const row = previewModelRow(model);
+  return Object.freeze({ inputTokens, outputTokens, reasoningTokens: total((event) => event.reasoningTokens),
+    cachedInputTokens: total((event) => event.cachedInputTokens),
+    costNanoUsd: row === undefined || inputTokens === null || outputTokens === null ? null
+      : String(previewCallNanoUsd(row, BigInt(inputTokens), outputTokens)) });
+}
+
+/** A model's budget of busy waits as used so far: the time, the waits, the waits in a row. */
+export type PracticeWaitBudget = { usedMs: number; waits: number; inARow: number };
+
+/**
+ * The next wait of a model whose job just ended busy, or null when its budget (`budgetMs`) is spent. The reason and the
+ * gate's own retry_after are read from the job's last busy event (`wire`); the wait is `practiceBusyWaitMs`, cut to what
+ * is left of the budget. The budget is updated (time used, waits, waits in a row).
+ */
+export function practiceNextBusyWait(budget: PracticeWaitBudget, budgetMs: number, wire: readonly PracticeWireEvent[],
+  random?: () => number): Readonly<{ waitMs: number; reason: "VENDOR_REFUSED" | "MODEL_COOLING"; retryAfterSeconds: number | null }> | null {
+  if (budget.usedMs >= budgetMs) return null;
+  const busyEvent = [...wire].reverse().find((event) => event.unbilledKind === "VENDOR_REFUSED" || event.unbilledKind === "MODEL_COOLING");
+  const reason = busyEvent?.unbilledKind === "MODEL_COOLING" ? "MODEL_COOLING" : "VENDOR_REFUSED";
+  const retryAfterSeconds = reason === "MODEL_COOLING" ? busyEvent?.retryAfterSeconds ?? null : null;
+  const waitMs = Math.min(budgetMs - budget.usedMs,
+    practiceBusyWaitMs({ retryAfterSeconds, waitsInARow: budget.inARow, ...(random === undefined ? {} : { random }) }));
+  budget.usedMs += waitMs;
+  budget.waits += 1;
+  budget.inARow += 1;
+  return Object.freeze({ waitMs, reason, retryAfterSeconds });
+}
+
+/**
+ * The ports a run's calls go through: each call takes a place at its gate (the gate's limit), then one overall, always
+ * in that order, before the brake looks at it.
+ */
+export function practiceLimitedPorts(ports: PreviewBudgetPorts, limits: Readonly<{
+  gateLimits?: Readonly<Partial<Record<PracticeGateName, number>>>; maxInFlight?: number;
+}> = {}): PreviewBudgetPorts {
+  const overall = new PracticeSemaphore(limits.maxInFlight ?? PRACTICE_FORMATS_DEFAULTS.maxInFlight);
+  return Object.fromEntries(Object.entries(ports).map(([provider, port]) => {
+    const gate: PracticeGateName = provider === "anthropic" ? "anthropic" : "deepinfra";
+    const perGate = new PracticeSemaphore(limits.gateLimits?.[gate] ?? PRACTICE_FORMATS_DEFAULTS.gateLimits[gate]);
+    return [provider, port === undefined ? port : limitPort(port, [perGate, overall])];
+  })) as PreviewBudgetPorts;
+}
+
 /** The code a skipped job of a busy model carries. Nothing was sent. */
 export const PRACTICE_MODEL_BUSY = "PRACTICE_MODEL_BUSY" as const;
 
-function gateOf(model: string): PracticeGateName {
+export function gateOf(model: string): PracticeGateName {
   return previewModelRow(model)?.provider === "anthropic" ? "anthropic" : "deepinfra";
 }
 
-function errorCodeOf(error: unknown): string {
+export function errorCodeOf(error: unknown): string {
   if (typeof error === "object" && error !== null) {
     const code = (error as { code?: unknown }).code;
     if (typeof code === "string") return code;
@@ -270,13 +377,9 @@ export async function runPracticeFormats(input: Readonly<{
     return fresh;
   };
   // Each call takes a place at its gate, then one overall (always in that order), before the brake looks at it.
-  const overall = new PracticeSemaphore(input.maxInFlight ?? PRACTICE_FORMATS_DEFAULTS.maxInFlight);
-  const limited = Object.fromEntries(Object.entries(input.ports).map(([provider, port]) => {
-    const gate: PracticeGateName = provider === "anthropic" ? "anthropic" : "deepinfra";
-    const perGate = new PracticeSemaphore(input.gateLimits?.[gate] ?? PRACTICE_FORMATS_DEFAULTS.gateLimits[gate]);
-    return [provider, port === undefined ? port : limitPort(port, [perGate, overall])];
-  })) as PreviewBudgetPorts;
-  const guardedFetch = createPreviewGuardedFetch(limited);
+  const guardedFetch = createPreviewGuardedFetch(practiceLimitedPorts(input.ports, {
+    ...(input.gateLimits === undefined ? {} : { gateLimits: input.gateLimits }),
+    ...(input.maxInFlight === undefined ? {} : { maxInFlight: input.maxInFlight }) }));
   const sleep = input.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
   const samples: PracticeSample[] = [];
   const busy: string[] = [];
@@ -307,22 +410,10 @@ export async function runPracticeFormats(input: Readonly<{
     }
     if (busy.includes(target.model)) return skipped("SKIPPED_MODEL_BUSY", PRACTICE_MODEL_BUSY);
     return async () => {
-      const sink = { artifacts: [] as RawArtifactInput[], ledger: [] as ProviderLedgerInput[], forms: new Map<string, PracticeReplyForm | null>() };
-      const recording = recordingGateway({ target, config: input.config, guardedFetch, sink,
-        ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
       // The job's gateway, watched as the runner's sit-out book watches a member's (the story writer swallows its
       // calls' failures, so the job's own outcome cannot say it).
-      let endedBusy = false;
-      const gateway: ProviderGateway = Object.freeze({
-        call: async (request: Parameters<ProviderGateway["call"]>[0]) => {
-          try {
-            return await recording.call(request);
-          } catch (error) {
-            if (providerCallEndedVendorRefusedUnbilled(error)) endedBusy = true;
-            throw error;
-          }
-        }
-      });
+      const job = practiceJobGateway({ target, config: input.config, guardedFetch, ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
+      const { gateway, sink } = job;
       const eventsBefore = input.observer.events.length;
       const started = performance.now();
       let errorCode: string | null = null;
@@ -341,21 +432,8 @@ export async function runPracticeFormats(input: Readonly<{
       const wire = input.observer.events.slice(eventsBefore).filter((event) => event.model === target.model);
       const unbilled = wire.filter((event) => event.outcome === "UNBILLED").length;
       const errorUnbilled = wire.filter((event) => event.unbilledKind === "VENDOR_ERROR_UNBILLED").length;
-      const inputTokens = wire.reduce<number | null>((sum, event) => event.inputTokens === null ? sum : (sum ?? 0) + event.inputTokens, null);
-      const outputTokens = wire.reduce<number | null>((sum, event) => event.outputTokens === null ? sum : (sum ?? 0) + event.outputTokens, null);
-      const cachedInputTokens = wire.reduce<number | null>((sum, event) =>
-        event.cachedInputTokens === undefined ? sum : (sum ?? 0) + event.cachedInputTokens, null);
-      const row = previewModelRow(target.model);
-      const costNanoUsd = row === undefined || inputTokens === null || outputTokens === null ? null
-        : String(previewCallNanoUsd(row, BigInt(inputTokens), outputTokens));
-      const attempts = sink.ledger.map((entry): PracticeAttempt => {
-        const artifact = sink.artifacts.find((candidate) => candidate.attemptId === entry.attemptId) ?? null;
-        return Object.freeze({ callSiteKey: entry.callSiteKey, outcome: entry.outcome, parseStatus: artifact?.parseStatus ?? null,
-          latencyMs: entry.finishedAt.getTime() - entry.startedAt.getTime(),
-          jsonRepair: artifact === null || entry.outcome !== "OK" ? null
-            : practiceJsonRepairOf(replyContentOf(artifact.rawText), practiceFinishReasonOf(artifact.metadata)),
-          replyForm: sink.forms.get(entry.attemptId) ?? null });
-      });
+      const { inputTokens, outputTokens, cachedInputTokens, costNanoUsd } = practiceWireUsage(target.model, wire);
+      const attempts = practiceAttemptsOf(sink);
       // The real model's artifacts only (the story jobs' local stand-in records none).
       const failed = [...sink.artifacts].reverse().find((artifact) => artifact.parseStatus !== "PARSED") ?? null;
       const last = sink.artifacts.at(-1) ?? null;
@@ -386,15 +464,10 @@ export async function runPracticeFormats(input: Readonly<{
         ?? attempts[0]?.callSiteKey ?? "UNMAPPED", content).issues;
       // A call ended in the vendor's refusal, not billed: while its budget lasts, the model is parked and the SAME job is
       // tried again after its wait (this attempt is not a sample; the busy-wait line keeps it, the wire lines its calls).
-      if (endedBusy && state.usedMs < budgetMs) {
-        const busyEvent = [...wire].reverse().find((event) => event.unbilledKind === "VENDOR_REFUSED" || event.unbilledKind === "MODEL_COOLING");
-        const reason = busyEvent?.unbilledKind === "MODEL_COOLING" ? "MODEL_COOLING" : "VENDOR_REFUSED";
-        const retryAfterSeconds = reason === "MODEL_COOLING" ? busyEvent?.retryAfterSeconds ?? null : null;
-        const waitMs = Math.min(budgetMs - state.usedMs,
-          practiceBusyWaitMs({ retryAfterSeconds, waitsInARow: state.inARow, ...(input.random === undefined ? {} : { random: input.random }) }));
-        state.usedMs += waitMs;
-        state.waits += 1;
-        state.inARow += 1;
+      const endedBusy = job.endedBusy();
+      const next = endedBusy ? practiceNextBusyWait(state, budgetMs, wire, input.random) : null;
+      if (next !== null) {
+        const { waitMs, reason, retryAfterSeconds } = next;
         state.parked = { lane, sample, since: performance.now() };
         input.onBusyWait?.(Object.freeze({ model: target.model, lane, sample, wait: state.waits, waitMs, reason, retryAfterSeconds }));
         input.progress?.(`${target.model} is busy (refused, not billed): waiting ${String(Math.round(waitMs / 1_000))}s, then ${lane} #${String(sample)} again`);
@@ -424,6 +497,27 @@ export async function runPracticeFormats(input: Readonly<{
     ...(input.stopSignal === undefined ? {} : { signal: input.stopSignal }) });
   return Object.freeze({ samples: Object.freeze(samples), models: Object.freeze(input.targets.map((target) => target.model)),
     lanes: Object.freeze([...input.lanes]), busyModels: Object.freeze([...busy]) });
+}
+
+/**
+ * The preview's declared targets (the runner's PROVIDER_DISCOVERY_TARGETS_JSON), read against the reviewed provider
+ * list as the runner reads them: each reviewed ref's maker and adapter from its preview model row.
+ */
+export function practiceDeclaredTargets(targetsJson: string): readonly ProviderDiscoveryTarget[] {
+  const configured = PREVIEW_REVIEWED_PROVIDER_REFS.map((providerRef) => {
+    const row = previewModelRow(previewTargetJsonRow(providerRef).model)!;
+    return { providerRef, maker: row.maker, adapterKind: row.adapterKind };
+  });
+  return parseProviderDiscoveryTargets(targetsJson, configured);
+}
+
+/** The preview's call policy over the development organ bounds, as the practice uses it (the judge, composer, evaluator bounds). */
+export function practiceRunnerPolicy(previewConfig: PreviewProviderTestConfig): ReturnType<typeof previewRunnerPolicy> {
+  return previewRunnerPolicy({
+    bounds: DEVELOPMENT_ORGAN_COST_BOUNDS.organs,
+    synthesisRolePolicy: { synthesizerBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.COMPOSER,
+      evaluatorBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.CONFORMANCE }
+  }, previewConfig);
 }
 
 /** One target per reviewed model: the first declared target of each model, in declaration order. */

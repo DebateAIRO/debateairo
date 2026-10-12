@@ -25,19 +25,20 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   createPreviewBudgetRpcPort,
-  parseProviderDiscoveryTargets,
-  previewRunnerPolicy,
   previewModelRow,
-  previewTargetJsonRow,
-  PREVIEW_REVIEWED_PROVIDER_REFS,
   type PreviewGateRemaining
 } from "@debateai/providers";
 import { readOperatorCommandEnvironment } from "@debateai/register";
 import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
-import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
 import { practiceRemainingPorts } from "./practice-ask-composition.js";
 import { runPracticeDebate } from "./practice-debate.js";
-import { onePerModel, PRACTICE_FORMATS_DEFAULTS, runPracticeFormats } from "./practice-formats.js";
+import {
+  onePerModel,
+  PRACTICE_FORMATS_DEFAULTS,
+  practiceDeclaredTargets,
+  practiceRunnerPolicy,
+  runPracticeFormats
+} from "./practice-formats.js";
 import { PracticeGateObserver, type PracticeGateName } from "./practice-gate-observer.js";
 import { practiceInterruptGate, takeOverSignals } from "./practice-interrupt.js";
 import { PRACTICE_LANES, type PracticeLane } from "./practice-lanes.js";
@@ -258,16 +259,8 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         const gate = previewModelRow(model)?.provider === "anthropic" ? "anthropic" : "deepinfra";
         if (!before[gate]!.enabledModels.includes(model)) throw new PracticeRefusal("PRACTICE_MODEL_NOT_ENABLED_AT_GATE", model);
       }
-      const configured = PREVIEW_REVIEWED_PROVIDER_REFS.map((providerRef) => {
-        const row = previewModelRow(previewTargetJsonRow(providerRef).model)!;
-        return { providerRef, maker: row.maker, adapterKind: row.adapterKind };
-      });
-      const declared = parseProviderDiscoveryTargets(settings.runner.PROVIDER_DISCOVERY_TARGETS_JSON, configured);
-      const policy = previewRunnerPolicy({
-        bounds: DEVELOPMENT_ORGAN_COST_BOUNDS.organs,
-        synthesisRolePolicy: { synthesizerBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.COMPOSER,
-          evaluatorBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.CONFORMANCE }
-      }, settings.previewConfig);
+      const declared = practiceDeclaredTargets(settings.runner.PROVIDER_DISCOVERY_TARGETS_JSON);
+      const policy = practiceRunnerPolicy(settings.previewConfig);
       const parallel = !args.switches.has("--sequential");
       const samples = wholeNumber(args, "--samples", 2, 1, 10);
       const maxInFlight = wholeNumber(args, "--max-in-flight", PRACTICE_FORMATS_DEFAULTS.maxInFlight, 1, 20);
