@@ -690,3 +690,21 @@ English `legacyNotice` text: "Depth mode, depth of scrutiny and max tokens are n
 ## After the tasks (orchestrator, not a subagent task)
 
 1. Whole-branch review (Opus). 2. `pnpm run typecheck`, `pnpm run test:ci-gate`, then each touched integration suite, one at a time. 3. Practice measurement on the real gates (spec §5). 4. Merge latest origin/dev, re-run, push, PR to dev with Auto-fix; report to the owner.
+
+---
+
+### Task 16: The preview operator path carries the call-concurrency row (plan amendment, controller ruling R18)
+
+Task 15 found that the preview's real publish path cannot carry the row: `deploy/preview-auth-dev/v1/native-operator.mjs` `validateNativePlan` accepts only `checkerChoice` and `roleRotation` as optional plan keys and calls `publisher.buildPreviewSourceRowsV2(…, plan.checkerChoice, plan.roleRotation)` without the policy, and `deploy/preview-release/v1/release-artifacts.mjs native-plan` has no option for it.
+
+**Files:**
+- Modify: `deploy/preview-auth-dev/v1/native-operator.mjs`, `deploy/preview-auth-dev/v1/publish-register-v2.ts` (only if `buildPreviewSourceRowsV2` needs its policy parameter position adjusted), `deploy/preview-release/v1/release-artifacts.mjs`, `deploy/preview-release/v1/README.md`, `deploy/preview-auth-dev/v1/README.md` (replace the "Not wired yet" bullet with the real steps)
+- Test: the existing unit tests of these modules (find them: `grep -rln "validateNativePlan\|release-artifacts" tests | head`)
+
+Rules (mirror `checkerChoice` exactly):
+- Native plan optional key `callConcurrency`: an object `{ perDebate, perModelPerDebate, perModelPerRunner }` (exact keys; integers; perModelPerRunner an object with a `default`); allowed only when `operation` is `plan` or `publish`; otherwise `PREVIEW_NATIVE_PLAN_REFUSED`. The publisher validates it again with `callConcurrencyPolicyFromValue` before building the row.
+- `runNativeOperator` passes `plan.callConcurrency` through to `buildPreviewSourceRowsV2` so the row is in the composed snapshot (and therefore in the owner-reviewed delta).
+- `release-artifacts.mjs native-plan` gains optional `--call-concurrency '<json>'` (a JSON object as above), allowed only with `--operation plan`; `publish` carries the value over from the `--from` plan exactly as `checkerChoice` is carried.
+- Preview off switch stays the value form (R6): `{"perDebate":1,"perModelPerDebate":1,"perModelPerRunner":{"default":1000}}`.
+- [ ] Step 1: failing tests (plan accepts the key on plan/publish, refuses it on apply-and-plan/verify and on a malformed value; release tool writes it on plan and carries it on publish; native operator passes it to the builder — use the module's existing test seams).
+- [ ] Step 2: FAIL. Step 3: implement. Step 4: PASS (+ any README-reading tests). Step 5: commit `Preview operator: a native plan can carry the call-concurrency row`.
