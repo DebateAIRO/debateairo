@@ -241,7 +241,8 @@ stored per call), so it is read from the gates' answers as the practice watches 
 - openings, all 12 questions and all four arms: about 350 calls. Cost: roughly $0.5 to $1 in all, a planning
   estimate, not yet measured (the first real run's report gives the real figure). The tighter pot is Haiku's: the test
   budget is $5 a day for DeepInfra but only $1 a day for Haiku, so check Haiku's share in the first run's report before
-  running again the same day. The steps of one arm go one after another, so it takes several hours (the slow models
+  running again the same day. `report.md` shows each gate's spend by the gate's own count ("spent by the gate's count"
+  on its line under "Gates"), and Haiku is the only AI on the Anthropic gate, so the `anthropic` line is Haiku's share. The steps of one arm go one after another, so it takes several hours (the slow models
   take 30 to 170 seconds a call). That is why S-6 runs it in two halves (see there). `--dry` spends nothing.
 - debate, depth 1: up to about 230 calls, about $0.15 to $0.70, about 1 to 2 hours. Depth 2: about 350 calls, up to
   about 3 hours. The start-of-debate estimate needs much more room left in the pots than is actually spent (about
@@ -374,9 +375,11 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
 echo "exit: $?"
 ```
 
-Then the English half, after S-3 again. If the relay has ended meanwhile, start it again with S-4's `systemd-run`
-line, then run only the `ssh -N` line of S-5 again (it puts the two sockets back in the same `D`; leave `D` and `P` as
-they are):
+Then the English half, after S-3 again. If the relay has ended meanwhile: on the server, as root, run S-4's
+`systemd-run` line again, then its three check lines (the install and the sha256 check of S-4 are skipped: the
+installed file is still there). Then on the Mac, first stop the earlier `ssh -N` (Ctrl-C in its terminal) and run S-5's
+`ssh -N` line again in that same terminal (it puts the two sockets back in the same `D`; leave `D` and `P` as they
+are):
 
 ```sh
 scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
