@@ -104,8 +104,10 @@ describe("practice verdict: fixed slips are a warning (owner ruling 2026-10-12)"
     expect(practiceVerdict({ ...CLEAN, callsByModel: { m: calls(20, 2) } }).reasons).toEqual(["FORMAT_REPAIRED:m:2"]);
   });
 
-  it("the story's outcome stays as it was: anything but READY fails, READY_WITH_RESERVATION too", () => {
-    expect(practiceVerdict({ ...CLEAN, storyOutcome: "READY_WITH_RESERVATION" }).reasons).toEqual(["STORY_NOT_READY:READY_WITH_RESERVATION"]);
+  it("a story served with the checker's reservation is a warning; any other story that is not READY fails (owner ruling 2026-10-12)", () => {
+    expect(practiceVerdict({ ...CLEAN, storyOutcome: "READY_WITH_RESERVATION" })).toMatchObject({ verdict: "PASS_WITH_WARNINGS", reasons: ["STORY_RESERVED"] });
+    expect(practiceVerdict({ ...CLEAN, storyOutcome: "FAILED" })).toMatchObject({ verdict: "FAIL", reasons: ["STORY_NOT_READY:FAILED"] });
+    expect(practiceVerdict({ ...CLEAN, storyOutcome: "MISSING" })).toMatchObject({ verdict: "FAIL", reasons: ["STORY_NOT_READY:MISSING"] });
   });
 });
 
