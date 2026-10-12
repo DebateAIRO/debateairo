@@ -183,6 +183,41 @@ describe("the short follow-up on the preview's DeepInfra wire", () => {
     expect(executions).toHaveLength(2);
   });
 
+  it("a patch that cannot be merged as the call's last POST changes nothing: the call's refusal is still the first reply's", async () => {
+    // The steps read the refusal's code (the runner's writer: a citation code ends the round with no draft, never a
+    // FAILED run). A patch reply that was not merged left the first reply standing, so its refusal is the call's; each
+    // try's own record keeps its own code.
+    const unmergeable = [
+      [fixedPosition(true), "SCHEMA_FAILED", "PATCH_KEY_NOT_REQUESTED@$"],
+      ["{}", "SCHEMA_FAILED", "PATCH_EMPTY@$"],
+      ["I cannot add that.", "PARSE_FAILED", "PATCH_NOT_AN_OBJECT@$"]
+    ] as const;
+    for (const [patchReply, patchStatus, patchError] of unmergeable) {
+      const { gateway, executions, artifacts } = deepInfraHarness([{ content: POSITION_SLIP }, { content: patchReply }]);
+      const refusal: unknown = await gateway.call({ ...positionRequest(), bound: { maxAttempts: 2, tokenCeiling: 8192, deadlineMs: 600_000 } })
+        .then(() => null, (error: unknown) => error);
+      expect(refusal).toMatchObject({
+        code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2,
+        lastParseStatus: "SCHEMA_FAILED", lastParseError: "invalid_type@value_laden", lastRawArtifactRef: artifacts[0]!.artifactId
+      });
+      expect(executions).toHaveLength(2);
+      expect(artifacts.map((artifact) => [artifact.parseStatus, artifact.parseError])).toEqual([
+        ["SCHEMA_FAILED", "invalid_type@value_laden"], [patchStatus, patchError]
+      ]);
+    }
+  });
+
+  it("a patch that was merged but still fails the step's check, as the call's last POST: the call's refusal is the merged answer's", async () => {
+    const { gateway, artifacts } = deepInfraHarness([{ content: POSITION_SLIP }, { content: "{\"value_laden\": \"no\"}" }]);
+    const refusal: unknown = await gateway.call({ ...positionRequest(), bound: { maxAttempts: 2, tokenCeiling: 8192, deadlineMs: 600_000 } })
+      .then(() => null, (error: unknown) => error);
+    expect(artifacts).toHaveLength(2);
+    expect(refusal).toMatchObject({
+      code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2,
+      lastParseStatus: "SCHEMA_FAILED", lastParseError: artifacts[1]!.parseError, lastRawArtifactRef: artifacts[1]!.artifactId
+    });
+  });
+
   it("a judging call never asks for JSON mode, on GLM either: not the first POST, the patch or the full re-ask", async () => {
     // 2026-10-12: JSON mode on the debate steps was tried and withdrawn the same day (GLM answered a judging call with
     // "{}" in JSON mode); only the story calls ask for it.

@@ -1748,13 +1748,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * accepted reply answered a repair packet.
      */
     let repairAttempts = 0;
-    let lastContentRejection: {
+    type ContentRefusalRecord = {
       attempts: number;
       parseStatus: ProviderContentRejectionStatus;
       parseError: string;
       rawArtifactRef: string;
       ledgerEntryRef: string;
-    } | null = null;
+    };
+    let lastContentRejection: ContentRefusalRecord | null = null;
 
     /**
      * Model scorecard §2.10: whether one attempt fits the declared window. The
@@ -1775,6 +1776,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     let patchPlan: PatchFollowUpPlan | null = null;
     let patchTried = false;
     let patchedRejection: RejectedProviderContent | null = null;
+    /** The first reply's refusal as recorded (its artifact and ledger row): the call's, while a patch was not merged. */
+    let patchedRefusal: ContentRefusalRecord | null = null;
     let repairForm: "PATCH" | "FULL" | undefined;
 
     for (let attempt = 1; attempt <= callAttempts(); attempt += 1) {
@@ -1966,6 +1969,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          * classifier checked, so every caller that reads `content` again reads exactly what was accepted.
          */
         let acceptedContent = content;
+        /** Patch follow-up: this attempt was the patch and its reply could not be merged, so the first reply stands. */
+        let patchNotMerged = false;
         let classifiedContent: ContentClassification | {
           readonly parseStatus: "UNPARSED";
           readonly parseError: null;
@@ -1974,6 +1979,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           if (content !== null && patchPlan !== null && request.classifyContent !== undefined) {
             const merged = mergePatchReply(patchPlan, content, replyFacts);
             if (merged.ok) acceptedContent = merged.content;
+            patchNotMerged = !merged.ok;
             classifiedContent = merged.ok
               ? request.classifyContent(merged.content, replyFacts)
               : { parseStatus: merged.parseStatus, parseError: merged.parseError };
@@ -2203,13 +2209,21 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             finishedAt: new Date()
           });
           ledgerRecorded = true;
-          lastContentRejection = {
-            attempts: attempt,
-            parseStatus: contentRejection.parseStatus,
-            parseError: contentRejection.parseError,
-            rawArtifactRef,
-            ledgerEntryRef
-          };
+          /**
+           * Patch follow-up: a patch reply that could not be merged (PATCH_KEY_NOT_REQUESTED, PATCH_EMPTY,
+           * PATCH_NOT_AN_OBJECT) changed nothing — the first reply still stands — so if the call ends here, its refusal is
+           * that reply's. The steps read this code: the writer's citation codes end its round with no draft, never a
+           * FAILED run (Task M4 I-1). This attempt's own artifact and ledger row above keep the patch's own code.
+           */
+          lastContentRejection = patchNotMerged && patchedRefusal !== null
+            ? { ...patchedRefusal, attempts: attempt }
+            : {
+                attempts: attempt,
+                parseStatus: contentRejection.parseStatus,
+                parseError: contentRejection.parseError,
+                rawArtifactRef,
+                ledgerEntryRef
+              };
           if (contentRejection.parseStatus === PROVIDER_CONTENT_LENGTH_EXCEEDED) {
             // W10/2: a truncation is NOT repaired by asking again for the same
             // thing. Appending a correction is strictly counterproductive here
@@ -2243,6 +2257,13 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
               patchTried = true;
               if (attempt === 1) patchWasSecondPost = true;
               patchedRejection = { rawText: content!, parseStatus: contentRejection.parseStatus, parseError: contentRejection.parseError };
+              patchedRefusal = {
+                attempts: attempt,
+                parseStatus: contentRejection.parseStatus,
+                parseError: contentRejection.parseError,
+                rawArtifactRef,
+                ledgerEntryRef
+              };
               repairForm = "PATCH";
               repairAttempts += 1;
             } else if (attempt < callAttempts()) {
