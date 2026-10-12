@@ -116,7 +116,7 @@ describe("map choose: the fallback when the choose step failed (MAP_CHOOSE_FALLB
   });
 });
 
-describe("map choose: the single-AI quota counts blind and gap makers only (spec §1.1)", () => {
+describe("map choose: the single-AI quota counts every maker of a point (controller ruling, 2026-10-12)", () => {
   const shown = (draft: MapItemDraft): MapItemDraft => ({ ...draft, origin: "SHOWN" }) as MapItemDraft;
   const gap = (draft: MapItemDraft): MapItemDraft => ({ ...draft, origin: "GAP" }) as MapItemDraft;
   const pair = (a: MapItemDraft[], seed: string) => {
@@ -126,7 +126,7 @@ describe("map choose: the single-AI quota counts blind and gap makers only (spec
     return { made, index, idsOf };
   };
 
-  it("does not count a point only a shown (snowball) item raised as single-AI", () => {
+  it("counts a point raised only by one shown (snowball) AI as single-AI, and it meets the quota", () => {
     const { made, index, idsOf } = pair([
       point(A, 0, 0, "Shared", null, "for_some_answer"), point(B, 1, 0, "Shared", null, "for_some_answer"),
       shown(point(C, 2, 0, "Shown only", null, "context")),
@@ -136,7 +136,8 @@ describe("map choose: the single-AI quota counts blind and gap makers only (spec
     const merged = [mapMergedAnswer("an01", "Yes.", idsOf("Yes."), index), mapMergedAnswer("an02", "No.", idsOf("No."), index)];
     const out = mapFinishChoice({ keyPoints: kps, mergedAnswers: merged, items: made, languageTag: "en", maxAnswers: 4, pointsPerAnswer: 3,
       reply: { answers: [chosen("a1", "Yes.", [], [], null), chosen("a2", "No.", [], [], null)] } });
-    expect(out.marks).toEqual([]);
+    expect(marksOf(out.marks)).toEqual(["CHOOSE_QUOTA_FILLED:SINGLE_AI:kp02"]);
+    expect(out.choice.answers[0]!.forKeyPointIds).toEqual(["kp02"]);
   });
 
   it("counts a point a gap round raised by one maker as single-AI", () => {
@@ -150,5 +151,17 @@ describe("map choose: the single-AI quota counts blind and gap makers only (spec
     const out = mapFinishChoice({ keyPoints: kps, mergedAnswers: merged, items: made, languageTag: "en", maxAnswers: 4, pointsPerAnswer: 3,
       reply: { answers: [chosen("a1", "Yes.", [], [], null), chosen("a2", "No.", [], [], null)] } });
     expect(marksOf(out.marks)).toEqual(["CHOOSE_QUOTA_FILLED:SINGLE_AI:kp02"]);
+  });
+});
+
+describe("map choose: an empty map (null reply, no merged answers, no OPPOSITE_CASE list) pins today's behaviour", () => {
+  it("fills two template answers, the second the template of the first, each recorded as ANSWERS_FILLED", () => {
+    const pointsOnly = items.filter((item) => item.kind === "POINT");
+    const out = mapFinishChoice({ ...BASE, items: pointsOnly, mergedAnswers: [], reply: null });
+    expect(out.choice.answers.map((entry) => `${entry.answerId}:${entry.statement}:${String(entry.filled)}>${entry.strongestRival}`))
+      .toEqual(["filled-1:An answer different from the one above:true>filled-2",
+        "filled-2:The opposite of this answer: An answer different from the one above:true>filled-1"]);
+    expect(marksOf(out.marks).filter((mark) => mark.startsWith("ANSWERS_FILLED"))).toEqual(["ANSWERS_FILLED:TEMPLATE", "ANSWERS_FILLED:TEMPLATE"]);
+    expect(marksOf(out.marks)[0]).toBe("MAP_CHOOSE_FALLBACK:choose reply missing");
   });
 });

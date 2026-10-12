@@ -91,8 +91,9 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
     place(target, pick);
     marks.push(Object.freeze({ mark: "CHOOSE_QUOTA_FILLED", step: "CHOOSE", detail: `${name}:${pick.keyPointId}` }));
   };
-  // "Raised by exactly one AI", blind and gap makers counted together (a shown item is not an independent raising).
-  quota("SINGLE_AI", (keyPoint) => new Set([...keyPoint.blindMakers, ...keyPoint.gapMakers]).size === 1);
+  // "Raised by exactly one AI": every maker of the point counts (blind, gap and shown), per the controller's ruling of
+  // 2026-10-12. Arm A's later AIs work on shown items by design, so excluding them would starve this quota.
+  quota("SINGLE_AI", (keyPoint) => keyPoint.makers.length === 1);
   quota("OPPOSITE_CASE", (keyPoint) => keyPoint.fixedAngleKinds.includes("OPPOSITE_CASE"));
   quota("ASKER_WORRY", (keyPoint) => keyPoint.fixedAngleKinds.includes("ASKER_WORRY"));
 
