@@ -324,7 +324,8 @@ describe("parallel calls: replies and cross-exchanges (Task 11)", () => {
       { name: "serial", seed: 141, row: undefined }
     ] as const;
     const runs = await savedAcrossVariants("boundary_stop", { panelRefs: twoMakers, depth: 2 }, variants, {
-      stoppingPolicy: { delta: 0, epsilon: 0.01 }, answers: rootOneAttackReviewStopped
+      stoppingPolicy: { delta: 0, epsilon: 0.01 },
+      answers: (question) => rootOneAttackReviewRefused(question, { gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" })
     });
     const decisions = runs.map((run) => ({ stopping: run.stoppingRows, frozen: branchFrozenFacts(run.saved) }));
     const serial = decisions[2]!;
@@ -334,6 +335,39 @@ describe("parallel calls: replies and cross-exchanges (Task 11)", () => {
     for (const [index, decision] of decisions.entries()) {
       expect(decision, variants[index]!.name).toEqual(serial);
       // No reply beyond the boundary was asked: the stop ended the arguing.
+      expect(runs[index]!.callSiteKeys.filter((key) => /^JUDGE:(defender|critic):root1:r2:/u.test(key)), variants[index]!.name).toEqual([]);
+    }
+  }, 900_000);
+
+  /**
+   * Ruling R26b (Task 11 fix round 2): the same for "too few members left". Today's boundary block reviews, then decides
+   * the round, whatever the review pass latched; a too-few stop latched BEFORE the boundary (the loop's own check before
+   * the boundary's last reply) skips the decision. Depth 2, two makers, the freezing bearings, run resilience on: the
+   * review of root 1's attack reply (node 9, the last of the round-1 boundary's review batch) is the vendor's
+   * gate-proven unbilled refusal, twice (the POST and its one resend), so its reviewer sits out — and with one maker
+   * left, too few are left to argue. The serial run still records round 1's decision; so must the parallel runs.
+   */
+  it("too few members left, raised by a boundary's own reviews: the round decision is still recorded, as the serial run records it", async () => {
+    const twoMakers = [
+      PANEL_REFS.find((ref) => PREVIEW_PROVIDER_REF_MODELS[ref] === DEEPSEEK)!,
+      PANEL_REFS.find((ref) => PREVIEW_PROVIDER_REF_MODELS[ref] === HAIKU)!
+    ];
+    const variants = [
+      { name: "parallel-a", seed: 151, row: OWNER_CALL_CONCURRENCY },
+      { name: "parallel-b", seed: 161, row: OWNER_CALL_CONCURRENCY },
+      { name: "serial", seed: 171, row: undefined }
+    ] as const;
+    const runs = await savedAcrossVariants("boundary_too_few", { panelRefs: twoMakers, depth: 2 }, variants, {
+      stoppingPolicy: { delta: 0, epsilon: 0.01 }, resilience: RUN_RESILIENCE,
+      answers: (question) => rootOneAttackReviewRefused(question, { unbilled: true })
+    });
+    const decisions = runs.map((run) => ({ stopping: run.stoppingRows, frozen: branchFrozenFacts(run.saved) }));
+    const serial = decisions[2]!;
+    expect(serial.stopping).toEqual([{ call_site_key: "STOPPING:round:1", outcome: "OK" }]);
+    expect(serial.frozen.length).toBeGreaterThan(0);
+    for (const [index, decision] of decisions.entries()) {
+      expect(decision, variants[index]!.name).toEqual(serial);
+      // No reply beyond the boundary was asked: too few members were left to argue.
       expect(runs[index]!.callSiteKeys.filter((key) => /^JUDGE:(defender|critic):root1:r2:/u.test(key)), variants[index]!.name).toEqual([]);
     }
   }, 900_000);
@@ -405,6 +439,8 @@ async function savedAcrossVariants(
   variants: readonly Readonly<{ name: string; seed: number; row: typeof OWNER_CALL_CONCURRENCY | undefined }>[],
   options: Readonly<{
     stoppingPolicy?: Readonly<{ delta: number; epsilon: number }>;
+    /** The run-resilience setting (members sit out); absent, nobody ever does. */
+    resilience?: typeof RUN_RESILIENCE;
     bearings?: Readonly<{ support: number; attack: number }>;
     /** The gates' answers (default: `scriptedAnswers` with `bearings`). */
     answers?: (question: string) => (request: GateRequest, chat: string) => GateOverride | null;
@@ -437,7 +473,8 @@ async function savedAcrossVariants(
       const gates = await run.startGates({}, undefined, answers, holds.delayMs);
       const composed = await run.previewRunner(gates, "resend", {
         ...(variant.row === undefined ? {} : { callConcurrency: variant.row }),
-        ...(options.stoppingPolicy === undefined ? {} : { stoppingPolicy: options.stoppingPolicy })
+        ...(options.stoppingPolicy === undefined ? {} : { stoppingPolicy: options.stoppingPolicy }),
+        ...(options.resilience === undefined ? {} : { resilience: options.resilience })
       });
       const result = await run.completedRun(composed, debate, gates);
       const arrivals = [...gates.arrivals];
@@ -525,10 +562,11 @@ function rootZeroReviewRefused(question: string) {
 
 /**
  * `scriptedAnswers` with the freezing bearings (support 0, attack 0.9), except that the review of ROOT 1's attack
- * reply — a review offering exactly one edge, an attack on root 1's statement (a cross-exchange offers two) — is the
- * gate's STOPPED refusal: the run's money ceiling. Root 1's statement is learnt from its author call's answer.
+ * reply — a review offering exactly one edge, an attack on root 1's statement (a cross-exchange offers two) — is
+ * answered `refusal` (the gate's STOPPED refusal: the run's money ceiling; or the vendor's unbilled refusal: busy).
+ * Root 1's statement is learnt from its author call's answer.
  */
-function rootOneAttackReviewStopped(question: string) {
+function rootOneAttackReviewRefused(question: string, refusal: GateOverride) {
   const scripted = scriptedAnswers(question, { support: 0, attack: 0.9 });
   let rootOne: string | null = null;
   return (request: GateRequest, chat: string): GateOverride | null => {
@@ -539,7 +577,7 @@ function rootOneAttackReviewStopped(question: string) {
     if (request.kind === "REVIEW" && rootOne !== null) {
       const edges = requestedReviewEdges(chat);
       if (edges.length === 1 && edges[0]!.relation === "attack" && edges[0]!.target_statement === rootOne) {
-        return { gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" };
+        return refusal;
       }
     }
     return answer;

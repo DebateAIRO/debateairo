@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Pool } from "pg";
@@ -1036,6 +1037,12 @@ export function reservingHoldRecorder(recorder: HoldRecorder): HoldRecorder {
 interface LaterParentNode {
   readonly saved: Promise<string | null>;
 }
+
+/**
+ * Parallel AI calls, ruling R26b — THE CHAIN STEP A MODEL CALL BELONGS TO: its place in today's serial order (the
+ * runner's `ChainRank`), so a member that sits out can be placed where today's loop would first have seen it.
+ */
+const chainStageScope = new AsyncLocalStorage<{ readonly rank: readonly number[] }>();
 
 /** The hold recorder of one site whose parent is saved later: each record waits for the parent's id and names it. */
 function laterParentHold(recorder: HoldRecorder, parent: LaterParentNode): HoldRecorder {
@@ -5021,9 +5028,25 @@ export class WalkingSkeletonRunner {
      * every per-run copy below (body makers, the legacy seat book, the synthesis and story makers) uses the lane.
      * Without either, the maker is returned as it is: today's run.
      */
+    /**
+     * Ruling R26b: told after every failed call of a member gateway (with the book only); it places the moment too few
+     * members are left to argue in today's order (`tooFewRank`). Set once the root seats exist.
+     */
+    let afterFailedCall: (() => void) | null = null;
+    const observedFailures = (provider: ProviderGateway): ProviderGateway => Object.freeze({
+      call: async (request: ProviderCallRequest): Promise<ProviderCallResult> => {
+        try {
+          return await provider.call(request);
+        } catch (error) {
+          afterFailedCall?.();
+          throw error;
+        }
+      }
+    });
     const sitOutMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {
       const sittingOut = sitOut === null ? maker.provider : sitOut.gateway(maker.providerRef, maker.provider);
-      const provider = throughCallLane(maker.providerRef, sittingOut);
+      const laned = throughCallLane(maker.providerRef, sittingOut);
+      const provider = sitOut === null ? laned : observedFailures(laned);
       if (provider === maker.provider) return maker;
       return Object.freeze({ ...maker, provider, judge: new Judge(provider) });
     };
@@ -6318,6 +6341,17 @@ export class WalkingSkeletonRunner {
       return membersSatOutStop;
     };
     /**
+     * Ruling R26b — WHERE IN TODAY'S ORDER TOO FEW MEMBERS WERE FIRST LEFT: the rank of the chain step whose failed call
+     * made the deciding member sit out (or whose reviewer choice found every reviewer sitting out); `[]` — before
+     * everything — for a call made outside the chains. Read only by a round boundary's decision (`argueTogether`).
+     */
+    let tooFewRank: readonly number[] | null = null;
+    const noteTooFew = (rank: readonly number[]): void => { tooFewRank ??= rank; };
+    afterFailedCall = () => {
+      if (tooFewRank !== null || effectiveMakerCount <= 1) return;
+      if (rootSeats.filter((_seat, rootIndex) => !rootSitsOut(rootIndex)).length < 2) noteTooFew(chainStageScope.getStore()?.rank ?? []);
+    };
+    /**
      * Parallel AI calls (spec 2026-10-12 §2.1) — THE PLAN, KNOWN BEFORE ROOT 0. Both plans are pure functions of the
      * depth and the maker count, so every node's PLAN POSITION is fixed before any call: root i → i, expansion leg
      * j → M + j (its `childIndex`), cross-exchange k → M + E + k. Nodes are saved, and reviews recorded, in that
@@ -6431,7 +6465,7 @@ export class WalkingSkeletonRunner {
      */
     const runChain = (body: (stage: { rank: ChainRank }) => Promise<void>, rank: ChainRank, release: () => void): Promise<void> => {
       const stage = { rank };
-      return body(stage).catch((error: unknown) => {
+      return chainStageScope.run(stage, () => body(stage)).catch((error: unknown) => {
         bodyFailed = true;
         bodyFailures.push(Object.freeze({ rank: stage.rank, error }));
         callLane?.stop();
@@ -7106,7 +7140,10 @@ export class WalkingSkeletonRunner {
           latest.set(authoredNode.maker, await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker));
         }
         const chosen = chooseReviewer(authoredNode, latest.get(authoredNode.maker) ?? null);
-        if (chosen.kind === "MEMBERS_SAT_OUT") return null;
+        if (chosen.kind === "MEMBERS_SAT_OUT") {
+          noteTooFew(slot.rank);
+          return null;
+        }
         latest.set(authoredNode.maker, chosen.reviewer.maker);
         reviewScheduledNodeIds.add(authoredNode.nodeId);
         return chosen.reviewer;
@@ -7460,11 +7497,14 @@ export class WalkingSkeletonRunner {
           // Every node up to the boundary saved or given up, and reviewed: its review batch ends at the boundary.
           await nodeRecorder.through(boundaryEnd);
           await reviewBatches[batchIndex]!.done;
-          // Today's loop never reached this boundary: a failure, the adaptive rule's stop at an earlier boundary, too
-          // few members left, or a spend stop raised BEFORE this boundary's own review pass. Ruling R26: a spend stop
-          // raised BY that pass (or by a step today's order puts after the boundary, a cross-exchange) still lets
-          // today's loop decide the round — pure code and one PROPAGATION row — so the chains decide it too.
-          if (stoppedByAdaptiveRule || bodyFailed || tooFewLeftToArgue()) return;
+          // Today's loop never reached this boundary: a failure, the adaptive rule's stop at an earlier boundary, or a
+          // stop it saw BEFORE the boundary. Ruling R26: a spend stop raised by this boundary's own review pass (or by
+          // a step today's order puts after the boundary, a cross-exchange) still lets today's loop decide the round —
+          // pure code and one PROPAGATION row — so the chains decide it too. R26b: today's loop asks "too few members
+          // left?" last before the boundary's last reply, so too few left by that reply or anything after it in
+          // today's order lets the round be decided too.
+          if (stoppedByAdaptiveRule || bodyFailed) return;
+          if (tooFewLeftToArgue() && !(tooFewRank !== null && compareRanks(tooFewRank, [batchIndex, 0, boundaryEnd - 1]) >= 0)) return;
           if (runBodyBudgetStop !== null && !spendStoppedFrom([batchIndex, 1])) return;
           stoppedByAdaptiveRule = await closeGlobalRound(completedRound, boundaryLegIndex);
         }, [batchIndex, 3], () => undefined);
