@@ -90,6 +90,9 @@ importers:
       '@debateai/mail-templates':
         specifier: workspace:*
         version: link:packages/mail-templates
+      '@debateai/map':
+        specifier: workspace:*
+        version: link:packages/map
       '@debateai/memory':
         specifier: workspace:*
         version: link:packages/memory
@@ -712,6 +715,18 @@ importers:
       '@debateai/billing-core':
         specifier: workspace:*
         version: link:../billing-core
+
+  packages/map:
+    dependencies:
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@debateai/providers':
+        specifier: workspace:*
+        version: link:../providers
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
 
   packages/memory:
     dependencies:

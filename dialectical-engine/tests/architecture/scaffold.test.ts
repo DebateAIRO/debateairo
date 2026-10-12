@@ -95,9 +95,11 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
   // api and runner name it in their own rows.
   // 36 -> 37: the payments-netopia package row (NETOPIA spec §2.4).
   // 37 -> 36: the first card processor's package row, removed with it (NETOPIA spec §2.19).
-  it("matches all 36 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
+  // 36 -> 37: the map package row (debate shape spec 2026-10-12, Phase 1). @debateai/map depends on kernel and
+  // providers; no app names it yet (Phase 2 adds "map" to apps/runner's row when the runner calls it).
+  it("matches all 37 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
     const report = await auditArchitecture();
-    expect(report.edgeRowsChecked).toBe(36);
+    expect(report.edgeRowsChecked).toBe(37);
     expect(report.violations.filter((violation) => !DEV_F31_OBS_CAPTURE_EDGES.includes(violation)))
       .toEqual([]);
   });

@@ -105,6 +105,7 @@
     "@debateai/legal-manifest": "workspace:*",
     "@debateai/liveness": "workspace:*",
     "@debateai/mail-templates": "workspace:*",
+    "@debateai/map": "workspace:*",
     "@debateai/memory": "workspace:*",
     "@debateai/obs-capture": "workspace:*",
     "@debateai/payments-netopia": "workspace:*",
