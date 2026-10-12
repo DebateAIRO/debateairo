@@ -82,8 +82,26 @@ export async function resolveClaimType(input: { readonly text: string; readonly 
   return Object.freeze({ ...codeResult, claimType: proposed as ClaimType, substance: "model" });
 }
 
+const FATAL_FLAG_TYPE_SHAPE = /^[A-Za-z][A-Za-z0-9_-]*$/u;
+const FATAL_FLAG_TYPE_MAX_CHARS = 64;
+
+/**
+ * 2026-10-12 practice finding: judge models write fatal flags in plain words ("false dichotomy",
+ * "ad hominem (imputed motive)"), and the old shape check refused the whole billed reply. The type is
+ * folded before the check: trim; NFKD with combining marks dropped (ș, ă, î become s, a, i); each run
+ * outside [A-Za-z0-9_-] becomes one "_"; edge "_"/"-" removed; "flag_" prefixed when no letter starts it;
+ * cut to 64. The CASE is kept: caps match whenFatalType exactly. Empty folds to "" and is still refused.
+ */
+function normaliseFatalFlagType(raw: string): string {
+  const folded = raw.trim().normalize("NFKD").replace(/\p{M}/gu, "");
+  const identifier = folded.replace(/[^A-Za-z0-9_-]+/gu, "_").replace(/^[_-]+|[_-]+$/gu, "");
+  if (identifier === "") return "";
+  const lettered = FATAL_FLAG_TYPE_SHAPE.test(identifier) ? identifier : `flag_${identifier}`;
+  return lettered.slice(0, FATAL_FLAG_TYPE_MAX_CHARS).replace(/_+$/u, "");
+}
+
 const fatalFlagSchema = z.object({
-  type: z.string().trim().regex(/^[A-Za-z][A-Za-z0-9_-]*$/u),
+  type: z.string().transform((raw) => normaliseFatalFlagType(raw)).pipe(z.string().regex(FATAL_FLAG_TYPE_SHAPE)),
   severity: z.number().min(0).max(1), description: z.string().trim().min(1)
 }).strict();
 
