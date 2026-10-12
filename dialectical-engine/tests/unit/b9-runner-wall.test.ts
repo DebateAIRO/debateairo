@@ -4,7 +4,13 @@ import { RUN_LEVEL_SPEND_STOP_CODES, TypedDomainError, isRunLevelSpendStop } fro
 import { PROVIDER_COST_ENVELOPE_REFUSAL_CODES } from "@debateai/providers";
 import { SERVE_DISCLOSURE_BODY_STOPS, SERVE_DISCLOSURE_SERVE_STOPS } from "@debateai/db";
 import { AnswerWritingStopSchema, ArguingStopSchema } from "@debateai/contract";
-import { CostEnvelopeGuard, type RunOwnerSpendReader } from "@debateai/budget";
+import {
+  CostEnvelopeGuard,
+  projectedCallCeilingMicros,
+  type InFlightSpend,
+  type RunOwnerSpendReader
+} from "@debateai/budget";
+import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import {
   ENVELOPE_STOP_CODES,
   ENVELOPE_STOP_REASONS,
@@ -168,5 +174,165 @@ describe("B9b · the person wall fails closed when the runner cannot read the pl
     // The wall the shipped runner builds on a version without the band: finishBasisPoints null, no plans.
     expect(await decide("owner-b9b", null)).toBe("PERSON_ALLOWANCE_REACHED");
     expect(await decide(null, null)).toBe("ADMITTED");
+  });
+});
+
+/**
+ * Parallel AI calls (spec 2026-10-12 §3.5), Task 8 — THE MONEY SEAM COUNTS THE CALLS IN FLIGHT. A charge is written
+ * only after its call, so with several calls of one debate in flight each would read the same spent total. The seam
+ * now registers its own call's projected maximum before it reads anything, and adds every OTHER call of the run in
+ * flight to the run's spend, and every other call of the runner in flight to the site's day. A person's windows add
+ * the run's own other calls in flight only (never a stranger's debate).
+ */
+describe("Parallel calls · the money seam adds the calls in flight", () => {
+  const PRICE = Object.freeze({ inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 });
+  const PROJECTION = Object.freeze({ requestBytes: 800, completionTokenCeiling: 64 });
+  const P = projectedCallCeilingMicros(PRICE, PROJECTION);
+  const RUN_CEILING = 250_000;
+  const RUN = "run-inflight";
+
+  function guardOver(input: {
+    readonly runSpent?: number;
+    readonly daySpent?: number;
+    readonly ownerSpent?: number;
+    readonly ownerLimit?: number;
+    readonly inFlight?: InFlightSpend;
+    readonly slowReads?: boolean;
+    readonly onRecordSpend?: () => void;
+  }) {
+    const read = async (value: number) => {
+      if (input.slowReads === true) await new Promise((resolve) => setTimeout(resolve, 0));
+      return value;
+    };
+    return new CostEnvelopeGuard({
+      store: {
+        recordSpend: async () => { await new Promise((resolve) => setTimeout(resolve, 0)); input.onRecordSpend?.(); },
+        readRunSpentMicros: () => read(input.runSpent ?? 0),
+        readRunStorySpentMicros: async () => 0,
+        readDaySpentMicros: () => read(input.daySpent ?? 0),
+        admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
+      },
+      policy: { perRunCeilingMicros: RUN_CEILING, dailyCeilingMicros: 2_000_000, perStoryCeilingMicros: 50_000 },
+      sharedWall: {
+        finishBasisPoints: 10_000,
+        persons: {
+          read: async () => input.ownerLimit === undefined ? [] : [{
+            scope: "PERSON_MONTH" as const,
+            limitMicros: input.ownerLimit,
+            periodStart: new Date(0),
+            resetsAt: new Date(8_640_000_000_000),
+            finishBasisPoints: 10_000,
+            closeBasisPoints: 10_000
+          }]
+        },
+        owners: {
+          readRunChargeOwnerRef: async () => (input.ownerLimit === undefined ? null : "owner-inflight"),
+          readOwnerSpentMicros: async () => input.ownerSpent ?? 0
+        }
+      },
+      ...(input.inFlight === undefined ? {} : { inFlight: input.inFlight })
+    });
+  }
+  const seamOf = (guard: CostEnvelopeGuard, runId = RUN) =>
+    guard.providerSeam({ runId, price: PRICE, requireReportedUsage: true, phase: "BODY" });
+  const outcome = (promise: Promise<unknown>): Promise<string> =>
+    promise.then(() => "ADMITTED", (error: unknown) => (error instanceof TypedDomainError ? error.code : String(error)));
+
+  it("refuses a call that fits alone but not beside another call of the run in flight", async () => {
+    const runSpent = RUN_CEILING - 2 * P + 1;
+    expect(await outcome(seamOf(guardOver({ runSpent, inFlight: createRunInFlight() })).assertCallAllowed(PROJECTION)))
+      .toBe("ADMITTED");
+    const inFlight = createRunInFlight();
+    const other = inFlight.begin(RUN, BigInt(P));
+    expect(await outcome(seamOf(guardOver({ runSpent, inFlight })).assertCallAllowed(PROJECTION)))
+      .toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+    // The refused call released its own projection; the other call is still counted.
+    expect(inFlight.projectedMicros(RUN)).toBe(BigInt(P));
+    other();
+    // Another run's call in flight is not this run's spend.
+    inFlight.begin("run-other", BigInt(P));
+    expect(await outcome(seamOf(guardOver({ runSpent, inFlight })).assertCallAllowed(PROJECTION)))
+      .toBe("ADMITTED");
+  });
+
+  it("admits exactly one of two calls of the run that both read the same spent total", async () => {
+    const inFlight = createRunInFlight();
+    const guard = guardOver({ runSpent: RUN_CEILING - 2 * P + 1, inFlight, slowReads: true });
+    const results = await Promise.all([
+      outcome(seamOf(guard).assertCallAllowed(PROJECTION)),
+      outcome(seamOf(guard).assertCallAllowed(PROJECTION))
+    ]);
+    expect(results.filter((result) => result === "ADMITTED")).toHaveLength(1);
+    expect(inFlight.attempts(RUN)).toBe(1);
+  });
+
+  it("holds the call's projection from admission until its charge is written, then releases it", async () => {
+    const inFlight = createRunInFlight();
+    const duringWrite: bigint[] = [];
+    const seam = seamOf(guardOver({ inFlight, onRecordSpend: () => duringWrite.push(inFlight.projectedMicros(RUN)) }));
+    await seam.assertCallAllowed(PROJECTION);
+    expect(inFlight.projectedMicros(RUN)).toBe(BigInt(P));
+    expect(inFlight.projectedMicrosAll()).toBe(BigInt(P));
+    await seam.recordCall({
+      providerRef: "provider:test",
+      usage: { prompt_tokens: 10, completion_tokens: 5 },
+      projection: PROJECTION
+    });
+    expect(duringWrite).toEqual([BigInt(P)]);
+    expect(inFlight.attempts(RUN)).toBe(0);
+    expect(inFlight.projectedMicrosAll()).toBe(0n);
+  });
+
+  it("releases a call that produced no charge: at the next attempt, and when the gateway's call ends", async () => {
+    const inFlight = createRunInFlight();
+    const seam = seamOf(guardOver({ inFlight }));
+    await seam.assertCallAllowed(PROJECTION);
+    // A transport failure: no recordCall, then the retry's own admission.
+    await seam.assertCallAllowed(PROJECTION);
+    expect(inFlight.attempts(RUN)).toBe(1);
+    expect(inFlight.projectedMicros(RUN)).toBe(BigInt(P));
+    seam.releaseInFlight?.();
+    seam.releaseInFlight?.();
+    expect(inFlight.attempts(RUN)).toBe(0);
+    expect(inFlight.projectedMicrosAll()).toBe(0n);
+  });
+
+  it("adds every other call of the runner in flight to the site's day", async () => {
+    const daySpent = 2_000_000 - 2 * P + 1;
+    expect(await outcome(seamOf(guardOver({ daySpent, inFlight: createRunInFlight() })).assertCallAllowed(PROJECTION)))
+      .toBe("ADMITTED");
+    const inFlight = createRunInFlight();
+    inFlight.begin("run-other", BigInt(P));
+    expect(await outcome(seamOf(guardOver({ daySpent, inFlight })).assertCallAllowed(PROJECTION)))
+      .toBe("DAILY_COST_ENVELOPE_REACHED");
+    // The wall's refusal released the call's own projection too.
+    expect(inFlight.projectedMicros(RUN)).toBe(0n);
+    expect(inFlight.projectedMicrosAll()).toBe(BigInt(P));
+  });
+
+  it("adds the run's own other calls in flight to the person's windows, and never a stranger's", async () => {
+    const ownerLimit = 1_000_000;
+    const ownerSpent = ownerLimit - 2 * P + 1;
+    const stranger = createRunInFlight();
+    stranger.begin("run-of-someone-else", BigInt(P));
+    expect(await outcome(seamOf(guardOver({ ownerSpent, ownerLimit, inFlight: stranger })).assertCallAllowed(PROJECTION)))
+      .toBe("ADMITTED");
+    const sameRun = createRunInFlight();
+    sameRun.begin(RUN, BigInt(P));
+    expect(await outcome(seamOf(guardOver({ ownerSpent, ownerLimit, inFlight: sameRun })).assertCallAllowed(PROJECTION)))
+      .toBe("PERSON_ALLOWANCE_REACHED");
+  });
+
+  it("never counts the story's calls, which spend their own envelope", async () => {
+    const inFlight = createRunInFlight();
+    const story = guardOver({ inFlight }).storySeam({ runId: RUN, price: PRICE, requireReportedUsage: true });
+    await story.assertCallAllowed(PROJECTION);
+    expect(inFlight.attempts(RUN)).toBe(0);
+    expect(inFlight.projectedMicrosAll()).toBe(0n);
+  });
+
+  it("refuses a counter it could not ask", () => {
+    expect(() => guardOver({ inFlight: { begin: () => () => undefined } as unknown as InFlightSpend }))
+      .toThrow("COST_ENVELOPE_GUARD_INPUT_INVALID");
   });
 });

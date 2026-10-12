@@ -200,6 +200,7 @@ import {
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
+import type { RunInFlight } from "./run-in-flight.js";
 import {
   createRunSitOutBook,
   runPanelRevisedReason,
@@ -953,8 +954,66 @@ export interface HoldProgressEvent {
 
 export interface HoldRecorder {
   countCooldownHolds(runId: string): Promise<number>;
+  /**
+   * Parallel AI calls (spec 2026-10-12 §2.3): takes one of the run's cooldown
+   * holds, or refuses (false) when the run already holds `cap`. Present, it
+   * replaces `withCooldownRetry`'s "count, then compare", which two sites
+   * failing together would both pass. `reservingHoldRecorder` supplies it.
+   */
+  reserveHold?(runId: string, cap: number): Promise<boolean>;
   record(event: HoldProgressEvent): Promise<void>;
   wait(cooldownMs: number): Promise<void>;
+}
+
+/**
+ * Parallel AI calls (spec 2026-10-12 §2.3) — THE RUN-WIDE HOLD CAP UNDER
+ * CONCURRENT FAILURES. Wraps a recorder with an in-memory reservation per run:
+ * `reserveHold` counts its hold as reserved synchronously, BEFORE it reads the
+ * run's recorded holds, and admits it iff recorded + reserved <= cap, where
+ * reserved is the count it saw when it reserved (itself included). Refused, it
+ * releases at once; admitted, it stays reserved until the hold's COOLDOWN_HOLD
+ * record has committed (or failed), when the database count takes over.
+ *
+ * The reserved count is the one taken at reservation, not one read after the
+ * count returns: a hold that commits and releases while this one's count is
+ * being read may be missing from that count, and would then be in neither
+ * number. Taken at reservation, the later of two reservations always sees the
+ * earlier (reserved, or by then recorded — at worst counted twice, which only
+ * refuses). One runner process owns a claimed debate, so the count is exact.
+ */
+export function reservingHoldRecorder(recorder: HoldRecorder): HoldRecorder {
+  const reserved = new Map<string, number>();
+  const release = (runId: string): void => {
+    const held = reserved.get(runId) ?? 0;
+    if (held <= 1) reserved.delete(runId);
+    else reserved.set(runId, held - 1);
+  };
+  return Object.freeze({
+    countCooldownHolds: (runId: string) => recorder.countCooldownHolds(runId),
+    reserveHold: async (runId: string, cap: number): Promise<boolean> => {
+      const held = (reserved.get(runId) ?? 0) + 1;
+      reserved.set(runId, held);
+      let recorded: number;
+      try {
+        recorded = await recorder.countCooldownHolds(runId);
+      } catch (error) {
+        release(runId);
+        throw error;
+      }
+      if (recorded + held <= cap) return true;
+      release(runId);
+      return false;
+    },
+    record: async (event: HoldProgressEvent): Promise<void> => {
+      if (event.kind !== "node.retrying" || event.state !== "COOLDOWN_HOLD") return recorder.record(event);
+      try {
+        await recorder.record(event);
+      } finally {
+        release(event.runId);
+      }
+    },
+    wait: (cooldownMs: number) => recorder.wait(cooldownMs)
+  });
 }
 
 export interface HaltedExpansionRecord {
@@ -1059,12 +1118,23 @@ export async function withCooldownRetry<T>(input: {
     // DR-186(8): review gets every ruled provider attempt plus the final
     // attempt, but never holds the in-run loading page open.
     if (input.failureScope === "REVIEW") return finalAttempt(error);
-    const holds = await input.hold.countCooldownHolds(input.runId);
-    // DR-184/C-1: the run-wide cap bounds waiting only. It must never eat the
-    // final attempt that the structural ceiling provisions at every site.
-    if (holds >= input.policy.maxCooldownHoldsPerRun) return finalAttempt(error);
-    const holdUntil = new Date(Date.now() + input.policy.cooldownMs).toISOString();
-    const heldAttempts = await spent(error.attempts);
+    let holdUntil: string;
+    let heldAttempts: number;
+    if (input.hold.reserveHold !== undefined) {
+      // Parallel AI calls (spec 2026-10-12 §2.3): the reservation is taken
+      // last, so nothing that can fail lies between it and the COOLDOWN_HOLD
+      // record that releases it. Refused, the site keeps its final attempt.
+      heldAttempts = await spent(error.attempts);
+      if (!(await input.hold.reserveHold(input.runId, input.policy.maxCooldownHoldsPerRun))) return finalAttempt(error);
+      holdUntil = new Date(Date.now() + input.policy.cooldownMs).toISOString();
+    } else {
+      const holds = await input.hold.countCooldownHolds(input.runId);
+      // DR-184/C-1: the run-wide cap bounds waiting only. It must never eat the
+      // final attempt that the structural ceiling provisions at every site.
+      if (holds >= input.policy.maxCooldownHoldsPerRun) return finalAttempt(error);
+      holdUntil = new Date(Date.now() + input.policy.cooldownMs).toISOString();
+      heldAttempts = await spent(error.attempts);
+    }
     await input.hold.record({
       kind: "node.retrying",
       state: "COOLDOWN_HOLD",
@@ -4603,6 +4673,11 @@ export class WalkingSkeletonRunner {
       readonly outcome: "TIMED_OUT" | "FAILED";
       readonly ledgerEntryRef: string;
     }>();
+    // Parallel AI calls (spec 2026-10-12 §2.3): one reservation book per run,
+    // so sites failing together cannot pass the run's hold cap.
+    const runHoldRecorder = this.settings.holdRecorder === undefined
+      ? undefined
+      : reservingHoldRecorder(this.settings.holdRecorder);
     const cooldownAttempt = async <T>(input: {
       readonly callSiteKey: string;
       readonly parentNodeId: string | null;
@@ -4635,7 +4710,7 @@ export class WalkingSkeletonRunner {
       if (policy === undefined) {
         return { kind: "AUTHORED", value: await input.attempt(this.settings.judgeBound.maxAttempts) };
       }
-      const hold = this.settings.holdRecorder;
+      const hold = runHoldRecorder;
       if (hold === undefined) {
         throw new TypedDomainError("RUN_HOLD_RECORDER_UNRESOLVED", "runDeathPolicy requires a production hold recorder");
       }
@@ -9981,6 +10056,13 @@ export function plansUnresolvedPersonAllowance(): PersonAllowanceSource {
   });
 }
 
+/**
+ * Parallel AI calls (spec 2026-10-12 §3.5): a money seam that may count its
+ * call's projection in flight (`CostEnvelopeGuard.providerSeam`), and releases
+ * it when the gateway's call has settled.
+ */
+type InFlightReleasingSeam = ProviderCostEnvelopeSeam & { readonly releaseInFlight?: () => void };
+
 export function createPostgresProviderGateway(
   pool: Pool,
   options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction" | "persistCallPrompt">
@@ -10002,18 +10084,27 @@ export function createPostgresProviderGateway(
         runId: string,
         phase: CostEnvelopePhase,
         sharedWall: SharedWallApplication
-      ) => ProviderCostEnvelopeSeam;
+      ) => InFlightReleasingSeam;
       /**
        * Verdict story (spec §8): the STORY's own money bound, built per call
        * from the leased run exactly as the run's is. A story call on a metered
        * gateway (one with `buildCostEnvelopeSeam`) that has no story seam is
        * refused, so a story can never spend unbounded where the debate cannot.
        */
-      readonly buildStoryCostEnvelopeSeam?: (runId: string) => ProviderCostEnvelopeSeam;
+      readonly buildStoryCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /**
+       * Parallel AI calls (spec 2026-10-12 §3.5): this process's calls in
+       * flight, for the run-wide attempt ceiling. A call bounded by that ceiling
+       * counts itself before the ceiling is first asked and is released once it
+       * settles, so its ledger rows are written by then; both ceiling checks add
+       * the run's OTHER calls in flight. Absent = today's checks, byte for byte.
+       * Never the money seam's counter (run-in-flight.ts).
+       */
+      readonly inFlight?: RunInFlight;
     }
 ): ProviderGateway {
   const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
-  const { buildStoryCostEnvelopeSeam, ...httpOptions } = gatewayOptions;
+  const { buildStoryCostEnvelopeSeam, inFlight, ...httpOptions } = gatewayOptions;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
   const http = new OpenAICompatibleProviderGateway({
@@ -10104,8 +10195,19 @@ export function createPostgresProviderGateway(
       // is bounded by its sealed call bound (the per-site count below), and the
       // rounds by `storyLoopMaxRounds`; the RUN's ceiling is never consulted,
       // so a debate that used every attempt still gets its story.
-      if (!authenticatedEvaluatorScope && !storyScope) {
-        await budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase);
+      const runCeilingBinds = !authenticatedEvaluatorScope && !storyScope;
+      // Parallel AI calls (spec 2026-10-12 §3.5): a call the run's ceiling binds
+      // counts itself in flight FIRST, synchronously, and every ceiling check
+      // then adds the run's OTHER calls in flight, counted before the ledger is
+      // read. Released in the finally below, once every row of the call is written.
+      const releaseCall = runCeilingBinds && inFlight !== undefined ? inFlight.begin(leasedRunId, 0n) : undefined;
+      const otherAttemptsInFlight = (): Readonly<{ inFlightAttempts: number }> => ({
+        inFlightAttempts: releaseCall === undefined ? 0 : inFlight!.attempts(leasedRunId) - 1
+      });
+      let costEnvelope: InFlightReleasingSeam | undefined;
+      try {
+      if (runCeilingBinds) {
+        await budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase, otherAttemptsInFlight());
       }
       const consumed = await ledger.countModelAttempts({
         runId: request.runId,
@@ -10121,6 +10223,27 @@ export function createPostgresProviderGateway(
         throw new TypedDomainError("CALL_BUDGET_EXHAUSTED", request.subjectItemId);
       }
       try {
+        /**
+         * V-28: the money envelope binds EVERY call, the authenticated evaluator
+         * scope included. That scope is exempt from the ATTEMPT ceiling because
+         * its attempts are billed to the evaluator rather than to the run
+         * (`ledger_entry_is_authenticated_scope`), but its calls are made against
+         * the same paid vendor with the same money, so exempting them from the
+         * money ceiling would leave a hole the size of the evaluator leg. The run
+         * id is the leased one, for the same reason as the attempt hook below.
+         *
+         * Verdict story: a story call is bound by the STORY's seam instead —
+         * its own ceiling, summed over STORY charges only.
+         *
+         * Task M1: the run's seam is built for the call's phase, so an
+         * answer-writing call is compared with the answer's ceiling.
+         *
+         * Parallel AI calls: built here, so the finally below can release what
+         * it still counts in flight once the call has settled.
+         */
+        costEnvelope = storyScope
+          ? buildStoryCostEnvelopeSeam?.(leasedRunId)
+          : buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request));
         return await http.call({
           // Preview retry fix, option B (spec 2026-10-11 §1.1): the spread forwards the preview's
           // `maxAttemptsThisCall` (one POST per call), and `remaining` stays the step's billed allowance,
@@ -10131,31 +10254,10 @@ export function createPostgresProviderGateway(
           // retry loop (B26c's hook, wired here), not only once per call; the refusal is the
           // run's own RUN_COST_ENVELOPE_EXHAUSTED and no ledger row is written for it. The
           // run id is the leased one the S06 seam bound above, not a re-read of the request.
-          ...(authenticatedEvaluatorScope || storyScope ? {} : {
-            assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase)
-          }),
-          /**
-           * V-28: the money envelope binds EVERY call, the authenticated evaluator
-           * scope included. That scope is exempt from the ATTEMPT ceiling because
-           * its attempts are billed to the evaluator rather than to the run
-           * (`ledger_entry_is_authenticated_scope`), but its calls are made against
-           * the same paid vendor with the same money, so exempting them from the
-           * money ceiling would leave a hole the size of the evaluator leg. The run
-           * id is the leased one, for the same reason as the attempt hook above.
-           *
-           * Verdict story: a story call is bound by the STORY's seam instead —
-           * its own ceiling, summed over STORY charges only.
-           *
-           * Task M1: the run's seam is built for the call's phase, so an
-           * answer-writing call is compared with the answer's ceiling.
-           */
-          ...(storyScope
-            ? (buildStoryCostEnvelopeSeam === undefined ? {} : {
-              costEnvelope: buildStoryCostEnvelopeSeam(leasedRunId)
-            })
-            : (buildCostEnvelopeSeam === undefined ? {} : {
-              costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase, providerCallSharedWall(request))
-            }))
+          ...(runCeilingBinds ? {
+            assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase, otherAttemptsInFlight())
+          } : {}),
+          ...(costEnvelope === undefined ? {} : { costEnvelope })
         });
       } catch (error) {
         capture?.emit(captureFailureEnvelope({
@@ -10166,6 +10268,10 @@ export function createPostgresProviderGateway(
           source: "first_party"
         }));
         throw error;
+      }
+      } finally {
+        costEnvelope?.releaseInFlight?.();
+        releaseCall?.();
       }
       });
       };
