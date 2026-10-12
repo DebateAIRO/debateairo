@@ -327,10 +327,13 @@ cp -a "$NP" "$S/native-plan.before.json"
    the three plans first, then regenerate the three release drop-ins from the finished lock,
    `daemon-reload`, and restart in that order. Each start's prestart re-verifies natively against
    the verify plan of step 4. The API and the runner each refuse to start if `REGISTER_VERSION`
-   differs from their pinned publication. The `&&` chain stops at the first refusal, so nothing
-   restarts on a half-pinned lock.
+   differs from their pinned publication. The `&&` chain stops at the first refusal, and it sets
+   `PINNED=yes` only after every pin, drop-in and restart in it succeeded. The runner block below
+   restarts the runner only when `PINNED` is `yes`. So no service restarts on a half-pinned lock:
+   not the API, not the website, not the runner.
 
    ```sh
+   PINNED=no
    L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
    N=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node
    $N $L/prestart.mjs pin --from "$ART/api-launch.json" \
@@ -342,12 +345,17 @@ cp -a "$NP" "$S/native-plan.before.json"
      && systemctl daemon-reload \
      && systemctl restart debateai-preview-api \
      && systemctl restart debateai-preview-ui \
+     && PINNED=yes \
      && echo "pinned; API and website restarted"
    ```
 
    Each `pin` prints one `PREVIEW_LIFECYCLE_RELEASE_PINNED` line naming the new register version.
 
-   **Then the runner, only when no debate is running.** Restarting the runner in the middle of a
+   **Then the runner, only when every pin succeeded and no debate is running.** Paste the next
+   lines in the same root shell, after the block above printed `pinned; API and website
+   restarted`. If that block stopped early, `PINNED` is still `no` and the runner is left exactly
+   as it was: step 5 already pointed `runner.env` at the new version, and a runner restarted
+   without its new pin would refuse to start and stay down. Restarting the runner in the middle of a
    debate cuts that debate off; another copy may later pick it up again and pay for calls twice. So
    the next lines first count the debates the runner is working on right now (`CLAIMED`), and
    restart the runner only when that count is 0. If they print a number above 0, nothing is
@@ -358,7 +366,7 @@ cp -a "$NP" "$S/native-plan.before.json"
 
    ```sh
    RUNNING=$(runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc "SELECT count(*) FROM core.work_item WHERE state = 'CLAIMED'"); echo "debates running now: $RUNNING"
-   [ "$RUNNING" = 0 ] && systemctl try-restart debateai-preview-runner && echo "runner restarted (if it was running)"
+   [ "${PINNED:-}" = yes ] && [ "$RUNNING" = 0 ] && systemctl try-restart debateai-preview-runner && echo "runner restarted (if it was running)"
    ```
 
 **Publishing the call-concurrency row.** The register row `callConcurrencyPolicy` says how many AI
@@ -374,15 +382,21 @@ says (stop, install the gate files from this release, write the GO again, restar
 service, `activate` with the owner's yes). The gate file in this release already holds the
 thinking-levels gate changes from dev (#149): one redeploy covers both, and it is needed even if the
 thinking-levels redeploy was done before, because the file's hash changed again. Then check both
-gates. Each `GO` line must say `matches`, and each `state` line must say `active`:
+gates against THIS release's gate files (in the candidate API folder `$CAPI` named in step 0 of
+the operator sequence; the gate README installs the same two files from the same place). An old
+gate file with its old GO would agree with each other, so each gate's two installed files and the
+two hashes in its GO must all equal this release's files. The first line must print
+`release gate files found`, each gate's line must say `match this release`, and each `state` line
+must say `active`:
 
 ```sh
-G=/opt/debateai-v3-preview/operator/deepinfra-budget-v3; GO=/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
-if [ "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" = "$(jq -r .bridge_sha256 "$GO")" ]; then echo "deepinfra GO matches"; else echo "deepinfra GO does NOT match: stop"; fi
-echo "deepinfra state $(/usr/bin/python3 -I "$G/preview_budget_authority.py" status --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 | jq -r .state)"
-G=/opt/debateai-v3-preview/operator/anthropic-budget-v1; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json
-if [ "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" = "$(jq -r .bridge_sha256 "$GO")" ]; then echo "anthropic GO matches"; else echo "anthropic GO does NOT match: stop"; fi
-echo "anthropic state $(/usr/bin/python3 -I "$G/preview_budget_authority.py" status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 | jq -r .state)"
+NEW=$CAPI/dialectical-engine/packages/providers/ops; test -f "$NEW/preview_budget_authority.py" && test -f "$NEW/preview_budget_helper.py" && echo "release gate files found"
+NB=$(sha256sum "$NEW/preview_budget_authority.py" | cut -d' ' -f1); NH=$(sha256sum "$NEW/preview_budget_helper.py" | cut -d' ' -f1)
+same() { [ -n "$NB" ] && [ -n "$NH" ] && [ "$(sha256sum "$1/preview_budget_authority.py" | cut -d' ' -f1)" = "$NB" ] && [ "$(sha256sum "$1/preview_budget_helper.py" | cut -d' ' -f1)" = "$NH" ] && [ "$(jq -r .bridge_sha256 "$2")" = "$NB" ] && [ "$(jq -r .helper_sha256 "$2")" = "$NH" ]; }
+if same /opt/debateai-v3-preview/operator/deepinfra-budget-v3 /etc/debateai-v3-preview/provider-deepinfra-go-v3.json; then echo "deepinfra gate files and GO match this release"; else echo "deepinfra does NOT match this release: stop"; fi
+echo "deepinfra state $(/usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 | jq -r .state)"
+if same /opt/debateai-v3-preview/operator/anthropic-budget-v1 /etc/debateai-v3-preview/provider-anthropic-go-v1.json; then echo "anthropic gate files and GO match this release"; else echo "anthropic does NOT match this release: stop"; fi
+echo "anthropic state $(/usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 | jq -r .state)"
 ```
 
 Anything else means stop: do not publish the row until both gates run the new code.
