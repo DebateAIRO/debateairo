@@ -81,6 +81,16 @@ describe("check-thinking-levels: the offline table check (spec 2026-10-12 §4.2)
     expect(other.lines.join("\n")).not.toContain("JUDGEMENT_PRODUCER");
   });
 
+  it("a bare long token typed as a table key or step: named in the detail only blanked", () => {
+    const token = "k3x9q2m7v8w1r4t6y0p5s2d8f3g7h1j9l4z6c2b8";
+    for (const table of [{ [token]: { level: "low" } }, { [GLM]: { steps: { [token]: "low" } } }]) {
+      const result = checkThinkingLevels(line({ ...BASE, thinking_levels: table }));
+      expect(result.exitCode).toBe(1);
+      expect(result.lines.join("\n")).toContain("[REDACTED:long-run]");
+      expect(result.lines.join("\n")).not.toContain(token);
+    }
+  });
+
   it("refuses no value, or two values", () => {
     expect(checkThinkingLevels("NODE_ENV=production")).toEqual({ exitCode: 2,
       lines: ["CHECK_REFUSED: no PREVIEW_PROVIDER_TEST_CONFIG_JSON= line (or bare JSON) found"] });

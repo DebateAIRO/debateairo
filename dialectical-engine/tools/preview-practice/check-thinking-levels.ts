@@ -10,8 +10,10 @@
  *    is accepted, and the row says it is unused), or
  *  - the parser's exact refusal: PREVIEW_THINKING_LEVELS_INVALID:<detail> or PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID.
  * Exit 0 OK, 1 the value is refused, 2 the check could not run (no value, two values, an unreadable file, a key-shaped
- * value). It sends nothing and reads no environment. It prints only model ids, level words and step names (all checked
- * against the reviewed rows); any other line of the file is never printed, and a key-shaped value is refused unprinted.
+ * value). It sends nothing and reads no environment. OK prints only model ids, level words and step names (all checked
+ * against the reviewed rows); a refusal's detail may name the unreviewed table key or step word it refuses, with every
+ * key shape (a bare long token too) blanked. Any other line of the file is never printed, and a key-shaped value is
+ * refused unprinted.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";

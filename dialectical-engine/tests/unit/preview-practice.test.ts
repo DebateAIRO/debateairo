@@ -351,6 +351,18 @@ describe("practice start refusals", () => {
       ? "PREVIEW_PROVIDER_TEST_CONFIG_JSON={" : line).join("\n")))
       .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
   });
+  it("a bad table's detail never carries a long token raw: an unreviewed key or step is blanked (re-review fix)", () => {
+    const token = "k3x9q2m7v8w1r4t6y0p5s2d8f3g7h1j9l4z6c2b8";
+    const withTable = (table: unknown) => lines.map((line) => line.startsWith("PREVIEW_PROVIDER_TEST_CONFIG_JSON=")
+      ? `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify({ ...JSON.parse(config) as object, thinking_levels: table })}` : line).join("\n");
+    for (const table of [{ [token]: { level: "low" } }, { "zai-org/GLM-5.3-Flash": { steps: { [token]: "low" } } }]) {
+      let message = "";
+      try { parsePracticeSettings(withTable(table)); } catch (error) { message = (error as Error).message; }
+      expect(message).toMatch(/^PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW_THINKING_LEVELS_INVALID:/u);
+      expect(message).toContain("[REDACTED:long-run]");
+      expect(message).not.toContain(token);
+    }
+  });
   it("a run that cannot start says why: the refusal's detail is in its log line", async () => {
     const logged: string[] = [];
     const outcome = await runPractice(["debate", "--levels", "zai-org/GLM-5.3-Flash=high"], {}, { log: (line) => logged.push(line) });

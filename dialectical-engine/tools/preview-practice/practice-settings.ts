@@ -117,10 +117,11 @@ export function parsePracticeSettings(text: string): PracticeSettings {
   };
   let previewConfig: PreviewProviderTestConfig | undefined;
   try { previewConfig = parsePreviewProviderTestConfig(get("PREVIEW_PROVIDER_TEST_CONFIG_JSON")); } catch (error) {
-    // Spec 2026-10-12 §4.2: the parser's own code is kept, and a bad table's detail with it (it names a model, step or
-    // level from a value already checked for key shapes above), so a practice on a bad table says why.
+    // Spec 2026-10-12 §4.2: the parser's own code is kept, and a bad table's detail with it, so a practice on a bad table
+    // says why. The detail can repeat an unreviewed table key or step word verbatim, and the key-shape screen above skips
+    // the long-run rules, so every key shape (a bare long token too) is blanked before it is shown.
     const message = error instanceof Error ? error.message : "";
-    const parserSays = message.startsWith(`${PREVIEW_THINKING_LEVELS_INVALID}:`) ? message.slice(0, 200)
+    const parserSays = message.startsWith(`${PREVIEW_THINKING_LEVELS_INVALID}:`) ? redactKeyShapes(message).slice(0, 200)
       : "PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID";
     throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", `PREVIEW_PROVIDER_TEST_CONFIG_JSON: ${parserSays}`);
   }
