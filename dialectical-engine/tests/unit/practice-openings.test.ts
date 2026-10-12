@@ -163,6 +163,12 @@ describe("practice openings: repairs and busy AIs", () => {
     // Both tries' tokens, from the gate's watch.
     expect(repaired.inputTokens).toBe(200);
     expect(result.script.slipped).toBe(true);
+    // F-I1: the reply text is the merged reply the gateway accepted (what the owners score), not the patch fragment.
+    const reply = JSON.parse(repaired.replyText ?? "null") as { points?: { claim: string }[]; candidate_answers?: string[] } | null;
+    expect(Array.isArray(reply?.points) && Array.isArray(reply.candidate_answers)).toBe(true);
+    expect(reply?.points).toHaveLength(3);
+    expect(reply?.points?.every((entry) => entry.claim.length <= 240)).toBe(true);
+    expect(reply?.candidate_answers).toHaveLength(1);
   });
 
   it("a model busy at merge sits out every later arm and question", async () => {

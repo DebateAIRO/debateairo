@@ -67,7 +67,10 @@ export type OpeningsCall = Readonly<{
   attempts: readonly PracticeAttempt[];
   /** The accepted try's form: ORIGINAL, PATCH (the short follow-up) or FULL (the full re-ask); null without one. */
   replyForm: PracticeReplyForm | null;
-  /** The last reply's text (accepted or refused), key-shaped strings blanked, at most 64 KiB; null when none came. */
+  /**
+   * An answered call: the reply the gateway accepted (after a patch follow-up, the merged whole reply, not the patch
+   * fragment). Otherwise the last reply's text. Key-shaped strings blanked, at most 64 KiB; null when none came.
+   */
   replyText: string | null;
 }>;
 

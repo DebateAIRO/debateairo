@@ -174,6 +174,16 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
         return { kind: "FAILED", code };
       }
       const job = practiceJobGateway({ target, config: input.config, guardedFetch, ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
+      // F-I1: the content of the last response the gateway accepted. After a patch follow-up it is the merged reply,
+      // while the last stored artifact holds only the patch fragment; the owners score the whole reply.
+      const accepted: { content: string | null } = { content: null };
+      const remembering: ProviderGateway = Object.freeze({
+        call: async (request: Parameters<ProviderGateway["call"]>[0]) => {
+          const response = await job.gateway.call(request);
+          accepted.content = response.content;
+          return response;
+        }
+      });
       const eventsBefore = input.observer.events.length;
       const startedAt = new Date();
       const started = performance.now();
@@ -182,7 +192,7 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
       let errorCode: string | null = null;
       let formatError = false;
       try {
-        value = await send(job.gateway);
+        value = await send(remembering);
         ok = true;
       } catch (error) {
         errorCode = errorCodeOf(error);
@@ -209,7 +219,8 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
         ...practiceWireUsage(model, wire),
         status, errorCode, attempts,
         replyForm: ok ? ([...attempts].reverse().find((attempt) => attempt.outcome === "OK")?.replyForm ?? null) : null,
-        replyText: last === null ? null : reportableReplyText(replyContentOf(last.rawText)) });
+        replyText: ok && accepted.content !== null ? reportableReplyText(accepted.content)
+          : last === null ? null : reportableReplyText(replyContentOf(last.rawText)) });
       input.progress?.(`${context.question.id} ${context.arm} ${context.callSiteKey} ${model}: ${status} ${String(latencyMs)}ms`);
       if (endedBusy) {
         // Its budget spent: the model sits out the rest of the run (marked once, after its call is told).
