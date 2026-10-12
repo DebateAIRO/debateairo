@@ -490,16 +490,21 @@ export function reportMarkdown(report: PracticeReport): string {
   }
   const levels = report.levels as Readonly<Record<string, Readonly<Record<string, PracticeLevelRunBlock>>>> | undefined;
   if (levels !== undefined) {
-    lines.push("Thinking levels (spec 2026-10-12 §4.8; the chance band is the gap between two runs of the same level):", "",
-      "| model | run | jobs | first try | repaired | failed | cut off | thinking median | time median / p90 | cost per job |",
-      "|---|---|---|---|---|---|---|---|---|---|");
+    // "answered / jobs" shows the skipped jobs (a busy model's); "over bar" is the run's own slip bar, information only:
+    // the verdict's slip rule still pools all of a model's runs (practice-verdict.ts).
+    lines.push("Thinking levels (spec 2026-10-12 §4.8; the chance band is the gap between two runs of the same level; "
+      + "\"over bar\": this run alone has more than 1 slip in 10 answered calls, for the comparison only, the verdict counts "
+      + "all of a model's runs together):", "",
+      "| model | run | answered / jobs | first try | repaired | failed | cut off | thinking median | time median / p90 | cost per job | over bar |",
+      "|---|---|---|---|---|---|---|---|---|---|---|");
     const bands: string[] = [];
     for (const [model, runs] of Object.entries(levels)) {
       const s = (value: number | null) => value === null ? "-" : (value / 1000).toFixed(1);
       for (const [run, entry] of Object.entries(runs)) {
-        lines.push(`| ${model} | ${run} | ${String(entry.jobs)} | ${String(entry.firstTry)} | ${String(entry.repaired)} | ${String(entry.failed)} | `
+        lines.push(`| ${model} | ${run} | ${String(entry.answered)}/${String(entry.jobs)} | ${String(entry.firstTry)} | ${String(entry.repaired)} | ${String(entry.failed)} | `
           + `${String(entry.cutOff)} | ${entry.reasoningMedian === null ? "-" : String(entry.reasoningMedian)} | `
-          + `${s(entry.latencyMedianMs)} / ${s(entry.latencyP90Ms)} s | ${entry.costPerJobUsd === null ? "-" : `$${entry.costPerJobUsd}`} |`);
+          + `${s(entry.latencyMedianMs)} / ${s(entry.latencyP90Ms)} s | ${entry.costPerJobUsd === null ? "-" : `$${entry.costPerJobUsd}`} | `
+          + `${entry.slipsOverBar ? "yes" : "no"} |`);
       }
       const band = chanceBandLine(model, runs);
       if (band !== null) bands.push(band);

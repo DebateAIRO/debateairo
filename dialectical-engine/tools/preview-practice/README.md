@@ -341,8 +341,8 @@ Optional flags:
   once, at the server's levels, as without `--levels`;
 - each sample in `samples.jsonl` also carries its run, level, thinking tokens, whether a reply stopped at max_tokens,
   and its accepted answer (key-shaped strings blanked, at most 64 KiB). `report.json` gets a `levels` block and
-  `report.md` a "Thinking levels" table: per model and run, jobs, first try, repaired, failed, cut off, thinking
-  median, time median / p90 and cost per job.
+  `report.md` a "Thinking levels" table: per model and run, answered / jobs, first try, repaired, failed, cut off,
+  thinking median, time median / p90, cost per job and over bar (this run alone over the slip bar; information only).
 
 The tool does not count the testing day's budget itself: before a `--levels` run, read both gates' day spend (S-3)
 and keep the day's total under the owner's limits. The run can be stopped at any time with Ctrl-C (the report is
@@ -374,8 +374,10 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
 echo "exit: $?"
 ```
 
-That is 19 runs of 36 jobs, about 680 jobs. Each run keeps the usual pass bar per model (a slip fixed by the second
-try is a warning; a step failed for good, or more than 1 slip in 10, fails).
+That is 19 runs of 36 jobs, about 680 jobs. The verdict stays per model, with all of that model's runs counted
+together (a slip fixed by the second try is a warning; a step failed for good, or more than 1 slip in 10 of the
+model's answered calls, fails). Each run's own bar is shown, for the comparison only, in the levels table's "over
+bar" column; its "answered / jobs" column shows the jobs a busy model skipped.
 
 ### S-7, stop and clean up
 

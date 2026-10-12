@@ -1162,13 +1162,15 @@ describe("practice report: the thinking levels table (spec 2026-10-12 §4.8)", (
       sample(1, { run: "low#1", status: "REPAIRED", latencyMs: 1, reasoning: 1, cost: "1" }),
       sample(2, { run: "low#1", status: "REPAIRED", latencyMs: 1, reasoning: 1, cost: "1" }), end]) as unknown as { levels: Record<string, Record<string, { slipsOverBar: boolean }>> };
     expect(report.levels[GLM]!["low#1"]!.slipsOverBar).toBe(true);
+    expect(reportMarkdown(report as unknown as Parameters<typeof reportMarkdown>[0])).toContain(`| ${GLM} | low#1 | 2/2 | 0 | 2 | 0 | 0 | 1 |`);
+    expect(reportMarkdown(report as unknown as Parameters<typeof reportMarkdown>[0])).toMatch(/\| low#1 \| .* \| yes \|$/mu);
   });
 
   it("the markdown has one row per model and run, and the chance band of a level run twice", () => {
     const markdown = reportMarkdown(practiceReportFromLog(lines));
-    expect(markdown).toContain("| model | run | jobs | first try | repaired | failed | cut off | thinking median | time median / p90 | cost per job |");
-    expect(markdown).toContain(`| ${GLM} | high#1 | 3 | 1 | 0 | 1 | 0 | 100 | 10.0 / 20.0 s | $0.002000000 |`);
-    expect(markdown).toContain(`| ${GLM} | high#2 | 2 | 1 | 1 | 0 | 1 | 500 | 12.0 / 30.0 s | $0.005000000 |`);
+    expect(markdown).toContain("| model | run | answered / jobs | first try | repaired | failed | cut off | thinking median | time median / p90 | cost per job | over bar |");
+    expect(markdown).toContain(`| ${GLM} | high#1 | 2/3 | 1 | 0 | 1 | 0 | 100 | 10.0 / 20.0 s | $0.002000000 | no |`);
+    expect(markdown).toContain(`| ${GLM} | high#2 | 2/2 | 1 | 1 | 0 | 1 | 500 | 12.0 / 30.0 s | $0.005000000 | no |`);
     expect(markdown).toContain(`${GLM} chance band (high#1 vs high#2): first try ±0, thinking median ±400, time median ±2.0 s, cost per job ±$0.003000000`);
   });
 
