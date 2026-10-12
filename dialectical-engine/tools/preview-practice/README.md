@@ -192,8 +192,8 @@ it (`busyProbesByModel`).
 - Formats mode: one call at a time per model, about a second apart (a slightly random gap, `--gap-ms`, default 1000),
   at most the gate's own number of calls at once per gate (root's status `max_concurrent_calls` when it names it, else
   4 for DeepInfra and 1 for Anthropic), and at most 5 calls at once in all (`--max-in-flight`). The relay must accept
-  at least 3 more connections than `--max-in-flight` (S-4 starts it with `--max-connections 8`); a relay that refuses a
-  connection makes that call fail and stops the gate. `--sequential`: one call at a time, a 2-second gap.
+  at least 3 more connections than `--max-in-flight` (S-4 starts it with `--max-connections 20`, enough for either
+  mode); a relay that refuses a connection makes that call fail and stops the gate. `--sequential`: one call at a time, a 2-second gap.
 - Debate mode: the runner sends a debate's AI calls at the same time, as the live preview does, within the
   call-concurrency setting: how many calls at once in the debate, how many to one model in the debate, and how many to
   one model across the runner (by vendor, with a `default`). Each gate's own number of calls at once
@@ -202,8 +202,15 @@ it (`busyProbesByModel`).
   the report says so. Without `--call-concurrency` the practice uses the live register's own setting, and one call at
   a time when the register has none (today's preview). `--call-concurrency 12/3/default=50,deepinfra=150,anthropic=50`
   sets it for this practice only; it is never written to any register. The relay must accept at least 3 more
-  connections than the two gates' numbers added up (S-4 starts it with `--max-connections 8`, enough for 4 DeepInfra
-  calls and 1 Anthropic call at once); when the gates allow more, start the relay with a higher `--max-connections`.
+  connections than the two gates' numbers added up: today 10 DeepInfra and 2 Anthropic calls at once, so at least 15
+  (S-4 starts it with `--max-connections 20`); if a gate's `max_concurrent_calls` is raised, raise
+  `--max-connections` with it.
+- Debate mode with calls at the same time (`--call-concurrency`, or a register that has the setting): first make sure
+  both gates run the gate code of this release (`deploy/preview-gate/v3/README.md` §"Redeploy (2026-10-12): calls on
+  their way together count once"; the checks are in `deploy/preview-release/v1/README.md` "Publishing the
+  call-concurrency row", Step 0). With the old gate code, one short network blip while 5 or more DeepInfra calls are
+  on their way counts as 5 failures and halts the DeepInfra gate (`provider_unreachable`). If that happens, re-open it
+  as that gate README's "Re-open after a halt" says (owner's yes).
 
 ## Money and time (rough)
 
@@ -290,7 +297,7 @@ call in flight finish for up to 1,500 s: a model call may take up to the gate's 
 install -d -o root -g root -m 0755 /usr/local/lib/debateai-practice
 install -o root -g root -m 0644 /home/ubuntu/gate-relay.py /usr/local/lib/debateai-practice/gate-relay.py
 sha256sum /usr/local/lib/debateai-practice/gate-relay.py
-systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=debateai-practice -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30600 -p TimeoutStopSec=1560 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group debateai-practice --mode 0660 --max-connections 8 --lifetime-seconds 28800 --drain-seconds 1500 --idle-timeout-seconds 1500
+systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=debateai-practice -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30600 -p TimeoutStopSec=1560 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group debateai-practice --mode 0660 --max-connections 20 --lifetime-seconds 28800 --drain-seconds 1500 --idle-timeout-seconds 1500
 systemctl status debateai-preview-practice-relay --no-pager
 journalctl -u debateai-preview-practice-relay -o cat --no-pager
 ls -l /run/debateai-practice

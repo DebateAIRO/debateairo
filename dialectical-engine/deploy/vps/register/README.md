@@ -116,6 +116,8 @@ The setting has three numbers:
 - `perModelPerDebate`: calls at once to one AI inside one debate. A whole number from 1 to 16.
 - `perModelPerRunner`: calls at once to one AI across all debates on this server. One number for each vendor, named in lower case, such as `deepinfra` or `anthropic`. Each is from 1 to 1000. The key `default` is required: it covers every vendor not named.
 
+**Which vendor names the runner knows.** The runner recognises exactly three keys in `perModelPerRunner`: `deepinfra`, `anthropic` and `default`. It reads each AI's vendor from the host of its address: an address on `deepinfra.com` (or a name under it) is `deepinfra`, one on `anthropic.com` (or a name under it) is `anthropic`, and every other address (a relay, a local model server, any other vendor) uses `default`. On the preview, each reviewed AI's own provider (`deepinfra` or `anthropic`) is its vendor. Any other key is accepted when the setting is published but never matches an AI, so those AIs fall back to `default`: for example a key `google` changes nothing today. (Code: `vendorOfBaseUrl` and `previewCallSubjects` in `apps/runner/src/call-lane-gateway.ts`.)
+
 The owner's start values are 12 for `perDebate`, 3 for `perModelPerDebate`, and 50 for `default`, 150 for `deepinfra` and 50 for `anthropic` in `perModelPerRunner`. The member goes at the top level of the file, like this, on one line: `"callConcurrencyPolicy": { "perDebate": 12, "perModelPerDebate": 3, "perModelPerRunner": { "default": 50, "deepinfra": 150, "anthropic": 50 } }`
 
 Rules, in plain words:
