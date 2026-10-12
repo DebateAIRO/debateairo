@@ -457,9 +457,10 @@ class DeepInfraProfile:
         ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 32768, 'high', True),
         ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 32768, 'high', False),
         # Owner approval 2026-10-12: MiMo closed Romanian quotation marks with a straight double quote inside its JSON
-        # in a live practice run. Its DeepInfra page lists JSON among its features and recommends temperature 1.0 and
-        # top_p 0.95: JSON mode is allowed and every request carries exactly those two (no top_k).
-        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 32768, None, True,
+        # in a live practice run. Its DeepInfra page recommends temperature 1.0 and top_p 0.95: every request carries
+        # exactly those two (no top_k). JSON mode was tried the same day and withdrawn: DeepInfra's JSON constraint
+        # turned that slip into garbage, which the app's reader repairs when JSON mode is off.
+        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 32768, None, False,
                  (('temperature', 1.0), ('top_p', 0.95))),
         # Owner swap 2026-10-10 (Qwen in place of Gemini): flat list price over the whole 1M window,
         # no promotion, no tiers; reasoning_effort is not listed, so none is sent.

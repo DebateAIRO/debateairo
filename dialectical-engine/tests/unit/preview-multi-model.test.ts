@@ -28,8 +28,10 @@ const BARE_BODY = ["max" + "_tokens", "messages", "model"];
 /** Qwen's reviewed sampling (2026-10-12): Qwen's own thinking-mode settings, so its JSON does not slide into noise. */
 const QWEN_SAMPLING = { temperature: 0.6, top_p: 0.95, top_k: 20 };
 /**
- * MiMo's reviewed sampling and JSON mode (owner approval 2026-10-12): DeepInfra's MiMo page recommends temperature 1.0
- * and top_p 0.95 and lists JSON among its features; MiMo broke its JSON with a straight closing quote in a live run.
+ * MiMo's reviewed sampling (owner approval 2026-10-12): DeepInfra's MiMo page recommends temperature 1.0 and top_p 0.95.
+ * JSON mode was tried the same day and withdrawn: when MiMo closed a Romanian quote („…) with a straight double quote,
+ * DeepInfra's JSON constraint ended the string there and forced the rest into garbage, which the engine's reader
+ * (INNER_QUOTE) repairs without any call when JSON mode is off. MiMo's row allows no JSON mode.
  */
 const MIMO_SAMPLING = { temperature: 1.0, top_p: 0.95 };
 const DEFAULT_LEVEL = "DEFAULT_ONLY";
@@ -195,6 +197,7 @@ describe("the guarded fetch sends only what the gate accepts for the body's row 
       { model: DEEPSEEK, reasoning_effort: "high", max_tokens: 8, messages, response_format: { type: "json_object" } },
       { model: MIMO, max_tokens: 8, messages, response_format: { type: "json_object" } },
       { model: MIMO, max_tokens: 8, ...MIMO_SAMPLING, messages, response_format: { type: "json_schema" } },
+      { model: MIMO, max_tokens: 8, ...MIMO_SAMPLING, messages, response_format: { type: "json_object" } },
       { model: DEEPSEEK, max_tokens: 8, messages },
       { model: DEEPSEEK, reasoning_effort: "medium", max_tokens: 8, messages },
       { model: MIMO, max_tokens: 0, messages },
@@ -209,7 +212,7 @@ describe("the guarded fetch sends only what the gate accepts for the body's row 
     const bodies = [
       { model: GLM, reasoning_effort: "high", max_tokens: 32_768, messages, response_format: { type: "json_object" } },
       { model: DEEPSEEK, reasoning_effort: "high", max_tokens: 32_768, messages },
-      { model: MIMO, max_tokens: 32_768, ...MIMO_SAMPLING, messages, response_format: { type: "json_object" } }
+      { model: MIMO, max_tokens: 32_768, ...MIMO_SAMPLING, messages }
     ];
     for (const body of bodies) await post(body);
     expect(executions).toHaveLength(3);
@@ -262,11 +265,11 @@ describe("each target's gateway sends a request its row accepts", () => {
     await expect((async () => gateway.call({ ...RESULT_REQUEST, thinkingLevel: "high" }))()).rejects.toMatchObject({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" });
     expect(executions).toHaveLength(1);
   });
-  it("a story JSON request reaches the vendor as JSON only on GLM and MiMo", async () => {
+  it("a story JSON request reaches the vendor as JSON only on GLM", async () => {
     for (const model of [GLM, DEEPSEEK, MIMO, QWEN]) {
       const { executions, gateway } = previewGateway(model);
       await gateway.call({ ...RESULT_REQUEST, lane: "story", callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER", preferredResponseFormat: "json_object" });
-      expect(Object.hasOwn(JSON.parse(executions[0]!.requestBody), "response_format")).toBe(model === GLM || model === MIMO);
+      expect(Object.hasOwn(JSON.parse(executions[0]!.requestBody), "response_format")).toBe(model === GLM);
     }
   });
   it("MiMo takes DEFAULT_ONLY as no level; an effort row still refuses it", async () => {
@@ -468,7 +471,7 @@ describe("reviewed sampling: a row's own sampling settings, exactly, and none on
       .toEqual([[GLM, null], [DEEPSEEK, null], [MIMO, MIMO_SAMPLING], [QWEN, QWEN_SAMPLING]]);
     expect(Object.keys(previewModelRow(MIMO)!.sampling!)).toEqual(["temperature", "top_p"]);
     expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.map(row => [row.model, row.jsonObject]))
-      .toEqual([[GLM, true], [DEEPSEEK, false], [MIMO, true], [QWEN, false]]);
+      .toEqual([[GLM, true], [DEEPSEEK, false], [MIMO, false], [QWEN, false]]);
     expect(Object.isFrozen(previewModelRow(MIMO)!.sampling)).toBe(true);
     expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.anthropic.every(row => row.sampling === undefined)).toBe(true);
     expect(Object.isFrozen(previewModelRow(QWEN)!.sampling)).toBe(true);
@@ -499,7 +502,7 @@ describe("reviewed sampling: a row's own sampling settings, exactly, and none on
       expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(QWEN)!, Buffer.byteLength(text))));
     }
   });
-  it("MiMo's gateway body carries its two sampling keys after max_tokens, and JSON mode on a story JSON request", async () => {
+  it("MiMo's gateway body carries its two sampling keys after max_tokens and never JSON mode, a story JSON request included", async () => {
     const story = { ...RESULT_REQUEST, lane: "story" as const, callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER" as const,
       preferredResponseFormat: "json_object" as const };
     const mimoSent = samplingBodies.sent.filter(sent => JSON.parse(sent.body).model === MIMO);
@@ -509,12 +512,10 @@ describe("reviewed sampling: a row's own sampling settings, exactly, and none on
       await gateway.call(request);
       const text = executions[0]!.requestBody;
       const sent = JSON.parse(text) as { max_tokens: number; messages: unknown };
-      // The judging (served) call: sampling, no JSON mode (the app asks for JSON mode only on story JSON requests,
-      // exactly as for GLM). The story call: sampling and response_format {"type":"json_object"}, last.
-      expect(text).toBe(JSON.stringify({ model: MIMO, max_tokens: sent.max_tokens, ...MIMO_SAMPLING, messages: sent.messages,
-        ...(request === story ? { response_format: { type: "json_object" } } : {}) }));
+      // The judging (served) call and the story call alike: sampling, and no JSON mode (MiMo's row allows none).
+      expect(text).toBe(JSON.stringify({ model: MIMO, max_tokens: sent.max_tokens, ...MIMO_SAMPLING, messages: sent.messages }));
       expect(text).toContain('"temperature":1,"top_p":0.95,"messages":');
-      expect(Object.keys(sent)).toEqual(Object.keys(JSON.parse(mimoSent[request === story ? 1 : 0]!.body)));
+      expect(Object.keys(sent)).toEqual(Object.keys(JSON.parse(mimoSent[0]!.body)));
       expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(MIMO)!, Buffer.byteLength(text))));
     }
   });
@@ -576,7 +577,8 @@ describe("reviewed sampling: a row's own sampling settings, exactly, and none on
  * JSON mode on every structured preview step (owner approval 2026-10-12, to fix MiMo's judging slips). On the preview,
  * a served call that carries its own content check (the author legs incl. critic and cross-root, panel and review:
  * JUDGE; the answer writer: SYNTHESIZER; the answer checker: EVALUATOR) asks for one JSON object when the target's row
- * allows JSON mode (GLM, MiMo); the story calls keep asking as before. DeepSeek, Qwen and Haiku requests are unchanged.
+ * allows JSON mode (GLM only, since MiMo's JSON mode was withdrawn the same day); the story calls keep asking as before.
+ * MiMo, DeepSeek, Qwen and Haiku requests are passed on without a JSON preference.
  */
 describe("JSON mode on every structured preview step, where the row allows it", () => {
   const HAIKU = "claude-haiku-5-5";
@@ -596,7 +598,7 @@ describe("JSON mode on every structured preview step, where the row allows it", 
 
   it("the preview policy asks for JSON on every structured served step of a JSON row, and on no other request", () => {
     for (const model of [GLM, DEEPSEEK, MIMO, QWEN, HAIKU]) {
-      const jsonRow = model === GLM || model === MIMO;
+      const jsonRow = model === GLM;
       for (const role of ["JUDGE", "SYNTHESIZER", "EVALUATOR"] as const) {
         expect(policySees(model, structured(role)).preferredResponseFormat, `${model} ${role}`).toBe(jsonRow ? "json_object" : undefined);
         // A structured step whose sealed bound leaves no repair still expects one JSON object.
@@ -611,7 +613,7 @@ describe("JSON mode on every structured preview step, where the row allows it", 
     }
   });
 
-  it("GLM's and MiMo's structured bodies carry response_format last; DeepSeek's and Qwen's are byte for byte as before", async () => {
+  it("GLM's structured bodies carry response_format last; MiMo's (sampling only), DeepSeek's and Qwen's carry none", async () => {
     for (const model of [GLM, DEEPSEEK, MIMO, QWEN]) {
       for (const role of ["JUDGE", "SYNTHESIZER", "EVALUATOR"] as const) {
         const { executions, gateway } = previewGateway(model);
@@ -622,20 +624,21 @@ describe("JSON mode on every structured preview step, where the row allows it", 
         expect(text, `${model} ${role}`).toBe(JSON.stringify({ model, max_tokens: sent.max_tokens,
           ...(row.effort === null ? {} : { reasoning_effort: row.effort }), ...(row.sampling ?? {}), messages: sent.messages,
           ...(row.jsonObject ? { response_format: { type: "json_object" } } : {}) }));
-        expect(Object.hasOwn(sent, "response_format")).toBe(model === GLM || model === MIMO);
+        expect(Object.hasOwn(sent, "response_format")).toBe(model === GLM);
         expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(row, Buffer.byteLength(text))));
       }
     }
   });
 
-  it("MiMo's full re-ask carries the same JSON mode and sampling, and the gate's check accepts both POSTs", async () => {
+  it("MiMo's full re-ask carries the same sampling and no JSON mode, and the gate's check accepts both POSTs", async () => {
     const { executions, gateway } = previewGateway(MIMO);
     let replies = 0;
     await gateway.call({ ...structured("JUDGE"),
       classifyContent: () => (++replies === 1 ? { parseStatus: "PARSE_FAILED", parseError: "synthetic" } : parsed) });
     expect(executions).toHaveLength(2);
     for (const execution of executions) {
-      expect(JSON.parse(execution.requestBody)).toMatchObject({ ...MIMO_SAMPLING, response_format: { type: "json_object" } });
+      expect(JSON.parse(execution.requestBody)).toMatchObject(MIMO_SAMPLING);
+      expect(Object.hasOwn(JSON.parse(execution.requestBody), "response_format")).toBe(false);
     }
   });
 });

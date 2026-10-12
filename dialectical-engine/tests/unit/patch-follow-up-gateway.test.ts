@@ -183,7 +183,7 @@ describe("the short follow-up on the preview's DeepInfra wire", () => {
   });
 
   it("every POST of a structured call asks for the same JSON mode: the first, the patch and the full re-ask", async () => {
-    // Owner approval 2026-10-12: a structured preview step asks for JSON mode on a row that allows it (GLM, MiMo), and
+    // Owner approval 2026-10-12: a structured preview step asks for JSON mode on a row that allows it (today GLM), and
     // its follow-ups carry the same response_format, so the cached prefix and the gate's body check match the first call.
     const { gateway, executions } = deepInfraHarness([
       { content: POSITION_SLIP }, { content: fixedPosition(true) }, { content: fixedPosition(true) }

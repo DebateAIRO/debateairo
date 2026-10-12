@@ -26,7 +26,7 @@ QWEN = 'Qwen/Qwen3.8-Flash'
 # every row (owner ruling 2026-10-10).
 ROWS = {MODEL: ('Z.AI', '0.15', '0.50', 32768, 'high', True),
         DEEPSEEK: ('DeepSeek', '0.20', '0.60', 32768, 'high', False),
-        MIMO: ('Xiaomi', '0.43', '0.87', 32768, None, True),
+        MIMO: ('Xiaomi', '0.43', '0.87', 32768, None, False),
         QWEN: ('Alibaba', '0.113', '0.382', 32768, None, False)}
 # The reviewed sampling (2026-10-12), written out independently of the gate: model -> the exact keys and
 # values its request must carry. A row not listed carries none of them. MiMo's (owner approval 2026-10-12) are

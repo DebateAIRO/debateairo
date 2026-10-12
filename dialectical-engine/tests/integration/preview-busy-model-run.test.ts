@@ -12,14 +12,14 @@
 // contract, so the 409 mapping, the body checks and the Anthropic wire are the shipped ones. Only the 60-second
 // waits are injected. Integration suites are skipped by the CI gate: run this file by hand before merging.
 //
-// JSON mode (spec "Check the JSON-mode needs"; owner approval 2026-10-12): GLM and MiMo are the reviewed rows with
-// jsonObject true (packages/providers/src/preview-models.ts). The story calls ask for JSON mode themselves
+// JSON mode (spec "Check the JSON-mode needs"; owner, 2026-10-12): GLM is the only reviewed row with jsonObject true
+// (packages/providers/src/preview-models.ts; MiMo's JSON mode was tried and withdrawn the same day). The story calls ask for JSON mode themselves
 // (packages/story/src/writer.ts, preferredResponseFormat "json_object"), and on the preview every structured served step
 // (judge legs, panel, review, answer writer, answer checker) asks for it on a jsonObject row (withPreviewProviderCallPolicy).
 // The gateway adds response_format only on the story or served lane AND for a gateway built with
 // supportsJsonObjectResponse, which providerTargetGatewayControls sets only for a jsonObject row; the guarded fetch
 // refuses response_format on any other row (packages/providers/src/preview-test.ts, deepInfraBodyAccepted). So here,
-// without GLM, only MiMo's requests carry JSON mode; a DeepSeek, Qwen or Haiku story call goes out WITHOUT it, and the
+// without GLM, no request carries JSON mode; every story call goes out WITHOUT it, and the
 // story's reader is a strict JSON.parse
 // (packages/story/src/validate.ts:262-270),
 // with the storyteller's one repair turn (story bound maxAttempts 2) as the only fallback. The doubles
@@ -462,16 +462,10 @@ describe("a preview debate admitted without busy GLM runs to an answer and a sto
     expect(gates.requests.filter((request) => request.kind === "STORY_CHECKER").map((request) => request.model))
       .toEqual([debate.rotated.storyChecker.modelId]);
 
-    // JSON mode (header comment): no request for a row without jsonObject ever carried response_format; MiMo (the one
-    // jsonObject row in this run) asked for it on every step that expects one JSON object, and never on its probes.
-    const withJson = gates.requests.filter((request) => Object.hasOwn(request.body, "response_format"));
-    expect(withJson.length).toBeGreaterThan(0);
-    expect(new Set(withJson.map((request) => request.model))).toEqual(new Set([MIMO]));
-    expect(withJson.every((request) => previewModelRow(request.model)?.jsonObject === true)).toBe(true);
-    expect(gates.requests.filter((request) => request.model === MIMO && request.kind !== "PROBE"
-      && !Object.hasOwn(request.body, "response_format"))).toEqual([]);
-    expect(gates.requests.filter((request) => request.model === MIMO && request.kind === "PROBE"
-      && Object.hasOwn(request.body, "response_format"))).toEqual([]);
+    // JSON mode (header comment): no request for a row without jsonObject ever carried response_format, and without
+    // GLM no row in this run has it (MiMo's requests went out with its sampling and without JSON mode).
+    expect(gates.requests.filter((request) => Object.hasOwn(request.body, "response_format"))).toEqual([]);
+    expect(gates.requests.some((request) => request.model === MIMO && request.kind !== "PROBE")).toBe(true);
   });
 
   it("control: the claim probe before the fix (one probe, no resend) loses the pinned writer and J24 refuses the run", async () => {

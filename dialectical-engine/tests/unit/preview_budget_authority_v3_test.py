@@ -382,7 +382,7 @@ class ModelCallTests(GateTest):
         # Owner ruling 2026-10-10: max_tokens is at most 32768 for every row; 32769 is refused.
         allowed = [body(model=MODEL), body(model=MODEL, response_format=json_mode), body(model=MODEL, max_tokens=32768),
                    body(model=DEEPSEEK), body(model=DEEPSEEK, max_tokens=32768),
-                   body(model=MIMO), body(model=MIMO, max_tokens=32768), body(model=MIMO, response_format=json_mode),
+                   body(model=MIMO), body(model=MIMO, max_tokens=32768),
                    body(model=QWEN), body(model=QWEN, max_tokens=32768)]
         refused = [body(model=model, max_tokens=32769) for model in ALL] + [
                    {k: v for k, v in body(model=MODEL).items() if k != 'reasoning_effort'},
@@ -391,7 +391,8 @@ class ModelCallTests(GateTest):
                    body(model=DEEPSEEK, reasoning_effort='medium'), body(model=DEEPSEEK, response_format=json_mode),
                    body(model=DEEPSEEK, max_tokens=131072),
                    body(model=MIMO, reasoning_effort='high'), body(model=MIMO, reasoning_effort=None),
-                   body(model=MIMO, response_format={'type': 'json_schema'}), body(model=MIMO, max_tokens=131072),
+                   body(model=MIMO, response_format=json_mode), body(model=MIMO, response_format={'type': 'json_schema'}),
+                   body(model=MIMO, max_tokens=131072),
                    body(model=MIMO, max_tokens=0)]
         for value in allowed:
             with self.subTest(allowed=value):
@@ -1910,15 +1911,15 @@ class SamplingTests(GateTest):
             with self.subTest(name):
                 self.assertFalse(DEEPINFRA.body_valid(value, row))
 
-    def test_mimo_takes_exactly_its_reviewed_values_and_json_mode(self):
-        # Owner approval 2026-10-12: MiMo broke its JSON with a straight closing quote in a live practice run.
+    def test_mimo_takes_exactly_its_reviewed_values_and_no_json_mode(self):
+        # Owner approval 2026-10-12: MiMo broke its JSON with a straight closing quote in a live practice run. Its JSON
+        # mode, tried the same day, was withdrawn: DeepInfra's JSON constraint turned that slip into garbage.
         row = DEEPINFRA.rows[MIMO]
-        self.assertTrue(row.json_object)
+        self.assertFalse(row.json_object)
         exact = body(model=MIMO)
         self.assertEqual({k: exact[k] for k in ('temperature', 'top_p')}, SAMPLING[MIMO])
         self.assertTrue(DEEPINFRA.body_valid(exact, row))
         self.assertTrue(DEEPINFRA.body_valid({**exact, 'temperature': 1}, row))  # 1 and 1.0: one JSON number (the app writes 1).
-        self.assertTrue(DEEPINFRA.body_valid({**exact, 'response_format': {'type': 'json_object'}}, row))
 
         def without(name):
             return {k: v for k, v in exact.items() if k != name}
@@ -1928,6 +1929,7 @@ class SamplingTests(GateTest):
                    'top_p_default': {**exact, 'top_p': 1}, 'top_p_hair': {**exact, 'top_p': 0.950001},
                    'temperature_true': {**exact, 'temperature': True}, 'temperature_text': {**exact, 'temperature': '1.0'},
                    'temperature_null': {**exact, 'temperature': None}, 'effort': {**exact, 'reasoning_effort': 'high'},
+                   'json_mode': {**exact, 'response_format': {'type': 'json_object'}},
                    'json_schema': {**exact, 'response_format': {'type': 'json_schema'}},
                    'json_mode_extra': {**exact, 'response_format': {'type': 'json_object', 'schema': {}}},
                    'json_mode_without_sampling': {**without('temperature'), 'response_format': {'type': 'json_object'}}}
@@ -1982,18 +1984,20 @@ class SamplingTests(GateTest):
         with self.refused('REQUEST_PARAMETERS_INVALID'):
             gate.call('bare', value={k: v for k, v in body(model=QWEN).items() if k not in SAMPLING[QWEN]})
 
-    def test_a_mimo_json_call_with_its_sampling_goes_through_and_sends_it(self):
+    def test_a_mimo_call_with_its_sampling_goes_through_and_json_mode_is_refused(self):
         gate = self.gate(enabled_models=ALL).ready()
         sent = []
 
         def dispatch(request, _key):
             sent.append(json.loads(request))
             return 200, provider_response('0.0004', MIMO)
-        value = body(model=MIMO, response_format={'type': 'json_object'})
+        value = body(model=MIMO)
         self.assertEqual(gate.call('ok', value=value, dispatch=dispatch)['status'], 200)
         self.assertEqual(sent, [value])
         self.assertEqual({k: sent[0][k] for k in SAMPLING[MIMO]}, SAMPLING[MIMO])
-        self.assertEqual(sent[0]['response_format'], {'type': 'json_object'})
+        self.assertNotIn('response_format', sent[0])
+        with self.refused('REQUEST_PARAMETERS_INVALID'):
+            gate.call('json', value={**value, 'response_format': {'type': 'json_object'}})
         with self.refused('REQUEST_PARAMETERS_INVALID'):
             gate.call('bare', value={k: v for k, v in value.items() if k not in SAMPLING[MIMO]})
 

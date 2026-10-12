@@ -281,10 +281,10 @@ function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
   catch { return false; }
 }
 /**
- * JSON mode on every structured preview step (owner approval 2026-10-12, to fix MiMo's judging slips): a debate step on
+ * JSON mode on every structured preview step (owner approval 2026-10-12; MiMo's JSON mode withdrawn the same day): a debate step on
  * the served lane (JUDGE: the author legs incl. critic and cross-root, panel and review; SYNTHESIZER: the answer writer;
  * EVALUATOR: the answer checker) that carries its own content check expects one JSON object, so on a row that allows
- * JSON mode (`jsonObject`: GLM, MiMo) it asks for it, as the story calls already do. Every other row's request, and every
+ * JSON mode (`jsonObject`: today GLM only) it asks for it, as the story calls already do. Every other row's request, and every
  * other request, is passed on as it came; the gateway still sends response_format only where the row allows it.
  */
 function previewStructuredStep(request: ProviderCallRequest): boolean {
