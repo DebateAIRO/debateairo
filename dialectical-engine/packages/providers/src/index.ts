@@ -3,7 +3,7 @@ import { networkInterfaces } from "node:os";
 import { z } from "zod";
 import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
 import { assertFramedPrompt, buildFramedPatchPrompt } from "./prompt-frame.js";
-import { mergePatchReply, planPatchFollowUp, type PatchFollowUpPlan } from "./patch-follow-up.js";
+import { PATCH_KEY_NOT_REQUESTED, mergePatchReply, planPatchFollowUp, type PatchFollowUpPlan } from "./patch-follow-up.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
 import {
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
@@ -1990,8 +1990,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const replyFacts: ModelReplyFacts = Object.freeze({ finishReason });
         /**
          * Patch follow-up: what this call hands back when the reply is accepted. The reply itself, except after a
-         * patch, where it is the first reply with the patch merged in (`mergePatchReply`) — the string the step's own
-         * classifier checked, so every caller that reads `content` again reads exactly what was accepted.
+         * merged patch, where it is the first reply with the patch merged in (`mergePatchReply`) — the string the step's
+         * own classifier checked, so every caller that reads `content` again reads exactly what was accepted.
          */
         let acceptedContent = content;
         /** Patch follow-up: this attempt was the patch and its reply could not be merged, so the first reply stands. */
@@ -2003,11 +2003,23 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         try {
           if (content !== null && patchPlan !== null && request.classifyContent !== undefined) {
             const merged = mergePatchReply(patchPlan, content, replyFacts);
-            if (merged.ok) acceptedContent = merged.content;
-            patchNotMerged = !merged.ok;
-            classifiedContent = merged.ok
-              ? request.classifyContent(merged.content, replyFacts)
-              : { parseStatus: merged.parseStatus, parseError: merged.parseError };
+            if (merged.ok) {
+              acceptedContent = merged.content;
+              classifiedContent = request.classifyContent(merged.content, replyFacts);
+            } else {
+              patchNotMerged = true;
+              classifiedContent = { parseStatus: merged.parseStatus, parseError: merged.parseError };
+              /**
+               * Owner ruling 2026-10-12: a reply with keys outside the request is most often the whole answer again.
+               * The step's own full check reads it as a whole answer, and it is accepted as it is when it passes —
+               * saving the full re-ask. When it does not, it stays refused as a patch (its record keeps
+               * PATCH_KEY_NOT_REQUESTED) and the first reply stands.
+               */
+              if (merged.parseError === PATCH_KEY_NOT_REQUESTED) {
+                const whole = request.classifyContent(content, replyFacts);
+                if (whole.parseStatus === "PARSED") classifiedContent = whole;
+              }
+            }
           } else {
             classifiedContent = content === null
               ? { parseStatus: "UNPARSED", parseError: null }
