@@ -11,15 +11,19 @@
 // Task 10 (pipeline, part 1 of 3): the opening positions, their panels and their reviews run together and are saved
 // in today's order. Task 11 (part 2 of 3): the support/attack replies and the cross-exchanges start as soon as the
 // positions they answer exist, and a reply beyond a round boundary waits for that boundary's freeze/stop decision.
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+// Task 12 (part 3 of 3): stops and failures while calls are in flight (spec §2.3).
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { createPool, migrate, type Pool } from "@debateai/db";
+import { JudgementRepository } from "@debateai/judgement";
+import { TypedDomainError } from "@debateai/kernel";
 import { PREVIEW_PROVIDER_REF_MODELS } from "@debateai/providers";
 import {
   DEEPSEEK,
   FIVE_MAKER_REFS,
   HAIKU,
   INCIDENT_PIN,
+  MIMO,
   OWNER_CALL_CONCURRENCY,
   PANEL_REFS,
   QWEN,
@@ -463,6 +467,261 @@ describe("parallel calls: replies and cross-exchanges (Task 11)", () => {
       expect(other, variants[index + 1]!.name).toEqual(first);
     }
   }, 900_000);
+});
+
+describe("parallel calls: stops and failures with calls in flight (Task 12)", () => {
+  /** A root's author call other than root 0's (its system message carries the independent-root directive). */
+  const isLaterRootAuthor = (request: GateRequest): boolean =>
+    request.kind === "JUDGE" && JSON.stringify(request.body).includes("Independently author your own position");
+  /** Root 0's author call: the first position. */
+  const isRootZeroAuthor = (request: GateRequest): boolean =>
+    request.kind === "JUDGE" && JSON.stringify(request.body).includes("Author your position on the question under debate.");
+  /** The AUTHOR and REVIEW calls that reached a gate after `at` (spec §2.3: none may START once the arguing stopped). */
+  const authorOrReviewAfter = (arrivals: readonly GateArrival[], at: number) =>
+    arrivals.filter((arrival) => (arrival.kind === "JUDGE" || arrival.kind === "REVIEW") && arrival.at > at);
+  /** The calls (probes aside) a gate had received and not yet answered at `at`. */
+  const inFlightAt = (arrivals: readonly GateArrival[], at: number) =>
+    arrivals.filter((arrival) => arrival.kind !== "PROBE" && arrival.at < at && (arrival.answeredAt === null || arrival.answeredAt > at));
+  const nodeCount = async (runId: string): Promise<number> => Number((await database.pool.query<{ nodes: string }>(
+    `SELECT count(*)::text AS nodes FROM core.node WHERE run_id=$1`, [runId])).rows[0]!.nodes);
+  const reviewCount = async (runId: string): Promise<number> => Number((await database.pool.query<{ reviews: string }>(
+    `SELECT count(*)::text AS reviews FROM ledger.node_review WHERE run_id=$1`, [runId])).rows[0]!.reviews);
+
+  /**
+   * The first author call of a root other than root 0 (not Haiku's) is refused by the gate as the run's money ceiling
+   * (a spend stop), answered after 100 ms; every other call is held `holdMs`. Returns the gates, and where the stopping
+   * call is in their arrival log.
+   */
+  async function moneyStopOnOneRoot(holdMs: number) {
+    let stopping: GateRequest | null = null;
+    let stoppingIndex = -1;
+    let arrivals: readonly GateArrival[] = [];
+    // Every model answers (GLM too: `{ unbilled: [] }`), so the incident's five makers can argue.
+    const gates = await harness.startGates({}, { unbilled: [] },
+      (request) => request === stopping ? { gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" } : null,
+      (request) => {
+        if (request.kind === "PROBE") return 0;
+        if (stopping === null && isLaterRootAuthor(request) && request.model !== HAIKU) {
+          stopping = request;
+          stoppingIndex = arrivals.length - 1;
+          return 100;
+        }
+        return holdMs;
+      });
+    arrivals = gates.arrivals;
+    return { gates, stoppingAt: () => gates.arrivals[stoppingIndex]! };
+  }
+
+  /**
+   * Spec §2.3 (O6), case (a): a spend stop raised by ONE call while six others are in flight (the incident's five makers
+   * and seating, so as many calls as that are always under way: root 0's four panel calls, the other roots, replies to
+   * root 0). No author or review call
+   * starts after it anywhere in the debate; every call already sent finishes, and its node is saved (each root and reply
+   * whose author call answered, with its panel); the stopped root has no node; the answer is served with the stop; and
+   * every chain had settled when the run ended (every call the gates received was answered before it ended).
+   */
+  it("a money stop raised by one root's author call while six other calls are in flight: nothing new starts, what was sent is kept, the answer is served", async () => {
+    const debate = await harness.admittedRun("money-stop-in-flight", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN, depth: 1 });
+    const { gates, stoppingAt } = await moneyStopOnOneRoot(500);
+    const composed = await harness.previewRunner(gates, "resend", { callConcurrency: OWNER_CALL_CONCURRENCY });
+    const result = await harness.completedRun(composed, debate, gates);
+    const endedAt = performance.now();
+
+    const stop = stoppingAt();
+    expect(stop.kind).toBe("JUDGE");
+    const stopAt = stop.answeredAt!;
+    expect(inFlightAt(gates.arrivals, stopAt).filter((arrival) => arrival !== stop).length).toBeGreaterThanOrEqual(6);
+    expect(authorOrReviewAfter(gates.arrivals, stopAt)).toEqual([]);
+    expect(gates.arrivals.filter((arrival) => arrival.answeredAt === null || arrival.answeredAt > endedAt)).toEqual([]);
+    // What was sent is kept: one node per author call that answered (root 0's, the roots and replies in flight), and
+    // none for the stopped root. The stop came before any node was saved, so no review was ever asked.
+    const answeredAuthors = gates.requests.filter((request) => request.kind === "JUDGE" && request.answer === "OK").length;
+    expect(answeredAuthors).toBeGreaterThan(1);
+    expect(await nodeCount(debate.runId)).toBe(answeredAuthors);
+    expect(await reviewCount(debate.runId)).toBe(0);
+    const { answer, workItem } = await harness.servedAnswer(debate, result.answerId);
+    expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
+    expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
+    expect((await harness.bodyFactsOf(result.answerId))?.body_stop).not.toBeNull();
+    expect(composed.lanes[0]!.stats().running).toBe(0);
+  }, 300_000);
+
+  /**
+   * Spec §2.3 (O6), the dispatch-time refusal (Task 10 review carry, ruled): one call per model at a time, so calls WAIT
+   * in the lane. Roots 1-3's author calls start together once root 0's panel answered (50 ms). The first of them to
+   * arrive answers in 50 ms, so its node's panel asks the other makers while their own root calls still hold their
+   * slots: those panel calls WAIT. The second is refused by the gate as the run's money ceiling at 300 ms (a spend
+   * stop); the third is held 1 s. When the stopped maker's slot frees, and later the slow one's, every AUTHOR and
+   * REVIEW call waiting there is refused by the lane as it would start (CALL_LANE_HELD_BACK: never sent, never a
+   * failure), while the waiting PANEL call of the node authored before the stop still starts. The answer is served.
+   */
+  it("a queued author or review call never starts after the stop; a queued panel call of an already-authored node does", async () => {
+    const debate = await harness.admittedRun("dispatch-held-back", { panelRefs: PANEL_REFS, depth: 1 });
+    const scripted = scriptedAnswers(debate.question);
+    /** Each authored statement, with when its author call was answered. */
+    const authoredAt = new Map<string, number>();
+    const laterRoots: GateRequest[] = [];
+    let stoppingIndex = -1;
+    /** Each panel call's body, by its place in the arrival log. */
+    const panelBodies = new Map<number, string>();
+    let arrivals: readonly GateArrival[] = [];
+    const gates = await harness.startGates({}, undefined, (request, chat) => {
+      if (request === laterRoots[1]) return { gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" };
+      const answer = scripted(request, chat);
+      if (request.kind === "JUDGE" && answer !== null && "content" in answer) {
+        authoredAt.set((JSON.parse(answer.content) as { statement: string }).statement, performance.now());
+      }
+      return answer;
+    }, (request) => {
+      if (request.kind === "PROBE") return 0;
+      if (request.kind === "PANEL") panelBodies.set(arrivals.length - 1, JSON.stringify(request.body));
+      if (!isLaterRootAuthor(request)) return 50;
+      laterRoots.push(request);
+      if (laterRoots.length === 2) stoppingIndex = arrivals.length - 1;
+      return [50, 300][laterRoots.length - 1] ?? 1_000;
+    });
+    arrivals = gates.arrivals;
+    const onePerModel = Object.freeze({ ...OWNER_CALL_CONCURRENCY, perModelPerDebate: 1 });
+    const composed = await harness.previewRunner(gates, "resend", { callConcurrency: onePerModel });
+    const result = await harness.completedRun(composed, debate, gates);
+
+    expect(laterRoots.length).toBeGreaterThanOrEqual(3);
+    const stopAt = gates.arrivals[stoppingIndex]!.answeredAt!;
+    expect(authorOrReviewAfter(gates.arrivals, stopAt)).toEqual([]);
+    // Author or review calls were waiting when the stop came: the lane held them back.
+    expect(composed.lanes[0]!.stats().heldBack).toBeGreaterThan(0);
+    // A panel call of a node whose author call answered BEFORE the stop reached its gate only AFTER the stop: it waited
+    // for its model's slot across the stop, and still started.
+    const panelsOfEarlierNodes = [...panelBodies].filter(([index, body]) => gates.arrivals[index]!.at > stopAt
+      && [...authoredAt].some(([statement, at]) => at < stopAt && body.includes(statement)));
+    expect(panelsOfEarlierNodes.length).toBeGreaterThan(0);
+    const { answer, workItem } = await harness.servedAnswer(debate, result.answerId);
+    expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
+    expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
+    expect(composed.lanes[0]!.stats().running).toBe(0);
+  }, 300_000);
+
+  /**
+   * Spec §2.3 (O6), case (b): too few members left, with calls in flight. Three makers, run resilience on. Root 0's
+   * writer (Z) is slow: its calls are held 700 ms. Once both other roots answered, their two makers turn busy: every call
+   * to them arriving after that is the vendor's unbilled refusal (the POST and its one resend), so both sit out and one
+   * maker is left — too few to argue. Z's calls already sent finish and are kept; no author or review call starts after
+   * the second maker sat out; the answer is served.
+   */
+  it("too few members left (two makers turn busy) with calls in flight: nothing new starts, what was sent is kept, the answer is served", async () => {
+    const threeMakers = [DEEPSEEK, MIMO, QWEN].map((model) => PANEL_REFS.find((ref) => PREVIEW_PROVIDER_REF_MODELS[ref] === model)!);
+    const debate = await harness.admittedRun("too-few-in-flight", { panelRefs: threeMakers, depth: 1 });
+    let rootZeroModel: string | null = null;
+    let rootsAnswered = 0;
+    /** Calls to the two other makers that arrived once both their roots had answered: refused, busy. */
+    const busy = new Set<GateRequest>();
+    let lastBusyAt = 0;
+    const gates = await harness.startGates({}, undefined, (request) => {
+      if (busy.has(request)) {
+        lastBusyAt = performance.now();
+        return { unbilled: true };
+      }
+      if (isLaterRootAuthor(request)) rootsAnswered += 1;
+      return null;
+    }, (request) => {
+      if (request.kind === "PROBE") return 0;
+      if (rootZeroModel === null && isRootZeroAuthor(request)) rootZeroModel = request.model;
+      if (rootsAnswered >= 2 && request.model !== rootZeroModel) busy.add(request);
+      return request.model === rootZeroModel ? 700 : 30;
+    });
+    const composed = await harness.previewRunner(gates, "resend", { resilience: RUN_RESILIENCE, callConcurrency: OWNER_CALL_CONCURRENCY });
+    const result = await harness.completedRun(composed, debate, gates);
+    const endedAt = performance.now();
+
+    expect(busy.size).toBeGreaterThan(0);
+    // Z's calls were in flight when the second maker sat out; no author or review call started after it.
+    expect(inFlightAt(gates.arrivals, lastBusyAt).filter((arrival) => arrival.model === rootZeroModel).length).toBeGreaterThan(0);
+    expect(authorOrReviewAfter(gates.arrivals, lastBusyAt)).toEqual([]);
+    expect(gates.arrivals.filter((arrival) => arrival.answeredAt === null || arrival.answeredAt > endedAt)).toEqual([]);
+    // What was sent is kept: every author call that answered has its node (its panel ran, the busy member failing).
+    const answeredAuthors = gates.requests.filter((request) => request.kind === "JUDGE" && request.answer === "OK").length;
+    expect(await nodeCount(debate.runId)).toBe(answeredAuthors);
+    const { answer, workItem } = await harness.servedAnswer(debate, result.answerId);
+    expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
+    expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
+    expect(composed.lanes[0]!.stats().running).toBe(0);
+  }, 300_000);
+
+  /**
+   * Spec §2.3, case (c): the keep-alive stop (here the task's time limit: Hatchet gave up) while calls are in flight.
+   * Every call is held 3 s, except root 0's and the first other root's author calls. Once five calls are in flight the
+   * task is aborted; the short root's answer then leads its chain to its next call, which the keep-alive refuses
+   * (RUNNER_TIME_LIMIT_REACHED). The work item ends with that code at once — within a second — with the held calls
+   * still in flight: they are abandoned, never awaited. They land later; nothing rejects unhandled (vitest fails on
+   * one), and the lane is left with no call running.
+   */
+  it("a keep-alive stop with calls in flight: the work item ends at once with today's code, the calls in flight are abandoned cleanly", async () => {
+    const debate = await harness.admittedRun("keep-alive-in-flight", { panelRefs: PANEL_REFS, depth: 1 });
+    const task = new AbortController();
+    let abortedAt: number | null = null;
+    let shortRoot: GateRequest | null = null;
+    let arrivals: readonly GateArrival[] = [];
+    const gates = await harness.startGates({}, undefined, undefined, (request) => {
+      if (request.kind === "PROBE") return 0;
+      if (isRootZeroAuthor(request)) return 10;
+      const inFlight = arrivals.filter((arrival) => arrival.kind !== "PROBE" && arrival.answeredAt === null).length;
+      if (abortedAt === null && inFlight >= 5) {
+        task.abort();
+        abortedAt = performance.now();
+      }
+      if (shortRoot === null && isLaterRootAuthor(request)) {
+        shortRoot = request;
+        return 200;
+      }
+      return 3_000;
+    });
+    arrivals = gates.arrivals;
+    const composed = await harness.previewRunner(gates, "resend", { callConcurrency: OWNER_CALL_CONCURRENCY });
+    await expect(composed.runner.executeWorkItem(debate.workItemId, { executionLimitMs: 3_600_000, signal: task.signal }))
+      .rejects.toMatchObject({ code: "RUNNER_TIME_LIMIT_REACHED" });
+    const endedAt = performance.now();
+
+    expect(abortedAt).not.toBeNull();
+    expect(endedAt - abortedAt!).toBeLessThan(1_000);
+    // The held calls were still in flight when the work item ended: abandoned, not awaited.
+    expect(gates.arrivals.filter((arrival) => arrival.kind !== "PROBE" && (arrival.answeredAt === null || arrival.answeredAt > endedAt)).length)
+      .toBeGreaterThanOrEqual(4);
+    // They land later; then the lane has nothing running, and nothing rejected unhandled meanwhile.
+    const deadline = Date.now() + 15_000;
+    while (gates.arrivals.some((arrival) => arrival.answeredAt === null) && Date.now() < deadline) {
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+    }
+    await new Promise((resolve) => { setTimeout(resolve, 500); });
+    expect(gates.arrivals.filter((arrival) => arrival.answeredAt === null)).toEqual([]);
+    expect(composed.lanes[0]!.stats().running).toBe(0);
+  }, 300_000);
+
+  /**
+   * Spec §2.3, case (d): a recorder write that throws. The second node's reduced judgement cannot be written: the run
+   * fails with that code — once every other chain has settled — and never hangs on the positions after it.
+   */
+  it("a recorder write that throws: the run fails with its code and does not hang", async () => {
+    const debate = await harness.admittedRun("recorder-throws", { panelRefs: PANEL_REFS, depth: 1 });
+    const gates = await harness.startGates({}, undefined, undefined, heldCalls(() => 100));
+    const composed = await harness.previewRunner(gates, "resend", { callConcurrency: OWNER_CALL_CONCURRENCY });
+    const recordReduced = JudgementRepository.prototype.recordReduced;
+    let writes = 0;
+    const failing = vi.spyOn(JudgementRepository.prototype, "recordReduced").mockImplementation(function (this: JudgementRepository, ...args) {
+      writes += 1;
+      if (writes === 2) return Promise.reject(new TypedDomainError("TEST_REDUCED_WRITE_FAILED", "the second node's reduced judgement"));
+      return recordReduced.apply(this, args);
+    });
+    try {
+      await expect(composed.runner.executeWorkItem(debate.workItemId)).rejects.toMatchObject({ code: "TEST_REDUCED_WRITE_FAILED" });
+    } finally {
+      failing.mockRestore();
+    }
+    const endedAt = performance.now();
+    expect(writes).toBeGreaterThanOrEqual(2);
+    // Every call the gates received was answered before the run ended: the other chains were awaited.
+    expect(gates.arrivals.filter((arrival) => arrival.answeredAt === null || arrival.answeredAt > endedAt)).toEqual([]);
+    expect(composed.lanes[0]!.stats().running).toBe(0);
+  }, 300_000);
 });
 
 /* ------------------------------------------------------------------ one admitted run, argued in several copies */

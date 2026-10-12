@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCallScheduler, callPriorityOf, CALL_LANE_STOPPED } from "../../apps/runner/src/call-scheduler.js";
+import { createCallScheduler, callPriorityOf, CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallTicket } from "../../apps/runner/src/call-scheduler.js";
 
 const deferred = () => { let resolve!: (v: string) => void; let reject!: (e: unknown) => void;
   const promise = new Promise<string>((res, rej) => { resolve = res; reject = rej; }); return { promise, resolve, reject }; };
@@ -124,6 +124,59 @@ describe("call scheduler", () => {
     gs[0]!.resolve("ok"); await flush(); expect(started).toEqual([0, 1]);
     gs[1]!.resolve("ok"); await Promise.all(runs);
     expect(s.stats().peakByGate).toEqual({ g: 1 });
+  });
+  /**
+   * Task 12 (spec 2026-10-12 §2.3, O6; Task 10 review carry): once the debate's arguing has stopped, no AUTHOR or REVIEW
+   * call starts — not even one already WAITING in the lane when the stop is recorded. The lane asks its start guard,
+   * synchronously, each time it would start a call; a refused call is never sent and rejects CALL_LANE_HELD_BACK, while a
+   * waiting PANEL call (the panel of a node whose author call was already sent) still starts. Running calls are untouched.
+   */
+  it("a start guard refuses waiting AUTHOR and REVIEW calls at dispatch, lets PANEL calls start, and touches no running call", async () => {
+    const s = createCallScheduler({ policy: { ...policy, perDebate: 1 } }); const lane = s.openLane("d1");
+    const started: string[] = []; const running = deferred();
+    const first = lane.run(t("A"), () => { started.push("running"); return running.promise; });
+    const waiting = (name: string, priority: CallTicket["priority"]) =>
+      lane.run(t("A", priority), async () => { started.push(name); return name; });
+    const author = waiting("author", "AUTHOR"); const review = waiting("review", "REVIEW");
+    const panel = waiting("panel", "PANEL"); const other = waiting("other", "OTHER");
+    let stopped = false;
+    lane.guardStarts((ticket) => !(stopped && (ticket.priority === "AUTHOR" || ticket.priority === "REVIEW")));
+    await flush();
+    expect(started).toEqual(["running"]);
+    // The stop is recorded while all four wait for the debate's one slot; the running call is not touched.
+    stopped = true;
+    running.resolve("done");
+    await expect(first).resolves.toBe("done");
+    await expect(author).rejects.toMatchObject({ code: CALL_LANE_HELD_BACK });
+    await expect(review).rejects.toMatchObject({ code: CALL_LANE_HELD_BACK });
+    await expect(panel).resolves.toBe("panel");
+    await expect(other).resolves.toBe("other");
+    expect(started).toEqual(["running", "panel", "other"]);
+    // A new AUTHOR call is refused at once, never sent; a new PANEL call still runs.
+    await expect(waiting("late author", "AUTHOR")).rejects.toMatchObject({ code: CALL_LANE_HELD_BACK });
+    await expect(waiting("late panel", "PANEL")).resolves.toBe("late panel");
+    expect(started).toEqual(["running", "panel", "other", "late panel"]);
+    expect(lane.stats()).toMatchObject({ running: 0, heldBack: 3, calls: 4 });
+    // The guard removed (the arguing is over: the answer's own calls follow), every call may start again.
+    lane.guardStarts(null);
+    await expect(waiting("after", "AUTHOR")).resolves.toBe("after");
+    await lane.drained();
+  });
+  it("a refused call frees no slot it never took, and another debate's lane is never asked", async () => {
+    const s = createCallScheduler({ policy: { perDebate: 2, perModelPerDebate: 1, perModelPerRunner: { default: 1 } } });
+    const mine = s.openLane("d1"); const theirs = s.openLane("d2");
+    const hold = deferred(); const started: string[] = [];
+    const held = mine.run(t("A"), () => { started.push("mine:A"); return hold.promise; });
+    // Both wait for model A's one runner-wide slot.
+    const myAuthor = mine.run(t("A", "AUTHOR"), async () => { started.push("mine:author"); return "x"; });
+    const theirAuthor = theirs.run(t("A", "AUTHOR"), async () => { started.push("theirs:author"); return "y"; });
+    mine.guardStarts((ticket) => ticket.priority !== "AUTHOR");
+    hold.resolve("ok"); await held;
+    await expect(myAuthor).rejects.toMatchObject({ code: CALL_LANE_HELD_BACK });
+    await expect(theirAuthor).resolves.toBe("y");
+    expect(started).toEqual(["mine:A", "theirs:author"]);
+    expect(mine.stats()).toMatchObject({ running: 0, heldBack: 1 });
+    expect(theirs.stats()).toMatchObject({ running: 0, heldBack: 0 });
   });
   it("names priorities from call-site keys", () => {
     expect(callPriorityOf("JUDGE")).toBe("AUTHOR");

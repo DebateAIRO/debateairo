@@ -22,15 +22,26 @@ import type { CallConcurrencyPolicy } from "@debateai/register";
  * elsewhere. A call held back only by its own debate's limits never holds back
  * another debate's call.
  *
+ * A debate may also give its lane a START GUARD (spec §2.3, O6): asked, synchronously, each time the lane would start
+ * one of its calls, whether that call may still start. A call it refuses is never sent; the lane runs on.
+ *
  * The scheduler knows nothing about debate shape and touches no database.
  */
 
 export const CALL_LANE_STOPPED = "CALL_LANE_STOPPED" as const;
+/** A call the lane's start guard refused (the debate's arguing had stopped): never sent. Never a debate's failure. */
+export const CALL_LANE_HELD_BACK = "CALL_LANE_HELD_BACK" as const;
 
 export type CallPriority = "AUTHOR" | "PANEL" | "REVIEW" | "OTHER";
 export interface CallSubject { readonly model: string; readonly vendor: string; readonly gate: string | null; }
 export interface CallTicket extends CallSubject { readonly priority: CallPriority; }
+/** Whether a call may still start; asked synchronously, at the moment the lane would start it. */
+export type CallStartGuard = (ticket: CallTicket) => boolean;
 export interface LaneStats {
+  /** This lane's calls running now. */
+  readonly running: number;
+  /** Calls the start guard refused (never sent). */
+  readonly heldBack: number;
   readonly peakInFlight: number;
   readonly peakByModel: Readonly<Record<string, number>>;
   readonly waitedMsByModel: Readonly<Record<string, number>>;
@@ -47,6 +58,12 @@ export interface DebateCallLane {
   run<T>(ticket: CallTicket, call: () => Promise<T>): Promise<T>;
   /** No new call starts; queued calls reject CALL_LANE_STOPPED; running calls are not touched. Idempotent. */
   stop(): void;
+  /**
+   * Installs this lane's start guard (`null` removes it). Every time the lane would start one of its calls — a call
+   * arriving, or a waiting call when a slot frees — it first asks the guard: a call the guard refuses is never sent and
+   * rejects with TypedDomainError CALL_LANE_HELD_BACK, and the rest of the lane runs on. Running calls are not touched.
+   */
+  guardStarts(guard: CallStartGuard | null): void;
   /** Resolves when no call of this lane is running. */
   drained(): Promise<void>;
   /** stop() + forget the lane's queues and counters (call once, at the end of the run). */
@@ -88,6 +105,9 @@ type Lane = {
   readonly runningByModel: Map<string, number>;
   readonly waiting: Waiting[];
   readonly drainWaiters: Array<() => void>;
+  /** The start guard (`guardStarts`); null: every call may start. */
+  guard: CallStartGuard | null;
+  heldBack: number;
   peakInFlight: number;
   readonly peakByModel: Map<string, number>;
   readonly waitedMsByModel: Map<string, number>;
@@ -118,6 +138,35 @@ function frozenRecord(counts: ReadonlyMap<string, number>): Readonly<Record<stri
 
 function laneStoppedError(debateId: string): TypedDomainError {
   return new TypedDomainError(CALL_LANE_STOPPED, `The call lane of debate ${debateId} is stopped; the call was not sent`);
+}
+
+function heldBackError(debateId: string): TypedDomainError {
+  return new TypedDomainError(CALL_LANE_HELD_BACK, `The arguing of debate ${debateId} has stopped; the call was not sent`);
+}
+
+/** The guard's answer; a guard that throws refuses (a call is never sent on a question that could not be answered). */
+function mayStart(guard: CallStartGuard, ticket: CallTicket): boolean {
+  try {
+    return guard(ticket);
+  } catch {
+    return false;
+  }
+}
+
+/** Takes every waiting call the lane's start guard now refuses out of its queue, and refuses it, unsent. */
+function holdBackRefused(lane: Lane): void {
+  const guard = lane.guard;
+  if (guard === null) return;
+  for (let index = 0; index < lane.waiting.length;) {
+    const entry = lane.waiting[index]!;
+    if (mayStart(guard, entry.ticket)) {
+      index += 1;
+      continue;
+    }
+    lane.waiting.splice(index, 1);
+    lane.heldBack += 1;
+    entry.fail(heldBackError(lane.debateId));
+  }
 }
 
 export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPolicy; now?: () => number }>): CallScheduler {
@@ -212,6 +261,8 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
         let chosen: Readonly<{ lane: Lane; index: number; turn: number }> | null = null;
         for (const lane of lanes) {
           if (lane.stopped) continue;
+          // Spec §2.3 (O6): the debate's start guard is asked before any of its waiting calls may start.
+          holdBackRefused(lane);
           const index = lane.waiting.findIndex((entry) => admissible(lane, entry.ticket));
           if (index < 0) continue;
           const turn = turnOf(lane, lane.waiting[index]!.ticket);
@@ -233,6 +284,8 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
       runningByModel: new Map(),
       waiting: [],
       drainWaiters: [],
+      guard: null,
+      heldBack: 0,
       peakInFlight: 0,
       peakByModel: new Map(),
       waitedMsByModel: new Map(),
@@ -278,6 +331,10 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
         });
       },
       stop,
+      guardStarts(guard: CallStartGuard | null): void {
+        lane.guard = guard;
+        pump();
+      },
       drained(): Promise<void> {
         if (lane.running === 0) return Promise.resolve();
         return new Promise<void>((resolve) => { lane.drainWaiters.push(resolve); });
@@ -289,6 +346,8 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
       },
       stats(): LaneStats {
         return Object.freeze({
+          running: lane.running,
+          heldBack: lane.heldBack,
           peakInFlight: lane.peakInFlight,
           peakByModel: frozenRecord(lane.peakByModel),
           waitedMsByModel: frozenRecord(lane.waitedMsByModel),

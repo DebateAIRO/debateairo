@@ -90,14 +90,19 @@ export function targetCallSubjects(
  * through on the old health: an answer marks the gate healthy (all its slots), a failure the gate proved unsent
  * (PROVIDER_NOT_REACHED, PROVIDER_ERROR_UNBILLED; `providerCallGateUnsent`) marks it unhealthy (one call in flight,
  * spec §3.4). Results and errors pass through unchanged.
+ *
+ * `onFailed` (spec §2.3, Task 12) is told of every failed call, also BEFORE its slot is freed: a stop that failure
+ * raises is then known to the lane's start guard when the freed slot would start the next waiting call. It never
+ * changes the error.
  */
 export function laneGateway(input: Readonly<{
   lane: DebateCallLane;
   scheduler: CallScheduler;
   subject: CallSubject;
   provider: ProviderGateway;
+  onFailed?: (error: unknown) => void;
 }>): ProviderGateway {
-  const { lane, scheduler, subject, provider } = input;
+  const { lane, scheduler, subject, provider, onFailed } = input;
   const gate = subject.gate;
   return Object.freeze({
     call(request) {
@@ -108,6 +113,7 @@ export function laneGateway(input: Readonly<{
           return result;
         } catch (error) {
           if (gate !== null && providerCallGateUnsent(error)) scheduler.markGateUnhealthy(gate);
+          try { onFailed?.(error); } catch { /* the hook never changes the call's error */ }
           throw error;
         }
       });

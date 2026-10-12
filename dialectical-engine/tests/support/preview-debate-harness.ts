@@ -66,7 +66,7 @@ import {
 } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS, DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
-import { createCallScheduler } from "../../apps/runner/src/call-scheduler.js";
+import { createCallScheduler, type CallScheduler, type DebateCallLane } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import {
@@ -296,9 +296,19 @@ export function previewDebateHarness(input: Readonly<{
     /** Every hold and halt record the run made (COOLDOWN_HOLD / COOLDOWN_RETRY / *_HALTED), in the order made. */
     const holdRecords: Parameters<NonNullable<WalkingSkeletonSettings["holdRecorder"]>["record"]>[0][] = [];
     const gatewayInFlight = createRunInFlight();
-    const callScheduler = createCallScheduler({
+    const scheduler = createCallScheduler({
       policy: effectiveCallConcurrency(options.callConcurrency === undefined
         ? { state: "ABSENT" } : { state: "SET", policy: options.callConcurrency })
+    });
+    /** Every debate lane the runner opened, in opening order (Task 12: a test reads a stopped run's lane stats). */
+    const lanes: DebateCallLane[] = [];
+    const callScheduler: CallScheduler = Object.freeze({
+      ...scheduler,
+      openLane: (debateId: string) => {
+        const lane = scheduler.openLane(debateId);
+        lanes.push(lane);
+        return lane;
+      }
     });
     const bootReads = gates.remainingReads.length;
     await applyPreviewGateCapacities({
@@ -374,7 +384,7 @@ export function previewDebateHarness(input: Readonly<{
         wait: async (cooldownMs) => { holdWaits.push(cooldownMs); }
       }
     });
-    return { runner, topology, probeSleeps, callSleeps, holdWaits, holdRecords, callScheduler };
+    return { runner, topology, probeSleeps, callSleeps, holdWaits, holdRecords, callScheduler, lanes };
   }
 
   const panelMember = (providerRef: string, asOf: string): DiscoveredPanelMember => Object.freeze({

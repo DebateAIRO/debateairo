@@ -47,8 +47,8 @@ function recordingLane(): DebateCallLane & { tickets: CallTicket[] } {
   return Object.assign({
     callsAtOnce: 1,
     run: <T>(ticket: CallTicket, call: () => Promise<T>) => { tickets.push(ticket); return call(); },
-    stop: () => undefined, drained: async () => undefined, close: () => undefined,
-    stats: () => ({ peakInFlight: 0, peakByModel: {}, waitedMsByModel: {}, calls: 0 })
+    stop: () => undefined, guardStarts: () => undefined, drained: async () => undefined, close: () => undefined,
+    stats: () => ({ running: 0, heldBack: 0, peakInFlight: 0, peakByModel: {}, waitedMsByModel: {}, calls: 0 })
   }, { tickets });
 }
 
@@ -217,6 +217,48 @@ describe("laneGateway: the call runs in its caller's async context", () => {
     first.resolve(answer("ok"));
     await expect(a).resolves.toBeDefined();
     expect(sent).toEqual(["JUDGE:1"]);
+  });
+
+  /**
+   * Task 12 (spec §2.3, O6): a failed call is told to `onFailed` BEFORE its slot frees, so a stop that failure raises
+   * is known to the lane's start guard when the freed slot would start the next waiting call — the call waiting
+   * behind it is held back, never sent. The error still leaves unchanged.
+   */
+  it("tells onFailed of a failed call before its slot frees, so the start guard already knows", async () => {
+    const scheduler = createCallScheduler({ policy: SERIAL });
+    const lane = scheduler.openLane("debate-1");
+    const refusal = new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "spent");
+    const first = deferred<ProviderCallResult>();
+    const sent: string[] = [];
+    let stopSeen = false;
+    lane.guardStarts((ticket) => !(stopSeen && ticket.priority === "AUTHOR"));
+    const gateway = laneGateway({
+      lane, scheduler, subject: { model: "m", vendor: "default", gate: null },
+      provider: { call: (req) => { sent.push(req.callSiteKey); return req.callSiteKey === "JUDGE:1" ? first.promise : Promise.resolve(answer("ok")); } },
+      onFailed: (error) => { if (error === refusal) stopSeen = true; }
+    });
+    const a = gateway.call(request("JUDGE:1"));
+    const b = gateway.call(request("JUDGE:2"));
+    const c = gateway.call(request("PANEL:JUDGE:0:ref:b"));
+    first.reject(refusal);
+    await expect(a).rejects.toBe(refusal);
+    await expect(b).rejects.toMatchObject({ code: "CALL_LANE_HELD_BACK" });
+    await expect(c).resolves.toBeDefined();
+    expect(sent).toEqual(["JUDGE:1", "PANEL:JUDGE:0:ref:b"]);
+    lane.close();
+  });
+
+  it("an onFailed that throws never changes the call's error", async () => {
+    const scheduler = createCallScheduler({ policy: SERIAL });
+    const lane = scheduler.openLane("debate-1");
+    const boom = new Error("vendor");
+    const gateway = laneGateway({
+      lane, scheduler, subject: { model: "m", vendor: "default", gate: null },
+      provider: { call: () => Promise.reject(boom) },
+      onFailed: () => { throw new Error("hook"); }
+    });
+    await expect(gateway.call(request("JUDGE:1"))).rejects.toBe(boom);
+    lane.close();
   });
 });
 

@@ -202,7 +202,7 @@ import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-s
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunInFlight } from "./run-in-flight.js";
-import { CALL_LANE_STOPPED, type CallScheduler } from "./call-scheduler.js";
+import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallTicket } from "./call-scheduler.js";
 import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
 import {
@@ -423,14 +423,30 @@ export type ReviewFailureOutcome =
  * stopped the lane; the refusal leaves as it arrived, so the runner throws that
  * real failure instead of this node's review (`throwBodyFailure` sets the
  * refusal aside).
+ *
+ * Parallel calls (Task 12): nor is a review the lane HELD BACK at dispatch
+ * because the arguing had stopped while it waited (CALL_LANE_HELD_BACK). It
+ * leaves as it arrived, and the chain that asked for it simply ends there
+ * (`runChain`): a review never asked, never a failure.
  */
 const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
   "CALL_BUDGET_EXHAUSTED",
   "PRODUCER_GRADING_FORBIDDEN",
   "RUNNER_CLAIM_LOST",
   "RUNNER_TIME_LIMIT_REACHED",
-  CALL_LANE_STOPPED
+  CALL_LANE_STOPPED,
+  CALL_LANE_HELD_BACK
 ]);
+
+/** Parallel calls (Task 12): a call the debate's lane held back at dispatch — never sent (spec §2.3, O6). */
+function callHeldBack(error: unknown): boolean {
+  return error instanceof TypedDomainError && error.code === CALL_LANE_HELD_BACK;
+}
+
+/** L4-F9: the keep-alive's refusal — the debate must make no further model call (its claim taken, or its time up). */
+function keepAliveStop(error: unknown): boolean {
+  return error instanceof TypedDomainError && (error.code === "RUNNER_CLAIM_LOST" || error.code === "RUNNER_TIME_LIMIT_REACHED");
+}
 
 export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
   const stop = expansionPhaseStop(error);
@@ -4691,6 +4707,11 @@ export class WalkingSkeletonRunner {
     const callScheduler = this.settings.callScheduler;
     const callLane = callScheduler === undefined ? undefined : callScheduler.openLane(claimedRunId);
     const callSubjects = this.settings.callSubjects;
+    /**
+     * Spec §2.3 (Task 12): told of every failed call of this debate's lane BEFORE its slot frees (`laneGateway`'s
+     * `onFailed`); set only while the arguing runs together (`argueTogether`), never on today's serial engine.
+     */
+    let laneCallFailed: ((error: unknown) => void) | null = null;
     /** A maker's gateway through this debate's lane; the gateway itself without a scheduler. */
     const throughCallLane = (providerRef: string, provider: ProviderGateway): ProviderGateway =>
       callScheduler === undefined || callLane === undefined ? provider : laneGateway({
@@ -4699,7 +4720,8 @@ export class WalkingSkeletonRunner {
         subject: callSubjects === undefined
           ? Object.freeze({ model: providerRef, vendor: "default", gate: null })
           : callSubjects.subjectOf(providerRef),
-        provider
+        provider,
+        onFailed: (error) => { laneCallFailed?.(error); }
       });
     try {
     return await runKeepAliveScope.run(keepAlive, async () => {
@@ -5038,7 +5060,8 @@ export class WalkingSkeletonRunner {
         try {
           return await provider.call(request);
         } catch (error) {
-          afterFailedCall?.();
+          // A call the lane held back was never sent: it cannot have made a member sit out (Task 12).
+          if (!callHeldBack(error)) afterFailedCall?.();
           throw error;
         }
       }
@@ -6460,15 +6483,24 @@ export class WalkingSkeletonRunner {
     /** Spec §2.3 (O6): no chain starts an AUTHOR or a REVIEW call once this is true. */
     const arguingStopped = (): boolean => bodyFailed || runBodyBudgetStop !== null || tooFewLeftToArgue();
     /**
+     * Spec §2.3 — THE KEEP-ALIVE STOP (claim lost, time limit) met by a chain: settled with that refusal, once. The
+     * arguing (`argueTogether`) then ends at once, without awaiting the calls in flight.
+     */
+    const keepAliveStopped = settable<unknown>();
+    /**
      * Runs one chain to its end. The returned promise never rejects: a failure is kept (above), and `release` then
      * gives up whatever recorder positions the chain did not commit. `stage.rank` moves on as the chain does.
+     * Task 12: a call the lane HELD BACK (the arguing had stopped while it waited) ends the chain as a stop does — its
+     * positions given up, never a failure; a keep-alive refusal is a failure, and is also told to `keepAliveStopped`.
      */
     const runChain = (body: (stage: { rank: ChainRank }) => Promise<void>, rank: ChainRank, release: () => void): Promise<void> => {
       const stage = { rank };
       return chainStageScope.run(stage, () => body(stage)).catch((error: unknown) => {
+        if (callHeldBack(error)) return;
         bodyFailed = true;
         bodyFailures.push(Object.freeze({ rank: stage.rank, error }));
         callLane?.stop();
+        if (keepAliveStop(error)) keepAliveStopped.resolve(error);
       }).finally(release);
     };
     /** Once every chain has settled: the first failure in today's order. A call the stopped lane refused is never the cause. */
@@ -7657,15 +7689,48 @@ export class WalkingSkeletonRunner {
         const position = effectiveMakerCount + expansionPlan.length + exchangeIndex;
         chains.push(runChain((stage) => crossChain(exchangeIndex, stage), authorRank(position), releaseAt(position)));
       });
-      await Promise.allSettled(chains);
-      await Promise.allSettled([everyBoundaryDecided, earlierBatches]);
-      await nodeRecorder.done();
-      await reviewChoices.done();
-      await reviewRecorder.done();
+      const allSettled = (async () => {
+        await Promise.allSettled(chains);
+        await Promise.allSettled([everyBoundaryDecided, earlierBatches]);
+        await nodeRecorder.done();
+        await reviewChoices.done();
+        await reviewRecorder.done();
+      })();
+      // Spec §2.3 — the keep-alive stop: the debate ends NOW, with today's code, and the calls in flight are never
+      // awaited (their receipts still land; the lane was stopped, so nothing new is sent, and nothing more is saved:
+      // the body has failed). Every promise left behind is handled, so none can reject unhandled. Any other way, every
+      // chain is awaited and the first failure in today's order is thrown, as before.
+      const keepAliveRefusal = await Promise.race([allSettled.then(() => null), keepAliveStopped.promise]);
+      if (keepAliveRefusal !== null) {
+        for (const abandoned of [allSettled, ...chains, everyBoundaryDecided, earlierBatches]) abandoned.catch(() => undefined);
+        throw keepAliveRefusal;
+      }
       throwBodyFailure();
     };
     if (callsRunTogether) {
-      await argueTogether();
+      /**
+       * Spec §2.3 (O6; Task 10 review carry, ruled) — NO AUTHOR OR REVIEW CALL STARTS ONCE THE ARGUING HAS STOPPED, not
+       * even one already waiting in the lane: the lane asks this guard at the moment it would start a call, and holds a
+       * refused one back (CALL_LANE_HELD_BACK: never sent; its chain ends as a stopped chain ends). Panel calls always
+       * start — the panel of a node whose author call was sent finishes that paid step. A spend refusal is known to the
+       * guard from the moment it leaves the lane, before its slot frees (`laneCallFailed`): with the cheaper-model
+       * setting off (B9) every such refusal stops the arguing once its chain hears it, so nothing waiting behind it
+       * slips out first; with the setting on, a refusal may instead move to a cheaper maker, so only the recorded stop
+       * counts. Only here: today's serial engine (one call at a time) never has a guard.
+       */
+      let spendRefusalSeen = false;
+      laneCallFailed = this.settings.bodyCostFallback === true ? null : (error) => {
+        if (expansionPhaseStop(error) !== null) spendRefusalSeen = true;
+      };
+      callLane?.guardStarts((ticket: CallTicket) =>
+        (ticket.priority !== "AUTHOR" && ticket.priority !== "REVIEW") || !(spendRefusalSeen || arguingStopped()));
+      try {
+        await argueTogether();
+      } finally {
+        // The answer's own calls follow: they are never held back.
+        callLane?.guardStarts(null);
+        laneCallFailed = null;
+      }
     } else {
       let activeExpansionRound = expansionPlan[0]?.round ?? null;
       for (const [legIndex, leg] of expansionPlan.entries()) {
@@ -9601,6 +9666,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "BUDGET_SKIP_AFFECTED_NODES_REQUIRED",
   "CALIBRATION_STRATEGY_INVALID",
   "CALL_BUDGET_EXHAUSTED",
+  "CALL_LANE_HELD_BACK",
   "CALL_LANE_STOPPED",
   "CALL_SITE_SEAT_ALREADY_MARKED",
   "CALL_SITE_SEAT_MARKER_REQUIRED",

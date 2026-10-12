@@ -1076,8 +1076,8 @@ describe("practice debate: --call-concurrency and the parallel stats", () => {
       policy: parsePracticeCallConcurrency("12/3/default=50,deepinfra=150,anthropic=50"), source: "FLAG", registerRow: null,
       gateSlotsAtStart: { deepinfra: { slots: 6, read: true }, anthropic: { slots: 1, read: false } },
       lanes: [
-        { peakInFlight: 5, peakByModel: { glm: 3, haiku: 1 }, waitedMsByModel: { glm: 1200.4, haiku: 0.2 }, calls: 40 },
-        { peakInFlight: 2, peakByModel: { glm: 1, qwen: 2 }, waitedMsByModel: { glm: 100.3, qwen: 7.6 }, calls: 3 }
+        { running: 0, heldBack: 0, peakInFlight: 5, peakByModel: { glm: 3, haiku: 1 }, waitedMsByModel: { glm: 1200.4, haiku: 0.2 }, calls: 40 },
+        { running: 0, heldBack: 0, peakInFlight: 2, peakByModel: { glm: 1, qwen: 2 }, waitedMsByModel: { glm: 100.3, qwen: 7.6 }, calls: 3 }
       ],
       scheduler: { peakByGate: { deepinfra: 6, anthropic: 1 }, peakByModel: { glm: 3 } },
       busyProbesByModel: { glm: 1 }
@@ -1098,7 +1098,7 @@ describe("practice debate: --call-concurrency and the parallel stats", () => {
     const parallel = practiceParallelBlock({
       policy: parsePracticeCallConcurrency("12/3/default=50,deepinfra=150,anthropic=50"), source: "FLAG", registerRow: null,
       gateSlotsAtStart: { deepinfra: { slots: 6, read: true }, anthropic: { slots: 1, read: false } },
-      lanes: [{ peakInFlight: 5, peakByModel: { glm: 3 }, waitedMsByModel: { glm: 12_400 }, calls: 40 }],
+      lanes: [{ running: 0, heldBack: 0, peakInFlight: 5, peakByModel: { glm: 3 }, waitedMsByModel: { glm: 12_400 }, calls: 40 }],
       scheduler: { peakByGate: { deepinfra: 6, anthropic: 1 }, peakByModel: { glm: 3 } },
       busyProbesByModel: { glm: 2 }
     });
