@@ -416,12 +416,19 @@ export type ReviewFailureOutcome =
  *
  * L4-F9 repair: a debate that must stop (its claim taken, or its time limit
  * reached) is not one unavailable review; the stop leaves as it arrived.
+ *
+ * Parallel calls (Task 10, fix round 1): neither is a review the debate's
+ * STOPPED lane refused unsent (CALL_LANE_STOPPED). Another chain failed and
+ * stopped the lane; the refusal leaves as it arrived, so the runner throws that
+ * real failure instead of this node's review (`throwBodyFailure` sets the
+ * refusal aside).
  */
 const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
   "CALL_BUDGET_EXHAUSTED",
   "PRODUCER_GRADING_FORBIDDEN",
   "RUNNER_CLAIM_LOST",
-  "RUNNER_TIME_LIMIT_REACHED"
+  "RUNNER_TIME_LIMIT_REACHED",
+  CALL_LANE_STOPPED
 ]);
 
 export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
