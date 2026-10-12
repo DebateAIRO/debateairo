@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { PROMPT_FRAME_VERSION, buildFramedPrompt, promptContractFingerprintText } from "@debateai/providers";
 import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "../../packages/judgement/src/prompts.js";
-import { SYNTHESIZER_PROMPT_CONTRACT, SYNTHESIZER_V1_ANSWER_FORM, SYNTHESIZER_V1_CONTRACT_ID } from "@debateai/serve";
-import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
+import { SYNTHESIZER_PROMPT_CONTRACT, SYNTHESIZER_V1_PROMPT_CONTRACT, SYNTHESIZER_V2_PROMPT_CONTRACT } from "@debateai/serve";
+import { EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import { BLIND_JUDGE_GRADE_CONTRACT_HASH, DOMAIN_TAGGER_CONTRACT_HASH } from "../../packages/evaluator/src/index.js";
 import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
 import { buildStorytellerContract, buildStoryCheckerContract, loadStoryPack, resolveStoryPackDir, storyContractHash } from "@debateai/story";
@@ -49,8 +49,11 @@ describe("S01 seals the content rule", () => {
   // hashes to the PLAN's exact post-change hashes, with no unsealed family left behind.
   it.each([
     ["judgeContractHash", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT), "3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69", "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365"],
-    ["composerContractHash serve.synthesizer.v1", () => sha256(promptContractFingerprintText({ ...SYNTHESIZER_PROMPT_CONTRACT, contractId: SYNTHESIZER_V1_CONTRACT_ID, answerForm: SYNTHESIZER_V1_ANSWER_FORM })), "9482cbb7bc9251d121f26cccf7141022caab4521b08b2a67f09ac07381443888", "d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866"],
-    ["conformanceContractHash", () => sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT)), "80753d1a25f5c771a2fecb7f80c4f6f687dfa78f2ca410f572fb1acf39d8b447", "f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc"],
+    // Practice debate 3 (2026-10-12): the v1 and evaluator-v1 rows now read the exported HISTORY contracts
+    // (`SYNTHESIZER_V1_PROMPT_CONTRACT`, `EVALUATOR_V1_PROMPT_CONTRACT`): the current contracts carry the v3/v2
+    // instruction, and spreading them would hash a contract that never shipped. The sealed values are unchanged.
+    ["composerContractHash serve.synthesizer.v1", () => sha256(promptContractFingerprintText(SYNTHESIZER_V1_PROMPT_CONTRACT)), "9482cbb7bc9251d121f26cccf7141022caab4521b08b2a67f09ac07381443888", "d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866"],
+    ["conformanceContractHash serve.evaluator.v1", () => sha256(promptContractFingerprintText(EVALUATOR_V1_PROMPT_CONTRACT)), "80753d1a25f5c771a2fecb7f80c4f6f687dfa78f2ca410f572fb1acf39d8b447", "f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc"],
     ["evaluator.blind-judge-grade.v1", () => BLIND_JUDGE_GRADE_CONTRACT_HASH, "8aeaf308a59c5c9d77349c2888cccfda2f9d6589eba991cad85ef3fc03744e31", "b23685cf8ac31e68f151573b83f1e807af73fe93098d026f5e23ca70f83fabe8"],
     ["evaluator.domain-tagger.v1", () => DOMAIN_TAGGER_CONTRACT_HASH, "02fc1d4e36df8d137a1673c85b5c8d03c3379b52c00bee627f84497d65ffd7f5", "0dfa57266bb57d90481e60e9d184fed8fd61eca6fab70c93a765d79e7ec3d509"],
     ["evaluator.consumer-aggregate.v1", () => sha256(promptContractFingerprintText(CONSUMER_AGGREGATE_PROMPT_CONTRACT)), "82bf46b39a0eca190425c4e8d9d01eb100ab61c39145d0af8551de1a65d70ac4", "33ce6f2ec2ff87f03cd5f4e76123e8d61f23235d88d32808a21adbd53a85f0ab"],
@@ -62,14 +65,28 @@ describe("S01 seals the content rule", () => {
     expect(now).not.toBe(base);
     expect(now).toBe(after);
   });
-  // serve.synthesizer.v2 supersedes v1 (served-number reference format, 2026-10-09): the
-  // v1 seal above stays as history; the composer row of every register version published
-  // from this code carries the v2 seal below.
-  it("keeps the current serve.synthesizer.v2 composer seal distinct from the preserved v1 seal", () => {
-    const now = sha256(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT));
-    expect(SYNTHESIZER_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v2");
-    expect(now).not.toBe("d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866");
-    expect(now).toBe("340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70");
+  // serve.synthesizer.v2 superseded v1 (served-number reference format, 2026-10-09); its seal stays
+  // as history: the preview's register versions 10 and 11 carry it.
+  it("keeps the serve.synthesizer.v2 composer seal as history, distinct from the preserved v1 seal", () => {
+    const v2 = sha256(promptContractFingerprintText(SYNTHESIZER_V2_PROMPT_CONTRACT));
+    expect(SYNTHESIZER_V2_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v2");
+    expect(v2).not.toBe("d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866");
+    expect(v2).toBe("340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70");
+  });
+  // Practice debate 3 (2026-10-12, owner-approved wording): serve.synthesizer.v3 supersedes v2 and
+  // serve.evaluator.v2 supersedes v1. The composer and conformance rows of every register version
+  // published from this code (the preview's version 12 first) carry the two seals below.
+  it("seals the current serve.synthesizer.v3 and serve.evaluator.v2, each distinct from the version it supersedes", () => {
+    const composer = sha256(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT));
+    const conformance = sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT));
+    expect(SYNTHESIZER_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v3");
+    expect(EVALUATOR_PROMPT_CONTRACT.contractId).toBe("serve.evaluator.v2");
+    expect(composer).not.toBe("340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70");
+    expect(conformance).not.toBe("f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc");
+    expect([composer, conformance]).toEqual([
+      "4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f",
+      "660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f"
+    ]);
   });
   it("keeps the reviewed compact storyteller v2 distinct from the preserved V1 seal", () => {
     expect(storyContractHash({ ...buildStorytellerContract(pack), contractId: STORYTELLER_V2_CONTRACT_ID, answerForm: STORYTELLER_V2_ANSWER_FORM }))

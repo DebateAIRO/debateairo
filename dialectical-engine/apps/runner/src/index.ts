@@ -39,6 +39,7 @@ import {
   structuredParseRepair,
   runJudgePanel,
   selectReducedJudgement,
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
   type ClaimType,
   type CompositionMapRegisterRow,
   type JudgeAssessment,
@@ -93,6 +94,7 @@ import {
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
+  promptContractFingerprintText,
   schemaFailureLocator,
   type FramedPrompt,
   type PromptContract,
@@ -141,6 +143,7 @@ import {
   toSynthesisPromptMaterial,
   SYNTHESIZER_PROMPT_CONTRACT,
   EVALUATOR_INSTRUCTIONS,
+  EVALUATOR_V1_INSTRUCTIONS,
   type BandCeilingRegisterRow,
   type ComposedSegment,
   type CompositionBudgetResolution,
@@ -592,16 +595,89 @@ export const EVALUATOR_CONTRACT_TEXT =
   "Return only JSON {satisfied,objection,criteria} where criteria is {fairness_to_losers,statement_label_agreement,no_overstatement,restatement,citation_tracing}, each a boolean. Set satisfied true only when every criterion is true. When satisfied is false, objection must state the objection in full; when it is true, objection must be null.";
 
 /**
- * V-11 (RUN1): the EVALUATOR's prompt contract. `EVALUATOR_CONTRACT_TEXT` is
- * the answer form — code's half — and `EVALUATOR_INSTRUCTIONS` (which already
- * shipped, inside the payload's `instructions` member) is the owners' slot.
- * Neither string is reworded; what moved is which compartment each sits in.
+ * V-11 (RUN1): the EVALUATOR's prompt contract as it first shipped, kept as
+ * history byte for byte. `EVALUATOR_CONTRACT_TEXT` is the answer form — code's
+ * half — and `EVALUATOR_V1_INSTRUCTIONS` (which already shipped, inside the
+ * payload's `instructions` member) is the owners' slot. Its fingerprint is the
+ * `conformanceContractHash` of every register version sealed before v2 (the
+ * preview's version 11 among them).
+ */
+export const EVALUATOR_V1_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "serve.evaluator.v1",
+  instruction: EVALUATOR_V1_INSTRUCTIONS,
+  answerForm: EVALUATOR_CONTRACT_TEXT
+});
+
+/**
+ * PRACTICE DEBATE 3 (2026-10-12): `serve.evaluator.v2`, what the runner sends.
+ * Only the owners' instruction slot changed (owner approved 2026-10-12,
+ * `EVALUATOR_INSTRUCTIONS`): the checker now also grades the reader's rule the
+ * writer's `serve.synthesizer.v3` instruction states. The answer form is the
+ * same sealed `EVALUATOR_CONTRACT_TEXT`, so the verdict schema below is
+ * unchanged. A new instruction is a new contract id, never an edit, and a new
+ * `conformanceContractHash` the register must carry before the runner starts
+ * (`assertRegisterPromptContractHashes`).
  */
 export const EVALUATOR_PROMPT_CONTRACT: PromptContract = Object.freeze({
-  contractId: "serve.evaluator.v1",
+  contractId: "serve.evaluator.v2",
   instruction: EVALUATOR_INSTRUCTIONS,
   answerForm: EVALUATOR_CONTRACT_TEXT
 });
+
+/**
+ * The fingerprints of the three prompt contracts this code SENDS, derived
+ * exactly as the register's builder derives its rows
+ * (`computeDevelopmentContractRows` in `./dev-deployment-register.ts`; that
+ * builder keeps its own three lines on purpose, so
+ * `tests/unit/f-sealedrows-a-dataflow.test.ts` can prove the row follows the
+ * exported contract it imports).
+ */
+export function codePromptContractHashes(): Readonly<{ judge: string; composer: string; conformance: string }> {
+  const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
+  return Object.freeze({
+    judge: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
+    composer: digest(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)),
+    conformance: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
+  });
+}
+
+/** The register row each prompt fingerprint is sealed in, and the contract it names. */
+const REGISTER_PROMPT_CONTRACT_ROWS = Object.freeze([
+  { key: "judge", rowKey: "judgeContractHash" },
+  { key: "composer", rowKey: "composerContractHash" },
+  { key: "conformance", rowKey: "conformanceContractHash" }
+] as const);
+
+/**
+ * PRACTICE DEBATE 3 (2026-10-12) — A PROMPT FINGERPRINT MISMATCH IS NEVER SILENT.
+ * The runner records every judge, answer-writer and answer-checker call under
+ * the fingerprint the REGISTER holds (`judgeContractHash`, `composerContractHash`,
+ * `conformanceContractHash`), never under the one the code computes. Shipping a
+ * new sealed prompt without a new register version therefore used to log the
+ * new prompt's calls under the old prompt's fingerprint, with nothing red
+ * anywhere. The runner's boot (main.ts) and the practice composition now call
+ * this right after reading the register: a register that does not carry the
+ * fingerprint of a prompt this code sends refuses the start, naming the row.
+ *
+ * Only the three PROMPT fingerprints are compared. `propagationContractHash`
+ * and `serveContractHash` are digests of whole source files, which move with
+ * any edit of those files; refusing on them would refuse every code-only
+ * release, which is a separate owner decision.
+ */
+export function assertRegisterPromptContractHashes(
+  registerHashes: Readonly<{ judge: string; composer: string; conformance: string }>,
+  registerVersion: string | number | bigint
+): void {
+  const code = codePromptContractHashes();
+  const differing = REGISTER_PROMPT_CONTRACT_ROWS.filter(({ key }) => registerHashes[key] !== code[key]);
+  if (differing.length === 0) return;
+  throw new TypedDomainError(
+    "REGISTER_PROMPT_CONTRACT_HASH_MISMATCH",
+    `Register version ${String(registerVersion)} does not carry the prompt fingerprints this code sends: `
+    + differing.map(({ key, rowKey }) => `${rowKey} is ${registerHashes[key]}, the code's is ${code[key]}`).join("; ")
+    + ". Publish a register version from this code and pin it in REGISTER_VERSION before starting the runner."
+  );
+}
 
 function promptContractInArgumentLanguage(
   contract: PromptContract,

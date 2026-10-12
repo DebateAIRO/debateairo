@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { buildAcceptanceRegisterRows } from "../../acceptance/seed-register.js";
 import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
-import { EVALUATOR_CONTRACT_TEXT, EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
+import { EVALUATOR_CONTRACT_TEXT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
 
@@ -71,8 +71,14 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
     expect(sha256(EVALUATOR_CONTRACT_TEXT))
       .toBe("2364b1b548c0e5a4f758ef325ed0234764aec9f88bc340a1f8c958bd3cc69b73");
     expect((EVALUATOR_PROMPT_CONTRACT as PromptContract).answerForm).toBe(EVALUATOR_CONTRACT_TEXT);
-    expect(sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT as PromptContract)))
+    // Practice debate 3 (2026-10-12): serve.evaluator.v2 changed only the owners' instruction slot
+    // (owner-approved wording), so the answer form above is still the sealed 2026-09-04 text and the
+    // fingerprint moves again, to a NEW sealed value; serve.evaluator.v1's f205421c…9dcc stays history
+    // (register versions sealed before v2, the preview's 11 among them, carry it).
+    expect(sha256(promptContractFingerprintText(EVALUATOR_V1_PROMPT_CONTRACT as PromptContract)))
       .toBe("f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc");
+    expect(sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT as PromptContract)))
+      .toBe("660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f");
   });
 
   /**
@@ -95,9 +101,11 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
     expect(acceptance.judgeContractHash)
       .toBe("e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365");
     // serve.synthesizer.v2 (2026-10-09) superseded the v1 composer seal
-    // d96e7cc9…c866 (register versions sealed before it keep that value).
+    // d96e7cc9…c866, and serve.synthesizer.v3 (2026-10-12, practice debate 3)
+    // superseded v2's 340e11a6…8b70 (register versions sealed before each keep
+    // the value they carry).
     expect(acceptance.composerContractHash)
-      .toBe("340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70");
+      .toBe("4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f");
     // Both deployments seal the same values, or one of them is seeding a prompt
     // the other never sends.
     expect(development.judgeContractHash).toBe(acceptance.judgeContractHash);

@@ -5,6 +5,7 @@ import {
   SYNTHESIS_WORDING_REFUSALS,
   SYNTHESIZER_ANSWER_FORM,
   SYNTHESIZER_SERVED_NUMBER_SLOT,
+  SYNTHESIZER_V2_ANSWER_FORM,
   buildEvaluatorRequest,
   buildSynthesisDigest,
   buildSynthesizerRequest,
@@ -144,8 +145,12 @@ describe("P7 · the answer's prose prints no score and no code token from its ma
       "It is an UNSERVED-MAKER-POSITION.", "The node_refs show it.", "Its servedStrength is high."
     ]) expect(synthesisWordingRefusalsIn(text, index), text).toEqual(["COMPOSED_TEXT_USES_ENGINE_CODE"]);
     expect(index.engineTokens.has(SYNTHESIZER_SERVED_NUMBER_SLOT)).toBe(true);
-    // The slot the code token names is the one the sealed answer form names.
-    expect(SYNTHESIZER_ANSWER_FORM).toContain(`The available slot is ${SYNTHESIZER_SERVED_NUMBER_SLOT},`);
+    // The slot the code token names is the one the sealed v2 answer form named. serve.synthesizer.v3
+    // (practice debate 3) asks for no slot at all, and the check stays exactly as strict: the slot is
+    // still refused in an answer's text.
+    expect(SYNTHESIZER_V2_ANSWER_FORM).toContain(`The available slot is ${SYNTHESIZER_SERVED_NUMBER_SLOT},`);
+    expect(SYNTHESIZER_ANSWER_FORM).not.toContain(SYNTHESIZER_SERVED_NUMBER_SLOT);
+    expect(SYNTHESIZER_ANSWER_FORM).toContain("served_number_refs is always [].");
   });
 
   it("leaves ordinary words, other figures and percentages alone", () => {
