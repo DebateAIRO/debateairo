@@ -59,12 +59,13 @@ describe("map choose: a reply that meets every quota", () => {
 });
 
 describe("map choose: quotas over the whole chosen set", () => {
-  it("adds the top single-AI point, then the OPPOSITE_CASE point, each to the answer with the fewest points", () => {
+  it("adds the top single-AI point to the answer with the fewest points, then the OPPOSITE_CASE point to the opposite-case answer's for", () => {
     const out = mapFinishChoice({ ...BASE, reply: { answers: [
       chosen("a1", "Yes, with conditions.", ["kp04"], [], "a2"), chosen("a2", "No, keep it as it is.", [], [], "a1")] } });
     expect(marksOf(out.marks)).toEqual(["CHOOSE_QUOTA_FILLED:SINGLE_AI:kp02", "CHOOSE_QUOTA_FILLED:OPPOSITE_CASE:kp01"]);
-    expect(out.choice.answers[0]!.againstKeyPointIds).toEqual(["kp01"]);
-    expect(out.choice.answers[1]!.forKeyPointIds).toEqual(["kp02"]);
+    // Fix round 1 (controller ruling 2): a2 is the opposite-case answer, so kp01 goes into its for, not its against.
+    expect(out.choice.answers[0]!.againstKeyPointIds).toEqual([]);
+    expect(out.choice.answers[1]!.forKeyPointIds).toEqual(["kp02", "kp01"]);
   });
 });
 
@@ -154,7 +155,7 @@ describe("map choose: the single-AI quota counts every maker of a point (control
   });
 });
 
-describe("map choose: an empty map (null reply, no merged answers, no OPPOSITE_CASE list) pins today's behaviour", () => {
+describe("map choose: an empty map (null reply, no merged answers, no OPPOSITE_CASE list) documents a case callers prevent", () => {
   it("fills two template answers, the second the template of the first, each recorded as ANSWERS_FILLED", () => {
     const pointsOnly = items.filter((item) => item.kind === "POINT");
     const out = mapFinishChoice({ ...BASE, items: pointsOnly, mergedAnswers: [], reply: null });
@@ -163,5 +164,57 @@ describe("map choose: an empty map (null reply, no merged answers, no OPPOSITE_C
         "filled-2:The opposite of this answer: An answer different from the one above:true>filled-1"]);
     expect(marksOf(out.marks).filter((mark) => mark.startsWith("ANSWERS_FILLED"))).toEqual(["ANSWERS_FILLED:TEMPLATE", "ANSWERS_FILLED:TEMPLATE"]);
     expect(marksOf(out.marks)[0]).toBe("MAP_CHOOSE_FALLBACK:choose reply missing");
+  });
+});
+
+describe("map choose (fix round 1): the fallback fills answers before it deals points", () => {
+  it("gives the filled answer its share of points, and no point with room left goes to alsoRaised", () => {
+    const out = mapFinishChoice({ ...BASE, mergedAnswers: [mergedAnswers[0]!], reply: null });
+    expect(marksOf(out.marks)).toEqual(["MAP_CHOOSE_FALLBACK:choose reply missing", "ANSWERS_FILLED:OPPOSITE_CASE_LIST"]);
+    expect(out.choice.answers.map((entry) => `${entry.answerId}:${String(entry.filled)}`)).toEqual(["a1:false", "filled-2:true"]);
+    expect(out.choice.answers[0]!.againstKeyPointIds).toEqual(["kp01"]);
+    expect(out.choice.answers[0]!.forKeyPointIds).toEqual(["kp02"]);
+    expect(out.choice.answers[1]!.forKeyPointIds).toEqual(["kp04", "kp03"]);
+    expect(out.choice.alsoRaised).toEqual([]);
+  });
+});
+
+describe("map choose (fix round 1): an OPPOSITE_CASE point goes to the opposite-case answer's for", () => {
+  it("puts the missing OPPOSITE_CASE point in the for of the opposite-case answer, never in its against", () => {
+    const out = mapFinishChoice({ ...BASE, reply: { answers: [
+      chosen("a1", "Yes, with conditions.", ["kp04", "kp02"], [], null),
+      chosen("a2", "No, keep it as it is.", ["kp03"], [], null)] } });
+    expect(marksOf(out.marks)).toEqual(["CHOOSE_QUOTA_FILLED:OPPOSITE_CASE:kp01"]);
+    expect(out.choice.answers[1]!.forKeyPointIds).toEqual(["kp03", "kp01"]);
+    expect(out.choice.answers[1]!.againstKeyPointIds).toEqual([]);
+    expect(out.choice.answers[0]!.againstKeyPointIds).toEqual([]);
+  });
+
+  it("keeps the brief's rule when no answer is from the opposite case: fewest points, and against", () => {
+    const pointsOnly = items.filter((item) => item.kind === "POINT");
+    const out = mapFinishChoice({ ...BASE, items: pointsOnly, mergedAnswers: [mergedAnswers[0]!], reply: { answers: [
+      chosen("a1", "Yes, with conditions.", ["kp04"], [], null), chosen("a2", "Maybe.", [], [], null)] } });
+    expect(marksOf(out.marks)).toEqual(["CHOOSE_QUOTA_FILLED:SINGLE_AI:kp02", "CHOOSE_QUOTA_FILLED:OPPOSITE_CASE:kp01"]);
+    expect(out.choice.answers[0]!.againstKeyPointIds).toEqual(["kp01"]);
+    expect(out.choice.answers[1]!.forKeyPointIds).toEqual(["kp02"]);
+  });
+});
+
+describe("map choose (fix round 1): filled answer ids are unique", () => {
+  it("never reuses an id a reply answer already has, and no answer is its own strongest rival", () => {
+    const out = mapFinishChoice({ ...BASE, reply: { answers: [chosen("filled-2", "Yes, with conditions.", [], [], null)] } });
+    const answerIds = out.choice.answers.map((entry) => entry.answerId);
+    expect(answerIds).toEqual(["filled-2", "filled-3"]);
+    expect(new Set(answerIds).size).toBe(answerIds.length);
+    for (const entry of out.choice.answers) expect(entry.strongestRival).not.toBe(entry.answerId);
+  });
+});
+
+describe("map choose (fix round 1): answers are de-duplicated before the cut to maxAnswers", () => {
+  it("keeps Yes., No. and Maybe. when a repeated wording would otherwise take a place", () => {
+    const four = [chosen("a1", "Yes.", [], [], null), chosen("a2", "yes", [], [], null), chosen("a3", "No.", [], [], null), chosen("a4", "Maybe.", [], [], null)];
+    const out = mapFinishChoice({ ...BASE, maxAnswers: 3, reply: { answers: four } });
+    expect(out.choice.answers.map((entry) => entry.statement)).toEqual(["Yes.", "No.", "Maybe."]);
+    expect(marksOf(out.marks).filter((mark) => mark.startsWith("ANSWERS_FILLED"))).toEqual([]);
   });
 });
