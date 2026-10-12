@@ -68,8 +68,17 @@ export function mapAssignItemIds(drafts: readonly MapItemDraft[], seed: string,
   return Object.freeze(out);
 }
 
+/**
+ * Items by id. An id given twice is refused, never overwritten: a repeated id would make who-raised-what silently wrong
+ * (every merge, count and choice reads items through this map).
+ */
 export function mapItemsById(items: readonly MapItem[]): ReadonlyMap<string, MapItem> {
-  return new Map(items.map((item) => [item.itemId, item] as const));
+  const byId = new Map<string, MapItem>();
+  for (const item of items) {
+    if (byId.has(item.itemId)) throw new TypeError("MAP_ITEM_ID_DUPLICATE");
+    byId.set(item.itemId, item);
+  }
+  return byId;
 }
 
 /**
