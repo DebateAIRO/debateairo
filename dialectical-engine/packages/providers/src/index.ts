@@ -194,6 +194,12 @@ export interface ProviderCallRequest {
    */
   readonly thinkingLevel?: string;
   /**
+   * Spec 2026-10-12 §4.4 (the owner's `slip_fix`): the thinking level of this call's REPAIR POSTs (the patch follow-up
+   * and the full re-ask), when it differs from `thinkingLevel`. Resolved, like `thinkingLevel`, before anything is
+   * sent; absent = every POST of the call runs at `thinkingLevel` (today's behaviour on every lane).
+   */
+  readonly repairThinkingLevel?: string;
+  /**
    * Model scorecard §2.1 (ruling R5): the debate job this call does, in the
    * scorecard's seven-role vocabulary (`@debateai/kernel` DEBATE_ROLES).
    * RECORDED on every attempt's ledger row, never sent. Optional on the type
@@ -1717,6 +1723,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * loop, like the frame refusal: nothing was sent, so nothing is ledgered.
      */
     const thinking = resolveThinkingLevel(request.thinkingLevel, this.#options.thinking, request.providerRef);
+    // Spec 2026-10-12 §4.4: the repair POSTs' level, decided and refused here too, before the first byte leaves.
+    const repairThinking = request.repairThinkingLevel === undefined
+      ? thinking : resolveThinkingLevel(request.repairThinkingLevel, this.#options.thinking, request.providerRef);
     assertProviderCallRecord(request);
     const callFacts = Object.freeze({
       modelRole: request.modelRole ?? null,
@@ -1794,6 +1803,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
        * rejection (or the usual PROVIDER_CALL_FAILED), never the window code.
        */
       if (attempt > 1 && !fitsContextWindow(attemptPacket, attemptTokenCeiling)) break;
+      // Spec 2026-10-12 §4.4: the original packet (and its length retries) runs at the call's level; an adopted repair
+      // packet (the patch follow-up or the full re-ask, `repairForm` set, reset by a length retry) at the repair level.
+      const attemptThinking = repairForm === undefined ? thinking : repairThinking;
       // L4-F8: back off first, then re-check the ceiling, so the decision to spend an attempt is
       // taken on the freshest state rather than on state read up to a backoff ago.
       if (attempt > 1) await sleep(providerBackoffMs(attempt));
@@ -1813,7 +1825,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           anthropicBody = anthropicMessagesRequestBody({
             model: this.#options.model,
             maxTokens: attemptTokenCeiling,
-            thinkingLevel: thinking.sent,
+            thinkingLevel: attemptThinking.sent,
             messages: attemptPacket.messages
           });
         } catch (error) {
@@ -1827,7 +1839,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         : JSON.stringify({
         model: this.#options.model,
         max_tokens: attemptTokenCeiling,
-        ...thinking.wire,
+        ...attemptThinking.wire,
         ...previewSamplingMembers(this.#options.endpoint, this.#options.model),
         messages: attemptPacket.messages,
         ...(responseFormat===undefined?{}:{response_format:responseFormat})
@@ -1855,7 +1867,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       let ledgerRecorded = false;
       // Model scorecard §2.2: the level this attempt ran at, as far as it got. A
       // failure before any body arrived records the level that was sent.
-      let attemptThinkingLevel: string = thinking.sent;
+      let attemptThinkingLevel: string = attemptThinking.sent;
       // Pre-flight fix F13: set when the prompt could not be recorded, so the
       // catch below lets that failure leave unsent, unledgered and unretried.
       let promptRecordFailed = false;
@@ -1954,7 +1966,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         // tokens are read leniently off the RAW block, so the strict
         // four-counter parse above (and every test pinning it) is untouched.
         const echoedLevel = echoedThinkingLevel(decoded);
-        const thinkingLevelUsed = echoedLevel ?? thinking.sent;
+        const thinkingLevelUsed = echoedLevel ?? attemptThinking.sent;
         const reasoningTokens = reportedReasoningTokens(rawUsage);
         attemptThinkingLevel = thinkingLevelUsed;
         const finishReason = observedFinishReason(decoded);
@@ -2115,13 +2127,13 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          *    another level) is CHANGED. A vendor never echoes, so there only a
          *    different echo is a change.
          */
-        if (thinking.sent !== THINKING_LEVEL_DEFAULT_ONLY
-          && (thinking.echoRequired
-            ? echoedLevel !== thinking.sent
-            : echoedLevel !== null && echoedLevel !== thinking.sent)) {
+        if (attemptThinking.sent !== THINKING_LEVEL_DEFAULT_ONLY
+          && (attemptThinking.echoRequired
+            ? echoedLevel !== attemptThinking.sent
+            : echoedLevel !== null && echoedLevel !== attemptThinking.sent)) {
           throw new TypedDomainError(
             PROVIDER_THINKING_LEVEL_CHANGED,
-            `${request.providerRef} was asked for thinking level ${thinking.sent} and did not report running at it`
+            `${request.providerRef} was asked for thinking level ${attemptThinking.sent} and did not report running at it`
           );
         }
         assertBoundedProviderResponse(decoded);
@@ -2236,7 +2248,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             const plan = !patchTried && attemptPacket === request.packet && content !== null && attempt < callAttempts()
               ? planPatchFollowUp({ content, reply: replyFacts, parseStatus: contentRejection.parseStatus, parseError: contentRejection.parseError })
               : null;
-            const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, thinking.sent, fitsContextWindow);
+            const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, repairThinking.sent, fitsContextWindow);
             if (plan !== null && patch !== null) {
               attemptPacket = patch;
               patchPlan = plan;

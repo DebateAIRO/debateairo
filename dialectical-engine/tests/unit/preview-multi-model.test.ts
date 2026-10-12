@@ -99,7 +99,7 @@ describe("the reviewed rows equal the shared parity file (contract A §1, §3)",
     for (const row of PREVIEW_MODEL_ROWS) {
       expect(row.outputBound).toBe(32_768);
       // What the gateway asks for is clamped to the cap, and a health check asks for 8,192.
-      expect(previewTargetGatewayControls(parse(MULTI), row)).toEqual({ maxOutputTokens: 32_768 });
+      expect(previewTargetGatewayControls(parse(MULTI), row).maxOutputTokens).toBe(32_768);
       expect(previewProbeControls(row).tokenCeiling).toBe(8192);
     }
     expect(fixtureRows.map(row => row.output_bound)).toEqual([32_768, 32_768, 32_768, 32_768]);
@@ -282,8 +282,11 @@ describe("each target's gateway sends a request its row accepts", () => {
   });
   it("the row output cap applies on the preview only", () => {
     const target = { model: DEEPSEEK };
-    expect(previewTargetGatewayControls(parse(MULTI), target)).toEqual({ maxOutputTokens: 32_768 });
-    expect(previewTargetGatewayControls(parse(LEGACY), { model: GLM })).toEqual({ maxOutputTokens: 32_768 });
+    // Spec 2026-10-12 §4.4: with the row's whole reviewed menu (tests/unit/preview-thinking-policy.test.ts).
+    expect(previewTargetGatewayControls(parse(MULTI), target)).toEqual({ maxOutputTokens: 32_768,
+      thinking: { parameter: "reasoning_effort", levels: ["high", "low", "none"] } });
+    expect(previewTargetGatewayControls(parse(LEGACY), { model: GLM })).toEqual({ maxOutputTokens: 32_768,
+      thinking: { parameter: "reasoning_effort", levels: ["high", "low"] } });
     expect(previewTargetGatewayControls(undefined, target)).toEqual({});
     expect(providerTargetGatewayControls({ ...targets(PREVIEW_REVIEWED_PROVIDER_REFS)[2]! })).toEqual({ thinking: { parameter: "reasoning_effort", levels: ["high"] }, contextWindowTokens: 1_048_576 });
     expect(() => previewTargetGatewayControls(parse(MULTI), { model: "other/model" })).toThrow();

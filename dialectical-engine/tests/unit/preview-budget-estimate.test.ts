@@ -481,6 +481,28 @@ describe("evaluateAskAdmission on the preview asks the gate before any run exist
     }), ASK)).rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
   });
 
+  it("spec 2026-10-12 §4.7: the owner's thinking levels never move the estimate (the call count and the price are the same)", async () => {
+    const HAIKU = "claude-haiku-5-5";
+    const levelled = parsePreviewProviderTestConfig(JSON.stringify({
+      deployment: "v3-preview", free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN],
+      requested_thinking_level: "high", budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture",
+      thinking_levels: { [DEEPSEEK]: { level: "none" }, [HAIKU]: { level: "low" } }
+    }))!;
+    expect(levelled.thinking_levels).toBeDefined();
+    // The one estimate function that takes the config: the same output ceilings.
+    const ceilings = { debate: [2048, 16_000], story: { storyteller: 12_000, checker: 2048 } };
+    expect(previewCallOutputTokens(levelled, ceilings)).toEqual(previewCallOutputTokens(PREVIEW, ceilings));
+    // The whole admission: exactly the same estimate admits, one nano-USD or one call below refuses, as without a table.
+    const counters = { probes: 0, remaining: 0 };
+    const withLevels = (patch: Partial<PreviewGateRemaining>) => settings(counters, { previewProviderTestConfig: levelled,
+      previewBudgetGate: gateWith(counters, async () => remainingWith(patch)) });
+    await expect(evaluateAskAdmission(withLevels({ remainingNanoUsd: ESTIMATE, remainingCalls: CALLS_NEEDED }), ASK)).resolves.toBeDefined();
+    await expect(evaluateAskAdmission(withLevels({ remainingNanoUsd: ESTIMATE - 1n }), ASK))
+      .rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
+    await expect(evaluateAskAdmission(withLevels({ remainingCalls: CALLS_NEEDED - 1 }), ASK))
+      .rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
+  });
+
   it("debates still running hold their estimate: a pot that fits one debate refuses the second", async () => {
     const counters = { probes: 0, remaining: 0 };
     // A running debate holds its estimate without its own ask's health checks: 588,447,180 and 96 calls.

@@ -11,7 +11,10 @@ import {
   previewModelRow, previewModelRowForRef, previewNanoUsdText, previewRefsAreReviewedSet, previewReservationNanoUsd,
   previewRostersHonourMakerRule, type PreviewModelRow, type PreviewProviderName
 } from "./preview-models.js";
-import { parsePreviewThinkingLevels, type PreviewThinkingLevels } from "./preview-thinking.js";
+import {
+  parsePreviewThinkingLevels, previewSlipFixLevel, previewThinkingLevelFor, previewThinkingLevelOnRequest, previewThinkingStepOf,
+  type PreviewThinkingLevels
+} from "./preview-thinking.js";
 
 export const PREVIEW_GLM_MODEL = "zai-org/GLM-5.3-Flash" as const;
 export const PREVIEW_GLM_PROVIDER_REF = "preview:fixture-a" as const;
@@ -237,13 +240,19 @@ export function previewProbeControls(target: Readonly<{ model: string }>): Reado
 /**
  * Contract A §2: on the preview only, a target's gateway never asks for more output than its
  * reviewed row allows (max_tokens is clamped to the row's bound, length retries included), so the
- * guarded fetch never meets a bound the gate refuses. Off the preview nothing is added.
+ * guarded fetch never meets a bound the gate refuses. Spec 2026-10-12 §4.4: and the gateway may set
+ * exactly the row's reviewed menu (less "default", which sends nothing), whatever single level the
+ * server's target file declares, so the owner's table needs no target-file change. Spread AFTER
+ * providerTargetGatewayControls, so this menu replaces the target file's. Off the preview nothing is added.
  */
 export function previewTargetGatewayControls(
   config: PreviewProviderTestConfig | undefined, target: Readonly<{ model: string }>
-): Readonly<{ maxOutputTokens?: number }> {
+): Readonly<{ maxOutputTokens?: number; thinking?: Readonly<{ parameter: "reasoning_effort"; levels: readonly string[] }> }> {
   if (config === undefined) return Object.freeze({});
-  return Object.freeze({ maxOutputTokens: (previewModelRow(target.model) ?? refused()).outputBound });
+  const reviewed = previewModelRow(target.model) ?? refused();
+  const levels = reviewed.efforts.filter(word => word !== "default");
+  return Object.freeze({ maxOutputTokens: reviewed.outputBound,
+    ...(levels.length === 0 ? {} : { thinking: Object.freeze({ parameter: "reasoning_effort" as const, levels: Object.freeze([...levels]) }) }) });
 }
 /**
  * The preview's token floor and deadline on a call bound. Preview retry fix, option B (spec 2026-10-11
@@ -384,9 +393,12 @@ function previewCallWasUnbilled(error: unknown): boolean {
     && (error as { cause?: unknown }).cause instanceof PreviewUnbilledRefusal);
 }
 /**
- * The preview's per-call policy for ONE target. A row with an effort switch runs every call at the
- * configured level ("high"); a row without one (MiMo, Qwen) never sends a level, and a request that asks
- * for one is refused before anything is sent.
+ * The preview's per-call policy for ONE target. Spec 2026-10-12 §4.4: the owner's `thinking_levels` table
+ * picks each call's level by its step (previewThinkingLevelFor), and a call's repair POSTs run at the AI's
+ * `slip_fix` level when the owner set one (`repairThinkingLevel`). With no table every call is today's: an
+ * effort row at its default ("high"), a row without a default level (MiMo, Qwen) sends none. The caller never
+ * picks: a request asking for another level, or carrying its own repair level, is refused before anything
+ * is sent (PROVIDER_THINKING_LEVEL_UNSUPPORTED).
  *
  * Preview retry fix, option B (spec 2026-10-11 §1.1, owner ruling R1): the request's lifetime bound
  * passes through (token floor and deadline applied, `maxAttempts` kept; the storyteller's token ceiling is
@@ -415,18 +427,29 @@ export function withPreviewProviderCallPolicy(
     if (!asksNoLevel && (reviewed.defaultEffort === "default" || request.thinkingLevel !== config.requested_thinking_level)) {
       throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", reviewed.defaultEffort === "default"
         ? "The private preview connection for this model has no thinking level"
-        : "The private preview connection is configured for high only");
+        : "The private preview chooses this model's thinking level itself");
+    }
+    // Spec 2026-10-12 §4.4: the repair level is the owner's slip_fix alone, never the caller's.
+    if (request.repairThinkingLevel !== undefined) {
+      throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", "The private preview chooses this model's thinking level itself");
     }
     const preview = previewCallBound(request.bound, config);
     const bound = previewStorySite(request, "STORYTELLER")
       ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) }) : preview;
     const storyRepair = previewStoryRepairAllowed(request);
     const formatRepair = !storyRepair && previewFormatRepairAllowed(request);
-    // One explicit level replaces whatever the request carried: the configured level on an effort
-    // row; DEFAULT_ONLY on a row without one, which the gateway treats exactly as "no level".
+    // Spec 2026-10-12 §4.4: one explicit level replaces whatever the request carried: the owner's table picks it per
+    // step (absent = the row's default = today's request: "high" on an effort row, DEFAULT_ONLY on a row without one,
+    // which the gateway treats exactly as "no level"). Decided once per call, so the unbilled resend below runs at it
+    // too. A call that may repair (the story's or the format repair) runs its repair POSTs at the AI's `slip_fix`
+    // level when the owner set one; absent, every POST runs at the call's level, as today.
     // Run resilience (spec 2026-10-12, fix (b)): the step's allowance is this maker's own (`attemptScope`), so a
     // fallback that moves a call to another maker never finds the step spent by the makers it moved away from.
-    const send = () => gateway.call({ ...request, thinkingLevel: reviewed.defaultEffort === "default" ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
+    const level = previewThinkingLevelOnRequest(previewThinkingLevelFor(config.thinking_levels, reviewed, previewThinkingStepOf(request)));
+    const slipFix = previewSlipFixLevel(config.thinking_levels, reviewed);
+    const repairLevel = slipFix === undefined || (!storyRepair && !formatRepair) ? undefined : previewThinkingLevelOnRequest(slipFix);
+    const send = () => gateway.call({ ...request, thinkingLevel: level,
+      ...(repairLevel === undefined ? {} : { repairThinkingLevel: repairLevel }),
       bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1, attemptScope: "actor",
       ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
     if (storyRepair) return send();
