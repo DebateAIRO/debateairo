@@ -98,19 +98,38 @@ cache reads.
   widened after review). The answers: 429 or 529 (`rate_limit_error` or `overloaded_error`), 400
   (`invalid_request_error`), 404 (`not_found_error`), 413 (`request_too_large`) and 500
   (`api_error`), each with a body that is only Anthropic's error message (no usage, no answer
-  content, no model name anywhere). Such a call is released in the same way as DeepInfra's "too
-  many requests" (the rules since 2026-10-12 are the same; see README.md): nothing is charged, the
-  day's record keeps it as a $0 `released_unbilled` entry with its HTTP status, that call alone
-  fails (`PROVIDER_REFUSED_UNBILLED`), and the app tries once more later. These answers never halt
-  the gate, and there is no daily limit on them (`today_unbilled_releases` in `status` shows the
-  count). After 2 of them for Haiku with no normal answer from Haiku in between, the gate refuses
-  new Haiku calls for a while (`MODEL_COOLING`, with `retry_after` in seconds). Nothing is set
-  aside and Anthropic is not contacted. The first wait is 60 seconds; then ONE call goes through as
-  a trial. If the trial is refused the same way, the wait doubles: 120, 240, 480, then 600 seconds
-  at most. A normal answer from Haiku ends the cool-off. The cool-off ends by itself; nothing needs
-  re-opening. Five in a row that never reached Anthropic at all (the connection failed before
-  anything was sent) halt with `provider_unreachable`. These answers do not count toward those
-  five, and a normal answer resets that count.
+  content, no model name anywhere). Every such call is released: nothing is charged, the day's
+  record keeps it as a $0 `released_unbilled` entry with its HTTP status, that call alone fails,
+  and the app tries once more later. There is no daily limit on them (`today_unbilled_releases` in
+  `status` shows the count; the halt watcher emails once a day when it reaches its threshold, see
+  "The daily unbilled email" below). What happens next depends on whether the answer means "busy"
+  (review of 2026-10-12):
+  - **Busy: 429 and 529** (`rate_limit_error`, `overloaded_error`). The same rules as DeepInfra's
+    "too many requests" (see README.md): the call fails with `PROVIDER_REFUSED_UNBILLED`, and it
+    never halts the gate. After 2 of them for Haiku with no normal answer from Haiku in between, the
+    gate refuses new Haiku calls for a while (`MODEL_COOLING`, with `retry_after` in seconds).
+    Nothing is set aside and Anthropic is not contacted. The first wait is 60 seconds; then ONE
+    call goes through as a trial. If the trial is refused the same way, the wait doubles: 120, 240,
+    480, then 600 seconds at most. A normal answer from Haiku ends the cool-off. The cool-off ends
+    by itself; nothing needs re-opening, and `activate` does not clear it (the wait runs on after a
+    re-open). These answers neither add to nor reset the count of five below.
+  - **Not busy: 400, 404, 413 and 500** (`invalid_request_error`, `not_found_error`,
+    `request_too_large`, `api_error`). The request itself was refused, or Anthropic had an inner
+    error: waiting would not help, so Haiku is never cooled off for them and the app does not make
+    it sit out the run. The call fails with `PROVIDER_ERROR_UNBILLED`. As before 2026-10-12, each
+    one adds to the count of five below.
+  Five in a row of "never reached Anthropic" (the connection failed before anything was sent) or
+  not-busy answers, with no normal answer in between, halt the gate with `provider_unreachable`,
+  and the halt watcher emails. A normal answer, or `activate`, resets that count.
+- **The daily unbilled email.** Once a day, the Anthropic halt watcher also warns about unbilled
+  refusals: when `status` shows `today_unbilled_releases` (calls Anthropic refused without billing
+  them, busy or not) at or above the threshold, the owner gets one email for that Bucharest day
+  with the count and the date. Nothing is halted; the email asks you to check Anthropic's billing
+  page that none of those calls was billed. The threshold is the `--unbilled-alert-at 100` flag in
+  `debateai-preview-anthropic-halt-watch.service` (1 to 100000; change it there, then
+  `systemctl daemon-reload`). The day is recorded before the email is queued, in
+  `/var/lib/debateai-preview-anthropic-halt-watch/announced-unbilled.json` (root-only, next to the
+  halt marker), so a failed email is not retried that day.
 - **These still halt:** 401 (`authentication_error`) and 403 (`permission_error`), because the key
   is wrong or lacks a permission and root must look; 402 (`billing_error`); 504 (`timeout_error`),
   because the work may already have run; any error type that does not belong to its status; and
@@ -350,10 +369,12 @@ It sends "Reply exactly: OK" with an answer limit of 1,024 tokens and the thinki
 
 If it prints `"status": "refused"` instead of a result, the probe did not pass:
 - `PROBE_FENCE_REQUIRED`: the command was not copied whole. Nothing was read or spent.
-- `PROVIDER_REFUSED_UNBILLED`: Anthropic answered with one of its errors that bill nothing (for
-  example 400, a setting it does not accept). The gate stays open; `status` shows today's
-  `released_unbilled` entry with its `http_status`. Do not switch Haiku on: report it to the
-  reviewers (the row or the request shape needs a reviewed code change).
+- `PROVIDER_ERROR_UNBILLED`: Anthropic answered with one of its errors that bill nothing and do
+  not mean "busy" (for example 400, a setting it does not accept). The gate stays open; `status`
+  shows today's `released_unbilled` entry with its `http_status`. Do not switch Haiku on: report it
+  to the reviewers (the row or the request shape needs a reviewed code change).
+- `PROVIDER_REFUSED_UNBILLED`: Anthropic was busy (429 or 529). Nothing was charged. Probe again
+  later.
 - `PROVIDER_NOT_REACHED`: the connection failed before anything was sent. Check step 2's
   addresses, then probe again.
 - `AUTHORITY_HALTED`: the gate was already halted, so nothing was set aside and Anthropic was not
@@ -428,7 +449,8 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
 
 **How much did we spend today? Is the gate open?** This only reads. Look at `today_spend_usd`,
 `remaining_today_usd`, `today_unbilled_releases` (refusals kept at $0; no limit), `cooling`
-(Haiku's cool-off, if any), `state`, `reason`, `halts` and `window_open`.
+(Haiku's cool-off, if any; `activate` does not clear it), `unsent_streak`, `state`, `reason`,
+`halts` and `window_open`.
 
 ```sh
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1

@@ -3,7 +3,13 @@
 # for a fixed gate event, through the same owner-only mail path as debateai-preview-alert@:
 #   debateai-preview-notice@gate-halted-<reason>.service  (gate-halt-watch, once per halt)
 #   debateai-preview-notice@gate-addresses-mismatch.service  (gate-addresses, once per change)
-# alert.mjs accepts only those two kinds; the email names the one command that fixes it.
+#   debateai-preview-notice@gate-unbilled-<count>_<YYYY>_<MM>_<DD>.service  (gate-halt-watch, at most
+#     once per Bucharest day, when today's unbilled refusals reach its --unbilled-alert-at threshold,
+#     default 100: a warning only, nothing is halted; check the vendor's billing page)
+# and the same kinds for the Anthropic gate (anthropic-halted, anthropic-addresses, anthropic-unbilled)
+# and the parked Google gate (google-halted, google-addresses; no unbilled notice).
+# alert.mjs accepts only those kinds; the email names the one command that fixes it (for an
+# unbilled notice: the gate's read-only status command).
 # A mail failure is logged and never fails this unit.
 [Unit]
 Description=DebateAI preview: email the owner a spending-gate notice (%i)

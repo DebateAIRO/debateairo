@@ -14,8 +14,15 @@
 // owner-only mail path for fixed spending-gate events, started by the gates' watchers:
 // "gate-halted-<reason>" (the gate stopped taking paid calls) and "gate-addresses-mismatch"
 // (DeepInfra's addresses no longer match the gate's allow-list), and the Google gate's twins
-// "google-halted-<reason>" and "google-addresses-mismatch". Each carries the one command
+// "google-halted-<reason>" and "google-addresses-mismatch", and the Anthropic gate's
+// "anthropic-halted-<reason>" and "anthropic-addresses-mismatch". Each carries the one command
 // that fixes it. Fixed wording, no amounts; at most one per notice name per 30 minutes.
+// Daily unbilled alert (2026-10-12 ruling: alert, never halt): "gate-unbilled-<count>_<YYYY>_<MM>_<DD>"
+// (DeepInfra) and "anthropic-unbilled-<count>_<YYYY>_<MM>_<DD>", queued by the halt watcher at most
+// once per gate per Bucharest day when status's today_unbilled_releases reaches its
+// --unbilled-alert-at threshold. The email names the gate, the count and the day, says nothing was
+// halted, asks the owner to check that vendor's billing page, and gives the gate's read-only
+// `status` command. Google (parked) has none.
 import { constants } from 'node:fs';
 import { link, lstat, open, unlink } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
@@ -28,7 +35,29 @@ export const ALERT_WINDOW_MS = 30 * 60 * 1000;
 const UNIT = /^[A-Za-z0-9][A-Za-z0-9:_.@\\-]{0,200}\.(service|socket|timer|target|mount|path)$/;
 const ADDRESS = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,24}$/;
 
-const NOTICE = /^(gate-halted|gate-addresses|google-halted|google-addresses)-([a-z0-9_]{1,64})$/;
+const NOTICE = /^(gate-halted|gate-addresses|gate-unbilled|google-halted|google-addresses)-([a-z0-9_]{1,64})$/;
+// An unbilled notice's code: the count (no leading zero) and the gate's Bucharest day.
+const UNBILLED_CODE = /^([1-9][0-9]{0,8})_([0-9]{4})_([0-9]{2})_([0-9]{2})$/;
+/** '<count>_<YYYY>_<MM>_<DD>' -> { count, day: 'YYYY-MM-DD' } for a real calendar day; anything else null. */
+function unbilledCode(code) {
+  const match = UNBILLED_CODE.exec(code);
+  if (!match) return null;
+  const [year, month, day] = match.slice(2).map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return { count: Number(match[1]), day: `${match[2]}-${match[3]}-${match[4]}` };
+}
+/** The fixed wording of one gate's daily unbilled alert; its "command" is the gate's read-only status. */
+const unbilledNotice = (vendor, folder, privateDir, lookAt) => code => {
+  const { count, day } = unbilledCode(code);
+  return {
+    subject: `Preview: ${vendor} gate: ${count} unbilled refusal${count === 1 ? '' : 's'} today (${day})`,
+    lead: `Today (${day}, Bucharest day) ${vendor} refused ${count} of the preview's model calls without billing them: the model was busy or the call was rejected. Nothing was halted: this is only a warning, and the gate keeps working. Please check ${vendor}'s billing page that none of these calls was billed. The gate's status lists them as today_unbilled_releases (the read-only command below). You get this email at most once a day per gate, when the count first reaches the halt watcher's alert threshold (--unbilled-alert-at).`,
+    commandIntro: 'To see the count (read-only, as root on the server):',
+    command: `/usr/bin/python3 -I ${folder}/preview_budget_authority.py status --private ${privateDir}`,
+    lookAt, journal: null
+  };
+};
 // The DeepInfra spending gate v3 (deploy/preview-gate/v3): its folder, state and GO.
 const GATE_FOLDER = '/opt/debateai-v3-preview/operator/deepinfra-budget-v3';
 const GATE_UNIT = 'debateai-preview-provider-budget.service';
@@ -45,6 +74,7 @@ const NOTICES = Object.freeze({
     command: `/usr/bin/python3 -I ${GATE_FOLDER}/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 --go /etc/debateai-v3-preview/provider-deepinfra-go-v3.json`,
     lookAt: GATE_UNIT, journal: null
   }),
+  'gate-unbilled': unbilledNotice('DeepInfra', GATE_FOLDER, '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', GATE_UNIT),
   'gate-addresses': code => ({
     subject: `Preview: spending gate address list needs an update (${code})`,
     lead: 'The hourly address check of the spending gate failed. Usually the addresses of api.deepinfra.com no longer match the gate\'s allow-list, and paid calls can fail until it is updated; the journal lines below say which case it is (DEEPINFRA_ADDRESSES_CHANGED, or another error such as an unreadable list). This email blanks addresses; to see the new ones, run the journalctl line under "What to look at" and check that they are DeepInfra\'s. Then run the one command below. It adds today\'s DNS answer to the list and restarts the gate.',
@@ -64,16 +94,17 @@ const NOTICES = Object.freeze({
     lookAt: GOOGLE_ADDRESS_UNIT, journal: GOOGLE_ADDRESS_UNIT
   })
 });
-/** `<kind>-<code>` -> { kind, code, unit } for the four notice kinds; anything else null. */
+/** `<kind>-<code>` -> { kind, code, unit } for the notice kinds; anything else null (an unbilled kind needs a valid count and day). */
 export function parseNotice(text) {
   const match = typeof text === 'string' ? (NOTICE.exec(text) ?? ANTHROPIC_NOTICE.exec(text)) : null;
+  if (match && match[1].endsWith('-unbilled') && unbilledCode(match[2]) === null) return null;
   return match ? { kind: match[1], code: match[2], unit: `debateai-preview-notice@${text}.service` } : null;
 }
 
 // The Anthropic spending gate (deploy/preview-gate/v3/README-anthropic.md, PR B): its own two
 // notices, kept apart from the DeepInfra and Google ones above so each gate's email names its own
 // unit and its own re-open command.
-const ANTHROPIC_NOTICE = /^(anthropic-halted|anthropic-addresses)-([a-z0-9_]{1,64})$/;
+const ANTHROPIC_NOTICE = /^(anthropic-halted|anthropic-addresses|anthropic-unbilled)-([a-z0-9_]{1,64})$/;
 const ANTHROPIC_FOLDER = '/opt/debateai-v3-preview/operator/anthropic-budget-v1';
 const ANTHROPIC_UNIT = 'debateai-preview-anthropic-budget.service';
 const ANTHROPIC_ADDRESS_UNIT = 'debateai-preview-anthropic-addresses.service';
@@ -84,6 +115,7 @@ const ANTHROPIC_NOTICES = Object.freeze({
     command: `/usr/bin/python3 -I ${ANTHROPIC_FOLDER}/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 --go /etc/debateai-v3-preview/provider-anthropic-go-v1.json`,
     lookAt: ANTHROPIC_UNIT, journal: null
   }),
+  'anthropic-unbilled': unbilledNotice('Anthropic', ANTHROPIC_FOLDER, '/var/lib/debateai-v3-preview/provider-anthropic-authority-v1', ANTHROPIC_UNIT),
   'anthropic-addresses': code => ({
     subject: `Preview: Anthropic gate addresses are outside its allowed range (${code})`,
     lead: 'The hourly address check of the Anthropic spending gate failed. Usually api.anthropic.com now answers with an address outside the published range the gate may reach (160.79.104.0/23), so Claude calls fail as not sent until this is fixed; the journal lines below say which case it is (ANTHROPIC_ADDRESSES_OUTSIDE_RANGE, or DNS trouble). This email blanks addresses. The range is written in the reviewed code, so there is no update command: run the check below to see the current answer, compare it with Anthropic\'s published list (platform.claude.com/docs/en/api/ip-addresses), and if the range really changed, the new range is a reviewed code change (README-anthropic.md, "Addresses").',
@@ -263,7 +295,7 @@ export function composeAlert({ unit, at, lines, from, to, failure = { kind: 'unk
   const look = notice ? notice.lookAt : unit;
   const body = [
     lead, '',
-    ...(notice ? ['The one command (as root on the server):', `  ${notice.command}`, ''] : []),
+    ...(notice ? [notice.commandIntro ?? 'The one command (as root on the server):', `  ${notice.command}`, ''] : []),
     `Unit: ${unit}`, `Time (UTC): ${at.toISOString().slice(0, 19).replace('T', ' ')} UTC`, `Time (Bucharest): ${bucharest(at)}`, '',
     'What to look at on the server:', `  systemctl status ${look}`, `  journalctl -u ${look} -n 100`, '',
     ...(notice && lines.length === 0 ? [] : [`Last ${lines.length} journal lines (anything secret-looking replaced):`, ...lines.map(line => `  ${line}`), '']),

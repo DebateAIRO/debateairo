@@ -39,14 +39,14 @@ describe('production preview spending guard optional JSON mode', () => {
   it('checks the reviewed gate v2 systemd files and the DeepInfra address check offline', () => {
     const result = runPython('tests/unit/preview_gate_v2_unit_test.py', 10000);
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain('Ran 24 tests');
+    expect(result.stderr).toContain('Ran 33 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('runs the v3 model table, /remaining and probe behaviors offline', () => {
     const result = runPython('tests/unit/preview_budget_authority_v3_test.py', 30000);
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
-    expect(result.stderr).toContain('Ran 100 tests');
+    expect(result.stderr).toContain('Ran 104 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the reviewed gate v3 systemd files and the enabled-model start check offline', () => {
@@ -59,7 +59,7 @@ describe('production preview spending guard optional JSON mode', () => {
     const result = runPython('tests/unit/preview_budget_authority_anthropic_test.py', 30000);
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
-    expect(result.stderr).toContain('Ran 40 tests');
+    expect(result.stderr).toContain('Ran 45 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the Anthropic gate systemd files and its address check offline', () => {

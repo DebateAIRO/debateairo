@@ -626,4 +626,58 @@ describe('spending-gate notices', () => {
     expect(update).not.toContain('203.0.113.9');
     expect(update).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/anthropic_addresses.py check');
   });
+
+  // 2026-10-12 ruling: a high daily count of unbilled refusals ALERTS (once a day per gate), never halts.
+  describe('daily unbilled-refusal alert', () => {
+    const deepinfra = 'debateai-preview-notice@gate-unbilled-100_2026_10_12.service';
+    const anthropic = 'debateai-preview-notice@anthropic-unbilled-1_2026_10_12.service';
+
+    it('takes only <count>_<YYYY>_<MM>_<DD> codes for the two unbilled kinds, and none for Google', () => {
+      expect(alert.parseAlertArgs(['--notice', 'gate-unbilled-100_2026_10_12'])).toEqual({ unit: deepinfra, test: false, notice: { kind: 'gate-unbilled', code: '100_2026_10_12', unit: deepinfra } });
+      expect(alert.parseAlertArgs(['--notice', 'anthropic-unbilled-1_2026_10_12'])).toEqual({ unit: anthropic, test: false, notice: { kind: 'anthropic-unbilled', code: '1_2026_10_12', unit: anthropic } });
+      expect(alert.parseAlertArgs(['--notice', 'gate-unbilled-100000_2026_12_31'])).toMatchObject({ notice: { kind: 'gate-unbilled' } });
+      for (const name of ['gate-unbilled-100', 'gate-unbilled-provider_unreachable', 'gate-unbilled-0100_2026_10_12', 'gate-unbilled-0_2026_10_12',
+        'gate-unbilled-100_2026_13_12', 'gate-unbilled-100_2026_10_32', 'gate-unbilled-100_2026_02_31', 'gate-unbilled-100_2026_10_12_x', 'gate-unbilled-100_26_10_12',
+        'gate-unbilled-1000000000_2026_10_12', 'gate-unbilled-100-2026-10-12', 'gate-unbilled-', 'google-unbilled-100_2026_10_12', 'anthropic-unbilled-x_2026_10_12']) {
+        expect(alert.parseAlertArgs(['--notice', name]), name).toBeNull();
+      }
+    });
+
+    it('the DeepInfra email names the gate, the count and the day, says nothing was halted, and gives the read-only status command', async () => {
+      const layout = server();
+      const h = harness(layout, { ...notMe, readJournal: async () => { throw new Error('an unbilled notice reads no journal'); } });
+      await expect(alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'gate-unbilled-100_2026_10_12']), layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_SENT', unit: deepinfra });
+      const mail = h.sent[0]!;
+      expect(mail).toContain('Subject: Preview: DeepInfra gate: 100 unbilled refusals today (2026-10-12)');
+      expect(mail).toContain('Nothing was halted');
+      expect(mail).toContain("DeepInfra's billing page");
+      expect(mail).toContain('today_unbilled_releases');
+      expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3');
+      expect(mail).toContain('systemctl status debateai-preview-provider-budget.service');
+      expect(mail).not.toContain(' activate ');
+      expect(mail).not.toContain('journal lines');
+      expect(mail).not.toMatch(/\$|usd|anthropic/i);
+    });
+
+    it('the Anthropic email names its own gate, billing page and status command; one refusal reads as one', async () => {
+      const layout = server();
+      const h = harness(layout, { ...notMe, readJournal: async () => { throw new Error('an unbilled notice reads no journal'); } });
+      await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'anthropic-unbilled-1_2026_10_12']), layout, deps: h.deps });
+      const mail = h.sent[0]!;
+      expect(mail).toContain('Subject: Preview: Anthropic gate: 1 unbilled refusal today (2026-10-12)');
+      expect(mail).toContain('Nothing was halted');
+      expect(mail).toContain("Anthropic's billing page");
+      expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1');
+      expect(mail).toContain('systemctl status debateai-preview-anthropic-budget.service');
+      expect(mail).not.toMatch(/\$|usd|deepinfra/i);
+    });
+
+    it('refuses an unbilled notice whose unit name does not match it', async () => {
+      const layout = server();
+      const h = harness(layout, notMe);
+      await expect(alert.runAlert({ unit: deepinfra, notice: { kind: 'gate-unbilled', code: '99_2026_10_12' }, layout, deps: h.deps })).resolves.toMatchObject({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', reason: 'NOTICE_REFUSED' });
+      await expect(alert.runAlert({ unit: 'debateai-preview-notice@gate-unbilled-x.service', notice: { kind: 'gate-unbilled', code: 'x' }, layout, deps: h.deps })).resolves.toMatchObject({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', reason: 'NOTICE_REFUSED' });
+      expect(h.sent).toEqual([]);
+    });
+  });
 });

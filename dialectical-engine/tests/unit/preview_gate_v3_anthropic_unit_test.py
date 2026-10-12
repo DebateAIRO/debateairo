@@ -138,6 +138,13 @@ class GateUnitTests(unittest.TestCase):
         # never DeepInfra's update command.
         self.assertEqual(values(CHECK_UNIT, 'OnFailure'), ['debateai-preview-notice@anthropic-addresses-mismatch.service'])
         self.assertEqual(options['--notice'], 'anthropic-halted')
+        # 2026-10-12: its own daily unbilled alert (anthropic-unbilled), at 100, beside its halt marker.
+        self.assertEqual(options['--unbilled-alert-at'], '100')
+        watcher = load(V2 / 'gate_watch.py', 'gate_watch_anthropic_unit')
+        args = watcher.parse_args(start[3:])
+        self.assertEqual((args.notice, args.unbilled_alert_at), ('anthropic-halted', 100))
+        self.assertEqual(watcher.UNBILLED_KINDS[args.notice], 'anthropic-unbilled')
+        self.assertEqual(str(watcher.unbilled_state_path(args.state)), '/var/lib/debateai-preview-anthropic-halt-watch/announced-unbilled.json')
         same = {'Description', 'ExecStart', 'StateDirectory', 'OnFailure'}
         self.assertEqual(without(CHECK_UNIT, same), without(DEEPINFRA_CHECK, same))
         for timer, v2 in ((HALT_TIMER, V2 / 'systemd/debateai-preview-gate-halt-watch.timer'),

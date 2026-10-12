@@ -25,7 +25,9 @@
  * The unbilled refusals the app's port tells apart (packages/providers/src/preview-test.ts previewAuthorityRefusal):
  *  - the vendor refused, not billed (PROVIDER_REFUSED_UNBILLED, PreviewVendorRefusedUnbilled): the model is busy;
  *  - the model is cooling off (MODEL_COOLING, PreviewModelCooling): the model is busy;
- *  - the vendor was not reached (PROVIDER_NOT_REACHED): counts in the run only;
+ *  - the vendor was not reached (PROVIDER_NOT_REACHED): counts in the run only; the Anthropic gate's not-busy error
+ *    answers (PROVIDER_ERROR_UNBILLED, review 2026-10-12: 400/404/413/500) arrive as the same plain refusal and are
+ *    counted the same way (the gate adds them to its streak too, and keeps a $0 entry);
  *  - the gate's own "too many calls in flight" (CONCURRENCY_LIMIT_REACHED): neither.
  */
 import { TypedDomainError } from "@debateai/kernel";

@@ -651,23 +651,105 @@ class UnbilledAndUnsentTests(AnthropicTest):
     def error(kind, **extra):
         return {'type': 'error', 'error': {'type': kind, 'message': 'synthetic'}, **extra}
 
+    NOT_BUSY = ((400, 'invalid_request_error'), (404, 'not_found_error'), (413, 'request_too_large'), (500, 'api_error'))
+
     def test_other_well_formed_non_billing_errors_are_released_on_the_same_ledger_entry(self):
         # Judge round on PR B: Anthropic's own error answers that bill nothing go through A's
-        # released_unbilled machinery (a $0 entry kept on the record, the daily ceiling, the streak).
-        for status, kind in ((400, 'invalid_request_error'), (404, 'not_found_error'),
-                             (413, 'request_too_large'), (500, 'api_error')):
+        # released_unbilled machinery (a $0 entry kept on the record). Review 2026-10-12: only 429/529
+        # say the model is busy; these four are not busy, so they count toward the gate-wide unsent
+        # streak exactly as before gate v4, never cool the model, and the caller sees
+        # PROVIDER_ERROR_UNBILLED (the app's plain unbilled refusal, never the busy one).
+        for status, kind in self.NOT_BUSY:
             with self.subTest(status=status):
                 reply = self.error(kind, request_id='req_synthetic')
                 self.assertTrue(ANTHROPIC.unbilled_refusal(status, reply))
+                self.assertFalse(ANTHROPIC.busy_refusal(status, reply))
                 gate = self.ready()
-                with self.refused('PROVIDER_REFUSED_UNBILLED'):
+                with self.refused('PROVIDER_ERROR_UNBILLED'):
                     self.call(gate, reply=reply, status=status)
                 entries = list(gate.day(DAY)['entries'].values())
                 self.assertEqual([(e['state'], e['held_usd'], e['http_status']) for e in entries],
                                  [('released_unbilled', '0', status)])
                 now = gate.status()
-                self.assertEqual((now['state'], now['today_spend_usd'], now['today_unbilled_releases'], now['in_flight']),
-                                 ('active', '0', 1, 0))
+                self.assertEqual((now['state'], now['today_spend_usd'], now['today_unbilled_releases'], now['in_flight'],
+                                  now['unsent_streak'], now['cooling']), ('active', '0', 1, 0, 1, {}))
+        self.assertEqual(json.loads(bridge.refusal_body(bridge.CallNotSent('PROVIDER_ERROR_UNBILLED'))),
+                         {'error': 'PROVIDER_ERROR_UNBILLED'})
+
+    def test_only_429_and_529_are_busy(self):
+        for status, reply in ((429, self.RATE), (429, self.BUSY), (529, self.BUSY), (529, self.RATE)):
+            with self.subTest(status=status, kind=reply['error']['type']):
+                self.assertTrue(ANTHROPIC.unbilled_refusal(status, reply))
+                self.assertTrue(ANTHROPIC.busy_refusal(status, reply))
+        for status, kind in self.NOT_BUSY:
+            self.assertFalse(ANTHROPIC.busy_refusal(status, self.error(kind)))
+
+    def test_five_404s_in_a_row_halt_provider_unreachable(self):
+        # As before gate v4: five not-busy unbilled errors with no settled reply between halt the gate
+        # (the halt watcher then emails), and the model is never cooled on the way.
+        gate = self.ready()
+        missing = self.error('not_found_error')
+        for number in range(1, 5):
+            with self.refused('PROVIDER_ERROR_UNBILLED'):
+                self.call(gate, 'op-%d' % number, reply=missing, status=404)
+            self.assertEqual((gate.status()['state'], gate.status()['unsent_streak'], gate.status()['cooling']),
+                             ('active', number, {}))
+        with self.refused('PROVIDER_ERROR_UNBILLED'):
+            self.call(gate, 'op-5', reply=missing, status=404)
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason'], status['unsent_streak'], status['today_unbilled_releases'],
+                          status['today_spend_usd'], status['in_flight']), ('halted', 'provider_unreachable', 5, 5, '0', 0))
+        sent = []
+        with self.refused('AUTHORITY_HALTED'):
+            self.call(gate, 'op-6', dispatch=lambda *args: sent.append(args))
+        self.assertEqual(sent, [])
+
+    def test_a_settled_reply_resets_the_not_busy_streak_and_busy_refusals_neither_grow_nor_reset_it(self):
+        gate = self.ready()
+        for number in range(1, 5):
+            with self.refused('PROVIDER_ERROR_UNBILLED'):
+                self.call(gate, 'bad-%d' % number, reply=self.error('invalid_request_error'), status=400)
+        self.call(gate, 'ok-1')
+        self.assertEqual(gate.status()['unsent_streak'], 0)
+        for number in range(1, 4):
+            with self.refused('PROVIDER_ERROR_UNBILLED'):
+                self.call(gate, 'big-%d' % number, reply=self.error('request_too_large'), status=413)
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            self.call(gate, 'busy-1', reply=self.BUSY, status=529)
+        status = gate.status()
+        self.assertEqual((status['state'], status['unsent_streak'], status['cooling'][HAIKU]['refusals'],
+                          status['cooling'][HAIKU]['cooling_now']), ('active', 3, 1, False))
+
+    def test_400_and_413_never_cool_the_model(self):
+        gate = self.ready()
+        replies = ((400, self.error('invalid_request_error')), (413, self.error('request_too_large')),
+                   (400, self.error('invalid_request_error')), (413, self.error('request_too_large')))
+        for number, (status, reply) in enumerate(replies, start=1):
+            with self.refused('PROVIDER_ERROR_UNBILLED'):
+                self.call(gate, 'op-%d' % number, reply=reply, status=status)
+        self.assertEqual((gate.status()['state'], gate.status()['cooling'], gate.status()['unsent_streak']), ('active', {}, 4))
+        sent = []
+
+        def answered(raw, _key):
+            sent.append(raw)
+            return 200, json.loads(json.dumps(message()))
+        self.call(gate, 'op-5', dispatch=answered)  # Not refused MODEL_COOLING: the vendor is asked.
+        self.assertEqual((len(sent), gate.status()['unsent_streak']), (1, 0))
+
+    def test_a_not_busy_answer_to_a_cooling_trial_neither_doubles_nor_extends_the_window(self):
+        gate = self.ready()
+        for number in (1, 2):
+            with self.refused('PROVIDER_REFUSED_UNBILLED'):
+                self.call(gate, 'busy-%d' % number, reply=self.RATE, status=429)
+        before = dict(gate.control()['cooling'][HAIKU])
+        gate.clock.set('2026-10-08T09:01:00+00:00')  # The first window has run out: this call is the trial.
+        with self.refused('PROVIDER_ERROR_UNBILLED'):
+            self.call(gate, 'trial', reply=self.error('invalid_request_error'), status=400)
+        after = gate.control()['cooling'][HAIKU]
+        self.assertEqual(after, {**before, 'trial': None})
+        self.assertEqual(gate.status()['unsent_streak'], 1)
+        self.call(gate, 'next')  # The next call is the trial; its answer ends the cool-off.
+        self.assertEqual(gate.status()['cooling'], {})
 
     def test_key_billing_and_timeout_errors_and_mismatched_types_still_halt(self):
         cases = {'401_authentication': (401, self.error('authentication_error')),
@@ -993,11 +1075,11 @@ class RemainingAndProbeTests(AnthropicTest):
                           summary['halt_reason'], summary['authority']),
                          (False, 'claude-haiku-5-5-20261001', False, 'provider_error_or_model_identity', 'halted'))
         # A well-formed 400 (Anthropic refused the request's shape) bills nothing: the probe is refused
-        # PROVIDER_REFUSED_UNBILLED and the day's record keeps the $0 entry with its HTTP status (the
-        # README's probe step says: that means stop and report).
+        # PROVIDER_ERROR_UNBILLED (not busy) and the day's record keeps the $0 entry with its HTTP
+        # status (the README's probe step says: that means stop and report).
         gate = self.ready()
         rejected = {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'output_config:\nunknown field'}}
-        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+        with self.refused('PROVIDER_ERROR_UNBILLED'):
             self.probe(gate, lambda _r, _k: (400, rejected))
         self.assertEqual([(e['state'], e['http_status']) for e in gate.day(DAY)['entries'].values()],
                          [('released_unbilled', 400)])

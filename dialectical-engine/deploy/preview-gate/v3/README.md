@@ -170,7 +170,7 @@ The smallest pot that passes with all four switched on is $1.43.
   changed 2026-10-11 and built 2026-10-12: an answer 429 that carries an error and no token
   counts, no answer and no cost anywhere is treated as not billed. Nothing is charged, that call
   alone fails (`PROVIDER_REFUSED_UNBILLED`), and the app may try again later. Any other error
-  answer still halts. Two limits keep this safe in case DeepInfra did bill such answers after all:
+  answer still halts. What keeps this safe in case DeepInfra did bill such answers after all:
   - Each one stays in the day's record with $0 charged, its status (429), the reason and the
     time, so it can be checked against DeepInfra's billing page. `status` shows today's number
     (`today_unbilled_releases`). There is no limit on that number, and these answers do not count
@@ -182,18 +182,36 @@ The smallest pot that passes with all four switched on is $1.43.
     through as a trial; the others are still refused while it is out. If the trial is refused the
     same way, the wait doubles: 120, 240, 480, then 600 seconds (10 minutes at most). A call that
     was already on its way when the cool-off began, and comes back refused, restarts the current
-    wait without doubling it. A normal answer from that model ends its cool-off. The other models
-    are never affected. Nothing needs re-opening: the cool-off ends by itself, and `status` shows
-    it under `cooling`.
+    wait (never shortening it) without doubling it. A normal answer from that model ends its
+    cool-off. The other models are never affected. Nothing needs re-opening: the cool-off ends by
+    itself, and `status` shows it under `cooling`. `activate` does not clear a cooling model either:
+    its wait runs on after a re-open.
+  - A daily email, never a halt. The halt watcher (`gate_watch.py`, every minute) also reads
+    `today_unbilled_releases`. When it reaches the threshold, the owner gets ONE email for that
+    Bucharest day with the gate, the count and the date: nothing was halted; check DeepInfra's
+    billing page that none of those calls was billed. The threshold is the `--unbilled-alert-at 100`
+    flag in `debateai-preview-gate-halt-watch.service` (1 to 100000; change it there, then
+    `systemctl daemon-reload`). The day is recorded before the email is queued, in
+    `/var/lib/debateai-preview-gate-watch/announced-unbilled.json` (root-only, next to the halt
+    marker), so a failed email is not retried that day.
 
-  Together these mean that even if DeepInfra did bill such answers, it could not drain the pot
-  quickly or unseen. Check the billing page if `today_unbilled_releases` looks large.
+  The real limits, in plain words: while a model is cooling off, at most one call for it per wait
+  reaches DeepInfra (the trial), plus any calls that were already on their way. When no model is
+  cooling off, nothing limits how fast such answers come except that at most 10 calls (the GO's
+  `max_concurrent_calls`) are on their way at once, and 2 such answers for one model start its
+  cool-off. Over a whole day, the only hard limit on their number is the size of the day's record
+  (about 15 MiB; past it the gate refuses every new call). Each one stays on that record, and the
+  daily email above tells you when the count gets large. Nothing is halted for them.
 - **Five in a row that never reached DeepInfra halt the gate** with `provider_unreachable`. "Never
   reached" means the connection failed before anything was sent. A "too many requests" answer in
-  between neither adds to that count nor resets it. A normal answer, or `activate`, resets it. Such
+  between neither adds to that count nor resets it. (For Anthropic, its not-busy error answers, 400,
+  404, 413 and 500, do add to that count, as before 2026-10-12: README-anthropic.md.) A normal answer, or `activate`, resets it. Such
   a failed connection leaves no entry: nothing was sent, so there is nothing DeepInfra could bill.
 - **What the app sees when a call is refused, in plain words.**
   - `PROVIDER_REFUSED_UNBILLED`: DeepInfra's "too many requests" answer. Nothing was charged.
+  - `PROVIDER_ERROR_UNBILLED`: only from the Anthropic gate: Anthropic answered with an error that
+    bills nothing but does not mean "busy" (400, 404, 413, 500). Nothing was charged; the model is
+    not cooled off, and the app does not make it sit out the run.
   - `MODEL_COOLING`, with `retry_after` (in seconds): this one model is cooling off. Nothing was
     set aside and DeepInfra was not contacted. The other models are not affected.
   - `PROVIDER_NOT_REACHED`: the connection failed before anything was sent. Nothing was charged.
@@ -545,8 +563,8 @@ the daily split (owner's ruling, 2026-10-10 evening) is DeepInfra $10.00 and Ant
 **How much did we spend today? Is the gate open?** This only reads; it writes nothing. Look at:
 - `today_spend_usd` and `remaining_today_usd` (the day is the Bucharest day);
 - `today_by_model`: spend and number of calls per model today;
-- `today_unbilled_releases`: today's "too many requests" answers kept at $0 (no limit; they never halt the gate);
-- `cooling`: per model, the short cool-off after such answers (`refusals`, `window_seconds`, `until_utc`, `trial`, `cooling_now`). A model is listed after its first such answer; `cooling_now` is true while it waits;
+- `today_unbilled_releases`: today's "too many requests" answers kept at $0 (no limit; they never halt the gate; the halt watcher emails once a day when the count reaches its threshold);
+- `cooling`: per model, the short cool-off after such answers (`refusals`, `window_seconds`, `until_utc`, `trial`, `cooling_now`). A model is listed after its first such answer; `cooling_now` is true while it waits. `activate` does not clear it: the wait runs on after a re-open, and only a normal answer from that model (or the wait running out, then a trial) ends it;
 - `state`, `reason` and `halts`;
 - `window_open` and `open_until_utc`;
 - `enabled_models`.

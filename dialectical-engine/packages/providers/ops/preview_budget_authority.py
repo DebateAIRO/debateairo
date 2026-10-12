@@ -57,35 +57,48 @@ process is listening on (a connect is refused). Anything else at that path refus
 Provably unsent calls (by design): if the TCP connect or the TLS handshake fails before any request
 byte is written, nothing billable reached the provider. That call's hold is released and only it
 fails (PROVIDER_NOT_REACHED; it leaves no entry: no byte reached the vendor, so there is nothing it
-could bill); the gate does not halt. UNSENT_HALT_STREAK such failures with no settled reply in
-between (kept in the control file, so a restart does not reset them) halt with
-provider_unreachable. Only a settled reply or an activation resets the streak.
+could bill); the gate does not halt. UNSENT_HALT_STREAK such failures (and not-busy unbilled
+errors, below) with no settled reply in between (kept in the control file, so a restart does not
+reset them) halt with provider_unreachable. Only a settled reply or an activation resets the streak.
 
 Unbilled refusals (owner ruling 5, 2026-10-10; per model since 2026-10-12): anything after the connect
 stays uncertain and halts as before, with one exception: a reply the profile's unbilled_refusal
 proves unbilled (DeepInfra: a 429 with an error and no usage, choices or estimated_cost anywhere;
-Anthropic: its well-formed error answers, 429 and 529 overloaded among them) has its hold released
+Anthropic: its well-formed error answers 400, 404, 413, 429, 500 and 529) has its hold released
 and stays on the record: its entry is kept as 'released_unbilled' with held_usd "0" and its HTTP
-status, reason and time, and the caller sees PROVIDER_REFUSED_UNBILLED. Those entries never count
-toward the pot or max_paid_posts_per_day. Owner direction 2026-10-11: such a refusal proves the
-vendor is reachable and costs nothing, so it never halts the gate. It neither grows nor resets the
-unsent streak (only a settled reply resets it), and there is no daily ceiling any more (the day's
-count stays visible in status as today_unbilled_releases). Busy-ness is handled per model instead:
-COOL_OFF_AFTER_REFUSALS such refusals for one model with no settled reply of that model in between
-start a cool-off for that model only. While it runs, a new call for that model is refused before
-any reservation and without contacting the vendor, with MODEL_COOLING and retry_after seconds. The
-window starts at COOL_OFF_FIRST_SECONDS; when it ends, ONE call for that model goes through (the
-trial; others are still refused while it is in flight). If the trial is refused unbilled again the
-window doubles, up to COOL_OFF_MAX_SECONDS; a call that was already in flight when the cool-off
-began and comes back refused restarts the current window without doubling it. A settled reply for
-that model ends its cool-off and its count. Other models are never affected. The cool-off state
-lives in the control file ('cooling', one record per model), written with the same atomic writes.
-So a vendor that billed such replies after all still could not drain the pot unseen or quickly:
-each entry stays on the record, and per model at most one call per cool-off window reaches it.
+status, reason and time. Those entries never count toward the pot or max_paid_posts_per_day, and
+there is no daily ceiling any more (the day's count is in status as today_unbilled_releases).
+The profile's busy_refusal then picks one of two paths (review 2026-10-12):
+- Busy (DeepInfra's 429; Anthropic's 429 rate_limit_error and 529 overloaded_error): the caller sees
+  PROVIDER_REFUSED_UNBILLED. Owner direction 2026-10-11: it proves the vendor is reachable and costs
+  nothing, so it never halts the gate and neither grows nor resets the unsent streak. Busy-ness is
+  handled per model instead: COOL_OFF_AFTER_REFUSALS such refusals for one model with no settled
+  reply of that model in between start a cool-off for that model only. While it runs, a new call
+  for that model is refused before any reservation and without contacting the vendor, with
+  MODEL_COOLING and retry_after seconds. The window starts at COOL_OFF_FIRST_SECONDS; when it ends,
+  ONE call for that model goes through (the trial; others are still refused while it is in flight).
+  If the trial is refused busy again the window doubles, up to COOL_OFF_MAX_SECONDS; a call that was
+  already in flight when the cool-off began and comes back refused restarts the current window (never
+  ending it sooner) without doubling it. A settled reply for that model ends its cool-off and its
+  count. Other models are never affected. The cool-off state lives in the control file ('cooling',
+  one record per model), written with the same atomic writes.
+- Not busy (Anthropic's 400, 404, 413 and 500): the caller sees PROVIDER_ERROR_UNBILLED. As before gate
+  v4 it grows the unsent streak (so UNSENT_HALT_STREAK of them, or of them and connect failures, with
+  no settled reply in between halt with provider_unreachable) and never cools the model.
+What bounds the unbilled refusals if a vendor billed them after all (none is ever a gate halt by
+itself): while a model is cooling, at most one call for it per window reaches the vendor (the trial),
+plus the calls already in flight when the cool-off began; when no model is cooling, nothing limits
+the rate but the concurrency: at most max_concurrent_calls calls are in flight at once, and two busy
+refusals of one model start its cool-off. Over a day the count is bounded only by the day ledger's
+size (DAY_LEDGER_RESERVE_BYTES; past it every reservation is refused DAY_LEDGER_FULL), and every one
+stays on that ledger. The halt watcher (deploy/preview-gate/v2/gate_watch.py) emails the owner once
+per gate per Bucharest day when today_unbilled_releases reaches its threshold (default 100), so the
+owner can check the vendor's billing page; nothing is halted for it.
 A probe (root, one deliberate call) is never refused for a cool-off, but its outcome counts.
 
-Refusal codes the caller sees (PUBLIC_REFUSALS): the three pot codes, PROVIDER_NOT_REACHED and
-PROVIDER_REFUSED_UNBILLED (nothing billed, hold released), MODEL_COOLING (nothing reserved or sent),
+Refusal codes the caller sees (PUBLIC_REFUSALS): the three pot codes, PROVIDER_NOT_REACHED,
+PROVIDER_REFUSED_UNBILLED and PROVIDER_ERROR_UNBILLED (nothing billed, hold released; only the second
+says the model is busy), MODEL_COOLING (nothing reserved or sent),
 and AUTHORITY_HALTED: the gate was already halted (or halted at that moment on an interrupted probe)
 when this call was checked, before anything was reserved. Every other refusal, among them every
 failure after a reservation, is the opaque PREVIEW_TEST_AUTHORITY_STOPPED.
@@ -162,27 +175,33 @@ SERVE_POLL_SECONDS = 0.5  # How often the accept loop checks for a stop (bounds 
 MAX_IPC_BYTES = 1024 * 1024
 IPC_READ_TIMEOUT_SECONDS = 10  # Each header or body read on the 0666 socket.
 MAX_IPC_CONNECTIONS = 32  # Connections beyond this are closed unread, without a thread.
-# Provably unsent calls (PROVIDER_NOT_REACHED) with no settled reply in between before the gate halts
-# (provider_unreachable). A vendor's unbilled refusal neither grows nor resets this count (2026-10-12).
+# Provably unsent calls (PROVIDER_NOT_REACHED) and not-busy unbilled errors (PROVIDER_ERROR_UNBILLED)
+# with no settled reply in between before the gate halts (provider_unreachable). A vendor's busy
+# unbilled refusal (PROVIDER_REFUSED_UNBILLED) neither grows nor resets this count (2026-10-12).
 UNSENT_HALT_STREAK = 5
 # Per-model cool-off (owner direction 2026-10-11): this many unbilled refusals for one model with no
 # settled reply of that model in between (one app call + its 60 s resend) cool that model off.
 COOL_OFF_AFTER_REFUSALS = 2
 COOL_OFF_FIRST_SECONDS = 60  # The first window; each refused trial doubles it ...
 COOL_OFF_MAX_SECONDS = 600  # ... up to ten minutes.
+# The longest stored window a control file may hold (any whole number 0..this). A stored window above
+# today's COOL_OFF_MAX_SECONDS is clamped to it when read (cooling_clamped), never refused, so a later,
+# lower maximum can never make the state unreadable (CONTROL_INVALID would block stop and status too).
+COOLING_RECORD_MAX_SECONDS = 600
 # A GO's max_concurrent_calls is 1 to this (owner ruling, 2026-10-10: "10 at once"). Gate v2 kept its
 # own bound of 8 in its own installed bytes (its GO binds them by hash); this code refuses every v2 GO.
 MAX_CONCURRENT_CALLS = 10
 STOPPED = 'PREVIEW_TEST_AUTHORITY_STOPPED'
-# Codes the caller may see. PROVIDER_NOT_REACHED and PROVIDER_REFUSED_UNBILLED mean this call's hold
-# is already released and nothing was billed (not reached; an unbilled refusal), so the app may treat
-# them as a transient failure. MODEL_COOLING (with retry_after seconds): this model is cooling off
+# Codes the caller may see. PROVIDER_NOT_REACHED, PROVIDER_REFUSED_UNBILLED and PROVIDER_ERROR_UNBILLED
+# mean this call's hold is already released and nothing was billed (not reached; the vendor was busy;
+# the vendor answered with another error that bills nothing, e.g. Anthropic's 400/404/413/500), so the
+# app may treat them as a transient failure; only PROVIDER_REFUSED_UNBILLED says the model is busy. MODEL_COOLING (with retry_after seconds): this model is cooling off
 # after unbilled refusals; nothing was reserved or sent. AUTHORITY_HALTED: the gate is halted, found
 # by the state check before anything was reserved (never after a reservation: every failure there
 # stays the opaque STOPPED).
 PUBLIC_REFUSALS = frozenset({'TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED',
-                             'PROVIDER_NOT_REACHED', 'PROVIDER_REFUSED_UNBILLED', 'MODEL_COOLING',
-                             'AUTHORITY_HALTED'})
+                             'PROVIDER_NOT_REACHED', 'PROVIDER_REFUSED_UNBILLED', 'PROVIDER_ERROR_UNBILLED',
+                             'MODEL_COOLING', 'AUTHORITY_HALTED'})
 GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'provider', 'enabled_models',
                          'scope_id', 'target_host', 'allowed_peer_uids', 'daily_budget_usd', 'max_paid_posts_per_day',
                          'max_concurrent_calls', 'open_days'})
@@ -501,15 +520,26 @@ def _utc_text_valid(value):
 
 def cooling_valid(cooling):
     """The per-model cool-off records: {model: {refusals, window_seconds, until_utc, trial}}. Only
-    this gate writes them; a window is 0 (not cooling yet) or one of the doubling steps."""
+    this gate writes them. A window is 0 (not cooling yet, and then there is no end time) or any
+    whole number of seconds up to COOLING_RECORD_MAX_SECONDS, with a timezone-aware end time; a
+    window above today's COOL_OFF_MAX_SECONDS is accepted here and clamped on read (cooling_clamped)."""
     return isinstance(cooling, dict) and all(
         isinstance(model, str) and isinstance(record, dict) and set(record) == COOLING_KEYS
         and _int_in(record['refusals'], 0, 2 ** 62)
-        and _int_in(record['window_seconds'], 0, COOL_OFF_MAX_SECONDS)
+        and _int_in(record['window_seconds'], 0, COOLING_RECORD_MAX_SECONDS)
         and (record['window_seconds'] == 0) == (record['until_utc'] is None)
         and (record['until_utc'] is None or _utc_text_valid(record['until_utc']))
         and (record['trial'] is None or isinstance(record['trial'], str))
         for model, record in cooling.items())
+
+
+def cooling_clamped(control):
+    """On read: every stored window above today's COOL_OFF_MAX_SECONDS is cut down to it (a later,
+    lower maximum). The stored end time is kept: it was at most COOLING_RECORD_MAX_SECONDS ahead
+    when written, so it runs out by itself, and the next refusal doubles from the clamped window."""
+    for record in control.get('cooling', {}).values():
+        record['window_seconds'] = min(record['window_seconds'], COOL_OFF_MAX_SECONDS)
+    return control
 
 
 def cooling_wait(control, model, moment):
@@ -609,7 +639,7 @@ class TeamStore:
     def control(self):
         if not self.has_control():
             raise SafetyError('STATE_MISSING')
-        return validate_control(helper.read_json(self.dir_fd, CONTROL_NAME, CONTROL_BYTES))
+        return cooling_clamped(validate_control(helper.read_json(self.dir_fd, CONTROL_NAME, CONTROL_BYTES)))
 
     def save_control(self, control):
         helper.write_json(self.dir_fd, CONTROL_NAME, validate_control(control), CONTROL_BYTES)
@@ -978,11 +1008,13 @@ class CallNotSent(SafetyError):
 
 class UnbilledRefusal(Exception):
     """The provider answered with a refusal its profile proves unbilled (profile.unbilled_refusal):
-    released by release_unbilled, which keeps the entry at $0."""
+    released by release_unbilled, which keeps the entry at $0. busy (profile.busy_refusal): the
+    vendor said it is busy (cools the model off) rather than another error (grows the unsent streak)."""
 
-    def __init__(self, status):
+    def __init__(self, status, busy):
         super().__init__('unbilled_refusal')
         self.status = status if type(status) is int else None
+        self.busy = busy is True
 
 
 def release_unsent(private, entry_id, day, now):
@@ -1015,17 +1047,23 @@ def release_unsent(private, entry_id, day, now):
         return {'authority': control['state'], 'unsent_streak': streak}
 
 
-def release_unbilled(private, entry_id, day, http_status, now):
+def release_unbilled(private, entry_id, day, http_status, now, busy=True):
     """Lock, release the hold of a refusal the profile proved unbilled, unlock.
 
     Unlike a provably unsent call, the entry stays on its reservation day's ledger: state
-    'released_unbilled', held_usd "0", with the HTTP status, the reason and the time. It never
-    halts the gate (owner direction 2026-10-11: the vendor answered, and nothing was billed): it
-    neither grows nor resets the unsent streak, and there is no daily ceiling. It counts toward
-    its model's cool-off instead (note_unbilled_refusal).
+    'released_unbilled', held_usd "0", with the HTTP status, the reason and the time. There is no
+    daily ceiling (status shows the day's count; the halt watcher emails once a day past a threshold).
 
-    Write order as for a settlement: the control file (the model's cool-off) first, then the
-    ledger, then in flight is cleared. Dying after the first write leaves a pending entry in flight
+    busy (the profile's busy_refusal: DeepInfra's 429, Anthropic's 429 and 529) never halts the gate
+    (owner direction 2026-10-11: the vendor answered, and nothing was billed): it neither grows nor
+    resets the unsent streak and counts toward its model's cool-off instead (note_unbilled_refusal).
+    Not busy (Anthropic's 400, 404, 413 and 500; review 2026-10-12): as before gate v4, it grows the
+    unsent streak (UNSENT_HALT_STREAK with no settled reply in between halt with provider_unreachable)
+    and never cools the model; a cool-off trial answered so proves nothing, so the next call may be
+    the trial (as for a trial that was not reached).
+
+    Write order as for a settlement: the control file (the model's cool-off, or the streak and any
+    halt) first, then the ledger, then in flight is cleared. Dying after the first write leaves a pending entry in flight
     (serve start halts on it: fail closed); after the second, a released_unbilled entry still in
     flight, which serve start drops (its record is complete and nothing was billed).
     """
@@ -1037,7 +1075,13 @@ def release_unbilled(private, entry_id, day, http_status, now):
         if entry is None or entry['state'] != 'pending' or control['in_flight'].get(entry_id) != day:
             raise SafetyError('SETTLEMENT_STATE_INVALID')
         released = unbilled_releases(ledger) + 1
-        note_unbilled_refusal(control, entry.get('model'), entry_id, moment)
+        if busy:
+            note_unbilled_refusal(control, entry.get('model'), entry_id, moment)
+        else:
+            control['unsent_streak'] = control.get('unsent_streak', 0) + 1
+            clear_trial(control, entry.get('model'), entry_id)
+            if control['unsent_streak'] >= UNSENT_HALT_STREAK:
+                _halt(control, 'provider_unreachable', moment, entry_id)
         store.save_control(control)
         entry.update(state='released_unbilled', held_usd='0', reason='unbilled_refusal',
                      http_status=http_status if type(http_status) is int else None, released_at=iso(moment))
@@ -1134,13 +1178,16 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             # on the RAW reply: redaction drops whole subtrees (headers, secrets), which could hide a
             # billing field. A hook that fails lands in the uncertain branch below, as any doubt does.
             unbilled = profile.unbilled_refusal(status, raw_response)
+            # Review 2026-10-12: only a busy refusal cools the model off; any other unbilled error
+            # (Anthropic's 400/404/413/500) grows the unsent streak instead, as before gate v4.
+            busy = bool(unbilled) and profile.busy_refusal(status, raw_response) is True
             response = helper.redact(raw_response, key, profile.redaction_patterns)
             if unbilled:
-                raise UnbilledRefusal(status)
+                raise UnbilledRefusal(status, busy)
         except (helper.RequestNotSent, UnbilledRefusal) as unsent:
             try:
                 # Unsent: no entry kept. Unbilled: kept at $0 on the record, and cools its model off.
-                outcome = (release_unbilled(private, entry_id, day, unsent.status, now)
+                outcome = (release_unbilled(private, entry_id, day, unsent.status, now, unsent.busy)
                            if isinstance(unsent, UnbilledRefusal) else release_unsent(private, entry_id, day, now))
             except BaseException:
                 # The hold could not be released: treat it exactly like an uncertain call.
@@ -1150,8 +1197,11 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
                 log_event({**event, 'status': 'uncertain', **outcome})
                 raise SafetyError('NEW_CHARGE_UNCERTAIN') from None
             refused = isinstance(unsent, UnbilledRefusal)
-            log_event({**event, 'status': 'not_sent', 'reason': 'unbilled_refusal' if refused else 'not_reached', **outcome})
-            raise CallNotSent('PROVIDER_REFUSED_UNBILLED' if refused else 'PROVIDER_NOT_REACHED') from None
+            log_event({**event, 'status': 'not_sent', 'reason': 'unbilled_refusal' if refused else 'not_reached',
+                       **({'vendor_busy': unsent.busy} if refused else {}), **outcome})
+            if not refused:
+                raise CallNotSent('PROVIDER_NOT_REACHED') from None
+            raise CallNotSent('PROVIDER_REFUSED_UNBILLED' if unsent.busy else 'PROVIDER_ERROR_UNBILLED') from None
         except BaseException as error:
             outcome = settle_or_halt(private, entry_id, day, {
                 'state': 'uncertain', 'held_usd': str(reserved), 'reason': 'transport_failure',
