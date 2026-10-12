@@ -98,10 +98,19 @@ cache reads.
   widened after review). The answers: 429 or 529 (`rate_limit_error` or `overloaded_error`), 400
   (`invalid_request_error`), 404 (`not_found_error`), 413 (`request_too_large`) and 500
   (`api_error`), each with a body that is only Anthropic's error message (no usage, no answer
-  content, no model name anywhere). Such a call is released like DeepInfra's "too many requests":
-  nothing is charged, the day's record keeps it as a $0 `released_unbilled` entry with its HTTP
-  status, that call alone fails, and the app tries once more later. Five in a row halt with
-  `provider_unreachable`; the 20th on one day halts with `unbilled_release_ceiling`.
+  content, no model name anywhere). Such a call is released in the same way as DeepInfra's "too
+  many requests" (the rules since 2026-10-12 are the same; see README.md): nothing is charged, the
+  day's record keeps it as a $0 `released_unbilled` entry with its HTTP status, that call alone
+  fails (`PROVIDER_REFUSED_UNBILLED`), and the app tries once more later. These answers never halt
+  the gate, and there is no daily limit on them (`today_unbilled_releases` in `status` shows the
+  count). After 2 of them for Haiku with no normal answer from Haiku in between, the gate refuses
+  new Haiku calls for a while (`MODEL_COOLING`, with `retry_after` in seconds). Nothing is set
+  aside and Anthropic is not contacted. The first wait is 60 seconds; then ONE call goes through as
+  a trial. If the trial is refused the same way, the wait doubles: 120, 240, 480, then 600 seconds
+  at most. A normal answer from Haiku ends the cool-off. The cool-off ends by itself; nothing needs
+  re-opening. Five in a row that never reached Anthropic at all (the connection failed before
+  anything was sent) halt with `provider_unreachable`. These answers do not count toward those
+  five, and a normal answer resets that count.
 - **These still halt:** 401 (`authentication_error`) and 403 (`permission_error`), because the key
   is wrong or lacks a permission and root must look; 402 (`billing_error`); 504 (`timeout_error`),
   because the work may already have run; any error type that does not belong to its status; and
@@ -347,6 +356,9 @@ If it prints `"status": "refused"` instead of a result, the probe did not pass:
   reviewers (the row or the request shape needs a reviewed code change).
 - `PROVIDER_NOT_REACHED`: the connection failed before anything was sent. Check step 2's
   addresses, then probe again.
+- `AUTHORITY_HALTED`: the gate was already halted, so nothing was set aside and Anthropic was not
+  contacted. Re-open the gate first ("Daily operations"), then probe again. A probe is never
+  refused for a cool-off (`MODEL_COOLING`).
 
 How to read the one line it prints when the call went through:
 
@@ -415,7 +427,8 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
 ## Daily operations
 
 **How much did we spend today? Is the gate open?** This only reads. Look at `today_spend_usd`,
-`remaining_today_usd`, `state`, `reason`, `halts` and `window_open`.
+`remaining_today_usd`, `today_unbilled_releases` (refusals kept at $0; no limit), `cooling`
+(Haiku's cool-off, if any), `state`, `reason`, `halts` and `window_open`.
 
 ```sh
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1

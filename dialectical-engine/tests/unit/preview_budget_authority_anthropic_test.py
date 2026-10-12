@@ -589,7 +589,7 @@ class SettlementTests(AnthropicTest):
         for named in ('claude-haiku-5-5-20261001', 'claude-sonnet-5-5', 'Claude-Haiku-5-5', HAIKU + ' ', None, 7):
             with self.subTest(named=named):
                 gate = self.ready()
-                with self.refused('AUTHORITY_HALTED'):
+                with self.refused('SETTLED_INTO_HALT'):
                     self.call(gate, reply=message(model=named))
                 entry = entry_of(gate)
                 self.assertEqual((entry['state'], Decimal(entry['held_usd'])), ('settled', Decimal('0.00035')))
@@ -599,7 +599,7 @@ class SettlementTests(AnthropicTest):
 
     def test_an_error_status_with_valid_usage_settles_and_halts(self):
         gate = self.ready()
-        with self.refused('AUTHORITY_HALTED'):
+        with self.refused('SETTLED_INTO_HALT'):
             self.call(gate, reply=message(), status=500)
         self.assertEqual((entry_of(gate)['state'], gate.status()['reason']), ('settled', 'provider_error_or_model_identity'))
 
@@ -612,7 +612,7 @@ class SettlementTests(AnthropicTest):
         expected = cost(UPPER, 1000, write_1h=200000, output=100)
         self.assertEqual(expected, Decimal('0.20075'))
         gate = self.ready()
-        with self.refused('AUTHORITY_HALTED'):
+        with self.refused('SETTLED_INTO_HALT'):
             self.call(gate, reply=reply)
         entry = entry_of(gate)
         self.assertEqual((entry['state'], Decimal(entry['held_usd'])), ('settled', expected))
@@ -637,7 +637,7 @@ class UnbilledAndUnsentTests(AnthropicTest):
                     self.call(gate, reply=reply, status=status)
                 status_now = gate.status()
                 self.assertEqual((status_now['state'], status_now['unsent_streak'], status_now['today_posts'],
-                                  status_now['today_spend_usd'], status_now['in_flight']), ('active', 1, 0, '0', 0))
+                                  status_now['today_spend_usd'], status_now['in_flight']), ('active', 0, 0, '0', 0))
                 # A's machinery: the entry stays on the record at $0 as 'released_unbilled'.
                 entries = gate.day(DAY)['entries']
                 self.assertEqual([(e['state'], e['held_usd'], e['http_status'], e['reason']) for e in entries.values()],
@@ -686,12 +686,23 @@ class UnbilledAndUnsentTests(AnthropicTest):
                     self.call(gate, reply=reply, status=status)
                 self.assert_uncertain_halt(gate)
 
-    def test_five_unbilled_in_a_row_halt_as_unreachable(self):
+    def test_overloaded_answers_never_halt_the_gate_they_cool_the_model_off(self):
+        # Owner direction 2026-10-11: 429/529 prove Anthropic is reachable; busy-ness is per model.
         gate = self.ready()
-        for number in range(1, 6):
+        for number in (1, 2):
             with self.refused('PROVIDER_REFUSED_UNBILLED'):
-                self.call(gate, 'op-%d' % number, reply=self.RATE, status=429)
-        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'provider_unreachable'))
+                self.call(gate, 'op-%d' % number, reply=self.BUSY, status=529)
+        for number in range(3, 8):
+            sent = []
+            with self.refused('MODEL_COOLING'):
+                self.call(gate, 'op-%d' % number, dispatch=lambda *args: sent.append(args))
+            self.assertEqual(sent, [])
+        status = gate.status()
+        self.assertEqual((status['state'], status['unsent_streak'], status['today_unbilled_releases'],
+                          status['cooling'][HAIKU]['cooling_now']), ('active', 0, 2, True))
+        gate.clock.set('2026-10-08T09:01:00+00:00')  # The first window (60 s) has run out: one trial goes through.
+        self.call(gate, 'op-8', reply=message())
+        self.assertEqual(gate.status()['cooling'], {})
 
     def test_anything_else_stays_uncertain_and_halts(self):
         cases = {

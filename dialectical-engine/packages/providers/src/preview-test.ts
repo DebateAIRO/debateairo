@@ -273,15 +273,35 @@ export class PreviewUnbilledRefusal extends ProviderUnbilledRefusal {
   constructor(message = "Private preview call was not billed and did not reach an answer") { super(message); }
 }
 /**
- * Run resilience, review amendment R-d (orchestrator, 2026-10-12): the one unbilled refusal that says the MODEL is
+ * Run resilience, review amendment R-d (orchestrator, 2026-10-12): the unbilled refusal that says the MODEL is
  * busy — the VENDOR refused the call and the gate proved it unbilled (PROVIDER_REFUSED_UNBILLED: a vendor 429/529,
- * hold released). The gate's own unbilled refusals stay plain `PreviewUnbilledRefusal`s: its slots were full
- * (CONCURRENCY_LIMIT_REACHED) or the vendor was never reached (PROVIDER_NOT_REACHED); they are still REFUSED rows
- * with the one 60-second resend, but they say nothing about the model, so they never make it sit out
- * (`providerCallEndedVendorRefusedUnbilled`, read by the runner's sit-out book).
+ * hold released), or, since gate v4, the gate refused it because that one model is cooling off after such refusals
+ * (MODEL_COOLING, `PreviewModelCooling` below). The gate's other unbilled refusals stay plain
+ * `PreviewUnbilledRefusal`s: its slots were full (CONCURRENCY_LIMIT_REACHED) or the vendor was never reached
+ * (PROVIDER_NOT_REACHED); they are still REFUSED rows with the one 60-second resend, but they say nothing about the
+ * model, so they never make it sit out (`providerCallEndedVendorRefusedUnbilled`, read by the runner's sit-out book).
  */
 export class PreviewVendorRefusedUnbilled extends PreviewUnbilledRefusal {
-  constructor() { super("Private preview vendor refused the call unbilled"); }
+  constructor(message = "Private preview vendor refused the call unbilled") { super(message); }
+}
+/** The longest cool-off the gate ever names (preview_budget_authority.py COOL_OFF_MAX_SECONDS: 60 s doubling to 600 s). */
+const PREVIEW_MODEL_COOLING_MAX_SECONDS = 600;
+/**
+ * Gate v4 (2026-10-12): MODEL_COOLING. After two or more vendor-unbilled refusals in a row for ONE model, the gate
+ * lets that model cool off (60 seconds, doubling up to 600) and refuses its calls before reserving anything and
+ * without contacting the vendor; after the wait one trial call goes through, and an answer clears it. Other models
+ * are not affected. For the app this is the model being busy, exactly like the vendor's own unbilled refusal: a
+ * REFUSED row, the one 60-second resend (which lands about when the first wait ends, so it is often the trial), and
+ * the model sits out the rest of the run. Never a money stop. `retryAfterSeconds` is the gate's wait in whole
+ * seconds, kept only when it is a whole number from 1 to 600; it is informational (nothing waits on it).
+ */
+export class PreviewModelCooling extends PreviewVendorRefusedUnbilled {
+  readonly retryAfterSeconds: number | undefined;
+  constructor(retryAfterSeconds?: unknown) {
+    super("Private preview gate is letting this model cool off after it was busy");
+    this.retryAfterSeconds = Number.isSafeInteger(retryAfterSeconds) && Number(retryAfterSeconds) >= 1
+      && Number(retryAfterSeconds) <= PREVIEW_MODEL_COOLING_MAX_SECONDS ? Number(retryAfterSeconds) : undefined;
+  }
 }
 /**
  * R-d: a call that ENDED in the vendor's gate-proven unbilled refusal — the gateway's PROVIDER_CALL_FAILED whose last
@@ -456,9 +476,11 @@ const PREVIEW_DAILY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_DAILY_BUDGET_
  * 429/529 with no usage and a provably unbilled body) released its hold, so it is the same
  * transient failure as a busy gate: PROVIDER_CALL_FAILED (as PreviewUnbilledRefusal, which
  * withPreviewProviderCallPolicy sends once more after its cooldown), never a money stop. The gate
- * must list both codes as public refusals for them to arrive here.
+ * must list both codes as public refusals for them to arrive here. Gate v4 (2026-10-12) adds MODEL_COOLING: the
+ * gate refused one busy model's call before reserving or sending anything, which the app reads as the vendor's own
+ * unbilled refusal (`PreviewModelCooling`).
  */
-const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED", "PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"]);
+const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED", "PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED", "MODEL_COOLING"]);
 function previewAuthorityRefusal(status: number | undefined, row: unknown): TypedDomainError {
   const code = status === 409 && typeof row === "object" && row !== null && !Array.isArray(row)
     ? (row as Record<string, unknown>).error : undefined;
@@ -470,10 +492,14 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
     // is unbilled like the other two: a REFUSED row no count includes, and the one 60-second resend.
     // R-d (2026-10-12): only the vendor's refusal says the model is busy; the gate's own two never do.
     if (code === "PROVIDER_REFUSED_UNBILLED") return new PreviewVendorRefusedUnbilled();
+    // Gate v4: the gate's cool-off for one busy model is the same "this model is busy" as the vendor's refusal.
+    if (code === "MODEL_COOLING") return new PreviewModelCooling((row as Record<string, unknown>).retry_after);
     return code === "CONCURRENCY_LIMIT_REACHED"
       ? new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight")
       : new PreviewUnbilledRefusal();
   }
+  // Gate v4: the gate says outright that it was already halted when the call arrived, before reserving anything.
+  if (code === "AUTHORITY_HALTED") return new PreviewGateUnavailable();
   return new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request");
 }
 /**
@@ -485,8 +511,11 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
  * read-only `/remaining` (preview-remaining.ts, on the same socket): a gate that is not active, or whose window is
  * shut, is UNAVAILABLE. The code is never a spend stop, the call is never resent (it is not an unbilled refusal),
  * and the gateway still records its FAILED row (counted against this maker only, fix (b)). Any other `/remaining`
- * answer, or none, keeps today's mapping. App-only: the gate's own codes are a later change (ruling, spec "Gate
- * change, later").
+ * answer, or none, keeps today's mapping. Gate v4 (2026-10-12) made the "gate change, later": a gate that is already
+ * halted when a call arrives now says so itself (AUTHORITY_HALTED, found before anything is reserved), which is read
+ * as UNAVAILABLE straight away, without asking `/remaining`. STOPPED stays the gate's word for everything else (a halt
+ * after the call was reserved, or doubt about whether it was sent), and an older gate that only says STOPPED keeps
+ * the `/remaining` read above.
  */
 export const PROVIDER_GATE_UNAVAILABLE = "PROVIDER_GATE_UNAVAILABLE" as const;
 export class PreviewGateUnavailable extends TypedDomainError {

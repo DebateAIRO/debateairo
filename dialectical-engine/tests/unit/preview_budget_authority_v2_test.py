@@ -304,7 +304,7 @@ class PhaseTests(GateTest):
         result = bridge.stop_authority(gate.private, now=gate.clock)
         self.assertEqual((result['state'], result['reason']), ('halted', 'operator_stop'))
         dispatched = []
-        with self.refused('AUTHORITY_STOPPED'):
+        with self.refused('AUTHORITY_HALTED'):
             gate.call(dispatch=lambda *args: dispatched.append(args))
         self.assertEqual(dispatched, [])
 
@@ -330,7 +330,7 @@ class PhaseTests(GateTest):
             'open_until_utc': '2026-10-15T09:00:00+00:00', 'window_open': True,
             'today': '2026-10-08', 'daily_budget_usd': '5.00', 'today_spend_usd': '0.01',
             'remaining_today_usd': '4.99', 'today_posts': 1, 'max_paid_posts_per_day': 500, 'in_flight': 0,
-            'today_unbilled_releases': 0, 'unbilled_releases_per_day': 20,
+            'today_unbilled_releases': 0, 'cooling': {},
             'today_uncertain': 0, 'halts': [], 'halts_dropped': 0})
 
     def test_status_of_uninitialized_directory_refuses_without_creating_files(self):
@@ -684,7 +684,7 @@ class HaltTests(GateTest):
         entry = gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-1']
         self.assertEqual(entry['state'], entry_state)
         dispatched = []
-        with self.refused('AUTHORITY_STOPPED'):
+        with self.refused('AUTHORITY_HALTED'):
             gate.call('op-later', dispatch=lambda *args: dispatched.append(args))
         self.assertEqual(dispatched, [])
         return entry
@@ -744,7 +744,7 @@ class HaltTests(GateTest):
     def test_charge_above_reservation_is_recorded_and_halts(self):
         gate = self.gate().ready()
         over = str(RESERVED + Decimal('0.000000001'))
-        with self.refused('AUTHORITY_HALTED'):
+        with self.refused('SETTLED_INTO_HALT'):
             gate.call('op-1', charge=over)
         entry = self.assert_halted(gate, 'charge_overrun', 'settled')
         self.assertEqual((entry['held_usd'], entry['overrun_usd']), (over, '1E-9'))
@@ -753,7 +753,7 @@ class HaltTests(GateTest):
         for kwargs in ({'status': 500}, {'status': 429}, {'model': 'other/model'}, {'model': None}):
             with self.subTest(kwargs=kwargs):
                 gate = self.gate().ready()
-                with self.refused('AUTHORITY_HALTED'):
+                with self.refused('SETTLED_INTO_HALT'):
                     gate.call('op-1', charge='0.01', **kwargs)
                 entry = self.assert_halted(gate, 'provider_error_or_model_identity', 'settled')
                 self.assertEqual(entry['held_usd'], '0.01')
@@ -1098,7 +1098,7 @@ class ConcurrencyTests(GateTest):
                 raise ConnectionResetError('synthetic')
             with self.refused('NEW_CHARGE_UNCERTAIN'):
                 gate.call('op-2', dispatch=broken)
-            with self.refused('AUTHORITY_STOPPED'):
+            with self.refused('AUTHORITY_HALTED'):
                 gate.call('op-3')
         finally:
             release.set()
@@ -1368,7 +1368,7 @@ class UnsentCallTests(GateTest):
         self.assertEqual((status['state'], status['reason'], status['in_flight'], status['today_posts']),
                          ('halted', 'provider_unreachable', 0, 0))
         self.assertEqual(status['halts'][-1]['entry_id'], 'preview-test:' + SCOPE + ':op-5')
-        with self.refused('AUTHORITY_STOPPED'):
+        with self.refused('AUTHORITY_HALTED'):
             gate.call('op-6')
         self.assertEqual(bridge.UNSENT_HALT_STREAK, 5)
 

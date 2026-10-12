@@ -231,6 +231,8 @@ class UnitFileTests(unittest.TestCase):
         for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"10.00"', '2000',
                      'max_concurrent_calls', GLM, DEEPSEEK, MIMO, QWEN, ' probe ', 'preview:qwen-3-8-flash',
                      'TEAM_TOTAL_BUDGET_EXCEEDED', 'unbilled_release_ceiling', 'PROBE_FENCE_REQUIRED',
+                     # 2026-10-12: busy models cool off one by one; a halted gate says so before reserving.
+                     'MODEL_COOLING', 'AUTHORITY_HALTED', 'today_unbilled_releases',
                      # The two round-2 documentation findings: the midnight overlap, and a predecessor
                      # hash that is written down only.
                      '**Midnight overlap.**', '10 x $0.1421 = $1.42', 'It never checks it against v2',
@@ -238,7 +240,8 @@ class UnitFileTests(unittest.TestCase):
                      # owner ruling 2026-10-10 (pots and per-call caps).
                      '$0.14211072 (MiMo) | $1.4211072 | yes', '(256 KiB)', '32,768', 'about 236 KiB'):
             self.assertIn(name, readme)
-        for old in ('"3.50"', '"4.00"', '128 KiB', '163,840', '$0.2276', '$0.0857'):  # Superseded figures.
+        for old in ('"3.50"', '"4.00"', '128 KiB', '163,840', '$0.2276', '$0.0857',  # Superseded figures.
+                    'At most 20 a day', '(the gate halts at 20)'):  # The daily unbilled ceiling is gone (2026-10-12).
             self.assertNotIn(old, readme)
         go_line = [line for line in readme.splitlines() if line.startswith('jq -n') and 'go-v3' in line]
         self.assertEqual(len(go_line), 1)

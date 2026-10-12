@@ -37,6 +37,14 @@ def no_network(*_args, **_kwargs):
     raise AssertionError('tests must never build the real HTTPS transport')
 
 
+def unreached(_sent, _key):
+    raise bridge.helper.RequestNotSent('request_not_sent')
+
+
+def later(gate, seconds):
+    gate.clock.set(bridge.iso(gate.clock() + bridge.timedelta(seconds=seconds)))
+
+
 def entry_of(gate, operation_id, day='2026-10-08'):
     return gate.day(day)['entries']['preview-test:' + SCOPE + ':' + operation_id]
 
@@ -352,7 +360,7 @@ class ModelCallTests(GateTest):
                              (MODEL, None), (MODEL, 7)):
             with self.subTest(asked=asked, named=named):
                 gate = self.gate(enabled_models=ALL).ready()
-                with self.refused('AUTHORITY_HALTED'):
+                with self.refused('SETTLED_INTO_HALT'):
                     gate.call('op-1', value=body(model=asked), model=named, charge='0.01')
                 status = gate.status()
                 self.assertEqual((status['state'], status['reason']), ('halted', 'provider_error_or_model_identity'))
@@ -362,7 +370,7 @@ class ModelCallTests(GateTest):
 
     def test_a_long_model_name_in_a_reply_is_not_stored(self):
         gate = self.gate().ready()
-        with self.refused('AUTHORITY_HALTED'):
+        with self.refused('SETTLED_INTO_HALT'):
             gate.call('op-1', model='m' * 129)
         self.assertIsNone(entry_of(gate, 'op-1')['reply_model'])
 
@@ -486,7 +494,7 @@ class RemainingTests(GateTest):
 
     def test_remaining_money_and_calls_never_go_below_zero(self):
         gate = self.gate(daily_budget_usd='0.13', max_concurrent_calls=1, max_paid_posts_per_day=1).ready()
-        with self.refused('AUTHORITY_HALTED'):
+        with self.refused('SETTLED_INTO_HALT'):
             gate.call('op-1', charge='0.20')  # An overrun: settled above the pot (and halts).
         report = self.report(gate)
         self.assertEqual((report['remaining_usd'], report['remaining_calls']), ('0', 0))
@@ -688,7 +696,7 @@ class ProbeTests(GateTest):
             self.probe(gate, DEEPSEEK, unsent)
         self.assertEqual((gate.status()['state'], gate.status()['today_posts']), ('active', 0))
         bridge.stop_authority(gate.private, now=gate.clock)
-        with self.refused('AUTHORITY_STOPPED'):
+        with self.refused('AUTHORITY_HALTED'):
             self.probe(gate, DEEPSEEK, no_network)
 
     def test_probe_counts_in_the_pot_and_the_daily_call_limit(self):
@@ -703,26 +711,28 @@ class UnbilledRefusalTests(GateTest):
     """Owner ruling 5 (2026-10-10): a 429 the profile proves unbilled counts as not sent."""
     RATE_LIMITED = {'error': {'message': 'Rate limit exceeded', 'type': 'rate_limit'}}
 
-    def test_a_429_without_usage_is_released_and_the_streak_grows_to_a_halt(self):
+    def test_a_429_without_usage_is_released_and_never_grows_the_streak_or_halts(self):
+        # Owner direction 2026-10-11: a vendor's unbilled refusal proves it is reachable; it never halts.
         gate = self.gate().ready()
-        for number in range(1, 5):
+        for number in range(1, 6):
             with self.refused('PROVIDER_REFUSED_UNBILLED'):
                 gate.call('op-%d' % number, dispatch=lambda _s, _k: (429, dict(self.RATE_LIMITED)))
             status = gate.status()
             self.assertEqual((status['state'], status['unsent_streak'], status['today_posts'], status['today_spend_usd'],
-                              status['in_flight']), ('active', number, 0, '0', 0))
+                              status['in_flight']), ('active', 0, 0, '0', 0))
+            later(gate, 601)  # Past any cool-off, so each call reaches the vendor.
         # Kept on the record at $0 (round 2 review): never counted as spend or as a paid post.
         self.assertEqual({entry['state'] for entry in gate.day('2026-10-08')['entries'].values()}, {'released_unbilled'})
-        self.assertEqual(gate.status()['today_unbilled_releases'], 4)
+        self.assertEqual(gate.status()['today_unbilled_releases'], 5)
         self.assertIn('"reason": "unbilled_refusal"', self.out.getvalue())
-        with self.refused('PROVIDER_REFUSED_UNBILLED'):
-            gate.call('op-5', dispatch=lambda _s, _k: (429, dict(self.RATE_LIMITED)))
-        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'provider_unreachable'))
 
     def test_a_settled_reply_resets_the_streak_and_ipc_does_not_halt(self):
         gate = self.gate().ready()
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call('op-0', dispatch=unreached)
         with self.refused('PROVIDER_REFUSED_UNBILLED'):
             gate.call('op-1', dispatch=lambda _s, _k: (429, dict(self.RATE_LIMITED)))
+        self.assertEqual(gate.status()['unsent_streak'], 1)  # The refusal neither grew nor reset it.
         gate.call('op-2')
         self.assertEqual(gate.status()['unsent_streak'], 0)
         # The app maps this code to its transient retry path: nothing was billed, the hold is gone.
@@ -732,7 +742,7 @@ class UnbilledRefusalTests(GateTest):
     def test_a_429_carrying_usage_is_settled_and_halts(self):
         gate = self.gate().ready()
         reply = {**self.RATE_LIMITED, 'usage': {'prompt_tokens': 10, 'completion_tokens': 0}}
-        with self.refused('AUTHORITY_HALTED'):
+        with self.refused('SETTLED_INTO_HALT'):
             gate.call('op-1', dispatch=lambda _s, _k: (429, reply))
         entry = entry_of(gate, 'op-1')
         self.assertEqual((entry['state'], gate.status()['reason']), ('settled', 'provider_error_or_model_identity'))
@@ -872,10 +882,12 @@ class ProfileApiTests(GateTest):
 
     def test_refusal_body_passes_only_the_public_codes(self):
         for code in ('PROVIDER_NOT_REACHED', 'PROVIDER_REFUSED_UNBILLED', 'TEAM_DAILY_BUDGET_REACHED',
-                     'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED'):
+                     'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED', 'AUTHORITY_HALTED', 'MODEL_COOLING'):
             self.assertEqual(json.loads(bridge.refusal_body(bridge.CallNotSent(code))), {'error': code})
-        for code in ('MODEL_NOT_ALLOWED', 'NEW_CHARGE_UNCERTAIN', 'AUTHORITY_HALTED', 'AUTHORITY_STOPPED', 'RESERVATION_MISMATCH',
-                     'REMAINING_REQUEST_INVALID', 'PROBE_RUNNING', 'SETTLEMENT_FAILED', 'provider_not_reached'):
+        self.assertEqual(json.loads(bridge.refusal_body(bridge.ModelCooling(42))), {'error': 'MODEL_COOLING', 'retry_after': 42})
+        # SETTLED_INTO_HALT: a call that was reserved and sent, then halted the gate, stays opaque.
+        for code in ('MODEL_NOT_ALLOWED', 'NEW_CHARGE_UNCERTAIN', 'SETTLED_INTO_HALT', 'AUTHORITY_STOPPED', 'RESERVATION_MISMATCH',
+                     'AUTHORITY_EXPIRED', 'REMAINING_REQUEST_INVALID', 'PROBE_RUNNING', 'SETTLEMENT_FAILED', 'provider_not_reached'):
             self.assertEqual(json.loads(bridge.refusal_body(SafetyError(code))), {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'})
         self.assertEqual(json.loads(bridge.refusal_body(ValueError('PROVIDER_NOT_REACHED'))),
                          {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'})
@@ -913,7 +925,7 @@ class ProbeLockTests(GateTest):
         bridge.reserve_call(gate.private, go, file_sha(gate.go_path), request, reserved, row, HOST, 0, gate.clock,
                             True, prices)  # The probe process died here: its lock is gone.
         dispatched = []
-        with self.refused('AUTHORITY_STOPPED'):
+        with self.refused('AUTHORITY_HALTED'):
             gate.call('op-1', dispatch=lambda *args: dispatched.append(args))
         status = gate.status()
         self.assertEqual((status['state'], status['reason'], dispatched), ('halted', 'interrupted_probe', []))
@@ -1093,36 +1105,32 @@ class UnbilledLedgerTests(GateTest):
         self.refuse(gate, 'op-2')
         report = bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, slots=gate.slots, now=gate.clock)
         self.assertEqual(report['remaining_calls'], 1)
+        later(gate, bridge.COOL_OFF_FIRST_SECONDS)  # The model's cool-off has run out: this call is its trial.
         self.assertEqual(gate.call('op-3')['status'], 200)
         with self.refused('DAILY_CALL_LIMIT_REACHED'):
             gate.call('op-4')
 
-    def test_the_twentieth_release_of_a_day_halts_and_settled_replies_do_not_reset_the_count(self):
-        self.assertEqual(bridge.UNBILLED_RELEASES_PER_DAY, 20)
+    def test_there_is_no_daily_ceiling_however_many_releases(self):
+        # Owner direction 2026-10-11: the old 20-a-day halt (unbilled_release_ceiling) is gone. The
+        # day's count stays visible in status, and never halts.
+        self.assertFalse(hasattr(bridge, 'UNBILLED_RELEASES_PER_DAY'))
         gate = self.gate().ready()
-        for number in range(1, 20):
+        for number in range(1, 41):
             self.refuse(gate, 'u-%d' % number)
-            if number % 4 == 0:
-                gate.call('ok-%d' % number)  # Resets the streak, never the daily count.
-                self.assertEqual(gate.status()['unsent_streak'], 0)
-            self.assertEqual((gate.status()['state'], gate.status()['today_unbilled_releases']), ('active', number))
-        self.refuse(gate, 'u-20')
+            later(gate, 601)
         status = gate.status()
-        self.assertEqual((status['state'], status['reason'], status['today_unbilled_releases'], status['in_flight']),
-                         ('halted', 'unbilled_release_ceiling', 20, 0))
-        self.assertEqual(status['halts'][-1]['entry_id'], 'preview-test:' + SCOPE + ':u-20')
-        self.assertEqual(entry_of(gate, 'u-20')['state'], 'released_unbilled')
-        with self.refused('AUTHORITY_STOPPED'):
-            gate.call('after')
-        # Re-opening the same day does not reset it either: the next release halts at once.
-        gate.activate()
-        self.refuse(gate, 'u-21')
-        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'unbilled_release_ceiling'))
+        self.assertEqual((status['state'], status['reason'], status['today_unbilled_releases'], status['unsent_streak'],
+                          status['today_posts'], status['today_spend_usd'], status['in_flight']),
+                         ('active', None, 40, 0, 0, '0', 0))
+        self.assertNotIn('unbilled_releases_per_day', status)
+        self.assertEqual(status['halts'], [])
+        self.assertEqual(gate.call('ok')['status'], 200)
 
     def test_the_next_bucharest_day_starts_at_zero(self):
         gate = self.gate().ready()
         for number in range(3):
             self.refuse(gate, 'u-%d' % number)
+            later(gate, 601)
         gate.clock.set('2026-10-08T21:30:00+00:00')  # 00:30 in Bucharest on 9 October.
         self.assertEqual((gate.status()['today'], gate.status()['today_unbilled_releases']), ('2026-10-09', 0))
         self.refuse(gate, 'next-day')
@@ -1131,10 +1139,6 @@ class UnbilledLedgerTests(GateTest):
 
     def test_a_release_across_midnight_counts_on_the_day_it_was_reserved(self):
         gate = self.gate().ready()
-        for number in range(19):
-            self.refuse(gate, 'u-%d' % number)
-            if number % 4 == 3:
-                gate.call('ok-%d' % number)  # Keeps the in-a-row streak (5) from halting first.
         gate.clock.set('2026-10-08T20:59:59+00:00')  # 23:59:59 in Bucharest on 8 October.
 
         def after_midnight(_body, _key):
@@ -1142,13 +1146,11 @@ class UnbilledLedgerTests(GateTest):
             return 429, dict(self.RATE_LIMITED)
         with self.refused('PROVIDER_REFUSED_UNBILLED'):
             gate.call('u-late', dispatch=after_midnight)
-        # The 20th release of 8 October: it halts, and it sits on 8 October's record at $0.
+        # It sits on 8 October's record at $0, and halts nothing.
         self.assertEqual(entry_of(gate, 'u-late')['state'], 'released_unbilled')
-        self.assertEqual(gate.status()['reason'], 'unbilled_release_ceiling')
-        self.assertEqual((gate.status()['today'], gate.status()['today_unbilled_releases']), ('2026-10-09', 0))
-        gate.activate()  # The new day's ceiling is untouched: its first release does not halt.
-        self.refuse(gate, 'next-day')
-        self.assertEqual((gate.status()['state'], gate.status()['today_unbilled_releases']), ('active', 1))
+        self.assertEqual(gate.day('2026-10-08')['entries'].keys(), {'preview-test:' + SCOPE + ':u-late'})
+        status = gate.status()
+        self.assertEqual((status['state'], status['today'], status['today_unbilled_releases']), ('active', '2026-10-09', 0))
 
     def test_recovery_and_day_spend_ignore_the_zero_holds(self):
         gate = self.gate().ready()
@@ -1192,13 +1194,296 @@ class UnbilledLedgerTests(GateTest):
                 self.assertEqual(entry_of(gate, 'op-1')['state'], state)
 
     def test_the_mechanism_is_the_profile_hook_for_any_provider(self):
-        # PR B routes its own proved-unbilled replies through profile.unbilled_refusal: same entry, same ceiling.
+        # PR B routes its own proved-unbilled replies through profile.unbilled_refusal: same entry, same cool-off.
         with patch.object(DEEPINFRA, 'unbilled_refusal', lambda status, _response: status == 503):
             gate = self.gate().ready()
             with self.refused('PROVIDER_REFUSED_UNBILLED'):
                 gate.call('op-1', dispatch=lambda _s, _k: (503, {'error': 'busy'}))
         entry = entry_of(gate, 'op-1')
         self.assertEqual((entry['state'], entry['held_usd'], entry['http_status']), ('released_unbilled', '0', 503))
+
+
+class ModelCoolingTests(GateTest):
+    """Owner direction 2026-10-11: a vendor's unbilled refusals cool THAT model off; the gate never
+    halts for them, other models are untouched, and every money rule stays as it was."""
+    RATE_LIMITED = UnbilledRefusalTests.RATE_LIMITED
+    START = '2026-10-08T09:00:00+00:00'
+
+    def busy(self, sent=None):
+        def dispatch(raw, _key):
+            if sent is not None:
+                sent.append(json.loads(raw)['model'])
+            return 429, dict(self.RATE_LIMITED)
+        return dispatch
+
+    def refuse(self, gate, operation_id, model=MODEL):
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call(operation_id, value=body(model=model), dispatch=self.busy())
+
+    def cooling(self, gate, operation_id, model=MODEL):
+        """A refused MODEL_COOLING call: returns its retry_after, and proves nothing was sent or reserved."""
+        sent, before, in_flight = [], gate.day('2026-10-08'), gate.status()['in_flight']
+        with self.assertRaises(bridge.ModelCooling) as caught:
+            gate.call(operation_id, value=body(model=model), dispatch=lambda *args: sent.append(args))
+        self.assertEqual(str(caught.exception), 'MODEL_COOLING')
+        self.assertEqual((sent, gate.day('2026-10-08'), gate.status()['in_flight']), ([], before, in_flight))
+        return caught.exception.retry_after
+
+    def record(self, gate, model=MODEL):
+        return gate.control()['cooling'].get(model)
+
+    def test_the_defaults_are_two_refusals_sixty_seconds_doubling_to_ten_minutes(self):
+        self.assertEqual((bridge.COOL_OFF_AFTER_REFUSALS, bridge.COOL_OFF_FIRST_SECONDS, bridge.COOL_OFF_MAX_SECONDS),
+                         (2, 60, 600))
+        self.assertEqual(bridge.UNSENT_HALT_STREAK, 5)
+
+    def test_one_refusal_does_not_cool_the_second_does_for_sixty_seconds_without_reserving(self):
+        gate = self.gate().ready()
+        self.refuse(gate, 'op-1')
+        self.assertEqual(self.record(gate), {'refusals': 1, 'window_seconds': 0, 'until_utc': None, 'trial': None})
+        self.refuse(gate, 'op-2')  # The app's one 60 s resend in real use; here at once.
+        self.assertEqual(self.record(gate), {'refusals': 2, 'window_seconds': 60,
+                                             'until_utc': '2026-10-08T09:01:00+00:00', 'trial': None})
+        self.assertEqual(self.cooling(gate, 'op-3'), 60)
+        later(gate, 20)
+        self.assertEqual(self.cooling(gate, 'op-4'), 40)
+        status = gate.status()
+        self.assertEqual((status['state'], status['unsent_streak'], status['today_unbilled_releases'], status['today_posts']),
+                         ('active', 0, 2, 0))
+        self.assertEqual(status['cooling'][MODEL]['cooling_now'], True)
+        # Refused calls leave no entry: only the two released refusals are on the record.
+        self.assertEqual(len(gate.day('2026-10-08')['entries']), 2)
+
+    def test_other_models_are_never_affected(self):
+        gate = self.gate(enabled_models=ALL).ready()
+        self.refuse(gate, 'glm-1')
+        self.refuse(gate, 'glm-2')
+        self.cooling(gate, 'glm-3')
+        for model in (DEEPSEEK, MIMO, QWEN):
+            self.assertEqual(gate.call('ok-' + model.split('/')[0], value=body(model=model))['status'], 200)
+        self.refuse(gate, 'ds-1', DEEPSEEK)  # One refusal for DeepSeek: not cooling.
+        self.assertEqual(gate.call('ds-2', value=body(model=DEEPSEEK))['status'], 200)
+        self.assertEqual(set(gate.status()['cooling']), {MODEL})  # DeepSeek's settled reply cleared its count.
+        self.cooling(gate, 'glm-4')
+
+    def test_after_the_window_one_trial_goes_through_and_the_others_wait_for_it(self):
+        gate = self.gate().ready()
+        self.refuse(gate, 'op-1')
+        self.refuse(gate, 'op-2')
+        later(gate, 60)
+        seen = []
+
+        def trial(_raw, _key):
+            # While the trial is out, every other call for this model is still refused.
+            seen.append(self.cooling(gate, 'op-other'))
+            seen.append(self.record(gate)['trial'])
+            return 200, provider_response('0.01', MODEL)
+        self.assertEqual(gate.call('op-trial', dispatch=trial)['status'], 200)
+        self.assertEqual(seen, [60, 'preview-test:' + SCOPE + ':op-trial'])
+        # The trial settled: the cool-off and its count are gone, calls flow again.
+        self.assertEqual(gate.status()['cooling'], {})
+        self.assertEqual(gate.call('op-next')['status'], 200)
+        self.refuse(gate, 'op-again')  # The count starts over: one refusal does not cool.
+        self.assertEqual(gate.call('op-after')['status'], 200)
+
+    def test_each_refused_trial_doubles_the_window_up_to_ten_minutes(self):
+        gate = self.gate().ready()
+        self.refuse(gate, 'op-1')
+        self.refuse(gate, 'op-2')
+        windows = []
+        for number, wait in enumerate((60, 120, 240, 480, 600, 600), start=3):
+            later(gate, wait - 1)
+            self.assertEqual(self.cooling(gate, 'early-%d' % number), 1)
+            later(gate, 1)
+            self.refuse(gate, 'trial-%d' % number)  # The trial reached the vendor, which refused again.
+            windows.append((self.record(gate)['window_seconds'], self.cooling(gate, 'after-%d' % number)))
+        self.assertEqual(windows, [(120, 120), (240, 240), (480, 480), (600, 600), (600, 600), (600, 600)])
+        self.assertEqual((gate.status()['state'], gate.status()['today_unbilled_releases']), ('active', 8))
+
+    def test_a_refused_call_that_was_already_in_flight_restarts_the_window_without_doubling(self):
+        gate = self.gate().ready()
+
+        def straggler(_raw, _key):
+            # Two calls sent beside this one are refused first: the cool-off starts at 09:00:00.
+            self.refuse(gate, 'op-b')
+            self.refuse(gate, 'op-c')
+            later(gate, 30)
+            return 429, dict(self.RATE_LIMITED)
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call('op-a', dispatch=straggler)
+        self.assertEqual(self.record(gate), {'refusals': 3, 'window_seconds': 60,
+                                             'until_utc': '2026-10-08T09:01:30+00:00', 'trial': None})
+        self.assertEqual(self.cooling(gate, 'op-d'), 60)
+
+    def test_a_trial_that_never_reached_the_vendor_lets_the_next_call_be_the_trial(self):
+        gate = self.gate().ready()
+        self.refuse(gate, 'op-1')
+        self.refuse(gate, 'op-2')
+        later(gate, 60)
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call('op-trial', dispatch=unreached)
+        self.assertEqual((self.record(gate)['trial'], self.record(gate)['window_seconds']), (None, 60))
+        self.assertEqual(gate.status()['unsent_streak'], 1)
+        self.assertEqual(gate.call('op-next')['status'], 200)
+        self.assertEqual(gate.status()['cooling'], {})
+
+    def test_many_unbilled_refusals_never_halt_and_never_touch_the_unsent_streak(self):
+        gate = self.gate(enabled_models=ALL).ready()
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call('nr-1', dispatch=unreached)
+        refusals = 0
+        for round_number in range(25):
+            for model in ALL:
+                record = gate.control().get('cooling', {}).get(model)
+                if record is None or record['until_utc'] is None \
+                        or bridge.datetime.fromisoformat(record['until_utc']) <= gate.clock():
+                    self.refuse(gate, 'r-%d-%s' % (round_number, model.split('/')[0]), model)
+                    refusals += 1
+                else:
+                    self.cooling(gate, 'c-%d-%s' % (round_number, model.split('/')[0]), model)
+            later(gate, 45)
+        status = gate.status()
+        self.assertEqual((status['state'], status['halts'], status['unsent_streak'], status['today_unbilled_releases']),
+                         ('active', [], 1, refusals))
+        self.assertGreater(refusals, 20)  # More than the old daily ceiling, from four models.
+
+    def test_connect_failures_still_halt_at_five_and_unbilled_refusals_between_them_do_not_reset_it(self):
+        gate = self.gate(enabled_models=ALL).ready()
+        for number in range(1, 5):
+            with self.refused('PROVIDER_NOT_REACHED'):
+                gate.call('nr-%d' % number, dispatch=unreached)
+            self.refuse(gate, 'u-%d' % number, DEEPSEEK if number % 2 else MIMO)
+            later(gate, 601)
+        self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', 4))
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call('nr-5', dispatch=unreached)
+        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'provider_unreachable'))
+        # A settled reply resets the streak (unchanged); here after re-opening.
+        gate.activate()
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call('nr-6', dispatch=unreached)
+        gate.call('ok')
+        self.assertEqual(gate.status()['unsent_streak'], 0)
+
+    def test_a_probe_is_never_refused_for_a_cool_off_and_its_settled_reply_ends_it(self):
+        gate = self.gate().ready()
+        self.refuse(gate, 'op-1')
+        self.refuse(gate, 'op-2')
+        self.cooling(gate, 'op-3')
+        self.assertEqual(ProbeTests.probe(self, gate, MODEL)['entry_state'], 'settled')
+        self.assertEqual(gate.status()['cooling'], {})
+        self.assertEqual(gate.call('op-4')['status'], 200)
+
+    def test_the_cool_off_survives_a_serve_restart_and_a_bad_record_refuses_the_state(self):
+        gate = self.gate().ready()
+        self.refuse(gate, 'op-1')
+        self.refuse(gate, 'op-2')
+        self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 0, 'unrecorded_uncertain': 0})
+        self.assertEqual(self.cooling(gate, 'op-3'), 60)
+        for name, bad in (('window_without_until', {'refusals': 2, 'window_seconds': 60, 'until_utc': None, 'trial': None}),
+                          ('over_the_cap', {'refusals': 2, 'window_seconds': 601, 'until_utc': self.START, 'trial': None}),
+                          ('naive_time', {'refusals': 2, 'window_seconds': 60, 'until_utc': '2026-10-08T09:01:00', 'trial': None}),
+                          ('extra_key', {'refusals': 2, 'window_seconds': 0, 'until_utc': None, 'trial': None, 'x': 1}),
+                          ('not_a_record', 'cooling')):
+            with self.subTest(name):
+                self.assertFalse(bridge.cooling_valid({MODEL: bad}))
+        self.assertFalse(bridge.cooling_valid([]))
+        control = gate.control()
+        control['cooling'][MODEL]['window_seconds'] = 601
+        (gate.private / 'team-control.json').write_text(json.dumps(control))
+        with self.refused('CONTROL_INVALID'):
+            gate.status()
+
+    def test_money_rules_are_unchanged_for_a_cooling_model(self):
+        gate = self.gate(max_paid_posts_per_day=1).ready()
+        self.refuse(gate, 'op-1')
+        self.refuse(gate, 'op-2')
+        later(gate, 60)
+        # The trial is paid like any call: an overrun is charged and halts the whole gate.
+        with self.refused('SETTLED_INTO_HALT'):
+            gate.call('op-trial', charge='1.00')
+        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'charge_overrun'))
+        self.assertEqual(json.loads(bridge.refusal_body(SafetyError('SETTLED_INTO_HALT'))),
+                         {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'})
+        # The pot and call-count codes come before the cool-off (a cooling model on a spent day says so).
+        other = self.gate(max_paid_posts_per_day=1, enabled_models=ALL).ready()
+        self.refuse(other, 'u-1')
+        self.refuse(other, 'u-2')
+        other.call('paid', value=body(model=DEEPSEEK))
+        with self.refused('DAILY_CALL_LIMIT_REACHED'):
+            other.call('next')
+        spent = self.gate(daily_budget_usd='0.08', max_concurrent_calls=1, enabled_models=[MODEL, DEEPSEEK]).ready()
+        self.refuse(spent, 'u-1')
+        self.refuse(spent, 'u-2')
+        for number in range(4):  # $0.076 spent: GLM's $0.0167 hold no longer fits the $0.08 pot.
+            spent.call('paid-%d' % number, value=body(model=DEEPSEEK), charge='0.019')
+        with self.refused('TEAM_DAILY_BUDGET_REACHED'):
+            spent.call('next')
+
+
+class HaltedRefusalTests(GateTest):
+    """AUTHORITY_HALTED: the state check found the gate halted before anything was reserved."""
+
+    def complete(self, gate, operation_id, dispatch):
+        """One POST /complete through the real IPC handler; returns (status line, reply)."""
+        server_side, client_side = socket.socketpair()
+        data = json.dumps(envelope(body(), operation_id)).encode()
+        client_side.sendall(b'POST /complete HTTP/1.0\r\nContent-Type: application/json\r\nContent-Length: '
+                            + str(len(data)).encode() + b'\r\n\r\n' + data)
+
+        def execute(request, peer_uid, cancelled, on_reserved):
+            return bridge.execute_request(gate.private, gate.go_path, request, peer_uid=peer_uid, slots=gate.slots,
+                                          dispatch=dispatch, key_loader=lambda _: KEY, host=HOST, platform='linux',
+                                          now=gate.clock, cancelled=cancelled, on_reserved=on_reserved)
+        handler = bridge.make_handler(gate.private, [PEER], execute, gate.slots, peer_uid_of=lambda _connection: PEER,
+                                      now=gate.clock)
+        thread = threading.Thread(target=handler, args=(server_side, '', types.SimpleNamespace()))
+        thread.start()
+        thread.join(10)
+        server_side.close()
+        raw = b''
+        while True:
+            chunk = client_side.recv(65536)
+            if not chunk:
+                break
+            raw += chunk
+        client_side.close()
+        head, _, reply = raw.partition(b'\r\n\r\n')
+        return head.split(b'\r\n')[0], json.loads(reply)
+
+    def test_a_halted_gate_refuses_authority_halted_before_reserving_and_adds_no_halt(self):
+        gate = self.gate().ready()
+        bridge.stop_authority(gate.private, now=gate.clock)
+        before, sent = gate.snapshot(), []
+        line, reply = self.complete(gate, 'op-1', lambda *args: sent.append(args))
+        self.assertEqual((line, reply, sent), (b'HTTP/1.0 409 Conflict', {'error': 'AUTHORITY_HALTED'}, []))
+        self.assertEqual(gate.snapshot(), before)  # Nothing reserved, no ipc halt added.
+        self.assertEqual([halt['reason'] for halt in gate.status()['halts']], ['operator_stop'])
+
+    def test_a_cooling_refusal_crosses_ipc_with_retry_after_and_adds_no_halt(self):
+        gate = self.gate().ready()
+        for number in (1, 2):
+            self.complete(gate, 'u-%d' % number, lambda _raw, _key: (429, dict(UnbilledRefusalTests.RATE_LIMITED)))
+        later(gate, 15)
+        line, reply = self.complete(gate, 'op-3', no_network)
+        self.assertEqual((line, reply), (b'HTTP/1.0 409 Conflict', {'error': 'MODEL_COOLING', 'retry_after': 45}))
+        self.assertEqual((gate.status()['state'], gate.status()['halts']), ('active', []))
+
+    def test_a_halt_after_a_reservation_stays_opaque(self):
+        gate = self.gate().ready()
+        line, reply = self.complete(gate, 'op-1', lambda _raw, _key: (200, provider_response('1.00', MODEL)))
+        self.assertEqual((line, reply), (b'HTTP/1.0 409 Conflict', {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'}))
+        self.assertEqual(gate.status()['reason'], 'charge_overrun')
+        line, reply = self.complete(gate, 'op-2', no_network)  # Now the state check says it.
+        self.assertEqual(reply, {'error': 'AUTHORITY_HALTED'})
+
+    def test_a_changed_go_or_a_stopping_server_stays_opaque(self):
+        gate = self.gate().ready()
+        gate.go_path = gate.write_go(name='other.json', daily_budget_usd='4.00')
+        with self.refused('AUTHORITY_STOPPED'):
+            gate.call('op-1')
+        self.assertEqual(json.loads(bridge.refusal_body(SafetyError('AUTHORITY_STOPPED'))),
+                         {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'})
 
 
 class ReasoningTokenTests(GateTest):

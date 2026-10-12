@@ -315,7 +315,8 @@ class DeepInfraProfile:
       account(response, row, moment) -> dict  usage and guard charge (see account_response's keys)
       reply_model(response) -> str|None  where the reply names the model that answered
       unbilled_refusal(status, response) -> bool  a refusal that provably billed nothing (the gate
-                                         keeps a $0 'released_unbilled' entry, capped per day)
+                                         keeps a $0 'released_unbilled' entry and cools that
+                                         model off; it never halts the gate)
       probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024)
       reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
     """
@@ -395,9 +396,9 @@ class DeepInfraProfile:
         """True only for a refusal that provably billed nothing (owner ruling 5, 2026-10-10): HTTP
         429, a JSON object with an error field, and no usage, choices, cost, estimated_cost,
         inference_status (DeepInfra's native cost block) or tokens_* key at any depth. The gate then
-        releases the hold, keeps the entry at $0 as 'released_unbilled' (so it stays on the record),
-        counts it toward the unsent streak and toward the daily ceiling UNBILLED_RELEASES_PER_DAY.
-        Anything else is accounted (and halts) as before."""
+        releases the hold, keeps the entry at $0 as 'released_unbilled' (so it stays on the record)
+        and counts it toward that model's cool-off (never a gate halt; 2026-10-12). Anything else is
+        accounted (and halts) as before."""
         return (status == 429 and isinstance(response, dict) and bool(response.get('error'))
                 and not names_any_key(response, BILLED_KEYS)
                 and not names_any_key_prefixed(response, 'tokens_'))
@@ -720,7 +721,7 @@ class AnthropicProfile:
 
     # Anthropic's well-formed error answers that bill nothing, by HTTP status: the error types each
     # status may carry (platform.claude.com, API Errors page, read 2026-10-10). Judge round on PR B:
-    # the same released_unbilled entry and daily ceiling as DeepInfra's 429s. Never here, so they halt:
+    # the same released_unbilled entry and per-model cool-off as DeepInfra's 429s. Never here, so they halt:
     # 401 authentication_error and 403 permission_error (the key is wrong: root must look),
     # 402 billing_error, 504 timeout_error (the work may have run), and any other status or type.
     UNBILLED_ERRORS = {
@@ -738,8 +739,8 @@ class AnthropicProfile:
         type "error", error (and an optional request_id string), an error type that status may
         carry, and no usage, content or model key, no other billed key (BILLED_KEYS) and no
         tokens_* or *_tokens key at any depth. The core passes the RAW reply (before redaction
-        drops any subtree), releases the hold and keeps a $0 'released_unbilled' entry (the daily
-        ceiling and the unsent streak count it). Anything else is accounted (and halts) as before."""
+        drops any subtree), releases the hold and keeps a $0 'released_unbilled' entry (that
+        model's cool-off counts it). Anything else is accounted (and halts) as before."""
         if status not in self.UNBILLED_ERRORS or not isinstance(response, dict):
             return False
         if set(response) not in ({'type', 'error'}, {'type', 'error', 'request_id'}):
