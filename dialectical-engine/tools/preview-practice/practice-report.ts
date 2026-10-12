@@ -267,6 +267,15 @@ export function reportMarkdown(report: PracticeReport): string {
     }
     lines.push("");
   }
+  const busy = report.busyByModel as Record<string, { waits: number; totalWaitMs: number; recovered: boolean; gaveUp: boolean }> | undefined;
+  if (busy !== undefined && Object.keys(busy).length > 0) {
+    lines.push("Busy models (refused as too busy, not billed, then waited and tried again):", "");
+    for (const [model, entry] of Object.entries(busy)) {
+      lines.push(`- ${model}: ${String(entry.waits)} wait(s), ${String(Math.round(entry.totalWaitMs / 1_000))} s in all, `
+        + `recovered: ${entry.recovered ? "yes" : "no"}${entry.gaveUp ? " (its wait budget ran out; its remaining jobs were skipped)" : ""}`);
+    }
+    lines.push("");
+  }
   const rows = (report.byModelAndSite ?? report.byModelAndLane) as readonly Record<string, unknown>[] | undefined;
   if (rows !== undefined && rows.length > 0) {
     lines.push("| model | step | calls | outcomes / statuses | format | p50 s | p90 s | max s |", "|---|---|---|---|---|---|---|---|");

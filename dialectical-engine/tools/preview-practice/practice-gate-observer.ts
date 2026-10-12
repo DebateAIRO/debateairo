@@ -90,6 +90,8 @@ export type PracticeWireEvent = Readonly<{
   concurrencyLimit: boolean;
   /** Which unbilled refusal it was (null for any other outcome). */
   unbilledKind: PracticeUnbilledKind | null;
+  /** A cool-off's own end, when the gate named it (MODEL_COOLING retry_after, seconds); null otherwise. */
+  retryAfterSeconds?: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
   reasoningTokens: number | null;
@@ -393,7 +395,8 @@ export class PracticeGateObserver {
           if (error instanceof PreviewUnbilledRefusal) {
             const unbilledKind = practiceUnbilledKind(error);
             this.#record({ ...base, latencyMs, outcome: "UNBILLED", vendorStatus: null, refusalCode: code,
-              concurrencyLimit: unbilledKind === "GATE_IN_FLIGHT", unbilledKind });
+              concurrencyLimit: unbilledKind === "GATE_IN_FLIGHT", unbilledKind,
+              retryAfterSeconds: error instanceof PreviewModelCooling ? error.retryAfterSeconds ?? null : null });
           } else if (code === "DAILY_COST_ENVELOPE_REACHED" || code === "RUN_COST_ENVELOPE_MONEY_REACHED"
             || code === PROVIDER_GATE_UNAVAILABLE) {
             this.#record({ ...base, latencyMs, outcome: "GATE_REFUSED", vendorStatus: null, refusalCode: code });

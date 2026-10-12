@@ -153,9 +153,9 @@ describe("preview practice: formats mode", () => {
     expect(stubs.requests.filter((request) => request.kind === "STORY_CHECKER")).toHaveLength(5);
   }, 300_000);
 
-  it("GLM refused as busy every time: GLM SKIPPED_MODEL_BUSY after its first job, the other four all exercised: NOT_PROVEN (exit 30)", async () => {
+  it("--busy-wait-minutes 0 (the old rule): GLM refused as busy every time: GLM SKIPPED_MODEL_BUSY after its first job, the other four all exercised: NOT_PROVEN (exit 30)", async () => {
     const { stubs, env, common, quiet } = await scenario((request) => request.model === GLM ? { unbilled: true } : null);
-    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0", "--busy-wait-minutes", "0"], env, quiet);
     const report = outcome.report as unknown as {
       verdict: string; reasons: string[]; busyModels: string[];
       byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[];
@@ -180,9 +180,9 @@ describe("preview practice: formats mode", () => {
     expect(report.gates.deepinfra!.observed.stop).toBeNull();
   }, 300_000);
 
-  it("GLM cools off at the gate (MODEL_COOLING): GLM SKIPPED_MODEL_BUSY after its first job, the other four all exercised, the gate never stopped: NOT_PROVEN (exit 30)", async () => {
+  it("--busy-wait-minutes 0: GLM cools off at the gate (MODEL_COOLING): GLM SKIPPED_MODEL_BUSY after its first job, the other four all exercised, the gate never stopped: NOT_PROVEN (exit 30)", async () => {
     const { stubs, env, common, quiet } = await scenario((request) => request.model === GLM ? { gateRefuses: "MODEL_COOLING" } : null);
-    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0", "--busy-wait-minutes", "0"], env, quiet);
     const report = outcome.report as unknown as {
       verdict: string; reasons: string[]; busyModels: string[];
       byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[];
@@ -217,6 +217,61 @@ describe("preview practice: formats mode", () => {
     expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
     expect(report.byModelAndLane.map((row) => row.statuses)).toEqual(FIVE.map(() => ({ PARSED: 1 })));
     expect(stubs.requests.filter((request) => request.kind === "COMPOSE")).toHaveLength(5);
+  }, 300_000);
+});
+
+describe("preview practice: formats mode, a busy model waits and retries", () => {
+  type BusyReport = SamplesReport & { busyModels: string[];
+    busyByModel: Record<string, { waits: number; totalWaitMs: number; recovered: boolean; gaveUp: boolean }> };
+  const logLines = (out: string) => readFileSync(join(out, "samples.jsonl"), "utf8").trim().split("\n")
+    .map((line) => JSON.parse(line) as { kind: string; model?: string; waitMs?: number; reason?: string });
+
+  it("GLM busy twice (each after its resend), then answering: GLM waits, retries the same job, does every job: PASS_WITH_WARNINGS (exit 10)", async () => {
+    let glmAsked = 0;
+    const { stubs, env, common, quiet, out } = await scenario((request) => request.model === GLM && glmAsked++ < 4 ? { unbilled: true } : null);
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
+    const report = outcome.report as unknown as BusyReport;
+    expect({ verdict: report.verdict, exit: outcome.exitCode, reasons: report.reasons })
+      .toEqual({ verdict: "PASS_WITH_WARNINGS", exit: 10, reasons: ["UNBILLED_REFUSALS:4"] });
+    expect(report.busyModels).toEqual([]);
+    for (const row of report.byModelAndLane) expect(row.statuses).toEqual({ PARSED: 1 });
+    expect(report.busyByModel[GLM]).toMatchObject({ waits: 2, recovered: true, gaveUp: false });
+    const lines = logLines(out);
+    expect(lines.filter((line) => line.kind === "busy-wait").map((line) => line.model)).toEqual([GLM, GLM]);
+    expect(lines.filter((line) => line.kind === "resume").map((line) => line.model)).toEqual([GLM, GLM]);
+    expect(lines.some((line) => line.kind === "busy")).toBe(false);
+    expect(stubs.requests.filter((request) => request.model === GLM).map((request) => request.answer).slice(0, 5))
+      .toEqual(["UNBILLED", "UNBILLED", "UNBILLED", "UNBILLED", "OK"]);
+  }, 300_000);
+
+  it("GLM busy past the budget: its waits add up to the budget, then its remaining jobs are skipped: NOT_PROVEN (exit 30)", async () => {
+    const { env, common, quiet, out } = await scenario((request) => request.model === GLM ? { unbilled: true } : null);
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0", "--busy-wait-minutes", "10"], env, quiet);
+    const report = outcome.report as unknown as BusyReport;
+    expect(outcome.exitCode).toBe(30);
+    expect(report.reasons).toContain(`MODEL_BUSY:${GLM}`);
+    expect(report.busyModels).toEqual([GLM]);
+    expect(report.busyByModel[GLM]).toMatchObject({ totalWaitMs: 600_000, recovered: false, gaveUp: true });
+    const glm = report.byModelAndLane.filter((row) => row.model === GLM);
+    expect(glm[0]!.statuses).toEqual({ UNBILLED_REFUSED: 1 });
+    for (const row of glm.slice(1)) expect(row.statuses).toEqual({ SKIPPED_MODEL_BUSY: 1 });
+    for (const row of report.byModelAndLane.filter((entry) => entry.model !== GLM)) expect(row.statuses).toEqual({ PARSED: 1 });
+    expect(logLines(out).filter((line) => line.kind === "busy-wait").reduce((sum, line) => sum + line.waitMs!, 0)).toBe(600_000);
+  }, 300_000);
+
+  it("GLM cooling off at the gate: each wait is the gate's retry_after (60 s, at most a quarter more)", async () => {
+    const { env, common, quiet, out } = await scenario((request) => request.model === GLM ? { gateRefuses: "MODEL_COOLING" } : null);
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0", "--busy-wait-minutes", "3",
+      "--lanes", "JUDGE_POSITION,PANEL"], env, quiet);
+    expect(outcome.exitCode).toBe(30);
+    const waits = logLines(out).filter((line) => line.kind === "busy-wait");
+    expect(waits.length).toBeGreaterThanOrEqual(2);
+    expect(waits.every((line) => line.reason === "MODEL_COOLING")).toBe(true);
+    for (const line of waits.slice(0, -1)) {
+      expect(line.waitMs).toBeGreaterThanOrEqual(60_000);
+      expect(line.waitMs).toBeLessThanOrEqual(75_000);
+    }
+    expect(waits.reduce((sum, line) => sum + line.waitMs!, 0)).toBe(180_000);
   }, 300_000);
 });
 

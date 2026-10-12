@@ -13,7 +13,7 @@
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import type { PreviewGateRemaining } from "@debateai/providers";
-import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
+import type { PracticeBusyResume, PracticeBusyWait, PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
 import { PracticeGateObserver, type PracticeGateName, type PracticeGateStop, type PracticeWireEvent } from "./practice-gate-observer.js";
 import type { PracticeLane } from "./practice-lanes.js";
 import { formatsReport, type PracticeReport } from "./practice-report.js";
@@ -37,12 +37,19 @@ export type PracticeRemainingLine = Readonly<{
 export type PracticeLogLine =
   | Readonly<{ kind: "start"; schema: typeof PRACTICE_SAMPLES_SCHEMA; mode: "formats"; startedAt: string;
     models: readonly string[]; lanes: readonly PracticeLane[]; samples: number; parallel: boolean;
+    /** Each model's budget of busy waits (absent in logs written before it existed). */
+    busyWaitMs?: number;
     unsentStreakAtStart: Readonly<Record<PracticeGateName, number>>;
     remainingBefore: Readonly<Record<PracticeGateName, PracticeRemainingLine | null>> }>
   | Readonly<{ kind: "wire"; event: PracticeWireEvent }>
   | Readonly<{ kind: "stop"; stop: PracticeGateStop }>
   | Readonly<{ kind: "sample"; sample: PracticeSample }>
+  /** A model marked busy for good: its wait budget spent, its remaining jobs skipped. */
   | Readonly<{ kind: "busy"; model: string }>
+  /** A busy model parked: it waits, then the same job is tried again. */
+  | (Readonly<{ kind: "busy-wait" }> & PracticeBusyWait)
+  /** A parked model's wait ended. */
+  | (Readonly<{ kind: "resume" }> & PracticeBusyResume)
   | Readonly<{ kind: "end"; finishedAt: string; interrupted: boolean;
     remainingAfter: Readonly<Record<PracticeGateName, PracticeRemainingLine | null>> }>
   | Readonly<{ kind: "abort"; at: string; code: string }>;
@@ -115,7 +122,7 @@ export function parsePracticeSampleLog(text: string): readonly PracticeLogLine[]
       throw new Error("PRACTICE_SAMPLES_LOG_INVALID");
     }
     const kind = typeof parsed === "object" && parsed !== null ? (parsed as { kind?: unknown }).kind : undefined;
-    if (!["start", "wire", "stop", "sample", "busy", "end", "abort"].includes(String(kind))) throw new Error("PRACTICE_SAMPLES_LOG_INVALID");
+    if (!["start", "wire", "stop", "sample", "busy", "busy-wait", "resume", "end", "abort"].includes(String(kind))) throw new Error("PRACTICE_SAMPLES_LOG_INVALID");
     lines.push(parsed as PracticeLogLine);
   }
   const start = lines.find((line) => line.kind === "start");
@@ -157,5 +164,31 @@ export function practiceReportFromLog(lines: readonly PracticeLogLine[], abort: 
       anthropic: { before: remainingValue(start.remainingBefore.anthropic), after: remainingValue(after?.anthropic) }
     } });
   return Object.freeze({ ...report, plannedSamples: start.models.length * start.lanes.length * start.samples,
-    parallel: start.parallel });
+    parallel: start.parallel, busyByModel: practiceBusyByModel(lines) });
+}
+
+export type PracticeBusySummary = Readonly<{
+  /** Times the model was parked busy. */
+  waits: number;
+  /** The waits it was given, added up. */
+  totalWaitMs: number;
+  /** After its last wait a job of it went through (not skipped, not refused). */
+  recovered: boolean;
+  /** Its wait budget ran out: its remaining jobs were skipped. */
+  gaveUp: boolean;
+}>;
+
+/** Per model that was ever parked busy: its waits, their total, and whether it came back. In the log's order. */
+export function practiceBusyByModel(lines: readonly PracticeLogLine[]): Readonly<Record<string, PracticeBusySummary>> {
+  const out: Record<string, PracticeBusySummary> = {};
+  const models = [...new Set(lines.flatMap((line) => line.kind === "busy-wait" ? [line.model] : []))];
+  for (const model of models) {
+    const lastWait = lines.reduce((at, line, index) => line.kind === "busy-wait" && line.model === model ? index : at, -1);
+    const waits = lines.filter((line) => line.kind === "busy-wait" && line.model === model) as readonly PracticeBusyWait[];
+    const gaveUp = lines.some((line) => line.kind === "busy" && line.model === model);
+    const recovered = !gaveUp && lines.slice(lastWait + 1).some((line) => line.kind === "sample" && line.sample.model === model
+      && !["SKIPPED_GATE_STOPPED", "SKIPPED_MODEL_BUSY", "UNBILLED_REFUSED"].includes(line.sample.status));
+    out[model] = Object.freeze({ waits: waits.length, totalWaitMs: waits.reduce((sum, wait) => sum + wait.waitMs, 0), recovered, gaveUp });
+  }
+  return Object.freeze(out);
 }

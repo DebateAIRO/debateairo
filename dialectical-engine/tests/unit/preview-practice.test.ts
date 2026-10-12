@@ -25,7 +25,7 @@ import {
 import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
 import { PracticeGateObserver, PRACTICE_GATE_STOPPED, practiceStopIsPause, vendorUsage } from "../../tools/preview-practice/practice-gate-observer.js";
-import { onePerModel, practiceTurnOrder, runPracticeFormats, type PracticeSample } from "../../tools/preview-practice/practice-formats.js";
+import { onePerModel, practiceBusyWaitMs, practiceTurnOrder, runPracticeFormats, type PracticeSample } from "../../tools/preview-practice/practice-formats.js";
 import { jitteredGap, limitPort, PracticeSemaphore, runModelQueues } from "../../tools/preview-practice/practice-concurrency.js";
 import { practiceInterruptGate } from "../../tools/preview-practice/practice-interrupt.js";
 import {
@@ -773,5 +773,170 @@ describe("practice samples log", () => {
     appendFileSync(join(directory, "samples.jsonl"), `${JSON.stringify(wire(1, "glm"))}\n`);
     expect(() => PracticeSampleLog.create(directory)).toThrow("PRACTICE_OUT_ALREADY_HOLDS_SAMPLES");
     expect(readPracticeSampleLog(directory)).toHaveLength(2);
+  });
+});
+
+describe("practice formats: a busy model waits out its cool-off and retries the same job", () => {
+  it("the wait: the gate's retry_after when it gave one, else 120 s doubling to at most 600 s; never shorter, at most a quarter longer", () => {
+    expect(practiceBusyWaitMs({ retryAfterSeconds: 60, waitsInARow: 0, random: () => 0 })).toBe(60_000);
+    expect(practiceBusyWaitMs({ retryAfterSeconds: 60, waitsInARow: 3, random: () => 1 })).toBe(75_000);
+    expect([0, 1, 2, 3, 4].map((waitsInARow) => practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow, random: () => 0 })))
+      .toEqual([120_000, 240_000, 480_000, 600_000, 600_000]);
+    expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 0, random: () => 1 })).toBe(150_000);
+    expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 2, random: () => 1 })).toBe(600_000);
+  });
+
+  it("parallel: only the busy model is parked; the others finish their jobs while it waits; then the SAME job is retried", async () => {
+    const started: string[] = [];
+    let release: (() => void) | null = null;
+    const waits: number[] = [];
+    let busyOnce = true;
+    const run = runModelQueues({ models: ["glm", "haiku"], jobs: [1, 2], parallel: true, gapMs: 0,
+      prepare: (model, job) => async () => {
+        started.push(`${model}#${String(job)}`);
+        if (model === "glm" && job === 1 && busyOnce) { busyOnce = false; return { retryAfterMs: 5_000 }; }
+        return undefined;
+      },
+      sleep: (milliseconds) => { waits.push(milliseconds); return new Promise<void>((resolve) => { release = resolve; }); } });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    // GLM waits; Haiku did both its jobs meanwhile.
+    expect(waits).toEqual([5_000]);
+    expect(started).toEqual(["glm#1", "haiku#1", "haiku#2"]);
+    release!();
+    await run;
+    expect(started).toEqual(["glm#1", "haiku#1", "haiku#2", "glm#1", "glm#2"]);
+  });
+
+  it("sequential: the parked model gives up its turns until its wait is over; the others go on", async () => {
+    let clock = 0;
+    const started: string[] = [];
+    let busyOnce = true;
+    await runModelQueues({ models: ["glm", "haiku"], jobs: [1, 2], parallel: false, gapMs: 0, now: () => clock,
+      prepare: (model, job) => async () => {
+        started.push(`${model}#${String(job)}`);
+        if (model === "glm" && job === 1 && busyOnce) { busyOnce = false; return { retryAfterMs: 5_000 }; }
+        return undefined;
+      },
+      sleep: async (milliseconds) => { clock += milliseconds; } });
+    expect(started).toEqual(["glm#1", "haiku#1", "haiku#2", "glm#1", "glm#2"]);
+    expect(clock).toBe(5_000);
+  });
+
+  it("an interrupt cancels a wait at once (the waits are abortable), and the job is then prepared again (and skipped)", async () => {
+    const controller = new AbortController();
+    const prepared: string[] = [];
+    const run = runModelQueues({ models: ["glm"], jobs: [1], parallel: true, gapMs: 0, signal: controller.signal,
+      prepare: (model, job) => {
+        prepared.push(`${model}#${String(job)}`);
+        if (controller.signal.aborted) return null;
+        return async () => ({ retryAfterMs: 600_000 });
+      },
+      sleep: () => new Promise<void>(() => undefined) });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    controller.abort();
+    await run;
+    expect(prepared).toEqual(["glm#1", "glm#1"]);
+  });
+});
+
+describe("practice formats: busy retries end to end (unit, fake waits)", () => {
+  const FIVE = ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash", "claude-haiku-5-5"];
+  const GLM = FIVE[0]!;
+  const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", free_model_ids: FIVE.slice(0, 2),
+    premium_model_ids: FIVE, requested_thinking_level: "high", budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock",
+    anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock", scope_id: "preview-practice-unit" }))!;
+  const configured = PREVIEW_REVIEWED_PROVIDER_REFS.map((providerRef) => {
+    const row = previewModelRow(previewTargetJsonRow(providerRef).model)!;
+    return { providerRef, maker: row.maker, adapterKind: row.adapterKind };
+  });
+  const targets = onePerModel(parseProviderDiscoveryTargets(JSON.stringify(PREVIEW_REVIEWED_PROVIDER_REFS.map(previewTargetJsonRow)), configured), FIVE);
+  const policy = previewRunnerPolicy({ bounds: DEVELOPMENT_ORGAN_COST_BOUNDS.organs,
+    synthesisRolePolicy: { synthesizerBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.COMPOSER, evaluatorBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.CONFORMANCE } }, config);
+  const pack = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
+  const bounds = { judge: policy.bounds.JUDGE, synthesizer: policy.synthesisRolePolicy.synthesizerBound, evaluator: policy.synthesisRolePolicy.evaluatorBound };
+  /** GLM refused as busy for its first `refusals` calls (vendor 429, or the gate's cool-off), then answered. */
+  function ports(observer: PracticeGateObserver, refusals: number, cooling = false) {
+    let glmCalls = 0;
+    const port = (provider: "deepinfra" | "anthropic"): PreviewBudgetPort => ({ async execute(input) {
+      const model = String((JSON.parse(input.requestBody) as { model: unknown }).model);
+      if (model === GLM && glmCalls++ < refusals) throw cooling ? new PreviewModelCooling(90) : new PreviewVendorRefusedUnbilled();
+      return { status: 200, body: stubVendorReply(provider, model, "{}", "unit") };
+    } });
+    return { deepinfra: observer.wrap("deepinfra", port("deepinfra")), anthropic: observer.wrap("anthropic", port("anthropic")) };
+  }
+
+  it("GLM busy twice (each time after its resend), then answers: every GLM job is done, never skipped, never busy at the end", async () => {
+    const observer = new PracticeGateObserver({ now: () => 0 });
+    const waits: { model: string; lane: string; sample: number; waitMs: number; reason: string }[] = [];
+    const resumes: string[] = [];
+    const result = await runPracticeFormats({ config, targets, ports: ports(observer, 4), observer, lanes: ["JUDGE_POSITION", "PANEL"], samples: 1,
+      gapMs: 0, pack, bounds, sleep: async () => undefined, parallel: true, busyWaitMs: 30 * 60_000, random: () => 0,
+      onBusyWait: (line) => waits.push(line), onResume: (line) => resumes.push(`${line.model}|${line.lane}`) });
+    expect(result.busyModels).toEqual([]);
+    const glm = result.samples.filter((sample) => sample.model === GLM);
+    expect(glm.map((sample) => sample.lane)).toEqual(["JUDGE_POSITION", "PANEL"]);
+    expect(glm.some((sample) => sample.status.startsWith("SKIPPED") || sample.status === "UNBILLED_REFUSED")).toBe(false);
+    expect(waits.map((wait) => [wait.lane, wait.waitMs, wait.reason])).toEqual([["JUDGE_POSITION", 120_000, "VENDOR_REFUSED"], ["JUDGE_POSITION", 240_000, "VENDOR_REFUSED"]]);
+    expect(resumes).toEqual([`${GLM}|JUDGE_POSITION`, `${GLM}|JUDGE_POSITION`]);
+  });
+
+  it("a cooling model waits the gate's retry_after", async () => {
+    const observer = new PracticeGateObserver({ now: () => 0 });
+    const waits: { waitMs: number; reason: string }[] = [];
+    await runPracticeFormats({ config, targets: targets.filter((target) => target.model === GLM), ports: ports(observer, 2, true), observer,
+      lanes: ["JUDGE_POSITION"], samples: 1, gapMs: 0, pack, bounds, sleep: async () => undefined, parallel: true,
+      busyWaitMs: 30 * 60_000, random: () => 0, onBusyWait: (line) => waits.push(line) });
+    expect(waits.map((wait) => [wait.waitMs, wait.reason])).toEqual([[90_000, "MODEL_COOLING"]]);
+  });
+
+  it("busy past the budget: the waits add up to the budget exactly, then the rest are skipped (the old rule)", async () => {
+    const observer = new PracticeGateObserver({ now: () => 0 });
+    const waits: number[] = [];
+    const result = await runPracticeFormats({ config, targets: targets.filter((target) => target.model === GLM), ports: ports(observer, 1_000), observer,
+      lanes: ["JUDGE_POSITION", "PANEL"], samples: 1, gapMs: 0, pack, bounds, sleep: async () => undefined, parallel: true,
+      busyWaitMs: 10 * 60_000, random: () => 0, onBusyWait: (line) => waits.push(line.waitMs) });
+    expect(waits).toEqual([120_000, 240_000, 240_000]);
+    expect(result.busyModels).toEqual([GLM]);
+    expect(result.samples.map((sample) => sample.status)).toEqual(["UNBILLED_REFUSED", "SKIPPED_MODEL_BUSY"]);
+  });
+
+  it("a budget of 0 is the old rule: no wait, skipped at once", async () => {
+    const observer = new PracticeGateObserver({ now: () => 0 });
+    const waits: number[] = [];
+    const result = await runPracticeFormats({ config, targets: targets.filter((target) => target.model === GLM), ports: ports(observer, 1_000), observer,
+      lanes: ["JUDGE_POSITION", "PANEL"], samples: 1, gapMs: 0, pack, bounds, sleep: async () => undefined, parallel: true,
+      busyWaitMs: 0, onBusyWait: (line) => waits.push(line.waitMs) });
+    expect(waits).toEqual([]);
+    expect(result.samples.map((sample) => sample.status)).toEqual(["UNBILLED_REFUSED", "SKIPPED_MODEL_BUSY"]);
+  });
+});
+
+describe("practice report: busy waits per model", () => {
+  const start: PracticeLogLine = { kind: "start", schema: "preview-practice-samples-v1", mode: "formats", startedAt: "2026-10-12T00:00:00.000Z",
+    models: ["glm", "haiku"], lanes: ["PANEL"], samples: 1, parallel: true, unsentStreakAtStart: { deepinfra: 0, anthropic: 0 },
+    remainingBefore: { deepinfra: null, anthropic: null } };
+  const sample = (model: string, status: PracticeSample["status"]): PracticeSample => ({
+    model, providerRef: `preview:${model}`, gate: model === "haiku" ? "anthropic" : "deepinfra", lane: "PANEL", sample: 1,
+    questionId: "en", status, latencyMs: 1_000, attempts: status === "PARSED" ? [{ callSiteKey: "PANEL:x", outcome: "OK", parseStatus: "PARSED", latencyMs: 1_000 }] : [],
+    inputTokens: null, outputTokens: null, costNanoUsd: null, unbilledRefusals: 0, issues: [], recheckIssues: [], errorCode: null, replyText: null, detail: null });
+  const end: PracticeLogLine = { kind: "end", finishedAt: "2026-10-12T00:30:00.000Z", interrupted: false, remainingAfter: { deepinfra: null, anthropic: null } };
+  const wait = (waitMs: number): PracticeLogLine => ({ kind: "busy-wait", model: "glm", lane: "PANEL", sample: 1, wait: 1, waitMs, reason: "VENDOR_REFUSED", retryAfterSeconds: null });
+  const resume: PracticeLogLine = { kind: "resume", model: "glm", lane: "PANEL", sample: 1, waitedMs: 120_000, cancelled: false };
+
+  it("a model that recovered and did all its jobs is not NOT_PROVEN; the report shows its waits", () => {
+    const report = practiceReportFromLog([start, wait(120_000), resume, wait(240_000), resume,
+      { kind: "sample", sample: sample("glm", "PARSED") }, { kind: "sample", sample: sample("haiku", "PARSED") }, end]) as unknown as {
+      verdict: string; busyByModel: Record<string, { waits: number; totalWaitMs: number; recovered: boolean; gaveUp: boolean }> };
+    expect(report.verdict).toBe("PASS");
+    expect(report.busyByModel).toEqual({ glm: { waits: 2, totalWaitMs: 360_000, recovered: true, gaveUp: false } });
+  });
+
+  it("a model that gave up after its waits is NOT_PROVEN, not recovered", () => {
+    const report = practiceReportFromLog([start, wait(120_000), resume, { kind: "busy", model: "glm" },
+      { kind: "sample", sample: sample("glm", "UNBILLED_REFUSED") }, { kind: "sample", sample: sample("haiku", "PARSED") }, end]) as unknown as {
+      verdict: string; reasons: string[]; busyByModel: Record<string, { recovered: boolean; gaveUp: boolean }> };
+    expect(report.verdict).toBe("NOT_PROVEN");
+    expect(report.reasons).toContain("MODEL_BUSY:glm");
+    expect(report.busyByModel.glm).toMatchObject({ recovered: false, gaveUp: true });
   });
 });
