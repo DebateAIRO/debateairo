@@ -60,6 +60,11 @@ fails (PROVIDER_NOT_REACHED; it leaves no entry: no byte reached the vendor, so 
 could bill); the gate does not halt. UNSENT_HALT_STREAK such failures (and not-busy unbilled
 errors, below) with no settled reply in between (kept in the control file, so a restart does not
 reset them) halt with provider_unreachable. Only a settled reply or an activation resets the streak.
+Calls in flight together count once (spec 2026-10-12 parallel calls section 3.4, owner ruling O8): when
+the streak grows, the control file keeps that moment ('unsent_counted_at'); a later such failure
+grows it again only if its call was not reserved before that moment (a call reserved earlier was
+in flight with the counted one), so one network blip under many parallel calls counts once. A
+settled reply also deletes 'unsent_counted_at'. Calls reserved one after another count one each.
 
 Unbilled refusals (owner ruling 5, 2026-10-10; per model since 2026-10-12): anything after the connect
 stays uncertain and halts as before, with one exception: a reply the profile's unbilled_refusal
@@ -179,6 +184,7 @@ MAX_IPC_CONNECTIONS = 32  # Connections beyond this are closed unread, without a
 # Provably unsent calls (PROVIDER_NOT_REACHED) and not-busy unbilled errors (PROVIDER_ERROR_UNBILLED)
 # with no settled reply in between before the gate halts (provider_unreachable). A vendor's busy
 # unbilled refusal (PROVIDER_REFUSED_UNBILLED) neither grows nor resets this count (2026-10-12).
+# Failures of calls that were in flight together count once (grow_unsent_streak; 2026-10-12 section 3.4).
 UNSENT_HALT_STREAK = 5
 # Per-model cool-off (owner direction 2026-10-11): this many unbilled refusals for one model with no
 # settled reply of that model in between (one app call + its 60 s resend) cool that model off.
@@ -1020,6 +1026,7 @@ def record_settlement(private, entry_id, day, changes, halt_reason, budget, now)
         entry.update(changes, reconciled_at=iso(moment))
         if entry['state'] == 'settled':
             control['unsent_streak'] = 0  # The provider answered with accountable usage.
+            control.pop('unsent_counted_at', None)  # So the next failure starts a new streak (section 3.4).
             clear_cooling(control, entry.get('model'))  # And this model answered: its cool-off ends.
         if halt_reason is None and day_spend(ledger) > budget:
             halt_reason = 'charge_overrun'
@@ -1072,6 +1079,22 @@ def vendor_refusal_facts(response, kept, moment):
         return no_vendor_facts()
 
 
+def grow_unsent_streak(control, entry, moment):
+    """Grow the unsent streak for this released entry unless its call was in flight together with the
+    last counted failure (spec 2026-10-12 parallel calls section 3.4, owner ruling O8): a call reserved
+    BEFORE 'unsent_counted_at' was already in flight when that failure was counted, so the same blip
+    is not counted twice. Full-precision times, compared as times (not text). Reserve and release
+    each read the clock under the store lock, so a call reserved after a counted release is never
+    earlier than it; an equal time (only a frozen test clock) counts, as before this rule (fail
+    closed). Returns True when the streak grew; only then may the caller halt."""
+    counted = control.get('unsent_counted_at')
+    if counted is not None and datetime.fromisoformat(entry['reserved_at']) < datetime.fromisoformat(counted):
+        return False
+    control['unsent_streak'] = control.get('unsent_streak', 0) + 1
+    control['unsent_counted_at'] = iso(moment)
+    return True
+
+
 def release_unsent(private, entry_id, day, now):
     """Lock, count one provably unsent call (halting at UNSENT_HALT_STREAK with no settled reply in
     between), drop its pending hold from the day ledger, clear it from in flight, unlock. A cool-off
@@ -1089,10 +1112,10 @@ def release_unsent(private, entry_id, day, now):
         entry = ledger['entries'].get(entry_id)
         if entry is None or entry['state'] != 'pending' or control['in_flight'].get(entry_id) != day:
             raise SafetyError('SETTLEMENT_STATE_INVALID')
-        streak = control.get('unsent_streak', 0) + 1
-        control['unsent_streak'] = streak
+        grew = grow_unsent_streak(control, entry, moment)  # Calls in flight together count once (section 3.4).
+        streak = control.get('unsent_streak', 0)
         clear_trial(control, entry.get('model'), entry_id)
-        if streak >= UNSENT_HALT_STREAK:
+        if grew and streak >= UNSENT_HALT_STREAK:
             _halt(control, 'provider_unreachable', moment, entry_id)
         store.save_control(control)
         del ledger['entries'][entry_id]
@@ -1135,9 +1158,9 @@ def release_unbilled(private, entry_id, day, http_status, now, busy=True, facts=
         if busy:
             note_unbilled_refusal(control, entry.get('model'), entry_id, moment, facts.get('vendor_retry_after_seconds'))
         else:
-            control['unsent_streak'] = control.get('unsent_streak', 0) + 1
+            grew = grow_unsent_streak(control, entry, moment)  # Calls in flight together count once (section 3.4).
             clear_trial(control, entry.get('model'), entry_id)
-            if control['unsent_streak'] >= UNSENT_HALT_STREAK:
+            if grew and control['unsent_streak'] >= UNSENT_HALT_STREAK:
                 _halt(control, 'provider_unreachable', moment, entry_id)
         store.save_control(control)
         entry.update(state='released_unbilled', held_usd='0', reason='unbilled_refusal',
