@@ -12,7 +12,7 @@
 export interface OrderedRecorder {
   /** Runs `write` once every position below `position` has committed or been skipped. Resolves/rejects with write's result. */
   commit<T>(position: number, write: () => Promise<T>): Promise<T>;
-  /** Marks a position as having nothing to write (a skipped or failed chain). */
+  /** Marks a position as having nothing to write (a skipped or failed chain). Idempotent. */
   skip(position: number): void;
   /** Resolves when every position in [0, size) is committed or skipped. */
   done(): Promise<void>;
@@ -39,10 +39,16 @@ export function createOrderedRecorder(size: number): OrderedRecorder {
     finish = resolve;
   });
 
-  const claim = (position: number): void => {
+  const checkRange = (position: number): void => {
     if (!Number.isInteger(position) || position < 0 || position >= size) {
       throw new TypeError("ORDERED_RECORDER_POSITION_OUT_OF_RANGE");
     }
+  };
+
+  // A position is claimed by its first commit or skip. Claiming it again throws,
+  // except that a repeated skip of a skipped position is a no-op (see skip below).
+  const claim = (position: number): void => {
+    checkRange(position);
     if (claimed.has(position)) {
       throw new TypeError("ORDERED_RECORDER_POSITION_REUSED");
     }
@@ -94,6 +100,10 @@ export function createOrderedRecorder(size: number): OrderedRecorder {
       });
     },
     skip(position: number): void {
+      checkRange(position);
+      // Idempotent: a second skip of an already-skipped position changes nothing.
+      // Skipping a committed or commit-pending position still throws (claim).
+      if (skipped.has(position)) return;
       claim(position);
       skipped.add(position);
       advance();

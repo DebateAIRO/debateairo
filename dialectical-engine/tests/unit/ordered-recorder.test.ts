@@ -149,11 +149,35 @@ describe("ordered recorder", () => {
     expect((error as Error).message).toBe("ORDERED_RECORDER_POSITION_REUSED");
   });
 
-  it("skipping a position twice throws a TypeError", () => {
+  it("skipping a position twice is a no-op and the next position still runs", async () => {
+    const recorder = createOrderedRecorder(3);
+    const ran: number[] = [];
+
+    recorder.skip(0);
+    const first = recorder.commit(1, async () => { ran.push(1); return "one"; });
+    expect(() => recorder.skip(0)).not.toThrow();
+
+    const second = recorder.commit(2, async () => { ran.push(2); return "two"; });
+    expect(await first).toBe("one");
+    expect(await second).toBe("two");
+    expect(ran).toEqual([1, 2]);
+    await expect(recorder.done()).resolves.toBeUndefined();
+  });
+
+  it("skipping a position with a commit pending throws a TypeError", () => {
+    const recorder = createOrderedRecorder(2);
+    void recorder.commit(1, async () => undefined);
+
+    const error = thrownBy(() => recorder.skip(1));
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toBe("ORDERED_RECORDER_POSITION_REUSED");
+  });
+
+  it("committing a position that was skipped throws a TypeError", () => {
     const recorder = createOrderedRecorder(2);
     recorder.skip(0);
 
-    const error = thrownBy(() => recorder.skip(0));
+    const error = thrownBy(() => recorder.commit(0, async () => undefined));
     expect(error).toBeInstanceOf(TypeError);
     expect((error as Error).message).toBe("ORDERED_RECORDER_POSITION_REUSED");
   });
