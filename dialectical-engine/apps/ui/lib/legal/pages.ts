@@ -235,7 +235,9 @@ const UNCHECKED_CLOUD = Object.freeze({
  * A `contact` is filled only where the provider's own privacy policy confirms it; the others stay bracketed.
  * The owner confirmed on 10 October 2026 that each family runs on the provider's direct API under those terms, so the
  * entities lost their brackets and `checkedOn` records that date. Location, retention, zero retention and training stay
- * "unconfirmed" until the production endpoints and account settings are fixed.
+ * "unconfirmed" until the production endpoints and account settings are fixed. Since 12 October 2026 these hosted rows
+ * reach `/providers` only on a build whose flag narrows the roster, and then only the own-servers Qwen row (the GLM-only
+ * first preview keeps it); the Claude, GPT, Gemini and Grok rows never show.
  */
 export const MODEL_PROVIDERS: readonly ProviderRegisterEntry[] = Object.freeze([
   { ...UNCHECKED_CLOUD, key: "claude", provider: "Anthropic", models: "Claude", entity: "Anthropic Ireland, Limited", homeCountryKey: "legal.providers.ireland", contact: "privacy@anthropic.com", checkedOn: "2026-10-10" },
@@ -321,10 +323,10 @@ const PREVIEW_ROLE_MODELS: ReadonlySet<string> = new Set(["zai-org/GLM-5.3-Flash
 
 /**
  * Serving company for the private preview's open-weight models; terms reviewed 5 October 2026 and
- * rechecked 10 October 2026. Listed only by a preview build (`providerRegister`), which names in
- * `models` the DeepInfra models that build uses. Its jobs are confirmed: every panel member writes
- * and judges arguments, GLM writes the answer and the verdict story, DeepSeek checks both (the
- * first preview's GLM alone does all three).
+ * rechecked 10 October 2026. Listed by any build that offers a DeepInfra model (`providerRegister`),
+ * which names in `models` the DeepInfra models that build uses (all four with no flag). Its jobs are
+ * confirmed: every panel member writes and judges arguments, GLM writes the answer and the verdict
+ * story, DeepSeek checks both (the first preview's GLM alone does all three).
  */
 export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -347,8 +349,8 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
  * outputs are deleted within 30 days unless flagged for misuse or the law requires more (privacy
  * center); zero data retention needs Anthropic's approval, which the preview does not have; no
  * training on customer content (Commercial Terms B); transfers under standard contractual clauses
- * (Data Processing Addendum). On a preview build that offers it, it replaces the hosted-site
- * placeholder row for Claude, so the page never shows Anthropic twice.
+ * (Data Processing Addendum). On any build that offers it, it replaces the hosted-site placeholder
+ * row for Claude, so the page never shows Anthropic twice; with no flag, every build offers it.
  */
 export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -433,11 +435,12 @@ function previewModelIds(flag: string): ReadonlySet<string> | null {
 }
 
 /**
- * The whole Register, in the order `/providers` shows it. Only the private preview's build sets
+ * The whole Register, in the order `/providers` shows it. Only a build that narrows the roster sets
  * the public flag the new-debate form reads (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON,
- * `previewPlanRoster`); every other build, the real site included, sets none and gets the
- * hosted-site rows unchanged. A preview build lists only the companies that receive text on it
- * (owner, 10 October 2026): the hosted Anthropic, OpenAI, Google and xAI rows never show there.
+ * `previewPlanRoster`). A build with no flag, the real site included, lists the five models the
+ * product runs (owner, 12 October 2026): Anthropic for Claude Haiku 5.5 and DeepInfra for the other
+ * four. Every build lists only the companies that receive text on it (owner, 10 October 2026): the
+ * hosted Anthropic, OpenAI, Google and xAI rows never show, only their checked preview rows.
  * It lists DeepInfra just before the support chat's model, naming the DeepInfra models its plans
  * offer plus, on a per-plan build, the two role models (GLM writes, DeepSeek checks); it shows the
  * checked Anthropic or Google preview row only when it offers Claude Haiku 5.5 or Gemini 3.8 Flash;
@@ -447,8 +450,7 @@ function previewModelIds(flag: string): ReadonlySet<string> | null {
  * Never throws.
  */
 export function providerRegister(previewFreeModelIdsJson: string | undefined): readonly ProviderRegisterEntry[] {
-  if (previewFreeModelIdsJson === undefined) return Object.freeze([...MODEL_PROVIDERS, SUPPORT_PROVIDER]);
-  const ids = previewModelIds(previewFreeModelIdsJson);
+  const ids = previewFreeModelIdsJson === undefined ? null : previewModelIds(previewFreeModelIdsJson);
   const offers = (id: string): boolean => ids === null || ids.has(id);
   // A per-plan build always uses the role models; the first preview's build (GLM alone) has no others.
   const roleModels = ids !== null && ids.size === 1 && ids.has(LEGACY_PREVIEW_MODEL) ? new Set<string>() : PREVIEW_ROLE_MODELS;

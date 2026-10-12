@@ -12,7 +12,8 @@ import ro from "../../apps/ui/messages/ro/legal.json";
  * build flag (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) names them either as the first preview's
  * list or as a per-plan object. The Model providers page must name every company that receives
  * text on that build, and a bad flag must disclose every preview provider rather than hide one.
- * Off the preview (no flag) the page is exactly the hosted-site Register.
+ * With no flag (the real site included) the page lists the five models the product runs: Anthropic
+ * for Claude Haiku 5.5 and DeepInfra for the other four (owner, 12 October 2026).
  */
 const FLAG = "NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON";
 const GLM = "zai-org/GLM-5.3-Flash";
@@ -60,29 +61,25 @@ async function build(flag: string | undefined) {
   return { LegalProvidersBody, pages, row, keys: pages.PROVIDER_REGISTER.map((entry) => entry.key) };
 }
 
-const HOSTED_KEYS = ["claude", "gpt", "gemini", "grok", "qwen", "support"];
 /**
  * A preview build names only the companies that receive text on it (owner, 10 October 2026): the hosted
  * OpenAI and xAI rows never show, and Anthropic and Google show only as the checked preview rows, when
  * the flag offers their model. The hosted Qwen row ("runs on our own servers") stays unless the build
  * sends Qwen to DeepInfra.
  */
-const HOSTED_CLOUD_KEYS = ["claude", "gpt", "gemini", "grok"] as const;
 const GLM_ONLY_KEYS = ["qwen", "deepinfra", "support"];
 const ANTHROPIC_GOOGLE_KEYS = ["claude", "gemini", "qwen", "deepinfra", "support"];
 /** Every DeepInfra model and Haiku (the all-five flag, and what a malformed flag discloses). */
 const ALL_FIVE_KEYS = ["claude", "deepinfra", "support"];
 
-describe("off the preview (flag unset) the Register is the hosted site's, unchanged", () => {
-  it("lists the hosted rows and no preview company", async () => {
+describe("with no flag (the real site included) the Register lists the five models (owner, 12 October 2026)", () => {
+  it("lists the checked Anthropic row and DeepInfra's four models, and no hosted cloud row", async () => {
     const { keys, row, pages } = await build(undefined);
-    expect(keys).toEqual(HOSTED_KEYS);
-    // The hosted rows' companies were confirmed by the owner on 10 October 2026 (dev's 239789903); what tells
-    // them apart from the preview's checked rows is the model family they name.
-    expect(row("claude")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "claude"));
-    expect(row("gemini")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "gemini"));
-    expect(row("claude")?.models).toBe("Claude");
-    expect(row("gemini")?.models).toBe("Gemini");
+    expect(keys).toEqual(ALL_FIVE_KEYS);
+    expect(row("claude")).toBe(pages.ANTHROPIC_PREVIEW_PROVIDER);
+    expect(row("claude")?.models).toBe("Claude Haiku 5.5");
+    expect(row("deepinfra")?.models).toBe(ALL_DEEPINFRA);
+    for (const key of ["gpt", "gemini", "grok", "qwen"]) expect(row(key), key).toBeUndefined();
   });
 });
 
@@ -266,13 +263,13 @@ describe("a preview build hides the hosted site's cloud rows (owner, 10 October 
     });
   }
 
-  it("the hosted build still shows every hosted cloud row", async () => {
+  it("the build with no flag shows no hosted OpenAI, Google, xAI or own-servers Qwen row either", async () => {
     const { keys, pages, LegalProvidersBody } = await build(undefined);
-    for (const key of HOSTED_CLOUD_KEYS) expect(keys).toContain(key);
+    for (const key of ["gpt", "gemini", "grok", "qwen"]) expect(keys).not.toContain(key);
+    expect(pages.PROVIDER_REGISTER).not.toContain(pages.MODEL_PROVIDERS.find((entry) => entry.key === "claude"));
     const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} />);
-    for (const key of HOSTED_CLOUD_KEYS) expect(html).toContain(`id="legal-provider-${key}"`);
-    for (const company of ["OpenAI Ireland Limited", "Google Cloud EMEA Limited", "X.AI LLC"]) expect(html).toContain(company);
-    expect(pages.PROVIDER_REGISTER.slice(0, -1)).toEqual(pages.MODEL_PROVIDERS);
+    for (const key of ["gpt", "gemini", "grok", "qwen"]) expect(html).not.toContain(`id="legal-provider-${key}"`);
+    for (const company of ["OpenAI Ireland Limited", "Google Cloud EMEA Limited", "X.AI LLC"]) expect(html).not.toContain(company);
   });
 
   it("PR B's reviewed all-models build value shows the checked Anthropic row and all four DeepInfra models", async () => {
