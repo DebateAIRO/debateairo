@@ -129,6 +129,10 @@ import {
   idShapedTokensIn,
   keepsCompleteSynthesisRounds,
   nodeIdsNamedInText,
+  synthesisWordingIndex,
+  synthesisWordingRefusalsIn,
+  SYNTHESIS_WORDING_REFUSALS,
+  type SynthesisWordingIndex,
   LABEL_BASIS_INCOMPLETE_MARK,
   PROTECTED_CORE_GUARD_RETIRED_MARK,
   resolveDigestNodeRef,
@@ -2294,13 +2298,26 @@ export function buildSchemaRepairPacket(framed: FramedPrompt, rejected: {
  *    carry: unknown, a real id where the digest showed short refs, or a point
  *    the spine left out. It used to end the run FAILED; now it is re-asked.
  *
+ * Practice debate 2 (2026-10-12), problem 7 adds two more, read the same way
+ * (`synthesisWordingRefusalsIn`, language-independent like the story's):
+ *
+ *  · `COMPOSED_TEXT_PRINTS_A_SCORE` — a segment's prose prints a strength the
+ *    material shows ("0.96", "0,96", the exact float), unless the person's
+ *    question or a debater's statement states that figure itself.
+ *  · `COMPOSED_TEXT_USES_ENGINE_CODE` — it uses one of the material's code
+ *    tokens (`finalStrength`, `code_label`, `REASONING`, the verdict label,
+ *    `number:final-strength` ...).
+ *
  * Each is reported the way the story's checks report theirs: `SCHEMA_FAILED`
  * with a JSON array of issues whose `path` is the member's machine address and
- * whose `message` is the code — never a byte the model wrote.
+ * whose `message` is the code — never a byte the model wrote. When every repair
+ * is still refused, any of the four ends the round `SYNTHESIS_NO_ARTIFACT`
+ * (`callSynthesisRole`), never a FAILED run: the answer always exists.
  */
 export const COMPOSED_CITATION_REJECTIONS = Object.freeze([
   "COMPOSED_TEXT_NAMES_A_NODE",
-  "COMPOSED_REF_NOT_IN_DIGEST"
+  "COMPOSED_REF_NOT_IN_DIGEST",
+  ...SYNTHESIS_WORDING_REFUSALS
 ] as const);
 type ComposedCitationRejection = typeof COMPOSED_CITATION_REJECTIONS[number];
 
@@ -2325,6 +2342,13 @@ interface ComposedCitationContext {
    * the person's and the debaters' own words, so the prose may repeat them.
    */
   readonly exemptTokens: ReadonlySet<string>;
+  /**
+   * Problem 7 (2026-10-12): the scores and code tokens this request's material
+   * shows, less the person's own (`synthesisWordingIndex`). Absent, the prose is
+   * checked for internal node names only, as before; the runner and the preview
+   * practice always pass it.
+   */
+  readonly wording?: SynthesisWordingIndex;
 }
 
 /**
@@ -2341,6 +2365,11 @@ export function classifyComposedContent(content: string, citation: ComposedCitat
   for (const [segmentIndex, segment] of composed.segments.entries()) {
     if (nodeIdsNamedInText(citation.digest, segment.text, citation.exemptTokens).length > 0) {
       issues.push({ path: ["segments", segmentIndex, "text"], message: "COMPOSED_TEXT_NAMES_A_NODE" });
+    }
+    if (citation.wording !== undefined) {
+      for (const refusal of synthesisWordingRefusalsIn(segment.text, citation.wording)) {
+        issues.push({ path: ["segments", segmentIndex, "text"], message: refusal });
+      }
     }
     for (const [refIndex, ref] of segment.node_refs.entries()) {
       if (!composedRefResolves(ref, citation)) {
@@ -7599,7 +7628,8 @@ export class WalkingSkeletonRunner {
      * looks like an internal id — every such token in the person's question
      * and in each node's full statement (not the digest's clipped summaries).
      */
-    const personIdTokens = idShapedTokensIn([run.questionLine, ...authoredNodeList.map((node) => node.statement)]);
+    const personTexts = Object.freeze([run.questionLine, ...authoredNodeList.map((node) => node.statement)]);
+    const personIdTokens = idShapedTokensIn(personTexts);
     const digestNodes: readonly DigestSourceNode[] = Object.freeze(authoredNodeList.map((node) => Object.freeze({
       nodeId: node.nodeId,
       statement: node.statement,
@@ -7906,10 +7936,13 @@ export class WalkingSkeletonRunner {
          */
         // All-steps format robustness (2026-10-12): the writer's classifier, remembered, so its accepted draft is read
         // again exactly as the classifier read it (the last tolerant repair depends on how the reply ended).
+        // Problem 7 (2026-10-12): no score and no code token from this request's material in the prose.
+        const writerWording = synthesisWordingIndex({ request, personTexts });
         const writerReading = rememberingAcceptedReply((content, reply) => classifyComposedContent(content, {
           digest: request.digest,
           servedNodes,
-          exemptTokens: personIdTokens
+          exemptTokens: personIdTokens,
+          wording: writerWording
         }, reply));
         const composedSegmentsOf = (content: string): readonly ComposedSegment[] => {
           const parsed = parseComposerOutput(content, writerReading.acceptedAs(content).reply);

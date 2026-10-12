@@ -55,6 +55,7 @@ import {
   buildSynthesizerRequest,
   idShapedTokensIn,
   synthesisCallSiteKey,
+  synthesisWordingIndex,
   type DigestSourceNode,
   type SynthesisDigest
 } from "@debateai/serve";
@@ -574,10 +575,12 @@ export async function runPracticeLane(context: PracticeLaneContext): Promise<Pra
       const request = buildSynthesizerRequest({ controls, round: 1, digest, codeLabel, prior: null });
       const framed = buildSynthesisRolePrompt(request, q.languageName);
       // As the runner's writerReading: the accepted draft is read again exactly as its classifier read it.
+      const personTexts = [q.questionLine, ...graph.authored.map((node) => node.statement)];
       const reading = rememberingAcceptedReply((content, reply) => classifyComposedContent(content, {
         digest: request.digest,
         servedNodes,
-        exemptTokens: idShapedTokensIn([q.questionLine, ...graph.authored.map((node) => node.statement)])
+        exemptTokens: idShapedTokensIn(personTexts),
+        wording: synthesisWordingIndex({ request, personTexts })
       }, reply));
       const response = await context.gateway.call({
         runId: context.runId, subjectItemId: context.workItemId,
