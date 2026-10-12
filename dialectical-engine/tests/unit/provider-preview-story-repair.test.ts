@@ -93,14 +93,15 @@ function nativeHarness(contents: readonly string[], finishReasons: readonly stri
 // Preview retry fix, option B (spec 2026-10-11 §1.1): the writer's bound is its LIFETIME allowance and passes
 // through (token floor and deadline applied); the attempts of ONE call are `maxAttemptsThisCall`.
 // Story format robustness (2026-10-12): the current storyteller contract is v3, and on the preview the
-// storyteller's call asks for its row's whole answer cap (32,768 on every reviewed row), room to think.
-const STORYTELLER_CAP = 32_768;
+// storyteller's call asks for its row's whole answer cap, room to think. Slow-answer ruling (2026-10-12): the cap is
+// per row, 16,384 on GLM (this fixture's model), MiMo and Qwen, 32,768 on DeepSeek and Haiku; the deadline is 1,260 s.
+const STORYTELLER_CAP = 16_384;
 describe("preview storyteller v3 safe repair allowance", () => {
   it.each([2, 3, 8])("permits two attempts per call when the writer's original allowance is %i", async maxAttempts => {
     const request = storyRequest();
     const effective = await forwarded({ ...request, bound: { ...request.bound, maxAttempts } });
     expect(effective.maxAttemptsThisCall).toBe(2);
-    expect(effective.bound).toEqual({ maxAttempts, tokenCeiling: STORYTELLER_CAP, deadlineMs: 600000 });
+    expect(effective.bound).toEqual({ maxAttempts, tokenCeiling: STORYTELLER_CAP, deadlineMs: 1260000 });
     expect(effective.thinkingLevel).toBe("high");
   });
 
@@ -108,7 +109,7 @@ describe("preview storyteller v3 safe repair allowance", () => {
     const request = storyRequest();
     const effective = await forwarded({ ...request, bound: { ...request.bound, maxAttempts: 1 } });
     expect(effective.maxAttemptsThisCall).toBe(1);
-    expect(effective.bound).toEqual({ maxAttempts: 1, tokenCeiling: STORYTELLER_CAP, deadlineMs: 600000 });
+    expect(effective.bound).toEqual({ maxAttempts: 1, tokenCeiling: STORYTELLER_CAP, deadlineMs: 1260000 });
   });
 
   it("asks for the row's whole cap and keeps all caller admission seams", async () => {
@@ -117,7 +118,7 @@ describe("preview storyteller v3 safe repair allowance", () => {
     const costEnvelope = { assertCallAllowed: () => undefined, recordCall: () => undefined, assertUsageReported: () => undefined };
     const effective = await forwarded({ ...request, bound: { ...request.bound, tokenCeiling: 12000 }, assertAttemptAllowed, costEnvelope });
     expect(effective.maxAttemptsThisCall).toBe(2);
-    expect(effective.bound).toEqual({ maxAttempts: 3, tokenCeiling: STORYTELLER_CAP, deadlineMs: 600000 });
+    expect(effective.bound).toEqual({ maxAttempts: 3, tokenCeiling: STORYTELLER_CAP, deadlineMs: 1260000 });
     expect(effective.packet).toBe(request.packet);
     expect(effective.providerRef).toBe("preview:fixture-a");
     expect(effective.contractHash).toBe("contract:synthetic-story");
@@ -172,7 +173,7 @@ describe("preview storyteller v3 safe repair allowance", () => {
     expect(effective.maxAttemptsThisCall).toBe(1);
     // Only the storyteller's own site (story lane, SYNTHESIZER, STORY:STORYTELLER:1-8) asks for the whole cap.
     const storytellerSite = request.lane === "story" && request.role === "SYNTHESIZER" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey);
-    expect(effective.bound).toEqual({ maxAttempts: request.bound.maxAttempts, tokenCeiling: storytellerSite ? STORYTELLER_CAP : 8192, deadlineMs: 600000 });
+    expect(effective.bound).toEqual({ maxAttempts: request.bound.maxAttempts, tokenCeiling: storytellerSite ? STORYTELLER_CAP : 8192, deadlineMs: 1260000 });
   });
 
   it("still refuses a weaker thinking request before forwarding", async () => {
@@ -243,11 +244,11 @@ describe("preview storyteller v3 safe repair allowance", () => {
     const result = await gateway.call({ ...storyRequest(), costEnvelope: {
       assertCallAllowed: () => undefined, recordCall: () => undefined, assertUsageReported: () => undefined } });
     expect(artifacts.map(artifact => artifact.parseStatus)).toEqual(["PARSE_FAILED", "PARSED"]);
-    // The W10 length retry: the ORIGINAL packet, never the repair packet. The first attempt already asked for
-    // the row's whole cap, so the raised bound is held to it, exactly as on the preview.
+    // The W10 length retry: the ORIGINAL packet, never the repair packet. On this slow row the first attempt asks for
+    // the 16,384 story allowance; the retry asks twice that, which is exactly the row's whole answer cap (32,768).
     const bodies = executions.map(execution => JSON.parse(execution.requestBody));
     expect(bodies[1].messages).toEqual(bodies[0].messages);
-    expect([bodies[0].max_tokens, bodies[1].max_tokens]).toEqual([STORYTELLER_CAP, STORYTELLER_CAP]);
+    expect([bodies[0].max_tokens, bodies[1].max_tokens]).toEqual([STORYTELLER_CAP, 2 * STORYTELLER_CAP]);
     expect(result.repairAttempts).toBe(0);
   });
 
