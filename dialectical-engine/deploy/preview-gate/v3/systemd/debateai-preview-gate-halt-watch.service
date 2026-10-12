@@ -5,6 +5,12 @@
 # `systemctl start --no-block` (the email names the reason and the one command that re-opens the
 # gate). It never touches the gate's state and never waits for mail. If the watcher itself breaks
 # (status unreadable, notice not queued), this unit fails and the preview alert emails that.
+# Daily unbilled alert (2026-10-12: alert, never halt): once status's today_unbilled_releases
+# reaches --unbilled-alert-at (100 here; 1..100000), it queues ONE
+# debateai-preview-notice@gate-unbilled-<count>_<YYYY>_<MM>_<DD>.service per Bucharest day, which
+# says nothing was halted and to check DeepInfra's billing page. The day is recorded first in
+# announced-unbilled.json next to the --state file (this unit's StateDirectory). Change the
+# threshold here, then `systemctl daemon-reload`.
 # Root only because the gate's private folder is root-only; the key file is hidden from it, and it
 # has no network at all (systemctl talks to systemd over a local socket).
 [Unit]
@@ -15,7 +21,7 @@ OnFailure=debateai-preview-alert@%n.service
 Type=oneshot
 User=root
 Group=root
-ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/gate_watch.py --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 --state /var/lib/debateai-preview-gate-watch/announced-halt.json
+ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/gate_watch.py --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 --state /var/lib/debateai-preview-gate-watch/announced-halt.json --unbilled-alert-at 100
 StateDirectory=debateai-preview-gate-watch
 StateDirectoryMode=0700
 # Short, so a stuck status run never holds the gate's shared lock long (the gate waits 10 s).

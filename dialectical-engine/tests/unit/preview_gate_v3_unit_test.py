@@ -208,6 +208,13 @@ class UnitFileTests(unittest.TestCase):
         start = values(HALT_UNIT, 'ExecStart')[0].split()
         self.assertEqual(start[:3], ['/usr/bin/python3', '-I', OPERATOR + 'gate_watch.py'])
         self.assertEqual(dict(zip(start[3::2], start[4::2]))['--private'], PRIVATE)
+        # 2026-10-12: one email per Bucharest day at 100 unbilled refusals (an alert, never a halt);
+        # the flag is in the unit so the owner sees and changes the threshold in one place.
+        self.assertEqual(dict(zip(start[3::2], start[4::2]))['--unbilled-alert-at'], '100')
+        gate_watch = load(V2 / 'gate_watch.py', 'gate_watch_v3_unit')
+        args = gate_watch.parse_args(start[3:])
+        self.assertEqual((args.notice, args.unbilled_alert_at), ('gate-halted', 100))
+        self.assertEqual(gate_watch.unbilled_state_path(args.state).parent, Path(args.state).parent)
         hidden = ' '.join(values(HALT_UNIT, 'InaccessiblePaths')).split()
         self.assertIn('-' + PRIVATE + '/api-key.txt', hidden)
         self.assertIn('-' + V2_PRIVATE, hidden)

@@ -277,9 +277,11 @@ export class PreviewUnbilledRefusal extends ProviderUnbilledRefusal {
  * busy — the VENDOR refused the call and the gate proved it unbilled (PROVIDER_REFUSED_UNBILLED: a vendor 429/529,
  * hold released), or, since gate v4, the gate refused it because that one model is cooling off after such refusals
  * (MODEL_COOLING, `PreviewModelCooling` below). The gate's other unbilled refusals stay plain
- * `PreviewUnbilledRefusal`s: its slots were full (CONCURRENCY_LIMIT_REACHED) or the vendor was never reached
- * (PROVIDER_NOT_REACHED); they are still REFUSED rows with the one 60-second resend, but they say nothing about the
- * model, so they never make it sit out (`providerCallEndedVendorRefusedUnbilled`, read by the runner's sit-out book).
+ * `PreviewUnbilledRefusal`s: its slots were full (CONCURRENCY_LIMIT_REACHED), the vendor was never reached
+ * (PROVIDER_NOT_REACHED), or the vendor answered with an error that bills nothing but is not "busy"
+ * (PROVIDER_ERROR_UNBILLED, review 2026-10-12: Anthropic's 400/404/413/500, which a resend of the same request would
+ * meet again); they are still REFUSED rows with the one 60-second resend, but they say nothing about the model being
+ * busy, so they never make it sit out (`providerCallEndedVendorRefusedUnbilled`, read by the runner's sit-out book).
  */
 export class PreviewVendorRefusedUnbilled extends PreviewUnbilledRefusal {
   constructor(message = "Private preview vendor refused the call unbilled") { super(message); }
@@ -478,9 +480,11 @@ const PREVIEW_DAILY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_DAILY_BUDGET_
  * withPreviewProviderCallPolicy sends once more after its cooldown), never a money stop. The gate
  * must list both codes as public refusals for them to arrive here. Gate v4 (2026-10-12) adds MODEL_COOLING: the
  * gate refused one busy model's call before reserving or sending anything, which the app reads as the vendor's own
- * unbilled refusal (`PreviewModelCooling`).
+ * unbilled refusal (`PreviewModelCooling`). Review 2026-10-12 adds PROVIDER_ERROR_UNBILLED: the vendor answered with an
+ * error that bills nothing but does not say it is busy (Anthropic's 400/404/413/500); the gate counts it toward its
+ * five-in-a-row streak, as before gate v4, and the app reads it as the plain `PreviewUnbilledRefusal`, never "busy".
  */
-const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED", "PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED", "MODEL_COOLING"]);
+const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED", "PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED", "PROVIDER_ERROR_UNBILLED", "MODEL_COOLING"]);
 function previewAuthorityRefusal(status: number | undefined, row: unknown): TypedDomainError {
   const code = status === 409 && typeof row === "object" && row !== null && !Array.isArray(row)
     ? (row as Record<string, unknown>).error : undefined;
@@ -494,6 +498,7 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
     if (code === "PROVIDER_REFUSED_UNBILLED") return new PreviewVendorRefusedUnbilled();
     // Gate v4: the gate's cool-off for one busy model is the same "this model is busy" as the vendor's refusal.
     if (code === "MODEL_COOLING") return new PreviewModelCooling((row as Record<string, unknown>).retry_after);
+    if (code === "PROVIDER_ERROR_UNBILLED") return new PreviewUnbilledRefusal("Private preview vendor answered with an error that was not billed");
     return code === "CONCURRENCY_LIMIT_REACHED"
       ? new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight")
       : new PreviewUnbilledRefusal();

@@ -122,7 +122,7 @@ describe("the preview spending gate's 409 refusal body", () => {
     await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
   });
 
-  it.each(["PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"])(
+  it.each(["PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED", "PROVIDER_ERROR_UNBILLED"])(
     "owner ruling 5: %s (a provably unbilled call, hold released) is the transient retry path, never a money stop",
     async (code) => {
       const { port } = await gate({ status: 409, body: JSON.stringify({ error: code }) });
@@ -186,7 +186,10 @@ describe("the preview spending gate's 409 refusal body", () => {
     // Review amendment R-d (2026-10-12): only the vendor's unbilled refusal ends a call as "the model is busy".
     expect(providerCallEndedVendorRefusedUnbilled(busy)).toBe(false);
     expect(busy).toMatchObject({ cause: expect.any(PreviewUnbilledRefusal) });
-    for (const [unsent, vendorBusy] of [["PROVIDER_NOT_REACHED", false], ["PROVIDER_REFUSED_UNBILLED", true]] as const) {
+    // Review 2026-10-12: PROVIDER_ERROR_UNBILLED (a vendor error that bills nothing but is not "busy", e.g.
+    // Anthropic's 400/404/413/500) is the plain unbilled refusal, as before gate v4: the model never sits out for it.
+    for (const [unsent, vendorBusy] of [["PROVIDER_NOT_REACHED", false], ["PROVIDER_REFUSED_UNBILLED", true],
+      ["PROVIDER_ERROR_UNBILLED", false]] as const) {
       const refusal = await call(unsent);
       expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: expect.any(PreviewUnbilledRefusal) });
       expect(isRunLevelSpendStop(refusal)).toBe(false);
@@ -194,9 +197,9 @@ describe("the preview spending gate's 409 refusal body", () => {
       expect((refusal as { cause: unknown }).cause instanceof PreviewVendorRefusedUnbilled, unsent).toBe(vendorBusy);
     }
     // Owner ruling 5: each unbilled refusal is sent once more after the cooldown, and only once.
-    expect(slept).toEqual([COOLDOWN_MS, COOLDOWN_MS, COOLDOWN_MS]);
+    expect(slept).toEqual([COOLDOWN_MS, COOLDOWN_MS, COOLDOWN_MS, COOLDOWN_MS]);
     await expect(call("PREVIEW_TEST_AUTHORITY_STOPPED")).resolves.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
-    expect(slept).toHaveLength(3);
+    expect(slept).toHaveLength(4);
   });
 
   describe("owner ruling 5: one retry after the cooldown, only for a call the gate proved unbilled", () => {

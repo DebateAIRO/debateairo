@@ -1194,13 +1194,29 @@ class UnbilledLedgerTests(GateTest):
                 self.assertEqual(entry_of(gate, 'op-1')['state'], state)
 
     def test_the_mechanism_is_the_profile_hook_for_any_provider(self):
-        # PR B routes its own proved-unbilled replies through profile.unbilled_refusal: same entry, same cool-off.
-        with patch.object(DEEPINFRA, 'unbilled_refusal', lambda status, _response: status == 503):
+        # PR B routes its own proved-unbilled replies through profile.unbilled_refusal: same entry. Review
+        # 2026-10-12: profile.busy_refusal then picks the path, the model's cool-off (busy) or the unsent
+        # streak (any other unbilled error); a busy hook that fails is doubt, which halts.
+        for busy, code, streak, refusals in ((True, 'PROVIDER_REFUSED_UNBILLED', 0, 1), (False, 'PROVIDER_ERROR_UNBILLED', 1, None)):
+            with self.subTest(busy=busy), patch.object(DEEPINFRA, 'unbilled_refusal', lambda status, _response: status == 503), \
+                    patch.object(DEEPINFRA, 'busy_refusal', lambda _status, _response, answer=busy: answer):
+                gate = self.gate().ready()
+                with self.refused(code):
+                    gate.call('op-1', dispatch=lambda _s, _k: (503, {'error': 'busy'}))
+                entry = entry_of(gate, 'op-1')
+                self.assertEqual((entry['state'], entry['held_usd'], entry['http_status']), ('released_unbilled', '0', 503))
+                status = gate.status()
+                self.assertEqual((status['state'], status['unsent_streak'], status['cooling'].get(MODEL, {}).get('refusals')),
+                                 ('active', streak, refusals))
+
+        def broken(_status, _response):
+            raise ValueError('hook failed')
+        with patch.object(DEEPINFRA, 'unbilled_refusal', lambda status, _response: status == 503), \
+                patch.object(DEEPINFRA, 'busy_refusal', broken):
             gate = self.gate().ready()
-            with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            with self.refused('NEW_CHARGE_UNCERTAIN'):
                 gate.call('op-1', dispatch=lambda _s, _k: (503, {'error': 'busy'}))
-        entry = entry_of(gate, 'op-1')
-        self.assertEqual((entry['state'], entry['held_usd'], entry['http_status']), ('released_unbilled', '0', 503))
+        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'uncertain_charge'))
 
 
 class ModelCoolingTests(GateTest):
@@ -1393,6 +1409,55 @@ class ModelCoolingTests(GateTest):
         (gate.private / 'team-control.json').write_text(json.dumps(control))
         with self.refused('CONTROL_INVALID'):
             gate.status()
+
+    def test_deepinfra_unbilled_refusals_are_all_busy(self):
+        # Review 2026-10-12: DeepInfra's only unbilled refusal is its 429, which is always "busy".
+        profile = bridge.helper.DeepInfraProfile()
+        self.assertTrue(profile.unbilled_refusal(429, dict(self.RATE_LIMITED)))
+        self.assertTrue(profile.busy_refusal(429, dict(self.RATE_LIMITED)))
+        for status in (400, 404, 413, 500, 503):
+            self.assertFalse(profile.unbilled_refusal(status, dict(self.RATE_LIMITED)))
+
+    def test_a_later_stored_end_is_kept_when_a_refusal_would_end_the_window_sooner(self):
+        moment = bridge.datetime.fromisoformat(self.START)
+        control = {'cooling': {MODEL: {'refusals': 2, 'window_seconds': 60,
+                                       'until_utc': '2026-10-08T09:05:00+00:00', 'trial': None}}, 'in_flight': {}}
+        # A refusal of a call that was already in flight: now + 60 s is 09:01, the stored end 09:05 stays.
+        bridge.note_unbilled_refusal(control, MODEL, 'straggler', moment)
+        self.assertEqual(control['cooling'][MODEL], {'refusals': 3, 'window_seconds': 60,
+                                                     'until_utc': '2026-10-08T09:05:00+00:00', 'trial': None})
+        # And a later moment moves it on: max(now + window, stored end).
+        bridge.note_unbilled_refusal(control, MODEL, 'straggler-2', moment + bridge.timedelta(seconds=290))
+        self.assertEqual(control['cooling'][MODEL]['until_utc'], '2026-10-08T09:05:50+00:00')
+
+    def test_a_stored_window_above_a_lower_future_maximum_is_clamped_on_read_not_refused(self):
+        gate = self.gate().ready()
+        self.refuse(gate, 'op-1')
+        self.refuse(gate, 'op-2')
+        control = gate.control()
+        control['cooling'][MODEL].update(window_seconds=600, until_utc='2026-10-08T09:10:00+00:00')
+        (gate.private / 'team-control.json').write_text(json.dumps(control))
+        with patch.object(bridge, 'COOL_OFF_MAX_SECONDS', 300):
+            status = gate.status()  # Not CONTROL_INVALID.
+            self.assertEqual((status['state'], status['cooling'][MODEL]['window_seconds'],
+                              status['cooling'][MODEL]['cooling_now']), ('active', 300, True))
+            self.assertEqual(self.cooling(gate, 'op-3'), 300)  # retry_after never above today's maximum.
+            later(gate, 600)
+            self.refuse(gate, 'trial')  # A refused trial doubles from the clamped 300, capped at 300.
+            self.assertEqual((self.record(gate)['window_seconds'], self.record(gate)['until_utc']),
+                             (300, '2026-10-08T09:15:00+00:00'))
+        for window in (0, 1, 59, 600):
+            self.assertTrue(bridge.cooling_valid({MODEL: {'refusals': 2, 'window_seconds': window,
+                                                          'until_utc': None if window == 0 else self.START, 'trial': None}}))
+
+    def test_activate_does_not_clear_a_cooling_model(self):
+        gate = self.gate().ready()
+        self.refuse(gate, 'op-1')
+        self.refuse(gate, 'op-2')
+        bridge.halt(gate.private, 'operator_stop', now=gate.clock)
+        gate.activate()
+        self.assertEqual(self.record(gate)['until_utc'], '2026-10-08T09:01:00+00:00')
+        self.assertEqual(self.cooling(gate, 'op-3'), 60)
 
     def test_money_rules_are_unchanged_for_a_cooling_model(self):
         gate = self.gate(max_paid_posts_per_day=1).ready()

@@ -4,6 +4,9 @@
 # `systemctl start --no-block` (the email names the reason and the one command that re-opens the
 # gate). It never touches the gate's state and never waits for mail. If the watcher itself breaks
 # (status unreadable, notice not queued), this unit fails and the preview alert emails that.
+# The same watcher also emails once per Bucharest day when status's today_unbilled_releases reaches
+# 100 (the default of --unbilled-alert-at; an alert, never a halt). A gate whose status has no such
+# count (an older gate) is skipped quietly; the v3 units pass the flag explicitly.
 # Root only because the gate's private folder is root-only; the key file is hidden from it, and it
 # has no network at all (systemctl talks to systemd over a local socket).
 [Unit]

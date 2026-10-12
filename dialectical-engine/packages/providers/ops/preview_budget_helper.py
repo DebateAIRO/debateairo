@@ -315,8 +315,11 @@ class DeepInfraProfile:
       account(response, row, moment) -> dict  usage and guard charge (see account_response's keys)
       reply_model(response) -> str|None  where the reply names the model that answered
       unbilled_refusal(status, response) -> bool  a refusal that provably billed nothing (the gate
-                                         keeps a $0 'released_unbilled' entry and cools that
-                                         model off; it never halts the gate)
+                                         keeps a $0 'released_unbilled' entry)
+      busy_refusal(status, response) -> bool  asked only of an unbilled refusal: True when it says
+                                         the vendor is busy (the gate cools that model off and
+                                         never halts for it); False for any other unbilled error
+                                         (counted toward the unsent streak, never cools the model)
       probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024)
       reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
     """
@@ -402,6 +405,10 @@ class DeepInfraProfile:
         return (status == 429 and isinstance(response, dict) and bool(response.get('error'))
                 and not names_any_key(response, BILLED_KEYS)
                 and not names_any_key_prefixed(response, 'tokens_'))
+
+    def busy_refusal(self, status, response):
+        """DeepInfra's only unbilled refusal is its 429 ("too many requests"): always busy."""
+        return status == 429
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
@@ -721,7 +728,9 @@ class AnthropicProfile:
 
     # Anthropic's well-formed error answers that bill nothing, by HTTP status: the error types each
     # status may carry (platform.claude.com, API Errors page, read 2026-10-10). Judge round on PR B:
-    # the same released_unbilled entry and per-model cool-off as DeepInfra's 429s. Never here, so they halt:
+    # the same released_unbilled entry as DeepInfra's 429s. Only the busy ones (BUSY_STATUSES: 429 and
+    # 529) cool the model off like DeepInfra's 429s; 400, 404, 413 and 500 are not busy (review
+    # 2026-10-12): they count toward the gate-wide unsent streak as before gate v4. Never here, so they halt:
     # 401 authentication_error and 403 permission_error (the key is wrong: root must look),
     # 402 billing_error, 504 timeout_error (the work may have run), and any other status or type.
     UNBILLED_ERRORS = {
@@ -732,6 +741,7 @@ class AnthropicProfile:
         500: frozenset({'api_error'}),
         529: frozenset({'rate_limit_error', 'overloaded_error'}),
     }
+    BUSY_STATUSES = frozenset({429, 529})  # rate_limit_error / overloaded_error: the vendor is busy.
 
     def unbilled_refusal(self, status, response):
         """True only for Anthropic's own well-formed error answers that bill nothing (owner ruling 5,
@@ -739,8 +749,9 @@ class AnthropicProfile:
         type "error", error (and an optional request_id string), an error type that status may
         carry, and no usage, content or model key, no other billed key (BILLED_KEYS) and no
         tokens_* or *_tokens key at any depth. The core passes the RAW reply (before redaction
-        drops any subtree), releases the hold and keeps a $0 'released_unbilled' entry (that
-        model's cool-off counts it). Anything else is accounted (and halts) as before."""
+        drops any subtree), releases the hold and keeps a $0 'released_unbilled' entry (a busy one
+        counts toward that model's cool-off, any other toward the unsent streak: busy_refusal).
+        Anything else is accounted (and halts) as before."""
         if status not in self.UNBILLED_ERRORS or not isinstance(response, dict):
             return False
         if set(response) not in ({'type', 'error'}, {'type', 'error', 'request_id'}):
@@ -752,6 +763,13 @@ class AnthropicProfile:
                 and not names_any_key(response, BILLED_KEYS + ('content', 'model'))
                 and not names_any_key_prefixed(response, 'tokens_')
                 and not names_any_key_suffixed(response, '_tokens'))
+
+    def busy_refusal(self, status, response):
+        """Of the unbilled errors above, only 429 and 529 (rate_limit_error, overloaded_error) say the
+        vendor is busy. 400 invalid_request_error, 404 not_found_error and 413 request_too_large
+        are deterministic for that request, and 500 api_error is Anthropic's own fault: none of them
+        is a reason to sit the model out, so the gate counts them toward the unsent streak instead."""
+        return status in self.BUSY_STATUSES
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),

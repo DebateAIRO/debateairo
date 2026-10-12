@@ -23,7 +23,9 @@
  * previewAuthorityRefusal), counted as the gate counts them:
  *  - the vendor refused, not billed (PROVIDER_REFUSED_UNBILLED, PreviewVendorRefusedUnbilled): the run in a row AND
  *    the day's count (the gate keeps it as a released_unbilled entry);
- *  - the vendor was not reached (PROVIDER_NOT_REACHED): the run in a row only (the gate keeps no entry);
+ *  - the vendor was not reached (PROVIDER_NOT_REACHED): the run in a row only (the gate keeps no entry); the
+ *    Anthropic gate's not-busy error answers (PROVIDER_ERROR_UNBILLED, review 2026-10-12: 400/404/413/500) arrive as
+ *    the same plain refusal and are counted the same way (the gate adds them to its streak too, and keeps a $0 entry);
  *  - the gate's own "too many calls in flight" (CONCURRENCY_LIMIT_REACHED): neither (refused before it reserves).
  */
 import { TypedDomainError } from "@debateai/kernel";
