@@ -8,7 +8,9 @@
  * whatever lines are there. `practice.ts report --out DIR` builds them again from DIR/samples.jsonl.
  *
  * What a line holds is exactly what the report holds: a sample's reply text only when the reply failed its format
- * check (key-shaped strings blanked, at most 64 KiB; practice-redaction.ts), never a request, never a key.
+ * check (key-shaped strings blanked, at most 64 KiB; practice-redaction.ts), never a request, never a key. In a
+ * `--levels` run only (spec 2026-10-12 §4.8), a sample also holds its accepted answer, blanked and cut the same way, and
+ * its run, level, thinking tokens and cut-off; an older log without these fields still reads.
  */
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, writeSync } from "node:fs";
 import { join } from "node:path";
@@ -40,7 +42,9 @@ export type PracticeLogLine =
     /** Each model's budget of busy waits (absent in logs written before it existed). */
     busyWaitMs?: number;
     unsentStreakAtStart: Readonly<Record<PracticeGateName, number>>;
-    remainingBefore: Readonly<Record<PracticeGateName, PracticeRemainingLine | null>> }>
+    remainingBefore: Readonly<Record<PracticeGateName, PracticeRemainingLine | null>>;
+    /** Spec 2026-10-12 §4.8: each `--levels` model's runs ("high#1", …); only in a `--levels` run's log. */
+    levels?: Readonly<Record<string, readonly string[]>> }>
   | Readonly<{ kind: "wire"; event: PracticeWireEvent }>
   | Readonly<{ kind: "stop"; stop: PracticeGateStop }>
   | Readonly<{ kind: "sample"; sample: PracticeSample }>
@@ -163,7 +167,9 @@ export function practiceReportFromLog(lines: readonly PracticeLogLine[], abort: 
       deepinfra: { before: remainingValue(start.remainingBefore.deepinfra), after: remainingValue(after?.deepinfra) },
       anthropic: { before: remainingValue(start.remainingBefore.anthropic), after: remainingValue(after?.anthropic) }
     } });
-  return Object.freeze({ ...report, plannedSamples: start.models.length * start.lanes.length * start.samples,
+  // A `--levels` model does each job once per run; any other model once (samples carry the new fields only then).
+  const runsOf = (model: string) => start.levels?.[model]?.length ?? 1;
+  return Object.freeze({ ...report, plannedSamples: start.models.reduce((sum, model) => sum + runsOf(model), 0) * start.lanes.length * start.samples,
     parallel: start.parallel, busyByModel: practiceBusyByModel(lines) });
 }
 

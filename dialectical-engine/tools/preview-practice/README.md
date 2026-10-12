@@ -319,6 +319,7 @@ Optional flags:
   skipped; 0 skips at once),
   `--models a,b` (model ids from the preview's roster), `--lanes JUDGE_POSITION,PANEL,...` (default all nine:
   JUDGE_POSITION, JUDGE_ATTACK, JUDGE_CROSS, PANEL, REVIEW, SYNTHESIZER, EVALUATOR, STORYTELLER, STORY_CHECKER).
+  `--levels "<model>=<level>,...;..."` (the same jobs at several thinking levels, see S-6b).
 - report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/samples.jsonl.
 - debate: `--depth 1|2`, `--question ro|en`, `--transcript` (also write `transcript.json`: every prompt and every
   answer, see "The whole debate, word for word" above). The register is copied only through the register's own publication
@@ -331,6 +332,64 @@ Optional flags:
   The progress line and `report.json` (`register.codeNext`) name every row the next version changes: on the server,
   the publish proposal must show the same rows (plus `nodeRuntimeVersion`'s source reference, which the server
   measures again). A checkout that changes no row refuses (`PRACTICE_REGISTER_NEXT_UNSUPPORTED`).
+
+### S-6b, Mac: thinking levels side by side (formats, `--levels`)
+
+`--levels` (formats mode only) asks the listed models every job once per listed thinking level (spec 2026-10-12
+§4.8). Its value is `<model>=<level>,<level>,...;<model>=...`:
+
+- each level must be on that model's reviewed menu (GLM: high, low; DeepSeek: high, low, none; MiMo: default, none;
+  Qwen: default, low, medium, none; Haiku: high, medium, low), and each model must be in this run (`--models`, or the
+  preview's roster without it). Anything else refuses before a gate is asked (`PRACTICE_LEVELS_INVALID`);
+- a level listed twice is run twice (`high#1`, `high#2`): the gap between those two runs shows how much the results
+  move by chance alone (the "chance band" line under the table in `report.md`);
+- the runs take turns per job (A, B, C, then B, C, A, ...), one after another, never at once, so a slow or busy hour
+  falls on every level alike. A busy model parks all its runs;
+- each run sends only its own level (the server's per-step levels are left out: a pure A/B). A model not listed runs
+  once, at the server's levels, as without `--levels`;
+- each sample in `samples.jsonl` also carries its run, level, thinking tokens, whether a reply stopped at max_tokens,
+  and its accepted answer (key-shaped strings blanked, at most 64 KiB). `report.json` gets a `levels` block and
+  `report.md` a "Thinking levels" table: per model and run, answered / jobs, first try, repaired, format failed (a reply
+  in the wrong format for good), call failed (the call itself failed or was refused, not billed), cut off, thinking
+  median and total, time median / p90, cost per job and total, and over bar (this run alone over the slip bar;
+  information only).
+
+To read the answers themselves, side by side: `node_modules/.bin/tsx tools/preview-practice/practice.ts report --side-by-side "$P/levels-step-b/samples.jsonl" --out "$P/levels-page"` writes `$P/levels-page/side-by-side.html` from a finished run's samples log, sending nothing and writing no report files. Open it in a browser. It shows the four chosen jobs only (PANEL, SYNTHESIZER, STORYTELLER, REVIEW); `--lanes PANEL,SYNTHESIZER` names other jobs, checked the same way as in formats mode. Each model has its own block, and each job a block per sample and question, with one labelled column per run: the accepted answer (or why there is none), then its status, thinking tokens, time, cost in US dollars, and "cut off" when a reply stopped at the length limit. Its header explains the labels: "high#2" is the same level run a second time, so you can see what changes by chance alone; "default" is the AI's own setting; "none" means thinking is switched off. The file holds the answers, so keep it in `$P` with the reports; it has no script, every value on it is escaped, and it is readable only by you.
+
+The tool does not count the testing day's budget itself: before a `--levels` run, read both gates' day spend (S-3)
+and keep the day's total under the owner's limits. The run can be stopped at any time with Ctrl-C (the report is
+still written).
+
+Step A (spec 2026-10-12 §6, a few cents): does each level really work? One job, one question, every level once. Same
+`D` and `P` as in S-5, fresh status files from S-3:
+
+```sh
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --lanes PANEL --samples 1 --levels "zai-org/GLM-5.3-Flash=high,low;deepseek-ai/DeepSeek-V4.1-Flash=high,low,none;Qwen/Qwen3.8-Flash=default,medium,low,none;XiaomiMiMo/MiMo-V2.6-Pro=default,none;claude-haiku-5-5=high,medium,low" --out "$P/levels-step-a"
+echo "exit: $?"
+```
+
+Step B (spec 2026-10-12 §6, the side-by-side run): all nine jobs, four samples of each job per run (the
+English and the Romanian practice question, each twice), today's level run twice. The planned runs:
+
+| AI | Level runs |
+|---|---|
+| GLM | high, high, low |
+| DeepSeek | high, high, low, none |
+| Qwen | default, default, medium, low, none |
+| MiMo | default, default, none |
+| Haiku | high, high, medium, low |
+
+Take out of the `--levels` value any level Step A showed refused or ignored, then (fresh status files from S-3 again):
+
+```sh
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --samples 4 --busy-wait-minutes 30 --levels "zai-org/GLM-5.3-Flash=high,high,low;deepseek-ai/DeepSeek-V4.1-Flash=high,high,low,none;Qwen/Qwen3.8-Flash=default,default,medium,low,none;XiaomiMiMo/MiMo-V2.6-Pro=default,default,none;claude-haiku-5-5=high,high,medium,low" --out "$P/levels-step-b"
+echo "exit: $?"
+```
+
+That is 19 runs of 36 jobs, about 680 jobs. The verdict stays per model, with all of that model's runs counted
+together (a slip fixed by the second try is a warning; a step failed for good, or more than 1 slip in 10 of the
+model's answered calls, fails). Each run's own bar is shown, for the comparison only, in the levels table's "over
+bar" column; its "answered / jobs" column shows the jobs a busy model skipped.
 
 ### S-7, stop and clean up
 
@@ -358,15 +417,22 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice.ts`: the command (both modes, the start checks, the report).
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
   `main.ts` files compose them on the preview. `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
-- `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode. `practice-debate.ts`,
+- `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode; `practice-levels.ts`: its `--levels`
+  plan; `practice-side-by-side.ts`: the side-by-side page (`report --side-by-side`). `practice-debate.ts`,
   `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode; `practice-transcript.ts`: its
   `--transcript` file.
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (models at once,
   the per-gate and overall limits), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
   `practice-questions.ts`.
+- `check-thinking-levels.ts`: the offline check of a `thinking_levels` table before any API or runner restart
+  (deploy/preview-auth-dev/v1/README.md, "The optional `thinking_levels` table"; it sends nothing and needs no gate):
+  `node_modules/.bin/tsx tools/preview-practice/check-thinking-levels.ts --settings "$P/candidate-settings.env"`.
 - `gate-relay.py` and `test_gate_relay.py` (run: `python3 tools/preview-practice/test_gate_relay.py`).
-- Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-transcript.test.ts`,
+- Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-levels.test.ts`,
+  `tests/unit/preview-thinking-levels-check.test.ts`,
+  `tests/unit/preview-practice-side-by-side.test.ts`,
+  `tests/unit/preview-practice-transcript.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,
   `tests/integration/preview-practice-run.test.ts` (both modes against the scripted gate doubles in
   `tests/support/preview-gate-stubs.ts`; no vendor is contacted).

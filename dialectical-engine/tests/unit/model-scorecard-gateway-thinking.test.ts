@@ -312,7 +312,14 @@ describe("model scorecard — a relay's own refusals (R1, pre-flight fix F1)", (
 });
 
 describe("model scorecard — thinking tokens", () => {
-  it("reads completion_tokens_details.reasoning_tokens, and nothing else", () => {
+  it("reads Anthropic's thinking tokens (spec 2026-10-12 §4.6)", () => {
+    expect(reportedReasoningTokens({ input_tokens: 10, output_tokens: 500, output_tokens_details: { thinking_tokens: 320 } })).toBe(320);
+    expect(reportedReasoningTokens({ input_tokens: 10, output_tokens: 500 })).toBeNull();
+    expect(reportedReasoningTokens({ output_tokens_details: { thinking_tokens: -1 } })).toBeNull();
+    expect(reportedReasoningTokens({ completion_tokens_details: { reasoning_tokens: 7 } })).toBe(7);
+  });
+
+  it("reads OpenAI's completion_tokens_details.reasoning_tokens, and rejects every malformed value", () => {
     expect(reportedReasoningTokens({ completion_tokens_details: { reasoning_tokens: 7 } })).toBe(7);
     expect(reportedReasoningTokens({ completion_tokens_details: { reasoning_tokens: 0 } })).toBe(0);
     for (const unreported of [

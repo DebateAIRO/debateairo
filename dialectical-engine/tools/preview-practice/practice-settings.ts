@@ -11,7 +11,7 @@
  */
 import { lstatSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import { parsePreviewProviderTestConfig, type PreviewProviderTestConfig } from "@debateai/providers";
+import { PREVIEW_THINKING_LEVELS_INVALID, parsePreviewProviderTestConfig, type PreviewProviderTestConfig } from "@debateai/providers";
 import { resolveDeploymentMode } from "@debateai/register";
 import { redactKeyShapes } from "./practice-redaction.js";
 import type { PracticeRunnerSettings } from "./practice-runner-composition.js";
@@ -77,6 +77,17 @@ export type PracticeSettings = Readonly<{
 }>;
 
 /**
+ * A settings value holds something key-shaped (a vendor key, bearer header, JWT, `secret=` pair, PEM block). The two
+ * generic long-run rules are left out: a scope id or a fingerprint is long but not a key. The offline thinking-levels
+ * check (check-thinking-levels.ts) uses the same rule.
+ */
+export function settingsValueIsKeyShaped(value: string): boolean {
+  const blanked = redactKeyShapes(value).replace(/\[REDACTED:long-run\]|\[REDACTED:long-hex\]/gu, "");
+  const unblanked = value.replace(/[A-Za-z0-9_-]{32,}/gu, "").replace(/\b[0-9a-fA-F]{32,}\b/gu, "");
+  return blanked !== unblanked;
+}
+
+/**
  * KEY=value lines, as root writes them with grep from runner.env and api.env (README step S-2). Values are never
  * quoted in those files. A blank line or a # comment is skipped. Anything outside the allow-list refuses, and so does
  * a value that holds anything key-shaped (the long-run rule is not applied: a scope id is long but not a key).
@@ -94,9 +105,7 @@ export function parsePracticeSettings(text: string): PracticeSettings {
       throw new PracticeRefusal("PRACTICE_SETTINGS_KEY_REFUSED", `line ${String(index + 1)}`);
     }
     if (values.has(key)) throw new PracticeRefusal("PRACTICE_SETTINGS_KEY_DUPLICATE", key);
-    const blanked = redactKeyShapes(value).replace(/\[REDACTED:long-run\]|\[REDACTED:long-hex\]/gu, "");
-    const unblanked = value.replace(/[A-Za-z0-9_-]{32,}/gu, "").replace(/\b[0-9a-fA-F]{32,}\b/gu, "");
-    if (blanked !== unblanked) throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_KEY_SHAPED", key);
+    if (settingsValueIsKeyShaped(value)) throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_KEY_SHAPED", key);
     values.set(key, value);
   }
   for (const key of REQUIRED_KEYS) if (!values.has(key)) throw new PracticeRefusal("PRACTICE_SETTINGS_KEY_MISSING", key);
@@ -107,8 +116,14 @@ export function parsePracticeSettings(text: string): PracticeSettings {
     return parsed;
   };
   let previewConfig: PreviewProviderTestConfig | undefined;
-  try { previewConfig = parsePreviewProviderTestConfig(get("PREVIEW_PROVIDER_TEST_CONFIG_JSON")); } catch {
-    throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", "PREVIEW_PROVIDER_TEST_CONFIG_JSON");
+  try { previewConfig = parsePreviewProviderTestConfig(get("PREVIEW_PROVIDER_TEST_CONFIG_JSON")); } catch (error) {
+    // Spec 2026-10-12 §4.2: the parser's own code is kept, and a bad table's detail with it, so a practice on a bad table
+    // says why. The detail can repeat an unreviewed table key or step word verbatim, and the key-shape screen above skips
+    // the long-run rules, so every key shape (a bare long token too) is blanked before it is shown.
+    const message = error instanceof Error ? error.message : "";
+    const parserSays = message.startsWith(`${PREVIEW_THINKING_LEVELS_INVALID}:`) ? redactKeyShapes(message).slice(0, 200)
+      : "PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID";
+    throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", `PREVIEW_PROVIDER_TEST_CONFIG_JSON: ${parserSays}`);
   }
   if (previewConfig === undefined || previewConfig.anthropic_budget_socket === undefined) {
     throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", "PREVIEW_PROVIDER_TEST_CONFIG_JSON names no Anthropic gate");

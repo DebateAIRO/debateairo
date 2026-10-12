@@ -245,7 +245,7 @@ function nativeHarness(contents: readonly string[], finishReasons: readonly stri
   const row = rowOf(model);
   const native = new OpenAICompatibleProviderGateway({
     endpoint: ENDPOINT, model, maker: row.maker,
-    ...(row.effort === null ? {} : { thinking: { parameter: "reasoning_effort", levels: ["high"] } }), fetchImplementation: fetcher,
+    ...(row.defaultEffort === "default" ? {} : { thinking: { parameter: "reasoning_effort", levels: [row.defaultEffort] } }), fetchImplementation: fetcher,
     assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined,
     persistRawArtifact: async (artifact) => { artifacts.push(artifact); return artifact.artifactId; },
     appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },

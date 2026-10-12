@@ -953,6 +953,7 @@ packages/providers/src/patch-follow-up.ts
 packages/providers/src/preview-models.ts
 packages/providers/src/preview-remaining.ts
 packages/providers/src/preview-test.ts
+packages/providers/src/preview-thinking.ts
 packages/providers/src/prompt-frame.ts
 packages/providers/src/prompt-tripwire.ts
 packages/providers/src/provider-probe.ts

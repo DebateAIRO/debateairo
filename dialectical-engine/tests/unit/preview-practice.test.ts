@@ -51,6 +51,8 @@ import {
   practiceSocketsFromEnvironment
 } from "../../tools/preview-practice/practice-settings.js";
 import { latencySummary, percentile, practiceVerdict, type PracticeVerdictInput } from "../../tools/preview-practice/practice-verdict.js";
+import { parsePracticeLevels } from "../../tools/preview-practice/practice-levels.js";
+import { parsePracticeArgs, runPractice } from "../../tools/preview-practice/practice.js";
 
 const CLEAN: PracticeVerdictInput = Object.freeze({
   harnessError: null, completed: true, servedAnswer: true, storyOutcome: "READY", formatFailures: 0, failedCalls: 0,
@@ -287,6 +289,11 @@ describe("practice gate brake", () => {
     expect(vendorUsage("anthropic", JSON.stringify({ usage: { input_tokens: 3, output_tokens: 2 } })))
       .toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: null, cachedInputTokens: null });
   });
+  it("reads Haiku's thinking tokens off the Anthropic usage block (spec 2026-10-12 §4.6)", () => {
+    expect(vendorUsage("anthropic", JSON.stringify({ usage: { input_tokens: 3, output_tokens: 500,
+      output_tokens_details: { thinking_tokens: 320 } } })))
+      .toEqual({ inputTokens: 3, outputTokens: 500, reasoningTokens: 320, cachedInputTokens: null });
+  });
 });
 
 describe("practice start refusals", () => {
@@ -334,6 +341,33 @@ describe("practice start refusals", () => {
     expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("PROVIDER_DISCOVERY_TARGETS_JSON=")
       ? 'PROVIDER_DISCOVERY_TARGETS_JSON=[{"authorization_file":"/x"}]' : line).join("\n"))).toThrow("PRACTICE_SETTINGS_VALUE_INVALID");
     expect(() => parsePracticeSettings(lines.filter((line) => !line.startsWith("CLAIM_MS=")).join("\n"))).toThrow("PRACTICE_SETTINGS_KEY_MISSING");
+  });
+  it("a bad thinking table: the refusal keeps the parser's detail (spec 2026-10-12 §4.2, final review fix 1b)", () => {
+    const bad = JSON.stringify({ ...JSON.parse(config) as object, thinking_levels: { "zai-org/GLM-5.3-Flash": { level: "medium" } } });
+    expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("PREVIEW_PROVIDER_TEST_CONFIG_JSON=")
+      ? `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${bad}` : line).join("\n")))
+      .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW_THINKING_LEVELS_INVALID:level zai-org/GLM-5.3-Flash");
+    expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("PREVIEW_PROVIDER_TEST_CONFIG_JSON=")
+      ? "PREVIEW_PROVIDER_TEST_CONFIG_JSON={" : line).join("\n")))
+      .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+  });
+  it("a bad table's detail never carries a long token raw: an unreviewed key or step is blanked (re-review fix)", () => {
+    const token = "k3x9q2m7v8w1r4t6y0p5s2d8f3g7h1j9l4z6c2b8";
+    const withTable = (table: unknown) => lines.map((line) => line.startsWith("PREVIEW_PROVIDER_TEST_CONFIG_JSON=")
+      ? `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify({ ...JSON.parse(config) as object, thinking_levels: table })}` : line).join("\n");
+    for (const table of [{ [token]: { level: "low" } }, { "zai-org/GLM-5.3-Flash": { steps: { [token]: "low" } } }]) {
+      let message = "";
+      try { parsePracticeSettings(withTable(table)); } catch (error) { message = (error as Error).message; }
+      expect(message).toMatch(/^PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW_THINKING_LEVELS_INVALID:/u);
+      expect(message).toContain("[REDACTED:long-run]");
+      expect(message).not.toContain(token);
+    }
+  });
+  it("a run that cannot start says why: the refusal's detail is in its log line", async () => {
+    const logged: string[] = [];
+    const outcome = await runPractice(["debate", "--levels", "zai-org/GLM-5.3-Flash=high"], {}, { log: (line) => logged.push(line) });
+    expect(outcome.report).toMatchObject({ reasons: ["HARNESS_ERROR:PRACTICE_FLAG_VALUE_INVALID"] });
+    expect(logged).toContain("practice could not run: PRACTICE_FLAG_VALUE_INVALID: --levels (formats mode only)");
   });
   it("never writes its report inside the repository", () => {
     expect(() => assertOutsideRepository("/repo/root/out", "/repo/root")).toThrow("PRACTICE_REPORT_INSIDE_REPOSITORY");
@@ -952,6 +986,24 @@ describe("practice formats: busy retries end to end (unit, fake waits)", () => {
     expect(resumes).toEqual([`${GLM}|JUDGE_POSITION`, `${GLM}|JUDGE_POSITION`]);
   });
 
+  it("with --levels the busy-wait and trying-again lines name the run (final review fix 5); without, they are as before", async () => {
+    const progress = async (levels: string | null) => {
+      const observer = new PracticeGateObserver({ now: () => 0 });
+      const lines: string[] = [];
+      await runPracticeFormats({ config, targets: targets.filter((target) => target.model === GLM), ports: ports(observer, 2), observer,
+        lanes: ["JUDGE_POSITION"], samples: 1, gapMs: 0, pack, bounds, sleep: async () => undefined, parallel: true,
+        busyWaitMs: 30 * 60_000, random: () => 0, progress: (line) => lines.push(line),
+        ...(levels === null ? {} : { levels: parsePracticeLevels(levels, [GLM]) }) });
+      return lines.filter((line) => /busy|trying again/u.test(line));
+    };
+    expect(await progress(`${GLM}=high,low`)).toEqual([
+      `${GLM} is busy (refused, not billed): waiting 60s, then JUDGE_POSITION #1 high#1 again`,
+      `${GLM} JUDGE_POSITION #1 high#1: trying again after its wait`]);
+    expect(await progress(null)).toEqual([
+      `${GLM} is busy (refused, not billed): waiting 60s, then JUDGE_POSITION #1 again`,
+      `${GLM} JUDGE_POSITION #1: trying again after its wait`]);
+  });
+
   it("a cooling model waits the gate's retry_after", async () => {
     const observer = new PracticeGateObserver({ now: () => 0 });
     const waits: { waitMs: number; reason: string }[] = [];
@@ -1010,5 +1062,195 @@ describe("practice report: busy waits per model", () => {
     expect(report.verdict).toBe("NOT_PROVEN");
     expect(report.reasons).toContain("MODEL_BUSY:glm");
     expect(report.busyByModel.glm).toMatchObject({ recovered: false, gaveUp: true });
+  });
+});
+
+describe("practice formats --levels: the same jobs at several thinking levels (spec 2026-10-12 §4.8)", () => {
+  const FIVE = ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash", "claude-haiku-5-5"];
+  const GLM = FIVE[0]!;
+  const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", free_model_ids: FIVE.slice(0, 2),
+    premium_model_ids: FIVE, requested_thinking_level: "high", budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock",
+    anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock", scope_id: "preview-practice-unit" }))!;
+  const configured = PREVIEW_REVIEWED_PROVIDER_REFS.map((providerRef) => {
+    const row = previewModelRow(previewTargetJsonRow(providerRef).model)!;
+    return { providerRef, maker: row.maker, adapterKind: row.adapterKind };
+  });
+  const targets = onePerModel(parseProviderDiscoveryTargets(JSON.stringify(PREVIEW_REVIEWED_PROVIDER_REFS.map(previewTargetJsonRow)), configured), FIVE)
+    .filter((target) => target.model === GLM);
+  const policy = previewRunnerPolicy({ bounds: DEVELOPMENT_ORGAN_COST_BOUNDS.organs,
+    synthesisRolePolicy: { synthesizerBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.COMPOSER, evaluatorBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.CONFORMANCE } }, config);
+  const pack = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
+  const bounds = { judge: policy.bounds.JUDGE, synthesizer: policy.synthesisRolePolicy.synthesizerBound, evaluator: policy.synthesisRolePolicy.evaluatorBound };
+  // A reply the judge's position check accepts; a key-shaped string inside it shows the answer text is redacted.
+  const vendorKey = ["sk", "ant", "x".repeat(6) + "Y7".repeat(12)].join("-");
+  const GOOD = JSON.stringify({ statement: `Free central lines are worth it if new money pays for them. ${vendorKey}`, way_of_knowing: "REASONING",
+    locator: null, restatement_text: "Should central buses be free?", restatement_status: "PASS", value_laden: true, claim_type: "normative",
+    steelman: { summary: "Fares are a barrier.", fidelity: 0.8 }, critic: { summary: "Lost fares cut service.", counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" },
+    evidence: { quality: 0.4, relevance: 0.8 }, context: { fit: 0.8, ambiguityFlags: [] }, fallacy: { severity: 0.1, fatalFlags: [] } });
+  const THINKING: Readonly<Record<string, number>> = { high: 400, low: 40 };
+
+  /**
+   * The DeepInfra gate: answers every call well, reporting thinking tokens by the effort the body asked for; the
+   * `cutAt`-th call (1-based) ends cut off at max_tokens. Records each body's effort in arrival order.
+   */
+  function port(efforts: (string | null)[], cutAt: number | null): PreviewBudgetPort {
+    let calls = 0;
+    return { async execute(input) {
+      const body = JSON.parse(input.requestBody) as { model: string; reasoning_effort?: string };
+      calls += 1;
+      const effort = body.reasoning_effort ?? null;
+      efforts.push(effort);
+      return { status: 200, body: JSON.stringify({ id: `lv-${String(calls)}`, model: body.model,
+        choices: [{ message: { role: "assistant", content: GOOD }, finish_reason: calls === cutAt ? "length" : "stop" }],
+        usage: { prompt_tokens: 100, completion_tokens: 500, completion_tokens_details: { reasoning_tokens: THINKING[effort ?? ""] ?? 0 } } }) };
+    } };
+  }
+  async function run(levels: string | null, cutAt: number | null = null, parallel = false) {
+    const observer = new PracticeGateObserver({ now: () => 0 });
+    const efforts: (string | null)[] = [];
+    const ports = { deepinfra: observer.wrap("deepinfra", port(efforts, cutAt)), anthropic: observer.wrap("anthropic", port(efforts, null)) };
+    const result = await runPracticeFormats({ config, targets, ports, observer, lanes: ["JUDGE_POSITION"], samples: 2, gapMs: 0, pack, bounds,
+      sleep: async () => undefined, parallel, ...(levels === null ? {} : { levels: parsePracticeLevels(levels, [GLM]) }) });
+    return { result, efforts, observer };
+  }
+
+  it("every job runs once per level, the runs taking turns per job; each sample names its run, level, thinking, cut-off and answer", async () => {
+    const { result, efforts } = await run(`${GLM}=high,low`);
+    expect(result.samples.map((sample) => [sample.lane, sample.sample, sample.levelRun, sample.thinkingLevel])).toEqual([
+      ["JUDGE_POSITION", 1, "high#1", "high"], ["JUDGE_POSITION", 1, "low#1", "low"],
+      ["JUDGE_POSITION", 2, "low#1", "low"], ["JUDGE_POSITION", 2, "high#1", "high"]]);
+    // The bodies sent carried the matching effort, one call per job.
+    expect(efforts).toEqual(["high", "low", "low", "high"]);
+    for (const sample of result.samples) {
+      expect(sample.status).toBe("PARSED");
+      expect(sample.reasoningTokens).toBe(THINKING[sample.thinkingLevel!]);
+      expect(sample.cutOff).toBe(false);
+      expect(sample.answerText).toBe(reportableReplyText(GOOD));
+      expect(sample.answerText).not.toContain(vendorKey);
+    }
+    // The same question for the same sample index at every level.
+    const questionOf = (index: number) => [...new Set(result.samples.filter((sample) => sample.sample === index).map((sample) => sample.questionId))];
+    expect(questionOf(1)).toHaveLength(1);
+    expect(questionOf(2)).toHaveLength(1);
+    expect(questionOf(1)).not.toEqual(questionOf(2));
+  });
+
+  it("a reply that ended at max_tokens marks its job cut off", async () => {
+    const { result } = await run(`${GLM}=high,low`, 2);
+    expect(result.samples.map((sample) => sample.cutOff)).toEqual([false, true, false, false]);
+    expect(result.samples[1]).toMatchObject({ levelRun: "low#1" });
+  });
+
+  it("parallel mode: the same runs, one job at a time per model (never two of its runs at once)", async () => {
+    const { result, efforts } = await run(`${GLM}=high,low`, null, true);
+    expect(result.samples.map((sample) => sample.levelRun)).toEqual(["high#1", "low#1", "low#1", "high#1"]);
+    expect(efforts).toEqual(["high", "low", "low", "high"]);
+    expect(result.samples.map((sample) => sample.reasoningTokens)).toEqual([400, 40, 40, 400]);
+  });
+
+  it("without --levels the samples carry none of the new fields (the logs are unchanged)", async () => {
+    const { result, efforts } = await run(null);
+    expect(result.samples).toHaveLength(2);
+    expect(efforts).toEqual(["high", "high"]);
+    for (const sample of result.samples) {
+      for (const key of ["levelRun", "thinkingLevel", "reasoningTokens", "cutOff", "answerText"]) expect(Object.keys(sample)).not.toContain(key);
+    }
+  });
+
+  it("the parsed plan reaches the command: --levels is a value flag, formats mode only", async () => {
+    expect(parsePracticeArgs(["formats", "--levels", `${GLM}=high,low`]).flags.get("--levels")).toBe(`${GLM}=high,low`);
+    const outcome = await runPractice(["debate", "--levels", `${GLM}=high,low`], {}, { log: () => undefined });
+    expect(outcome.report).toMatchObject({ verdict: "HARNESS_ERROR", reasons: ["HARNESS_ERROR:PRACTICE_FLAG_VALUE_INVALID"] });
+    expect(outcome.directory).toBeNull();
+  });
+});
+
+describe("practice report: the thinking levels table (spec 2026-10-12 §4.8)", () => {
+  const GLM = "zai-org/GLM-5.3-Flash";
+  const start: PracticeLogLine = { kind: "start", schema: "preview-practice-samples-v1", mode: "formats", startedAt: "2026-10-12T00:00:00.000Z",
+    models: [GLM], lanes: ["PANEL"], samples: 2, parallel: true, unsentStreakAtStart: { deepinfra: 0, anthropic: 0 },
+    remainingBefore: { deepinfra: null, anthropic: null } };
+  const end: PracticeLogLine = { kind: "end", finishedAt: "2026-10-12T00:30:00.000Z", interrupted: false, remainingAfter: { deepinfra: null, anthropic: null } };
+  type Shape = Readonly<{ run: string; status: PracticeSample["status"]; latencyMs: number; reasoning: number | null; cost: string | null; cutOff?: boolean }>;
+  const sample = (index: number, shape: Shape): PracticeLogLine => {
+    const skipped = shape.status.startsWith("SKIPPED");
+    const tries = shape.status === "REPAIRED"
+      ? [{ callSiteKey: "PANEL:x", outcome: "FAILED" as const, parseStatus: "SCHEMA_FAILED" as const, latencyMs: 1 },
+        { callSiteKey: "PANEL:x", outcome: "OK" as const, parseStatus: "PARSED" as const, latencyMs: 1 }]
+      : shape.status === "PARSED" ? [{ callSiteKey: "PANEL:x", outcome: "OK" as const, parseStatus: "PARSED" as const, latencyMs: 1 }]
+        : ["CALL_FAILED", "UNBILLED_REFUSED", "VENDOR_ERROR_UNBILLED"].includes(shape.status)
+          ? [{ callSiteKey: "PANEL:x", outcome: "FAILED" as const, parseStatus: null, latencyMs: 1 }]
+        : skipped ? [] : [{ callSiteKey: "PANEL:x", outcome: "FAILED" as const, parseStatus: "PARSE_FAILED" as const, latencyMs: 1 },
+          { callSiteKey: "PANEL:x", outcome: "FAILED" as const, parseStatus: "PARSE_FAILED" as const, latencyMs: 1 }];
+    return { kind: "sample", sample: { model: GLM, providerRef: "preview:glm", gate: "deepinfra", lane: "PANEL", sample: index, questionId: "en",
+      status: shape.status, latencyMs: shape.latencyMs, attempts: tries, inputTokens: null, outputTokens: null, costNanoUsd: shape.cost,
+      unbilledRefusals: 0, issues: [], recheckIssues: [], errorCode: null, replyText: null, detail: null,
+      levelRun: shape.run, thinkingLevel: "high", reasoningTokens: shape.reasoning, cutOff: shape.cutOff ?? false, answerText: null } };
+  };
+  const lines: PracticeLogLine[] = [start,
+    sample(1, { run: "high#1", status: "PARSED", latencyMs: 10_000, reasoning: 300, cost: "2000000" }),
+    sample(1, { run: "high#2", status: "PARSED", latencyMs: 12_000, reasoning: 500, cost: "4000000" }),
+    sample(2, { run: "high#2", status: "REPAIRED", latencyMs: 30_000, reasoning: 700, cost: "6000000", cutOff: true }),
+    sample(2, { run: "high#1", status: "PARSE_FAILED", latencyMs: 20_000, reasoning: 100, cost: "2000000" }),
+    sample(3, { run: "high#1", status: "SKIPPED_MODEL_BUSY", latencyMs: 0, reasoning: null, cost: null }),
+    end];
+
+  it("lists per model and run: jobs, first try, repaired, format failed, call failed, cut off, thinking, time, cost, slips over the bar", () => {
+    const report = practiceReportFromLog(lines) as unknown as { levels: Record<string, Record<string, unknown>> };
+    expect(report.levels).toEqual({ [GLM]: {
+      "high#1": { jobs: 3, answered: 2, firstTry: 1, repaired: 0, formatFailed: 1, callFailed: 0, cutOff: 0, reasoningMedian: 100, reasoningTotal: 400,
+        latencyMedianMs: 10_000, latencyP90Ms: 20_000, costPerJobUsd: "0.002000000", costTotalUsd: "0.004000000", slipsOverBar: false },
+      "high#2": { jobs: 2, answered: 2, firstTry: 1, repaired: 1, formatFailed: 0, callFailed: 0, cutOff: 1, reasoningMedian: 500, reasoningTotal: 1_200,
+        latencyMedianMs: 12_000, latencyP90Ms: 30_000, costPerJobUsd: "0.005000000", costTotalUsd: "0.010000000", slipsOverBar: false } } });
+  });
+
+  it("a call that failed (CALL_FAILED, UNBILLED_REFUSED, VENDOR_ERROR_UNBILLED) is counted apart from a reply in the wrong format", () => {
+    const report = practiceReportFromLog([start,
+      sample(1, { run: "none#1", status: "PARSED", latencyMs: 1, reasoning: null, cost: "1" }),
+      sample(2, { run: "none#1", status: "PARSE_FAILED", latencyMs: 1, reasoning: null, cost: "1" }),
+      sample(3, { run: "none#1", status: "POST_CHECK_FAILED", latencyMs: 1, reasoning: null, cost: "1" }),
+      sample(4, { run: "none#1", status: "CALL_FAILED", latencyMs: 1, reasoning: null, cost: null }),
+      sample(5, { run: "none#1", status: "UNBILLED_REFUSED", latencyMs: 1, reasoning: null, cost: null }),
+      sample(6, { run: "none#1", status: "VENDOR_ERROR_UNBILLED", latencyMs: 1, reasoning: null, cost: null }), end]);
+    const levels = (report as unknown as { levels: Record<string, Record<string, unknown>> }).levels;
+    expect(levels[GLM]!["none#1"]).toMatchObject({ answered: 6, firstTry: 1, repaired: 0, formatFailed: 2, callFailed: 3 });
+    expect(Object.keys(levels[GLM]!["none#1"]!)).not.toContain("failed");
+    expect(reportMarkdown(report)).toContain(`| ${GLM} | none#1 | 6/6 | 1 | 0 | 2 | 3 | 0 | - | - |`);
+  });
+
+  it("over the slip bar: more slips than max(1, floor(answered / 10))", () => {
+    const report = practiceReportFromLog([start,
+      sample(1, { run: "low#1", status: "REPAIRED", latencyMs: 1, reasoning: 1, cost: "1" }),
+      sample(2, { run: "low#1", status: "REPAIRED", latencyMs: 1, reasoning: 1, cost: "1" }), end]) as unknown as { levels: Record<string, Record<string, { slipsOverBar: boolean }>> };
+    expect(report.levels[GLM]!["low#1"]!.slipsOverBar).toBe(true);
+    expect(reportMarkdown(report as unknown as Parameters<typeof reportMarkdown>[0])).toContain(`| ${GLM} | low#1 | 2/2 | 0 | 2 | 0 | 0 | 0 | 1 | 2 |`);
+    expect(reportMarkdown(report as unknown as Parameters<typeof reportMarkdown>[0])).toMatch(/\| low#1 \| .* \| yes \|$/mu);
+  });
+
+  it("the markdown has one row per model and run, and the chance band of a level run twice", () => {
+    const markdown = reportMarkdown(practiceReportFromLog(lines));
+    expect(markdown).toContain("| model | run | answered / jobs | first try | repaired | format failed | call failed | cut off | thinking median | "
+      + "thinking total | time median / p90 | cost per job | cost total | over bar |");
+    expect(markdown).toContain(`| ${GLM} | high#1 | 2/3 | 1 | 0 | 1 | 0 | 0 | 100 | 400 | 10.0 / 20.0 s | $0.002000000 | $0.004000000 | no |`);
+    expect(markdown).toContain(`| ${GLM} | high#2 | 2/2 | 1 | 1 | 0 | 0 | 1 | 500 | 1200 | 12.0 / 30.0 s | $0.005000000 | $0.010000000 | no |`);
+    expect(markdown).toContain(`${GLM} chance band (high#1 vs high#2): first try ±0, thinking median ±400, time median ±2.0 s, cost per job ±$0.003000000`);
+  });
+
+  it("the planned jobs count each --levels model once per run (from the start line's runs)", () => {
+    const withRuns: PracticeLogLine = { ...start, levels: { [GLM]: ["high#1", "high#2"] } } as PracticeLogLine;
+    expect(practiceReportFromLog([withRuns, end]).plannedSamples).toBe(4);
+    expect(practiceReportFromLog([start, end]).plannedSamples).toBe(2);
+  });
+
+  it("no levels block, and no chance band, when the samples carry no level run", () => {
+    const plain = lines.map((line) => {
+      if (line.kind !== "sample") return line;
+      const { levelRun: _run, thinkingLevel: _level, reasoningTokens: _thinking, cutOff: _cut, answerText: _answer, ...rest } = line.sample;
+      return { kind: "sample", sample: rest } as PracticeLogLine;
+    });
+    const report = practiceReportFromLog(plain);
+    expect(Object.keys(report)).not.toContain("levels");
+    expect(reportMarkdown(report)).not.toContain("Thinking levels");
+    expect(reportMarkdown(report)).not.toContain("chance band");
   });
 });
