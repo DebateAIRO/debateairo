@@ -227,7 +227,7 @@ it("U-10 maps each refusal to a visible status then preserves the next read stat
     stub.requestDataExport.mockRejectedValue(new ContractHttpError(
       code === "SESSION_REQUIRED" || code === "COOKIE_SESSION_REQUIRED" ? "SESSION_REQUIRED" : code === "EXPORT_RATE_LIMITED" ? "RATE_LIMITED" : "FORBIDDEN",
       code === "EXPORT_RATE_LIMITED" ? 429 : 403, code, code, null, null,
-      code === "EXPORT_RATE_LIMITED" ? 3600 : null
+      code === "EXPORT_RATE_LIMITED" ? 3_600_000 : null
     ));
     stub.stepUp.mockResolvedValue(grant() as never);
     await mount(<DataExportCard catalog={settings} locale="en" client={stub as never} />); await click(settings["settings.export.request"]); await flush();

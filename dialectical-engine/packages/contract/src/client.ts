@@ -149,10 +149,6 @@ function codeForStatus(status: number): ContractErrorCode {
 }
 
 async function contractErrorForResponse(response: Response): Promise<ContractHttpError> {
-  const retryAfter = response.headers.get("retry-after")?.trim();
-  const parsedRetryAfter = retryAfter !== undefined && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
-  const retryAfterSeconds = parsedRetryAfter !== null && Number.isSafeInteger(parsedRetryAfter)
-    ? parsedRetryAfter : null;
   let serverCode: string | null = null;
   let serverMessage: string | null = null;
   let statement: PublicationRefusalStatement | null = null;
@@ -184,7 +180,7 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
     : serverCode ?? serverMessage ?? `Contract request failed with ${response.status}`;
   return new ContractHttpError(
     codeForStatus(response.status), response.status, detail, serverCode, statement, waiting,
-    retryAfterMs(response.headers.get("retry-after")), retryAfterSeconds
+    retryAfterMs(response.headers.get("retry-after"))
   );
 }
 

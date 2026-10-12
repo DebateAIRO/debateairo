@@ -114,13 +114,15 @@ describe("data export contract", () => {
     ]);
   });
 
-  it("K-11 carries numeric Retry-After seconds on rate limit errors and rejects other forms", async () => {
+  it("K-11 carries Retry-After as milliseconds on rate limit errors and rejects unusable forms", async () => {
+    // One field for the wait (retryAfterMs, shared with the live page): delay-seconds or a future HTTP date.
     const cases: readonly [string | null, number | null][] = [
-      ["3600", 3600],
-      ["60", 60],
+      ["3600", 3_600_000],
+      ["60", 60_000],
       [null, null],
+      ["0", null],
       ["soon", null],
-      ["Wed, 21 Oct 2026 07:28:00 GMT", null]
+      ["Wed, 21 Oct 2015 07:28:00 GMT", null]
     ];
     for (const [header, expected] of cases) {
       const fetchStub: typeof fetch = async () => Response.json(
@@ -130,7 +132,7 @@ describe("data export contract", () => {
       const client = createContractClient("https://example.test", fetchStub);
       const error: unknown = await client.requestDataExport(grant, "ro").catch((reason: unknown) => reason);
       expect(error).toBeInstanceOf(ContractHttpError);
-      expect((error as ContractHttpError).retryAfterSeconds).toBe(expected);
+      expect((error as ContractHttpError).retryAfterMs).toBe(expected);
     }
   });
 });
