@@ -353,7 +353,7 @@ export async function runPracticeFormats(input: Readonly<{
         return Object.freeze({ callSiteKey: entry.callSiteKey, outcome: entry.outcome, parseStatus: artifact?.parseStatus ?? null,
           latencyMs: entry.finishedAt.getTime() - entry.startedAt.getTime(),
           jsonRepair: artifact === null || entry.outcome !== "OK" ? null
-            : practiceJsonRepairOf(replyContentOf(artifact.rawText), practiceFinishReasonOf(artifact.metadata)),
+            : practiceJsonRepairOf(replyContentOf(artifact.rawText), practiceFinishReasonOf(artifact.metadata), entry.callSiteKey),
           replyForm: sink.forms.get(entry.attemptId) ?? null });
       });
       // The real model's artifacts only (the story jobs' local stand-in records none).
