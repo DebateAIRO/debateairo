@@ -262,7 +262,10 @@ describe("B9c · a panel seat refused for money is left out, as a failed seat is
       await expect(panel(stop, { leaveOutMoneyRefusedSeats: true }), code).rejects.toBe(stop);
       const heard = await panel(stop, { leaveOutMoneyRefusedSeats: true, onRunLevelSpendStop: "RETURN_HEARD" });
       expect(heard.stoppedBy, code).toBe(stop);
-      expect(heard.judgements.map((entry) => entry.judgementRef), code).toEqual(["judgement:author"]);
+      // Never a SPEND_REFUSED note. Parallel calls (spec 2026-10-12 §2.3, O6):
+      // the next seat was asked at once, and its voice is kept beside the stop.
+      expect(heard.notes, code).toEqual([]);
+      expect(heard.judgements.map((entry) => entry.judgementRef), code).toEqual(["judgement:author", "judgement:heard"]);
     }
   });
 

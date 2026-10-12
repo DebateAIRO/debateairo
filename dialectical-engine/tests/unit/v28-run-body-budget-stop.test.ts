@@ -192,9 +192,10 @@ describe("C2(b) — a run-level spend stop is never a panel member failure", () 
       expect.objectContaining({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" })
     );
 
-    // And it stops the panel where it stood: the second member is never called,
-    // which is the whole point — every further member is another billed call.
-    expect(reached).toEqual(["panel-1"]);
+    // Parallel calls (spec 2026-10-12 §2.3, owner ruling O6): the members are
+    // asked together, so the second member was already asked when the stop
+    // arrived; the stop still leaves the panel as itself, never as a note.
+    expect(reached).toEqual(["panel-1", "panel-2"]);
   });
 
   it("still records an ordinary member failure as a note", async () => {

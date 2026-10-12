@@ -115,6 +115,11 @@ describe("M2 — the first root's panel keeps what it heard, and falls back to i
    * note, so this row's first version asserted ATTEMPTS through a path the
    * runtime could not take. It drives the member call itself, in the mode the
    * runner asks for on the first root's panel (`RETURN_HEARD`, round 2).
+   *
+   * Parallel calls (spec 2026-10-12 §2.3, owner ruling O6): the members are
+   * asked TOGETHER, so the member after the stop was already asked; its voice
+   * came back and is kept. A panel whose only member stops still leaves the
+   * author alone.
    */
   it("hands every stop kind back on the first root's panel, through the real member call", async () => {
     for (const code of STOP_CODES) {
@@ -133,14 +138,28 @@ describe("M2 — the first root's panel keeps what it heard, and falls back to i
         onRunLevelSpendStop: "RETURN_HEARD"
       });
 
-      // It left the member call as itself — not a PROVIDER_ERROR note — and the
-      // panel asked nobody after it. With no member heard, the author is alone.
+      // It left the member call as itself — not a PROVIDER_ERROR note. Both
+      // members were asked at once, and the voice that came back is kept.
       expect(panel.stoppedBy, code).toBeInstanceOf(TypedDomainError);
       expect((panel.stoppedBy as TypedDomainError).code, code).toBe(code);
       expect(panel.notes, code).toEqual([]);
-      expect(panel.judgements.map((entry) => entry.judgementRef), code).toEqual(["j0"]);
-      expect(reached, code).toEqual(["refused member"]);
+      expect(panel.judgements.map((entry) => entry.judgementRef), code).toEqual(["j0", "j2"]);
+      expect([...reached].sort(), code).toEqual(["next member", "refused member"]);
       expect(panelSpendStop(panel.stoppedBy, "AUTHOR_ONLY"), code).toBe(ENVELOPE_STOP_CODES[code]);
+
+      // With no member heard, the author is alone.
+      const alone: string[] = [];
+      const lonePanel = await runJudgePanel({
+        artifactProducerRef: "actor:author",
+        primary: { judgementRef: "j0", assessment: {} as never, memberRole: "author" },
+        members: [refusingMember("member-1", code, alone)],
+        onRunLevelSpendStop: "RETURN_HEARD"
+      });
+      expect((lonePanel.stoppedBy as TypedDomainError).code, code).toBe(code);
+      expect(lonePanel.notes, code).toEqual([]);
+      expect(lonePanel.judgements.map((entry) => entry.judgementRef), code).toEqual(["j0"]);
+      expect(alone, code).toEqual(["refused member"]);
+      expect(panelSpendStop(lonePanel.stoppedBy, "AUTHOR_ONLY"), code).toBe(ENVELOPE_STOP_CODES[code]);
     }
   });
 
@@ -150,8 +169,12 @@ describe("M2 — the first root's panel keeps what it heard, and falls back to i
    * away with the panel, and the node fell to the single-voice disclosure and
    * its step-down. The first root's panel now returns what it heard: the
    * runner selects over the author and those voices, with PANEL-PARTIAL.
+   *
+   * Parallel calls (spec 2026-10-12 §2.3, owner ruling O6): every member is
+   * asked at once, so the member after the stop was asked too; its voice came
+   * back and is kept, in member order.
    */
-  it("keeps a member voice heard before the stop, with every note, and asks nobody after it", async () => {
+  it("keeps every member voice that came back around the stop, with every note, all asked together", async () => {
     for (const code of ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED"] as const) {
       const reached: string[] = [];
       const panel = await runJudgePanel({
@@ -181,10 +204,11 @@ describe("M2 — the first root's panel keeps what it heard, and falls back to i
       });
 
       expect((panel.stoppedBy as TypedDomainError).code, code).toBe(code);
-      expect(panel.judgements.map((entry) => entry.memberRole), code).toEqual(["author", "member-1"]);
+      expect(panel.judgements.map((entry) => entry.memberRole), code).toEqual(["author", "member-1", "member-3"]);
       expect(panel.judgements[1]!.judgementRef, code).toBe("artifact:panel-member");
+      expect(panel.judgements[2]!.judgementRef, code).toBe("j3");
       expect(panel.notes.map((note) => note.kind), code).toEqual(["PRODUCER_GRADING_FORBIDDEN"]);
-      expect(reached, code).toEqual(["member-1", "refused member"]);
+      expect([...reached].sort(), code).toEqual(["member-1", "member-3", "refused member"]);
     }
   });
 
@@ -192,9 +216,11 @@ describe("M2 — the first root's panel keeps what it heard, and falls back to i
    * Every other panel (the default rule, RETHROW): the stop leaves as itself,
    * and a voice heard before it is dropped with the panel — the caller's phase
    * discards the node anyway. A member answers first here, so the test shows
-   * that voice is NOT carried, and that nobody after the stop is asked.
+   * that voice is NOT carried. Parallel calls (spec 2026-10-12 §2.3, owner
+   * ruling O6): every member was asked at once, so the member after the stop
+   * was asked too; the stop leaves once every member has settled.
    */
-  it("still rethrows by default for every other panel, dropping a voice heard before the stop, and asks nobody after it", async () => {
+  it("still rethrows by default for every other panel, dropping every voice heard, once every member (all asked together) has settled", async () => {
     for (const code of ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED"] as const) {
       const reached: string[] = [];
       const thrown: unknown = await runJudgePanel({
@@ -221,7 +247,7 @@ describe("M2 — the first root's panel keeps what it heard, and falls back to i
       expect(thrown, code).toBeInstanceOf(TypedDomainError);
       expect((thrown as TypedDomainError).code, code).toBe(code);
       expect(thrown, code).not.toHaveProperty("judgements");
-      expect(reached, code).toEqual(["member-1", "refused member"]);
+      expect([...reached].sort(), code).toEqual(["member-1", "member-3", "refused member"]);
     }
   });
 
