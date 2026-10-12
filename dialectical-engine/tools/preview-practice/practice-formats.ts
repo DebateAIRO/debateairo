@@ -16,7 +16,7 @@
  *
  * A busy model: when a job's call ends in the vendor's refusal, not billed (the call and its one resend, the gate's
  * PROVIDER_REFUSED_UNBILLED, or the model is cooling off as MODEL_COOLING), only that model is parked: it waits out its
- * cool-off (the gate's retry_after when it named one, else 120 s doubling up to 600 s, up to a quarter longer) while the
+ * cool-off (the gate's retry_after when it named one, else 60 s doubling up to 600 s, up to a quarter longer) while the
  * other models go on, then the SAME job is tried again. Each model has a budget of such waits (`busyWaitMs`, the
  * command's --busy-wait-minutes, default 30; 0 is the old rule). Only when its budget is spent is the model marked busy
  * and its remaining jobs skipped (SKIPPED_MODEL_BUSY). Busy-ness is read by
@@ -165,12 +165,13 @@ export const PRACTICE_FORMATS_DEFAULTS: Readonly<{ gateLimits: Readonly<Record<P
   Object.freeze({ gateLimits: Object.freeze({ deepinfra: 4, anthropic: 1 }), maxInFlight: 5 });
 
 /** The first wait of a busy model without the gate's retry_after; each wait in a row doubles it, up to the most. */
-const BUSY_WAIT_FIRST_MS = 120_000;
+const BUSY_WAIT_FIRST_MS = 60_000;
 const BUSY_WAIT_MOST_MS = 600_000;
 
 /**
- * How long a busy model waits before its job is tried again: the gate's retry_after when it named one, else 120 s
- * doubling with each wait in a row, at most 600 s. Never shorter than that, and up to a quarter longer (so the models'
+ * How long a busy model waits before its job is tried again: the gate's retry_after when it named one (never less),
+ * else 60 s doubling with each wait in a row (60, 120, 240, 480), at most 600 s: the gate's own cool-off steps (owner,
+ * 2026-10-12). Never shorter than that, and up to a quarter longer (so the models'
  * retries do not line up).
  */
 export function practiceBusyWaitMs(input: Readonly<{ retryAfterSeconds: number | null; waitsInARow: number; random?: () => number }>): number {

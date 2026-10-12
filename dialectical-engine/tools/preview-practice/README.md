@@ -51,7 +51,7 @@ other way out too (Ctrl-C, Ctrl-C again, the tool breaking midway). To build `re
 a folder's `samples.jsonl` (nothing is sent; no socket or acknowledgement needed):
 
 ```sh
-pnpm exec tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
+node_modules/.bin/tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
 ```
 
 The last line on the screen and the exit code say:
@@ -77,7 +77,8 @@ The last line on the screen and the exit code say:
 - A busy model (formats mode): when the AI company refuses a model's call as "too busy" and refuses its one resend
   too (not billed), or the model is cooling off after such refusals (the gate refuses that model for a while, without
   contacting the AI company), only that model pauses. It waits out its cool-off (as long as the gate says when it
-  names a time, otherwise 2 minutes, then 4, 8 and at most 10 minutes for each wait in a row, a little longer at
+  names a time, never less; otherwise 1 minute, then 2, 4, 8 and at most 10 minutes for each wait in a row, the gate's
+  own cool-off steps, a little longer at
   random), then the same job is tried again; the other models, on the same gate too, go on meanwhile, and the gate is
   not stopped for this. Each model may wait at most `--busy-wait-minutes` in all (default 30). Only when that time is
   used up is the model marked busy and its remaining jobs skipped (`SKIPPED_MODEL_BUSY`): NOT_PROVEN, not FAIL. A
@@ -95,8 +96,13 @@ The last line on the screen and the exit code say:
   in flight on the gate stays within 4 (if every one of them failed, the gate would still not halt); otherwise it waits
   for one to come back. In formats mode a job whose calls all ended in such an unbilled error is a failed call (FAIL),
   never "busy".
+- Start it with `node_modules/.bin/tsx` as in S-6, not `pnpm exec tsx`: on Ctrl-C pnpm quits at once (it sends the
+  practice SIGTERM and gives up), so the terminal shows pnpm's exit 130 instead of the practice's own exit code. The
+  practice still finishes and writes its report even then, but the exit code the release steps read is lost.
 - Ctrl-C once: no new calls are sent, the calls in flight finish, the report is written (NOT_PROVEN unless something
-  failed). Ctrl-C again within two seconds counts as the same press (pnpm and tsx pass the key press on again). Ctrl-C
+  failed). Ctrl-C again within two seconds counts as the same press (pnpm and tsx pass the key press on again; pnpm's
+  SIGTERM right after it too). A SIGTERM or SIGHUP at any other time quits at once and still writes the report
+  (ABORTED). Ctrl-C
   again later quits at once and still writes the report from the finished jobs (ABORTED); avoid it: a call killed
   mid-flight can halt the gate.
 - Formats mode: one call at a time per model, about a second apart (a slightly random gap, `--gap-ms`, default 1000),
@@ -215,7 +221,7 @@ In a second terminal, from the worktree's `dialectical-engine` folder (set `D` a
 S-5):
 
 ```sh
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" pnpm exec tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/formats-report"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/formats-report"
 echo "exit: $?"
 ```
 
@@ -223,7 +229,7 @@ Only after formats passes: repeat S-3 (fresh gate status) and copy the two statu
 
 ```sh
 scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" pnpm exec tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --out "$P/debate-report"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --out "$P/debate-report"
 echo "exit: $?"
 ```
 

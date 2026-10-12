@@ -27,7 +27,8 @@ import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deploym
 import { PracticeGateObserver, PRACTICE_GATE_STOPPED, practiceStopIsPause, vendorUsage } from "../../tools/preview-practice/practice-gate-observer.js";
 import { onePerModel, practiceBusyWaitMs, practiceTurnOrder, runPracticeFormats, type PracticeSample } from "../../tools/preview-practice/practice-formats.js";
 import { jitteredGap, limitPort, PracticeSemaphore, runModelQueues } from "../../tools/preview-practice/practice-concurrency.js";
-import { practiceInterruptGate } from "../../tools/preview-practice/practice-interrupt.js";
+import { practiceInterruptGate, takeOverSignals } from "../../tools/preview-practice/practice-interrupt.js";
+import { EventEmitter } from "node:events";
 import {
   parsePracticeSampleLog,
   PracticeSampleLog,
@@ -697,6 +698,34 @@ describe("practice interrupt", () => {
     clock += 5; expect(gate.signal()).toBe("QUIT");
     expect(gate.signal()).toBe("QUIT");
   });
+  it("a stop signal within two seconds of the first interrupt is the same key press (pnpm sends its child SIGTERM on Ctrl-C)", () => {
+    let clock = 0;
+    const gate = practiceInterruptGate({ now: () => clock });
+    expect(gate.justInterrupted()).toBe(false);
+    gate.signal();
+    clock += 1_500; expect(gate.justInterrupted()).toBe(true);
+    clock += 600; expect(gate.justInterrupted()).toBe(false);
+  });
+  it("takes over SIGINT, SIGTERM and SIGHUP: a library's own listener (async-exit-hook's process.exit(130)) is removed, ours alone answers", () => {
+    const target = new EventEmitter();
+    const quits: string[] = [];
+    // What embedded-postgres's async-exit-hook installs when it loads.
+    const libraryExit = () => { quits.push("library exit 130"); };
+    target.on("SIGINT", libraryExit);
+    target.on("SIGTERM", libraryExit);
+    target.on("exit", libraryExit);
+    const heard: string[] = [];
+    const handlers = { SIGINT: () => heard.push("SIGINT"), SIGTERM: () => heard.push("SIGTERM"), SIGHUP: () => heard.push("SIGHUP") };
+    const signals = target as unknown as Parameters<typeof takeOverSignals>[0];
+    expect(takeOverSignals(signals, handlers)).toEqual({ SIGINT: 1, SIGTERM: 1, SIGHUP: 0 });
+    // Again (as the run starts): nothing new, ours not added twice.
+    expect(takeOverSignals(signals, handlers)).toEqual({ SIGINT: 0, SIGTERM: 0, SIGHUP: 0 });
+    target.emit("SIGINT"); target.emit("SIGTERM"); target.emit("SIGHUP");
+    expect(heard).toEqual(["SIGINT", "SIGTERM", "SIGHUP"]);
+    expect(quits).toEqual([]);
+    // Its exit hook stays (the throwaway database is still stopped when the process ends).
+    expect(target.listeners("exit")).toEqual([libraryExit]);
+  });
 });
 
 describe("practice samples log", () => {
@@ -777,13 +806,14 @@ describe("practice samples log", () => {
 });
 
 describe("practice formats: a busy model waits out its cool-off and retries the same job", () => {
-  it("the wait: the gate's retry_after when it gave one, else 120 s doubling to at most 600 s; never shorter, at most a quarter longer", () => {
+  it("the wait: the gate's retry_after when it gave one, else 60 s doubling to at most 600 s (the gate's own steps); never shorter, at most a quarter longer", () => {
     expect(practiceBusyWaitMs({ retryAfterSeconds: 60, waitsInARow: 0, random: () => 0 })).toBe(60_000);
     expect(practiceBusyWaitMs({ retryAfterSeconds: 60, waitsInARow: 3, random: () => 1 })).toBe(75_000);
     expect([0, 1, 2, 3, 4].map((waitsInARow) => practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow, random: () => 0 })))
-      .toEqual([120_000, 240_000, 480_000, 600_000, 600_000]);
-    expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 0, random: () => 1 })).toBe(150_000);
-    expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 2, random: () => 1 })).toBe(600_000);
+      .toEqual([60_000, 120_000, 240_000, 480_000, 600_000]);
+    expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 0, random: () => 1 })).toBe(75_000);
+    expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 3, random: () => 1 })).toBe(600_000);
+    expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 9, random: () => 1 })).toBe(600_000);
   });
 
   it("parallel: only the busy model is parked; the others finish their jobs while it waits; then the SAME job is retried", async () => {
@@ -876,7 +906,7 @@ describe("practice formats: busy retries end to end (unit, fake waits)", () => {
     const glm = result.samples.filter((sample) => sample.model === GLM);
     expect(glm.map((sample) => sample.lane)).toEqual(["JUDGE_POSITION", "PANEL"]);
     expect(glm.some((sample) => sample.status.startsWith("SKIPPED") || sample.status === "UNBILLED_REFUSED")).toBe(false);
-    expect(waits.map((wait) => [wait.lane, wait.waitMs, wait.reason])).toEqual([["JUDGE_POSITION", 120_000, "VENDOR_REFUSED"], ["JUDGE_POSITION", 240_000, "VENDOR_REFUSED"]]);
+    expect(waits.map((wait) => [wait.lane, wait.waitMs, wait.reason])).toEqual([["JUDGE_POSITION", 60_000, "VENDOR_REFUSED"], ["JUDGE_POSITION", 120_000, "VENDOR_REFUSED"]]);
     expect(resumes).toEqual([`${GLM}|JUDGE_POSITION`, `${GLM}|JUDGE_POSITION`]);
   });
 
@@ -895,7 +925,7 @@ describe("practice formats: busy retries end to end (unit, fake waits)", () => {
     const result = await runPracticeFormats({ config, targets: targets.filter((target) => target.model === GLM), ports: ports(observer, 1_000), observer,
       lanes: ["JUDGE_POSITION", "PANEL"], samples: 1, gapMs: 0, pack, bounds, sleep: async () => undefined, parallel: true,
       busyWaitMs: 10 * 60_000, random: () => 0, onBusyWait: (line) => waits.push(line.waitMs) });
-    expect(waits).toEqual([120_000, 240_000, 240_000]);
+    expect(waits).toEqual([60_000, 120_000, 240_000, 180_000]);
     expect(result.busyModels).toEqual([GLM]);
     expect(result.samples.map((sample) => sample.status)).toEqual(["UNBILLED_REFUSED", "SKIPPED_MODEL_BUSY"]);
   });
