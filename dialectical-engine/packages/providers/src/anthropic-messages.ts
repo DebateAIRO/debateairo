@@ -15,7 +15,7 @@ import type { PromptPacket } from "./index.js";
  * preview's root gate validates the very same shape strictly and forwards the
  * bytes it priced. So this file never adds a body member that is not listed
  * there: `model`, `max_tokens`, `messages`, optional `system`, and
- * `output_config: {"effort":"high"}` when the high thinking level is asked.
+ * `output_config: {"effort":<level>}` when a reviewed thinking level is asked.
  * Prompt caching (owner approval 2026-10-12): `system` is either the one string,
  * or, when the engine's framed system text carries its per-call marker tail,
  * exactly two text blocks with the one 5-minute cache mark on the first
@@ -39,11 +39,10 @@ export const ANTHROPIC_API_VERSION = "2023-06-01" as const;
 /** Appended to the target's base URL (`https://api.anthropic.com/v1`). */
 export const ANTHROPIC_MESSAGES_PATH = "/messages" as const;
 /**
- * The thinking levels this wire can carry, as `output_config.effort`. The
- * contract sends only "high"; any other level is refused before anything is
- * sent rather than run at a level nobody priced or reviewed.
+ * The thinking levels this wire can carry, as `output_config.effort` (spec 2026-10-12 §4.4: the reviewed Haiku menu).
+ * Claude Haiku 5.5 also has xhigh and max; they are not reviewed, so they are refused before anything is sent.
  */
-export const ANTHROPIC_EFFORT_LEVELS = Object.freeze(["high"] as const);
+export const ANTHROPIC_EFFORT_LEVELS = Object.freeze(["low", "medium", "high"] as const);
 /**
  * The discovery probe's default answer bound for this wire. Claude Haiku 5.5
  * thinks by default and its thinking counts against `max_tokens`, so the eight

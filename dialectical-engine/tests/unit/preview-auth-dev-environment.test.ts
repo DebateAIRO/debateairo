@@ -49,6 +49,10 @@ describe('the website\'s model list: one reviewed value per stage of the switch-
   ['the two-list value with lists in another order',MULTI_FLAG,apiConfig({free_model_ids:[DEEPSEEK,GLM],premium_model_ids:[GLM,DEEPSEEK,MIMO,QWEN]}),false],
   ['the two-list value with free and premium swapped',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK,MIMO,QWEN],premium_model_ids:[GLM,DEEPSEEK]}),false],
   ['a config with an extra key',LEGACY_FLAG,apiConfig({free_model_ids:[GLM],extra:true}),false],
+  // Spec 2026-10-12 §4.2: thinking_levels is an optional key on both forms; the website lists still have to match.
+  ['the legacy array with the legacy config plus a thinking_levels table',LEGACY_FLAG,apiConfig({free_model_ids:[GLM],thinking_levels:{[GLM]:{level:'high'}}}),true],
+  ['the two-list value with the six-key config plus a thinking_levels table',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO,QWEN],thinking_levels:{[QWEN]:{level:'low',steps:{story_writer:'medium'}}}}),true],
+  ['the legacy config with a thinking_levels table and an extra key',LEGACY_FLAG,apiConfig({free_model_ids:[GLM],thinking_levels:{[GLM]:{level:'high'}},extra:true}),false],
   // PR B: the six-key config may also name the Anthropic gate's socket; the website lists must still match.
   ['the two-list value with the six-key config plus the Anthropic socket',MULTI_FLAG,apiConfig({free_model_ids:[GLM,DEEPSEEK],premium_model_ids:[GLM,DEEPSEEK,MIMO,QWEN],anthropic_budget_socket:'/run/debateai-v3-preview/anthropic-budget-v1.sock'}),true],
   ['the legacy array with the legacy config plus the Anthropic socket',LEGACY_FLAG,apiConfig({free_model_ids:[GLM],anthropic_budget_socket:'/run/debateai-v3-preview/anthropic-budget-v1.sock'}),false],
