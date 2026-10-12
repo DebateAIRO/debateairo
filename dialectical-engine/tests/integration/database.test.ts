@@ -5222,9 +5222,11 @@ describe("apps/runner — legal command lifecycle", () => {
     } finally { await calibration.stop(); }
 
     // Review fix I-1: the writer's first draft names the node in its prose; the
-    // classifier refuses it and the provider's repair re-asks the same call.
+    // classifier refuses it and the provider's repair re-asks the same call —
+    // since the patch follow-up (owner design, 2026-10-12) with the short patch
+    // first, which the writer answers with only the refused member.
     const provider = await startProviderDouble([
-      judge, compositionCiting("n1", "A compact answer (n1)."), compositionCiting("n1"), evaluatorSatisfied()
+      judge, compositionCiting("n1", "A compact answer (n1)."), JSON.stringify({ "segments.0.text": "A compact answer." }), evaluatorSatisfied()
     ]);
     const settings = runnerSettings();
     const servePolicy = settings.servePolicy!;
@@ -5259,13 +5261,15 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(projection?.condition_marks).toContain("DIGEST-COMPRESSED");
       expect(projection?.band_ceiling).toMatchObject({ basis: { LOOKED_UP: 0, RAN: 0, REASONING: 1 } });
       // I-1: two writer attempts on the wire — the second is the repair turn,
-      // naming what to fix and where — and the served prose is the model's own
-      // clean words, never an edited copy of the first draft.
+      // naming what to fix and where (the patch: only that member) — and the
+      // served prose is the model's own clean words, never an edited copy of the
+      // first draft: the engine only puts the model's rewrite in its place.
       const writerAttempts = provider.bodies().map((body) => readFramedMaterial(wirePacket(body)))
         .filter((material) => material.contractId === SYNTHESIZER_PROMPT_CONTRACT.contractId);
       expect(writerAttempts).toHaveLength(2);
       expect(framedField(writerAttempts[1]!, "machine_rejection_code")).toBe("COMPOSED_TEXT_NAMES_A_NODE");
-      expect(framedField(writerAttempts[1]!, "machine_rejection_path")).toBe("segments.0.text");
+      expect(framedField(writerAttempts[1]!, "machine_rejection_paths")).toBe("segments.0.text");
+      expect(framedField(writerAttempts[1]!, "machine_reply_form")).toBe("PATCH");
       expect(projection?.composed_text.map((segment) => segment.text)).toContain("A compact answer.");
       expect(JSON.stringify(projection?.composed_text)).not.toContain("(n1)");
       expect(provider.calls()).toBe(4);
@@ -6376,7 +6380,9 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       primary: [
         ...debate.judgements, ...debate.reviews,
         m4Composition("The judged position survives (00000000-0000-4000-8000-00000000abcd)."),
-        m4Composition("The judged position survives, per 00000000-0000-4000-8000-00000000abcd.")
+        // The patch follow-up (owner design, 2026-10-12): the writer rewrites only the refused member, and the merged
+        // draft still names the id.
+        JSON.stringify({ "segments.0.text": "The judged position survives, per 00000000-0000-4000-8000-00000000abcd." })
       ],
       secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
       settings: m4WriterAttempts(2)
@@ -6402,6 +6408,8 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
         ...debate.judgements, ...debate.reviews,
         resil01Composition, evaluatorObjecting("Round one overstates the margin."),
         m4Composition("A rewrite citing 00000000-0000-4000-8000-00000000abcd."),
+        // Asked for the patch follow-up, the writer sends a whole draft again: it is not merged, so the first draft and
+        // its refusal stand, and the round still ends with no draft rather than a FAILED run.
         m4Composition("Another rewrite citing 00000000-0000-4000-8000-00000000abcd.")
       ],
       secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],

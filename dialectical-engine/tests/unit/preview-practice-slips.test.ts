@@ -172,8 +172,9 @@ describe("practice formats: the second try is the app's own (same preview call p
 
   /**
    * Every model answers well, except MiMo's first reply of its first `slips.remaining` jobs, which leaves out a
-   * required field. MiMo answers a patch follow-up with `patchAnswer`: the patch itself (the default), or its whole
-   * answer again (refused as a patch, so the call goes on to the full re-ask, which is answered well).
+   * required field. MiMo answers a patch follow-up with `patchAnswer`: the patch itself (the default), or a whole answer
+   * — accepted when it passes the step's check (owner ruling 2026-10-12), else refused as a patch, so the call goes on
+   * to the full re-ask, which is answered well.
    */
   function port(provider: "deepinfra" | "anthropic", slips: { remaining: number }, sent: string[],
     patchAnswer: string = PATCH, forms: string[] = []): PreviewBudgetPort {
@@ -225,8 +226,20 @@ describe("practice formats: the second try is the app's own (same preview call p
     expect(reportMarkdown(report)).toContain("1 fixed by the same call (by patch 1, by full re-ask 0, otherwise 0)");
   });
 
-  it("MiMo answers the patch follow-up with its whole answer again (refused as a patch), the full re-ask fixes it: REPAIRED by FULL, three tries", async () => {
+  it("owner ruling 2026-10-12: MiMo answers the patch follow-up with a whole answer that passes the check: accepted, REPAIRED by PATCH, two tries", async () => {
     const { result, report, forms } = await run(1, 1, GOOD);
+    const mimo = result.samples.find((sample) => sample.model === MIMO)!;
+    expect(mimo.status).toBe("REPAIRED");
+    expect(mimo.attempts.map((attempt) => [attempt.outcome, attempt.parseStatus, attempt.replyForm])).toEqual([
+      ["FAILED", "SCHEMA_FAILED", "ORIGINAL"], ["OK", "PARSED", "PATCH"]]);
+    expect(forms).toEqual(["ORIGINAL", "PATCH"]);
+    expect(mimo.repairKind).toBe("PATCH");
+    expect(mimo.issues).toEqual(["invalid_type@value_laden"]);
+    expect((report.slipsByModel as Record<string, unknown>)[MIMO]).toMatchObject({ repaired: 1, repairedByPatch: 1, repairedByFullAsk: 0 });
+  });
+
+  it("MiMo answers the patch follow-up with its whole answer again, still missing the field (refused as a patch), the full re-ask fixes it: REPAIRED by FULL, three tries", async () => {
+    const { result, report, forms } = await run(1, 1, MISSING_FIELD);
     const mimo = result.samples.find((sample) => sample.model === MIMO)!;
     expect(mimo.status).toBe("REPAIRED");
     expect(mimo.attempts.map((attempt) => [attempt.outcome, attempt.parseStatus, attempt.replyForm])).toEqual([

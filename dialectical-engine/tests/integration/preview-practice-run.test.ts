@@ -65,14 +65,17 @@ const isPatchRequest = (request: GateRequest): boolean => {
 /** The patch that fixes BAD_PANEL: only the member it was asked for, at the stand-in panel's own value. */
 const PANEL_PATCH = JSON.stringify({ "steelman.fidelity": 0 });
 /**
- * MiMo's first panel reply breaks the schema; MiMo answers the patch follow-up with the patch (`patch: true`) or, as a
- * model that ignores the requested form, with its whole answer again (the stand-in's own valid panel reply), which is
- * refused as a patch so the call goes on to the full re-ask.
+ * MiMo's first panel reply breaks the schema; MiMo answers the patch follow-up with the patch (`patch: "PATCH"`) or, as
+ * a model that ignores the requested form, with a whole answer: the stand-in's own valid panel reply (`"WHOLE"`, which
+ * passes the step's check and is accepted, owner ruling 2026-10-12) or the same broken reply again (`"WHOLE_BROKEN"`,
+ * refused as a patch, so the call goes on to the full re-ask).
  */
-function mimoFirstPanelSlips(options: Readonly<{ patch: boolean }>): (request: GateRequest) => GateOverride | null {
+function mimoFirstPanelSlips(options: Readonly<{ patch: "PATCH" | "WHOLE" | "WHOLE_BROKEN" }>): (request: GateRequest) => GateOverride | null {
   let mimoPanels = 0;
   return (request) => {
-    if (request.model === MIMO && isPatchRequest(request)) return options.patch ? { content: PANEL_PATCH } : null;
+    if (request.model === MIMO && isPatchRequest(request)) {
+      return options.patch === "PATCH" ? { content: PANEL_PATCH } : options.patch === "WHOLE_BROKEN" ? { content: BAD_PANEL } : null;
+    }
     return request.model === MIMO && request.kind === "PANEL" && ++mimoPanels === 1 ? { content: BAD_PANEL } : null;
   };
 }
@@ -191,7 +194,7 @@ describe("preview practice: formats mode", () => {
   };
 
   it("owner ruling 2026-10-12 (\"Fixed slips = warning\") and the patch follow-up: MiMo's first panel reply breaks the schema, the short patch follow-up fixes it: REPAIRED by PATCH, PASS_WITH_WARNINGS (exit 10)", async () => {
-    const { stubs, env, common, quiet, out } = await scenario(mimoFirstPanelSlips({ patch: true }));
+    const { stubs, env, common, quiet, out } = await scenario(mimoFirstPanelSlips({ patch: "PATCH" }));
     const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
     const report = outcome.report as unknown as RepairReport;
     expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS_WITH_WARNINGS", reasons: [`FORMAT_REPAIRED:${MIMO}:1`] });
@@ -211,8 +214,23 @@ describe("preview practice: formats mode", () => {
     expect(readFileSync(join(out, "report.md"), "utf8")).toContain("1 fixed by the same call (by patch 1, by full re-ask 0, otherwise 0)");
   }, 300_000);
 
-  it("the patch follow-up answered with the whole answer again is refused as a patch; the full re-ask fixes it: REPAIRED by FULL (three tries), PASS_WITH_WARNINGS (exit 10)", async () => {
-    const { stubs, env, common, quiet } = await scenario(mimoFirstPanelSlips({ patch: false }));
+  it("owner ruling 2026-10-12: the patch follow-up answered with a whole answer that passes the step's check is accepted: REPAIRED by PATCH (two tries), PASS_WITH_WARNINGS (exit 10)", async () => {
+    const { stubs, env, common, quiet } = await scenario(mimoFirstPanelSlips({ patch: "WHOLE" }));
+    const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
+    const report = outcome.report as unknown as RepairReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS_WITH_WARNINGS", reasons: [`FORMAT_REPAIRED:${MIMO}:1`] });
+    expect(outcome.exitCode).toBe(10);
+    expect(stubs.requests.filter((request) => request.model === MIMO && request.kind === "PANEL").map((request) => isPatchRequest(request)))
+      .toEqual([false, true]);
+    expect(report.slipsByModel[MIMO]).toMatchObject({ slips: 1, repaired: 1, repairedByPatch: 1, repairedByFullAsk: 0 });
+    expect(report.failures).toEqual([expect.objectContaining({ model: MIMO, lane: "PANEL", status: "REPAIRED", repairKind: "PATCH",
+      issues: ["invalid_type@steelman.fidelity"] })]);
+    expect(report.failures[0]!.attempts.map((attempt) => [attempt.outcome, attempt.parseStatus, attempt.replyForm]))
+      .toEqual([["FAILED", "SCHEMA_FAILED", "ORIGINAL"], ["OK", "PARSED", "PATCH"]]);
+  }, 300_000);
+
+  it("the patch follow-up answered with the same broken whole answer again is refused as a patch; the full re-ask fixes it: REPAIRED by FULL (three tries), PASS_WITH_WARNINGS (exit 10)", async () => {
+    const { stubs, env, common, quiet } = await scenario(mimoFirstPanelSlips({ patch: "WHOLE_BROKEN" }));
     const outcome = await runPractice(["formats", ...common, "--samples", "1", "--gap-ms", "0"], env, quiet);
     const report = outcome.report as unknown as RepairReport;
     expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS_WITH_WARNINGS", reasons: [`FORMAT_REPAIRED:${MIMO}:1`] });
@@ -653,7 +671,7 @@ describe("preview practice: debate mode", () => {
   }, 600_000);
 
   it("--transcript: transcript.json holds every model call of the ledger in order, with the prompts the gates received and the replies they gave, decrypted", async () => {
-    const { stubs, env, common, quiet, out } = await scenario(mimoFirstPanelSlips({ patch: true }));
+    const { stubs, env, common, quiet, out } = await scenario(mimoFirstPanelSlips({ patch: "PATCH" }));
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1", "--transcript"], env, quiet);
     const report = outcome.report as unknown as { verdict: string; totals: { calls: number }; run: { runId: string } };
     // The report is the same as without the flag (owner ruling: fixed slip, a warning).
@@ -699,7 +717,7 @@ describe("preview practice: debate mode", () => {
   }, 600_000);
 
   it("owner ruling 2026-10-12 (\"Fixed slips = warning\") and the patch follow-up: MiMo's first panel reply breaks the schema and the short patch follow-up fixes it: PASS_WITH_WARNINGS (exit 10), repaired by PATCH", async () => {
-    const { env, common, quiet } = await scenario(mimoFirstPanelSlips({ patch: true }));
+    const { env, common, quiet } = await scenario(mimoFirstPanelSlips({ patch: "PATCH" }));
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1"], env, quiet);
     const report = outcome.report as unknown as {
       verdict: string; reasons: string[];
