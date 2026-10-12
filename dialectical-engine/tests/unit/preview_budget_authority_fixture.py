@@ -26,11 +26,13 @@ QWEN = 'Qwen/Qwen3.8-Flash'
 # every row (owner ruling 2026-10-10).
 ROWS = {MODEL: ('Z.AI', '0.15', '0.50', 32768, 'high', True),
         DEEPSEEK: ('DeepSeek', '0.20', '0.60', 32768, 'high', False),
-        MIMO: ('Xiaomi', '0.43', '0.87', 32768, None, False),
+        MIMO: ('Xiaomi', '0.43', '0.87', 32768, None, True),
         QWEN: ('Alibaba', '0.113', '0.382', 32768, None, False)}
 # The reviewed sampling (2026-10-12), written out independently of the gate: model -> the exact keys and
-# values its request must carry. A row not listed carries none of them.
-SAMPLING = {QWEN: {'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}}
+# values its request must carry. A row not listed carries none of them. MiMo's (owner approval 2026-10-12) are
+# DeepInfra's recommended temperature 1.0 and top_p 0.95, with no top_k.
+SAMPLING = {MIMO: {'temperature': 1.0, 'top_p': 0.95},
+            QWEN: {'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}}
 HOST = 'synthetic-host'
 SCOPE = 'preview-team-synthetic'
 # A made-up test value, not a key. Built from pieces so a secret scanner does not read it as one

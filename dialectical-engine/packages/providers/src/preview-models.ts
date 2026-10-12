@@ -15,8 +15,8 @@
  * Anthropic). A later provider is one more key there and one more parity file.
  *
  * Reviewed sampling (2026-10-12): a DeepInfra row may carry its own `sampling` settings, which every request for that
- * row sends and both the app's guarded fetch and the gate require exactly. Only Qwen has one today; a later row's is
- * one more `sampling` entry here, in the gate's row and in the parity file.
+ * row sends and both the app's guarded fetch and the gate require exactly. Qwen and (since the owner's approval of
+ * 2026-10-12) MiMo have one; a later row's is one more `sampling` entry here, in the gate's row and in the parity file.
  *
  * No imports on purpose: index.ts, preview-test.ts and provider-probe.ts all read these rows.
  */
@@ -181,8 +181,12 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
       outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: true }),
     row("deepinfra", { model: "deepseek-ai/DeepSeek-V4.1-Flash", maker: "DeepSeek", inputUsdPerM: "0.20", outputUsdPerM: "0.60",
       outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false }),
+    // Owner approval 2026-10-12: in a live practice run MiMo closed Romanian quotation marks („…) with a straight double
+    // quote inside its JSON (nine times in one judging reply), then wrote a second JSON answer in the same reply. Its
+    // DeepInfra page lists JSON among its features and recommends temperature 1.0, top_p 0.95: JSON mode is allowed (sent
+    // on story JSON requests, exactly as for GLM) and every request carries those two sampling members (no top_k).
     row("deepinfra", { model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false }),
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: true, sampling: { temperature: 1.0, top_p: 0.95 } }),
     // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
     // Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid mid-answer into
     // random multilingual tokens in a live practice run (2 of its first 4 calls unreadable). It thinks by default, so

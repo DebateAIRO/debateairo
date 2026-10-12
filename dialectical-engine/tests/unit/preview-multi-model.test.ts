@@ -27,6 +27,11 @@ const SHARED_WINDOW = { context_window_tokens: 1_048_576 };
 const BARE_BODY = ["max" + "_tokens", "messages", "model"];
 /** Qwen's reviewed sampling (2026-10-12): Qwen's own thinking-mode settings, so its JSON does not slide into noise. */
 const QWEN_SAMPLING = { temperature: 0.6, top_p: 0.95, top_k: 20 };
+/**
+ * MiMo's reviewed sampling and JSON mode (owner approval 2026-10-12): DeepInfra's MiMo page recommends temperature 1.0
+ * and top_p 0.95 and lists JSON among its features; MiMo broke its JSON with a straight closing quote in a live run.
+ */
+const MIMO_SAMPLING = { temperature: 1.0, top_p: 0.95 };
 const DEFAULT_LEVEL = "DEFAULT_ONLY";
 const URL_COMPLETIONS = "https://api.deepinfra.com/v1/openai/chat/completions";
 const BASE = { deployment: "v3-preview", requested_thinking_level: "high",
@@ -189,6 +194,7 @@ describe("the guarded fetch sends only what the gate accepts for the body's row 
       { model: MIMO, reasoning_effort: "high", max_tokens: 8, messages },
       { model: DEEPSEEK, reasoning_effort: "high", max_tokens: 8, messages, response_format: { type: "json_object" } },
       { model: MIMO, max_tokens: 8, messages, response_format: { type: "json_object" } },
+      { model: MIMO, max_tokens: 8, ...MIMO_SAMPLING, messages, response_format: { type: "json_schema" } },
       { model: DEEPSEEK, max_tokens: 8, messages },
       { model: DEEPSEEK, reasoning_effort: "medium", max_tokens: 8, messages },
       { model: MIMO, max_tokens: 0, messages },
@@ -203,7 +209,7 @@ describe("the guarded fetch sends only what the gate accepts for the body's row 
     const bodies = [
       { model: GLM, reasoning_effort: "high", max_tokens: 32_768, messages, response_format: { type: "json_object" } },
       { model: DEEPSEEK, reasoning_effort: "high", max_tokens: 32_768, messages },
-      { model: MIMO, max_tokens: 32_768, messages }
+      { model: MIMO, max_tokens: 32_768, ...MIMO_SAMPLING, messages, response_format: { type: "json_object" } }
     ];
     for (const body of bodies) await post(body);
     expect(executions).toHaveLength(3);
@@ -252,15 +258,15 @@ describe("each target's gateway sends a request its row accepts", () => {
   it("never sends a thinking level to MiMo, and refuses a request that asks for one before sending", async () => {
     const { executions, gateway } = previewGateway(MIMO);
     await gateway.call(RESULT_REQUEST);
-    expect(Object.keys(JSON.parse(executions[0]!.requestBody)).sort()).toEqual(["max_tokens", "messages", "model"]);
+    expect(Object.keys(JSON.parse(executions[0]!.requestBody)).sort()).toEqual(["max_tokens", "messages", "model", "temperature", "top_p"]);
     await expect((async () => gateway.call({ ...RESULT_REQUEST, thinkingLevel: "high" }))()).rejects.toMatchObject({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" });
     expect(executions).toHaveLength(1);
   });
-  it("a story JSON request reaches the vendor as JSON only on GLM", async () => {
+  it("a story JSON request reaches the vendor as JSON only on GLM and MiMo", async () => {
     for (const model of [GLM, DEEPSEEK, MIMO, QWEN]) {
       const { executions, gateway } = previewGateway(model);
       await gateway.call({ ...RESULT_REQUEST, lane: "story", callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER", preferredResponseFormat: "json_object" });
-      expect(Object.hasOwn(JSON.parse(executions[0]!.requestBody), "response_format")).toBe(model === GLM);
+      expect(Object.hasOwn(JSON.parse(executions[0]!.requestBody), "response_format")).toBe(model === GLM || model === MIMO);
     }
   });
   it("MiMo takes DEFAULT_ONLY as no level; an effort row still refuses it", async () => {
@@ -457,9 +463,13 @@ describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 32768
 const samplingBodies = JSON.parse(readFileSync(new URL("./fixtures/deepinfra-sampling-bodies.json", import.meta.url), "utf8")) as {
   schema: string; sent: { name: string; body: string; reservedUsd: string }[]; refused: { name: string; body: string }[] };
 describe("reviewed sampling: a row's own sampling settings, exactly, and none on any other row", () => {
-  it("only Qwen carries sampling, and its values are the reviewed ones", () => {
+  it("only MiMo and Qwen carry sampling, and their values are the reviewed ones", () => {
     expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.map(row => [row.model, row.sampling ?? null]))
-      .toEqual([[GLM, null], [DEEPSEEK, null], [MIMO, null], [QWEN, QWEN_SAMPLING]]);
+      .toEqual([[GLM, null], [DEEPSEEK, null], [MIMO, MIMO_SAMPLING], [QWEN, QWEN_SAMPLING]]);
+    expect(Object.keys(previewModelRow(MIMO)!.sampling!)).toEqual(["temperature", "top_p"]);
+    expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.map(row => [row.model, row.jsonObject]))
+      .toEqual([[GLM, true], [DEEPSEEK, false], [MIMO, true], [QWEN, false]]);
+    expect(Object.isFrozen(previewModelRow(MIMO)!.sampling)).toBe(true);
     expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.anthropic.every(row => row.sampling === undefined)).toBe(true);
     expect(Object.isFrozen(previewModelRow(QWEN)!.sampling)).toBe(true);
   });
@@ -489,10 +499,29 @@ describe("reviewed sampling: a row's own sampling settings, exactly, and none on
       expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(QWEN)!, Buffer.byteLength(text))));
     }
   });
-  it("every other row's gateway body is byte for byte what it was before sampling existed", async () => {
+  it("MiMo's gateway body carries its two sampling keys after max_tokens, and JSON mode on a story JSON request", async () => {
     const story = { ...RESULT_REQUEST, lane: "story" as const, callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER" as const,
       preferredResponseFormat: "json_object" as const };
-    for (const model of [GLM, DEEPSEEK, MIMO]) {
+    const mimoSent = samplingBodies.sent.filter(sent => JSON.parse(sent.body).model === MIMO);
+    expect(mimoSent.length).toBeGreaterThanOrEqual(2);
+    for (const request of [RESULT_REQUEST, story]) {
+      const { executions, gateway } = previewGateway(MIMO);
+      await gateway.call(request);
+      const text = executions[0]!.requestBody;
+      const sent = JSON.parse(text) as { max_tokens: number; messages: unknown };
+      // The judging (served) call: sampling, no JSON mode (the app asks for JSON mode only on story JSON requests,
+      // exactly as for GLM). The story call: sampling and response_format {"type":"json_object"}, last.
+      expect(text).toBe(JSON.stringify({ model: MIMO, max_tokens: sent.max_tokens, ...MIMO_SAMPLING, messages: sent.messages,
+        ...(request === story ? { response_format: { type: "json_object" } } : {}) }));
+      expect(text).toContain('"temperature":1,"top_p":0.95,"messages":');
+      expect(Object.keys(sent)).toEqual(Object.keys(JSON.parse(mimoSent[request === story ? 1 : 0]!.body)));
+      expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(MIMO)!, Buffer.byteLength(text))));
+    }
+  });
+  it("GLM's and DeepSeek's gateway bodies are byte for byte what they were before sampling existed", async () => {
+    const story = { ...RESULT_REQUEST, lane: "story" as const, callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER" as const,
+      preferredResponseFormat: "json_object" as const };
+    for (const model of [GLM, DEEPSEEK]) {
       for (const request of [RESULT_REQUEST, story]) {
         const { executions, gateway } = previewGateway(model);
         await gateway.call(request);
@@ -524,7 +553,7 @@ describe("reviewed sampling: a row's own sampling settings, exactly, and none on
     expect(JSON.parse(bodies[0]!)).toMatchObject(QWEN_SAMPLING);
     expect(Object.keys(JSON.parse(bodies[1]!)).sort()).toEqual(BARE_BODY);
   });
-  it("Qwen's health probe carries the same sampling and passes the guarded fetch; MiMo's probe is unchanged", async () => {
+  it("Qwen's and MiMo's health probes carry their own sampling and pass the guarded fetch", async () => {
     const all = targets(PREVIEW_REVIEWED_PROVIDER_REFS);
     const bodies: string[] = [];
     for (const [target, model] of [[all[4]!, QWEN], [all[3]!, MIMO]] as const) {
@@ -536,8 +565,9 @@ describe("reviewed sampling: a row's own sampling settings, exactly, and none on
     }
     const [qwen, mimo] = bodies.map(text => JSON.parse(text) as { messages: unknown });
     expect(bodies[0]).toBe(JSON.stringify({ model: QWEN, max_tokens: 8192, ...QWEN_SAMPLING, messages: qwen!.messages }));
-    expect(bodies[1]).toBe(JSON.stringify({ model: MIMO, max_tokens: 8192, messages: mimo!.messages }));
+    expect(bodies[1]).toBe(JSON.stringify({ model: MIMO, max_tokens: 8192, ...MIMO_SAMPLING, messages: mimo!.messages }));
     // The start-of-debate estimate prices a health check as a body of at most 1,024 bytes.
     expect(Buffer.byteLength(bodies[0]!)).toBeLessThanOrEqual(1024);
+    expect(Buffer.byteLength(bodies[1]!)).toBeLessThanOrEqual(1024);
   });
 });

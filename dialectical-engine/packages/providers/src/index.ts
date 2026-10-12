@@ -2470,6 +2470,7 @@ export {
   PATCH_REPLY_FORM_SENTENCE,
   PER_CALL_MARKERS_HEADING,
   PROMPT_FRAME_VERSION,
+  TEXT_QUOTE_RULE_SENTENCE,
   appendFramedRejection,
   assertFramedPrompt,
   buildFramedPatchPrompt,

@@ -31,7 +31,7 @@ What is new in v3:
 |---|---|---|---|---|---|---|
 | `zai-org/GLM-5.3-Flash` | Z.AI | $0.15 / $0.50 | 32,768 | "high" | allowed | $0.0560 |
 | `deepseek-ai/DeepSeek-V4.1-Flash` | DeepSeek | $0.20 / $0.60 | 32,768 | "high" | not allowed | $0.0725 |
-| `XiaomiMiMo/MiMo-V2.6-Pro` | Xiaomi | $0.43 / $0.87 | 32,768 | none sent | not allowed | $0.1421 |
+| `XiaomiMiMo/MiMo-V2.6-Pro` | Xiaomi | $0.43 / $0.87 | 32,768 | none sent | allowed (since 2026-10-12) | $0.1421 |
 | `Qwen/Qwen3.8-Flash` | Alibaba | $0.113 / $0.382 | 32,768 | none sent | not allowed | $0.0424 |
 
 - The prices are DeepInfra's list prices. GLM and DeepSeek are on promotion today (50% and 30%
@@ -42,10 +42,20 @@ What is new in v3:
   `top_p` 0.95 and `top_k` 20, exactly, and the gate refuses a Qwen request without them or with
   any other value. At DeepInfra's own defaults (temperature 1, top_p 1, top_k off) Qwen slid into
   random words in several languages halfway through an answer, so its answer could not be read.
-  These are the settings Qwen's makers give for its thinking mode. No other model may carry any of
-  the three; its requests are exactly as before. A change is a reviewed code change (the gate, the
-  app and their shared test files), never an edit of the GO. The probe sends them too, and prints
-  them under `sent.sampling`.
+  These are the settings Qwen's makers give for its thinking mode.
+- MiMo's answer settings and JSON mode (owner approval 2026-10-12): every MiMo request carries
+  `temperature` 1.0 and `top_p` 0.95, exactly, and no `top_k`; the gate refuses a MiMo request
+  without them, with any other value, or with `top_k`. MiMo may also ask for JSON mode
+  (`response_format` `{"type":"json_object"}`), as GLM may; the app asks for it only on the story
+  writer's and checker's JSON requests, exactly as for GLM. Why: in a practice run MiMo closed
+  Romanian quotation marks („…) with a plain straight quote inside its JSON answer, nine times in
+  one reply, so the answer could not be read. DeepInfra's MiMo page lists JSON among its features
+  and recommends these two settings. (Every model's instructions also gained one fixed sentence
+  the same day on how to write quotation marks inside a text; that is in the app, not the gate.)
+- GLM and DeepSeek carry none of the three sampling settings; their requests are exactly as
+  before. A change is a reviewed code change (the gate, the app and their shared test files),
+  never an edit of the GO. The probe sends each model's own settings too, and prints them under
+  `sent.sampling`.
 - "Thinking" tokens are charged as answer tokens. If the answer does not prove that they are
   already inside its answer count, the gate charges them on top. That is the careful side too.
 - "Most one call can set aside" is for the largest question the gate accepts (256 KiB). No

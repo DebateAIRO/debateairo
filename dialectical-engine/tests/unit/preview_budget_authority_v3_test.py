@@ -382,7 +382,7 @@ class ModelCallTests(GateTest):
         # Owner ruling 2026-10-10: max_tokens is at most 32768 for every row; 32769 is refused.
         allowed = [body(model=MODEL), body(model=MODEL, response_format=json_mode), body(model=MODEL, max_tokens=32768),
                    body(model=DEEPSEEK), body(model=DEEPSEEK, max_tokens=32768),
-                   body(model=MIMO), body(model=MIMO, max_tokens=32768),
+                   body(model=MIMO), body(model=MIMO, max_tokens=32768), body(model=MIMO, response_format=json_mode),
                    body(model=QWEN), body(model=QWEN, max_tokens=32768)]
         refused = [body(model=model, max_tokens=32769) for model in ALL] + [
                    {k: v for k, v in body(model=MODEL).items() if k != 'reasoning_effort'},
@@ -391,7 +391,7 @@ class ModelCallTests(GateTest):
                    body(model=DEEPSEEK, reasoning_effort='medium'), body(model=DEEPSEEK, response_format=json_mode),
                    body(model=DEEPSEEK, max_tokens=131072),
                    body(model=MIMO, reasoning_effort='high'), body(model=MIMO, reasoning_effort=None),
-                   body(model=MIMO, response_format=json_mode), body(model=MIMO, max_tokens=131072),
+                   body(model=MIMO, response_format={'type': 'json_schema'}), body(model=MIMO, max_tokens=131072),
                    body(model=MIMO, max_tokens=0)]
         for value in allowed:
             with self.subTest(allowed=value):
@@ -1868,17 +1868,22 @@ class ProbeFenceTests(GateTest):
 
 
 class SamplingTests(GateTest):
-    """Reviewed sampling (2026-10-12): a row may carry its own sampling settings (today only Qwen, at its makers'
-    thinking-mode values, after it slid into random multilingual tokens at DeepInfra's defaults). Its requests must
+    """Reviewed sampling (2026-10-12): a row may carry its own sampling settings (Qwen, at its makers' thinking-mode
+    values, after it slid into random multilingual tokens at DeepInfra's defaults; MiMo, at DeepInfra's recommended
+    temperature 1.0 and top_p 0.95, after it broke its JSON with a straight closing quote). Its requests must
     carry exactly those keys with exactly those values; every other row's requests must carry none of them."""
     QWEN_SAMPLING = (('temperature', 0.6), ('top_p', 0.95), ('top_k', 20))
+    # Owner approval 2026-10-12: DeepInfra's recommended settings for MiMo, with no top_k.
+    MIMO_SAMPLING = (('temperature', 1.0), ('top_p', 0.95))
 
-    def test_only_the_qwen_row_carries_sampling_and_it_equals_the_independent_copy(self):
+    def test_only_the_mimo_and_qwen_rows_carry_sampling_and_they_equal_the_independent_copy(self):
         self.assertEqual(DEEPINFRA.rows[QWEN].sampling, self.QWEN_SAMPLING)
         self.assertEqual(dict(DEEPINFRA.rows[QWEN].sampling), SAMPLING[QWEN])
-        self.assertEqual({model: row.sampling for model, row in DEEPINFRA.rows.items() if model != QWEN},
-                         {MODEL: None, DEEPSEEK: None, MIMO: None})
-        self.assertEqual(set(SAMPLING), {QWEN})
+        self.assertEqual(DEEPINFRA.rows[MIMO].sampling, self.MIMO_SAMPLING)
+        self.assertEqual(dict(DEEPINFRA.rows[MIMO].sampling), SAMPLING[MIMO])
+        self.assertEqual({model: row.sampling for model, row in DEEPINFRA.rows.items() if model not in (MIMO, QWEN)},
+                         {MODEL: None, DEEPSEEK: None})
+        self.assertEqual(set(SAMPLING), {MIMO, QWEN})
         for name, profile in bridge.helper.PROFILES.items():
             if name != 'deepinfra':
                 with self.subTest(provider=name):
@@ -1905,8 +1910,33 @@ class SamplingTests(GateTest):
             with self.subTest(name):
                 self.assertFalse(DEEPINFRA.body_valid(value, row))
 
+    def test_mimo_takes_exactly_its_reviewed_values_and_json_mode(self):
+        # Owner approval 2026-10-12: MiMo broke its JSON with a straight closing quote in a live practice run.
+        row = DEEPINFRA.rows[MIMO]
+        self.assertTrue(row.json_object)
+        exact = body(model=MIMO)
+        self.assertEqual({k: exact[k] for k in ('temperature', 'top_p')}, SAMPLING[MIMO])
+        self.assertTrue(DEEPINFRA.body_valid(exact, row))
+        self.assertTrue(DEEPINFRA.body_valid({**exact, 'temperature': 1}, row))  # 1 and 1.0: one JSON number (the app writes 1).
+        self.assertTrue(DEEPINFRA.body_valid({**exact, 'response_format': {'type': 'json_object'}}, row))
+
+        def without(name):
+            return {k: v for k, v in exact.items() if k != name}
+        refused = {'no_sampling': {k: v for k, v in exact.items() if k not in SAMPLING[MIMO]},
+                   'no_temperature': without('temperature'), 'no_top_p': without('top_p'),
+                   'with_top_k': {**exact, 'top_k': 20}, 'qwen_temperature': {**exact, 'temperature': 0.6},
+                   'top_p_default': {**exact, 'top_p': 1}, 'top_p_hair': {**exact, 'top_p': 0.950001},
+                   'temperature_true': {**exact, 'temperature': True}, 'temperature_text': {**exact, 'temperature': '1.0'},
+                   'temperature_null': {**exact, 'temperature': None}, 'effort': {**exact, 'reasoning_effort': 'high'},
+                   'json_schema': {**exact, 'response_format': {'type': 'json_schema'}},
+                   'json_mode_extra': {**exact, 'response_format': {'type': 'json_object', 'schema': {}}},
+                   'json_mode_without_sampling': {**without('temperature'), 'response_format': {'type': 'json_object'}}}
+        for name, value in refused.items():
+            with self.subTest(name):
+                self.assertFalse(DEEPINFRA.body_valid(value, row))
+
     def test_a_row_without_sampling_refuses_every_sampling_key(self):
-        for model in (MODEL, DEEPSEEK, MIMO):
+        for model in (MODEL, DEEPSEEK):
             row = DEEPINFRA.rows[model]
             self.assertTrue(DEEPINFRA.body_valid(body(model=model), row))
             for name, value in SAMPLING[QWEN].items():
@@ -1952,6 +1982,21 @@ class SamplingTests(GateTest):
         with self.refused('REQUEST_PARAMETERS_INVALID'):
             gate.call('bare', value={k: v for k, v in body(model=QWEN).items() if k not in SAMPLING[QWEN]})
 
+    def test_a_mimo_json_call_with_its_sampling_goes_through_and_sends_it(self):
+        gate = self.gate(enabled_models=ALL).ready()
+        sent = []
+
+        def dispatch(request, _key):
+            sent.append(json.loads(request))
+            return 200, provider_response('0.0004', MIMO)
+        value = body(model=MIMO, response_format={'type': 'json_object'})
+        self.assertEqual(gate.call('ok', value=value, dispatch=dispatch)['status'], 200)
+        self.assertEqual(sent, [value])
+        self.assertEqual({k: sent[0][k] for k in SAMPLING[MIMO]}, SAMPLING[MIMO])
+        self.assertEqual(sent[0]['response_format'], {'type': 'json_object'})
+        with self.refused('REQUEST_PARAMETERS_INVALID'):
+            gate.call('bare', value={k: v for k, v in value.items() if k not in SAMPLING[MIMO]})
+
     def test_the_probe_sends_the_rows_sampling_and_reports_it(self):
         gate = self.gate().ready()  # GLM only: a probe reaches a reviewed model the GO does not enable yet.
         sent = []
@@ -1966,8 +2011,12 @@ class SamplingTests(GateTest):
                                  **SAMPLING[QWEN]}])
         self.assertEqual(summary['sent'], {'max_tokens': 1024, 'effort': 'none', 'sampling': SAMPLING[QWEN]})
         self.assertEqual((summary['http_status'], summary['entry_state']), (200, 'settled'))
-        # Every other row's probe body and summary are as before: no sampling at all.
-        for model in (MODEL, DEEPSEEK, MIMO):
+        # MiMo's probe carries its own two (owner approval 2026-10-12); GLM's and DeepSeek's are as before: none.
+        self.assertEqual(DEEPINFRA.probe_body(DEEPINFRA.rows[MIMO]),
+                         {'model': MIMO, 'max_tokens': 1024, 'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}],
+                          **SAMPLING[MIMO]})
+        self.assertTrue(DEEPINFRA.body_valid(DEEPINFRA.probe_body(DEEPINFRA.rows[MIMO]), DEEPINFRA.rows[MIMO]))
+        for model in (MODEL, DEEPSEEK):
             with self.subTest(model=model):
                 probe_body = DEEPINFRA.probe_body(DEEPINFRA.rows[model])
                 self.assertEqual(probe_body, {'model': model, 'max_tokens': 1024,

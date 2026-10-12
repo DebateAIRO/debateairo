@@ -1,6 +1,6 @@
 {
   "schema": "deepinfra-sampling-bodies-v1",
-  "about": "DeepInfra request bodies for the reviewed sampling rule (2026-10-12). A row with a reviewed `sampling` (today Qwen/Qwen3.8-Flash: temperature 0.6, top_p 0.95, top_k 20) must carry exactly those keys with exactly those values; a row without one must carry none of them. `sent` bodies are in the app's own key order and serializer (JSON.stringify), each with the reservation the app computes for its exact bytes; `refused` bodies break the rule. The app's guarded fetch (tests/unit/preview-multi-model.test.ts) and the gate's DeepInfraProfile.body_valid and validate_request (tests/unit/preview_budget_authority_v3_test.py) must accept every `sent` body at exactly its reservedUsd and refuse every `refused` one.",
+  "about": "DeepInfra request bodies for the reviewed sampling rule (2026-10-12). A row with a reviewed `sampling` (Qwen/Qwen3.8-Flash: temperature 0.6, top_p 0.95, top_k 20; XiaomiMiMo/MiMo-V2.6-Pro since 2026-10-12: temperature 1.0, top_p 0.95, no top_k, written 1 by the app's serializer) must carry exactly those keys with exactly those values; a row without one must carry none of them. `sent` bodies are in the app's own key order and serializer (JSON.stringify), each with the reservation the app computes for its exact bytes; `refused` bodies break the rule. The app's guarded fetch (tests/unit/preview-multi-model.test.ts) and the gate's DeepInfraProfile.body_valid and validate_request (tests/unit/preview_budget_authority_v3_test.py) must accept every `sent` body at exactly its reservedUsd and refuse every `refused` one.",
   "sent": [
     {
       "name": "Qwen: its reviewed sampling after max_tokens",
@@ -13,9 +13,14 @@
       "reservedUsd": "0.012775016"
     },
     {
-      "name": "MiMo: no sampling, the body as before",
-      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}",
-      "reservedUsd": "0.029439540"
+      "name": "MiMo: its reviewed sampling after max_tokens (a judging call: no JSON mode)",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"top_p\":0.95,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}",
+      "reservedUsd": "0.029452010"
+    },
+    {
+      "name": "MiMo: sampling and JSON mode (a story JSON call), a system turn and non-ASCII text, the full answer cap",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":32768,\"temperature\":1,\"top_p\":0.95,\"messages\":[{\"role\":\"system\",\"content\":\"Răspunde doar cu JSON.\"},{\"role\":\"user\",\"content\":\"Întrebare sintetică: „da” sau „nu”?\"}],\"response_format\":{\"type\":\"json_object\"}}",
+      "reservedUsd": "0.029503180"
     },
     {
       "name": "GLM: effort and JSON mode, no sampling, the body as before",
@@ -80,6 +85,30 @@
     {
       "name": "Qwen with the sampling nested",
       "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}],\"sampling\":{\"temperature\":0.6,\"top_p\":0.95,\"top_k\":20}}"
+    },
+    {
+      "name": "MiMo without sampling (the body before 2026-10-12)",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "MiMo without top_p",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "MiMo with DeepInfra's default top_p",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"top_p\":1,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "MiMo with a top_k",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "MiMo with JSON mode but no sampling",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}],\"response_format\":{\"type\":\"json_object\"}}"
+    },
+    {
+      "name": "MiMo with another response format",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":1,\"top_p\":0.95,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}],\"response_format\":{\"type\":\"json_schema\"}}"
     },
     {
       "name": "MiMo with a temperature",
