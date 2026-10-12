@@ -5,7 +5,7 @@
   "legal.notice.title": "Rekvizitai",
   "legal.notice.meta": "Kas valdo {product} ir kaip su mumis susisiekti",
   "legal.notice.s01.title": "Kas mes esame",
-  "legal.notice.s01.body": "{product} (dar vadinamą {alsoCalled}) valdo Rumunijoje registruota bendrovė {company}.",
+  "legal.notice.s01.body": "{product} valdo Rumunijoje registruota bendrovė {company}.",
   "legal.notice.s01.seller": "{company} taip pat yra mokamų planų pardavėjas: jūsų sutartis, mokėjimai ir sąskaitos sudaromi su {company}.",
   "legal.notice.company.name": "Įmonės pavadinimas",
   "legal.notice.company.tradingNames": "Komerciniai pavadinimai",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Įsimena jūsų pasirinktą sąsajos kalbą.",
   "legal.cookies.locale.life": "1 metai",
   "legal.cookies.storageTitle": "Saugoma jūsų naršyklėje, o ne slapuke",
-  "legal.cookies.storageIntro": "Jūsų naršyklės saugykloje laikomi keturi elementai: du vietinėje saugykloje, kol jų neišvalysite, ir du seanso saugykloje, kol uždarysite skirtuką. Kitaip nei slapukai, jie nepridedami prie jūsų užklausų; pagalbos pokalbio elementas saugo pokalbio su DebateAI pagalba kopiją, o jo žinutės pasiekė DebateAI, kai jas išsiuntėte.",
+  "legal.cookies.storageIntro": "Jūsų naršyklės saugykloje laikomi keturi elementai: du vietinėje saugykloje, kol jų neišvalysite, ir du seanso saugykloje, kol uždarysite skirtuką. Kitaip nei slapukai, jie nepridedami prie jūsų užklausų; pagalbos pokalbio elementas saugo pokalbio su Dialectical Engine pagalba kopiją, o jo žinutės pasiekė Dialectical Engine, kai jas išsiuntėte.",
   "legal.cookies.consent.kind": "Vietinė saugykla",
   "legal.cookies.consent.purpose": "Įsimena, kad jau matėte pranešimą apie slapukus, todėl jis rodomas tik kartą.",
   "legal.cookies.consent.life": "Kol jo neišvalysite",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Seanso saugykla",
   "legal.cookies.supportConversation.purpose": "Laiko jūsų pokalbį su pagalbos pokalbių langu ekrane, kol skirtukas atidarytas. Jis ištrinamas, kai šiame skirtuke kas nors prisijungia arba atsijungia.",
   "legal.cookies.supportConversation.life": "Kol uždarysite skirtuką",
-  "legal.cookies.recipient.server": "Tik DebateAI serveriui",
+  "legal.cookies.recipient.server": "Tik Dialectical Engine serveriui",
   "legal.cookies.recipient.browser": "lieka jūsų naršyklėje",
   "legal.cookies.refuse": "Norėdami jų atsisakyti, naršyklės nustatymuose užblokuokite arba ištrinkite šios svetainės slapukus ir svetainės duomenis.",
   "legal.cookies.refuseEffect": "Kas tada nustoja veikti: prisijungimas ir jūsų kalbos bei rodymo pasirinkimų įsiminimas.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Iki 30 minučių",
   "legal.cookies.mfaRecovery.life": "Iki 299 sekundžių",
   "legal.cookies.social.life": "Iki 5 minučių",
-  "legal.cookies.phoneDraft.life": "15 minučių arba iki ankstesnio pašalinimo"
+  "legal.cookies.phoneDraft.life": "15 minučių arba iki ankstesnio pašalinimo",
+  "legal.cookies.exportPending.purpose": "Šiame skirtuke saugo el. paštu atsiųstą eksporto nuorodą prisijungimui ir pakartotiniam bandymui.",
+  "legal.cookies.exportLinkOutcome.purpose": "Prisimena, kurį atsisiuntimo nuorodos pranešimą rodyti šiame skirtuke.",
+  "legal.cookies.exportPending.life": "Iki skirtuko uždarymo, atsijungimo, naujos nuorodos, pirmo sėkmingo atsisiuntimo arba netinkamos nuorodos ar kitos paskyros rezultato",
+  "legal.cookies.exportLinkOutcome.life": "Iki skirtuko uždarymo, atsijungimo arba naujos nuorodos"
 }

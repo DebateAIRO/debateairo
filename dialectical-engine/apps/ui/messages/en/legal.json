@@ -5,7 +5,7 @@
   "legal.notice.title": "Legal notice",
   "legal.notice.meta": "Who runs {product}, and how to reach us",
   "legal.notice.s01.title": "Who we are",
-  "legal.notice.s01.body": "{product} (also called {alsoCalled}) is run by {company}, a company registered in Romania.",
+  "legal.notice.s01.body": "{product} is run by {company}, a company registered in Romania.",
   "legal.notice.s01.seller": "{company} is also the seller of the paid plans: your contract, your payments and your invoices are with {company}.",
   "legal.notice.company.name": "Company name",
   "legal.notice.company.tradingNames": "Trading names",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Remembers the interface language you picked.",
   "legal.cookies.locale.life": "1 year",
   "legal.cookies.storageTitle": "Stored in your browser, not in a cookie",
-  "legal.cookies.storageIntro": "Four items are kept in your browser's storage: two in local storage, until you clear it, and two in session storage, until you close the tab. Unlike cookies, they are not attached to your requests; the help-chat item holds a copy of a conversation you had with DebateAI's help, whose messages reached DebateAI when you sent them.",
+  "legal.cookies.storageIntro": "Four items are kept in your browser's storage: two in local storage, until you clear it, and two in session storage, until you close the tab. Unlike cookies, they are not attached to your requests; the help-chat item holds a copy of a conversation you had with Dialectical Engine's help, whose messages reached Dialectical Engine when you sent them.",
   "legal.cookies.consent.kind": "Local storage",
   "legal.cookies.consent.purpose": "Remembers that you have seen the cookie notice, so it is shown once.",
   "legal.cookies.consent.life": "Until you clear it",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Session storage",
   "legal.cookies.supportConversation.purpose": "Keeps your help-chat conversation on screen while the tab stays open. It is erased when someone signs in or signs out in this tab.",
   "legal.cookies.supportConversation.life": "Until you close the tab",
-  "legal.cookies.recipient.server": "DebateAI's server only",
+  "legal.cookies.recipient.server": "Dialectical Engine's server only",
   "legal.cookies.recipient.browser": "stays in your browser",
   "legal.cookies.refuse": "To refuse them, block or delete cookies and site data for this site in your browser settings.",
   "legal.cookies.refuseEffect": "What then stops working: signing in, and the remembering of your language and display choices.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Up to 30 minutes",
   "legal.cookies.mfaRecovery.life": "Up to 299 seconds",
   "legal.cookies.social.life": "Up to 5 minutes",
-  "legal.cookies.phoneDraft.life": "15 minutes or until earlier clearing"
+  "legal.cookies.phoneDraft.life": "15 minutes or until earlier clearing",
+  "legal.cookies.exportPending.purpose": "Keeps the emailed export link in this tab for sign-in and retry.",
+  "legal.cookies.exportLinkOutcome.purpose": "Remembers which download-link message to show in this tab.",
+  "legal.cookies.exportPending.life": "Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result",
+  "legal.cookies.exportLinkOutcome.life": "Until tab close, sign-out, or a new link"
 }

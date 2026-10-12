@@ -15,6 +15,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isRunLevelSpendStop } from "@debateai/kernel";
 import {
+  buildFramedPrompt,
+  buildFramedRepairPrompt,
+  schemaFailureLocator,
+  type ProviderCallRequest,
   createPreviewBudgetRpcPort,
   createPreviewGuardedFetch,
   OpenAICompatibleProviderGateway,
@@ -24,6 +28,7 @@ import {
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
   createPreviewBusyCoordinator,
+  PreviewChargeBookedMax,
   PreviewGateUnavailable,
   PreviewGateUnsent,
   PreviewModelCooling,
@@ -746,5 +751,94 @@ describe("the preview spending gate's reply always settles", () => {
       setTimeout(() => response.socket?.destroy(), 20);
     });
     await expect(settledWithin(port.execute(execution), 5_000)).rejects.toMatchObject({ code: "PROVIDER_USAGE_UNREPORTED" });
+  });
+});
+
+/**
+ * Slow answer (owner ruling 2026-10-12): the gate's new public refusal PROVIDER_CHARGE_BOOKED_MAX. The call was reserved
+ * and SENT; the vendor connection then failed or ran past the gate's 1,200 s deadline; the gate booked the call's whole
+ * reservation as its charge and stays active. Until now the gate answered such a call PREVIEW_TEST_AUTHORITY_STOPPED,
+ * which the app read (after a /remaining read) as the run's money ceiling. It is the app's own sent-and-failed
+ * transport failure: billed (never REFUSED, never the unbilled 60-second resend), never money, never "gate unavailable".
+ */
+describe("PROVIDER_CHARGE_BOOKED_MAX: a sent call the gate charged at its reservation is a billed transport failure", () => {
+  const booked = { status: 409, body: JSON.stringify({ error: "PROVIDER_CHARGE_BOOKED_MAX" }) };
+
+  it("the port reads it as a billed transport failure, without asking /remaining", async () => {
+    const { port, received } = await gate(booked);
+    const refusal: unknown = await port.execute(execution).then(() => null, (error: unknown) => error);
+    expect(refusal).toBeInstanceOf(PreviewChargeBookedMax);
+    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+    expect(refusal).not.toBeInstanceOf(ProviderUnbilledRefusal);
+    expect(refusal).not.toBeInstanceOf(PreviewGateUnavailable);
+    expect(providerCallGateUnavailable(refusal)).toBe(false);
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+  });
+
+  const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
+  const REF = "preview:mimo-v2-6-pro";
+  const preview = parsePreviewProviderTestConfig(JSON.stringify({
+    deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"],
+    premium_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", MIMO], requested_thinking_level: "high",
+    budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture-scope"
+  }))!;
+  const gatewayFor = (port: PreviewBudgetPort, slept: number[], ledger: ProviderLedgerInput[], sent: string[]) => {
+    const target = parseProviderDiscoveryTargets(JSON.stringify([{
+      provider_ref: REF, base_url: "https://api.deepinfra.com/v1/openai", model: MIMO,
+      input_price_micros_per_million: 430000, output_price_micros_per_million: 870000, context_window_tokens: 1048576
+    }]), [{ providerRef: REF, maker: "Xiaomi" }])[0]!;
+    const recording: PreviewBudgetPort = { execute: (input, signal) => { sent.push(input.requestBody); return port.execute(input, signal); } };
+    return withPreviewProviderCallPolicy(new OpenAICompatibleProviderGateway({
+      endpoint: target.baseUrl, model: target.model, maker: target.maker, ...providerTargetGatewayControls(target),
+      fetchImplementation: createPreviewGuardedFetch(recording),
+      persistRawArtifact: async (artifact) => artifact.artifactId,
+      appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
+      assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
+    }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); } });
+  };
+
+  it("through the native gateway a debate call records ONE billed FAILED attempt, is not resent, and leaves as PROVIDER_CALL_FAILED", async () => {
+    const { port, received } = await gate(booked);
+    const slept: number[] = [];
+    const ledger: ProviderLedgerInput[] = [];
+    const sent: string[] = [];
+    const failure: unknown = await gatewayFor(port, slept, ledger, sent).call({
+      runId: "run:synthetic", subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
+      bound: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 5000 }, contractHash: "contract:test", providerRef: REF,
+      packet: framedFixturePacket("Synthetic school phone policy; no personal data.")
+    }).then(() => null, (error: unknown) => error);
+    expect(failure).toMatchObject({ code: "PROVIDER_CALL_FAILED", lastOutcome: "FAILED", cause: expect.any(PreviewChargeBookedMax) });
+    expect(isRunLevelSpendStop(failure)).toBe(false);
+    expect(providerCallGateUnavailable(failure)).toBe(false);
+    expect(providerCallEndedVendorRefusedUnbilled(failure)).toBe(false);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+    expect(sent).toHaveLength(1);
+    expect(slept).toEqual([]);
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+  });
+
+  it("the storyteller's call uses its second POST at the same 16,384 allowance (MiMo), each a billed FAILED attempt", async () => {
+    const { port } = await gate(booked);
+    const slept: number[] = [];
+    const ledger: ProviderLedgerInput[] = [];
+    const sent: string[] = [];
+    const framed = buildFramedPrompt({
+      contract: { contractId: "story.storyteller.v3", instruction: "Do the synthetic story step.", answerForm: "Return one JSON object." },
+      material: [{ name: "story_material", content: "One policy position, cited as P1." }]
+    });
+    const storyteller: ProviderCallRequest = {
+      runId: "run:synthetic", subjectItemId: "story:synthetic", callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER", lane: "story",
+      bound: { maxAttempts: 2, tokenCeiling: 12_000, deadlineMs: 300_000 }, contractHash: "contract:synthetic-STORYTELLER",
+      providerRef: REF, packet: framed.packet, preferredResponseFormat: "json_object",
+      classifyContent: () => ({ parseStatus: "PARSED", parseError: null }),
+      buildRepairPacket: (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))
+    };
+    const failure: unknown = await gatewayFor(port, slept, ledger, sent).call(storyteller).then(() => null, (error: unknown) => error);
+    expect(failure).toMatchObject({ code: "PROVIDER_CALL_FAILED", lastOutcome: "FAILED", cause: expect.any(PreviewChargeBookedMax) });
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED"]);
+    expect(sent.map((body) => JSON.parse(body).max_tokens)).toEqual([16_384, 16_384]);
+    expect(slept).toEqual([]);
   });
 });

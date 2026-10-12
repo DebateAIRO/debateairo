@@ -17,7 +17,7 @@ import { AccountProfileError, type AccountProfileService } from "./account-profi
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
 import type { ProfileSession } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
-import type { FundingBasis } from "@debateai/kernel";
+import { exhaustive, type FundingBasis } from "@debateai/kernel";
 import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -26,15 +26,15 @@ import {
   AccountErasureScheduleRequestSchema,
   AccountErasureCancelRequestSchema,
   AccountErasureStatusSchema,
+  DataExportRequestSchema,
+  DataExportStatusSchema,
+  DataExportDownloadRequestSchema,
   EmailChangeCancelledSchema,
   EmailChangeConfirmedSchema,
   EmailChangeLinkRequestSchema,
   EmailChangePendingSchema,
   EmailChangeRequestSchema,
-  AnswerSchema,
   AnswerIndexSchema,
-  AnswerStorySchema,
-  AnswerDisclosureSchema,
   ArgumentLanguageSchema,
   AskAcceptedSchema,
   AskAlreadyWaitingSchema,
@@ -42,13 +42,10 @@ import {
   askQuestionMaxBytes,
   DeploymentSchema,
   EventTypeSchema,
-  ExecutionLedgerDigestSchema,
-  InspectionSchema,
   InvestigationAcceptedSchema,
   InvestigationRequestSchema,
   LegacyRunClaimRequestSchema,
   LegacyRunClaimResultSchema,
-  NodeSchema,
   PrivateDebateErasureRequestSchema,
   PrivateDebateErasureStatusSchema,
   PLAN_TIER_ROSTERS,
@@ -67,8 +64,6 @@ import {
   UnpublishDebateRequestSchema,
   type Answer,
   type AnswerIndex,
-  type AnswerDisclosure,
-  type AnswerStory,
   type ArgumentLanguage,
   type AskAccepted,
   type AskApplied,
@@ -198,7 +193,6 @@ import {
   type TierSource
 } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
-import { STORY_UNREADABLE, answerCarriesStoryLabel, buildAnswerStory, deriveStoryStatus } from "@debateai/story";
 import type { Hatchet } from "@hatchet-dev/typescript-sdk";
 import type {
   EvaluatorConsumerSelectionResult,
@@ -241,6 +235,11 @@ import type { PublicationContentCheck } from "./publication-check/check.js";
 import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
+import type { DataExportApplication } from "./data-export/service.js";
+import {
+  readOwnerRun, readOwnerRunAnswer, readOwnerAnswer, readOwnerInspection,
+  readOwnerLedgerDigest, readOwnerStory, readOwnerDisclosure, readOwnerNode
+} from "./owner-read.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
 import type { LegalAcceptanceApplication } from "./legal.js";
 import type { CountryGate } from "./country-gate.js";
@@ -945,6 +944,9 @@ const KNOWN_FAILURE_CONSTANTS: readonly string[] = Object.freeze([
   "CONTENT_PROVISION_DATABASE_ROLE_MUST_BE_ISOLATED",
   "CONTENT_PROVISION_DATABASE_URL_MUST_BE_SEPARATE",
   "CONVERGENCE_EPSILON_INVALID",
+  "DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED",
+  "DATA_EXPORT_DATABASE_URL_MUST_BE_SEPARATE",
+  "DATA_EXPORT_DATABASE_URL_REQUIRED",
   "ENCRYPTED_RUN_OWNER_INVALID",
   "ENCRYPTED_RUN_OWNER_TRANSFER_REQUIRES_REWRAP",
   "ERASURE_DATABASE_ROLE_ATTESTATION_FAILED",
@@ -1335,6 +1337,9 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+  { route: "GET /v1/account/export", auth: "user", resource: "identity", action: "read-data-export" },
+  { route: "POST /v1/account/export", auth: "user", resource: "identity", action: "request-data-export" },
+  { route: "POST /v1/account/export/download", auth: "user", resource: "identity", action: "download-data-export" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
@@ -1684,6 +1689,7 @@ export interface ApiOptions {
    */
   readonly disclosures?: AnswerDisclosureApplication;
   readonly accountErasure?: AccountErasureApplication;
+  readonly dataExport?: DataExportApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
   /** Paid plans L4: re-acceptance of the Terms and the Privacy Policy; the routes answer 503 without it. */
   readonly legal?: LegalAcceptanceApplication;
@@ -2887,6 +2893,56 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.send({ status:"CANCELLED" });
     }
   );
+  api.post("/v1/account/export", credentialRoutePolicy("POST /v1/account/export"), async (request, reply) => {
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const input = parseRequest(DataExportRequestSchema, request.body);
+    if (options.dataExport === undefined) return reply.status(503).send({ error: "EXPORT_UNAVAILABLE" });
+    const outcome = await options.dataExport.request({
+      userId: authenticated.userId,
+      sessionId: authenticated.session.session_id,
+      grantToken: input.step_up_grant,
+      locale: input.locale,
+      source: sourceFor(request)
+    });
+    switch (outcome.kind) {
+      case "ACCEPTED":
+        return reply.status(202).send(DataExportStatusSchema.parse({
+          status: "PREPARING", requested_at: outcome.requestedAt.toISOString()
+        }));
+      case "STEP_UP_INVALID": return reply.status(403).send({ error: "STEP_UP_REQUIRED" });
+      case "EMAIL_REQUIRED": return reply.status(409).send({ error: "EXPORT_EMAIL_REQUIRED" });
+      case "ERASING": return reply.status(409).send({ error: "EXPORT_ACCOUNT_ERASING" });
+      case "HELD": return reply.status(409).send({ error: "EXPORT_ACCOUNT_HELD" });
+      case "IN_PROGRESS": return reply.status(409).send({ error: "EXPORT_IN_PROGRESS" });
+      case "RATE_LIMITED": return reply.status(429).header("retry-after", String(outcome.retryAfterSeconds))
+        .send({ error: "EXPORT_RATE_LIMITED" });
+      default: return exhaustive(outcome);
+    }
+  });
+  api.get("/v1/account/export", routePolicy("GET /v1/account/export"), async (request, reply) => {
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (options.dataExport === undefined) return reply.status(503).send({ error: "EXPORT_UNAVAILABLE" });
+    return reply.send(DataExportStatusSchema.parse(await options.dataExport.status(authenticated.userId)));
+  });
+  api.post("/v1/account/export/download", credentialRoutePolicy("POST /v1/account/export/download"), async (request, reply) => {
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const input = parseRequest(DataExportDownloadRequestSchema, request.body);
+    if (options.dataExport === undefined) return reply.status(503).send({ error: "EXPORT_UNAVAILABLE" });
+    const result = await options.dataExport.download(authenticated.userId, input.token, sourceFor(request));
+    switch (result.kind) {
+      case "OK": return reply.status(200).header("content-type", "application/zip")
+        .header("content-disposition", `attachment; filename="${result.filename}"`)
+        .header("cache-control", "no-store").send(result.bytes);
+      case "WRONG_ACCOUNT": return reply.status(403).send({ error: "EXPORT_WRONG_ACCOUNT" });
+      case "INVALID": return reply.status(404).send({ error: "EXPORT_LINK_INVALID" });
+      case "HELD": return reply.status(409).send({ error: "EXPORT_ACCOUNT_HELD" });
+      case "UNAVAILABLE": return reply.status(503).send({ error: "EXPORT_UNAVAILABLE" });
+      default: return exhaustive(result);
+    }
+  });
   api.post(
     "/v1/account/legacy-runs/claim",
     credentialRoutePolicy("POST /v1/account/legacy-runs/claim"),
@@ -3480,10 +3536,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
-    const answer = await options.application.readAnswer(
-      answerId.data, request.session, version, ownershipFor(request)
-    );
-    return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_FOUND" }) : reply.send(AnswerSchema.parse(answer));
+    const answer = await readOwnerAnswer(options, answerId.data, version, request.session, ownershipFor(request));
+    return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_FOUND" }) : reply.send(answer);
   });
 
   api.get<{ Params: { id: string }; Querystring: { version?: string } }>("/v1/answers/:id/inspection", routePolicy("GET /v1/answers/{id}/inspection"), async (request, reply) => {
@@ -3494,19 +3548,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
-    const inspection = await options.application.readInspection(
-      answerId.data, request.session, version, ownershipFor(request)
-    );
+    const inspection = await readOwnerInspection(options, answerId.data, version, request.session, ownershipFor(request));
     return inspection === null
       ? reply.status(404).send({ error: "INSPECTION_NOT_FOUND" })
-      : reply.send(InspectionSchema.parse(inspection));
+      : reply.send(inspection);
   });
 
   api.get<{ Params: { id: string } }>("/v1/answers/:id/ledger-digest", routePolicy("GET /v1/answers/{id}/ledger-digest"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     if (!answerId.success) return reply.status(404).send({ error: "LEDGER_DIGEST_NOT_FOUND" });
-    const digest = await options.application.readLedgerDigest(answerId.data, request.session, ownershipFor(request));
-    return digest === null ? reply.status(404).send({ error: "LEDGER_DIGEST_NOT_FOUND" }) : reply.send(ExecutionLedgerDigestSchema.parse(digest));
+    const digest = await readOwnerLedgerDigest(options, answerId.data, request.session, ownershipFor(request));
+    return digest === null ? reply.status(404).send({ error: "LEDGER_DIGEST_NOT_FOUND" }) : reply.send(digest);
   });
 
   // Verdict story (spec 2026-09-26 §10). Mounted outside the guarded
@@ -3519,63 +3571,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // version it is written for (the answer's first), never from a catch-up.
   api.get<{ Params: { id: string } }>("/v1/answers/:id/story", routePolicy("GET /v1/answers/{id}/story"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
-    const stories = options.stories;
-    if (!answerId.success || stories === undefined) {
+    if (!answerId.success) {
       return reply.status(404).send({ error: "STORY_NOT_FOUND" });
     }
-    const ownership = ownershipFor(request);
-    const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownership);
-    if (answer === null) return reply.status(404).send({ error: "STORY_NOT_FOUND" });
-    let body: AnswerStory;
-    try {
-      const stored = await stories.readStory({
-        answerId: answer.answer_id,
-        answerVersion: answer.answer_version,
-        ownership
-      });
-      // Task M5 (spec §14.4.4): a components-only answer with a FLOOR gets a
-      // story too, so it waits like a served one instead of "no verdict". Read
-      // only when it can matter — no stored story, and no label of its own —
-      // and through the floor-only read (M5 review, M6).
-      const floor = stored === null && answer.verdict_state === null && options.disclosures !== undefined
-        ? await options.disclosures.readFloor({ answerId: answer.answer_id, ownership })
-        : null;
-      const anchor = stored === null
-        ? await stories.readStoryAnchor({ answerId: answer.answer_id, ownership })
-        : null;
-      const derived = deriveStoryStatus({
-        stored,
-        answerHasVerdict: answerCarriesStoryLabel({
-          verdictState: answer.verdict_state,
-          floorVerdictState: floor?.verdict_state ?? null
-        }),
-        answerCreatedAt: anchor?.storedAt ?? new Date(answer.relevant_as_of),
-        now: options.storyClock?.() ?? new Date()
-      });
-      body = AnswerStorySchema.parse(buildAnswerStory({
-        answerId: answer.answer_id,
-        answerVersion: stored?.answerVersion ?? anchor?.answerVersion ?? answer.answer_version,
-        stored,
-        derived
-      }));
-    } catch (error) {
-      // The answer IS the caller's, so the failure is a status, never a 500:
-      // a fixed reason in the body, and only the bounded diagnostic (a typed
-      // code or a class category, never the message) in the log.
-      console.error(JSON.stringify(Object.freeze({
-        event: "api.story.unreadable",
-        requestId: request.id,
-        route: request.routeOptions.url,
-        diagnostic: apiOperationalErrorDiagnostic(error)
-      })));
-      body = AnswerStorySchema.parse(buildAnswerStory({
-        answerId: answer.answer_id,
-        answerVersion: answer.answer_version,
-        stored: null,
-        derived: STORY_UNREADABLE
-      }));
-    }
-    return reply.send(body);
+    const story = await readOwnerStory(options, answerId.data, request.session, ownershipFor(request), {
+      requestId: request.id, route: request.routeOptions.url ?? "/v1/answers/:id/story"
+    });
+    return story === null ? reply.status(404).send({ error: "STORY_NOT_FOUND" }) : reply.send(story);
   });
 
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
@@ -3593,29 +3595,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // from "could not read" and keep a floor it already shows (floorAnswer.ts).
   api.get<{ Params: { id: string } }>("/v1/answers/:id/disclosure", routePolicy("GET /v1/answers/{id}/disclosure"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
-    const disclosures = options.disclosures;
-    if (!answerId.success || disclosures === undefined) {
+    if (!answerId.success) {
       return reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" });
     }
-    const ownership = ownershipFor(request);
-    const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownership);
-    if (answer === null) return reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" });
-    let disclosure: AnswerDisclosure | null;
-    try {
-      const read = await disclosures.readDisclosure({ answerId: answer.answer_id, ownership });
-      disclosure = read === null ? null : AnswerDisclosureSchema.parse(read);
-    } catch (error) {
-      const corruptRecord = (error instanceof TypedDomainError && error.code === "SERVE_DISCLOSURE_ROW_INVALID")
-        || (error instanceof Error && error.name === "ZodError");
-      if (!corruptRecord) throw error;
-      console.error(JSON.stringify(Object.freeze({
-        event: "api.disclosure.unreadable",
-        requestId: request.id,
-        route: request.routeOptions.url,
-        diagnostic: apiOperationalErrorDiagnostic(error)
-      })));
-      disclosure = null;
-    }
+    const disclosure = await readOwnerDisclosure(options, answerId.data, request.session, ownershipFor(request), {
+      requestId: request.id, route: request.routeOptions.url ?? "/v1/answers/:id/disclosure"
+    });
     return disclosure === null
       ? reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" })
       : reply.send(disclosure);
@@ -3625,10 +3610,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     const nodeId = ResourceIdSchema.safeParse(request.params.nodeId);
     if (!answerId.success || !nodeId.success) return reply.status(404).send({ error: "NODE_NOT_FOUND" });
-    const node = await options.application.readNode(
-      answerId.data, nodeId.data, request.session, ownershipFor(request)
-    );
-    return node === null ? reply.status(404).send({ error: "NODE_NOT_FOUND" }) : reply.send(NodeSchema.parse(node));
+    const node = await readOwnerNode(options, answerId.data, nodeId.data, request.session, ownershipFor(request));
+    return node === null ? reply.status(404).send({ error: "NODE_NOT_FOUND" }) : reply.send(node);
   });
 
   api.post<{ Params: { id: string; gapRef: string } }>("/v1/answers/:id/investigations/:gapRef", routePolicy("POST /v1/answers/{id}/investigations/{gapRef}"), async (request, reply) => {
@@ -3691,8 +3674,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.get<{ Params: { id: string } }>("/v1/runs/:id", routePolicy("GET /v1/runs/{id}"), async (request, reply) => {
     const runId = ResourceIdSchema.safeParse(request.params.id);
     if (!runId.success) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-    const run = await options.application.readRun(runId.data, request.session, ownershipFor(request));
-    return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(RunProjectionSchema.parse(run));
+    const run = await readOwnerRun(options, runId.data, request.session, ownershipFor(request));
+    return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(run);
   });
   api.get<{ Params: { id: string } }>(
     "/v1/runs/:id/visibility",
@@ -3715,8 +3698,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.get<{ Params: { id: string } }>("/v1/runs/:id/answer", routePolicy("GET /v1/runs/{id}/answer"), async (request, reply) => {
     const runId = ResourceIdSchema.safeParse(request.params.id);
     if (!runId.success) return reply.status(404).send({ error: "ANSWER_NOT_SERVED" });
-    const answer = await options.application.readRunAnswer(runId.data, request.session, ownershipFor(request));
-    return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_SERVED" }) : reply.send(AnswerSchema.parse(answer));
+    const answer = await readOwnerRunAnswer(options, runId.data, request.session, ownershipFor(request));
+    return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_SERVED" }) : reply.send(answer);
   });
   api.post<{ Params: { id: string } }>(
     "/v1/runs/:id/publish",

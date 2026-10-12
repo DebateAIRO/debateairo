@@ -177,7 +177,7 @@ export function writeCountryMmdb(networks: ReadonlyArray<MmdbCountryNetwork>): B
     ["binary_format_minor_version", { type: "uint16", value: 0 }],
     ["build_epoch", { type: "uint64", value: 1_790_000_000n }],
     ["database_type", { type: "string", value: "DBIP-Country-Lite" }],
-    ["description", { type: "map", value: [["en", { type: "string", value: "DebateAI test fixture" }]] }],
+    ["description", { type: "map", value: [["en", { type: "string", value: "Dialectical Engine test fixture" }]] }],
     ["ip_version", { type: "uint16", value: 6 }],
     ["languages", { type: "array", value: [{ type: "string", value: "en" }] }],
     ["node_count", { type: "uint32", value: nodeCount }],

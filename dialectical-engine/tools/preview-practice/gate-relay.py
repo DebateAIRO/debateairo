@@ -41,8 +41,10 @@ DEFAULT_ANTHROPIC_GATE = "/run/debateai-v3-preview/anthropic-budget-v1.sock"
 DEFAULT_MODE = 0o660
 DEFAULT_MAX_CONNECTIONS = 4
 DEFAULT_LIFETIME_SECONDS = 28800.0
-DEFAULT_DRAIN_SECONDS = 900.0
-DEFAULT_IDLE_TIMEOUT_SECONDS = 1200.0
+# Slow answer (owner ruling 2026-10-12): the gate gives a vendor 1,200 s, the app waits 1,260 s and its socket 1,290 s.
+# A quiet connection (the gate sends nothing until the vendor answers) and an in-flight call at a stop outlast both.
+DEFAULT_DRAIN_SECONDS = 1500.0
+DEFAULT_IDLE_TIMEOUT_SECONDS = 1500.0
 
 NAMES = ("deepinfra", "anthropic")
 SOCKET_FILE_NAMES = {"deepinfra": "deepinfra.sock", "anthropic": "anthropic.sock"}
@@ -589,9 +591,9 @@ def build_parser():
     parser.add_argument("--lifetime-seconds", type=_positive_float, default=DEFAULT_LIFETIME_SECONDS,
                         help="stop accepting and exit after this many seconds (default 28800)")
     parser.add_argument("--drain-seconds", type=_nonnegative_float, default=DEFAULT_DRAIN_SECONDS,
-                        help="grace for in-flight calls at lifetime end or on SIGTERM/SIGINT (default 900)")
+                        help="grace for in-flight calls at lifetime end or on SIGTERM/SIGINT (default 1500)")
     parser.add_argument("--idle-timeout-seconds", type=_positive_float, default=DEFAULT_IDLE_TIMEOUT_SECONDS,
-                        help="close a connection after this long with no bytes either way (default 1200)")
+                        help="close a connection after this long with no bytes either way (default 1500)")
     return parser
 
 

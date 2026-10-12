@@ -8,8 +8,8 @@ import { readCustodyAuthorizationHeader } from "../../packages/crypto/src/index.
 import {
   ApiVendorAdapter,
   RelayAdapter,
-  SUPPORT_HERMES_MODEL,
-  SUPPORT_HERMES_PROVIDER_REF,
+  SUPPORT_RELAY_MODEL,
+  SUPPORT_RELAY_PROVIDER_REF,
   SUPPORT_MODEL_STARTUP_REFUSAL_CODES,
   createSupportModelAdapter,
   parseSupportModelTargetJson
@@ -45,9 +45,9 @@ const VENDOR_CREDENTIAL = "Bearer t12-fixture-token-0123456789";
 const RELAY_CREDENTIAL = "Bearer support-only";
 
 const RELAY_TARGET = JSON.stringify({
-  provider_ref: SUPPORT_HERMES_PROVIDER_REF,
+  provider_ref: SUPPORT_RELAY_PROVIDER_REF,
   base_url: "http://127.0.0.1:8794/v1",
-  model: SUPPORT_HERMES_MODEL,
+  model: SUPPORT_RELAY_MODEL,
   authorization_header: RELAY_CREDENTIAL
 });
 
@@ -110,7 +110,7 @@ function ask(): Readonly<{ packet: PromptPacket; language: "en" }> {
 describe("V-30 hosted: the support chat reaches a paid API and refuses a relay", () => {
   it("refuses today's loopback relay target with a typed provider code", () => {
     expect(() => parseSupportModelTargetJson(RELAY_TARGET, HOSTED))
-      .toThrowError(new TypeError(`PROVIDER_BASE_URL_TLS_REQUIRED:${SUPPORT_HERMES_PROVIDER_REF}`));
+      .toThrowError(new TypeError(`PROVIDER_BASE_URL_TLS_REQUIRED:${SUPPORT_RELAY_PROVIDER_REF}`));
   });
 
   it("refuses a TLS relay that merely names this machine", () => {
@@ -359,25 +359,25 @@ describe("V-30 the hosted credential cannot escape", () => {
     const code = source
       .replace(/\/\*[\s\S]*?\*\//gu, "")
       .replace(/(^|[^:])\/\/.*$/gmu, "$1");
-    expect(code).toContain("class SupportChatCompletionsAdapter");
+    expect(code).toContain("class SupportHttpAdapter");
     expect(code).not.toMatch(/child_process|spawnSync|execFile|console\s*\./u);
   });
 });
 
 describe("V-30 local: today's relay path is unchanged", () => {
-  it("parses the dedicated loopback Hermes target exactly as before", () => {
+  it("parses the dedicated loopback Claude Haiku 5.5 relay target", () => {
     expect(parseSupportModelTargetJson(RELAY_TARGET, LOCAL)).toEqual({
-      providerRef: SUPPORT_HERMES_PROVIDER_REF,
+      providerRef: SUPPORT_RELAY_PROVIDER_REF,
       baseUrl: "http://127.0.0.1:8794/v1",
-      model: SUPPORT_HERMES_MODEL,
+      model: SUPPORT_RELAY_MODEL,
       authorizationHeader: RELAY_CREDENTIAL
     });
   });
 
   it("still refuses every target the ratified relay shape refused", () => {
     for (const invalid of [
-      RELAY_TARGET.replace(SUPPORT_HERMES_PROVIDER_REF, "development:codex-cli"),
-      RELAY_TARGET.replace(SUPPORT_HERMES_MODEL, "other-model"),
+      RELAY_TARGET.replace(SUPPORT_RELAY_PROVIDER_REF, "development:codex-cli"),
+      RELAY_TARGET.replace(SUPPORT_RELAY_MODEL, "other-model"),
       RELAY_TARGET.replace("127.0.0.1", "localhost"),
       RELAY_TARGET.replace("8794", "8792"),
       RELAY_TARGET.replace(RELAY_CREDENTIAL, ""),
@@ -411,7 +411,7 @@ describe("V-30 local: today's relay path is unchanged", () => {
     expect((fetchRecord.calls[0]?.init.headers as Record<string, string>).authorization)
       .toBe(RELAY_CREDENTIAL);
     const body = String(fetchRecord.calls[0]?.init.body);
-    expect(JSON.parse(body)).toMatchObject({ model: SUPPORT_HERMES_MODEL, stream: false });
+    expect(JSON.parse(body)).toMatchObject({ model: SUPPORT_RELAY_MODEL, stream: false });
     /**
      * FW-B / B-I1. The call is the same call; what changed is the PACKET. The
      * body carries the framed packet the door accepted, verbatim — no turn
@@ -436,7 +436,7 @@ describe("V-30 local: today's relay path is unchanged", () => {
    */
   it("keeps the local production floor and admits no cleartext target off this machine", () => {
     expect(parseSupportModelTargetJson(RELAY_TARGET, LOCAL_PRODUCTION))
-      .toMatchObject({ providerRef: SUPPORT_HERMES_PROVIDER_REF });
+      .toMatchObject({ providerRef: SUPPORT_RELAY_PROVIDER_REF });
     for (const deployment of [LOCAL, LOCAL_PRODUCTION, HOSTED]) {
       expect(() => parseSupportModelTargetJson(vendorTarget(
         { authorization_header: VENDOR_CREDENTIAL },

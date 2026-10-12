@@ -35,8 +35,9 @@ const OPERATOR_COMMANDS = 10; // billing, support and owner commands, run by han
 // short extra connection outside its pool (packages/db/src/private-stream.ts),
 // and the owner needs room to log in during an incident. 25 until 2026-10-12;
 // parallel AI calls (spec 2026-10-12-parallel-calls-design.md §3.6) gave the
-// runner 14 more (20 -> 34), which leaves 22.
-const SPARE = 22;
+// runner 14 more (20 -> 34), and the data export worker (mission data-export
+// S01) took 1 on the API, which leaves 21.
+const SPARE = 21;
 
 function poolCalls(source: string): readonly string[] {
   return [...source.matchAll(/createPool\([^)]*\)/gu)].map((match) => match[0]);
@@ -128,11 +129,20 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
       // Opening a case holds one connection and reads the messages on another.
       support: 2 * 2,
       // Every relay slot the register may allow, plus the queue's bookkeeping.
-      supportRelayLease: relaySlots + 2
+      supportRelayLease: relaySlots + 2,
+      // One export build at a time (single-flight timer) on one connection (V-43): its lease renewal queues behind its snapshot read.
+      dataExport: 1
     };
     for (const [key, floor] of Object.entries(floors)) {
       expect(API_DATABASE_POOLS[key as keyof typeof API_DATABASE_POOLS].max, key).toBeGreaterThanOrEqual(floor);
     }
+  });
+
+  it("lets the export's lease renewal wait out its snapshot read on one connection", () => {
+    // V-43: one connection. The worker renews its 45 s lease every 15 s; on one connection that renewal queues behind
+    // the snapshot read and must wait the full 15 s, so a read of up to ~30 s keeps its lease (measured, ARCH-FIX r17).
+    expect(API_DATABASE_POOLS.dataExport.max).toBe(1);
+    expect(API_DATABASE_POOLS.dataExport.connectionTimeoutMillis).toBe(15_000);
   });
 
   it("caps the runner's debates so each one has its three connections, and claim renewal its own two", async () => {

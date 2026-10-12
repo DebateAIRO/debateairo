@@ -18,6 +18,17 @@ first, in announced-unbilled.json next to the --state file (same folder, 0600, a
 failed notice is not retried that day. Nothing is halted and the gate is never touched. A status
 without the count (an older gate) or with a bad count or day is skipped quietly. The Google gate
 (google-halted) has no unbilled notice.
+
+Booked-at-maximum alert (owner ruling 2026-10-12, "Book max cost, keep going"): when the vendor
+connection fails or times out after a call was sent, the gate books that call's full reservation as
+its charge (ledger state settled_reserved_max) and keeps working; it never halts for it. In the same
+run the watcher reads status's today_booked_max (that day's count of such calls). Whenever the count
+is above the one it last announced for that Bucharest day, it queues one notice,
+debateai-preview-notice@<gate>-booked-<count>_<YYYY>_<MM>_<DD>.service: one email per new booking
+(several bookings between two runs share one email, with the day's count). The day and count are
+recorded first, in announced-booked.json next to the --state file (same folder, 0600, atomic), so a
+failed notice is not retried. A status without the count (an older gate) or with a bad count or day
+is skipped quietly. The Google gate has no booked notice.
 One JSON line on stdout; exit 0, or 1 when status or the notice could not be run (the unit then
 fails, and its OnFailure= alert emails that the watcher itself is broken).
 """
@@ -58,6 +69,9 @@ class WatchError(Exception):
 NOTICE_KINDS = NOTICE_KINDS + ('anthropic-halted',)
 # Each gate's own daily unbilled notice, by its halt kind. Google is parked: none.
 UNBILLED_KINDS = {'gate-halted': 'gate-unbilled', 'anthropic-halted': 'anthropic-unbilled'}
+# Each gate's own booked-at-maximum notice (owner ruling 2026-10-12), by its halt kind. Google: none.
+BOOKED_KINDS = {'gate-halted': 'gate-booked', 'anthropic-halted': 'anthropic-booked'}
+BOOKED_STATE_NAME = 'announced-booked.json'
 
 
 def read_status(private, run=subprocess.run):
@@ -113,7 +127,7 @@ def write_announced(path, value):
 
 
 def queue_notice(code, run=subprocess.run, kind='gate-halted'):
-    if kind not in NOTICE_KINDS and kind not in UNBILLED_KINDS.values():
+    if kind not in NOTICE_KINDS and kind not in UNBILLED_KINDS.values() and kind not in BOOKED_KINDS.values():
         raise WatchError('NOTICE_KIND_INVALID')
     unit = 'debateai-preview-notice@%s-%s.service' % (kind, code)
     try:
@@ -131,9 +145,14 @@ def unbilled_state_path(state_path):
     return Path(state_path).with_name(UNBILLED_STATE_NAME)
 
 
-def unbilled_today(status):
+def booked_state_path(state_path):
+    """The booked-at-maximum marker: announced-booked.json in the --state file's own folder."""
+    return Path(state_path).with_name(BOOKED_STATE_NAME)
+
+
+def unbilled_today(status, field='today_unbilled_releases'):
     """(count, day) from status, or None when either is missing or not exactly as the gate writes it."""
-    count, today = status.get('today_unbilled_releases'), status.get('today')
+    count, today = status.get(field), status.get('today')
     if type(count) is not int or not 0 <= count <= UNBILLED_COUNT_MAX:
         return None
     match = DAY.fullmatch(today) if isinstance(today, str) else None
@@ -160,6 +179,24 @@ def watch_unbilled(status, state_path, run, kind, alert_at):
     return {'unbilled': 'now', 'today': today, 'unbilled_notice': queue_notice(code, run, unbilled_kind)}
 
 
+def watch_booked(status, state_path, run, kind):
+    """One notice whenever today's count of calls booked at their reservation is above the count last
+    announced for that day. Recorded first: a failed notice is not retried for that count."""
+    booked_kind = BOOKED_KINDS.get(kind)
+    found = unbilled_today(status, 'today_booked_max') if booked_kind else None
+    if found is None or found[0] < 1:
+        return {}
+    count, today = found
+    path = booked_state_path(state_path)
+    announced = read_announced(path)
+    if (isinstance(announced, dict) and announced.get('today') == today and type(announced.get('count')) is int
+            and announced['count'] >= count):
+        return {'booked': 'before', 'today': today}
+    write_announced(path, {'today': today, 'count': count})
+    code = '%d_%s' % (count, today.replace('-', '_'))
+    return {'booked': 'now', 'today': today, 'booked_notice': queue_notice(code, run, booked_kind)}
+
+
 def watch_halt(status, state_path, run, kind):
     if status['state'] != 'halted':
         return {'status': 'ok', 'state': status['state']}
@@ -174,11 +211,12 @@ def watch_halt(status, state_path, run, kind):
 
 
 def watch(private, state_path, run=subprocess.run, kind='gate-halted', alert_at=UNBILLED_ALERT_DEFAULT):
-    """Both checks run on one status; a failure in one never skips the other. Any failure fails the run."""
+    """The three checks run on one status; a failure in one never skips the others. Any failure fails the run."""
     status = read_status(private, run)
     line, errors = {}, []
     for check in (lambda: watch_halt(status, state_path, run, kind),
-                  lambda: watch_unbilled(status, state_path, run, kind, alert_at)):
+                  lambda: watch_unbilled(status, state_path, run, kind, alert_at),
+                  lambda: watch_booked(status, state_path, run, kind)):
         try:
             line.update(check())
         except WatchError as error:
@@ -209,8 +247,8 @@ def parse_args(argv=None):
 def main(argv=None, run=subprocess.run):
     args = parse_args(argv)
     try:
-        if args.state.name == UNBILLED_STATE_NAME:
-            raise WatchError('STATE_PATH_INVALID')  # The halt marker and the daily marker are two files.
+        if args.state.name in (UNBILLED_STATE_NAME, BOOKED_STATE_NAME):
+            raise WatchError('STATE_PATH_INVALID')  # The halt marker and the other two markers are three files.
         print(json.dumps(watch(args.private, args.state, run, args.notice, args.unbilled_alert_at)))
         return 0
     except (WatchError, OSError) as error:

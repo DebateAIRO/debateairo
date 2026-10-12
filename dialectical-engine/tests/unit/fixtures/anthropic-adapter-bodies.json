@@ -133,8 +133,8 @@
       "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":1.5,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"}}"
     },
     {
-      "name": "effort low",
-      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"low\"}}"
+      "name": "effort xhigh (off the reviewed menu, spec 2026-10-12 section 4.5)",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"xhigh\"}}"
     },
     {
       "name": "an output_config with a format",

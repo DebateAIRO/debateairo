@@ -183,7 +183,7 @@ describe("N11 a NETOPIA renewal charges the saved card (spec §2.9.2)", () => {
       orderId: charge.chargeId, amountMicros: 24_200_000, currency: "USD", payerIp: "198.51.100.7", language: "ro",
       notifyUrl: `${TEST_PUBLIC_APP_URL}/api/v1/billing/netopia/notify`,
       returnUrl: `${TEST_PUBLIC_APP_URL}/checkout/return?charge=${charge.chargeId}`,
-      description: "DebateAI Plus monthly plan",
+      description: "Dialectical Engine Plus monthly plan",
       payer: {
         firstName: "Ana", lastName: "Pop", email: run.email, phone: "+40712345678", country: "RO",
         region: "Cluj", city: "Cluj-Napoca", postalCode: "400001", street: "Strada Memorandumului 1"
@@ -273,7 +273,7 @@ describe("N11 a NETOPIA renewal charges the saved card (spec §2.9.2)", () => {
       const run = await due();
       const seedOrder = randomBytes(16).toString("hex");
       await real.startHostedPayment(Object.freeze({
-        orderId: seedOrder, amountMicros: 24_200_000, currency: "USD", description: "DebateAI Plus monthly plan",
+        orderId: seedOrder, amountMicros: 24_200_000, currency: "USD", description: "Dialectical Engine Plus monthly plan",
         payer: Object.freeze({
           firstName: "Ana", lastName: "Pop", email: run.email, phone: "+40712345678", country: "RO", region: "Cluj",
           city: "Cluj-Napoca", postalCode: "400001", street: "Strada Memorandumului 1"

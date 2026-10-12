@@ -5,7 +5,7 @@
   "legal.notice.title": "المعلومات القانونية",
   "legal.notice.meta": "من يدير {product}، وكيف تتواصل معنا",
   "legal.notice.s01.title": "من نحن",
-  "legal.notice.s01.body": "تُشغّل {company}، وهي شركة مسجلة في رومانيا، خدمة {product} (المعروفة أيضًا باسم {alsoCalled}).",
+  "legal.notice.s01.body": "تُشغّل {company}، وهي شركة مسجلة في رومانيا، خدمة {product}.",
   "legal.notice.s01.seller": "{company} هي أيضًا بائع الخطط المدفوعة: عقدك ومدفوعاتك وفواتيرك كلها مع {company}.",
   "legal.notice.company.name": "اسم الشركة",
   "legal.notice.company.tradingNames": "الأسماء التجارية",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "يتذكّر لغة الواجهة التي اخترتها.",
   "legal.cookies.locale.life": "1 سنة",
   "legal.cookies.storageTitle": "محفوظة في متصفحك، لا في ملف تعريف ارتباط",
-  "legal.cookies.storageIntro": "يُحفظ أربعة عناصر في مساحة تخزين متصفحك: اثنان في التخزين المحلي حتى تمسحهما، واثنان في تخزين الجلسة حتى تغلق علامة التبويب. وعلى خلاف ملفات تعريف الارتباط، لا تُرفق بطلباتك؛ ويحتفظ عنصر محادثة المساعدة بنسخة من محادثة أجريتها مع مساعدة DebateAI، وقد وصلت رسائلها إلى DebateAI عندما أرسلتها.",
+  "legal.cookies.storageIntro": "يُحفظ أربعة عناصر في مساحة تخزين متصفحك: اثنان في التخزين المحلي حتى تمسحهما، واثنان في تخزين الجلسة حتى تغلق علامة التبويب. وعلى خلاف ملفات تعريف الارتباط، لا تُرفق بطلباتك؛ ويحتفظ عنصر محادثة المساعدة بنسخة من محادثة أجريتها مع مساعدة Dialectical Engine، وقد وصلت رسائلها إلى Dialectical Engine عندما أرسلتها.",
   "legal.cookies.consent.kind": "التخزين المحلي",
   "legal.cookies.consent.purpose": "يتذكر أنك رأيت إشعار ملفات تعريف الارتباط، فلا يظهر إلا مرة واحدة.",
   "legal.cookies.consent.life": "حتى تمسحه",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "تخزين الجلسة",
   "legal.cookies.supportConversation.purpose": "يُبقي محادثتك مع المساعدة ظاهرة على الشاشة ما دامت علامة التبويب مفتوحة. وتُمحى عندما يسجّل أي شخص الدخول أو الخروج في علامة التبويب هذه.",
   "legal.cookies.supportConversation.life": "حتى تغلق علامة التبويب",
-  "legal.cookies.recipient.server": "خادم DebateAI فقط",
+  "legal.cookies.recipient.server": "خادم Dialectical Engine فقط",
   "legal.cookies.recipient.browser": "يبقى في متصفحك",
   "legal.cookies.refuse": "لرفضها، احظر ملفات تعريف الارتباط وبيانات الموقع لهذا الموقع أو احذفها من إعدادات متصفحك.",
   "legal.cookies.refuseEffect": "ما يتوقف عن العمل عندئذٍ: تسجيل الدخول، وتذكُّر لغتك وخيارات العرض لديك.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "حتى 30 دقيقة",
   "legal.cookies.mfaRecovery.life": "حتى 299 ثانية",
   "legal.cookies.social.life": "حتى 5 دقائق",
-  "legal.cookies.phoneDraft.life": "15 دقيقة أو حتى الحذف المبكر"
+  "legal.cookies.phoneDraft.life": "15 دقيقة أو حتى الحذف المبكر",
+  "legal.cookies.exportPending.purpose": "يحتفظ برابط التصدير المرسل بالبريد الإلكتروني في علامة التبويب هذه لتسجيل الدخول وإعادة المحاولة.",
+  "legal.cookies.exportLinkOutcome.purpose": "يتذكر رسالة رابط التنزيل التي تُعرض في علامة التبويب هذه.",
+  "legal.cookies.exportPending.life": "حتى إغلاق علامة التبويب أو تسجيل الخروج أو فتح رابط جديد أو أول تنزيل ناجح أو ظهور نتيجة رابط غير صالح أو حساب مختلف",
+  "legal.cookies.exportLinkOutcome.life": "حتى إغلاق علامة التبويب أو تسجيل الخروج أو فتح رابط جديد"
 }

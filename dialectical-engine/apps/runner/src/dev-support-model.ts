@@ -3,9 +3,10 @@ import {
   type DevelopmentAuthStackProfile
 } from "./dev-auth-stack-profile.js";
 
+/** The support chat's model, Claude Haiku 5.5, through the Claude CLI relay (V, 2026-10-12). */
 export const DEVELOPMENT_SUPPORT_MODEL_PROVIDER_REF =
-  "development:hermes-glm-5.3-flash" as const;
-export const DEVELOPMENT_SUPPORT_MODEL = "z-ai/glm-5.3-flash" as const;
+  "development:claude-haiku-5.5" as const;
+export const DEVELOPMENT_SUPPORT_MODEL = "claude-haiku-5-5" as const;
 export const DEVELOPMENT_SUPPORT_MODEL_BASE_URL = "http://127.0.0.1:8794/v1" as const;
 
 export type DevelopmentSupportModelTarget = Readonly<{

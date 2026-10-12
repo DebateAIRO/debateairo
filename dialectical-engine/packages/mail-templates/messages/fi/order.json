@@ -1,5 +1,5 @@
 {
-  "order.planDescription": "DebateAI {plan} -kuukausitilaus",
-  "order.cardCheck": "DebateAI-kortin tarkistus",
-  "invoice.line": "DebateAI {plan} -tilaus, {from}–{to}"
+  "order.planDescription": "Dialectical Engine {plan} -kuukausitilaus",
+  "order.cardCheck": "Dialectical Engine -kortin tarkistus",
+  "invoice.line": "Dialectical Engine {plan} -tilaus, {from}–{to}"
 }

@@ -48,7 +48,7 @@ export function confirmationPhraseMatches(typed: string, phrase: string, locale:
 }
 
 type ErasureStatus = Awaited<ReturnType<ContractClient["readAccountErasure"]>>;
-const DEBATEAI_BRAND = "DebateAI";
+const DEBATEAI_BRAND = "Dialectical Engine";
 /**
  * `getBillingSubscription` is optional: without it (or with billing off, a 404) the panel says nothing about a plan.
  * The default client has it.

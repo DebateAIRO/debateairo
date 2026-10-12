@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "您在 Dialectical Engine 的数据",
+  "archive.generated": "于 {time} 为 {pseudonym} 准备。",
+  "archive.accountHeading": "账户",
+  "archive.email": "电子邮箱",
+  "archive.memberSince": "注册时间",
+  "archive.debatesHeading": "您的辩论 ({count})",
+  "archive.question": "问题",
+  "archive.verdict": "结论",
+  "archive.verdictSupported": "受支持",
+  "archive.verdictContested": "有争议",
+  "archive.verdictUnsupported": "不受支持",
+  "archive.story": "辩论摘要",
+  "archive.arguments": "论点",
+  "archive.visibilityPublic": "已发布",
+  "archive.visibilityPrivate": "私密",
+  "archive.unreadable": "此辩论的密钥已销毁，因此内容无法再读取。",
+  "archive.noDebates": "您还没有辩论记录。",
+  "archive.filesNote": "此 ZIP 压缩包中的 JSON 文件以机器可读格式保存了相同的数据；文件列表见 README.txt。"
+}

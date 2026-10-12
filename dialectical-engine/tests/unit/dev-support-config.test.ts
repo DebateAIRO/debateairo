@@ -45,8 +45,8 @@ function publication(current: SupportConfigurationStatus) {
   }) satisfies Pick<RegisterPublicationPort,"readSupportStatus"|"publishSupport">;
 }
 
-describe("development Support Hermes configuration",() => {
-  it("initializes every required row with Support enabled and Hermes GLM selected",async () => {
+describe("development Support configuration (Claude Haiku 5.5)",() => {
+  it("initializes every required row with Support enabled and Claude Haiku 5.5 selected",async () => {
     const port = publication(null);
     await expect(initializeDevelopmentSupportConfiguration({
       publication: port,baseRegisterVersion: parseRegisterVersionText("4"),
@@ -57,7 +57,7 @@ describe("development Support Hermes configuration",() => {
     expect(input.patch).toHaveLength(16);
     expect(Object.fromEntries(input.patch.map((row) => [row.key,row.valueJsonText]))).toMatchObject({
       support_enabled: "true",
-      support_model_ref: '"development:hermes-glm-5.3-flash"'
+      support_model_ref: '"development:claude-haiku-5.5"'
     });
   });
 
@@ -77,7 +77,7 @@ describe("development Support Hermes configuration",() => {
     expect(JSON.stringify(input.patch)).not.toContain("support_daily_call_cap");
   });
 
-  it("is idempotent when the Hermes binding is already active",async () => {
+  it("is idempotent when the Claude Haiku 5.5 binding is already active",async () => {
     const port = publication(status());
     await expect(initializeDevelopmentSupportConfiguration({
       publication: port,baseRegisterVersion: parseRegisterVersionText("4"),

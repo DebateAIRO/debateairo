@@ -15,7 +15,7 @@ import type { PromptPacket } from "./index.js";
  * preview's root gate validates the very same shape strictly and forwards the
  * bytes it priced. So this file never adds a body member that is not listed
  * there: `model`, `max_tokens`, `messages`, optional `system`, and
- * `output_config: {"effort":"high"}` when the high thinking level is asked.
+ * `output_config: {"effort":<level>}` when a reviewed thinking level is asked.
  * Prompt caching (owner approval 2026-10-12): `system` is either the one string,
  * or, when the engine's framed system text carries its per-call marker tail,
  * exactly two text blocks with the one 5-minute cache mark on the first
@@ -39,19 +39,10 @@ export const ANTHROPIC_API_VERSION = "2023-06-01" as const;
 /** Appended to the target's base URL (`https://api.anthropic.com/v1`). */
 export const ANTHROPIC_MESSAGES_PATH = "/messages" as const;
 /**
- * The thinking levels this wire can carry, as `output_config.effort`. The
- * contract sends only "high"; any other level is refused before anything is
- * sent rather than run at a level nobody priced or reviewed.
+ * The thinking levels this wire can carry, as `output_config.effort` (spec 2026-10-12 §4.4: the reviewed Haiku menu).
+ * Claude Haiku 5.5 also has xhigh and max; they are not reviewed, so they are refused before anything is sent.
  */
-export const ANTHROPIC_EFFORT_LEVELS = Object.freeze(["high"] as const);
-/**
- * The discovery probe's default answer bound for this wire. Claude Haiku 5.5
- * thinks by default and its thinking counts against `max_tokens`, so the eight
- * tokens the OpenAI-compatible probe asks for could be spent before "OK" is
- * written. A caller that passes its own ceiling (the preview does) is unaffected.
- */
-const ANTHROPIC_PROBE_DEFAULT_MAX_TOKENS = 512;
-
+export const ANTHROPIC_EFFORT_LEVELS = Object.freeze(["low", "medium", "high"] as const);
 /**
  * The vendor declined to answer (`stop_reason: "refusal"`). Billed, not retried.
  * The same name the Gemini adapter uses for its safety blocks (lead, 2026-10-10).
@@ -377,7 +368,8 @@ export function readAnthropicMessagesReply(decoded: unknown): AnthropicMessagesR
  */
 export function anthropicMessagesProbeRequest(input: Readonly<{
   model: string;
-  maxTokens: number | undefined;
+  /** Always given: the probe owns its default room (provider-probe.ts), one number for both wires. */
+  maxTokens: number;
   thinkingLevel: string | undefined;
   credential: string | undefined;
   prompt: string;
@@ -388,20 +380,27 @@ export function anthropicMessagesProbeRequest(input: Readonly<{
     headers: anthropicMessagesRequestHeaders(input.credential),
     body: anthropicMessagesRequestBody({
       model: input.model,
-      maxTokens: input.maxTokens ?? ANTHROPIC_PROBE_DEFAULT_MAX_TOKENS,
+      maxTokens: input.maxTokens,
       thinkingLevel: input.thinkingLevel ?? THINKING_LEVEL_DEFAULT_ONLY,
       messages: [{ role: "user", content: input.prompt }]
     })
   });
 }
 
-/** The probe's reading of a reply: the echoed model and the answer text, or null when unusable. */
-export function anthropicMessagesProbeAnswer(decoded: unknown): Readonly<{ model: unknown; text: string }> | null {
+/**
+ * The probe's reading of a reply: the echoed model, the answer text, how it ended ("length" when cut off at
+ * max_tokens) and whether the model declined; null when the reply is not a message this wire can use. Probe failure
+ * reasons (2026-10-12): the probe records which of these ended it (provider-probe.ts).
+ */
+export function anthropicMessagesProbeAnswer(decoded: unknown): Readonly<{
+  model: unknown; text: string; finishReason: string | null; refused: boolean;
+}> | null {
   const reply = readAnthropicMessagesReply(decoded);
-  if (reply.failure !== null || !isRecord(reply.normalized)) return null;
+  if (!isRecord(reply.normalized)) return null;
+  const refused = reply.failure?.code === PROVIDER_CONTENT_REFUSED;
+  if (reply.failure !== null && !refused) return null;
   const choices = reply.normalized.choices;
   if (!Array.isArray(choices) || choices.length !== 1) return null;
   const choice = choices[0] as Readonly<{ message: { content: string }; finish_reason: string | null }>;
-  if (choice.finish_reason === "length") return null;
-  return Object.freeze({ model: reply.normalized.model, text: choice.message.content });
+  return Object.freeze({ model: reply.normalized.model, text: choice.message.content, finishReason: choice.finish_reason, refused });
 }

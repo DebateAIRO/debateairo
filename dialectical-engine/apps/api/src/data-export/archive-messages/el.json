@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Τα δεδομένα σας στο Dialectical Engine",
+  "archive.generated": "Ετοιμάστηκε στις {time} για τον/την {pseudonym}.",
+  "archive.accountHeading": "Λογαριασμός",
+  "archive.email": "Διεύθυνση email",
+  "archive.memberSince": "Μέλος από",
+  "archive.debatesHeading": "Οι αντιπαραθέσεις σας ({count})",
+  "archive.question": "Ερώτηση",
+  "archive.verdict": "Κρίση",
+  "archive.verdictSupported": "Υποστηρίζεται",
+  "archive.verdictContested": "Αμφισβητούμενο",
+  "archive.verdictUnsupported": "Δεν υποστηρίζεται",
+  "archive.story": "Η αντιπαράθεση με λίγα λόγια",
+  "archive.arguments": "Επιχειρήματα",
+  "archive.visibilityPublic": "Δημοσιευμένη",
+  "archive.visibilityPrivate": "Ιδιωτική",
+  "archive.unreadable": "Το περιεχόμενο αυτής της αντιπαράθεσης δεν μπορεί πλέον να διαβαστεί, επειδή το κλειδί της καταστράφηκε.",
+  "archive.noDebates": "Δεν έχετε αντιπαραθέσεις.",
+  "archive.filesNote": "Τα αρχεία JSON σε αυτό το αρχείο ZIP περιέχουν τα ίδια δεδομένα σε μηχαναγνώσιμη μορφή· το README.txt τα απαριθμεί."
+}

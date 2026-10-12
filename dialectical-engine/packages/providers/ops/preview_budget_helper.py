@@ -9,7 +9,7 @@ No retries, external packages, environment proxies, redirects, or credential art
 A provider profile is everything the gate knows about one vendor: its host and path, its auth
 header, the exact request shape it forwards (and the bytes it sends), how a reply's usage is
 priced, where a reply names its model, extra key shapes to blank, and its reviewed model rows
-(prices, output bound, effort, JSON mode, sampling). The GO names one profile (`provider`) and the rows it
+(prices, output bound, thinking-level menu, JSON mode, sampling). The GO names one profile (`provider`) and the rows it
 enables; the GO binds this file's hash, so it binds every profile and every row too. A price
 change is a reviewed code change here (plus the app's parity fixture), never a GO edit. Adding a
 vendor means adding one profile class to PROFILES; the gate's core does not change.
@@ -30,7 +30,7 @@ from decimal import Decimal, InvalidOperation
 from email.utils import parsedate_to_datetime
 
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
-MAX_TIMEOUT_SECONDS = 600
+MAX_TIMEOUT_SECONDS = 1200  # The gate's CALL_DEADLINE_SECONDS (owner ruling 2026-10-12: 20 minutes, was 600).
 CONNECT_TIMEOUT_SECONDS = 15  # TCP connect + TLS handshake; a black-holed address fails (unsent) fast.
 
 
@@ -376,12 +376,14 @@ def names_any_key(value, names):
 
 # One reviewed model of a profile. Prices are the vendor's LIST prices in USD per million tokens
 # (the careful side while a vendor runs a promotion); the gate reserves and settles with them.
-# output_bound is both the max_tokens ceiling and what a call reserves for output. effort is
-# 'high' (the request must carry the profile's effort field with exactly that value) or None (the
-# request must not carry it at all). json_object says whether JSON mode may be asked for. sampling
+# output_bound is both the max_tokens ceiling and what a call reserves for output. efforts (spec 2026-10-12
+# section 4.1) is the reviewed thinking-level menu: a non-empty tuple of distinct words from the profile's
+# effort_words, where None means the request carries no effort member at all (the vendor's default); a request's
+# level must be on it. Its first element is the level the app sends by default (today's request), and the one the
+# probe sends. A menu change is a reviewed row change. json_object says whether JSON mode may be asked for. sampling
 # (reviewed 2026-10-12) is None (the request must carry none of the profile's sampling_keys) or a tuple
 # of (name, number) pairs: the request must carry exactly those members with exactly those values.
-ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound effort json_object sampling',
+ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound efforts json_object sampling',
                       defaults=(None,))
 
 
@@ -453,21 +455,30 @@ class DeepInfraProfile:
     key_pattern = r'(?!sk-ant-|AIza)[!-~]{16,512}'
     # Reviewed sampling (2026-10-12): the members a row may set, in the order the app's body carries them.
     sampling_keys = ('temperature', 'top_p', 'top_k')
+    # Spec 2026-10-12 section 4.1: the words a row's menu may hold. None is no reasoning_effort member at all (the
+    # vendor's default); 'none' asks DeepInfra to switch thinking off.
+    effort_words = (None, 'none', 'low', 'medium', 'high')
     rows = {row.model: row for row in (
-        ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 32768, 'high', True),
-        ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 32768, 'high', False),
+        # Thinking levels (spec 2026-10-12 section 2): Z.AI documents low, high and max only; thinking cannot be off.
+        ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 32768, ('high', 'low'), True),
+        # Thinking levels: DeepSeek documents none, low, high and max ('medium' is treated as high).
+        ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 32768,
+                 ('high', 'low', 'none'), False),
         # Owner approval 2026-10-12: MiMo closed Romanian quotation marks with a straight double quote inside its JSON
         # in a live practice run. Its DeepInfra page recommends temperature 1.0 and top_p 0.95: every request carries
         # exactly those two (no top_k). JSON mode was tried the same day and withdrawn: DeepInfra's JSON constraint
         # turned that slip into garbage, which the app's reader repairs when JSON mode is off.
-        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 32768, None, False,
+        # Thinking levels: Xiaomi documents thinking on or off only, no levels.
+        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 32768, (None, 'none'), False,
                  (('temperature', 1.0), ('top_p', 0.95))),
         # Owner swap 2026-10-10 (Qwen in place of Gemini): flat list price over the whole 1M window,
         # no promotion, no tiers; reasoning_effort is not listed, so none is sent.
         # Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid
         # mid-answer into random multilingual tokens (a live practice run, 2 of its first 4 calls). It thinks by
         # default, so it runs at its makers' thinking-mode settings.
-        ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 32768, None, False,
+        # Thinking levels: Alibaba documents low, medium and xhigh (its default); 'high' is not a Qwen value.
+        ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 32768,
+                 (None, 'low', 'medium', 'none'), False,
                  (('temperature', 0.6), ('top_p', 0.95), ('top_k', 20))))}
 
     def path_for(self, row):
@@ -488,13 +499,15 @@ class DeepInfraProfile:
         return body.get('model') if isinstance(body, dict) else None
 
     def body_valid(self, body, row):
-        """Exactly model, max_tokens and messages; reasoning_effort "high" iff the row says so; the
-        row's reviewed sampling members with exactly its numbers iff it has one (none of them
-        otherwise); an optional response_format {"type": "json_object"} only for a row that allows it."""
+        """Exactly model, max_tokens and messages; a reasoning_effort word on the row's menu, or none where the menu
+        holds None (spec 2026-10-12 section 4.5); the row's reviewed sampling members with exactly its numbers iff it
+        has one (none of them otherwise); an optional response_format {"type": "json_object"} only for a row that
+        allows it."""
         if not isinstance(body, dict) or body.get('model') != row.model:
             return False
         sampling = dict(row.sampling or ())
-        fields = {'model', 'max_tokens', 'messages'} | ({'reasoning_effort'} if row.effort else set()) | set(sampling)
+        effort_member = 'reasoning_effort' in body
+        fields = {'model', 'max_tokens', 'messages'} | ({'reasoning_effort'} if effort_member else set()) | set(sampling)
         extra = set(body) - fields
         if not fields <= set(body) or extra - {'response_format'}:
             return False
@@ -502,7 +515,11 @@ class DeepInfraProfile:
             mode = body['response_format']
             if not row.json_object or not (isinstance(mode, dict) and set(mode) == {'type'} and mode['type'] == 'json_object'):
                 return False
-        if row.effort and body['reasoning_effort'] != row.effort:
+        # Spec 2026-10-12 section 4.5: the level is on the row's reviewed menu; no member only where the menu holds None.
+        if effort_member:
+            if not (isinstance(body['reasoning_effort'], str) and body['reasoning_effort'] in row.efforts):
+                return False
+        elif None not in row.efforts:
             return False
         # The same number exactly (20 and 20.0 are one JSON number to the app too); never a bool, text or null.
         if any(type(body[name]) not in (int, float) or body[name] != value for name, value in sampling.items()):
@@ -511,6 +528,11 @@ class DeepInfraProfile:
                 and isinstance(body['messages'], list) and bool(body['messages'])
                 and all(isinstance(m, dict) and set(m) == {'role', 'content'} and m['role'] in ('system', 'user', 'assistant')
                         and isinstance(m['content'], str) for m in body['messages']))
+
+    def body_effort(self, body):
+        """The level a body carries (spec 2026-10-12 section 4.5): its reasoning_effort, or None for no member."""
+        value = body.get('reasoning_effort') if isinstance(body, dict) else None
+        return value if isinstance(value, str) else None
 
     def request_bytes(self, body):
         """The exact bytes sent upstream for a body that passed body_valid."""
@@ -541,8 +563,8 @@ class DeepInfraProfile:
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
                 'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}]}
-        if row.effort:
-            body['reasoning_effort'] = row.effort
+        if row.efforts[0] is not None:  # Spec 2026-10-12 section 4.5: the row's default level, as the app sends it.
+            body['reasoning_effort'] = row.efforts[0]
         body.update(row.sampling or ())  # The probe asks as the app's calls do: the row's own sampling, if any.
         return body
 
@@ -701,9 +723,13 @@ class AnthropicProfile:
     # (sk-ant-admin...) or any other Anthropic credential is refused (platform.claude.com, Admin API
     # and Authentication pages, read 2026-10-10).
     key_pattern = r'sk-ant-api[0-9]{2}-[A-Za-z0-9_-]+'
+    # Spec 2026-10-12 section 4.1: the words a row's menu may hold, each sent as output_config {"effort": word}.
+    # No None: an Anthropic row always carries its level (Haiku 5.5's own default is medium, not today's high).
+    effort_words = ('low', 'medium', 'high')
     rows = {row.model: row for row in (
         # The row holds the lower step's prices (the estimate's and a small call's); see reservation_prices.
-        ModelRow('claude-haiku-5-5', 'Anthropic', Decimal('0.10'), Decimal('0.50'), 32768, 'high', False),)}
+        # Thinking levels (spec 2026-10-12 section 2): Anthropic documents low, medium, high, xhigh and max for Haiku 5.5.
+        ModelRow('claude-haiku-5-5', 'Anthropic', Decimal('0.10'), Decimal('0.50'), 32768, ('high', 'medium', 'low'), False),)}
     settlement_steps = (
         PriceStep('up_to_100k', 100000, Decimal('0.10'), Decimal('0.125'), Decimal('0.20'), Decimal('0.01'), Decimal('0.50')),
         PriceStep('over_100k', None, Decimal('0.50'), Decimal('0.625'), Decimal('1.00'), Decimal('0.05'), Decimal('2.50')))
@@ -767,23 +793,27 @@ class AnthropicProfile:
 
     def body_valid(self, body, row):
         """Exactly model, max_tokens and messages, an optional system (system_valid: a string, or the two
-        blocks that carry the one cache mark), and output_config {"effort": "high"} iff the row says so
-        (then required). Nothing else anywhere (contract-BC-wire, Anthropic). It mirrors what the app's
+        blocks that carry the one cache mark), and output_config exactly {"effort": <a word on the row's menu>}
+        (spec 2026-10-12 section 4.5; absent only where the menu holds None, which no Anthropic row does). Nothing else anywhere (contract-BC-wire, Anthropic). It mirrors what the app's
         adapter (anthropic-messages.ts) can send, no more: text content that is not only whitespace
         (JavaScript's trim set), roles alternating user/assistant starting AND ending with a user turn
         (the adapter joins same-role turns and refuses a final assistant turn), and a system whose text is
         not only whitespace when present."""
         if not isinstance(body, dict) or body.get('model') != row.model:
             return False
-        required = {'model', 'max_tokens', 'messages'} | ({'output_config'} if row.effort else set())
+        effort_member = 'output_config' in body
+        required = {'model', 'max_tokens', 'messages'} | ({'output_config'} if effort_member else set())
         allowed = required | {'system'}
         if not required <= set(body) <= allowed:
             return False
-        if row.effort:
+        # Spec 2026-10-12 section 4.5: the level is on the row's reviewed menu; no member only where the menu holds None.
+        if effort_member:
             config = body['output_config']
             if not (isinstance(config, dict) and set(config) == {'effort'} and isinstance(config['effort'], str)
-                    and config['effort'] == row.effort):
+                    and config['effort'] in row.efforts):
                 return False
+        elif None not in row.efforts:
+            return False
         if 'system' in body and not self.system_valid(body['system']):
             return False
         messages = body['messages']
@@ -793,6 +823,12 @@ class AnthropicProfile:
                         and m['role'] == ('user' if index % 2 == 0 else 'assistant')
                         and isinstance(m['content'], str) and m['content'].strip(JS_WHITESPACE)
                         for index, m in enumerate(messages)))
+
+    def body_effort(self, body):
+        """The level a body carries (spec 2026-10-12 section 4.5): output_config's effort, or None for no member."""
+        config = body.get('output_config') if isinstance(body, dict) else None
+        value = config.get('effort') if isinstance(config, dict) else None
+        return value if isinstance(value, str) else None
 
     def request_bytes(self, body):
         return canonical(body)
@@ -945,8 +981,8 @@ class AnthropicProfile:
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
                 'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}]}
-        if row.effort:
-            body['output_config'] = {'effort': row.effort}
+        if row.efforts[0] is not None:  # Spec 2026-10-12 section 4.5: the row's default level, as the app sends it.
+            body['output_config'] = {'effort': row.efforts[0]}
         return body
 
     def reply_text(self, response):

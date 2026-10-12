@@ -30,13 +30,15 @@ export type GateRequest = Readonly<{ provider: GateProvider; model: string; kind
  * off (COOLING, 409 MODEL_COOLING with retry_after: gate v4, nothing reserved, the vendor not contacted), a halted gate
  * (STOPPED, 409 PREVIEW_TEST_AUTHORITY_STOPPED; or HALTED, gate v4's 409 AUTHORITY_HALTED), a vendor error the gate
  * released unbilled and not as "busy" (ERROR_UNBILLED, 409 PROVIDER_ERROR_UNBILLED, review 2026-10-12), a
- * billed vendor error (BILLED_500 for a refused model; VENDOR_ERROR for a scenario's vendor status), or a request no
- * contract answers (UNEXPECTED, a billed vendor 500 too). Only OK, UNBILLED, BILLED_500, VENDOR_ERROR and UNEXPECTED
- * stand for a request that reached the vendor.
+ * billed vendor error (BILLED_500 for a refused model; VENDOR_ERROR for a scenario's vendor status), a sent call whose
+ * vendor connection then failed or timed out, which the gate booked at its whole reservation and stayed active
+ * (BOOKED_MAX, 409 PROVIDER_CHARGE_BOOKED_MAX: slow answer, owner ruling 2026-10-12), or a request no contract answers
+ * (UNEXPECTED, a billed vendor 500 too). Only OK, UNBILLED, ERROR_UNBILLED, BILLED_500, VENDOR_ERROR, BOOKED_MAX and
+ * UNEXPECTED stand for a request that reached the vendor.
  */
-export type GateAnswer = "OK" | "UNBILLED" | "ERROR_UNBILLED" | "GATE_REFUSED" | "COOLING" | "STOPPED" | "HALTED" | "BILLED_500" | "VENDOR_ERROR" | "UNEXPECTED";
+export type GateAnswer = "OK" | "UNBILLED" | "ERROR_UNBILLED" | "GATE_REFUSED" | "COOLING" | "STOPPED" | "HALTED" | "BILLED_500" | "VENDOR_ERROR" | "BOOKED_MAX" | "UNEXPECTED";
 /** The answers that stand for a request the vendor received (the rest were refused by the gate itself). */
-export const GATE_ANSWERS_REACHING_VENDOR: ReadonlySet<GateAnswer> = new Set<GateAnswer>(["OK", "UNBILLED", "ERROR_UNBILLED", "BILLED_500", "VENDOR_ERROR", "UNEXPECTED"]);
+export const GATE_ANSWERS_REACHING_VENDOR: ReadonlySet<GateAnswer> = new Set<GateAnswer>(["OK", "UNBILLED", "ERROR_UNBILLED", "BILLED_500", "VENDOR_ERROR", "BOOKED_MAX", "UNEXPECTED"]);
 /** The retry_after a stand-in cool-off names: the real gate's first window (COOL_OFF_FIRST_SECONDS). */
 export const STUB_COOL_OFF_RETRY_AFTER_SECONDS = 60;
 /** A recorded /complete request: the request and how it was answered, in arrival order. */
@@ -87,7 +89,12 @@ export type GateOverride = Readonly<{ content: string }> | Readonly<{ unbilled: 
    * The gate's STOPPED refusal for this one call while the gate itself stays active (its /remaining says so): the runner
    * reads it as the run's money ceiling, a spend stop (parallel calls, Task 11 fix round 1).
    */
-  | Readonly<{ gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" }>;
+  | Readonly<{ gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" }>
+  /**
+   * Slow answer (owner ruling 2026-10-12): the call was sent, then its vendor connection failed or ran past the gate's
+   * 1,200 s; the gate booked its whole reservation as its charge and stays active (409 PROVIDER_CHARGE_BOOKED_MAX).
+   */
+  | Readonly<{ gateRefuses: "PROVIDER_CHARGE_BOOKED_MAX" }>;
 
 /* ------------------------------------------------------------------ the doubles' answers */
 
@@ -379,6 +386,7 @@ export async function startPreviewGateStubs(input: Readonly<{
             if (override.gateRefuses === "AUTHORITY_HALTED") { record("HALTED"); refuse("AUTHORITY_HALTED"); return; }
             if (override.gateRefuses === "PROVIDER_ERROR_UNBILLED") { record("ERROR_UNBILLED"); refuse("PROVIDER_ERROR_UNBILLED"); return; }
             if (override.gateRefuses === "PREVIEW_TEST_AUTHORITY_STOPPED") { record("STOPPED"); refuse("PREVIEW_TEST_AUTHORITY_STOPPED"); return; }
+            if (override.gateRefuses === "PROVIDER_CHARGE_BOOKED_MAX") { record("BOOKED_MAX"); refuse("PROVIDER_CHARGE_BOOKED_MAX"); return; }
             record("GATE_REFUSED"); refuse(override.gateRefuses); return;
           }
           if ("vendorStatus" in override) {

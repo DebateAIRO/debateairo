@@ -330,7 +330,7 @@ class PhaseTests(GateTest):
             'open_until_utc': '2026-10-15T09:00:00+00:00', 'window_open': True,
             'today': '2026-10-08', 'daily_budget_usd': '5.00', 'today_spend_usd': '0.01',
             'remaining_today_usd': '4.99', 'today_posts': 1, 'max_paid_posts_per_day': 500, 'in_flight': 0,
-            'today_unbilled_releases': 0, 'cooling': {},
+            'today_unbilled_releases': 0, 'cooling': {}, 'today_booked_max': 0, 'today_booked_max_usd': '0',
             'today_uncertain': 0, 'halts': [], 'halts_dropped': 0})
 
     def test_status_of_uninitialized_directory_refuses_without_creating_files(self):
@@ -539,7 +539,7 @@ class DailyPotTests(GateTest):
         for leaked in (KEY, 'synthetic answer text', 'Offline synthetic test'):
             self.assertNotIn(leaked, log)
 
-    def test_default_transport_gets_the_remaining_six_hundred_second_deadline(self):
+    def test_default_transport_gets_the_remaining_twelve_hundred_second_deadline(self):
         gate = self.gate().ready()
         seen = []
 
@@ -555,7 +555,7 @@ class DailyPotTests(GateTest):
                                    slots=gate.slots, key_loader=lambda _: KEY, host=HOST, platform='linux',
                                    now=gate.clock)
         self.assertEqual(len(seen), 1)
-        self.assertTrue(590 < seen[0] <= 600, seen)
+        self.assertTrue(1190 < seen[0] <= 1200, seen)  # Owner ruling 2026-10-12: 20 minutes for a slow model.
 
     def test_upstream_timeout_is_what_remains_after_the_reservation_lock_wait(self):
         gate = self.gate().ready()
@@ -579,14 +579,17 @@ class DailyPotTests(GateTest):
                                    now=gate.clock)
         self.assertEqual(seen, [bridge.CALL_DEADLINE_SECONDS - bridge.LOCK_TIMEOUT_SECONDS])
 
-    def test_worst_case_call_fits_inside_the_callers_630_second_timeout(self):
+    def test_worst_case_call_answers_inside_the_apps_1260_second_deadline(self):
         # From acceptance: slot wait + reservation lock + upstream share CALL_DEADLINE_SECONDS. After the
         # upstream deadline: a settlement lock wait, a fallback halt lock wait, the state writes and the reply.
-        caller_timeout = 630  # preview-test.ts: PREVIEW_GLM_DEADLINE_MS + 30_000
+        # Owner ruling 2026-10-12: the gate (1,200 s), not the app (1,260 s), decides a slow call.
+        app_deadline = 1260  # preview-test.ts: PREVIEW_GLM_DEADLINE_MS
+        caller_timeout = 1290  # preview-test.ts: PREVIEW_GLM_DEADLINE_MS + 30_000 (the IPC request timeout)
         writes_and_reply = 5
+        self.assertEqual(bridge.CALL_DEADLINE_SECONDS, 1200)
         self.assertEqual(bridge.REPLY_TIMEOUT_SECONDS, caller_timeout)
         self.assertLessEqual(bridge.CALL_DEADLINE_SECONDS + 2 * bridge.LOCK_TIMEOUT_SECONDS + writes_and_reply,
-                             caller_timeout)
+                             app_deadline)
         self.assertGreaterEqual(bridge.CALL_DEADLINE_SECONDS - bridge.SLOT_WAIT_SECONDS - bridge.LOCK_TIMEOUT_SECONDS, 500)
         self.assertLessEqual(bridge.CALL_DEADLINE_SECONDS, bridge.helper.MAX_TIMEOUT_SECONDS)
 
@@ -689,11 +692,13 @@ class HaltTests(GateTest):
         self.assertEqual(dispatched, [])
         return entry
 
-    def test_transport_failure_after_dispatch_holds_full_reservation_and_halts(self):
+    def test_a_fault_in_the_transport_after_dispatch_holds_full_reservation_and_halts(self):
+        # A connection failure after the send is booked at the reservation instead (BookedAtReservationTests);
+        # any other failure while sending stays uncertain and halts.
         gate = self.gate().ready()
 
         def broken(_body, _key):
-            raise OSError('synthetic transport failure ' + KEY)
+            raise RuntimeError('synthetic transport failure ' + KEY)
         with self.refused('NEW_CHARGE_UNCERTAIN'):
             gate.call('op-1', dispatch=broken)
         entry = self.assert_halted(gate, 'uncertain_charge', 'uncertain')
@@ -762,7 +767,7 @@ class HaltTests(GateTest):
         gate = self.gate().ready()
 
         def broken(_body, _key):
-            raise OSError('synthetic')
+            raise RuntimeError('synthetic')
         with self.refused('NEW_CHARGE_UNCERTAIN'):
             gate.call('op-1', dispatch=broken)
         gate.clock.set('2026-10-08T09:05:00+00:00')
@@ -794,7 +799,7 @@ class HaltTests(GateTest):
         gate = self.gate(daily_budget_usd='0.06', max_concurrent_calls=1).ready()
 
         def broken(_body, _key):
-            raise TimeoutError('deadline')
+            raise RuntimeError('synthetic')  # Not a connection failure: uncertain (a timeout is booked instead).
         for operation_id in ('op-1', 'op-1b', 'op-1c'):  # Three full uncertain holds: a fourth is over 0.06.
             with self.refused('NEW_CHARGE_UNCERTAIN'):
                 gate.call(operation_id, dispatch=broken)
@@ -895,8 +900,11 @@ class CrashRecoveryTests(GateTest):
 
     def test_death_between_any_two_settlement_writes_still_halts_after_restart(self):
         def transport_failure():
-            raise OSError('synthetic')
+            raise RuntimeError('synthetic')  # Uncertain (a connection failure would be booked instead).
+        def timed_out():
+            raise TimeoutError('deadline')
         outcomes = {'uncertain': (transport_failure, 3),
+                    'booked_at_reservation': (timed_out, 2),  # No halt write: the ledger, then in flight.
                     'overrun': (lambda: (200, provider_response(str(RESERVED + Decimal('0.01')))), 3),
                     'non_200': (lambda: (500, provider_response('0.01')), 3),
                     'settled_reply_lost': (lambda: (200, provider_response('0.01')), 2)}
@@ -908,7 +916,8 @@ class CrashRecoveryTests(GateTest):
                     self.restart(gate)
                     status = gate.status()
                     self.assertEqual((status['state'], status['in_flight']), ('halted', 0))
-                    self.assertIn(gate.day('2026-10-08')['entries'][self.ENTRY]['state'], ('uncertain', 'settled'))
+                    self.assertIn(gate.day('2026-10-08')['entries'][self.ENTRY]['state'],
+                                  ('uncertain', 'settled', 'settled_reserved_max'))
                     self.assertIn(self.ENTRY, [event.get('entry_id') for event in status['halts']])
 
     def test_leftover_in_flight_entry_halts_at_serve_start_whatever_its_state(self):
@@ -935,7 +944,7 @@ class CrashRecoveryTests(GateTest):
         gate = self.gate().ready()
 
         def broken(_body, _key):
-            raise OSError('synthetic')
+            raise RuntimeError('synthetic')
         with self.refused('NEW_CHARGE_UNCERTAIN'):
             gate.call('op-1', dispatch=broken)
         control_path = gate.private / 'team-control.json'
@@ -1095,7 +1104,7 @@ class ConcurrencyTests(GateTest):
             self.assertTrue(entered.wait(3))
 
             def broken(_body, _key):
-                raise ConnectionResetError('synthetic')
+                raise RuntimeError('synthetic')
             with self.refused('NEW_CHARGE_UNCERTAIN'):
                 gate.call('op-2', dispatch=broken)
             with self.refused('AUTHORITY_HALTED'):
@@ -1819,6 +1828,172 @@ class SocketServerTests(GateTest):
         self.assertEqual((bridge.IPC_READ_TIMEOUT_SECONDS, bridge.UnixThreadingServer.max_connections), (10, 32))
         handler = bridge.make_handler(Path('/nonexistent'), [PEER], None, bridge.CallSlots(1))
         self.assertEqual(handler.timeout, 10)
+
+
+class BookedAtReservationTests(GateTest):
+    """Owner ruling 2026-10-12 ("Book max cost, keep going"): when the vendor connection fails or times
+    out AFTER the request was sent, the call's own reservation (its input bytes and max_tokens at the
+    reserve prices) bounds what the vendor can bill. The gate books exactly that amount as the call's
+    charge (state settled_reserved_max), stays active, journals it, and the halt watcher emails the
+    owner. Everything genuinely anomalous still halts as before."""
+    ENTRY = 'preview-test:' + SCOPE + ':op-1'
+    exchange = IpcTests.exchange
+
+    def refused(self, code):
+        return self.assertRaisesRegex(SafetyError, '^' + code + '$')
+
+    @staticmethod
+    def timed_out(_body, _key):
+        raise TimeoutError('deadline')
+
+    def assert_booked(self, gate, error_class='TimeoutError'):
+        entry = gate.day('2026-10-08')['entries'][self.ENTRY]
+        self.assertEqual((entry['state'], entry['reason'], entry['error_class']),
+                         ('settled_reserved_max', 'transport_failure', error_class))
+        self.assertEqual((Decimal(entry['held_usd']), Decimal(entry['reserved_usd'])), (RESERVED, RESERVED))
+        self.assertIn('elapsed_seconds', entry)
+        self.assertIn('reconciled_at', entry)
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason'], status['in_flight'], status['halts']), ('active', None, 0, []))
+        self.assertEqual((status['today_booked_max'], Decimal(status['today_booked_max_usd'])), (1, RESERVED))
+        self.assertEqual(status['today_uncertain'], 0)
+        return entry
+
+    def test_a_timeout_after_send_is_booked_at_the_reservation_and_the_gate_stays_active(self):
+        gate = self.gate().ready()
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+            gate.call('op-1', dispatch=self.timed_out)
+        self.assert_booked(gate)
+        self.assertEqual(gate.call('op-2')['status'], 200)  # Every model keeps working.
+        logged = [json.loads(line) for line in self.out.getvalue().splitlines() if line.startswith('{')]
+        booked = [line for line in logged if line.get('status') == 'settled_reserved_max']
+        self.assertEqual(len(booked), 1)
+        self.assertEqual((booked[0]['event'], booked[0]['model'], booked[0]['alert'], booked[0]['authority']),
+                         ('preview_provider_paid_post', MODEL, 'charge_booked_at_reservation', 'active'))
+        self.assertEqual(Decimal(booked[0]['booked_usd']), RESERVED)
+
+    def test_every_connection_failure_after_send_is_booked(self):
+        import http.client
+        import ssl
+        for error in (OSError('reset'), ConnectionResetError('reset'), BrokenPipeError('pipe'),
+                      http.client.RemoteDisconnected('closed'), http.client.IncompleteRead(b'partial'),
+                      ssl.SSLError('bad record'), TimeoutError('read timed out')):
+            with self.subTest(error=type(error).__name__):
+                gate = self.gate().ready()
+
+                def broken(_body, _key, e=error):
+                    raise e
+                with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                    gate.call('op-1', dispatch=broken)
+                self.assert_booked(gate, type(error).__name__)
+
+    def test_anything_else_after_the_reservation_still_halts_as_before(self):
+        cases = {'bug_in_transport': RuntimeError('synthetic'), 'reply_too_large': bridge.helper.ResponseTooLarge('response_too_large'),
+                 'transport_refusal': SafetyError('request_bytes_required'), 'value': ValueError('synthetic')}
+        for name, error in cases.items():
+            with self.subTest(name):
+                gate = self.gate().ready()
+
+                def broken(_body, _key, e=error):
+                    raise e
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    gate.call('op-1', dispatch=broken)
+                status = gate.status()
+                self.assertEqual((status['state'], status['reason'], status['today_booked_max']), ('halted', 'uncertain_charge', 0))
+                self.assertEqual(gate.day('2026-10-08')['entries'][self.ENTRY]['state'], 'uncertain')
+
+    def test_a_reply_that_cannot_be_bounded_or_overruns_still_halts(self):
+        gate = self.gate().ready()
+        with self.refused('NEW_CHARGE_UNCERTAIN'):
+            gate.call('op-1', charge=None)  # A reply without usage.
+        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'uncertain_charge'))
+        gate = self.gate().ready()
+        with self.refused('SETTLED_INTO_HALT'):
+            gate.call('op-1', charge=str(RESERVED + Decimal('0.000000001')))
+        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'charge_overrun'))
+        gate = self.gate().ready()
+        with self.refused('SETTLED_INTO_HALT'):
+            gate.call('op-1', charge='0.01', model='other/model')
+        self.assertEqual(gate.status()['reason'], 'provider_error_or_model_identity')
+
+    def test_the_booked_amount_counts_toward_the_day_and_the_pot_still_holds(self):
+        gate = self.gate(daily_budget_usd='0.06', max_concurrent_calls=1).ready()
+        for operation_id in ('op-1', 'op-1b', 'op-1c'):  # Three booked holds (about $0.0167 each); a fourth is over $0.06.
+            with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                gate.call(operation_id, dispatch=self.timed_out)
+        status = gate.status()
+        self.assertEqual((status['state'], status['today_posts'], status['today_booked_max']), ('active', 3, 3))
+        self.assertEqual(Decimal(status['today_spend_usd']), 3 * RESERVED)
+        self.assertEqual(Decimal(status['remaining_today_usd']), Decimal('0.06') - 3 * RESERVED)
+        self.assertEqual(status['today_by_model'], {MODEL: {'spend_usd': format(3 * RESERVED, 'f'), 'posts': 3}})
+        _scope, _uids, remaining = bridge.remaining_snapshot(gate.private, gate.go_path, now=gate.clock)
+        self.assertEqual(Decimal(remaining['remaining_usd']), Decimal('0.06') - 3 * RESERVED)
+        self.assertEqual(remaining['remaining_calls'], 500 - 3)
+        with self.refused('TEAM_DAILY_BUDGET_REACHED'):
+            gate.call('op-2')
+        gate.clock.set('2026-10-08T21:00:00+00:00')  # The next Bucharest day has its own pot.
+        self.assertEqual(gate.call('op-2')['status'], 200)
+        gate = self.gate(max_paid_posts_per_day=1).ready()
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+            gate.call('op-1', dispatch=self.timed_out)
+        with self.refused('DAILY_CALL_LIMIT_REACHED'):  # A booked call is a paid post.
+            gate.call('op-2')
+
+    def test_a_booking_neither_grows_nor_resets_the_unsent_streak_and_never_cools_the_model(self):
+        gate = self.gate().ready()
+
+        def unreached(_body, _key):
+            raise bridge.helper.RequestNotSent('request_not_sent')
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call('op-0', dispatch=unreached)
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+            gate.call('op-1', dispatch=self.timed_out)
+        control = gate.control()
+        self.assertEqual((control['unsent_streak'], control.get('cooling', {})), (1, {}))
+
+    def test_the_ipc_reply_is_the_public_code_and_nothing_halts(self):
+        gate = self.gate().ready()
+        line, payload = self.exchange(gate, lambda _client: self.timed_out)
+        self.assertIn(b' 409 ', line)
+        self.assertEqual(json.loads(payload), {'error': 'PROVIDER_CHARGE_BOOKED_MAX'})
+        self.assert_booked(gate)
+        self.assertIn('PROVIDER_CHARGE_BOOKED_MAX', bridge.PUBLIC_REFUSALS)
+
+    def test_a_booked_entry_must_hold_exactly_its_reservation(self):
+        gate = self.gate().ready()
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+            gate.call('op-1', dispatch=self.timed_out)
+        path = gate.private / 'team-ledger-2026-10-08.json'
+        for held in (str(RESERVED - Decimal('0.000000001')), str(RESERVED + Decimal('0.000000001')), '0'):
+            with self.subTest(held=held):
+                ledger = json.loads(path.read_text())
+                ledger['entries'][self.ENTRY]['held_usd'] = held
+                with self.assertRaisesRegex(SafetyError, '^LEDGER_ENTRY_(INVALID|UNDER_RESERVED)$'):
+                    bridge.day_spend(ledger)
+
+    def test_serve_start_does_not_halt_on_a_finished_booking_but_does_on_an_interrupted_one(self):
+        gate = self.gate().ready()
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+            gate.call('op-1', dispatch=self.timed_out)
+        self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 0, 'unrecorded_uncertain': 0})
+        self.assertEqual(gate.status()['state'], 'active')
+        control_path = gate.private / 'team-control.json'
+        control = json.loads(control_path.read_text())
+        control['in_flight'][self.ENTRY] = '2026-10-08'  # Died after the ledger write, before in flight was cleared.
+        control_path.write_text(json.dumps(control))
+        self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 1, 'unrecorded_uncertain': 0})
+        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'interrupted_after_settlement'))
+
+    def test_a_cooling_trial_that_is_booked_frees_the_next_call_to_be_the_trial(self):
+        gate = self.gate().ready()
+        control_path = gate.private / 'team-control.json'
+        control = json.loads(control_path.read_text())
+        control['cooling'] = {MODEL: {'refusals': 2, 'window_seconds': 60, 'until_utc': '2026-10-08T08:59:00+00:00', 'trial': None}}
+        control_path.write_text(json.dumps(control))
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+            gate.call('op-1', dispatch=self.timed_out)
+        self.assertIsNone(gate.control()['cooling'][MODEL]['trial'])
+        self.assertEqual(gate.call('op-2')['status'], 200)
 
 
 if __name__ == '__main__':

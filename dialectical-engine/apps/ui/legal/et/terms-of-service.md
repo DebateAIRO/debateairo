@@ -1,4 +1,4 @@
-# DebateAI — Teenusetingimused
+# Dialectical Engine — Teenusetingimused
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
-**In short.** Peate olema vähemalt 18-aastane. DebateAI koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
+**In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
 ## 1. Kes me oleme ja kuidas meiega ühendust võtta
 
-DebateAI-d käitab Rumeenias registreeritud äriühing **DMS Merchandise Shop S.R.L.**.
+Dialectical Engine-d käitab Rumeenias registreeritud äriühing **DMS Merchandise Shop S.R.L.**.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ DebateAI-d käitab Rumeenias registreeritud äriühing **DMS Merchandise Shop S.
 
 Need andmed on püsivalt esitatud ka veebisaidil dezbatere.ro/legal. Teil on alati võimalik võtta ühendust inimesega, mitte ainult meie assistendiga; jaotises 10 selgitatakse, kuidas seda teha.
 
-## 2. Kus me DebateAI-d pakume
+## 2. Kus me Dialectical Engine-d pakume
 
-Pakume DebateAI-d inimestele, kes elavad Euroopa Liidus (27 riiki) ja Euroopa Majanduspiirkonnas (Norra, Island ja Liechtenstein), Šveitsis, Moldovas, Ameerika Ühendriikides (välja arvatud Tennessee), Kanadas, Austraalias, Uus-Meremaal, Singapuris, Jaapanis, Lõuna-Koreas ja Taiwanil. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas.
+Pakume Dialectical Engine-d inimestele, kes elavad Euroopa Liidus (27 riiki) ja Euroopa Majanduspiirkonnas (Norra, Island ja Liechtenstein), Šveitsis, Moldovas, Ameerika Ühendriikides (välja arvatud Tennessee), Kanadas, Austraalias, Uus-Meremaal, Singapuris, Jaapanis, Lõuna-Koreas ja Taiwanil. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas.
 
 ## 3. Nende Tingimustega nõustumine
 
@@ -58,21 +58,21 @@ Meie **Privaatsuspoliitikas** aadressil dezbatere.ro/privacy selgitatakse, kuida
 
 Enne meiega elektrooniliselt lepingu sõlmimist näidatakse kasutajaliideses vajalikke samme, võimaldatakse teil sisestatu enne esitamist üle vaadata ja parandada ning antakse teada keeled, milles saab lepingu sõlmida. Need Tingimused on saadaval salvestataval ja prinditaval kujul. Tasulise paketi ostmisel saadame teile e-posti teel versiooni, millega nõustusite. Koopiat saate taotleda igal ajal. Miski neis Tingimustes ei piira teie õigusi, mis tulenevad Rumeenia või ELi tarbijaõigusest või teie elukohariigi õigusest ja mida ei saa lepinguga piirata.
 
-## 4. Kes võib DebateAI-d kasutada
+## 4. Kes võib Dialectical Engine-d kasutada
 
-Konto loomiseks peate olema **vähemalt 18-aastane** ja kinnitate seda registreerumisel. DebateAI ei ole suunatud lastele ja me ei paku seda teadlikult alla 18-aastastele. Kui saame teada, et konto kuulub alla 18-aastasele isikule, sulgeme selle. Mõnes piirkonnas ei piisa kinnitusest; lisas A on märgitud, mida kus kohaldatakse.
+Konto loomiseks peate olema **vähemalt 18-aastane** ja kinnitate seda registreerumisel. Dialectical Engine ei ole suunatud lastele ja me ei paku seda teadlikult alla 18-aastastele. Kui saame teada, et konto kuulub alla 18-aastasele isikule, sulgeme selle. Mõnes piirkonnas ei piisa kinnitusest; lisas A on märgitud, mida kus kohaldatakse.
 
-Teil peab olema õiguslik teovõime selle lepingu sõlmimiseks. Kui kasutate DebateAI-d organisatsiooni nimel, kinnitate, et teil on õigus organisatsioonile siduvaid kohustusi võtta, ning „teie“ tähendab sel juhul seda organisatsiooni.
+Teil peab olema õiguslik teovõime selle lepingu sõlmimiseks. Kui kasutate Dialectical Engine-d organisatsiooni nimel, kinnitate, et teil on õigus organisatsioonile siduvaid kohustusi võtta, ning „teie“ tähendab sel juhul seda organisatsiooni.
 
 Avaldatud väitlust võib lugeda igaüks. Lugemiseks ei ole kontot vaja, kuid see on teenuse kasutamine ning sellele kohaldatakse jaotisi 7, 15, 16 ja 18.
 
-## 5. Mida DebateAI teeb ja mida see ei ole
+## 5. Mida Dialectical Engine teeb ja mida see ei ole
 
-Esitate küsimuse või väite. DebateAI saadab selle mitmele kolmanda isiku tehisintellektimudelile, mis koostavad selle ümber argumendigraafi: väited, vastuväited, kriitika, tõendiviited, hinded ning otsuse koos kindlusastmega. Saate üksikuid väiteid vaidlustada, paluda mõnd punkti põhjalikumalt uurida ja otsustada, kas tulemus avaldada.
+Esitate küsimuse või väite. Dialectical Engine saadab selle mitmele kolmanda isiku tehisintellektimudelile, mis koostavad selle ümber argumendigraafi: väited, vastuväited, kriitika, tõendiviited, hinded ning otsuse koos kindlusastmega. Saate üksikuid väiteid vaidlustada, paluda mõnd punkti põhjalikumalt uurida ja otsustada, kas tulemus avaldada.
 
 **Kõik väitluses sisalduv on tehisintellekti loodud.** Argumendid, kriitika, tõendiviited, hinded, otsused ja kasutajatoe assistendi vastused on masinloodud. Need võivad olla valed, puudulikud, aegunud või veendunult ekslikud ning võivad kajastada mudelite kallutatust. Ükski inimene ei vaata neid enne teile näitamist või avaldamist üle ning ükski nimetatud isik ei kanna nende eest toimetusvastutust. Loodud sisu märgistatakse tootes, avaldatud lehtedel ja eksporditud failides tehisintellekti loodud sisuna.
 
-**DebateAI ei anna nõu.** See ei ole õigus-, meditsiini-, finants-, maksu-, psühholoogia-, ohutus- ega muu kutsealane nõuanne ning otsus ei ole faktilise asjaolu tuvastamine. Ärge kasutage väitlust oma tervise, ohutuse, raha, õigusliku seisundi või teiste heaolu seisukohast olulise otsuse alusena, kontrollimata algallikaid ja vajaduse korral kvalifitseeritud spetsialistiga konsulteerimata. Kõrge kindlusaste tähendab, et mudelid pidasid nähtud materjali põhjal tõlgendust kindlaks; see ei taga selle tõesust.
+**Dialectical Engine ei anna nõu.** See ei ole õigus-, meditsiini-, finants-, maksu-, psühholoogia-, ohutus- ega muu kutsealane nõuanne ning otsus ei ole faktilise asjaolu tuvastamine. Ärge kasutage väitlust oma tervise, ohutuse, raha, õigusliku seisundi või teiste heaolu seisukohast olulise otsuse alusena, kontrollimata algallikaid ja vajaduse korral kvalifitseeritud spetsialistiga konsulteerimata. Kõrge kindlusaste tähendab, et mudelid pidasid nähtud materjali põhjal tõlgendust kindlaks; see ei taga selle tõesust.
 
 **Milleks me kohustume.** Pakume teenust mõistliku hoolsuse ja oskusega ning kooskõlas meie avaldatud kirjeldusega. Kui seadus annab teile garantii, et teenus vastab kirjeldusele ja sobib oma tavapäraseks otstarbeks, kohaldatakse seda garantiid ning miski neis Tingimustes ei kõrvalda seda. Me ei luba aga ühegi konkreetse väljundi täpsust: see on loodud sisu omadus, mitte teenuse toimimise omadus.
 
@@ -92,19 +92,19 @@ Saate konto igal ajal sulgeda menüüs **Seaded → Konto**. Sulgemine jõustub 
 
 Need reeglid kehtivad teie esitatud sisu, teenuse kasutamise viisi ja avaldatava sisu suhtes.
 
-**Ärge esitage teiste inimeste isikuandmeid.** Esitage küsimusi teemade, argumentide ja avalike küsimuste, mitte tuvastatavate eraisikute kohta. Ärge lisage nime, kontaktandmeid, isikukoode, pilte, tervise-, finants- ega muid kedagi tuvastavaid andmeid ning ärge kasutage DebateAI-d isiku kohta süüdistusmaterjali, profiili või toimiku koostamiseks. Avaliku elu tegelaste kohta nende avalikus rollis esitatud küsimused on lubatud; eraisikule suunatud küsimused ei ole. Kui te selliseid andmeid siiski esitate, vastutate nende eest ja me võime sisu eemaldada.
+**Ärge esitage teiste inimeste isikuandmeid.** Esitage küsimusi teemade, argumentide ja avalike küsimuste, mitte tuvastatavate eraisikute kohta. Ärge lisage nime, kontaktandmeid, isikukoode, pilte, tervise-, finants- ega muid kedagi tuvastavaid andmeid ning ärge kasutage Dialectical Engine-d isiku kohta süüdistusmaterjali, profiili või toimiku koostamiseks. Avaliku elu tegelaste kohta nende avalikus rollis esitatud küsimused on lubatud; eraisikule suunatud küsimused ei ole. Kui te selliseid andmeid siiski esitate, vastutate nende eest ja me võime sisu eemaldada.
 
 **Teie enda tundlik teave.** Teie küsimused võivad puudutada teie enda tervist, veendumusi, poliitilisi vaateid või muid tundlikke teemasid. Annate selleks nõusoleku eraldi ekraanikuval enne oma esimest väitlust. Kui elate kohas, kus kehtivad terviseandmete erireeglid, võib lisa A suunata teid eraldi teate juurde.
 
 **Ärge esitage ega avaldage ebaseaduslikku sisu**, sealhulgas sisu, mis on laimav, õhutab vägivallale või vihkamisele, ahistab või ähvardab, kujutab nõusolekuta jagatud intiimkujutisi, rikub intellektuaalomandit või konfidentsiaalsust, avaldab ärisaladusi, kujutab laste seksuaalset väärkohtlemist või rikub sanktsioone või ekspordikontrolli.
 
-**Ärge kasutage DebateAI-d petmiseks.** Ärge esitage loodud väljundit inimese kirjutatuna, kui see oleks eksitav, ärge eemaldage sellelt tehisintellekti loodud sisu märgist ega kasutage seda näilise üksmeele, võltstõendite või kellegi teisena esinemise loomiseks.
+**Ärge kasutage Dialectical Engine-d petmiseks.** Ärge esitage loodud väljundit inimese kirjutatuna, kui see oleks eksitav, ärge eemaldage sellelt tehisintellekti loodud sisu märgist ega kasutage seda näilise üksmeele, võltstõendite või kellegi teisena esinemise loomiseks.
 
 **Ärge rünnake teenust.** Otsingumootorid võivad avaldatud väitlusi tavapäraselt indekseerida. Muu automatiseeritud juurdepääs, andmete kraapimine, roomamine või avaldatud väitluste massiline väljavõtmine nõuab meie kirjalikku luba. Keelatud on kiiruspiirangutest, autentimisest või avaldamiskontrollidest möödahiilimine; viipade või süsteemijuhiste väljavõtmise katsed; viipade sisestamine eesmärgiga panna mootor oma piiranguid eirama; ning teenuse sondeerimine või koormustestimine ilma meie kirjaliku loata.
 
 **Ärge müüge ega kaubamärgistage teenust ümber** ega kasutage seda konkureeriva mootori loomiseks, sealhulgas väljundite kasutamisega treeningandmetena, ilma meie kirjaliku nõusolekuta.
 
-**Ärge kasutage DebateAI-d otsuste tegemiseks, mis puudutavad isiku** tervist, ohutust, seaduslikke õigusi, töösuhet, krediiti, eluaset või immigratsioonistaatust. See ei ole selleks loodud ja selle väljundid ei ole selliste otsuste turvaline alus.
+**Ärge kasutage Dialectical Engine-d otsuste tegemiseks, mis puudutavad isiku** tervist, ohutust, seaduslikke õigusi, töösuhet, krediiti, eluaset või immigratsioonistaatust. See ei ole selleks loodud ja selle väljundid ei ole selliste otsuste turvaline alus.
 
 **Kohalik õigus avaldamise kohas.** Vastutate selle eest, et kõik, mida avaldate, vastaks teie asukohariigi õigusele. Võime teatud piirkondades piirata teatud teemade avaldamist.
 
@@ -132,9 +132,9 @@ Väitlused on **vaikimisi privaatsed**. Miski teie loodust ei ole teistele näht
 
 **Mida avaldamine teeb.** Avaldamine on tahtlik ja eraldi kinnitatav toiming. Avaldamisel loome väitluse fikseeritud hetktõmmise ja teeme selle kõigile ilma kontota loetavaks. Otsingumootorid võivad selle indekseerida. Hetktõmmisel näidatakse teie **pseudonüümi**, küsimust sellisel kujul, nagu te selle kirjutasite, argumendipuud, hindeid, otsust ja kindlusastet ning sellel on nähtav märgis, et sisu on tehisintellekti loodud. Sellel ei näidata teie e-posti aadressi, seansikirjeid ega konto ajalugu.
 
-**Avaldamine on praktikas sisuliselt pöördumatu.** Kui väitlus on avalik, saavad teised inimesed seda lugeda, tsiteerida, ekraanitõmmisele jäädvustada, arhiveerida ja vahemällu salvestada. Avaldamise tühistamisel eemaldatakse see DebateAI-st ja hävitatakse meie koopia võti, kuid juba mujal olevaid koopiaid ei saa sellega kõrvaldada. Ärge avaldage midagi, mille püsivat seostamist oma pseudonüümiga te ei soovi.
+**Avaldamine on praktikas sisuliselt pöördumatu.** Kui väitlus on avalik, saavad teised inimesed seda lugeda, tsiteerida, ekraanitõmmisele jäädvustada, arhiveerida ja vahemällu salvestada. Avaldamise tühistamisel eemaldatakse see Dialectical Engine-st ja hävitatakse meie koopia võti, kuid juba mujal olevaid koopiaid ei saa sellega kõrvaldada. Ärge avaldage midagi, mille püsivat seostamist oma pseudonüümiga te ei soovi.
 
-**Avaldatud väitlused konto sulgemisel.** Kui kavandate oma konto sulgemise, valite, mis saab teie avaldatud väitlustest. Kui märgite **„Kustuta ka minu avalikud väitlused“**, eemaldame need kõik DebateAI-st ja hävitame sulgemise ajal oma koopia võtme, nagu avaldamise lõpetamisel, välja arvatud juhul, kui seadus nõuab konkreetse kirje säilitamist. Kui jätate ruudu märkimata, jäävad väitlused avalikuks kasutuselt kõrvaldatud pseudonüümi all. Teiste enne eemaldamist tehtud koopiad ei ole meie kontrolli all. Kui soovite eemaldatavat väitlust endale alles jätta, laadige see enne alla.
+**Avaldatud väitlused konto sulgemisel.** Kui kavandate oma konto sulgemise, valite, mis saab teie avaldatud väitlustest. Kui märgite **„Kustuta ka minu avalikud väitlused“**, eemaldame need kõik Dialectical Engine-st ja hävitame sulgemise ajal oma koopia võtme, nagu avaldamise lõpetamisel, välja arvatud juhul, kui seadus nõuab konkreetse kirje säilitamist. Kui jätate ruudu märkimata, jäävad väitlused avalikuks kasutuselt kõrvaldatud pseudonüümi all. Teiste enne eemaldamist tehtud koopiad ei ole meie kontrolli all. Kui soovite eemaldatavat väitlust endale alles jätta, laadige see enne alla.
 
 **Võime avaldatud sisu alati eemaldada.** Võime avaldatud väitluse eemaldada või sellele juurdepääsu piirata, kui seda nõuab seadus või kohus või pädev asutus või kui väitlus rikub neid Tingimusi või on ebaseaduslik. Miski selles jaotises ei takista meil tegutseda jaotise 10 kohase kehtiva teate alusel ega luba, et avaldatud väitlus jääb kättesaadavaks.
 
@@ -161,7 +161,7 @@ Kinnitame iga teate kättesaamist põhjendamatu viivituseta. Käsitleme teateid 
 
 **Inimesega ühenduse võtmine.** Meie kasutajatoe assistent on tehisintellektisüsteem ja annab sellest teada. Võite igal ajal paluda inimesega rääkida ning see võimalus on olemas igas kasutajatoe vestluses. Me ei kasuta teiega suhtlemiseks ainult automatiseeritud tööriistu.
 
-**Terroristlik sisu.** Terroristlik sisu on ebaseaduslik ja seda ei ole DebateAI-s lubatud (jaotis 7). Euroopa Liidu pädevad asutused võivad saata meile eemaldamiskorraldusi määruse (EL) 2021/784 alusel jaotises 1 nimetatud kontaktpunktile. Sellise korralduse saamisel eemaldame sisu või blokeerime juurdepääsu sellele kõigis ELi riikides ühe tunni jooksul. Teavitame sisu avaldanud isikut selle eemaldamisest ning tema soovi korral ka sellest, miks see eemaldati ja kuidas korraldust vaidlustada, välja arvatud juhul, kui asutus otsustab, et avaliku julgeoleku huvides tuleb teabe avaldamisest piiratud ajaks loobuda. Nagu määrus nõuab, säilitame eemaldatud sisu ja sellega seotud andmed kuus kuud, et eemaldamist saaks kontrollida ja selle ekslikkuse korral tühistada. Sisu avaldanud isik võib korraldust vaidlustada selle riigi kohtutes, mille asutus korralduse tegi, ning võib samuti kasutada meie kaebuste esitamise kanalit. Ükski asutus ei ole nõudnud meilt määruse alusel konkreetsete meetmete võtmist terroristliku sisu vastu; kui nii juhtub, kirjeldame neid meetmeid siin, sealhulgas mis tahes automatiseeritud tööriistu.
+**Terroristlik sisu.** Terroristlik sisu on ebaseaduslik ja seda ei ole Dialectical Engine-s lubatud (jaotis 7). Euroopa Liidu pädevad asutused võivad saata meile eemaldamiskorraldusi määruse (EL) 2021/784 alusel jaotises 1 nimetatud kontaktpunktile. Sellise korralduse saamisel eemaldame sisu või blokeerime juurdepääsu sellele kõigis ELi riikides ühe tunni jooksul. Teavitame sisu avaldanud isikut selle eemaldamisest ning tema soovi korral ka sellest, miks see eemaldati ja kuidas korraldust vaidlustada, välja arvatud juhul, kui asutus otsustab, et avaliku julgeoleku huvides tuleb teabe avaldamisest piiratud ajaks loobuda. Nagu määrus nõuab, säilitame eemaldatud sisu ja sellega seotud andmed kuus kuud, et eemaldamist saaks kontrollida ja selle ekslikkuse korral tühistada. Sisu avaldanud isik võib korraldust vaidlustada selle riigi kohtutes, mille asutus korralduse tegi, ning võib samuti kasutada meie kaebuste esitamise kanalit. Ükski asutus ei ole nõudnud meilt määruse alusel konkreetsete meetmete võtmist terroristliku sisu vastu; kui nii juhtub, kirjeldame neid meetmeid siin, sealhulgas mis tahes automatiseeritud tööriistu.
 
 **Tõsine oht elule või turvalisusele.** Kui saame teada teabest, mis viitab kuriteole, millega kaasneb oht kellegi elule või turvalisusele, teavitame pädevaid asutusi.
 
@@ -183,7 +183,7 @@ Jaotised 8 (juba avaldatud sisu kohta), 15, 16 ja 18 jäävad pärast lõpetamis
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI pakub tasuta paketti. Tulevikus on saadaval tasuline **Premium**-pakett, mis annab juurdepääsu mudelite täielikule valikule ja võimaldab teil väitluse seadeid ise määrata.
+Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval tasuline **Premium**-pakett, mis annab juurdepääsu mudelite täielikule valikule ja võimaldab teil väitluse seadeid ise määrata.
 
 **Enne maksmist** näitame otse maksenupu kohal: paketti; koguhinda koos kohalduvate maksudega; arveldusperioodi; asjaolu, et pakett uueneb automaatselt kuni tühistamiseni; tasuta prooviperioodi lõppkuupäeva ja pärast seda võetavat tasu; ning tühistamise viisi. Kinnitate uuendamistingimused eraldi ruudu märkimisega. Nupul on kiri **Tellige ja makske** (rumeenia keeles *Comandă cu obligație de plată*). Saadame teile püsival andmekandjal kinnituse, mis sisaldab sama teavet, neid Tingimusi ja taganemisvormi.
 
@@ -211,11 +211,11 @@ Kui elate mujal, on lisas A märgitud teie piirkonnas kohaldatav taganemis- või
 
 ## 14. Teenuse ja nende Tingimuste muudatused
 
-**Teenuse muudatused.** Arendame DebateAI-d pidevalt ning tavapärased täiustused, parandused ja mudelivaliku muudatused toimuvad ette teatamata. Kui teeme muudatuse, mis läheb teenuse kirjeldatud viisil toimivana hoidmisest kaugemale, teeme seda ainult ühel järgmistest põhjustest: õigus- või regulatiivse nõude täitmiseks; turva- või kuritarvitamisprobleemile reageerimiseks; seetõttu, et mudelipakkuja muudab, piirab või kõrvaldab mudeli või funktsiooni, millest sõltume; kohanemiseks tehnilise keskkonnaga, mida me ei kontrolli; või funktsiooni lisamiseks, täiustamiseks või kasutuselt kõrvaldamiseks viisil, mis ei tekita teile lisakulu.
+**Teenuse muudatused.** Arendame Dialectical Engine-d pidevalt ning tavapärased täiustused, parandused ja mudelivaliku muudatused toimuvad ette teatamata. Kui teeme muudatuse, mis läheb teenuse kirjeldatud viisil toimivana hoidmisest kaugemale, teeme seda ainult ühel järgmistest põhjustest: õigus- või regulatiivse nõude täitmiseks; turva- või kuritarvitamisprobleemile reageerimiseks; seetõttu, et mudelipakkuja muudab, piirab või kõrvaldab mudeli või funktsiooni, millest sõltume; kohanemiseks tehnilise keskkonnaga, mida me ei kontrolli; või funktsiooni lisamiseks, täiustamiseks või kasutuselt kõrvaldamiseks viisil, mis ei tekita teile lisakulu.
 
 Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada **30 päeva** jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa.
 
-**Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; DebateAI kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
+**Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
 
 ## 15. Vastutus
 
@@ -231,15 +231,15 @@ Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel o
 
 ## 16. Intellektuaalomand
 
-Teenus ise — tarkvara, mootor, hindamismeetod, kasutajaliides, nimed DebateAI ja DebateAIRO ning meie logod — kuulub meile või meie litsentsiandjatele. Need Tingimused annavad teile loa teenust kasutada, mitte selle omandiõigust.
+Teenus ise — tarkvara, mootor, hindamismeetod, kasutajaliides, nimed Dialectical Engine ja DebateAIRO ning meie logod — kuulub meile või meie litsentsiandjatele. Need Tingimused annavad teile loa teenust kasutada, mitte selle omandiõigust.
 
-Võite avaldatud väitlusi tsiteerida ja linkida, viidates DebateAI-le ja lisades lingi algsele lehele. Avaliku korpuse massiline kopeerimine, süstemaatiline reprodutseerimine ja avaldatud väitluste kasutamine treeningandmetena ei ole meie kirjaliku nõusolekuta lubatud.
+Võite avaldatud väitlusi tsiteerida ja linkida, viidates Dialectical Engine-le ja lisades lingi algsele lehele. Avaliku korpuse massiline kopeerimine, süstemaatiline reprodutseerimine ja avaldatud väitluste kasutamine treeningandmetena ei ole meie kirjaliku nõusolekuta lubatud.
 
-Jaotises 8 käsitletakse teie sisu ja loodud väljundite staatust. Kui arvate, et miski DebateAI-s rikub teie intellektuaalomandiõigusi, kasutage jaotises 10 kirjeldatud teatamiskanalit.
+Jaotises 8 käsitletakse teie sisu ja loodud väljundite staatust. Kui arvate, et miski Dialectical Engine-s rikub teie intellektuaalomandiõigusi, kasutage jaotises 10 kirjeldatud teatamiskanalit.
 
 ## 17. Isikuandmed
 
-Isikuandmete töötlemist kirjeldatakse **Privaatsuspoliitikas** aadressil dezbatere.ro/privacy. Selles selgitatakse, mida me kogume, iga eesmärgi õiguslikku alust, andmete säilitamise aega, andmete vastuvõtjaid, asjaomaseid edastamisi ning seda, kuidas oma õigusi kasutada. Lisaks rõhutame siin kolme asja. Jaotises 7 palutakse teil mitte lisada küsimusse teiste inimeste isikuandmeid; kui te seda siiski teete, vastutate nende eest ja me võime sisu eemaldada. Kui DebateAI-s avaldatud väitlus sisaldab teie isikuandmeid, võite konto olemasolust olenemata paluda meil need eemaldada (jaotis 9). Samuti säilitame andmed selle kohta, et nõustusite nende Tingimustega — versioon, aeg ja seansi tehnilised üksikasjad — lepingu tõendina, nagu on selgitatud Privaatsuspoliitikas.
+Isikuandmete töötlemist kirjeldatakse **Privaatsuspoliitikas** aadressil dezbatere.ro/privacy. Selles selgitatakse, mida me kogume, iga eesmärgi õiguslikku alust, andmete säilitamise aega, andmete vastuvõtjaid, asjaomaseid edastamisi ning seda, kuidas oma õigusi kasutada. Lisaks rõhutame siin kolme asja. Jaotises 7 palutakse teil mitte lisada küsimusse teiste inimeste isikuandmeid; kui te seda siiski teete, vastutate nende eest ja me võime sisu eemaldada. Kui Dialectical Engine-s avaldatud väitlus sisaldab teie isikuandmeid, võite konto olemasolust olenemata paluda meil need eemaldada (jaotis 9). Samuti säilitame andmed selle kohta, et nõustusite nende Tingimustega — versioon, aeg ja seansi tehnilised üksikasjad — lepingu tõendina, nagu on selgitatud Privaatsuspoliitikas.
 
 ## 18. Kohaldatav õigus ja vaidluste lahendamise koht
 
@@ -277,7 +277,7 @@ Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma e
 
 ### A.2 Ameerika Ühendriigid
 
-**Tennessee.** Me ei paku DebateAI-d inimestele, kes elavad Tennessees.
+**Tennessee.** Me ei paku Dialectical Engine-d inimestele, kes elavad Tennessees.
 
 **Teated ja sisu eemaldamine.** Nõusolekuta jagatud intiimkujutistest võib ilma kontota teatada e-kirjaga aadressil abuse@dezbatere.ro ning need eemaldatakse 48 tunni jooksul pärast kehtiva taotluse saamist. Autoriõiguse rikkumise kaebused esitatakse jaotises 10 kirjeldatud teatamiskanali kaudu.
 

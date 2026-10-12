@@ -28,7 +28,8 @@ bytes run.
 Each call reserves its worst case under a short ledger lock, the lock is released for the one
 fixed upstream HTTPS request, and the charge is then settled under the lock. Uncertainty,
 missing usage, overrun, a provider error, another model, a lost reply or any failure after the
-reservation halts every new call until Root re-activates; calls already in flight finish and
+reservation halts every new call until Root re-activates (except a connection failure after the
+send, which is booked at its reservation: below); calls already in flight finish and
 settle. A halt is written before the ledger entry it explains, and serve start halts on any
 call a crash interrupted. If a settlement or a halt cannot be written, the running server
 reserves nothing more until it is restarted. A probe runs in its own process beside serve and
@@ -65,6 +66,26 @@ the streak grows, the control file keeps that moment ('unsent_counted_at'); a la
 grows it again only if its call was not reserved before that moment (a call reserved earlier was
 in flight with the counted one), so one network blip under many parallel calls counts once. A
 settled reply also deletes 'unsent_counted_at'. Calls reserved one after another count one each.
+
+Booked at the reservation (owner ruling 2026-10-12, "Book max cost, keep going"): when the vendor
+connection fails or times out AFTER the request may have been sent (the transport raised an OSError,
+e.g. the CALL_DEADLINE_SECONDS timeout, a reset or a TLS error, or an http.client.HTTPException, e.g.
+the vendor closed the connection mid-reply), no reply was read, so the charge is unknown; but the
+call's own reservation already prices its request bytes (+ 2048) and its row's whole output bound at
+the reserve prices, so it bounds what the vendor can bill. The gate then books exactly that amount as
+the call's charge: the entry becomes 'settled_reserved_max' (held_usd = reserved_usd, reason
+'transport_failure', the error class and the elapsed time), the gate stays active, the day's spend,
+pot and call count include it like any settled call, the caller sees PROVIDER_CHARGE_BOOKED_MAX, and
+the journal line carries alert 'charge_booked_at_reservation'. status counts the day's bookings
+(today_booked_max, today_booked_max_usd) and the halt watcher emails the owner once per new booking.
+A booking neither grows nor resets the unsent streak and never cools or uncools a model (a cool-off
+trial that is booked proves nothing: the next call may be the trial). Everything else still halts
+exactly as before: any other failure while sending or reading (a reply too large, a fault in the
+transport itself), a hook that fails on a reply, a reply without accountable usage (also a vendor's
+own timeout answer such as Anthropic's 504), a charge above the reservation (charge_overrun),
+another model or a non-200 reply, a key, identity or configuration problem, a hold that cannot be
+released, a lost reply or an interrupted call (a booking still in flight at serve start halts, as a
+settled call does).
 
 Unbilled refusals (owner ruling 5, 2026-10-10; per model since 2026-10-12): anything after the connect
 stays uncertain and halts as before, with one exception: a reply the profile's unbilled_refusal
@@ -103,7 +124,8 @@ A probe (root, one deliberate call) is never refused for a cool-off, but its out
 
 Refusal codes the caller sees (PUBLIC_REFUSALS): the three pot codes, PROVIDER_NOT_REACHED,
 PROVIDER_REFUSED_UNBILLED and PROVIDER_ERROR_UNBILLED (nothing billed, hold released; only the second
-says the model is busy), MODEL_COOLING (nothing reserved or sent),
+says the model is busy), MODEL_COOLING (nothing reserved or sent), PROVIDER_CHARGE_BOOKED_MAX (sent,
+the connection then failed, booked at the reservation; the gate stays active),
 and AUTHORITY_HALTED: the gate was already halted (or halted at that moment on an interrupted probe)
 when this call was checked, before anything was reserved. Every other refusal, among them every
 failure after a reservation, is the opaque PREVIEW_TEST_AUTHORITY_STOPPED.
@@ -127,6 +149,7 @@ max_concurrent_calls + 1 calls may be in flight; the pot itself is still checked
 import argparse
 import fcntl
 import hashlib
+import http.client
 import json
 import math
 import os
@@ -172,9 +195,11 @@ LOCK_TIMEOUT_SECONDS = 10
 SLOT_WAIT_SECONDS = 60
 # From acceptance, slot wait + reservation lock + upstream call share this deadline; after it a
 # settlement lock wait and a fallback halt lock wait (2 x 10 s) and the reply still fit inside the
-# caller's 630 s timeout (preview-test.ts: PREVIEW_GLM_DEADLINE_MS + 30 s).
-CALL_DEADLINE_SECONDS = 600
-REPLY_TIMEOUT_SECONDS = 630
+# app's own 1,260 s call deadline (preview-test.ts: PREVIEW_GLM_DEADLINE_MS), so the gate, not the
+# app, decides a slow call (owner ruling 2026-10-12: 20 minutes, was 600 s). REPLY_TIMEOUT_SECONDS is
+# the caller's IPC timeout (PREVIEW_GLM_DEADLINE_MS + 30 s): how long writing the reply may take.
+CALL_DEADLINE_SECONDS = 1200
+REPLY_TIMEOUT_SECONDS = 1290
 DRAIN_REPLY_SECONDS = 30  # Once stopping (or tripped), a reply must be taken this fast or the gate halts.
 STOP_SIGNALS = (signal.SIGTERM, signal.SIGINT)
 SERVE_POLL_SECONDS = 0.5  # How often the accept loop checks for a stop (bounds the stop's first step).
@@ -206,9 +231,11 @@ STOPPED = 'PREVIEW_TEST_AUTHORITY_STOPPED'
 # after unbilled refusals; nothing was reserved or sent. AUTHORITY_HALTED: the gate is halted, found
 # by the state check before anything was reserved (never after a reservation: every failure there
 # stays the opaque STOPPED).
+# PROVIDER_CHARGE_BOOKED_MAX (owner ruling 2026-10-12): this call was sent, the vendor connection then failed or
+# timed out, and its full reservation is booked as its charge; the gate stays active.
 PUBLIC_REFUSALS = frozenset({'TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED',
                              'PROVIDER_NOT_REACHED', 'PROVIDER_REFUSED_UNBILLED', 'PROVIDER_ERROR_UNBILLED',
-                             'MODEL_COOLING', 'AUTHORITY_HALTED'})
+                             'MODEL_COOLING', 'AUTHORITY_HALTED', 'PROVIDER_CHARGE_BOOKED_MAX'})
 GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'provider', 'enabled_models',
                          'scope_id', 'target_host', 'allowed_peer_uids', 'daily_budget_usd', 'max_paid_posts_per_day',
                          'max_concurrent_calls', 'open_days'})
@@ -224,7 +251,15 @@ PROBE_LOCK_NAME = 'team-probe.lock'  # Held by a running probe; serve start and 
 PROBE_EXCERPT_CHARS = 80
 # released_unbilled: a refusal the profile proved unbilled; its hold is released (held_usd "0") but
 # the entry stays on the day's record (status counts them as today_unbilled_releases; never a halt).
-ENTRY_STATES = ('pending', 'settled', 'uncertain', 'released_unbilled')
+# settled_reserved_max (owner ruling 2026-10-12): sent, then the vendor connection failed or timed out;
+# booked at exactly its reservation (held_usd == reserved_usd), counted like a settled call, never a halt
+# (status counts them as today_booked_max).
+BOOKED_MAX = 'settled_reserved_max'
+ENTRY_STATES = ('pending', 'settled', 'uncertain', 'released_unbilled', BOOKED_MAX)
+# What the transport raises when the connection fails or times out after the request may have been
+# sent (socket timeouts, resets, TLS errors, a closed or cut reply). Only these are booked at the
+# reservation; anything else after the reservation stays uncertain and halts.
+BOOKABLE_TRANSPORT_FAILURES = (OSError, http.client.HTTPException)
 # Owner ruling 2026-10-10: one GO may ask for at most $10.00 a day (the DeepInfra pot), and the
 # daily team total over every provider gate's pot is $12.00 (DeepInfra $10.00 + Anthropic $2.00).
 MAX_GO_BUDGET_USD = Decimal('10.00')
@@ -407,14 +442,29 @@ def sampling_reviewed(profile, sampling):
             and len({pair[0] for pair in sampling}) == len(sampling))
 
 
+def efforts_reviewed(profile, efforts):
+    """Spec 2026-10-12 section 4.5: a non-empty tuple of distinct words from the profile's effort_words
+    (None there is no effort member at all). Membership is checked first, so an unhashable item is refused, not raised."""
+    words = getattr(profile, 'effort_words', ())
+    return (type(efforts) is tuple and 1 <= len(efforts) <= len(words)
+            and all(word is None or type(word) is str for word in efforts)
+            and all(word in words for word in efforts) and len(set(efforts)) == len(efforts))
+
+
+def effort_word(value):
+    """Spec 2026-10-12 section 4.5: a level as the records name it, 'default' for no effort member (None)."""
+    return 'default' if value is None else value
+
+
 def row_reviewed(profile, model, row):
     """A row the gate will price with: positive ceiling prices under MAX_PRICE_USD_PER_M, a sane
-    bound, a known effort rule, a well-formed sampling (if any), a valid path, and a full-size
-    request that reserves no more than the profile's per-call cap."""
+    bound, a reviewed thinking-level menu (efforts_reviewed), a well-formed sampling (if any), a valid path, and a
+    full-size request that reserves no more than the profile's per-call cap."""
     return bool(isinstance(model, str) and MODEL_ID_PATTERN.fullmatch(model) and '..' not in model
                 and getattr(row, 'model', None) == model and isinstance(row.maker, str) and 1 <= len(row.maker) <= 64
                 and prices_ok(profile.ceiling_prices(row)) and helper.path_valid(profile.path_for(row))
-                and _int_in(row.output_bound, 1, MAX_OUTPUT_BOUND) and row.effort in ('high', None)
+                and _int_in(row.output_bound, 1, MAX_OUTPUT_BOUND)
+                and efforts_reviewed(profile, getattr(row, 'efforts', None))
                 and type(row.json_object) is bool and sampling_reviewed(profile, getattr(row, 'sampling', None))
                 and worst_case_reservation(profile, row) <= profile.per_call_cap_usd)
 
@@ -491,8 +541,9 @@ def day_ledger_name(day):
 
 
 def day_spend(ledger):
-    """Held amounts of every entry reserved on this day: pending, settled and uncertain. A
-    released_unbilled entry holds exactly 0 (its reservation stays recorded beside it)."""
+    """Held amounts of every entry reserved on this day: pending, settled, booked at the reservation and
+    uncertain. A released_unbilled entry holds exactly 0 (its reservation stays recorded beside it); a
+    settled_reserved_max entry holds exactly its reservation."""
     total = Decimal(0)
     for entry in ledger['entries'].values():
         held = helper.decimal_amount(entry.get('held_usd')) if isinstance(entry, dict) else None
@@ -501,6 +552,9 @@ def day_spend(ledger):
             raise SafetyError('LEDGER_ENTRY_INVALID')
         if entry['state'] == 'released_unbilled':
             if held != 0:
+                raise SafetyError('LEDGER_ENTRY_INVALID')
+        elif entry['state'] == BOOKED_MAX:
+            if held != reserved:
                 raise SafetyError('LEDGER_ENTRY_INVALID')
         elif entry['state'] != 'settled' and held < reserved:
             raise SafetyError('LEDGER_ENTRY_UNDER_RESERVED')
@@ -511,6 +565,12 @@ def day_spend(ledger):
 def unbilled_releases(ledger):
     """Today's refusals released as unbilled (kept on the record at $0)."""
     return sum(1 for entry in ledger['entries'].values() if entry['state'] == 'released_unbilled')
+
+
+def booked_max(ledger):
+    """Today's calls booked at their reservation (settled_reserved_max): (count, amount)."""
+    booked = [entry for entry in ledger['entries'].values() if entry['state'] == BOOKED_MAX]
+    return len(booked), sum((helper.decimal_amount(entry['held_usd']) for entry in booked), Decimal(0))
 
 
 def paid_posts(ledger):
@@ -732,6 +792,7 @@ def day_summary(control, ledger, moment):
             'today_spend_usd': format(spend, 'f'), 'remaining_today_usd': format(max(Decimal(0), budget - spend), 'f'),
             'today_posts': paid_posts(ledger), 'max_paid_posts_per_day': control['limits']['max_paid_posts_per_day'],
             'today_unbilled_releases': unbilled_releases(ledger), 'cooling': cooling_summary(control, moment),
+            'today_booked_max': booked_max(ledger)[0], 'today_booked_max_usd': format(booked_max(ledger)[1], 'f'),
             'in_flight': len(control['in_flight']),
             'today_uncertain': sum(1 for entry in ledger['entries'].values() if entry['state'] == 'uncertain'),
             'today_by_model': spend_by_model(ledger),
@@ -942,6 +1003,9 @@ def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now,
     hold, unlock. A halted gate refuses AUTHORITY_HALTED here, before anything is reserved. A call that
     asked for a cache write says so in its entry (cache_write_requested: '5m')."""
     prices = (row.input_usd_per_m, row.output_usd_per_m) if prices is None else prices
+    # Spec 2026-10-12 section 4.5: the entry records the level the BODY carried ('default' for no member).
+    # validate_request accepted these exact bytes for this GO's profile, so they parse.
+    requested_effort = effort_word(helper.PROFILES[go['provider']].body_effort(json.loads(input['requestBody'])))
     with TeamStore(private) as store:
         control = store.control()
         if control['state'] == 'halted':
@@ -986,7 +1050,7 @@ def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now,
                                        'provider': go['provider'], 'model': row.model, 'maker': row.maker,
                                        'reserve_input_usd_per_m': str(prices[0]), 'reserve_output_usd_per_m': str(prices[1]),
                                        'output_bound': row.output_bound,
-                                       'requested_effort': row.effort or 'none', 'peer_uid': peer_uid,
+                                       'requested_effort': requested_effort, 'peer_uid': peer_uid,
                                        **({'cache_write_requested': '5m'} if cache_write else {}),
                                        **({'probe': True} if probe else {})}
         data = helper.encode_json(ledger)
@@ -1028,6 +1092,9 @@ def record_settlement(private, entry_id, day, changes, halt_reason, budget, now)
             control['unsent_streak'] = 0  # The provider answered with accountable usage.
             control.pop('unsent_counted_at', None)  # So the next failure starts a new streak (section 3.4).
             clear_cooling(control, entry.get('model'))  # And this model answered: its cool-off ends.
+        elif entry['state'] == BOOKED_MAX:
+            # No answer: the streak and the model's cool-off stay as they are; a trial proves nothing.
+            clear_trial(control, entry.get('model'), entry_id)
         if halt_reason is None and day_spend(ledger) > budget:
             halt_reason = 'charge_overrun'
         if halt_reason is not None:
@@ -1042,6 +1109,20 @@ def record_settlement(private, entry_id, day, changes, halt_reason, budget, now)
 class CallNotSent(SafetyError):
     """This call failed before any request byte was written, and its hold was released. The IPC
     handler does not halt for it: nothing paid can have been lost."""
+
+
+class ChargeBookedMax(SafetyError):
+    """PROVIDER_CHARGE_BOOKED_MAX: this call was sent, the vendor connection then failed or timed out,
+    and its full reservation is booked as its charge (settled_reserved_max). The gate stays active and
+    the IPC handler does not halt for it: the booking is already on the record."""
+
+
+class _FailedAfterSend(Exception):
+    """Internal: the transport raised one of BOOKABLE_TRANSPORT_FAILURES (error_class: its class name)."""
+
+    def __init__(self, error_class):
+        super().__init__('failed_after_send')
+        self.error_class = error_class
 
 
 class UnbilledRefusal(Exception):
@@ -1255,7 +1336,13 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             # The upstream timeout is what remains after the slot wait and the reservation lock.
             send = dispatch or helper.HttpsTransport(timeout=max(1.0, CALL_DEADLINE_SECONDS - (time.monotonic() - accepted)),
                                                      profile=profile, path=profile.path_for(row))
-            status, raw_response = send(outgoing, key)
+            try:
+                status, raw_response = send(outgoing, key)
+            except helper.RequestNotSent:
+                raise
+            except BOOKABLE_TRANSPORT_FAILURES as failure:
+                # Owner ruling 2026-10-12: sent, then the connection failed or timed out (no reply read).
+                raise _FailedAfterSend(type(failure).__name__) from None
             raw_response = raw_response if isinstance(raw_response, dict) else {}
             # 2026-10-12: what the transport kept of the answer's headers (Retry-After, rate-limit header names).
             kept_headers = getattr(send, 'vendor_headers', None)
@@ -1288,6 +1375,16 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             if not refused:
                 raise CallNotSent('PROVIDER_NOT_REACHED') from None
             raise CallNotSent('PROVIDER_REFUSED_UNBILLED' if unsent.busy else 'PROVIDER_ERROR_UNBILLED') from None
+        except _FailedAfterSend as failed:
+            # The reservation bounds the bill: book it as the charge and keep the gate active (no halt reason).
+            # A settlement that cannot be written still halts (settle_or_halt), as for any call.
+            outcome = settle_or_halt(private, entry_id, day, {
+                'state': BOOKED_MAX, 'held_usd': str(reserved), 'reason': 'transport_failure',
+                'error_class': failed.error_class, 'elapsed_seconds': round(time.monotonic() - started, 6)},
+                None, budget, now, slots)
+            log_event({**event, 'model': row.model, 'status': BOOKED_MAX, 'alert': 'charge_booked_at_reservation',
+                       'booked_usd': str(reserved), 'error_class': failed.error_class, **outcome})
+            raise ChargeBookedMax('PROVIDER_CHARGE_BOOKED_MAX') from None
         except BaseException as error:
             outcome = settle_or_halt(private, entry_id, day, {
                 'state': 'uncertain', 'held_usd': str(reserved), 'reason': 'transport_failure',
@@ -1464,7 +1561,7 @@ def probe_summary(observed, profile):
     billed = accounting.get('billed_output_tokens')
     completion = billed if billed is not None else accounting.get('completion_tokens')
     return {'status': 'probed', 'provider': profile.name, 'model': row.model, 'maker': row.maker,
-            'sent': {'max_tokens': max_tokens, 'effort': row.effort or 'none',
+            'sent': {'max_tokens': max_tokens, 'effort': effort_word(row.efforts[0]),  # The row's default (probe_body).
                      **({'sampling': dict(row.sampling)} if getattr(row, 'sampling', None) else {})},
             # A model that bills past max_tokens would overrun its reservation in real use: do not enable it.
             'completion_within_max_tokens': completion <= max_tokens if type(completion) is int else None,
@@ -1772,9 +1869,10 @@ def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_u
                 result = execute(data, uid, lambda: caller_canceled(self.connection), reserved.append)
                 encoded = json.dumps(result, ensure_ascii=True).encode('ascii')
             except BaseException as error:
-                if reserved and not isinstance(error, CallNotSent):
+                if reserved and not isinstance(error, (CallNotSent, ChargeBookedMax)):
                     # Once a hold exists, any failure may lose a paid reply: halt, as for a lost reply.
-                    # A provably unsent call released its hold already; nothing paid can be lost.
+                    # A provably unsent call released its hold already; nothing paid can be lost. A call
+                    # booked at its reservation has no reply to lose and its charge is already recorded.
                     self.stop_gate(reserved[0])
                 try:
                     self.reply(409, refusal_body(error))

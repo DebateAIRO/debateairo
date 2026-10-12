@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.3 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas: dezbatere.ro/privacy/versions · Pārzinis: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
-**In short.** Mēs vācam konta darbībai nepieciešamo informāciju un to, ko izvēlaties ievadīt. Jūsu jautājumi tiek nosūtīti mūsu Reģistrā norādītajiem MI pakalpojumu sniedzējiem; tie netiek izmantoti modeļu apmācībai. Debates ir privātas, ja vien jūs tās nepublicējat. Dzēšot kontu, tiek iznīcinātas jūsu privāto datu atslēgas; plānojot dzēšanu, jūs izvēlaties, vai arī publicētās debates tiks noņemtas vai paliks publiskas ar jūsu vairs neizmantoto pseidonīmu. Varat ar mums sazināties, rakstot uz privacy@dezbatere.ro, un debatēs minētās personas var pieprasīt satura noņemšanu arī bez konta.
+**In short.** Mēs vācam konta darbībai nepieciešamo informāciju un to, ko izvēlaties ievadīt. Jūsu jautājumi tiek nosūtīti mūsu Reģistrā norādītajiem MI pakalpojumu sniedzējiem; tie netiek izmantoti modeļu apmācībai. Mūsu mitināšanas pakalpojumu sniedzējs glabā jūsu kontu un debates Londonā, Apvienotajā Karalistē; 5. sadaļā norādīts, uz kurieni jūsu dati tiek nosūtīti vēl. Debates ir privātas, ja vien jūs tās nepublicējat. Dzēšot kontu, tiek iznīcinātas jūsu privāto datu atslēgas; plānojot dzēšanu, jūs izvēlaties, vai arī publicētās debates tiks noņemtas vai paliks publiskas ar jūsu vairs neizmantoto pseidonīmu. Varat ar mums sazināties, rakstot uz privacy@dezbatere.ro, un debatēs minētās personas var pieprasīt satura noņemšanu arī bez konta.
 
 ## 1. Kas atbild par jūsu datiem
 
@@ -95,6 +95,8 @@ Mēs jūs neprofilējam, neizmantojam jūsu datus reklāmai un tos nepārdodam. 
 
 **Citi saņēmēji.** Papildus MI pakalpojumu sniedzējiem datus mūsu uzdevumā apstrādā šādi apstrādātāji. Mūsu mitināšanas pakalpojumu sniedzējs OVHcloud glabā un uztur pakalpojumu savā datu centrā Londonā, Apvienotajā Karalistē. Eiropas Komisija ir lēmusi, ka Apvienotā Karaliste nodrošina pietiekamu personas datu aizsardzību (lēmums par aizsardzības līmeņa pietiekamību ir spēkā līdz 2031. gada decembrim), tāpēc šai nosūtīšanai papildu garantijas nav vajadzīgas. Cloudflare nodrošina mūsu lapu piegādi, pārraida datplūsmu starp jums un pakalpojumu un veic robotu pārbaudi (2. sadaļa); tas ir ASV uzņēmums, kas sertificēts saskaņā ar ES un ASV datu privātuma regulējumu (EU–US Data Privacy Framework), un tā līgumā ar mums kā rezerves risinājums ir pievienotas ES standarta līguma klauzulas. Ar kontu saistītos e-pastus nosūta Amazon Simple Email Service saskaņā ar mūsu līgumu ar Amazon Web Services EMEA SARL Luksemburgā; ja Amazon šos datus apstrādā Amerikas Savienotajās Valstīs, nosūtīšanas pamats ir ES standarta līguma klauzulas, kas iekļautas Amazon datu apstrādes noteikumos. Maksājumi notiek, izmantojot mūsu maksājumu pakalpojumu sniedzēju NETOPIA Payments, pēc maksas plānu ieviešanas. Katrs no tiem rīkojas saskaņā ar mūsu dokumentētajiem norādījumiem un datu apstrādes līgumu, kurā paredzētas 28. pantā noteiktās garantijas. Mēs nevienam apstrādātājam neatļaujam izmantot jūsu datus saviem nolūkiem. Ja pakalpojumu sniedzējs to darītu, tas būtu patstāvīgs pārzinis, un mēs tam jūsu datus nesūtītu.
 
+**Kur atrodas jūsu dati.** Jūsu konts un debates tiek glabāti Apvienotajā Karalistē, mūsu mitināšanas pakalpojumu sniedzēja serveros Londonā. Cloudflare pārraida datplūsmu pa savu tīklu, un Amazon ar kontu saistītos e-pastus var apstrādāt Amerikas Savienotajās Valstīs. Katrs MI pakalpojumu sniedzējs saņemto tekstu apstrādā tajās valstīs, ko Reģistrs tam norāda, galvenokārt Amerikas Savienotajās Valstīs.
+
 **Publiskās iestādes.** Mēs izpaužam personas datus tiesām, regulatoriem vai tiesībaizsardzības iestādēm, ja to prasa tiesību akti, un par to jūs informējam, ja vien tiesību akti mums to neaizliedz.
 
 ## 6. Publicēšana un redzamība
@@ -148,12 +150,12 @@ Jūs varat bez maksas izmantot jebkuras no šīm tiesībām, rakstot uz **privac
 
 | Tiesības | Ko tās nozīmē šajā gadījumā |
 | --- | --- |
-| **Piekļuve** (GDPR 15. pants; Art. 15) | Mūsu rīcībā esošo jūsu personas datu kopija un šī informācija. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Piekļuve** (GDPR 15. pants; Art. 15) | Mūsu rīcībā esošo jūsu personas datu kopija un šī informācija. Iestatījumos izvēlieties Eksportēt datus: mēs sagatavojam ZIP failu ar JSON failiem un vienu lapu, ko var atvērt jebkurā pārlūkprogrammā, un pa e-pastu nosūtām lejupielādes saiti, kas darbojas 24 stundas un tikai tad, kad esat pieteicies savā kontā. |
 | **Labošana** (GDPR 16. pants; Art. 16) | Savas e-pasta adreses vai atkopšanas e-pasta adreses labošana Iestatījumos. Jūsu pseidonīmu nevar mainīt Noteikumos izskaidroto iemeslu dēļ; varat slēgt kontu un atvērt jaunu |
 | **Dzēšana** (GDPR 17. pants; Art. 17) | Privātu debašu dzēšana jebkurā laikā debašu lapā. Konta slēgšana Iestatījumos; 7. sadaļā ir precīzi paskaidrots, ko tas nozīmē. Pieprasījums mums noņemt publicētas debates, kas satur jūsu datus, neatkarīgi no tā, vai esat to autors |
 | **Ierobežošana** (GDPR 18. pants; Art. 18) | Pieprasījums mums pārtraukt konkrētu datu apstrādi, kamēr tiek atrisināts strīds par tiem |
 | **Iebildums** (GDPR 21. pants; Art. 21) | Iebildums pret apstrādi, kas balstīta uz leģitīmām interesēm — 4. sadaļā minēto drošības un audita apstrādi —, un mēs to pārtrauksim, ja vien nevarēsim pierādīt pārliecinošu pamatojumu. Jebkurā laikā varat iebilst pret tirgvedību, un mēs to pārtrauksim |
-| **Pārnesamība** (GDPR 20. pants; Art. 20) | Jūsu debates un konta dati plaši izmantotā, mašīnlasāmā formātā. \[Pending: same export as Access.\] Jūsu radītais saturs, kas nav personas dati, piemēram, jūsu jautājumi, pēc pieprasījuma tiek jums atdots, beidzoties līgumam |
+| **Pārnesamība** (GDPR 20. pants; Art. 20) | Jūsu debates un konta dati plaši izmantotā, mašīnlasāmā formātā. Izmantojiet Iestatījumu funkciju Eksportēt datus: ZIP failā ir jūsu dati mašīnlasāmos JSON failos un viena lasāma lapa; pa e-pastu nosūtītā saite darbojas 24 stundas un tikai tad, kad esat pieteicies savā kontā. Jūsu radītais saturs, kas nav personas dati, piemēram, jūsu jautājumi, pēc pieprasījuma tiek jums atdots, beidzoties līgumam |
 | **Piekrišanas atsaukšana** (GDPR 7. panta 3. punkts; Art. 7(3)) | Tirgvedības piekrišanas atsaukšana jebkurā e-pasta ziņojumā vai Iestatījumos; piekrišanas sensitīvu datu apstrādei atsaukšana, slēdzot kontu Iestatījumos (šādus datus var arī neiekļaut vai dzēst debates, kurās tie ir). Atsaukšana neietekmē jau notikušu apstrādi |
 | **Sūdzība** | Rumānijas uzraudzības iestādei **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukareste, <anspdcp@dataprotection.ro>, vai jūsu dzīvesvietas valsts uzraudzības iestādei. Mēs vēlētos, lai jūs vispirms sazinātos ar mums |
 
@@ -174,7 +176,7 @@ Dialectical Engine ir paredzēts pieaugušajiem. Reģistrējoties jūs apstiprin
 ## 13. Sīkdatnes
 
 
-Dialectical Engine izmanto 18 elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai Dialectical Engine: 13 sīkdatnes un 5 ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. **Sīkdatņu politikā** vietnē dezbatere.ro/cookies tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits.
+Dialectical Engine izmanto 20 elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai Dialectical Engine: 13 sīkdatnes un 7 ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. **Sīkdatņu politikā** vietnē dezbatere.ro/cookies tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits.
 
 | Nosaukums | Veids | Nolūks | Ilgums |
 |---|---|---|---|
@@ -196,6 +198,8 @@ Dialectical Engine izmanto 18 elementus, kas visi ir absolūti nepieciešami jū
 | `debateai.languageOffer.dismissed` | Sesijas krātuve | Atceras šai cilnei, ka atteicāties no piedāvājuma rādīt debates citā valodā. | Līdz jūs aizverat cilni |
 | `debateai.support.conversation.v2` | Sesijas krātuve | Saglabā jūsu palīdzības tērzēšanas sarunu ekrānā, kamēr cilne ir atvērta. Tā tiek izdzēsta, kad šajā cilnē kāds pierakstās vai izrakstās. | Līdz jūs aizverat cilni |
 | `debateai.phone-completion-draft.v1` | Sesijas krātuve | Nepabeigts jautājums tālruņa soļa laikā; dzēsts pie sesijas maiņas, izrakstīšanās vai īpašnieka maiņas | 15 minūtes vai līdz agrākai dzēšanai |
+| `debateai.exportPending` | Sesijas krātuve | Saglabā e-pastā saņemto eksporta saiti šajā cilnē, lai varētu pierakstīties un mēģināt vēlreiz. | Līdz cilnes aizvēršanai, izrakstīšanai, jaunai saitei, pirmajai veiksmīgajai lejupielādei vai nederīgas saites vai nepareiza konta rezultātam |
+| `debateai.exportLinkOutcome` | Sesijas krātuve | Atceras, kurš lejupielādes saites ziņojums jārāda šajā cilnē. | Līdz cilnes aizvēršanai, izrakstīšanai vai jaunai saitei |
 
 Neviena cita puse ar Dialectical Engine starpniecību nevāc informāciju par jūsu darbībām tiešsaistē laika gaitā un dažādās tīmekļa vietnēs.
 
@@ -229,7 +233,7 @@ Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas
 
 ### B.4 Austrālija un Jaunzēlande
 
-**Austrālija.** Jūsu personas informācijas saņēmēji ārvalstīs ir Reģistrā norādītie MI pakalpojumu sniedzēji un apstrādātāji, kas atrodas Amerikas Savienotajās Valstīs un Eiropas Savienībā; mēs veicam pamatotus pasākumus, lai nodrošinātu, ka tie apstrādā šo informāciju saskaņā ar Austrālijas privātuma principiem. **Automatizēti lēmumi:** no 2026. gada 10. decembra šajā politikā ir norādīti datorprogrammu pieņemto lēmumu veidi, kas būtiski ietekmē jūsu tiesības vai intereses — tādu nav; vērtējumi un spriedumi attiecas uz argumentiem, nevis jums —, kā arī tajos izmantotā personas informācija. Sūdzības var iesniegt **Office of the Australian Information Commissioner**. **Jaunzēlande.** Mūsu privātuma speciālists ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Ja mēs personas informāciju par jums vācam netieši — jo cits lietotājs to ir iekļāvis jautājumā —, šī politika un 11. sadaļa ir paziņojums, ko jums sniedzam. Mēs izpaužam datus Reģistrā norādītajiem MI pakalpojumu sniedzējiem kā apstrādātājiem, kas rīkojas mūsu vārdā, saskaņā ar līgumiem, kuros noteiktas līdzvērtīgas garantijas. Sūdzības var iesniegt **Office of the Privacy Commissioner**.
+**Austrālija.** Jūsu personas informācijas saņēmēji ārvalstīs ir 5. sadaļā minētie apstrādātāji, tostarp mūsu mitināšanas pakalpojumu sniedzējs Londonā, Apvienotajā Karalistē, un Reģistrā norādītie MI pakalpojumu sniedzēji. Tie atrodas Apvienotajā Karalistē, Amerikas Savienotajās Valstīs un Eiropas Savienībā, un Reģistrs norāda katra MI pakalpojumu sniedzēja valstis; mēs veicam pamatotus pasākumus, lai nodrošinātu, ka tie apstrādā šo informāciju saskaņā ar Austrālijas privātuma principiem. **Automatizēti lēmumi:** no 2026. gada 10. decembra šajā politikā ir norādīti datorprogrammu pieņemto lēmumu veidi, kas būtiski ietekmē jūsu tiesības vai intereses — tādu nav; vērtējumi un spriedumi attiecas uz argumentiem, nevis jums —, kā arī tajos izmantotā personas informācija. Sūdzības var iesniegt **Office of the Australian Information Commissioner**. **Jaunzēlande.** Mūsu privātuma speciālists ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Ja mēs personas informāciju par jums vācam netieši — jo cits lietotājs to ir iekļāvis jautājumā —, šī politika un 11. sadaļa ir paziņojums, ko jums sniedzam. Mēs izpaužam datus Reģistrā norādītajiem MI pakalpojumu sniedzējiem kā apstrādātājiem, kas rīkojas mūsu vārdā, saskaņā ar līgumiem, kuros noteiktas līdzvērtīgas garantijas. Sūdzības var iesniegt **Office of the Privacy Commissioner**.
 
 ### B.5 Šveice
 

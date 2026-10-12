@@ -1,4 +1,4 @@
-# DebateAI — Käyttöehdot
+# Dialectical Engine — Käyttöehdot
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
-**In short.** Sinun on oltava vähintään 18-vuotias. DebateAI muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
+**In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
 ## 1. Keitä olemme ja miten saat meihin yhteyden
 
-DebateAI-palvelua ylläpitää **DMS Merchandise Shop S.R.L.**, Romaniaan rekisteröity yhtiö.
+Dialectical Engine -palvelua ylläpitää **DMS Merchandise Shop S.R.L.**, Romaniaan rekisteröity yhtiö.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ DebateAI-palvelua ylläpitää **DMS Merchandise Shop S.R.L.**, Romaniaan rekist
 
 Nämä tiedot ovat myös pysyvästi nähtävillä sivustolla osoitteessa dezbatere.ro/legal. Saat aina yhteyden henkilöön etkä ainoastaan avustajaamme; kohdassa 10 kerrotaan, miten.
 
-## 2. Missä tarjoamme DebateAI-palvelua
+## 2. Missä tarjoamme Dialectical Engine -palvelua
 
-Tarjoamme DebateAI-palvelua henkilöille, jotka asuvat Euroopan unionissa (27 maata) ja Euroopan talousalueella (Norja, Islanti ja Liechtenstein), Sveitsissä, Moldovassa, Yhdysvalloissa (lukuun ottamatta Tennesseetä), Kanadassa, Australiassa, Uudessa-Seelannissa, Singaporessa, Japanissa, Etelä-Koreassa ja Taiwanissa. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan.
+Tarjoamme Dialectical Engine -palvelua henkilöille, jotka asuvat Euroopan unionissa (27 maata) ja Euroopan talousalueella (Norja, Islanti ja Liechtenstein), Sveitsissä, Moldovassa, Yhdysvalloissa (lukuun ottamatta Tennesseetä), Kanadassa, Australiassa, Uudessa-Seelannissa, Singaporessa, Japanissa, Etelä-Koreassa ja Taiwanissa. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan.
 
 ## 3. Näiden käyttöehtojen hyväksyminen
 
@@ -58,21 +58,21 @@ Osoitteessa dezbatere.ro/privacy oleva **tietosuojakäytäntömme** kertoo, mite
 
 Ennen kuin teet kanssamme sopimuksen sähköisesti, käyttöliittymä näyttää sopimuksen tekemiseen liittyvät vaiheet, antaa sinun tarkistaa ja korjata syöttämäsi tiedot ennen niiden lähettämistä sekä ilmoittaa kielet, joilla sopimus voidaan tehdä. Nämä käyttöehdot ovat saatavilla tallennettavassa ja tulostettavassa muodossa. Kun ostat maksullisen tilauksen, lähetämme sinulle sähköpostitse hyväksymäsi version. Voit pyytää siitä jäljennöstä milloin tahansa. Mikään näissä käyttöehdoissa ei rajoita Romanian tai EU:n kuluttajansuojalainsäädäntöön taikka asuinmaasi lainsäädäntöön perustuvia oikeuksiasi, joita ei voida rajoittaa sopimuksella.
 
-## 4. Kuka voi käyttää DebateAI-palvelua
+## 4. Kuka voi käyttää Dialectical Engine -palvelua
 
-Sinun on oltava **vähintään 18-vuotias** voidaksesi luoda tilin, ja vahvistat tämän rekisteröityessäsi. DebateAI-palvelua ei ole suunnattu lapsille, emmekä tietoisesti tarjoa sitä alle 18-vuotiaille. Jos saamme tietää tilin kuuluvan alle 18-vuotiaalle, suljemme sen. Joillakin alueilla vaaditaan muutakin kuin vahvistus; liitteessä A kerrotaan, mitä kullakin alueella sovelletaan.
+Sinun on oltava **vähintään 18-vuotias** voidaksesi luoda tilin, ja vahvistat tämän rekisteröityessäsi. Dialectical Engine -palvelua ei ole suunnattu lapsille, emmekä tietoisesti tarjoa sitä alle 18-vuotiaille. Jos saamme tietää tilin kuuluvan alle 18-vuotiaalle, suljemme sen. Joillakin alueilla vaaditaan muutakin kuin vahvistus; liitteessä A kerrotaan, mitä kullakin alueella sovelletaan.
 
-Sinulla on oltava oikeustoimikelpoisuus tämän sopimuksen tekemiseen. Jos käytät DebateAI-palvelua organisaation puolesta, vahvistat, että sinulla on valtuudet sitoa organisaatio sopimukseen, jolloin ”sinä” tarkoittaa kyseistä organisaatiota.
+Sinulla on oltava oikeustoimikelpoisuus tämän sopimuksen tekemiseen. Jos käytät Dialectical Engine -palvelua organisaation puolesta, vahvistat, että sinulla on valtuudet sitoa organisaatio sopimukseen, jolloin ”sinä” tarkoittaa kyseistä organisaatiota.
 
 Kuka tahansa voi lukea julkaistun väittelyn. Lukeminen ei edellytä tiliä, mutta se on palvelun käyttöä, ja siihen sovelletaan kohtia 7, 15, 16 ja 18.
 
-## 5. Mitä DebateAI tekee ja mitä se ei ole
+## 5. Mitä Dialectical Engine tekee ja mitä se ei ole
 
-Lähetät kysymyksen tai väitteen. DebateAI lähettää sen useille kolmansien osapuolten tekoälymalleille, jotka muodostavat sen ympärille argumenttikaavion: väitteitä, vastaväitteitä, kritiikkiä, viittauksia näyttöön, pisteytyksiä ja tuomion luottamusväleineen. Voit kyseenalaistaa yksittäisiä väitteitä, pyytää jonkin seikan lisätutkimista ja päättää, julkaisetko tuloksen.
+Lähetät kysymyksen tai väitteen. Dialectical Engine lähettää sen useille kolmansien osapuolten tekoälymalleille, jotka muodostavat sen ympärille argumenttikaavion: väitteitä, vastaväitteitä, kritiikkiä, viittauksia näyttöön, pisteytyksiä ja tuomion luottamusväleineen. Voit kyseenalaistaa yksittäisiä väitteitä, pyytää jonkin seikan lisätutkimista ja päättää, julkaisetko tuloksen.
 
 **Kaikki väittelyn sisältö on tekoälyn tuottamaa.** Argumentit, kritiikki, viittaukset näyttöön, pisteytykset, tuomiot ja tukipalveluavustajan vastaukset ovat koneellisesti tuotettuja. Ne voivat olla virheellisiä, puutteellisia, vanhentuneita tai vakuuttavasti vääriä, ja ne voivat heijastaa mallien vinoumia. Kukaan ei tarkasta niitä ennen kuin ne näytetään sinulle tai julkaistaan, eikä kenelläkään nimetyllä henkilöllä ole niistä toimituksellista vastuuta. Tuotettu sisältö merkitään tekoälyn tuottamaksi tuotteessa, julkaistuilla sivuilla ja vienneissä.
 
-**DebateAI ei ole neuvontaa.** Se ei ole oikeudellista, lääketieteellistä, taloudellista, verotuksellista, psykologista, turvallisuutta koskevaa tai muuta ammatillista neuvontaa, eikä tuomio ole tosiseikan vahvistaminen. Älä käytä väittelyä terveytesi, turvallisuutesi, varojesi, oikeudellisen asemasi tai muiden hyvinvoinnin kannalta merkittävän päätöksen perusteena tarkistamatta ensisijaisia lähteitä ja tarvittaessa pätevän ammattilaisen näkemystä. Korkea luottamusväli tarkoittaa, että mallit pitivät tulkintaa näkemänsä aineiston perusteella vakiintuneena; se ei takaa tulkinnan paikkansapitävyyttä.
+**Dialectical Engine ei ole neuvontaa.** Se ei ole oikeudellista, lääketieteellistä, taloudellista, verotuksellista, psykologista, turvallisuutta koskevaa tai muuta ammatillista neuvontaa, eikä tuomio ole tosiseikan vahvistaminen. Älä käytä väittelyä terveytesi, turvallisuutesi, varojesi, oikeudellisen asemasi tai muiden hyvinvoinnin kannalta merkittävän päätöksen perusteena tarkistamatta ensisijaisia lähteitä ja tarvittaessa pätevän ammattilaisen näkemystä. Korkea luottamusväli tarkoittaa, että mallit pitivät tulkintaa näkemänsä aineiston perusteella vakiintuneena; se ei takaa tulkinnan paikkansapitävyyttä.
 
 **Mihin sitoudumme.** Tarjoamme palvelun kohtuullista huolellisuutta ja ammattitaitoa noudattaen sekä julkaisemamme kuvauksen mukaisesti. Jos laki takaa, että palvelu vastaa kuvaustaan ja soveltuu tavanomaiseen käyttötarkoitukseensa, kyseistä takuuta sovelletaan, eikä mikään näissä käyttöehdoissa poista sitä. Emme kuitenkaan lupaa yksittäisen tuotoksen olevan täsmällinen: se on tuotetun sisällön ominaisuus eikä palvelun toimivuuden mittari.
 
@@ -92,19 +92,19 @@ Voit sulkea tilisi milloin tahansa kohdassa **Asetukset → Tili**. Sulkeminen t
 
 Näitä sääntöjä sovelletaan lähettämääsi sisältöön, palvelun käyttötapaasi ja julkaisemaasi sisältöön.
 
-**Älä lähetä muita henkilöitä koskevia henkilötietoja.** Esitä kysymyksiä aiheista, argumenteista ja julkisista asioista yksilöitävissä olevien yksityishenkilöiden sijaan. Älä sisällytä nimiä, yhteystietoja, tunnistenumeroita, kuvia, terveydellisiä, taloudellisia tai muita henkilön yksilöiviä tietoja, äläkä käytä DebateAI-palvelua henkilöä koskevan asian, profiilin tai asiakirjakokonaisuuden rakentamiseen. Julkisessa roolissaan toimivia julkisuuden henkilöitä koskevat kysymykset ovat sallittuja; yksityishenkilöön kohdistuvat kysymykset eivät ole. Jos lähetät tällaisia tietoja, vastaat niistä, ja voimme poistaa sisällön.
+**Älä lähetä muita henkilöitä koskevia henkilötietoja.** Esitä kysymyksiä aiheista, argumenteista ja julkisista asioista yksilöitävissä olevien yksityishenkilöiden sijaan. Älä sisällytä nimiä, yhteystietoja, tunnistenumeroita, kuvia, terveydellisiä, taloudellisia tai muita henkilön yksilöiviä tietoja, äläkä käytä Dialectical Engine -palvelua henkilöä koskevan asian, profiilin tai asiakirjakokonaisuuden rakentamiseen. Julkisessa roolissaan toimivia julkisuuden henkilöitä koskevat kysymykset ovat sallittuja; yksityishenkilöön kohdistuvat kysymykset eivät ole. Jos lähetät tällaisia tietoja, vastaat niistä, ja voimme poistaa sisällön.
 
 **Omat arkaluonteiset tietosi.** Esittämäsi kysymykset voivat koskea omaa terveyttäsi, vakaumustasi, poliittisia näkemyksiäsi tai muita arkaluonteisia asioita. Annat tähän suostumuksesi erillisessä näkymässä ennen ensimmäistä väittelyäsi. Jos asut alueella, jolla terveystietoihin sovelletaan erityisiä sääntöjä, liitteessä A voidaan viitata erilliseen ilmoitukseen.
 
 **Älä lähetä tai julkaise lainvastaista sisältöä**, mukaan lukien sisältöä, joka on herjaavaa, yllyttää väkivaltaan tai vihaan, häiritsee tai uhkailee, sisältää ilman suostumusta jaettua intiimiä kuva-aineistoa, loukkaa immateriaalioikeuksia tai luottamuksellisuutta, paljastaa liikesalaisuuksia, sisältää lasten seksuaaliseen hyväksikäyttöön liittyvää aineistoa tai rikkoo pakotteita tai vientivalvontaa.
 
-**Älä käytä DebateAI-palvelua harhaanjohtamiseen.** Älä esitä tuotettua sisältöä ihmisen kirjoittamana, jos se johtaisi harhaan, poista siitä tekoälyn tuottamaa sisältöä koskevaa merkintää äläkä käytä sitä näennäisen yhteisymmärryksen, väärennetyn näytön tai toisena henkilönä esiintymisen luomiseen.
+**Älä käytä Dialectical Engine -palvelua harhaanjohtamiseen.** Älä esitä tuotettua sisältöä ihmisen kirjoittamana, jos se johtaisi harhaan, poista siitä tekoälyn tuottamaa sisältöä koskevaa merkintää äläkä käytä sitä näennäisen yhteisymmärryksen, väärennetyn näytön tai toisena henkilönä esiintymisen luomiseen.
 
 **Älä hyökkää palvelua vastaan.** Hakukoneet saavat indeksoida julkaistuja väittelyjä tavanomaisesti; muu automaattinen käyttö, tiedonharavointi, sivuston ryömintä tai massaluonteinen poiminta edellyttää kirjallista lupaamme; nopeusrajoituksia, tunnistautumista tai julkaisunhallintaa ei saa kiertää; kehotteita tai järjestelmäohjeita ei saa yrittää poimia; järjestelmän rajoitteiden sivuuttamiseen tähtäävä kehoteinjektio on kielletty; palvelua ei saa koestaa tai kuormitustestata ilman kirjallista lupaamme.
 
 **Älä jälleenmyy tai brändää uudelleen** palvelua äläkä käytä sitä kilpailevan järjestelmän rakentamiseen, myöskään käyttämällä tuotoksia koulutusaineistona, ilman kirjallista sopimustamme.
 
-**Älä käytä DebateAI-palvelua henkilön** terveyttä, turvallisuutta, laillisia oikeuksia, työsuhdetta, luottoa, asumista tai maahanmuuttoasemaa koskeviin päätöksiin. Palvelua ei ole rakennettu tähän, eivätkä sen tuotokset ole turvallinen peruste tällaisille päätöksille.
+**Älä käytä Dialectical Engine -palvelua henkilön** terveyttä, turvallisuutta, laillisia oikeuksia, työsuhdetta, luottoa, asumista tai maahanmuuttoasemaa koskeviin päätöksiin. Palvelua ei ole rakennettu tähän, eivätkä sen tuotokset ole turvallinen peruste tällaisille päätöksille.
 
 **Julkaisupaikan paikallinen laki.** Vastaat siitä, että kaikki julkaisemasi sisältö on sen maan lain mukaista, jossa olet. Voimme rajoittaa tiettyjä aiheita koskevaa julkaisemista tietyillä alueilla.
 
@@ -132,9 +132,9 @@ Väittelyt ovat **oletusarvoisesti yksityisiä**. Mikään luomasi ei näy muill
 
 **Mitä julkaiseminen tekee.** Julkaiseminen on tarkoituksellinen, erikseen vahvistettava toimi. Kun julkaiset, otamme väittelystä muuttumattoman tilannevedoksen ja asetamme sen kaikkien luettavaksi ilman tiliä. Hakukoneet voivat indeksoida sen. Tilannevedoksessa näkyvät **nimimerkkisi**, kysymyksesi kirjoittamassasi muodossa, argumenttipuu, pisteytykset, tuomio ja luottamusväli, ja siinä on näkyvä merkintä sisällön tuottamisesta tekoälyllä. Siinä ei näy sähköpostiosoitettasi, istuntotietojasi tai tilihistoriaasi.
 
-**Julkaiseminen on käytännössä tosiasiallisesti peruuttamatonta.** Kun väittely on julkinen, muut voivat lukea, lainata, kuvakaapata, arkistoida ja tallentaa sen välimuistiin. Julkaisun peruuttaminen poistaa sen DebateAI-palvelusta ja tuhoaa hallussamme olevan jäljennöksen salausavaimen, mutta ei voi poistaa muualla jo olevia jäljennöksiä. Älä julkaise mitään, jonka et halua yhdistyvän pysyvästi nimimerkkiisi.
+**Julkaiseminen on käytännössä tosiasiallisesti peruuttamatonta.** Kun väittely on julkinen, muut voivat lukea, lainata, kuvakaapata, arkistoida ja tallentaa sen välimuistiin. Julkaisun peruuttaminen poistaa sen Dialectical Engine -palvelusta ja tuhoaa hallussamme olevan jäljennöksen salausavaimen, mutta ei voi poistaa muualla jo olevia jäljennöksiä. Älä julkaise mitään, jonka et halua yhdistyvän pysyvästi nimimerkkiisi.
 
-**Julkaistut väittelyt sulkiessasi tilisi.** Kun ajoitat tilisi sulkemisen, valitset, mitä julkaisemillesi väittelyille tapahtuu. Jos valitset **"Poista myös julkiset väittelyni"**, poistamme jokaisen DebateAI:sta ja tuhoamme oman kopiomme avaimen sulkemisen yhteydessä, kuten julkaisun perumisessa, ellei laki edellytä tietyn kohteen säilyttämistä. Jos jätät valintaruudun valitsematta, väittelyt pysyvät julkisina käytöstä poistetulla salanimellä. Muiden ennen poistamista tekemät kopiot eivät ole hallinnassamme. Jos haluat säilyttää itselläsi poistettavan väittelyn, lataa se ensin.
+**Julkaistut väittelyt sulkiessasi tilisi.** Kun ajoitat tilisi sulkemisen, valitset, mitä julkaisemillesi väittelyille tapahtuu. Jos valitset **"Poista myös julkiset väittelyni"**, poistamme jokaisen Dialectical Engine:sta ja tuhoamme oman kopiomme avaimen sulkemisen yhteydessä, kuten julkaisun perumisessa, ellei laki edellytä tietyn kohteen säilyttämistä. Jos jätät valintaruudun valitsematta, väittelyt pysyvät julkisina käytöstä poistetulla salanimellä. Muiden ennen poistamista tekemät kopiot eivät ole hallinnassamme. Jos haluat säilyttää itselläsi poistettavan väittelyn, lataa se ensin.
 
 **Voimme aina poistaa julkaistun sisällön.** Voimme poistaa julkaistun väittelyn tai rajoittaa pääsyä siihen, jos laki sitä edellyttää, tuomioistuin tai toimivaltainen viranomainen niin määrää taikka väittely rikkoo näitä käyttöehtoja tai on lainvastainen. Mikään tässä kohdassa ei estä meitä toimimasta kohdassa 10 tarkoitetun pätevän ilmoituksen perusteella, eikä mikään tässä kohdassa ole lupaus julkaistun väittelyn saatavuuden jatkumisesta.
 
@@ -161,7 +161,7 @@ Vahvistamme jokaisen ilmoituksen vastaanottamisen ilman aiheetonta viivytystä. 
 
 **Yhteyden saaminen henkilöön.** Tukipalveluavustajamme on tekoälyjärjestelmä ja ilmoittaa siitä. Voit milloin tahansa pyytää saada keskustella henkilön kanssa, ja tämä vaihtoehto tarjotaan jokaisessa tukikeskustelussa. Emme käytä viestinnässäsi pelkästään automatisoituja työkaluja.
 
-**Terroristinen sisältö.** Terroristinen sisältö on laitonta, ja se on kiellettyä DebateAI-palvelussa (kohta 7). Euroopan unionin toimivaltaiset viranomaiset voivat lähettää meille poistamismääräyksiä asetuksen (EU) 2021/784 nojalla kohdassa 1 ilmoitettuun yhteyspisteeseen. Kun saamme tällaisen määräyksen, poistamme sisällön tai estämme pääsyn siihen kaikissa EU-maissa tunnin kuluessa. Ilmoitamme sisällön julkaisseelle henkilölle, että sisältö on poistettu, ja hänen pyynnöstään kerromme poistamisen syyt ja sen, miten määräyksen voi riitauttaa, paitsi jos viranomainen päättää, että yleinen turvallisuus edellyttää, ettei tietoja anneta rajoitettuna aikana. Asetuksen edellyttämällä tavalla säilytämme poistetun sisällön ja siihen liittyvät tiedot kuuden kuukauden ajan, jotta poistaminen voidaan tarkastaa ja peruuttaa, jos se oli virheellinen. Sisällön julkaissut henkilö voi riitauttaa määräyksen sen maan tuomioistuimissa, jonka viranomainen antoi määräyksen, ja voi myös käyttää valitusreittiämme. Mikään viranomainen ei ole edellyttänyt meiltä erityisiä toimenpiteitä terroristista sisältöä vastaan asetuksen nojalla; jos jokin viranomainen niin tekee, kuvaamme nämä toimenpiteet tässä, mukaan lukien mahdolliset automatisoidut työkalut.
+**Terroristinen sisältö.** Terroristinen sisältö on laitonta, ja se on kiellettyä Dialectical Engine -palvelussa (kohta 7). Euroopan unionin toimivaltaiset viranomaiset voivat lähettää meille poistamismääräyksiä asetuksen (EU) 2021/784 nojalla kohdassa 1 ilmoitettuun yhteyspisteeseen. Kun saamme tällaisen määräyksen, poistamme sisällön tai estämme pääsyn siihen kaikissa EU-maissa tunnin kuluessa. Ilmoitamme sisällön julkaisseelle henkilölle, että sisältö on poistettu, ja hänen pyynnöstään kerromme poistamisen syyt ja sen, miten määräyksen voi riitauttaa, paitsi jos viranomainen päättää, että yleinen turvallisuus edellyttää, ettei tietoja anneta rajoitettuna aikana. Asetuksen edellyttämällä tavalla säilytämme poistetun sisällön ja siihen liittyvät tiedot kuuden kuukauden ajan, jotta poistaminen voidaan tarkastaa ja peruuttaa, jos se oli virheellinen. Sisällön julkaissut henkilö voi riitauttaa määräyksen sen maan tuomioistuimissa, jonka viranomainen antoi määräyksen, ja voi myös käyttää valitusreittiämme. Mikään viranomainen ei ole edellyttänyt meiltä erityisiä toimenpiteitä terroristista sisältöä vastaan asetuksen nojalla; jos jokin viranomainen niin tekee, kuvaamme nämä toimenpiteet tässä, mukaan lukien mahdolliset automatisoidut työkalut.
 
 **Vakava henkeen tai turvallisuuteen kohdistuva riski.** Jos saamme tietoomme tietoja, jotka viittaavat jonkun henkeä tai turvallisuutta uhkaavaan rikokseen, ilmoitamme niistä toimivaltaisille viranomaisille.
 
@@ -183,7 +183,7 @@ Kohdat 8 (jo julkaistun sisällön osalta), 15, 16 ja 18 jäävät voimaan sopim
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI tarjoaa maksuttoman tilauksen. Tarjolle tulee maksullinen **Premium**-tilaus, joka avaa koko mallivalikoiman ja antaa sinun asettaa väittelyn mittarit itse.
+Dialectical Engine tarjoaa maksuttoman tilauksen. Tarjolle tulee maksullinen **Premium**-tilaus, joka avaa koko mallivalikoiman ja antaa sinun asettaa väittelyn mittarit itse.
 
 **Ennen maksamista** näytämme suoraan maksupainikkeen yläpuolella: tilauksen; kokonaishinnan sovellettavine veroineen; laskutuskauden; tiedon siitä, että tilaus uusiutuu automaattisesti peruuttamiseen asti; maksuttoman kokeilujakson päättymispäivän ja sen jälkeen veloitettavan määrän; sekä peruutustavan. Vahvistat uusimisehdot valitsemalla erillisen valintaruudun. Painikkeessa lukee **Tilaa ja maksa** (romaniaksi *Comandă cu obligație de plată*). Lähetämme sinulle pysyvällä välineellä vahvistuksen, joka sisältää samat tiedot, nämä käyttöehdot ja peruuttamislomakkeen.
 
@@ -211,11 +211,11 @@ Jos asut muualla, liitteessä A ilmoitetaan alueellasi mahdollisesti sovellettav
 
 ## 14. Palvelun ja näiden käyttöehtojen muutokset
 
-**Palvelun muutokset.** Kehitämme DebateAI-palvelua jatkuvasti, ja tavanomaiset parannukset, korjaukset ja mallivalikoiman muutokset tehdään ilman ilmoitusta. Jos muutos ylittää sen, mikä on tarpeen palvelun pitämiseksi kuvatulla tavalla toimivana, teemme sen vain jostakin seuraavista syistä: oikeudellisen tai sääntelyvaatimuksen noudattamiseksi; turvallisuus- tai väärinkäytösongelmaan reagoimiseksi; koska mallipalveluntarjoaja muuttaa tai rajoittaa mallia tai ominaisuutta, johon tukeudumme, taikka poistaa sen; mukautuaksemme tekniseen ympäristöön, jota emme hallitse; tai lisätäksemme, parantaaksemme tai poistaaksemme ominaisuuden tavalla, josta ei aiheudu sinulle kustannuksia.
+**Palvelun muutokset.** Kehitämme Dialectical Engine -palvelua jatkuvasti, ja tavanomaiset parannukset, korjaukset ja mallivalikoiman muutokset tehdään ilman ilmoitusta. Jos muutos ylittää sen, mikä on tarpeen palvelun pitämiseksi kuvatulla tavalla toimivana, teemme sen vain jostakin seuraavista syistä: oikeudellisen tai sääntelyvaatimuksen noudattamiseksi; turvallisuus- tai väärinkäytösongelmaan reagoimiseksi; koska mallipalveluntarjoaja muuttaa tai rajoittaa mallia tai ominaisuutta, johon tukeudumme, taikka poistaa sen; mukautuaksemme tekniseen ympäristöön, jota emme hallitse; tai lisätäksemme, parantaaksemme tai poistaaksemme ominaisuuden tavalla, josta ei aiheudu sinulle kustannuksia.
 
 Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin. Jos muutoksella on vähäistä suurempi kielteinen vaikutus mahdollisuuteesi käyttää palvelua tai palvelun käyttöösi, voit päättää sopimuksen maksutta **30 päivän** kuluessa ilmoituksesta tai muutoksen voimaantulosta sen mukaan, kumpi ajankohta on myöhäisempi, ja palautamme käyttämättömään aikaan kohdistuvat ennakkomaksut.
 
-**Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; DebateAI-palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
+**Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
 
 ## 15. Vastuu
 
@@ -231,15 +231,15 @@ Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin
 
 ## 16. Immateriaalioikeudet
 
-Itse palvelu — ohjelmisto, järjestelmä, pisteytysmenetelmä, käyttöliittymä, nimet DebateAI ja DebateAIRO sekä logomme — kuuluu meille tai lisenssinantajillemme. Nämä käyttöehdot antavat sinulle luvan käyttää palvelua, eivät sen omistusoikeutta.
+Itse palvelu — ohjelmisto, järjestelmä, pisteytysmenetelmä, käyttöliittymä, nimet Dialectical Engine ja DebateAIRO sekä logomme — kuuluu meille tai lisenssinantajillemme. Nämä käyttöehdot antavat sinulle luvan käyttää palvelua, eivät sen omistusoikeutta.
 
-Voit lainata julkaistuja väittelyitä ja linkittää niihin, kun mainitset DebateAI-palvelun lähteenä ja lisäät linkin alkuperäiselle sivulle. Julkisen aineiston massakopiointi ja järjestelmällinen jäljentäminen sekä julkaistujen väittelyiden käyttö koulutusaineistona on kielletty ilman kirjallista sopimustamme.
+Voit lainata julkaistuja väittelyitä ja linkittää niihin, kun mainitset Dialectical Engine -palvelun lähteenä ja lisäät linkin alkuperäiselle sivulle. Julkisen aineiston massakopiointi ja järjestelmällinen jäljentäminen sekä julkaistujen väittelyiden käyttö koulutusaineistona on kielletty ilman kirjallista sopimustamme.
 
-Kohdassa 8 käsitellään sisältöäsi ja tuotettujen sisältöjen asemaa. Jos katsot jonkin DebateAI-palvelussa loukkaavan immateriaalioikeuksiasi, käytä kohdassa 10 tarkoitettua ilmoitusreittiä.
+Kohdassa 8 käsitellään sisältöäsi ja tuotettujen sisältöjen asemaa. Jos katsot jonkin Dialectical Engine -palvelussa loukkaavan immateriaalioikeuksiasi, käytä kohdassa 10 tarkoitettua ilmoitusreittiä.
 
 ## 17. Henkilötiedot
 
-Henkilötietojen käsittelymme kuvataan osoitteessa dezbatere.ro/privacy olevassa **tietosuojakäytännössä**. Siinä kerrotaan, mitä keräämme, kunkin tarkoituksen oikeusperuste, tietojen säilytysaika, tietojen vastaanottajat, tietojen siirrot ja oikeuksiesi käyttäminen. Myös kolme seuraavaa seikkaa kuuluvat tähän. Kohdassa 7 pyydetään, ettet sisällytä kysymykseen muiden henkilötietoja; jos teet niin, vastaat siitä, ja voimme poistaa sisällön. Jos DebateAI-palvelussa julkaistu väittely sisältää sinua koskevia henkilötietoja, voit pyytää niiden poistamista ilman tiliä (kohta 9). Lisäksi säilytämme sopimuksen todisteena tiedon näiden käyttöehtojen hyväksymisestäsi — version, ajankohdan ja istunnon tekniset tiedot — tietosuojakäytännössä kuvatulla tavalla.
+Henkilötietojen käsittelymme kuvataan osoitteessa dezbatere.ro/privacy olevassa **tietosuojakäytännössä**. Siinä kerrotaan, mitä keräämme, kunkin tarkoituksen oikeusperuste, tietojen säilytysaika, tietojen vastaanottajat, tietojen siirrot ja oikeuksiesi käyttäminen. Myös kolme seuraavaa seikkaa kuuluvat tähän. Kohdassa 7 pyydetään, ettet sisällytä kysymykseen muiden henkilötietoja; jos teet niin, vastaat siitä, ja voimme poistaa sisällön. Jos Dialectical Engine -palvelussa julkaistu väittely sisältää sinua koskevia henkilötietoja, voit pyytää niiden poistamista ilman tiliä (kohta 9). Lisäksi säilytämme sopimuksen todisteena tiedon näiden käyttöehtojen hyväksymisestäsi — version, ajankohdan ja istunnon tekniset tiedot — tietosuojakäytännössä kuvatulla tavalla.
 
 ## 18. Sovellettava laki ja riitojen käsittelypaikka
 
@@ -277,7 +277,7 @@ Näiden käyttöehtojen yleinen osa on laadittu sinua varten. Lisäksi: voit nos
 
 ### A.2 Yhdysvallat
 
-**Tennessee.** Emme tarjoa DebateAI-palvelua henkilöille, jotka asuvat Tennesseessä.
+**Tennessee.** Emme tarjoa Dialectical Engine -palvelua henkilöille, jotka asuvat Tennesseessä.
 
 **Ilmoitukset ja poistot.** Ilman suostumusta jaetusta intiimistä kuva-aineistosta voi ilmoittaa ilman tiliä sähköpostitse osoitteeseen abuse@dezbatere.ro, ja se poistetaan 48 tunnin kuluessa pätevästä pyynnöstä. Tekijänoikeusvalitukset käsitellään kohdassa 10 tarkoitetun ilmoitusreitin kautta.
 

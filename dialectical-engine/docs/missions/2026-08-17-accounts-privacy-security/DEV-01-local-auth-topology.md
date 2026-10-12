@@ -29,7 +29,7 @@ removed deterministic scaffold is never started.
 
 The future stop command is `pnpm dev:auth:stop`. Stop is non-destructive: Postgres, user DEKs, audit keys, mail, TLS material, and operator credentials remain under `.local/dev-auth`.
 
-DEV-03 now implements only the bounded post-migration principal step as `pnpm dev:auth:provision-principals`. It writes the nine application service URLs to the ignored mode-`0600` `.local/dev-auth/database-principals.env`, prints no URL or password, and refuses privilege drift. It is not the promised full-stack start command.
+DEV-03 now implements only the bounded post-migration principal step as `pnpm dev:auth:provision-principals`. It writes the twelve application service URLs to the ignored mode-`0600` `.local/dev-auth/database-principals.env`, prints no URL or password, and refuses privilege drift. It is not the promised full-stack start command.
 
 DEV-04 now implements only the bounded persistent-secret step as `pnpm dev:auth:generate-secrets`. It atomically publishes the absent KEK, blind-index key, and audit-source-IP salt as distinct 32-byte mode-`0600` files, creates the audit-key and user-DEK stores at mode `0700`, reuses only valid existing custody, and prints no key material. It refuses permissive modes, malformed files, symlinks, duplicate material/inodes, and unknown ownership rather than repairing or rotating them. It is not the promised full-stack start command.
 
@@ -162,7 +162,7 @@ answer or the real browser acceptance journey.
 
 ## Database principals
 
-The local databases have ten wrapper LOGINs. Eight least-privilege application wrappers are provisioned by DEV-03 after migrations create their NOLOGIN capability roles; the migrator and Hatchet database owner remain separate bootstrap concerns.
+The local databases have fourteen wrapper LOGINs. Twelve application wrappers are provisioned by DEV-03 after migrations create their NOLOGIN capability roles; the migrator and Hatchet database owner remain separate bootstrap concerns.
 
 - `debateai_dev_migrator` is the only elevated principal. It owns the `debateai` database and the migration-created schemas `audit_crypto_internal`, `core`, `evidence`, `identity`, `ledger`, `memory`, `obs`, `register`, `scorecard`, and `serve`, and is used only by principal bootstrap, migrations, and register seeding. Migration 0023 deliberately leaves `evaluator` owned by the NOLOGIN `debateai_evaluator_ddl` role; the migrator applies and replays that migration but must not take evaluator ownership. Its credential is never passed to a long-lived service.
 - `debateai_dev_runtime` is `LOGIN INHERIT` and a direct member only of `debateai_billing_runtime` (migration 0093, go-live row 41); that migration-owned capability deliberately inherits `debateai_runtime`, so the API's login holds billing's privileges and the runtime ones. The development runner shares this login, so in development only the liveness login is kept away from billing.
@@ -174,9 +174,12 @@ The local databases have ten wrapper LOGINs. Eight least-privilege application w
 - `debateai_dev_liveness` is a credential-distinct `LOGIN INHERIT` member only of `debateai_runtime`, matching the liveness repository's existing runtime-governed tables without sharing the API credential; it is never a member of `debateai_billing_runtime`.
 - `debateai_dev_settlement` is `LOGIN INHERIT` and a member only of `debateai_settlement_watch`.
 - `debateai_dev_evaluator_api` is `LOGIN INHERIT` and a member only of `debateai_evaluator_api`; it is the only development principal accepted for the development-only evaluator menu.
+- `debateai_dev_support_config_operator` is `LOGIN INHERIT` and a member only of `debateai_support_config_operator`.
+- `debateai_dev_support` is `LOGIN INHERIT` and a member only of `debateai_support`.
+- `debateai_dev_data_export` is `LOGIN INHERIT` and a member only of `debateai_data_export_worker`; its `DATA_EXPORT_DATABASE_URL` is distinct from the request pool's `AUTHORIZATION_DATABASE_URL`. It runs only the export worker functions.
 - `debateai_dev_hatchet` owns only the separate `hatchet` database and has no application capability membership.
 
-Every service LOGIN is `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, owns no application schema/table/sequence/function, and has no direct/inherited `pg_*` membership. All nine application URLs resolve to credential-distinct current users; runtime and liveness intentionally share only a capability role, never a login. The API still creates separate pool instances for admission and work; a separate pool is not permission to alias the principals.
+Every service LOGIN is `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, owns no application schema/table/sequence/function, and has no direct/inherited `pg_*` membership. All twelve application URLs resolve to credential-distinct current users; runtime and liveness intentionally share only a capability role, never a login. The API keeps the authorization request pool and data-export worker pool credential-distinct.
 
 ## Ordered bootstrap
 
@@ -184,7 +187,7 @@ Every service LOGIN is `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPA
 2. **PERSISTENT_PATHS:** create/verify exact modes; refuse unknown ownership or permissive keys.
 3. **POSTGRES:** start the pinned Postgres major with persistent data and wait for the exact server identity.
 4. **MIGRATIONS_REPLAY:** apply `0000` through the current migration, then replay the current migration to prove idempotency. Capability roles are migration-owned and are never duplicated by the principal command.
-5. **APPLICATION_PRINCIPALS:** create or verify the nine exact application LOGINs and their SCRAM passwords; privilege drift is fatal. The migrator and isolated Hatchet owner were created by the PostgreSQL bootstrap.
+5. **APPLICATION_PRINCIPALS:** create or verify the twelve exact application LOGINs and their SCRAM passwords; privilege drift is fatal. The migrator and isolated Hatchet owner were created by the PostgreSQL bootstrap.
 6. **REGISTER_SEED:** load the private real-provider panel, then persist and seal the production bootstrap, auth, MFA, session, provider, discovery, structural, and risk rows as register version 4. Acceptance-only seed/server code and substitute providers are forbidden.
 7. **SECRETS:** generate only absent secrets, verify all existing commitments/modes, and never print key bytes.
 8. **HATCHET:** start the pinned local engine against the separate `hatchet` database, then run `pnpm dev:auth:provision-hatchet-token`; it issues once through the image's supported admin binary and live-attests tenant/workflow API authority on every use.
@@ -202,7 +205,7 @@ Every service LOGIN is `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPA
 - fresh migration plus replay safety;
 - complete sealed register with every row the API reads before listen;
 - exact runtime CLI-handshake panel with at least one real responder, exact register/target equality, and no substitute-provider process;
-- exact runtime/content-provision/erasure/authorization/publication-cleanup/replay/liveness/settlement/evaluator-api current-user and capability isolation, using production witnesses where present plus the DEV-03 actual-login matrix;
+- exact runtime/content-provision/erasure/authorization/publication-cleanup/replay/liveness/settlement/evaluator-api/support/data-export current-user and capability isolation, using production witnesses where present plus the DEV-03 actual-login matrix;
 - pairwise-distinct application service database principals and URLs, including credential-distinct runtime and liveness wrappers;
 - 32-byte/mode-0600 secret files and mode-0700 stores;
 - sendmail executable plus private writable capture with no terminal payload;

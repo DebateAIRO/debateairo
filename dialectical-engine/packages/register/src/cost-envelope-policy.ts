@@ -35,8 +35,9 @@ import type { Pool } from "pg";
  *    `SUPPORT` spend source and the daily sum already includes it, so wiring it
  *    in is one call at that transport's own seam and needs no migration.
  *  - the DISCOVERY PROBES. Each ask-time and claim-time health probe is a real
- *    `max_tokens: 8` completion per vendor (`packages/providers/src/provider-probe.ts`)
- *    and is charged nowhere.
+ *    completion per vendor of at most `max_tokens: 512` (raised from 8 on
+ *    2026-10-12 so a model that thinks first can still write its "OK";
+ *    `packages/providers/src/provider-probe.ts`) and is charged nowhere.
  *
  * Both are small beside a debate run and both are bounded in CALLS; neither is
  * bounded in MONEY by this row. An operator reading this ceiling as the day's

@@ -5,7 +5,7 @@
   "legal.notice.title": "Mentions légales",
   "legal.notice.meta": "Qui exploite {product} et comment nous contacter",
   "legal.notice.s01.title": "Qui sommes-nous",
-  "legal.notice.s01.body": "{product} (également appelé {alsoCalled}) est exploité par {company}, une société immatriculée en Roumanie.",
+  "legal.notice.s01.body": "{product} est exploité par {company}, une société immatriculée en Roumanie.",
   "legal.notice.s01.seller": "{company} est aussi le vendeur des formules payantes : votre contrat, vos paiements et vos factures sont conclus avec {company}.",
   "legal.notice.company.name": "Dénomination sociale",
   "legal.notice.company.tradingNames": "Noms commerciaux",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Mémorise la langue d’interface que vous avez choisie.",
   "legal.cookies.locale.life": "1 an",
   "legal.cookies.storageTitle": "Stockés dans votre navigateur, et non dans des cookies",
-  "legal.cookies.storageIntro": "Quatre éléments sont conservés dans le stockage de votre navigateur : deux dans le stockage local, jusqu’à ce que vous les effaciez, et deux dans le stockage de session, jusqu’à la fermeture de l’onglet. Contrairement aux cookies, ils ne sont pas joints à vos requêtes ; l’élément du chat d’aide conserve une copie d’une conversation que vous avez eue avec l’aide de DebateAI, dont les messages sont parvenus à DebateAI au moment où vous les avez envoyés.",
+  "legal.cookies.storageIntro": "Quatre éléments sont conservés dans le stockage de votre navigateur : deux dans le stockage local, jusqu’à ce que vous les effaciez, et deux dans le stockage de session, jusqu’à la fermeture de l’onglet. Contrairement aux cookies, ils ne sont pas joints à vos requêtes ; l’élément du chat d’aide conserve une copie d’une conversation que vous avez eue avec l’aide de Dialectical Engine, dont les messages sont parvenus à Dialectical Engine au moment où vous les avez envoyés.",
   "legal.cookies.consent.kind": "Stockage local",
   "legal.cookies.consent.purpose": "Retient que vous avez vu l’avis sur les cookies, afin qu’il ne s’affiche qu’une fois.",
   "legal.cookies.consent.life": "Jusqu’à ce que vous l’effaciez",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Stockage de session",
   "legal.cookies.supportConversation.purpose": "Garde votre conversation avec l’aide à l’écran tant que l’onglet reste ouvert. Elle est effacée quand quelqu’un se connecte ou se déconnecte dans cet onglet.",
   "legal.cookies.supportConversation.life": "Jusqu’à la fermeture de l’onglet",
-  "legal.cookies.recipient.server": "Serveur de DebateAI uniquement",
+  "legal.cookies.recipient.server": "Serveur de Dialectical Engine uniquement",
   "legal.cookies.recipient.browser": "reste dans votre navigateur",
   "legal.cookies.refuse": "Pour les refuser, bloquez ou supprimez les cookies et les données de ce site dans les paramètres de votre navigateur.",
   "legal.cookies.refuseEffect": "Ce qui cesse alors de fonctionner : la connexion, et la mémorisation de votre langue et de vos choix d’affichage.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Jusqu’à 30 minutes",
   "legal.cookies.mfaRecovery.life": "Jusqu’à 299 secondes",
   "legal.cookies.social.life": "Jusqu’à 5 minutes",
-  "legal.cookies.phoneDraft.life": "15 minutes ou jusqu’à l’effacement"
+  "legal.cookies.phoneDraft.life": "15 minutes ou jusqu’à l’effacement",
+  "legal.cookies.exportPending.purpose": "Conserve dans cet onglet le lien d’exportation reçu par e-mail pour la connexion et une nouvelle tentative.",
+  "legal.cookies.exportLinkOutcome.purpose": "Mémorise le message concernant le lien de téléchargement à afficher dans cet onglet.",
+  "legal.cookies.exportPending.life": "Jusqu’à la fermeture de l’onglet, la déconnexion, un nouveau lien, le premier téléchargement réussi ou un résultat de lien invalide ou de mauvais compte",
+  "legal.cookies.exportLinkOutcome.life": "Jusqu’à la fermeture de l’onglet, la déconnexion ou un nouveau lien"
 }

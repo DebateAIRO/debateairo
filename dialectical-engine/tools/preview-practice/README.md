@@ -54,13 +54,48 @@ a folder's `samples.jsonl` (nothing is sent; no socket or acknowledgement needed
 node_modules/.bin/tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
 ```
 
+### The whole debate, word for word (debate mode, `--transcript`)
+
+Add `--transcript` to a debate run to also get `transcript.json` in the same `--out` folder: every real prompt and
+every real answer of the practice debate, so the owner can read exactly what each AI was asked and what it said.
+Without the flag nothing more is written; with it, `report.json` and `report.md` stay exactly as they are.
+
+It is written right after the debate ends, while the throwaway database and the debate's key still exist (both are
+deleted a moment later), and it holds one JSON object:
+
+- `run`: the run id, the question (id and text), the depth, the register version, the AIs on the panel (each with its
+  maker), the ones that sat out, who wrote and checked the answer and the story, when the debate started and ended,
+  how it ended, the served answer's summary and the story's outcome.
+- `attempts`: every model call in the order the ledger recorded it (usually 150 to 250): which job (`family`,
+  `callSiteKey`, `modelRole`), which AI (`providerRef`, `model`, `maker`), how it ended, its start, end and length in
+  milliseconds, its tokens (input, output, reasoning, cached, as the vendor reported them), its cost (what the spend
+  ledger charged and the price list's estimate), its format check (status, the check's own words, `code@path` issues,
+  the tolerant repair it needed), whether it was the step's own ask, the short patch follow-up or the full re-ask
+  (`replyForm`), the full prompt (`prompt.messages`: every message exactly as sent: the system message with the
+  instruction text, the safety frame and the call's markers, then the material) and the full reply (`reply.content`:
+  the AI's own text; `reply.vendorBody`: the vendor's whole reply body when that is what was stored, never a header;
+  `reply.vendorUsage`).
+- `structure`: the debate as the site reads it: `answer` (the positions with their text and makers, the judgements,
+  the reviews, the edges, the served text and the verdict), `inspection` (the answer checker's record per piece of
+  text), `story` (as stored; the story text when it is READY).
+- `unavailable`: what the file could not hold and why (for example: the site's reader lists only positions that got a
+  judgement, so a position with none is seen only in `attempts`).
+
+Nothing is cut and model text is not blanked (the 64 KiB cap and the redaction of `report.json` do not apply). As a
+safety net, every string still goes through the named key shapes (a PEM block, a bearer or authorization header, a
+vendor key, a JWT, a `secret=`-style pair): the practice prints whether that blanked anything (`transcript: the
+key-shape safety net changed nothing`). The generic "long run of letters" rule is not used here, because it would blank
+every id in the file. No key, password, database address or setting is ever written. The file is written whole or not
+at all, readable only by you. It can be several megabytes. It holds only our own practice question and the AIs' text
+about it; keep it in `$P` with the reports.
+
 The last line on the screen and the exit code say:
 
 | Exit | Verdict | Meaning |
 |---|---|---|
 | 0 | PASS | Everything worked. The upload may go ahead. |
-| 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes, or an AI's reply had the wrong format and a later try of the same call fixed it, by the short follow-up or the full re-ask (`FORMAT_REPAIRED:<model>:<how many>`, owner ruling 2026-10-12 "Fixed slips = warning"), or an AI was busy and sat out the rest after giving at least one accepted answer (`MODEL_BUSY_PARTLY:<model>:answered=<n>:skipped=<m>`, owner ruling 2026-10-12 "Keep GLM, it sits out"). Owner decides. |
-| 20 | FAIL | A call ended without an accepted reply after its tries because of its format (`FORMAT_FAILED`), or one AI's first tries had the wrong format too often (`SLIP_RATE:<model>:<slips>/<answered calls>`: more than 1 in 10 of its answered calls, one slip always allowed), a call failed, the debate did not finish, no answer or no story (anything but READY, so READY_WITH_RESERVATION too), or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
+| 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes, or an AI's reply had the wrong format and a later try of the same call fixed it, by the short follow-up or the full re-ask (`FORMAT_REPAIRED:<model>:<how many>`, owner ruling 2026-10-12 "Fixed slips = warning"), or an AI was busy and sat out the rest after giving at least one accepted answer (`MODEL_BUSY_PARTLY:<model>:answered=<n>:skipped=<m>`, owner ruling 2026-10-12 "Keep GLM, it sits out"), or the story was served with the story checker's reservation after its rounds ran out (`STORY_RESERVED`, owner ruling 2026-10-12). Owner decides. |
+| 20 | FAIL | A call ended without an accepted reply after its tries because of its format (`FORMAT_FAILED`), or one AI's first tries had the wrong format too often (`SLIP_RATE:<model>:<slips>/<answered calls>`: more than 1 in 10 of its answered calls, one slip always allowed), a call failed, the debate did not finish, no answer or no story (anything but READY or READY_WITH_RESERVATION), or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
 | 30 | NOT_PROVEN | It worked, but a model stayed busy (the AI company kept refusing its call as "too busy", not billed, or the model kept cooling off) and sat out before it gave a single accepted answer, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, or the operator pressed Ctrl-C once, so some model was not tested to the end. Run again later, or owner decides. |
 
 | 40 | HARNESS_ERROR | The practice could not run (a start check refused, or the tool broke). Nothing about the release is known. |
@@ -197,7 +232,9 @@ for d in node_modules/.pnpm/@embedded-postgres+darwin-arm64@*/node_modules/@embe
 shasum -a 256 tools/preview-practice/gate-relay.py
 ```
 
-Copy the relay to the server (the server checks the same digest in S-4):
+The digest printed must be `356f35eaf28764a3e17c2af5e2ec25360405c775331323177aac4e12ab409ce0` (the relay of the slow-answer ruling, 2026-10-12: it keeps a quiet connection
+open 1,500 s and lets an in-flight call finish for up to 1,500 s, past the gate's 1,200 s vendor deadline and the app's
+1,290 s socket timeout). Copy the relay to the server (the server checks the same digest in S-4):
 
 ```sh
 scp tools/preview-practice/gate-relay.py "$PREVIEW_SSH:/home/ubuntu/gate-relay.py"
@@ -244,15 +281,16 @@ getent group debateai-practice || groupadd --system debateai-practice
 gpasswd -a ubuntu debateai-practice
 ```
 
-Each time: install the relay (compare the digest with the one printed on the Mac in S-0), then start it as the
-runner account, sandboxed: no network but unix sockets, read-only system, no new privileges, ends by itself after
-8 hours.
+Each time: install the relay (the digest printed must be `356f35eaf28764a3e17c2af5e2ec25360405c775331323177aac4e12ab409ce0`, the one printed on the Mac in S-0), then start it
+as the runner account, sandboxed: no network but unix sockets, read-only system, no new privileges, ends by itself
+after 8 hours. It closes a connection only after 1,500 s with no bytes either way, and at its end (or a stop) lets a
+call in flight finish for up to 1,500 s: a model call may take up to the gate's 1,200 s (slow answer, 2026-10-12).
 
 ```sh
 install -d -o root -g root -m 0755 /usr/local/lib/debateai-practice
 install -o root -g root -m 0644 /home/ubuntu/gate-relay.py /usr/local/lib/debateai-practice/gate-relay.py
 sha256sum /usr/local/lib/debateai-practice/gate-relay.py
-systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=debateai-practice -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30000 -p TimeoutStopSec=960 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group debateai-practice --mode 0660 --max-connections 8 --lifetime-seconds 28800 --drain-seconds 900
+systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=debateai-practice -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30600 -p TimeoutStopSec=1560 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group debateai-practice --mode 0660 --max-connections 8 --lifetime-seconds 28800 --drain-seconds 1500 --idle-timeout-seconds 1500
 systemctl status debateai-preview-practice-relay --no-pager
 journalctl -u debateai-preview-practice-relay -o cat --no-pager
 ls -l /run/debateai-practice
@@ -300,12 +338,72 @@ Optional flags:
   skipped; 0 skips at once),
   `--models a,b` (model ids from the preview's roster), `--lanes JUDGE_POSITION,PANEL,...` (default all nine:
   JUDGE_POSITION, JUDGE_ATTACK, JUDGE_CROSS, PANEL, REVIEW, SYNTHESIZER, EVALUATOR, STORYTELLER, STORY_CHECKER).
+  `--levels "<model>=<level>,...;..."` (the same jobs at several thinking levels, see S-6b).
 - report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/samples.jsonl.
 - debate: `--depth 1|2`, `--question ro|en`, `--call-concurrency A/B/default=N,deepinfra=N,anthropic=N` (A: calls at
   once in the debate, 1 to 64; B: calls at once to one model in the debate, 1 to 16; each N: calls at once to one model
   across the runner for that vendor, 1 to 1000, `default` required; for example `12/3/default=50,deepinfra=150,anthropic=50`;
-  formats mode refuses it). The register is copied only through the register's own publication
+  formats mode refuses it), `--transcript` (also write `transcript.json`: every prompt and every answer, see "The whole
+  debate, word for word" above). The register is copied only through the register's own publication
   paths; an export holding a support-configuration version refuses (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
+
+### S-6b, Mac: thinking levels side by side (formats, `--levels`)
+
+`--levels` (formats mode only) asks the listed models every job once per listed thinking level (spec 2026-10-12
+§4.8). Its value is `<model>=<level>,<level>,...;<model>=...`:
+
+- each level must be on that model's reviewed menu (GLM: high, low; DeepSeek: high, low, none; MiMo: default, none;
+  Qwen: default, low, medium, none; Haiku: high, medium, low), and each model must be in this run (`--models`, or the
+  preview's roster without it). Anything else refuses before a gate is asked (`PRACTICE_LEVELS_INVALID`);
+- a level listed twice is run twice (`high#1`, `high#2`): the gap between those two runs shows how much the results
+  move by chance alone (the "chance band" line under the table in `report.md`);
+- the runs take turns per job (A, B, C, then B, C, A, ...), one after another, never at once, so a slow or busy hour
+  falls on every level alike. A busy model parks all its runs;
+- each run sends only its own level (the server's per-step levels are left out: a pure A/B). A model not listed runs
+  once, at the server's levels, as without `--levels`;
+- each sample in `samples.jsonl` also carries its run, level, thinking tokens, whether a reply stopped at max_tokens,
+  and its accepted answer (key-shaped strings blanked, at most 64 KiB). `report.json` gets a `levels` block and
+  `report.md` a "Thinking levels" table: per model and run, answered / jobs, first try, repaired, format failed (a reply
+  in the wrong format for good), call failed (the call itself failed or was refused, not billed), cut off, thinking
+  median and total, time median / p90, cost per job and total, and over bar (this run alone over the slip bar;
+  information only).
+
+To read the answers themselves, side by side: `node_modules/.bin/tsx tools/preview-practice/practice.ts report --side-by-side "$P/levels-step-b/samples.jsonl" --out "$P/levels-page"` writes `$P/levels-page/side-by-side.html` from a finished run's samples log, sending nothing and writing no report files. Open it in a browser. It shows the four chosen jobs only (PANEL, SYNTHESIZER, STORYTELLER, REVIEW); `--lanes PANEL,SYNTHESIZER` names other jobs, checked the same way as in formats mode. Each model has its own block, and each job a block per sample and question, with one labelled column per run: the accepted answer (or why there is none), then its status, thinking tokens, time, cost in US dollars, and "cut off" when a reply stopped at the length limit. Its header explains the labels: "high#2" is the same level run a second time, so you can see what changes by chance alone; "default" is the AI's own setting; "none" means thinking is switched off. The file holds the answers, so keep it in `$P` with the reports; it has no script, every value on it is escaped, and it is readable only by you.
+
+The tool does not count the testing day's budget itself: before a `--levels` run, read both gates' day spend (S-3)
+and keep the day's total under the owner's limits. The run can be stopped at any time with Ctrl-C (the report is
+still written).
+
+Step A (spec 2026-10-12 §6, a few cents): does each level really work? One job, one question, every level once. Same
+`D` and `P` as in S-5, fresh status files from S-3:
+
+```sh
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --lanes PANEL --samples 1 --levels "zai-org/GLM-5.3-Flash=high,low;deepseek-ai/DeepSeek-V4.1-Flash=high,low,none;Qwen/Qwen3.8-Flash=default,medium,low,none;XiaomiMiMo/MiMo-V2.6-Pro=default,none;claude-haiku-5-5=high,medium,low" --out "$P/levels-step-a"
+echo "exit: $?"
+```
+
+Step B (spec 2026-10-12 §6, the side-by-side run): all nine jobs, four samples of each job per run (the
+English and the Romanian practice question, each twice), today's level run twice. The planned runs:
+
+| AI | Level runs |
+|---|---|
+| GLM | high, high, low |
+| DeepSeek | high, high, low, none |
+| Qwen | default, default, medium, low, none |
+| MiMo | default, default, none |
+| Haiku | high, high, medium, low |
+
+Take out of the `--levels` value any level Step A showed refused or ignored, then (fresh status files from S-3 again):
+
+```sh
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --samples 4 --busy-wait-minutes 30 --levels "zai-org/GLM-5.3-Flash=high,high,low;deepseek-ai/DeepSeek-V4.1-Flash=high,high,low,none;Qwen/Qwen3.8-Flash=default,default,medium,low,none;XiaomiMiMo/MiMo-V2.6-Pro=default,default,none;claude-haiku-5-5=high,high,medium,low" --out "$P/levels-step-b"
+echo "exit: $?"
+```
+
+That is 19 runs of 36 jobs, about 680 jobs. The verdict stays per model, with all of that model's runs counted
+together (a slip fixed by the second try is a warning; a step failed for good, or more than 1 slip in 10 of the
+model's answered calls, fails). Each run's own bar is shown, for the comparison only, in the levels table's "over
+bar" column; its "answered / jobs" column shows the jobs a busy model skipped.
 
 ### S-7, stop and clean up
 
@@ -333,14 +431,23 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice.ts`: the command (both modes, the start checks, the report).
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
   `main.ts` files compose them on the preview. `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
-- `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode. `practice-debate.ts`,
-  `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode.
+- `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode; `practice-levels.ts`: its `--levels`
+  plan; `practice-side-by-side.ts`: the side-by-side page (`report --side-by-side`). `practice-debate.ts`,
+  `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode; `practice-transcript.ts`: its
+  `--transcript` file.
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (formats: models at once,
   the per-gate and overall limits), `practice-parallel.ts` (debate: `--call-concurrency` and the report's
   "Calls at once"), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
   `practice-questions.ts`.
+- `check-thinking-levels.ts`: the offline check of a `thinking_levels` table before any API or runner restart
+  (deploy/preview-auth-dev/v1/README.md, "The optional `thinking_levels` table"; it sends nothing and needs no gate):
+  `node_modules/.bin/tsx tools/preview-practice/check-thinking-levels.ts --settings "$P/candidate-settings.env"`.
 - `gate-relay.py` and `test_gate_relay.py` (run: `python3 tools/preview-practice/test_gate_relay.py`).
-- Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-wiring-drift.test.ts`,
+- Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-levels.test.ts`,
+  `tests/unit/preview-thinking-levels-check.test.ts`,
+  `tests/unit/preview-practice-side-by-side.test.ts`,
+  `tests/unit/preview-practice-transcript.test.ts`,
+  `tests/unit/preview-practice-wiring-drift.test.ts`,
   `tests/integration/preview-practice-run.test.ts` (both modes against the scripted gate doubles in
   `tests/support/preview-gate-stubs.ts`; no vendor is contacted).

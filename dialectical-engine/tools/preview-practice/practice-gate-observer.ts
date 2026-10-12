@@ -39,7 +39,9 @@
  */
 import { TypedDomainError } from "@debateai/kernel";
 import {
+  PROVIDER_CHARGE_BOOKED_MAX,
   PROVIDER_GATE_UNAVAILABLE,
+  PreviewChargeBookedMax,
   PreviewModelCooling,
   PreviewUnbilledRefusal,
   PreviewVendorRefusedUnbilled,
@@ -70,6 +72,12 @@ export type PracticeWireOutcome =
    * says AUTHORITY_HALTED outright) or, when that read fails, as RUN_COST_ENVELOPE_MONEY_REACHED.
    */
   | "GATE_REFUSED"
+  /**
+   * Slow answer (owner ruling 2026-10-12): the call was sent, then its vendor connection timed out (the gate's 1,200 s)
+   * or broke; the gate charged it its full reservation (settled_reserved_max) and kept going. Billed; never a reason to
+   * stop sending to the gate, and it neither adds to nor resets the not-reached run (as the gate's own streak).
+   */
+  | "BOOKED_MAX"
   /** The gate could not be reached or its answer could not be read. */
   | "TRANSPORT_FAILED"
   /** The practice's own brake: never sent. */
@@ -150,6 +158,8 @@ export type PracticeGateSummary = Readonly<{
   vendorErrorUnbilled: number;
   concurrencyLimit: number;
   gateRefused: number;
+  /** Calls the gate booked at their maximum: sent, then timed out or cut off (PROVIDER_CHARGE_BOOKED_MAX). Billed. */
+  bookedMax: number;
   transportFailed: number;
   stoppedLocally: number;
   /**
@@ -202,7 +212,11 @@ export function vendorUsage(gate: PracticeGateName, vendorBody: string): Readonl
     return {
       inputTokens: input === null || !absentOrCount(row.cache_creation_input_tokens) || !absentOrCount(row.cache_read_input_tokens)
         ? null : input + cacheWrite + (cacheRead ?? 0),
-      outputTokens: count(row.output_tokens), reasoningTokens: null, cachedInputTokens: cacheRead
+      outputTokens: count(row.output_tokens),
+      // Spec 2026-10-12 §4.6: Haiku's thinking, which `output_tokens` already includes.
+      reasoningTokens: typeof row.output_tokens_details === "object" && row.output_tokens_details !== null
+        ? count((row.output_tokens_details as Record<string, unknown>).thinking_tokens) : null,
+      cachedInputTokens: cacheRead
     };
   }
   const details = row.completion_tokens_details;
@@ -362,6 +376,7 @@ export class PracticeGateObserver {
       vendorErrorUnbilled: kind("VENDOR_ERROR_UNBILLED"),
       concurrencyLimit: mine.filter((event) => event.concurrencyLimit).length,
       gateRefused: of("GATE_REFUSED"),
+      bookedMax: of("BOOKED_MAX"),
       transportFailed: of("TRANSPORT_FAILED"),
       stoppedLocally: of("STOPPED"),
       longestNotReachedRun: this.#maxConsecutive.get(gate) ?? 0,
@@ -376,7 +391,8 @@ export class PracticeGateObserver {
     this.#events.push(recorded);
     for (const listener of [...this.#listeners]) listener.event?.(recorded);
     const gate = event.gate;
-    if (event.outcome === "STOPPED") return;
+    // A booked-at-maximum call neither stops the gate nor touches the run (the gate keeps going and keeps its streak).
+    if (event.outcome === "STOPPED" || event.outcome === "BOOKED_MAX") return;
     if (event.outcome === "UNBILLED") {
       // Only "not reached" and a vendor error that was not billed (not busy) count in the run, as the gate's own streak
       // does. A vendor refusal and a model's cool-off neither add to the run nor reset it; the gate's own in-flight limit
@@ -426,6 +442,8 @@ export class PracticeGateObserver {
             this.#record({ ...base, latencyMs, outcome: "UNBILLED", vendorStatus: null, refusalCode: code,
               concurrencyLimit: unbilledKind === "GATE_IN_FLIGHT", unbilledKind,
               retryAfterSeconds: error instanceof PreviewModelCooling ? error.retryAfterSeconds ?? null : null });
+          } else if (error instanceof PreviewChargeBookedMax) {
+            this.#record({ ...base, latencyMs, outcome: "BOOKED_MAX", vendorStatus: null, refusalCode: PROVIDER_CHARGE_BOOKED_MAX });
           } else if (code === "DAILY_COST_ENVELOPE_REACHED" || code === "RUN_COST_ENVELOPE_MONEY_REACHED"
             || code === PROVIDER_GATE_UNAVAILABLE) {
             this.#record({ ...base, latencyMs, outcome: "GATE_REFUSED", vendorStatus: null, refusalCode: code });

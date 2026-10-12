@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Vaši podatki v Dialectical Engine",
+  "archive.generated": "Pripravljeno {time} za {pseudonym}.",
+  "archive.accountHeading": "Račun",
+  "archive.email": "E-pošta",
+  "archive.memberSince": "Član od",
+  "archive.debatesHeading": "Vaše razprave ({count})",
+  "archive.question": "Vprašanje",
+  "archive.verdict": "Razsodba",
+  "archive.verdictSupported": "Podprto",
+  "archive.verdictContested": "Izpodbijano",
+  "archive.verdictUnsupported": "Nepodprto",
+  "archive.story": "Razprava na kratko",
+  "archive.arguments": "Argumenti",
+  "archive.visibilityPublic": "Objavljeno",
+  "archive.visibilityPrivate": "Zasebno",
+  "archive.unreadable": "Vsebine te razprave ni več mogoče prebrati, ker je bil njen ključ uničen.",
+  "archive.noDebates": "Nimate razprav.",
+  "archive.filesNote": "Datoteke JSON v tem arhivu ZIP vsebujejo iste podatke v strojno berljivi obliki; navedene so v README.txt."
+}

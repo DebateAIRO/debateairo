@@ -1,0 +1,143 @@
+import {
+  AnswerSchema, AnswerStorySchema, AnswerDisclosureSchema, ExecutionLedgerDigestSchema,
+  InspectionSchema, NodeSchema, RunProjectionSchema,
+  type Answer, type AnswerStory, type AnswerDisclosure, type ExecutionLedgerDigest,
+  type Inspection, type Node, type RunProjection, type Session
+} from "@debateai/contract";
+import type { RunOwnershipAccess } from "@debateai/db";
+import { TypedDomainError } from "@debateai/kernel";
+import { STORY_UNREADABLE, answerCarriesStoryLabel, buildAnswerStory, deriveStoryStatus } from "@debateai/story";
+import { apiOperationalErrorDiagnostic, type ApiOptions } from "./index.js";
+
+export type OwnerReadDeps = Pick<ApiOptions, "application" | "stories" | "disclosures" | "storyClock">;
+type LogContext = Readonly<{ requestId: string; route: string }>;
+
+export function ownerSession(ownerRef: string, sessionId: string): Session {
+  return Object.freeze({
+    asker_id: `owner:${ownerRef}`,
+    session_id: sessionId,
+    caller_scope: "ASKER" as const,
+    ownership_provenance: "server_session" as const,
+    provisional_identity_model: false as const
+  });
+}
+
+export async function readOwnerRun(
+  d: OwnerReadDeps, runId: string, session: Session, ownership: RunOwnershipAccess
+): Promise<RunProjection | null> {
+  const run = await d.application.readRun(runId, session, ownership);
+  return run === null ? null : RunProjectionSchema.parse(run);
+}
+
+export async function readOwnerRunAnswer(
+  d: OwnerReadDeps, runId: string, session: Session, ownership: RunOwnershipAccess
+): Promise<Answer | null> {
+  const answer = await d.application.readRunAnswer(runId, session, ownership);
+  return answer === null ? null : AnswerSchema.parse(answer);
+}
+
+export async function readOwnerAnswer(
+  d: OwnerReadDeps, answerId: string, version: number | undefined, session: Session, ownership: RunOwnershipAccess
+): Promise<Answer | null> {
+  const answer = await d.application.readAnswer(answerId, session, version, ownership);
+  return answer === null ? null : AnswerSchema.parse(answer);
+}
+
+export async function readOwnerInspection(
+  d: OwnerReadDeps, answerId: string, version: number | undefined, session: Session, ownership: RunOwnershipAccess
+): Promise<Inspection | null> {
+  const inspection = await d.application.readInspection(answerId, session, version, ownership);
+  return inspection === null ? null : InspectionSchema.parse(inspection);
+}
+
+export async function readOwnerLedgerDigest(
+  d: OwnerReadDeps, answerId: string, session: Session, ownership: RunOwnershipAccess
+): Promise<ExecutionLedgerDigest | null> {
+  const digest = await d.application.readLedgerDigest(answerId, session, ownership);
+  return digest === null ? null : ExecutionLedgerDigestSchema.parse(digest);
+}
+
+export async function readOwnerStory(
+  d: OwnerReadDeps, answerId: string, session: Session, ownership: RunOwnershipAccess,
+  logContext?: LogContext
+): Promise<AnswerStory | null> {
+  const stories = d.stories;
+  if (stories === undefined) return null;
+  const answer = await d.application.readAnswer(answerId, session, undefined, ownership);
+  if (answer === null) return null;
+  let body: AnswerStory;
+  try {
+    const stored = await stories.readStory({
+      answerId: answer.answer_id,
+      answerVersion: answer.answer_version,
+      ownership
+    });
+    const floor = stored === null && answer.verdict_state === null && d.disclosures !== undefined
+      ? await d.disclosures.readFloor({ answerId: answer.answer_id, ownership })
+      : null;
+    const anchor = stored === null
+      ? await stories.readStoryAnchor({ answerId: answer.answer_id, ownership })
+      : null;
+    const derived = deriveStoryStatus({
+      stored,
+      answerHasVerdict: answerCarriesStoryLabel({
+        verdictState: answer.verdict_state,
+        floorVerdictState: floor?.verdict_state ?? null
+      }),
+      answerCreatedAt: anchor?.storedAt ?? new Date(answer.relevant_as_of),
+      now: d.storyClock?.() ?? new Date()
+    });
+    body = AnswerStorySchema.parse(buildAnswerStory({
+      answerId: answer.answer_id,
+      answerVersion: stored?.answerVersion ?? anchor?.answerVersion ?? answer.answer_version,
+      stored,
+      derived
+    }));
+  } catch (error) {
+    console.error(JSON.stringify(Object.freeze({
+      event: "api.story.unreadable",
+      ...(logContext === undefined ? {} : { requestId: logContext.requestId, route: logContext.route }),
+      diagnostic: apiOperationalErrorDiagnostic(error)
+    })));
+    body = AnswerStorySchema.parse(buildAnswerStory({
+      answerId: answer.answer_id,
+      answerVersion: answer.answer_version,
+      stored: null,
+      derived: STORY_UNREADABLE
+    }));
+  }
+  return body;
+}
+
+export async function readOwnerDisclosure(
+  d: OwnerReadDeps, answerId: string, session: Session, ownership: RunOwnershipAccess,
+  logContext?: LogContext
+): Promise<AnswerDisclosure | null> {
+  const disclosures = d.disclosures;
+  if (disclosures === undefined) return null;
+  const answer = await d.application.readAnswer(answerId, session, undefined, ownership);
+  if (answer === null) return null;
+  let disclosure: AnswerDisclosure | null;
+  try {
+    const read = await disclosures.readDisclosure({ answerId: answer.answer_id, ownership });
+    disclosure = read === null ? null : AnswerDisclosureSchema.parse(read);
+  } catch (error) {
+    const corruptRecord = (error instanceof TypedDomainError && error.code === "SERVE_DISCLOSURE_ROW_INVALID")
+      || (error instanceof Error && error.name === "ZodError");
+    if (!corruptRecord) throw error;
+    console.error(JSON.stringify(Object.freeze({
+      event: "api.disclosure.unreadable",
+      ...(logContext === undefined ? {} : { requestId: logContext.requestId, route: logContext.route }),
+      diagnostic: apiOperationalErrorDiagnostic(error)
+    })));
+    disclosure = null;
+  }
+  return disclosure;
+}
+
+export async function readOwnerNode(
+  d: OwnerReadDeps, answerId: string, nodeId: string, session: Session, ownership: RunOwnershipAccess
+): Promise<Node | null> {
+  const node = await d.application.readNode(answerId, nodeId, session, ownership);
+  return node === null ? null : NodeSchema.parse(node);
+}

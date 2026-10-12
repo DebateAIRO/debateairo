@@ -33,11 +33,12 @@ Restart=on-failure
 RestartMode=direct
 RestartSec=30
 # SIGTERM: the socket closes at once and nothing more is reserved; calls in flight finish and
-# settle (600 s deadline, plus 2 x 10 s locks), and each reply then gets 30 s or the gate halts;
-# the socket file is removed and serve exits 0. After 700 s systemd sends SIGKILL; the next
-# start then removes the stale socket and halts on any interrupted call.
+# settle (1,200 s deadline since the owner ruling of 2026-10-12, plus 2 x 10 s locks), and each
+# reply then gets 30 s or the gate halts; the socket file is removed and serve exits 0. After
+# 1,300 s systemd sends SIGKILL; the next start then removes the stale socket and halts on any
+# interrupted call.
 KillSignal=SIGTERM
-TimeoutStopSec=700
+TimeoutStopSec=1300
 UMask=0077
 NoNewPrivileges=yes
 CapabilityBoundingSet=

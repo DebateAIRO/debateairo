@@ -126,7 +126,7 @@ describe("N18 the checkout starts NETOPIA's page (spec §2.6.2)", () => {
     const customer = await w.repository.customerByOwner(w.ownerRef);
     expect(w.payments.starts).toHaveLength(1);
     expect(w.payments.starts[0]).toEqual({
-      orderId: result.chargeId, amountMicros: 24_200_000, currency: "USD", description: "DebateAI Plus monthly plan",
+      orderId: result.chargeId, amountMicros: 24_200_000, currency: "USD", description: "Dialectical Engine Plus monthly plan",
       clientId: customer!.customerId.replaceAll("-", ""), language: "en",
       returnUrl: `${TEST_PUBLIC_APP_URL}/checkout/return?charge=${result.chargeId}`,
       notifyUrl: `${TEST_PUBLIC_APP_URL}/api/v1/billing/netopia/notify`,
@@ -160,14 +160,14 @@ describe("N18 the checkout starts NETOPIA's page (spec §2.6.2)", () => {
 
   it("words the order line and NETOPIA's page language in the buyer's locale through the order-text port (spec §2.3, §2.4.2)", async () => {
     const romanian: BillingOrderText = (kind, locale, params) => locale === "ro" && kind === "ORDER_PLAN"
-      ? `DebateAI ${params.plan ?? ""}, abonament lunar` : englishOrderText(kind, locale, params);
+      ? `Dialectical Engine ${params.plan ?? ""}, abonament lunar` : englishOrderText(kind, locale, params);
     const w = world({
       orderText: romanian,
       consentDocuments: (kind, locale) => (locale === "en" || locale === "ro" ? consentDocument(TEXT[kind]) : null)
     });
     await w.start(await w.quote(), { locale: "ro" });
     expect(w.payments.starts).toHaveLength(1);
-    expect(w.payments.starts[0]).toMatchObject({ description: "DebateAI Plus, abonament lunar", language: "ro" });
+    expect(w.payments.starts[0]).toMatchObject({ description: "Dialectical Engine Plus, abonament lunar", language: "ro" });
   });
 
   it("keeps a confirmed country on CREATED so VERIFY_PAYMENT can weigh the card country by it", async () => {

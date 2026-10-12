@@ -131,16 +131,16 @@ describe("P17 mail catalogues", () => {
     const english = read("en/order.json");
     // D6a's englishOrderText says the same three sentences; tests/unit/mail-order-text.test.ts compares them.
     expect(english).toEqual({
-      "order.planDescription": "DebateAI {plan} monthly plan",
-      "order.cardCheck": "DebateAI card check",
-      "invoice.line": "DebateAI {plan} plan, {from} to {to}"
+      "order.planDescription": "Dialectical Engine {plan} monthly plan",
+      "order.cardCheck": "Dialectical Engine card check",
+      "invoice.line": "Dialectical Engine {plan} plan, {from} to {to}"
     });
     const catalogs = new Map<string, Record<string, string>>();
     for (const locale of MAIL_LOCALES) {
       const localized = read(`${locale}/order.json`);
       assertLocalizedCatalog({ english, localized, locale, namespace: "order" });
       // The product and plan names stay as they are in every language (contract §10).
-      expect(localized["order.cardCheck"], `${locale} names DebateAI`).toContain("DebateAI");
+      expect(localized["order.cardCheck"], `${locale} names Dialectical Engine`).toContain("Dialectical Engine");
       catalogs.set(locale, localized);
     }
     assertTranslationSample({ catalogs, english, namespace: "order" });

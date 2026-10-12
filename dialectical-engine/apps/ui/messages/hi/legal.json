@@ -5,7 +5,7 @@
   "legal.notice.title": "विधिक सूचना",
   "legal.notice.meta": "{product} का संचालन कौन करता है, और हमसे कैसे संपर्क करें",
   "legal.notice.s01.title": "हम कौन हैं",
-  "legal.notice.s01.body": "{product} (जिसे {alsoCalled} भी कहा जाता है) का संचालन रोमानिया में पंजीकृत कंपनी {company} करती है।",
+  "legal.notice.s01.body": "{product} का संचालन रोमानिया में पंजीकृत कंपनी {company} करती है।",
   "legal.notice.s01.seller": "{company} सशुल्क योजनाओं का विक्रेता भी है: आपका अनुबंध, आपके भुगतान और आपके चालान {company} के साथ हैं।",
   "legal.notice.company.name": "कंपनी का नाम",
   "legal.notice.company.tradingNames": "व्यापारिक नाम",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "आपके द्वारा चुनी गई इंटरफ़ेस की भाषा याद रखती है।",
   "legal.cookies.locale.life": "1 वर्ष",
   "legal.cookies.storageTitle": "कुकी में नहीं, आपके ब्राउज़र में संग्रहीत",
-  "legal.cookies.storageIntro": "आपके ब्राउज़र के संग्रहण में चार चीज़ें रखी जाती हैं: दो स्थानीय संग्रहण में, जब तक आप उन्हें साफ़ न करें, और दो सत्र संग्रहण में, जब तक आप टैब बंद न करें। कुकीज़ के विपरीत, ये आपके अनुरोधों के साथ नहीं जोड़ी जातीं; सहायता चैट वाली चीज़ DebateAI की सहायता के साथ हुई आपकी बातचीत की एक प्रति रखती है, जिसके संदेश भेजते समय DebateAI तक पहुँच चुके थे।",
+  "legal.cookies.storageIntro": "आपके ब्राउज़र के संग्रहण में चार चीज़ें रखी जाती हैं: दो स्थानीय संग्रहण में, जब तक आप उन्हें साफ़ न करें, और दो सत्र संग्रहण में, जब तक आप टैब बंद न करें। कुकीज़ के विपरीत, ये आपके अनुरोधों के साथ नहीं जोड़ी जातीं; सहायता चैट वाली चीज़ Dialectical Engine की सहायता के साथ हुई आपकी बातचीत की एक प्रति रखती है, जिसके संदेश भेजते समय Dialectical Engine तक पहुँच चुके थे।",
   "legal.cookies.consent.kind": "स्थानीय संग्रहण",
   "legal.cookies.consent.purpose": "याद रखता है कि आपने कुकी सूचना देख ली है, ताकि वह केवल एक बार दिखे।",
   "legal.cookies.consent.life": "जब तक आप इसे साफ़ न करें",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "सत्र संग्रहण",
   "legal.cookies.supportConversation.purpose": "टैब खुला रहने तक सहायता चैट में आपकी बातचीत स्क्रीन पर बनाए रखता है। इस टैब में कोई भी साइन इन या साइन आउट करे, तो यह मिटा दी जाती है।",
   "legal.cookies.supportConversation.life": "जब तक आप टैब बंद न करें",
-  "legal.cookies.recipient.server": "केवल DebateAI का सर्वर",
+  "legal.cookies.recipient.server": "केवल Dialectical Engine का सर्वर",
   "legal.cookies.recipient.browser": "आपके ब्राउज़र में ही रहता है",
   "legal.cookies.refuse": "इन्हें अस्वीकार करने के लिए, अपने ब्राउज़र की सेटिंग्स में इस साइट की कुकी और साइट डेटा को ब्लॉक करें या हटाएँ।",
   "legal.cookies.refuseEffect": "तब क्या काम करना बंद कर देता है: साइन इन करना, और आपकी भाषा व प्रदर्शन विकल्पों को याद रखना।",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "अधिकतम 30 मिनट",
   "legal.cookies.mfaRecovery.life": "अधिकतम 299 सेकंड",
   "legal.cookies.social.life": "अधिकतम 5 मिनट",
-  "legal.cookies.phoneDraft.life": "15 मिनट या पहले मिटाए जाने तक"
+  "legal.cookies.phoneDraft.life": "15 मिनट या पहले मिटाए जाने तक",
+  "legal.cookies.exportPending.purpose": "साइन इन और दोबारा कोशिश के लिए ईमेल से मिला निर्यात लिंक इस टैब में रखता है।",
+  "legal.cookies.exportLinkOutcome.purpose": "याद रखता है कि इस टैब में डाउनलोड लिंक का कौन-सा संदेश दिखाना है।",
+  "legal.cookies.exportPending.life": "टैब बंद होने, साइन आउट, नया लिंक खुलने, पहली सफल डाउनलोड या अमान्य लिंक अथवा गलत खाते का परिणाम आने तक",
+  "legal.cookies.exportLinkOutcome.life": "टैब बंद होने, साइन आउट या नया लिंक खुलने तक"
 }

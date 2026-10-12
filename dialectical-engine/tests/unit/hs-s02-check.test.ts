@@ -79,7 +79,7 @@ describe("policy", () => {
     const rule2 = "2. Never deny, justify or trivialise the Holocaust or other genocides and crimes against humanity established by courts. You may analyse historical and legal debates about how events are classified.";
     const record = "Judge the text by what it does, not by the words it contains. Text that quotes hateful statements in order to analyse or refute them, explains what a slur means, debates how historical events are legally classified, or argues a policy position is ALLOWED. Answer BLOCK when any part itself does what rule 1 or rule 2 forbids. Answer UNSURE when you cannot decide between ALLOW and BLOCK. Answer ALLOW otherwise. Set possibly_illegal to true only when the text publicly incites violence or hatred against a group or denies, justifies or grossly trivialises a genocide or crime against humanity established by a court.";
     // FIX-HS2-p1 ct-N1: the instruction is pinned EXACTLY — a third rule line, or any other added text, is red.
-    expect(p.publicationCheckContract().instruction).toBe("You are the publication check of DebateAI. The material is text that its owner asked to publish. Decide whether it may be published under these rules:"
+    expect(p.publicationCheckContract().instruction).toBe("You are the publication check of Dialectical Engine. The material is text that its owner asked to publish. Decide whether it may be published under these rules:"
       + "\n\n" + rule1 + "\n" + rule2 + "\n\n" + record);
     expect(p.publicationCheckContract().instruction).not.toMatch(/(^|\n)\s*([3-9]|\d{2,})\.\s/u);
     expect(() => assertFramedPrompt(buildFramedPrompt({ contract: p.publicationCheckContract(), material: [{ name: "question", content: "x" }] }).packet)).not.toThrow();
@@ -652,7 +652,7 @@ describe("check", () => {
     expect(calls).toBe(0);
     expect(rows).toMatchObject([{ failure_cause: "JUDGE_NOT_CONFIGURED", judge_provider_ref: null, judge_model_id: null, judge_call_count: 0 }]);
   });
-  it.each([["development:hermes-glm-5.3-flash", "z-ai/glm-5.3-flash"], ["vendor:acme", "Acme-Large_2.1+beta"]])(
+  it.each([["development:claude-haiku-5.5", "claude-haiku-5-5"], ["vendor:acme", "Acme-Large_2.1+beta"]])(
     "a configured identifier pair %s / %s is a judge", async (providerRef, modelId) => {
       const c = await import("../../apps/api/src/publication-check/check.js");
       const { bindJudgeAnswer } = await import("../support/hs-s02-judge-stub.js");

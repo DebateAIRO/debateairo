@@ -1,5 +1,5 @@
 {
-  "order.planDescription": "DebateAI {plan} 月額プラン",
-  "order.cardCheck": "DebateAI カード確認",
-  "invoice.line": "DebateAI {plan} プラン、{from}～{to}"
+  "order.planDescription": "Dialectical Engine {plan} 月額プラン",
+  "order.cardCheck": "Dialectical Engine カード確認",
+  "invoice.line": "Dialectical Engine {plan} プラン、{from}～{to}"
 }

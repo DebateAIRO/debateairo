@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.3 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
-**In short.** Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie privaatsete andmete võtmed; kustutamist ajastades valite, kas ka teie avaldatud väitlused eemaldatakse või jäävad teie kasutuselt kõrvaldatud pseudonüümi all avalikuks. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota.
+**In short.** Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Meie majutusteenuse pakkuja säilitab teie konto ja väitlused Londonis Ühendkuningriigis; jaotises 5 on öeldud, kuhu mujale teie andmed jõuavad. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie privaatsete andmete võtmed; kustutamist ajastades valite, kas ka teie avaldatud väitlused eemaldatakse või jäävad teie kasutuselt kõrvaldatud pseudonüümi all avalikuks. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota.
 
 ## 1. Kes vastutab teie andmete eest
 
@@ -95,6 +95,8 @@ Me ei tee teie kohta profiilianalüüsi, ei kasuta teie andmeid reklaamiks ega m
 
 **Muud vastuvõtjad.** Lisaks tehisintellekti pakkujatele töötlevad meie jaoks andmeid järgmised volitatud töötlejad. Meie majutusteenuse pakkuja OVHcloud säilitab ja käitab teenust oma Londoni andmekeskuses Ühendkuningriigis. Euroopa Komisjon on otsustanud, et Ühendkuningriik tagab isikuandmete piisava kaitse (selle piisavusotsus kehtib kuni 2031. aasta detsembrini), mistõttu see edastus ei vaja täiendavaid kaitsemeetmeid. Cloudflare edastab meie lehti, vahendab liiklust teie ja teenuse vahel ning teeb robotikontrolli (jaotis 2); see on USA ettevõte, mis on sertifitseeritud ELi–USA andmekaitseraamistiku alusel, ja selle leping meiega lisab varuvariandina ELi standardlepingu klauslid. Kontoga seotud e-kirju saadab Amazon Simple Email Service meie ja äriühingu Amazon Web Services EMEA SARL (Luksemburg) vahelise lepingu alusel; kui Amazon töötleb neid andmeid Ameerika Ühendriikides, tugineb edastus ELi standardlepingu klauslitele, mis sisalduvad Amazoni andmetöötlustingimustes. Makseid töötleb meie makseteenuse pakkuja NETOPIA Payments, kui tasulised paketid algavad. Igaüks tegutseb meie dokumenteeritud juhiste järgi andmetöötluslepingu alusel koos artiklis 28 nõutud kaitsemeetmetega. Me ei luba ühelgi volitatud töötlejal kasutada teie andmeid oma eesmärkidel. Kui pakkuja seda teeks, oleks ta iseseisev vastutav töötleja ja me ei saadaks talle teie andmeid.
 
+**Kus teie andmed asuvad.** Teie kontot ja väitlusi säilitatakse Ühendkuningriigis, meie majutusteenuse pakkuja serverites Londonis. Cloudflare vahendab liiklust oma võrgu kaudu ning Amazon võib töödelda kontoga seotud e-kirju Ameerika Ühendriikides. Iga tehisintellekti pakkuja töötleb saadud teksti nendes riikides, mille register tema kohta nimetab, enamasti Ameerika Ühendriikides.
+
 **Avaliku sektori asutused.** Avaldame isikuandmeid kohtutele, järelevalve- või õiguskaitseasutustele, kui seadus seda nõuab, ning teavitame teid, kui seadus seda ei keela.
 
 ## 6. Avaldamine ja nähtavus
@@ -148,12 +150,12 @@ Võite kõiki neid õigusi tasuta kasutada, kirjutades aadressil **privacy@dezba
 
 | Õigus | Mida see siin tähendab |
 | --- | --- |
-| **Juurdepääs** (Art. 15) | Koopia teie isikuandmetest, mida säilitame, ja käesolev teave. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.] |
+| **Juurdepääs** (Art. 15) | Koopia teie isikuandmetest, mida säilitame, ja käesolev teave. Valige Seaded ja seejärel Ekspordi andmed: valmistame ette ZIP-faili JSON-failide ja ühe lehega, mida saab avada igas brauseris, ning saadame teile e-postiga allalaadimislingi, mis kehtib 24 tundi ja töötab ainult siis, kui olete oma kontole sisse logitud. |
 | **Parandamine** (Art. 16) | Parandage seadetes oma e-posti aadress või taastamise e-posti aadress. Teie pseudonüümi ei saa Tingimustes esitatud põhjustel muuta; võite konto sulgeda ja uue avada |
 | **Kustutamine** (Art. 17) | Kustutage privaatne väitlus igal ajal väitluse lehel. Sulgege konto seadetes; jaotis 7 selgitab täpselt selle tagajärgi. Paluge meil eemaldada teie andmeid sisaldav avaldatud väitlus olenemata sellest, kas olete selle autor |
 | **Piiramine** (Art. 18) | Paluge meil peatada konkreetsete andmete töötlemine, kuni neid puudutav vaidlus lahendatakse |
 | **Vastuväide** (Art. 21) | Esitage vastuväide õigustatud huvidel põhinevale töötlemisele — jaotises 4 kirjeldatud turbe- ja audititöötlusele — ning lõpetame selle, kui me ei suuda tõendada ülekaalukaid põhjuseid. Esitage igal ajal vastuväide turundusele ja lõpetame selle |
-| **Andmete ülekantavus** (Art. 20) | Teie väitlused ja kontoandmed üldkasutatavas masinloetavas vormingus. [Pending: same export as Access.] Teie loodud mitteisiklik sisu, näiteks küsimused, tagastatakse teile taotluse korral lepingu lõppemisel |
+| **Andmete ülekantavus** (Art. 20) | Teie väitlused ja kontoandmed üldkasutatavas masinloetavas vormingus. Kasutage Seadetes valikut Ekspordi andmed: ZIP-fail sisaldab teie andmeid masinloetavate JSON-failidena ja üht loetavat lehte; e-postiga saadetud link kehtib 24 tundi ja töötab ainult siis, kui olete oma kontole sisse logitud. Teie loodud mitteisiklik sisu, näiteks küsimused, tagastatakse teile taotluse korral lepingu lõppemisel |
 | **Nõusoleku tagasivõtmine** (Art. 7(3)) | Võtke turundusnõusolek tagasi mis tahes e-kirja kaudu või seadetes; võtke tundlike andmete nõusolek tagasi, sulgedes konto seadetes (võite need andmed ka välja jätta või kustutada neid sisaldava väitluse). Tagasivõtmine ei mõjuta juba toimunud töötlemist |
 | **Kaebuse esitamine** | Rumeenia järelevalveasutusele **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, <anspdcp@dataprotection.ro>, või teie elukohariigi asutusele. Eelistaksime siiski, et pöörduksite esmalt meie poole |
 
@@ -174,7 +176,7 @@ Dialectical Engine on mõeldud täiskasvanutele. Registreerumisel kinnitate, et 
 ## 13. Küpsised
 
 
-Dialectical Engine kasutab 18 üksust, mis kõik on teie tellitud teenuse jaoks rangelt vajalikud ja mida kõiki paigaldab ainult Dialectical Engine: 13 küpsist ja 5 kirjet teie brauseri salvestusruumis. Me ei paigalda analüüsi-, reklaami- ega jälgimisküpsiseid. **Küpsisepoliitikas** aadressil dezbatere.ro/cookies on need loetletud koos sellega, mida igaüks teeb ja kes selle saab, ning seda muudetakse enne, kui midagi muud lisatakse.
+Dialectical Engine kasutab 20 üksust, mis kõik on teie tellitud teenuse jaoks rangelt vajalikud ja mida kõiki paigaldab ainult Dialectical Engine: 13 küpsist ja 7 kirjet teie brauseri salvestusruumis. Me ei paigalda analüüsi-, reklaami- ega jälgimisküpsiseid. **Küpsisepoliitikas** aadressil dezbatere.ro/cookies on need loetletud koos sellega, mida igaüks teeb ja kes selle saab, ning seda muudetakse enne, kui midagi muud lisatakse.
 
 | Nimi | Liik | Eesmärk | Kestus |
 |---|---|---|---|
@@ -196,6 +198,8 @@ Dialectical Engine kasutab 18 üksust, mis kõik on teie tellitud teenuse jaoks 
 | `debateai.languageOffer.dismissed` | Seansi salvestusruum | Jätab selle vahekaardi jaoks meelde, et loobusite pakkumisest näidata väitlust teises keeles. | Kuni te vahekaardi sulgete |
 | `debateai.support.conversation.v2` | Seansi salvestusruum | Hoiab teie abivestluse ekraanil, kuni vahekaart on avatud. See kustutatakse, kui keegi selles vahekaardis sisse või välja logib. | Kuni te vahekaardi sulgete |
 | `debateai.phone-completion-draft.v1` | Seansi salvestusruum | Lõpetamata küsimus telefonisammu ajal; kustutatakse seansi vahetusel, väljalogimisel või omaniku vahetusel | 15 minutit või varasema kustutamiseni |
+| `debateai.exportPending` | Seansi salvestusruum | Hoiab e-kirjaga saadetud ekspordilinki sellel vahekaardil sisselogimiseks ja uuesti proovimiseks. | Kuni vahekaardi sulgemise, väljalogimise, uue lingi, esimese õnnestunud allalaadimise või vigase lingi või vale konto tulemuseni |
+| `debateai.exportLinkOutcome` | Seansi salvestusruum | Jätab meelde, millist allalaadimislingi teadet sellel vahekaardil näidata. | Kuni vahekaardi sulgemise, väljalogimise või uue lingini |
 
 Ükski teine osapool ei kogu Dialectical Engine kaudu teavet teie võrgutegevuse kohta aja jooksul ja eri veebisaitidel.
 
@@ -229,7 +233,7 @@ Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on m
 
 ### B.4 Austraalia ja Uus-Meremaa
 
-**Austraalia.** Teie isikuandmete välismaised vastuvõtjad on registris loetletud tehisintellekti pakkujad ja volitatud töötlejad, kes asuvad Ameerika Ühendriikides ja Euroopa Liidus; võtame mõistlikke meetmeid tagamaks, et nad töötlevad andmeid kooskõlas Austraalia privaatsuspõhimõtetega. **Automatiseeritud otsused:** alates 10. detsembrist 2026 nimetatakse selles poliitikas arvutiprogrammide tehtavate ja teie õigusi või huve märkimisväärselt mõjutavate otsuste liigid — neid ei ole; hinded ja otsused puudutavad argumente, mitte teid — ning nendes kasutatavad isikuandmed. Kaebuse võib esitada **Office of the Australian Information Commissionerile**. **Uus-Meremaa.** Meie privaatsusametnik on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Kui kogume teie kohta isikuandmeid kaudselt — kuna teine kasutaja lisas need küsimusse — on käesolev poliitika ja jaotis 11 teile antav teade. Avaldame andmeid oma esindajatena tegutsevatele registris loetletud tehisintellekti pakkujatele lepingute alusel, mis nõuavad võrreldavaid kaitsemeetmeid. Kaebuse võib esitada **Office of the Privacy Commissionerile**.
+**Austraalia.** Teie isikuandmete välismaised vastuvõtjad on jaotises 5 nimetatud volitatud töötlejad, sealhulgas meie majutusteenuse pakkuja Londonis Ühendkuningriigis, ning registris loetletud tehisintellekti pakkujad. Nad asuvad Ühendkuningriigis, Ameerika Ühendriikides ja Euroopa Liidus ning register nimetab iga tehisintellekti pakkuja riigid; võtame mõistlikke meetmeid tagamaks, et nad töötlevad andmeid kooskõlas Austraalia privaatsuspõhimõtetega. **Automatiseeritud otsused:** alates 10. detsembrist 2026 nimetatakse selles poliitikas arvutiprogrammide tehtavate ja teie õigusi või huve märkimisväärselt mõjutavate otsuste liigid — neid ei ole; hinded ja otsused puudutavad argumente, mitte teid — ning nendes kasutatavad isikuandmed. Kaebuse võib esitada **Office of the Australian Information Commissionerile**. **Uus-Meremaa.** Meie privaatsusametnik on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Kui kogume teie kohta isikuandmeid kaudselt — kuna teine kasutaja lisas need küsimusse — on käesolev poliitika ja jaotis 11 teile antav teade. Avaldame andmeid oma esindajatena tegutsevatele registris loetletud tehisintellekti pakkujatele lepingute alusel, mis nõuavad võrreldavaid kaitsemeetmeid. Kaebuse võib esitada **Office of the Privacy Commissionerile**.
 
 ### B.5 Šveits
 

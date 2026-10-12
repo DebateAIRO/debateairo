@@ -65,7 +65,7 @@ class FakeVendorProfile(bridge.helper.DeepInfraProfile):
     path = '/v1/chat'
     redaction_patterns = (r'fk-[A-Za-z0-9]{8,}',)
     rows = {'fake/model-1': bridge.helper.ModelRow('fake/model-1', 'FakeMaker', Decimal('0.10'), Decimal('0.20'),
-                                                   4096, None, False)}
+                                                   4096, (None,), False)}
 
 
 class GateTest(unittest.TestCase):
@@ -106,13 +106,15 @@ class ReviewedTableTests(GateTest):
                                   'output_usd_per_m': str(row.output_usd_per_m),
                                   'input_nano_usd_per_token': int(row.input_usd_per_m * 1000),
                                   'output_nano_usd_per_token': int(row.output_usd_per_m * 1000),
-                                  'output_bound': row.output_bound, 'effort': row.effort, 'json_object': row.json_object,
+                                  'output_bound': row.output_bound,
+                                  'efforts': ['default' if word is None else word for word in row.efforts],
+                                  'json_object': row.json_object,
                                   'sampling': dict(row.sampling) if row.sampling is not None else None,
                                   'worst_case_reservation_usd': '%.9f' % bridge.worst_case_reservation(DEEPINFRA, row)},
                                  expected)
                 # The fixture's own rows also equal the independent copy the other tests use.
                 self.assertEqual(ROWS[row.model], (row.maker, str(row.input_usd_per_m), str(row.output_usd_per_m),
-                                                   row.output_bound, row.effort, row.json_object))
+                                                   row.output_bound, row.efforts, row.json_object))
 
     def test_every_reviewed_row_fits_the_per_call_cap_for_a_full_size_request(self):
         # Owner rulings 2026-10-10: a hard 256 KiB body cap and output bound 32768 for every row.
@@ -154,7 +156,7 @@ class ReviewedTableTests(GateTest):
                   'float_price': glm._replace(input_usd_per_m=0.15),
                   'over_cap': glm._replace(output_bound=1048576),
                   'zero_bound': glm._replace(output_bound=0),
-                  'effort_max': glm._replace(effort='max'),
+                  'effort_max': glm._replace(efforts=('high', 'max')),
                   'json_text': glm._replace(json_object='yes'),
                   'no_maker': glm._replace(maker=''),
                   'other_id': glm._replace(model='zai-org/GLM-5.3'),
@@ -331,7 +333,7 @@ class ModelCallTests(GateTest):
                 raw = json.dumps(value)
                 self.assertEqual(gate.call(model.split('/')[0], value=value, dispatch=observe)['status'], 200)
                 entry = entry_of(gate, model.split('/')[0])
-                maker, price_in, price_out, bound, effort, _json = ROWS[model]
+                maker, price_in, price_out, bound, efforts, _json = ROWS[model]
                 self.assertEqual({k: entry[k] for k in ('provider', 'model', 'maker', 'reserve_input_usd_per_m',
                                                         'reserve_output_usd_per_m', 'settle_input_usd_per_m',
                                                         'settle_output_usd_per_m', 'output_bound', 'requested_effort',
@@ -339,7 +341,8 @@ class ModelCallTests(GateTest):
                                  {'provider': 'deepinfra', 'model': model, 'maker': maker, 'reserve_input_usd_per_m': price_in,
                                   'reserve_output_usd_per_m': price_out, 'settle_input_usd_per_m': price_in,
                                   'settle_output_usd_per_m': price_out, 'output_bound': bound,
-                                  'requested_effort': effort or 'none', 'reserved_usd': str(reservation_of(raw, model)),
+                                  # Spec 2026-10-12 section 4.5: the level the body carried (body(): the row's default).
+                                  'requested_effort': 'default' if efforts[0] is None else efforts[0], 'reserved_usd': str(reservation_of(raw, model)),
                                   'state': 'settled', 'reply_model': model})
                 self.assertEqual(Decimal(entry['held_usd']), expected[model])
                 self.assertEqual(Decimal(entry['accounting']['configured_price_cost_usd']), expected[model])
@@ -624,7 +627,7 @@ class ProbeTests(GateTest):
                 summary = self.probe(gate, model, dispatch)
                 expected_body = {'model': model, 'max_tokens': 1024,
                                  'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}]}
-                if ROWS[model][4] == 'high':
+                if ROWS[model][4][0] == 'high':
                     expected_body['reasoning_effort'] = 'high'
                 expected_body.update(SAMPLING.get(model, {}))  # None of these rows has any (SamplingTests: Qwen).
                 self.assertEqual(sent, [(expected_body, KEY)])
@@ -802,7 +805,7 @@ class DatedVendorProfile(FakeVendorProfile):
     """A vendor whose price rises on a date (as Google's will) and whose path names the model."""
     name = 'datedvendor'
     rows = {'dated/model-1': bridge.helper.ModelRow('dated/model-1', 'DatedMaker', Decimal('0.10'), Decimal('0.20'),
-                                                     4096, None, False)}
+                                                     4096, (None,), False)}
     RISE = bridge.datetime.fromisoformat('2026-10-09T00:00:00+00:00')
 
     def path_for(self, row):
@@ -1066,8 +1069,8 @@ class QwenRowTests(GateTest):
     def test_the_qwen_row_is_appended_after_mimo_with_its_contract_values(self):
         self.assertEqual(list(DEEPINFRA.rows), [MODEL, DEEPSEEK, MIMO, QWEN])
         row = DEEPINFRA.rows[QWEN]
-        self.assertEqual((row.maker, row.input_usd_per_m, row.output_usd_per_m, row.output_bound, row.effort, row.json_object),
-                         ('Alibaba', Decimal('0.113'), Decimal('0.382'), 32768, None, False))
+        self.assertEqual((row.maker, row.input_usd_per_m, row.output_usd_per_m, row.output_bound, row.efforts, row.json_object),
+                         ('Alibaba', Decimal('0.113'), Decimal('0.382'), 32768, (None, 'low', 'medium', 'none'), False))
         # ((262144 + 2048) x 0.113 + 32768 x 0.382) / 1e6, under the $0.25 cap (caps: owner, 2026-10-10).
         self.assertEqual(bridge.worst_case_reservation(DEEPINFRA, row), Decimal('0.042371072'))
         self.assertTrue(bridge.row_reviewed(DEEPINFRA, QWEN, row))
@@ -1079,6 +1082,64 @@ class QwenRowTests(GateTest):
                             ('json', {**body(model=QWEN), 'response_format': {'type': 'json_object'}})):
             with self.subTest(name), self.refused('REQUEST_PARAMETERS_INVALID'):
                 gate.call(name, value=value)
+
+
+class ThinkingLevelMenus(GateTest):
+    """Spec 2026-10-12 section 4.5: the gate accepts exactly each row's reviewed menu."""
+
+    def base(self, model, **members):
+        row = DEEPINFRA.rows[model]
+        payload = {'model': model, 'max_tokens': 8, 'messages': [{'role': 'user', 'content': 'x'}]}
+        payload.update(dict(row.sampling or ()))
+        payload.update(members)
+        return payload, row
+
+    def test_menus_are_the_reviewed_ones(self):
+        self.assertEqual({model: row.efforts for model, row in DEEPINFRA.rows.items()}, {
+            MODEL: ('high', 'low'), DEEPSEEK: ('high', 'low', 'none'), MIMO: (None, 'none'), QWEN: (None, 'low', 'medium', 'none')})
+        self.assertEqual(DEEPINFRA.effort_words, (None, 'none', 'low', 'medium', 'high'))
+
+    def test_every_menu_level_is_accepted_and_nothing_else(self):
+        for model, row in DEEPINFRA.rows.items():
+            for word in ('none', 'low', 'medium', 'high', 'max', 'xhigh', 'default', 'minimal'):
+                payload, _ = self.base(model, reasoning_effort=word)
+                with self.subTest(model=model, word=word):
+                    self.assertEqual(DEEPINFRA.body_valid(payload, row), word in row.efforts)
+            payload, _ = self.base(model)
+            with self.subTest(model=model, word='absent'):
+                self.assertEqual(DEEPINFRA.body_valid(payload, row), None in row.efforts)
+            for bad in (None, 1, True, ['low'], {'effort': 'low'}):
+                payload, _ = self.base(model, reasoning_effort=bad)
+                with self.subTest(model=model, bad=repr(bad)):
+                    self.assertFalse(DEEPINFRA.body_valid(payload, row))
+
+    def test_row_review_refuses_a_malformed_menu(self):
+        row = DEEPINFRA.rows[MODEL]
+        for efforts in ((), ('high', 'high'), ('ultra',), 'high', None, ['high'], (['high'],), (None, None),
+                        ('high', 'low', 'medium', 'none', None, 'max')):
+            with self.subTest(efforts=repr(efforts)):
+                self.assertFalse(bridge.row_reviewed(DEEPINFRA, MODEL, row._replace(efforts=efforts)))
+        self.assertTrue(bridge.row_reviewed(DEEPINFRA, MODEL, row))
+
+    def test_the_probe_sends_the_rows_default(self):
+        self.assertEqual(DEEPINFRA.probe_body(DEEPINFRA.rows[DEEPSEEK])['reasoning_effort'], 'high')
+        self.assertNotIn('reasoning_effort', DEEPINFRA.probe_body(DEEPINFRA.rows[QWEN]))
+
+    def test_body_effort_names_the_level_a_body_carries(self):
+        self.assertEqual(DEEPINFRA.body_effort({'reasoning_effort': 'low'}), 'low')
+        self.assertIsNone(DEEPINFRA.body_effort({}))
+        self.assertIsNone(DEEPINFRA.body_effort(None))
+
+    def test_the_ledger_records_the_level_the_body_carried(self):
+        gate = self.gate(enabled_models=ALL).ready()
+        for operation_id, value, word in (('glm-low', body(model=MODEL, reasoning_effort='low'), 'low'),
+                                          ('glm-high', body(model=MODEL), 'high'),
+                                          ('deepseek-none', body(model=DEEPSEEK, reasoning_effort='none'), 'none'),
+                                          ('mimo-default', body(model=MIMO), 'default'),
+                                          ('qwen-medium', body(model=QWEN, reasoning_effort='medium'), 'medium')):
+            with self.subTest(operation_id=operation_id):
+                self.assertEqual(gate.call(operation_id, value=value)['status'], 200)
+                self.assertEqual(entry_of(gate, operation_id)['requested_effort'], word)
 
 
 class UnbilledLedgerTests(GateTest):
@@ -2102,7 +2163,7 @@ class SamplingTests(GateTest):
                                platform='linux', uid=0, now=gate.clock, fence=lambda _provider: None)
         self.assertEqual(sent, [{'model': QWEN, 'max_tokens': 1024, 'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}],
                                  **SAMPLING[QWEN]}])
-        self.assertEqual(summary['sent'], {'max_tokens': 1024, 'effort': 'none', 'sampling': SAMPLING[QWEN]})
+        self.assertEqual(summary['sent'], {'max_tokens': 1024, 'effort': 'default', 'sampling': SAMPLING[QWEN]})
         self.assertEqual((summary['http_status'], summary['entry_state']), (200, 'settled'))
         # MiMo's probe carries its own two (owner approval 2026-10-12); GLM's and DeepSeek's are as before: none.
         self.assertEqual(DEEPINFRA.probe_body(DEEPINFRA.rows[MIMO]),
@@ -2114,7 +2175,7 @@ class SamplingTests(GateTest):
                 probe_body = DEEPINFRA.probe_body(DEEPINFRA.rows[model])
                 self.assertEqual(probe_body, {'model': model, 'max_tokens': 1024,
                                               'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}],
-                                              **({'reasoning_effort': 'high'} if ROWS[model][4] == 'high' else {})})
+                                              **({'reasoning_effort': 'high'} if ROWS[model][4][0] == 'high' else {})})
 
     def test_row_review_refuses_a_malformed_sampling(self):
         qwen = DEEPINFRA.rows[QWEN]

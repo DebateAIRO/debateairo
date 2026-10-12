@@ -385,8 +385,10 @@ class RelayTestCase(unittest.TestCase):
         self.assertEqual(args.mode, 0o660)
         self.assertEqual(args.max_connections, 4)
         self.assertEqual(args.lifetime_seconds, 28800.0)
-        self.assertEqual(args.drain_seconds, 900.0)
-        self.assertEqual(args.idle_timeout_seconds, 1200.0)
+        # Slow answer (owner ruling 2026-10-12): the gate gives a vendor 1,200 s and answers within 30 s more; the app
+        # waits 1,260 s and its socket 1,290 s. A quiet connection, and an in-flight call at a stop, outlast both.
+        self.assertEqual(args.drain_seconds, 1500.0)
+        self.assertEqual(args.idle_timeout_seconds, 1500.0)
         args = gate_relay.build_parser().parse_args(["--listen-dir", self.listen_dir, "--mode", "640"])
         self.assertEqual(args.mode, 0o640)
 

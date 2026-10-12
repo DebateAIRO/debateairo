@@ -18,8 +18,8 @@ export type FakeNetopiaOptions = Readonly<{
   /** Where a saved card's token rides (N-4): `payment.binding.token` (default), `payment.instrument.token` or `payment.token`. */
   tokenAt?: "binding" | "instrument" | "payment";
   noticeContentType?: string;
-  /** N-16: a status read without ntpID is answered (default) or reads as no such order. */
-  statusWithoutNtpId?: "ANSWER" | "NOT_FOUND";
+  /** N-16: a status read without ntpID is answered (default) or gets NETOPIA's answer for an id it does not hold (INVALID_NTP_ID). */
+  statusWithoutNtpId?: "ANSWER" | "INVALID_NTP_ID";
   /** N-11: the status of an approved 0 card check (default 2, authorized: nothing is captured at 0). */
   zeroCheckStatus?: 2 | 3;
   now?: () => Date;
@@ -63,7 +63,9 @@ const POS_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const MAX_REQUEST_BYTES = 65_536;
 const AMOUNT_SLOT = '"__AMOUNT__"';
 const MERCHANT_SETTINGS: Result = Object.freeze({ status: 200, text: '{"error":{"code":"32","message":"Incorrect merchant settings"}}' });
-const NOT_FOUND: Result = Object.freeze({ status: 200, text: '{"error":{"code":"404","message":"Order not found"}}' });
+// What the sandbox answered on 2026-10-11 for a status read with an empty payment id and for a made-up one: HTTP 200,
+// error 99 "Invalid ntpID", every payment field zero. NETOPIA documents no "no such order" answer (see notFoundCodes).
+const INVALID_NTP_ID: Result = Object.freeze({ status: 200, text: '{"bnpl":{"oney":{},"paypo":{}},"card":{"clickpay":{}},"config":{},"customerAction":{"qrCode":{}},"error":{"code":"99","message":"Invalid ntpID"},"merchant":{"posID":0,"posType":0,"qrType":0,"showCancel":false},"order":{"amount":0,"billing":{"country":0},"dateTime":"0001-01-01T00:00:00","installments":{"selected":0},"shipping":{"country":0}},"payment":{"amount":0,"binding":{"expireMonth":0,"expireYear":0},"instrument":{"country":0},"operationDate":"0001-01-01T00:00:00","options":{"bonus":0,"installments":0},"status":0}}' });
 
 const record = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -275,7 +277,7 @@ export async function startFakeNetopia(options: FakeNetopiaOptions = {}): Promis
     if (body.posID !== posSignature) return MERCHANT_SETTINGS;
     const order = typeof body.orderID === "string" ? orders.get(body.orderID) : undefined;
     const ntpId = typeof body.ntpID === "string" ? body.ntpID : "";
-    if (order === undefined || (ntpId === "" ? statusWithoutNtpId === "NOT_FOUND" : ntpId !== order.ntpId)) return NOT_FOUND;
+    if (order === undefined || (ntpId === "" ? statusWithoutNtpId === "INVALID_NTP_ID" : ntpId !== order.ntpId)) return INVALID_NTP_ID;
     const touched = order.status !== 1;
     return { status: 200, text: withAmount({
       merchant: { posID: 1, posName: "fake" }, card: {}, error: { code: "00", message: "OK" },

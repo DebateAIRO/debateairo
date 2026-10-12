@@ -33,9 +33,15 @@ they hide the Anthropic key folder (install step 3a, which comes BEFORE the Anth
 
 One reviewed model:
 
-| Model | Maker | Longest answer allowed (tokens) | Thinking | JSON mode |
+| Model | Maker | Longest answer allowed (tokens) | Thinking levels (first = the app's default) | JSON mode |
 |---|---|---|---|---|
-| `claude-haiku-5-5` | Anthropic | 32,768 | "high" | not allowed |
+| `claude-haiku-5-5` | Anthropic | 32,768 | "high", "medium", "low" | not allowed |
+
+Thinking levels (spec 2026-10-12): every request carries `output_config` `{"effort": <one of the
+three>}`; the gate refuses any other word ("xhigh" and "max" are not reviewed) and a request with
+no `output_config`. "high" is what the app sends when the owner has not chosen a level: exactly
+the request of before. The day ledger's `requested_effort` names the level the request carried. A
+menu change is a reviewed row change (new helper hash, GO rewrite, restart).
 
 Anthropic's list prices (per million tokens), read on 2026-10-10 from
 platform.claude.com/docs/en/about-claude/pricing. The price depends on how long the question is.
@@ -96,8 +102,8 @@ cache reads.
 
 - **The gate refuses anything but a plain text question.** The request may carry only the model,
   the answer length, the messages (text only, the first one from the user), an optional system
-  text (or the two parts that carry its one 5-minute caching mark, see "Caching" above), and the
-  thinking setting "high". Anything else (tools, streaming, any other caching mark, temperature, a
+  text (or the two parts that carry its one 5-minute caching mark, see "Caching" above), and a
+  thinking setting from the reviewed menu ("high", "medium" or "low"). Anything else (tools, streaming, any other caching mark, temperature, a
   region or service tier, and so on) is refused before anything is set aside.
 - **Anything in Anthropic's answer the gate does not understand halts.** Usage fields it does not
   know, any use of Anthropic's server tools (web search and the like), a service tier other than
@@ -145,6 +151,18 @@ cache reads.
   `systemctl daemon-reload`). The day is recorded before the email is queued, in
   `/var/lib/debateai-preview-anthropic-halt-watch/announced-unbilled.json` (root-only, next to the
   halt marker), so a failed email is not retried that day.
+- **A slow or cut-off answer is booked at its maximum, never a halt** (owner ruling of 2026-10-12,
+  "Book max cost, keep going"; the same code as the DeepInfra gate, see README.md "Slow or cut-off
+  answers"). The gate waits up to 20 minutes (1,200 seconds) for Anthropic's answer. If the
+  connection times out or breaks AFTER the call was sent, the gate charges that call exactly the
+  amount it set aside (the most it can cost: every byte of the question as a token at the dearest
+  price that question can have, plus the longest answer allowed), records it as
+  `settled_reserved_max`, counts it in today's spend, pot and call count, and keeps working. That
+  call alone fails with `PROVIDER_CHARGE_BOOKED_MAX`. `status` shows `today_booked_max` and
+  `today_booked_max_usd`, and the halt watcher emails the owner each time that number goes up
+  (recorded first in `/var/lib/debateai-preview-anthropic-halt-watch/announced-booked.json`). An
+  answer that does come back is judged exactly as before: Anthropic's own 504 timeout answer still
+  halts (next point).
 - **These still halt:** 401 (`authentication_error`) and 403 (`permission_error`), because the key
   is wrong or lacks a permission and root must look; 402 (`billing_error`); 504 (`timeout_error`),
   because the work may already have run; any error type that does not belong to its status; and
@@ -463,7 +481,9 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
 ## Daily operations
 
 **How much did we spend today? Is the gate open?** This only reads. Look at `today_spend_usd`,
-`remaining_today_usd`, `today_unbilled_releases` (refusals kept at $0; no limit), `cooling`
+`remaining_today_usd`, `today_unbilled_releases` (refusals kept at $0; no limit), `today_booked_max`
+and `today_booked_max_usd` (calls whose connection timed out or broke after they were sent, each
+charged the most it could cost; already inside `today_spend_usd`; never a halt), `cooling`
 (Haiku's cool-off, if any; `activate` does not clear it), `unsent_streak`, `state`, `reason`,
 `halts` and `window_open`.
 
@@ -475,7 +495,8 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
 1. Read `reason` and `halts` in `status` first.
 2. If a call was uncertain (`uncertain_charge`, `interrupted_call_uncertain`), look at the usage
    page of the preview workspace in the Anthropic Console for that time before re-opening. Its
-   full set-aside amount stays counted in that day's pot.
+   full set-aside amount stays counted in that day's pot. (A call that only timed out or lost its
+   connection after it was sent no longer halts: it is booked at its maximum and needs no re-open.)
 3. If the reason is `provider_error_or_model_identity`, the entry's `reply_model` in that day's
    record shows which model the answer named. For an answer the gate could not price, the entry's
    `accounting.invalid_reason` names the check it failed and `accounting.reply_shape` outlines the
@@ -488,10 +509,19 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
 ```
 
 **The halt watcher.** Every minute it asks this gate for `status` (read-only). Once per halt it
-queues one email to the owner with the reason code and this gate's own re-open command.
+queues one email to the owner with the reason code and this gate's own re-open command. It also
+emails once a day about many unbilled refusals, and once each time `today_booked_max` goes up (a
+call booked at its maximum; nothing to re-open).
+
+**Installing the slow-answer change (2026-10-12).** As in README.md "Slow answers (2026-10-12):
+installing this change", with this gate's own files and steps: copy the gate files, `gate_watch.py`
+and the unit `debateai-preview-anthropic-budget.service` (now `TimeoutStopSec=1300`) from the
+release, `systemctl daemon-reload`, write this gate's GO again (new hashes), restart
+`debateai-preview-anthropic-budget.service` when no debate is running (it may wait up to about 22
+minutes), then `activate` (owner's yes) and run the halt watcher once by hand.
 
 **Emergency off.** Level 1 is instant (no new paid call starts; re-open with `activate`). Level 2
-stops the service (up to about 11 minutes, while calls in flight finish).
+stops the service (up to about 22 minutes, while calls in flight finish; `TimeoutStopSec=1300`).
 
 ```sh
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py stop --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1
