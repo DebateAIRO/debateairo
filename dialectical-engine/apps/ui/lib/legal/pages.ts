@@ -74,7 +74,7 @@ export type Company = Readonly<{
  */
 export const COMPANY: Company = Object.freeze({
   legalName: "DMS Merchandise Shop S.R.L.",
-  tradingNames: Object.freeze(["DebateAI", "Dialectical Engine"]),
+  tradingNames: Object.freeze(["Dialectical Engine"]),
   registeredOffice: "Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, județul Neamț, România",
   tradeRegisterNo: "J2022000426271",
   cui: "45935221",
@@ -140,7 +140,7 @@ export const LEGAL_COOKIES: readonly LegalInventoryItem[] = Object.freeze([
 
 /**
  * Browser-storage keys the UI writes: two in local storage and five in session storage. The
- * export link token is sent to the DebateAI server when redeemed; the link outcome stays in the
+ * export link token is sent to the Dialectical Engine server when redeemed; the link outcome stays in the
  * browser. The help-chat name is literal so this page does not pull in the support widget.
  */
 export const LEGAL_BROWSER_STORAGE: readonly LegalInventoryItem[] = Object.freeze([

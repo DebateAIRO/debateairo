@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Tietosuoja",
-  "consent.settings.hint": "Tämä selain säilyttää vain sen, mitä DebateAI tarvitsee toimiakseen. Näet koko luettelon täältä milloin tahansa.",
+  "consent.settings.hint": "Tämä selain säilyttää vain sen, mitä Dialectical Engine tarvitsee toimiakseen. Näet koko luettelon täältä milloin tahansa.",
   "consent.settings.button": "Mitä tallennamme",
   "consent.bar.label": "Evästeilmoitus",
   "consent.bar.eyebrow": "TIETOSI, AVOIMESTI KIRJATTUINA",
   "consent.bar.title": "Tallennamme vain palvelun toiminnan kannalta välttämättömät tiedot.",
-  "consent.bar.body": "Neljä evästettä ja neljä kohdetta selaimesi tallennustilassa, jokainen välttämätön DebateAI:n toiminnalle. Ei mitään valinnaista, ei mitään jaettua muille.",
+  "consent.bar.body": "Neljä evästettä ja neljä kohdetta selaimesi tallennustilassa, jokainen välttämätön Dialectical Engine:n toiminnalle. Ei mitään valinnaista, ei mitään jaettua muille.",
   "consent.bar.acknowledge": "Selvä",
   "consent.bar.whatWeStore": "Mitä tallennamme",
   "consent.link.cookiePolicy": "Evästekäytäntö",

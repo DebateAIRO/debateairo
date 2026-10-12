@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Privacidade",
-  "consent.settings.hint": "Este navegador guarda apenas o que o DebateAI precisa para funcionar. Consulte aqui a lista completa a qualquer momento.",
+  "consent.settings.hint": "Este navegador guarda apenas o que o Dialectical Engine precisa para funcionar. Consulte aqui a lista completa a qualquer momento.",
   "consent.settings.button": "O que guardamos",
   "consent.bar.label": "Aviso sobre cookies",
   "consent.bar.eyebrow": "OS SEUS DADOS, COM TOTAL TRANSPARÊNCIA",
   "consent.bar.title": "Guardamos apenas o necessário para manter o tribunal em funcionamento.",
-  "consent.bar.body": "Quatro cookies e quatro itens no armazenamento do seu navegador, cada um necessário para o DebateAI funcionar. Nada opcional, nada partilhado com mais ninguém.",
+  "consent.bar.body": "Quatro cookies e quatro itens no armazenamento do seu navegador, cada um necessário para o Dialectical Engine funcionar. Nada opcional, nada partilhado com mais ninguém.",
   "consent.bar.acknowledge": "Entendi",
   "consent.bar.whatWeStore": "O que guardamos",
   "consent.link.cookiePolicy": "Política de Cookies",

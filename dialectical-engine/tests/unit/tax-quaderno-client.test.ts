@@ -24,7 +24,7 @@ const sale = (transactionId: string): SaleRecord => ({
   chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId, issuedOn: new Date("2026-10-02T10:00:00Z"), currency: "USD",
   customer: { name: "Test Person", email: "person@example.test", country: "DE", region: null, postalCode: "10115",
     city: "Berlin", street: null, taxId: null, locale: "de" },
-  lines: [{ description: "DebateAI Plus, October 2026", netMicros: 20_000_000, taxMicros: 3_800_000, taxRateBasisPoints: 1900 }],
+  lines: [{ description: "Dialectical Engine Plus, October 2026", netMicros: 20_000_000, taxMicros: 3_800_000, taxRateBasisPoints: 1900 }],
   taxCode: "saas",
   evidence: { billingCountry: "DE", ipAddress: "203.0.113.10", bankCountry: "DE" },
   processor: "netopia"
@@ -102,7 +102,7 @@ describe("P4 — Quaderno client against the fake", () => {
       customer: { first_name: "Test Person", email: "person@example.test", country: "DE" },
       evidence: { billing_country: "DE", ip_address: "203.0.113.10", bank_country: "DE" },
       custom_metadata: { charge_id: "c0ffee00c0ffee00c0ffee00c0ffee00" },
-      items: [{ description: "DebateAI Plus, October 2026", quantity: 1, amount: 23.8, tax: { country: "DE", rate: 19, tax_code: "saas" } }]
+      items: [{ description: "Dialectical Engine Plus, October 2026", quantity: 1, amount: 23.8, tax: { country: "DE", rate: 19, tax_code: "saas" } }]
     });
   });
 

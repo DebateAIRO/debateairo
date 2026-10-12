@@ -428,7 +428,7 @@ describe("P10b SmartBill invoices for Romania", () => {
     expect(smartbill.credits.find((refund) => refund.chargeId === credited.chargeId)).toMatchObject({
       refundTotalMicros: 12_100_000, taxRateBasisPoints: 2_100, customer: { name: "Test Buyer", country: "RO" },
       // RefundRecord.description: the credited line, worded as the invoice's was (the harness buyer's locale is en).
-      description: expect.stringMatching(/^DebateAI Plus plan, .+ to .+$/)
+      description: expect.stringMatching(/^Dialectical Engine Plus plan, .+ to .+$/)
     });
     const manual = await partialRefund(false);
     expect((await h.outboxRows(manual.chargeId)).find((row) => row.kind === "SMARTBILL_STORNO")).toMatchObject({ dead: true, lastErrorCode: "CREDIT_NOTE_MANUAL" });

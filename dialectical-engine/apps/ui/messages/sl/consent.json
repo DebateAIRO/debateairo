@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Zasebnost",
-  "consent.settings.hint": "Ta brskalnik hrani le tisto, kar DebateAI potrebuje za delovanje. Celoten seznam si lahko tukaj ogledate kadar koli.",
+  "consent.settings.hint": "Ta brskalnik hrani le tisto, kar Dialectical Engine potrebuje za delovanje. Celoten seznam si lahko tukaj ogledate kadar koli.",
   "consent.settings.button": "Kaj shranjujemo",
   "consent.bar.label": "Obvestilo o piškotkih",
   "consent.bar.eyebrow": "VAŠI PODATKI — BREZ SKRIVANJA",
   "consent.bar.title": "Shranjujemo le tisto, kar omogoča delovanje razsodniškega senata.",
-  "consent.bar.body": "Štirje piškotki in štirje elementi v shrambi vašega brskalnika, vsak potreben za delovanje DebateAI. Nič neobveznega, nič deljenega z nikomer drugim.",
+  "consent.bar.body": "Štirje piškotki in štirje elementi v shrambi vašega brskalnika, vsak potreben za delovanje Dialectical Engine. Nič neobveznega, nič deljenega z nikomer drugim.",
   "consent.bar.acknowledge": "Razumem",
   "consent.bar.whatWeStore": "Kaj shranjujemo",
   "consent.link.cookiePolicy": "Pravilnik o piškotkih",

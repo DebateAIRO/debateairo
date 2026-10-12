@@ -156,12 +156,12 @@ describe("legal documents — generated data", () => {
 
     it("keeps Tennessee out: section 2 lists the United States without it, and Annex A.2 says so first", () => {
       expect(texts(section(TERMS_OF_SERVICE, "02"))[0]).toContain("Moldova, the United States (except Tennessee), Canada,");
-      expect(texts(section(TERMS_OF_SERVICE, "A.2"))[0]).toBe("Tennessee. We do not offer DebateAI to people who live in Tennessee.");
+      expect(texts(section(TERMS_OF_SERVICE, "A.2"))[0]).toBe("Tennessee. We do not offer Dialectical Engine to people who live in Tennessee.");
     });
 
     it("lists the countries served in plain prose, and names none it does not serve (owner's ruling of 9 October 2026)", () => {
       expect(texts(section(TERMS_OF_SERVICE, "02"))[0]).toBe(
-        "We offer DebateAI to people who live in the European Union (27 countries) and the European Economic Area"
+        "We offer Dialectical Engine to people who live in the European Union (27 countries) and the European Economic Area"
           + " (Norway, Iceland and Liechtenstein), Switzerland, Moldova, the United States (except Tennessee), Canada,"
           + " Australia, New Zealand, Singapore, Japan, South Korea and Taiwan. We do not offer it elsewhere."
           + " If you live outside those countries you may be able to reach the site, but we do not direct the service to you,"

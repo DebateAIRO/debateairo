@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Integritet",
-  "consent.settings.hint": "Den här webbläsaren sparar bara det som DebateAI behöver för att fungera. Se hela listan här när som helst.",
+  "consent.settings.hint": "Den här webbläsaren sparar bara det som Dialectical Engine behöver för att fungera. Se hela listan här när som helst.",
   "consent.settings.button": "Det här sparar vi",
   "consent.bar.label": "Cookiemeddelande",
   "consent.bar.eyebrow": "DINA DATA, DOKUMENTERADE",
   "consent.bar.title": "Vi lagrar bara det som krävs för att hålla domarpanelen igång.",
-  "consent.bar.body": "Fyra cookies och fyra poster i webbläsarens lagring, var och en nödvändig för att DebateAI ska fungera. Inget valfritt, inget som delas med någon annan.",
+  "consent.bar.body": "Fyra cookies och fyra poster i webbläsarens lagring, var och en nödvändig för att Dialectical Engine ska fungera. Inget valfritt, inget som delas med någon annan.",
   "consent.bar.acknowledge": "Uppfattat",
   "consent.bar.whatWeStore": "Det här sparar vi",
   "consent.link.cookiePolicy": "Cookiepolicy",

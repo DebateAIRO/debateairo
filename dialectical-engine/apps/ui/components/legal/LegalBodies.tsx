@@ -137,7 +137,7 @@ export function LegalNoticeBody({
   /** Paid plans (P21, R3-4): §01 names the seller, §04 and §05 describe the paid plans. Off: the free-product text. */
   billingOn?: boolean;
 }) {
-  const [product = COMPANY.legalName, ...otherNames] = COMPANY.tradingNames;
+  const [product = COMPANY.legalName] = COMPANY.tradingNames;
   const vat =
     COMPANY.vat.kind === "registered"
       ? COMPANY.vat.number
@@ -166,7 +166,6 @@ export function LegalNoticeBody({
         <p>
           {withFacts(t(legalCatalog, "legal.notice.s01.body"), {
             product,
-            alsoCalled: otherNames.join(", "),
             company: COMPANY.legalName
           })}
         </p>

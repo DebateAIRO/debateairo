@@ -348,7 +348,7 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
       catalog["consent.settings.hint"]
     );
     expect(catalog["consent.settings.hint"]).toBe(
-      "This browser keeps only what DebateAI needs to work. See the full list here any time."
+      "This browser keeps only what Dialectical Engine needs to work. See the full list here any time."
     );
     const opener = document.querySelector<HTMLButtonElement>("button.setBtn");
     expect(opener, "one .setBtn opener").not.toBeNull();

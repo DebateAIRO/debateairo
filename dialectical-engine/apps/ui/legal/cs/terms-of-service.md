@@ -1,4 +1,4 @@
-# DebateAI — Podmínky poskytování služby
+# Dialectical Engine — Podmínky poskytování služby
 
 <!-- legal-chrome
 summaryTitle: Stručně
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12. října 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
 
-**In short.** Musí vám být alespoň 18 let. DebateAI vytváří argumenty pomocí modelů AI a vše, co vygeneruje, může být nesprávné — nejde o poradenství. Vaše debaty jsou soukromé, dokud je nezveřejníte; pokud je zveřejníte, může je číst kdokoli. Text, který zadáte, je odesílán poskytovatelům AI uvedeným v našem Registru poskytovatelů a nepoužívá se k trénování modelů. Nezákonný obsah hlaste na support@dezbatere.ro bez ohledu na to, zda máte účet. Rozhodným právem je rumunské právo, vaše místní spotřebitelská ochrana vám však zůstává zachována.
+**In short.** Musí vám být alespoň 18 let. Dialectical Engine vytváří argumenty pomocí modelů AI a vše, co vygeneruje, může být nesprávné — nejde o poradenství. Vaše debaty jsou soukromé, dokud je nezveřejníte; pokud je zveřejníte, může je číst kdokoli. Text, který zadáte, je odesílán poskytovatelům AI uvedeným v našem Registru poskytovatelů a nepoužívá se k trénování modelů. Nezákonný obsah hlaste na support@dezbatere.ro bez ohledu na to, zda máte účet. Rozhodným právem je rumunské právo, vaše místní spotřebitelská ochrana vám však zůstává zachována.
 
 ## 1. Kdo jsme a jak nás kontaktovat
 
-Službu DebateAI provozuje **DMS Merchandise Shop S.R.L.**, společnost zapsaná v Rumunsku.
+Službu Dialectical Engine provozuje **DMS Merchandise Shop S.R.L.**, společnost zapsaná v Rumunsku.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ Službu DebateAI provozuje **DMS Merchandise Shop S.R.L.**, společnost zapsaná
 
 Tyto údaje jsou také trvale uvedeny na webu na adrese dezbatere.ro/legal. Vždy můžete kontaktovat člověka, nejen našeho asistenta; postup vysvětluje oddíl 10.
 
-## 2. Kde službu DebateAI nabízíme
+## 2. Kde službu Dialectical Engine nabízíme
 
-Službu DebateAI nabízíme osobám, které žijí v těchto zemích a regionech: Evropská unie (27 zemí) a Evropský hospodářský prostor (Norsko, Island a Lichtenštejnsko), Švýcarsko, Moldavsko, Spojené státy (kromě Tennessee), Kanada, Austrálie, Nový Zéland, Singapur, Japonsko, Jižní Korea a Tchaj-wan. Jinde ji nenabízíme. Pokud žijete mimo tyto země, můžete mít k webu přístup, službu však na vás nezaměřujeme, nepřijímáme od vás platby a tyto Podmínky ani naše Zásady ochrany osobních údajů nejsou přizpůsobeny právu vaší země. Příloha A stanoví, co platí v jednotlivých regionech, v nichž službu poskytujeme.
+Službu Dialectical Engine nabízíme osobám, které žijí v těchto zemích a regionech: Evropská unie (27 zemí) a Evropský hospodářský prostor (Norsko, Island a Lichtenštejnsko), Švýcarsko, Moldavsko, Spojené státy (kromě Tennessee), Kanada, Austrálie, Nový Zéland, Singapur, Japonsko, Jižní Korea a Tchaj-wan. Jinde ji nenabízíme. Pokud žijete mimo tyto země, můžete mít k webu přístup, službu však na vás nezaměřujeme, nepřijímáme od vás platby a tyto Podmínky ani naše Zásady ochrany osobních údajů nejsou přizpůsobeny právu vaší země. Příloha A stanoví, co platí v jednotlivých regionech, v nichž službu poskytujeme.
 
 ## 3. Přijetí těchto Podmínek
 
@@ -58,21 +58,21 @@ Naše **Zásady ochrany osobních údajů** na adrese dezbatere.ro/privacy vysv�
 
 Než s námi elektronicky uzavřete smlouvu, rozhraní vám zobrazí jednotlivé kroky, umožní vám před odesláním zkontrolovat a opravit zadané údaje a sdělí vám jazyky, v nichž lze smlouvu uzavřít. Tyto Podmínky jsou dostupné ve formě, kterou můžete uložit a vytisknout. Při koupi placeného tarifu vám e-mailem zašleme verzi, kterou jste přijali. O kopii můžete požádat kdykoli. Nic v těchto Podmínkách neomezuje práva, která máte podle rumunského či unijního spotřebitelského práva nebo práva země, v níž žijete, pokud je nelze smluvně omezit.
 
-## 4. Kdo může službu DebateAI používat
+## 4. Kdo může službu Dialectical Engine používat
 
-Pro vytvoření účtu vám musí být **alespoň 18 let**, což při registraci potvrzujete. DebateAI není určena dětem a vědomě ji neposkytujeme nikomu mladšímu 18 let. Zjistíme-li, že účet patří osobě mladší 18 let, uzavřeme jej. Některé regiony vyžadují více než potvrzení; příloha A uvádí, co kde platí.
+Pro vytvoření účtu vám musí být **alespoň 18 let**, což při registraci potvrzujete. Dialectical Engine není určena dětem a vědomě ji neposkytujeme nikomu mladšímu 18 let. Zjistíme-li, že účet patří osobě mladší 18 let, uzavřeme jej. Některé regiony vyžadují více než potvrzení; příloha A uvádí, co kde platí.
 
-Musíte mít právní způsobilost tuto smlouvu uzavřít. Používáte-li DebateAI jménem organizace, potvrzujete, že jste oprávněni ji zavázat, a výraz „vy“ pak označuje tuto organizaci.
+Musíte mít právní způsobilost tuto smlouvu uzavřít. Používáte-li Dialectical Engine jménem organizace, potvrzujete, že jste oprávněni ji zavázat, a výraz „vy“ pak označuje tuto organizaci.
 
 Zveřejněnou debatu může číst kdokoli. Čtení nevyžaduje účet, představuje však užívání služby a vztahují se na ně oddíly 7, 15, 16 a 18.
 
-## 5. Co DebateAI dělá a čím není
+## 5. Co Dialectical Engine dělá a čím není
 
-Zadáte otázku nebo tvrzení. DebateAI je odešle několika modelům AI třetích stran, které kolem nich vytvoří graf argumentů: tvrzení, protitvrzení, kritiky, odkazy na důkazy, hodnocení a závěr s intervalem spolehlivosti. Jednotlivá tvrzení můžete zpochybnit, požádat o další prověření určitého bodu a rozhodnout, zda výsledek zveřejníte.
+Zadáte otázku nebo tvrzení. Dialectical Engine je odešle několika modelům AI třetích stran, které kolem nich vytvoří graf argumentů: tvrzení, protitvrzení, kritiky, odkazy na důkazy, hodnocení a závěr s intervalem spolehlivosti. Jednotlivá tvrzení můžete zpochybnit, požádat o další prověření určitého bodu a rozhodnout, zda výsledek zveřejníte.
 
 **Vše v debatě vytváří AI.** Argumenty, kritiky, odkazy na důkazy, hodnocení, závěry a odpovědi asistenta podpory jsou generovány strojově. Mohou být nesprávné, neúplné, zastaralé nebo sebejistě mylné a mohou odrážet zkreslení modelů. Před zobrazením nebo zveřejněním je žádný člověk nekontroluje a žádná konkrétní osoba za ně nenese redakční odpovědnost. Vygenerovaný obsah je v produktu, na zveřejněných stránkách a v exportech označen jako vytvořený AI.
 
-**DebateAI neposkytuje poradenství.** Nejde o právní, lékařské, finanční, daňové, psychologické, bezpečnostní ani jiné odborné poradenství a závěr není skutkovým zjištěním. Debatu nepoužívejte jako základ pro rozhodnutí důležité pro vaše zdraví, bezpečnost, finance, právní postavení nebo blaho jiných osob, aniž byste ověřili primární zdroje a případně se poradili s kvalifikovaným odborníkem. Vysoký interval spolehlivosti znamená, že modely považovaly výklad na základě materiálů, které měly k dispozici, za dobře ustálený; nezaručuje jeho pravdivost.
+**Dialectical Engine neposkytuje poradenství.** Nejde o právní, lékařské, finanční, daňové, psychologické, bezpečnostní ani jiné odborné poradenství a závěr není skutkovým zjištěním. Debatu nepoužívejte jako základ pro rozhodnutí důležité pro vaše zdraví, bezpečnost, finance, právní postavení nebo blaho jiných osob, aniž byste ověřili primární zdroje a případně se poradili s kvalifikovaným odborníkem. Vysoký interval spolehlivosti znamená, že modely považovaly výklad na základě materiálů, které měly k dispozici, za dobře ustálený; nezaručuje jeho pravdivost.
 
 **K čemu se zavazujeme.** Službu budeme poskytovat s přiměřenou péčí a odborností a v souladu se zveřejněným popisem. Pokud vám zákon poskytuje záruku, že služba odpovídá svému popisu a je vhodná pro svůj obvyklý účel, tato záruka platí a nic v těchto Podmínkách ji neodstraňuje. Neslibujeme však přesnost konkrétního výstupu: ta je vlastností vygenerovaného obsahu, nikoli otázkou toho, zda služba funguje.
 
@@ -92,19 +92,19 @@ Svůj účet můžete kdykoli uzavřít v nabídce **Nastavení → Účet**. Uz
 
 Tato pravidla se vztahují na to, co zadáváte, jak službu používáte a co zveřejňujete.
 
-**Nezadávejte osobní údaje jiných osob.** Ptejte se na témata, argumenty a veřejné otázky, nikoli na identifikovatelné soukromé osoby. Neuvádějte jména, kontaktní údaje, identifikační čísla, fotografie ani zdravotní, finanční či jiné údaje, podle nichž lze někoho identifikovat, a nepoužívejte DebateAI k vytváření případu, profilu nebo spisu o určité osobě. Otázky týkající se veřejně činných osob v jejich veřejné roli jsou přípustné; otázky zaměřené na soukromou osobu nikoli. Pokud takové údaje přesto zadáte, odpovídáte za ně a my můžeme obsah odstranit.
+**Nezadávejte osobní údaje jiných osob.** Ptejte se na témata, argumenty a veřejné otázky, nikoli na identifikovatelné soukromé osoby. Neuvádějte jména, kontaktní údaje, identifikační čísla, fotografie ani zdravotní, finanční či jiné údaje, podle nichž lze někoho identifikovat, a nepoužívejte Dialectical Engine k vytváření případu, profilu nebo spisu o určité osobě. Otázky týkající se veřejně činných osob v jejich veřejné roli jsou přípustné; otázky zaměřené na soukromou osobu nikoli. Pokud takové údaje přesto zadáte, odpovídáte za ně a my můžeme obsah odstranit.
 
 **Vaše vlastní citlivé informace.** Otázky, které pokládáte, se mohou týkat vašeho zdraví, přesvědčení, politických názorů nebo jiných citlivých záležitostí. Souhlas s tím vyslovujete na samostatné obrazovce před svou první debatou. Pokud žijete v místě se zvláštními pravidly pro údaje o zdravotním stavu, může vás příloha A odkázat na samostatné oznámení.
 
 **Nezadávejte ani nezveřejňujte nezákonný obsah**, včetně obsahu, který je pomlouvačný, podněcuje k násilí nebo nenávisti, obtěžuje či vyhrožuje, představuje intimní snímky sdílené bez souhlasu, porušuje práva duševního vlastnictví nebo důvěrnost, vyzrazuje obchodní tajemství, představuje materiál zobrazující sexuální zneužívání dětí nebo porušuje sankce či pravidla kontroly vývozu.
 
-**Nepoužívejte DebateAI ke klamání.** Nevydávejte vygenerovaný výstup za text napsaný člověkem, pokud by to bylo zavádějící, neodstraňujte z něj označení, že jej vytvořila AI, a nepoužívejte jej k vytváření zdání konsenzu, falešných důkazů nebo k vydávání se za jinou osobu.
+**Nepoužívejte Dialectical Engine ke klamání.** Nevydávejte vygenerovaný výstup za text napsaný člověkem, pokud by to bylo zavádějící, neodstraňujte z něj označení, že jej vytvořila AI, a nepoužívejte jej k vytváření zdání konsenzu, falešných důkazů nebo k vydávání se za jinou osobu.
 
 **Nenapadejte službu.** Běžné indexování zveřejněných debat vyhledávači je dovoleno. Jiný automatizovaný přístup, stahování, procházení či hromadné vytěžování těchto debat vyžaduje náš písemný souhlas. Nesmíte obcházet omezení četnosti požadavků, ověřování ani kontrolní mechanismy zveřejňování; pokoušet se získat prompty nebo systémové pokyny; používat prompt injection s cílem přimět systém ignorovat svá omezení; ani bez našeho písemného svolení provádět průzkumné či zátěžové testy.
 
 **Službu dále neprodávejte ani neuvádějte pod jinou značkou** a bez naší písemné dohody ji nepoužívejte k vytvoření konkurenčního systému, včetně použití výstupů jako trénovacích dat.
 
-**Nepoužívejte DebateAI k rozhodování o** zdraví, bezpečnosti, právních nárocích, zaměstnání, úvěru, bydlení nebo imigračním statusu určité osoby. Služba k tomu není určena a její výstupy nejsou pro taková rozhodnutí bezpečným základem.
+**Nepoužívejte Dialectical Engine k rozhodování o** zdraví, bezpečnosti, právních nárocích, zaměstnání, úvěru, bydlení nebo imigračním statusu určité osoby. Služba k tomu není určena a její výstupy nejsou pro taková rozhodnutí bezpečným základem.
 
 **Místní právo v místě zveřejnění.** Odpovídáte za to, že vše, co zveřejníte, je v souladu s právem země, v níž se nacházíte. V některých regionech můžeme zveřejňování určitých témat omezit.
 
@@ -132,9 +132,9 @@ Debaty jsou **ve výchozím nastavení soukromé**. Nic z toho, co vytvoříte, 
 
 **Co zveřejnění způsobí.** Zveřejnění je úmyslný, samostatně potvrzený úkon. Při zveřejnění pořídíme neměnný snímek debaty a zpřístupníme jej komukoli ke čtení bez účtu. Vyhledávače ji mohou indexovat. Snímek zobrazuje váš **pseudonym**, otázku tak, jak jste ji napsali, strom argumentů, hodnocení, závěr a interval spolehlivosti a nese viditelné označení, že obsah vytvořila AI. Nezobrazuje vaši e-mailovou adresu, záznamy relací ani historii účtu.
 
-**Zveřejnění je v praxi fakticky nevratné.** Jakmile je debata veřejná, jiné osoby ji mohou číst, citovat, pořizovat snímky obrazovky, archivovat a ukládat do mezipaměti. Zrušení zveřejnění odstraní debatu z DebateAI a zničí klíč k naší kopii, nedosáhne však na kopie, které již existují jinde. Nezveřejňujte nic, co byste nechtěli mít trvale spojeno se svým pseudonymem.
+**Zveřejnění je v praxi fakticky nevratné.** Jakmile je debata veřejná, jiné osoby ji mohou číst, citovat, pořizovat snímky obrazovky, archivovat a ukládat do mezipaměti. Zrušení zveřejnění odstraní debatu z Dialectical Engine a zničí klíč k naší kopii, nedosáhne však na kopie, které již existují jinde. Nezveřejňujte nic, co byste nechtěli mít trvale spojeno se svým pseudonymem.
 
-**Zveřejněné debaty při uzavření účtu.** Když naplánujete uzavření účtu, zvolíte, co se stane s debatami, které jste zveřejnili. Pokud zaškrtnete **„Smazat také mé veřejné debaty“**, každou z nich při provedení uzavření odstraníme z DebateAI a zničíme klíč k naší kopii, stejně jako při zrušení zveřejnění, ledaže nám zákon ukládá uchovat konkrétní položku. Pokud políčko nezaškrtnete, debaty zůstanou veřejné pod vaším vyřazeným pseudonymem. Kopie pořízené jinými osobami před odstraněním nemůžeme ovlivnit. Chcete-li si odstraňovanou debatu ponechat, nejprve si ji stáhněte.
+**Zveřejněné debaty při uzavření účtu.** Když naplánujete uzavření účtu, zvolíte, co se stane s debatami, které jste zveřejnili. Pokud zaškrtnete **„Smazat také mé veřejné debaty“**, každou z nich při provedení uzavření odstraníme z Dialectical Engine a zničíme klíč k naší kopii, stejně jako při zrušení zveřejnění, ledaže nám zákon ukládá uchovat konkrétní položku. Pokud políčko nezaškrtnete, debaty zůstanou veřejné pod vaším vyřazeným pseudonymem. Kopie pořízené jinými osobami před odstraněním nemůžeme ovlivnit. Chcete-li si odstraňovanou debatu ponechat, nejprve si ji stáhněte.
 
 **Zveřejněný obsah můžeme vždy odstranit.** Zveřejněnou debatu můžeme odstranit nebo k ní omezit přístup, vyžaduje-li to zákon, nařídí-li to soud nebo příslušný orgán, nebo porušuje-li tyto Podmínky či je nezákonná. Nic v tomto oddílu nám nebrání jednat na základě platného oznámení podle oddílu 10 a nic v něm nepředstavuje příslib, že zveřejněná debata zůstane dostupná.
 
@@ -161,7 +161,7 @@ Každé hlášení potvrdíme bez zbytečného odkladu. Hlášení vyřizujeme v
 
 **Kontakt s člověkem.** Náš asistent podpory je systém AI a tuto skutečnost uvádí. Kdykoli můžete požádat o rozhovor s člověkem a každý rozhovor s podporou tuto možnost nabízí. Při komunikaci s vámi nespoléháme pouze na automatizované nástroje.
 
-**Teroristický obsah.** Teroristický obsah je nezákonný a na DebateAI není povolen (oddíl 7). Příslušné orgány v Evropské unii nám mohou zasílat příkazy k odstranění podle nařízení (EU) 2021/784 na kontaktní místo uvedené v oddílu 1. Jakmile příkaz obdržíme, obsah odstraníme nebo k němu znemožníme přístup ve všech zemích EU do jedné hodiny. Osobu, která obsah zveřejnila, informujeme, že byl odstraněn, a na její žádost i proč a jak může příkaz napadnout, pokud orgán nerozhodne, že veřejná bezpečnost vyžaduje, abychom po omezenou dobu mlčeli. Jak nařízení vyžaduje, odstraněný obsah a související údaje uchováváme po dobu šesti měsíců, aby bylo možné odstranění přezkoumat a, pokud bylo chybné, zrušit. Osoba, která obsah zveřejnila, může příkaz napadnout u soudů země, jejíž orgán jej vydal, a může také využít náš postup pro vyřizování stížností. Žádný orgán nám dosud neuložil přijmout zvláštní opatření proti teroristickému obsahu podle tohoto nařízení; pokud k tomu dojde, tato opatření zde popíšeme, včetně případných automatizovaných nástrojů.
+**Teroristický obsah.** Teroristický obsah je nezákonný a na Dialectical Engine není povolen (oddíl 7). Příslušné orgány v Evropské unii nám mohou zasílat příkazy k odstranění podle nařízení (EU) 2021/784 na kontaktní místo uvedené v oddílu 1. Jakmile příkaz obdržíme, obsah odstraníme nebo k němu znemožníme přístup ve všech zemích EU do jedné hodiny. Osobu, která obsah zveřejnila, informujeme, že byl odstraněn, a na její žádost i proč a jak může příkaz napadnout, pokud orgán nerozhodne, že veřejná bezpečnost vyžaduje, abychom po omezenou dobu mlčeli. Jak nařízení vyžaduje, odstraněný obsah a související údaje uchováváme po dobu šesti měsíců, aby bylo možné odstranění přezkoumat a, pokud bylo chybné, zrušit. Osoba, která obsah zveřejnila, může příkaz napadnout u soudů země, jejíž orgán jej vydal, a může také využít náš postup pro vyřizování stížností. Žádný orgán nám dosud neuložil přijmout zvláštní opatření proti teroristickému obsahu podle tohoto nařízení; pokud k tomu dojde, tato opatření zde popíšeme, včetně případných automatizovaných nástrojů.
 
 **Vážné ohrožení života nebo bezpečnosti.** Dozvíme-li se o informacích nasvědčujících trestnému činu spojenému s ohrožením života nebo bezpečnosti určité osoby, informujeme příslušné orgány.
 
@@ -183,7 +183,7 @@ Oddíly 8 (pokud jde o již zveřejněný obsah), 15, 16 a 18 zůstávají v pla
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI nabízí bezplatný tarif. Bude k dispozici placený tarif **Premium**, který zpřístupní úplný výběr modelů a umožní vám samostatně nastavovat parametry debaty.
+Dialectical Engine nabízí bezplatný tarif. Bude k dispozici placený tarif **Premium**, který zpřístupní úplný výběr modelů a umožní vám samostatně nastavovat parametry debaty.
 
 **Před zaplacením** vám přímo nad platebním tlačítkem zobrazíme: tarif; celkovou cenu včetně příslušné daně; fakturační období; skutečnost, že se tarif automaticky obnovuje až do zrušení; datum skončení případného bezplatného zkušebního období a částku, která vám poté bude účtována; a způsob zrušení. Podmínky obnovení potvrdíte zaškrtnutím samostatného políčka. Tlačítko zní **Předplatit a zaplatit** (v rumunštině *Comandă cu obligație de plată*). Na trvalém nosiči vám zašleme potvrzení obsahující stejné informace, tyto Podmínky a formulář pro odstoupení.
 
@@ -211,11 +211,11 @@ Pokud jste nás zaškrtnutím políčka při nákupu požádali, abychom službu
 
 ## 14. Změny služby a těchto Podmínek
 
-**Změny služby.** DebateAI průběžně vyvíjíme a běžná zlepšení, opravy a změny ve výběru modelů probíhají bez předchozího upozornění. Pokud provedeme změnu přesahující rámec zachování funkčnosti služby podle popisu, činíme tak pouze z některého z těchto důvodů: splnění právního nebo regulatorního požadavku; reakce na bezpečnostní problém nebo zneužití; změna, omezení nebo stažení modelu či funkce poskytovatelem modelu, na nichž jsme závislí; přizpůsobení technickému prostředí, které neovládáme; nebo přidání, zlepšení či ukončení funkce způsobem, který vám nezvyšuje náklady.
+**Změny služby.** Dialectical Engine průběžně vyvíjíme a běžná zlepšení, opravy a změny ve výběru modelů probíhají bez předchozího upozornění. Pokud provedeme změnu přesahující rámec zachování funkčnosti služby podle popisu, činíme tak pouze z některého z těchto důvodů: splnění právního nebo regulatorního požadavku; reakce na bezpečnostní problém nebo zneužití; změna, omezení nebo stažení modelu či funkce poskytovatelem modelu, na nichž jsme závislí; přizpůsobení technickému prostředí, které neovládáme; nebo přidání, zlepšení či ukončení funkce způsobem, který vám nezvyšuje náklady.
 
 O tom, co a kdy se mění, vás předem informujeme na trvalém nosiči. Má-li změna více než nepodstatný nepříznivý dopad na váš přístup ke službě nebo její používání, můžete smlouvu bezplatně ukončit do **30 dnů** ode dne, kdy jste byli informováni, nebo ode dne nabytí účinku změny, podle toho, který den nastane později, a vrátíme vám případnou předplacenou částku za nevyužité období.
 
-**Změny těchto Podmínek.** Tyto Podmínky můžeme měnit ze stejných druhů důvodů. U změn, které neomezují vaše práva, zveřejníme novou verzi se shrnutím změn a nejméně **30 dnů** před nabytím účinku vám zašleme e-mail; pokračováním v používání DebateAI po tomto datu změnu přijímáte a před tímto datem můžete svůj účet uzavřít. U změn, které omezují vaše práva — včetně zvýšení ceny stávajícího tarifu, snížení limitů, odstranění funkcí, nového způsobu použití vašeho obsahu nebo změn odpovědnosti, rozhodného práva či řešení sporů — vás při příštím přihlášení požádáme, abyste novou verzi výslovně přijali, a změna platí pouze do budoucna. Žádnou změnu nikdy neuplatníme zpětně a tento oddíl nikdy nepoužijeme ke změně podstaty toho, za co jste v průběhu období zaplatili, aniž bychom vám nabídli možnost smlouvu ukončit. Předchozí verze zůstávají dostupné na adrese dezbatere.ro/terms/versions.
+**Změny těchto Podmínek.** Tyto Podmínky můžeme měnit ze stejných druhů důvodů. U změn, které neomezují vaše práva, zveřejníme novou verzi se shrnutím změn a nejméně **30 dnů** před nabytím účinku vám zašleme e-mail; pokračováním v používání Dialectical Engine po tomto datu změnu přijímáte a před tímto datem můžete svůj účet uzavřít. U změn, které omezují vaše práva — včetně zvýšení ceny stávajícího tarifu, snížení limitů, odstranění funkcí, nového způsobu použití vašeho obsahu nebo změn odpovědnosti, rozhodného práva či řešení sporů — vás při příštím přihlášení požádáme, abyste novou verzi výslovně přijali, a změna platí pouze do budoucna. Žádnou změnu nikdy neuplatníme zpětně a tento oddíl nikdy nepoužijeme ke změně podstaty toho, za co jste v průběhu období zaplatili, aniž bychom vám nabídli možnost smlouvu ukončit. Předchozí verze zůstávají dostupné na adrese dezbatere.ro/terms/versions.
 
 ## 15. Odpovědnost
 
@@ -231,15 +231,15 @@ O tom, co a kdy se mění, vás předem informujeme na trvalém nosiči. Má-li 
 
 ## 16. Duševní vlastnictví
 
-Samotná služba — software, systém, metoda hodnocení, rozhraní, názvy DebateAI a DebateAIRO a naše loga — patří nám nebo našim poskytovatelům licencí. Tyto Podmínky vám udělují oprávnění službu používat, nikoli ji vlastnit.
+Samotná služba — software, systém, metoda hodnocení, rozhraní, názvy Dialectical Engine a DebateAIRO a naše loga — patří nám nebo našim poskytovatelům licencí. Tyto Podmínky vám udělují oprávnění službu používat, nikoli ji vlastnit.
 
-Zveřejněné debaty můžete citovat a odkazovat na ně s uvedením DebateAI a odkazu na původní stránku. Hromadné kopírování, systematické rozmnožování veřejného souboru debat a použití zveřejněných debat jako trénovacích dat není bez naší písemné dohody dovoleno.
+Zveřejněné debaty můžete citovat a odkazovat na ně s uvedením Dialectical Engine a odkazu na původní stránku. Hromadné kopírování, systematické rozmnožování veřejného souboru debat a použití zveřejněných debat jako trénovacích dat není bez naší písemné dohody dovoleno.
 
-Oddíl 8 upravuje váš obsah a postavení vygenerovaných výstupů. Domníváte-li se, že něco na DebateAI porušuje vaše práva duševního vlastnictví, použijte postup pro hlášení uvedený v oddílu 10.
+Oddíl 8 upravuje váš obsah a postavení vygenerovaných výstupů. Domníváte-li se, že něco na Dialectical Engine porušuje vaše práva duševního vlastnictví, použijte postup pro hlášení uvedený v oddílu 10.
 
 ## 17. Osobní údaje
 
-Způsob, jakým nakládáme s osobními údaji, stanoví **Zásady ochrany osobních údajů** na adrese dezbatere.ro/privacy. Vysvětlují, co shromažďujeme, právní základ každého účelu, dobu uchovávání, příjemce údajů, související předávání a způsob uplatnění vašich práv. Tři body patří i sem. Oddíl 7 vás žádá, abyste do otázky nevkládali osobní údaje jiných osob; pokud tak učiníte, odpovídáte za ně a my můžeme obsah odstranit. Obsahuje-li debata zveřejněná na DebateAI vaše osobní údaje, můžete nás požádat o jejich odstranění, aniž byste měli účet (oddíl 9). A uchováváme záznam o vašem přijetí těchto Podmínek — verzi, čas a technické údaje relace — jako důkaz smlouvy, jak vysvětlují Zásady ochrany osobních údajů.
+Způsob, jakým nakládáme s osobními údaji, stanoví **Zásady ochrany osobních údajů** na adrese dezbatere.ro/privacy. Vysvětlují, co shromažďujeme, právní základ každého účelu, dobu uchovávání, příjemce údajů, související předávání a způsob uplatnění vašich práv. Tři body patří i sem. Oddíl 7 vás žádá, abyste do otázky nevkládali osobní údaje jiných osob; pokud tak učiníte, odpovídáte za ně a my můžeme obsah odstranit. Obsahuje-li debata zveřejněná na Dialectical Engine vaše osobní údaje, můžete nás požádat o jejich odstranění, aniž byste měli účet (oddíl 9). A uchováváme záznam o vašem přijetí těchto Podmínek — verzi, čas a technické údaje relace — jako důkaz smlouvy, jak vysvětlují Zásady ochrany osobních údajů.
 
 ## 18. Rozhodné právo a soudní příslušnost
 
@@ -277,7 +277,7 @@ Hlavní část těchto Podmínek je určena pro vás. Dále platí: řízení m�
 
 ### A.2 Spojené státy
 
-**Tennessee.** Službu DebateAI nenabízíme osobám, které žijí v Tennessee.
+**Tennessee.** Službu Dialectical Engine nenabízíme osobám, které žijí v Tennessee.
 
 **Oznámení a odstraňování.** Intimní snímky bez souhlasu lze nahlásit e-mailem na adrese abuse@dezbatere.ro, bez účtu, a budou odstraněny do 48 hodin od platné žádosti. Stížnosti týkající se autorských práv se podávají postupem podle oddílu 10.
 

@@ -1,4 +1,4 @@
-# DebateAI — Pakalpojuma noteikumi
+# Dialectical Engine — Pakalpojuma noteikumi
 
 <!-- legal-chrome
 summaryTitle: Īsumā
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
-**In short.** Jums jābūt vismaz 18 gadus vecam. DebateAI veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
+**In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
 ## 1. Kas mēs esam un kā ar mums sazināties
 
-DebateAI darbību nodrošina **DMS Merchandise Shop S.R.L.**, Rumānijā reģistrēts uzņēmums.
+Dialectical Engine darbību nodrošina **DMS Merchandise Shop S.R.L.**, Rumānijā reģistrēts uzņēmums.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ DebateAI darbību nodrošina **DMS Merchandise Shop S.R.L.**, Rumānijā reģist
 
 Šī informācija ir arī pastāvīgi redzama vietnē dezbatere.ro/legal. Jūs vienmēr varat sazināties ar cilvēku, ne tikai ar mūsu asistentu; 10. sadaļā paskaidrots, kā to izdarīt.
 
-## 2. Kur mēs piedāvājam DebateAI
+## 2. Kur mēs piedāvājam Dialectical Engine
 
-Mēs piedāvājam DebateAI personām, kuras dzīvo Eiropas Savienībā (27 valstis) un Eiropas Ekonomikas zonā (Norvēģijā, Islandē un Lihtenšteinā), Šveicē, Moldovā, Amerikas Savienotajās Valstīs (izņemot Tenesī), Kanādā, Austrālijā, Jaunzēlandē, Singapūrā, Japānā, Dienvidkorejā un Taivānā. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu.
+Mēs piedāvājam Dialectical Engine personām, kuras dzīvo Eiropas Savienībā (27 valstis) un Eiropas Ekonomikas zonā (Norvēģijā, Islandē un Lihtenšteinā), Šveicē, Moldovā, Amerikas Savienotajās Valstīs (izņemot Tenesī), Kanādā, Austrālijā, Jaunzēlandē, Singapūrā, Japānā, Dienvidkorejā un Taivānā. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu.
 
 ## 3. Piekrišana šiem Noteikumiem
 
@@ -58,21 +58,21 @@ Mūsu **Privātuma politikā** vietnē dezbatere.ro/privacy paskaidrots, kā mē
 
 Pirms elektroniski noslēdzat ar mums līgumu, saskarne parāda veicamās darbības, ļauj pirms iesniegšanas pārskatīt un izlabot ievadīto informāciju un informē par valodām, kurās līgumu var noslēgt. Šie Noteikumi ir pieejami formā, ko varat saglabāt un izdrukāt, iegādājoties maksas plānu, mēs pa e-pastu nosūtām jums versiju, kurai piekritāt, un jūs jebkurā laikā varat pieprasīt kopiju. Nekas šajos Noteikumos neierobežo tādas jūsu tiesības saskaņā ar Rumānijas vai ES patērētāju tiesībām vai jūsu dzīvesvietas valsts tiesībām, kuras nevar ierobežot ar līgumu.
 
-## 4. Kas drīkst lietot DebateAI
+## 4. Kas drīkst lietot Dialectical Engine
 
-Lai izveidotu kontu, jums jābūt **vismaz 18 gadus vecam**, un reģistrējoties jūs to apliecināt. DebateAI nav paredzēts bērniem, un mēs apzināti to nesniedzam personām, kas jaunākas par 18 gadiem. Ja uzzinām, ka konts pieder personai, kas jaunāka par 18 gadiem, mēs to slēdzam. Dažos reģionos ar apliecinājumu vien nepietiek; A pielikumā norādīts, kas attiecīgajā vietā ir piemērojams.
+Lai izveidotu kontu, jums jābūt **vismaz 18 gadus vecam**, un reģistrējoties jūs to apliecināt. Dialectical Engine nav paredzēts bērniem, un mēs apzināti to nesniedzam personām, kas jaunākas par 18 gadiem. Ja uzzinām, ka konts pieder personai, kas jaunāka par 18 gadiem, mēs to slēdzam. Dažos reģionos ar apliecinājumu vien nepietiek; A pielikumā norādīts, kas attiecīgajā vietā ir piemērojams.
 
-Jums jābūt rīcībspējīgam, lai noslēgtu šo līgumu. Ja DebateAI lietojat kādas organizācijas vārdā, jūs apliecināt, ka esat pilnvarots uzņemties saistības tās vārdā, un tad „jūs” nozīmē šo organizāciju.
+Jums jābūt rīcībspējīgam, lai noslēgtu šo līgumu. Ja Dialectical Engine lietojat kādas organizācijas vārdā, jūs apliecināt, ka esat pilnvarots uzņemties saistības tās vārdā, un tad „jūs” nozīmē šo organizāciju.
 
 Ikviens drīkst lasīt publicētas debates. Lasīšanai konts nav vajadzīgs, taču tā ir pakalpojuma lietošana, un uz to attiecas 7., 15., 16. un 18. sadaļa.
 
-## 5. Ko DebateAI dara un kas tas nav
+## 5. Ko Dialectical Engine dara un kas tas nav
 
-Jūs iesniedzat jautājumu vai apgalvojumu. DebateAI to nosūta vairākiem trešo personu MI modeļiem, kas ap to izveido argumentu grafu: apgalvojumus, pretargumentus, kritiku, atsauces uz pierādījumiem, vērtējumus un spriedumu ar ticamības pakāpi. Varat apstrīdēt atsevišķus apgalvojumus, lūgt jautājumu izpētīt sīkāk un izlemt, vai rezultātu publicēt.
+Jūs iesniedzat jautājumu vai apgalvojumu. Dialectical Engine to nosūta vairākiem trešo personu MI modeļiem, kas ap to izveido argumentu grafu: apgalvojumus, pretargumentus, kritiku, atsauces uz pierādījumiem, vērtējumus un spriedumu ar ticamības pakāpi. Varat apstrīdēt atsevišķus apgalvojumus, lūgt jautājumu izpētīt sīkāk un izlemt, vai rezultātu publicēt.
 
 **Visu debašu saturu ģenerē MI.** Argumentus, kritiku, atsauces uz pierādījumiem, vērtējumus, spriedumus un atbalsta asistenta atbildes ģenerē mašīna. Tie var būt nepareizi, nepilnīgi, novecojuši vai pārliecinoši kļūdaini, un tajos var izpausties modeļu aizspriedumi. Neviena persona tos nepārskata, pirms tie tiek parādīti jums vai publicēti, un neviena vārdā nosaukta persona neuzņemas par tiem redakcionālu atbildību. Ģenerētais saturs produktā, publicētajās lapās un eksportētajos materiālos ir marķēts kā MI ģenerēts.
 
-**DebateAI nav konsultācija.** Tā nav juridiska, medicīniska, finanšu, nodokļu, psiholoģiska, drošības vai cita profesionāla konsultācija, un spriedums nav fakta konstatējums. Neizmantojiet debates kā pamatu lēmumam, kas ir būtisks jūsu veselībai, drošībai, naudai, tiesiskajam stāvoklim vai citu personu labklājībai, nepārbaudot pirmavotus un attiecīgā gadījumā nekonsultējoties ar kvalificētu speciālistu. Augsta ticamības pakāpe nozīmē, ka modeļi, pamatojoties uz apskatīto materiālu, uzskatīja interpretāciju par labi nostiprinātu; tas negarantē tās patiesumu.
+**Dialectical Engine nav konsultācija.** Tā nav juridiska, medicīniska, finanšu, nodokļu, psiholoģiska, drošības vai cita profesionāla konsultācija, un spriedums nav fakta konstatējums. Neizmantojiet debates kā pamatu lēmumam, kas ir būtisks jūsu veselībai, drošībai, naudai, tiesiskajam stāvoklim vai citu personu labklājībai, nepārbaudot pirmavotus un attiecīgā gadījumā nekonsultējoties ar kvalificētu speciālistu. Augsta ticamības pakāpe nozīmē, ka modeļi, pamatojoties uz apskatīto materiālu, uzskatīja interpretāciju par labi nostiprinātu; tas negarantē tās patiesumu.
 
 **Ko mēs apņemamies.** Mēs sniegsim pakalpojumu ar pienācīgu rūpību un prasmi un atbilstoši mūsu publicētajam aprakstam. Ja tiesību akti jums piešķir garantiju, ka pakalpojums atbilst tā aprakstam un ir piemērots parastajam nolūkam, šī garantija ir spēkā un nekas šajos Noteikumos to neatceļ. Mēs neapsolām, ka konkrēts rezultāts būs precīzs: tā ir ģenerētā satura īpašība, nevis pakalpojuma darbības rādītājs.
 
@@ -92,19 +92,19 @@ Jebkurā laikā varat slēgt kontu sadaļā **Iestatījumi → Konts**. Slēgša
 
 Šie noteikumi attiecas uz jūsu iesniegto saturu, pakalpojuma lietošanu un publicēto saturu.
 
-**Neiesniedziet citu personu datus.** Jautājiet par problēmām, argumentiem un sabiedriski nozīmīgiem jautājumiem, nevis par identificējamām privātpersonām. Neiekļaujiet vārdus, kontaktinformāciju, identifikācijas numurus, attēlus, veselības, finanšu vai citus datus, kas identificē personu, un neizmantojiet DebateAI, lai izveidotu lietu, profilu vai dosjē par kādu personu. Jautājumi par publiskām personām, kas darbojas publiskā statusā, ir pieņemami; jautājumi, kas vērsti pret privātpersonu, nav pieņemami. Ja tomēr iesniedzat šādus datus, jūs par tiem atbildat, un mēs varam saturu noņemt.
+**Neiesniedziet citu personu datus.** Jautājiet par problēmām, argumentiem un sabiedriski nozīmīgiem jautājumiem, nevis par identificējamām privātpersonām. Neiekļaujiet vārdus, kontaktinformāciju, identifikācijas numurus, attēlus, veselības, finanšu vai citus datus, kas identificē personu, un neizmantojiet Dialectical Engine, lai izveidotu lietu, profilu vai dosjē par kādu personu. Jautājumi par publiskām personām, kas darbojas publiskā statusā, ir pieņemami; jautājumi, kas vērsti pret privātpersonu, nav pieņemami. Ja tomēr iesniedzat šādus datus, jūs par tiem atbildat, un mēs varam saturu noņemt.
 
 **Jūsu sensitīvā informācija.** Jūsu uzdotie jautājumi var skart jūsu veselību, pārliecību, politiskos uzskatus vai citas sensitīvas tēmas. Šādas informācijas apstrādei jūs piekrītat atsevišķā ekrānā pirms savām pirmajām debatēm. Ja dzīvojat vietā, kur veselības datiem ir īpaši noteikumi, A pielikumā var būt norāde uz atsevišķu paziņojumu.
 
 **Neiesniedziet un nepublicējiet nelikumīgu saturu**, tostarp saturu, kas ir neslavu ceļošs, mudina uz vardarbību vai naidu, aizskar vai draud, ir bez piekrišanas kopīgoti intīmi attēli, pārkāpj intelektuālā īpašuma tiesības vai konfidencialitāti, izpauž komercnoslēpumus, ir materiāls, kurā atspoguļota bērnu seksuāla izmantošana, vai pārkāpj sankcijas vai eksporta kontroli.
 
-**Neizmantojiet DebateAI maldināšanai.** Neuzdodiet ģenerēto rezultātu par cilvēka rakstītu, ja tas maldinātu, nenoņemiet MI ģenerēta satura marķējumu un neizmantojiet to šķietamas vienprātības, viltotu pierādījumu vai citas personas atdarināšanas radīšanai.
+**Neizmantojiet Dialectical Engine maldināšanai.** Neuzdodiet ģenerēto rezultātu par cilvēka rakstītu, ja tas maldinātu, nenoņemiet MI ģenerēta satura marķējumu un neizmantojiet to šķietamas vienprātības, viltotu pierādījumu vai citas personas atdarināšanas radīšanai.
 
 **Neuzbrūciet pakalpojumam.** Publicētās debates drīkst ierasti indeksēt meklētājprogrammas, taču citai automatizētai piekļuvei, datu izgūšanai, pārmeklēšanai vai masveida ieguvei nepieciešama mūsu rakstiska atļauja; nav atļauts apiet pieprasījumu biežuma ierobežojumus, autentifikāciju vai publicēšanas kontroli; mēģināt iegūt uzvednes vai sistēmas norādījumus; izmantot uzvedņu injekciju, lai panāktu, ka dzinējs ignorē ierobežojumus; veikt zondēšanu vai slodzes testēšanu bez mūsu rakstiskas atļaujas.
 
 **Nepārdodiet un nepārzīmolojiet** pakalpojumu un neizmantojiet to konkurējoša dzinēja izveidei, tostarp izmantojot rezultātus kā apmācības datus, bez mūsu rakstiskas vienošanās.
 
-**Neizmantojiet DebateAI lēmumiem par personas** veselību, drošību, likumiskajām tiesībām, nodarbinātību, kredītu, mājokli vai imigrācijas statusu. Tas nav šim nolūkam izveidots, un tā rezultāti nav drošs pamats šādiem lēmumiem.
+**Neizmantojiet Dialectical Engine lēmumiem par personas** veselību, drošību, likumiskajām tiesībām, nodarbinātību, kredītu, mājokli vai imigrācijas statusu. Tas nav šim nolūkam izveidots, un tā rezultāti nav drošs pamats šādiem lēmumiem.
 
 **Vietējie tiesību akti publicēšanas vietā.** Jūs atbildat par to, lai viss jūsu publicētais atbilstu tās valsts tiesību aktiem, kurā atrodaties. Dažos reģionos mēs varam ierobežot noteiktu tēmu publicēšanu.
 
@@ -132,9 +132,9 @@ Debates **pēc noklusējuma ir privātas**. Nekas no jūsu izveidotā nav redzam
 
 **Ko dara publicēšana.** Publicēšana ir apzināta darbība, ko apstiprina atsevišķi. Kad publicējat, mēs izveidojam fiksētu debašu momentuzņēmumu un ļaujam ikvienam to lasīt bez konta. Meklētājprogrammas to var indeksēt. Momentuzņēmumā redzams jūsu **pseidonīms**, jūsu jautājums tādā formā, kādā to uzrakstījāt, argumentu koks, vērtējumi, spriedums un ticamības pakāpe, kā arī redzams marķējums, ka saturu ģenerējis MI. Tajā nav redzama jūsu e-pasta adrese, sesiju ieraksti vai konta vēsture.
 
-**Praksē publicēšana faktiski ir neatgriezeniska.** Kad debates kļūst publiskas, citas personas tās var lasīt, citēt, uzņemt to ekrānuzņēmumus, arhivēt un saglabāt kešatmiņā. Publikācijas atcelšana noņem tās no DebateAI un iznīcina mūsu kopijas atslēgu, taču nevar sasniegt kopijas, kas jau atrodas citviet. Nepublicējiet neko tādu, ko nevēlētos pastāvīgi saistīt ar savu pseidonīmu.
+**Praksē publicēšana faktiski ir neatgriezeniska.** Kad debates kļūst publiskas, citas personas tās var lasīt, citēt, uzņemt to ekrānuzņēmumus, arhivēt un saglabāt kešatmiņā. Publikācijas atcelšana noņem tās no Dialectical Engine un iznīcina mūsu kopijas atslēgu, taču nevar sasniegt kopijas, kas jau atrodas citviet. Nepublicējiet neko tādu, ko nevēlētos pastāvīgi saistīt ar savu pseidonīmu.
 
-**Publicētās debates, kad slēdzat kontu.** Plānojot konta slēgšanu, jūs izvēlaties, kas notiks ar jūsu publicētajām debatēm. Ja atzīmēsiet **„Dzēst arī manas publiskās debates”**, slēgšanas laikā katras debates noņemsim no DebateAI un iznīcināsim savas kopijas atslēgu, kā tas notiek, atsaucot publikāciju, ja vien likums neliek saglabāt konkrētu vienumu. Ja lodziņu neatzīmēsiet, debates paliks publiskas ar jūsu vairs neizmantoto pseidonīmu. Kopijas, ko citi izveidojuši pirms noņemšanas, nav mūsu kontrolē. Ja vēlaties noņemamās debates saglabāt sev, vispirms tās lejupielādējiet.
+**Publicētās debates, kad slēdzat kontu.** Plānojot konta slēgšanu, jūs izvēlaties, kas notiks ar jūsu publicētajām debatēm. Ja atzīmēsiet **„Dzēst arī manas publiskās debates”**, slēgšanas laikā katras debates noņemsim no Dialectical Engine un iznīcināsim savas kopijas atslēgu, kā tas notiek, atsaucot publikāciju, ja vien likums neliek saglabāt konkrētu vienumu. Ja lodziņu neatzīmēsiet, debates paliks publiskas ar jūsu vairs neizmantoto pseidonīmu. Kopijas, ko citi izveidojuši pirms noņemšanas, nav mūsu kontrolē. Ja vēlaties noņemamās debates saglabāt sev, vispirms tās lejupielādējiet.
 
 **Mēs vienmēr varam noņemt publicētu saturu.** Mēs varam noņemt publicētas debates vai ierobežot piekļuvi tām, ja to prasa tiesību akti, ja to uzdod tiesa vai kompetenta iestāde vai ja tās pārkāpj šos Noteikumus vai ir nelikumīgas. Nekas šajā sadaļā neliedz mums rīkoties pēc derīga paziņojuma saskaņā ar 10. sadaļu, un nekas tajā nav solījums, ka publicētas debates paliks pieejamas.
 
@@ -161,7 +161,7 @@ Mēs bez nepamatotas kavēšanās apstiprinām katra ziņojuma saņemšanu. Mēs
 
 **Saziņa ar cilvēku.** Mūsu atbalsta asistents ir MI sistēma un par to informē. Jūs jebkurā laikā varat lūgt sazināties ar cilvēku, un katrā atbalsta sarunā tiek piedāvāta šāda iespēja. Saziņā ar jums mēs nepaļaujamies tikai uz automatizētiem rīkiem.
 
-**Teroristisks saturs.** Teroristisks saturs ir nelikumīgs, un DebateAI tas nav atļauts (7. sadaļa). Eiropas Savienības kompetentās iestādes var nosūtīt mums izņemšanas rīkojumus saskaņā ar Regulu (ES) 2021/784 uz 1. sadaļā norādīto kontaktpunktu. Saņēmuši šādu rīkojumu, mēs vienas stundas laikā izņemam saturu vai atspējojam piekļuvi tam visās ES valstīs. Mēs informējam personu, kura saturu publicēja, ka tas ir izņemts, un, ja tā pieprasa, kāpēc tas izņemts un kā rīkojumu var apstrīdēt, ja vien iestāde nenolemj, ka sabiedriskās drošības dēļ informāciju uz ierobežotu laiku nedrīkst izpaust. Kā to prasa Regula, izņemto saturu un ar to saistītos datus mēs glabājam sešus mēnešus, lai izņemšanu varētu pārskatīt un, ja tā bijusi nepamatota, atcelt. Persona, kura saturu publicēja, var apstrīdēt rīkojumu tās valsts tiesās, kuras iestāde rīkojumu izdevusi, kā arī izmantot mūsu sūdzību kārtību. Neviena iestāde nav pieprasījusi, lai mēs saskaņā ar šo Regulu veiktu konkrētus pasākumus pret teroristisku saturu; ja tas notiks, mēs šos pasākumus, tostarp jebkādus automatizētus rīkus, aprakstīsim šeit.
+**Teroristisks saturs.** Teroristisks saturs ir nelikumīgs, un Dialectical Engine tas nav atļauts (7. sadaļa). Eiropas Savienības kompetentās iestādes var nosūtīt mums izņemšanas rīkojumus saskaņā ar Regulu (ES) 2021/784 uz 1. sadaļā norādīto kontaktpunktu. Saņēmuši šādu rīkojumu, mēs vienas stundas laikā izņemam saturu vai atspējojam piekļuvi tam visās ES valstīs. Mēs informējam personu, kura saturu publicēja, ka tas ir izņemts, un, ja tā pieprasa, kāpēc tas izņemts un kā rīkojumu var apstrīdēt, ja vien iestāde nenolemj, ka sabiedriskās drošības dēļ informāciju uz ierobežotu laiku nedrīkst izpaust. Kā to prasa Regula, izņemto saturu un ar to saistītos datus mēs glabājam sešus mēnešus, lai izņemšanu varētu pārskatīt un, ja tā bijusi nepamatota, atcelt. Persona, kura saturu publicēja, var apstrīdēt rīkojumu tās valsts tiesās, kuras iestāde rīkojumu izdevusi, kā arī izmantot mūsu sūdzību kārtību. Neviena iestāde nav pieprasījusi, lai mēs saskaņā ar šo Regulu veiktu konkrētus pasākumus pret teroristisku saturu; ja tas notiks, mēs šos pasākumus, tostarp jebkādus automatizētus rīkus, aprakstīsim šeit.
 
 **Nopietns dzīvības vai drošības apdraudējums.** Ja uzzinām informāciju, kas liecina par noziedzīgu nodarījumu, kurš apdraud kādas personas dzīvību vai drošību, mēs informējam kompetentās iestādes.
 
@@ -183,7 +183,7 @@ Ja pilnībā slēdzam pakalpojumu vai pārtraucam to sniegt jūsu valstī, mēs 
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI piedāvā bezmaksas plānu. Būs pieejams maksas **Premium** plāns, kas nodrošina piekļuvi pilnam modeļu klāstam un ļauj jums pašam iestatīt debašu parametrus.
+Dialectical Engine piedāvā bezmaksas plānu. Būs pieejams maksas **Premium** plāns, kas nodrošina piekļuvi pilnam modeļu klāstam un ļauj jums pašam iestatīt debašu parametrus.
 
 **Pirms maksājuma veikšanas** tieši virs maksājuma pogas mēs parādām: plānu; kopējo cenu ar piemērojamiem nodokļiem; norēķinu periodu; to, ka plāns tiek automātiski atjaunots līdz atcelšanai; datumu, kad beidzas bezmaksas izmēģinājums, un pēc tam iekasējamo summu; un atcelšanas kārtību. Jūs apstiprināt atjaunošanas noteikumus, atzīmējot atsevišķu izvēles rūtiņu. Uz pogas ir teksts **Abonēt un maksāt** (rumāņu valodā *Comandă cu obligație de plată*). Mēs nosūtām jums apstiprinājumu pastāvīgā informācijas nesējā, kurā ietverta tā pati informācija, šie Noteikumi un atteikuma veidlapa.
 
@@ -211,11 +211,11 @@ Ja dzīvojat citviet, A pielikumā norādītas jūsu reģionā piemērojamās at
 
 ## 14. Pakalpojuma un šo Noteikumu izmaiņas
 
-**Pakalpojuma izmaiņas.** Mēs nepārtraukti attīstām DebateAI, un kārtējie uzlabojumi, labojumi un modeļu klāsta izmaiņas notiek bez iepriekšēja paziņojuma. Ja veicam izmaiņas, kas pārsniedz pakalpojuma darbības uzturēšanu atbilstoši aprakstam, mēs to darām tikai kāda no šiem iemesliem dēļ: lai izpildītu juridisku vai regulatīvu prasību; reaģētu uz drošības vai ļaunprātīgas izmantošanas problēmu; jo modeļa pakalpojumu sniedzējs maina, ierobežo vai atsauc modeli vai funkciju, no kuras esam atkarīgi; lai pielāgotos tehniskai videi, kuru nekontrolējam; vai lai pievienotu, uzlabotu vai izbeigtu funkciju tādā veidā, kas jums nerada izmaksas.
+**Pakalpojuma izmaiņas.** Mēs nepārtraukti attīstām Dialectical Engine, un kārtējie uzlabojumi, labojumi un modeļu klāsta izmaiņas notiek bez iepriekšēja paziņojuma. Ja veicam izmaiņas, kas pārsniedz pakalpojuma darbības uzturēšanu atbilstoši aprakstam, mēs to darām tikai kāda no šiem iemesliem dēļ: lai izpildītu juridisku vai regulatīvu prasību; reaģētu uz drošības vai ļaunprātīgas izmantošanas problēmu; jo modeļa pakalpojumu sniedzējs maina, ierobežo vai atsauc modeli vai funkciju, no kuras esam atkarīgi; lai pielāgotos tehniskai videi, kuru nekontrolējam; vai lai pievienotu, uzlabotu vai izbeigtu funkciju tādā veidā, kas jums nerada izmaksas.
 
 Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainīsies. Ja izmaiņas vairāk nekā nebūtiski nelabvēlīgi ietekmē jūsu piekļuvi pakalpojumam vai tā lietošanu, varat bez maksas izbeigt līgumu **30 dienu laikā** pēc paziņojuma saņemšanas vai izmaiņu stāšanās spēkā atkarībā no tā, kurš datums ir vēlāks, un mēs atmaksājam iepriekš samaksāto summu par neizmantoto periodu.
 
-**Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot DebateAI pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
+**Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
 
 ## 15. Atbildība
 
@@ -231,15 +231,15 @@ Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainī
 
 ## 16. Intelektuālais īpašums
 
-Pats pakalpojums — programmatūra, dzinējs, vērtēšanas metode, saskarne, nosaukumi DebateAI un DebateAIRO un mūsu logotipi — pieder mums vai mūsu licences devējiem. Šie Noteikumi piešķir jums atļauju lietot pakalpojumu, nevis īpašumtiesības uz to.
+Pats pakalpojums — programmatūra, dzinējs, vērtēšanas metode, saskarne, nosaukumi Dialectical Engine un DebateAIRO un mūsu logotipi — pieder mums vai mūsu licences devējiem. Šie Noteikumi piešķir jums atļauju lietot pakalpojumu, nevis īpašumtiesības uz to.
 
-Jūs drīkstat citēt publicētas debates un ievietot saites uz tām, norādot DebateAI kā avotu un pievienojot saiti uz sākotnējo lapu. Publiskā kopuma masveida kopēšana, sistemātiska reproducēšana un publicēto debašu izmantošana kā apmācības dati bez mūsu rakstiskas vienošanās nav atļautas.
+Jūs drīkstat citēt publicētas debates un ievietot saites uz tām, norādot Dialectical Engine kā avotu un pievienojot saiti uz sākotnējo lapu. Publiskā kopuma masveida kopēšana, sistemātiska reproducēšana un publicēto debašu izmantošana kā apmācības dati bez mūsu rakstiskas vienošanās nav atļautas.
 
-8. sadaļa attiecas uz jūsu saturu un ģenerēto rezultātu statusu. Ja uzskatāt, ka kaut kas pakalpojumā DebateAI pārkāpj jūsu intelektuālā īpašuma tiesības, izmantojiet 10. sadaļā noteikto ziņošanas kārtību.
+8. sadaļa attiecas uz jūsu saturu un ģenerēto rezultātu statusu. Ja uzskatāt, ka kaut kas pakalpojumā Dialectical Engine pārkāpj jūsu intelektuālā īpašuma tiesības, izmantojiet 10. sadaļā noteikto ziņošanas kārtību.
 
 ## 17. Personas dati
 
-Tas, kā mēs rīkojamies ar personas datiem, ir noteikts **Privātuma politikā** vietnē dezbatere.ro/privacy. Tajā paskaidrots, ko vācam, katra nolūka juridiskais pamats, cik ilgi glabājam datus, kas tos saņem, kāda nosūtīšana notiek un kā īstenot savas tiesības. Arī šeit jānorāda trīs aspekti. 7. sadaļā lūdzam neiekļaut jautājumā citu personu datus; ja tos tomēr iekļaujat, jūs par to atbildat, un mēs varam saturu noņemt. Ja pakalpojumā DebateAI publicētās debatēs ir jūsu personas dati, varat lūgt mums tos noņemt bez konta (9. sadaļa). Turklāt mēs glabājam ierakstu par jūsu piekrišanu šiem Noteikumiem — versiju, laiku un sesijas tehnisko informāciju — kā līguma pierādījumu, kā paskaidrots Privātuma politikā.
+Tas, kā mēs rīkojamies ar personas datiem, ir noteikts **Privātuma politikā** vietnē dezbatere.ro/privacy. Tajā paskaidrots, ko vācam, katra nolūka juridiskais pamats, cik ilgi glabājam datus, kas tos saņem, kāda nosūtīšana notiek un kā īstenot savas tiesības. Arī šeit jānorāda trīs aspekti. 7. sadaļā lūdzam neiekļaut jautājumā citu personu datus; ja tos tomēr iekļaujat, jūs par to atbildat, un mēs varam saturu noņemt. Ja pakalpojumā Dialectical Engine publicētās debatēs ir jūsu personas dati, varat lūgt mums tos noņemt bez konta (9. sadaļa). Turklāt mēs glabājam ierakstu par jūsu piekrišanu šiem Noteikumiem — versiju, laiku un sesijas tehnisko informāciju — kā līguma pierādījumu, kā paskaidrots Privātuma politikā.
 
 ## 18. Piemērojamie tiesību akti un strīdu izskatīšanas vieta
 
@@ -277,7 +277,7 @@ Katrs ieraksts ir piemērojams personām, kuras dzīvo attiecīgajā reģionā, 
 
 ### A.2 Amerikas Savienotās Valstis
 
-**Tenesī.** Mēs nepiedāvājam DebateAI personām, kuras dzīvo Tenesī.
+**Tenesī.** Mēs nepiedāvājam Dialectical Engine personām, kuras dzīvo Tenesī.
 
 **Paziņojumi un noņemšana.** Par bez piekrišanas kopīgotiem intīmiem attēliem var ziņot, nosūtot e-pastu uz abuse@dezbatere.ro, bez konta, un pēc derīga pieprasījuma tie tiek noņemti 48 stundu laikā. Autortiesību sūdzības tiek iesniegtas, izmantojot 10. sadaļā noteikto ziņošanas kārtību.
 

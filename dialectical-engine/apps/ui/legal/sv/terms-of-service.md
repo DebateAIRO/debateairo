@@ -1,4 +1,4 @@
-# DebateAI — Användarvillkor
+# Dialectical Engine — Användarvillkor
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
-**In short.** Du måste ha fyllt 18 år. DebateAI bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
+**In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
 ## 1. Vilka vi är och hur du kontaktar oss
 
-DebateAI drivs av **DMS Merchandise Shop S.R.L.**, ett bolag registrerat i Rumänien.
+Dialectical Engine drivs av **DMS Merchandise Shop S.R.L.**, ett bolag registrerat i Rumänien.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ DebateAI drivs av **DMS Merchandise Shop S.R.L.**, ett bolag registrerat i Rumä
 
 Dessa uppgifter visas även permanent på webbplatsen på dezbatere.ro/legal. Du kan alltid nå en person, inte bara vår assistent; avsnitt 10 förklarar hur.
 
-## 2. Var vi erbjuder DebateAI
+## 2. Var vi erbjuder Dialectical Engine
 
-Vi erbjuder DebateAI till personer som bor i Europeiska unionen (27 länder) och Europeiska ekonomiska samarbetsområdet (Norge, Island och Liechtenstein), Schweiz, Moldavien, USA (förutom Tennessee), Kanada, Australien, Nya Zeeland, Singapore, Japan, Sydkorea och Taiwan. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten.
+Vi erbjuder Dialectical Engine till personer som bor i Europeiska unionen (27 länder) och Europeiska ekonomiska samarbetsområdet (Norge, Island och Liechtenstein), Schweiz, Moldavien, USA (förutom Tennessee), Kanada, Australien, Nya Zeeland, Singapore, Japan, Sydkorea och Taiwan. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten.
 
 ## 3. Godkännande av dessa villkor
 
@@ -58,21 +58,21 @@ Vår **integritetspolicy** på dezbatere.ro/privacy förklarar hur vi behandlar 
 
 Innan du ingår ett avtal med oss elektroniskt visar gränssnittet vilka steg som ingår, låter dig granska och korrigera det du har angett innan du skickar in det och upplyser dig om på vilka språk avtalet kan ingås. Dessa villkor tillhandahålls i ett format som du kan spara och skriva ut. När du köper ett betalabonnemang skickar vi dig den version du godkände via e-post. Du kan också när som helst begära en kopia. Ingenting i dessa villkor begränsar rättigheter som du har enligt rumänsk konsumenträtt, EU:s konsumenträtt eller lagen i det land där du bor och som inte får begränsas genom avtal.
 
-## 4. Vem som får använda DebateAI
+## 4. Vem som får använda Dialectical Engine
 
-Du måste ha **fyllt 18 år** för att skapa ett konto, och du bekräftar detta när du registrerar dig. DebateAI riktar sig inte till barn och vi tillhandahåller inte medvetet tjänsten till någon under 18 år. Om vi får kännedom om att ett konto tillhör någon under 18 år avslutar vi det. Vissa regioner kräver mer än en bekräftelse; bilaga A anger vad som gäller på respektive plats.
+Du måste ha **fyllt 18 år** för att skapa ett konto, och du bekräftar detta när du registrerar dig. Dialectical Engine riktar sig inte till barn och vi tillhandahåller inte medvetet tjänsten till någon under 18 år. Om vi får kännedom om att ett konto tillhör någon under 18 år avslutar vi det. Vissa regioner kräver mer än en bekräftelse; bilaga A anger vad som gäller på respektive plats.
 
-Du måste ha rättslig handlingsförmåga att ingå detta avtal. Om du använder DebateAI för en organisations räkning bekräftar du att du har behörighet att binda organisationen, och ”du” avser då den organisationen.
+Du måste ha rättslig handlingsförmåga att ingå detta avtal. Om du använder Dialectical Engine för en organisations räkning bekräftar du att du har behörighet att binda organisationen, och ”du” avser då den organisationen.
 
 Vem som helst får läsa en debatt som har publicerats. Det krävs inget konto för att läsa, men läsningen utgör användning av tjänsten, och avsnitten 7, 15, 16 och 18 gäller för den.
 
-## 5. Vad DebateAI gör och inte gör
+## 5. Vad Dialectical Engine gör och inte gör
 
-Du skickar in en fråga eller ett påstående. DebateAI skickar det till flera AI-modeller från tredje part, vilka bygger en argumentgraf kring det: påståenden, motpåståenden, kritik, hänvisningar till belägg, poäng och ett utslag med en konfidensnivå. Du kan ifrågasätta enskilda påståenden, be att en punkt undersöks närmare och besluta om resultatet ska publiceras.
+Du skickar in en fråga eller ett påstående. Dialectical Engine skickar det till flera AI-modeller från tredje part, vilka bygger en argumentgraf kring det: påståenden, motpåståenden, kritik, hänvisningar till belägg, poäng och ett utslag med en konfidensnivå. Du kan ifrågasätta enskilda påståenden, be att en punkt undersöks närmare och besluta om resultatet ska publiceras.
 
 **Allt i en debatt genereras av AI.** Argumenten, kritiken, hänvisningarna till belägg, poängen, utslagen och supportassistentens svar är maskingenererade. De kan vara felaktiga, ofullständiga eller inaktuella, också när de framförs med stor säkerhet, och de kan återspegla snedvridningar i modellerna. Ingen person granskar dem innan de visas för dig eller publiceras, och ingen namngiven person har redaktionellt ansvar för dem. Genererat innehåll märks som AI-genererat i produkten, på publicerade sidor och i exporter.
 
-**DebateAI är inte rådgivning.** Tjänsten utgör inte juridisk, medicinsk, finansiell, skattemässig, psykologisk, säkerhetsrelaterad eller annan professionell rådgivning, och ett utslag är inte ett fastställande av faktiska omständigheter. Använd inte en debatt som grund för ett beslut som är viktigt för din hälsa, säkerhet, ekonomi, rättsliga ställning eller andras välbefinnande utan att kontrollera primärkällor och, när det är lämpligt, rådfråga en kvalificerad yrkesperson. En hög konfidensnivå innebär att modellerna bedömde tolkningen som väl etablerad utifrån det material de såg; det är ingen garanti för att den är sann.
+**Dialectical Engine är inte rådgivning.** Tjänsten utgör inte juridisk, medicinsk, finansiell, skattemässig, psykologisk, säkerhetsrelaterad eller annan professionell rådgivning, och ett utslag är inte ett fastställande av faktiska omständigheter. Använd inte en debatt som grund för ett beslut som är viktigt för din hälsa, säkerhet, ekonomi, rättsliga ställning eller andras välbefinnande utan att kontrollera primärkällor och, när det är lämpligt, rådfråga en kvalificerad yrkesperson. En hög konfidensnivå innebär att modellerna bedömde tolkningen som väl etablerad utifrån det material de såg; det är ingen garanti för att den är sann.
 
 **Vad vi åtar oss.** Vi tillhandahåller tjänsten med skälig omsorg och sakkunskap samt i enlighet med den beskrivning som vi offentliggör. Om lagen ger dig en garanti för att tjänsten överensstämmer med beskrivningen och lämpar sig för sitt vanliga ändamål gäller den garantin, och ingenting i dessa villkor upphäver den. Vi utfäster däremot inte att ett visst resultat är korrekt: detta är en egenskap hos det genererade innehållet, inte en fråga om huruvida tjänsten fungerar.
 
@@ -92,19 +92,19 @@ Du kan när som helst avsluta ditt konto under **Inställningar → Konto**. Avs
 
 Dessa regler gäller för vad du skickar in, hur du använder tjänsten och vad du publicerar.
 
-**Skicka inte in personuppgifter om andra personer.** Ställ frågor om sakförhållanden, argument och samhällsfrågor i stället för om identifierbara privatpersoner. Ta inte med namn, kontaktuppgifter, identifikationsnummer, bilder, hälsouppgifter, ekonomiska uppgifter eller andra uppgifter som identifierar någon, och använd inte DebateAI för att bygga upp ett fall, en profil eller en akt om en person. Frågor om offentliga personer som agerar i sin offentliga roll är tillåtna; frågor som riktar sig mot en privatperson är det inte. Om du ändå skickar in sådana uppgifter ansvarar du för dem, och vi kan ta bort innehållet.
+**Skicka inte in personuppgifter om andra personer.** Ställ frågor om sakförhållanden, argument och samhällsfrågor i stället för om identifierbara privatpersoner. Ta inte med namn, kontaktuppgifter, identifikationsnummer, bilder, hälsouppgifter, ekonomiska uppgifter eller andra uppgifter som identifierar någon, och använd inte Dialectical Engine för att bygga upp ett fall, en profil eller en akt om en person. Frågor om offentliga personer som agerar i sin offentliga roll är tillåtna; frågor som riktar sig mot en privatperson är det inte. Om du ändå skickar in sådana uppgifter ansvarar du för dem, och vi kan ta bort innehållet.
 
 **Dina egna känsliga uppgifter.** Frågor som du ställer kan beröra din egen hälsa, övertygelse, politik eller andra känsliga förhållanden. Du samtycker till detta på en separat skärm före din första debatt. Om du bor på en plats med särskilda regler om hälsouppgifter kan bilaga A hänvisa dig till ett separat meddelande.
 
 **Skicka inte in eller publicera olagligt innehåll**, däribland innehåll som är ärekränkande, uppmanar till våld eller hat, trakasserar eller hotar, utgör intima bilder som delats utan samtycke, gör intrång i immateriella rättigheter eller sekretess, röjer företagshemligheter, utgör material med sexuella övergrepp mot barn eller bryter mot sanktioner eller exportkontroller.
 
-**Använd inte DebateAI för att vilseleda.** Framställ inte genererat material som människoskapat när det skulle vara vilseledande, ta inte bort märkningen om AI-generering och använd inte materialet för att skapa skenbar enighet eller fabricerade bevis, eller för att utge dig för att vara någon annan.
+**Använd inte Dialectical Engine för att vilseleda.** Framställ inte genererat material som människoskapat när det skulle vara vilseledande, ta inte bort märkningen om AI-generering och använd inte materialet för att skapa skenbar enighet eller fabricerade bevis, eller för att utge dig för att vara någon annan.
 
 **Angrip inte tjänsten.** Sökmotorer får indexera publicerade debatter på vanligt sätt. Annan automatiserad åtkomst, skrapning, genomsökning eller massutvinning av debatterna kräver vårt skriftliga tillstånd. Du får inte kringgå hastighetsbegränsningar, autentisering eller publiceringskontroller; försöka extrahera promptar eller systeminstruktioner; injicera promptar för att få motorn att bortse från sina begränsningar; eller sondera eller belastningstesta utan vårt skriftliga tillstånd.
 
 **Återförsälj eller omprofilera inte** tjänsten och använd den inte för att bygga en konkurrerande motor, inbegripet genom att använda resultat som träningsdata, utan vårt skriftliga medgivande.
 
-**Använd inte DebateAI för beslut om en persons** hälsa, säkerhet, rättigheter, anställning, kredit, bostad eller immigrationsstatus. Tjänsten är inte utformad för detta, och dess resultat utgör inte en säker grund för sådana beslut.
+**Använd inte Dialectical Engine för beslut om en persons** hälsa, säkerhet, rättigheter, anställning, kredit, bostad eller immigrationsstatus. Tjänsten är inte utformad för detta, och dess resultat utgör inte en säker grund för sådana beslut.
 
 **Lokal lag där du publicerar.** Du ansvarar för att allt du publicerar följer lagen i det land där du befinner dig. Vi kan begränsa publicering av vissa ämnen i vissa regioner.
 
@@ -132,9 +132,9 @@ Debatter är **privata som standard**. Ingenting som du skapar är synligt för 
 
 **Vad publicering innebär.** Publicering är en avsiktlig åtgärd som bekräftas separat. När du publicerar tar vi en fryst ögonblicksbild av debatten och gör den läsbar för vem som helst utan konto. Sökmotorer kan indexera den. Ögonblicksbilden visar din **pseudonym**, din fråga såsom du skrev den, argumentträdet, poängen, utslaget och konfidensnivån samt har en synlig märkning om att innehållet är AI-genererat. Den visar inte din e-postadress, dina sessionsuppgifter eller din kontohistorik.
 
-**Publicering går i praktiken inte att göra ogjord.** När en debatt väl är offentlig kan andra personer läsa, citera, skärmbilda, arkivera och cachelagra den. När publiceringen återkallas tas debatten bort från DebateAI och nyckeln till vår kopia förstörs, men detta påverkar inte kopior som redan finns på andra platser. Publicera inget som du inte vill ska förknippas med din pseudonym för all framtid.
+**Publicering går i praktiken inte att göra ogjord.** När en debatt väl är offentlig kan andra personer läsa, citera, skärmbilda, arkivera och cachelagra den. När publiceringen återkallas tas debatten bort från Dialectical Engine och nyckeln till vår kopia förstörs, men detta påverkar inte kopior som redan finns på andra platser. Publicera inget som du inte vill ska förknippas med din pseudonym för all framtid.
 
-**Publicerade debatter när du avslutar ditt konto.** När du schemalägger att ditt konto ska avslutas väljer du vad som händer med debatterna du har publicerat. Om du markerar **”Radera även mina offentliga debatter”** tar vi bort var och en från DebateAI och förstör nyckeln till vår kopia när avslutandet genomförs, som när en publicering återtas, om inte lagen kräver att vi behåller ett visst objekt. Om du lämnar rutan omarkerad förblir debatterna offentliga under din avvecklade pseudonym. Kopior som andra gjort före borttagningen ligger utanför vår kontroll. Om du vill behålla tillgången till en debatt som du tar bort, ladda ned den först.
+**Publicerade debatter när du avslutar ditt konto.** När du schemalägger att ditt konto ska avslutas väljer du vad som händer med debatterna du har publicerat. Om du markerar **”Radera även mina offentliga debatter”** tar vi bort var och en från Dialectical Engine och förstör nyckeln till vår kopia när avslutandet genomförs, som när en publicering återtas, om inte lagen kräver att vi behåller ett visst objekt. Om du lämnar rutan omarkerad förblir debatterna offentliga under din avvecklade pseudonym. Kopior som andra gjort före borttagningen ligger utanför vår kontroll. Om du vill behålla tillgången till en debatt som du tar bort, ladda ned den först.
 
 **Vi kan alltid ta bort publicerat innehåll.** Vi kan ta bort eller begränsa åtkomsten till en publicerad debatt om lagen kräver det, om en domstol eller behörig myndighet beslutar det eller om debatten bryter mot dessa villkor eller är olaglig. Ingenting i detta avsnitt hindrar oss från att agera med anledning av ett giltigt meddelande enligt avsnitt 10, och ingenting här är ett löfte om att en publicerad debatt kommer att förbli tillgänglig.
 
@@ -161,7 +161,7 @@ Vi bekräftar mottagandet av varje rapport utan onödigt dröjsmål. Vi hanterar
 
 **Kontakt med en person.** Vår supportassistent är ett AI-system och upplyser om detta. Du kan när som helst be att få tala med en person, och varje supportsamtal erbjuder den möjligheten. Vi förlitar oss inte enbart på automatiserade verktyg när vi kommunicerar med dig.
 
-**Terrorisminnehåll.** Terrorisminnehåll är olagligt och är inte tillåtet på DebateAI (avsnitt 7). Behöriga myndigheter i Europeiska unionen kan skicka oss avlägsnandeorder enligt förordning (EU) 2021/784 till kontaktpunkten i avsnitt 1. När vi tar emot en sådan order tar vi bort innehållet, eller blockerar åtkomsten till det i samtliga EU-länder, inom en timme. Vi informerar den person som publicerade innehållet om att det har tagits bort och, på begäran, om skälen och om hur ordern kan bestridas, såvida inte myndigheten beslutar att inga uppgifter får lämnas ut under en begränsad tid av hänsyn till allmän säkerhet. I enlighet med förordningens krav bevarar vi det borttagna innehållet och tillhörande uppgifter i sex månader, så att borttagningen kan granskas och, om den var felaktig, upphävas. Den person som publicerade innehållet kan bestrida ordern vid domstolarna i det land vars myndighet utfärdade den, och kan även använda vår klagomålsväg. Ingen myndighet har krävt att vi vidtar särskilda åtgärder mot terrorisminnehåll enligt förordningen; om någon gör det kommer vi att beskriva de åtgärderna här, inklusive eventuella automatiserade verktyg.
+**Terrorisminnehåll.** Terrorisminnehåll är olagligt och är inte tillåtet på Dialectical Engine (avsnitt 7). Behöriga myndigheter i Europeiska unionen kan skicka oss avlägsnandeorder enligt förordning (EU) 2021/784 till kontaktpunkten i avsnitt 1. När vi tar emot en sådan order tar vi bort innehållet, eller blockerar åtkomsten till det i samtliga EU-länder, inom en timme. Vi informerar den person som publicerade innehållet om att det har tagits bort och, på begäran, om skälen och om hur ordern kan bestridas, såvida inte myndigheten beslutar att inga uppgifter får lämnas ut under en begränsad tid av hänsyn till allmän säkerhet. I enlighet med förordningens krav bevarar vi det borttagna innehållet och tillhörande uppgifter i sex månader, så att borttagningen kan granskas och, om den var felaktig, upphävas. Den person som publicerade innehållet kan bestrida ordern vid domstolarna i det land vars myndighet utfärdade den, och kan även använda vår klagomålsväg. Ingen myndighet har krävt att vi vidtar särskilda åtgärder mot terrorisminnehåll enligt förordningen; om någon gör det kommer vi att beskriva de åtgärderna här, inklusive eventuella automatiserade verktyg.
 
 **Allvarlig risk för liv eller säkerhet.** Om vi får kännedom om uppgifter som tyder på ett brott som innebär ett hot mot någons liv eller säkerhet underrättar vi de behöriga myndigheterna.
 
@@ -183,7 +183,7 @@ Avsnitten 8 (i fråga om innehåll som redan har publicerats), 15, 16 och 18 for
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Premium**-abonnemang kommer att bli tillgängligt, vilket ger tillgång till hela modellutbudet och låter dig själv ställa in debattens parametrar.
+Dialectical Engine erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Premium**-abonnemang kommer att bli tillgängligt, vilket ger tillgång till hela modellutbudet och låter dig själv ställa in debattens parametrar.
 
 **Innan du betalar** visar vi, direkt ovanför betalningsknappen: abonnemanget; totalpriset inklusive tillämplig skatt; faktureringsperioden; att abonnemanget förnyas automatiskt tills det sägs upp; vilket datum en eventuell kostnadsfri provperiod upphör och vilket belopp du därefter debiteras; samt hur du säger upp abonnemanget. Du bekräftar förnyelsevillkoren genom att markera en separat ruta. På knappen står **Teckna abonnemang och betala** (på rumänska *Comandă cu obligație de plată*). Vi skickar dig en bekräftelse på ett varaktigt medium med samma information, dessa villkor och ångerblanketten.
 
@@ -211,11 +211,11 @@ Om du bor någon annanstans anger bilaga A den ånger- eller betänketid som gä
 
 ## 14. Ändringar av tjänsten och dessa villkor
 
-**Tjänsten.** Vi utvecklar DebateAI fortlöpande, och rutinmässiga förbättringar, rättelser och ändringar av modellutbudet sker utan föregående meddelande. Om vi gör en ändring som går utöver att hålla tjänsten fungerande på beskrivet sätt gör vi det endast av något av följande skäl: för att uppfylla ett rättsligt krav eller myndighetskrav; för att hantera ett säkerhets- eller missbruksproblem; för att en modelleverantör ändrar, begränsar eller drar tillbaka en modell eller funktion som vi är beroende av; för att anpassa oss till en teknisk miljö som vi inte kontrollerar; eller för att lägga till, förbättra eller avveckla en funktion på ett sätt som inte medför någon kostnad för dig.
+**Tjänsten.** Vi utvecklar Dialectical Engine fortlöpande, och rutinmässiga förbättringar, rättelser och ändringar av modellutbudet sker utan föregående meddelande. Om vi gör en ändring som går utöver att hålla tjänsten fungerande på beskrivet sätt gör vi det endast av något av följande skäl: för att uppfylla ett rättsligt krav eller myndighetskrav; för att hantera ett säkerhets- eller missbruksproblem; för att en modelleverantör ändrar, begränsar eller drar tillbaka en modell eller funktion som vi är beroende av; för att anpassa oss till en teknisk miljö som vi inte kontrollerar; eller för att lägga till, förbättra eller avveckla en funktion på ett sätt som inte medför någon kostnad för dig.
 
 Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och när. Om ändringen har mer än en mindre negativ inverkan på din åtkomst till eller användning av tjänsten får du säga upp avtalet utan kostnad inom **30 dagar** från det att du underrättades eller från det att ändringen trädde i kraft, beroende på vilket som inträffar senare, och vi återbetalar eventuellt förskottsbetalt belopp för den oanvända perioden.
 
-**Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda DebateAI efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
+**Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
 
 ## 15. Ansvar
 
@@ -231,15 +231,15 @@ Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och
 
 ## 16. Immateriella rättigheter
 
-Själva tjänsten — programvaran, motorn, poängsättningsmetoden, gränssnittet, namnen DebateAI och DebateAIRO samt våra logotyper — tillhör oss eller våra licensgivare. Dessa villkor ger dig tillstånd att använda tjänsten, inte äganderätt till den.
+Själva tjänsten — programvaran, motorn, poängsättningsmetoden, gränssnittet, namnen Dialectical Engine och DebateAIRO samt våra logotyper — tillhör oss eller våra licensgivare. Dessa villkor ger dig tillstånd att använda tjänsten, inte äganderätt till den.
 
-Du får citera och länka till publicerade debatter med angivande av DebateAI och en länk till originalsidan. Masskopiering, systematisk återgivning av det offentliga materialet och användning av publicerade debatter som träningsdata är inte tillåtna utan vårt skriftliga medgivande.
+Du får citera och länka till publicerade debatter med angivande av Dialectical Engine och en länk till originalsidan. Masskopiering, systematisk återgivning av det offentliga materialet och användning av publicerade debatter som träningsdata är inte tillåtna utan vårt skriftliga medgivande.
 
-Avsnitt 8 reglerar ditt innehåll och statusen för genererade resultat. Om du anser att något på DebateAI gör intrång i dina immateriella rättigheter ska du använda rapporteringsvägen i avsnitt 10.
+Avsnitt 8 reglerar ditt innehåll och statusen för genererade resultat. Om du anser att något på Dialectical Engine gör intrång i dina immateriella rättigheter ska du använda rapporteringsvägen i avsnitt 10.
 
 ## 17. Personuppgifter
 
-Hur vi behandlar personuppgifter anges i **integritetspolicyn** på dezbatere.ro/privacy. Den förklarar vad vi samlar in, den rättsliga grunden för varje ändamål, hur länge vi behåller uppgifter, vilka som tar emot uppgifter, vilka överföringar som sker och hur du utövar dina rättigheter. Tre punkter hör även hemma här. Enligt avsnitt 7 ska du inte ange andra personers personuppgifter i en fråga; om du ändå gör det ansvarar du för detta, och vi kan ta bort innehållet. Om en debatt som publicerats på DebateAI innehåller personuppgifter om dig kan du begära att vi tar bort dem utan att ha ett konto (avsnitt 9). Vi bevarar dessutom en uppgift om ditt godkännande av dessa villkor — version, tidpunkt och sessionens tekniska uppgifter — som bevis för avtalet, i enlighet med integritetspolicyn.
+Hur vi behandlar personuppgifter anges i **integritetspolicyn** på dezbatere.ro/privacy. Den förklarar vad vi samlar in, den rättsliga grunden för varje ändamål, hur länge vi behåller uppgifter, vilka som tar emot uppgifter, vilka överföringar som sker och hur du utövar dina rättigheter. Tre punkter hör även hemma här. Enligt avsnitt 7 ska du inte ange andra personers personuppgifter i en fråga; om du ändå gör det ansvarar du för detta, och vi kan ta bort innehållet. Om en debatt som publicerats på Dialectical Engine innehåller personuppgifter om dig kan du begära att vi tar bort dem utan att ha ett konto (avsnitt 9). Vi bevarar dessutom en uppgift om ditt godkännande av dessa villkor — version, tidpunkt och sessionens tekniska uppgifter — som bevis för avtalet, i enlighet med integritetspolicyn.
 
 ## 18. Tillämplig lag och forum för tvister
 
@@ -277,7 +277,7 @@ Huvuddelen av dessa villkor är skriven för dig. Därutöver gäller följande:
 
 ### A.2 USA
 
-**Tennessee.** Vi erbjuder inte DebateAI till personer som bor i Tennessee.
+**Tennessee.** Vi erbjuder inte Dialectical Engine till personer som bor i Tennessee.
 
 **Meddelanden och borttaganden.** Intima bilder utan samtycke kan rapporteras via e-post till abuse@dezbatere.ro, utan konto, och tas bort inom 48 timmar från en giltig begäran. Upphovsrättsliga klagomål följer rapporteringsvägen i avsnitt 10.
 

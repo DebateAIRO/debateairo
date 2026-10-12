@@ -359,7 +359,7 @@ describe("P17 renderMail", () => {
 
   it("renders the owner's summary in English whatever locale is asked", () => {
     const owner = renderMail("O1", "ro", paramsFor("O1"));
-    expect(owner.subject).toBe("DebateAI tax summary for 2026-Q4");
+    expect(owner.subject).toBe("Dialectical Engine tax summary for 2026-Q4");
     expect(owner.text).toContain("RO  net 100.00  tax 21.00\nDE  net 50.00  tax 9.50");
     expect(owner.html).toContain("<pre");
   });
@@ -391,7 +391,7 @@ describe("P17 renderMail", () => {
       "Amount to refund: $12.10",
       "Reason code: PAYMENT_CONFIGURATION_REFUSED",
       "Check this payment in NETOPIA's admin and settle the refund by hand there. The owner summary lists it until then.",
-      "The DebateAI team"
+      "The Dialectical Engine team"
     ].join("\n\n"))).toBe(true);
     expect(refused.subject).toBe("A refund could not be completed and needs your attention");
   });
@@ -440,7 +440,7 @@ describe("P17 renderMail", () => {
         + " WITHDRAWAL_BY_OWNER until then.",
       `${ON_HOST} billing:withdraw --owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93 --refund <amount through this command>`
         + " --dashboard <amount refunded in NETOPIA's admin>",
-      "The DebateAI team"
+      "The Dialectical Engine team"
     ].join("\n\n"))).toBe(true);
     // The settling command is the API's own (`hostCommand`, as billing:withdraw prints it) and README §14.8's line.
     const settle = hostCommand("billing:withdraw --owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93"
@@ -476,7 +476,7 @@ describe("P17 renderMail", () => {
         + `  ${ON_HOST} billing:invoice --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>`,
       "The owner summary (the quarterly email, or the tax summary command run as root on the server as the runbook"
         + " shows) lists it until it is settled.",
-      "The DebateAI team"
+      "The Dialectical Engine team"
     ].join("\n\n"))).toBe(true);
     // Owner-facing: a job kind, our own reference, a code and the steps; never a customer's name, email or card.
     expect(Object.keys(MAIL_TEMPLATES.O3.params).sort()).toEqual(["jobKind", "nextSteps", "reasonCode", "reference"]);
@@ -533,7 +533,7 @@ describe("P17 renderMail", () => {
       "Reason code: OTHER_PAYMENT_SYSTEM",
       "Nothing is owed on this server. If it was a real customer's payment in the other system, refund it in that"
         + " system's admin; a sandbox test payment needs nothing. The owner summary lists it as REFUND_OTHER_SYSTEM.",
-      "The DebateAI team"
+      "The Dialectical Engine team"
     ].join("\n\n"))).toBe(true);
     for (const part of [other.text, other.html]) {
       expect(part).not.toContain("NETOPIA refused");

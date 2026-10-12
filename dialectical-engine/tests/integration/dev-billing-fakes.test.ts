@@ -85,7 +85,7 @@ describe("P6b — development billing fakes", () => {
       // The API's NETOPIA client talks to the fake with the custody key: a hosted start answers the fake's page.
       expect(connectors.paymentEnvironment).toBe("sandbox");
       const started = await connectors.payments.startHostedPayment({
-        orderId: "d".repeat(32), amountMicros: 1_000_000, currency: "USD", description: "DebateAI Plus",
+        orderId: "d".repeat(32), amountMicros: 1_000_000, currency: "USD", description: "Dialectical Engine Plus",
         payer: {
           firstName: "Test", lastName: "Person", email: "person@example.test", phone: "+40712345678", country: "RO",
           region: "Cluj", city: "Cluj-Napoca", postalCode: "400001", street: "Str. Exemplu 1"
@@ -110,7 +110,7 @@ describe("P6b — development billing fakes", () => {
           name: "Test Person", email: "person@example.test", country: "RO", region: "Cluj", postalCode: "400001",
           city: "Cluj-Napoca", street: "Str. Exemplu 1", taxId: null, locale: "ro"
         },
-        lines: [{ description: "DebateAI Plus", netMicros: 1_000_000, taxMicros: 210_000, taxRateBasisPoints: 2100 }],
+        lines: [{ description: "Dialectical Engine Plus", netMicros: 1_000_000, taxMicros: 210_000, taxRateBasisPoints: 2100 }],
         taxCode: "saas",
         evidence: { billingCountry: "RO", ipAddress: "203.0.113.10", bankCountry: "RO" }, processor: "netopia"
       });

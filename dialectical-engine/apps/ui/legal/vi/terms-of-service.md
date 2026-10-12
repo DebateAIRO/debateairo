@@ -1,4 +1,4 @@
-# DebateAI — Điều khoản dịch vụ
+# Dialectical Engine — Điều khoản dịch vụ
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
-**In short.** Bạn phải từ 18 tuổi trở lên. DebateAI xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Các cuộc tranh luận của bạn là riêng tư trừ khi bạn công khai chúng; nếu bạn công khai, bất kỳ ai cũng có thể đọc. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
+**In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Các cuộc tranh luận của bạn là riêng tư trừ khi bạn công khai chúng; nếu bạn công khai, bất kỳ ai cũng có thể đọc. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
 ## 1. Chúng tôi là ai và cách liên hệ
 
-DebateAI do **DMS Merchandise Shop S.R.L.**, một công ty đăng ký tại Romania, vận hành.
+Dialectical Engine do **DMS Merchandise Shop S.R.L.**, một công ty đăng ký tại Romania, vận hành.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ DebateAI do **DMS Merchandise Shop S.R.L.**, một công ty đăng ký tại Rom
 
 Những thông tin này cũng được hiển thị thường xuyên trên trang web tại dezbatere.ro/legal. Bạn luôn có thể liên hệ với một người, không chỉ với trợ lý của chúng tôi; mục 10 giải thích cách thức.
 
-## 2. Nơi chúng tôi cung cấp DebateAI
+## 2. Nơi chúng tôi cung cấp Dialectical Engine
 
-Chúng tôi cung cấp DebateAI cho những người sống tại Liên minh Châu Âu (27 quốc gia) và Khu vực Kinh tế Châu Âu (Na Uy, Iceland và Liechtenstein), Thụy Sĩ, Moldova, Hoa Kỳ (trừ Tennessee), Canada, Australia, New Zealand, Singapore, Nhật Bản, Hàn Quốc và Đài Loan. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ.
+Chúng tôi cung cấp Dialectical Engine cho những người sống tại Liên minh Châu Âu (27 quốc gia) và Khu vực Kinh tế Châu Âu (Na Uy, Iceland và Liechtenstein), Thụy Sĩ, Moldova, Hoa Kỳ (trừ Tennessee), Canada, Australia, New Zealand, Singapore, Nhật Bản, Hàn Quốc và Đài Loan. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ.
 
 ## 3. Chấp nhận các Điều khoản này
 
@@ -58,21 +58,21 @@ Bạn chấp nhận các Điều khoản này bằng cách đánh dấu vào ô 
 
 Trước khi bạn giao kết bất kỳ hợp đồng điện tử nào với chúng tôi, giao diện sẽ hiển thị các bước liên quan, cho phép bạn xem lại và sửa nội dung đã nhập trước khi gửi, đồng thời cho biết các ngôn ngữ có thể dùng để giao kết hợp đồng. Các Điều khoản này được cung cấp dưới hình thức bạn có thể lưu và in; khi bạn mua gói trả phí, chúng tôi gửi qua email phiên bản bạn đã chấp nhận, và bạn có thể yêu cầu bản sao bất kỳ lúc nào. Không nội dung nào trong các Điều khoản này hạn chế những quyền không thể bị hạn chế bằng hợp đồng mà bạn có theo pháp luật bảo vệ người tiêu dùng của Romania hoặc EU, hoặc pháp luật của quốc gia nơi bạn sinh sống.
 
-## 4. Ai có thể sử dụng DebateAI
+## 4. Ai có thể sử dụng Dialectical Engine
 
-Bạn phải **từ 18 tuổi trở lên** để tạo tài khoản và xác nhận điều này khi đăng ký. DebateAI không hướng đến trẻ em và chúng tôi không cố ý cung cấp dịch vụ cho bất kỳ ai dưới 18 tuổi. Nếu biết một tài khoản thuộc về người dưới 18 tuổi, chúng tôi sẽ đóng tài khoản đó. Một số khu vực yêu cầu nhiều hơn việc xác nhận; Phụ lục A nêu rõ nội dung áp dụng tại từng nơi.
+Bạn phải **từ 18 tuổi trở lên** để tạo tài khoản và xác nhận điều này khi đăng ký. Dialectical Engine không hướng đến trẻ em và chúng tôi không cố ý cung cấp dịch vụ cho bất kỳ ai dưới 18 tuổi. Nếu biết một tài khoản thuộc về người dưới 18 tuổi, chúng tôi sẽ đóng tài khoản đó. Một số khu vực yêu cầu nhiều hơn việc xác nhận; Phụ lục A nêu rõ nội dung áp dụng tại từng nơi.
 
-Bạn phải có năng lực pháp luật để giao kết hợp đồng này. Nếu sử dụng DebateAI thay mặt một tổ chức, bạn xác nhận mình được ủy quyền để ràng buộc tổ chức đó, và khi ấy "bạn" có nghĩa là tổ chức đó.
+Bạn phải có năng lực pháp luật để giao kết hợp đồng này. Nếu sử dụng Dialectical Engine thay mặt một tổ chức, bạn xác nhận mình được ủy quyền để ràng buộc tổ chức đó, và khi ấy "bạn" có nghĩa là tổ chức đó.
 
 Bất kỳ ai cũng có thể đọc một cuộc tranh luận đã được công khai. Việc đọc không đòi hỏi tài khoản, nhưng vẫn là hành vi sử dụng dịch vụ và các mục 7, 15, 16 và 18 được áp dụng.
 
-## 5. DebateAI làm gì và không phải là gì
+## 5. Dialectical Engine làm gì và không phải là gì
 
-Bạn gửi một câu hỏi hoặc một nhận định. DebateAI chuyển nội dung đó đến một số mô hình AI của bên thứ ba; các mô hình xây dựng một đồ thị lập luận xoay quanh nội dung ấy, gồm: luận điểm, phản biện, phê bình, tham chiếu bằng chứng, điểm số và phán quyết kèm khoảng tin cậy. Bạn có thể chất vấn từng luận điểm, yêu cầu điều tra sâu hơn một điểm và quyết định có công khai kết quả hay không.
+Bạn gửi một câu hỏi hoặc một nhận định. Dialectical Engine chuyển nội dung đó đến một số mô hình AI của bên thứ ba; các mô hình xây dựng một đồ thị lập luận xoay quanh nội dung ấy, gồm: luận điểm, phản biện, phê bình, tham chiếu bằng chứng, điểm số và phán quyết kèm khoảng tin cậy. Bạn có thể chất vấn từng luận điểm, yêu cầu điều tra sâu hơn một điểm và quyết định có công khai kết quả hay không.
 
 **Mọi nội dung trong một cuộc tranh luận đều do AI tạo ra.** Các lập luận, phê bình, tham chiếu bằng chứng, điểm số, phán quyết và câu trả lời của trợ lý hỗ trợ đều do máy tạo ra. Chúng có thể sai, không đầy đủ, lỗi thời hoặc được trình bày đầy tự tin dù không chính xác, và có thể phản ánh thiên kiến trong các mô hình. Không có người nào rà soát chúng trước khi hiển thị cho bạn hoặc được công khai, và không có cá nhân được nêu tên nào chịu trách nhiệm biên tập đối với chúng. Nội dung được tạo ra được gắn nhãn là do AI tạo trong sản phẩm, trên các trang công khai và trong dữ liệu xuất.
 
-**DebateAI không đưa ra lời tư vấn.** Dịch vụ không cung cấp tư vấn pháp lý, y tế, tài chính, thuế, tâm lý, an toàn hoặc tư vấn chuyên môn khác, và một phán quyết không phải là kết luận về sự thật. Không sử dụng một cuộc tranh luận làm căn cứ cho quyết định quan trọng đối với sức khỏe, an toàn, tiền bạc, vị thế pháp lý của bạn hoặc phúc lợi của người khác mà không kiểm tra các nguồn sơ cấp và, khi thích hợp, tham vấn chuyên gia có trình độ. Khoảng tin cậy cao có nghĩa là các mô hình nhận thấy cách diễn giải đã được xác lập rõ dựa trên tài liệu chúng xem xét; đó không phải sự bảo đảm rằng cách diễn giải ấy là đúng.
+**Dialectical Engine không đưa ra lời tư vấn.** Dịch vụ không cung cấp tư vấn pháp lý, y tế, tài chính, thuế, tâm lý, an toàn hoặc tư vấn chuyên môn khác, và một phán quyết không phải là kết luận về sự thật. Không sử dụng một cuộc tranh luận làm căn cứ cho quyết định quan trọng đối với sức khỏe, an toàn, tiền bạc, vị thế pháp lý của bạn hoặc phúc lợi của người khác mà không kiểm tra các nguồn sơ cấp và, khi thích hợp, tham vấn chuyên gia có trình độ. Khoảng tin cậy cao có nghĩa là các mô hình nhận thấy cách diễn giải đã được xác lập rõ dựa trên tài liệu chúng xem xét; đó không phải sự bảo đảm rằng cách diễn giải ấy là đúng.
 
 **Cam kết của chúng tôi.** Chúng tôi sẽ cung cấp dịch vụ với sự cẩn trọng và kỹ năng hợp lý, phù hợp với mô tả đã công bố. Khi pháp luật trao cho bạn sự bảo đảm rằng dịch vụ phù hợp với mô tả và thích hợp cho mục đích thông thường, sự bảo đảm đó được áp dụng và không nội dung nào trong các Điều khoản này loại bỏ sự bảo đảm ấy. Điều chúng tôi không cam kết là tính chính xác của bất kỳ kết quả cụ thể nào: đó là thuộc tính của nội dung được tạo ra, không phải tiêu chí xác định dịch vụ có hoạt động hay không.
 
@@ -92,19 +92,19 @@ Bạn có thể đóng tài khoản bất kỳ lúc nào từ **Cài đặt → 
 
 Các quy tắc này áp dụng đối với nội dung bạn gửi, cách bạn sử dụng dịch vụ và nội dung bạn công khai.
 
-**Không gửi dữ liệu cá nhân của người khác.** Hãy hỏi về các vấn đề, lập luận và câu hỏi công khai thay vì về những cá nhân riêng tư có thể được nhận dạng. Không đưa vào tên, thông tin liên hệ, số định danh, hình ảnh, thông tin sức khỏe, tài chính hoặc thông tin khác nhận dạng một người, và không sử dụng DebateAI để xây dựng vụ việc, hồ sơ mô tả hoặc hồ sơ tập hợp thông tin về một người. Câu hỏi về nhân vật công chúng khi họ hành động trong vai trò công chúng được chấp nhận; câu hỏi nhắm vào một cá nhân riêng tư thì không. Nếu bạn gửi dữ liệu như vậy, bạn chịu trách nhiệm về dữ liệu đó và chúng tôi có thể gỡ bỏ nội dung.
+**Không gửi dữ liệu cá nhân của người khác.** Hãy hỏi về các vấn đề, lập luận và câu hỏi công khai thay vì về những cá nhân riêng tư có thể được nhận dạng. Không đưa vào tên, thông tin liên hệ, số định danh, hình ảnh, thông tin sức khỏe, tài chính hoặc thông tin khác nhận dạng một người, và không sử dụng Dialectical Engine để xây dựng vụ việc, hồ sơ mô tả hoặc hồ sơ tập hợp thông tin về một người. Câu hỏi về nhân vật công chúng khi họ hành động trong vai trò công chúng được chấp nhận; câu hỏi nhắm vào một cá nhân riêng tư thì không. Nếu bạn gửi dữ liệu như vậy, bạn chịu trách nhiệm về dữ liệu đó và chúng tôi có thể gỡ bỏ nội dung.
 
 **Thông tin nhạy cảm của chính bạn.** Những câu hỏi bạn đặt ra có thể đề cập đến sức khỏe, niềm tin, quan điểm chính trị hoặc các vấn đề nhạy cảm khác của chính bạn. Bạn đồng ý với điều đó trên một màn hình riêng biệt trước cuộc tranh luận đầu tiên của mình. Nếu sống tại nơi có quy tắc riêng về dữ liệu sức khỏe, Phụ lục A có thể dẫn bạn đến một thông báo riêng.
 
 **Không gửi hoặc công khai nội dung trái pháp luật**, bao gồm nội dung phỉ báng, kích động bạo lực hoặc thù hận, quấy rối hoặc đe dọa, là hình ảnh riêng tư được chia sẻ khi chưa có sự đồng ý, xâm phạm quyền sở hữu trí tuệ hoặc nghĩa vụ bảo mật, tiết lộ bí mật thương mại, cấu thành tài liệu xâm hại tình dục trẻ em, hoặc vi phạm lệnh trừng phạt hay biện pháp kiểm soát xuất khẩu.
 
-**Không sử dụng DebateAI để lừa dối.** Không trình bày kết quả do AI tạo ra như thể do con người viết khi điều đó gây hiểu lầm, không loại bỏ nhãn do AI tạo, và không sử dụng kết quả để tạo ra sự đồng thuận giả tạo, bằng chứng giả hoặc hành vi mạo danh.
+**Không sử dụng Dialectical Engine để lừa dối.** Không trình bày kết quả do AI tạo ra như thể do con người viết khi điều đó gây hiểu lầm, không loại bỏ nhãn do AI tạo, và không sử dụng kết quả để tạo ra sự đồng thuận giả tạo, bằng chứng giả hoặc hành vi mạo danh.
 
 **Không tấn công dịch vụ.** Công cụ tìm kiếm được phép lập chỉ mục các cuộc tranh luận đã công bố theo cách thông thường. Mọi hình thức truy cập tự động, thu thập dữ liệu, thu thập bằng trình thu thập web hoặc trích xuất hàng loạt khác đều cần có sự cho phép bằng văn bản của chúng tôi. Ngoài ra, không được né tránh giới hạn tốc độ, cơ chế xác thực hoặc kiểm soát công khai; không được cố gắng trích xuất câu lệnh hoặc chỉ dẫn hệ thống; không được chèn câu lệnh nhằm khiến công cụ bỏ qua các ràng buộc; không được thăm dò hoặc kiểm thử tải khi chưa có sự cho phép bằng văn bản của chúng tôi.
 
 **Không bán lại hoặc đổi thương hiệu** của dịch vụ, hoặc sử dụng dịch vụ để xây dựng một công cụ cạnh tranh, kể cả bằng cách sử dụng kết quả làm dữ liệu huấn luyện, nếu chưa có thỏa thuận bằng văn bản của chúng tôi.
 
-**Không sử dụng DebateAI để đưa ra quyết định về** sức khỏe, an toàn, quyền pháp lý, việc làm, tín dụng, nhà ở hoặc tình trạng nhập cư của một người. Dịch vụ không được xây dựng cho mục đích đó và kết quả của dịch vụ không phải là căn cứ an toàn để ra các quyết định này.
+**Không sử dụng Dialectical Engine để đưa ra quyết định về** sức khỏe, an toàn, quyền pháp lý, việc làm, tín dụng, nhà ở hoặc tình trạng nhập cư của một người. Dịch vụ không được xây dựng cho mục đích đó và kết quả của dịch vụ không phải là căn cứ an toàn để ra các quyết định này.
 
 **Pháp luật địa phương tại nơi bạn công khai.** Bạn chịu trách nhiệm bảo đảm rằng mọi nội dung mình công khai tuân thủ pháp luật của quốc gia nơi bạn đang ở. Chúng tôi có thể hạn chế việc công khai một số chủ đề tại một số khu vực.
 
@@ -132,9 +132,9 @@ Các cuộc tranh luận **mặc định là riêng tư**. Không nội dung nà
 
 **Tác động của việc công khai.** Công khai là một hành động có chủ ý và được xác nhận riêng. Khi bạn công khai, chúng tôi tạo một bản chụp cố định của cuộc tranh luận và cho phép bất kỳ ai đọc mà không cần tài khoản. Công cụ tìm kiếm có thể lập chỉ mục cho nội dung đó. Bản chụp hiển thị **bí danh** của bạn, câu hỏi đúng như bạn đã viết, cây lập luận, điểm số, phán quyết và khoảng tin cậy, đồng thời mang nhãn dễ nhận biết rằng nội dung do AI tạo ra. Bản chụp không hiển thị địa chỉ email, hồ sơ phiên hoặc lịch sử tài khoản của bạn.
 
-**Trên thực tế, việc công khai hầu như không thể đảo ngược.** Khi một cuộc tranh luận đã được công khai, người khác có thể đọc, trích dẫn, chụp màn hình, lưu trữ và lưu vào bộ nhớ đệm. Việc hủy công khai sẽ gỡ nội dung khỏi DebateAI và hủy khóa của bản sao do chúng tôi nắm giữ, nhưng không thể tác động đến các bản sao đã tồn tại ở nơi khác. Không công khai bất kỳ nội dung nào mà bạn không muốn bị gắn vĩnh viễn với bí danh của mình.
+**Trên thực tế, việc công khai hầu như không thể đảo ngược.** Khi một cuộc tranh luận đã được công khai, người khác có thể đọc, trích dẫn, chụp màn hình, lưu trữ và lưu vào bộ nhớ đệm. Việc hủy công khai sẽ gỡ nội dung khỏi Dialectical Engine và hủy khóa của bản sao do chúng tôi nắm giữ, nhưng không thể tác động đến các bản sao đã tồn tại ở nơi khác. Không công khai bất kỳ nội dung nào mà bạn không muốn bị gắn vĩnh viễn với bí danh của mình.
 
-**Các cuộc tranh luận đã công khai khi bạn đóng tài khoản.** Khi lên lịch đóng tài khoản, bạn chọn điều gì xảy ra với các cuộc tranh luận mình đã công khai. Nếu đánh dấu **"Xóa cả các cuộc tranh luận công khai của tôi"**, chúng tôi gỡ từng cuộc khỏi DebateAI và hủy khóa của bản sao do chúng tôi giữ khi việc đóng tài khoản diễn ra, như khi hủy công khai, trừ khi pháp luật buộc chúng tôi lưu giữ một mục cụ thể. Nếu không đánh dấu ô này, các cuộc tranh luận vẫn công khai dưới bút danh đã ngừng sử dụng của bạn. Bản sao do người khác tạo trước khi gỡ nằm ngoài quyền kiểm soát của chúng tôi. Nếu muốn giữ một cuộc tranh luận mà bạn gỡ để tự xem, hãy tải xuống trước.
+**Các cuộc tranh luận đã công khai khi bạn đóng tài khoản.** Khi lên lịch đóng tài khoản, bạn chọn điều gì xảy ra với các cuộc tranh luận mình đã công khai. Nếu đánh dấu **"Xóa cả các cuộc tranh luận công khai của tôi"**, chúng tôi gỡ từng cuộc khỏi Dialectical Engine và hủy khóa của bản sao do chúng tôi giữ khi việc đóng tài khoản diễn ra, như khi hủy công khai, trừ khi pháp luật buộc chúng tôi lưu giữ một mục cụ thể. Nếu không đánh dấu ô này, các cuộc tranh luận vẫn công khai dưới bút danh đã ngừng sử dụng của bạn. Bản sao do người khác tạo trước khi gỡ nằm ngoài quyền kiểm soát của chúng tôi. Nếu muốn giữ một cuộc tranh luận mà bạn gỡ để tự xem, hãy tải xuống trước.
 
 **Chúng tôi luôn có thể gỡ nội dung đã công khai.** Chúng tôi có thể gỡ bỏ hoặc hạn chế quyền truy cập vào một cuộc tranh luận đã công khai khi pháp luật yêu cầu, khi tòa án hoặc cơ quan có thẩm quyền ra lệnh, hoặc khi nội dung vi phạm các Điều khoản này hay trái pháp luật. Không nội dung nào trong mục này ngăn chúng tôi hành động theo một thông báo hợp lệ tại mục 10, và không nội dung nào là cam kết rằng một cuộc tranh luận đã công khai sẽ tiếp tục được cung cấp.
 
@@ -161,7 +161,7 @@ Chúng tôi xác nhận đã nhận mọi báo cáo mà không trì hoãn quá m
 
 **Liên hệ với con người.** Trợ lý hỗ trợ của chúng tôi là một hệ thống AI và tự giới thiệu như vậy. Bạn có thể yêu cầu nói chuyện với một người bất kỳ lúc nào, và mọi cuộc trao đổi hỗ trợ đều cung cấp lựa chọn đó. Chúng tôi không chỉ dựa vào các công cụ tự động để giao tiếp với bạn.
 
-**Nội dung khủng bố.** Nội dung khủng bố là bất hợp pháp và không được phép xuất hiện trên DebateAI (mục 7). Các cơ quan có thẩm quyền tại Liên minh Châu Âu có thể gửi cho chúng tôi lệnh gỡ bỏ theo Quy định (EU) số 2021/784 đến đầu mối liên hệ nêu ở mục 1. Khi nhận được một lệnh như vậy, chúng tôi gỡ bỏ nội dung, hoặc chặn quyền truy cập vào nội dung đó tại mọi quốc gia EU, trong vòng một giờ. Chúng tôi thông báo cho người đã công khai nội dung đó rằng nội dung đã bị gỡ bỏ và, nếu họ yêu cầu, lý do cũng như cách phản đối lệnh đó, trừ khi cơ quan có thẩm quyền quyết định rằng an ninh công cộng đòi hỏi không được tiết lộ thông tin này trong một thời hạn nhất định. Theo yêu cầu của Quy định này, chúng tôi lưu giữ nội dung đã gỡ bỏ và dữ liệu liên quan trong sáu tháng, để việc gỡ bỏ có thể được rà soát và, nếu sai, được đảo ngược. Người đã công khai nội dung đó có thể phản đối lệnh tại tòa án của quốc gia mà cơ quan ban hành lệnh thuộc về, và cũng có thể sử dụng kênh khiếu nại của chúng tôi. Chưa có cơ quan nào yêu cầu chúng tôi áp dụng biện pháp cụ thể đối với nội dung khủng bố theo Quy định này; nếu có, chúng tôi sẽ mô tả các biện pháp đó tại đây, bao gồm bất kỳ công cụ tự động nào.
+**Nội dung khủng bố.** Nội dung khủng bố là bất hợp pháp và không được phép xuất hiện trên Dialectical Engine (mục 7). Các cơ quan có thẩm quyền tại Liên minh Châu Âu có thể gửi cho chúng tôi lệnh gỡ bỏ theo Quy định (EU) số 2021/784 đến đầu mối liên hệ nêu ở mục 1. Khi nhận được một lệnh như vậy, chúng tôi gỡ bỏ nội dung, hoặc chặn quyền truy cập vào nội dung đó tại mọi quốc gia EU, trong vòng một giờ. Chúng tôi thông báo cho người đã công khai nội dung đó rằng nội dung đã bị gỡ bỏ và, nếu họ yêu cầu, lý do cũng như cách phản đối lệnh đó, trừ khi cơ quan có thẩm quyền quyết định rằng an ninh công cộng đòi hỏi không được tiết lộ thông tin này trong một thời hạn nhất định. Theo yêu cầu của Quy định này, chúng tôi lưu giữ nội dung đã gỡ bỏ và dữ liệu liên quan trong sáu tháng, để việc gỡ bỏ có thể được rà soát và, nếu sai, được đảo ngược. Người đã công khai nội dung đó có thể phản đối lệnh tại tòa án của quốc gia mà cơ quan ban hành lệnh thuộc về, và cũng có thể sử dụng kênh khiếu nại của chúng tôi. Chưa có cơ quan nào yêu cầu chúng tôi áp dụng biện pháp cụ thể đối với nội dung khủng bố theo Quy định này; nếu có, chúng tôi sẽ mô tả các biện pháp đó tại đây, bao gồm bất kỳ công cụ tự động nào.
 
 **Rủi ro nghiêm trọng đối với tính mạng hoặc an toàn.** Nếu biết được thông tin cho thấy có hành vi phạm tội liên quan đến mối đe dọa đối với tính mạng hoặc an toàn của một người, chúng tôi sẽ thông báo cho cơ quan có thẩm quyền.
 
@@ -183,7 +183,7 @@ Các mục 8 (đối với nội dung đã được công khai), 15, 16 và 18 t
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI cung cấp một gói miễn phí. Gói **Premium** trả phí sẽ được cung cấp, mở khóa toàn bộ danh sách mô hình và cho phép bạn tự thiết lập các thước đo tranh luận.
+Dialectical Engine cung cấp một gói miễn phí. Gói **Premium** trả phí sẽ được cung cấp, mở khóa toàn bộ danh sách mô hình và cho phép bạn tự thiết lập các thước đo tranh luận.
 
 **Trước khi bạn thanh toán**, ngay phía trên nút thanh toán, chúng tôi hiển thị: gói dịch vụ; tổng giá gồm thuế áp dụng; kỳ thanh toán; thông tin rằng gói dịch vụ tự động gia hạn cho đến khi bị hủy; ngày kết thúc mọi thời gian dùng thử miễn phí và khoản tiền bạn sẽ phải trả sau đó; cùng cách hủy. Bạn xác nhận điều khoản gia hạn bằng cách đánh dấu vào một ô riêng. Nút này ghi **Đăng ký và thanh toán** (bằng tiếng Romania, *Comandă cu obligație de plată*). Chúng tôi gửi cho bạn xác nhận trên một phương tiện bền vững có cùng thông tin, các Điều khoản này và biểu mẫu rút lui.
 
@@ -211,11 +211,11 @@ Nếu sống tại nơi khác, Phụ lục A quy định quyền rút lui hoặc
 
 ## 14. Thay đổi đối với dịch vụ và các Điều khoản này
 
-**Đối với dịch vụ.** Chúng tôi liên tục phát triển DebateAI, và những cải tiến thường kỳ, bản sửa lỗi và thay đổi danh sách mô hình diễn ra mà không cần thông báo. Khi thực hiện thay đổi vượt ra ngoài việc duy trì hoạt động của dịch vụ như mô tả, chúng tôi chỉ làm vậy vì một trong các lý do sau: tuân thủ yêu cầu pháp lý hoặc quản lý; ứng phó vấn đề bảo mật hoặc lạm dụng; do nhà cung cấp mô hình thay đổi, hạn chế hoặc rút mô hình hay tính năng mà chúng tôi phụ thuộc; thích ứng với môi trường kỹ thuật nằm ngoài sự kiểm soát của chúng tôi; hoặc thêm, cải thiện hay ngừng một tính năng theo cách không làm phát sinh chi phí cho bạn.
+**Đối với dịch vụ.** Chúng tôi liên tục phát triển Dialectical Engine, và những cải tiến thường kỳ, bản sửa lỗi và thay đổi danh sách mô hình diễn ra mà không cần thông báo. Khi thực hiện thay đổi vượt ra ngoài việc duy trì hoạt động của dịch vụ như mô tả, chúng tôi chỉ làm vậy vì một trong các lý do sau: tuân thủ yêu cầu pháp lý hoặc quản lý; ứng phó vấn đề bảo mật hoặc lạm dụng; do nhà cung cấp mô hình thay đổi, hạn chế hoặc rút mô hình hay tính năng mà chúng tôi phụ thuộc; thích ứng với môi trường kỹ thuật nằm ngoài sự kiểm soát của chúng tôi; hoặc thêm, cải thiện hay ngừng một tính năng theo cách không làm phát sinh chi phí cho bạn.
 
 Chúng tôi thông báo trước cho bạn trên một phương tiện bền vững về nội dung và thời điểm thay đổi. Nếu thay đổi có tác động tiêu cực lớn hơn mức không đáng kể đối với khả năng truy cập hoặc sử dụng dịch vụ của bạn, bạn có thể chấm dứt miễn phí trong vòng **30 ngày** kể từ khi được thông báo hoặc kể từ khi thay đổi có hiệu lực, tùy thời điểm nào muộn hơn, và chúng tôi hoàn trả mọi khoản đã trả trước cho thời gian chưa sử dụng.
 
-**Đối với các Điều khoản này.** Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất **30 ngày** trước khi phiên bản có hiệu lực; tiếp tục sử dụng DebateAI sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions.
+**Đối với các Điều khoản này.** Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất **30 ngày** trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions.
 
 ## 15. Trách nhiệm
 
@@ -231,15 +231,15 @@ Chúng tôi thông báo trước cho bạn trên một phương tiện bền v�
 
 ## 16. Sở hữu trí tuệ
 
-Bản thân dịch vụ — phần mềm, công cụ, phương pháp chấm điểm, giao diện, tên DebateAI và DebateAIRO cùng các biểu trưng của chúng tôi — thuộc về chúng tôi hoặc bên cấp phép của chúng tôi. Các Điều khoản này cho phép bạn sử dụng dịch vụ chứ không trao cho bạn quyền sở hữu dịch vụ.
+Bản thân dịch vụ — phần mềm, công cụ, phương pháp chấm điểm, giao diện, tên Dialectical Engine và DebateAIRO cùng các biểu trưng của chúng tôi — thuộc về chúng tôi hoặc bên cấp phép của chúng tôi. Các Điều khoản này cho phép bạn sử dụng dịch vụ chứ không trao cho bạn quyền sở hữu dịch vụ.
 
-Bạn có thể trích dẫn và liên kết đến các cuộc tranh luận đã công khai với ghi nhận nguồn là DebateAI và liên kết đến trang gốc. Không được sao chép hàng loạt, tái tạo có hệ thống kho dữ liệu công khai hoặc sử dụng các cuộc tranh luận đã công khai làm dữ liệu huấn luyện khi chưa có thỏa thuận bằng văn bản của chúng tôi.
+Bạn có thể trích dẫn và liên kết đến các cuộc tranh luận đã công khai với ghi nhận nguồn là Dialectical Engine và liên kết đến trang gốc. Không được sao chép hàng loạt, tái tạo có hệ thống kho dữ liệu công khai hoặc sử dụng các cuộc tranh luận đã công khai làm dữ liệu huấn luyện khi chưa có thỏa thuận bằng văn bản của chúng tôi.
 
-Mục 8 quy định về nội dung của bạn và tình trạng của kết quả được tạo ra. Nếu cho rằng nội dung nào đó trên DebateAI xâm phạm quyền sở hữu trí tuệ của mình, hãy sử dụng kênh báo cáo tại mục 10.
+Mục 8 quy định về nội dung của bạn và tình trạng của kết quả được tạo ra. Nếu cho rằng nội dung nào đó trên Dialectical Engine xâm phạm quyền sở hữu trí tuệ của mình, hãy sử dụng kênh báo cáo tại mục 10.
 
 ## 17. Dữ liệu cá nhân
 
-Cách chúng tôi xử lý dữ liệu cá nhân được quy định trong **Chính sách quyền riêng tư** tại dezbatere.ro/privacy. Chính sách giải thích dữ liệu chúng tôi thu thập, cơ sở pháp lý cho từng mục đích, thời hạn lưu giữ, bên nhận dữ liệu, hoạt động chuyển dữ liệu liên quan và cách thực hiện các quyền của bạn. Ba điểm cũng thuộc mục này. Mục 7 yêu cầu bạn không đưa dữ liệu cá nhân của người khác vào một câu hỏi; nếu làm vậy, bạn chịu trách nhiệm và chúng tôi có thể gỡ nội dung. Nếu một cuộc tranh luận được công khai trên DebateAI chứa dữ liệu cá nhân về bạn, bạn có thể yêu cầu chúng tôi gỡ bỏ mà không cần có tài khoản (mục 9). Và chúng tôi lưu hồ sơ về việc bạn chấp nhận các Điều khoản này — phiên bản, thời điểm và chi tiết kỹ thuật của phiên — làm bằng chứng về hợp đồng, như được giải thích trong Chính sách quyền riêng tư.
+Cách chúng tôi xử lý dữ liệu cá nhân được quy định trong **Chính sách quyền riêng tư** tại dezbatere.ro/privacy. Chính sách giải thích dữ liệu chúng tôi thu thập, cơ sở pháp lý cho từng mục đích, thời hạn lưu giữ, bên nhận dữ liệu, hoạt động chuyển dữ liệu liên quan và cách thực hiện các quyền của bạn. Ba điểm cũng thuộc mục này. Mục 7 yêu cầu bạn không đưa dữ liệu cá nhân của người khác vào một câu hỏi; nếu làm vậy, bạn chịu trách nhiệm và chúng tôi có thể gỡ nội dung. Nếu một cuộc tranh luận được công khai trên Dialectical Engine chứa dữ liệu cá nhân về bạn, bạn có thể yêu cầu chúng tôi gỡ bỏ mà không cần có tài khoản (mục 9). Và chúng tôi lưu hồ sơ về việc bạn chấp nhận các Điều khoản này — phiên bản, thời điểm và chi tiết kỹ thuật của phiên — làm bằng chứng về hợp đồng, như được giải thích trong Chính sách quyền riêng tư.
 
 ## 18. Luật điều chỉnh và nơi giải quyết tranh chấp
 
@@ -277,7 +277,7 @@ Phần nội dung chung của các Điều khoản này được soạn cho bạ
 
 ### A.2 Hoa Kỳ
 
-**Tennessee.** Chúng tôi không cung cấp DebateAI cho những người sống tại Tennessee.
+**Tennessee.** Chúng tôi không cung cấp Dialectical Engine cho những người sống tại Tennessee.
 
 **Thông báo và gỡ bỏ.** Hình ảnh riêng tư không có sự đồng thuận có thể được báo cáo qua email tới abuse@dezbatere.ro mà không cần tài khoản, và được gỡ bỏ trong vòng 48 giờ kể từ khi nhận yêu cầu hợp lệ. Khiếu nại về quyền tác giả được xử lý theo kênh báo cáo tại mục 10.
 
