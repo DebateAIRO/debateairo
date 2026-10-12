@@ -949,6 +949,7 @@ packages/providers/src/anthropic-messages.ts
 packages/providers/src/content-rule.ts
 packages/providers/src/index.ts
 packages/providers/src/model-json.ts
+packages/providers/src/patch-follow-up.ts
 packages/providers/src/preview-models.ts
 packages/providers/src/preview-remaining.ts
 packages/providers/src/preview-test.ts
@@ -962,6 +963,7 @@ packages/register/src/answer-role-rotation-policy.ts
 packages/register/src/auth-policy.ts
 packages/register/src/billing-plans.ts
 packages/register/src/billing-policy.ts
+packages/register/src/call-concurrency-policy.ts
 packages/register/src/compose-env.ts
 packages/register/src/configured-provider-set.ts
 packages/register/src/consumer-recovery-policy.ts

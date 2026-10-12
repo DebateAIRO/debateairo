@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256 } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows, composePreviewSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import {
   buildPreviewSourceRowsV2, composePreviewSnapshotV2, assertBaseIsCurrent, publishPreviewRegisterV2, previewDeltaSha256V2, previewCheckerRoleRef,
-  PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS, BASE_NOT_CURRENT, PreviewRegisterBaseNotCurrentError,
+  PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS, BASE_NOT_CURRENT, PreviewRegisterBaseNotCurrentError,
   PREVIEW_SYNTHESIZER_ROLE_REF, PREVIEW_EVALUATOR_ROLE_REF, PREVIEW_DEEPSEEK_CHECKER_ROLE_REF
 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
 
@@ -307,6 +307,33 @@ describe('publish kit v2: the role rotation switch (on by default; off is a repu
     ['upper case', 'OFF'], ['a boolean false', false], ['a boolean true', true], ['null', null], ['another word', 'disabled'], ['an object', { roleRotation: 'off' }]
   ])('refuses %s, by its own rule, before building any row', async (_name, choice) => {
     await expect(build(choice)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: role-rotation-choice');
+  });
+});
+
+describe('publish kit v2: the optional callConcurrencyPolicy row (absent by default)', () => {
+  const policy = { perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50, deepinfra: 150, anthropic: 50 } };
+  const build = async (callConcurrency?: unknown) => [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, undefined, undefined, callConcurrency as any)] as Row[];
+
+  it('adds exactly one row when supplied and nothing by default; the reviewed key list is unchanged', async () => {
+    const absent = await build(), given = await build(policy);
+    expect(absent.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
+    expect(await build(null)).toEqual(absent);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY]);
+    expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
+    expect(given.filter(row => row.rowKey !== CALL_CONCURRENCY_POLICY_ROW_KEY)).toEqual(absent);
+    expect(JSON.parse(given.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)!.valueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
+  });
+
+  it('refuses a policy the register parser refuses, before building any row', async () => {
+    await expect(build({ ...policy, perDebate: 65 })).rejects.toThrow('CALL_CONCURRENCY_POLICY_INVALID');
+    await expect(build({ ...policy, perModelPerRunner: { deepinfra: 150 } })).rejects.toThrow('CALL_CONCURRENCY_POLICY_INVALID');
+  });
+
+  it('composes with or without the row, and never drops a sealed one silently', async () => {
+    const f = await fixture();
+    const given = compose(await build(policy), f.v9);
+    expect(given.addedKeys).toEqual([ROTATION_KEY, CALL_CONCURRENCY_POLICY_ROW_KEY].sort((a, b) => a.localeCompare(b, 'en')));
+    expect(() => compose(f.source, [...given.rows] as Row[], '10')).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: base-row-dropped');
   });
 });
 

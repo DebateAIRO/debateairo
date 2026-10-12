@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { migrate } from '@debateai/db';
-import { loadBootstrapRegister, createPostgresRegisterPublicationPort, canonicalRegisterJson, parseRegisterVersionText } from '@debateai/register';
+import {
+  loadBootstrapRegister, createPostgresRegisterPublicationPort, canonicalRegisterJson, parseRegisterVersionText,
+  CALL_CONCURRENCY_POLICY_ROW_KEY, callConcurrencyPolicyFromValue, callConcurrencyPolicyRow, readCallConcurrencyPolicy
+} from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, publishPreviewRegisterV2, readSealedSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
 import { startTestDatabase } from '../support/testDatabase.js';
@@ -53,6 +56,42 @@ describe('publish kit v2 on PostgreSQL 18 (source evidence, not the Linux operat
       expect(await readSealedSnapshot(pool, '5')).toEqual(current);
       // Nothing was written by the refused attempts: no version 7 (an explicit version, never a latest selection).
       expect((await pool.query('SELECT count(*)::int n FROM register.register_version WHERE register_version=$1', ['7'])).rows[0].n).toBe(0);
+    } finally { await db.stop(); }
+  }, 180000);
+
+  // Parallel calls (spec 2026-10-12 §3.1): the row is optional input to the kit, absent by default.
+  it('seals no callConcurrencyPolicy row by default, and seals exactly the built row when the operator supplies one', async () => {
+    const db = await startTestDatabase();
+    try {
+      await migrate(db.pool);
+      const pool = db.pool;
+      const bootstrap = await loadBootstrapRegister();
+      const owned = [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
+      const absentSource = [...await buildPreviewSourceRowsV2(bootstrap, observation)];
+      await createPostgresRegisterPublicationPort(pool).importHistorical({ registerVersion: parseRegisterVersionText('4'), rows: [...absentSource, ...owned] });
+      const v4 = await readSealedSnapshot(pool, '4');
+
+      // Absent: the default source carries no such row, so the version the kit seals has none.
+      const absent = composePreviewSnapshotV2({ sourceRows: absentSource, baseRows: v4.rows, baseRegisterVersion: '4', baseSnapshotSha256: v4.snapshotSha256 });
+      const changedSource = absentSource.map(row => row.rowKey === 'composerContractHash' ? { ...row, valueJsonText: '"' + 'e'.repeat(64) + '"' } : row) as typeof absentSource;
+      const absentChanged = composePreviewSnapshotV2({ sourceRows: changedSource, baseRows: v4.rows, baseRegisterVersion: '4', baseSnapshotSha256: v4.snapshotSha256 });
+      expect(absent.addedKeys).toEqual([]);
+      await publishPreviewRegisterV2(pool, { publicationId: randomUUID(), sourceRef: 'publish kit v2 fixture', snapshot: absentChanged, approval: approvalOf(absentChanged) });
+      const v5 = await readSealedSnapshot(pool, '5');
+      expect(v5.rows.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
+      await expect(readCallConcurrencyPolicy(pool, 5)).resolves.toEqual({ state: 'ABSENT' });
+
+      // Given: one added row, sealed exactly as callConcurrencyPolicyRow builds it.
+      const policy = callConcurrencyPolicyFromValue({ kind: 'CALL_CONCURRENCY_POLICY', perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50, deepinfra: 150, anthropic: 50 } });
+      const givenSource = [...await buildPreviewSourceRowsV2(bootstrap, observation, undefined, undefined, policy)];
+      const given = composePreviewSnapshotV2({ sourceRows: givenSource, baseRows: v5.rows, baseRegisterVersion: '5', baseSnapshotSha256: v5.snapshotSha256 });
+      expect(given.addedKeys).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY]);
+      expect(given.changedKeys).toEqual(['composerContractHash']);
+      await publishPreviewRegisterV2(pool, { publicationId: randomUUID(), sourceRef: 'publish kit v2 fixture', snapshot: given, approval: approvalOf(given) });
+      const sealed = (await readSealedSnapshot(pool, '6')).rows.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY);
+      const expected = callConcurrencyPolicyRow(policy, 'docs/superpowers/specs/2026-10-12-parallel-calls-design.md; owner 2026-10-12');
+      expect(sealed).toEqual({ rowKey: expected.rowKey, valueJsonText: expected.valueJsonText, sourceRef: expected.sourceRef });
+      await expect(readCallConcurrencyPolicy(pool, 6)).resolves.toEqual({ state: 'SET', policy });
     } finally { await db.stop(); }
   }, 180000);
 });

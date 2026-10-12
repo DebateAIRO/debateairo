@@ -28,6 +28,9 @@
 // Role rotation (spec 2026-10-11): the source also carries the answerRoleRotationPolicy row, enabled, so the
 // preview rotates the four roles over each debate's own panel. A base without it (the live v9) shows it as `added`.
 // The operator's `roleRotation: 'off'` publishes the same row disabled (the preview's rollback: a republish).
+// Parallel calls (spec 2026-10-12 §3.1): the operator MAY also hand the kit a callConcurrencyPolicy; only then does
+// the source carry that row (an optional key, PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2). Left out (the default), the
+// source has no such row and the preview runs one call at a time per debate, as before.
 // The delta now carries the old and new canonical values, so the owner reviews values, not hashes;
 // deltaSha256 binds that exact document and the approval binds deltaSha256.
 import { createHash } from 'node:crypto';
@@ -36,8 +39,8 @@ import {
   canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256,
   parseRegisterVersionText, buildConfiguredProviderSetSealedRow, buildConfiguredProviderSetDeploymentRow,
   PASSWORD_RESET_POLICY_REGISTER_ROW, BACKUP_EMAIL_POLICY_REGISTER_ROW, MFA_RECOVERY_POLICY_REGISTER_ROW,
-  answerRoleRotationPolicyRow,
-  type BootstrapRegister, type RegisterPublicationRow
+  answerRoleRotationPolicyRow, callConcurrencyPolicyRow, CALL_CONCURRENCY_POLICY_ROW_KEY,
+  type BootstrapRegister, type CallConcurrencyPolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
 import { parseProviderDiscoveryTargets } from '@debateai/providers';
@@ -77,6 +80,11 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
   'storytellerCallBound','storytellerRoleRef','synthesizerCallBound','synthesizerRoleRef','taxAuthorities','typescriptVersion',
   'verdictHighCut','verdictLowCut','verdictMarginGamma','verificationPolicy','vllmImageDigest','wayOfKnowingCeiling'
 ] as const);
+/**
+ * Reviewed keys the source carries only when the operator supplies them (spec 2026-10-12 §3.1): never required,
+ * never in PREVIEW_SOURCE_ROW_KEYS_V2's exact closure. A base row with such a key is still never dropped silently.
+ */
+export const PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 = Object.freeze([CALL_CONCURRENCY_POLICY_ROW_KEY] as const);
 
 /** The answer writer: GLM (fixture-a), always. Story roles follow the writer and checker (story-policy.ts). */
 export const PREVIEW_SYNTHESIZER_ROLE_REF = 'preview:fixture-a' as const;
@@ -113,15 +121,23 @@ export function previewRoleRotationEnabled(choice:unknown='on'):boolean {
 
 const sameKeys = (actual:readonly string[], expected:readonly string[]) =>
   actual.length===expected.length && [...actual].sort().join('\0')===[...expected].sort().join('\0');
+/** The source closure: exactly the reviewed key list, plus at most one of each reviewed optional key. */
+const sourceKeysReviewed = (keys:readonly string[]) => {
+  const optional=PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 as readonly string[];
+  return new Set(keys).size===keys.length&&sameKeys(keys.filter(key=>!optional.includes(key)),PREVIEW_SOURCE_ROW_KEYS_V2);
+};
 
 /**
  * v1's source build (same runtime gate, same provider panel), closed by the reviewed key list instead of a count.
  * `checker` is the reviewed checker choice (default GLM) and `roleRotation` the operator's rotation switch
- * (default 'on'); both are checked before anything else is built.
+ * (default 'on'); `callConcurrency` the operator's optional parallel-calls policy (default null: no row, one call at
+ * a time). All three are checked before anything else is built (the policy by the register's own parser,
+ * CALL_CONCURRENCY_POLICY_INVALID).
  */
-export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on'):Promise<readonly RegisterPublicationRow[]> {
+export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
   const evaluatorRoleRef=previewCheckerRoleRef(checker);
   const rotationEnabled=previewRoleRotationEnabled(roleRotation);
+  const concurrencyRows=callConcurrency===null?[]:[callConcurrencyPolicyRow(callConcurrency,'docs/superpowers/specs/2026-10-12-parallel-calls-design.md; owner 2026-10-12')];
   if(runtime.nodeVersion!=='v26.8.2'||runtime.pnpmVersion!=='11.20.0'||!/^([0-9a-f]{40})$/.test(runtime.sourceRevision)
     ||!/^([0-9a-f]{40})$/.test(runtime.sourceTree)||!/^([0-9a-f]{64})$/.test(runtime.operatorSha256)
     ||!Number.isFinite(Date.parse(runtime.observedAt))||bootstrap.values.pnpmVersion!==runtime.pnpmVersion||bootstrap.values.postgresMajorVersion!=='18')fail();
@@ -139,8 +155,10 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
     ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef})),
     // Role rotation (spec 2026-10-11): the preview rotates the four roles over each debate's own panel, unless the
     // operator published with roleRotation 'off' (the row stays, disabled: behaviour is then today's).
-    answerRoleRotationPolicyRow(rotationEnabled,'docs/superpowers/specs/2026-10-11-role-rotation-design.md; owner 2026-10-10')];
-  if(!sameKeys(rows.map(row=>row.rowKey),PREVIEW_SOURCE_ROW_KEYS_V2))fail('source-key-list');
+    answerRoleRotationPolicyRow(rotationEnabled,'docs/superpowers/specs/2026-10-11-role-rotation-design.md; owner 2026-10-10'),
+    // Parallel calls (spec 2026-10-12 §3.1): only when the operator supplied a policy.
+    ...concurrencyRows];
+  if(!sourceKeysReviewed(rows.map(row=>row.rowKey)))fail('source-key-list');
   return Object.freeze(rows.map(row=>Object.freeze(row)));
 }
 
@@ -205,7 +223,7 @@ export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly Reg
   if([...sourceMap.keys(),...baseMap.keys()].some(key=>FORBIDDEN_KEYS.includes(key)))fail('support-or-scorecard-row');
   if(source.some(row=>owned.includes(row.rowKey)))fail('base-owned-row-in-source');
   if(owned.some(key=>!baseMap.has(key)))fail('base-owned-row-missing');
-  if(!sameKeys(source.map(row=>row.rowKey),PREVIEW_SOURCE_ROW_KEYS_V2))fail('source-key-list');
+  if(!sourceKeysReviewed(source.map(row=>row.rowKey)))fail('source-key-list');
   // A base row the source no longer builds is never dropped silently.
   if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)))fail('base-row-dropped');
   assertProviderRows(sourceMap,'source');
