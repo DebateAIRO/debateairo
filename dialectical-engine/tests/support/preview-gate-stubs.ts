@@ -6,7 +6,10 @@
 // model's script; with `debate` scripts a scripted model refuses every other request unbilled and the DeepInfra gate
 // halts at its ceiling of unbilled releases (the run-resilience scenarios, spec
 // docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md T1/T2); every other request is answered by its
-// contract (a valid reply), unless the scenario's `override` answers it first.
+// contract (a valid reply), unless the scenario's `override` answers it first. Gate v4 (2026-10-12,
+// packages/providers/ops/preview_budget_authority.py): with `debate.coolOffAfter` a model cools off after that many
+// unbilled refusals in a row (409 MODEL_COOLING with retry_after, never contacting the vendor), and with
+// `debate.deepInfraHaltedAnswer: "AUTHORITY_HALTED"` the halted DeepInfra gate says so itself instead of STOPPED.
 import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -23,12 +26,18 @@ export type GateRequest = Readonly<{ provider: GateProvider; model: string; kind
 /**
  * How the gate answered a /complete request: by its contract or a scenario's content (OK), a gate-proven unbilled
  * vendor 429 (UNBILLED, 409 PROVIDER_REFUSED_UNBILLED), the gate's OWN unbilled refusal (GATE_REFUSED, 409
- * CONCURRENCY_LIMIT_REACHED or PROVIDER_NOT_REACHED: never one of its unbilled releases), a halted gate (STOPPED, 409
- * PREVIEW_TEST_AUTHORITY_STOPPED), a
+ * CONCURRENCY_LIMIT_REACHED or PROVIDER_NOT_REACHED: never one of its unbilled releases), a model the gate lets cool
+ * off (COOLING, 409 MODEL_COOLING with retry_after: gate v4, nothing reserved, the vendor not contacted), a halted gate
+ * (STOPPED, 409 PREVIEW_TEST_AUTHORITY_STOPPED; or HALTED, gate v4's 409 AUTHORITY_HALTED), a
  * billed vendor error (BILLED_500 for a refused model; VENDOR_ERROR for a scenario's vendor status), or a request no
- * contract answers (UNEXPECTED, a billed vendor 500 too).
+ * contract answers (UNEXPECTED, a billed vendor 500 too). Only OK, UNBILLED, BILLED_500, VENDOR_ERROR and UNEXPECTED
+ * stand for a request that reached the vendor.
  */
-export type GateAnswer = "OK" | "UNBILLED" | "GATE_REFUSED" | "STOPPED" | "BILLED_500" | "VENDOR_ERROR" | "UNEXPECTED";
+export type GateAnswer = "OK" | "UNBILLED" | "GATE_REFUSED" | "COOLING" | "STOPPED" | "HALTED" | "BILLED_500" | "VENDOR_ERROR" | "UNEXPECTED";
+/** The answers that stand for a request the vendor received (the rest were refused by the gate itself). */
+export const GATE_ANSWERS_REACHING_VENDOR: ReadonlySet<GateAnswer> = new Set<GateAnswer>(["OK", "UNBILLED", "BILLED_500", "VENDOR_ERROR", "UNEXPECTED"]);
+/** The retry_after a stand-in cool-off names: the real gate's first window (COOL_OFF_FIRST_SECONDS). */
+export const STUB_COOL_OFF_RETRY_AFTER_SECONDS = 60;
 /** A recorded /complete request: the request and how it was answered, in arrival order. */
 export type GateRecord = GateRequest & Readonly<{ answer: GateAnswer }>;
 /** One read of a gate's `POST /remaining` (contract A §5), with the state it was answered. */
@@ -43,17 +52,32 @@ export type GateRemainingRead = Readonly<{ provider: GateProvider; state: "activ
  *    `unbilled_release_ceiling`): once it has given this many PROVIDER_REFUSED_UNBILLED answers it HALTS, so every later
  *    DeepInfra /complete is refused 409 PREVIEW_TEST_AUTHORITY_STOPPED before anything is reserved, and its /remaining
  *    answers state "halted" (the window stays open). Absent, it never halts. The Anthropic gate never halts.
+ *    (The live gate no longer halts on unbilled refusals since gate v4; this replays the 2026-10-11 incident.)
+ *  - `deepInfraHaltedAnswer`: what the halted DeepInfra gate answers a /complete: "STOPPED" (the default, the older gate
+ *    and the incident) or gate v4's "AUTHORITY_HALTED" (409 {"error": "AUTHORITY_HALTED"}).
+ *  - `coolOffAfter`: gate v4's per-model cool-off. A model that has had this many PROVIDER_REFUSED_UNBILLED answers in
+ *    a row (any request, probes included, with no OK of that model in between) cools off: every later request for it
+ *    is refused 409 {"error": "MODEL_COOLING", "retry_after": 60} before the vendor is asked, which is never an
+ *    unbilled release (it does not count toward `deepInfraHaltAt`). The stand-in has no clock, so a cooling model
+ *    never gets the real gate's trial call. Absent, nothing cools off. The live gate's value is 2.
  */
-export type GateDebateScripts = Readonly<{ unbilled: readonly string[]; deepInfraHaltAt?: number }>;
+export type GateDebateScripts = Readonly<{
+  unbilled: readonly string[];
+  deepInfraHaltAt?: number;
+  deepInfraHaltedAnswer?: "STOPPED" | "AUTHORITY_HALTED";
+  coolOffAfter?: number;
+}>;
 /**
  * The DeepInfra gate's halt: its count of unbilled releases, the index (in `requests`) of the request whose release
- * reached the ceiling, and the index of the first request it answered STOPPED.
+ * reached the ceiling, and the index of the first request it answered STOPPED (or AUTHORITY_HALTED).
  */
 export type GateHalt = { unbilledReleases: number; haltedAt: number | null; firstStoppedAt: number | null };
 /** What a scenario may answer instead of the contract's valid reply. */
 export type GateOverride = Readonly<{ content: string }> | Readonly<{ unbilled: true }> | Readonly<{ vendorStatus: number }>
   /** The gate's own unbilled refusal (review amendment R-d, 2026-10-12): its slots full, or the vendor not reached. */
-  | Readonly<{ gateRefuses: "CONCURRENCY_LIMIT_REACHED" | "PROVIDER_NOT_REACHED" }>;
+  | Readonly<{ gateRefuses: "CONCURRENCY_LIMIT_REACHED" | "PROVIDER_NOT_REACHED" }>
+  /** Gate v4's own refusals: this model cooling off (COOLING, with retry_after 60), or the gate halted (HALTED). */
+  | Readonly<{ gateRefuses: "MODEL_COOLING" | "AUTHORITY_HALTED" }>;
 
 /* ------------------------------------------------------------------ the doubles' answers */
 
@@ -158,6 +182,8 @@ export type PreviewGateStubs = Readonly<{
   remainingReads: GateRemainingRead[];
   /** The DeepInfra gate's halt (only ever moves with `debate.deepInfraHaltAt`). */
   halt: Readonly<GateHalt>;
+  /** The models cooling off (only ever filled with `debate.coolOffAfter`), each with its run of unbilled refusals. */
+  cooling: ReadonlyMap<string, number>;
   sockets: Readonly<Record<GateProvider, string>>;
   close(): Promise<void>;
 }>;
@@ -175,8 +201,9 @@ export type PreviewGateStubs = Readonly<{
  *  - `enabledModels`: what /remaining says each gate serves (default: the five reviewed models by their gate).
  *  - `remainingState`: what /remaining says while the gate has not halted (default "active"); a halted DeepInfra gate
  *    always answers "halted".
- * The order of answers: a halted DeepInfra gate (STOPPED), a refused model (BILLED_500), an unbilled step (the probe's
- * script, or `debate.unbilled` for any other request), the override, the contract.
+ * The order of answers: a halted DeepInfra gate (STOPPED or HALTED), a model cooling off (COOLING), a refused model
+ * (BILLED_500), an unbilled step (the probe's script, or `debate.unbilled` for any other request), the override, the
+ * contract.
  */
 export async function startPreviewGateStubs(input: Readonly<{
   storyDefaultShape: string;
@@ -191,6 +218,9 @@ export async function startPreviewGateStubs(input: Readonly<{
   const remainingReads: GateRemainingRead[] = [];
   const queues = new Map<string, ("OK" | "UNBILLED")[]>(Object.entries(input.probeScripts ?? {}).map(([model, steps]) => [model, [...steps]]));
   const halt: GateHalt = { unbilledReleases: 0, haltedAt: null, firstStoppedAt: null };
+  // Gate v4's cool-off: each model's run of unbilled refusals with no OK in between, and the models cooling off.
+  const unbilledRun = new Map<string, number>();
+  const cooling = new Map<string, number>();
   const servers: Server[] = [];
   const directories: string[] = [];
   let served = 0;
@@ -239,7 +269,11 @@ export async function startPreviewGateStubs(input: Readonly<{
         let kind: GateRequestKind | "UNKNOWN";
         try { kind = classifyGateRequest(chat); } catch { kind = "UNKNOWN"; }
         const seen: GateRequest = Object.freeze({ provider, model, kind, body });
-        const record = (answer: GateAnswer): number => requests.push(Object.freeze({ ...seen, answer })) - 1;
+        const record = (answer: GateAnswer): number => {
+          // A settled reply of a model ends its run of unbilled refusals (the real gate's clear_cooling).
+          if (answer === "OK") unbilledRun.delete(model);
+          return requests.push(Object.freeze({ ...seen, answer })) - 1;
+        };
         const reply = (status: number, vendorBody: string) => json(200, JSON.stringify({ status, body: vendorBody }));
         const refuse = (code: string) => json(409, JSON.stringify({ error: code }));
         const unbilled = () => {
@@ -249,14 +283,24 @@ export async function startPreviewGateStubs(input: Readonly<{
             const ceiling = input.debate?.deepInfraHaltAt;
             if (ceiling !== undefined && halt.unbilledReleases >= ceiling) halt.haltedAt ??= at;
           }
+          const run = (unbilledRun.get(model) ?? 0) + 1;
+          unbilledRun.set(model, run);
+          const coolOffAfter = input.debate?.coolOffAfter;
+          if (coolOffAfter !== undefined && run >= coolOffAfter) cooling.set(model, run);
           refuse("PROVIDER_REFUSED_UNBILLED");
         };
+        const coolingRefusal = () => {
+          record("COOLING");
+          json(409, JSON.stringify({ error: "MODEL_COOLING", retry_after: STUB_COOL_OFF_RETRY_AFTER_SECONDS }));
+        };
         if (provider === "deepinfra" && halt.haltedAt !== null) {
-          const at = record("STOPPED");
+          const authorityHalted = input.debate?.deepInfraHaltedAnswer === "AUTHORITY_HALTED";
+          const at = record(authorityHalted ? "HALTED" : "STOPPED");
           halt.firstStoppedAt ??= at;
-          refuse("PREVIEW_TEST_AUTHORITY_STOPPED");
+          refuse(authorityHalted ? "AUTHORITY_HALTED" : "PREVIEW_TEST_AUTHORITY_STOPPED");
           return;
         }
+        if (cooling.has(model)) { coolingRefusal(); return; }
         if (input.refuseModels?.includes(model) === true) {
           record("BILLED_500");
           reply(500, JSON.stringify({ error: { message: "this model must never be called in this test" } }));
@@ -269,7 +313,11 @@ export async function startPreviewGateStubs(input: Readonly<{
         const override = input.override?.(seen, chat) ?? null;
         if (override !== null) {
           if ("unbilled" in override) { unbilled(); return; }
-          if ("gateRefuses" in override) { record("GATE_REFUSED"); refuse(override.gateRefuses); return; }
+          if ("gateRefuses" in override) {
+            if (override.gateRefuses === "MODEL_COOLING") { coolingRefusal(); return; }
+            if (override.gateRefuses === "AUTHORITY_HALTED") { record("HALTED"); refuse("AUTHORITY_HALTED"); return; }
+            record("GATE_REFUSED"); refuse(override.gateRefuses); return;
+          }
           if ("vendorStatus" in override) {
             record("VENDOR_ERROR");
             reply(override.vendorStatus, JSON.stringify({ error: { message: "scripted vendor error" } }));
@@ -295,6 +343,7 @@ export async function startPreviewGateStubs(input: Readonly<{
     requests,
     remainingReads,
     halt,
+    cooling,
     sockets,
     async close() {
       await Promise.all(servers.splice(0).map((server) => new Promise<void>((done) => server.close(() => done()))));

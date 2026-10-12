@@ -23,12 +23,15 @@ import {
   PROVIDER_COST_ENVELOPE_REFUSAL_CODES,
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
+  PreviewGateUnavailable,
+  PreviewModelCooling,
   PreviewUnbilledRefusal,
   PreviewVendorRefusedUnbilled,
   providerCallEndedVendorRefusedUnbilled,
   providerCallGateUnavailable,
   ProviderUnbilledRefusal,
   type PreviewBudgetPort,
+  type PreviewGateRemaining,
   type PreviewProviderTestConfig,
   type ProviderLedgerInput
 } from "@debateai/providers";
@@ -402,6 +405,143 @@ describe("run resilience (c): a halted gate is unavailable, not money", () => {
     expect(received.filter((line) => line.startsWith("POST /complete"))).toHaveLength(1);
     // The FAILED row is kept (a counted attempt of THIS maker only, fix (b)).
     expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+  });
+});
+
+/**
+ * Gate v4 (gate fix 2026-10-12, preview_budget_authority.py): the gate answers two new public refusals.
+ * MODEL_COOLING (with retry_after whole seconds, 1..600): ONE model is cooling off after two or more vendor-unbilled
+ * refusals in a row; the gate refused before reserving anything and never contacted the vendor. It is read exactly like
+ * the vendor's own unbilled refusal (the model is busy): a REFUSED row, the one 60-second resend, and the model sits
+ * out. AUTHORITY_HALTED: the gate was already halted when the call arrived (found before any reservation); it is the
+ * unavailable gate of fix (c) straight away, with no /remaining read and no resend. STOPPED keeps its /remaining read.
+ */
+describe("gate v4: MODEL_COOLING is a busy model, AUTHORITY_HALTED is an unavailable gate", () => {
+  const MODEL = "zai-org/GLM-5.3-Flash";
+  const REF = "preview:fixture-a";
+  /** One gate socket answering every /complete with `body` (a 409), and recording whether /remaining is ever asked. */
+  const refusingGate = (body: string) => answeringByPath((_path, response) => {
+    response.writeHead(409, { "content-type": "application/json" });
+    response.end(body);
+  });
+  const refusalOf = (port: PreviewBudgetPort): Promise<unknown> => port.execute(execution).then(() => null, (error: unknown) => error);
+
+  it.each([
+    ["with retry_after", { error: "MODEL_COOLING", retry_after: 120 }, 120],
+    ["without retry_after", { error: "MODEL_COOLING" }, undefined],
+    ["with a retry_after over the 600 s ceiling", { error: "MODEL_COOLING", retry_after: 601 }, undefined],
+    ["with a zero retry_after", { error: "MODEL_COOLING", retry_after: 0 }, undefined],
+    ["with a fractional retry_after", { error: "MODEL_COOLING", retry_after: 1.5 }, undefined],
+    ["with a text retry_after", { error: "MODEL_COOLING", retry_after: "60" }, undefined]
+  ] as const)("MODEL_COOLING %s is the vendor's busy refusal, unbilled, never money", async (_name, body, retryAfter) => {
+    const { port, received } = await refusingGate(JSON.stringify(body));
+    const refusal = await refusalOf(port);
+    expect(refusal).toBeInstanceOf(PreviewModelCooling);
+    expect(refusal).toBeInstanceOf(PreviewVendorRefusedUnbilled);
+    expect(refusal).toBeInstanceOf(PreviewUnbilledRefusal);
+    expect(refusal).toBeInstanceOf(ProviderUnbilledRefusal);
+    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+    expect((refusal as PreviewModelCooling).retryAfterSeconds).toBe(retryAfter);
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
+    expect(providerCallGateUnavailable(refusal)).toBe(false);
+    // Only STOPPED asks /remaining.
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+  });
+
+  it("AUTHORITY_HALTED is PROVIDER_GATE_UNAVAILABLE at once: /remaining is never asked, never money", async () => {
+    const { port, received } = await refusingGate(JSON.stringify({ error: "AUTHORITY_HALTED" }));
+    const refusal = await refusalOf(port);
+    expect(refusal).toBeInstanceOf(PreviewGateUnavailable);
+    expect(refusal).toMatchObject({ code: "PROVIDER_GATE_UNAVAILABLE" });
+    expect(refusal).not.toBeInstanceOf(ProviderUnbilledRefusal);
+    expect(providerCallGateUnavailable(refusal)).toBe(true);
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+  });
+
+  /** A gate socket refusing every /complete with {"error": code}, its port built with a /remaining port that records each ask. */
+  const withRecordedRemaining = async (code: string) => {
+    const asked: string[] = [];
+    const directory = await mkdtemp(join(tmpdir(), "pvg-"));
+    directories.push(directory);
+    const socket = join(directory, "gate.sock");
+    const server = createServer((request, response) => {
+      request.resume();
+      request.on("end", () => {
+        response.writeHead(409, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: code }));
+      });
+    });
+    servers.push(server);
+    await new Promise<void>((done) => server.listen(socket, done));
+    const config = Object.freeze({
+      deployment: "v3-preview", free_model_ids: [MODEL], requested_thinking_level: "high", budget_socket: socket, scope_id: "fixture-scope"
+    }) as unknown as PreviewProviderTestConfig;
+    const halted: PreviewGateRemaining = { state: "halted", windowOpen: true } as unknown as PreviewGateRemaining;
+    const port = createPreviewBudgetRpcPort(config, socket, { remaining: async () => { asked.push("remaining"); return halted; } });
+    return { port, asked };
+  };
+
+  it("AUTHORITY_HALTED never asks an injected /remaining port either", async () => {
+    const { port, asked } = await withRecordedRemaining("AUTHORITY_HALTED");
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "PROVIDER_GATE_UNAVAILABLE" });
+    expect(asked).toEqual([]);
+  });
+
+  it("STOPPED still asks the injected /remaining port, as before", async () => {
+    const { port, asked } = await withRecordedRemaining("PREVIEW_TEST_AUTHORITY_STOPPED");
+    await expect(port.execute(execution)).rejects.toMatchObject({ code: "PROVIDER_GATE_UNAVAILABLE" });
+    expect(asked).toEqual(["remaining"]);
+  });
+
+  it("through the native gateway: MODEL_COOLING gets the one resend and ends the call as the vendor's busy refusal", async () => {
+    const target = parseProviderDiscoveryTargets(JSON.stringify([{
+      provider_ref: REF, base_url: "https://api.deepinfra.com/v1/openai", model: MODEL,
+      input_price_micros_per_million: 150000, output_price_micros_per_million: 500000,
+      thinking_parameter: "reasoning_effort", thinking_levels: ["high"], context_window_tokens: 1048576
+    }]), [{ providerRef: REF, maker: "Z.AI" }])[0]!;
+    const preview = parsePreviewProviderTestConfig(JSON.stringify({
+      deployment: "v3-preview", free_model_ids: [MODEL], requested_thinking_level: "high",
+      budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture-scope"
+    }))!;
+    const call = async (body: string) => {
+      const { port, received } = await refusingGate(body);
+      const slept: number[] = [];
+      const ledger: ProviderLedgerInput[] = [];
+      const gateway = withPreviewProviderCallPolicy(new OpenAICompatibleProviderGateway({
+        endpoint: target.baseUrl, model: target.model, maker: target.maker, ...providerTargetGatewayControls(target),
+        fetchImplementation: createPreviewGuardedFetch(port),
+        persistRawArtifact: async (artifact) => artifact.artifactId,
+        appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
+        assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
+      }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); } });
+      const refusal: unknown = await gateway.call({
+        runId: "run:synthetic", subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
+        bound: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 5000 }, contractHash: "contract:test", providerRef: REF,
+        packet: framedFixturePacket("Synthetic school phone policy; no personal data.")
+      }).then(() => null, (error: unknown) => error);
+      return { refusal, slept, ledger, received };
+    };
+    const cooling = await call(JSON.stringify({ error: "MODEL_COOLING", retry_after: 60 }));
+    expect(cooling.refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: expect.any(PreviewModelCooling) });
+    expect(providerCallEndedVendorRefusedUnbilled(cooling.refusal)).toBe(true);
+    expect(providerCallGateUnavailable(cooling.refusal)).toBe(false);
+    expect(isRunLevelSpendStop(cooling.refusal)).toBe(false);
+    // The one resend after the cooldown, like PROVIDER_REFUSED_UNBILLED; two REFUSED rows, nothing counted.
+    expect(cooling.slept).toEqual([COOLDOWN_MS]);
+    expect(cooling.received.filter((line) => line.startsWith("POST /complete"))).toHaveLength(2);
+    expect(cooling.ledger.map((entry) => entry.outcome)).toEqual(["REFUSED", "REFUSED"]);
+
+    const halted = await call(JSON.stringify({ error: "AUTHORITY_HALTED" }));
+    expect(halted.refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: { code: "PROVIDER_GATE_UNAVAILABLE" } });
+    expect(providerCallGateUnavailable(halted.refusal)).toBe(true);
+    expect(providerCallEndedVendorRefusedUnbilled(halted.refusal)).toBe(false);
+    expect(isRunLevelSpendStop(halted.refusal)).toBe(false);
+    // Never resent, never a /remaining read; the FAILED row is kept (this maker's own, fix (b)).
+    expect(halted.slept).toEqual([]);
+    expect(halted.received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
+    expect(halted.ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
   });
 });
 

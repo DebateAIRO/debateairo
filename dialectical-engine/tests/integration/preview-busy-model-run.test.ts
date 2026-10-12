@@ -43,6 +43,7 @@ import {
   parsePreviewProviderTestConfig,
   parseProviderDiscoveryTargets,
   PREVIEW_GLM_DEADLINE_MS,
+  PreviewModelCooling,
   previewModelRow,
   previewProbeControls,
   previewRunnerPolicy,
@@ -81,7 +82,14 @@ import {
 } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS, DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
-import { startPreviewGateStubs, type GateDebateScripts, type GateOverride, type GateRequest } from "../support/preview-gate-stubs.js";
+import {
+  GATE_ANSWERS_REACHING_VENDOR,
+  startPreviewGateStubs,
+  STUB_COOL_OFF_RETRY_AFTER_SECONDS,
+  type GateDebateScripts,
+  type GateOverride,
+  type GateRequest
+} from "../support/preview-gate-stubs.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
@@ -198,8 +206,8 @@ async function startGates(
   const deepinfra = createPreviewBudgetRpcPort(PREVIEW, stubs.sockets.deepinfra);
   const anthropic = createPreviewBudgetRpcPort(PREVIEW, stubs.sockets.anthropic);
   return {
-    requests: stubs.requests, remainingReads: stubs.remainingReads, halt: stubs.halt,
-    guardedFetch: createPreviewGuardedFetch({ deepinfra, anthropic })
+    requests: stubs.requests, remainingReads: stubs.remainingReads, halt: stubs.halt, cooling: stubs.cooling,
+    deepinfraPort: deepinfra, guardedFetch: createPreviewGuardedFetch({ deepinfra, anthropic })
   };
 }
 
@@ -674,6 +682,99 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
     expect(writers).toHaveLength(1);
     expect(PREVIEW_PROVIDER_REF_MODELS[writers[0]!]).not.toBe(GLM);
     expect(await disclosureOf(result.answerId)).toMatchObject({ fallback_reason: null, writer_fallback_reason: "ROLE_UNAVAILABLE" });
+  });
+
+  it("gate v4: GLM busy, the gate cools GLM off after its two unbilled refusals; GLM sits out after ONE call and the run is served", async () => {
+    // Gate v4 (preview_budget_authority.py note_unbilled_refusal): after two vendor-unbilled refusals in a row for one
+    // model, the gate lets that model cool off and refuses its calls MODEL_COOLING without contacting the vendor; the
+    // gate itself never halts on them any more. GLM's one call (its seat on root 0's panel, T2) is the two refusals
+    // that start the cool-off: the POST and its one 60-second resend. Then the runner sits GLM out, so no GLM request
+    // reaches the vendor again, and any that reached the gate would be answered MODEL_COOLING.
+    const debate = await admittedRun("cooling-glm", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
+    const gates = await startGates({}, { unbilled: [GLM], coolOffAfter: 2 });
+    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const result = await completedRun(composed, debate, gates);
+
+    // Two GLM requests reached the vendor after claim (the call and its resend), both refused unbilled; the gate then
+    // cooled GLM off, and nothing for GLM reached the vendor after them. Any later GLM request was answered COOLING.
+    const glm = gates.requests.filter((request) => request.model === GLM && request.kind !== "PROBE");
+    expect(glm.slice(0, 2).map((request) => [request.kind, request.answer])).toEqual([["PANEL", "UNBILLED"], ["PANEL", "UNBILLED"]]);
+    expect(glm.slice(2).filter((request) => GATE_ANSWERS_REACHING_VENDOR.has(request.answer))).toEqual([]);
+    expect(glm.slice(2).every((request) => request.answer === "COOLING")).toBe(true);
+    expect(gates.cooling.get(GLM)).toBe(2);
+    expect([...gates.cooling.keys()]).toEqual([GLM]);
+    expect(gates.halt.haltedAt).toBeNull();
+    // One 60-second wait (GLM's resend), no 10-minute holds.
+    expect(composed.callSleeps).toEqual([UNBILLED_RESEND_MS]);
+    expect(composed.holdWaits).toEqual([]);
+    // Other models were never cooled off and never refused.
+    expect(gates.requests.filter((request) => request.model !== GLM).map((request) => request.answer)
+      .filter((answer) => answer !== "OK")).toEqual([]);
+
+    // Served, with a READY story; never a money reason, never CALL_BUDGET_EXHAUSTED.
+    const { answer, story, workItem } = await servedAnswer(debate, result.answerId);
+    expect(answer).not.toBeNull();
+    expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
+    expect(story).toMatchObject({ outcome: "READY", failureCode: null });
+    expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
+    const records = answer!.condition_mark_records;
+    const recordsText = JSON.stringify(records.map((record) => [record.mark, record.reason]));
+    expect(recordsText).not.toContain("RUN_COST_ENVELOPE_MONEY_REACHED");
+    expect(recordsText).not.toContain("CALL_BUDGET_EXHAUSTED");
+    expect(answer!.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+    const revised = records.find((record) => record.mark === "CRITIQUE-UNAVAILABLE" && record.reason.includes("RUN_PANEL_REVISED:"));
+    expect(revised, `condition mark records: ${recordsText}`).toBeDefined();
+    expect(revised!.reason, `condition mark records: ${recordsText}`).toMatch(GLM_SAT_OUT);
+    const calls = await modelCalls(debate.runId);
+    expect(calls.filter((call) => call.outcome === "OK" && PREVIEW_PROVIDER_REF_MODELS[call.actor_ref] === GLM)).toEqual([]);
+
+    // The gate's cool-off is live: one more GLM call now is refused MODEL_COOLING before the vendor is asked, and the
+    // app reads it as the busy model it is (PreviewModelCooling), not as money.
+    const before = gates.requests.length;
+    const refusal: unknown = await gates.deepinfraPort.execute({
+      operationId: randomUUID(), requestBody: JSON.stringify({ model: GLM }), requestSha256: "0".repeat(64), reservedUsd: "0.010000000"
+    }).then(() => null, (error: unknown) => error);
+    expect(refusal).toBeInstanceOf(PreviewModelCooling);
+    expect((refusal as PreviewModelCooling).retryAfterSeconds).toBe(STUB_COOL_OFF_RETRY_AFTER_SECONDS);
+    expect(gates.requests.slice(before).map((request) => [request.model, request.answer])).toEqual([[GLM, "COOLING"]]);
+  });
+
+  it("gate v4: the halted DeepInfra gate says AUTHORITY_HALTED; the T1 replay is served the same, without asking /remaining", async () => {
+    // T1's scenario with gate v4's own word for a halted gate: every DeepInfra /complete after the halt is refused
+    // AUTHORITY_HALTED, which the app reads as an unavailable gate at once (no /remaining read, no resend).
+    const debate = await admittedRun("incident-halted", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
+    const gates = await startGates({}, { unbilled: [GLM, QWEN], deepInfraHaltAt: 4, deepInfraHaltedAnswer: "AUTHORITY_HALTED" });
+    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const result = await completedRun(composed, debate, gates);
+
+    expect(gates.halt.unbilledReleases).toBe(4);
+    expect(gates.halt.firstStoppedAt).not.toBeNull();
+    expect(gates.requests[gates.halt.firstStoppedAt!]!.answer).toBe("HALTED");
+    expect(gates.requests.filter((request) => request.answer === "STOPPED")).toEqual([]);
+    // Zero DeepInfra requests after the first AUTHORITY_HALTED, and no /remaining read was needed to tell.
+    expect(gates.requests.slice(gates.halt.firstStoppedAt! + 1).filter((request) => request.provider === "deepinfra")
+      .map((request) => `${request.model} ${request.kind} ${request.answer}`)).toEqual([]);
+    expect(gates.remainingReads.filter((read) => read.provider === "deepinfra")).toEqual([]);
+
+    const { answer, story, workItem } = await servedAnswer(debate, result.answerId);
+    expect(answer).not.toBeNull();
+    expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
+    expect(story).toMatchObject({ outcome: "READY", failureCode: null });
+    expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
+    const records = answer!.condition_mark_records;
+    const recordsText = JSON.stringify(records.map((record) => [record.mark, record.reason]));
+    expect(recordsText).not.toContain("RUN_COST_ENVELOPE_MONEY_REACHED");
+    expect(recordsText).not.toContain("CALL_BUDGET_EXHAUSTED");
+    expect(answer!.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+    // The same disclosure as T1, to the byte: GLM and Qwen busy, the other DeepInfra members behind an unavailable gate.
+    const revised = records.find((record) => record.mark === "CRITIQUE-UNAVAILABLE" && record.reason.includes("RUN_PANEL_REVISED:"));
+    expect(revised?.reason, `condition mark records: ${recordsText}`).toBe("RUN_PANEL_REVISED:preview:fixture-a=PROVIDER_BUSY,"
+      + "preview:deepseek-v4-1-flash=PROVIDER_GATE_UNAVAILABLE,preview:mimo-v2-6-pro=PROVIDER_GATE_UNAVAILABLE,preview:qwen-3-8-flash=PROVIDER_BUSY");
+    const calls = await modelCalls(debate.runId);
+    const okActors = (key: string) => calls.filter((call) => call.call_site_key === key && call.outcome === "OK").map((call) => call.actor_ref);
+    expect(okActors(WRITER_KEY)).toEqual([HAIKU_REF]);
+    expect(okActors(CHECKER_KEY)).toEqual([HAIKU_REF]);
+    expect(composed.holdWaits).toEqual([]);
   });
 
   /**
