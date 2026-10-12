@@ -7717,10 +7717,23 @@ export class WalkingSkeletonRunner {
        * setting off (B9) every such refusal stops the arguing once its chain hears it, so nothing waiting behind it
        * slips out first; with the setting on, a refusal may instead move to a cheaper maker, so only the recorded stop
        * counts. Only here: today's serial engine (one call at a time) never has a guard.
+       *
+       * Ruling R30 (Task 12 fix round 1) — A KEEP-ALIVE REFUSAL ENDS THE ARGUING WHICHEVER CALL MET IT. The keep-alive
+       * sits below the lane, so every refusal it makes passes this hook — a panel member's too, which the panel would
+       * otherwise take as one failed member while other nodes' author calls land, run their panels and save, with
+       * another copy maybe running the same debate (L4-F9). So, whatever the cheaper-model setting: the body is failed
+       * (nothing more is saved), the lane stopped (nothing more is sent) and the arguing ends at once (`keepAliveStopped`).
        */
       let spendRefusalSeen = false;
-      laneCallFailed = this.settings.bodyCostFallback === true ? null : (error) => {
-        if (expansionPhaseStop(error) !== null) spendRefusalSeen = true;
+      const spendRefusalsCount = this.settings.bodyCostFallback !== true;
+      laneCallFailed = (error) => {
+        if (keepAliveStop(error)) {
+          bodyFailed = true;
+          callLane?.stop();
+          keepAliveStopped.resolve(error);
+          return;
+        }
+        if (spendRefusalsCount && expansionPhaseStop(error) !== null) spendRefusalSeen = true;
       };
       callLane?.guardStarts((ticket: CallTicket) =>
         (ticket.priority !== "AUTHOR" && ticket.priority !== "REVIEW") || !(spendRefusalSeen || arguingStopped()));

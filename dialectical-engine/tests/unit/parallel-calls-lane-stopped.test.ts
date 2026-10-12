@@ -57,7 +57,10 @@ describe("a call refused by the stopped lane leaves as it arrived", () => {
   it("the runner stops the lane only after marking the body failed, saves nothing after, and sets the refusal aside", () => {
     const source = readFileSync(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
     expect(source).toMatch(/bodyFailed = true;\s*bodyFailures\.push\(Object\.freeze\(\{ rank: stage\.rank, error \}\)\);\s*callLane\?\.stop\(\);/u);
-    expect(source.match(/callLane\?\.stop\(\)/gu) ?? []).toHaveLength(1);
+    // Two stops: `runChain`'s, and (ruling R30, Task 12 fix round 1) the keep-alive hook's on the parallel path — each
+    // right after marking the body failed.
+    expect(source.match(/callLane\?\.stop\(\)/gu) ?? []).toHaveLength(2);
+    expect(source).toMatch(/if \(keepAliveStop\(error\)\) \{\s*bodyFailed = true;\s*callLane\?\.stop\(\);\s*keepAliveStopped\.resolve\(error\);/u);
     expect(source).toContain("nodeRecorder.commit(0, async () => bodyFailed ? null : saveAuthored(");
     expect(source).toContain("nodeRecorder.commit(rootIndex, async () => bodyFailed ? null : saveAuthored(");
     expect(source).toContain("if (outcome.kind === \"STOPPED\" || bodyFailed) return;");
@@ -103,6 +106,8 @@ describe("a call the lane held back leaves as it arrived, and ends its chain wit
     const failedHooks = [...source.matchAll(/laneCallFailed = /gu)].map((match) => match.index);
     expect(failedHooks).toHaveLength(2);
     for (const at of failedHooks) expect(at > together && at < serial).toBe(true);
+    // R30: the keep-alive hook is not behind the cheaper-model setting; only the spend mark is.
+    expect(source).toContain("if (spendRefusalsCount && expansionPhaseStop(error) !== null) spendRefusalSeen = true;");
     // The keep-alive stop ends the arguing without awaiting the calls in flight, every promise left behind handled.
     expect(source).toContain("const keepAliveRefusal = await Promise.race([allSettled.then(() => null), keepAliveStopped.promise]);");
     expect(source).toContain("for (const abandoned of [allSettled, ...chains, everyBoundaryDecided, earlierBatches]) abandoned.catch(() => undefined);");

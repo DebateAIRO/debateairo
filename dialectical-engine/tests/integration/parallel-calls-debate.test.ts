@@ -486,6 +486,14 @@ describe("parallel calls: stops and failures with calls in flight (Task 12)", ()
     `SELECT count(*)::text AS nodes FROM core.node WHERE run_id=$1`, [runId])).rows[0]!.nodes);
   const reviewCount = async (runId: string): Promise<number> => Number((await database.pool.query<{ reviews: string }>(
     `SELECT count(*)::text AS reviews FROM ledger.node_review WHERE run_id=$1`, [runId])).rows[0]!.reviews);
+  /** Waits (15 s deadline) until every call a gate received is answered, then 500 ms more for what follows them. */
+  const untilAbandonedCallsLand = async (arrivals: readonly GateArrival[]): Promise<void> => {
+    const deadline = Date.now() + 15_000;
+    while (arrivals.some((arrival) => arrival.answeredAt === null) && Date.now() < deadline) {
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+    }
+    await new Promise((resolve) => { setTimeout(resolve, 500); });
+  };
 
   /**
    * The first author call of a root other than root 0 (not Haiku's) is refused by the gate as the run's money ceiling
@@ -686,13 +694,64 @@ describe("parallel calls: stops and failures with calls in flight (Task 12)", ()
     // The held calls were still in flight when the work item ended: abandoned, not awaited.
     expect(gates.arrivals.filter((arrival) => arrival.kind !== "PROBE" && (arrival.answeredAt === null || arrival.answeredAt > endedAt)).length)
       .toBeGreaterThanOrEqual(4);
-    // They land later; then the lane has nothing running, and nothing rejected unhandled meanwhile.
-    const deadline = Date.now() + 15_000;
-    while (gates.arrivals.some((arrival) => arrival.answeredAt === null) && Date.now() < deadline) {
-      await new Promise((resolve) => { setTimeout(resolve, 100); });
-    }
-    await new Promise((resolve) => { setTimeout(resolve, 500); });
+    // They land later; then the lane has nothing running, and nothing rejected unhandled meanwhile. Their results are
+    // discarded: no node and no review appears once the work item has ended (fix round 1, reviewer minor 5).
+    const savedAtEnd = { nodes: await nodeCount(debate.runId), reviews: await reviewCount(debate.runId) };
+    await untilAbandonedCallsLand(gates.arrivals);
     expect(gates.arrivals.filter((arrival) => arrival.answeredAt === null)).toEqual([]);
+    expect({ nodes: await nodeCount(debate.runId), reviews: await reviewCount(debate.runId) }).toEqual(savedAtEnd);
+    expect(composed.lanes[0]!.stats().running).toBe(0);
+  }, 300_000);
+
+  /**
+   * Spec §2.3, the keep-alive stop seen only by PANEL calls (Task 12 fix round 1, ruling R30). Two makers, depth 1.
+   * Root 0's panel call, root 1's author call and root 0's two replies are all in flight when the task is aborted
+   * (root 0's panel held 1 s, root 1's author call 3 s, the replies 500 ms). The replies land first: their panels' calls
+   * are the only calls asked next, and the keep-alive refuses them before they are sent — a panel takes such a refusal
+   * as one failed member. That refusal must still end the debate: the work item ends with today's code before root 0's
+   * panel lands, and root 0 — whose panel was in flight when the stop came — is never saved, nor anything else.
+   */
+  it("a keep-alive stop seen only by panel calls: the debate ends, and a node whose panel was in flight is never saved", async () => {
+    const twoMakers = [DEEPSEEK, QWEN].map((model) => PANEL_REFS.find((ref) => PREVIEW_PROVIDER_REF_MODELS[ref] === model)!);
+    const debate = await harness.admittedRun("keep-alive-panel", { panelRefs: twoMakers, depth: 1 });
+    const task = new AbortController();
+    let abortedAt: number | null = null;
+    let rootZeroPanel = -1;
+    let arrivals: readonly GateArrival[] = [];
+    const gates = await harness.startGates({}, undefined, undefined, (request) => {
+      if (request.kind === "PROBE") return 0;
+      if (isRootZeroAuthor(request)) return 10;
+      const index = arrivals.length - 1;
+      const inFlight = arrivals.filter((arrival) => arrival.kind !== "PROBE" && arrival.answeredAt === null).length;
+      if (abortedAt === null && inFlight >= 4) {
+        task.abort();
+        abortedAt = performance.now();
+      }
+      if (request.kind === "PANEL" && rootZeroPanel < 0) {
+        rootZeroPanel = index;
+        return 1_000;
+      }
+      if (isLaterRootAuthor(request)) return 3_000;
+      return 500;
+    });
+    arrivals = gates.arrivals;
+    // Four calls of one model may run at once in this debate, so all four are in flight together.
+    const composed = await harness.previewRunner(gates, "resend", {
+      callConcurrency: Object.freeze({ ...OWNER_CALL_CONCURRENCY, perModelPerDebate: 4 })
+    });
+    await expect(composed.runner.executeWorkItem(debate.workItemId, { executionLimitMs: 3_600_000, signal: task.signal }))
+      .rejects.toMatchObject({ code: "RUNNER_TIME_LIMIT_REACHED" });
+    const endedAt = performance.now();
+
+    expect(abortedAt).not.toBeNull();
+    expect(rootZeroPanel).toBeGreaterThanOrEqual(0);
+    // Root 0's panel was in flight when the stop came, and still was when the work item ended.
+    expect(gates.arrivals[rootZeroPanel]!.at).toBeLessThan(abortedAt!);
+    expect(gates.arrivals[rootZeroPanel]!.answeredAt === null || gates.arrivals[rootZeroPanel]!.answeredAt! > endedAt).toBe(true);
+    await untilAbandonedCallsLand(gates.arrivals);
+    expect(gates.arrivals.filter((arrival) => arrival.answeredAt === null)).toEqual([]);
+    // Nothing was saved: not root 0 (its panel landed after the stop), not the replies (their panels were refused).
+    expect({ nodes: await nodeCount(debate.runId), reviews: await reviewCount(debate.runId) }).toEqual({ nodes: 0, reviews: 0 });
     expect(composed.lanes[0]!.stats().running).toBe(0);
   }, 300_000);
 
