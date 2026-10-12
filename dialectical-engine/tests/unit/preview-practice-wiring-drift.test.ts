@@ -156,6 +156,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(code).toContain("previewCallSubjects(previewConfig)");
       expect(code).toContain("await applyPreviewGateCapacities({");
       expect(code).toMatch(/renewals: new WorkItemRepository\(/u);
+      // Ruling R31 and spec §3.4 (final review): the busy wait before the slot, and the gate marked on its first
+      // unsent refusal, on both sides.
+      expect(code).toContain("callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model)");
+      expect(code).toContain("onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); }");
     }
     for (const key of ["callScheduler", "callSubjects", "renewals"]) {
       expect(objectAfter(RUNNER_MAIN, "new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {").has(key), key).toBe(true);

@@ -275,7 +275,7 @@ describe("the preview spending gate's 409 refusal body", () => {
       return { sent, port };
     };
     const gatewayFor = (port: PreviewBudgetPort, slept: number[], ledger: ProviderLedgerInput[] = [],
-      options: Readonly<{ busy?: ReturnType<typeof createPreviewBusyCoordinator>; sleep?: (milliseconds: number) => Promise<void> }> = {}) => {
+      options: Readonly<{ busy?: ReturnType<typeof createPreviewBusyCoordinator>; sleep?: (milliseconds: number) => Promise<void>; onGateUnsent?: (gate: string) => void }> = {}) => {
       const thinking = { thinking_parameter: "reasoning_effort", thinking_levels: ["high"] };
       const target = parseProviderDiscoveryTargets(JSON.stringify([{
         provider_ref: REF, base_url: "https://api.deepinfra.com/v1/openai", model: MODEL,
@@ -289,7 +289,8 @@ describe("the preview spending gate's 409 refusal body", () => {
         appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
         assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
       }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); await options.sleep?.(milliseconds); },
-        ...(options.busy === undefined ? {} : { busy: options.busy }) });
+        ...(options.busy === undefined ? {} : { busy: options.busy }),
+        ...(options.onGateUnsent === undefined ? {} : { onGateUnsent: options.onGateUnsent }) });
     };
     const site = "fixture:judge";
     const contract = "contract:test";
@@ -421,6 +422,35 @@ describe("the preview spending gate's 409 refusal body", () => {
       expect(gateUnsent.sent).toHaveLength(2);
       // A gate-unsent refusal never opens the model: the next call is admitted and its busy refusal is a fresh probe.
       await expect(busy.refusedBusy(MODEL, undefined)).resolves.toBe("PROBE");
+    });
+
+    /**
+     * Spec §3.4 (final review, minor 6): the gate is marked unhealthy on the FIRST PreviewGateUnsent, before the
+     * policy's 60 s resend wait — not only when the call finally fails at the lane — so the gate admits one call in
+     * flight during that minute. Never for the gate's own slots refusal or a busy model.
+     */
+    it("onGateUnsent: told of the gate on the first gate-unsent refusal, before the resend wait; never for other refusals", async () => {
+      const events: string[] = [];
+      const record = (milliseconds: number) => { events.push(`sleep:${String(milliseconds)}`); return Promise.resolve(); };
+      const onGateUnsent = (gate: string) => { events.push(`unsent:${gate}`); };
+      const unsent = sequenced((index) => index === 1 ? new PreviewGateUnsent() : answer);
+      await expect(gatewayFor(unsent.port, [], [], { sleep: record, onGateUnsent }).call(request)).resolves.toBeDefined();
+      expect(events).toEqual(["unsent:deepinfra", `sleep:${String(COOLDOWN_MS)}`]);
+      events.length = 0;
+      const slots = sequenced((index) => index === 1 ? new PreviewUnbilledRefusal() : answer);
+      await expect(gatewayFor(slots.port, [], [], { sleep: record, onGateUnsent }).call(request)).resolves.toBeDefined();
+      const busyModel = sequenced((index) => index === 1 ? new PreviewVendorRefusedUnbilled() : answer);
+      await expect(gatewayFor(busyModel.port, [], [], { sleep: record, onGateUnsent }).call(request)).resolves.toBeDefined();
+      expect(events).toEqual([`sleep:${String(COOLDOWN_MS)}`, `sleep:${String(COOLDOWN_MS)}`]);
+    });
+
+    it("onGateUnsent that throws never changes the call: it still waits and resends once", async () => {
+      const slept: number[] = [];
+      const unsent = sequenced((index) => index === 1 ? new PreviewGateUnsent() : answer);
+      await expect(gatewayFor(unsent.port, slept, [], { onGateUnsent: () => { throw new Error("test-layer hook"); } }).call(request))
+        .resolves.toBeDefined();
+      expect(slept).toEqual([COOLDOWN_MS]);
+      expect(unsent.sent).toHaveLength(2);
     });
 
     it("an unbilled attempt is recorded REFUSED, a billed failure FAILED; the thrown error keeps FAILED", async () => {

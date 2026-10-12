@@ -50,7 +50,7 @@ import {
   type StoryPack
 } from "@debateai/story";
 import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logBodyCostFallback, logServeDisclosure, plansUnresolvedPersonAllowance, WalkingSkeletonRunner } from "./index.js";
-import { createCallScheduler } from "./call-scheduler.js";
+import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
 import {
@@ -380,7 +380,11 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
       })
     })
   });
-  return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig, target, { busy: previewBusy });
+  // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.
+  return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig, target, {
+    busy: previewBusy,
+    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); }
+  });
 });
 const runRepository = new RunRepository(pool);
 // V-20: taken on the DECLARED targets, because the three optional keys describe
@@ -537,6 +541,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // each provider ref's model, vendor and (preview) gate, and the claim renewals on their own pool.
   callScheduler: runnerCallScheduler,
   callSubjects: previewConfig === undefined ? targetCallSubjects(providerTargets) : previewCallSubjects(previewConfig),
+  // Ruling R31 (preview only): a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
+  ...(previewConfig === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),
   renewals: new WorkItemRepository(keepAlivePool),
   ...(previewConfig === undefined ? {} : {
     answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ provider_ref: string; model_id: string }>[] }>) =>

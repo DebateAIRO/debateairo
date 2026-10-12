@@ -70,7 +70,7 @@ import {
 } from "@debateai/runner";
 import { assertRunnerPrimaryProviderConfiguration, createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
-import { createCallScheduler } from "../../apps/runner/src/call-scheduler.js";
+import { createCallScheduler, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import { PracticeCallStats } from "./practice-parallel.js";
@@ -181,8 +181,12 @@ export async function composePracticeRunner(input: Readonly<{
       ...previewTargetGatewayControls(previewConfig, target),
       inFlight: gatewayInFlight
     });
-    return withPreviewProviderCallPolicy(gateway, previewConfig, target,
-      { busy: previewBusy, ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
+    // Spec §3.4, as main.ts: the gate is marked unhealthy on its FIRST unsent refusal, before the resend wait.
+    return withPreviewProviderCallPolicy(gateway, previewConfig, target, {
+      busy: previewBusy,
+      onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
+      ...(input.sleep === undefined ? {} : { sleep: input.sleep })
+    });
   });
   const runRepository = new RunRepository(pool);
   assertRunnerPrimaryProviderConfiguration({
@@ -285,6 +289,8 @@ export async function composePracticeRunner(input: Readonly<{
     // model, vendor and gate, and the claim renewals on their own pool.
     callScheduler: runnerCallScheduler,
     callSubjects: previewCallSubjects(previewConfig),
+    // Ruling R31, as main.ts: a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
+    callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model),
     renewals: new WorkItemRepository(input.keepAlivePool),
     holdRecorder: {
       countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),

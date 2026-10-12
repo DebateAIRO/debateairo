@@ -94,6 +94,12 @@ export function targetCallSubjects(
  * `onFailed` (spec §2.3, Task 12) is told of every failed call, also BEFORE its slot is freed: a stop that failure
  * raises is then known to the lane's start guard when the freed slot would start the next waiting call. It never
  * changes the error.
+ *
+ * `beforeSlot` (ruling R31; preview only, main.ts wires it to the runner-wide busy coordinator's `admit`) is awaited
+ * BEFORE the call asks for any slot: a call to a model that is busy (one probe in flight, the rest waiting through the
+ * gate's 60-600 s cool-off) then waits holding no debate, model or gate slot, so another model's calls through the same
+ * gate are never stalled behind it. A rejection ends the call with that error, nothing sent and no slot taken. The wait
+ * and the slot request both run in the caller's async context, whoever releases the wait.
  */
 export function laneGateway(input: Readonly<{
   lane: DebateCallLane;
@@ -101,8 +107,9 @@ export function laneGateway(input: Readonly<{
   subject: CallSubject;
   provider: ProviderGateway;
   onFailed?: (error: unknown) => void;
+  beforeSlot?: (subject: CallSubject) => Promise<void>;
 }>): ProviderGateway {
-  const { lane, scheduler, subject, provider, onFailed } = input;
+  const { lane, scheduler, subject, provider, onFailed, beforeSlot } = input;
   const gate = subject.gate;
   return Object.freeze({
     call(request) {
@@ -117,7 +124,13 @@ export function laneGateway(input: Readonly<{
           throw error;
         }
       });
-      return lane.run({ ...subject, priority: callPriorityOf(request.callSiteKey) }, send);
+      const ticket = { ...subject, priority: callPriorityOf(request.callSiteKey) };
+      if (beforeSlot === undefined) return lane.run(ticket, send);
+      // Bound, so the slot request (and the lane's start guard) runs in this caller's context however the wait ends.
+      const askForSlot = AsyncResource.bind(() => lane.run(ticket, send));
+      let waited: Promise<void>;
+      try { waited = beforeSlot(subject); } catch (error) { return Promise.reject(error); }
+      return waited.then(askForSlot);
     }
   } satisfies ProviderGateway);
 }

@@ -202,7 +202,7 @@ import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-s
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunInFlight } from "./run-in-flight.js";
-import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallTicket } from "./call-scheduler.js";
+import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
 import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
 import {
@@ -2279,6 +2279,13 @@ export interface WalkingSkeletonSettings {
    * `targetCallSubjects` elsewhere). Read only with `callScheduler`; absent, each ref is its own model behind no gate.
    */
   readonly callSubjects?: CallSubjectResolver;
+  /**
+   * Ruling R31 (preview only): awaited by every lane call BEFORE it asks for a slot (`laneGateway`'s `beforeSlot`).
+   * main.ts sets it to the runner-wide busy coordinator's `admit(subject.model)`, so a call to a busy model waits
+   * holding no debate, model or gate slot. Read only with `callScheduler`; absent (hosted and local), nothing waits
+   * before the slot.
+   */
+  readonly callBeforeSlot?: (subject: CallSubject) => Promise<void>;
   /**
    * Spec §3.6: where the claim renewals of a running debate go — a repository on the runner's own small keep-alive
    * pool, so a burst of a debate's writes never keeps a renewal waiting for a connection. Absent: the runner's pool.
@@ -4733,7 +4740,8 @@ export class WalkingSkeletonRunner {
           ? Object.freeze({ model: providerRef, vendor: "default", gate: null })
           : callSubjects.subjectOf(providerRef),
         provider,
-        onFailed: (error) => { laneCallFailed?.(error); }
+        onFailed: (error) => { laneCallFailed?.(error); },
+        ...(this.settings.callBeforeSlot === undefined ? {} : { beforeSlot: this.settings.callBeforeSlot })
       });
     try {
     return await runKeepAliveScope.run(keepAlive, async () => {

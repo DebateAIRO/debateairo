@@ -445,10 +445,19 @@ function retryAfterOf(error: unknown): number | undefined {
  * and resends once; the model's other refused calls wait for its outcome and then resend once (answered, or any other
  * outcome) or end with their own refusal (busy again), and its calls not yet sent wait before their first send. The
  * default `NO_BUSY_COORDINATION` makes every refused call its own probe: today's behaviour, unchanged.
+ *
+ * Parallel calls §3.4 (owner ruling O8): `options.onGateUnsent` is told of the row's gate on the FIRST refusal the gate
+ * proved unsent (`PreviewGateUnsent`: PROVIDER_NOT_REACHED, PROVIDER_ERROR_UNBILLED), BEFORE the 60-second resend wait,
+ * so the runner's scheduler lets one call in flight through that gate during that minute (main.ts wires it to
+ * `markGateUnhealthy`; the lane still marks it again when a call finally fails). A hook that throws changes nothing.
  */
 export function withPreviewProviderCallPolicy(
   gateway: ProviderGateway, config: PreviewProviderTestConfig, target: Readonly<{ model: string }>,
-  options: Readonly<{ sleep?: (milliseconds: number) => Promise<void>; busy?: PreviewBusyCoordinator }> = {}
+  options: Readonly<{
+    sleep?: (milliseconds: number) => Promise<void>;
+    busy?: PreviewBusyCoordinator;
+    onGateUnsent?: (gate: PreviewProviderName) => void;
+  }> = {}
 ): ProviderGateway {
   const reviewed = previewModelRow(target.model) ?? refused();
   const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => { setTimeout(resolve, milliseconds); }));
@@ -519,6 +528,10 @@ export function withPreviewProviderCallPolicy(
         return result;
       }
       // The gate's own unbilled refusals (its slots, or the vendor unreached / an unbilled error): today's path.
+      // Spec §3.4: a gate that could not reach its vendor is marked before the minute's wait, not after it.
+      if (providerCallGateUnsent(error)) {
+        try { options.onGateUnsent?.(reviewed.provider); } catch { /* the hook never changes the call */ }
+      }
       await sleep(PREVIEW_UNBILLED_RETRY_COOLDOWN_MS);
       const result = await send();
       busy.answered(reviewed.model);

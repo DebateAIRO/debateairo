@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import {
+  createPreviewBusyCoordinator,
   PreviewGateUnsent,
   PreviewUnbilledRefusal,
   type PreviewGateRemaining,
@@ -351,6 +352,103 @@ describe("each preview gate's slots, read once at boot", () => {
   });
 });
 
+/**
+ * Ruling R31 (final review, Important 4): on the preview the lane wrapper waits on the runner-wide busy coordinator
+ * (`beforeSlot`) BEFORE it asks for any slot, so a call to a model that is OPEN (one probe in flight, the rest waiting
+ * up to the gate's 60-600 s cool-off) holds no debate, model or gate slot while it waits, and another model's calls
+ * still get the gate's slots. The policy's inner admit stays (a model that turns OPEN between the hook and the slot).
+ */
+describe("laneGateway: beforeSlot waits outside every slot (R31)", () => {
+  it("three debates' calls to an OPEN model wait without holding gate slots; a call to another model still gets one", async () => {
+    const busy = createPreviewBusyCoordinator();
+    const scheduler = createCallScheduler({ policy: WIDE });
+    scheduler.setGateCapacity("deepinfra", 2);
+    const lanes = ["debate-1", "debate-2", "debate-3"].map((id) => scheduler.openLane(id));
+    const sent: string[] = [];
+    // The provider behind the lane is the preview call policy: it, too, admits before its first send (the inner admit).
+    const providerFor = (model: string): ProviderGateway => ({
+      call: async (req) => { await busy.admit(model); sent.push(`${model}:${req.callSiteKey}`); return answer(req.callSiteKey); }
+    });
+    const through = (lane: DebateCallLane, model: string) => laneGateway({
+      lane, scheduler, subject: { model, vendor: "deepinfra", gate: "deepinfra" }, provider: providerFor(model),
+      beforeSlot: (subject) => busy.admit(subject.model)
+    });
+    // Model A turns busy: one refused call is its probe, in flight; the model is OPEN.
+    await expect(busy.refusedBusy("A", undefined)).resolves.toBe("PROBE");
+    const waitingA = lanes.map((lane, index) => through(lane, "A").call(request(`JUDGE:a${String(index + 1)}`)));
+    await flush();
+    expect(sent).toEqual([]);
+    // Nothing of A holds a gate slot: a call to model B through the same gate goes out at once, from any debate.
+    await expect(through(lanes[0]!, "B").call(request("JUDGE:b1"))).resolves.toEqual(answer("JUDGE:b1"));
+    await expect(through(lanes[1]!, "B").call(request("PANEL:b2"))).resolves.toEqual(answer("PANEL:b2"));
+    expect(sent).toEqual(["B:JUDGE:b1", "B:PANEL:b2"]);
+    expect(scheduler.stats().peakByGate.deepinfra).toBe(1);
+    // The probe answers: A's waiting calls take their slots (the gate's 2 at most at once) and go out.
+    busy.probeOutcome("A", "ANSWERED");
+    await Promise.all(waitingA);
+    expect(sent.slice(2).sort()).toEqual(["A:JUDGE:a1", "A:JUDGE:a2", "A:JUDGE:a3"]);
+    expect(scheduler.stats().peakByGate.deepinfra).toBeLessThanOrEqual(2);
+    for (const lane of lanes) lane.close();
+  });
+
+  it("control: without beforeSlot the same OPEN-model calls park on the gate's slots and the other model's call waits", async () => {
+    const busy = createPreviewBusyCoordinator();
+    const scheduler = createCallScheduler({ policy: WIDE });
+    scheduler.setGateCapacity("deepinfra", 2);
+    const lanes = ["debate-1", "debate-2", "debate-3"].map((id) => scheduler.openLane(id));
+    const sent: string[] = [];
+    const providerFor = (model: string): ProviderGateway => ({
+      call: async (req) => { await busy.admit(model); sent.push(`${model}:${req.callSiteKey}`); return answer(req.callSiteKey); }
+    });
+    const through = (lane: DebateCallLane, model: string) => laneGateway({
+      lane, scheduler, subject: { model, vendor: "deepinfra", gate: "deepinfra" }, provider: providerFor(model)
+    });
+    await busy.refusedBusy("A", undefined);
+    const waitingA = lanes.map((lane, index) => through(lane, "A").call(request(`JUDGE:a${String(index + 1)}`)));
+    const b = through(lanes[0]!, "B").call(request("JUDGE:b1"));
+    await flush();
+    expect(sent).toEqual([]);
+    busy.probeOutcome("A", "ANSWERED");
+    await Promise.all([...waitingA, b]);
+    expect(sent).toHaveLength(4);
+    for (const lane of lanes) lane.close();
+  });
+
+  it("the call (and the slot request) runs in its caller's async context, whoever releases the wait", async () => {
+    const store = new AsyncLocalStorage<string>();
+    const busy = createPreviewBusyCoordinator();
+    const scheduler = createCallScheduler({ policy: WIDE });
+    const lane = scheduler.openLane("debate-1");
+    const seen: Array<string | undefined> = [];
+    const provider: ProviderGateway = { call: async (req) => { seen.push(store.getStore()); return answer(req.callSiteKey); } };
+    await busy.refusedBusy("A", undefined);
+    const gateway = laneGateway({
+      lane, scheduler, subject: { model: "A", vendor: "deepinfra", gate: null }, provider,
+      beforeSlot: (subject) => busy.admit(subject.model)
+    });
+    const call = store.run("debate-1", () => gateway.call(request("JUDGE:a")));
+    await flush();
+    store.run("someone-else", () => { busy.probeOutcome("A", "ANSWERED"); });
+    await call;
+    expect(seen).toEqual(["debate-1"]);
+    lane.close();
+  });
+
+  it("a beforeSlot that fails ends the call with its error, and nothing is sent or slotted", async () => {
+    const lane = recordingLane();
+    const refusal = new TypedDomainError("TEST_BEFORE_SLOT", "test-layer");
+    let calls = 0;
+    const gateway = laneGateway({
+      lane, scheduler: recordingScheduler(), subject: SUBJECT,
+      provider: { call: async () => { calls += 1; return answer("x"); } },
+      beforeSlot: () => Promise.reject(refusal)
+    });
+    await expect(gateway.call(request("JUDGE"))).rejects.toBe(refusal);
+    expect(calls).toBe(0);
+    expect(lane.tickets).toEqual([]);
+  });
+});
+
 describe("the runner's wiring (source pins)", () => {
   const read = (relative: string) => readFileSync(new URL(`../../${relative}`, import.meta.url), "utf8");
   const RUNNER = read("apps/runner/src/index.ts");
@@ -368,6 +466,36 @@ describe("the runner's wiring (source pins)", () => {
     expect(execute.match(/callLane\?\.close\(\)/gu) ?? []).toHaveLength(1);
   });
 
+  /**
+   * Final review T9: the lane must wrap each maker's gateway exactly ONCE. A second wrap (the lane around a gateway
+   * that is already in the lane) would make every call ask for a second slot of its own debate while holding the first:
+   * at perDebate 1 (the absent row, hosted and local) every debate would deadlock on its first call. And ruling R9's
+   * order: the lane wraps the SIT-OUT gateway, so a call that waited for a slot meets the sit-out check when it starts.
+   */
+  it("the lane wraps each maker once: throughCallLane at its definition, the sit-out loop and the assigned seats only", () => {
+    const code = RUNNER.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/^\s*\/\/.*$/gmu, "");
+    expect(code.match(/\bthroughCallLane\b/gu) ?? []).toHaveLength(3);
+    expect(code).toContain("const throughCallLane = (providerRef: string, provider: ProviderGateway): ProviderGateway =>");
+    // R9: the sit-out book's gateway first, then the lane around it.
+    expect(code).toContain("const sittingOut = sitOut === null ? maker.provider : sitOut.gateway(maker.providerRef, maker.provider);\n      const laned = throughCallLane(maker.providerRef, sittingOut);");
+    // The assigned book reads the configured makers (never the sit-out copies, which are already laned).
+    const assigned = code.slice(code.indexOf("const assignedConfigured: ReadonlyMap<string, ConfiguredSeatMaker>"), code.indexOf("assignedSeats = buildAssignedRunSeatBook({"));
+    expect(assigned).toContain("new Map([...configuredByProviderRef].map(([ref, maker]) => {\n          const provider = throughCallLane(ref, maker.provider);");
+    // sitOutMaker (which lanes) runs over the configured makers once, and on an out-of-panel role's UNWRAPPED maker.
+    expect(code.match(/\bsitOutMaker\(/gu) ?? []).toHaveLength(2);
+    expect(code).toContain("configuredMakers.forEach((maker, index) => { configuredMakers[index] = sitOutMaker(maker); });");
+    expect(code).toContain("const unwrapped = configuredByProviderRef.get(roleRef);\n      const configured = unwrapped === undefined ? undefined : sitOutMaker(unwrapped);");
+    expect(code).toContain("const sitOutMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {");
+  });
+
+  it("the lane's beforeSlot is the runner setting, and the panel asks together only when the debate's calls run together", () => {
+    expect(RUNNER).toContain("...(this.settings.callBeforeSlot === undefined ? {} : { beforeSlot: this.settings.callBeforeSlot })");
+    // Ruling R32: one place decides it, from the lane.
+    expect(RUNNER.match(/askTogether: /gu) ?? []).toHaveLength(1);
+    expect(RUNNER).toContain("askTogether: callsRunTogether,");
+    expect(RUNNER).toContain("const callsRunTogether = callLane !== undefined && callLane.callsAtOnce > 1;");
+  });
+
   it("claim renewals use the keep-alive repository when one is given", () => {
     expect(RUNNER).toContain("renew: (heldUntil) => (this.settings.renewals ?? this.#work).renewClaim(");
   });
@@ -376,7 +504,9 @@ describe("the runner's wiring (source pins)", () => {
     expect(MAIN.match(/createCallScheduler\(/gu) ?? []).toHaveLength(1);
     expect(MAIN.match(/createPreviewBusyCoordinator\(\)/gu) ?? []).toHaveLength(1);
     expect(MAIN.match(/createRunInFlight\(\)/gu) ?? []).toHaveLength(2);
-    expect(MAIN).toContain("withPreviewProviderCallPolicy(gateway, previewConfig, target, { busy: previewBusy })");
+    expect(MAIN).toContain("withPreviewProviderCallPolicy(gateway, previewConfig, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); }\n  });");
+    // Ruling R31: on the preview only, every lane call waits on the busy coordinator before it asks for a slot.
+    expect(MAIN).toContain("...(previewConfig === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),");
     expect(MAIN).toContain("inFlight: gatewayInFlight");
     expect(MAIN).toContain("inFlight: moneyInFlight");
     expect(MAIN).toContain("createPool(environment.DATABASE_URL, RUNNER_DATABASE_POOLS.keepAlive)");
