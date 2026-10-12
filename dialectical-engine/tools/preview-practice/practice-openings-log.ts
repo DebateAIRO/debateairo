@@ -15,7 +15,17 @@ import type { MapMarkRecord, MapNoteRecord, MapResult, MapStep } from "@debateai
 import type { PracticeAttempt } from "./practice-formats.js";
 import type { PracticeGateName } from "./practice-gate-observer.js";
 import type { OpeningsArm, OpeningsQuestionDigest } from "./practice-openings-questions.js";
-import { GATES, gateHalted, gatePauses, gateStopped, p90ByModel, PRACTICE_REPORT_SCHEMA, usd, type PracticeReport } from "./practice-report.js";
+import {
+  GATES,
+  gateHalted,
+  gatePauses,
+  gateStopped,
+  p90ByModel,
+  PRACTICE_REPORT_SCHEMA,
+  spentUsdByRemaining,
+  usd,
+  type PracticeReport
+} from "./practice-report.js";
 import { redactKeyShapes, reportableReplyText } from "./practice-redaction.js";
 import {
   isPracticeLogCommonLine,
@@ -233,6 +243,8 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     unbilledRefusals: GATES.reduce((sum, gate) => sum + ending.observer.summary(gate).unbilled, 0),
     p90ByModel: p90ByModel(calls.map((call) => ({ model: call.model, latencies: call.attempts.map((attempt) => attempt.latencyMs) })))
   });
+  const nanoOf = (line: PracticeRemainingLine | null | undefined): bigint | null =>
+    line === null || line === undefined ? null : BigInt(line.remainingNanoUsd);
   const nano = (rows: readonly OpeningsCall[]) => rows.reduce((sum, call) => sum + BigInt(call.costNanoUsd ?? "0"), 0n);
   const tokens = (rows: readonly OpeningsCall[], pick: (call: OpeningsCall) => number | null) =>
     rows.reduce((sum, call) => sum + (pick(call) ?? 0), 0);
@@ -263,7 +275,9 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     callsByModel, repairKindsByModel: practiceRepairKindsByModel(tries),
     byArm,
     gates: Object.fromEntries(GATES.map((gate) => [gate, Object.freeze({ observed: ending.observer.summary(gate),
-      remainingBefore: start.remainingBefore[gate], remainingAfter: after?.[gate] ?? null })])),
+      remainingBefore: start.remainingBefore[gate], remainingAfter: after?.[gate] ?? null,
+      // The formats report's own check (report.md prints it per gate): the gate's count before less after.
+      spentUsdByRemaining: spentUsdByRemaining(nanoOf(start.remainingBefore[gate]), nanoOf(after?.[gate])) })])),
     totals: Object.freeze({
       calls: calls.length,
       costUsd: usd(nano(calls)),

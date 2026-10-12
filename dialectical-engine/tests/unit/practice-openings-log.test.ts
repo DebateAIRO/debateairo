@@ -208,7 +208,7 @@ describe("practice openings: the report", () => {
       { kind: "call", call: callFailed }, { kind: "call", call: formatFailed }, end]);
     expect((report.failures as readonly unknown[]).length).toBe(3);
     expect(reportMarkdown(report)).toContain("Wrong-format or failed calls: 3 (the exact problems are in report.json; "
-      + "reply text only for calls that never got an accepted reply).");
+      + "reply text only for calls whose format never passed).");
   });
 
   it("report.md says what the openings failures hold: the openings wording, not the formats one", () => {
@@ -218,8 +218,22 @@ describe("practice openings: the report", () => {
       attempts: [{ callSiteKey: "MAP:merge", outcome: "FAILED", parseStatus: "SCHEMA_FAILED", latencyMs: 900, jsonRepair: null, replyForm: "ORIGINAL" }] });
     const markdown = reportMarkdown(openingsReportFromLog([start, { kind: "call", call: callFailed }, { kind: "call", call: formatFailed }, end]));
     expect(markdown).toContain("Wrong-format or failed calls: 2 (the exact problems are in report.json; "
-      + "reply text only for calls that never got an accepted reply).");
+      + "reply text only for calls whose format never passed).");
     expect(markdown).not.toContain("their text and the exact problems are in report.json");
+  });
+
+  it("report.md shows each gate's spend by its own count, as formats does; a gate with no count shows none", () => {
+    const remaining = (nano: string) => ({ state: "active" as const, windowOpen: true, remainingNanoUsd: nano, remainingCalls: 100,
+      maxConcurrentCalls: 4, largestReservationNanoUsd: "50000000", enabledModels: ["m-1"] });
+    const lines: OpeningsLogLine[] = [{ ...start, remainingBefore: { deepinfra: remaining("5000000000"), anthropic: null } },
+      { kind: "call", call: call() },
+      { kind: "end", finishedAt: T1, interrupted: false, remainingAfter: { deepinfra: remaining("4750000000"), anthropic: remaining("1000000000") } }];
+    const report = openingsReportFromLog(lines);
+    const gates = report.gates as Record<string, { spentUsdByRemaining: string | null }>;
+    expect([gates.deepinfra!.spentUsdByRemaining, gates.anthropic!.spentUsdByRemaining]).toEqual(["0.250000000", null]);
+    const markdown = reportMarkdown(report).split("\n");
+    expect(markdown.find((line) => line.startsWith("- deepinfra:"))).toContain(", spent by the gate's count $0.250000000");
+    expect(markdown.find((line) => line.startsWith("- anthropic:"))).not.toContain("spent by the gate's count");
   });
 
   it("report.md keeps the formats wording byte-identical for a formats report", () => {

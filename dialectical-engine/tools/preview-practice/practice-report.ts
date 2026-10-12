@@ -63,6 +63,15 @@ export function usd(nano: bigint): string {
   return `${sign}${String(abs / 1_000_000_000n)}.${String(abs % 1_000_000_000n).padStart(9, "0")}`;
 }
 
+/**
+ * What a gate spent by its own count: its remaining money before the run less after it, or null without both. It
+ * includes any live-site spend in the same window: a check, never the source of the cost figures. Formats and openings
+ * report it the same way.
+ */
+export function spentUsdByRemaining(beforeNanoUsd: bigint | null, afterNanoUsd: bigint | null): string | null {
+  return beforeNanoUsd === null || afterNanoUsd === null ? null : usd(beforeNanoUsd - afterNanoUsd);
+}
+
 function gateBlock(observer: PracticeGateObserver, gate: PracticeGateName,
   remaining?: Readonly<{ before: import("@debateai/providers").PreviewGateRemaining | null; after: import("@debateai/providers").PreviewGateRemaining | null }>): GateBlock {
   const view = (value: import("@debateai/providers").PreviewGateRemaining | null | undefined) => value === null || value === undefined ? null
@@ -74,8 +83,7 @@ function gateBlock(observer: PracticeGateObserver, gate: PracticeGateName,
     wireLatencyMs: latencySummary(observer.events.filter((event) => event.gate === gate && event.outcome !== "STOPPED").map((event) => event.latencyMs)),
     remainingBefore: view(before),
     remainingAfter: view(after),
-    // Includes any live-site spend in the same window: a check, never the source of the cost figures.
-    spentUsdByRemaining: before === null || after === null ? null : usd(before.remainingNanoUsd - after.remainingNanoUsd)
+    spentUsdByRemaining: spentUsdByRemaining(before?.remainingNanoUsd ?? null, after?.remainingNanoUsd ?? null)
   });
 }
 
@@ -437,10 +445,10 @@ export function reportMarkdown(report: PracticeReport): string {
     lines.push("");
   }
   const failures = report.failures as readonly unknown[] | undefined;
-  // Openings keep reply text in "failures" only for a call that never got an accepted reply; the formats wording is unchanged.
+  // Openings keep reply text in "failures" only for a call whose format never passed; the formats wording is unchanged.
   lines.push(report.mode === "openings"
     ? `Wrong-format or failed calls: ${String(failures?.length ?? 0)} (the exact problems are in report.json; `
-      + "reply text only for calls that never got an accepted reply)."
+      + "reply text only for calls whose format never passed)."
     : `Wrong-format replies, fixed by their call or not: ${String(failures?.length ?? 0)} (their text and the exact problems are in report.json, "failures").`, "");
   return lines.join("\n");
 }
