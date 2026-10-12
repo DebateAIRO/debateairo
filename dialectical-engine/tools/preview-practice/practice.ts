@@ -12,6 +12,8 @@
  *    models work at the same time (one call each at a time); --sequential sends one call at a time. Every finished job
  *    is written to <out>/samples.jsonl at once (practice-samples-log.ts), and the report is built from it.
  *  - debate:  one whole practice debate (depth 1 by default, 2 allowed) through the real ask path and the real runner.
+ *             With --transcript it also writes <out>/transcript.json: every prompt and every reply, decrypted
+ *             (practice-transcript.ts).
  *  - report:  builds report.json and report.md again from <out>/samples.jsonl (sends nothing, needs no gate).
  *
  * The exact commands are in tools/preview-practice/README.md. Exit codes: 0 PASS, 10 PASS_WITH_WARNINGS, 20 FAIL,
@@ -78,7 +80,7 @@ type Args = Readonly<{ mode: "formats" | "debate" | "report"; flags: ReadonlyMap
 
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes"]);
-const SWITCHES = new Set<string>(["--sequential"]);
+const SWITCHES = new Set<string>(["--sequential", "--transcript"]);
 
 export function parsePracticeArgs(argv: readonly string[]): Args {
   const [mode, ...rest] = argv;
@@ -191,6 +193,9 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
   try {
     const args = parsePracticeArgs(argv);
     mode = args.mode;
+    if (args.switches.has("--transcript") && args.mode !== "debate") {
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--transcript (debate mode only)");
+    }
     if (args.mode === "report") {
       // Rebuilds the report from an existing samples log; nothing is sent. On a refusal nothing is written there.
       const folder = required(args, "--out");
@@ -330,7 +335,8 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       questionId: args.flags.get("--question") ?? "ro",
       ...(options.wait === undefined ? {} : { wait: options.wait }),
       ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
-      progress: log
+      progress: log,
+      transcriptDirectory: args.switches.has("--transcript") ? directory : null
     });
     return finish(debateReport({ result, observer, startedAt, finishedAt: new Date() }));
   } catch (error) {

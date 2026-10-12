@@ -54,6 +54,41 @@ a folder's `samples.jsonl` (nothing is sent; no socket or acknowledgement needed
 node_modules/.bin/tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
 ```
 
+### The whole debate, word for word (debate mode, `--transcript`)
+
+Add `--transcript` to a debate run to also get `transcript.json` in the same `--out` folder: every real prompt and
+every real answer of the practice debate, so the owner can read exactly what each AI was asked and what it said.
+Without the flag nothing more is written; with it, `report.json` and `report.md` stay exactly as they are.
+
+It is written right after the debate ends, while the throwaway database and the debate's key still exist (both are
+deleted a moment later), and it holds one JSON object:
+
+- `run`: the run id, the question (id and text), the depth, the register version, the AIs on the panel (each with its
+  maker), the ones that sat out, who wrote and checked the answer and the story, when the debate started and ended,
+  how it ended, the served answer's summary and the story's outcome.
+- `attempts`: every model call in the order the ledger recorded it (usually 150 to 250): which job (`family`,
+  `callSiteKey`, `modelRole`), which AI (`providerRef`, `model`, `maker`), how it ended, its start, end and length in
+  milliseconds, its tokens (input, output, reasoning, cached, as the vendor reported them), its cost (what the spend
+  ledger charged and the price list's estimate), its format check (status, the check's own words, `code@path` issues,
+  the tolerant repair it needed), whether it was the step's own ask, the short patch follow-up or the full re-ask
+  (`replyForm`), the full prompt (`prompt.messages`: every message exactly as sent: the system message with the
+  instruction text, the safety frame and the call's markers, then the material) and the full reply (`reply.content`:
+  the AI's own text; `reply.vendorBody`: the vendor's whole reply body when that is what was stored, never a header;
+  `reply.vendorUsage`).
+- `structure`: the debate as the site reads it: `answer` (the positions with their text and makers, the judgements,
+  the reviews, the edges, the served text and the verdict), `inspection` (the answer checker's record per piece of
+  text), `story` (as stored; the story text when it is READY).
+- `unavailable`: what the file could not hold and why (for example: the site's reader lists only positions that got a
+  judgement, so a position with none is seen only in `attempts`).
+
+Nothing is cut and model text is not blanked (the 64 KiB cap and the redaction of `report.json` do not apply). As a
+safety net, every string still goes through the named key shapes (a PEM block, a bearer or authorization header, a
+vendor key, a JWT, a `secret=`-style pair): the practice prints whether that blanked anything (`transcript: the
+key-shape safety net changed nothing`). The generic "long run of letters" rule is not used here, because it would blank
+every id in the file. No key, password, database address or setting is ever written. The file is written whole or not
+at all, readable only by you. It can be several megabytes. It holds only our own practice question and the AIs' text
+about it; keep it in `$P` with the reports.
+
 The last line on the screen and the exit code say:
 
 | Exit | Verdict | Meaning |
@@ -282,7 +317,8 @@ Optional flags:
   `--models a,b` (model ids from the preview's roster), `--lanes JUDGE_POSITION,PANEL,...` (default all nine:
   JUDGE_POSITION, JUDGE_ATTACK, JUDGE_CROSS, PANEL, REVIEW, SYNTHESIZER, EVALUATOR, STORYTELLER, STORY_CHECKER).
 - report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/samples.jsonl.
-- debate: `--depth 1|2`, `--question ro|en`. The register is copied only through the register's own publication
+- debate: `--depth 1|2`, `--question ro|en`, `--transcript` (also write `transcript.json`: every prompt and every
+  answer, see "The whole debate, word for word" above). The register is copied only through the register's own publication
   paths; an export holding a support-configuration version refuses (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
 
 ### S-7, stop and clean up
@@ -312,12 +348,14 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
   `main.ts` files compose them on the preview. `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
 - `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode. `practice-debate.ts`,
-  `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode.
+  `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode; `practice-transcript.ts`: its
+  `--transcript` file.
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (models at once,
   the per-gate and overall limits), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
   `practice-questions.ts`.
 - `gate-relay.py` and `test_gate_relay.py` (run: `python3 tools/preview-practice/test_gate_relay.py`).
-- Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-wiring-drift.test.ts`,
+- Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-transcript.test.ts`,
+  `tests/unit/preview-practice-wiring-drift.test.ts`,
   `tests/integration/preview-practice-run.test.ts` (both modes against the scripted gate doubles in
   `tests/support/preview-gate-stubs.ts`; no vendor is contacted).

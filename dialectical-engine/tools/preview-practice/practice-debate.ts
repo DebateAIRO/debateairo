@@ -39,6 +39,7 @@ import {
 import { composePracticeRunner } from "./practice-runner-composition.js";
 import type { PracticeSettings, PracticeSockets } from "./practice-settings.js";
 import { startPracticeDatabase, type PracticeDatabase } from "./practice-throwaway-db.js";
+import { recordPracticeTranscript } from "./practice-transcript.js";
 import {
   latencySummary,
   practiceCallFacts,
@@ -143,6 +144,11 @@ export type PracticeDebateResult = Readonly<{
   refusedCalls: number;
   remaining: Readonly<Record<PracticeGateName, Readonly<{ before: PreviewGateRemaining | null; after: PreviewGateRemaining | null }>>>;
   seconds: Readonly<{ admission: number; debate: number }>;
+  /**
+   * `--transcript` only: where transcript.json went, how many calls it holds, and what the key-shape safety net
+   * blanked (by kind; empty when nothing). `error` names why it could not be written. Not part of report.json.
+   */
+  transcript?: Readonly<{ path: string | null; attempts: number; bytes: number; blanked: Readonly<Record<string, number>>; error: string | null }>;
 }>;
 
 const ROSTER_ORDER = Object.freeze(["JUDGE", "PANEL", "REVIEW", "SYNTHESIZER", "EVALUATOR", "STORYTELLER", "STORY_CHECKER", "UNMAPPED"]);
@@ -293,6 +299,8 @@ export async function runPracticeDebate(input: Readonly<{
   wait?: (milliseconds: number) => Promise<void>;
   sleep?: (milliseconds: number) => Promise<void>;
   progress?: (line: string) => void;
+  /** `--transcript`: the folder transcript.json is written to, before the throwaway database is deleted; null: none. */
+  transcriptDirectory?: string | null;
 }>): Promise<PracticeDebateResult> {
   const progress = input.progress ?? (() => undefined);
   const remainingPorts = practiceRemainingPorts(input.settings, input.sockets);
@@ -376,6 +384,7 @@ export async function runPracticeDebate(input: Readonly<{
     const probes = probeRows.map((row) => Object.freeze({ providerRef: row.provider_ref, state: row.state, failureCode: row.failure_code, count: row.n }));
     if (job === undefined) {
       progress(`the practice ask was refused: ${refusalCode ?? "NOT_DISPATCHED"}`);
+      if (input.transcriptDirectory !== undefined && input.transcriptDirectory !== null) progress("transcript: not written (no debate was admitted)");
       remaining.deepinfra.after = await readRemaining(remainingPorts.deepinfra);
       remaining.anthropic.after = await readRemaining(remainingPorts.anthropic);
       return Object.freeze({
@@ -399,6 +408,7 @@ export async function runPracticeDebate(input: Readonly<{
          FROM core.run_role_rotation WHERE run_id=$1`, [job.runId])).rows[0];
     progress(`admitted run ${job.runId} with ${String(panel.length)} models; the debate starts`);
     const debateStarted = performance.now();
+    const debateStartedAt = new Date();
     let workItemOutcome: string;
     let failureCode: string | null = null;
     let answerId: string | null = null;
@@ -411,11 +421,15 @@ export async function runPracticeDebate(input: Readonly<{
       failureCode = codeOf(error);
     }
     const debateSeconds = (performance.now() - debateStarted) / 1000;
+    const debateFinishedAt = new Date();
     progress(`the debate ended: ${workItemOutcome}${failureCode === null ? "" : ` (${failureCode})`}`);
     let answer: PracticeDebateResult["run"]["answer"] = null;
     let story: PracticeDebateResult["run"]["story"] = null;
+    // Kept whole for the transcript (--transcript): the served answer and the story exactly as the site reads them.
+    let projection: Awaited<ReturnType<ServeRepository["readAnswerProjection"]>> = null;
+    let storedStory: Awaited<ReturnType<StoryRepository["readForAnswer"]>> = null;
     if (answerId !== null) {
-      const projection = await new ServeRepository(pool).readAnswerProjection(answerId, { ownerRef, legacyAskerId: null } as never);
+      projection = await new ServeRepository(pool).readAnswerProjection(answerId, { ownerRef, legacyAskerId: null } as never);
       answer = projection === null ? Object.freeze({ served: false, terminal: null, serveState: null, verdictState: null, conditionMarks: [] })
         : Object.freeze({
           served: projection.terminal !== "BLOCKED",
@@ -423,7 +437,37 @@ export async function runPracticeDebate(input: Readonly<{
           conditionMarks: Object.freeze((projection.condition_mark_records ?? []).map((record) => String((record as { code?: unknown }).code ?? "MARK")))
         });
       const stored = await new StoryRepository(pool).readForAnswer({ answerId, answerVersion: null, ownership: { ownerRef } });
+      storedStory = stored;
       story = Object.freeze({ outcome: stored?.outcome ?? null, failureCode: stored?.failureCode ?? null });
+    }
+    const panelFacts = Object.freeze(panel.map((member) => Object.freeze({ providerRef: member.provider_ref, modelId: member.model_id, maker: member.maker })));
+    const rotation = rotationRow === undefined ? null : Object.freeze({
+      answerWriter: rotationRow.writer_provider_ref!, answerChecker: rotationRow.checker_provider_ref!,
+      storyteller: rotationRow.storyteller_provider_ref!, storyChecker: rotationRow.story_checker_provider_ref!
+    });
+    let transcript: PracticeDebateResult["transcript"];
+    if (input.transcriptDirectory !== undefined && input.transcriptDirectory !== null) {
+      // Before the finally below deletes the database and with it the only way to read the run's sealed text; and before
+      // the report's own reading (collect), so a reading that breaks there cannot cost the transcript.
+      try {
+        const written = await recordPracticeTranscript({
+          pool, directory: input.transcriptDirectory, ownerRef, answer: projection, story: storedStory,
+          run: Object.freeze({
+            runId: job.runId, question: Object.freeze({ id: question.id, text: question.questionLine }), depth: input.depth,
+            registerVersion: receipt.registerVersion, panel: panelFacts, satOut: Object.freeze(satOut), rotation,
+            startedAt: debateStartedAt.toISOString(), finishedAt: debateFinishedAt.toISOString(),
+            workItemOutcome, failureCode, answerId, answer, story
+          })
+        });
+        transcript = Object.freeze({ path: written.path, attempts: written.attempts, bytes: written.bytes, blanked: written.blanked, error: null });
+        progress(`transcript: ${written.path} (${String(written.attempts)} calls)`);
+        const blanked = Object.entries(written.blanked);
+        progress(blanked.length === 0 ? "transcript: the key-shape safety net changed nothing"
+          : `transcript: the key-shape safety net blanked ${blanked.map(([kind, count]) => `${String(count)} ${kind}`).join(", ")}`);
+      } catch (error) {
+        transcript = Object.freeze({ path: null, attempts: 0, bytes: 0, blanked: Object.freeze({}), error: codeOf(error) });
+        progress(`transcript could not be written: ${codeOf(error)}`);
+      }
     }
     const collected = await collect(pool, job.runId);
     remaining.deepinfra.after = await readRemaining(remainingPorts.deepinfra);
@@ -432,16 +476,14 @@ export async function runPracticeDebate(input: Readonly<{
       register: receipt, questionId: question.id, depth: input.depth,
       admission: Object.freeze({
         admitted: true, refusalCode: null,
-        panel: Object.freeze(panel.map((member) => Object.freeze({ providerRef: member.provider_ref, modelId: member.model_id, maker: member.maker }))),
+        panel: panelFacts,
         satOut: Object.freeze(satOut),
-        rotation: rotationRow === undefined ? null : Object.freeze({
-          answerWriter: rotationRow.writer_provider_ref!, answerChecker: rotationRow.checker_provider_ref!,
-          storyteller: rotationRow.storyteller_provider_ref!, storyChecker: rotationRow.story_checker_provider_ref!
-        })
+        rotation
       }),
       run: Object.freeze({ runId: job.runId, workItemOutcome, failureCode, answer, story }),
       ...collected, probes: Object.freeze(probes), remaining,
-      seconds: Object.freeze({ admission: admissionSeconds, debate: debateSeconds })
+      seconds: Object.freeze({ admission: admissionSeconds, debate: debateSeconds }),
+      ...(transcript === undefined ? {} : { transcript })
     });
   } finally {
     remaining.deepinfra.after ??= await readRemaining(remainingPorts.deepinfra);
