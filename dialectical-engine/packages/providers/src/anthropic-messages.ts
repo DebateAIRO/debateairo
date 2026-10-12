@@ -44,14 +44,6 @@ export const ANTHROPIC_MESSAGES_PATH = "/messages" as const;
  */
 export const ANTHROPIC_EFFORT_LEVELS = Object.freeze(["low", "medium", "high"] as const);
 /**
- * The discovery probe's default answer bound for this wire. Claude Haiku 5.5
- * thinks by default and its thinking counts against `max_tokens`, so the eight
- * tokens the OpenAI-compatible probe asks for could be spent before "OK" is
- * written. A caller that passes its own ceiling (the preview does) is unaffected.
- */
-const ANTHROPIC_PROBE_DEFAULT_MAX_TOKENS = 512;
-
-/**
  * The vendor declined to answer (`stop_reason: "refusal"`). Billed, not retried.
  * The same name the Gemini adapter uses for its safety blocks (lead, 2026-10-10).
  */
@@ -376,7 +368,8 @@ export function readAnthropicMessagesReply(decoded: unknown): AnthropicMessagesR
  */
 export function anthropicMessagesProbeRequest(input: Readonly<{
   model: string;
-  maxTokens: number | undefined;
+  /** Always given: the probe owns its default room (provider-probe.ts), one number for both wires. */
+  maxTokens: number;
   thinkingLevel: string | undefined;
   credential: string | undefined;
   prompt: string;
@@ -387,20 +380,27 @@ export function anthropicMessagesProbeRequest(input: Readonly<{
     headers: anthropicMessagesRequestHeaders(input.credential),
     body: anthropicMessagesRequestBody({
       model: input.model,
-      maxTokens: input.maxTokens ?? ANTHROPIC_PROBE_DEFAULT_MAX_TOKENS,
+      maxTokens: input.maxTokens,
       thinkingLevel: input.thinkingLevel ?? THINKING_LEVEL_DEFAULT_ONLY,
       messages: [{ role: "user", content: input.prompt }]
     })
   });
 }
 
-/** The probe's reading of a reply: the echoed model and the answer text, or null when unusable. */
-export function anthropicMessagesProbeAnswer(decoded: unknown): Readonly<{ model: unknown; text: string }> | null {
+/**
+ * The probe's reading of a reply: the echoed model, the answer text, how it ended ("length" when cut off at
+ * max_tokens) and whether the model declined; null when the reply is not a message this wire can use. Probe failure
+ * reasons (2026-10-12): the probe records which of these ended it (provider-probe.ts).
+ */
+export function anthropicMessagesProbeAnswer(decoded: unknown): Readonly<{
+  model: unknown; text: string; finishReason: string | null; refused: boolean;
+}> | null {
   const reply = readAnthropicMessagesReply(decoded);
-  if (reply.failure !== null || !isRecord(reply.normalized)) return null;
+  if (!isRecord(reply.normalized)) return null;
+  const refused = reply.failure?.code === PROVIDER_CONTENT_REFUSED;
+  if (reply.failure !== null && !refused) return null;
   const choices = reply.normalized.choices;
   if (!Array.isArray(choices) || choices.length !== 1) return null;
   const choice = choices[0] as Readonly<{ message: { content: string }; finish_reason: string | null }>;
-  if (choice.finish_reason === "length") return null;
-  return Object.freeze({ model: reply.normalized.model, text: choice.message.content });
+  return Object.freeze({ model: reply.normalized.model, text: choice.message.content, finishReason: choice.finish_reason, refused });
 }

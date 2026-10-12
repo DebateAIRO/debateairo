@@ -694,15 +694,16 @@ describe("PR B — the discovery probe speaks the target's wire", () => {
     expect(JSON.parse(high.sent[0]!.body)).toMatchObject({ max_tokens: 300, output_config: { effort: "high" } });
   });
 
-  for (const [label, response] of [
-    ["another model", () => reply(message({ model: "claude-other", content: [{ type: "text", text: "OK" }] }))],
-    ["another answer", () => reply(message({ content: [{ type: "text", text: "Sure, OK" }] }))],
-    ["a refusal", () => reply(message({ content: [{ type: "text", text: "OK" }], stop_reason: "refusal" }))],
-    ["a truncation", () => reply(message({ content: [{ type: "text", text: "OK" }], stop_reason: "max_tokens" }))],
-    ["an overloaded vendor", () => vendorError(529, "overloaded_error")]
+  // Probe failure reasons (2026-10-12): each records why (tests/unit/provider-probe-failure-reason.test.ts).
+  for (const [label, response, failureCode] of [
+    ["another model", () => reply(message({ model: "claude-other", content: [{ type: "text", text: "OK" }] })), "PROVIDER_PROBE_MODEL_MISMATCH"],
+    ["another answer", () => reply(message({ content: [{ type: "text", text: "Sure, OK" }] })), "PROVIDER_PROBE_ANSWER_NOT_OK"],
+    ["a refusal", () => reply(message({ content: [{ type: "text", text: "OK" }], stop_reason: "refusal" })), "PROVIDER_PROBE_ANSWER_REFUSED"],
+    ["a truncation", () => reply(message({ content: [{ type: "text", text: "OK" }], stop_reason: "max_tokens" })), "PROVIDER_PROBE_ANSWER_CUT_OFF"],
+    ["an overloaded vendor", () => vendorError(529, "overloaded_error"), "PROVIDER_PROBE_HTTP_529"]
   ] as const) {
     it(`is ABSENT on ${label}`, async () => {
-      expect((await probe(response)).observation).toMatchObject({ state: "ABSENT", failureCode: "PROVIDER_PROBE_FAILED" });
+      expect((await probe(response)).observation).toMatchObject({ state: "ABSENT", failureCode });
     });
   }
 });
