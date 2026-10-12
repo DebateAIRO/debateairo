@@ -39,10 +39,10 @@ prompt.
 
 | Tool | Today | Owed |
 |---|---|---|
-| `claude` (`acceptance/claude-relay.ts`) | prompt passed as an argument (DR-133) | pass by stdin or a private file once that tool reliably supports it, with a no-hang proof |
+| `claude` (`acceptance/claude-relay.ts`, also the support chat's relay: Claude Haiku 5.5) | prompt passed as an argument (DR-133) | pass by stdin or a private file once that tool reliably supports it, with a no-hang proof |
 | `codex` (`acceptance/model-shim.ts`) | prompt passed as an argument (DR-133) | pass by stdin or a private file once that tool reliably supports it, with a no-hang proof |
 | `grok` (`acceptance/grok-relay.ts`) | prompt passed as an argument (DR-133) | pass by stdin or a private file once that tool reliably supports it, with a no-hang proof |
-| `hermes` (`acceptance/hermes-relay.ts`, the support chat's relay) | prompt passed as an argument (DR-133) | pass by stdin or a private file once that tool reliably supports it, with a no-hang proof |
+| `hermes` (`acceptance/hermes-relay.ts`; the support chat's relay until 2026-10-12, no longer started by the local stack) | prompt passed as an argument (DR-133) | pass by stdin or a private file once that tool reliably supports it, with a no-hang proof |
 
 V declined "harden all relays now" (V-30(2)), so nothing on this list is
 half-done in the meantime: every relay still closes its standard input and
@@ -75,8 +75,8 @@ DEBATEAI_DEV_AUTH_STACK_PROFILE=support-preview pnpm dev:auth:up
 ```
 
 That profile uses `https://localhost:3100`, private UI `3101`, API `8890`,
-provider relays `8891`, `8895`, `8892`, `8896`, and `8893`, Hermes support
-`8894`, PostgreSQL `55433`, and Hatchet gRPC/API `7177`/`8988`. Its Compose
+provider relays `8891`, `8895`, `8892`, `8896`, and `8893`, the Claude Haiku 5.5
+support relay `8894`, PostgreSQL `55433`, and Hatchet gRPC/API `7177`/`8988`. Its Compose
 project is `debateai-v3-support-preview`, so its containers and volume are
 separate from the default `debateai-v3` project. Only `default` and
 `support-preview` are accepted; arbitrary ports, URLs, and namespaces are

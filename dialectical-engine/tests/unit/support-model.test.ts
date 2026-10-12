@@ -23,26 +23,26 @@ function adapter(fetchImplementation: typeof fetch): RelayAdapter {
 }
 
 describe("support relay response boundary", () => {
-  it("accepts only the dedicated loopback Hermes GLM target",() => {
+  it("accepts only the dedicated loopback Claude Haiku 5.5 relay target",() => {
     // V-30/task 12: the parse now takes the deployment it is parsing for. The
     // local mode is what this case has always measured, and every assertion
     // below is unchanged.
     const local = { mode: "local",nodeEnv: undefined } as const;
     const source = JSON.stringify({
-      provider_ref: "development:hermes-glm-5.3-flash",
+      provider_ref: "development:claude-haiku-5.5",
       base_url: "http://127.0.0.1:8794/v1",
-      model: "z-ai/glm-5.3-flash",
+      model: "claude-haiku-5-5",
       authorization_header: "Bearer support-only"
     });
     expect(parseSupportModelTargetJson(source,local)).toEqual({
-      providerRef: "development:hermes-glm-5.3-flash",
+      providerRef: "development:claude-haiku-5.5",
       baseUrl: "http://127.0.0.1:8794/v1",
-      model: "z-ai/glm-5.3-flash",
+      model: "claude-haiku-5-5",
       authorizationHeader: "Bearer support-only"
     });
     for (const invalid of [
-      source.replace("development:hermes-glm-5.3-flash","development:codex-cli"),
-      source.replace("z-ai/glm-5.3-flash","other-model"),
+      source.replace("development:claude-haiku-5.5","development:codex-cli"),
+      source.replace("claude-haiku-5-5","other-model"),
       source.replace("127.0.0.1","localhost"),
       source.replace("Bearer support-only",""),
       source.slice(0,-1) + ',"fallback":"development:codex-cli"}'
@@ -54,16 +54,16 @@ describe("support relay response boundary", () => {
     // rule and there is no default mode that could let it through hosted.
     const local = { mode: "local",nodeEnv: undefined } as const;
     const source = JSON.stringify({
-      provider_ref: "development:hermes-glm-5.3-flash",
+      provider_ref: "development:claude-haiku-5.5",
       base_url: "http://127.0.0.1:8894/v1",
-      model: "z-ai/glm-5.3-flash",
+      model: "claude-haiku-5-5",
       authorization_header: "Bearer support-only",
       development_stack_profile: "support-preview"
     });
     expect(parseSupportModelTargetJson(source,local)).toEqual({
-      providerRef: "development:hermes-glm-5.3-flash",
+      providerRef: "development:claude-haiku-5.5",
       baseUrl: "http://127.0.0.1:8894/v1",
-      model: "z-ai/glm-5.3-flash",
+      model: "claude-haiku-5-5",
       authorizationHeader: "Bearer support-only"
     });
     for (const invalid of [
@@ -71,13 +71,13 @@ describe("support relay response boundary", () => {
       source.replace("8894","8994"),
       source.replace("support-preview","default"),
       source.replace(',"development_stack_profile":"support-preview"',""),
-      source.replace("development:hermes-glm-5.3-flash","development:codex-cli"),
-      source.replace("z-ai/glm-5.3-flash","other-model"),
+      source.replace("development:claude-haiku-5.5","development:codex-cli"),
+      source.replace("claude-haiku-5-5","other-model"),
       source.replace("Bearer support-only","")
     ]) expect(() => parseSupportModelTargetJson(invalid,local)).toThrow("SUPPORT_MODEL_PATH_NOT_RATIFIED");
     // Hosted refuses the preview relay exactly as it refuses the default one.
     expect(() => parseSupportModelTargetJson(source,{ mode: "hosted",nodeEnv: "production" }))
-      .toThrowError(new TypeError("PROVIDER_BASE_URL_TLS_REQUIRED:development:hermes-glm-5.3-flash"));
+      .toThrowError(new TypeError("PROVIDER_BASE_URL_TLS_REQUIRED:development:claude-haiku-5.5"));
   });
 
   it("propagates the caller abort signal into fetch", async () => {

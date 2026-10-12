@@ -489,6 +489,30 @@ describe("the model providers page lists the model families the product runs", (
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
   });
 
+  it("names Claude Haiku 5.5 as the support chat's model, with Anthropic's checked facts and no brackets", () => {
+    // Owner, 12 October 2026: the support chat runs on Claude Haiku 5.5 on Anthropic's API.
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
+    const support = [...view.querySelectorAll(".legalProviderEntry")].at(-1);
+    expect(support?.querySelector("h2")?.textContent).toBe("Support chat model");
+    const cells = Object.fromEntries([...(support?.querySelectorAll("tbody tr") ?? [])].map((row) => [
+      row.querySelector("th")?.textContent, row.querySelector("td")?.textContent?.trim()
+    ]));
+    expect(cells).toEqual({
+      "Models": "Claude Haiku 5.5",
+      "Company": "Anthropic Ireland, Limited",
+      "Home country": "Ireland",
+      "What it receives, and why": "What you type in the support chat — to answer you",
+      "Where it processes": legalEnglish["legal.providers.locationAnthropic"],
+      "How long it keeps data": legalEnglish["legal.providers.retentionAnthropic"],
+      "Zero data retention": "No",
+      "May it train on your data?": "No",
+      "Transfer basis": legalEnglish["legal.providers.sccBasis"],
+      "Contact": "privacy@anthropic.com",
+      "Last checked": "2026-10-10"
+    });
+    expect(support?.textContent).not.toMatch(/\[/u);
+  });
+
   it("on the private preview's GLM build, lists DeepInfra just before the support chat's model, and no hosted cloud row", async () => {
     vi.stubEnv("NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON", "[\"zai-org/GLM-5.3-Flash\"]");
     vi.resetModules();

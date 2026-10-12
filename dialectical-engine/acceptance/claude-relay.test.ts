@@ -9,11 +9,14 @@ import {
   CLAUDE_BINARY_NAME,
   CLAUDE_CLI_USAGE_CAP,
   CLAUDE_HANDSHAKE_PROMPT,
+  CLAUDE_SUPPORT_MODEL,
   CLAUDE_USAGE_CAP_PATTERN,
   preflightClaudeCli,
   resolveClaudeBinary,
   startClaudeRelay,
-  type ClaudeRelayHandle
+  startClaudeSupportRelay,
+  type ClaudeRelayHandle,
+  type ClaudeSupportRelayHandle
 } from "./claude-relay.js";
 import { CLI_RELAY_USAGE_CAP_CODE_TOKEN, RELAY_MINIMAL_SYSTEM_PROMPT } from "./relay-core.js";
 import {
@@ -856,5 +859,69 @@ describe("D8 a start whose handshake fails leaves no workspace behind (Task A12b
     expect(new Set(logged).size).toBe(1);
     expect(basename(logged[0]!).startsWith("relay-anthropic-workspace-")).toBe(true);
     expect(existsSync(logged[0]!)).toBe(false);
+  });
+});
+
+/**
+ * V, 2026-10-12: the support agent runs on Claude Haiku 5.5. The development
+ * stack's support relay is this CLI asked for `--model haiku`, and it starts only
+ * when the CLI itself reports Claude Haiku 5.5 (DR-115 lineage honesty).
+ */
+describe("support relay on Claude Haiku 5.5", () => {
+  const supportHandles: ClaudeSupportRelayHandle[] = [];
+  afterEach(async () => {
+    await Promise.all(supportHandles.splice(0).map((handle) => handle.close()));
+  });
+
+  /** An envelope reporting `model`, whose answer is the argument list it was given. */
+  function reportingCli(model: string) {
+    const script = [
+      "console.log(JSON.stringify({",
+      "  is_error: false, result: JSON.stringify({ argumentList: process.argv }), total_cost_usd: 0.0002,",
+      `  modelUsage: { ${JSON.stringify(model)}: { inputTokens: 12, outputTokens: 3 } }`,
+      "}));"
+    ].join("");
+    return { binary: process.execPath, prefixArguments: ["-e", script, "--"] };
+  }
+
+  it("asks the CLI for haiku and writes the support target the stack hands the API", async () => {
+    const relay = await startClaudeSupportRelay({
+      port: 0, timeoutMs: 1_000, testOnlyCommand: reportingCli(CLAUDE_SUPPORT_MODEL)
+    });
+    supportHandles.push(relay);
+    expect(relay.providerRef).toBe("development:claude-haiku-5.5");
+    expect(relay.model).toBe("claude-haiku-5-5");
+    expect(JSON.parse(relay.targetJson)).toEqual({
+      provider_ref: "development:claude-haiku-5.5",
+      base_url: `${relay.baseUrl}/v1`,
+      model: "claude-haiku-5-5",
+      authorization_header: relay.authorizationHeader
+    });
+    const response = await fetch(`${relay.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: relay.authorizationHeader },
+      body: JSON.stringify({ model: "ignored-by-relay", messages: [{ role: "user", content: "help" }] })
+    });
+    expect(response.status).toBe(200);
+    const completion = await response.json() as { choices: readonly { message: { content: string } }[] };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as { argumentList: readonly string[] };
+    expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1]).toBe("haiku");
+  });
+
+  it("marks the support-preview stack's target", async () => {
+    const relay = await startClaudeSupportRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      developmentStackProfile: "support-preview",
+      testOnlyCommand: reportingCli(CLAUDE_SUPPORT_MODEL)
+    });
+    supportHandles.push(relay);
+    expect(JSON.parse(relay.targetJson)).toMatchObject({ development_stack_profile: "support-preview" });
+  });
+
+  it("refuses to start when the CLI answers as another model", async () => {
+    await expect(startClaudeSupportRelay({
+      port: 0, timeoutMs: 1_000, testOnlyCommand: reportingCli("claude-sonnet-5")
+    })).rejects.toThrow("CLAUDE_SUPPORT_MODEL_MISMATCH");
   });
 });

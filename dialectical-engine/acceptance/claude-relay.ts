@@ -380,3 +380,64 @@ export async function startClaudeRelay(options: ClaudeRelayOptions): Promise<Cla
     throw error;
   }
 }
+
+/**
+ * The support chat's relay (V, 2026-10-12: the support agent runs on Claude
+ * Haiku 5.5; until then it was the Hermes GLM 5.3 Flash relay). It IS
+ * `startClaudeRelay` asked for `--model haiku`, plus the one-entry support
+ * target the development stack writes into `api.env`. The model stays the
+ * CLI-reported id (DR-115): a CLI that answers as anything but Claude Haiku 5.5
+ * is closed and refused, never left serving the support chat under this ref.
+ */
+export const CLAUDE_SUPPORT_PROVIDER_REF = "development:claude-haiku-5.5" as const;
+export const CLAUDE_SUPPORT_MODEL = "claude-haiku-5-5" as const;
+export const CLAUDE_SUPPORT_MODEL_ALIAS = "haiku" as const;
+
+export interface ClaudeSupportRelayOptions {
+  readonly port: number;
+  readonly timeoutMs: number;
+  readonly developmentStackProfile?: "support-preview";
+  /** Test-only process seam. Rejected outside NODE_ENV=test (DR-115). */
+  readonly testOnlyCommand?: CommandSpec;
+}
+
+export interface ClaudeSupportRelayHandle extends CliRelayHandle {
+  readonly providerRef: typeof CLAUDE_SUPPORT_PROVIDER_REF;
+  readonly model: typeof CLAUDE_SUPPORT_MODEL;
+  readonly maker: typeof ANTHROPIC_MAKER;
+  readonly targetJson: string;
+}
+
+export async function startClaudeSupportRelay(
+  options: ClaudeSupportRelayOptions
+): Promise<ClaudeSupportRelayHandle> {
+  const relay = await startClaudeRelay({
+    port: options.port,
+    timeoutMs: options.timeoutMs,
+    modelAlias: CLAUDE_SUPPORT_MODEL_ALIAS,
+    ...(options.testOnlyCommand === undefined ? {} : { testOnlyCommand: options.testOnlyCommand })
+  });
+  if (relay.model !== CLAUDE_SUPPORT_MODEL) {
+    await relay.close();
+    throw new CliRelayFailure("FAILED", "CLAUDE_SUPPORT_MODEL_MISMATCH");
+  }
+  const targetJson = JSON.stringify({
+    provider_ref: CLAUDE_SUPPORT_PROVIDER_REF,
+    base_url: `${relay.baseUrl}/v1`,
+    model: CLAUDE_SUPPORT_MODEL,
+    authorization_header: relay.authorizationHeader,
+    ...(options.developmentStackProfile === "support-preview"
+      ? { development_stack_profile: "support-preview" }
+      : {})
+  });
+  return Object.freeze({
+    port: relay.port,
+    baseUrl: relay.baseUrl,
+    authorizationHeader: relay.authorizationHeader,
+    providerRef: CLAUDE_SUPPORT_PROVIDER_REF,
+    model: CLAUDE_SUPPORT_MODEL,
+    maker: ANTHROPIC_MAKER,
+    targetJson,
+    close: () => relay.close()
+  });
+}
