@@ -874,6 +874,28 @@ describe("Parallel calls · task 6 — the seat caller with calls in flight toge
     expect(caller.backupAnswers()).toHaveLength(2);
   });
 
+  it("still records and announces a later failure of a member the ledger moved off at another site (serial, as before O7)", async () => {
+    // Fix round 1: a ledger hand-off names the slot but never downs it, so the member still goes first
+    // at sites where it is eligible; its own outage there is a second switch, as a serial run records.
+    const seat = backupOnlySeat();
+    const events: string[] = [];
+    const caller = createSeatCaller({
+      assigned: true,
+      onSwitch: async (record) => { events.push(`switch:${record.cause}:${String(record.callSiteKey)}`); }
+    });
+    const script = scripted({ "provider:a": throws(transportFailure), "provider:b": answers("b") });
+    const spentMain = (member: SeatMember): boolean => member.pinnedAs !== "MAIN";
+    await caller.callSeat({
+      seat, callSiteKey: "k", eligible: spentMain, ledgerMove: { from: "MAIN", callSiteKey: "k:seat:main" }, call: script.call
+    });
+    await expect(caller.callSeat({ seat, callSiteKey: "m", call: script.call })).resolves.toMatchObject({ value: "b" });
+    expect(script.calls).toEqual(["provider:b@k:seat:runnerUp", "provider:a@m:seat:main", "provider:b@m:seat:runnerUp"]);
+    expect(events).toEqual(["switch:SPENT_ON_EARLIER_PASS:k:seat:main", "switch:TRANSPORT_FAILURE:m:seat:main"]);
+    expect(caller.switches().map((record) => [record.cause, record.callSiteKey])).toEqual([
+      ["SPENT_ON_EARLIER_PASS", "k:seat:main"], ["TRANSPORT_FAILURE", "m:seat:main"]
+    ]);
+  });
+
   it("holds the second call's backup until the one announcement has been awaited (R4: no backup answers undisclosed)", async () => {
     const seat = backupOnlySeat();
     const events: string[] = [];

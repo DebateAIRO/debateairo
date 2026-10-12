@@ -892,15 +892,18 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
       try {
         return await answer(first);
       } catch (error) {
+        const wasDown = isDown(input.seat, first);
         const cause = failed(first, error);
         if (cause === null) throw error;
         // DR-184-v5: the post-cooldown retry belongs to ONE key; it never opens the backup's.
         if (retry) throw error;
         const second = members.find((member) => member !== first && !isDown(input.seat, member));
         if (second === undefined) throw error;
-        // O7: another call in flight on this seat may have switched this slot already — one notice
-        // per seat slot; this call waits for that notice, then goes to the backup too.
-        const announced = switchedFrom.get(slotId(input.seat, first));
+        // O7: another call in flight on this seat may have downed and switched this slot already —
+        // one notice per seat slot; this call waits for that notice, then goes to the backup too.
+        // Only a slot that was DOWN when this call failed counts: a ledger hand-off names the slot
+        // without downing it, and the member's own outage at another site is a switch of its own.
+        const announced = wasDown ? switchedFrom.get(slotId(input.seat, first)) : undefined;
         if (announced === undefined) await recordSwitch(first, second, cause, keyOf(input, first));
         else await announced;
         try {
