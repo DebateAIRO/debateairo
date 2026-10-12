@@ -11,6 +11,7 @@ import { join, resolve, sep } from "node:path";
 import type { PracticeDebateResult } from "./practice-debate.js";
 import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
 import { practiceStopIsPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
+import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
 import {
   latencySummary,
   practiceCallFacts,
@@ -321,6 +322,8 @@ export function debateReport(input: Readonly<{
     cacheByModel: cacheByModel(input.observer),
     run: r.run,
     probes: r.probes,
+    // Parallel AI calls: the setting, each gate's slots at the start, how many calls really went at once, the waits.
+    ...(r.parallel === undefined ? {} : { parallel: r.parallel }),
     byModelAndSite: r.byModelAndSite,
     gates: Object.fromEntries(GATES.map((gate) => [gate, gateBlock(input.observer, gate, r.remaining[gate])])),
     totals: Object.freeze({
@@ -399,6 +402,8 @@ export function reportMarkdown(report: PracticeReport): string {
     }
     lines.push("");
   }
+  const parallel = report.parallel as PracticeParallelBlock | undefined;
+  if (parallel !== undefined) lines.push(...practiceParallelLines(parallel));
   const cache = report.cacheByModel as Readonly<Record<string, PracticeCacheBlock>> | undefined;
   if (cache !== undefined && Object.keys(cache).length > 0) {
     lines.push("Prompt cache per AI (as the vendors reported it; information only):", "");

@@ -102,6 +102,15 @@ model and job. Input tokens count the way the app counts them: for Anthropic its
 included (Anthropic's own `input_tokens` leaves them out). The database keeps no cached count (only four counters are
 stored per call), so it is read from the gates' answers as the practice watches them.
 
+Calls at once (debate only, information only): `parallel` in report.json, "Calls at once" in report.md. It gives the
+setting the runner ran with (`setting`, written the way `--call-concurrency` takes it, and where it came from: `source`
+`FLAG` or `REGISTER`, and `registerRow` `SET` or `ABSENT`), each gate's number of calls at once as read at the start
+(`gateSlotsAtStart.<gate>`: `slots`, and `read: false` when the gate could not be read, so it ran with 1), the most
+calls that really went at once in the debate (`peakInFlight`), per model (`peakByModel`) and per gate (`peakByGate`),
+how long each model's calls waited for a free slot in all (`waitedMsByModel`, milliseconds), the calls (`calls`), and
+how many times a model's "too busy" refusal made one call wait and try again while the model's other calls waited for
+it (`busyProbesByModel`).
+
 ## Safety rules built in
 
 - It refuses to start unless `PRACTICE_ACK=spends-real-money` is set and both forwarded sockets exist.
@@ -149,8 +158,17 @@ stored per call), so it is read from the gates' answers as the practice watches 
   at most the gate's own number of calls at once per gate (root's status `max_concurrent_calls` when it names it, else
   4 for DeepInfra and 1 for Anthropic), and at most 5 calls at once in all (`--max-in-flight`). The relay must accept
   at least 3 more connections than `--max-in-flight` (S-4 starts it with `--max-connections 8`); a relay that refuses a
-  connection makes that call fail and stops the gate. `--sequential`: one call at a time, a 2-second gap. Debate mode
-  is unchanged: the runner sends one call at a time.
+  connection makes that call fail and stops the gate. `--sequential`: one call at a time, a 2-second gap.
+- Debate mode: the runner sends a debate's AI calls at the same time, as the live preview does, within the
+  call-concurrency setting: how many calls at once in the debate, how many to one model in the debate, and how many to
+  one model across the runner (by vendor, with a `default`). Each gate's own number of calls at once
+  (`max_concurrent_calls`, read from the gate at the start) is never passed: extra calls wait their turn on the Mac
+  instead of being refused by the gate. A gate whose number cannot be read at the start runs with 1 call at a time, and
+  the report says so. Without `--call-concurrency` the practice uses the live register's own setting, and one call at
+  a time when the register has none (today's preview). `--call-concurrency 12/3/default=50,deepinfra=150,anthropic=50`
+  sets it for this practice only; it is never written to any register. The relay must accept at least 3 more
+  connections than the two gates' numbers added up (S-4 starts it with `--max-connections 8`, enough for 4 DeepInfra
+  calls and 1 Anthropic call at once); when the gates allow more, start the relay with a higher `--max-connections`.
 
 ## Money and time (rough)
 
@@ -158,8 +176,9 @@ stored per call), so it is read from the gates' answers as the practice watches 
   it takes about as long as the slowest model's 18 jobs: about 15 to 50 minutes (GLM, Qwen and MiMo take 30 to 170
   seconds a call), plus up to `--busy-wait-minutes` (default 30) when a model is busy. With `--sequential`, about 1
   to 2 hours, plus the same.
-- debate, depth 1: up to about 230 calls, about $0.15 to $0.70, about 1 to 2 hours. Depth 2: about 350 calls, up to
-  about 3 hours. The start-of-debate estimate needs much more room left in the pots than is actually spent (about
+- debate, depth 1: up to about 230 calls, about $0.15 to $0.70, about 1 to 2 hours one call at a time. Depth 2: about
+  350 calls, up to about 3 hours. Calls at the same time (`--call-concurrency`, or the register's setting) cost the
+  same and should take less time; the report's "Calls at once" part shows how much the calls overlapped. The start-of-debate estimate needs much more room left in the pots than is actually spent (about
   $4 DeepInfra and $0.90 Anthropic left for depth 1), so run early in the Bucharest day.
 
 ## Operator steps
@@ -282,7 +301,10 @@ Optional flags:
   `--models a,b` (model ids from the preview's roster), `--lanes JUDGE_POSITION,PANEL,...` (default all nine:
   JUDGE_POSITION, JUDGE_ATTACK, JUDGE_CROSS, PANEL, REVIEW, SYNTHESIZER, EVALUATOR, STORYTELLER, STORY_CHECKER).
 - report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/samples.jsonl.
-- debate: `--depth 1|2`, `--question ro|en`. The register is copied only through the register's own publication
+- debate: `--depth 1|2`, `--question ro|en`, `--call-concurrency A/B/default=N,deepinfra=N,anthropic=N` (A: calls at
+  once in the debate, 1 to 64; B: calls at once to one model in the debate, 1 to 16; each N: calls at once to one model
+  across the runner for that vendor, 1 to 1000, `default` required; for example `12/3/default=50,deepinfra=150,anthropic=50`;
+  formats mode refuses it). The register is copied only through the register's own publication
   paths; an export holding a support-configuration version refuses (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
 
 ### S-7, stop and clean up
@@ -314,8 +336,9 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode. `practice-debate.ts`,
   `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode.
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
-  `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (models at once,
-  the per-gate and overall limits), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
+  `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (formats: models at once,
+  the per-gate and overall limits), `practice-parallel.ts` (debate: `--call-concurrency` and the report's
+  "Calls at once"), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
   `practice-questions.ts`.
 - `gate-relay.py` and `test_gate_relay.py` (run: `python3 tools/preview-practice/test_gate_relay.py`).
 - Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-wiring-drift.test.ts`,

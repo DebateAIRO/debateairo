@@ -12,6 +12,7 @@
  *    models work at the same time (one call each at a time); --sequential sends one call at a time. Every finished job
  *    is written to <out>/samples.jsonl at once (practice-samples-log.ts), and the report is built from it.
  *  - debate:  one whole practice debate (depth 1 by default, 2 allowed) through the real ask path and the real runner.
+ *             --call-concurrency sets how many AI calls go at once for this practice only (practice-parallel.ts).
  *  - report:  builds report.json and report.md again from <out>/samples.jsonl (sends nothing, needs no gate).
  *
  * The exact commands are in tools/preview-practice/README.md. Exit codes: 0 PASS, 10 PASS_WITH_WARNINGS, 20 FAIL,
@@ -39,6 +40,7 @@ import { onePerModel, PRACTICE_FORMATS_DEFAULTS, runPracticeFormats } from "./pr
 import { PracticeGateObserver, type PracticeGateName } from "./practice-gate-observer.js";
 import { practiceInterruptGate, takeOverSignals } from "./practice-interrupt.js";
 import { PRACTICE_LANES, type PracticeLane } from "./practice-lanes.js";
+import { parsePracticeCallConcurrency } from "./practice-parallel.js";
 import { parsePracticeRegisterExport, PracticeRegisterError } from "./practice-register-import.js";
 import {
   abortedReport,
@@ -77,7 +79,8 @@ export function repositoryRoot(): string {
 type Args = Readonly<{ mode: "formats" | "debate" | "report"; flags: ReadonlyMap<string, string>; switches: ReadonlySet<string> }>;
 
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
-  "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes"]);
+  "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes",
+  "--call-concurrency"]);
 const SWITCHES = new Set<string>(["--sequential"]);
 
 export function parsePracticeArgs(argv: readonly string[]): Args {
@@ -191,6 +194,12 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
   try {
     const args = parsePracticeArgs(argv);
     mode = args.mode;
+    // Parallel AI calls: the debate's runner only; checked before anything is read or sent.
+    const callConcurrencyText = args.flags.get("--call-concurrency");
+    if (callConcurrencyText !== undefined && args.mode !== "debate") {
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--call-concurrency (debate mode only)");
+    }
+    const callConcurrency = callConcurrencyText === undefined ? undefined : parsePracticeCallConcurrency(callConcurrencyText);
     if (args.mode === "report") {
       // Rebuilds the report from an existing samples log; nothing is sent. On a refusal nothing is written there.
       const folder = required(args, "--out");
@@ -328,6 +337,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       settings, sockets, register: register!,
       budgetPorts, observer, depth: wholeNumber(args, "--depth", 1, 1, 2),
       questionId: args.flags.get("--question") ?? "ro",
+      ...(callConcurrency === undefined ? {} : { callConcurrency }),
       ...(options.wait === undefined ? {} : { wait: options.wait }),
       ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
       progress: log

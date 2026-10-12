@@ -14,6 +14,10 @@
  *    built from the configuration's server socket paths; so are the gates' read-only `/remaining` readers, which set
  *    the call scheduler's gate slots, and the keep-alive pool the claim renewals use (the throwaway database's).
  *  - Local mode has no money guard, so of main.ts's two in-flight counters only the gateway's (attempts) exists here.
+ *  - The call-concurrency setting can be handed in (`callConcurrency`, the practice's --call-concurrency) instead of
+ *    read from the register; it is never written anywhere. The one scheduler and the one busy coordinator are watched
+ *    (practice-parallel.ts: every lane's stats, each gate's slots at the start, each model's busy probes) for the
+ *    report; the watching changes nothing they do.
  *  - No Hatchet, no worker, no start-up re-dispatch, no team gate: the practice calls executeWorkItem itself.
  *  - The story shape pack is the repository's own (the server's DEBATEAI_STORY_SHAPES_DIR is a server path).
  *  - `wait` (the runner's cooldown hold) and `sleep` (the preview policy's one 60-second resend) can be injected, for
@@ -29,6 +33,7 @@ import {
   readEngineVersion,
   readModelScorecard,
   readStoryPolicyFromRegister,
+  type CallConcurrencyPolicy,
   type DeploymentMode
 } from "@debateai/register";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -68,6 +73,7 @@ import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-po
 import { createCallScheduler } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
+import { PracticeCallStats } from "./practice-parallel.js";
 
 /** The runner settings the practice needs: the non-secret runner.env keys the operator exports (README step S-2). */
 export type PracticeRunnerSettings = Readonly<{
@@ -102,6 +108,8 @@ export async function composePracticeRunner(input: Readonly<{
   remaining: Readonly<Record<PreviewProviderName, () => Promise<PreviewGateRemaining>>>;
   /** The claim renewals' own pool (main.ts: RUNNER_DATABASE_POOLS.keepAlive), distinct from `pool`. */
   keepAlivePool: Pool;
+  /** The practice's --call-concurrency: used as it is, instead of the register's row. Absent: the register's row (main.ts). */
+  callConcurrency?: CallConcurrencyPolicy;
   /** Test seam: the runner's cooldown hold. Default: real time. */
   wait?: (milliseconds: number) => Promise<void>;
   /** Test seam: the preview call policy's and the claim probe's one 60-second resend. Default: real time. */
@@ -148,14 +156,17 @@ export async function composePracticeRunner(input: Readonly<{
   const previewFetch = createPreviewGuardedFetch(input.budgetPorts);
   // Parallel AI calls (spec 2026-10-12 §3.2-§3.5), as main.ts composes them on the preview.
   const gatewayInFlight = createRunInFlight();
-  const runnerCallScheduler = createCallScheduler({
-    policy: effectiveCallConcurrency(await readCallConcurrencyPolicy(pool, environment.REGISTER_VERSION))
-  });
+  const callStats = new PracticeCallStats();
+  const callPolicy = input.callConcurrency
+    ?? effectiveCallConcurrency(await readCallConcurrencyPolicy(pool, environment.REGISTER_VERSION).then(callStats.noteRegisterRow));
+  callStats.notePolicy(callPolicy, input.callConcurrency === undefined ? "REGISTER" : "FLAG");
+  const runnerCallScheduler = callStats.observeScheduler(createCallScheduler({ policy: callPolicy }));
   await applyPreviewGateCapacities({
     scheduler: runnerCallScheduler,
-    gates: previewGateNames(previewConfig).map((gate) => ({ gate, remaining: input.remaining[gate] }))
+    gates: previewGateNames(previewConfig).map((gate) => ({ gate, remaining: input.remaining[gate] })),
+    log: (line) => { callStats.gateCapacityLog(line); console.warn(line); }
   });
-  const previewBusy = createPreviewBusyCoordinator();
+  const previewBusy = callStats.observeBusy(createPreviewBusyCoordinator());
   // The preview declares no credential (the gates hold the keys); the resolver must then find nothing to read.
   const providerTargets = resolveProviderTargetCredentials(declaredProviderTargets, () => {
     throw new TypeError("PRACTICE_TARGET_DECLARES_A_CREDENTIAL");
@@ -295,5 +306,5 @@ export async function composePracticeRunner(input: Readonly<{
     }
   });
   return Object.freeze({ runner, providerTopology, providerTargets, declaredProviderTargets, policy, storyPolicy, previewFetch,
-    configuredProviders: deploymentMakers.configuredProviders, callScheduler: runnerCallScheduler });
+    configuredProviders: deploymentMakers.configuredProviders, callScheduler: runnerCallScheduler, callStats });
 }
