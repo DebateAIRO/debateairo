@@ -315,6 +315,7 @@ apps/runner/src/hosted-register-publish.ts
 apps/runner/src/index.ts
 apps/runner/src/main.ts
 apps/runner/src/migrate-cli.ts
+apps/runner/src/ordered-recorder.ts
 apps/runner/src/owner-bootstrap-cli.ts
 apps/runner/src/owner-cli.ts
 apps/runner/src/owner-command.ts
