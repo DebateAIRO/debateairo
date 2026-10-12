@@ -113,3 +113,7 @@ fd422018e71b56b9826d8d6ce9f6a0fb4840b249:dialectical-engine/tests/unit/preview_b
 4cbdfd7169686350b246c86c5a3ce57ae2589b05:dialectical-engine/tests/architecture/security-migration-0065.test.ts:generic-api-key:624
 # a database step file name (0112_auth_db_batch.sql) in a test list, not a key
 4cbdfd7169686350b246c86c5a3ce57ae2589b05:dialectical-engine/tests/integration/preview-auth-dev-fallback.test.ts:generic-api-key:162
+# a fake 40-character test string (random letters and digits) that the long-run redaction test must blank, not a key (owner yes 2026-10-12)
+42af415d85116f4e49fa24866ae9744f556e00e4:dialectical-engine/tests/unit/preview-thinking-levels-check.test.ts:generic-api-key:85
+# a fake 40-character test string (random letters and digits) that the long-run redaction test must blank, not a key (owner yes 2026-10-12)
+42af415d85116f4e49fa24866ae9744f556e00e4:dialectical-engine/tests/unit/preview-practice.test.ts:generic-api-key:355
