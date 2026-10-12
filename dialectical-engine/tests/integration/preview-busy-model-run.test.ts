@@ -64,6 +64,7 @@ import {
   CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
   buildStoryRegisterRows,
   computeStructuralCeilingBasis,
+  effectiveCallConcurrency,
   readStoryPolicy
 } from "@debateai/register";
 import { createPostgresProviderGateway, WalkingSkeletonRunner, type WalkingSkeletonSettings } from "@debateai/runner";
@@ -84,6 +85,9 @@ import {
 } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS, DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
+import { createCallScheduler } from "../../apps/runner/src/call-scheduler.js";
+import { previewCallSubjects } from "../../apps/runner/src/call-lane-gateway.js";
+import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import {
   GATE_ANSWERS_REACHING_VENDOR,
   startPreviewGateStubs,
@@ -295,16 +299,21 @@ type ClaimComposition = "resend" | "single";
 /**
  * apps/runner/src/main.ts's preview runner, over these gates; the waits are recorded, never slept. `resilience` is the
  * run-resilience setting (RUN_RESILIENCE): only the second describe passes it, so the first describe's runner stays
- * 8b3201d75's composition exactly.
+ * 8b3201d75's composition exactly, but for the parallel-calls wiring (2026-10-12) both describes share: the attempt
+ * counter and the call scheduler's serial lane (register row absent), which keep today's one-call-at-a-time order.
  */
 function previewRunner(gates: Awaited<ReturnType<typeof startGates>>, claim: ClaimComposition, resilience?: typeof RUN_RESILIENCE) {
   const probeSleeps: number[] = [];
   const callSleeps: number[] = [];
   const holdWaits: number[] = [];
+  // Parallel AI calls (spec 2026-10-12 §3.2, §3.5), as main.ts: the attempt counter on every gateway and the runner's
+  // call scheduler, here with the register row ABSENT (one call at a time per debate: the serial lane).
+  const gatewayInFlight = createRunInFlight();
+  const callScheduler = createCallScheduler({ policy: effectiveCallConcurrency({ state: "ABSENT" }) });
   const topology = createRunnerProviderTopology(TARGETS, (target) => withPreviewProviderCallPolicy(
     createPostgresProviderGateway(database.pool, {
       fetchImplementation: gates.guardedFetch, endpoint: target.baseUrl, model: target.model, maker: target.maker,
-      ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(PREVIEW, target)
+      ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(PREVIEW, target), inFlight: gatewayInFlight
     }),
     PREVIEW, target, { sleep: async (milliseconds) => { callSleeps.push(milliseconds); } }
   ));
@@ -352,6 +361,8 @@ function previewRunner(gates: Awaited<ReturnType<typeof startGates>>, claim: Cla
     claimTimeSynthesisRoleProbe: probe,
     answerRoleFallbackCovered: ({ roleRef, panel }) => previewSealedRoleFallbackCovered(roleRef, panel),
     ...(resilience === undefined ? {} : { runResilience: resilience }),
+    callScheduler,
+    callSubjects: previewCallSubjects(PREVIEW),
     holdRecorder: {
       countCooldownHolds: async () => holdWaits.length,
       record: async () => undefined,

@@ -11,7 +11,9 @@
  *  - LOCAL mode only (the preview stays local mode): no per-run money envelope, no shared wall, no billing reads. A
  *    hosted settings file is refused (PRACTICE_REQUIRES_LOCAL_MODE).
  *  - The two gate ports are passed in (the forwarded sockets, wrapped by the practice's gate watcher) instead of being
- *    built from the configuration's server socket paths.
+ *    built from the configuration's server socket paths; so are the gates' read-only `/remaining` readers, which set
+ *    the call scheduler's gate slots, and the keep-alive pool the claim renewals use (the throwaway database's).
+ *  - Local mode has no money guard, so of main.ts's two in-flight counters only the gateway's (attempts) exists here.
  *  - No Hatchet, no worker, no start-up re-dispatch, no team gate: the practice calls executeWorkItem itself.
  *  - The story shape pack is the repository's own (the server's DEBATEAI_STORY_SHAPES_DIR is a server path).
  *  - `wait` (the runner's cooldown hold) and `sleep` (the preview policy's one 60-second resend) can be injected, for
@@ -19,15 +21,23 @@
  */
 import type { Pool } from "pg";
 import { RunRepository } from "@debateai/db";
-import { createTerminalActivationEvaluator } from "@debateai/battery";
+import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
-import { readEngineVersion, readModelScorecard, readStoryPolicyFromRegister, type DeploymentMode } from "@debateai/register";
+import {
+  effectiveCallConcurrency,
+  readCallConcurrencyPolicy,
+  readEngineVersion,
+  readModelScorecard,
+  readStoryPolicyFromRegister,
+  type DeploymentMode
+} from "@debateai/register";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   assertDeploymentProviderTargets,
   assertPreviewProviderTargets,
   assertPreviewRoleTargets,
   assertPricedProviderTargets,
+  createPreviewBusyCoordinator,
   createPreviewGuardedFetch,
   observeClaimTimeTarget,
   parseProviderDiscoveryTargets,
@@ -41,6 +51,8 @@ import {
   resolveProviderTargetCredentials,
   withPreviewProviderCallPolicy,
   type PreviewBudgetPorts,
+  type PreviewGateRemaining,
+  type PreviewProviderName,
   type PreviewProviderTestConfig
 } from "@debateai/providers";
 import { StoryWriter, loadStoryPack, resolveStoryPackDir, type StoryPack } from "@debateai/story";
@@ -53,6 +65,9 @@ import {
 } from "@debateai/runner";
 import { assertRunnerPrimaryProviderConfiguration, createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
+import { createCallScheduler } from "../../apps/runner/src/call-scheduler.js";
+import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames } from "../../apps/runner/src/call-lane-gateway.js";
+import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 
 /** The runner settings the practice needs: the non-secret runner.env keys the operator exports (README step S-2). */
 export type PracticeRunnerSettings = Readonly<{
@@ -83,6 +98,10 @@ export async function composePracticeRunner(input: Readonly<{
   environment: PracticeRunnerSettings;
   /** The two gate ports (the forwarded sockets, watched). */
   budgetPorts: PreviewBudgetPorts;
+  /** Each gate's read-only `/remaining` (the forwarded sockets): the call scheduler's gate slots, read once. */
+  remaining: Readonly<Record<PreviewProviderName, () => Promise<PreviewGateRemaining>>>;
+  /** The claim renewals' own pool (main.ts: RUNNER_DATABASE_POOLS.keepAlive), distinct from `pool`. */
+  keepAlivePool: Pool;
   /** Test seam: the runner's cooldown hold. Default: real time. */
   wait?: (milliseconds: number) => Promise<void>;
   /** Test seam: the preview call policy's and the claim probe's one 60-second resend. Default: real time. */
@@ -127,6 +146,16 @@ export async function composePracticeRunner(input: Readonly<{
     throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT", "Preview roster cannot override a valid scorecard");
   }
   const previewFetch = createPreviewGuardedFetch(input.budgetPorts);
+  // Parallel AI calls (spec 2026-10-12 §3.2-§3.5), as main.ts composes them on the preview.
+  const gatewayInFlight = createRunInFlight();
+  const runnerCallScheduler = createCallScheduler({
+    policy: effectiveCallConcurrency(await readCallConcurrencyPolicy(pool, environment.REGISTER_VERSION))
+  });
+  await applyPreviewGateCapacities({
+    scheduler: runnerCallScheduler,
+    gates: previewGateNames(previewConfig).map((gate) => ({ gate, remaining: input.remaining[gate] }))
+  });
+  const previewBusy = createPreviewBusyCoordinator();
   // The preview declares no credential (the gates hold the keys); the resolver must then find nothing to read.
   const providerTargets = resolveProviderTargetCredentials(declaredProviderTargets, () => {
     throw new TypeError("PRACTICE_TARGET_DECLARES_A_CREDENTIAL");
@@ -138,10 +167,11 @@ export async function composePracticeRunner(input: Readonly<{
       model: target.model,
       maker: target.maker,
       ...providerTargetGatewayControls(target),
-      ...previewTargetGatewayControls(previewConfig, target)
+      ...previewTargetGatewayControls(previewConfig, target),
+      inFlight: gatewayInFlight
     });
     return withPreviewProviderCallPolicy(gateway, previewConfig, target,
-      input.sleep === undefined ? {} : { sleep: input.sleep });
+      { busy: previewBusy, ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
   });
   const runRepository = new RunRepository(pool);
   assertRunnerPrimaryProviderConfiguration({
@@ -240,6 +270,11 @@ export async function composePracticeRunner(input: Readonly<{
     runResilience: previewRunResilience(previewConfig)!,
     answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ provider_ref: string; model_id: string }>[] }>) =>
       previewSealedRoleFallbackCovered(roleRef, panel),
+    // Parallel AI calls (spec 2026-10-12 §3.2, §3.6), as main.ts: the one scheduler's lane per debate, each ref's
+    // model, vendor and gate, and the claim renewals on their own pool.
+    callScheduler: runnerCallScheduler,
+    callSubjects: previewCallSubjects(previewConfig),
+    renewals: new WorkItemRepository(input.keepAlivePool),
     holdRecorder: {
       countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),
       record: (event) => runRepository.recordRunLifecycleEvent({
@@ -260,5 +295,5 @@ export async function composePracticeRunner(input: Readonly<{
     }
   });
   return Object.freeze({ runner, providerTopology, providerTargets, declaredProviderTargets, policy, storyPolicy, previewFetch,
-    configuredProviders: deploymentMakers.configuredProviders });
+    configuredProviders: deploymentMakers.configuredProviders, callScheduler: runnerCallScheduler });
 }

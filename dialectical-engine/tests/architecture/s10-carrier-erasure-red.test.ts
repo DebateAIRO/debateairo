@@ -229,6 +229,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       .map(([path]) => path)
       .sort();
     expect(providerFiles).toEqual([
+      // Parallel AI calls (spec 2026-10-12 §3.2): the debate's call lane hands each runner call, unchanged, to the
+      // member's gateway it wraps, once a slot is free, in the caller's own async context (its lease and keep-alive).
+      // It opens no lease and reads no content.
+      "apps/runner/src/call-lane-gateway.ts",
       "apps/runner/src/index.ts",
       // L4-F9 repair: the keep-alive hands each runner call, unchanged, to the
       // gateway it wraps (the run-required, leased gateway), or refuses it before

@@ -350,6 +350,7 @@ export async function runPracticeDebate(input: Readonly<{
       dispatcher: { dispatch: async (job) => { dispatched.push({ ...job }); } }, log: progress
     });
     const runner = await composePracticeRunner({ pool, environment: input.settings.runner, budgetPorts: input.budgetPorts,
+      remaining: remainingPorts, keepAlivePool: database.extraPool(),
       ...(input.wait === undefined ? {} : { wait: input.wait }), ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
     const question = practiceQuestion(input.questionId);
     const request = {

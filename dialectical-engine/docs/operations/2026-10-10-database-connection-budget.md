@@ -18,6 +18,12 @@ takes at most 8 debates at once; the rest wait their turn in the job queue for u
 Owner rulings, 2026-10-10: size for **one** API process (the server runs exactly one, `deploy/vps/README.md`, "Exactly one
 API unit"), and **8 debates at once** on the runner.
 
+**Update 2026-10-12 (parallel AI calls,
+[spec §3.6](../superpowers/specs/2026-10-12-parallel-calls-design.md)):** a debate now asks its independent AI calls at the
+same time, so their ledger and spend writes overlap. The runner's main pool grows from 20 to 32 (8 debates × 3 + 8), and a
+separate pool of 2 serves only claim renewal, so a burst of writes never costs a debate its claim. The runner's total is
+34; the server's sum of ceilings is 175 of 197 and 22 stay free.
+
 ## 1. The budget
 
 A pool opens a connection only when it needs one and closes it after 10 seconds unused, so these numbers are ceilings,
@@ -47,7 +53,8 @@ guard that keeps the code and the numbers in step is
 
 | Pool | Before | Now | Wait limit | Why |
 |---|---|---|---|---|
-| `runner:runtime` | 10 | 20 | 5 s | 8 debates × 2 connections, plus 4 for claiming work, start-up checks and the story writer |
+| `runner:runtime` | 10 | 32 (20 until 2026-10-12) | 5 s | 8 debates × 3 connections (the content lease, spend and memory reads, and the writes of AI calls running at the same time), plus 8 for claiming work, start-up checks, the story writer and bursts |
+| `runner:keep-alive` (since 2026-10-12) | none | 2 | 5 s | Only the running debates' claim renewals, so they never wait behind a debate's writes |
 | Debates at once | 100 (job system default) | **8** | 30 min in the queue | Each debate keeps its content lease for the whole debate and needs a second connection for spend and memory reads |
 
 ### The whole server
@@ -55,16 +62,16 @@ guard that keeps the code and the numbers in step is
 | Who | Connections at most |
 |---|---|
 | Website (API), one process | 78 |
-| Debate runner | 20 |
+| Debate runner (32 + 2 for claim renewal) | 34 |
 | Hatchet (its role's limit, `deploy/postgres/bootstrap.sql`) | 50 |
 | Migrator (its role's limit) | 3 |
 | Owner's commands (billing, support, owner CLI; by hand, one at a time) | about 10 |
-| **Sum of ceilings** | **161 of 197** |
-| Left free | 36: room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
+| **Sum of ceilings** | **175 of 197** (161 before 2026-10-12) |
+| Left free | 22 (36 before 2026-10-12): room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
 
 Backups (`pg_dump` as the `postgres` user) use the 3 administrator slots.
 
-A second API process does **not** fit: 161 + 78 is more than 197. Before running two (for example to restart without a
+A second API process does **not** fit: 175 + 78 is more than 197. Before running two (for example to restart without a
 gap, or to grow), put PgBouncer in front (section 4) or raise `max_connections` together with the memory settings
 (section 3).
 
@@ -119,7 +126,7 @@ log_temp_files = 10MB             # log any query that spills more than 10 MB to
 
 * **If the preview cluster runs on the same machine as production**, split it: give each about 1.5 GB of
   `shared_buffers` and 3.5 GB of `effective_cache_size`.
-* **Why not more `work_mem`:** it is per step, per query. 161 connections × 8 MB × a few steps could, in theory, exceed
+* **Why not more `work_mem`:** it is per step, per query. 175 connections × 8 MB × a few steps could, in theory, exceed
   the RAM. In practice only about as many queries run at once as there are cores, so 8 MB is safe. Raise it only when
   `log_temp_files` shows spills.
 * **Keep `max_connections = 200`.** Each extra allowed connection costs memory even when unused, and 6 cores cannot run

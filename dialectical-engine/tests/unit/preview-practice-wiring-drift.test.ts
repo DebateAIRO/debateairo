@@ -143,6 +143,25 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     }
   });
 
+  it("parallel AI calls: both build the call scheduler, the busy coordinator, the call subjects, the attempt counter and the keep-alive renewals", () => {
+    // Spec 2026-10-12-parallel-calls-design.md §3.2-§3.6: the practice measures the runner the preview runs.
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
+      const code = withoutComments(source);
+      expect(code).toContain("effectiveCallConcurrency(await readCallConcurrencyPolicy(");
+      expect(code.match(/createCallScheduler\(/gu) ?? []).toHaveLength(1);
+      expect(code.match(/createPreviewBusyCoordinator\(\)/gu) ?? []).toHaveLength(1);
+      expect(code).toContain("withPreviewProviderCallPolicy(gateway, previewConfig, target");
+      expect(code).toMatch(/busy: previewBusy/u);
+      expect(code).toContain("inFlight: gatewayInFlight");
+      expect(code).toContain("previewCallSubjects(previewConfig)");
+      expect(code).toContain("await applyPreviewGateCapacities({");
+      expect(code).toMatch(/renewals: new WorkItemRepository\(/u);
+    }
+    for (const key of ["callScheduler", "callSubjects", "renewals"]) {
+      expect(objectAfter(RUNNER_MAIN, "new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {").has(key), key).toBe(true);
+    }
+  });
+
   it("run resilience is the preview's alone: main.ts sets runResilience only when the preview config is present", () => {
     // Review 2026-10-12, test gap (f) (ruling R-c: hosted and local unchanged). The one place main.ts sets the
     // runner's runResilience is a spread guarded by the preview config, which only the preview's environment carries.

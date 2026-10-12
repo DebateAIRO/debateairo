@@ -356,7 +356,8 @@ describe("B9c · the shipped runner switches it on only with the new settings", 
     const start = source.indexOf("assignedSeats = buildAssignedRunSeatBook({");
     expect(start).toBeGreaterThan(0);
     const call = source.slice(start, source.indexOf("});", start));
-    expect(call).toContain("assignment: roleAssignment, configured: configuredByProviderRef, routeHealth,");
+    // Parallel AI calls (2026-10-12): the configured makers through the debate's call lane, when the runner has one.
+    expect(call).toContain("assignment: roleAssignment, configured: assignedConfigured, routeHealth,");
     expect(call).toContain("...(this.settings.bodyCostFallback === true ? { judgeGatewayFor: bodyGatewayFor } : {})");
     // The factory is the one the legacy book's judges are wrapped with, over the claim-eligible makers.
     expect(source).toContain("const bodyGatewayFor = (planned: ConfiguredSeatMaker, provider: ProviderGateway): ProviderGateway =>\n      bodyCostFallbackGateway({");

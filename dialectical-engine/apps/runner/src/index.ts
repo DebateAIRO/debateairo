@@ -201,6 +201,8 @@ import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-s
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunInFlight } from "./run-in-flight.js";
+import type { CallScheduler } from "./call-scheduler.js";
+import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
 import {
   createRunSitOutBook,
   runPanelRevisedReason,
@@ -2207,6 +2209,24 @@ export interface WalkingSkeletonSettings {
    * `previewRunResilience` on the preview only.
    */
   readonly runResilience?: RunResilienceSettings;
+  /**
+   * Parallel AI calls (spec docs/superpowers/specs/2026-10-12-parallel-calls-design.md §3.2): the runner's one call
+   * scheduler. Each claimed debate opens a lane in it, and every claim-eligible maker's gateway (its judge's too) goes
+   * through that lane, outside the sit-out book, so body, serve and story calls all wait for a slot under the register's
+   * limits (absent row: one call at a time per debate). The lane closes when `execute` ends, after the story. Absent:
+   * nothing is wrapped, today's runner.
+   */
+  readonly callScheduler?: CallScheduler;
+  /**
+   * The model, vendor and preview gate each provider ref's calls use (`previewCallSubjects` on the preview,
+   * `targetCallSubjects` elsewhere). Read only with `callScheduler`; absent, each ref is its own model behind no gate.
+   */
+  readonly callSubjects?: CallSubjectResolver;
+  /**
+   * Spec §3.6: where the claim renewals of a running debate go — a repository on the runner's own small keep-alive
+   * pool, so a burst of a debate's writes never keeps a renewal waiting for a connection. Absent: the runner's pool.
+   */
+  readonly renewals?: Pick<WorkItemRepository, "renewClaim">;
   readonly scoringOperator?: ScoringOperatorRegisterInput;
   readonly runDeathPolicy?: RunDeathPolicy;
   readonly hiddenNodeScoreThreshold?: {
@@ -4623,9 +4643,27 @@ export class WalkingSkeletonRunner {
     const keepAlive = startRunKeepAlive({
       claimDeadline: claimed.claimDeadline,
       renewEveryMs: this.settings.claimMs / 3,
-      renew: (heldUntil) => this.#work.renewClaim({ ...claimInput, workItemId: claimed.workItemId, heldUntil }),
+      renew: (heldUntil) => (this.settings.renewals ?? this.#work).renewClaim({ ...claimInput, workItemId: claimed.workItemId, heldUntil }),
       ...(task === undefined ? {} : { task })
     });
+    /**
+     * Parallel AI calls (spec 2026-10-12 §3.2): this debate's lane of the runner's call scheduler, opened once the
+     * debate is claimed and closed in the `finally` below, after the story: a call still waiting then is refused
+     * (CALL_LANE_STOPPED) and never sent. Without a scheduler there is no lane and nothing is wrapped.
+     */
+    const callScheduler = this.settings.callScheduler;
+    const callLane = callScheduler === undefined ? undefined : callScheduler.openLane(claimedRunId);
+    const callSubjects = this.settings.callSubjects;
+    /** A maker's gateway through this debate's lane; the gateway itself without a scheduler. */
+    const throughCallLane = (providerRef: string, provider: ProviderGateway): ProviderGateway =>
+      callScheduler === undefined || callLane === undefined ? provider : laneGateway({
+        lane: callLane,
+        scheduler: callScheduler,
+        subject: callSubjects === undefined
+          ? Object.freeze({ model: providerRef, vendor: "default", gate: null })
+          : callSubjects.subjectOf(providerRef),
+        provider
+      });
     try {
     return await runKeepAliveScope.run(keepAlive, async () => {
     /**
@@ -4937,9 +4975,16 @@ export class WalkingSkeletonRunner {
     const sitOut: RunSitOutBook | null = this.settings.runResilience === undefined
       ? null
       : createRunSitOutBook(this.settings.runResilience);
+    /**
+     * Parallel AI calls (spec 2026-10-12 §3.2): the same loop puts every maker's gateway through this debate's call
+     * lane, OUTSIDE the sit-out book: a call that waited for a slot meets the sit-out check only when it may start. So
+     * every per-run copy below (body makers, the legacy seat book, the synthesis and story makers) uses the lane.
+     * Without either, the maker is returned as it is: today's run.
+     */
     const sitOutMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {
-      if (sitOut === null) return maker;
-      const provider = sitOut.gateway(maker.providerRef, maker.provider);
+      const sittingOut = sitOut === null ? maker.provider : sitOut.gateway(maker.providerRef, maker.provider);
+      const provider = throughCallLane(maker.providerRef, sittingOut);
+      if (provider === maker.provider) return maker;
       return Object.freeze({ ...maker, provider, judge: new Judge(provider) });
     };
     configuredMakers.forEach((maker, index) => { configuredMakers[index] = sitOutMaker(maker); });
@@ -5067,8 +5112,16 @@ export class WalkingSkeletonRunner {
           ? Object.freeze({ state: "HEALTHY" as const })
           : Object.freeze({ state: "ABSENT" as const, failureCode }));
       }
+      // Parallel AI calls (spec 2026-10-12 §3.2): an assigned seat's member calls through this debate's lane too. The
+      // assigned book reads the configured makers, not the sit-out copies, as before; without a scheduler, as they are.
+      const assignedConfigured: ReadonlyMap<string, ConfiguredSeatMaker> = callLane === undefined
+        ? configuredByProviderRef
+        : new Map([...configuredByProviderRef].map(([ref, maker]) => {
+          const provider = throughCallLane(ref, maker.provider);
+          return [ref, Object.freeze({ ...maker, provider, judge: new Judge(provider) })] as const;
+        }));
       assignedSeats = buildAssignedRunSeatBook({
-        assignment: roleAssignment, configured: configuredByProviderRef, routeHealth,
+        assignment: roleAssignment, configured: assignedConfigured, routeHealth,
         // B9c x S1a: an assigned seat's judge goes through the cheaper-model gateway too.
         ...(this.settings.bodyCostFallback === true ? { judgeGatewayFor: bodyGatewayFor } : {})
       });
@@ -8750,6 +8803,7 @@ export class WalkingSkeletonRunner {
     return executed;
     });
     } finally {
+      callLane?.close();
       keepAlive.stop();
     }
   }
