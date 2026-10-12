@@ -15,8 +15,11 @@
  * each model's own jobs keep their order (job by job, the samples of a job together).
  *
  * A busy model: when a job's call ends in the vendor's refusal, not billed (the call and its one resend, the gate's
- * PROVIDER_REFUSED_UNBILLED, or the model is cooling off as MODEL_COOLING), the model is marked busy and its remaining
- * jobs are skipped (SKIPPED_MODEL_BUSY), read by
+ * PROVIDER_REFUSED_UNBILLED, or the model is cooling off as MODEL_COOLING), only that model is parked: it waits out its
+ * cool-off (the gate's retry_after when it named one, else 60 s doubling up to 600 s, up to a quarter longer) while the
+ * other models go on, then the SAME job is tried again. Each model has a budget of such waits (`busyWaitMs`, the
+ * command's --busy-wait-minutes, default 30; 0 is the old rule). Only when its budget is spent is the model marked busy
+ * and its remaining jobs skipped (SKIPPED_MODEL_BUSY). Busy-ness is read by
  * the runner's own predicate (providerCallEndedVendorRefusedUnbilled) on the job's gateway, as the runner's sit-out
  * book reads it on a member's gateway (apps/runner/src/run-sit-out.ts). The other models, on the same gate too, go
  * on. The gate's own refusals (too many calls in flight, vendor not reached) are the gate's, not the model's: they
@@ -41,7 +44,7 @@ import {
 import type { StoryPack } from "@debateai/story";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
 import { limitPort, PracticeSemaphore, runModelQueues, type PracticePreparedJob } from "./practice-concurrency.js";
-import type { PracticeGateName, PracticeGateObserver } from "./practice-gate-observer.js";
+import type { PracticeGateName, PracticeGateObserver, PracticeUnbilledKind } from "./practice-gate-observer.js";
 import {
   issueListFromParseError,
   recheckReply,
@@ -161,6 +164,35 @@ export function practiceTurnOrder(targets: readonly ProviderDiscoveryTarget[]): 
 export const PRACTICE_FORMATS_DEFAULTS: Readonly<{ gateLimits: Readonly<Record<PracticeGateName, number>>; maxInFlight: number }> =
   Object.freeze({ gateLimits: Object.freeze({ deepinfra: 4, anthropic: 1 }), maxInFlight: 5 });
 
+/** The first wait of a busy model without the gate's retry_after; each wait in a row doubles it, up to the most. */
+const BUSY_WAIT_FIRST_MS = 60_000;
+const BUSY_WAIT_MOST_MS = 600_000;
+
+/**
+ * How long a busy model waits before its job is tried again: the gate's retry_after when it named one (never less),
+ * else 60 s doubling with each wait in a row (60, 120, 240, 480), at most 600 s: the gate's own cool-off steps (owner,
+ * 2026-10-12). Never shorter than that, and up to a quarter longer (so the models'
+ * retries do not line up).
+ */
+export function practiceBusyWaitMs(input: Readonly<{ retryAfterSeconds: number | null; waitsInARow: number; random?: () => number }>): number {
+  const spread = 1 + 0.25 * Math.min(1, Math.max(0, (input.random ?? Math.random)()));
+  if (input.retryAfterSeconds !== null) return Math.round(input.retryAfterSeconds * 1_000 * spread);
+  const base = Math.min(BUSY_WAIT_MOST_MS, BUSY_WAIT_FIRST_MS * 2 ** Math.max(0, input.waitsInARow));
+  return Math.min(BUSY_WAIT_MOST_MS, Math.round(base * spread));
+}
+
+/** A busy model parked: what samples.jsonl keeps of it. */
+export type PracticeBusyWait = Readonly<{
+  model: string; lane: PracticeLane; sample: number;
+  /** This model's waits so far, this one included. */
+  wait: number;
+  waitMs: number;
+  reason: Extract<PracticeUnbilledKind, "VENDOR_REFUSED" | "MODEL_COOLING">;
+  retryAfterSeconds: number | null;
+}>;
+/** A parked model's wait ended (cancelled: the operator's interrupt or a gate stop cut it short or ends the run). */
+export type PracticeBusyResume = Readonly<{ model: string; lane: PracticeLane; sample: number; waitedMs: number; cancelled: boolean }>;
+
 export async function runPracticeFormats(input: Readonly<{
   config: PreviewProviderTestConfig;
   /** One target per model (the first declared target of each model). */
@@ -188,9 +220,27 @@ export async function runPracticeFormats(input: Readonly<{
   random?: () => number;
   /** Told each finished (or skipped) job at once: the samples log. */
   onSample?: (sample: PracticeSample) => void;
-  /** Told each model marked busy at once. */
+  /** Told each model marked busy at once (its wait budget spent: the rest of its jobs are skipped). */
   onBusy?: (model: string) => void;
+  /** Each model's budget of busy waits, in ms (default 0: a busy model's remaining jobs are skipped at once). */
+  busyWaitMs?: number;
+  /** Told each time a busy model is parked, and when its wait ends. */
+  onBusyWait?: (wait: PracticeBusyWait) => void;
+  onResume?: (resume: PracticeBusyResume) => void;
+  /** Aborted by the operator's interrupt: cuts the busy waits short. */
+  stopSignal?: AbortSignal;
 }>): Promise<PracticeFormatsResult> {
+  const budgetMs = input.busyWaitMs ?? 0;
+  // Each model's waits: the time used of its budget, its waits so far and in a row, and the wait it is parked in.
+  type WaitState = { usedMs: number; waits: number; inARow: number; parked: { lane: PracticeLane; sample: number; since: number } | null };
+  const waiting = new Map<string, WaitState>();
+  const waitState = (model: string): WaitState => {
+    const known = waiting.get(model);
+    if (known !== undefined) return known;
+    const fresh: WaitState = { usedMs: 0, waits: 0, inARow: 0, parked: null };
+    waiting.set(model, fresh);
+    return fresh;
+  };
   // Each call takes a place at its gate, then one overall (always in that order), before the brake looks at it.
   const overall = new PracticeSemaphore(input.maxInFlight ?? PRACTICE_FORMATS_DEFAULTS.maxInFlight);
   const limited = Object.fromEntries(Object.entries(input.ports).map(([provider, port]) => {
@@ -210,6 +260,14 @@ export async function runPracticeFormats(input: Readonly<{
     const gate = gateOf(target.model);
     const question = PRACTICE_QUESTIONS[(sample - 1) % PRACTICE_QUESTIONS.length]!;
     const base = { model: target.model, providerRef: target.providerRef, gate, lane, sample, questionId: question.id };
+    const state = waitState(target.model);
+    if (state.parked !== null) {
+      const cancelled = input.observer.stopped(gate) !== null || input.shouldStop?.() === true;
+      input.onResume?.(Object.freeze({ model: target.model, lane, sample, cancelled,
+        waitedMs: Math.round(performance.now() - state.parked.since) }));
+      if (!cancelled) input.progress?.(`${target.model} ${lane} #${String(sample)}: trying again after its wait`);
+      state.parked = null;
+    }
     const skipped = (status: "SKIPPED_GATE_STOPPED" | "SKIPPED_MODEL_BUSY", errorCode: string) => {
       record(Object.freeze({ ...base, status, latencyMs: 0, attempts: [],
         inputTokens: null, outputTokens: null, costNanoUsd: null, unbilledRefusals: 0, issues: [], recheckIssues: [],
@@ -283,7 +341,24 @@ export async function runPracticeFormats(input: Readonly<{
       const issues = problem === null ? [] : issueListFromParseError(problem.parseError ?? null);
       const recheck = problem === null || content === null ? [] : recheckReply(attempts.find((attempt) => attempt.parseStatus !== "PARSED")?.callSiteKey
         ?? attempts[0]?.callSiteKey ?? "UNMAPPED", content).issues;
-      // A call ended in the vendor's refusal, not billed: the model sits out the rest (marked before the sample is told).
+      // A call ended in the vendor's refusal, not billed: while its budget lasts, the model is parked and the SAME job is
+      // tried again after its wait (this attempt is not a sample; the busy-wait line keeps it, the wire lines its calls).
+      if (endedBusy && state.usedMs < budgetMs) {
+        const busyEvent = [...wire].reverse().find((event) => event.unbilledKind === "VENDOR_REFUSED" || event.unbilledKind === "MODEL_COOLING");
+        const reason = busyEvent?.unbilledKind === "MODEL_COOLING" ? "MODEL_COOLING" : "VENDOR_REFUSED";
+        const retryAfterSeconds = reason === "MODEL_COOLING" ? busyEvent?.retryAfterSeconds ?? null : null;
+        const waitMs = Math.min(budgetMs - state.usedMs,
+          practiceBusyWaitMs({ retryAfterSeconds, waitsInARow: state.inARow, ...(input.random === undefined ? {} : { random: input.random }) }));
+        state.usedMs += waitMs;
+        state.waits += 1;
+        state.inARow += 1;
+        state.parked = { lane, sample, since: performance.now() };
+        input.onBusyWait?.(Object.freeze({ model: target.model, lane, sample, wait: state.waits, waitMs, reason, retryAfterSeconds }));
+        input.progress?.(`${target.model} is busy (refused, not billed): waiting ${String(Math.round(waitMs / 1_000))}s, then ${lane} #${String(sample)} again`);
+        return { retryAfterMs: waitMs };
+      }
+      if (!endedBusy) state.inARow = 0;
+      // Its budget spent: the model sits out the rest (marked before the sample is told).
       const markedBusy = endedBusy && !busy.includes(target.model);
       if (markedBusy) busy.push(target.model);
       record(Object.freeze({
@@ -298,10 +373,12 @@ export async function runPracticeFormats(input: Readonly<{
         input.progress?.(`${target.model} is busy (refused, not billed): its remaining jobs are skipped`);
       }
       input.progress?.(`${target.model} ${lane} #${String(sample)}: ${status} ${String(latencyMs)}ms`);
+      return undefined;
     };
   };
   await runModelQueues({ models: order, jobs, parallel: input.parallel === true, gapMs: input.gapMs, prepare, sleep,
-    ...(input.random === undefined ? {} : { random: input.random }) });
+    ...(input.random === undefined ? {} : { random: input.random }),
+    ...(input.stopSignal === undefined ? {} : { signal: input.stopSignal }) });
   return Object.freeze({ samples: Object.freeze(samples), models: Object.freeze(input.targets.map((target) => target.model)),
     lanes: Object.freeze([...input.lanes]), busyModels: Object.freeze([...busy]) });
 }

@@ -51,7 +51,7 @@ other way out too (Ctrl-C, Ctrl-C again, the tool breaking midway). To build `re
 a folder's `samples.jsonl` (nothing is sent; no socket or acknowledgement needed):
 
 ```sh
-pnpm exec tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
+node_modules/.bin/tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
 ```
 
 The last line on the screen and the exit code say:
@@ -61,7 +61,7 @@ The last line on the screen and the exit code say:
 | 0 | PASS | Everything worked. The upload may go ahead. |
 | 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes. Owner decides. |
 | 20 | FAIL | A reply had the wrong format, a call failed, the debate did not finish, no answer or no story, or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
-| 30 | NOT_PROVEN | It worked, but a model was busy (the AI company refused its call as "too busy", not billed, or the model was cooling off) and sat out the rest, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, or the operator pressed Ctrl-C once, so some model was not tested to the end. Run again later, or owner decides. |
+| 30 | NOT_PROVEN | It worked, but a model stayed busy (the AI company kept refusing its call as "too busy", not billed, or the model kept cooling off) until its waiting time ran out (formats) and sat out the rest, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, or the operator pressed Ctrl-C once, so some model was not tested to the end. Run again later, or owner decides. |
 | 40 | HARNESS_ERROR | The practice could not run (a start check refused, or the tool broke). Nothing about the release is known. |
 | 50 | ABORTED | The practice started but did not reach its end (Ctrl-C a second time, or the tool broke midway). The report holds every job that finished, and lists whatever else it found. Run again. |
 
@@ -74,12 +74,18 @@ The last line on the screen and the exit code say:
   start. It also refuses unless each gate's own read-only "what is left today" answer says active and open.
 - The settings file may hold only non-secret settings from an allow-list; a database address, a team list or
   anything key-shaped refuses.
-- A busy model: when the AI company refuses a model's call as "too busy" and refuses its one resend too (not
-  billed), or the model is cooling off after such refusals (the gate refuses that model for a while, without
-  contacting the AI company), that model is marked busy and its remaining jobs are skipped (`SKIPPED_MODEL_BUSY`;
-  formats mode). The other models, on the same gate too, go on, and the gate is not stopped for this. In debate mode
-  the runner makes a busy model sit out by itself. Either way the verdict for that model is NOT_PROVEN, not FAIL.
-  The gate's own refusal "too many calls at once" never marks a model busy.
+- A busy model (formats mode): when the AI company refuses a model's call as "too busy" and refuses its one resend
+  too (not billed), or the model is cooling off after such refusals (the gate refuses that model for a while, without
+  contacting the AI company), only that model pauses. It waits out its cool-off (as long as the gate says when it
+  names a time, never less; otherwise 1 minute, then 2, 4, 8 and at most 10 minutes for each wait in a row, the gate's
+  own cool-off steps, a little longer at
+  random), then the same job is tried again; the other models, on the same gate too, go on meanwhile, and the gate is
+  not stopped for this. Each model may wait at most `--busy-wait-minutes` in all (default 30). Only when that time is
+  used up is the model marked busy and its remaining jobs skipped (`SKIPPED_MODEL_BUSY`): NOT_PROVEN, not FAIL. A
+  model that came back and did all its jobs is proven; its refusals stay a warning (PASS_WITH_WARNINGS). The report
+  lists per model how often it waited, how long in all, and whether it recovered. `--busy-wait-minutes 0` is the old
+  rule: skip the rest at once. Ctrl-C cuts a wait short. In debate mode the runner makes a busy model sit out by
+  itself (NOT_PROVEN for that model). The gate's own refusal "too many calls at once" never marks a model busy.
 - The safety net on each gate, counted as the gate counts: the practice never sends to a gate again after 4
   answers in a row on it that were "could not reach the AI company" or an error the AI company answered without
   billing it and without saying it is busy (the gate's PROVIDER_ERROR_UNBILLED, e.g. Anthropic's 400, 404, 413 or 500:
@@ -90,8 +96,13 @@ The last line on the screen and the exit code say:
   in flight on the gate stays within 4 (if every one of them failed, the gate would still not halt); otherwise it waits
   for one to come back. In formats mode a job whose calls all ended in such an unbilled error is a failed call (FAIL),
   never "busy".
+- Start it with `node_modules/.bin/tsx` as in S-6, not `pnpm exec tsx`: on Ctrl-C pnpm quits at once (it sends the
+  practice SIGTERM and gives up), so the terminal shows pnpm's exit 130 instead of the practice's own exit code. The
+  practice still finishes and writes its report even then, but the exit code the release steps read is lost.
 - Ctrl-C once: no new calls are sent, the calls in flight finish, the report is written (NOT_PROVEN unless something
-  failed). Ctrl-C again within two seconds counts as the same press (pnpm and tsx pass the key press on again). Ctrl-C
+  failed). Ctrl-C again within two seconds counts as the same press (pnpm and tsx pass the key press on again; pnpm's
+  SIGTERM right after it too). A SIGTERM or SIGHUP at any other time quits at once and still writes the report
+  (ABORTED). Ctrl-C
   again later quits at once and still writes the report from the finished jobs (ABORTED); avoid it: a call killed
   mid-flight can halt the gate.
 - Formats mode: one call at a time per model, about a second apart (a slightly random gap, `--gap-ms`, default 1000),
@@ -105,7 +116,8 @@ The last line on the screen and the exit code say:
 
 - formats, default (5 models x 9 jobs x 2 samples): 90 jobs, about $0.10 to $0.30. The models go at the same time, so
   it takes about as long as the slowest model's 18 jobs: about 15 to 50 minutes (GLM, Qwen and MiMo take 30 to 170
-  seconds a call). With `--sequential`, about 1 to 2 hours.
+  seconds a call), plus up to `--busy-wait-minutes` (default 30) when a model is busy. With `--sequential`, about 1
+  to 2 hours, plus the same.
 - debate, depth 1: up to about 230 calls, about $0.15 to $0.70, about 1 to 2 hours. Depth 2: about 350 calls, up to
   about 3 hours. The start-of-debate estimate needs much more room left in the pots than is actually spent (about
   $4 DeepInfra and $0.90 Anthropic left for depth 1), so run early in the Bucharest day.
@@ -209,7 +221,7 @@ In a second terminal, from the worktree's `dialectical-engine` folder (set `D` a
 S-5):
 
 ```sh
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" pnpm exec tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/formats-report"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/formats-report"
 echo "exit: $?"
 ```
 
@@ -217,7 +229,7 @@ Only after formats passes: repeat S-3 (fresh gate status) and copy the two statu
 
 ```sh
 scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" pnpm exec tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --out "$P/debate-report"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --out "$P/debate-report"
 echo "exit: $?"
 ```
 
@@ -225,6 +237,8 @@ Optional flags:
 
 - formats: `--samples N` (1 to 10, default 2), `--gap-ms MS` (between one model's calls, default 1000; with
   `--sequential` between all calls, default 2000), `--max-in-flight N` (1 to 20, default 5), `--sequential`,
+  `--busy-wait-minutes N` (0 to 240, default 30: how long in all one busy model may wait before its remaining jobs are
+  skipped; 0 skips at once),
   `--models a,b` (model ids from the preview's roster), `--lanes JUDGE_POSITION,PANEL,...` (default all nine:
   JUDGE_POSITION, JUDGE_ATTACK, JUDGE_CROSS, PANEL, REVIEW, SYNTHESIZER, EVALUATOR, STORYTELLER, STORY_CHECKER).
 - report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/samples.jsonl.

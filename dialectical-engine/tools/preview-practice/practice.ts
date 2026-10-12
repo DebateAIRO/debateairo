@@ -37,7 +37,7 @@ import { practiceRemainingPorts } from "./practice-ask-composition.js";
 import { runPracticeDebate } from "./practice-debate.js";
 import { onePerModel, PRACTICE_FORMATS_DEFAULTS, runPracticeFormats } from "./practice-formats.js";
 import { PracticeGateObserver, type PracticeGateName } from "./practice-gate-observer.js";
-import { practiceInterruptGate } from "./practice-interrupt.js";
+import { practiceInterruptGate, takeOverSignals } from "./practice-interrupt.js";
 import { PRACTICE_LANES, type PracticeLane } from "./practice-lanes.js";
 import { parsePracticeRegisterExport, PracticeRegisterError } from "./practice-register-import.js";
 import {
@@ -77,7 +77,7 @@ export function repositoryRoot(): string {
 type Args = Readonly<{ mode: "formats" | "debate" | "report"; flags: ReadonlyMap<string, string>; switches: ReadonlySet<string> }>;
 
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
-  "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight"]);
+  "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes"]);
 const SWITCHES = new Set<string>(["--sequential"]);
 
 export function parsePracticeArgs(argv: readonly string[]): Args {
@@ -146,8 +146,11 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
   // Set once the report is on the disk (the run's own, or the abort's): nothing writes over it afterwards.
   let settled: PracticeRunResult | null = null;
   let stopRequested = false;
+  // The first interrupt also cuts a busy model's wait short.
+  const interrupted = new AbortController();
   const stop = () => {
     stopRequested = true;
+    interrupted.abort();
     observer?.stop("deepinfra", "OPERATOR_INTERRUPT");
     observer?.stop("anthropic", "OPERATOR_INTERRUPT");
   };
@@ -263,6 +266,8 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       const parallel = !args.switches.has("--sequential");
       const samples = wholeNumber(args, "--samples", 2, 1, 10);
       const maxInFlight = wholeNumber(args, "--max-in-flight", PRACTICE_FORMATS_DEFAULTS.maxInFlight, 1, 20);
+      // Each model's budget of busy waits (0: a busy model's remaining jobs are skipped at once, the old rule).
+      const busyWaitMs = wholeNumber(args, "--busy-wait-minutes", 30, 0, 240) * 60_000;
       const targets = onePerModel(declared, wanted);
       // The samples log: opened before the first paid call; every finished job, call and stop goes in at once.
       try { samplesLog = PracticeSampleLog.create(directory); } catch (error) {
@@ -275,7 +280,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       }
       const sampleLog = samplesLog;
       sampleLog.append({ kind: "start", schema: "preview-practice-samples-v1", mode: "formats", startedAt: startedAt.toISOString(),
-        models: targets.map((target) => target.model), lanes, samples, parallel, unsentStreakAtStart,
+        models: targets.map((target) => target.model), lanes, samples, parallel, busyWaitMs, unsentStreakAtStart,
         remainingBefore: { deepinfra: remainingLine(before.deepinfra), anthropic: remainingLine(before.anthropic) } });
       observer.listen({ event: (event) => sampleLog.append({ kind: "wire", event }), stop: (gateStop) => sampleLog.append({ kind: "stop", stop: gateStop }) });
       log(`samples: ${sampleLog.path}`);
@@ -301,7 +306,11 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         progress: log,
         shouldStop: () => stopRequested,
         onSample: (sample) => sampleLog.append({ kind: "sample", sample }),
-        onBusy: (model) => sampleLog.append({ kind: "busy", model })
+        onBusy: (model) => sampleLog.append({ kind: "busy", model }),
+        busyWaitMs,
+        onBusyWait: (wait) => sampleLog.append({ kind: "busy-wait", ...wait }),
+        onResume: (resume) => sampleLog.append({ kind: "resume", ...resume }),
+        stopSignal: interrupted.signal
       });
       if (settled !== null) return settled;
       const after = {
@@ -349,7 +358,7 @@ if (invokedDirectly) {
     try { exitCode = control?.abort(code) ?? 50; } catch { /* exit below all the same */ }
     process.exit(exitCode);
   };
-  process.on("SIGINT", () => {
+  const onInterrupt = () => {
     const action = interrupts.signal();
     // The same key press passed on again by pnpm or tsx (within two seconds of the first): already handled.
     if (action === "REPEAT_IGNORED") return;
@@ -361,7 +370,17 @@ if (invokedDirectly) {
     }
     process.stderr.write("interrupt again: quitting now; writing the report from the finished samples\n");
     quit("OPERATOR_SECOND_INTERRUPT");
-  });
+  };
+  const onStopFromOutside = (signal: string) => () => {
+    // pnpm answers a terminal Ctrl-C by sending its child SIGTERM and quitting itself: within two seconds of the first
+    // interrupt that is the same key press, so the calls in flight still finish and the report is still written.
+    if (interrupts.justInterrupted()) return;
+    process.stderr.write(`${signal}: quitting now; writing the report from the finished samples\n`);
+    quit(`OPERATOR_${signal}`);
+  };
+  // Ours alone: a library's own listener (embedded-postgres's async-exit-hook) would quit with 130 before the report.
+  const handlers = { SIGINT: onInterrupt, SIGTERM: onStopFromOutside("SIGTERM"), SIGHUP: onStopFromOutside("SIGHUP") };
+  takeOverSignals(process, handlers);
   process.on("uncaughtException", (error) => {
     process.stderr.write(`practice broke: ${error.name}\n`);
     quit(`UNCAUGHT:${error.name}`);
@@ -372,6 +391,10 @@ if (invokedDirectly) {
   });
   // ADR-0027: an operator command names the keys it reads; the register's loader is the one reader of the environment.
   const env = readOperatorCommandEnvironment(["PRACTICE_ACK", "PRACTICE_DEEPINFRA_SOCKET", "PRACTICE_ANTHROPIC_SOCKET"]);
-  const outcome = await runPractice(process.argv.slice(2), env, { onControl: (given) => { control = given; } });
+  const outcome = await runPractice(process.argv.slice(2), env, { onControl: (given) => {
+    control = given;
+    // Once more as the run starts, in case anything loaded since added its own.
+    takeOverSignals(process, handlers);
+  } });
   process.exit(outcome.exitCode);
 }
