@@ -77,6 +77,17 @@ describe("map replies: lists", () => {
     expect(mapClassifyReply(ro, STOP, mapListReplySchema, mapListCheck("ro")).classification.parseStatus).toBe("PARSED");
   });
 
+  it("checks points and candidate answers apart: English candidate answers for a Romanian question are refused at candidate_answers only, and the patch asks for that member", () => {
+    const englishAnswer = "Yes, the change should go ahead, but only with clear conditions on who pays for it.";
+    const content = JSON.stringify({ points: RO_POINTS, candidate_answers: [englishAnswer] });
+    const out = mapClassifyReply(content, STOP, mapListReplySchema, mapListCheck("ro"));
+    expect(out.classification.parseStatus).toBe("SCHEMA_FAILED");
+    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@candidate_answers"]);
+    if (out.classification.parseStatus !== "SCHEMA_FAILED") throw new Error("unreachable");
+    const plan = planPatchFollowUp({ content, reply: STOP, parseStatus: out.classification.parseStatus, parseError: out.classification.parseError });
+    expect(plan?.locator.paths).toEqual(["candidate_answers"]);
+  });
+
   it("reads Romanian quotes: „…” inside text, and „…\" closed with a straight quote (the tolerant decode)", () => {
     const quoted = JSON.stringify({ points: [point("Mulți spun „da” și pleacă.", RO_WHY), ...RO_POINTS.slice(1)], candidate_answers: ["Da."] });
     expect(mapClassifyReply(quoted, STOP, mapListReplySchema, mapListCheck("ro")).value?.points[0]?.claim).toBe("Mulți spun „da” și pleacă.");
@@ -99,7 +110,7 @@ describe("map replies: lists", () => {
 });
 
 describe("map replies: merge check: unknown, reused and wrong-kind ids", () => {
-  const check = mapMergeCheck(new Set(["pt01", "pt02", "pt03"]), new Set(["ca01"]));
+  const check = mapMergeCheck(new Set(["pt01", "pt02", "pt03"]), new Set(["ca01"]), "en");
   const merge = (keyPoints: unknown[], answers: unknown[]) => JSON.stringify({ key_points: keyPoints, answers });
 
   it("accepts groups that use known ids once", () => {
@@ -120,6 +131,22 @@ describe("map replies: merge check: unknown, reused and wrong-kind ids", () => {
       "MAP_ITEM_ID_REUSED@key_points.1.member_item_ids.0",
       "MAP_UNKNOWN_ITEM_ID@answers.0.member_item_ids.0"
     ]);
+  });
+
+  it("refuses a merged claim written in the wrong language at its key_points path", () => {
+    const roCheck = mapMergeCheck(new Set(["pt01", "pt02", "pt03"]), new Set(["ca01"]), "ro");
+    const content = merge([{ key_point_id: "k1", claim: "The cost of the change is high and the state should pay it.", member_item_ids: ["pt01"] }],
+      [{ answer_id: "a1", answer: "Da, cu condiții.", member_item_ids: ["ca01"] }]);
+    const out = mapClassifyReply(content, STOP, mapMergeReplySchema, roCheck);
+    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@key_points.0.claim"]);
+  });
+
+  it("refuses a merged answer written in the wrong language at its answers path", () => {
+    const roCheck = mapMergeCheck(new Set(["pt01", "pt02", "pt03"]), new Set(["ca01"]), "ro");
+    const content = merge([{ key_point_id: "k1", claim: "Costul schimbării este mare și statul ar trebui să îl plătească.", member_item_ids: ["pt01"] }],
+      [{ answer_id: "a1", answer: "Yes, the change should go ahead, but only with clear conditions on who pays for it.", member_item_ids: ["ca01"] }]);
+    const out = mapClassifyReply(content, STOP, mapMergeReplySchema, roCheck);
+    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@answers.0.answer"]);
   });
 });
 
@@ -153,6 +180,23 @@ describe("map replies: choose check", () => {
       "MAP_UNKNOWN_RIVAL@answers.0.strongest_rival",
       "MAP_UNKNOWN_RIVAL@answers.1.strongest_rival"
     ]);
+  });
+
+  it("reports a statement in the wrong language at its own answers path", () => {
+    const roCheck = mapChooseCheck(new Set(["kp01", "kp02", "kp03"]), "ro");
+    const content = JSON.stringify({ answers: [
+      { answer_id: "a1", statement: "Da, schimbarea trebuie făcută, cu condiții clare.", for: ["kp01"], against: [], strongest_rival: null },
+      { answer_id: "a2", statement: "The change should be made, but only with clear conditions on who pays.", for: ["kp02"], against: [], strongest_rival: null }] });
+    const out = mapClassifyReply(content, STOP, mapChooseReplySchema, roCheck);
+    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@answers.1.statement"]);
+  });
+
+  it("refuses a second answer whose statement repeats the first once case, punctuation and diacritics are set aside", () => {
+    const content = JSON.stringify({ answers: [
+      { answer_id: "a1", statement: "Yes, the plan works well.", for: ["kp01"], against: [], strongest_rival: null },
+      { answer_id: "a2", statement: "YES — the plan works well!", for: ["kp02"], against: [], strongest_rival: null }] });
+    const out = mapClassifyReply(content, STOP, mapChooseReplySchema, check);
+    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_ANSWER_DUPLICATE@answers.1.statement"]);
   });
 
   it("refuses five answers", () => {

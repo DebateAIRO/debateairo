@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { decodeModelJson, type ContentClassification, type ModelReplyFacts } from "@debateai/providers";
-import { mapWrongLanguage } from "./text.js";
+import { mapNormaliseText, mapWrongLanguage } from "./text.js";
 import { MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS } from "./types.js";
 
 /**
@@ -122,12 +122,15 @@ export const mapAnglesCheck: MapReplyCheck<MapAnglesReply> = (value) => {
   return issues;
 };
 
+/** Points and candidate answers are read apart, so a wrong-language member is named at its own path. */
 export function mapListCheck(languageTag: string): MapReplyCheck<MapListReply | MapSnowballReply> {
-  return (value) => mapLanguageIssues([...value.points.flatMap((point) => [point.claim, point.why_it_matters]),
-    ...value.candidate_answers], languageTag, ["points"]);
+  return (value) => [
+    ...mapLanguageIssues(value.points.flatMap((point) => [point.claim, point.why_it_matters]), languageTag, ["points"]),
+    ...mapLanguageIssues(value.candidate_answers, languageTag, ["candidate_answers"])
+  ];
 }
 
-export function mapMergeCheck(pointIds: ReadonlySet<string>, answerIds: ReadonlySet<string>): MapReplyCheck<MapMergeReply> {
+export function mapMergeCheck(pointIds: ReadonlySet<string>, answerIds: ReadonlySet<string>, languageTag: string): MapReplyCheck<MapMergeReply> {
   return (value) => {
     const issues: MapReplyIssue[] = [];
     const usedItems = new Set<string>();
@@ -144,6 +147,8 @@ export function mapMergeCheck(pointIds: ReadonlySet<string>, answerIds: Readonly
     };
     value.key_points.forEach((group, index) => visit("key_points", index, group.key_point_id, "key_point_id", group.member_item_ids, pointIds));
     value.answers.forEach((group, index) => visit("answers", index, group.answer_id, "answer_id", group.member_item_ids, answerIds));
+    value.key_points.forEach((group, index) => issues.push(...mapLanguageIssues([group.claim], languageTag, ["key_points", index, "claim"])));
+    value.answers.forEach((group, index) => issues.push(...mapLanguageIssues([group.answer], languageTag, ["answers", index, "answer"])));
     return issues;
   };
 }
@@ -156,6 +161,7 @@ export function mapChooseCheck(keyPointIds: ReadonlySet<string>, languageTag: st
   return (value) => {
     const issues: MapReplyIssue[] = [];
     const ids = value.answers.map((answer) => answer.answer_id);
+    const statements = new Set<string>();
     value.answers.forEach((answer, index) => {
       if (ids.indexOf(answer.answer_id) !== index) issues.push({ path: ["answers", index, "answer_id"], code: "MAP_ANSWER_ID_REUSED" });
       const seen = new Set<string>();
@@ -170,7 +176,11 @@ export function mapChooseCheck(keyPointIds: ReadonlySet<string>, languageTag: st
       if (rival !== null && (rival === answer.answer_id || !ids.includes(rival))) {
         issues.push({ path: ["answers", index, "strongest_rival"], code: "MAP_UNKNOWN_RIVAL" });
       }
+      const statement = mapNormaliseText(answer.statement);
+      if (statements.has(statement)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_DUPLICATE" });
+      statements.add(statement);
+      issues.push(...mapLanguageIssues([answer.statement], languageTag, ["answers", index, "statement"]));
     });
-    return [...issues, ...mapLanguageIssues(value.answers.map((answer) => answer.statement), languageTag, ["answers"])];
+    return issues;
   };
 }
