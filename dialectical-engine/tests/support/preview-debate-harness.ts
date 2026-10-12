@@ -66,7 +66,7 @@ import {
 } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS, DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
-import { createCallScheduler, type CallScheduler, type DebateCallLane } from "../../apps/runner/src/call-scheduler.js";
+import { createCallScheduler, type CallPriority, type CallScheduler, type DebateCallLane } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import {
@@ -162,6 +162,12 @@ export const OWNER_CALL_CONCURRENCY: CallConcurrencyPolicy = Object.freeze({
 export type ClaimComposition = "resend" | "single";
 
 export type PreviewGates = Awaited<ReturnType<ReturnType<typeof previewDebateHarness>["startGates"]>>;
+/** One lane call as the runner's scheduler saw it (ruling R33), in the order it happened. */
+export type LaneEvent = Readonly<
+  | { kind: "STARTED"; priority: CallPriority; model: string }
+  | { kind: "FAILED"; priority: CallPriority; model: string; error: unknown }
+>;
+
 export type ComposedPreviewRunner = ReturnType<ReturnType<typeof previewDebateHarness>["previewRunner"]>;
 export type AdmittedRun = Awaited<ReturnType<ReturnType<typeof previewDebateHarness>["admittedRun"]>>;
 
@@ -302,12 +308,30 @@ export function previewDebateHarness(input: Readonly<{
     });
     /** Every debate lane the runner opened, in opening order (Task 12: a test reads a stopped run's lane stats). */
     const lanes: DebateCallLane[] = [];
+    /**
+     * Ruling R33: every lane's calls in the RUNNER's own order, never the gates' clocks. STARTED is pushed when the
+     * scheduler starts a call (after the lane's start guard let it through); FAILED when that call's failure reaches
+     * the lane, which is AFTER the runner's lane hook (`onFailed`, inside the call) has seen it and BEFORE its slot
+     * frees. So a call STARTED after a FAILED entry was started by a lane whose guard already knew of that failure.
+     */
+    const laneEvents: LaneEvent[] = [];
     const callScheduler: CallScheduler = Object.freeze({
       ...scheduler,
       openLane: (debateId: string) => {
         const lane = scheduler.openLane(debateId);
         lanes.push(lane);
-        return lane;
+        return Object.freeze({
+          ...lane,
+          run: <T>(ticket: Parameters<DebateCallLane["run"]>[0], call: () => Promise<T>): Promise<T> => lane.run(ticket, () => {
+            laneEvents.push(Object.freeze({ kind: "STARTED", priority: ticket.priority, model: ticket.model }));
+            let settled: Promise<T>;
+            try { settled = Promise.resolve(call()); } catch (error) { settled = Promise.reject(error); }
+            return settled.catch((error: unknown) => {
+              laneEvents.push(Object.freeze({ kind: "FAILED", priority: ticket.priority, model: ticket.model, error }));
+              throw error;
+            });
+          })
+        });
       }
     });
     const bootReads = gates.remainingReads.length;
@@ -384,7 +408,7 @@ export function previewDebateHarness(input: Readonly<{
         wait: async (cooldownMs) => { holdWaits.push(cooldownMs); }
       }
     });
-    return { runner, topology, probeSleeps, callSleeps, holdWaits, holdRecords, callScheduler, lanes };
+    return { runner, topology, probeSleeps, callSleeps, holdWaits, holdRecords, callScheduler, lanes, laneEvents };
   }
 
   const panelMember = (providerRef: string, asOf: string): DiscoveredPanelMember => Object.freeze({

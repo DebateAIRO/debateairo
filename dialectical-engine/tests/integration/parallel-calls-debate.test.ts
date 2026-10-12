@@ -31,6 +31,7 @@ import {
   previewDebateHarness,
   type AdmittedRun
 } from "../support/preview-debate-harness.js";
+import { expansionPhaseStop } from "@debateai/runner";
 import type { GateArrival, GateOverride, GateRequest } from "../support/preview-gate-stubs.js";
 import { framedField, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { requestedReviewEdges, reviewArtifact, withRequestDerivedBearings } from "../support/reviewBearings.js";
@@ -599,7 +600,15 @@ describe("parallel calls: stops and failures with calls in flight (Task 12)", ()
 
     expect(laterRoots.length).toBeGreaterThanOrEqual(3);
     const stopAt = gates.arrivals[stoppingIndex]!.answeredAt!;
-    expect(authorOrReviewAfter(gates.arrivals, stopAt)).toEqual([]);
+    // Ruling R33: compared in the RUNNER's order, not by the gates' clocks (a call the runner started before it knew of
+    // the stop may still reach its gate after the gate answered the stop). The stop is the first spend-stop failure the
+    // lane saw; no AUTHOR or REVIEW call was started after it, while PANEL calls were.
+    const events = composed.laneEvents;
+    const stopEvent = events.findIndex((event) => event.kind === "FAILED" && expansionPhaseStop(event.error) !== null);
+    expect(stopEvent).toBeGreaterThan(0);
+    const startedAfterStop = events.slice(stopEvent + 1).filter((event) => event.kind === "STARTED");
+    expect(startedAfterStop.filter((event) => event.priority === "AUTHOR" || event.priority === "REVIEW")).toEqual([]);
+    expect(startedAfterStop.filter((event) => event.priority === "PANEL").length).toBeGreaterThan(0);
     // Author or review calls were waiting when the stop came: the lane held them back.
     expect(composed.lanes[0]!.stats().heldBack).toBeGreaterThan(0);
     // A panel call of a node whose author call answered BEFORE the stop reached its gate only AFTER the stop: it waited
