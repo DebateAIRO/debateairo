@@ -19,6 +19,7 @@ import {
 } from "./anthropic-messages.js";
 import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
+import type { ModelJsonRepair, ModelReplyFacts } from "./model-json.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
 // not organ aliases. A debater's model may hold either role; the CALL is
@@ -50,8 +51,13 @@ export interface PromptPacket {
   }[];
 }
 
+/**
+ * `jsonRepair` (story format robustness, 2026-10-12): the one repair the tolerant decode
+ * (`decodeModelJson`) needed before the content passed its checks, so repairs can be counted.
+ * Absent for content that was strict JSON, and for every classifier that does not use the decode.
+ */
 export type ContentClassification =
-  | { readonly parseStatus: "PARSED"; readonly parseError: null }
+  | { readonly parseStatus: "PARSED"; readonly parseError: null; readonly jsonRepair?: ModelJsonRepair }
   | { readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly parseError: string };
 
 /**
@@ -133,7 +139,12 @@ export interface ProviderCallRequest {
   readonly providerRef: string;
   readonly packet: PromptPacket;
   readonly preferredResponseFormat?: "json_object";
-  readonly classifyContent?: (content: string) => ContentClassification;
+  /**
+   * `reply` (story format robustness, 2026-10-12): how this reply ended, so a classifier can refuse to
+   * repair an answer cut off at its token ceiling. Always passed by this gateway; a classifier that
+   * gets none must treat the ending as unknown.
+   */
+  readonly classifyContent?: (content: string, reply?: ModelReplyFacts) => ContentClassification;
   readonly buildRepairPacket?: (rejected: RejectedProviderContent) => PromptPacket;
   /**
    * L4-F8: re-evaluated before EVERY attempt, so a run-wide model-attempt ceiling checked once
@@ -1889,7 +1900,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         try {
           classifiedContent = content === null
             ? { parseStatus: "UNPARSED", parseError: null }
-            : request.classifyContent?.(content) ?? {
+            : request.classifyContent?.(content, Object.freeze({ finishReason })) ?? {
                 parseStatus: contentParseStatus(content),
                 parseError: null
               };
@@ -2386,6 +2397,15 @@ export {
 } from "./provider-probe.js";
 
 export { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
+// Story format robustness (2026-10-12): the tolerant decode of a model's JSON answer.
+export {
+  decodeModelJson,
+  modelJsonFenceBody,
+  modelJsonObjectSpans,
+  type ModelJsonDecoded,
+  type ModelJsonRepair,
+  type ModelReplyFacts
+} from "./model-json.js";
 export * from "./preview-test.js";
 
 // Multi-model preview, PR B: the native Anthropic Messages wire.

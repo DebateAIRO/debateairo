@@ -100,8 +100,8 @@ export const PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS = 1_000_000 as const;
 export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
 /**
  * Owner ruling 2026-10-10: every reviewed row's answer cap (its max_tokens ceiling and the output side
- * of every reservation). No call the app makes asks for more than 24,000 today (debate calls and health
- * checks 8,192, the storyteller 12,000 then 24,000 on its retry).
+ * of every reservation). Debate calls and health checks ask for 8,192; the storyteller asks for this whole
+ * cap (story format robustness, 2026-10-12: its thinking counts toward max_tokens), and its retry is held to it.
  */
 const PREVIEW_ANSWER_CAP_TOKENS = 32_768;
 /** Template allowance added to the body's bytes on the input side of a reservation (contract A §3). */

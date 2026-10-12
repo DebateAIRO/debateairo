@@ -9,6 +9,8 @@ import {
   type CallBound,
   type ContentClassification,
   type FramedMaterialField,
+  type ModelJsonRepair,
+  type ModelReplyFacts,
   type PromptContract,
   type ProviderCallRequest,
   type ProviderCallResult,
@@ -234,6 +236,25 @@ function lineageOf(result: ProviderCallResult, providerRef: string): MakerLineag
 }
 
 /**
+ * Story format robustness (2026-10-12): the classifier a story call hands the gateway, remembering how the
+ * reply it accepted ended and which repair the tolerant decode needed. The writer then reads the accepted
+ * content exactly as the classifier read it (the last repair depends on how the reply ended) and logs the
+ * repair by its code. A gateway that never classifies leaves nothing remembered: the content is read strictly.
+ */
+function rememberingAcceptedReply(classify: (content: string, reply: ModelReplyFacts | undefined) => ContentClassification) {
+  let accepted: Readonly<{ content: string; reply: ModelReplyFacts | undefined; repair: ModelJsonRepair | null }> | null = null;
+  return Object.freeze({
+    classifyContent: (content: string, reply?: ModelReplyFacts): ContentClassification => {
+      const classified = classify(content, reply);
+      if (classified.parseStatus === "PARSED") accepted = Object.freeze({ content, reply, repair: classified.jsonRepair ?? null });
+      return classified;
+    },
+    acceptedAs: (content: string): Readonly<{ reply: ModelReplyFacts | undefined; repair: ModelJsonRepair | null }> =>
+      accepted !== null && accepted.content === content ? accepted : Object.freeze({ reply: undefined, repair: null })
+  });
+}
+
+/**
  * THE ONE STORY REQUEST BUILDER (pre-flight ruling): the storyteller and the
  * checker differ only in what they are handed, never in how the request is
  * shaped. The prompt is framed by the providers' one door; the repair packet is
@@ -250,7 +271,7 @@ function storyCallRequest(input: {
   readonly contract: PromptContract;
   readonly contractHash: string;
   readonly material: readonly FramedMaterialField[];
-  readonly classifyContent: (content: string) => ContentClassification;
+  readonly classifyContent: (content: string, reply?: ModelReplyFacts) => ContentClassification;
 }): ProviderCallRequest {
   const framed = buildFramedPrompt({ contract: input.contract, material: input.material });
   const request: ProviderCallRequest = {
@@ -427,6 +448,14 @@ export class StoryWriter {
     }
   }
 
+  /** Story format robustness (2026-10-12): an accepted reply that needed a repair, by code and ids only. */
+  #logRepair(site: StoryCallSite, round: number, repair: ModelJsonRepair | null, input: StoryWriteInput): void {
+    if (repair === null) return;
+    this.#log("STORY_REPLY_REPAIRED", () => ({
+      answerId: input.answerId, answerVersion: input.answerVersion, round, site, repair
+    }));
+  }
+
   async #store(record: StoryRecordInput, stepLease: StoryStepLease): Promise<void> {
     let stored: "INSERTED" | "ALREADY_PRESENT" | "RUN_ERASED";
     try {
@@ -539,6 +568,7 @@ export class StoryWriter {
     const repairedRounds = new Set<number>();
     const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds }, {
       writeStory: async ({ round, priorObjection }) => {
+        const reading = rememberingAcceptedReply((content, reply) => classifyStoryContent(content, built.index, reply));
         const request = storyCallRequest({
           story: input,
           site: "STORYTELLER",
@@ -548,7 +578,7 @@ export class StoryWriter {
           contract: storytellerContract,
           contractHash: storytellerHash,
           material: toStoryPromptMaterial(built.material, priorObjection),
-          classifyContent: (content) => classifyStoryContent(content, built.index)
+          classifyContent: reading.classifyContent
         });
         // Task M7 (review ruling): a fallback storyteller is STRICTLY cheapest
         // first, the planned checker's maker included. Both calls spend ONE
@@ -560,7 +590,9 @@ export class StoryWriter {
         draftWriterByRound.set(round, servedBy.providerRef);
         // Short refs on purpose: the checker judges this body against the SAME
         // material the storyteller read. Real ids are restored only for storage.
-        const body: StoryBody = parseStoryBody(result.content, built.index);
+        const accepted = reading.acceptedAs(result.content);
+        const body: StoryBody = parseStoryBody(result.content, built.index, accepted.reply);
+        this.#logRepair("STORYTELLER", round, accepted.repair, input);
         if ((result.repairAttempts ?? 0) > 0) repairedRounds.add(round);
         return {
           artifactRef: result.rawArtifactRef,
@@ -571,6 +603,7 @@ export class StoryWriter {
         };
       },
       checkStory: async ({ round, candidate }) => {
+        const reading = rememberingAcceptedReply((content, reply) => classifyCheckerContent(content, reply));
         const request = storyCallRequest({
           story: input,
           site: "CHECKER",
@@ -580,16 +613,19 @@ export class StoryWriter {
           contract: checkerContract,
           contractHash: checkerHash,
           material: toCheckerPromptMaterial(built.material, candidate),
-          classifyContent: (content) => classifyCheckerContent(content)
+          classifyContent: reading.classifyContent
         });
         // Task M7: the planned checker is always asked first; a fallback checker
         // prefers a maker other than the one that wrote this round's draft.
         const { result, servedBy } = await callStoryRole(checker, request, draftWriterByRound.get(round) ?? null);
+        const accepted = reading.acceptedAs(result.content);
+        const verdict = parseCheckerVerdict(result.content, accepted.reply);
+        this.#logRepair("CHECKER", round, accepted.repair, input);
         return {
           artifactRef: result.rawArtifactRef,
           callSiteKey: request.callSiteKey,
           lineage: lineageOf(result, servedBy.providerRef),
-          verdict: parseCheckerVerdict(result.content)
+          verdict
         };
       }
     });
