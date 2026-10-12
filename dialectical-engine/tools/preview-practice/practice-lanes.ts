@@ -16,6 +16,7 @@ import { StoryBodySchema } from "@debateai/contract";
 import {
   Judge,
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
+  JUDGE_ARTIFACT_READING,
   judgeArtifactSchema,
   judgeAssessmentSchema,
   nodeReviewArtifactSchema,
@@ -197,8 +198,8 @@ function fromStructured(result: ReturnType<typeof parseStructuredArtifact>): rea
 export function recheckReply(callSiteKey: string, content: string): Readonly<{ family: PracticeCallFamily; issues: readonly string[] }> {
   const family = callFamilyOf(callSiteKey);
   switch (family) {
-    case "JUDGE": return { family, issues: fromStructured(parseStructuredArtifact(content, judgeArtifactSchema)) };
-    case "PANEL": return { family, issues: fromStructured(parseStructuredArtifact(content, judgeAssessmentSchema)) };
+    case "JUDGE": return { family, issues: fromStructured(parseStructuredArtifact(content, judgeArtifactSchema, undefined, JUDGE_ARTIFACT_READING)) };
+    case "PANEL": return { family, issues: fromStructured(parseStructuredArtifact(content, judgeAssessmentSchema, undefined, JUDGE_ARTIFACT_READING)) };
     case "REVIEW": {
       let edges = 0;
       try {

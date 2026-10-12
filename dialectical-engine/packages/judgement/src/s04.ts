@@ -130,10 +130,11 @@ export type JudgeAssessment = z.infer<typeof judgeAssessmentSchema>;
  * repairs the story's tolerant decode makes (`modelJsonLateRepair`): INNER_QUOTE (a straight double quote inside a text
  * that cannot end it, read as escaped) and, only for a reply that finished normally, CLOSING_BRACKETS.
  */
-export type StructuredParseStrategy = "RAW" | "ONE_FENCE" | "BRACE_BALANCED" | "INNER_QUOTE" | "CLOSING_BRACKETS";
+export type StructuredParseStrategy = "RAW" | "ONE_FENCE" | "BRACE_BALANCED" | "INNER_QUOTE" | "CLOSING_BRACKETS" | "NESTED_FIELDS";
 
 const STRUCTURED_PARSE_REPAIRS: Readonly<Record<StructuredParseStrategy, ModelJsonRepair | null>> = Object.freeze({
-  RAW: null, ONE_FENCE: "CODE_FENCE", BRACE_BALANCED: "OUTERMOST_OBJECT", INNER_QUOTE: "INNER_QUOTE", CLOSING_BRACKETS: "CLOSING_BRACKETS"
+  RAW: null, ONE_FENCE: "CODE_FENCE", BRACE_BALANCED: "OUTERMOST_OBJECT", INNER_QUOTE: "INNER_QUOTE", CLOSING_BRACKETS: "CLOSING_BRACKETS",
+  NESTED_FIELDS: "NESTED_FIELDS"
 });
 
 /** The repair code a strategy is counted under (`ContentClassification.jsonRepair`); RAW needed none. */
@@ -175,11 +176,84 @@ function schemaFailureMessage(error: z.ZodError): string {
     : rendered;
 }
 
-function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, schema: z.ZodType<T>): ParseStructuredArtifactResult<T> {
+/** How a step asks its reply to be read. `nestedFields`: the one shape repair (`nestedFieldsPlan`), the judge's author legs and panel only. */
+export interface StructuredReadingOptions {
+  readonly nestedFields?: boolean;
+}
+
+/**
+ * One member the NESTED_FIELDS repair may rebuild, read off the schema: `member` is a root member whose schema is an
+ * object; `text` is that object's ONLY string member; `lifted` are its other members, none of which is a root member.
+ */
+export interface NestedFieldsPlanEntry {
+  readonly member: string;
+  readonly text: string;
+  readonly lifted: readonly string[];
+}
+
+const nestedFieldsPlans = new WeakMap<z.ZodType, readonly NestedFieldsPlanEntry[]>();
+
+/**
+ * Judge nested fields (2026-10-12): which members the NESTED_FIELDS repair may rebuild, derived from the schema
+ * itself (nothing is named in code). For the judge artifact that is exactly steelman {summary, fidelity} and critic
+ * {summary, counterargumentStrength, basis}; evidence, context and fallacy hold no string member and never qualify.
+ * A schema that is not an object has no plan.
+ */
+export function nestedFieldsPlan(schema: z.ZodType): readonly NestedFieldsPlanEntry[] {
+  const known = nestedFieldsPlans.get(schema);
+  if (known !== undefined) return known;
+  const entries: NestedFieldsPlanEntry[] = [];
+  if (schema instanceof z.ZodObject) {
+    const root = schema.shape as Record<string, z.ZodType>;
+    for (const [member, memberSchema] of Object.entries(root)) {
+      if (!(memberSchema instanceof z.ZodObject)) continue;
+      const inner = Object.entries(memberSchema.shape as Record<string, z.ZodType>);
+      const texts = inner.filter(([, innerSchema]) => innerSchema instanceof z.ZodString).map(([name]) => name);
+      const lifted = inner.map(([name]) => name).filter((name) => !texts.includes(name));
+      if (texts.length !== 1 || lifted.length === 0 || lifted.some((name) => Object.hasOwn(root, name))) continue;
+      entries.push(Object.freeze({ member, text: texts[0]!, lifted: Object.freeze(lifted) }));
+    }
+  }
+  const plan = Object.freeze(entries);
+  nestedFieldsPlans.set(schema, plan);
+  return plan;
+}
+
+/**
+ * Judge nested fields (2026-10-12): MiMo-V2.6-Pro in JSON mode wrote `"steelman": "<summary>"` with `"fidelity"` at
+ * the root, and `"critic": "<summary>"` with `"counterargumentStrength"` and `"basis"` at the root. For each plan entry
+ * whose member is a string while EVERY lifted member stands at the root, the member becomes {text: the string, each
+ * lifted member: its root value} and only those root keys are removed. Nothing is invented, nothing else moves; null
+ * when no entry applied. The caller runs the full schema on the result.
+ */
+function nestFlattenedMembers(decoded: unknown, plan: readonly NestedFieldsPlanEntry[]): Record<string, unknown> | null {
+  if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return null;
+  const source = decoded as Record<string, unknown>;
+  let repaired: Record<string, unknown> | null = null;
+  for (const entry of plan) {
+    const current = repaired ?? source;
+    if (typeof current[entry.member] !== "string" || !entry.lifted.every((name) => Object.hasOwn(current, name))) continue;
+    const next: Record<string, unknown> = { ...current };
+    const nested: Record<string, unknown> = { [entry.text]: current[entry.member] };
+    for (const name of entry.lifted) {
+      nested[name] = current[name];
+      delete next[name];
+    }
+    next[entry.member] = nested;
+    repaired = next;
+  }
+  return repaired;
+}
+
+function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, schema: z.ZodType<T>, options?: StructuredReadingOptions): ParseStructuredArtifactResult<T> {
   const parsed = schema.safeParse(decoded);
-  return parsed.success
-    ? Object.freeze({ kind: "PARSED", strategy, value: parsed.data })
-    : Object.freeze({ kind: "SCHEMA_FAILURE", message: schemaFailureMessage(parsed.error) });
+  if (parsed.success) return Object.freeze({ kind: "PARSED", strategy, value: parsed.data });
+  const refused: ParseStructuredArtifactResult<T> = Object.freeze({ kind: "SCHEMA_FAILURE", message: schemaFailureMessage(parsed.error) });
+  if (options?.nestedFields !== true) return refused;
+  const nested = nestFlattenedMembers(decoded, nestedFieldsPlan(schema));
+  if (nested === null) return refused;
+  const repaired = schema.safeParse(nested);
+  return repaired.success ? Object.freeze({ kind: "PARSED", strategy: "NESTED_FIELDS", value: repaired.data }) : refused;
 }
 
 /**
@@ -196,19 +270,27 @@ function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, sc
  * closed. A reply cut off at its token ceiling is never repaired. Whatever decodes
  * still passes the full schema; the stored artifact stays the vendor's bytes.
  * Without `reply` the ending is unknown and the last repair is not made.
+ *
+ * Judge nested fields (2026-10-12): with `options.nestedFields` (the judge's author legs and panel), an object that decoded but
+ * failed the schema is tried once more with its flattened members nested (`nestFlattenedMembers`, the plan read off
+ * the schema by `nestedFieldsPlan`); it is accepted only if the result passes the full schema, as NESTED_FIELDS, and
+ * otherwise the original refusal stands. The step re-reads its accepted content with the same options, so every
+ * reader gets the repaired object.
  */
-export function parseStructuredArtifact<T>(content: string, schema: z.ZodType<T>, reply?: ModelReplyFacts): ParseStructuredArtifactResult<T> {
-  try { return schemaResult(JSON.parse(content), "RAW", schema); } catch { /* advance only on parse failure */ }
+export function parseStructuredArtifact<T>(
+  content: string, schema: z.ZodType<T>, reply?: ModelReplyFacts, options?: StructuredReadingOptions
+): ParseStructuredArtifactResult<T> {
+  try { return schemaResult(JSON.parse(content), "RAW", schema, options); } catch { /* advance only on parse failure */ }
   const fenced = modelJsonFenceBody(content);
   if (fenced !== null) {
-    try { return schemaResult(JSON.parse(fenced), "ONE_FENCE", schema); } catch { /* next strategy */ }
+    try { return schemaResult(JSON.parse(fenced), "ONE_FENCE", schema, options); } catch { /* next strategy */ }
   }
   const balanced = firstBalancedObject(content);
   if (balanced !== null) {
-    try { return schemaResult(JSON.parse(balanced), "BRACE_BALANCED", schema); } catch { /* next strategy */ }
+    try { return schemaResult(JSON.parse(balanced), "BRACE_BALANCED", schema, options); } catch { /* next strategy */ }
   }
   const late = modelJsonLateRepair(content, reply);
-  if (late !== null) return schemaResult(late.value, late.repair, schema);
+  if (late !== null) return schemaResult(late.value, late.repair, schema, options);
   return Object.freeze({ kind: "PARSE_FAILURE", message: "No parsing strategy produced a JSON object" });
 }
 
@@ -216,8 +298,10 @@ export function parseStructuredArtifact<T>(content: string, schema: z.ZodType<T>
  * The content classifier every judge-family call hands the gateway (author legs, review, panel): the same reading as
  * `parseStructuredArtifact`, with the repair it needed as `jsonRepair` (all-steps format robustness, 2026-10-12).
  */
-export function classifyStructuredArtifact<T>(content: string, schema: z.ZodType<T>, reply?: ModelReplyFacts): ContentClassification {
-  const outcome = parseStructuredArtifact(content, schema, reply);
+export function classifyStructuredArtifact<T>(
+  content: string, schema: z.ZodType<T>, reply?: ModelReplyFacts, options?: StructuredReadingOptions
+): ContentClassification {
+  const outcome = parseStructuredArtifact(content, schema, reply, options);
   if (outcome.kind === "PARSED") {
     const repair = structuredParseRepair(outcome.strategy);
     return repair === null ? { parseStatus: "PARSED", parseError: null } : { parseStatus: "PARSED", parseError: null, jsonRepair: repair };
