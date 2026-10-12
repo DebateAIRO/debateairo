@@ -51,11 +51,11 @@ What is new in v3:
   the same day and withdrawn, because with JSON mode on DeepInfra ended the text at that straight
   quote and forced the rest of the answer into garbage, while without it the app repairs that
   exact slip itself. The gate refuses a MiMo request carrying `response_format`.
-- JSON mode on the preview: for GLM only (the one model that allows it), the app asks for it on
-  every step that expects one JSON object: the debate's judging steps (author legs incl. critic
-  and cross-root, panel, review), the answer writer, the answer checker, and the story writer and
-  checker; a repair follow-up carries the same setting as the first request. DeepSeek, MiMo, Qwen
-  and Haiku requests never carry it. (Every model's instructions also gained one fixed sentence on
+- JSON mode on the preview: GLM only (the one model that allows it), and only on the story
+  writer's and checker's requests; a repair follow-up carries the same setting as the first
+  request. Asking for it on every debate step was tried on 2026-10-12 and withdrawn the same day
+  (GLM in JSON mode answered a judging question with an empty `{}`). DeepSeek, MiMo, Qwen and Haiku
+  requests never carry it. (Every model's instructions also gained one fixed sentence on
   2026-10-12 on how to write quotation marks inside a text; that is in the app, not the gate.)
 - GLM and DeepSeek carry none of the three sampling settings; their requests are exactly as
   before. A change is a reviewed code change (the gate, the app and their shared test files),

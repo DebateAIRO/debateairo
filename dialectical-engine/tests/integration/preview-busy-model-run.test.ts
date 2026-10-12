@@ -14,9 +14,9 @@
 //
 // JSON mode (spec "Check the JSON-mode needs"; owner, 2026-10-12): GLM is the only reviewed row with jsonObject true
 // (packages/providers/src/preview-models.ts; MiMo's JSON mode was tried and withdrawn the same day). The story calls ask for JSON mode themselves
-// (packages/story/src/writer.ts, preferredResponseFormat "json_object"), and on the preview every structured served step
-// (judge legs, panel, review, answer writer, answer checker) asks for it on a jsonObject row (withPreviewProviderCallPolicy).
-// The gateway adds response_format only on the story or served lane AND for a gateway built with
+// (packages/story/src/writer.ts, preferredResponseFormat "json_object"); no debate step asks for it (asking on every
+// structured served step was tried and withdrawn the same day: GLM in JSON mode answered a judging call with "{}").
+// The gateway adds response_format only on the story lane AND for a gateway built with
 // supportsJsonObjectResponse, which providerTargetGatewayControls sets only for a jsonObject row; the guarded fetch
 // refuses response_format on any other row (packages/providers/src/preview-test.ts, deepInfraBodyAccepted). So here,
 // without GLM, no request carries JSON mode; every story call goes out WITHOUT it, and the
