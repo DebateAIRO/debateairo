@@ -41,6 +41,10 @@ const SUPPORT_ROLE = "debateai_dev_support_config_operator";
 const SUPPORT_DATA_ROLE = "debateai_dev_support";
 const SUPPORT_CAPABILITY = "debateai_support_config_operator";
 const PRODUCTION_SUPPORT_ROLE = "debateai_prod_support_config_operator";
+// The twelfth login (data export, PR #138): its one consumer is the API's data-export pool.
+const DATA_EXPORT_KEY = "DATA_EXPORT_DATABASE_URL";
+const DATA_EXPORT_ROLE = "debateai_dev_data_export";
+const DATA_EXPORT_CAPABILITY = "debateai_data_export_worker";
 
 let database: TestDatabase;
 let repositoryRoot: string;
@@ -51,9 +55,10 @@ function parseExactMaster(source: string): ReadonlyMap<string, string> {
   expect(source.endsWith("\n")).toBe(true);
   expect(source).not.toContain("\r");
   const rows = source.slice(0, -1).split("\n");
-  expect(rows).toHaveLength(11);
+  expect(rows).toHaveLength(12);
   expect(rows.map((row) => row.slice(0, row.indexOf("="))))
     .toEqual(DEVELOPMENT_DATABASE_PRINCIPALS.map(({ environmentKey }) => environmentKey));
+  expect(rows.at(-1)?.startsWith(`${DATA_EXPORT_KEY}=`)).toBe(true);
   return new Map(rows.map((row) => {
     const separator = row.indexOf("=");
     return [row.slice(0, separator), row.slice(separator + 1)];
@@ -157,17 +162,21 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
     }
   });
 
-  it("credential privacy: one eleven-row master file feeds only the dedicated loaders", async () => {
+  it("credential privacy: one twelve-row master file feeds only the dedicated loaders", async () => {
     await expect(provisionDevelopmentDatabasePrincipals({
       adminPool: database.pool,
       adminDatabaseUrl: LOCAL_ADMIN_DATABASE_URL,
       credentialFilePath
-    })).resolves.toEqual({ credentialFilePath, principalCount: 11 });
+    })).resolves.toEqual({ credentialFilePath, principalCount: 12 });
 
     const masterSource = await readFile(credentialFilePath, "utf8");
     const master = parseExactMaster(masterSource);
     const supportDatabaseUrl = master.get(SUPPORT_KEY)!;
     const supportDataDatabaseUrl = master.get(SUPPORT_DATA_KEY)!;
+    const dataExportDatabaseUrl = master.get(DATA_EXPORT_KEY)!;
+    expect(new URL(dataExportDatabaseUrl).username).toBe(DATA_EXPORT_ROLE);
+    expect(dataExportDatabaseUrl).not.toBe(supportDatabaseUrl);
+    expect(dataExportDatabaseUrl).not.toBe(supportDataDatabaseUrl);
     expect(new URL(supportDatabaseUrl)).toMatchObject({
       hostname: "127.0.0.1",
       port: "55432",
@@ -205,6 +214,10 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
     expect(JSON.stringify(receipt)).not.toContain(supportDatabaseUrl);
     expect(apiSource).not.toContain(SUPPORT_KEY);
     expect(apiSource).not.toContain(supportDatabaseUrl);
+    expect(apiEnvironment.get(DATA_EXPORT_KEY)).toBe(dataExportDatabaseUrl);
+    expect([...apiEnvironment.entries()]
+      .filter(([, value]) => value === dataExportDatabaseUrl)
+      .map(([key]) => key)).toEqual([DATA_EXPORT_KEY]);
   }, 120_000);
 
   it("opens development initialization writes on one bounded five-second pool", async () => {
@@ -293,6 +306,7 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
       const capabilityRoles = [...new Set(
         DEVELOPMENT_DATABASE_PRINCIPALS.map(({ capabilityRole }) => capabilityRole)
       )].sort();
+      expect(capabilityRoles).toContain(DATA_EXPORT_CAPABILITY);
       const effective = await operatorPool.query<{ roleName: string; member: boolean }>(`
         SELECT role_name AS "roleName",pg_has_role(current_user,role_name,'MEMBER') AS member
         FROM unnest($1::text[]) AS expected(role_name) ORDER BY role_name
@@ -506,7 +520,7 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
       adminPool: database.pool,
       adminDatabaseUrl: LOCAL_ADMIN_DATABASE_URL,
       credentialFilePath
-    })).resolves.toEqual({ credentialFilePath, principalCount: 11 });
+    })).resolves.toEqual({ credentialFilePath, principalCount: 12 });
   }, 120_000);
 
   it("rejects loader custody, exact-schema, ordering, and endpoint drift", async () => {
