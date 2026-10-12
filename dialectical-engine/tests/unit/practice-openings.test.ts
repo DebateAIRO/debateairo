@@ -32,7 +32,7 @@ import {
   openingsQuestionDigests,
   openingsQuestionsFromFlag
 } from "../../tools/preview-practice/practice-openings-questions.js";
-import { openingsGapRoundsMax, runPracticeOpenings, type OpeningsRunInput } from "../../tools/preview-practice/practice-openings.js";
+import { openingsGapRoundsMax, openingsQuestionRotations, runPracticeOpenings, type OpeningsRunInput } from "../../tools/preview-practice/practice-openings.js";
 
 const HAIKU = "claude-haiku-5-5";
 const config = openingsDryConfig();
@@ -217,5 +217,59 @@ describe("practice openings: repairs and busy AIs", () => {
     expect(report.exitCode).toBe(10);
     expect(report.reasons).toEqual([expect.stringMatching(new RegExp(`^MODEL_BUSY_PARTLY:${HAIKU}:answered=\\d+:skipped=1$`, "u")),
       `FORMAT_REPAIRED:${HAIKU}:1`, "UNBILLED_REFUSALS:2"]);
+  });
+});
+
+describe("practice openings: the selection is checked before the first call (ruling T11-m6)", () => {
+  it("a question that is not one of the twelve word for word, or an unknown arm, is refused before anything is sent", async () => {
+    const [first, second] = OPENINGS_QUESTIONS as [typeof OPENINGS_QUESTIONS[number], typeof OPENINGS_QUESTIONS[number]];
+    let sent = 0;
+    const counting: Wrap = (port) => ({ execute: async (input, signal) => { sent += 1; return port.execute(input, signal); } });
+    for (const more of [
+      { questions: [first, Object.freeze({ ...second, questionLine: "Should I lie to my boss?" })] },
+      { questions: [first, Object.freeze({ ...second, id: "xx-unknown" })] },
+      { questions: [first, first] },
+      { arms: ["T", "Z"] as unknown as OpeningsRunInput["arms"] }
+    ] satisfies Partial<OpeningsRunInput>[]) {
+      await expect(run(undefined, "T", counting, more)).rejects.toThrow("PRACTICE_FLAG_VALUE_INVALID");
+    }
+    expect(sent).toBe(0);
+    expect(openingsQuestionRotations(openingsQuestionsFromFlag("en-rent-caps,ro-euro"))).toEqual([0, 11]);
+  });
+});
+
+describe("practice openings: a stopped gate ends the run after the arm in progress (ruling T11-m1)", () => {
+  it("the arm in progress records a STOPPED note; no new arm or question starts", async () => {
+    const observer = new PracticeGateObserver({ now: () => 0 });
+    let requests = 0;
+    const stopsAtFirst: Wrap = (port) => ({ execute: async (input, signal) => {
+      requests += 1;
+      if (requests === 1) observer.stop("deepinfra", "GATE_REFUSED_TEST");
+      return port.execute(input, signal);
+    } });
+    const result = await run("ro-euro,en-rent-caps", "T,B", stopsAtFirst, { observer });
+    expect(result.arms.map((arm) => `${arm.questionId}:${arm.arm}`)).toEqual(["ro-euro:T"]);
+    expect(result.arms[0]!.notes).toEqual([{ note: "STOPPED", step: "POSITION", detail: "deepinfra:GATE_REFUSED_TEST" }]);
+    expect(result.calls.every((call) => call.arm === "T" && call.questionId === "ro-euro")).toBe(true);
+  });
+
+  it("a stop during a map arm: its later calls behind the stopped gate are SKIPPED_STOPPED and the arm's note says why", async () => {
+    const observer = new PracticeGateObserver({ now: () => 0 });
+    const stopsAtMerge: Wrap = (port) => ({ execute: async (input, signal) => {
+      if (readPromptFrame(openingsDryPacket(input.requestBody).packet).contractId === MAP_CONTRACT_IDS.merge) observer.stop("deepinfra", "GATE_REFUSED_TEST");
+      return port.execute(input, signal);
+    } });
+    const result = await run("ro-euro,en-rent-caps", "B", stopsAtMerge, { observer });
+    expect(result.arms.map((arm) => `${arm.questionId}:${arm.arm}`)).toEqual(["ro-euro:B"]);
+    expect(result.arms[0]!.notes.filter((note) => note.note === "STOPPED"))
+      .toEqual([{ note: "STOPPED", step: "MAP", detail: "deepinfra:GATE_REFUSED_TEST" }]);
+    const skipped = result.calls.filter((call) => call.status === "SKIPPED_STOPPED");
+    expect(skipped.length).toBeGreaterThan(0);
+    expect(skipped.every((call) => call.gate === "deepinfra" && call.errorCode === "GATE_REFUSED_TEST")).toBe(true);
+  });
+
+  it("an arm that ran with no stop has no STOPPED note", async () => {
+    const result = await run("ro-euro", "T,B");
+    expect(result.arms.flatMap((arm) => arm.notes.map((note) => note.note))).not.toContain("STOPPED");
   });
 });

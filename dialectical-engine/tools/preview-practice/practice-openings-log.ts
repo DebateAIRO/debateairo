@@ -71,6 +71,14 @@ export type OpeningsCall = Readonly<{
   replyText: string | null;
 }>;
 
+/**
+ * The practice's own note on an arm (ruling T11-m1): a gate stopped, or the operator interrupted, while the arm ran;
+ * `detail` names the stops (`gate:reason`). Its calls behind the stopped gate were not sent: they are not the models'
+ * own fallbacks. The run starts nothing after it.
+ */
+export type OpeningsStopNote = Readonly<{ note: "STOPPED"; step: OpeningsStep | "MAP"; detail: string }>;
+export type OpeningsArmNote = MapNoteRecord | OpeningsStopNote;
+
 export type OpeningsArmLine = Readonly<{
   arm: OpeningsArm;
   questionId: string;
@@ -81,7 +89,7 @@ export type OpeningsArmLine = Readonly<{
   /** Arm T: positions written. */
   positions: number;
   marks: readonly MapMarkRecord[];
-  notes: readonly MapNoteRecord[];
+  notes: readonly OpeningsArmNote[];
   /** The map without its call records (each call has its own line). */
   map: Omit<MapResult, "calls"> | null;
 }>;

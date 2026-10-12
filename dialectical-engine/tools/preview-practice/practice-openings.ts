@@ -48,9 +48,10 @@ import {
 } from "./practice-formats.js";
 import type { PracticeGateName, PracticeGateObserver } from "./practice-gate-observer.js";
 import { replyContentOf } from "./practice-lanes.js";
-import type { OpeningsArmLine, OpeningsBusyWait, OpeningsCall, OpeningsCallStatus, OpeningsStep } from "./practice-openings-log.js";
-import { OPENINGS_QUESTIONS, type OpeningsArm, type OpeningsQuestion } from "./practice-openings-questions.js";
+import type { OpeningsArmLine, OpeningsArmNote, OpeningsBusyWait, OpeningsCall, OpeningsCallStatus, OpeningsStep } from "./practice-openings-log.js";
+import { OPENINGS_ARMS, OPENINGS_QUESTIONS, type OpeningsArm, type OpeningsQuestion } from "./practice-openings-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
+import { PracticeRefusal } from "./practice-settings.js";
 
 /** The map's sizes for five AIs, as a Premium plan (spec §5, Pro: 5 map AIs, 4 answers; up to 2 gap rounds, 1 for arm B). */
 export const OPENINGS_MAP_SIZES = Object.freeze({ gapRoundsC: 2, gapRoundsB: 1, maxAnswers: 4, pointsPerAnswer: 4 });
@@ -104,14 +105,32 @@ type OpeningsCallContext = Readonly<{
   target: ProviderDiscoveryTarget; shown: "BLIND" | readonly string[]; order: number;
 }>;
 
-/** The question's fixed place among the twelve: its seat rotation (ruling P9). */
-function openingsRotationOf(question: OpeningsQuestion): number {
-  const fixed = OPENINGS_QUESTIONS.findIndex((known) => known.id === question.id);
-  if (fixed < 0) throw new Error("PRACTICE_OPENINGS_QUESTION_UNKNOWN");
-  return fixed;
+/**
+ * Each asked question's fixed place among the twelve: its seat rotation (ruling P9). Checked for every question before
+ * the first call (ruling T11-m6): a question must be one of the twelve word for word (id, line and language), each at
+ * most once, so nothing outside the fixed list is ever sent and a bad selection spends nothing. The refusal never
+ * repeats what it was given.
+ */
+export function openingsQuestionRotations(questions: readonly OpeningsQuestion[]): readonly number[] {
+  const rotations = questions.map((question) => OPENINGS_QUESTIONS.findIndex((known) => known.id === question.id
+    && known.questionLine === question.questionLine && known.languageTag === question.languageTag && known.languageName === question.languageName));
+  if (rotations.some((fixed) => fixed < 0) || new Set(rotations).size !== rotations.length) {
+    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--questions (only the fixed question ids, each once)");
+  }
+  return Object.freeze(rotations);
+}
+
+/** The arms asked: each one of T, A, B, C, at most once (checked with the questions, before the first call). */
+function openingsAssertArms(arms: readonly OpeningsArm[]): void {
+  if (arms.some((arm) => !(OPENINGS_ARMS as readonly string[]).includes(arm)) || new Set(arms).size !== arms.length) {
+    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, each once)");
+  }
 }
 
 export async function runPracticeOpenings(input: OpeningsRunInput): Promise<OpeningsRunResult> {
+  // The whole selection first: nothing is sent for a run that would refuse midway.
+  const rotations = openingsQuestionRotations(input.questions);
+  openingsAssertArms(input.arms);
   const budgetMs = input.busyWaitMs ?? 0;
   const sleep = input.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
   // As formats: each call takes a place at its gate, then one overall, before the brake looks at it.
@@ -238,17 +257,35 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
   };
 
   const emit = (line: OpeningsArmLine) => { const frozen = Object.freeze(line); armLines.push(frozen); input.onArm?.(frozen); };
+  /**
+   * Ruling T11-m1: a stopped or halted gate (or the operator's interrupt) ends the run. The arm in progress finishes
+   * (its calls behind the stopped gate are SKIPPED_STOPPED) and carries a STOPPED note, so those calls are not read as
+   * the models' own fallbacks; no new arm or question starts.
+   */
+  const stopNow = (): string | null => {
+    const stops = (["deepinfra", "anthropic"] as const).flatMap((gate) => {
+      const stop = input.observer.stopped(gate);
+      return stop === null ? [] : [`${gate}:${stop.reason}`];
+    });
+    if (stops.length > 0) return stops.join(",");
+    return input.shouldStop?.() === true ? "PRACTICE_INTERRUPTED" : null;
+  };
+  const withStop = (notes: readonly OpeningsArmNote[], step: OpeningsArmNote["step"]): readonly OpeningsArmNote[] => {
+    const stopped = stopNow();
+    return stopped === null ? notes : [...notes, Object.freeze({ note: "STOPPED" as const, step, detail: stopped })];
+  };
   const order = practiceTurnOrder(input.targets);
-  for (const question of input.questions) {
-    const rotation = openingsRotationOf(question);
+  for (const [index, question] of input.questions.entries()) {
+    if (stopNow() !== null) break;
+    const rotation = rotations[index]!;
     for (const arm of input.arms) {
-      if (input.shouldStop?.() === true) break;
+      if (stopNow() !== null) break;
       const seats = mapRotateSeats(order, rotation).filter((target) => !busy.includes(target.model));
       const startedAt = new Date().toISOString();
       if (arm === "T") {
         const written = await positions(question, seats);
         emit({ arm, questionId: question.id, startedAt, finishedAt: new Date().toISOString(), outcome: "POSITIONS", positions: written,
-          marks: [], notes: [], map: null });
+          marks: [], notes: withStop([], "POSITION"), map: null });
         input.progress?.(`${question.id} T: ${String(written)} position(s)`);
         continue;
       }
@@ -264,10 +301,9 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
       const { calls: _calls, ...map } = result;
       void _calls; // each call has its own line already
       emit({ arm, questionId: question.id, startedAt, finishedAt: new Date().toISOString(), outcome: result.kind, positions: 0,
-        marks: result.marks, notes: result.notes, map });
+        marks: result.marks, notes: withStop(result.notes, "MAP"), map });
       input.progress?.(`${question.id} ${arm}: ${result.kind}, marks ${result.marks.map((mark) => mark.mark).join(",") || "none"}`);
     }
-    if (input.shouldStop?.() === true) break;
   }
   return Object.freeze({ calls: Object.freeze([...calls]), arms: Object.freeze([...armLines]), busyModels: Object.freeze([...busy]) });
 }

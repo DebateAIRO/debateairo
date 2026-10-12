@@ -7,13 +7,17 @@
  * gates on the server (they hold the keys; this computer never sees one), reached through SSH-forwarded sockets and a
  * small relay on the server (gate-relay.py). It spends real money, a little: see the README.
  *
- * Two modes, and a third command:
+ * Three modes, and a fourth command:
  *  - formats: every model asked to do every job a few times; each reply checked by that job's real format check. The
  *    models work at the same time (one call each at a time); --sequential sends one call at a time. Every finished job
  *    is written to <out>/samples.jsonl at once (practice-samples-log.ts), and the report is built from it.
  *  - debate:  one whole practice debate (depth 1 by default, 2 allowed) through the real ask path and the real runner.
  *             With --transcript it also writes <out>/transcript.json: every prompt and every reply, decrypted
  *             (practice-transcript.ts).
+ *  - openings: the debate-shape comparison (spec 2026-10-12 §2): today's opening (T) and three map openings (A snowball,
+ *             B blind lists, C the angle map) on 12 fixed questions; every finished call goes to <out>/openings.jsonl at
+ *             once (practice-openings-log.ts) and the report is built from it, on every way out. --dry answers from a
+ *             script (practice-openings-dry.ts): no settings, no socket, no gate port is built, nothing is spent.
  *  - report:  builds report.json and report.md again from <out>/samples.jsonl (sends nothing, needs no gate).
  *
  * The exact commands are in tools/preview-practice/README.md. Exit codes: 0 PASS, 10 PASS_WITH_WARNINGS, 20 FAIL,
@@ -23,10 +27,14 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { mapPromptContractHash } from "@debateai/map";
 import {
   createPreviewBudgetRpcPort,
   previewModelRow,
-  type PreviewGateRemaining
+  type PreviewBudgetPorts,
+  type PreviewGateRemaining,
+  type PreviewProviderTestConfig,
+  type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import { readOperatorCommandEnvironment } from "@debateai/register";
 import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
@@ -41,7 +49,17 @@ import {
 } from "./practice-formats.js";
 import { PracticeGateObserver, type PracticeGateName } from "./practice-gate-observer.js";
 import { practiceInterruptGate, takeOverSignals } from "./practice-interrupt.js";
-import { PRACTICE_LANES, type PracticeLane } from "./practice-lanes.js";
+import { PRACTICE_CONTRACT_HASHES, PRACTICE_LANES, type PracticeLane } from "./practice-lanes.js";
+import { openingsDryConfig, openingsDryPorts, openingsDryTargets } from "./practice-openings-dry.js";
+import { OPENINGS_SCHEMA, OpeningsLog, openingsReportFromLog, readOpeningsLog } from "./practice-openings-log.js";
+import {
+  openingsArmsFromFlag,
+  openingsQuestionDigests,
+  openingsQuestionsFromFlag,
+  type OpeningsArm,
+  type OpeningsQuestion
+} from "./practice-openings-questions.js";
+import { openingsQuestionRotations, runPracticeOpenings } from "./practice-openings.js";
 import { parsePracticeRegisterExport, PracticeRegisterError } from "./practice-register-import.js";
 import {
   abortedReport,
@@ -77,15 +95,17 @@ export function repositoryRoot(): string {
   }
 }
 
-type Args = Readonly<{ mode: "formats" | "debate" | "report"; flags: ReadonlyMap<string, string>; switches: ReadonlySet<string> }>;
+type Args = Readonly<{ mode: "formats" | "debate" | "openings" | "report"; flags: ReadonlyMap<string, string>; switches: ReadonlySet<string> }>;
 
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
-  "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes"]);
-const SWITCHES = new Set<string>(["--sequential", "--transcript"]);
+  "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--questions", "--arms"]);
+const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry"]);
 
 export function parsePracticeArgs(argv: readonly string[]): Args {
   const [mode, ...rest] = argv;
-  if (mode !== "formats" && mode !== "debate" && mode !== "report") throw new PracticeRefusal("PRACTICE_MODE_REQUIRED", "formats, debate or report");
+  if (mode !== "formats" && mode !== "debate" && mode !== "openings" && mode !== "report") {
+    throw new PracticeRefusal("PRACTICE_MODE_REQUIRED", "formats, debate, openings or report");
+  }
   const flags = new Map<string, string>();
   const switches = new Set<string>();
   for (let index = 0; index < rest.length; index += 1) {
@@ -104,6 +124,14 @@ function required(args: Args, flag: string): string {
   const value = args.flags.get(flag);
   if (value === undefined) throw new PracticeRefusal("PRACTICE_FLAG_REQUIRED", flag);
   return value;
+}
+
+/** Every model must be enabled at its own gate, by the gate's own read-only answer (formats and openings). */
+function assertEnabledAtGates(models: readonly string[], before: Readonly<Record<PracticeGateName, PreviewGateRemaining | null>>): void {
+  for (const model of models) {
+    const gate = previewModelRow(model)?.provider === "anthropic" ? "anthropic" : "deepinfra";
+    if (!before[gate]!.enabledModels.includes(model)) throw new PracticeRefusal("PRACTICE_MODEL_NOT_ENABLED_AT_GATE", model);
+  }
 }
 
 function wholeNumber(args: Args, flag: string, fallback: number, minimum: number, maximum: number): number {
@@ -141,11 +169,13 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
   options: PracticeRunOptions = {}): Promise<PracticeRunResult> {
   const startedAt = new Date();
   const log = options.log ?? ((line: string) => { process.stderr.write(`${line}\n`); });
-  let mode = argv[0] === "debate" ? "debate" : argv[0] === "report" ? "report" : "formats";
+  let mode = argv[0] === "debate" ? "debate" : argv[0] === "report" ? "report" : argv[0] === "openings" ? "openings" : "formats";
   let directory: string | null = null;
   let observer: PracticeGateObserver | null = null;
   // Formats: the samples log, open from just before the first paid call to the end line.
   let samplesLog: PracticeSampleLog | null = null;
+  // Openings: openings.jsonl, open from just before the first call to the end line.
+  let openingsLog: OpeningsLog | null = null;
   // Set once the report is on the disk (the run's own, or the abort's): nothing writes over it afterwards.
   let settled: PracticeRunResult | null = null;
   let stopRequested = false;
@@ -176,6 +206,17 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     if (settled !== null) return settled;
     // No new call is sent; a call in flight cannot be taken back.
     stop();
+    if (openingsLog !== null && directory !== null) {
+      const at = new Date();
+      try { openingsLog.append({ kind: "abort", at: at.toISOString(), code }); } catch { /* the report below still names the abort */ }
+      openingsLog.close();
+      try {
+        settled = write(openingsReportFromLog(readOpeningsLog(directory), { code, at }));
+        return settled;
+      } catch (error) {
+        log(`openings log unreadable: ${error instanceof Error ? error.message : "UNKNOWN"}`);
+      }
+    }
     if (samplesLog !== null && directory !== null) {
       const at = new Date();
       try { samplesLog.append({ kind: "abort", at: at.toISOString(), code }); } catch { /* the report below still names the abort */ }
@@ -191,12 +232,89 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     return settled;
   };
   options.onControl?.(Object.freeze({ stop, abort: (code: string) => abort(code).exitCode }));
+
+  /**
+   * Mode openings: openings.jsonl opened before the first call (its start line pins each asked question's digest), the
+   * run, the end line with each gate's answer after (none in --dry), and the report built from the log on the disk, as
+   * formats builds its own. Every other way out goes through `abort`, which builds the report from the same log.
+   */
+  const runOpeningsMode = async (setup: Readonly<{
+    watched: PracticeGateObserver;
+    config: PreviewProviderTestConfig;
+    targets: readonly ProviderDiscoveryTarget[];
+    ports: PreviewBudgetPorts;
+    dry: boolean;
+    folder: string;
+    unsentStreakAtStart: Readonly<Record<PracticeGateName, number>>;
+    gateLimits: Readonly<Record<PracticeGateName, number>>;
+    before: Readonly<Record<PracticeGateName, PreviewGateRemaining | null>>;
+    remainingPorts: ReturnType<typeof practiceRemainingPorts> | null;
+    questions: readonly OpeningsQuestion[];
+    arms: readonly OpeningsArm[];
+    busyWaitMs: number;
+    maxInFlight: number;
+    sleep: ((milliseconds: number) => Promise<void>) | undefined;
+  }>): Promise<PracticeRunResult> => {
+    let opened: OpeningsLog;
+    try { opened = OpeningsLog.create(setup.folder); } catch (error) {
+      if (error instanceof Error && error.message === "PRACTICE_OUT_ALREADY_HOLDS_OPENINGS") {
+        // Another run's folder: its report is left as it is.
+        directory = null;
+        throw new PracticeRefusal("PRACTICE_OUT_ALREADY_HOLDS_OPENINGS", "use a new --out folder");
+      }
+      throw error;
+    }
+    openingsLog = opened;
+    opened.append({ kind: "start", schema: OPENINGS_SCHEMA, mode: "openings", dry: setup.dry, startedAt: startedAt.toISOString(),
+      models: setup.targets.map((target) => target.model), questions: setup.questions.map((question) => question.id),
+      questionDigests: openingsQuestionDigests(setup.questions), arms: setup.arms,
+      busyWaitMs: setup.busyWaitMs, unsentStreakAtStart: setup.unsentStreakAtStart,
+      remainingBefore: { deepinfra: remainingLine(setup.before.deepinfra), anthropic: remainingLine(setup.before.anthropic) } });
+    setup.watched.listen({ event: (event) => opened.append({ kind: "wire", event }), stop: (gateStop) => opened.append({ kind: "stop", stop: gateStop }) });
+    log(`openings: ${opened.path}`);
+    log(`openings: ${String(setup.questions.length)} question(s), arms ${setup.arms.join(",")}, ${String(setup.targets.length)} AIs`
+      + (setup.dry ? ", dry (scripted answers, nothing spent)" : ""));
+    const policy = practiceRunnerPolicy(setup.config);
+    await runPracticeOpenings({
+      config: setup.config, targets: setup.targets, ports: setup.ports, observer: setup.watched,
+      questions: setup.questions, arms: setup.arms, bound: policy.bounds.JUDGE,
+      contractHashes: { judge: PRACTICE_CONTRACT_HASHES.judge, map: mapPromptContractHash() },
+      ...(setup.sleep === undefined ? {} : { sleep: setup.sleep }),
+      ...(options.random === undefined ? {} : { random: options.random }),
+      progress: log, shouldStop: () => stopRequested, stopSignal: interrupted.signal, busyWaitMs: setup.busyWaitMs,
+      gateLimits: setup.gateLimits, maxInFlight: setup.maxInFlight,
+      onCall: (call) => opened.append({ kind: "call", call }),
+      onArm: (arm) => opened.append({ kind: "arm", arm }),
+      onBusy: (model) => opened.append({ kind: "busy", model }),
+      onBusyWait: (wait) => opened.append({ kind: "busy-wait", ...wait })
+    });
+    if (settled !== null) return settled;
+    const after = setup.remainingPorts === null ? { deepinfra: null, anthropic: null } : {
+      deepinfra: await setup.remainingPorts.deepinfra().catch(() => null),
+      anthropic: await setup.remainingPorts.anthropic().catch(() => null)
+    };
+    if (settled !== null) return settled;
+    opened.append({ kind: "end", finishedAt: new Date().toISOString(), interrupted: stopRequested,
+      remainingAfter: { deepinfra: remainingLine(after.deepinfra), anthropic: remainingLine(after.anthropic) } });
+    opened.close();
+    // The report is built from the log on the disk, as formats builds its own.
+    return finish(openingsReportFromLog(readOpeningsLog(setup.folder)));
+  };
   try {
     const args = parsePracticeArgs(argv);
     mode = args.mode;
     if (args.switches.has("--transcript") && args.mode !== "debate") {
       throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--transcript (debate mode only)");
     }
+    if (args.switches.has("--dry") && args.mode !== "openings") throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--dry (openings mode only)");
+    for (const flag of ["--questions", "--arms"]) {
+      if (args.flags.has(flag) && args.mode !== "openings") throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (openings mode only)`);
+    }
+    // Only fixed ids are accepted, each checked with its seat rotation before anything else (ruling T11-m6); the text of
+    // a refused value is never repeated (practice-openings-questions.ts).
+    const openingsQuestions = args.mode === "openings" ? openingsQuestionsFromFlag(args.flags.get("--questions")) : [];
+    const openingsArms = args.mode === "openings" ? openingsArmsFromFlag(args.flags.get("--arms")) : [];
+    openingsQuestionRotations(openingsQuestions);
     if (args.mode === "report") {
       // Rebuilds the report from an existing samples log; nothing is sent. On a refusal nothing is written there.
       const folder = required(args, "--out");
@@ -206,6 +324,25 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       }
       directory = assertOutsideRepository(folder, repositoryRoot());
       return finish(practiceReportFromLog(lines));
+    }
+    if (args.mode === "openings" && args.switches.has("--dry")) {
+      // --dry (ruling T11-m3): the two gate ports come ONLY from the script (practice-openings-dry.ts). No acknowledgement,
+      // no socket, no settings, no gate status; no RPC or "what is left" port is built (the dry config names the real
+      // socket paths only because its parser requires them), so nothing can reach a gate and nothing is spent.
+      const folder = assertOutsideRepository(args.flags.get("--out") ?? defaultReportDirectory(mode, startedAt), repositoryRoot());
+      directory = folder;
+      const watched = new PracticeGateObserver();
+      observer = watched;
+      options.onObserver?.(watched, stop);
+      const config = openingsDryConfig();
+      const dry = openingsDryPorts();
+      return await runOpeningsMode({ watched, config, targets: openingsDryTargets(config),
+        ports: Object.freeze({ deepinfra: watched.wrap("deepinfra", dry.ports.deepinfra), anthropic: watched.wrap("anthropic", dry.ports.anthropic) }),
+        dry: true, folder, unsentStreakAtStart: { deepinfra: 0, anthropic: 0 }, gateLimits: PRACTICE_FORMATS_DEFAULTS.gateLimits,
+        before: { deepinfra: null, anthropic: null }, remainingPorts: null, questions: openingsQuestions, arms: openingsArms,
+        // A busy model sits out at once unless asked otherwise; the script's waits take no time either way.
+        busyWaitMs: wholeNumber(args, "--busy-wait-minutes", 0, 0, 240) * 60_000,
+        maxInFlight: wholeNumber(args, "--max-in-flight", PRACTICE_FORMATS_DEFAULTS.maxInFlight, 1, 20), sleep: dry.sleep });
     }
     directory = assertOutsideRepository(args.flags.get("--out") ?? defaultReportDirectory(mode, startedAt), repositoryRoot());
     const sockets = practiceSocketsFromEnvironment(env);
@@ -245,6 +382,17 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       if (answer.state !== "active" || !answer.windowOpen) throw new PracticeRefusal("PRACTICE_GATE_NOT_OPEN", `${gate}: ${answer.state}`);
       before[gate] = answer;
     }
+    if (args.mode === "openings") {
+      // All the preview's AIs (spec §2: "all five preview AIs"); each must be enabled at its gate.
+      const models = [...settings.previewConfig.premium_model_ids];
+      assertEnabledAtGates(models, before);
+      return await runOpeningsMode({ watched: observer, config: settings.previewConfig,
+        targets: onePerModel(practiceDeclaredTargets(settings.runner.PROVIDER_DISCOVERY_TARGETS_JSON), models),
+        ports: budgetPorts, dry: false, folder: directory, unsentStreakAtStart, gateLimits, before, remainingPorts,
+        questions: openingsQuestions, arms: openingsArms,
+        busyWaitMs: wholeNumber(args, "--busy-wait-minutes", 30, 0, 240) * 60_000,
+        maxInFlight: wholeNumber(args, "--max-in-flight", PRACTICE_FORMATS_DEFAULTS.maxInFlight, 1, 20), sleep: options.sleep });
+    }
     if (mode === "formats") {
       const wanted = args.flags.get("--models")?.split(",").map((model) => model.trim()).filter((model) => model !== "")
         ?? [...settings.previewConfig.premium_model_ids];
@@ -255,10 +403,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       if (lanes.length === 0 || lanes.some((lane) => !(PRACTICE_LANES as readonly string[]).includes(lane))) {
         throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--lanes");
       }
-      for (const model of wanted) {
-        const gate = previewModelRow(model)?.provider === "anthropic" ? "anthropic" : "deepinfra";
-        if (!before[gate]!.enabledModels.includes(model)) throw new PracticeRefusal("PRACTICE_MODEL_NOT_ENABLED_AT_GATE", model);
-      }
+      assertEnabledAtGates(wanted, before);
       const declared = practiceDeclaredTargets(settings.runner.PROVIDER_DISCOVERY_TARGETS_JSON);
       const policy = practiceRunnerPolicy(settings.previewConfig);
       const parallel = !args.switches.has("--sequential");
@@ -339,7 +484,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
           : error instanceof Error ? `${error.name}:${error.message.slice(0, 120)}` : "UNKNOWN";
     if (code === "PRACTICE_REPORT_INSIDE_REPOSITORY" || mode === "report") directory = null;
     // Once the samples log is open the run has started: what finished is kept, and the verdict is ABORTED.
-    if (samplesLog !== null) {
+    if (samplesLog !== null || openingsLog !== null) {
       log(`practice broke midway: ${code}`);
       return abort(code);
     }

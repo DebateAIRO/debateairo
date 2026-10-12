@@ -355,7 +355,9 @@ export function harnessErrorReport(mode: string, code: string, startedAt: Date, 
 
 /** The short, content-free summary a person reads first. No reply text, ever. */
 export function reportMarkdown(report: PracticeReport): string {
-  const lines = [`# Preview practice (${String(report.mode)}): ${report.verdict}`, "",
+  // An openings --dry run says so in its title: its costs are the price list's estimate for the script's made-up tokens.
+  const dry = report.dry === true ? ", dry: scripted answers, nothing spent" : "";
+  const lines = [`# Preview practice (${String(report.mode)}${dry}): ${report.verdict}`, "",
     `Exit code ${String(report.exitCode)}. Started ${String(report.startedAt)}, finished ${String(report.finishedAt)}.`, ""];
   if (report.reasons.length > 0) {
     lines.push("Why:", "", ...report.reasons.map((reason) => `- ${reason}`), "");

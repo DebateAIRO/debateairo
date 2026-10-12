@@ -17,7 +17,7 @@ server, because only they hold the keys. The Mac never sees a key:
 
 It spends real money from the same daily pots as the site, a little (see "Money and time").
 
-Two modes:
+Three modes:
 
 - **formats**: every model is asked to do every job a few times (write a position, attack one, answer a cross
   exchange, sit on a panel, review a node, write the answer, check the answer, tell the story, check the story). The
@@ -34,16 +34,24 @@ Two modes:
   check of each model, start-of-debate estimate against what each gate says is left, role rotation, admission) and
   then the real runner, on the live register's exact settings. At the end: served answer, story, and every call's
   format check, time and tokens.
+- **openings** (the debate-shape comparison, spec 2026-10-12 §2): on 12 fixed questions (6 Romanian, 6 English), the
+  same AIs open each question four ways: **T** today's opening (every AI writes a full position, blind), **A** a
+  snowball (the first AI lists points, each next AI sees them and adds only new ones), **B** blind lists (every AI
+  lists points with no angle, then merge, one "what is missing?" round and choose) and **C** the angle map (one AI
+  picks the angles, each AI lists points from its own angle, then merge, up to two "what is missing?" rounds and
+  choose). The first AI changes from question to question. It is not a pass/fail test of the release: it collects the
+  data the owners compare with their own method.
 
-Run **formats** first, then **debate**. Both must PASS.
+Run **formats** first, then **debate**. Both must PASS. **openings** is separate: run it when the owners want the
+comparison, never as a release check.
 
 ## The result
 
 Each run writes `report.json` (everything, including the text of every reply that failed its format check, with
 anything key-shaped blanked, at most 64 KiB each) and `report.md` (a short summary with no reply text) into the folder
-given by `--out`. The folder must be outside the repository; the tool refuses a folder inside it, and (formats) a folder
-that already holds another run's `samples.jsonl`. Without `--out` it makes a fresh folder under the system temp folder
-and prints its path.
+given by `--out`. The folder must be outside the repository; the tool refuses a folder inside it, and a folder that
+already holds another run's `samples.jsonl` (formats) or `openings.jsonl` (openings). Without `--out` it makes a fresh
+folder under the system temp folder and prints its path.
 
 Formats mode never loses a finished job: each one is written to `samples.jsonl` in the same folder the moment it
 finishes (with the same content the report holds), and the report is built from that file at the end, and on every
@@ -52,6 +60,40 @@ a folder's `samples.jsonl` (nothing is sent; no socket or acknowledgement needed
 
 ```sh
 node_modules/.bin/tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
+```
+
+### The openings record (openings mode)
+
+Every call is written to `openings.jsonl` in the `--out` folder the moment it finishes. Each line holds:
+
+- the arm, the question and the step;
+- the AI and its maker;
+- exactly what the AI could see (blind, or the ids of the points it was shown) and its place in the plan;
+- its times, its tokens (in, out, reasoning) and its cost;
+- its format check, and how a slip was fixed (by the short patch follow-up or by a full re-ask);
+- the reply itself, with anything key-shaped blanked, at most 64 KiB.
+
+The first line names the AIs, the arms and the questions asked, each question with a short fingerprint of its exact
+wording, so two runs can be compared question by question. After each arm of each question, one line holds what came
+out: the angles, the points with who raised them, the merged answers, the chosen answers with their points for and
+against and their strongest rival, the points raised but not chosen, and every fallback that was used.
+
+`report.json` and `report.md` are built from `openings.jsonl` at the end, and on every other way out too (Ctrl-C,
+Ctrl-C again, the tool breaking midway), as formats builds its report from `samples.jsonl`. They hold counts, cost,
+time, slips and fallbacks per arm. They never hold a quality score: the comparison is the owners' own method, outside
+this repository. When a gate stops or halts (or Ctrl-C is pressed once), the arm in progress finishes, it gets a
+`STOPPED` note (its unsent calls are the stop, not the AIs' own fallbacks), and no new arm or question starts.
+
+Before the real run, run it dry. `--dry` answers from a script: no socket, no settings, no acknowledgement, no
+connection to a gate at all, and nothing is spent. It goes through every arm of all 12 questions in a few seconds,
+with one repaired slip, one busy AI and the fallbacks, and ends PASS_WITH_WARNINGS (exit 10). Its report says "dry" in
+its title; the costs in it are the price list's estimate for the script's made-up token counts, not money spent. The
+block below makes its own fresh folder outside the repository:
+
+```sh
+O=$(mktemp -d /tmp/openings-dry.XXXXXX)
+node_modules/.bin/tsx tools/preview-practice/practice.ts openings --dry --out "$O/report"
+echo "exit: $?"
 ```
 
 ### The whole debate, word for word (debate mode, `--transcript`)
@@ -193,6 +235,12 @@ stored per call), so it is read from the gates' answers as the practice watches 
   it takes about as long as the slowest model's 18 jobs: about 15 to 50 minutes (GLM, Qwen and MiMo take 30 to 170
   seconds a call), plus up to `--busy-wait-minutes` (default 30) when a model is busy. With `--sequential`, about 1
   to 2 hours, plus the same.
+- openings, all 12 questions and all four arms: about 350 calls, roughly $0.5 to $1 within the test budget ($5
+  DeepInfra and $1 Haiku). The steps of one arm go one after another, so it takes several hours (the slow models take
+  30 to 170 seconds a call). The relay of S-4 ends by itself after 8 hours: for a longer run, split it with
+  `--questions` into two runs (for example the 6 Romanian, then the 6 English questions), each with its own `--out`
+  folder. The AIs are seated by each question's fixed place, so a split run seats them as the full run would.
+  `--dry` spends nothing.
 - debate, depth 1: up to about 230 calls, about $0.15 to $0.70, about 1 to 2 hours. Depth 2: about 350 calls, up to
   about 3 hours. The start-of-debate estimate needs much more room left in the pots than is actually spent (about
   $4 DeepInfra and $0.90 Anthropic left for depth 1), so run early in the Bucharest day.
@@ -293,7 +341,7 @@ scp "$PREVIEW_SSH:/home/ubuntu/practice/*" "$P/"
 ssh -N -o ExitOnForwardFailure=yes -o StreamLocalBindUnlink=yes -o StreamLocalBindMask=0177 -L "$D/deepinfra.sock:/run/debateai-practice/deepinfra.sock" -L "$D/anthropic.sock:/run/debateai-practice/anthropic.sock" "$PREVIEW_SSH"
 ```
 
-### S-6, Mac: run formats, then debate
+### S-6, Mac: run formats, then debate (and openings, when the owners ask for it)
 
 In a second terminal, from the worktree's `dialectical-engine` folder (set `D` and `P` to the same folders as in
 S-5):
@@ -311,6 +359,15 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
 echo "exit: $?"
 ```
 
+The openings comparison (it spends real money from the test budget; see "Money and time"): one run, all five AIs,
+after a fresh S-3 gate status and the two status files copied down again. Run it dry first (see "The openings record"):
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts openings --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/openings-report"
+echo "exit: $?"
+```
+
 Optional flags:
 
 - formats: `--samples N` (1 to 10, default 2), `--gap-ms MS` (between one model's calls, default 1000; with
@@ -319,6 +376,12 @@ Optional flags:
   skipped; 0 skips at once),
   `--models a,b` (model ids from the preview's roster), `--lanes JUDGE_POSITION,PANEL,...` (default all nine:
   JUDGE_POSITION, JUDGE_ATTACK, JUDGE_CROSS, PANEL, REVIEW, SYNTHESIZER, EVALUATOR, STORYTELLER, STORY_CHECKER).
+- openings: `--dry` (scripted answers, nothing spent), `--questions ro-euro,en-rent-caps,...` (only the fixed ids:
+  ro-euro, ro-autobuze, ro-final-viata, ro-ciuperci, ro-strainatate, ro-hpv, en-nuclear, en-four-day-week,
+  en-phones-school, en-retirement-age, en-social-media-age, en-rent-caps; default all twelve), `--arms T,A,B,C`
+  (default all four; they always run in the order T, A, B, C), `--busy-wait-minutes N` and `--max-in-flight N` as in
+  formats (with `--dry` a busy AI sits out at once unless `--busy-wait-minutes` is given). The questions themselves
+  are fixed in the code and never read from the command line; a refused value is never repeated in the output.
 - report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/samples.jsonl.
 - debate: `--depth 1|2`, `--question ro|en`, `--transcript` (also write `transcript.json`: every prompt and every
   answer, see "The whole debate, word for word" above). The register is copied only through the register's own publication
@@ -347,7 +410,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 
 ## Files
 
-- `practice.ts`: the command (both modes, the start checks, the report).
+- `practice.ts`: the command (the three modes, the start checks, the report).
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
   `main.ts` files compose them on the preview. `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
 - `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode. `practice-debate.ts`,
@@ -357,6 +420,9 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (models at once,
   the per-gate and overall limits), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
   `practice-questions.ts`.
+- `practice-openings.ts` (the openings run), `practice-openings-questions.ts` (the 12 fixed questions),
+  `practice-openings-log.ts` (openings.jsonl and its report), `practice-openings-dry.ts` (`--dry`'s scripted gates).
+  The map itself is the package `packages/map`. Tests: `tests/unit/map-*.test.ts`, `tests/unit/practice-openings*.test.ts`.
 - `gate-relay.py` and `test_gate_relay.py` (run: `python3 tools/preview-practice/test_gate_relay.py`).
 - Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-transcript.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,
