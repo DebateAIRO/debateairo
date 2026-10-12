@@ -11,10 +11,13 @@ import {
   type TemplatedMail
 } from "../../apps/api/src/mail-channel.js";
 
-// P7 declared its port before this package existed; these lines stop compiling the day the two drift apart.
-type SameIds = [BillingMailTemplateId] extends [MailTemplateId]
-  ? ([MailTemplateId] extends [BillingMailTemplateId] ? true : false) : false;
-const SAME_IDS: SameIds = true;
+// Every billing id is a package id; DATA_EXPORT (data-export S01, not a billing mail) is the one package id outside billing.
+type BillingInMail = [BillingMailTemplateId] extends [MailTemplateId] ? true : false;
+type OutsideBilling = Exclude<MailTemplateId, BillingMailTemplateId>;
+type OnlyExport = [OutsideBilling] extends ["DATA_EXPORT"]
+  ? (["DATA_EXPORT"] extends [OutsideBilling] ? true : false) : false;
+const BILLING_IN_MAIL: BillingInMail = true;
+const ONLY_EXPORT_OUTSIDE_BILLING: OnlyExport = true;
 
 const CAPTURE = resolve("deploy/dev-auth/sendmail-capture.mjs");
 const CAPTURE_DIR = "DEBATEAI_DEV_MAIL_CAPTURE_DIR";
@@ -123,10 +126,11 @@ describe("P17 TemplatedMailSender over the dev sendmail capture", { concurrent: 
   });
 
   it("both senders are P7's BillingMailPort, and the EMAIL job's message goes through unchanged", async () => {
-    expect(SAME_IDS).toBe(true);
+    expect([BILLING_IN_MAIL, ONLY_EXPORT_OUTSIDE_BILLING]).toEqual([true, true]);
     // R-8's sixteen, ruling Q-5's owner template O2, W9's M8_RECEIVED and O2_WITHDRAWAL (P2-I11), and W12's O3 (P2-I16), N9's O4,
-    // N14's O2_REFUND_DUE and O2_REFUND_REMINDER, and N17's M12 (ruling PR-17).
-    expect(MAIL_TEMPLATE_IDS).toHaveLength(24);
+    // N14's O2_REFUND_DUE and O2_REFUND_REMINDER, N17's M12 (ruling PR-17) + data-export S01's DATA_EXPORT.
+    expect(MAIL_TEMPLATE_IDS).toHaveLength(25);
+    expect(MAIL_TEMPLATE_IDS.filter((id) => id !== "DATA_EXPORT")).toHaveLength(24);
     const memory = new MemoryTemplatedMailSender();
     const ports: BillingMailPort[] = [
       memory,

@@ -149,6 +149,13 @@ export function readPaymentAnswer(json: unknown, context: Readonly<{ orderId: st
   const answer = answerRecord(json);
   const code = answerCode(answer);
   const payment = paymentOf(answer);
+  // NETOPIA's answer for an id it does not hold (error 99, "Invalid ntpID") carries an all-zero payment status, which is not a
+  // status text: no report. Only that shape is tagged "99" (the code stays PAYMENT_RESPONSE_INVALID, as before). A real decline
+  // also carries code 99 with a status text, and a 99 with no payment or no status keeps its refusal.
+  if (context.purpose === "STATUS" && code === "99" && payment !== null && payment.status !== undefined && payment.status !== null
+    && !(typeof payment.status === "string" && STATUS_TEXT.test(payment.status))) {
+    throw paymentError("PAYMENT_RESPONSE_INVALID", code);
+  }
   const statusText = statusTextOf(payment);
   const report = (forced: PaymentState | null, orderReused = false): PaymentAnswer =>
     Object.freeze({ kind: "REPORT", report: reportOf(answer, context, code, forced), orderReused });

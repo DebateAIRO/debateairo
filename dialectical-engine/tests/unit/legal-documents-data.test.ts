@@ -174,11 +174,12 @@ describe("legal documents — generated data", () => {
       }
       // The United Kingdom is not served (owner's ruling of 9 October 2026), but since the owner's answer of
       // 10 October 2026 the service is hosted there (OVHcloud, London). The Terms never name it; the Privacy
-      // Policy names it only where it says where data is held or goes.
+      // Policy names it only where it says where data is held or goes (since 12 October 2026 also in the summary,
+      // section 5 and Annex B.4, all naming London).
       expect(allTexts(TERMS_OF_SERVICE).filter((text) => text.includes("United Kingdom"))).toEqual([]);
       const ukMentions = allTexts(PRIVACY_POLICY).filter((text) => text.includes("United Kingdom"));
       expect(ukMentions.length).toBeGreaterThan(0);
-      for (const text of ukMentions) expect(text).toMatch(/OVHcloud|EU countries, the United Kingdom|other EU countries, the United Kingdom/u);
+      for (const text of ukMentions) expect(text).toMatch(/OVHcloud|London|EU countries, the United Kingdom|other EU countries, the United Kingdom/u);
     });
 
     it("says the support chat sends text to a model too, right after the debate paragraph", () => {

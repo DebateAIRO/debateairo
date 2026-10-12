@@ -78,6 +78,9 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+  { route: "GET /v1/account/export", auth: "user", resource: "identity", action: "read-data-export" },
+  { route: "POST /v1/account/export", auth: "user", resource: "identity", action: "request-data-export" },
+  { route: "POST /v1/account/export/download", auth: "user", resource: "identity", action: "download-data-export" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
@@ -309,8 +312,9 @@ describe("S7 deny-by-default authorization", () => {
     expect(staffContractInventory.routes).toHaveLength(18);
     // The merged closed inventory adds the twenty-one external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
-    // GET /v1/billing/subscription/card, and the auth DB batch adds four MFA-recovery wait routes, beside dev's 158.
-    expect(contractInventory.routes).toHaveLength(163);
+    // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
+    // data-export S01's 3 routes.
+    expect(contractInventory.routes).toHaveLength(166);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

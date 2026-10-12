@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Jūsu dati pakalpojumā Dialectical Engine",
+  "archive.generated": "Sagatavots {time} lietotājam {pseudonym}.",
+  "archive.accountHeading": "Konts",
+  "archive.email": "E-pasts",
+  "archive.memberSince": "Dalībnieks kopš",
+  "archive.debatesHeading": "Jūsu debates ({count})",
+  "archive.question": "Jautājums",
+  "archive.verdict": "Vērtējums",
+  "archive.verdictSupported": "Pamatots",
+  "archive.verdictContested": "Apstrīdēts",
+  "archive.verdictUnsupported": "Nepamatots",
+  "archive.story": "Debates īsumā",
+  "archive.arguments": "Argumenti",
+  "archive.visibilityPublic": "Publicēts",
+  "archive.visibilityPrivate": "Privāts",
+  "archive.unreadable": "Šo debašu saturu vairs nevar nolasīt, jo to atslēga ir iznīcināta.",
+  "archive.noDebates": "Jums nav debašu.",
+  "archive.filesNote": "Šajā ZIP arhīvā esošie JSON faili satur tos pašus datus mašīnlasāmā formā; to saraksts ir README.txt."
+}

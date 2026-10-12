@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kort fortalt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Vi indsamler det, en konto har brug for, og det, du vælger at skrive. Dine spørgsmål sendes til AI-udbydere, der er anført i vores Register; de bruges ikke til at træne modeller. Debatter er private, medmindre du offentliggør dem. Når du sletter din konto, destrueres nøglerne til dine private data; når du planlægger sletningen, vælger du, om dine offentliggjorte debatter også skal fjernes eller forblive offentlige under dit udfasede pseudonym. Du kan kontakte os på privacy@dezbatere.ro, og personer, som nævnes i en debat, kan anmode om fjernelse uden at have en konto." }
+      { kind: "p", text: "Vi indsamler det, en konto har brug for, og det, du vælger at skrive. Dine spørgsmål sendes til AI-udbydere, der er anført i vores Register; de bruges ikke til at træne modeller. Vores hostingudbyder opbevarer din konto og dine debatter i London i Storbritannien; afsnit 5 beskriver, hvor dine data ellers sendes hen. Debatter er private, medmindre du offentliggør dem. Når du sletter din konto, destrueres nøglerne til dine private data; når du planlægger sletningen, vælger du, om dine offentliggjorte debatter også skal fjernes eller forblive offentlige under dit udfasede pseudonym. Du kan kontakte os på privacy@dezbatere.ro, og personer, som nævnes i en debat, kan anmode om fjernelse uden at have en konto." }
     ]
   },
   {
@@ -113,6 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Træning og opbevaring er forskellige ting. Vi bruger kun AI-udbydere på vilkår, der ikke tillader dem at bruge dit indhold til at træne eller forbedre deres modeller; Registret viser for hver udbyder, om vi har bekræftet dette over for vores konto, og hvornår. Nogle udbydere opbevarer prompts og svar i en begrænset periode af hensyn til sikkerhed, forebyggelse af misbrug eller deres egne retlige forpligtelser; Registret angiver hvor længe og hvorfor. Hvor nuldataopbevaring er aktiv, angiver Registret dette og de funktioner, det gælder for. Vi beskriver ikke indhold som uopbevaret, når det ikke er tilfældet." },
       { kind: "p", text: "Overførsler uden for EØS. Udbydere, der er etableret i USA, modtager data efter en af mekanismerne i kapitel V i GDPR: EU-USA-databeskyttelsesrammen, hvor den konkrete kontraherende enhed er certificeret for disse data, eller Europa-Kommissionens standardkontraktbestemmelser (modul to, dataansvarlig til databehandler), understøttet af en vurdering af overførselsrisikoen og supplerende foranstaltninger. Registret angiver mekanismen for hver udbyder. Du kan få en kopi af de bestemmelser, vi støtter os på, ved at skrive til privacy@dezbatere.ro. Hvis en mekanisme, vi støtter os på, erklæres ugyldig, skifter vi til en anden, før overførslerne fortsætter, og vi underretter dig." },
       { kind: "p", text: "Andre modtagere. Ud over AI-udbyderne behandler følgende databehandlere data for os. Vores hostingudbyder, OVHcloud, opbevarer og driver tjenesten i sit datacenter i London i Storbritannien. Europa-Kommissionen har besluttet, at Storbritannien yder tilstrækkelig beskyttelse af personoplysninger (dens tilstrækkelighedsafgørelse gælder til december 2031), så denne overførsel kræver ingen yderligere garantier. Cloudflare leverer vores sider, transporterer trafik mellem dig og tjenesten og udfører botkontrollen (afsnit 2); det er en amerikansk virksomhed, der er certificeret under EU–US Data Privacy Framework, og dens kontrakt med os tilføjer EU's standardkontraktbestemmelser som reserve. Amazon Simple Email Service sender e-mails om din konto i henhold til vores kontrakt med Amazon Web Services EMEA SARL i Luxembourg; hvor Amazon behandler disse data i USA, bygger overførslen på EU's standardkontraktbestemmelser i Amazons databehandlingsvilkår. Betalinger foregår via vores betalingsudbyder, NETOPIA Payments, når betalte abonnementer starter. De handler alle efter vores dokumenterede instrukser i henhold til en databehandleraftale med de garantier, som artikel 28 kræver. Vi tillader ikke nogen databehandler at bruge dine data til egne formål. Hvis en udbyder gjorde det, ville vedkommende være selvstændig dataansvarlig, og vi ville ikke sende dine data til denne udbyder." },
+      { kind: "p", text: "Hvor dine data befinder sig. Din konto og dine debatter opbevares i Storbritannien på vores hostingudbyders servere i London. Cloudflare transporterer trafik gennem sit eget netværk, og Amazon kan behandle e-mails om din konto i USA. Hver AI-udbyder behandler den tekst, den modtager, i de lande, som Registret angiver for den, for det meste USA." },
       { kind: "p", text: "Offentlige myndigheder. Vi videregiver personoplysninger til domstole, tilsynsmyndigheder eller retshåndhævende myndigheder, hvor loven kræver det, og vi underretter dig, medmindre loven forhindrer os i det." }
     ]
   },
@@ -183,12 +184,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Indsigt (Art. 15) — En kopi af de personoplysninger, vi har om dig, samt disse oplysninger. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Indsigt (Art. 15) — En kopi af de personoplysninger, vi har om dig, samt disse oplysninger. Vælg Eksportér data under Indstillinger: Vi klargør en ZIP-fil med JSON-filer og én side, som du kan åbne i enhver browser, og sender dig et downloadlink via e-mail, der virker i 24 timer og kun, mens du er logget ind på din konto.",
         "Berigtigelse (Art. 16) — Ret din e-mailadresse eller gendannelsesadresse fra Indstillinger. Dit pseudonym kan af de grunde, der er angivet i Vilkårene, ikke ændres; du kan lukke kontoen og oprette en ny",
         "Sletning (Art. 17) — Slet til enhver tid en privat debat fra debatens side. Luk din konto fra Indstillinger; afsnit 7 forklarer præcist, hvad det medfører. Bed os om at fjerne en offentliggjort debat, som indeholder dine data, uanset om du er forfatteren",
         "Begrænsning (Art. 18) — Bed os om at standse behandlingen af bestemte data, mens en tvist om dem afgøres",
         "Indsigelse (Art. 21) — Gør indsigelse mod behandling baseret på legitime interesser — sikkerheds- og revisionsbehandlingen i afsnit 4 — hvorefter vi standser, medmindre vi kan påvise vægtige grunde. Gør til enhver tid indsigelse mod markedsføring, hvorefter vi standser den",
-        "Dataportabilitet (Art. 20) — Dine debatter og kontodata i et almindeligt anvendt, maskinlæsbart format. [Pending: same export as Access.] Ikke-personligt indhold, du har skabt, såsom dine spørgsmål, returneres til dig efter anmodning, når kontrakten ophører",
+        "Dataportabilitet (Art. 20) — Dine debatter og kontodata i et almindeligt anvendt, maskinlæsbart format. Brug Eksportér data under Indstillinger: ZIP-filen indeholder dine data som maskinlæsbare JSON-filer og én læsbar side; linket sendes via e-mail, virker i 24 timer og kun, mens du er logget ind på din konto. Ikke-personligt indhold, du har skabt, såsom dine spørgsmål, returneres til dig efter anmodning, når kontrakten ophører",
         "Tilbagetrækning af samtykke (Art. 7(3)) — Træk samtykke til markedsføring tilbage fra enhver e-mail eller fra Indstillinger; træk samtykket til følsomme data tilbage ved at lukke din konto fra Indstillinger (du kan også undlade at medtage dem eller slette en debat, der indeholder dem). Tilbagetrækningen påvirker ikke behandling, der allerede er sket",
         "Klage — Til den rumænske tilsynsmyndighed, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, eller til myndigheden i det land, hvor du bor. Vi ser helst, at du kontakter os først"
         ]
@@ -219,7 +220,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine bruger 18 elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af Dialectical Engine: 13 cookies og 5 poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. Cookiepolitikken på dezbatere.ro/cookies angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes." },
+      { kind: "p", text: "Dialectical Engine bruger 20 elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af Dialectical Engine: 13 cookies og 7 poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. Cookiepolitikken på dezbatere.ro/cookies angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes." },
       {
         kind: "list",
         items: [
@@ -240,7 +241,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokal lagring — Om du bruger lys eller mørk tilstand. — Indtil du sletter det",
         "debateai.languageOffer.dismissed — Sessionslagring — Husker for denne fane, at du har takket nej til at se en debat på et andet sprog. — Indtil du lukker fanen",
         "debateai.support.conversation.v2 — Sessionslagring — Holder din samtale med hjælpechatten på skærmen, så længe fanen er åben. Den slettes, når nogen logger ind eller ud i denne fane. — Indtil du lukker fanen",
-        "debateai.phone-completion-draft.v1 — Sessionslagring — Ufærdigt spørgsmål under telefontrinnet; slettes ved sessionsskift, logout eller ejerskift — 15 minutter eller indtil tidligere sletning"
+        "debateai.phone-completion-draft.v1 — Sessionslagring — Ufærdigt spørgsmål under telefontrinnet; slettes ved sessionsskift, logout eller ejerskift — 15 minutter eller indtil tidligere sletning",
+        "debateai.exportPending — Sessionslagring — Gemmer eksportlinket fra e-mailen i denne fane til login og nye forsøg. — Indtil fanen lukkes, du logger ud, et nyt link åbnes, den første vellykkede download eller et resultat om ugyldigt link eller forkert konto",
+        "debateai.exportLinkOutcome — Sessionslagring — Husker, hvilken besked om downloadlinket der skal vises i denne fane. — Indtil fanen lukkes, du logger ud, eller et nyt link åbnes"
         ]
       },
       { kind: "p", text: "Ingen anden part indsamler via Dialectical Engine oplysninger om dine onlineaktiviteter over tid og på tværs af websteder." },
@@ -295,7 +298,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Australien og New Zealand",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Australien. Udenlandske modtagere af dine personoplysninger er de AI-udbydere og databehandlere, der er anført i Registret, og som befinder sig i USA og Den Europæiske Union; vi træffer rimelige foranstaltninger for at sikre, at de behandler oplysningerne i overensstemmelse med de australske principper om privatliv. Automatiserede afgørelser: Fra den 10. december 2026 angiver denne politik de typer afgørelser, der træffes af computerprogrammer, og som påvirker dine rettigheder eller interesser væsentligt — der er ingen; bedømmelser og konklusioner vedrører argumenter, ikke dig — samt de personoplysninger, der anvendes i dem. Klager kan indgives til Office of the Australian Information Commissioner. New Zealand. Vores privatlivsansvarlige er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Hvor vi indsamler personoplysninger om dig indirekte — fordi en anden bruger medtog dem i et spørgsmål — udgør denne politik og afsnit 11 den meddelelse, vi giver dig. Vi videregiver til AI-udbyderne i Registret som vores agenter i henhold til kontrakter, der kræver tilsvarende garantier. Klager kan indgives til Office of the Privacy Commissioner." }
+      { kind: "p", text: "Australien. Udenlandske modtagere af dine personoplysninger er de databehandlere, der er nævnt i afsnit 5, herunder vores hostingudbyder i London i Storbritannien, og de AI-udbydere, der er anført i Registret. De befinder sig i Storbritannien, USA og Den Europæiske Union, og Registret angiver hver AI-udbyders lande; vi træffer rimelige foranstaltninger for at sikre, at de behandler oplysningerne i overensstemmelse med de australske principper om privatliv. Automatiserede afgørelser: Fra den 10. december 2026 angiver denne politik de typer afgørelser, der træffes af computerprogrammer, og som påvirker dine rettigheder eller interesser væsentligt — der er ingen; bedømmelser og konklusioner vedrører argumenter, ikke dig — samt de personoplysninger, der anvendes i dem. Klager kan indgives til Office of the Australian Information Commissioner. New Zealand. Vores privatlivsansvarlige er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Hvor vi indsamler personoplysninger om dig indirekte — fordi en anden bruger medtog dem i et spørgsmål — udgør denne politik og afsnit 11 den meddelelse, vi giver dig. Vi videregiver til AI-udbyderne i Registret som vores agenter i henhold til kontrakter, der kræver tilsvarende garantier. Klager kan indgives til Office of the Privacy Commissioner." }
     ]
   },
   {
@@ -327,7 +330,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "45d138a87d586041d50986a9381c6866a8c12f4e8141775b7965fdbca300f288",
+  sha256: "9f0f94467fa01dc6fb0ade8fc5d67eeb510ddcb32305f76d8ae8f86966b321b2",
   eyebrow: "PRIVATLIVSPOLITIK · v3.3 · GÆLDENDE FRA 12. OKTOBER 2026",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",

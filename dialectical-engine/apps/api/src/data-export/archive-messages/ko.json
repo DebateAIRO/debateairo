@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Dialectical Engine의 내 데이터",
+  "archive.generated": "{pseudonym}님을 위해 {time}에 준비했습니다.",
+  "archive.accountHeading": "계정",
+  "archive.email": "이메일",
+  "archive.memberSince": "가입일",
+  "archive.debatesHeading": "내 토론 ({count})",
+  "archive.question": "질문",
+  "archive.verdict": "판정",
+  "archive.verdictSupported": "지지됨",
+  "archive.verdictContested": "논쟁 중",
+  "archive.verdictUnsupported": "지지되지 않음",
+  "archive.story": "토론 요약",
+  "archive.arguments": "주장",
+  "archive.visibilityPublic": "게시됨",
+  "archive.visibilityPrivate": "비공개",
+  "archive.unreadable": "이 토론의 키가 폐기되어 내용을 더 이상 읽을 수 없습니다.",
+  "archive.noDebates": "토론이 없습니다.",
+  "archive.filesNote": "이 ZIP의 JSON 파일에는 동일한 데이터가 기계가 읽을 수 있는 형식으로 들어 있습니다. 파일 목록은 README.txt를 참조하세요."
+}

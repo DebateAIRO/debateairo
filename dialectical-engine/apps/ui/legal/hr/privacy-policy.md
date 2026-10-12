@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.3 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/privacy/versions · Voditelj obrade: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
-**In short.** Prikupljamo ono što je potrebno za račun i ono što odlučite upisati. Vaša se pitanja šalju pružateljima usluga umjetne inteligencije navedenima u našem Registru; ne upotrebljavaju se za treniranje modela. Rasprave su privatne osim ako ih objavite. Brisanjem računa uništavaju se ključevi vaših privatnih podataka; pri zakazivanju birate hoće li se i vaše objavljene rasprave ukloniti ili ostati javne pod vašim pseudonimom koji se više ne upotrebljava. Možete nam se obratiti na privacy@dezbatere.ro, a osobe imenovane u raspravi mogu zatražiti uklanjanje i bez računa.
+**In short.** Prikupljamo ono što je potrebno za račun i ono što odlučite upisati. Vaša se pitanja šalju pružateljima usluga umjetne inteligencije navedenima u našem Registru; ne upotrebljavaju se za treniranje modela. Naš pružatelj usluga smještaja pohranjuje vaš račun i vaše rasprave u Londonu, u Ujedinjenoj Kraljevini; odjeljak 5 navodi kamo još idu vaši podaci. Rasprave su privatne osim ako ih objavite. Brisanjem računa uništavaju se ključevi vaših privatnih podataka; pri zakazivanju birate hoće li se i vaše objavljene rasprave ukloniti ili ostati javne pod vašim pseudonimom koji se više ne upotrebljava. Možete nam se obratiti na privacy@dezbatere.ro, a osobe imenovane u raspravi mogu zatražiti uklanjanje i bez računa.
 
 ## 1. Tko je odgovoran za vaše podatke
 
@@ -95,6 +95,8 @@ Ne izrađujemo vaš profil, ne upotrebljavamo vaše podatke za oglašavanje i ne
 
 **Drugi primatelji.** Osim pružatelja usluga umjetne inteligencije, podatke za nas obrađuju i sljedeći izvršitelji obrade. Naš pružatelj usluga smještaja, OVHcloud, pohranjuje i pokreće uslugu u svojem podatkovnom centru u Londonu, u Ujedinjenoj Kraljevini. Europska komisija utvrdila je da Ujedinjena Kraljevina primjereno štiti osobne podatke (njezina odluka o primjerenosti traje do prosinca 2031.), pa taj prijenos ne zahtijeva dodatne zaštitne mjere. Cloudflare isporučuje naše stranice, prenosi podatkovni promet između vas i usluge te provodi provjeru botova (odjeljak 2); riječ je o američkoj tvrtki certificiranoj prema Okviru EU-SAD za privatnost podataka (Data Privacy Framework), a njezin ugovor s nama kao rezervnu osnovu dodaje standardne ugovorne klauzule EU-a. Amazon Simple Email Service, na temelju našeg ugovora s društvom Amazon Web Services EMEA SARL u Luksemburgu, šalje poruke e-pošte vezane za račun; ako Amazon te podatke obrađuje u Sjedinjenim Američkim Državama, prijenos se temelji na standardnim ugovornim klauzulama EU-a iz Amazonovih uvjeta obrade podataka. Plaćanja se obavljaju putem našeg pružatelja platnih usluga, NETOPIA Payments, kada plaćeni planovi započnu. Svaki postupa prema našim dokumentiranim uputama na temelju ugovora o obradi podataka uz zaštitne mjere koje zahtijeva članak 28. Nijednom izvršitelju obrade ne dopuštamo uporabu vaših podataka u vlastite svrhe. Ako bi pružatelj tako postupao, bio bi samostalan voditelj obrade i ne bismo mu slali vaše podatke.
 
+**Gdje su vaši podaci.** Vaš račun i vaše rasprave pohranjeni su u Ujedinjenoj Kraljevini, na poslužiteljima našeg pružatelja usluga smještaja u Londonu. Cloudflare prenosi podatkovni promet putem vlastite mreže, a Amazon može obrađivati poruke e-pošte vezane za račun u Sjedinjenim Američkim Državama. Svaki pružatelj usluga umjetne inteligencije obrađuje tekst koji primi u državama koje Registar navodi za njega, većinom u Sjedinjenim Američkim Državama.
+
 **Javna tijela.** Osobne podatke otkrivamo sudovima, regulatornim tijelima ili tijelima kaznenog progona ako to nalaže zakon te vas obavještavamo osim ako nam zakon to zabranjuje.
 
 ## 6. Objavljivanje i vidljivost
@@ -148,12 +150,12 @@ Svako od ovih prava možete besplatno ostvariti pisanjem na **privacy@dezbatere.
 
 | Pravo | Što ovdje znači |
 | --- | --- |
-| **Pristup** (Art. 15) | Primjerak osobnih podataka koje imamo o vama i ove informacije. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Pristup** (Art. 15) | Primjerak osobnih podataka koje imamo o vama i ove informacije. U Postavkama odaberite Izvezi podatke: pripremamo ZIP datoteku s JSON datotekama i jednom stranicom koju možete otvoriti u bilo kojem pregledniku te vam e-poštom šaljemo poveznicu za preuzimanje koja vrijedi 24 sata i radi samo dok ste prijavljeni na svoj račun. |
 | **Ispravak** (Art. 16) | Ispravite adresu e-pošte ili adresu e-pošte za oporavak u Postavkama. Vaš pseudonim nije moguće promijeniti iz razloga navedenih u Uvjetima; možete zatvoriti račun i izraditi novi |
 | **Brisanje** (Art. 17) | Izbrišite privatnu raspravu u bilo kojem trenutku sa stranice rasprave. Zatvorite račun u Postavkama; odjeljak 7 točno objašnjava što se time čini. Zatražite da uklonimo objavljenu raspravu koja sadržava vaše podatke bez obzira na to jeste li autor |
 | **Ograničenje** (Art. 18) | Zatražite da prestanemo obrađivati određene podatke dok se ne riješi spor o njima |
 | **Prigovor** (Art. 21) | Uložite prigovor na obradu koja se temelji na legitimnim interesima — sigurnosnu i revizijsku obradu iz odjeljka 4 — i prestat ćemo osim ako možemo dokazati uvjerljive razloge. Uložite prigovor na marketing u bilo kojem trenutku i prestat ćemo |
-| **Prenosivost** (Art. 20) | Vaše rasprave i podaci o računu u uobičajenom, strojno čitljivom formatu. \[Pending: same export as Access.\] Neosobni sadržaj koji ste stvorili, kao što su vaša pitanja, vraća vam se na zahtjev nakon prestanka ugovora |
+| **Prenosivost** (Art. 20) | Vaše rasprave i podaci o računu u uobičajenom, strojno čitljivom formatu. Upotrijebite Izvezi podatke u Postavkama: ZIP sadrži vaše podatke u strojno čitljivim JSON datotekama i jednu čitljivu stranicu; poveznica poslana e-poštom vrijedi 24 sata i radi samo dok ste prijavljeni na svoj račun. Neosobni sadržaj koji ste stvorili, kao što su vaša pitanja, vraća vam se na zahtjev nakon prestanka ugovora |
 | **Povlačenje privole** (Art. 7(3)) | Povucite privolu za marketing iz bilo koje poruke e-pošte ili u Postavkama; povucite privolu za osjetljive podatke zatvaranjem računa u Postavkama (takve podatke možete i izostaviti ili izbrisati raspravu koja ih sadržava). Povlačenje ne utječe na obradu koja je već provedena |
 | **Pritužba** | Rumunjskom nadzornom tijelu, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukurešt, <anspdcp@dataprotection.ro>, ili tijelu u državi u kojoj živite. Radije bismo da nam se prvo obratite |
 
@@ -174,7 +176,7 @@ Dialectical Engine namijenjen je odraslima. Pri registraciji potvrđujete da ima
 ## 13. Kolačići
 
 
-Dialectical Engine koristi 18 stavki, sve strogo nužne za uslugu koju ste zatražili i sve ih postavlja isključivo Dialectical Engine: 13 kolačića i 5 zapisa u pohrani vašeg preglednika. Ne postavljamo analitičke, oglasne ni prateće kolačiće. **Pravila o kolačićima** na dezbatere.ro/cookies navode ih uz opis onoga što svaka stavka radi i tko je prima te će se promijeniti prije nego što se doda bilo što drugo.
+Dialectical Engine koristi 20 stavki, sve strogo nužne za uslugu koju ste zatražili i sve ih postavlja isključivo Dialectical Engine: 13 kolačića i 7 zapisa u pohrani vašeg preglednika. Ne postavljamo analitičke, oglasne ni prateće kolačiće. **Pravila o kolačićima** na dezbatere.ro/cookies navode ih uz opis onoga što svaka stavka radi i tko je prima te će se promijeniti prije nego što se doda bilo što drugo.
 
 | Naziv | Vrsta | Svrha | Trajanje |
 |---|---|---|---|
@@ -196,6 +198,8 @@ Dialectical Engine koristi 18 stavki, sve strogo nužne za uslugu koju ste zatra
 | `debateai.languageOffer.dismissed` | Pohrana sesije | Pamti, za ovu karticu, da ste odbili ponudu da se rasprava prikaže na drugom jeziku. | Dok ne zatvorite karticu |
 | `debateai.support.conversation.v2` | Pohrana sesije | Drži vaš razgovor s pomoći na zaslonu dok je kartica otvorena. Briše se kada se bilo tko prijavi ili odjavi u ovoj kartici. | Dok ne zatvorite karticu |
 | `debateai.phone-completion-draft.v1` | Pohrana sesije | Nedovršeno pitanje tijekom koraka s telefonom; briše se pri promjeni sesije, odjavi ili promjeni vlasnika | 15 minuta ili do ranijeg brisanja |
+| `debateai.exportPending` | Pohrana sesije | Čuva poveznicu za izvoz poslanu e-poštom u ovoj kartici za prijavu i ponovni pokušaj. | Do zatvaranja kartice, odjave, nove poveznice, prvog uspješnog preuzimanja ili ishoda nevaljane poveznice ili pogrešnog računa |
+| `debateai.exportLinkOutcome` | Pohrana sesije | Pamti koju poruku o poveznici za preuzimanje treba prikazati u ovoj kartici. | Do zatvaranja kartice, odjave ili nove poveznice |
 
 Nijedna druga strana putem Dialectical Engine-ja ne prikuplja informacije o vašim internetskim aktivnostima tijekom vremena i na različitim web-mjestima.
 
@@ -229,7 +233,7 @@ Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih p
 
 ### B.4 Australija i Novi Zeland
 
-**Australija.** Inozemni primatelji vaših osobnih podataka pružatelji su usluga umjetne inteligencije i izvršitelji obrade navedeni u Registru, smješteni u Sjedinjenim Američkim Državama i Europskoj uniji; poduzimamo razumne korake kako bismo osigurali da s njima postupaju u skladu s Australskim načelima privatnosti. **Automatizirane odluke:** od 10. prosinca 2026. ova pravila utvrđuju vrste odluka računalnih programa koje znatno utječu na vaša prava ili interese — takvih nema; rezultati i presude odnose se na argumente, a ne na vas — i osobne podatke koji se u njima upotrebljavaju. Pritužbe se mogu podnijeti **Uredu australskog povjerenika za informacije**. **Novi Zeland.** Naš službenik za privatnost jest naš direktor, dostupan na privacy@dezbatere.ro. Ako osobne podatke o vama prikupljamo neizravno — jer ih je drugi korisnik uključio u pitanje — ova pravila i odjeljak 11 obavijest su koju vam dajemo. Podatke otkrivamo pružateljima usluga umjetne inteligencije iz Registra kao svojim zastupnicima, na temelju ugovora koji zahtijevaju usporedive zaštitne mjere. Pritužbe se mogu podnijeti **Uredu povjerenika za privatnost**.
+**Australija.** Inozemni primatelji vaših osobnih podataka su izvršitelji obrade navedeni u odjeljku 5, uključujući našeg pružatelja usluga smještaja u Londonu, u Ujedinjenoj Kraljevini, te pružatelji usluga umjetne inteligencije navedeni u Registru. Smješteni su u Ujedinjenoj Kraljevini, Sjedinjenim Američkim Državama i Europskoj uniji, a Registar navodi države svakog pružatelja usluga umjetne inteligencije; poduzimamo razumne korake kako bismo osigurali da s njima postupaju u skladu s Australskim načelima privatnosti. **Automatizirane odluke:** od 10. prosinca 2026. ova pravila utvrđuju vrste odluka računalnih programa koje znatno utječu na vaša prava ili interese — takvih nema; rezultati i presude odnose se na argumente, a ne na vas — i osobne podatke koji se u njima upotrebljavaju. Pritužbe se mogu podnijeti **Uredu australskog povjerenika za informacije**. **Novi Zeland.** Naš službenik za privatnost jest naš direktor, dostupan na privacy@dezbatere.ro. Ako osobne podatke o vama prikupljamo neizravno — jer ih je drugi korisnik uključio u pitanje — ova pravila i odjeljak 11 obavijest su koju vam dajemo. Podatke otkrivamo pružateljima usluga umjetne inteligencije iz Registra kao svojim zastupnicima, na temelju ugovora koji zahtijevaju usporedive zaštitne mjere. Pritužbe se mogu podnijeti **Uredu povjerenika za privatnost**.
 
 ### B.5 Švicarska
 

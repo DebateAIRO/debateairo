@@ -192,6 +192,36 @@
       "serviceCredential": true
     },
     {
+      "id": "debateai_dev_support_config_operator",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_support_config_operator"],
+      "forbiddenMemberships": ["debateai_runtime", "debateai_authorization_runtime", "debateai_erasure_runtime", "debateai_data_export_worker", "pg_*"],
+      "owns": [],
+      "purpose": ["SUPPORT_CONFIG_OPERATOR_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_support",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_support"],
+      "forbiddenMemberships": ["debateai_runtime", "debateai_authorization_runtime", "debateai_erasure_runtime", "debateai_data_export_worker", "pg_*"],
+      "owns": [],
+      "purpose": ["SUPPORT_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_data_export",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_data_export_worker"],
+      "forbiddenMemberships": ["debateai_runtime", "debateai_authorization_runtime", "debateai_erasure_runtime", "debateai_support", "pg_*"],
+      "owns": [],
+      "purpose": ["DATA_EXPORT_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
       "id": "debateai_dev_hatchet",
       "login": true,
       "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
@@ -218,6 +248,7 @@
     "PUBLICATION_ENABLED": "true",
     "EVALUATOR_DEV_MENU_ENABLED": "false",
     "EVALUATOR_DEV_MENU_DATABASE_URL": ".local/dev-auth/database-principals.env:EVALUATOR_DEV_MENU_DATABASE_URL",
+    "DATA_EXPORT_DATABASE_URL": ".local/dev-auth/database-principals.env:DATA_EXPORT_DATABASE_URL",
     "ACCOUNT_ERASURE_GRACE_MS": "604800000",
     "HATCHET_HOST_PORT": "127.0.0.1:7077",
     "HATCHET_API_URL": "http://127.0.0.1:8888",

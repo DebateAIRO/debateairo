@@ -70,6 +70,11 @@ export const DEVELOPMENT_DATABASE_PRINCIPALS = Object.freeze([
     roleName: "debateai_dev_support",
     capabilityRole: "debateai_support",
     environmentKey: "SUPPORT_DATABASE_URL"
+  }),
+  Object.freeze({
+    roleName: "debateai_dev_data_export",
+    capabilityRole: "debateai_data_export_worker",
+    environmentKey: "DATA_EXPORT_DATABASE_URL"
   })
 ] satisfies readonly DevelopmentDatabasePrincipal[]);
 
@@ -89,6 +94,8 @@ const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
 const MAX_CREDENTIAL_FILE_BYTES = 64 * 1024;
 const LEGACY_DEVELOPMENT_DATABASE_ENVIRONMENT_KEY_SETS = Object.freeze([
+  Object.freeze(DEVELOPMENT_DATABASE_PRINCIPALS.slice(0, -3)
+    .map(({ environmentKey }) => environmentKey)),
   Object.freeze(DEVELOPMENT_DATABASE_PRINCIPALS.slice(0, -2)
     .map(({ environmentKey }) => environmentKey)),
   Object.freeze(DEVELOPMENT_DATABASE_PRINCIPALS.slice(0, -1)

@@ -494,7 +494,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
       credentialFilePath
-    })).resolves.toEqual({ credentialFilePath, principalCount: 11 });
+    })).resolves.toEqual({ credentialFilePath, principalCount: 12 });
     const repaired = (await database.pool.query<{
       rolinherit: boolean;
       rolcreatedb: boolean;
@@ -550,14 +550,14 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       REVOKE debateai_billing_runtime FROM debateai_dev_runtime;
       GRANT debateai_runtime TO debateai_dev_runtime WITH INHERIT TRUE, SET TRUE
     `);
-    await expect(provision()).resolves.toEqual({ credentialFilePath, principalCount: 11 });
+    await expect(provision()).resolves.toEqual({ credentialFilePath, principalCount: 12 });
     expect(await directRoles()).toEqual(billingOnly);
 
     // Anything else is drift, as before: here, both roles at once.
     await database.pool.query("GRANT debateai_runtime TO debateai_dev_runtime WITH INHERIT TRUE, SET TRUE");
     await expect(provision()).rejects.toThrow("DEV_DATABASE_PRINCIPAL_DRIFT");
     await database.pool.query("REVOKE debateai_runtime FROM debateai_dev_runtime");
-    await expect(provision()).resolves.toEqual({ credentialFilePath, principalCount: 11 });
+    await expect(provision()).resolves.toEqual({ credentialFilePath, principalCount: 12 });
     expect(await directRoles()).toEqual(billingOnly);
   });
 
@@ -617,10 +617,10 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     });
     const currentSource = await readFile(credentialFilePath, "utf8");
     const legacySource = currentSource.split("\n")
-      .filter((row) => row.length > 0 && !row.startsWith("SUPPORT_DATABASE_URL="))
+      .filter((row) => row.length > 0 && !row.startsWith("SUPPORT_DATABASE_URL=") && !row.startsWith("DATA_EXPORT_DATABASE_URL="))
       .join("\n") + "\n";
     const legacyCredentials = parseCredentialFile(legacySource);
-    expect(legacyCredentials.size).toBe(DEVELOPMENT_DATABASE_PRINCIPALS.length-1);
+    expect(legacyCredentials.size).toBe(DEVELOPMENT_DATABASE_PRINCIPALS.length-2);
     const upgradedPath = join(secretRoot, "legacy-database-principals.env");
     await writeFile(upgradedPath, legacySource, { encoding: "utf8", mode: 0o600 });
 

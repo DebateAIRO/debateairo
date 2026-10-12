@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Sa 30 minuta",
   "legal.cookies.mfaRecovery.life": "Sa 299 sekonda",
   "legal.cookies.social.life": "Sa 5 minuti",
-  "legal.cookies.phoneDraft.life": "15-il minuta jew sakemm jitħassar qabel"
+  "legal.cookies.phoneDraft.life": "15-il minuta jew sakemm jitħassar qabel",
+  "legal.cookies.exportPending.purpose": "Iżomm il-link tal-esportazzjoni mibgħut bl-email f’din it-tab biex tidħol u terġa’ tipprova.",
+  "legal.cookies.exportLinkOutcome.purpose": "Jiftakar liema messaġġ dwar il-link tat-tniżżil għandu jintwera f’din it-tab.",
+  "legal.cookies.exportPending.life": "Sakemm tingħalaq it-tab, toħroġ, jinfetaħ link ġdid, jirnexxi l-ewwel tniżżil jew jirriżulta link invalidu jew kont ħażin",
+  "legal.cookies.exportLinkOutcome.life": "Sakemm tingħalaq it-tab, toħroġ jew jinfetaħ link ġdid"
 }

@@ -41,7 +41,8 @@ guard that keeps the code and the numbers in step is
 | `api:support` | 10 | 6 | 5 s | Opening a support case holds one connection and reads messages on a second |
 | `api:support-relay-lease` | 18 | 18 | 5 s | Unchanged: up to 16 AI support chats at once (a live register setting the owner can raise without a restart) plus 2 for the queue |
 | `support:control` | 2 | 2 | 0.2 s | Unchanged; the support settings reader |
-| **Total on the server** (dev menu off) | **104** | **78** | | |
+| `api:data-export` (only when the export store is set; mission data-export S01) | — | 1 | 15 s | One export build at a time on one connection: its lease renewal (every 15 s) waits for the snapshot read to free it, so a read of up to about 30 s keeps its lease |
+| **Total on the server** (dev menu off) | **104** | **79** | | |
 
 ### Debate runner
 
@@ -54,23 +55,23 @@ guard that keeps the code and the numbers in step is
 
 | Who | Connections at most |
 |---|---|
-| Website (API), one process | 78 |
+| Website (API), one process | 79 |
 | Debate runner | 20 |
 | Hatchet (its role's limit, `deploy/postgres/bootstrap.sql`) | 50 |
 | Migrator (its role's limit) | 3 |
 | Owner's commands (billing, support, owner CLI; by hand, one at a time) | about 10 |
-| **Sum of ceilings** | **161 of 197** |
-| Left free | 36: room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
+| **Sum of ceilings** | **162 of 197** |
+| Left free | 35: room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
 
 Backups (`pg_dump` as the `postgres` user) use the 3 administrator slots.
 
-A second API process does **not** fit: 161 + 78 is more than 197. Before running two (for example to restart without a
+A second API process does **not** fit: 162 + 79 is more than 197. Before running two (for example to restart without a
 gap, or to grow), put PgBouncer in front (section 4) or raise `max_connections` together with the memory settings
 (section 3).
 
 ## 2. What happens when a pool runs dry
 
-* The caller waits at most its wait limit (5 s, or 10 s on the ask path), then gets a typed failure that is marked
+* The caller waits at most its wait limit (5 s, 10 s on the ask path, or 15 s for the data export worker), then gets a typed failure that is marked
   *busy* (`isDatabasePoolBusy`, `packages/db/src/index.ts`). The pool is not damaged; the next caller tries again.
   Before, the caller waited forever. Postgres's own "too many clients" refusal (SQLSTATE 53300) counts as busy too.
 * The API answers a busy failure with HTTP 503, body `{"error":"SERVICE_BUSY"}`, header `Retry-After: 2`. The site's

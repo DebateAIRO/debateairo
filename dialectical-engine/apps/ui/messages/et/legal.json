@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Kuni 30 minutit",
   "legal.cookies.mfaRecovery.life": "Kuni 299 sekundit",
   "legal.cookies.social.life": "Kuni 5 minutit",
-  "legal.cookies.phoneDraft.life": "15 minutit või varasema kustutamiseni"
+  "legal.cookies.phoneDraft.life": "15 minutit või varasema kustutamiseni",
+  "legal.cookies.exportPending.purpose": "Hoiab e-kirjaga saadetud ekspordilinki sellel vahekaardil sisselogimiseks ja uuesti proovimiseks.",
+  "legal.cookies.exportLinkOutcome.purpose": "Jätab meelde, millist allalaadimislingi teadet sellel vahekaardil näidata.",
+  "legal.cookies.exportPending.life": "Kuni vahekaardi sulgemise, väljalogimise, uue lingi, esimese õnnestunud allalaadimise või vigase lingi või vale konto tulemuseni",
+  "legal.cookies.exportLinkOutcome.life": "Kuni vahekaardi sulgemise, väljalogimise või uue lingini"
 }

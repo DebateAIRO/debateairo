@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Do 30 minut",
   "legal.cookies.mfaRecovery.life": "Do 299 sekund",
   "legal.cookies.social.life": "Do 5 minut",
-  "legal.cookies.phoneDraft.life": "15 minut lub do wcześniejszego usunięcia"
+  "legal.cookies.phoneDraft.life": "15 minut lub do wcześniejszego usunięcia",
+  "legal.cookies.exportPending.purpose": "Przechowuje w tej karcie link do eksportu otrzymany e-mailem na czas logowania i ponownej próby.",
+  "legal.cookies.exportLinkOutcome.purpose": "Zapamiętuje, który komunikat o linku do pobrania wyświetlić w tej karcie.",
+  "legal.cookies.exportPending.life": "Do zamknięcia karty, wylogowania, otwarcia nowego linku, pierwszego udanego pobrania lub wyniku wskazującego nieprawidłowy link albo inne konto",
+  "legal.cookies.exportLinkOutcome.life": "Do zamknięcia karty, wylogowania lub otwarcia nowego linku"
 }

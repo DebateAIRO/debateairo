@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Iki 30 minučių",
   "legal.cookies.mfaRecovery.life": "Iki 299 sekundžių",
   "legal.cookies.social.life": "Iki 5 minučių",
-  "legal.cookies.phoneDraft.life": "15 minučių arba iki ankstesnio pašalinimo"
+  "legal.cookies.phoneDraft.life": "15 minučių arba iki ankstesnio pašalinimo",
+  "legal.cookies.exportPending.purpose": "Šiame skirtuke saugo el. paštu atsiųstą eksporto nuorodą prisijungimui ir pakartotiniam bandymui.",
+  "legal.cookies.exportLinkOutcome.purpose": "Prisimena, kurį atsisiuntimo nuorodos pranešimą rodyti šiame skirtuke.",
+  "legal.cookies.exportPending.life": "Iki skirtuko uždarymo, atsijungimo, naujos nuorodos, pirmo sėkmingo atsisiuntimo arba netinkamos nuorodos ar kitos paskyros rezultato",
+  "legal.cookies.exportLinkOutcome.life": "Iki skirtuko uždarymo, atsijungimo arba naujos nuorodos"
 }
