@@ -54,8 +54,13 @@ describe("map prompts: seven contracts, owner text and code forms", () => {
   });
 
   it("never asks a merging or gap AI about authors or counts", () => {
-    for (const name of ["merge", "gap"] as const) {
+    // choose may name raised_by and makers by design; every other step must not.
+    for (const name of MAP_CONTRACT_NAMES.filter((step) => step !== "choose")) {
       expect(MAP_DEFAULT_INSTRUCTIONS[name]).not.toMatch(/raised_by|maker|author/iu);
+    }
+    // "counts against some answer" (the leans sentence) is a verb, not a count: refuse the count phrases, not the verb.
+    for (const name of ["merge", "gap"] as const) {
+      expect(MAP_DEFAULT_INSTRUCTIONS[name]).not.toMatch(/how many|\bnumber of\b|\bcounts? (?:of|per)\b|\bcount\b|independently/iu);
     }
   });
 });

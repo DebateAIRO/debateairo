@@ -86,7 +86,7 @@ export const MAP_DEFAULT_INSTRUCTIONS: MapInstructionTexts = Object.freeze({
     "two wordings of the same answer.",
     "For each answer, list by key_point_id the key points that speak for it and those that speak against it, most important",
     "first, judging importance by one test: could this point change the answer?",
-    "Each key point shows raised_by, how many participants raised it independently, and angle_kind when it came from a fixed",
+    "Each key point shows raised_by, how many different AI makers raised it independently, and angle_kind when it came from a fixed",
     "angle; a point raised by only one participant can still be the most important.",
     "For each answer, name in strongest_rival the answer_id of the other answer that competes with it most.",
     "Do not argue the answers here."
