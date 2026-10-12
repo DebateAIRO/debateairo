@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "गोपनीयता",
-  "consent.settings.hint": "यह ब्राउज़र केवल वही रखता है जिसकी DebateAI को काम करने के लिए ज़रूरत है। पूरी सूची यहाँ कभी भी देखें।",
+  "consent.settings.hint": "यह ब्राउज़र केवल वही रखता है जिसकी Dialectical Engine को काम करने के लिए ज़रूरत है। पूरी सूची यहाँ कभी भी देखें।",
   "consent.settings.button": "हम क्या संग्रहीत करते हैं",
   "consent.bar.label": "कुकी सूचना",
   "consent.bar.eyebrow": "आपके डेटा का स्पष्ट अभिलेख",
   "consent.bar.title": "हम केवल वही संग्रहीत करते हैं जो सेवा चलाने के लिए आवश्यक है।",
-  "consent.bar.body": "चार कुकी और आपके ब्राउज़र के स्टोरेज में चार आइटम, हर एक DebateAI के काम करने के लिए ज़रूरी। कुछ भी वैकल्पिक नहीं, किसी और के साथ कुछ भी साझा नहीं।",
+  "consent.bar.body": "चार कुकी और आपके ब्राउज़र के स्टोरेज में चार आइटम, हर एक Dialectical Engine के काम करने के लिए ज़रूरी। कुछ भी वैकल्पिक नहीं, किसी और के साथ कुछ भी साझा नहीं।",
   "consent.bar.acknowledge": "ठीक है",
   "consent.bar.whatWeStore": "हम क्या संग्रहीत करते हैं",
   "consent.link.cookiePolicy": "कुकी नीति",

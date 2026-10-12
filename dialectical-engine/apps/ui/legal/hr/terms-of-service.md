@@ -1,4 +1,4 @@
-# DebateAI — Uvjeti korištenja
+# Dialectical Engine — Uvjeti korištenja
 
 <!-- legal-chrome
 summaryTitle: Ukratko
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
-**In short.** Morate imati najmanje 18 godina. DebateAI izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Vaše su rasprave privatne osim ako ih objavite; ako ih objavite, svatko ih može pročitati. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
+**In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Vaše su rasprave privatne osim ako ih objavite; ako ih objavite, svatko ih može pročitati. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
 ## 1. Tko smo i kako nam se možete obratiti
 
-Uslugom DebateAI upravlja **DMS Merchandise Shop S.R.L.**, društvo registrirano u Rumunjskoj.
+Uslugom Dialectical Engine upravlja **DMS Merchandise Shop S.R.L.**, društvo registrirano u Rumunjskoj.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ Uslugom DebateAI upravlja **DMS Merchandise Shop S.R.L.**, društvo registrirano
 
 Ti su podaci također trajno prikazani na mrežnom mjestu dezbatere.ro/legal. Uvijek možete stupiti u kontakt s osobom, a ne samo s našim pomoćnikom; u odjeljku 10. objašnjeno je kako.
 
-## 2. Gdje nudimo DebateAI
+## 2. Gdje nudimo Dialectical Engine
 
-DebateAI nudimo osobama koje žive u sljedećim državama i regijama: Europska unija (27 država) i Europski gospodarski prostor (Norveška, Island i Lihtenštajn), Švicarska, Moldova, Sjedinjene Američke Države (osim savezne države Tennessee), Kanada, Australija, Novi Zeland, Singapur, Japan, Južna Koreja i Tajvan. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu.
+Dialectical Engine nudimo osobama koje žive u sljedećim državama i regijama: Europska unija (27 država) i Europski gospodarski prostor (Norveška, Island i Lihtenštajn), Švicarska, Moldova, Sjedinjene Američke Države (osim savezne države Tennessee), Kanada, Australija, Novi Zeland, Singapur, Japan, Južna Koreja i Tajvan. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu.
 
 ## 3. Prihvaćanje ovih Uvjeta
 
@@ -58,21 +58,21 @@ Naša **Pravila o privatnosti** na dezbatere.ro/privacy objašnjavaju kako postu
 
 Prije nego što s nama elektroničkim putem sklopite bilo koji ugovor, sučelje vam prikazuje potrebne korake, omogućuje vam da prije slanja pregledate i ispravite unesene podatke te vas obavještava o jezicima na kojima se ugovor može sklopiti. Ovi Uvjeti dostupni su u obliku koji možete spremiti i ispisati, kada kupite plaćeni plan, verziju koju ste prihvatili šaljemo vam e-poštom, a presliku možete zatražiti u bilo kojem trenutku. Ništa u ovim Uvjetima ne ograničava prava koja imate prema rumunjskom pravu ili pravu EU-a o zaštiti potrošača, odnosno prema pravu države u kojoj živite, a koja se ne mogu ograničiti ugovorom.
 
-## 4. Tko smije upotrebljavati DebateAI
+## 4. Tko smije upotrebljavati Dialectical Engine
 
-Za izradu računa morate imati **najmanje 18 godina**, što potvrđujete pri registraciji. DebateAI nije namijenjen djeci i svjesno ga ne pružamo osobama mlađima od 18 godina. Ako saznamo da račun pripada osobi mlađoj od 18 godina, zatvorit ćemo ga. Neke regije zahtijevaju više od potvrde; Prilog A navodi što se gdje primjenjuje.
+Za izradu računa morate imati **najmanje 18 godina**, što potvrđujete pri registraciji. Dialectical Engine nije namijenjen djeci i svjesno ga ne pružamo osobama mlađima od 18 godina. Ako saznamo da račun pripada osobi mlađoj od 18 godina, zatvorit ćemo ga. Neke regije zahtijevaju više od potvrde; Prilog A navodi što se gdje primjenjuje.
 
-Morate imati poslovnu sposobnost za sklapanje ovog ugovora. Ako DebateAI upotrebljavate u ime organizacije, potvrđujete da ste ovlašteni obvezati je, a „vi” tada znači tu organizaciju.
+Morate imati poslovnu sposobnost za sklapanje ovog ugovora. Ako Dialectical Engine upotrebljavate u ime organizacije, potvrđujete da ste ovlašteni obvezati je, a „vi” tada znači tu organizaciju.
 
 Svatko može pročitati objavljenu raspravu. Za čitanje nije potreban račun, ali ono predstavlja uporabu usluge te se na njega primjenjuju odjeljci 7., 15., 16. i 18.
 
-## 5. Što DebateAI radi, a što nije
+## 5. Što Dialectical Engine radi, a što nije
 
-Šaljete pitanje ili tvrdnju. DebateAI ih prosljeđuje većem broju modela umjetne inteligencije trećih strana, koji oko njih izrađuju graf argumenata: tvrdnje, protutvrdnje, kritike, upućivanja na dokaze, rezultate te presudu s rasponom pouzdanosti. Možete osporiti pojedine tvrdnje, zatražiti dodatno istraživanje neke točke i odlučiti hoćete li objaviti ishod.
+Šaljete pitanje ili tvrdnju. Dialectical Engine ih prosljeđuje većem broju modela umjetne inteligencije trećih strana, koji oko njih izrađuju graf argumenata: tvrdnje, protutvrdnje, kritike, upućivanja na dokaze, rezultate te presudu s rasponom pouzdanosti. Možete osporiti pojedine tvrdnje, zatražiti dodatno istraživanje neke točke i odlučiti hoćete li objaviti ishod.
 
 **Sve u raspravi generira umjetna inteligencija.** Argumenti, kritike, upućivanja na dokaze, rezultati, presude i odgovori pomoćnika za podršku strojno su generirani. Mogu biti pogrešni, nepotpuni, zastarjeli ili izneseni s neopravdanim uvjerenjem te mogu odražavati pristranosti modela. Nijedna ih osoba ne pregledava prije nego što vam se prikažu ili objave i nijedna imenovana osoba ne snosi uredničku odgovornost za njih. Generirani sadržaj u proizvodu, na objavljenim stranicama i u izvezenim datotekama označen je kao sadržaj generiran umjetnom inteligencijom.
 
-**DebateAI nije savjet.** Nije pravni, medicinski, financijski, porezni, psihološki, sigurnosni ni drugi stručni savjet, a presuda nije utvrđenje činjenice. Nemojte raspravu upotrebljavati kao osnovu za odluku važnu za vaše zdravlje, sigurnost, novac, pravni položaj ili dobrobit drugih osoba bez provjere primarnih izvora i, prema potrebi, savjetovanja s kvalificiranim stručnjakom. Visok raspon pouzdanosti znači da su modeli na temelju materijala koji su vidjeli ocijenili tumačenje dobro utvrđenim; to nije jamstvo njegove istinitosti.
+**Dialectical Engine nije savjet.** Nije pravni, medicinski, financijski, porezni, psihološki, sigurnosni ni drugi stručni savjet, a presuda nije utvrđenje činjenice. Nemojte raspravu upotrebljavati kao osnovu za odluku važnu za vaše zdravlje, sigurnost, novac, pravni položaj ili dobrobit drugih osoba bez provjere primarnih izvora i, prema potrebi, savjetovanja s kvalificiranim stručnjakom. Visok raspon pouzdanosti znači da su modeli na temelju materijala koji su vidjeli ocijenili tumačenje dobro utvrđenim; to nije jamstvo njegove istinitosti.
 
 **Na što se obvezujemo.** Uslugu ćemo pružati uz razumnu pažnju i stručnost te u skladu s opisom koji objavljujemo. Kada vam zakon daje jamstvo da je usluga u skladu sa svojim opisom i prikladna za uobičajenu svrhu, to se jamstvo primjenjuje i ništa ga u ovim Uvjetima ne ukida. Ne jamčimo točnost bilo kojeg pojedinačnog izlaznog sadržaja: to je svojstvo generiranog sadržaja, a ne pitanje funkcionira li usluga.
 
@@ -92,19 +92,19 @@ Račun možete zatvoriti u bilo kojem trenutku u odjeljku **Postavke → Račun*
 
 Ova se pravila primjenjuju na ono što šaljete, način na koji upotrebljavate uslugu i ono što objavljujete.
 
-**Ne šaljite osobne podatke drugih osoba.** Pitajte o temama, argumentima i javnim pitanjima, a ne o privatnim osobama koje je moguće identificirati. Nemojte navoditi imena, kontaktne podatke, identifikacijske brojeve, slike, zdravstvene, financijske ni druge podatke koji identificiraju neku osobu i nemojte upotrebljavati DebateAI za sastavljanje predmeta, profila ili dosjea o osobi. Pitanja o javnim osobama koje djeluju u svojoj javnoj ulozi dopuštena su; pitanja usmjerena na privatnu osobu nisu. Ako ipak pošaljete takve podatke, odgovorni ste za njih, a mi možemo ukloniti sadržaj.
+**Ne šaljite osobne podatke drugih osoba.** Pitajte o temama, argumentima i javnim pitanjima, a ne o privatnim osobama koje je moguće identificirati. Nemojte navoditi imena, kontaktne podatke, identifikacijske brojeve, slike, zdravstvene, financijske ni druge podatke koji identificiraju neku osobu i nemojte upotrebljavati Dialectical Engine za sastavljanje predmeta, profila ili dosjea o osobi. Pitanja o javnim osobama koje djeluju u svojoj javnoj ulozi dopuštena su; pitanja usmjerena na privatnu osobu nisu. Ako ipak pošaljete takve podatke, odgovorni ste za njih, a mi možemo ukloniti sadržaj.
 
 **Vaše vlastite osjetljive informacije.** Pitanja koja postavljate mogu se odnositi na vaše zdravlje, uvjerenja, političke stavove ili druga osjetljiva pitanja. Na to pristajete na zasebnom zaslonu prije svoje prve rasprave. Ako živite u području s posebnim pravilima o zdravstvenim podacima, Prilog A može vas uputiti na zasebnu obavijest.
 
 **Ne šaljite niti objavljujte nezakonit sadržaj**, uključujući sadržaj koji je klevetnički, potiče nasilje ili mržnju, uznemirava ili prijeti, predstavlja intimne snimke podijeljene bez privole, povređuje intelektualno vlasništvo ili povjerljivost, otkriva poslovne tajne, predstavlja materijal seksualnog zlostavljanja djece ili krši sankcije ili kontrolu izvoza.
 
-**Ne upotrebljavajte DebateAI za obmanjivanje.** Nemojte generirani izlazni sadržaj prikazivati kao ljudsko djelo ako bi to dovelo u zabludu, uklanjati s njega oznaku da je generiran umjetnom inteligencijom niti ga upotrebljavati za stvaranje privida suglasnosti, lažnih dokaza ili lažnog predstavljanja.
+**Ne upotrebljavajte Dialectical Engine za obmanjivanje.** Nemojte generirani izlazni sadržaj prikazivati kao ljudsko djelo ako bi to dovelo u zabludu, uklanjati s njega oznaku da je generiran umjetnom inteligencijom niti ga upotrebljavati za stvaranje privida suglasnosti, lažnih dokaza ili lažnog predstavljanja.
 
 **Ne napadajte uslugu.** Uobičajeno indeksiranje objavljenih rasprava u tražilicama dopušteno je. Za svaki drugi automatizirani pristup, prikupljanje podataka, pretraživanje robotima ili masovno izdvajanje trebate naše pisano dopuštenje. Ne smijete zaobilaziti ograničenja učestalosti, autentifikaciju ili kontrole objavljivanja, pokušavati izvlačiti upite ili sistemske upute, ubacivati zlonamjerne upite kako bi sustav zanemario ograničenja niti provoditi ispitivanje ili testiranje opterećenja bez našeg pisanog dopuštenja.
 
 **Ne preprodajte niti preoznačavajte** uslugu i nemojte je upotrebljavati za izradu konkurentskog sustava, uključujući uporabu izlaznog sadržaja kao podataka za treniranje, bez našeg pisanog sporazuma.
 
-**Ne upotrebljavajte DebateAI za odluke o nečijem** zdravlju, sigurnosti, zakonskim pravima, zaposlenju, kreditu, stanovanju ili useljeničkom statusu. Nije izrađen za to i njegov izlazni sadržaj nije sigurna osnova za takve odluke.
+**Ne upotrebljavajte Dialectical Engine za odluke o nečijem** zdravlju, sigurnosti, zakonskim pravima, zaposlenju, kreditu, stanovanju ili useljeničkom statusu. Nije izrađen za to i njegov izlazni sadržaj nije sigurna osnova za takve odluke.
 
 **Lokalno pravo u mjestu objavljivanja.** Odgovorni ste osigurati da sve što objavite bude u skladu s pravom države u kojoj se nalazite. U određenim regijama možemo ograničiti objavljivanje određenih tema.
 
@@ -132,9 +132,9 @@ Rasprave su **prema zadanim postavkama privatne**. Ništa što izradite nije vid
 
 **Što se događa objavljivanjem.** Objavljivanje je namjerna radnja koja se zasebno potvrđuje. Kada objavite raspravu, izrađujemo njezinu nepromjenjivu snimku i omogućujemo svakome da je pročita bez računa. Tražilice mogu indeksirati tu snimku. Snimka prikazuje vaš **pseudonim**, vaše pitanje onako kako ste ga napisali, stablo argumenata, rezultate, presudu i raspon pouzdanosti te nosi vidljivu oznaku da je sadržaj generiran umjetnom inteligencijom. Ne prikazuje vašu adresu e-pošte, zapise o sesijama ni povijest računa.
 
-**Objavljivanje je u praksi gotovo nepovratno.** Nakon što rasprava postane javna, drugi je mogu čitati, citirati, arhivirati i spremati u predmemoriju te izrađivati njezine snimke zaslona. Povlačenjem objave rasprava se uklanja s DebateAI-ja i uništava se ključ naše kopije, ali nije moguće dohvatiti kopije koje već postoje drugdje. Nemojte objavljivati ništa za što ne biste htjeli da bude trajno povezano s vašim pseudonimom.
+**Objavljivanje je u praksi gotovo nepovratno.** Nakon što rasprava postane javna, drugi je mogu čitati, citirati, arhivirati i spremati u predmemoriju te izrađivati njezine snimke zaslona. Povlačenjem objave rasprava se uklanja s Dialectical Engine-a i uništava se ključ naše kopije, ali nije moguće dohvatiti kopije koje već postoje drugdje. Nemojte objavljivati ništa za što ne biste htjeli da bude trajno povezano s vašim pseudonimom.
 
-**Objavljene rasprave nakon zatvaranja računa.** Kada zakažete zatvaranje računa, birate što će se dogoditi s raspravama koje ste objavili. Ako označite **„Izbrišite i moje javne rasprave”**, svaku od njih uklanjamo s DebateAI-ja i uništavamo ključ svoje kopije kada se zatvaranje provede, kao pri povlačenju objave, osim ako zakon nalaže čuvanje određene stavke. Ako kućicu ne označite, rasprave ostaju javne pod pseudonimom koji se više ne upotrebljava. Kopije koje su drugi napravili prije uklanjanja izvan su našeg nadzora. Ako želite zadržati pristup raspravi koju uklanjate, najprije je preuzmite.
+**Objavljene rasprave nakon zatvaranja računa.** Kada zakažete zatvaranje računa, birate što će se dogoditi s raspravama koje ste objavili. Ako označite **„Izbrišite i moje javne rasprave”**, svaku od njih uklanjamo s Dialectical Engine-a i uništavamo ključ svoje kopije kada se zatvaranje provede, kao pri povlačenju objave, osim ako zakon nalaže čuvanje određene stavke. Ako kućicu ne označite, rasprave ostaju javne pod pseudonimom koji se više ne upotrebljava. Kopije koje su drugi napravili prije uklanjanja izvan su našeg nadzora. Ako želite zadržati pristup raspravi koju uklanjate, najprije je preuzmite.
 
 **Objavljeni sadržaj uvijek možemo ukloniti.** Objavljenu raspravu možemo ukloniti ili ograničiti pristup njoj kada to zahtijeva zakon, kada to naloži sud ili nadležno tijelo, ili kada krši ove Uvjete ili je nezakonita. Ništa u ovom odjeljku ne sprječava nas da postupimo po valjanoj obavijesti iz odjeljka 10. niti predstavlja obećanje da će objavljena rasprava ostati dostupna.
 
@@ -161,7 +161,7 @@ Svaku prijavu potvrđujemo bez nepotrebne odgode. Prijave obrađujemo pravodobno
 
 **Kontakt s osobom.** Naš pomoćnik za podršku sustav je umjetne inteligencije i tako se predstavlja. U bilo kojem trenutku možete zatražiti razgovor s osobom i svaki razgovor s podrškom nudi tu mogućnost. U komunikaciji s vama ne oslanjamo se samo na automatizirane alate.
 
-**Teroristički sadržaj.** Teroristički sadržaj nezakonit je i nije dopušten na DebateAI-ju (odjeljak 7.). Nadležna tijela u Europskoj uniji mogu nam slati naloge za uklanjanje prema Uredbi (EU) 2021/784 na kontaktnu točku navedenu u odjeljku 1. Kada primimo takav nalog, uklanjamo sadržaj ili onemogućujemo pristup tom sadržaju u svim državama EU-a u roku od jednog sata. Osobu koja je sadržaj objavila obavještavamo da je uklonjen te, na njezin zahtjev, zašto i kako može osporiti nalog, osim ako tijelo odluči da javna sigurnost zahtijeva šutnju tijekom ograničenog razdoblja. Kako Uredba zahtijeva, uklonjeni sadržaj i povezane podatke čuvamo šest mjeseci, kako bi uklanjanje moglo biti preispitano i, ako je bilo pogrešno, poništeno. Osoba koja je sadržaj objavila može osporiti nalog pred sudovima države čije ga je tijelo izdalo, a može se i koristiti našim postupkom za pritužbe. Nijedno tijelo od nas nije zahtijevalo poduzimanje posebnih mjera protiv terorističkog sadržaja na temelju Uredbe; ako to učini, te ćemo mjere ovdje opisati, uključujući sve automatizirane alate.
+**Teroristički sadržaj.** Teroristički sadržaj nezakonit je i nije dopušten na Dialectical Engine-u (odjeljak 7.). Nadležna tijela u Europskoj uniji mogu nam slati naloge za uklanjanje prema Uredbi (EU) 2021/784 na kontaktnu točku navedenu u odjeljku 1. Kada primimo takav nalog, uklanjamo sadržaj ili onemogućujemo pristup tom sadržaju u svim državama EU-a u roku od jednog sata. Osobu koja je sadržaj objavila obavještavamo da je uklonjen te, na njezin zahtjev, zašto i kako može osporiti nalog, osim ako tijelo odluči da javna sigurnost zahtijeva šutnju tijekom ograničenog razdoblja. Kako Uredba zahtijeva, uklonjeni sadržaj i povezane podatke čuvamo šest mjeseci, kako bi uklanjanje moglo biti preispitano i, ako je bilo pogrešno, poništeno. Osoba koja je sadržaj objavila može osporiti nalog pred sudovima države čije ga je tijelo izdalo, a može se i koristiti našim postupkom za pritužbe. Nijedno tijelo od nas nije zahtijevalo poduzimanje posebnih mjera protiv terorističkog sadržaja na temelju Uredbe; ako to učini, te ćemo mjere ovdje opisati, uključujući sve automatizirane alate.
 
 **Ozbiljna opasnost za život ili sigurnost.** Ako saznamo za informacije koje upućuju na kazneno djelo koje uključuje prijetnju nečijem životu ili sigurnosti, obavještavamo nadležna tijela.
 
@@ -183,7 +183,7 @@ Odjeljci 8. (u odnosu na već objavljeni sadržaj), 15., 16. i 18. nastavljaju s
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI nudi besplatni plan. Bit će dostupan plaćeni plan **Premium**, koji će otključati cijeli popis modela i omogućiti vam da sami postavite mjerače rasprave.
+Dialectical Engine nudi besplatni plan. Bit će dostupan plaćeni plan **Premium**, koji će otključati cijeli popis modela i omogućiti vam da sami postavite mjerače rasprave.
 
 **Prije plaćanja** neposredno iznad gumba za plaćanje prikazujemo vam: plan; ukupnu cijenu s primjenjivim porezom; obračunsko razdoblje; činjenicu da se plan automatski obnavlja do otkazivanja; datum završetka eventualnog besplatnog probnog razdoblja i iznos koji će vam se tada naplatiti; te način otkazivanja. Uvjete obnavljanja potvrđujete označavanjem zasebnog polja. Na gumbu piše **Pretplatite se i platite** (na rumunjskom *Comandă cu obligație de plată*). Na trajnom mediju šaljemo vam potvrdu koja sadržava iste informacije, ove Uvjete i obrazac za odustanak.
 
@@ -211,11 +211,11 @@ Ako živite drugdje, Prilog A navodi pravo na odustanak ili razdoblje za odustan
 
 ## 14. Promjene usluge i ovih Uvjeta
 
-**Promjene usluge.** Stalno razvijamo DebateAI, a rutinska poboljšanja, ispravci i promjene popisa modela događaju se bez obavijesti. Ako napravimo promjenu koja nadilazi održavanje rada usluge kako je opisano, činimo to samo iz jednog od sljedećih razloga: radi usklađivanja sa zakonskim ili regulatornim zahtjevom; radi odgovora na sigurnosni problem ili zlouporabu; zato što pružatelj modela mijenja, ograničava ili povlači model ili značajku o kojoj ovisimo; radi prilagodbe tehničkom okruženju koje ne kontroliramo; ili radi dodavanja, poboljšavanja ili ukidanja značajke na način koji vam ne stvara dodatne troškove.
+**Promjene usluge.** Stalno razvijamo Dialectical Engine, a rutinska poboljšanja, ispravci i promjene popisa modela događaju se bez obavijesti. Ako napravimo promjenu koja nadilazi održavanje rada usluge kako je opisano, činimo to samo iz jednog od sljedećih razloga: radi usklađivanja sa zakonskim ili regulatornim zahtjevom; radi odgovora na sigurnosni problem ili zlouporabu; zato što pružatelj modela mijenja, ograničava ili povlači model ili značajku o kojoj ovisimo; radi prilagodbe tehničkom okruženju koje ne kontroliramo; ili radi dodavanja, poboljšavanja ili ukidanja značajke na način koji vam ne stvara dodatne troškove.
 
 Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promjena ima više nego neznatan negativan učinak na vaš pristup usluzi ili njezinu uporabu, možete bez naknade raskinuti ugovor u roku od **30 dana** od obavijesti ili od stupanja promjene na snagu, ovisno o tome što je kasnije, a mi ćemo vratiti svaki unaprijed plaćeni iznos za neiskorišteno razdoblje.
 
-**Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe DebateAI-ja nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
+**Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
 
 ## 15. Odgovornost
 
@@ -231,15 +231,15 @@ Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promj
 
 ## 16. Intelektualno vlasništvo
 
-Sama usluga — softver, sustav, metoda bodovanja, sučelje, nazivi DebateAI i DebateAIRO te naši logotipi — pripada nama ili našim davateljima licencije. Ovi Uvjeti daju vam dopuštenje za uporabu usluge, a ne vlasništvo nad njom.
+Sama usluga — softver, sustav, metoda bodovanja, sučelje, nazivi Dialectical Engine i DebateAIRO te naši logotipi — pripada nama ili našim davateljima licencije. Ovi Uvjeti daju vam dopuštenje za uporabu usluge, a ne vlasništvo nad njom.
 
-Objavljene rasprave možete citirati i povezivati uz navođenje DebateAI-ja i poveznicu na izvornu stranicu. Masovno kopiranje, sustavno umnožavanje javnog korpusa i uporaba objavljenih rasprava kao podataka za treniranje nisu dopušteni bez našeg pisanog sporazuma.
+Objavljene rasprave možete citirati i povezivati uz navođenje Dialectical Engine-a i poveznicu na izvornu stranicu. Masovno kopiranje, sustavno umnožavanje javnog korpusa i uporaba objavljenih rasprava kao podataka za treniranje nisu dopušteni bez našeg pisanog sporazuma.
 
-Odjeljak 8. uređuje vaš sadržaj i status generiranog izlaznog sadržaja. Ako smatrate da nešto na DebateAI-ju povređuje vaše intelektualno vlasništvo, upotrijebite način prijavljivanja iz odjeljka 10.
+Odjeljak 8. uređuje vaš sadržaj i status generiranog izlaznog sadržaja. Ako smatrate da nešto na Dialectical Engine-u povređuje vaše intelektualno vlasništvo, upotrijebite način prijavljivanja iz odjeljka 10.
 
 ## 17. Osobni podaci
 
-Način na koji postupamo s osobnim podacima utvrđen je u **Pravilima o privatnosti** na dezbatere.ro/privacy. Ona objašnjavaju što prikupljamo, pravnu osnovu za svaku svrhu, koliko dugo čuvamo pojedine podatke, tko prima podatke, uključene prijenose i kako ostvariti svoja prava. Ovdje valja istaknuti još tri točke. Odjeljak 7. traži od vas da u pitanje ne unosite osobne podatke drugih osoba; ako to ipak učinite, odgovorni ste za njih, a mi možemo ukloniti sadržaj. Ako rasprava objavljena na DebateAI-ju sadržava vaše osobne podatke, možete zatražiti da je uklonimo iako nemate račun (odjeljak 9.). Čuvamo i zapis o vašem prihvaćanju ovih Uvjeta — verziju, vrijeme i tehničke pojedinosti sesije — kao dokaz ugovora, kako je objašnjeno u Pravilima o privatnosti.
+Način na koji postupamo s osobnim podacima utvrđen je u **Pravilima o privatnosti** na dezbatere.ro/privacy. Ona objašnjavaju što prikupljamo, pravnu osnovu za svaku svrhu, koliko dugo čuvamo pojedine podatke, tko prima podatke, uključene prijenose i kako ostvariti svoja prava. Ovdje valja istaknuti još tri točke. Odjeljak 7. traži od vas da u pitanje ne unosite osobne podatke drugih osoba; ako to ipak učinite, odgovorni ste za njih, a mi možemo ukloniti sadržaj. Ako rasprava objavljena na Dialectical Engine-u sadržava vaše osobne podatke, možete zatražiti da je uklonimo iako nemate račun (odjeljak 9.). Čuvamo i zapis o vašem prihvaćanju ovih Uvjeta — verziju, vrijeme i tehničke pojedinosti sesije — kao dokaz ugovora, kako je objašnjeno u Pravilima o privatnosti.
 
 ## 18. Mjerodavno pravo i mjesto rješavanja sporova
 
@@ -277,7 +277,7 @@ Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pre
 
 ### A.2 Sjedinjene Američke Države
 
-**Tennessee.** Ne nudimo DebateAI osobama koje žive u Tennesseeju.
+**Tennessee.** Ne nudimo Dialectical Engine osobama koje žive u Tennesseeju.
 
 **Obavijesti i uklanjanja.** Intimne snimke objavljene bez privole mogu se prijaviti e-poštom na abuse@dezbatere.ro, bez računa, i uklanjaju se u roku od 48 sati od valjanog zahtjeva. Pritužbe zbog autorskih prava podnose se postupkom iz odjeljka 10.
 

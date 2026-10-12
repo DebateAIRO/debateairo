@@ -1,5 +1,5 @@
 {
-  "order.planDescription": "DebateAI {plan} havi csomag",
-  "order.cardCheck": "DebateAI kártyaellenőrzés",
-  "invoice.line": "DebateAI {plan} csomag, {from} – {to}"
+  "order.planDescription": "Dialectical Engine {plan} havi csomag",
+  "order.cardCheck": "Dialectical Engine kártyaellenőrzés",
+  "invoice.line": "Dialectical Engine {plan} csomag, {from} – {to}"
 }

@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "الخصوصية",
-  "consent.settings.hint": "لا يحتفظ هذا المتصفح إلا بما يحتاجه DebateAI ليعمل. اطّلع على القائمة الكاملة هنا في أي وقت.",
+  "consent.settings.hint": "لا يحتفظ هذا المتصفح إلا بما يحتاجه Dialectical Engine ليعمل. اطّلع على القائمة الكاملة هنا في أي وقت.",
   "consent.settings.button": "ما نخزّنه",
   "consent.bar.label": "إشعار ملفات تعريف الارتباط",
   "consent.bar.eyebrow": "بياناتك، موثّقة بوضوح",
   "consent.bar.title": "لا نخزّن إلا ما يلزم لتشغيل المنصة.",
-  "consent.bar.body": "أربعة ملفات تعريف ارتباط وأربعة عناصر في مساحة تخزين متصفحك، وكلٌّ منها ضروري ليعمل DebateAI. لا شيء اختياري، ولا شيء نشاركه مع أي جهة أخرى.",
+  "consent.bar.body": "أربعة ملفات تعريف ارتباط وأربعة عناصر في مساحة تخزين متصفحك، وكلٌّ منها ضروري ليعمل Dialectical Engine. لا شيء اختياري، ولا شيء نشاركه مع أي جهة أخرى.",
   "consent.bar.acknowledge": "حسنًا",
   "consent.bar.whatWeStore": "ما نخزّنه",
   "consent.link.cookiePolicy": "سياسة ملفات تعريف الارتباط",

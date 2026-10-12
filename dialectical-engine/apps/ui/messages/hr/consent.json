@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Privatnost",
-  "consent.settings.hint": "Ovaj preglednik čuva samo ono što je DebateAI-ju potrebno za rad. Potpuni popis pogledajte ovdje u bilo kojem trenutku.",
+  "consent.settings.hint": "Ovaj preglednik čuva samo ono što je Dialectical Engine-u potrebno za rad. Potpuni popis pogledajte ovdje u bilo kojem trenutku.",
   "consent.settings.button": "Što pohranjujemo",
   "consent.bar.label": "Obavijest o kolačićima",
   "consent.bar.eyebrow": "VAŠI PODACI, SLUŽBENO ZABILJEŽENI",
   "consent.bar.title": "Pohranjujemo samo ono što je nužno za rad vijeća.",
-  "consent.bar.body": "Četiri kolačića i četiri stavke u pohrani vašeg preglednika, svaka potrebna za rad DebateAI-ja. Ništa neobavezno, ništa podijeljeno ni s kim drugim.",
+  "consent.bar.body": "Četiri kolačića i četiri stavke u pohrani vašeg preglednika, svaka potrebna za rad Dialectical Engine-a. Ništa neobavezno, ništa podijeljeno ni s kim drugim.",
   "consent.bar.acknowledge": "U redu",
   "consent.bar.whatWeStore": "Što pohranjujemo",
   "consent.link.cookiePolicy": "Pravila o kolačićima",

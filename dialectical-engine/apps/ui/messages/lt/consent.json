@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Privatumas",
-  "consent.settings.hint": "Ši naršyklė saugo tik tai, ko DebateAI reikia veikti. Visą sąrašą čia galite peržiūrėti bet kada.",
+  "consent.settings.hint": "Ši naršyklė saugo tik tai, ko Dialectical Engine reikia veikti. Visą sąrašą čia galite peržiūrėti bet kada.",
   "consent.settings.button": "Ką saugome",
   "consent.bar.label": "Pranešimas apie slapukus",
   "consent.bar.eyebrow": "JŪSŲ DUOMENYS – AIŠKIAI UŽFIKSUOTI",
   "consent.bar.title": "Saugome tik tai, ko reikia sistemai veikti.",
-  "consent.bar.body": "Keturi slapukai ir keturi įrašai jūsų naršyklės saugykloje – kiekvienas būtinas, kad DebateAI veiktų. Nieko neprivalomo, niekuo nesidalijama su kitais.",
+  "consent.bar.body": "Keturi slapukai ir keturi įrašai jūsų naršyklės saugykloje – kiekvienas būtinas, kad Dialectical Engine veiktų. Nieko neprivalomo, niekuo nesidalijama su kitais.",
   "consent.bar.acknowledge": "Supratau",
   "consent.bar.whatWeStore": "Ką saugome",
   "consent.link.cookiePolicy": "Slapukų politika",

@@ -69,11 +69,11 @@ describe("the preview claim-time probe of one target (spec 2026-10-11 busy model
     expect(gate.posts()).toBe(2);
     expect(sleeps).toEqual([60_000]);
   });
-  it("a billed failure is PROVIDER_PROBE_FAILED, gets no resend and is not busy", async () => {
+  it("a billed failure records its reason (a vendor 500: PROVIDER_PROBE_HTTP_500), gets no resend and is not busy", async () => {
     const gate = scripted(["BILLED", "OK"]);
     const sleeps: number[] = [];
     const observations = await observePreviewProviderTarget(probe(gate.fetchImplementation, sleeps));
-    expect(observations.map((entry) => entry.failureCode)).toEqual(["PROVIDER_PROBE_FAILED"]);
+    expect(observations.map((entry) => entry.failureCode)).toEqual(["PROVIDER_PROBE_HTTP_500"]);
     expect(previewProbeRoundBusy(observations)).toBe(false);
     expect(gate.posts()).toBe(1);
     expect(sleeps).toEqual([]);

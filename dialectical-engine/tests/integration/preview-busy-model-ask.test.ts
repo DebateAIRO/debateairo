@@ -270,7 +270,8 @@ describe("the preview ask with a busy model (spec 2026-10-11 busy model)", () =>
     noResendWait(round);
     expect(count(round.sent, GLM)).toBe(1);
     expect(await probeRows("preview:fixture-a", round.startedAt)).toEqual([
-      expect.objectContaining({ state: "ABSENT", failure_code: "PROVIDER_PROBE_FAILED" })
+      // Probe failure reasons (2026-10-12): the vendor's 500 is recorded as its own reason.
+      expect.objectContaining({ state: "ABSENT", failure_code: "PROVIDER_PROBE_HTTP_500" })
     ]);
   });
 

@@ -1,4 +1,4 @@
-# DebateAI — Téarmaí Seirbhíse
+# Dialectical Engine — Téarmaí Seirbhíse
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
-**In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann DebateAI argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Bíonn do dhíospóireachtaí príobháideach mura bhfoilsíonn tú iad; má fhoilsíonn tú iad, is féidir le duine ar bith iad a léamh. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
+**In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Bíonn do dhíospóireachtaí príobháideach mura bhfoilsíonn tú iad; má fhoilsíonn tú iad, is féidir le duine ar bith iad a léamh. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
 ## 1. Cé sinne agus conas teagmháil a dhéanamh linn
 
-Tá DebateAI á oibriú ag **DMS Merchandise Shop S.R.L.**, cuideachta atá cláraithe sa Rómáin.
+Tá Dialectical Engine á oibriú ag **DMS Merchandise Shop S.R.L.**, cuideachta atá cláraithe sa Rómáin.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ Tá DebateAI á oibriú ag **DMS Merchandise Shop S.R.L.**, cuideachta atá clá
 
 Taispeántar na sonraí seo go buan ar an suíomh ag dezbatere.ro/legal freisin. Is féidir leat teagmháil a dhéanamh le duine i gcónaí, ní hamháin lenár gcúntóir; mínítear i rannán 10 conas é sin a dhéanamh.
 
-## 2. Na háiteanna ina gcuirimid DebateAI ar fáil
+## 2. Na háiteanna ina gcuirimid Dialectical Engine ar fáil
 
-Cuirimid DebateAI ar fáil do dhaoine a bhfuil cónaí orthu san Aontas Eorpach (27 tír) agus sa Limistéar Eorpach Eacnamaíoch (an Iorua, an Íoslainn agus an Lichtinstéin), san Eilvéis, sa Mholdóiv, sna Stáit Aontaithe (ach amháin Tennessee), i gCeanada, san Astráil, sa Nua-Shéalainn, i Singeapór, sa tSeapáin, sa Chóiré Theas agus sa Téaváin. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid.
+Cuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu san Aontas Eorpach (27 tír) agus sa Limistéar Eorpach Eacnamaíoch (an Iorua, an Íoslainn agus an Lichtinstéin), san Eilvéis, sa Mholdóiv, sna Stáit Aontaithe (ach amháin Tennessee), i gCeanada, san Astráil, sa Nua-Shéalainn, i Singeapór, sa tSeapáin, sa Chóiré Theas agus sa Téaváin. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid.
 
 ## 3. Glacadh leis na Téarmaí seo
 
@@ -58,21 +58,21 @@ Mínítear inár **mBeartas Príobháideachais** ag dezbatere.ro/privacy conas a
 
 Sula dtabharfaidh tú aon chonradh linn i gcrích go leictreonach, taispeánann an comhéadan duit na céimeanna atá i gceist, ligeann sé duit an méid a chuir tú isteach a athbhreithniú agus a cheartú sula gcuireann tú isteach é, agus insíonn sé duit na teangacha inar féidir an conradh a thabhairt i gcrích. Tá na Téarmaí seo ar fáil i bhfoirm is féidir leat a shábháil agus a phriontáil. Nuair a cheannaíonn tú plean íoctha, seolaimid chugat le ríomhphost an leagan ar ghlac tú leis. Is féidir leat cóip a iarraidh am ar bith. Ní chuireann aon ní sna Téarmaí seo teorainn le cearta atá agat faoi dhlí tomhaltóirí na Rómáine nó an AE, ná faoi dhlí na tíre ina bhfuil cónaí ort, nach féidir a theorannú le conradh.
 
-## 4. Cé a fhéadfaidh DebateAI a úsáid
+## 4. Cé a fhéadfaidh Dialectical Engine a úsáid
 
-Ní mór duit a bheith **18 mbliana d'aois nó os a chionn** chun cuntas a chruthú, agus deimhníonn tú é seo nuair a chláraíonn tú. Níl DebateAI dírithe ar leanaí agus ní chuirimid ar fáil go feasach é d'aon duine faoi 18 mbliana d'aois. Má fhaighimid amach go bhfuil cuntas ag duine faoi 18 mbliana d'aois, dúnfaimid é. Éilíonn roinnt réigiún níos mó ná deimhniú; deir Iarscríbhinn A cad atá i bhfeidhm agus cén áit.
+Ní mór duit a bheith **18 mbliana d'aois nó os a chionn** chun cuntas a chruthú, agus deimhníonn tú é seo nuair a chláraíonn tú. Níl Dialectical Engine dírithe ar leanaí agus ní chuirimid ar fáil go feasach é d'aon duine faoi 18 mbliana d'aois. Má fhaighimid amach go bhfuil cuntas ag duine faoi 18 mbliana d'aois, dúnfaimid é. Éilíonn roinnt réigiún níos mó ná deimhniú; deir Iarscríbhinn A cad atá i bhfeidhm agus cén áit.
 
-Ní mór duit an inniúlacht dhlíthiúil a bheith agat chun an conradh seo a dhéanamh. Má úsáideann tú DebateAI thar ceann eagraíochta, deimhníonn tú go bhfuil tú údaraithe í a cheangal, agus ciallaíonn "tú" an eagraíocht sin ansin.
+Ní mór duit an inniúlacht dhlíthiúil a bheith agat chun an conradh seo a dhéanamh. Má úsáideann tú Dialectical Engine thar ceann eagraíochta, deimhníonn tú go bhfuil tú údaraithe í a cheangal, agus ciallaíonn "tú" an eagraíocht sin ansin.
 
 Is féidir le duine ar bith díospóireacht a foilsíodh a léamh. Ní gá cuntas a bheith agat chun í a léamh, ach is úsáid na seirbhíse é, agus tá feidhm ag rannáin 7, 15, 16 agus 18 maidir leis.
 
-## 5. An méid a dhéanann DebateAI, agus an rud nach é
+## 5. An méid a dhéanann Dialectical Engine, agus an rud nach é
 
-Cuireann tú ceist nó maíomh isteach. Seolann DebateAI é chuig roinnt samhlacha IS tríú páirtí, a thógann graf argóna timpeall air: maímh, frithmhaímh, cáintí, tagairtí fianaise, scóir, agus breithiúnas le banda muiníne. Is féidir leat dúshlán a thabhairt do mhaímh aonair, iarraidh go ndéanfaí pointe a imscrúdú tuilleadh, agus socrú an bhfoilseofar an toradh.
+Cuireann tú ceist nó maíomh isteach. Seolann Dialectical Engine é chuig roinnt samhlacha IS tríú páirtí, a thógann graf argóna timpeall air: maímh, frithmhaímh, cáintí, tagairtí fianaise, scóir, agus breithiúnas le banda muiníne. Is féidir leat dúshlán a thabhairt do mhaímh aonair, iarraidh go ndéanfaí pointe a imscrúdú tuilleadh, agus socrú an bhfoilseofar an toradh.
 
 **Gineann IS gach rud i ndíospóireacht.** Is meaisínghinte iad na hargóintí, na cáintí, na tagairtí fianaise, na scóir, na breithiúnais agus freagraí an chúntóra thacaíochta. D'fhéadfaidís a bheith mícheart, neamhiomlán, as dáta, nó mícheart go muiníneach, agus d'fhéadfaidís laofachtaí sna samhlacha a léiriú. Ní dhéanann aon duine athbhreithniú orthu sula dtaispeántar duit iad nó sula bhfoilsítear iad, agus ní bhíonn freagracht eagarthóireachta astu ar aon duine ainmnithe. Lipéadaítear ábhar ginte mar ábhar arna ghiniúint ag IS sa táirge, ar leathanaigh fhoilsithe, agus in easpórtálacha.
 
-**Ní comhairle é DebateAI.** Ní comhairle dlí, leighis, airgeadais, cánach, síceolaíochta, sábháilteachta ná comhairle ghairmiúil eile é, agus ní cinneadh fíorais é breithiúnas. Ná húsáid díospóireacht mar bhonn le cinneadh a bhaineann le do shláinte, do shábháilteacht, d'airgead, do sheasamh dlíthiúil ná leas daoine eile gan foinsí príomha a sheiceáil agus, nuair is cuí, dul i gcomhairle le gairmí cáilithe. Ciallaíonn banda ard muiníne gur mheas na samhlacha go raibh an léamh socraithe go maith bunaithe ar an ábhar a chonaic siad; ní ráthaíocht é go bhfuil sé fíor.
+**Ní comhairle é Dialectical Engine.** Ní comhairle dlí, leighis, airgeadais, cánach, síceolaíochta, sábháilteachta ná comhairle ghairmiúil eile é, agus ní cinneadh fíorais é breithiúnas. Ná húsáid díospóireacht mar bhonn le cinneadh a bhaineann le do shláinte, do shábháilteacht, d'airgead, do sheasamh dlíthiúil ná leas daoine eile gan foinsí príomha a sheiceáil agus, nuair is cuí, dul i gcomhairle le gairmí cáilithe. Ciallaíonn banda ard muiníne gur mheas na samhlacha go raibh an léamh socraithe go maith bunaithe ar an ábhar a chonaic siad; ní ráthaíocht é go bhfuil sé fíor.
 
 **An méid a gheallaimid.** Cuirfimid an tseirbhís ar fáil le cúram agus scil réasúnta agus de réir an chur síos a fhoilsímid. Sa chás ina dtugann an dlí ráthaíocht duit go gcomhlíonann an tseirbhís an cur síos uirthi agus go bhfuil sí oiriúnach dá gnáthchuspóir, tá feidhm ag an ráthaíocht sin agus ní bhaineann aon ní sna Téarmaí seo í. Ní gheallaimid go bhfuil aon aschur ar leith cruinn: is airí de chuid an ábhair ghinte é sin, ní airí den cheist an bhfeidhmíonn an tseirbhís.
 
@@ -92,19 +92,19 @@ Is féidir leat do chuntas a dhúnadh am ar bith ó **Socruithe → Cuntas**. Ta
 
 Baineann na rialacha seo leis an méid a chuireann tú isteach, leis an gcaoi a n-úsáideann tú an tseirbhís, agus leis an méid a fhoilsíonn tú.
 
-**Ná cuir sonraí pearsanta faoi dhaoine eile isteach.** Cuir ceisteanna faoi shaincheisteanna, argóintí agus ceisteanna poiblí seachas faoi dhaoine príobháideacha inaitheanta. Ná cuir ainmneacha, sonraí teagmhála, uimhreacha aitheantais, íomhánna, sonraí sláinte, airgeadais ná sonraí eile a aithníonn duine san áireamh, agus ná húsáid DebateAI chun cás, próifíl nó sainchomhad faoi dhuine a chur le chéile. Tá ceisteanna faoi phearsana poiblí agus iad ag gníomhú ina ról poiblí inghlactha; níl ceisteanna a dhíríonn ar dhuine príobháideach inghlactha. Má chuireann tú sonraí den sórt sin isteach, tá tú freagrach astu, agus féadfaimid an t-ábhar a bhaint.
+**Ná cuir sonraí pearsanta faoi dhaoine eile isteach.** Cuir ceisteanna faoi shaincheisteanna, argóintí agus ceisteanna poiblí seachas faoi dhaoine príobháideacha inaitheanta. Ná cuir ainmneacha, sonraí teagmhála, uimhreacha aitheantais, íomhánna, sonraí sláinte, airgeadais ná sonraí eile a aithníonn duine san áireamh, agus ná húsáid Dialectical Engine chun cás, próifíl nó sainchomhad faoi dhuine a chur le chéile. Tá ceisteanna faoi phearsana poiblí agus iad ag gníomhú ina ról poiblí inghlactha; níl ceisteanna a dhíríonn ar dhuine príobháideach inghlactha. Má chuireann tú sonraí den sórt sin isteach, tá tú freagrach astu, agus féadfaimid an t-ábhar a bhaint.
 
 **D'fhaisnéis íogair féin.** D'fhéadfadh ceisteanna a chuireann tú baint le do shláinte, do chreidimh, do pholaitíocht nó nithe íogaire eile. Toilíonn tú leis sin ar scáileán ar leith roimh do chéad díospóireacht. Má tá cónaí ort in áit ina bhfuil rialacha sonracha maidir le sonraí sláinte, féadfaidh Iarscríbhinn A tú a threorú chuig fógra ar leith.
 
 **Ná cuir ábhar neamhdhleathach isteach agus ná foilsigh é**, lena n-áirítear ábhar atá clúmhillteach, a ghríosaíonn foréigean nó fuath, a dhéanann ciapadh nó bagairt, arb íomhánna dlúthchaidrimh é a roinneadh gan toiliú, a sháraíonn maoin intleachtúil nó rúndacht, a nochtann rúin trádála, arb ábhar mí-úsáide gnéasaí leanaí é, nó a sháraíonn smachtbhannaí nó rialuithe onnmhairiúcháin.
 
-**Ná húsáid DebateAI chun meabhlaireacht a dhéanamh.** Ná cuir aschur ginte i láthair mar ábhar scríofa ag duine sa chás ina mbeadh sé sin míthreorach, ná bain an lipéad gur ghin IS é de, ná húsáid é chun comhthoil dhealraitheach, fianaise bhréige nó pearsanú a chruthú.
+**Ná húsáid Dialectical Engine chun meabhlaireacht a dhéanamh.** Ná cuir aschur ginte i láthair mar ábhar scríofa ag duine sa chás ina mbeadh sé sin míthreorach, ná bain an lipéad gur ghin IS é de, ná húsáid é chun comhthoil dhealraitheach, fianaise bhréige nó pearsanú a chruthú.
 
 **Ná hionsaigh an tseirbhís.** Ceadaítear gnáth-innéacsú díospóireachtaí foilsithe ag innill chuardaigh; teastaíonn ár gcead i scríbhinn le haghaidh rochtain uathoibrithe eile, scríobadh, crawláil nó eastóscadh ar an mórchóir; ní cheadaítear dul timpeall ar theorainneacha ráta, fíordheimhniú ná rialuithe foilsithe; ní cheadaítear iarrachtaí chun leideanna nó treoracha córais a bhaint; ní cheadaítear instealladh leide arb é is aidhm dó tabhairt ar an inneall neamhaird a dhéanamh dá shrianta; ní cheadaítear seiceálacha taiscéalaíocha ná tástáil ualaigh gan ár gcead i scríbhinn.
 
 **Ná hathdhíol ná hathbhrandáil** an tseirbhís, agus ná húsáid í chun inneall iomaíoch a thógáil, lena n-áirítear trí aschuir a úsáid mar shonraí oiliúna, gan ár gcomhaontú i scríbhinn.
 
-**Ná húsáid DebateAI le haghaidh cinntí faoi** shláinte, sábháilteacht, cearta dlíthiúla, fostaíocht, creidmheas, tithíocht ná stádas inimirce duine. Ní chuige sin a tógadh é agus ní bonn sábháilte iad a aschuir le haghaidh cinntí den sórt sin.
+**Ná húsáid Dialectical Engine le haghaidh cinntí faoi** shláinte, sábháilteacht, cearta dlíthiúla, fostaíocht, creidmheas, tithíocht ná stádas inimirce duine. Ní chuige sin a tógadh é agus ní bonn sábháilte iad a aschuir le haghaidh cinntí den sórt sin.
 
 **An dlí áitiúil san áit a bhfoilsíonn tú.** Tá tú freagrach as a chinntiú go gcomhlíonann aon ní a fhoilsíonn tú dlí na tíre ina bhfuil tú. Féadfaimid foilsiú ábhar áirithe a shrianadh i réigiúin áirithe.
 
@@ -132,9 +132,9 @@ Bíonn díospóireachtaí **príobháideach mar réamhshocrú**. Ní bhíonn aon
 
 **An méid a dhéanann foilsiú.** Is gníomh d'aon ghnó é foilsiú agus deimhnítear ar leithligh é. Nuair a fhoilsíonn tú, cruthaímid leagan reoite den díospóireacht agus cuirimid ar fáil é le léamh ag duine ar bith, gan cuntas. Féadfaidh innill chuardaigh í a innéacsú. Taispeántar sa leagan sin d'**ainm cleite**, do cheist mar a scríobh tú í, crann na n-argóintí, na scóir, an breithiúnas agus an banda muiníne, agus bíonn lipéad infheicthe air a deir gur ghin IS an t-ábhar. Ní thaispeántar ann do sheoladh ríomhphoist, do thaifid sheisiúin ná stair do chuntais.
 
-**Is beag nach bhfuil foilsiú dochúlaithe sa chleachtas.** Nuair a bhíonn díospóireacht poiblí, is féidir le daoine eile í a léamh, a lua, gabháil scáileáin a dhéanamh di, í a chartlannú agus í a chur i dtaisce. Má dhífhoilsítear í, baintear í ó DebateAI agus scriostar an eochair dár leagan féin, ach ní féidir leis an dífhoilsiú cóipeanna atá ann cheana in áiteanna eile a bhaint amach. Ná foilsigh aon ní nach mbeifeá sásta go mbeadh baint bhuan aige le d'ainm cleite.
+**Is beag nach bhfuil foilsiú dochúlaithe sa chleachtas.** Nuair a bhíonn díospóireacht poiblí, is féidir le daoine eile í a léamh, a lua, gabháil scáileáin a dhéanamh di, í a chartlannú agus í a chur i dtaisce. Má dhífhoilsítear í, baintear í ó Dialectical Engine agus scriostar an eochair dár leagan féin, ach ní féidir leis an dífhoilsiú cóipeanna atá ann cheana in áiteanna eile a bhaint amach. Ná foilsigh aon ní nach mbeifeá sásta go mbeadh baint bhuan aige le d'ainm cleite.
 
-**Díospóireachtaí foilsithe nuair a dhúnann tú do chuntas.** Nuair a sceidealaíonn tú dúnadh do chuntais, roghnaíonn tú cad a tharlóidh do na díospóireachtaí a d’fhoilsigh tú. Má chuireann tú tic le **"Scrios mo dhíospóireachtaí poiblí freisin"**, bainimid gach ceann díobh de DebateAI agus scriosaimid eochair ár gcóipe nuair a dhéantar an dúnadh, mar a dhéantar nuair a dhífhoilsítear iad, mura gceanglaíonn an dlí orainn mír shonrach a choinneáil. Má fhágann tú an bosca gan tic, fanann siad poiblí faoi ainm cleite scortha. Níl cóipeanna a rinne daoine eile roimh an mbaint faoina smacht againn. Más mian leat díospóireacht a bhaintear a choinneáil ar fáil duit, íoslódáil ar dtús í.
+**Díospóireachtaí foilsithe nuair a dhúnann tú do chuntas.** Nuair a sceidealaíonn tú dúnadh do chuntais, roghnaíonn tú cad a tharlóidh do na díospóireachtaí a d’fhoilsigh tú. Má chuireann tú tic le **"Scrios mo dhíospóireachtaí poiblí freisin"**, bainimid gach ceann díobh de Dialectical Engine agus scriosaimid eochair ár gcóipe nuair a dhéantar an dúnadh, mar a dhéantar nuair a dhífhoilsítear iad, mura gceanglaíonn an dlí orainn mír shonrach a choinneáil. Má fhágann tú an bosca gan tic, fanann siad poiblí faoi ainm cleite scortha. Níl cóipeanna a rinne daoine eile roimh an mbaint faoina smacht againn. Más mian leat díospóireacht a bhaintear a choinneáil ar fáil duit, íoslódáil ar dtús í.
 
 **Is féidir linn ábhar foilsithe a bhaint anuas i gcónaí.** Féadfaimid díospóireacht fhoilsithe a bhaint nó rochtain uirthi a shrianadh nuair a éilíonn an dlí é, nuair a ordaíonn cúirt nó údarás inniúil é, nó nuair a sháraíonn sí na Téarmaí seo nó nuair atá sí neamhdhleathach. Ní chuireann aon ní sa rannán seo cosc orainn gníomhú de bhun fógra bailí faoi rannán 10, agus ní gealltanas é aon ní ann go bhfanfaidh díospóireacht fhoilsithe ar fáil.
 
@@ -161,7 +161,7 @@ Admhaímid gach tuairisc gan moill mhíchuí. Láimhseálaimid tuairiscí ar bhe
 
 **Teagmháil a dhéanamh le duine.** Is córas IS é ár gcúntóir tacaíochta agus deir sé amhlaidh. Is féidir leat iarraidh labhairt le duine am ar bith, agus cuirtear an bealach sin ar fáil i ngach comhrá tacaíochta. Ní bhraithimid ar uirlisí uathoibrithe amháin chun cumarsáid a dhéanamh leat.
 
-**Ábhar sceimhlitheoireachta.** Tá ábhar sceimhlitheoireachta neamhdhleathach agus ní cheadaítear é ar DebateAI (rannán 7). Féadfaidh údaráis inniúla san Aontas Eorpach orduithe baint anuas faoi Rialachán (AE) 2021/784 a sheoladh chugainn chuig an bpointe teagmhála atá luaite i rannán 1. Nuair a fhaighimid ordú den sórt sin, bainimid an t-ábhar anuas, nó díchumasaímid an rochtain air i ngach tír san AE, laistigh d'uair an chloig. Cuirimid in iúl don duine a d'fhoilsigh an t-ábhar gur baineadh anuas é agus, má iarrann an duine sin é, cén fáth agus conas is féidir agóid a dhéanamh ar an ordú, ach amháin má chinneann an t-údarás gur gá, ar chúiseanna slándála poiblí, gan aon ní a nochtadh ar feadh tréimhse teoranta. Mar a cheanglaítear leis an Rialachán, coinnímid an t-ábhar a baineadh anuas agus na sonraí gaolmhara ar feadh sé mhí, ionas gur féidir an bhaint anuas a athbhreithniú agus, más rud é go raibh sí mícheart, í a aisiompú. Féadfaidh an duine a d'fhoilsigh an t-ábhar agóid a dhéanamh ar an ordú os comhair chúirteanna Bhallstát an údaráis a d'eisigh é, agus féadfaidh sé ár mbealach gearán a úsáid freisin. Níor éiligh aon údarás orainn bearta sonracha a ghlacadh faoin Rialachán i gcoinne ábhair sceimhlitheoireachta; má éilítear é sin orainn, déanfaimid cur síos anseo ar na bearta sin, lena n-áirítear aon uirlisí uathoibrithe.
+**Ábhar sceimhlitheoireachta.** Tá ábhar sceimhlitheoireachta neamhdhleathach agus ní cheadaítear é ar Dialectical Engine (rannán 7). Féadfaidh údaráis inniúla san Aontas Eorpach orduithe baint anuas faoi Rialachán (AE) 2021/784 a sheoladh chugainn chuig an bpointe teagmhála atá luaite i rannán 1. Nuair a fhaighimid ordú den sórt sin, bainimid an t-ábhar anuas, nó díchumasaímid an rochtain air i ngach tír san AE, laistigh d'uair an chloig. Cuirimid in iúl don duine a d'fhoilsigh an t-ábhar gur baineadh anuas é agus, má iarrann an duine sin é, cén fáth agus conas is féidir agóid a dhéanamh ar an ordú, ach amháin má chinneann an t-údarás gur gá, ar chúiseanna slándála poiblí, gan aon ní a nochtadh ar feadh tréimhse teoranta. Mar a cheanglaítear leis an Rialachán, coinnímid an t-ábhar a baineadh anuas agus na sonraí gaolmhara ar feadh sé mhí, ionas gur féidir an bhaint anuas a athbhreithniú agus, más rud é go raibh sí mícheart, í a aisiompú. Féadfaidh an duine a d'fhoilsigh an t-ábhar agóid a dhéanamh ar an ordú os comhair chúirteanna Bhallstát an údaráis a d'eisigh é, agus féadfaidh sé ár mbealach gearán a úsáid freisin. Níor éiligh aon údarás orainn bearta sonracha a ghlacadh faoin Rialachán i gcoinne ábhair sceimhlitheoireachta; má éilítear é sin orainn, déanfaimid cur síos anseo ar na bearta sin, lena n-áirítear aon uirlisí uathoibrithe.
 
 **Riosca tromchúiseach don bheatha nó don tsábháilteacht.** Má thagaimid ar an eolas faoi fhaisnéis a thugann le fios go bhfuil cion coiriúil i gceist lena mbaineann bagairt do bheatha nó do shábháilteacht duine, cuirimid na húdaráis inniúla ar an eolas.
 
@@ -183,7 +183,7 @@ Maireann rannáin 8 (a mhéid a bhaineann le hábhar a foilsíodh cheana), 15, 1
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-Cuireann DebateAI plean saor in aisce ar fáil. Beidh plean íoctha **Préimh** ar fáil, a dhíghlasálann liosta iomlán na samhlacha agus a ligeann duit rialtáin na díospóireachta a shocrú tú féin.
+Cuireann Dialectical Engine plean saor in aisce ar fáil. Beidh plean íoctha **Préimh** ar fáil, a dhíghlasálann liosta iomlán na samhlacha agus a ligeann duit rialtáin na díospóireachta a shocrú tú féin.
 
 **Sula n-íocann tú** taispeánaimid duit, díreach os cionn an chnaipe íocaíochta: an plean; an praghas iomlán lena n-áirítear an cháin is infheidhme; an tréimhse bhilleála; go n-athnuaitear an plean go huathoibríoch go dtí go gcealaítear é; an dáta a chríochnaíonn aon triail saor in aisce agus an méid a ghearrfar ort ansin; agus conas cealú. Deimhníonn tú na téarmaí athnuachana trí bhosca ar leith a thiceáil. Léitear **Liostáil agus íoc** ar an gcnaipe (sa Rómáinis, *Comandă cu obligație de plată*). Seolaimid deimhniú chugat ar mheán marthanach ina bhfuil an fhaisnéis chéanna, na Téarmaí seo, agus an fhoirm um tharraingt siar.
 
@@ -211,11 +211,11 @@ Má tá cónaí ort in áit eile, sonraítear in Iarscríbhinn A cibé ceart tar
 
 ## 14. Athruithe ar an tseirbhís agus ar na Téarmaí seo
 
-**Ar an tseirbhís.** Déanaimid DebateAI a fhorbairt go leanúnach, agus tarlaíonn gnáthfheabhsuithe, ceartúcháin agus athruithe ar liosta na samhlacha gan fógra. Nuair a dhéanaimid athrú a théann níos faide ná an tseirbhís a choinneáil ag feidhmiú mar a thuairiscítear, ní dhéanaimid é ach ar cheann de na cúiseanna seo: chun ceanglas dlíthiúil nó rialála a chomhlíonadh; chun freagairt ar fhadhb slándála nó mí-úsáide; toisc go n-athraíonn, go srianaíonn nó go dtarraingíonn soláthraí samhla siar samhail nó gné ar a mbraithimid; chun oiriúnú do thimpeallacht theicniúil nach bhfuil smacht againn uirthi; nó chun gné a chur leis, a fheabhsú nó a scor ar bhealach nach gcuireann aon chostas ort.
+**Ar an tseirbhís.** Déanaimid Dialectical Engine a fhorbairt go leanúnach, agus tarlaíonn gnáthfheabhsuithe, ceartúcháin agus athruithe ar liosta na samhlacha gan fógra. Nuair a dhéanaimid athrú a théann níos faide ná an tseirbhís a choinneáil ag feidhmiú mar a thuairiscítear, ní dhéanaimid é ach ar cheann de na cúiseanna seo: chun ceanglas dlíthiúil nó rialála a chomhlíonadh; chun freagairt ar fhadhb slándála nó mí-úsáide; toisc go n-athraíonn, go srianaíonn nó go dtarraingíonn soláthraí samhla siar samhail nó gné ar a mbraithimid; chun oiriúnú do thimpeallacht theicniúil nach bhfuil smacht againn uirthi; nó chun gné a chur leis, a fheabhsú nó a scor ar bhealach nach gcuireann aon chostas ort.
 
 Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. Má bhíonn éifeacht dhiúltach níos mó ná mionéifeacht ag an athrú ar do rochtain ar an tseirbhís nó ar d'úsáid aisti, féadfaidh tú foirceannadh saor in aisce laistigh de **30 lá** tar éis duit a bheith curtha ar an eolas, nó tar éis don athrú teacht i bhfeidhm, cibé acu is déanaí, agus aisíocaimid aon mhéid réamhíoctha don tréimhse nár úsáideadh.
 
-**Ar na Téarmaí seo.** Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat **30 lá ar a laghad** sula dtagann sé i bhfeidhm; má leanann tú d'úsáid DebateAI tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions.
+**Ar na Téarmaí seo.** Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat **30 lá ar a laghad** sula dtagann sé i bhfeidhm; má leanann tú d'úsáid Dialectical Engine tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions.
 
 ## 15. Dliteanas
 
@@ -231,15 +231,15 @@ Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. 
 
 ## 16. Maoin intleachtúil
 
-Is linne nó lenár gceadúnóirí an tseirbhís féin — na bogearraí, an t-inneall, an modh scórála, an comhéadan, na hainmneacha DebateAI agus DebateAIRO agus ár lógónna. Tugann na Téarmaí seo cead duit an tseirbhís a úsáid, ní úinéireacht uirthi.
+Is linne nó lenár gceadúnóirí an tseirbhís féin — na bogearraí, an t-inneall, an modh scórála, an comhéadan, na hainmneacha Dialectical Engine agus DebateAIRO agus ár lógónna. Tugann na Téarmaí seo cead duit an tseirbhís a úsáid, ní úinéireacht uirthi.
 
-Féadfaidh tú díospóireachtaí foilsithe a lua agus nasc a dhéanamh leo ar choinníoll go dtugann tú aitheantas do DebateAI agus go gcuireann tú nasc leis an leathanach bunaidh. Ní cheadaítear cóipeáil ar an mórchóir, atáirgeadh córasach ar an gcorpas poiblí, ná úsáid díospóireachtaí foilsithe mar shonraí oiliúna gan ár gcomhaontú i scríbhinn.
+Féadfaidh tú díospóireachtaí foilsithe a lua agus nasc a dhéanamh leo ar choinníoll go dtugann tú aitheantas do Dialectical Engine agus go gcuireann tú nasc leis an leathanach bunaidh. Ní cheadaítear cóipeáil ar an mórchóir, atáirgeadh córasach ar an gcorpas poiblí, ná úsáid díospóireachtaí foilsithe mar shonraí oiliúna gan ár gcomhaontú i scríbhinn.
 
-Clúdaítear d'ábhar agus stádas aschur ginte i rannán 8. Má chreideann tú go sáraíonn rud éigin ar DebateAI do mhaoin intleachtúil, úsáid an bealach tuairiscithe i rannán 10.
+Clúdaítear d'ábhar agus stádas aschur ginte i rannán 8. Má chreideann tú go sáraíonn rud éigin ar Dialectical Engine do mhaoin intleachtúil, úsáid an bealach tuairiscithe i rannán 10.
 
 ## 17. Sonraí pearsanta
 
-Leagtar amach sa **Bheartas Príobháideachais** ag dezbatere.ro/privacy conas a láimhseálaimid sonraí pearsanta. Mínítear ann an méid a bhailímid, an bunús dlíthiúil le gach cuspóir, cá fhad a choinnímid nithe, cé a fhaigheann sonraí, na haistrithe atá i gceist, agus conas do chearta a fheidhmiú. Baineann trí phointe leis an áit seo freisin. Iarrtar ort i rannán 7 gan sonraí pearsanta daoine eile a chur i do cheist; má dhéanann tú é, tá tú freagrach astu, agus féadfaimid an t-ábhar a bhaint. Má tá sonraí pearsanta fút i ndíospóireacht a foilsíodh ar DebateAI, is féidir leat iarraidh orainn í a bhaint gan cuntas a bheith agat (rannán 9). Agus coinnímid taifead de do ghlacadh leis na Téarmaí seo — an leagan, an t-am, agus sonraí teicniúla an tseisiúin — mar fhianaise ar an gconradh, mar a mhínítear sa Bheartas Príobháideachais.
+Leagtar amach sa **Bheartas Príobháideachais** ag dezbatere.ro/privacy conas a láimhseálaimid sonraí pearsanta. Mínítear ann an méid a bhailímid, an bunús dlíthiúil le gach cuspóir, cá fhad a choinnímid nithe, cé a fhaigheann sonraí, na haistrithe atá i gceist, agus conas do chearta a fheidhmiú. Baineann trí phointe leis an áit seo freisin. Iarrtar ort i rannán 7 gan sonraí pearsanta daoine eile a chur i do cheist; má dhéanann tú é, tá tú freagrach astu, agus féadfaimid an t-ábhar a bhaint. Má tá sonraí pearsanta fút i ndíospóireacht a foilsíodh ar Dialectical Engine, is féidir leat iarraidh orainn í a bhaint gan cuntas a bheith agat (rannán 9). Agus coinnímid taifead de do ghlacadh leis na Téarmaí seo — an leagan, an t-am, agus sonraí teicniúla an tseisiúin — mar fhianaise ar an gconradh, mar a mhínítear sa Bheartas Príobháideachais.
 
 ## 18. An dlí rialaithe agus an áit ina n-éistear díospóidí
 
@@ -277,7 +277,7 @@ Scríobhadh príomhchorp na dTéarmaí seo duit. Ina theannta sin: féadfaidh t�
 
 ### A.2 Stáit Aontaithe Mheiriceá
 
-**Tennessee.** Ní chuirimid DebateAI ar fáil do dhaoine a bhfuil cónaí orthu i Tennessee.
+**Tennessee.** Ní chuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu i Tennessee.
 
 **Fógraí agus baint anuas.** Féadfar íomhánna dlúthchaidrimh neamhthoiliúla a thuairisciú trí ríomhphost chuig abuse@dezbatere.ro, gan cuntas, agus baintear iad laistigh de 48 uair an chloig ó iarratas bailí. Téann gearáin chóipchirt tríd an mbealach tuairiscithe i rannán 10.
 

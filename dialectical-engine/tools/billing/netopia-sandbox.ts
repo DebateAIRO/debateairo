@@ -38,7 +38,7 @@ export const NETOPIA_SANDBOX_USAGE =
 const TOOL_ORDER = /^t-[0-9a-f]{30}$/u;
 const MAX_TOOL_AMOUNT_MICROS = 5_000_000;
 const MIN_TOOL_AMOUNT_MICROS = 10_000;
-const RECORDING_DESCRIPTION = "DebateAI NETOPIA recording";
+const RECORDING_DESCRIPTION = "Dialectical Engine NETOPIA recording";
 const SANDBOX_PAYER_IP = "192.0.2.10";
 const PRINTABLE_CODE = /^[A-Z][A-Z0-9_]{2,95}(?::[A-Za-z0-9_.-]{1,64})?$/u;
 /** A string member whose key holds "token" in any letter case (token, Token, cardToken, token_id, authenticationToken, …). */

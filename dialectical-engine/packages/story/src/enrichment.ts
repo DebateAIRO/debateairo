@@ -4,6 +4,7 @@ import {
   type CryptoEnvelope,
   type Pool
 } from "@debateai/db";
+import { readAnthropicMessagesReply } from "@debateai/providers";
 import type { StoryNodeEnrichment } from "./material.js";
 
 /**
@@ -15,9 +16,11 @@ import type { StoryNodeEnrichment } from "./material.js";
  * every decrypt below:
  *
  *  - the judge's best case and strongest objection, from the judge's OWN raw
- *    artifact (`ledger.raw_artifact`, carrier `{ rawText }`). Parsed LENIENTLY:
- *    raw JSON, one code fence, or the outermost braces. A judgement that does
- *    not parse gives nulls for that node, never a throw.
+ *    artifact (`ledger.raw_artifact`, carrier `{ rawText }`). The gateway stores
+ *    the vendor's WHOLE HTTP reply there, so the judgement is read out of it
+ *    first (`judgeReplyText`), then parsed LENIENTLY: raw JSON, one code fence,
+ *    or the outermost braces. A judgement that does not parse gives nulls for
+ *    that node, never a throw.
  *  - the cross-maker review's outcome and its reasons (`ledger.node_review`,
  *    carrier `{ reasons }`).
  *  - the recorded panel dispersion (`ledger.reduced_judgement`).
@@ -51,6 +54,31 @@ function unfenced(text: string): string | null {
   const firstNewline = trimmed.indexOf("\n");
   if (firstNewline < 0) return null;
   return trimmed.slice(firstNewline + 1, trimmed.length - CODE_FENCE.length).trim();
+}
+
+/**
+ * The text the judge WROTE, out of its stored artifact (fix 2026-10-12, practice debate 2). The gateway stores the
+ * vendor's whole HTTP reply (`persistRawArtifact({ rawText })` in packages/providers), so parsing that text as the
+ * judgement read the envelope, which has no `steelman` or `critic`, and every node got nulls. The judgement is the
+ * OpenAI-compatible wire's `choices[0].message.content`, or the Anthropic Messages wire's `text` blocks, read by the
+ * gateway's own reader (thinking skipped). A text that is neither envelope is read as the reply itself; an envelope
+ * with no text gives null, so the envelope itself is never read as the judgement.
+ */
+function judgeReplyText(rawText: string): string | null {
+  let body: unknown;
+  try {
+    body = JSON.parse(rawText);
+  } catch {
+    return rawText;
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) return rawText;
+  const choices = (body as Readonly<Record<string, unknown>>).choices
+    ?? (readAnthropicMessagesReply(body).normalized as Readonly<Record<string, unknown>>).choices;
+  if (!Array.isArray(choices)) return rawText;
+  const first: unknown = choices[0];
+  const message = first !== null && typeof first === "object" ? (first as Readonly<Record<string, unknown>>).message : null;
+  const content = message !== null && typeof message === "object" ? (message as Readonly<Record<string, unknown>>).content : null;
+  return typeof content === "string" ? content : null;
 }
 
 function lenientJudgeObject(rawText: string): Readonly<Record<string, unknown>> | null {
@@ -128,7 +156,8 @@ export async function readStoryEnrichment(
           leased, "ledger.raw_artifact", row.raw_artifact_id, row.content_ciphertext,
           { rawText: row.raw_text }
         );
-        const judge = typeof content.rawText === "string" ? lenientJudgeObject(content.rawText) : null;
+        const replyText = typeof content.rawText === "string" ? judgeReplyText(content.rawText) : null;
+        const judge = replyText === null ? null : lenientJudgeObject(replyText);
         judgeTexts.set(row.raw_artifact_id, {
           bestCase: summaryOf(judge, "steelman"),
           objection: summaryOf(judge, "critic")

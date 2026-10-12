@@ -160,7 +160,7 @@ describe("P10a Quaderno invoices", () => {
       transactionId: paid.payment.providerPaymentId, refundTotalMicros: 23_800_000,
       original: { documentId: original!.external_ref, number: original!.number },
       // The credit line in the buyer's language, for the period it credits (P5/P4's RefundRecord.description).
-      description: `DebateAI Plus plan, ${invoiceDate(loaded.period.start, "en")} to ${invoiceDate(loaded.period.end, "en")}`
+      description: `Dialectical Engine Plus plan, ${invoiceDate(loaded.period.start, "en")} to ${invoiceDate(loaded.period.end, "en")}`
     });
     expect((await invoices(paid.chargeId)).map((row) => row.kind)).toEqual(["CREDIT_NOTE", "INVOICE"]);
   });
@@ -210,10 +210,10 @@ describe("P10a Quaderno invoices", () => {
     expect(loaded.period.start).toEqual(paying.occurredAt);
     expect(loaded.period.start.getTime()).toBeGreaterThan(loaded.charge.periodStart.getTime());
     const romanian: BillingOrderText = (kind, locale, params) => kind === "INVOICE_LINE" && locale === "ro"
-      ? `DebateAI ${params.plan ?? ""}, ${params.from ?? ""} – ${params.to ?? ""}` : englishOrderText(kind, locale, params);
+      ? `Dialectical Engine ${params.plan ?? ""}, ${params.from ?? ""} – ${params.to ?? ""}` : englishOrderText(kind, locale, params);
     const line = saleRecordOf({ ...loaded, profile: { ...loaded.profile, locale: "ro" } }, {}, "saas", romanian).lines[0]!.description;
-    expect(line).toBe(`DebateAI Plus, ${invoiceDate(loaded.period.start, "ro")} – ${invoiceDate(loaded.period.end, "ro")}`);
+    expect(line).toBe(`Dialectical Engine Plus, ${invoiceDate(loaded.period.start, "ro")} – ${invoiceDate(loaded.period.end, "ro")}`);
     expect(saleRecordOf(loaded, {}, "saas").lines[0]!.description)
-      .toBe(`DebateAI Plus plan, ${invoiceDate(loaded.period.start, "en")} to ${invoiceDate(loaded.period.end, "en")}`);
+      .toBe(`Dialectical Engine Plus plan, ${invoiceDate(loaded.period.start, "en")} to ${invoiceDate(loaded.period.end, "en")}`);
   });
 });

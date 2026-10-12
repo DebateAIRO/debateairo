@@ -35,7 +35,7 @@ export type SellerCompany = Readonly<{
 
 export const SELLER_COMPANY: SellerCompany = Object.freeze({
   legalName: "DMS Merchandise Shop S.R.L.",
-  tradingNames: Object.freeze(["DebateAI", "Dialectical Engine"]),
+  tradingNames: Object.freeze(["Dialectical Engine"]),
   registeredOffice: "Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, județul Neamț, România",
   tradeRegisterNo: "J2022000426271",
   cui: "45935221",

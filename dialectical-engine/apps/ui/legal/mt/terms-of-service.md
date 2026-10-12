@@ -1,4 +1,4 @@
-# DebateAI — Termini tas-Servizz
+# Dialectical Engine — Termini tas-Servizz
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
-**In short.** Irid ikollok 18-il sena jew aktar. DebateAI tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Id-dibattiti tiegħek huma privati sakemm ma tippubblikahomx; jekk tippubblikahom, kulħadd jista’ jaqrahom. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
+**In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Id-dibattiti tiegħek huma privati sakemm ma tippubblikahomx; jekk tippubblikahom, kulħadd jista’ jaqrahom. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
 ## 1. Min aħna u kif tikkuntattjana
 
-DebateAI titħaddem minn **DMS Merchandise Shop S.R.L.**, kumpanija rreġistrata fir-Rumanija.
+Dialectical Engine titħaddem minn **DMS Merchandise Shop S.R.L.**, kumpanija rreġistrata fir-Rumanija.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ DebateAI titħaddem minn **DMS Merchandise Shop S.R.L.**, kumpanija rreġistrata
 
 Dawn id-dettalji jintwerew ukoll b’mod permanenti fuq is-sit fuq dezbatere.ro/legal. Dejjem tista’ tikkuntattja persuna, mhux biss lill-assistent tagħna; it-taqsima 10 tispjega kif.
 
-## 2. Fejn noffru DebateAI
+## 2. Fejn noffru Dialectical Engine
 
-Noffru DebateAI lil persuni li jgħixu fl-Unjoni Ewropea (27 pajjiż) u fiż-Żona Ekonomika Ewropea (in-Norveġja, l-Iżlanda u l-Liechtenstein), fl-Iżvizzera, fil-Moldova, fl-Istati Uniti (ħlief Tennessee), fil-Kanada, fl-Awstralja, fiż-Żelanda l-Ġdida, f’Singapor, fil-Ġappun, fil-Korea t’Isfel u fit-Tajwan. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu.
+Noffru Dialectical Engine lil persuni li jgħixu fl-Unjoni Ewropea (27 pajjiż) u fiż-Żona Ekonomika Ewropea (in-Norveġja, l-Iżlanda u l-Liechtenstein), fl-Iżvizzera, fil-Moldova, fl-Istati Uniti (ħlief Tennessee), fil-Kanada, fl-Awstralja, fiż-Żelanda l-Ġdida, f’Singapor, fil-Ġappun, fil-Korea t’Isfel u fit-Tajwan. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu.
 
 ## 3. Aċċettazzjoni ta’ dawn it-Termini
 
@@ -58,21 +58,21 @@ Il-**Politika dwar il-Privatezza** tagħna fuq dezbatere.ro/privacy tispjega kif
 
 Qabel ma tikkonkludi kwalunkwe kuntratt magħna b’mod elettroniku, l-interfaċċa turik il-passi involuti, tħallik tirrieżamina u tikkoreġi dak li tkun daħħalt qabel tissottomettih, u tgħidlek il-lingwi li bihom jista’ jiġi konkluż il-kuntratt. Dawn it-Termini huma disponibbli f’forma li tippermettilek taħżinhom u tipprintjahom, meta tixtri pjan bi ħlas, nibagħtulek bil-posta elettronika l-verżjoni li aċċettajt, u tista’ titlob kopja fi kwalunkwe ħin. Xejn f’dawn it-Termini ma jillimita drittijiet li għandek skont il-liġi Rumena jew tal-UE dwar il-konsumatur, jew skont il-liġi tal-pajjiż fejn tgħix, li ma jistgħux jiġu limitati b’kuntratt.
 
-## 4. Min jista’ juża DebateAI
+## 4. Min jista’ juża Dialectical Engine
 
-Irid ikollok **18-il sena jew aktar** biex toħloq kont, u tikkonferma dan meta tirreġistra. DebateAI mhijiex indirizzata lit-tfal u ma nipprovduhiex konxjament lil xi ħadd taħt it-18-il sena. Jekk insiru nafu li kont jappartjeni lil xi ħadd taħt it-18-il sena, nagħlquh. Xi reġjuni jitolbu aktar minn konferma; l-Anness A jgħid x’japplika fejn.
+Irid ikollok **18-il sena jew aktar** biex toħloq kont, u tikkonferma dan meta tirreġistra. Dialectical Engine mhijiex indirizzata lit-tfal u ma nipprovduhiex konxjament lil xi ħadd taħt it-18-il sena. Jekk insiru nafu li kont jappartjeni lil xi ħadd taħt it-18-il sena, nagħlquh. Xi reġjuni jitolbu aktar minn konferma; l-Anness A jgħid x’japplika fejn.
 
-Irid ikollok il-kapaċità ġuridika li tidħol f’dan il-kuntratt. Jekk tuża DebateAI f’isem organizzazzjoni, tikkonferma li int awtorizzat torbotha, u “int” imbagħad tfisser dik l-organizzazzjoni.
+Irid ikollok il-kapaċità ġuridika li tidħol f’dan il-kuntratt. Jekk tuża Dialectical Engine f’isem organizzazzjoni, tikkonferma li int awtorizzat torbotha, u “int” imbagħad tfisser dik l-organizzazzjoni.
 
 Kulħadd jista’ jaqra dibattitu li jkun ġie ppubblikat. Il-qari ma jirrikjedix kont, iżda huwa użu tas-servizz, u t-taqsimiet 7, 15, 16 u 18 japplikaw għalih.
 
-## 5. X’tagħmel DebateAI, u x’mhijiex
+## 5. X’tagħmel Dialectical Engine, u x’mhijiex
 
-Int tissottometti mistoqsija jew pretensjoni. DebateAI tibgħatha lil diversi mudelli tal-IA ta’ partijiet terzi, li jibnu graff tal-argumenti madwarha: pretensjonijiet, kontropretensjonijiet, kritiki, referenzi għall-evidenza, punteġġi, u verdett b’medda ta’ kunfidenza. Tista’ tikkontesta pretensjonijiet individwali, titlob li punt jiġi investigat aktar, u tiddeċiedi jekk tippubblikax ir-riżultat.
+Int tissottometti mistoqsija jew pretensjoni. Dialectical Engine tibgħatha lil diversi mudelli tal-IA ta’ partijiet terzi, li jibnu graff tal-argumenti madwarha: pretensjonijiet, kontropretensjonijiet, kritiki, referenzi għall-evidenza, punteġġi, u verdett b’medda ta’ kunfidenza. Tista’ tikkontesta pretensjonijiet individwali, titlob li punt jiġi investigat aktar, u tiddeċiedi jekk tippubblikax ir-riżultat.
 
 **Kollox f’dibattitu jiġi ġġenerat mill-IA.** L-argumenti, il-kritiki, ir-referenzi għall-evidenza, il-punteġġi, il-verdettijiet u t-tweġibiet tal-assistent tal-appoġġ huma ġġenerati mill-magni. Jistgħu jkunu żbaljati, mhux kompluti, skaduti, jew żbaljati b’ċertezza, u jistgħu jirriflettu preġudizzji fil-mudelli. Ebda persuna ma tirrieżaminahom qabel ma jintwerewlek jew jiġu ppubblikati, u ebda persuna msemmija ma għandha r-responsabbiltà editorjali għalihom. Il-kontenut iġġenerat jiġi mmarkat bħala ġġenerat mill-IA fil-prodott, fuq il-paġni ppubblikati, u fl-esportazzjonijiet.
 
-**DebateAI mhijiex parir.** Mhijiex parir legali, mediku, finanzjarju, fiskali, psikoloġiku, dwar is-sigurtà jew parir professjonali ieħor, u verdett mhuwiex konstatazzjoni ta’ fatt. Tużax dibattitu bħala l-bażi għal deċiżjoni li taffettwa saħħtek, is-sigurtà tiegħek, flusek, il-pożizzjoni legali tiegħek jew il-benesseri ta’ oħrajn mingħajr ma tivverifika s-sorsi primarji u, fejn xieraq, ma’ professjonist ikkwalifikat. Medda ta’ kunfidenza għolja tfisser li l-mudelli sabu li l-interpretazzjoni kienet stabbilita sew abbażi tal-materjal li raw; mhijiex garanzija li hija vera.
+**Dialectical Engine mhijiex parir.** Mhijiex parir legali, mediku, finanzjarju, fiskali, psikoloġiku, dwar is-sigurtà jew parir professjonali ieħor, u verdett mhuwiex konstatazzjoni ta’ fatt. Tużax dibattitu bħala l-bażi għal deċiżjoni li taffettwa saħħtek, is-sigurtà tiegħek, flusek, il-pożizzjoni legali tiegħek jew il-benesseri ta’ oħrajn mingħajr ma tivverifika s-sorsi primarji u, fejn xieraq, ma’ professjonist ikkwalifikat. Medda ta’ kunfidenza għolja tfisser li l-mudelli sabu li l-interpretazzjoni kienet stabbilita sew abbażi tal-materjal li raw; mhijiex garanzija li hija vera.
 
 **Dak li nimpenjaw ruħna għalih.** Aħna nipprovdu s-servizz b’attenzjoni u ħila raġonevoli u skont id-deskrizzjoni li nippubblikaw. Fejn il-liġi tagħtik garanzija li s-servizz jikkonforma mad-deskrizzjoni tiegħu u huwa adatt għall-iskop ordinarju tiegħu, dik il-garanzija tapplika u xejn f’dawn it-Termini ma jneħħiha. Dak li ma nwiegħdux huwa li xi riżultat partikolari jkun preċiż: dik hija karatteristika tal-kontenut iġġenerat, mhux ta’ jekk is-servizz jaħdimx.
 
@@ -92,19 +92,19 @@ Tista’ tagħlaq il-kont tiegħek fi kwalunkwe ħin minn **Issettjar → Kont**
 
 Dawn ir-regoli japplikaw għal dak li tissottometti, għal kif tuża s-servizz, u għal dak li tippubblika.
 
-**Tissottomettix data personali dwar persuni oħra.** Staqsi dwar kwistjonijiet, argumenti u mistoqsijiet pubbliċi minflok dwar individwi privati identifikabbli. Tinkludix ismijiet, dettalji ta’ kuntatt, numri ta’ identifikazzjoni, stampi, dettalji dwar is-saħħa, il-finanzi jew dettalji oħra li jidentifikaw lil xi ħadd, u tużax DebateAI biex tibni każ, profil jew dossier dwar persuna. Mistoqsijiet dwar persuni pubbliċi li jkunu qed jaġixxu fir-rwol pubbliku tagħhom huma aċċettabbli; mistoqsijiet immirati lejn individwu privat mhumiex. Jekk tissottometti data bħal din, int responsabbli għaliha, u nistgħu nneħħu l-kontenut.
+**Tissottomettix data personali dwar persuni oħra.** Staqsi dwar kwistjonijiet, argumenti u mistoqsijiet pubbliċi minflok dwar individwi privati identifikabbli. Tinkludix ismijiet, dettalji ta’ kuntatt, numri ta’ identifikazzjoni, stampi, dettalji dwar is-saħħa, il-finanzi jew dettalji oħra li jidentifikaw lil xi ħadd, u tużax Dialectical Engine biex tibni każ, profil jew dossier dwar persuna. Mistoqsijiet dwar persuni pubbliċi li jkunu qed jaġixxu fir-rwol pubbliku tagħhom huma aċċettabbli; mistoqsijiet immirati lejn individwu privat mhumiex. Jekk tissottometti data bħal din, int responsabbli għaliha, u nistgħu nneħħu l-kontenut.
 
 **L-informazzjoni sensittiva tiegħek stess.** Il-mistoqsijiet li tistaqsi jistgħu jolqtu s-saħħa, it-twemmin, il-politika jew kwistjonijiet sensittivi oħra tiegħek stess. Int tagħti l-kunsens għal dan fuq skrin separat qabel l-ewwel dibattitu tiegħek. Jekk tgħix f’post b’regoli speċifiċi dwar data tas-saħħa, l-Anness A jista’ jidderiġik lejn avviż separat.
 
 **Tissottomettix jew tippubblikax kontenut illegali**, inkluż kontenut li jkun malafamanti, jinċita l-vjolenza jew il-mibegħda, jimmolesta jew jhedded, ikun stampi intimi kondiviżi mingħajr kunsens, jikser il-proprjetà intellettwali jew il-kunfidenzjalità, jiżvela sigrieti kummerċjali, jikkostitwixxi materjal ta’ abbuż sesswali tat-tfal, jew jikser sanzjonijiet jew kontrolli fuq l-esportazzjoni.
 
-**Tużax DebateAI biex tqarraq.** Tippreżentax riżultat iġġenerat bħala miktub minn persuna meta dan ikun qarrieqi, tneħħix it-tikketta li tgħid li huwa ġġenerat mill-IA, u tużahx biex toħloq kunsens apparenti, evidenza falza jew impersonazzjoni.
+**Tużax Dialectical Engine biex tqarraq.** Tippreżentax riżultat iġġenerat bħala miktub minn persuna meta dan ikun qarrieqi, tneħħix it-tikketta li tgħid li huwa ġġenerat mill-IA, u tużahx biex toħloq kunsens apparenti, evidenza falza jew impersonazzjoni.
 
 **Tattakkax is-servizz.** L-indiċjar ordinarju tad-dibattiti ppubblikati mill-magni tat-tiftix huwa permess, iżda aċċess awtomatizzat ieħor, ġbir awtomatiku tad-data, skanjar awtomatizzat jew estrazzjoni bil-massa jeħtieġu l-permess bil-miktub tagħna; ebda evitar tal-limiti tar-rata, tal-awtentikazzjoni jew tal-kontrolli tal-pubblikazzjoni; ebda tentattiv biex jiġu estratti messaġġi ta’ istruzzjoni jew struzzjonijiet tas-sistema; ebda injezzjoni ta’ messaġġi ta’ istruzzjoni mmirata biex iġġiegħel lill-magna tinjora l-limitazzjonijiet tagħha; ebda stħarriġ esploratorju jew ittestjar tat-tagħbija mingħajr il-permess bil-miktub tagħna.
 
 **Terġax tbigħ jew tagħti marka ġdida** lis-servizz, u tużahx biex tibni magna kompetitriċi, inkluż billi tuża r-riżultati bħala data għat-taħriġ, mingħajr il-ftehim bil-miktub tagħna.
 
-**Tużax DebateAI għal deċiżjonijiet dwar** is-saħħa, is-sigurtà, id-drittijiet legali, l-impjieg, il-kreditu, l-akkomodazzjoni jew l-istatus tal-immigrazzjoni ta’ persuna. Mhijiex mibnija għal dan u r-riżultati tagħha mhumiex bażi sigura għalih.
+**Tużax Dialectical Engine għal deċiżjonijiet dwar** is-saħħa, is-sigurtà, id-drittijiet legali, l-impjieg, il-kreditu, l-akkomodazzjoni jew l-istatus tal-immigrazzjoni ta’ persuna. Mhijiex mibnija għal dan u r-riżultati tagħha mhumiex bażi sigura għalih.
 
 **Il-liġi lokali fejn tippubblika.** Int responsabbli biex tiżgura li dak kollu li tippubblika jikkonforma mal-liġi tal-pajjiż fejn tinsab. Nistgħu nirrestrinġu l-pubblikazzjoni ta’ ċerti suġġetti f’ċerti reġjuni.
 
@@ -132,9 +132,9 @@ Id-dibattiti huma **privati b’mod awtomatiku**. Xejn minn dak li toħloq ma jk
 
 **X’tagħmel il-pubblikazzjoni.** Il-pubblikazzjoni hija azzjoni intenzjonata u kkonfermata separatament. Meta tippubblika, nieħdu stampa fissa tad-dibattitu u nagħmluha disponibbli għall-qari minn kulħadd, mingħajr kont. Il-magni tat-tiftix jistgħu jindiċjaw l-istampa fissa. L-istampa turi l-**psewdonimu** tiegħek, il-mistoqsija tiegħek kif ktibtha, is-siġra tal-argumenti, il-punteġġi, il-verdett u l-medda ta’ kunfidenza, u jkollha tikketta viżibbli li l-kontenut huwa ġġenerat mill-IA. Ma turix l-indirizz elettroniku tiegħek, ir-rekords tas-sessjoni tiegħek jew l-istorja tal-kont tiegħek.
 
-**Fil-prattika, il-pubblikazzjoni effettivament ma tistax titreġġa’ lura.** Ladarba dibattitu jkun pubbliku, persuni oħra jistgħu jaqrawh, jikkwotawh, jieħdu kopji tal-iskrin tiegħu, jarkivjawh u jaħżnuh temporanjament. It-tneħħija tal-pubblikazzjoni tneħħih minn DebateAI u teqred iċ-ċavetta tal-kopja tagħna, iżda ma tistax tilħaq kopji li diġà jeżistu band’oħra. Tippubblikax xi ħaġa li ma tkunx lest li tkun assoċjata b’mod permanenti mal-psewdonimu tiegħek.
+**Fil-prattika, il-pubblikazzjoni effettivament ma tistax titreġġa’ lura.** Ladarba dibattitu jkun pubbliku, persuni oħra jistgħu jaqrawh, jikkwotawh, jieħdu kopji tal-iskrin tiegħu, jarkivjawh u jaħżnuh temporanjament. It-tneħħija tal-pubblikazzjoni tneħħih minn Dialectical Engine u teqred iċ-ċavetta tal-kopja tagħna, iżda ma tistax tilħaq kopji li diġà jeżistu band’oħra. Tippubblikax xi ħaġa li ma tkunx lest li tkun assoċjata b’mod permanenti mal-psewdonimu tiegħek.
 
-**Dibattiti ppubblikati meta tagħlaq il-kont tiegħek.** Meta tippjana l-għeluq tal-kont tiegħek, tagħżel x’jiġri mid-dibattiti li ppubblikajt. Jekk timmarka **"Ħassar ukoll id-dibattiti pubbliċi tiegħi"**, inneħħu kull wieħed minnhom minn DebateAI u neqirdu ċ-ċavetta tal-kopja tagħna meta jitwettaq l-għeluq, bħalma jsir meta titneħħa pubblikazzjoni, sakemm il-liġi ma titlobx li nżommu element partikolari. Jekk tħalli l-kaxxa mhux immarkata, id-dibattiti jibqgħu pubbliċi taħt psewdonimu rtirat. Kopji magħmula minn oħrajn qabel it-tneħħija mhumiex taħt il-kontroll tagħna. Jekk trid iżżomm dibattitu li tneħħi disponibbli għalik, niżżlu l-ewwel.
+**Dibattiti ppubblikati meta tagħlaq il-kont tiegħek.** Meta tippjana l-għeluq tal-kont tiegħek, tagħżel x’jiġri mid-dibattiti li ppubblikajt. Jekk timmarka **"Ħassar ukoll id-dibattiti pubbliċi tiegħi"**, inneħħu kull wieħed minnhom minn Dialectical Engine u neqirdu ċ-ċavetta tal-kopja tagħna meta jitwettaq l-għeluq, bħalma jsir meta titneħħa pubblikazzjoni, sakemm il-liġi ma titlobx li nżommu element partikolari. Jekk tħalli l-kaxxa mhux immarkata, id-dibattiti jibqgħu pubbliċi taħt psewdonimu rtirat. Kopji magħmula minn oħrajn qabel it-tneħħija mhumiex taħt il-kontroll tagħna. Jekk trid iżżomm dibattitu li tneħħi disponibbli għalik, niżżlu l-ewwel.
 
 **Dejjem nistgħu nneħħu kontenut ippubblikat.** Nistgħu nneħħu jew nirrestrinġu l-aċċess għal dibattitu ppubblikat fejn titlob dan il-liġi, fejn tordna dan qorti jew awtorità kompetenti, jew fejn jikser dawn it-Termini jew ikun illegali. Xejn f’din it-taqsima ma jwaqqafna milli naġixxu fuq avviż validu skont it-taqsima 10, u xejn fiha mhu wegħda li dibattitu ppubblikat se jibqa’ disponibbli.
 
@@ -161,7 +161,7 @@ Nikkonfermaw li rċevejna kull rapport mingħajr dewmien żejjed. Nittrattaw ir-
 
 **Kuntatt ma’ persuna.** L-assistent tal-appoġġ tagħna huwa sistema tal-IA u jgħid hekk. Tista’ titlob li titkellem ma’ persuna fi kwalunkwe ħin, u kull konverżazzjoni mal-appoġġ toffri dik ir-rotta. Ma niddependux biss fuq għodod awtomatizzati biex nikkomunikaw miegħek.
 
-**Kontenut terroristiku.** Il-kontenut terroristiku huwa illegali u mhux permess fuq DebateAI (taqsima 7). L-awtoritajiet kompetenti fl-Unjoni Ewropea jistgħu jibagħtulna ordnijiet ta’ tneħħija skont ir-Regolament (UE) 2021/784 fil-punt ta’ kuntatt fit-taqsima 1. Meta nirċievu waħda, inneħħu l-kontenut, jew niddiżattivaw l-aċċess għalih fl-Istati Membri kollha tal-UE, fi żmien siegħa. Ngħidu lill-persuna li ppubblikatu li tneħħa u, jekk titlob, għaliex u kif tista’ tikkontesta l-ordni, ħlief jekk l-awtorità tiddeċiedi li, għal raġunijiet ta’ sigurtà pubblika, ma għandu jkun hemm l-ebda żvelar għal perjodu limitat. Kif jirrikjedi r-Regolament, inżommu l-kontenut imneħħi u d-data relatata għal sitt xhur, sabiex it-tneħħija tkun tista’ tiġi rieżaminata u, jekk kienet żbaljata, titreġġa’ lura. Il-persuna li ppubblikat il-kontenut tista’ tikkontesta l-ordni quddiem il-qrati tal-pajjiż li l-awtorità tiegħu ħarġet l-ordni, u tista’ wkoll tuża l-proċedura tal-ilmenti tagħna. L-ebda awtorità ma rrikjediet minna li nieħdu miżuri speċifiċi kontra l-kontenut terroristiku skont ir-Regolament; jekk xi waħda tagħmel dan, se niddeskrivu dawk il-miżuri hawnhekk, inklużi kwalunkwe għodod awtomatizzati.
+**Kontenut terroristiku.** Il-kontenut terroristiku huwa illegali u mhux permess fuq Dialectical Engine (taqsima 7). L-awtoritajiet kompetenti fl-Unjoni Ewropea jistgħu jibagħtulna ordnijiet ta’ tneħħija skont ir-Regolament (UE) 2021/784 fil-punt ta’ kuntatt fit-taqsima 1. Meta nirċievu waħda, inneħħu l-kontenut, jew niddiżattivaw l-aċċess għalih fl-Istati Membri kollha tal-UE, fi żmien siegħa. Ngħidu lill-persuna li ppubblikatu li tneħħa u, jekk titlob, għaliex u kif tista’ tikkontesta l-ordni, ħlief jekk l-awtorità tiddeċiedi li, għal raġunijiet ta’ sigurtà pubblika, ma għandu jkun hemm l-ebda żvelar għal perjodu limitat. Kif jirrikjedi r-Regolament, inżommu l-kontenut imneħħi u d-data relatata għal sitt xhur, sabiex it-tneħħija tkun tista’ tiġi rieżaminata u, jekk kienet żbaljata, titreġġa’ lura. Il-persuna li ppubblikat il-kontenut tista’ tikkontesta l-ordni quddiem il-qrati tal-pajjiż li l-awtorità tiegħu ħarġet l-ordni, u tista’ wkoll tuża l-proċedura tal-ilmenti tagħna. L-ebda awtorità ma rrikjediet minna li nieħdu miżuri speċifiċi kontra l-kontenut terroristiku skont ir-Regolament; jekk xi waħda tagħmel dan, se niddeskrivu dawk il-miżuri hawnhekk, inklużi kwalunkwe għodod awtomatizzati.
 
 **Riskju serju għall-ħajja jew għas-sigurtà.** Jekk insiru konxji ta’ informazzjoni li tissuġġerixxi reat kriminali li jinvolvi theddida għall-ħajja jew għas-sigurtà ta’ xi ħadd, ninfurmaw lill-awtoritajiet kompetenti.
 
@@ -183,7 +183,7 @@ It-taqsimiet 8 (fir-rigward ta’ kontenut diġà ppubblikat), 15, 16 u 18 jibqg
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI toffri pjan bla ħlas. Pjan **Premium** bi ħlas se jkun disponibbli, li jiftaħ il-lista sħiħa tal-mudelli u jħallik tistabbilixxi l-kontrolli tad-dibattitu int stess.
+Dialectical Engine toffri pjan bla ħlas. Pjan **Premium** bi ħlas se jkun disponibbli, li jiftaħ il-lista sħiħa tal-mudelli u jħallik tistabbilixxi l-kontrolli tad-dibattitu int stess.
 
 **Qabel ma tħallas** nuruk, direttament fuq il-buttuna tal-ħlas: il-pjan; il-prezz totali inkluża t-taxxa applikabbli; il-perjodu tal-fatturazzjoni; li l-pjan jiġġedded awtomatikament sakemm jiġi kkanċellat; id-data meta jintemm kwalunkwe perjodu ta’ prova bla ħlas u kemm imbagħad ikollok tħallas; u kif tikkanċella. Tikkonferma t-termini tat-tiġdid billi timmarka kaxxa separata. Fuq il-buttuna jkun hemm **Abbona u ħallas** (bir-Rumen, *Comandă cu obligație de plată*). Nibagħtulek konferma fuq mezz durabbli li jkun fiha l-istess informazzjoni, dawn it-Termini, u l-formola tal-irtirar.
 
@@ -211,11 +211,11 @@ Jekk tgħix band’oħra, l-Anness A jiddikjara d-dritt ta’ rtirar jew il-perj
 
 ## 14. Bidliet fis-servizz u f’dawn it-Termini
 
-**Fis-servizz.** Aħna niżviluppaw DebateAI kontinwament, u titjib ta’ rutina, soluzzjonijiet għal problemi u bidliet fil-lista tal-mudelli jsiru mingħajr avviż. Fejn nagħmlu bidla li tmur lil hinn milli nżommu s-servizz jaħdem kif deskritt, nagħmluha biss għal waħda minn dawn ir-raġunijiet: biex nikkonformaw ma’ rekwiżit legali jew regolatorju; biex nirrispondu għal problema ta’ sigurtà jew abbuż; għaliex fornitur tal-mudelli jibdel, jirrestrinġi jew jirtira mudell jew funzjonalità li niddependu fuqha; biex nadattaw għal ambjent tekniku li ma nikkontrollawx; jew biex inżidu, intejbu jew nirtiraw funzjonalità b’mod li ma jżid ebda spiża għalik.
+**Fis-servizz.** Aħna niżviluppaw Dialectical Engine kontinwament, u titjib ta’ rutina, soluzzjonijiet għal problemi u bidliet fil-lista tal-mudelli jsiru mingħajr avviż. Fejn nagħmlu bidla li tmur lil hinn milli nżommu s-servizz jaħdem kif deskritt, nagħmluha biss għal waħda minn dawn ir-raġunijiet: biex nikkonformaw ma’ rekwiżit legali jew regolatorju; biex nirrispondu għal problema ta’ sigurtà jew abbuż; għaliex fornitur tal-mudelli jibdel, jirrestrinġi jew jirtira mudell jew funzjonalità li niddependu fuqha; biex nadattaw għal ambjent tekniku li ma nikkontrollawx; jew biex inżidu, intejbu jew nirtiraw funzjonalità b’mod li ma jżid ebda spiża għalik.
 
 Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidla jkollha effett negattiv aktar minn minuri fuq l-aċċess tiegħek għas-servizz jew l-użu tiegħu, tista’ tittermina mingħajr ħlas fi żmien **30 jum** minn meta tiġi avżat, jew minn meta tidħol fis-seħħ il-bidla, skont liema jiġi l-aħħar, u nagħtuk lura kwalunkwe ammont imħallas bil-quddiem għall-perjodu mhux użat.
 
-**F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża DebateAI wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
+**F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
 
 ## 15. Responsabbiltà
 
@@ -231,15 +231,15 @@ Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidl
 
 ## 16. Proprjetà intellettwali
 
-Is-servizz innifsu — is-software, il-magna, il-metodu tal-punteġġ, l-interfaċċa, l-ismijiet DebateAI u DebateAIRO u l-logos tagħna — jappartjeni lilna jew lil-liċenzjanti tagħna. Dawn it-Termini jagħtuk permess tuża s-servizz, mhux sjieda tiegħu.
+Is-servizz innifsu — is-software, il-magna, il-metodu tal-punteġġ, l-interfaċċa, l-ismijiet Dialectical Engine u DebateAIRO u l-logos tagħna — jappartjeni lilna jew lil-liċenzjanti tagħna. Dawn it-Termini jagħtuk permess tuża s-servizz, mhux sjieda tiegħu.
 
-Tista’ tikkwota u tagħmel ħolqa għal dibattiti ppubblikati b’attribuzzjoni lil DebateAI u b’ħolqa għall-paġna oriġinali. L-ikkupjar bil-massa, ir-riproduzzjoni sistematika tal-korpus pubbliku, u l-użu ta’ dibattiti ppubblikati bħala data għat-taħriġ mhumiex permessi mingħajr il-ftehim bil-miktub tagħna.
+Tista’ tikkwota u tagħmel ħolqa għal dibattiti ppubblikati b’attribuzzjoni lil Dialectical Engine u b’ħolqa għall-paġna oriġinali. L-ikkupjar bil-massa, ir-riproduzzjoni sistematika tal-korpus pubbliku, u l-użu ta’ dibattiti ppubblikati bħala data għat-taħriġ mhumiex permessi mingħajr il-ftehim bil-miktub tagħna.
 
-It-taqsima 8 tkopri l-kontenut tiegħek u l-istatus tar-riżultati ġġenerati. Jekk temmen li xi ħaġa fuq DebateAI tikser il-proprjetà intellettwali tiegħek, uża r-rotta ta’ rapportar fit-taqsima 10.
+It-taqsima 8 tkopri l-kontenut tiegħek u l-istatus tar-riżultati ġġenerati. Jekk temmen li xi ħaġa fuq Dialectical Engine tikser il-proprjetà intellettwali tiegħek, uża r-rotta ta’ rapportar fit-taqsima 10.
 
 ## 17. Data personali
 
-Il-mod kif nittrattaw id-data personali huwa stabbilit fil-**Politika dwar il-Privatezza** fuq dezbatere.ro/privacy. Hija tispjega x’niġbru, il-bażi legali għal kull skop, għal kemm żmien inżommu l-affarijiet, min jirċievi d-data, it-trasferimenti involuti, u kif teżerċita d-drittijiet tiegħek. Hawnhekk ukoll japplikaw tliet punti. It-taqsima 7 titolbok ma ddaħħalx data personali ta’ persuni oħra f’mistoqsija; jekk tagħmel dan, int responsabbli għaliha, u nistgħu nneħħu l-kontenut. Jekk dibattitu ppubblikat fuq DebateAI jkun fih data personali dwarek, tista’ titlobna nneħħuha mingħajr ma jkollok kont (it-taqsima 9). U nżommu rekord tal-aċċettazzjoni tiegħek ta’ dawn it-Termini — il-verżjoni, il-ħin, u d-dettalji tekniċi tas-sessjoni — bħala evidenza tal-kuntratt, kif tispjega l-Politika dwar il-Privatezza.
+Il-mod kif nittrattaw id-data personali huwa stabbilit fil-**Politika dwar il-Privatezza** fuq dezbatere.ro/privacy. Hija tispjega x’niġbru, il-bażi legali għal kull skop, għal kemm żmien inżommu l-affarijiet, min jirċievi d-data, it-trasferimenti involuti, u kif teżerċita d-drittijiet tiegħek. Hawnhekk ukoll japplikaw tliet punti. It-taqsima 7 titolbok ma ddaħħalx data personali ta’ persuni oħra f’mistoqsija; jekk tagħmel dan, int responsabbli għaliha, u nistgħu nneħħu l-kontenut. Jekk dibattitu ppubblikat fuq Dialectical Engine jkun fih data personali dwarek, tista’ titlobna nneħħuha mingħajr ma jkollok kont (it-taqsima 9). U nżommu rekord tal-aċċettazzjoni tiegħek ta’ dawn it-Termini — il-verżjoni, il-ħin, u d-dettalji tekniċi tas-sessjoni — bħala evidenza tal-kuntratt, kif tispjega l-Politika dwar il-Privatezza.
 
 ## 18. Liġi applikabbli u fejn jinstema’ t-tilwim
 
@@ -277,7 +277,7 @@ Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista�
 
 ### A.2 L-Istati Uniti
 
-**Tennessee.** Ma noffrux DebateAI lil persuni li jgħixu fi Tennessee.
+**Tennessee.** Ma noffrux Dialectical Engine lil persuni li jgħixu fi Tennessee.
 
 **Avviżi u tneħħijiet.** Stampi intimi mhux kunsenswali jistgħu jiġu rrappurtati bl-email lil abuse@dezbatere.ro, mingħajr kont, u jitneħħew fi żmien 48 siegħa minn talba valida. Ilmenti dwar id-drittijiet tal-awtur jgħaddu mir-rotta tar-rapportar fit-taqsima 10.
 
