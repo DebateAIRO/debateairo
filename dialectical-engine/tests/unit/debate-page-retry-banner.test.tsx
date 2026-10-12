@@ -1,4 +1,7 @@
 /**
+ * A .tsx file (like the other tests that import a page component): the root
+ * `tsc --noEmit` has no JSX setting and cannot read DebatePageClient.tsx.
+ *
  * Parallel calls, task 13: steps of one debate now run at the same time, so a
  * retry on one step can arrive while ANOTHER step's failure is on the page's
  * single error banner. A `node.retrying` clears the banner only when it is the
@@ -7,25 +10,25 @@
 import { describe, expect, it, vi } from "vitest";
 import { RunEventSchema, type RunEvent } from "@debateai/contract";
 import { createDebatePageRunEventConsumer } from "../../apps/ui/app/debate/[id]/DebatePageClient.js";
-import { createLiveRunState } from "../../apps/ui/lib/v3/liveEvents.js";
+import { createLiveRunState, type LiveRunState } from "../../apps/ui/lib/v3/liveEvents.js";
 import debateChromeEnglish from "../../apps/ui/messages/en/debateChrome.json" with { type: "json" };
 
 const RUN = "run:parallel-banner";
 const FAILED = debateChromeEnglish["debateChrome.error.claimGenerationFailed"];
 
 function harness() {
-  let live = createLiveRunState();
+  let live: LiveRunState = createLiveRunState();
   let error: string | null = null;
   let sequence = 0;
   const consume = createDebatePageRunEventConsumer({
     runRef: RUN,
     readLive: () => live,
-    writeLive: (next) => { live = next; },
+    writeLive: (next: LiveRunState) => { live = next; },
     // An answer is "present" so the consumer does not rebuild the live tree: this test is about the banner.
     hasAnswer: () => true,
     updateDebate: vi.fn(),
     updateSynthesisDraft: vi.fn(),
-    writeError: (next) => { error = next; },
+    writeError: (next: string | null) => { error = next; },
     refresh: vi.fn()
   });
   const send = (event_type: RunEvent["event_type"], subject: string | null, payload: Record<string, unknown> = {}) => {
