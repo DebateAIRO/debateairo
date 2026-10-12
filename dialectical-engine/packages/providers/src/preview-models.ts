@@ -14,10 +14,23 @@
  * (tests/unit/fixtures/preview-model-rows.json for DeepInfra, preview-model-rows-anthropic.json for
  * Anthropic). A later provider is one more key there and one more parity file.
  *
+ * Reviewed sampling (2026-10-12): a DeepInfra row may carry its own `sampling` settings, which every request for that
+ * row sends and both the app's guarded fetch and the gate require exactly. Only Qwen has one today; a later row's is
+ * one more `sampling` entry here, in the gate's row and in the parity file.
+ *
  * No imports on purpose: index.ts, preview-test.ts and provider-probe.ts all read these rows.
  */
 /** The providers the preview has a reviewed root gate for. */
 export type PreviewProviderName = "deepinfra" | "anthropic";
+
+/**
+ * The sampling members a reviewed row may set, in the order a request body carries them (the gate's
+ * DeepInfraProfile.sampling_keys holds the same three).
+ */
+export const PREVIEW_SAMPLING_KEYS = Object.freeze(["temperature", "top_p", "top_k"] as const);
+export type PreviewSamplingKey = typeof PREVIEW_SAMPLING_KEYS[number];
+/** A row's reviewed sampling: the exact members and values its every request carries. */
+export type PreviewSampling = Readonly<Partial<Record<PreviewSamplingKey, number>>>;
 
 export type PreviewModelRow = Readonly<{
   /** The provider (and so the root gate) this row's calls go through. */
@@ -61,6 +74,13 @@ export type PreviewModelRow = Readonly<{
   effort: "high" | null;
   /** Whether response_format {"type":"json_object"} may be sent. */
   jsonObject: boolean;
+  /**
+   * Reviewed sampling (2026-10-12), DeepInfra rows only: when present, every request for this row carries exactly
+   * these members with exactly these values (after max_tokens and any effort member, before messages), and the
+   * guarded fetch and the gate refuse a body that differs. Absent: the body carries none of PREVIEW_SAMPLING_KEYS and
+   * the vendor's defaults apply.
+   */
+  sampling?: PreviewSampling;
 }>;
 
 /** The DeepInfra connection's base URL and window, shared by every DeepInfra row. */
@@ -91,6 +111,7 @@ type RowInput = Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;
   outputBound: number; effort: "high" | null; jsonObject: boolean; contextWindowTokens?: number;
   upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string }>;
+  sampling?: PreviewSampling;
 }>;
 const PROVIDER_CONNECTIONS = Object.freeze({
   deepinfra: Object.freeze({ provider: "deepinfra", baseUrl: PREVIEW_DEEPINFRA_BASE_URL,
@@ -107,10 +128,19 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
   };
   const inputNanoUsdPerToken = nano(input.inputUsdPerM);
   const outputNanoUsdPerToken = nano(input.outputUsdPerM);
-  const { upperStep, ...plain } = input;
+  const { upperStep, sampling, ...plain } = input;
+  // Only the DeepInfra wire (and its gate) knows sampling; each member is a reviewed key with a finite number, kept
+  // in PREVIEW_SAMPLING_KEYS order so every body says them the same way.
+  if (sampling !== undefined && (provider !== "deepinfra" || Object.keys(sampling).length === 0
+    || Object.keys(sampling).some(key => !(PREVIEW_SAMPLING_KEYS as readonly string[]).includes(key))
+    || Object.values(sampling).some(value => typeof value !== "number" || !Number.isFinite(value)))) {
+    throw new TypeError("PREVIEW_MODEL_ROW_SAMPLING_INVALID");
+  }
   return Object.freeze({
     ...PROVIDER_CONNECTIONS[provider],
     ...plain,
+    ...(sampling === undefined ? {} : { sampling: Object.freeze(Object.fromEntries(
+      PREVIEW_SAMPLING_KEYS.filter(key => Object.hasOwn(sampling, key)).map(key => [key, sampling[key]!]))) as PreviewSampling }),
     ...(upperStep === undefined ? {} : { upperStep: Object.freeze({ ...upperStep,
       inputNanoUsdPerToken: nano(upperStep.inputUsdPerM), outputNanoUsdPerToken: nano(upperStep.outputUsdPerM) }) }),
     contextWindowTokens: input.contextWindowTokens ?? PROVIDER_CONNECTIONS[provider].contextWindowTokens,
@@ -134,8 +164,12 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
     row("deepinfra", { model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
       outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false }),
     // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
+    // Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid mid-answer into
+    // random multilingual tokens in a live practice run (2 of its first 4 calls unreadable). It thinks by default, so
+    // it runs at its makers' thinking-mode settings: temperature 0.6, top_p 0.95, top_k 20.
     row("deepinfra", { model: "Qwen/Qwen3.8-Flash", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 })
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false, contextWindowTokens: 1_000_000,
+      sampling: { temperature: 0.6, top_p: 0.95, top_k: 20 } })
   ]),
   // PR B, owner ruling 2026-10-10 (evening). Estimate and reserve at the lower step ($0.10 / $0.50);
   // a call whose bytes + 2048 are above 100,000 reserves at the upper step ($0.50 / $2.50), so a
@@ -257,6 +291,15 @@ export function previewReservationNanoUsd(reviewed: PreviewModelRow, bodyBytes: 
 export function previewModelRowForEndpoint(baseUrl: string, model: string): PreviewModelRow | undefined {
   const reviewed = previewModelRow(model);
   return reviewed !== undefined && reviewed.baseUrl === baseUrl ? reviewed : undefined;
+}
+
+/**
+ * Reviewed sampling (2026-10-12): the sampling members an OpenAI-compatible request to this exact base URL and model
+ * carries — the reviewed row's `sampling`, else none (an empty object, so every other body stays byte for byte what
+ * it was). Row-driven like JSON mode: it follows the endpoint and model, on the preview or off it.
+ */
+export function previewSamplingMembers(baseUrl: string, model: string): PreviewSampling {
+  return previewModelRowForEndpoint(baseUrl, model)?.sampling ?? Object.freeze({});
 }
 
 /** The two-maker rule (contract A §6/§7): with two or more makers in the union, each roster names two or more. */

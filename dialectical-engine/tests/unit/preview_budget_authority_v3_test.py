@@ -21,7 +21,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from preview_budget_authority_fixture import (  # noqa: E402
-    DEEPSEEK, HELPER_SOURCE, file_sha, HOST, KEY, MIMO, MODEL, PEER, QWEN, RESERVED, ROWS, SCOPE, SOURCE, Gate, body, envelope,
+    DEEPSEEK, HELPER_SOURCE, file_sha, HOST, KEY, MIMO, MODEL, PEER, QWEN, RESERVED, ROWS, SAMPLING, SCOPE, SOURCE, Gate, body, envelope,
     go_document,
     load_bridge, provider_response, reservation_of)
 
@@ -30,6 +30,7 @@ SafetyError = bridge.helper.SafetyError
 DEEPINFRA = bridge.helper.PROFILES['deepinfra']
 _HTTPS = bridge.helper.HttpsTransport
 PARITY = Path(__file__).resolve().parent / 'fixtures/preview-model-rows.json'
+SAMPLING_BODIES = Path(__file__).resolve().parent / 'fixtures/deepinfra-sampling-bodies.json'
 ALL = [MODEL, DEEPSEEK, MIMO, QWEN]
 
 
@@ -106,6 +107,7 @@ class ReviewedTableTests(GateTest):
                                   'input_nano_usd_per_token': int(row.input_usd_per_m * 1000),
                                   'output_nano_usd_per_token': int(row.output_usd_per_m * 1000),
                                   'output_bound': row.output_bound, 'effort': row.effort, 'json_object': row.json_object,
+                                  'sampling': dict(row.sampling) if row.sampling is not None else None,
                                   'worst_case_reservation_usd': '%.9f' % bridge.worst_case_reservation(DEEPINFRA, row)},
                                  expected)
                 # The fixture's own rows also equal the independent copy the other tests use.
@@ -623,6 +625,7 @@ class ProbeTests(GateTest):
                                  'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}]}
                 if ROWS[model][4] == 'high':
                     expected_body['reasoning_effort'] = 'high'
+                expected_body.update(SAMPLING.get(model, {}))  # None of these rows has any (SamplingTests: Qwen).
                 self.assertEqual(sent, [(expected_body, KEY)])
                 self.assertEqual({k: summary[k] for k in ('status', 'model', 'http_status', 'model_echoed_exactly',
                                                           'entry_state', 'halt_reason', 'authority', 'reply_excerpt')},
@@ -1862,6 +1865,134 @@ class ProbeFenceTests(GateTest):
         self.assertEqual((code, json.loads(out.getvalue())),
                          (2, {'status': 'refused', 'error_class': 'FenceRequired', 'error': 'PROBE_FENCE_REQUIRED',
                               'missing': ['unit', 'network']}))
+
+
+class SamplingTests(GateTest):
+    """Reviewed sampling (2026-10-12): a row may carry its own sampling settings (today only Qwen, at its makers'
+    thinking-mode values, after it slid into random multilingual tokens at DeepInfra's defaults). Its requests must
+    carry exactly those keys with exactly those values; every other row's requests must carry none of them."""
+    QWEN_SAMPLING = (('temperature', 0.6), ('top_p', 0.95), ('top_k', 20))
+
+    def test_only_the_qwen_row_carries_sampling_and_it_equals_the_independent_copy(self):
+        self.assertEqual(DEEPINFRA.rows[QWEN].sampling, self.QWEN_SAMPLING)
+        self.assertEqual(dict(DEEPINFRA.rows[QWEN].sampling), SAMPLING[QWEN])
+        self.assertEqual({model: row.sampling for model, row in DEEPINFRA.rows.items() if model != QWEN},
+                         {MODEL: None, DEEPSEEK: None, MIMO: None})
+        self.assertEqual(set(SAMPLING), {QWEN})
+        for name, profile in bridge.helper.PROFILES.items():
+            if name != 'deepinfra':
+                with self.subTest(provider=name):
+                    self.assertEqual({row.sampling for row in profile.rows.values()}, {None})
+        self.assertEqual(DEEPINFRA.sampling_keys, ('temperature', 'top_p', 'top_k'))
+
+    def test_a_row_with_sampling_takes_exactly_its_reviewed_values(self):
+        row = DEEPINFRA.rows[QWEN]
+        exact = body(model=QWEN)
+        self.assertTrue(DEEPINFRA.body_valid(exact, row))
+        self.assertTrue(DEEPINFRA.body_valid({**exact, 'top_k': 20.0}, row))  # The same number, as JSON says it.
+
+        def without(name):
+            return {k: v for k, v in exact.items() if k != name}
+        refused = {'no_sampling': {k: v for k, v in exact.items() if k not in SAMPLING[QWEN]},
+                   'no_temperature': without('temperature'), 'no_top_p': without('top_p'), 'no_top_k': without('top_k'),
+                   'temperature_default': {**exact, 'temperature': 1}, 'temperature_off': {**exact, 'temperature': 0.61},
+                   'top_p_hair': {**exact, 'top_p': 0.950001}, 'top_k_other': {**exact, 'top_k': 21},
+                   'top_k_off': {**exact, 'top_k': 0}, 'temperature_text': {**exact, 'temperature': '0.6'},
+                   'top_k_true': {**exact, 'top_k': True}, 'temperature_null': {**exact, 'temperature': None},
+                   'top_p_nan': {**exact, 'top_p': float('nan')}, 'extra_min_p': {**exact, 'min_p': 0},
+                   'nested': {**without('temperature'), 'sampling': SAMPLING[QWEN]}}
+        for name, value in refused.items():
+            with self.subTest(name):
+                self.assertFalse(DEEPINFRA.body_valid(value, row))
+
+    def test_a_row_without_sampling_refuses_every_sampling_key(self):
+        for model in (MODEL, DEEPSEEK, MIMO):
+            row = DEEPINFRA.rows[model]
+            self.assertTrue(DEEPINFRA.body_valid(body(model=model), row))
+            for name, value in SAMPLING[QWEN].items():
+                with self.subTest(model=model, key=name):
+                    self.assertFalse(DEEPINFRA.body_valid({**body(model=model), name: value}, row))
+            self.assertFalse(DEEPINFRA.body_valid({**body(model=model), **SAMPLING[QWEN]}, row))
+
+    def test_every_body_the_app_sends_passes_at_its_reservation_to_the_digit_and_the_rest_are_refused(self):
+        # tests/unit/fixtures/deepinfra-sampling-bodies.json: `sent` holds bodies in the app's own key order and
+        # serializer, each with the reservation the app computes (its TS test sends each through the guarded fetch).
+        fixture = json.loads(SAMPLING_BODIES.read_text())
+        self.assertEqual(fixture['schema'], 'deepinfra-sampling-bodies-v1')
+        go = bridge.read_go(self.gate(enabled_models=ALL).go_path)
+        self.assertGreaterEqual(len(fixture['sent']), 5)
+        for case in fixture['sent']:
+            with self.subTest(sent=case['name']):
+                value, raw = json.loads(case['body']), case['body']
+                request = {'scope_id': SCOPE, 'operationId': 'op-1', 'requestBody': raw,
+                           'requestSha256': hashlib.sha256(raw.encode()).hexdigest(), 'reservedUsd': case['reservedUsd']}
+                outgoing, reserved, row, _ = bridge.validate_request(request, go)
+                self.assertEqual((json.loads(outgoing), row.model), (value, value['model']))
+                self.assertEqual(reserved, Decimal(case['reservedUsd']))
+                self.assertEqual(reserved, reservation_of(raw, value['model']))
+                self.assertLessEqual(len(outgoing), len(raw.encode()))
+                self.assertEqual(set(SAMPLING.get(value['model'], {})) <= set(value), True)
+        self.assertGreaterEqual(len(fixture['refused']), 15)
+        for case in fixture['refused']:
+            with self.subTest(refused=case['name']):
+                value = json.loads(case['body'])
+                self.assertFalse(DEEPINFRA.body_valid(value, DEEPINFRA.rows[value['model']]))
+                with self.refused('REQUEST_PARAMETERS_INVALID'):
+                    bridge.validate_request(envelope(value), go)
+
+    def test_a_qwen_call_with_its_sampling_goes_through_and_sends_it(self):
+        gate = self.gate(enabled_models=ALL).ready()
+        sent = []
+
+        def dispatch(request, _key):
+            sent.append(json.loads(request))
+            return 200, provider_response('0.0004', QWEN)
+        self.assertEqual(gate.call('ok', value=body(model=QWEN), dispatch=dispatch)['status'], 200)
+        self.assertEqual({k: sent[0][k] for k in SAMPLING[QWEN]}, SAMPLING[QWEN])
+        with self.refused('REQUEST_PARAMETERS_INVALID'):
+            gate.call('bare', value={k: v for k, v in body(model=QWEN).items() if k not in SAMPLING[QWEN]})
+
+    def test_the_probe_sends_the_rows_sampling_and_reports_it(self):
+        gate = self.gate().ready()  # GLM only: a probe reaches a reviewed model the GO does not enable yet.
+        sent = []
+
+        def dispatch(request, _key):
+            sent.append(json.loads(request))
+            return 200, {'model': QWEN, 'choices': [{'message': {'content': 'OK'}}],
+                         'usage': {'prompt_tokens': 12, 'completion_tokens': 30, 'total_tokens': 42}}
+        summary = bridge.probe(gate.private, gate.go_path, QWEN, dispatch=dispatch, key_loader=lambda _private: KEY, host=HOST,
+                               platform='linux', uid=0, now=gate.clock, fence=lambda _provider: None)
+        self.assertEqual(sent, [{'model': QWEN, 'max_tokens': 1024, 'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}],
+                                 **SAMPLING[QWEN]}])
+        self.assertEqual(summary['sent'], {'max_tokens': 1024, 'effort': 'none', 'sampling': SAMPLING[QWEN]})
+        self.assertEqual((summary['http_status'], summary['entry_state']), (200, 'settled'))
+        # Every other row's probe body and summary are as before: no sampling at all.
+        for model in (MODEL, DEEPSEEK, MIMO):
+            with self.subTest(model=model):
+                probe_body = DEEPINFRA.probe_body(DEEPINFRA.rows[model])
+                self.assertEqual(probe_body, {'model': model, 'max_tokens': 1024,
+                                              'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}],
+                                              **({'reasoning_effort': 'high'} if ROWS[model][4] == 'high' else {})})
+
+    def test_row_review_refuses_a_malformed_sampling(self):
+        qwen = DEEPINFRA.rows[QWEN]
+        self.assertTrue(bridge.row_reviewed(DEEPINFRA, QWEN, qwen))
+        broken = {'empty': (), 'dict_form': {'temperature': 0.6}, 'unknown_key': (('min_p', 0.1),),
+                  'duplicate_key': (('top_k', 20), ('top_k', 20)), 'bool_value': (('top_k', True),),
+                  'text_value': (('temperature', '0.6'),), 'nan': (('top_p', float('nan')),),
+                  'infinite': (('temperature', float('inf')),), 'decimal_value': (('temperature', Decimal('0.6')),),
+                  'not_pairs': ('temperature', 0.6), 'triple': (('temperature', 0.6, 1),)}
+        for name, sampling in broken.items():
+            with self.subTest(name):
+                self.assertFalse(bridge.row_reviewed(DEEPINFRA, QWEN, qwen._replace(sampling=sampling)))
+        # A profile with no sampling keys (Anthropic's) never reviews a row that carries any.
+        anthropic = bridge.helper.PROFILES['anthropic']
+        haiku = next(iter(anthropic.rows.values()))
+        self.assertTrue(bridge.row_reviewed(anthropic, haiku.model, haiku))
+        self.assertFalse(bridge.row_reviewed(anthropic, haiku.model, haiku._replace(sampling=(('temperature', 0.6),))))
+        # A malformed row fails its whole profile, as any other unreviewed row does.
+        with patch.dict(DEEPINFRA.rows, {QWEN: qwen._replace(sampling=(('top_k', True),))}):
+            self.assertIsNone(bridge.profile_of('deepinfra'))
 
 
 if __name__ == '__main__':

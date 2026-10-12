@@ -38,6 +38,14 @@ What is new in v3:
   off), so the gate counts more than the real bill. That is the careful side. Qwen3.8-Flash (not
   the larger, dearer "Qwen3.8") has one flat price over its whole 1,000,000-token window, with no
   promotion.
+- Qwen's answer settings (reviewed 2026-10-12): every Qwen request carries `temperature` 0.6,
+  `top_p` 0.95 and `top_k` 20, exactly, and the gate refuses a Qwen request without them or with
+  any other value. At DeepInfra's own defaults (temperature 1, top_p 1, top_k off) Qwen slid into
+  random words in several languages halfway through an answer, so its answer could not be read.
+  These are the settings Qwen's makers give for its thinking mode. No other model may carry any of
+  the three; its requests are exactly as before. A change is a reviewed code change (the gate, the
+  app and their shared test files), never an edit of the GO. The probe sends them too, and prints
+  them under `sent.sampling`.
 - "Thinking" tokens are charged as answer tokens. If the answer does not prove that they are
   already inside its answer count, the gate charges them on top. That is the careful side too.
 - "Most one call can set aside" is for the largest question the gate accepts (256 KiB). No

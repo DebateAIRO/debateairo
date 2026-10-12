@@ -4,7 +4,7 @@ per Bucharest day. No retries.
 
 The GO (schema v3, root-owned, bound by hash at activate) names one provider profile (`provider`)
 and the reviewed models of that profile it switches on (`enabled_models`). The profile and its
-model rows (prices, output bound, effort, JSON mode) live in the helper's code, so the GO's
+model rows (prices, output bound, effort, JSON mode, sampling) live in the helper's code, so the GO's
 helper_sha256 binds them: a price change is a reviewed code change, never a GO edit. A v2 GO (one
 fixed model) is refused. A model the GO does not enable is refused before any reservation or key
 read; each call reserves its own row's worst case ((request bytes + 2048) x input price + output
@@ -123,6 +123,7 @@ import argparse
 import fcntl
 import hashlib
 import json
+import math
 import os
 import re
 import signal
@@ -381,15 +382,28 @@ def prices_ok(prices):
     return isinstance(prices, tuple) and len(prices) == 2 and all(_price_ok(price) for price in prices)
 
 
+def sampling_reviewed(profile, sampling):
+    """None, or a non-empty tuple of (name, number) pairs: each name one of the profile's
+    sampling_keys, named once, each number a finite int or float (never a bool)."""
+    if sampling is None:
+        return True
+    keys = getattr(profile, 'sampling_keys', ())
+    return (type(sampling) is tuple and len(sampling) >= 1
+            and all(type(pair) is tuple and len(pair) == 2 and pair[0] in keys and type(pair[1]) in (int, float)
+                    and math.isfinite(pair[1]) for pair in sampling)
+            and len({pair[0] for pair in sampling}) == len(sampling))
+
+
 def row_reviewed(profile, model, row):
     """A row the gate will price with: positive ceiling prices under MAX_PRICE_USD_PER_M, a sane
-    bound, a known effort rule, a valid path, and a full-size request that reserves no more than
-    the profile's per-call cap."""
+    bound, a known effort rule, a well-formed sampling (if any), a valid path, and a full-size
+    request that reserves no more than the profile's per-call cap."""
     return bool(isinstance(model, str) and MODEL_ID_PATTERN.fullmatch(model) and '..' not in model
                 and getattr(row, 'model', None) == model and isinstance(row.maker, str) and 1 <= len(row.maker) <= 64
                 and prices_ok(profile.ceiling_prices(row)) and helper.path_valid(profile.path_for(row))
                 and _int_in(row.output_bound, 1, MAX_OUTPUT_BOUND) and row.effort in ('high', None)
-                and type(row.json_object) is bool and worst_case_reservation(profile, row) <= profile.per_call_cap_usd)
+                and type(row.json_object) is bool and sampling_reviewed(profile, getattr(row, 'sampling', None))
+                and worst_case_reservation(profile, row) <= profile.per_call_cap_usd)
 
 
 def profile_of(provider):
@@ -1376,7 +1390,8 @@ def probe_summary(observed, profile):
     billed = accounting.get('billed_output_tokens')
     completion = billed if billed is not None else accounting.get('completion_tokens')
     return {'status': 'probed', 'provider': profile.name, 'model': row.model, 'maker': row.maker,
-            'sent': {'max_tokens': max_tokens, 'effort': row.effort or 'none'},
+            'sent': {'max_tokens': max_tokens, 'effort': row.effort or 'none',
+                     **({'sampling': dict(row.sampling)} if getattr(row, 'sampling', None) else {})},
             # A model that bills past max_tokens would overrun its reservation in real use: do not enable it.
             'completion_within_max_tokens': completion <= max_tokens if type(completion) is int else None,
             'http_status': observed['changes'].get('http_status'),

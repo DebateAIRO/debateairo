@@ -1,6 +1,6 @@
 {
   "schema": "preview-model-rows-v1",
-  "about": "The reviewed DeepInfra model rows of the preview spending gate (contract A section 1). The gate (packages/providers/ops/preview_budget_helper.py) and the app (packages/providers/src) must both equal this file; a price change is a reviewed change to both sides and to this file. Prices are list prices in USD per million tokens. effort null means the request carries no reasoning_effort field. Per-call caps (owner ruling 2026-10-10), the same for every row: output_bound (the max_tokens ceiling and the reservation's output term) 32768 tokens, and a hard request body cap of 256 KiB (worst_case_request_bytes; story requests reach about 236 KiB at the high story size).",
+  "about": "The reviewed DeepInfra model rows of the preview spending gate (contract A section 1). The gate (packages/providers/ops/preview_budget_helper.py) and the app (packages/providers/src) must both equal this file; a price change is a reviewed change to both sides and to this file. Prices are list prices in USD per million tokens. effort null means the request carries no reasoning_effort field. sampling null means the request carries none of temperature, top_p and top_k; a sampling object means it carries exactly those keys with exactly those values (reviewed 2026-10-12: Qwen3.8-Flash degenerated into random multilingual tokens at DeepInfra's defaults, so it runs at its makers' thinking-mode settings). Per-call caps (owner ruling 2026-10-10), the same for every row: output_bound (the max_tokens ceiling and the reservation's output term) 32768 tokens, and a hard request body cap of 256 KiB (worst_case_request_bytes; story requests reach about 236 KiB at the high story size).",
   "provider": "deepinfra",
   "reservation": {
     "formula": "((request utf-8 bytes + overhead_bytes) * input price + output_bound * output price) / 1000000",
@@ -19,6 +19,7 @@
       "output_bound": 32768,
       "effort": "high",
       "json_object": true,
+      "sampling": null,
       "worst_case_reservation_usd": "0.056012800"
     },
     {
@@ -31,6 +32,7 @@
       "output_bound": 32768,
       "effort": "high",
       "json_object": false,
+      "sampling": null,
       "worst_case_reservation_usd": "0.072499200"
     },
     {
@@ -43,6 +45,7 @@
       "output_bound": 32768,
       "effort": null,
       "json_object": false,
+      "sampling": null,
       "worst_case_reservation_usd": "0.142110720"
     },
     {
@@ -55,6 +58,11 @@
       "output_bound": 32768,
       "effort": null,
       "json_object": false,
+      "sampling": {
+        "temperature": 0.6,
+        "top_p": 0.95,
+        "top_k": 20
+      },
       "worst_case_reservation_usd": "0.042371072"
     }
   ]

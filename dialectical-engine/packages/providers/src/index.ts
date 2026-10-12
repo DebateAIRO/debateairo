@@ -17,7 +17,7 @@ import {
   isAnthropicThinkingControl,
   readAnthropicMessagesReply
 } from "./anthropic-messages.js";
-import { previewModelRowForEndpoint } from "./preview-models.js";
+import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
@@ -1725,6 +1725,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // per-attempt bound a length retry raised (W10/2).
       // Model scorecard §2.2: with no level asked this is today's three-member
       // body byte for byte; with one, the target's own member carries it.
+      // Reviewed sampling (2026-10-12): a reviewed row with its own sampling (Qwen on
+      // DeepInfra) carries exactly those members after the level; every other target's
+      // body is unchanged (previewSamplingMembers is empty for it).
       // PR B: the Anthropic wire builds its own contract body; a packet it
       // cannot say is refused here, before anything is sent or recorded.
       let anthropicBody: string | undefined;
@@ -1748,6 +1751,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         model: this.#options.model,
         max_tokens: attemptTokenCeiling,
         ...thinking.wire,
+        ...previewSamplingMembers(this.#options.endpoint, this.#options.model),
         messages: attemptPacket.messages,
         ...(responseFormat===undefined?{}:{response_format:responseFormat})
       });

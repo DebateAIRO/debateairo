@@ -1,0 +1,101 @@
+{
+  "schema": "deepinfra-sampling-bodies-v1",
+  "about": "DeepInfra request bodies for the reviewed sampling rule (2026-10-12). A row with a reviewed `sampling` (today Qwen/Qwen3.8-Flash: temperature 0.6, top_p 0.95, top_k 20) must carry exactly those keys with exactly those values; a row without one must carry none of them. `sent` bodies are in the app's own key order and serializer (JSON.stringify), each with the reservation the app computes for its exact bytes; `refused` bodies break the rule. The app's guarded fetch (tests/unit/preview-multi-model.test.ts) and the gate's DeepInfraProfile.body_valid and validate_request (tests/unit/preview_budget_authority_v3_test.py) must accept every `sent` body at exactly its reservedUsd and refuse every `refused` one.",
+  "sent": [
+    {
+      "name": "Qwen: its reviewed sampling after max_tokens",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"temperature\":0.6,\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}",
+      "reservedUsd": "0.012766202"
+    },
+    {
+      "name": "Qwen: a system turn and non-ASCII text, the full answer cap",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":32768,\"temperature\":0.6,\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"system\",\"content\":\"Răspunde doar cu JSON.\"},{\"role\":\"user\",\"content\":\"Întrebare sintetică: „da” sau „nu”?\"}]}",
+      "reservedUsd": "0.012775016"
+    },
+    {
+      "name": "MiMo: no sampling, the body as before",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}",
+      "reservedUsd": "0.029439540"
+    },
+    {
+      "name": "GLM: effort and JSON mode, no sampling, the body as before",
+      "body": "{\"model\":\"zai-org/GLM-5.3-Flash\",\"max_tokens\":8192,\"reasoning_effort\":\"high\",\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}],\"response_format\":{\"type\":\"json_object\"}}",
+      "reservedUsd": "0.016718500"
+    },
+    {
+      "name": "DeepSeek: effort, no sampling, the body as before",
+      "body": "{\"model\":\"deepseek-ai/DeepSeek-V4.1-Flash\",\"max_tokens\":8192,\"reasoning_effort\":\"high\",\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}",
+      "reservedUsd": "0.020100600"
+    }
+  ],
+  "refused": [
+    {
+      "name": "Qwen without sampling",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "Qwen without top_k",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"temperature\":0.6,\"top_p\":0.95,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "Qwen without temperature",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "Qwen with another temperature",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"temperature\":0.7,\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "Qwen with DeepInfra's default temperature",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"temperature\":1,\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "Qwen with top_p a hair off",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"temperature\":0.6,\"top_p\":0.950001,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "Qwen with another top_k",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"temperature\":0.6,\"top_p\":0.95,\"top_k\":21,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "Qwen with top_k off (0)",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"temperature\":0.6,\"top_p\":0.95,\"top_k\":0,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "Qwen with temperature as text",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"temperature\":\"0.6\",\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "Qwen with top_k as true",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"temperature\":0.6,\"top_p\":0.95,\"top_k\":true,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "Qwen with temperature null",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"temperature\":null,\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "Qwen with an extra sampling key",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"temperature\":0.6,\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}],\"min_p\":0}"
+    },
+    {
+      "name": "Qwen with the sampling nested",
+      "body": "{\"model\":\"Qwen/Qwen3.8-Flash\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}],\"sampling\":{\"temperature\":0.6,\"top_p\":0.95,\"top_k\":20}}"
+    },
+    {
+      "name": "MiMo with a temperature",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":0.6,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "MiMo with Qwen's sampling",
+      "body": "{\"model\":\"XiaomiMiMo/MiMo-V2.6-Pro\",\"max_tokens\":8192,\"temperature\":0.6,\"top_p\":0.95,\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "GLM with a top_k",
+      "body": "{\"model\":\"zai-org/GLM-5.3-Flash\",\"max_tokens\":8192,\"reasoning_effort\":\"high\",\"top_k\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    },
+    {
+      "name": "DeepSeek with a top_p",
+      "body": "{\"model\":\"deepseek-ai/DeepSeek-V4.1-Flash\",\"max_tokens\":8192,\"reasoning_effort\":\"high\",\"top_p\":0.95,\"messages\":[{\"role\":\"user\",\"content\":\"Offline synthetic test\"}]}"
+    }
+  ]
+}

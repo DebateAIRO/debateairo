@@ -383,17 +383,24 @@ export type PreviewBudgetPorts = Readonly<Partial<Record<PreviewProviderName, Pr
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-/** Contract A §2: the DeepInfra (OpenAI) body the DeepInfra gate accepts for a row of its own. */
+/**
+ * Contract A §2: the DeepInfra (OpenAI) body the DeepInfra gate accepts for a row of its own. Reviewed sampling
+ * (2026-10-12): a row with `sampling` requires exactly those members with exactly those numbers (a row without one
+ * accepts none of them, as it accepts no other member), as the gate's DeepInfraProfile.body_valid does.
+ */
 function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
   if (reviewed.provider !== "deepinfra") return false;
   const hasResponseFormat = Object.hasOwn(body, "response_format");
   const responseFormat = body.response_format;
   if (hasResponseFormat && (!reviewed.jsonObject || !isPlainObject(responseFormat)
     || Object.keys(responseFormat).length !== 1 || !Object.hasOwn(responseFormat, "type") || responseFormat.type !== "json_object")) return false;
-  const required = ["model", "max_tokens", "messages", ...(reviewed.effort === null ? [] : ["reasoning_effort"])];
+  const sampling = Object.entries(reviewed.sampling ?? {});
+  const required = ["model", "max_tokens", "messages", ...(reviewed.effort === null ? [] : ["reasoning_effort"]),
+    ...sampling.map(([key]) => key)];
   return Object.keys(body).length === required.length + (hasResponseFormat ? 1 : 0)
     && required.every(key => Object.hasOwn(body, key))
     && (reviewed.effort === null || body.reasoning_effort === reviewed.effort)
+    && sampling.every(([key, value]) => typeof body[key] === "number" && body[key] === value)
     && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
     && Array.isArray(body.messages);
 }
@@ -431,7 +438,7 @@ function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
  * routes by the EXACT call URL to that provider's gate (DeepInfra chat completions to the DeepInfra
  * gate, Anthropic Messages to the Anthropic gate), so a call can only ever reach its own provider's
  * socket. It sends only a body that gate accepts for that body's reviewed row of THAT provider
- * (exact keys, the row's effort and JSON switches, 1 <= max_tokens <= the row's bound, at most
+ * (exact keys, the row's effort and JSON switches and its reviewed sampling, 1 <= max_tokens <= the row's bound, at most
  * 256 KiB), never a key header, and reserves at that row's price.
  */
 export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudgetPorts): typeof fetch {

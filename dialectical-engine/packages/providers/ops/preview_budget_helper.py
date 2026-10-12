@@ -9,7 +9,7 @@ No retries, external packages, environment proxies, redirects, or credential art
 A provider profile is everything the gate knows about one vendor: its host and path, its auth
 header, the exact request shape it forwards (and the bytes it sends), how a reply's usage is
 priced, where a reply names its model, extra key shapes to blank, and its reviewed model rows
-(prices, output bound, effort, JSON mode). The GO names one profile (`provider`) and the rows it
+(prices, output bound, effort, JSON mode, sampling). The GO names one profile (`provider`) and the rows it
 enables; the GO binds this file's hash, so it binds every profile and every row too. A price
 change is a reviewed code change here (plus the app's parity fixture), never a GO edit. Adding a
 vendor means adding one profile class to PROFILES; the gate's core does not change.
@@ -277,8 +277,11 @@ def names_any_key(value, names):
 # (the careful side while a vendor runs a promotion); the gate reserves and settles with them.
 # output_bound is both the max_tokens ceiling and what a call reserves for output. effort is
 # 'high' (the request must carry the profile's effort field with exactly that value) or None (the
-# request must not carry it at all). json_object says whether JSON mode may be asked for.
-ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound effort json_object')
+# request must not carry it at all). json_object says whether JSON mode may be asked for. sampling
+# (reviewed 2026-10-12) is None (the request must carry none of the profile's sampling_keys) or a tuple
+# of (name, number) pairs: the request must carry exactly those members with exactly those values.
+ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound effort json_object sampling',
+                      defaults=(None,))
 
 
 PATH_PATTERN = re.compile(r'/[A-Za-z0-9._~:/-]{0,511}')
@@ -303,6 +306,8 @@ class DeepInfraProfile:
                                          gate refuses any other key before a reservation, so a
                                          key of another provider in this gate's folder is never sent
       rows {model: ModelRow}             the reviewed models
+      sampling_keys (tuple of str)       the sampling members a row of this profile may set (row.sampling);
+                                         empty or absent: no row of the profile may set any
       path_for(row) -> str               the POST path (checked: no '?', starts with '/')
       auth_headers(key) -> dict          the header(s) carrying the key
       requested_model(body) -> str|None  where the request names its model
@@ -320,7 +325,7 @@ class DeepInfraProfile:
                                          the vendor is busy (the gate cools that model off and
                                          never halts for it); False for any other unbilled error
                                          (counted toward the unsent streak, never cools the model)
-      probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024)
+      probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024), with the row's sampling
       reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
     """
     name = 'deepinfra'
@@ -339,13 +344,19 @@ class DeepInfraProfile:
     redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
     # No fixed shape either, but never another provider's key (Anthropic sk-ant-, Google AIza).
     key_pattern = r'(?!sk-ant-|AIza)[!-~]{16,512}'
+    # Reviewed sampling (2026-10-12): the members a row may set, in the order the app's body carries them.
+    sampling_keys = ('temperature', 'top_p', 'top_k')
     rows = {row.model: row for row in (
         ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 32768, 'high', True),
         ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 32768, 'high', False),
         ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 32768, None, False),
         # Owner swap 2026-10-10 (Qwen in place of Gemini): flat list price over the whole 1M window,
         # no promotion, no tiers; reasoning_effort is not listed, so none is sent.
-        ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 32768, None, False))}
+        # Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid
+        # mid-answer into random multilingual tokens (a live practice run, 2 of its first 4 calls). It thinks by
+        # default, so it runs at its makers' thinking-mode settings.
+        ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 32768, None, False,
+                 (('temperature', 0.6), ('top_p', 0.95), ('top_k', 20))))}
 
     def path_for(self, row):
         return self.path
@@ -365,11 +376,13 @@ class DeepInfraProfile:
         return body.get('model') if isinstance(body, dict) else None
 
     def body_valid(self, body, row):
-        """Exactly model, max_tokens and messages; reasoning_effort "high" iff the row says so; an
-        optional response_format {"type": "json_object"} only for a row that allows it."""
+        """Exactly model, max_tokens and messages; reasoning_effort "high" iff the row says so; the
+        row's reviewed sampling members with exactly its numbers iff it has one (none of them
+        otherwise); an optional response_format {"type": "json_object"} only for a row that allows it."""
         if not isinstance(body, dict) or body.get('model') != row.model:
             return False
-        fields = {'model', 'max_tokens', 'messages'} | ({'reasoning_effort'} if row.effort else set())
+        sampling = dict(row.sampling or ())
+        fields = {'model', 'max_tokens', 'messages'} | ({'reasoning_effort'} if row.effort else set()) | set(sampling)
         extra = set(body) - fields
         if not fields <= set(body) or extra - {'response_format'}:
             return False
@@ -378,6 +391,9 @@ class DeepInfraProfile:
             if not row.json_object or not (isinstance(mode, dict) and set(mode) == {'type'} and mode['type'] == 'json_object'):
                 return False
         if row.effort and body['reasoning_effort'] != row.effort:
+            return False
+        # The same number exactly (20 and 20.0 are one JSON number to the app too); never a bool, text or null.
+        if any(type(body[name]) not in (int, float) or body[name] != value for name, value in sampling.items()):
             return False
         return (type(body['max_tokens']) is int and 1 <= body['max_tokens'] <= row.output_bound
                 and isinstance(body['messages'], list) and bool(body['messages'])
@@ -415,6 +431,7 @@ class DeepInfraProfile:
                 'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}]}
         if row.effort:
             body['reasoning_effort'] = row.effort
+        body.update(row.sampling or ())  # The probe asks as the app's calls do: the row's own sampling, if any.
         return body
 
     def reply_text(self, response):
