@@ -65,13 +65,17 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
   const marks: MapMarkRecord[] = [];
   const ranked = mapRankKeyPoints(input.keyPoints);
   const byId = new Map(input.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
-  // The texts of the answers that came from the opposite case (a merged answer with fromOppositeCase, or an OPPOSITE_CASE candidate).
+  // The texts of the answers that came from the opposite case (a merged answer with fromOppositeCase, or an OPPOSITE_CASE
+  // candidate). A chosen answer is opposite when its text matches one of them, or (F-I3) when it reuses the answer_id of a
+  // merged answer from the opposite case.
   const oppositeTexts = new Set([
     ...input.mergedAnswers.filter((answer) => answer.fromOppositeCase).map((answer) => mapNormaliseText(answer.answer)),
     ...input.items.filter((item): item is MapAnswerItem => item.kind === "ANSWER" && item.angleKind === "OPPOSITE_CASE")
       .map((item) => mapNormaliseText(item.answer))
   ]);
   const isOpposite = (statement: string) => oppositeTexts.has(mapNormaliseText(statement));
+  // F-I3: a chooser that reworded an opposite-case merged answer but reused its answer_id still names that answer.
+  const oppositeAnswerIds = new Set(input.mergedAnswers.filter((answer) => answer.fromOppositeCase).map((answer) => answer.answerId));
   const place = (draft: MapAnswerDraft, keyPoint: MapKeyPoint) =>
     (mapSideOf(keyPoint) === "against" ? draft.againstIds : draft.forIds).push(keyPoint.keyPointId);
   const countOf = (draft: MapAnswerDraft) => draft.forIds.length + draft.againstIds.length;
@@ -88,7 +92,7 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
   } else {
     for (const answer of mapFirstOfEachStatement(input.reply.answers, (entry) => entry.statement).slice(0, input.maxAnswers)) {
       drafts.push({ answerId: answer.answer_id, statement: answer.statement, forIds: [...answer.for], againstIds: [...answer.against],
-        rival: answer.strongest_rival, filled: false, opposite: isOpposite(answer.statement) });
+        rival: answer.strongest_rival, filled: false, opposite: oppositeAnswerIds.has(answer.answer_id) || isOpposite(answer.statement) });
     }
   }
 

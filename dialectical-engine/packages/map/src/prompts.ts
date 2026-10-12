@@ -89,7 +89,8 @@ export const MAP_DEFAULT_INSTRUCTIONS: MapInstructionTexts = Object.freeze({
     "Each key point shows raised_by, how many different AI makers raised it independently, and angle_kind when it came from a fixed",
     "angle; a point raised by only one participant can still be the most important.",
     "For each answer, name in strongest_rival the answer_id of the other answer that competes with it most.",
-    "Do not argue the answers here."
+    "Do not argue the answers here.",
+    "When an answer comes from answers, reuse its answer_id."
   ].join(" ")
 });
 

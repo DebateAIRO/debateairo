@@ -311,6 +311,22 @@ describe("map arm A: snowball from the first AI", () => {
     expect(result.keyPoints).toHaveLength(7);
   });
 
+  it("tags the choose material with every maker (F-I2): a later AI's shown point is raised_by 1, not 0", async () => {
+    const { caller, requests } = scripted(normal);
+    await mapRunSnowball(input(caller, { seed: "q1|A" }));
+    const rows = JSON.parse(field(requests.find((request) => request.step === "CHOOSE")!, "key_points")) as { claim: string; raised_by: number }[];
+    expect(rows.find((row) => row.claim.startsWith("A new point after seeing the others"))?.raised_by).toBe(1);
+    expect(rows.every((row) => row.raised_by === 1)).toBe(true);
+  });
+
+  it("arm B keeps the blind-only count (F-I2): a gap round's point is raised_by 0, a shared blind point by every maker", async () => {
+    const { caller, requests } = scripted(normal);
+    await mapRunBlindLists(input(caller, { gapRoundsMax: 1, seed: "q1|B" }));
+    const rows = JSON.parse(field(requests.find((request) => request.step === "CHOOSE")!, "key_points")) as { claim: string; raised_by: number }[];
+    expect(rows.find((row) => row.claim.startsWith("A missing point about night buses"))?.raised_by).toBe(0);
+    expect(rows.find((row) => row.claim.startsWith("The shared point"))?.raised_by).toBe(5);
+  });
+
   it("a busy AI in the snowball sits out the choose too", async () => {
     const result = await mapRunSnowball(input(scripted((request) =>
       request.seat.aiRef === "ai-2" && request.step === "SNOWBALL" ? "BUSY" : normal(request)).caller, { seed: "q1|A" }));

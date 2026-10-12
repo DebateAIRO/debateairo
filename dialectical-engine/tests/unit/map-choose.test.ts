@@ -200,6 +200,27 @@ describe("map choose (fix round 1): an OPPOSITE_CASE point goes to the opposite-
   });
 });
 
+describe("map choose (F-I3): an opposite-case answer is known by its answer_id as well as its text", () => {
+  it("gives the OPPOSITE_CASE point to the for of a reworded answer that reuses the opposite merged answer's answer_id", () => {
+    expect(mergedAnswers[1]!.fromOppositeCase).toBe(true);
+    const out = mapFinishChoice({ ...BASE, reply: { answers: [
+      chosen("a1", "Yes, with conditions.", ["kp03", "kp02"], [], "an02"),
+      chosen("an02", "Leave the system unchanged.", [], [], "a1")] } });
+    expect(marksOf(out.marks)).toEqual(["CHOOSE_QUOTA_FILLED:OPPOSITE_CASE:kp01"]);
+    expect(out.choice.answers[1]!.forKeyPointIds).toEqual(["kp01"]);
+    expect(out.choice.answers[1]!.againstKeyPointIds).toEqual([]);
+  });
+
+  it("does not treat a reused id of a merged answer that is not from the opposite case as opposite", () => {
+    const out = mapFinishChoice({ ...BASE, reply: { answers: [
+      chosen("an01", "Yes, but only with conditions.", ["kp03", "kp02"], [], "a2"),
+      chosen("a2", "Something else entirely.", [], [], "an01")] } });
+    expect(marksOf(out.marks)).toEqual(["CHOOSE_QUOTA_FILLED:OPPOSITE_CASE:kp01"]);
+    // No answer is from the opposite case: the brief's rule, against the answer with the fewest points.
+    expect(out.choice.answers[1]!.againstKeyPointIds).toEqual(["kp01"]);
+  });
+});
+
 describe("map choose (fix round 1): filled answer ids are unique", () => {
   it("never reuses an id a reply answer already has, and no answer is its own strongest rival", () => {
     const out = mapFinishChoice({ ...BASE, reply: { answers: [chosen("filled-2", "Yes, with conditions.", [], [], null)] } });

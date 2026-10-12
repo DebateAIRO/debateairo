@@ -136,6 +136,16 @@ describe("map specs: what each step sends", () => {
     ]);
   });
 
+  it("choose can count every maker instead (raisedByCounts ALL, arm A): kp02's gap maker then counts", () => {
+    expect(JSON.parse(field(mapChooseSpec(CTX, keyPoints, answers, { raisedByCounts: "ALL" }), "key_points"))).toEqual([
+      { key_point_id: "kp01", claim: "Fares pay for repairs.", raised_by: 2, angle_kind: "OPPOSITE_CASE" },
+      { key_point_id: "kp02", claim: "Free rides cut car traffic.", raised_by: 2, angle_kind: null }
+    ]);
+    // The default stays the blind count.
+    expect(field(mapChooseSpec(CTX, keyPoints, answers, { raisedByCounts: "BLIND" }), "key_points"))
+      .toBe(field(mapChooseSpec(CTX, keyPoints, answers), "key_points"));
+  });
+
   it("gives the gateway its classifier, its repair packet and the accepted value", () => {
     const pieces = mapProviderPieces(mapChooseSpec(CTX, keyPoints, answers));
     const reply = JSON.stringify({ answers: [{ answer_id: "a1", statement: "No, keep the fares.", for: ["kp01"], against: ["kp02"], strongest_rival: null }] });

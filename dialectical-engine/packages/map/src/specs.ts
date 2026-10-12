@@ -111,11 +111,22 @@ export function mapGapSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoint[
   mapGapReplySchema, mapGapCheck(ctx.languageTag));
 }
 
-/** Choose: each key point tagged by code with its distinct blind makers and its first fixed angle kind. */
-export function mapChooseSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoint[], mergedAnswers: readonly MapMergedAnswer[]): MapStepSpec<MapChooseReply> {
+/**
+ * What `raised_by` counts in the choose material. BLIND (arms B and C): the distinct makers that raised the point blind.
+ * ALL (arm A, the snowball): every distinct maker, since a later AI's points are shown-origin by design and a blind count
+ * would tag them 0; each arm-A key point is one item, so it reads 1 there. Arm A's counts thus mean "raised by" rather
+ * than "raised independently by".
+ */
+export type MapRaisedByCounts = "BLIND" | "ALL";
+
+/** Choose: each key point tagged by code with its distinct makers (blind by default) and its first fixed angle kind. */
+export function mapChooseSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoint[], mergedAnswers: readonly MapMergedAnswer[],
+  options: Readonly<{ raisedByCounts?: MapRaisedByCounts }> = {}): MapStepSpec<MapChooseReply> {
+  const raisedBy = (keyPoint: MapKeyPoint): number =>
+    (options.raisedByCounts === "ALL" ? keyPoint.makers : keyPoint.blindMakers).length;
   return mapSpecOf("CHOOSE", ctx, "choose", [mapQuestionField(ctx),
     { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => ({ key_point_id: keyPoint.keyPointId, claim: keyPoint.claim,
-      raised_by: keyPoint.blindMakers.length, angle_kind: keyPoint.fixedAngleKinds[0] ?? null }))) },
+      raised_by: raisedBy(keyPoint), angle_kind: keyPoint.fixedAngleKinds[0] ?? null }))) },
     { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => ({ answer_id: answer.answerId, answer: answer.answer }))) }],
   mapChooseReplySchema, mapChooseCheck(new Set(keyPoints.map((keyPoint) => keyPoint.keyPointId)), ctx.languageTag));
 }

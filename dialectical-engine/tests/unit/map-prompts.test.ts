@@ -53,6 +53,10 @@ describe("map prompts: seven contracts, owner text and code forms", () => {
     expect(mapPromptContractHash(edited)).not.toBe(mapPromptContractHash());
   });
 
+  it("asks the choose AI to reuse a merged answer's answer_id (F-I3), as the last sentence of its text", () => {
+    expect(MAP_DEFAULT_INSTRUCTIONS.choose.endsWith(" When an answer comes from answers, reuse its answer_id.")).toBe(true);
+  });
+
   it("never asks a merging or gap AI about authors or counts", () => {
     // choose may name raised_by and makers by design; every other step must not.
     for (const name of MAP_CONTRACT_NAMES.filter((step) => step !== "choose")) {

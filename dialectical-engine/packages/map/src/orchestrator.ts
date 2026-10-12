@@ -23,6 +23,7 @@ import {
   mapListSpec,
   mapMergeSpec,
   mapSnowballSpec,
+  type MapRaisedByCounts,
   type MapSpecContext,
   type MapStepSpec
 } from "./specs.js";
@@ -190,7 +191,7 @@ const mapShownIds = (merged: MapMergedMap): readonly string[] =>
   [...merged.keyPoints.map((keyPoint) => keyPoint.keyPointId), ...merged.mergedAnswers.map((answer) => answer.answerId)];
 
 async function mapMergeGapChoose(run: MapRun, angles: readonly MapAngle[], items: readonly MapItem[],
-  listWriters: ReadonlySet<string>, premerged: MapMergedMap | null): Promise<MapResult> {
+  listWriters: ReadonlySet<string>, premerged: MapMergedMap | null, raisedByCounts: MapRaisedByCounts): Promise<MapResult> {
   const order = run.input.seats;
   let mergedBy: MapSeat | null = null;
   let merged: MapMergedMap;
@@ -242,10 +243,10 @@ async function mapMergeGapChoose(run: MapRun, angles: readonly MapAngle[], items
     }
   }
 
-  // With no merger (arm A, or a failed merge) roles.ts anchors on the would-be merger, which is then tried last.
+  // With no merger (arm A, or a failed merge) roles.ts anchors on the would-be merger, which then comes last among equal ranks.
   const chooser = mapPickChooser(order, run.out, mergedBy);
   const reply = chooser === null ? null
-    : await run.mapAsk("CHOOSE", "MAP:choose", chooser, mapShownIds(merged), mapChooseSpec(run.ctx, merged.keyPoints, merged.mergedAnswers));
+    : await run.mapAsk("CHOOSE", "MAP:choose", chooser, mapShownIds(merged), mapChooseSpec(run.ctx, merged.keyPoints, merged.mergedAnswers, { raisedByCounts }));
   // Plan sizes are capped by the makers present (spec §5, ruling P7): no more answers than distinct makers still
   // available, never capped below the two distinct answers the map always gives.
   const makersPresent = Math.max(MAP_LIMITS.chooseDistinctAnswersMin, mapDistinctMakers(run.available));
@@ -259,7 +260,7 @@ async function mapMergeGapChoose(run: MapRun, angles: readonly MapAngle[], items
 async function mapAfterLists(run: MapRun, angles: readonly MapAngle[], lists: readonly MapArrivedList[]): Promise<MapResult> {
   const items = mapAssignItemIds(lists.flatMap((entry) => mapDraftsOfList(entry.assignment, entry.reply, "BLIND")), run.input.seed);
   if (lists.length < 2) return run.mapUnavailable(angles, items, `${String(lists.length)} list(s) arrived`);
-  return mapMergeGapChoose(run, angles, items, new Set(lists.map((entry) => entry.assignment.seat.aiRef)), null);
+  return mapMergeGapChoose(run, angles, items, new Set(lists.map((entry) => entry.assignment.seat.aiRef)), null, "BLIND");
 }
 
 /** The map needs two makers (spec §3.3); with fewer, today's opening, and no call is made. */
@@ -332,5 +333,6 @@ export async function mapRunSnowball(input: MapRunInput): Promise<MapResult> {
       `${input.seed}|snowball|${String(index)}`, mapNextItemNumbers(items))]);
   }
   if (writers.size < 2) return run.mapUnavailable([], items, `${String(writers.size)} list(s) arrived`);
-  return mapMergeGapChoose(run, [], items, writers, mapSingletonMap(items));
+  // Arm A's later points are shown-origin by design: the choose counts every maker (F-I2), so each reads 1, not 0.
+  return mapMergeGapChoose(run, [], items, writers, mapSingletonMap(items), "ALL");
 }
