@@ -102,7 +102,9 @@ Root 0 goes first (O9). Everything else in the body runs as soon as its inputs e
 ### 2.3 Stops and failures (O6)
 
 - A stop observed by any chain (a spend stop → `runBodyBudgetStop`; too few members left → `membersSatOutStop`):
-  no new call starts anywhere in the debate; calls already sent finish; their results are saved through the recorders
+  no new AUTHOR or REVIEW call starts anywhere in the debate (the panel of a node whose author call was already sent
+  still runs: it finishes a paid step, as the serial leg that was underway did, and a money refusal inside it keeps
+  today's panel rules); calls already sent finish; their results are saved through the recorders
   and kept (their nodes are minted, their reviews recorded) — EXCEPT a node whose panel's stop is "TRAVEL"
   (today: the node is not minted) and children of a node that was never minted (no parent to attach to): those are
   paid and dropped, as today's rule already drops a stopped leg. The debate then goes on to its answer as today.
