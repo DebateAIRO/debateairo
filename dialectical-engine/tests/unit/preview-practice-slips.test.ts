@@ -164,6 +164,7 @@ describe("practice formats: the second try is the app's own (same preview call p
     const { value_laden: _left, ...rest } = JSON.parse(good) as Record<string, unknown>;
     return JSON.stringify(rest);
   };
+  const MISSING_FIELD = withoutValueLaden(GOOD);
 
   /** The patch follow-up's answer when it does its job: only the member it was asked for. */
   const PATCH = JSON.stringify({ value_laden: true });
@@ -273,7 +274,7 @@ describe("practice formats: the second try is the app's own (same preview call p
     const observer = new PracticeGateObserver({ now: () => 0 });
     const always: PreviewBudgetPort = { async execute(input) {
       const model = String((JSON.parse(input.requestBody) as { model: unknown }).model);
-      return { status: 200, body: stubVendorReply("deepinfra", model, model === MIMO ? withoutValueLaden(GOOD) : GOOD, "x") };
+      return { status: 200, body: stubVendorReply("deepinfra", model, model === MIMO ? MISSING_FIELD : GOOD, "x") };
     } };
     const ports = { deepinfra: observer.wrap("deepinfra", always), anthropic: observer.wrap("anthropic", port("anthropic", { remaining: 0 }, [])) };
     const result = await runPracticeFormats({ config, targets, ports, observer, lanes: ["JUDGE_POSITION"], samples: 1, gapMs: 0, pack, bounds,
