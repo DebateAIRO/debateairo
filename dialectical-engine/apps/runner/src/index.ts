@@ -795,6 +795,8 @@ export function buildSynthesisRolePrompt(
   // Debate shape (spec §3.3 step 8): only a writer call with an answer length takes the length variant; without one
   // (every run without a shape, and every checker call) the packet is today's, byte for byte.
   const lengthed = request.role === "SYNTHESIZER" && answerWords !== null;
+  // V-MINIMUM-PAYLOAD: the one projection, applied once; the length variant only appends its own field after it.
+  const material = toSynthesisPromptMaterial(request);
   return buildFramedPrompt({
     contract: promptContractInArgumentLanguage(
       request.role === "SYNTHESIZER"
@@ -802,9 +804,7 @@ export function buildSynthesisRolePrompt(
         : EVALUATOR_PROMPT_CONTRACT,
       argumentLanguageName
     ),
-    material: lengthed
-      ? [...toSynthesisPromptMaterial(request), synthesizerAnswerLengthField(answerWords)]
-      : toSynthesisPromptMaterial(request),
+    material: lengthed ? [...material, synthesizerAnswerLengthField(answerWords)] : material,
     ...(randomBytes === undefined ? {} : { randomBytes })
   });
 }

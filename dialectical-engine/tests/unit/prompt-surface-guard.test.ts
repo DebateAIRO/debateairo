@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildFramedPrompt, readPromptFrame } from "@debateai/providers";
 import { Judge } from "@debateai/judgement";
+import { buildSynthesisRolePrompt } from "@debateai/runner";
 import { argumentLanguageDirective } from "@debateai/kernel";
 import {
   ProviderContentUnacceptedError,
@@ -304,9 +305,11 @@ const RUNNER_SRC = fileURLToPath(new URL("../../apps/runner/src/index.ts", impor
 const SYNTHESIS_SRC = fileURLToPath(new URL("../../packages/serve/src/synthesis.ts", import.meta.url));
 
 /**
- * Two CALL SITES in the runner (`synthesize`, `evaluate`) render three PAYLOAD
- * SHAPES, because the synthesizer site serves both of its stages. The coverage
- * row counts the sites in the source; the table below enumerates the shapes.
+ * Two CALL SITES in the runner (`synthesize`, `evaluate`) render four PAYLOAD
+ * SHAPES, because the synthesizer site serves both of its stages and, on a run
+ * with a debate shape, the answer-length variant (spec 2026-10-12 §3.3 step 8).
+ * The coverage row counts the sites in the source; the table below enumerates
+ * the shapes.
  */
 const SYNTHESIS_CALL_SITES = 2;
 
@@ -335,6 +338,8 @@ const VERDICT_LABEL = "CONTESTED";
 const SERVED_NODE_ID = "position:a";
 const SERVED_STRENGTH = 0.7321;
 const MARGIN = 0.1234;
+/** The debate shape's answer length (spec §3.3 step 8): the one field the length variant appends. */
+const ANSWER_WORDS = 777;
 
 /**
  * Tokens four provider doubles classify requests by
@@ -420,6 +425,21 @@ const SYNTHESIS_PAYLOADS = [
     })))
   },
   {
+    // Debate shape (spec §3.3 step 8, commit 040ddb9fd): the writer's answer-length variant. Rendered through the
+    // runner's ONE builder (not the projection alone), so the field it appends is held to the same withholding.
+    name: "SYNTHESIZER:LENGTH",
+    projectedKeys: ["answer_length", "code_label", "digest"],
+    material: [DIGEST_NODE_TEXT, VERDICT_LABEL, `about ${String(ANSWER_WORDS)} words`],
+    foreignOrganTokens: FOREIGN_ORGAN_TOKENS,
+    render: (): string => buildSynthesisRolePrompt(buildSynthesizerRequest({
+      controls: SYNTHESIS_CONTROLS,
+      round: MACHINERY.round,
+      digest: guardDigest(),
+      codeLabel: SYNTHESIS_CODE_LABEL,
+      prior: null
+    }), ARGUMENT_LANGUAGE_NAME, undefined, ANSWER_WORDS).packet.messages[1]!.content
+  },
+  {
     name: "EVALUATOR",
     projectedKeys: ["candidate_statement", "code_label", "digest"],
     material: [DIGEST_NODE_TEXT, VERDICT_LABEL, CANDIDATE_STATEMENT],
@@ -490,6 +510,8 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     // projection is applied.
     expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName)")).toBe(SYNTHESIS_CALL_SITES);
     expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(1);
+    // Debate shape (040ddb9fd): the answer-length variant adds ONE field after that one projection, nothing else.
+    expect(runner).toContain("material: lengthed ? [...material, synthesizerAnswerLengthField(answerWords)] : material,");
     // ...and there is exactly ONE projection, so the allow-list cannot be forked
     // into a second copy that quietly readmits a field.
     expect(occurrences(readFileSync(SYNTHESIS_SRC, "utf8"), "export function toSynthesisPromptMaterial")).toBe(1);
