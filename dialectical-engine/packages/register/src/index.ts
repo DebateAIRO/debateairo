@@ -1183,6 +1183,26 @@ export {
   type CallConcurrencyPolicyState
 } from "./call-concurrency-policy.js";
 export {
+  DEBATE_SHAPE_OPENINGS,
+  DEBATE_SHAPE_PLAN_KEYS,
+  DEBATE_SHAPE_POLICY_ROW_KEY,
+  assertDebateShapeRunnerReady,
+  debateShapePlanKeyOf,
+  debateShapePolicyRow,
+  debateShapePolicyStartValues,
+  normaliseDepthParamsForShape,
+  parseDebateShapePolicy,
+  readDebateShapePolicy,
+  resolveDebateShape,
+  type DebateShapeCeilingInput,
+  type DebateShapeLength,
+  type DebateShapeOpening,
+  type DebateShapePlan,
+  type DebateShapePlanKey,
+  type DebateShapePolicy,
+  type DebateShapeScrutinyBudget
+} from "./debate-shape-policy.js";
+export {
   MFA_POLICY_REGISTER_ROW,
   MFA_POLICY_DEPLOYMENT_REGISTER_ROW,
   MFA_POLICY_ROW_KEY,
