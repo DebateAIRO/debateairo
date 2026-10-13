@@ -1,5 +1,5 @@
 import { mapRankKeyPoints, mapRankMergedAnswers } from "./items.js";
-import { MAP_OPPOSITE_TEMPLATES } from "./opposite-templates.js";
+import { MAP_OPPOSITE_SEPARATORS, MAP_OPPOSITE_TEMPLATES } from "./opposite-templates.js";
 import type { MapChooseReply } from "./replies.js";
 import { mapNormaliseText, mapPrimarySubtag } from "./text.js";
 import {
@@ -18,8 +18,11 @@ import {
  * a language the site does not serve gets English.
  */
 export function mapOppositeTemplate(statement: string, languageTag: string): string {
-  const template = MAP_OPPOSITE_TEMPLATES[mapPrimarySubtag(languageTag)] ?? MAP_OPPOSITE_TEMPLATES.en!;
-  return (statement.trim() === "" ? template.empty : `${template.lead}: ${statement.trim()}`).slice(0, MAP_LIMITS.claimMaxChars);
+  // Own keys only: a tag such as "constructor" must not read the object's prototype.
+  const subtag = mapPrimarySubtag(languageTag);
+  const template = Object.hasOwn(MAP_OPPOSITE_TEMPLATES, subtag) ? MAP_OPPOSITE_TEMPLATES[subtag]! : MAP_OPPOSITE_TEMPLATES.en!;
+  const separator = Object.hasOwn(MAP_OPPOSITE_SEPARATORS, subtag) ? MAP_OPPOSITE_SEPARATORS[subtag]! : ": ";
+  return (statement.trim() === "" ? template.empty : `${template.lead}${separator}${statement.trim()}`).slice(0, MAP_LIMITS.claimMaxChars);
 }
 
 export type MapFinishChoiceInput = Readonly<{
@@ -108,6 +111,8 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
     return `filled-${String(n)}`;
   };
   while (drafts.length < MAP_LIMITS.chooseDistinctAnswersMin) {
+    // `taken` keeps the old rule on purpose (an empty normalised key IS taken): if an answer that normalises to nothing
+    // matched nothing here, the same merged answer could be filled in twice while drafts start empty.
     const taken = new Set(drafts.map((draft) => mapNormaliseText(draft.statement)));
     const fromMap = mapRankMergedAnswers(input.mergedAnswers).find((answer) => !taken.has(mapNormaliseText(answer.answer)));
     const fromOpposite = input.items.find((item): item is MapAnswerItem => item.kind === "ANSWER"

@@ -10,7 +10,7 @@ export const MAP_OPPOSITE_TEMPLATES: Readonly<Record<string, Readonly<{ lead: st
   bg: Object.freeze({ lead: "Противоположното на този отговор", empty: "Отговор, различен от горния" }),
   cs: Object.freeze({ lead: "Opak této odpovědi", empty: "Odpověď odlišná od té výše" }),
   da: Object.freeze({ lead: "Det modsatte af dette svar", empty: "Et andet svar end det ovenfor" }),
-  de: Object.freeze({ lead: "Das Gegenteil dieser Antwort", empty: "Eine andere Antwort als die oben" }),
+  de: Object.freeze({ lead: "Das Gegenteil dieser Antwort", empty: "Eine andere Antwort als die obige" }),
   el: Object.freeze({ lead: "Το αντίθετο αυτής της απάντησης", empty: "Διαφορετική απάντηση από την παραπάνω" }),
   en: Object.freeze({ lead: "The opposite of this answer", empty: "An answer different from the one above" }),
   es: Object.freeze({ lead: "Lo contrario de esta respuesta", empty: "Una respuesta distinta a la de arriba" }),
@@ -41,4 +41,15 @@ export const MAP_OPPOSITE_TEMPLATES: Readonly<Record<string, Readonly<{ lead: st
   uk: Object.freeze({ lead: "Протилежність цієї відповіді", empty: "Інша відповідь, ніж наведена вище" }),
   vi: Object.freeze({ lead: "Điều ngược lại với câu trả lời này", empty: "Câu trả lời khác với câu ở trên" }),
   zh: Object.freeze({ lead: "这个答案的反面", empty: "与上面不同的答案" })
+});
+
+/**
+ * What joins `lead` to the first answer's statement, where it is not ": ". French puts a (no-break) space before the
+ * colon; Chinese and Japanese use the full-width colon with no space after it. Read by the same primary subtag as the
+ * template, so a language the site does not serve gets English's ": ".
+ */
+export const MAP_OPPOSITE_SEPARATORS: Readonly<Record<string, string>> = Object.freeze({
+  fr: "\u00A0: ",
+  ja: "\uFF1A",
+  zh: "\uFF1A"
 });
