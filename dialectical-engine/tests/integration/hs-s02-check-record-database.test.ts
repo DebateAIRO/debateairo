@@ -203,7 +203,7 @@ describe("publication check record repository", () => {
   ] satisfies Omit<PublicationCheckRecordRow, "run_id" | "attempted_at" | "policy_version">[];
 
   // FIX-HS2-p1 sd-N1: the identifiers the product composes today are accepted by the 0082 grammar.
-  it.each([["development:hermes-glm-5.3-flash", "z-ai/glm-5.3-flash"], ["vendor:acme", "Acme-Large_2.1+beta"]])(
+  it.each([["development:claude-haiku-5.5", "claude-haiku-5-5"], ["vendor:acme", "Acme-Large_2.1+beta"]])(
     "accepts the configured identifier pair %s / %s as debateai_runtime", async (provider, model) => {
       await asRuntime(async (client) => {
         await insertRow({ ...allowRow(), judge_provider_ref: provider, judge_model_id: model }, client);

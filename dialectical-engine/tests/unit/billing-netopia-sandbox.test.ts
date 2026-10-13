@@ -11,7 +11,7 @@ import type { PaymentEnvironment, PaymentReport } from "@debateai/billing-core";
 import { createSecretToken } from "@debateai/payments-netopia";
 import { createNetopiaPaymentsForRecording } from "../../packages/payments-netopia/src/client.js";
 import {
-  NETOPIA_CAPTURE_FORMAT, captureFetch, newToolOrderId, parseSandboxArguments, redactTokens, runNetopiaSandbox,
+  NETOPIA_CAPTURE_FORMAT, captureFetch, newToolOrderId, parseSandboxArguments, probeApiKey, redactTokens, runNetopiaSandbox,
   sandboxStatusLine, type CapturedExchange, type SandboxSession
 } from "../../tools/billing/netopia-sandbox.js";
 import { startFakeNetopia, type FakeNetopia } from "../support/fake-netopia.js";
@@ -60,6 +60,7 @@ async function harness(o: Readonly<{ environment?: PaymentEnvironment; apiKey?: 
     payments: (facts) => createNetopiaPaymentsForRecording(
       { baseUrl: fake.baseUrl, apiKey: o.apiKey ?? fake.apiKey, posSignature: fake.posSignature },
       { fetch: captureFetch(fetch, (exchange) => exchanges.push(exchange)) }, facts),
+    probeKey: () => probeApiKey(fake.baseUrl, o.apiKey ?? fake.apiKey, fake.posSignature, fetch),
     insertToolOrder: async (row) => { toolOrders.push(row); },
     toolOrder: async (orderId) => toolOrders.find((row) => row.orderId === orderId) ?? null,
     latestCard: async (orderId) => (cards.has(orderId) ? createSecretToken(cards.get(orderId)!) : null),
@@ -210,11 +211,26 @@ describe("N22 — start, status and zero on the sandbox", () => {
     expect(await h.run("status", "--capture-dir", h.dir, "--order", orderId, "--no-ntp-id")).toBe(0);
     expect(printed(h.out, "NETOPIA_SANDBOX_STATUS")).toBe("PAID:3:1.00 USD");
     h.out.length = 0;
-    expect(await h.run("status", "--capture-dir", h.dir, "--unknown-order")).toBe(0);
-    expect(printed(h.out, "NETOPIA_SANDBOX_STATUS")).toBe("NO_SUCH_ORDER");
-    expect(kinds(h.dir)).toEqual(["start-answer", "start-request", "status-answer", "status-answer-without-ntp-id", "status-no-such-order"]);
+    expect(kinds(h.dir)).toEqual(["start-answer", "start-request", "status-answer", "status-answer-without-ntp-id"]);
     expect(await h.run("status", "--capture-dir", h.dir, "--order", newToolOrderId())).toBe(1);
     expect(h.err.join("")).toContain("NETOPIA_SANDBOX_TOOL_ORDER_UNKNOWN");
+  });
+
+  // Known gap (owner decision): the sandbox answers an unknown id with error 99 "Invalid ntpID" and an all-zero payment,
+  // which the status read refuses as PAYMENT_RESPONSE_INVALID. This states the wanted result; it starts failing, and must
+  // be made a plain test, once that changes.
+  it.fails("files an unknown order as NO_SUCH_ORDER (known gap: NETOPIA's invalid-id answer is refused)", async () => {
+    const h = await harness();
+    expect(await h.run("status", "--capture-dir", h.dir, "--unknown-order")).toBe(0);
+    expect(printed(h.out, "NETOPIA_SANDBOX_STATUS")).toBe("NO_SUCH_ORDER");
+    expect(kinds(h.dir)).toEqual(["status-no-such-order"]);
+  });
+
+  it("prints NETOPIA's invalid-id answer for an unknown order as the error it is, and files it as status-no-such-order", async () => {
+    const h = await harness();
+    expect(await h.run("status", "--capture-dir", h.dir, "--unknown-order")).toBe(1);
+    expect(printed(h.out, "NETOPIA_SANDBOX_STATUS")).toBe("PAYMENT_RESPONSE_INVALID:99");
+    expect(kinds(h.dir)).toEqual(["status-no-such-order"]);
   });
 
   it("files an unknown-order read as status-no-such-order even when the package refuses NETOPIA's answer", async () => {
@@ -339,6 +355,28 @@ describe("N22 — the live guards and the check", () => {
     const refused = await harness({ apiKey: ["wrong", "key", "0001"].join("-") });
     expect(await refused.run("check")).toBe(1);
     expect(refused.out.join("")).toContain("✗ NETOPIA refused the API key");
+  });
+});
+
+describe("N22 — the key probe", () => {
+  const url = "https://secure-sandbox.netopia-payments.com";
+  const key = ["key", "0001"].join("-");
+  const answering = (reply: () => Response) => probeApiKey(url, key, "POS", (async () => reply()) as typeof fetch);
+
+  it("accepts a key NETOPIA answers, even with error 99 (NETOPIA reads the payment id only after the key)", async () => {
+    expect(await answering(() => new Response('{"error":{"code":"99","message":"Invalid ntpID"}}', { status: 200 }))).toBe("ACCEPTED");
+  });
+
+  it("refuses a key NETOPIA answers with 401 or 403", async () => {
+    expect(await answering(() => new Response('{"code":"401","message":"Unauthorized"}', { status: 401 }))).toBe("REFUSED");
+    expect(await answering(() => new Response("", { status: 403 }))).toBe("REFUSED");
+  });
+
+  it("says NETOPIA could not be asked for overload, server errors and network failures", async () => {
+    expect(await answering(() => new Response("", { status: 429 }))).toBe("UNREACHABLE");
+    expect(await answering(() => new Response("", { status: 503 }))).toBe("UNREACHABLE");
+    const down = (async () => { throw new TypeError("fetch failed"); }) as typeof fetch;
+    expect(await probeApiKey(url, key, "POS", down)).toBe("UNREACHABLE");
   });
 });
 

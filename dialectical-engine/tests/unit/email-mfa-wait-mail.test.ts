@@ -15,7 +15,7 @@ const body = (mail: Record<string, unknown>) => renderEmailRecoveryMail(mail as 
 describe("the 24-hour wait notice", () => {
   it("states when it finishes, that everything keeps working until then, and how to cancel", () => {
     const text = body({ ...base, event: "WAITING", notBefore: NOT_BEFORE, cancelToken: CANCEL });
-    expect(text).toContain("Subject: DebateAI authenticator recovery finishes in 24 hours\r\n");
+    expect(text).toContain("Subject: Dialectical Engine authenticator recovery finishes in 24 hours\r\n");
     expect(text).toContain(NOT_BEFORE.toISOString());
     expect(text).toContain("your current authenticator, your recovery codes and your signed-in sessions keep working");
     expect(text).toContain(`https://app.example.test/recover-authenticator#cancel=${CANCEL}\r\n`);

@@ -5,7 +5,7 @@
   "legal.notice.title": "Informace o provozovateli",
   "legal.notice.meta": "Kdo provozuje službu {product} a jak nás kontaktovat",
   "legal.notice.s01.title": "Kdo jsme",
-  "legal.notice.s01.body": "Službu {product} (známou také jako {alsoCalled}) provozuje {company}, společnost zapsaná v Rumunsku.",
+  "legal.notice.s01.body": "Službu {product} provozuje {company}, společnost zapsaná v Rumunsku.",
   "legal.notice.s01.seller": "{company} je také prodejcem placených plánů: vaše smlouva, vaše platby i vaše faktury jsou se společností {company}.",
   "legal.notice.company.name": "Název společnosti",
   "legal.notice.company.tradingNames": "Obchodní názvy",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Pamatuje si, jaký jazyk rozhraní jste zvolili.",
   "legal.cookies.locale.life": "1 rok",
   "legal.cookies.storageTitle": "Uloženo ve vašem prohlížeči, nikoli v souboru cookie",
-  "legal.cookies.storageIntro": "Ve vašem prohlížeči jsou uloženy čtyři položky: dvě v místním úložišti, dokud je nevymažete, a dvě v úložišti relace, dokud nezavřete kartu. Na rozdíl od souborů cookie se nepřikládají k vašim požadavkům; položka chatu nápovědy uchovává kopii konverzace, kterou jste vedli s nápovědou DebateAI, a její zprávy se k DebateAI dostaly ve chvíli, kdy jste je odeslali.",
+  "legal.cookies.storageIntro": "Ve vašem prohlížeči jsou uloženy čtyři položky: dvě v místním úložišti, dokud je nevymažete, a dvě v úložišti relace, dokud nezavřete kartu. Na rozdíl od souborů cookie se nepřikládají k vašim požadavkům; položka chatu nápovědy uchovává kopii konverzace, kterou jste vedli s nápovědou Dialectical Engine, a její zprávy se k Dialectical Engine dostaly ve chvíli, kdy jste je odeslali.",
   "legal.cookies.consent.kind": "Místní úložiště",
   "legal.cookies.consent.purpose": "Pamatuje si, že jste oznámení o souborech cookie už viděli, takže se zobrazí jen jednou.",
   "legal.cookies.consent.life": "Do vymazání",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Úložiště relace",
   "legal.cookies.supportConversation.purpose": "Drží vaši konverzaci s nápovědou na obrazovce, dokud je karta otevřená. Smaže se, když se na této kartě kdokoli přihlásí nebo odhlásí.",
   "legal.cookies.supportConversation.life": "Do zavření karty",
-  "legal.cookies.recipient.server": "Pouze serveru DebateAI",
+  "legal.cookies.recipient.server": "Pouze serveru Dialectical Engine",
   "legal.cookies.recipient.browser": "zůstává ve vašem prohlížeči",
   "legal.cookies.refuse": "Chcete-li je odmítnout, zablokujte nebo smažte soubory cookie a data tohoto webu v nastavení prohlížeče.",
   "legal.cookies.refuseEffect": "Co pak přestane fungovat: přihlášení a pamatování vašeho jazyka a nastavení zobrazení.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Až 30 minut",
   "legal.cookies.mfaRecovery.life": "Až 299 sekund",
   "legal.cookies.social.life": "Až 5 minut",
-  "legal.cookies.phoneDraft.life": "15 minut nebo do dřívějšího vymazání"
+  "legal.cookies.phoneDraft.life": "15 minut nebo do dřívějšího vymazání",
+  "legal.cookies.exportPending.purpose": "Uchovává odkaz pro export zaslaný e-mailem na této kartě pro přihlášení a opakovaný pokus.",
+  "legal.cookies.exportLinkOutcome.purpose": "Pamatuje si, která zpráva o odkazu ke stažení se má na této kartě zobrazit.",
+  "legal.cookies.exportPending.life": "Do zavření karty, odhlášení, otevření nového odkazu, prvního úspěšného stažení nebo výsledku neplatného odkazu či jiného účtu",
+  "legal.cookies.exportLinkOutcome.life": "Do zavření karty, odhlášení nebo otevření nového odkazu"
 }

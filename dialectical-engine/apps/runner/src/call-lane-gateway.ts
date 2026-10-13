@@ -1,0 +1,177 @@
+import { AsyncResource } from "node:async_hooks";
+import {
+  PREVIEW_PROVIDER_SOCKET_KEYS,
+  createPreviewRemainingRpcPort,
+  previewModelRowForRef,
+  previewProviderSocket,
+  providerCallGateUnsent,
+  type PreviewGateRemaining,
+  type PreviewProviderName,
+  type PreviewProviderTestConfig,
+  type ProviderGateway
+} from "@debateai/providers";
+import { callPriorityOf, type CallScheduler, type CallSubject, type DebateCallLane } from "./call-scheduler.js";
+
+/**
+ * Parallel AI calls (docs/superpowers/specs/2026-10-12-parallel-calls-design.md §3.2, §3.4) — a debate's calls go
+ * through its lane of the runner's call scheduler.
+ *
+ * `execute` opens one lane per claimed debate and wraps every claim-eligible maker's gateway in `laneGateway`, OUTSIDE
+ * the run's sit-out book, so a call that waited for a slot is checked against the sit-out book only when it may start.
+ * The lane asks for a slot under every limit (the debate's, the model's in the debate and across the runner, the
+ * preview gate's), then runs the call and frees the slot when it settles. With the register row absent every debate's
+ * lane is one call at a time: today's order.
+ */
+
+/** Which model, vendor and preview gate a maker's calls use. */
+export interface CallSubjectResolver {
+  subjectOf(providerRef: string): CallSubject;
+}
+
+/** A ref with no known row: its own model, behind no gate, under the default runner-wide limit. */
+function unknownSubject(providerRef: string): CallSubject {
+  return Object.freeze({ model: providerRef, vendor: "default", gate: null });
+}
+
+/**
+ * On the preview: each ref's reviewed row. The model is the row's model (two refs of one model share its slots), and
+ * the row's provider is both the vendor (its runner-wide limit) and the gate its calls go through.
+ */
+export function previewCallSubjects(config: PreviewProviderTestConfig): CallSubjectResolver {
+  return Object.freeze({
+    subjectOf(providerRef: string): CallSubject {
+      const row = previewModelRowForRef(providerRef);
+      if (row === undefined) return unknownSubject(providerRef);
+      // A provider whose gate this configuration has no socket for could never be called; it is then behind no gate.
+      const gate = previewProviderSocket(config, row.provider) === undefined ? null : row.provider;
+      return Object.freeze({ model: row.model, vendor: row.provider, gate });
+    }
+  });
+}
+
+function hostIs(hostname: string, domain: string): boolean {
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+}
+
+/** The vendor a target's host names; "default" for any other host (relays, local model servers). */
+function vendorOfBaseUrl(baseUrl: string): string {
+  let hostname: string;
+  try {
+    hostname = new URL(baseUrl).hostname.toLowerCase();
+  } catch {
+    return "default";
+  }
+  if (hostIs(hostname, "deepinfra.com")) return "deepinfra";
+  if (hostIs(hostname, "anthropic.com")) return "anthropic";
+  return "default";
+}
+
+/** Off the preview (hosted and local): each target's model, its vendor read from its host, and no gate. */
+export function targetCallSubjects(
+  targets: readonly Readonly<{ providerRef: string; model: string; baseUrl: string }>[]
+): CallSubjectResolver {
+  const subjects = new Map(targets.map((target) => [target.providerRef, Object.freeze({
+    model: target.model,
+    vendor: vendorOfBaseUrl(target.baseUrl),
+    gate: null
+  }) as CallSubject] as const));
+  return Object.freeze({
+    subjectOf: (providerRef: string): CallSubject => subjects.get(providerRef) ?? unknownSubject(providerRef)
+  });
+}
+
+/**
+ * One maker's gateway, through the debate's lane. The call's kind (author, panel, review, other) comes from its
+ * call-site key. The call runs in the async context it was made in, however late its slot frees: the slot may be freed
+ * by another debate's call settling, and the keep-alive, the content lease and the evaluator scope the call's gateways
+ * read belong to the debate that made it (AsyncLocalStorage, run-keep-alive.ts and packages/db).
+ *
+ * On the preview the gate's health is kept here, BEFORE the slot is freed, so a call waiting for that gate never slips
+ * through on the old health: an answer marks the gate healthy (all its slots), a failure the gate proved unsent
+ * (PROVIDER_NOT_REACHED, PROVIDER_ERROR_UNBILLED; `providerCallGateUnsent`) marks it unhealthy (one call in flight,
+ * spec §3.4). Results and errors pass through unchanged.
+ *
+ * `onFailed` (spec §2.3, Task 12) is told of every failed call, also BEFORE its slot is freed: a stop that failure
+ * raises is then known to the lane's start guard when the freed slot would start the next waiting call. It never
+ * changes the error.
+ *
+ * `beforeSlot` (ruling R31; preview only, main.ts wires it to the runner-wide busy coordinator's `admit`) is awaited
+ * BEFORE the call asks for any slot: a call to a model that is busy (one probe in flight, the rest waiting through the
+ * gate's 60-600 s cool-off) then waits holding no debate, model or gate slot, so another model's calls through the same
+ * gate are never stalled behind it. A rejection ends the call with that error, nothing sent and no slot taken. The wait
+ * and the slot request both run in the caller's async context, whoever releases the wait.
+ */
+export function laneGateway(input: Readonly<{
+  lane: DebateCallLane;
+  scheduler: CallScheduler;
+  subject: CallSubject;
+  provider: ProviderGateway;
+  onFailed?: (error: unknown) => void;
+  beforeSlot?: (subject: CallSubject) => Promise<void>;
+}>): ProviderGateway {
+  const { lane, scheduler, subject, provider, onFailed, beforeSlot } = input;
+  const gate = subject.gate;
+  return Object.freeze({
+    call(request) {
+      const send = AsyncResource.bind(async () => {
+        try {
+          const result = await provider.call(request);
+          if (gate !== null) scheduler.markGateHealthy(gate);
+          return result;
+        } catch (error) {
+          if (gate !== null && providerCallGateUnsent(error)) scheduler.markGateUnhealthy(gate);
+          try { onFailed?.(error); } catch { /* the hook never changes the call's error */ }
+          throw error;
+        }
+      });
+      const ticket = { ...subject, priority: callPriorityOf(request.callSiteKey) };
+      if (beforeSlot === undefined) return lane.run(ticket, send);
+      // Bound, so the slot request (and the lane's start guard) runs in this caller's context however the wait ends.
+      const askForSlot = AsyncResource.bind(() => lane.run(ticket, send));
+      let waited: Promise<void>;
+      try { waited = beforeSlot(subject); } catch (error) { return Promise.reject(error); }
+      return waited.then(askForSlot);
+    }
+  } satisfies ProviderGateway);
+}
+
+/** The preview gates this configuration names, each with a socket: the gate names `previewCallSubjects` reports. */
+export function previewGateNames(config: PreviewProviderTestConfig): readonly PreviewProviderName[] {
+  return Object.freeze((["deepinfra", ...Object.keys(PREVIEW_PROVIDER_SOCKET_KEYS)] as PreviewProviderName[])
+    .filter((gate) => previewProviderSocket(config, gate) !== undefined));
+}
+
+/** Each preview gate's read-only `/remaining`, over the configuration's own sockets (main.ts). */
+export function previewGateRemainingReaders(config: PreviewProviderTestConfig): readonly Readonly<{
+  gate: PreviewProviderName;
+  remaining: () => Promise<PreviewGateRemaining>;
+}>[] {
+  return Object.freeze(previewGateNames(config).map((gate) => {
+    const port = createPreviewRemainingRpcPort({ budget_socket: previewProviderSocket(config, gate)!, scope_id: config.scope_id });
+    return Object.freeze({ gate, remaining: () => port.remaining() });
+  }));
+}
+
+/**
+ * Spec §3.2: each preview gate's own slots (`max_concurrent_calls`), read once at boot, so the runner never sends a gate
+ * more calls than it holds at once (CONCURRENCY_LIMIT_REACHED): the rest wait in the scheduler. A gate that cannot be
+ * read gets ONE slot, and one content-free line names it (never the error's text, which can carry a socket path).
+ */
+export async function applyPreviewGateCapacities(input: Readonly<{
+  scheduler: Pick<CallScheduler, "setGateCapacity">;
+  gates: readonly Readonly<{ gate: string; remaining: () => Promise<PreviewGateRemaining> }>[];
+  log?: (line: string) => void;
+}>): Promise<void> {
+  const log = input.log ?? ((line: string) => { console.warn(line); });
+  await Promise.all(input.gates.map(async ({ gate, remaining }) => {
+    let slots = 1;
+    try {
+      const read = (await remaining()).maxConcurrentCalls;
+      if (Number.isSafeInteger(read) && read >= 1) slots = read;
+      else throw new TypeError("GATE_CAPACITY_INVALID");
+    } catch {
+      log(JSON.stringify({ kind: "DEBATEAI_CALL_SCHEDULER", event: "GATE_CAPACITY_UNREAD", gate }));
+    }
+    input.scheduler.setGateCapacity(gate, slots);
+  }));
+}

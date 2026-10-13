@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Do chuid sonraí in Dialectical Engine",
+  "archive.generated": "Ullmhaíodh ar {time} do {pseudonym}.",
+  "archive.accountHeading": "Cuntas",
+  "archive.email": "Ríomhphost",
+  "archive.memberSince": "Ball ó",
+  "archive.debatesHeading": "Do chuid díospóireachtaí ({count})",
+  "archive.question": "Ceist",
+  "archive.verdict": "Breithiúnas",
+  "archive.verdictSupported": "Tacaíocht leis",
+  "archive.verdictContested": "Faoi chonspóid",
+  "archive.verdictUnsupported": "Gan tacaíocht",
+  "archive.story": "An díospóireacht go hachomair",
+  "archive.arguments": "Argóintí",
+  "archive.visibilityPublic": "Foilsithe",
+  "archive.visibilityPrivate": "Príobháideach",
+  "archive.unreadable": "Ní féidir ábhar na díospóireachta seo a léamh a thuilleadh mar scriosadh a heochair.",
+  "archive.noDebates": "Níl aon díospóireachtaí agat.",
+  "archive.filesNote": "Tá na sonraí céanna sna comhaid JSON sa chomhad ZIP seo i bhfoirm atá inléite ag meaisín; tá liosta díobh in README.txt."
+}

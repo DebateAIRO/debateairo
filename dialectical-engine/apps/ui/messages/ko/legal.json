@@ -5,7 +5,7 @@
   "legal.notice.title": "사업자 정보",
   "legal.notice.meta": "{product}의 운영 주체와 연락 방법",
   "legal.notice.s01.title": "당사 소개",
-  "legal.notice.s01.body": "{product}(다른 이름: {alsoCalled})는 루마니아에 등록된 회사 {company}에서 운영합니다.",
+  "legal.notice.s01.body": "{product}는 루마니아에 등록된 회사 {company}에서 운영합니다.",
   "legal.notice.s01.seller": "{company}는 유료 요금제의 판매자이기도 합니다. 계약, 결제, 청구서는 모두 {company}와 이루어집니다.",
   "legal.notice.company.name": "상호",
   "legal.notice.company.tradingNames": "영업 명칭",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "귀하가 선택한 인터페이스 언어를 기억합니다.",
   "legal.cookies.locale.life": "1년",
   "legal.cookies.storageTitle": "쿠키가 아닌 브라우저에 저장되는 정보",
-  "legal.cookies.storageIntro": "브라우저 저장소에는 네 가지 항목이 보관됩니다. 두 가지는 로컬 스토리지에 직접 삭제할 때까지, 두 가지는 세션 스토리지에 탭을 닫을 때까지 보관됩니다. 쿠키와 달리 이 항목들은 요청에 첨부되지 않습니다. 도움말 채팅 항목은 DebateAI 도움말과 나눈 대화의 사본을 보관하며, 그 메시지는 보낼 때 이미 DebateAI에 전달되었습니다.",
+  "legal.cookies.storageIntro": "브라우저 저장소에는 네 가지 항목이 보관됩니다. 두 가지는 로컬 스토리지에 직접 삭제할 때까지, 두 가지는 세션 스토리지에 탭을 닫을 때까지 보관됩니다. 쿠키와 달리 이 항목들은 요청에 첨부되지 않습니다. 도움말 채팅 항목은 Dialectical Engine 도움말과 나눈 대화의 사본을 보관하며, 그 메시지는 보낼 때 이미 Dialectical Engine에 전달되었습니다.",
   "legal.cookies.consent.kind": "로컬 스토리지",
   "legal.cookies.consent.purpose": "쿠키 안내를 이미 보셨다는 사실을 기억하여 안내가 한 번만 표시되도록 합니다.",
   "legal.cookies.consent.life": "직접 삭제할 때까지",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "세션 스토리지",
   "legal.cookies.supportConversation.purpose": "탭이 열려 있는 동안 도움말 채팅 대화를 화면에 유지합니다. 이 탭에서 누군가 로그인하거나 로그아웃하면 삭제됩니다.",
   "legal.cookies.supportConversation.life": "탭을 닫을 때까지",
-  "legal.cookies.recipient.server": "DebateAI 서버만",
+  "legal.cookies.recipient.server": "Dialectical Engine 서버만",
   "legal.cookies.recipient.browser": "브라우저에만 남음",
   "legal.cookies.refuse": "이를 거부하려면 브라우저 설정에서 이 사이트의 쿠키와 사이트 데이터를 차단하거나 삭제하세요.",
   "legal.cookies.refuseEffect": "그러면 작동하지 않게 되는 기능: 로그인, 그리고 언어와 화면 표시 선택을 기억하는 기능입니다.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "최대 30분",
   "legal.cookies.mfaRecovery.life": "최대 299초",
   "legal.cookies.social.life": "최대 5분",
-  "legal.cookies.phoneDraft.life": "15분 또는 그전에 삭제할 때까지"
+  "legal.cookies.phoneDraft.life": "15분 또는 그전에 삭제할 때까지",
+  "legal.cookies.exportPending.purpose": "로그인하거나 다시 시도할 수 있도록 이메일로 받은 내보내기 링크를 이 탭에 보관합니다.",
+  "legal.cookies.exportLinkOutcome.purpose": "이 탭에 표시할 다운로드 링크 메시지를 기억합니다.",
+  "legal.cookies.exportPending.life": "탭을 닫거나 로그아웃하거나 새 링크를 열거나 첫 다운로드가 성공하거나 링크가 유효하지 않거나 계정이 다르다는 결과가 나올 때까지",
+  "legal.cookies.exportLinkOutcome.life": "탭을 닫거나 로그아웃하거나 새 링크를 열 때까지"
 }

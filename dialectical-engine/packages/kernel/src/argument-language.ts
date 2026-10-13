@@ -57,8 +57,8 @@ const LATIN_FUNCTION_WORDS: Readonly<Record<KnownArgumentLanguageTag, readonly s
   cs: ["a", "ale", "by", "byl", "byla", "je", "jsou", "když", "má", "měl", "měla", "měli", "mělo", "mohou", "nebo", "pro", "protože", "se", "své", "že"],
   da: ["af", "at", "bør", "de", "den", "det", "en", "er", "for", "fordi", "ikke", "kan", "med", "når", "og", "på", "som", "til"],
   de: ["aber", "als", "das", "den", "der", "die", "ein", "eine", "für", "ist", "kann", "können", "mit", "nicht", "sollte", "sollten", "und", "weil", "wenn", "zu"],
-  en: ["and", "are", "because", "can", "for", "from", "government", "it", "of", "should", "that", "the", "their", "they", "to", "when", "with"],
-  es: ["cuando", "de", "debería", "deberían", "el", "en", "es", "la", "las", "los", "para", "porque", "pueden", "que", "sus", "una", "y"],
+  en: ["and", "are", "be", "because", "been", "can", "could", "does", "for", "from", "government", "has", "have", "if", "it", "its", "more", "not", "of", "or", "should", "than", "that", "the", "their", "these", "they", "this", "to", "when", "which", "will", "with", "would"],
+  es: ["al", "como", "con", "cuando", "de", "debería", "deberían", "el", "en", "es", "la", "las", "los", "más", "para", "por", "porque", "pueden", "que", "si", "sus", "una", "y"],
   et: ["aga", "et", "ja", "kas", "kui", "ning", "oma", "on", "peaks", "peaksid", "saavad", "see", "sest", "seal", "või"],
   fi: ["että", "ja", "jos", "koska", "kun", "mutta", "ne", "on", "pitäisi", "se", "tai", "voi", "voivat"],
   fr: ["au", "aux", "bien", "car", "ce", "de", "des", "devrait", "devraient", "elle", "elles", "est", "et", "ils", "la", "le", "les", "leurs", "lorsque", "peu", "peuvent", "pour", "que", "sont", "une"],
@@ -73,7 +73,7 @@ const LATIN_FUNCTION_WORDS: Readonly<Record<KnownArgumentLanguageTag, readonly s
   nl: ["als", "daar", "dat", "de", "die", "een", "en", "goed", "het", "hun", "is", "kan", "kunnen", "maar", "met", "moet", "moeten", "niet", "om", "omdat", "voor", "wanneer", "zou"],
   pl: ["aby", "czy", "dla", "dobrze", "gdy", "i", "jest", "ma", "mogą", "na", "on", "ona", "państwo", "ponieważ", "powinien", "powinna", "powinni", "powinno", "przy", "swoje", "w", "więcej", "z", "że"],
   pt: ["a", "cidade", "com", "conseguem", "de", "deveria", "deveriam", "e", "é", "ela", "eles", "em", "o", "os", "para", "porque", "quando", "uma"],
-  ro: ["ar", "atunci", "ca", "că", "care", "când", "deoarece", "este", "mai", "mult", "nu", "pentru", "pot", "să", "și", "trebui", "un", "o"],
+  ro: ["acest", "această", "ar", "atunci", "ca", "că", "care", "când", "cu", "dar", "deoarece", "este", "fi", "în", "lor", "mai", "mult", "nu", "pe", "pentru", "pot", "prin", "sau", "să", "și", "sunt", "trebui", "un", "o", "vă"],
   sk: ["a", "aby", "ale", "by", "dobre", "dokážu", "je", "keď", "mal", "mala", "mali", "malo", "má", "môžu", "na", "pre", "pretože", "sa", "svoje", "že"],
   sl: ["ali", "bi", "da", "doma", "dobro", "in", "je", "kadar", "ker", "lahko", "malo", "morala", "morali", "na", "naj", "ona", "se", "svoje", "v", "z", "za"],
   sv: ["att", "av", "bör", "de", "den", "det", "där", "eftersom", "en", "för", "inte", "kan", "med", "när", "och", "på", "sina", "ska", "som", "väl", "är"],
@@ -121,6 +121,30 @@ const LATIN_ENDINGS: Readonly<Partial<Record<KnownArgumentLanguageTag, readonly 
   sv: [/(?:ande|arna|erna|heten)$/u, /(?:ligt|ning|ningar)$/u],
   tr: [/(?:malı|meli|dır|dir|yor)$/u, /(?:ları|leri|ken)$/u]
 });
+
+/**
+ * The letters beyond a-z each Latin-script language writes in its own lowercase words (a capitalised word is a name,
+ * and names keep their own spelling: "Łódź" in an English reply is fine). English and Indonesian write none.
+ */
+const LATIN_ALPHABET_EXTRAS: Readonly<Record<string, string>> = Object.freeze({
+  ca: "àçéèíïòóúü", cs: "áčďéěíňóřšťúůýž", da: "åæéø", de: "äéöüß", en: "", es: "áéíñóúü", et: "äõöüšž", fi: "äåöšž",
+  fr: "àâæçéèêëîïôœùûüÿ", ga: "áéíóú", hr: "čćđšž", hu: "áéíóöőúüű", id: "", it: "àèéìíîòóù",
+  lt: "ąčęėįšųūž", lv: "āčēģīķļņšūž", mt: "àèìòùċġħż", nl: "áéèëíïóöúü", pl: "ąćęłńóśźż",
+  pt: "áâãàçéêíóôõú", ro: "ăâîșțşţ", sk: "áäčďéíĺľňóôŕšťúýž", sl: "čšž", sv: "åäéö", tr: "âçğıîöşüû",
+  vi: "àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ"
+});
+/**
+ * How many letters of `text`'s lowercase Latin words `tag`'s language never writes (`LATIN_ALPHABET_EXTRAS`): ă, ș or ț
+ * in a French reading, ř or ě in a Slovak one. Capitalised words are names and keep their own spelling; a letter run
+ * touching a digit is a code, not a word. Zero for a tag with no Latin alphabet on record.
+ */
+export function foreignLatinLetterCount(text: string, tag: string): number {
+  const alphabet = LATIN_ALPHABET_EXTRAS[tag];
+  if (alphabet === undefined) return 0;
+  const lowercaseWords = text.normalize("NFC").match(/(?<![\p{L}\p{M}\p{N}])\p{Ll}[\p{L}\p{M}]*(?![\p{L}\p{M}\p{N}])/gu) ?? [];
+  return lowercaseWords.reduce((n, word) => n + [...word].filter((letter) =>
+    /\p{Script=Latin}/u.test(letter) && !/[a-z]/u.test(letter) && !alphabet.includes(letter)).length, 0);
+}
 
 function detected(tag: KnownArgumentLanguageTag): ArgumentLanguageDetection {
   return Object.freeze({ tag, nameEn: LANGUAGE_NAMES[tag], confidence: "high" });
@@ -213,17 +237,36 @@ function scriptDetection(text: string): ArgumentLanguageDetection | null {
   return null;
 }
 
+/**
+ * Question language (2026-10-13): a language whose alphabet lacks letters the claim writes in its own lowercase words
+ * (`foreignLatinLetterCount`) is not the claim's: one such letter costs it its marker, two rule it out. On the site's
+ * translated legal pages this stopped Romanian being read as French (they share î and â, "de", "la" and "au") and
+ * Czech or Croatian as Slovak.
+ */
+const MAX_FOREIGN_LETTERS = 1;
+
+/**
+ * A close sibling outside the interface languages, scored only so it can hold its neighbours back: Catalan shares
+ * Spanish's alphabet and half its small words, so once French and Italian are ruled out by the letters ó and ú a
+ * Catalan claim would read as Spanish. When the sibling wins, or comes within the margin, the claim falls back.
+ */
+const SIBLING_FUNCTION_WORDS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  ca: ["aquest", "aquesta", "amb", "dels", "els", "és", "fer", "hauria", "haurien", "més", "molt", "pel", "per", "perquè", "seu", "seva", "també"]
+});
+
 function latinDetection(text: string): ArgumentLanguageDetection {
   const normalized = text.normalize("NFC").toLocaleLowerCase("en-US");
   const words = normalized.match(/\p{Script=Latin}+/gu) ?? [];
   if (words.length < 3) return FALLBACK;
 
-  const scored = Object.entries(LATIN_FUNCTION_WORDS)
+  const scored = [...Object.entries(LATIN_FUNCTION_WORDS), ...Object.entries(SIBLING_FUNCTION_WORDS)]
     .filter(([, functionWords]) => functionWords.length > 0)
+    .filter(([tag]) => foreignLatinLetterCount(text, tag) <= MAX_FOREIGN_LETTERS)
     .map(([tag, functionWords]) => {
       const vocabulary = new Set(functionWords);
       const functionScore = words.reduce((score, word) => score + (vocabulary.has(word) ? 1 : 0), 0);
-      const markerScore = LATIN_MARKERS[tag as KnownArgumentLanguageTag]?.test(normalized) === true ? 2 : 0;
+      const markerScore = LATIN_MARKERS[tag as KnownArgumentLanguageTag]?.test(normalized) === true
+        && foreignLatinLetterCount(text, tag) === 0 ? 2 : 0;
       const endingScore = Math.min(2, (LATIN_ENDINGS[tag as KnownArgumentLanguageTag] ?? [])
         .reduce((score, ending) => score + (words.some((word) => ending.test(word)) ? 1 : 0), 0));
       return {
@@ -237,6 +280,7 @@ function latinDetection(text: string): ArgumentLanguageDetection {
   const winner = scored[0];
   const runnerUp = scored[1];
   if (winner === undefined
+    || Object.hasOwn(SIBLING_FUNCTION_WORDS, winner.tag)
     || winner.score < 3
     || (winner.markerScore === 2 && winner.score - winner.markerScore < 2)
     || winner.score < (runnerUp?.score ?? 0) + 2) return FALLBACK;
@@ -301,7 +345,12 @@ export function detectArgumentLanguage(text: string): ArgumentLanguageDetection 
   return scriptDetection(matrix) ?? latinDetection(matrix);
 }
 
+/**
+ * Reply language (owner approval 2026-10-12): a named language is called the question's, and every language holds
+ * where the material quotes another one; the fallback already says "the same language as the question".
+ */
 export function argumentLanguageDirective(name: string): string {
   const language = name.trim() || FALLBACK.nameEn;
-  return `Write every natural-language field in ${language}. Keep JSON keys, enum tokens, JSON literals (null, true, false), and identifier-shaped values (including claim_type, basis, outcome, fatalFlags[].type, segment_id, node_refs, and served_number_refs) in English exactly as specified; never translate an identifier or literal.`;
+  const named = language === FALLBACK.nameEn ? `${language},` : `${language}, the language of the question,`;
+  return `Write every natural-language field in ${named} even where the material quotes another language. Keep JSON keys, enum tokens, JSON literals (null, true, false), and identifier-shaped values (including claim_type, basis, outcome, fatalFlags[].type, segment_id, node_refs, and served_number_refs) in English exactly as specified; never translate an identifier or literal.`;
 }

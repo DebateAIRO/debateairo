@@ -124,7 +124,11 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     // lock that livelocks against a waiting erasure.
     expect(main).toMatch(/new StoryWriter\(\{\s*pool,/u);
     expect(main).toContain("new WalkingSkeletonRunner(pool, ");
-    expect(main.match(/createPool\(/gu)).toHaveLength(1);
+    // Parallel AI calls (spec 2026-10-12 §3.6): the one other pool serves only claim renewals, never the story.
+    expect(main.match(/createPool\(/gu)).toHaveLength(2);
+    expect(main).toContain("const keepAlivePool = createPool(environment.DATABASE_URL, RUNNER_DATABASE_POOLS.keepAlive);");
+    expect(main.match(/\bkeepAlivePool\b/gu)).toHaveLength(2);
+    expect(main).toContain("renewals: new WorkItemRepository(keepAlivePool),");
     expect(main).toContain("buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({");
     expect(main).not.toContain(["process", "env"].join("."));
     // Any boot failure to load the pack — a broken rule, an unresolvable

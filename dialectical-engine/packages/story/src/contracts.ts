@@ -90,7 +90,10 @@ ${STORY_CHECKER_CRITERIA_SENTENCE} ${STORY_QUOTE_SENTENCE}`;
 
 /** The objection's limit in v1 and v2, and since v3 (`StoryCheckerVerdictSchema` in `validate.ts` mirrors it). */
 const STORY_CHECKER_V1_OBJECTION_LIMIT = "\"objection\": null | non-empty string of at most 2000 characters,";
-export const STORY_CHECKER_OBJECTION_MAX_CHARS = 4000;
+// R15 into dev (2026-10-13): a frozen limits object, as STORY_PACK_LIMITS and @debateai/contract's STORY_BODY_LIMITS,
+// because the source-purity law (tools/orphan-audit, J10(b)) refuses an exported bare number. The value and every
+// byte of the checker v3 form it is written into are unchanged.
+export const STORY_CHECKER_LIMITS = Object.freeze({ maxObjectionChars: 4000 });
 
 /**
  * Current form: v2 byte for byte except the objection's limit, 4000 characters instead of 2000 (R15 practice
@@ -98,7 +101,7 @@ export const STORY_CHECKER_OBJECTION_MAX_CHARS = 4000;
  */
 export const STORY_CHECKER_ANSWER_FORM = STORY_CHECKER_V2_ANSWER_FORM.replace(
   STORY_CHECKER_V1_OBJECTION_LIMIT,
-  `"objection": null | non-empty string of at most ${STORY_CHECKER_OBJECTION_MAX_CHARS} characters,`
+  `"objection": null | non-empty string of at most ${STORY_CHECKER_LIMITS.maxObjectionChars} characters,`
 );
 
 export function buildStorytellerContract(pack: StoryPack): PromptContract {

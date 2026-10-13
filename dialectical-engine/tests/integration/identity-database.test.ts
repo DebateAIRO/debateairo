@@ -59,6 +59,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "consumer_passkey_challenge", "consumer_passkey_credential", "consumer_passkey_subject",
       "consumer_recovery_enrollment", "consumer_recovery_gate", "consumer_recovery_reservation", "consumer_recovery_token",
       "consumer_security_challenge", "consumer_security_notice", "consumer_totp_enrollment",
+      "data_export",
       "email_change_request", "login_challenge", "mfa_factor",
       "mfa_recovery_control", "mfa_recovery_legacy_cohort", "mfa_recovery_notice", "mfa_recovery_notice_binding",
       "mfa_recovery_source_window", "mfa_recovery_staged_code",

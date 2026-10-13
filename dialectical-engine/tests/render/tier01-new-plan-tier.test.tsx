@@ -352,7 +352,7 @@ describe("S01 /new plan tier", () => {
     }
   );
 
-  it.each(SESSION_STATES)("S01-27 R4 locks all fifteen controls while Free is chosen, when %s", async (_state, session, hint) => {
+  it.each(SESSION_STATES)("S01-27 R4 locks all thirteen controls while Free is chosen, when %s", async (_state, session, hint) => {
     mocks.readSession.mockResolvedValue(session);
     await renderPage();
     await click('.ndOptionsToggle');
@@ -371,17 +371,15 @@ describe("S01 /new plan tier", () => {
       "modelStrength-BEST",
       "depthMode",
       "scrutinyDepth",
-      "branchingWidth",
-      "concurrency",
       "maxTokens"
     ];
     const locked = lockedIds.map((id) => document.querySelector<HTMLElement>(`#${id}`)!);
-    expect(locked.filter((control) => control.hasAttribute("disabled"))).toHaveLength(15);
+    expect(locked.filter((control) => control.hasAttribute("disabled"))).toHaveLength(13);
     expect(locked.filter((control) => control.hasAttribute("aria-disabled"))).toEqual([]);
     expect(locked.map((control) => {
       const visualLock = control.tagName === "SELECT" ? control.closest<HTMLElement>('.ndSelect')! : control;
       return [visualLock.style.opacity, visualLock.style.cursor];
-    })).toEqual(Array.from({ length: 15 }, () => ["", ""]));
+    })).toEqual(Array.from({ length: 13 }, () => ["", ""]));
     expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(hint);
   });
 
@@ -399,7 +397,8 @@ describe("S01 /new plan tier", () => {
       document.querySelectorAll('.ndSteerInput:disabled').length,
       document.querySelectorAll('.ndSelect select:disabled').length
     // A21: the three model-strength pills are segmented items too (6 -> 9).
-    ]).toEqual([9, 4, 0, 2]);
+    // Parallel calls task 13: Branching width and Concurrency are gone (sliders 4 -> 2).
+    ]).toEqual([9, 2, 0, 2]);
     expect(locked.every((control) => (control as HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).disabled)).toBe(true);
     expect(locked.map((control) => control.getAttribute("aria-describedby")).every(Boolean)).toBe(true);
     expect(locked.every((control) => document.getElementById(control.getAttribute("aria-describedby")!))).toBe(true);
@@ -417,7 +416,7 @@ describe("S01 /new plan tier", () => {
       "budgetTier-low", "budgetTier-medium", "budgetTier-high",
       "treeDepth",
       "modelStrength-ECONOMY", "modelStrength-BALANCED", "modelStrength-BEST",
-      "depthMode", "scrutinyDepth", "branchingWidth", "concurrency", "maxTokens"
+      "depthMode", "scrutinyDepth", "maxTokens"
     ];
     const focusAccepted = lockedIds.filter((id) => {
       const control = document.querySelector<HTMLElement>(`#${id}`)!;
@@ -438,8 +437,25 @@ describe("S01 /new plan tier", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(document.querySelector('#additionalRunOptions')).not.toBeNull();
     expect(document.querySelector('.ndLegacyNotice')?.textContent?.replace(/\s+/g, " ").trim()).toBe(
-      "Depth mode, depth of scrutiny, branching width, concurrency, and max tokens are V2 controls the V3 run contract has no slot for — they are not sent."
+      "Depth mode, depth of scrutiny and max tokens are not sent yet: the new engine does not use them."
     );
+  });
+
+  /* Parallel calls task 13 (owner ruling 2026-10-12): Concurrency is an owner-only
+     register setting and branching width is the algorithm's choice (one support and
+     one attack reply), so neither is offered on /new in either plan. */
+  it.each(["free", "premium"] as const)("offers no Concurrency or Branching width control in %s", async (tier) => {
+    await renderPage();
+    if (tier === "premium") await click('#planTier-premium');
+    await click('.ndOptionsToggle');
+    const panel = document.querySelector<HTMLElement>('#additionalRunOptions')!;
+    expect(panel).not.toBeNull();
+    expect(document.querySelector('#branchingWidth')).toBeNull();
+    expect(document.querySelector('#concurrency')).toBeNull();
+    expect(panel.textContent).not.toMatch(/Branching width|Concurrency|Pro \+ con children per claim|Models running in parallel/);
+    expect([...panel.querySelectorAll('.ndSlider')].map((slider) => slider.id)).toEqual(["maxTokens"]);
+    expect(document.querySelector('#depthMode')).not.toBeNull();
+    expect(document.querySelector('#scrutinyDepth')).not.toBeNull();
   });
 
   it("S01-31 R16 inspects a non-empty submit region for retired V2 fields", () => {
@@ -490,8 +506,6 @@ describe("S01 /new plan tier", () => {
     await click('.ndOptionsToggle');
     await selectValue('#depthMode', "adaptive");
     await selectValue('#scrutinyDepth', "deep");
-    await inputValue('#branchingWidth', "4");
-    await inputValue('#concurrency', "6");
     await inputValue('#maxTokens', "4000");
 
     await click('#planTier-free');
@@ -513,16 +527,12 @@ describe("S01 /new plan tier", () => {
     );
     expect(document.querySelector<HTMLSelectElement>('#depthMode')?.value).toBe("fixed");
     expect(document.querySelector<HTMLSelectElement>('#scrutinyDepth')?.value).toBe("standard");
-    expect(document.querySelector<HTMLInputElement>('#branchingWidth')?.value).toBe("2");
-    expect(document.querySelector<HTMLInputElement>('#concurrency')?.value).toBe("3");
-    const sliderGrid = ["treeDepth", "branchingWidth", "concurrency", "maxTokens"].map((id) => {
+    const sliderGrid = ["treeDepth", "maxTokens"].map((id) => {
       const slider = document.querySelector<HTMLInputElement>(`#${id}`)!;
       return { id, min: slider.min, max: slider.max, step: slider.step, value: slider.value };
     });
     expect(sliderGrid).toEqual([
       { id: "treeDepth", min: "1", max: "5", step: "1", value: "2" },
-      { id: "branchingWidth", min: "1", max: "4", step: "1", value: "2" },
-      { id: "concurrency", min: "1", max: "6", step: "1", value: "3" },
       { id: "maxTokens", min: "128", max: "4000", step: "32", value: "800" }
     ]);
     expect(sliderGrid.every(({ min, max, step, value }) =>
@@ -530,7 +540,7 @@ describe("S01 /new plan tier", () => {
       (Number(max) - Number(min)) % Number(step) === 0
     )).toBe(true);
     expect(document.querySelector<HTMLTextAreaElement>('#topic')?.value).toBe("a debatable claim");
-    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(15);
+    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(13);
   });
 
   it("S01-35 R8 restores nothing from a remembered pre-Free state", async () => {
@@ -576,8 +586,6 @@ describe("S01 /new plan tier", () => {
       "modelStrength-BEST",
       "depthMode",
       "scrutinyDepth",
-      "branchingWidth",
-      "concurrency",
       "maxTokens"
     ];
     expect(gaugeIds.filter((id) => {

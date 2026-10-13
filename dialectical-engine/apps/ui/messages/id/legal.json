@@ -5,7 +5,7 @@
   "legal.notice.title": "Informasi hukum",
   "legal.notice.meta": "Siapa yang mengoperasikan {product}, dan cara menghubungi kami",
   "legal.notice.s01.title": "Siapa kami",
-  "legal.notice.s01.body": "{product} (juga dikenal sebagai {alsoCalled}) dioperasikan oleh {company}, sebuah perusahaan yang terdaftar di Rumania.",
+  "legal.notice.s01.body": "{product} dioperasikan oleh {company}, sebuah perusahaan yang terdaftar di Rumania.",
   "legal.notice.s01.seller": "{company} juga merupakan penjual paket berbayar: kontrak, pembayaran, dan faktur Anda adalah dengan {company}.",
   "legal.notice.company.name": "Nama perusahaan",
   "legal.notice.company.tradingNames": "Nama dagang",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Mengingat bahasa antarmuka yang Anda pilih.",
   "legal.cookies.locale.life": "1 tahun",
   "legal.cookies.storageTitle": "Disimpan di peramban Anda, bukan dalam kuki",
-  "legal.cookies.storageIntro": "Empat item disimpan di penyimpanan peramban Anda: dua di penyimpanan lokal, sampai Anda menghapusnya, dan dua di penyimpanan sesi, sampai Anda menutup tab. Berbeda dengan kuki, item ini tidak dilampirkan pada permintaan Anda; item obrolan bantuan menyimpan salinan percakapan yang Anda lakukan dengan bantuan DebateAI, dan pesan-pesannya sampai ke DebateAI saat Anda mengirimnya.",
+  "legal.cookies.storageIntro": "Empat item disimpan di penyimpanan peramban Anda: dua di penyimpanan lokal, sampai Anda menghapusnya, dan dua di penyimpanan sesi, sampai Anda menutup tab. Berbeda dengan kuki, item ini tidak dilampirkan pada permintaan Anda; item obrolan bantuan menyimpan salinan percakapan yang Anda lakukan dengan bantuan Dialectical Engine, dan pesan-pesannya sampai ke Dialectical Engine saat Anda mengirimnya.",
   "legal.cookies.consent.kind": "Penyimpanan lokal",
   "legal.cookies.consent.purpose": "Mengingat bahwa Anda sudah melihat pemberitahuan kuki, sehingga pemberitahuan itu hanya muncul sekali.",
   "legal.cookies.consent.life": "Sampai Anda menghapusnya",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Penyimpanan sesi",
   "legal.cookies.supportConversation.purpose": "Menjaga percakapan obrolan bantuan Anda tetap di layar selama tab masih terbuka. Percakapan dihapus saat seseorang masuk atau keluar di tab ini.",
   "legal.cookies.supportConversation.life": "Sampai Anda menutup tab",
-  "legal.cookies.recipient.server": "Hanya server DebateAI",
+  "legal.cookies.recipient.server": "Hanya server Dialectical Engine",
   "legal.cookies.recipient.browser": "tetap di peramban Anda",
   "legal.cookies.refuse": "Untuk menolaknya, blokir atau hapus kuki dan data situs untuk situs ini di pengaturan peramban Anda.",
   "legal.cookies.refuseEffect": "Yang kemudian berhenti berfungsi: masuk ke akun, serta pengingatan bahasa dan pilihan tampilan Anda.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Hingga 30 menit",
   "legal.cookies.mfaRecovery.life": "Hingga 299 detik",
   "legal.cookies.social.life": "Hingga 5 menit",
-  "legal.cookies.phoneDraft.life": "15 menit atau sampai lebih awal dihapus"
+  "legal.cookies.phoneDraft.life": "15 menit atau sampai lebih awal dihapus",
+  "legal.cookies.exportPending.purpose": "Menyimpan tautan ekspor dari email di tab ini untuk masuk dan mencoba lagi.",
+  "legal.cookies.exportLinkOutcome.purpose": "Mengingat pesan tautan unduhan yang perlu ditampilkan di tab ini.",
+  "legal.cookies.exportPending.life": "Hingga tab ditutup, keluar, tautan baru dibuka, unduhan pertama berhasil, atau hasil tautan tidak valid maupun akun yang salah",
+  "legal.cookies.exportLinkOutcome.life": "Hingga tab ditutup, keluar, atau tautan baru dibuka"
 }

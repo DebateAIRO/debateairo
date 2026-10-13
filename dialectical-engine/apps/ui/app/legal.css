@@ -368,6 +368,34 @@
   inset-block-end: 38px;
 }
 
+/* CONSUMER PROTECTION (15a/15b/15c): ANPC's SAL badge on a white chip in both themes, since
+   the artwork's own background is white. */
+.siteFooterConsumer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  max-width: 1180px;
+  margin: 22px auto 0;
+}
+.siteFooterAnpc {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  opacity: .92;
+}
+.siteFooterAnpc:hover { opacity: 1; }
+.siteFooterAnpc:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.siteFooterAnpc img { display: block; width: auto; height: 44px; }
+
 /* ---------- 15b in-app footer: one line ---------- */
 
 .siteFooterLine {
@@ -386,10 +414,14 @@
 .siteFooterLine nav { margin-inline-start: auto; }
 .siteFooterLineLinks { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; }
 .siteFooterLine .siteFooterLink { font-size: 10.5px; font-weight: 600; }
+.siteFooterLine .siteFooterAnpc { padding: 2px 4px; border-radius: 6px; }
+.siteFooterLine .siteFooterAnpc img { height: 22px; }
 
 /* 15b on the debate canvas: the canvas is exactly one viewport tall, so it gives
-   the footer its line instead of pushing the footer below the fold. */
-.appShell { --site-footer-line-h: 41px; }
+   the footer its line instead of pushing the footer below the fold. The line is the
+   SAL chip (22px + 2px padding and 1px border each side), 10px padding each side and
+   the 1px top border. */
+.appShell { --site-footer-line-h: 49px; }
 .appShell:has(.debateView) .debateView {
   height: calc(100vh - var(--site-footer-line-h));
   height: calc(100dvh - var(--site-footer-line-h));
@@ -453,6 +485,8 @@
     min-height: 44px;
     font-size: 13px;
   }
+  .siteFooterConsumer { flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 20px; }
+  .siteFooterConsumer .siteFooterAnpc img { height: 40px; }
   .siteFooterBase { margin-top: 20px; padding-top: 14px; }
 
   .siteFooterLine { padding: 10px 16px; gap: 8px 18px; }

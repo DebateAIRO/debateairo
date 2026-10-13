@@ -50,6 +50,7 @@ read that vendor's data-use and retention terms and named the vendor in the priv
 | `taxAuthorities` | optional: where and when each tax is paid, in plain words, for the quarterly tax summary. Left out, the code-owned `taxAuthorities` row is published unchanged; include the member to correct the text. The example carries the member, equal to the code-owned text, so a file copied from it seals that copy under your own `sourceRef`: the code-owned "research of 29 September 2026, for the accountant to confirm" provenance is dropped, and a later correction of the code-owned row never reaches your versions while your file keeps the member. Delete the member from your copy unless you are correcting the text | the register's own parser — `TAX_AUTHORITIES_INVALID` (a `null` member is refused too) |
 | `publicationCheckPolicy` | optional, and NOT in the example: the deadline of the safety check that runs before a debate is published, as `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": 60000}`, in whole milliseconds from 1000 to 60000 (60 seconds is the spec's cap, and the website waits 85 seconds for a publish). Left out, the code-owned `publicationCheckPolicy` row is published unchanged (60000); include the member only to change the deadline. A check that runs out of time refuses the publish, so a shorter deadline can only refuse more publishes, never skip the check | the register's own parser — `PUBLICATION_CHECK_POLICY_INVALID` (a `null` member is refused too) |
 | `answerRoleRotation` | optional, and NOT in the example: `{ "enabled": true }` turns on per-debate role rotation (spec 2026-10-11). When a debate's panel has models from two or more companies, each of its four jobs (the answer writer, the answer checker, the storyteller and the story checker) goes to the model on that panel that has done that job least often so far, and the choice is kept for that debate. `{ "enabled": false }` seals the switch off. Left out, no row is published and the engine keeps its fixed roles. Turn it on only after migration 0114 is applied (`deploy/vps/README.md` §11, "Upgrading to role rotation") | the command's own check — `HOSTED_REGISTER_ROLE_ROTATION_INVALID` (the member must be exactly `enabled`, a boolean; a `null` member is refused too) |
+| `callConcurrencyPolicy` | optional, and NOT in the example: how many AI calls may run at the same time. `perDebate` is the number inside one debate (1 to 64), `perModelPerDebate` the number to one AI inside one debate (1 to 16), and `perModelPerRunner` the number to one AI across all debates, one value per vendor name in lower case, each from 1 to 1000, with a required `default`. The member is one object with no `kind`, for example `{ "perDebate": 12, "perModelPerDebate": 3, "perModelPerRunner": { "default": 50, "deepinfra": 150, "anthropic": 50 } }` (the owner's start values). Left out, no row is sealed and the runner makes one call at a time per debate. See "The call-concurrency setting" below | the command's own check — `HOSTED_REGISTER_CALL_CONCURRENCY_INVALID` (a member that is not an object or carries `kind`, an extra top-level key, a number that is not a whole number in its range, a vendor name that is not lower case, a missing `default`, or a `null` member) |
 
 Any other member is refused (`HOSTED_REGISTER_FILE_KEY_UNKNOWN`). `providerTargets` is checked and
 **never published**: prices, addresses and credential paths stay in the two `EnvironmentFile`s,
@@ -104,6 +105,85 @@ expected start on every poll: the API keeps each waiting question's expected sta
 seconds, or until the next minute, when the line is next looked at, whichever comes first. That
 needs no setting.
 
+## The call-concurrency setting (parallel calls, optional)
+
+A debate asks its independent AI calls at the same time, within the limits this setting sets. It is optional.
+Leave it out and the runner makes one call at a time per debate, as it does today.
+
+The setting has three numbers:
+
+- `perDebate`: calls at once inside one debate. A whole number from 1 to 64.
+- `perModelPerDebate`: calls at once to one AI inside one debate. A whole number from 1 to 16.
+- `perModelPerRunner`: calls at once to one AI across all debates on this server. One number for each vendor, named in lower case, such as `deepinfra` or `anthropic`. Each is from 1 to 1000. The key `default` is required: it covers every vendor not named.
+
+**Which vendor names the runner knows.** The runner recognises exactly three keys in `perModelPerRunner`: `deepinfra`, `anthropic` and `default`. It reads each AI's vendor from the host of its address: an address on `deepinfra.com` (or a name under it) is `deepinfra`, one on `anthropic.com` (or a name under it) is `anthropic`, and every other address (a relay, a local model server, any other vendor) uses `default`. On the preview, each reviewed AI's own provider (`deepinfra` or `anthropic`) is its vendor. Any other key is accepted when the setting is published but never matches an AI, so those AIs fall back to `default`: for example a key `google` changes nothing today. (Code: `vendorOfBaseUrl` and `previewCallSubjects` in `apps/runner/src/call-lane-gateway.ts`.)
+
+The owner's start values are 12 for `perDebate`, 3 for `perModelPerDebate`, and 50 for `default`, 150 for `deepinfra` and 50 for `anthropic` in `perModelPerRunner`. The member goes at the top level of the file, like this, on one line: `"callConcurrencyPolicy": { "perDebate": 12, "perModelPerDebate": 3, "perModelPerRunner": { "default": 50, "deepinfra": 150, "anthropic": 50 } }`
+
+Rules, in plain words:
+
+- **A sealed version is never edited.** A new number is a new version. Copy the file, change the numbers, and publish.
+- **Do not roll back by pinning an older version number.** Every version is a complete set of settings, so an older version number also brings back the older vendors, ceilings, billing and country settings. To go back to older numbers for this setting, publish them as a new version.
+- **The runner reads the setting when it starts.** A change takes effect after the restart in the steps below.
+
+To turn it on or change the numbers on the hosted server, do these steps in order. Run every command from the engine's folder, `/opt/debateai/dialectical-engine`, as root.
+
+1. Edit `/etc/debateai/register/hosted-register.json`. Add the member at the top level, or change its numbers. Leave the other members as they are.
+2. Check the file. This writes nothing, and it needs no migrator window:
+
+```sh
+cd /opt/debateai/dialectical-engine && pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-register.json
+```
+
+The plan's `row_keys=` line must name `callConcurrencyPolicy`. If the command refuses with `HOSTED_REGISTER_CALL_CONCURRENCY_INVALID`, nothing was sealed. Fix the numbers and run this check again.
+
+3. Check whether the owners' scorecard file exists:
+
+```sh
+test -e /etc/debateai/register/model-scorecard.json && echo "scorecard file present" || echo "no scorecard file"
+```
+
+If it says `scorecard file present`, use the form with the scorecard file in step 4. If it says `no scorecard file`, use the plain form. A publish without the scorecard file seals a version with no scorecard, and asks then use the plan's usual models (see "The model scorecard" below).
+
+4. Open the migrator window (`deploy/vps/README.md`, section 4, step 2). In that same shell, publish. Use one of these two forms.
+
+The plain form, when there is no scorecard file:
+
+```sh
+cd /opt/debateai/dialectical-engine && pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json
+```
+
+The form with the scorecard file:
+
+```sh
+cd /opt/debateai/dialectical-engine && pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json --scorecard /etc/debateai/register/model-scorecard.json
+```
+
+Then close the migrator window (section 4, step 5).
+
+5. Read the lines the publish prints. `HOSTED_REGISTER_BOOT_READY register_version=N` followed by `REGISTER_VERSION=N` means the version is good. `outcome=REPLAYED` means this exact file was already published, so nothing new was sealed. If you see `HOSTED_REGISTER_NOT_BOOT_READY` instead, pin nothing. Read the refusal code, correct the file, and publish again.
+6. Check that the newest version holds the row:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT register_version, row_key, value_json FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key = 'callConcurrencyPolicy'"
+```
+
+One row comes back, and it shows `callConcurrencyPolicy`.
+
+7. Copy the printed `REGISTER_VERSION=N` line into both `/etc/debateai/api.env` and `/etc/debateai/runner.env`.
+8. Restart the API first, then the runner. The runner restarts only if the API restart worked:
+
+```sh
+systemctl restart debateai-api && systemctl restart debateai-runner
+```
+
+To turn it off on the hosted server:
+
+1. Remove the `callConcurrencyPolicy` member from the file. Leave the other members as they are.
+2. Do steps 2 to 8 above again. In step 2 the plan's `row_keys=` line no longer names `callConcurrencyPolicy`. In step 6 the result has zero rows, which is right. Nothing is edited: the earlier version stays sealed, and the new version has no row. With no row, the runner makes one call at a time per debate.
+
+On the preview, this setting is not in this file. The preview publishes its own register through its kit. See `deploy/preview-auth-dev/v1/README.md`, "Call-concurrency row". The preview's native plan carries it as `callConcurrency` (the release tool's `native-plan --operation plan --call-concurrency '<JSON>'`); the steps are in that section.
+
 ## What `sourceRef` becomes
 
 Your `sourceRef` is sealed in these places, and only there:
@@ -117,6 +197,8 @@ Your `sourceRef` is sealed in these places, and only there:
 - the `publicationCheckPolicy` row's source reference, verbatim, when the file carries the member
   (left out, that row keeps the code-owned source reference);
 - the `answerRoleRotationPolicy` row's source reference, verbatim, when the file carries the member
+  (left out, no such row is sealed);
+- the `callConcurrencyPolicy` row's source reference, verbatim, when the file carries the member
   (left out, no such row is sealed);
 - the `configuredProviderSet` row's source reference: your `sourceRef` followed by the fixed V-9
   sentence `+ V-9 ruled 2026-09-22 (V, chat): versioned configuredProviderSet row carrying each

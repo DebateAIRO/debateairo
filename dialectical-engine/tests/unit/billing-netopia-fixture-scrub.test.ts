@@ -15,7 +15,7 @@ const POS = ["RE41", "LPOS", "1234", "5678", "ABCD"].join("-");
 const startRequest = JSON.stringify({
   config: { emailTemplate: "", notifyUrl: "https://test.dezbatere.ro/api/v1/billing/netopia/notify", redirectUrl: "https://test.dezbatere.ro/", language: "ro" },
   payment: { options: { installments: 0, bonus: 0 }, instrument: { type: "card" } },
-  order: { ntpID: "", posSignature: POS, dateTime: "2026-10-08T10:00:00Z", description: "DebateAI sandbox recording", orderID: `t-${"a".repeat(30)}`,
+  order: { ntpID: "", posSignature: POS, dateTime: "2026-10-08T10:00:00Z", description: "Dialectical Engine sandbox recording", orderID: `t-${"a".repeat(30)}`,
     amount: 1, currency: "USD", clientID: "c".repeat(32), billing: { email: "stefan.real@example.org", phone: "+40722333444", firstName: "Stefan",
       lastName: "Realname", city: "Iasi", country: 642, countryName: "Romania", state: "Iasi", postalCode: "700259", details: "Strada Reala 12" } }
 }).replace('"amount":1,', '"amount":1.00,');

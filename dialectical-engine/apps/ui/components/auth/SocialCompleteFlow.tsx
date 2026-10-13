@@ -11,6 +11,7 @@ import { createConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { ownedPhoneCompletionDraft } from '@/lib/phoneCompletionDraft';
 import { retainSocialStepUp } from '@/lib/socialStepUpHandoff';
 import { safeSocialReturnPath } from '@/lib/returnPath';
+import { readPendingExport } from '@/lib/dataExportPending';
 import { takeFragmentToken } from '@/lib/mfaEnrollment';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode, sixDigitCodeToSend } from '@/lib/sixDigitCode';
@@ -107,6 +108,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const navigateAuthenticated = () => {
         if (onAuthenticated)
             onAuthenticated();
+        else if (readPendingExport() !== null)
+            router.push('/export');
         else
             window.location.assign(returnPath);
     };

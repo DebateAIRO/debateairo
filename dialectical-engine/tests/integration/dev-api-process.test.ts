@@ -49,6 +49,7 @@ function environment(
     PUBLICATION_ENABLED: "true",
     PUBLICATION_CLEANUP_DATABASE_URL: database("debateai_dev_publication_cleanup", "pub"),
     ERASURE_DATABASE_URL: database("debateai_dev_erasure", "two"),
+    DATA_EXPORT_DATABASE_URL: database("debateai_dev_data_export", "export"),
     ACCOUNT_ERASURE_GRACE_MS: "604800000",
     MAIL_SENDMAIL_PATH: join(root, "deploy", "dev-auth", "sendmail-capture.mjs"),
     MAIL_FROM: "noreply@localhost.test",
@@ -67,9 +68,9 @@ function environment(
       ? TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson
       : developmentConfiguredProviderPanel(profile).targetsJson,
     SUPPORT_MODEL_TARGET_JSON: JSON.stringify({
-      provider_ref: "development:hermes-glm-5.3-flash",
+      provider_ref: "development:claude-haiku-5.5",
       base_url: `http://127.0.0.1:${profile.supportModelPort}/v1`,
-      model: "z-ai/glm-5.3-flash",
+      model: "claude-haiku-5-5",
       authorization_header: "Bearer support-test",
       ...(profile.name === "support-preview"
         ? { development_stack_profile: "support-preview" }

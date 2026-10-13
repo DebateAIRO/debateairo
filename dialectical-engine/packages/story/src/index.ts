@@ -14,19 +14,22 @@ export {
   STORYTELLER_V1_CONTRACT_ID,
   STORY_CHECKER_ANSWER_FORM,
   STORY_CHECKER_CONTRACT_ID,
-  STORY_CHECKER_OBJECTION_MAX_CHARS,
+  STORY_CHECKER_LIMITS,
   buildStoryCheckerContract,
   buildStorytellerContract,
   storyContractHash,
   storyContractInArgumentLanguage
 } from "./contracts.js";
 export {
+  STORY_BODY_PROSE,
+  STORY_CHECKER_PROSE,
   StoryCheckerVerdictSchema,
   classifyCheckerContent,
   classifyStoryContent,
   parseCheckerVerdict,
   parseStoryBody,
   type StoryCheckerVerdict,
+  type StoryLanguageCheck,
   type StoryMaterialIndex
 } from "./validate.js";
 export {

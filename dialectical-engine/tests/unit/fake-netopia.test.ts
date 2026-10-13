@@ -58,11 +58,11 @@ async function setup(options: FakeNetopiaOptions = {}) {
   const payments = createNetopiaPayments({ baseUrl: fake.baseUrl, apiKey: fake.apiKey, posSignature: fake.posSignature });
   const trust = Object.freeze({ posSignature: fake.posSignature, keys: loadTrustedKeys(fake.trustedKeysPem) });
   const startOf = (orderId: string, amountMicros = 24_200_000): HostedPaymentStart => Object.freeze({
-    orderId, amountMicros, currency: "USD", description: "DebateAI Plus, one month", payer: PAYER, clientId: CLIENT,
+    orderId, amountMicros, currency: "USD", description: "Dialectical Engine Plus, one month", payer: PAYER, clientId: CLIENT,
     returnUrl: `https://debateai.test/checkout/return?charge=${orderId}`, notifyUrl: sink.url, language: "ro"
   });
   const chargeOf = (orderId: string, token: string, amountMicros = 24_200_000): SavedCardCharge => Object.freeze({
-    orderId, amountMicros, currency: "USD", description: "DebateAI Plus, one month", payer: PAYER, cardToken: createSecretToken(token),
+    orderId, amountMicros, currency: "USD", description: "Dialectical Engine Plus, one month", payer: PAYER, cardToken: createSecretToken(token),
     payerIp: "203.0.113.7", returnUrl: `https://debateai.test/checkout/return?charge=${orderId}`, notifyUrl: sink.url, language: "ro"
   });
   /** A started order paid on the fake's page, its first message delivered: the token the fake issued is returned. */
@@ -227,17 +227,34 @@ describe("N5 — saved-card charges (spec §2.4.2, §2.9)", () => {
 });
 
 describe("N5 — status reads, refunds and disputes (spec §2.12, §2.13, §2.14)", () => {
-  it("reads with and without ntpID, and says no such order plainly", async () => {
+  it("reads with and without ntpID", async () => {
     const { payments, paidWithCard } = await setup();
     const { orderId, ntpId } = await paidWithCard();
-    expect(await payments.status({ orderId: hex(), providerPaymentId: null })).toBe("NO_SUCH_ORDER");
     expect(asReport(await payments.status({ orderId, providerPaymentId: null })).state).toBe("PAID");
     expect(asReport(await payments.status({ orderId, providerPaymentId: ntpId })).state).toBe("PAID");
+    const strict = await setup({ statusWithoutNtpId: "INVALID_NTP_ID" });
+    const paid = await strict.paidWithCard();
+    expect(asReport(await strict.payments.status({ orderId: paid.orderId, providerPaymentId: paid.ntpId })).state).toBe("PAID");
+  });
+
+  // Known gap (owner decision): the sandbox answers an id it does not hold with error 99 "Invalid ntpID" and an all-zero
+  // payment, which the status read refuses as PAYMENT_RESPONSE_INVALID. This states the wanted result; it starts failing,
+  // and must be made a plain test, once that changes.
+  it.fails("says no such order plainly (known gap: NETOPIA's invalid-id answer is refused)", async () => {
+    const { payments, paidWithCard } = await setup();
+    const { orderId } = await paidWithCard();
+    expect(await payments.status({ orderId: hex(), providerPaymentId: null })).toBe("NO_SUCH_ORDER");
     expect(await payments.status({ orderId, providerPaymentId: "999999999" })).toBe("NO_SUCH_ORDER");
-    const strict = await setup({ statusWithoutNtpId: "NOT_FOUND" });
+    const strict = await setup({ statusWithoutNtpId: "INVALID_NTP_ID" });
     const paid = await strict.paidWithCard();
     expect(await strict.payments.status({ orderId: paid.orderId, providerPaymentId: null })).toBe("NO_SUCH_ORDER");
-    expect(asReport(await strict.payments.status({ orderId: paid.orderId, providerPaymentId: paid.ntpId })).state).toBe("PAID");
+  });
+
+  it("refuses an id the sandbox does not hold as its invalid-id answer, never as a report", async () => {
+    const { payments, paidWithCard } = await setup();
+    const { orderId } = await paidWithCard();
+    await expect(payments.status({ orderId: hex(), providerPaymentId: null })).rejects.toThrow("PAYMENT_RESPONSE_INVALID:99");
+    await expect(payments.status({ orderId, providerPaymentId: "999999999" })).rejects.toThrow("PAYMENT_RESPONSE_INVALID:99");
   });
 
   it("reports admin refunds (whole and partial), the three charge-back statuses and status 17, each with a message", async () => {
@@ -381,7 +398,7 @@ describe("N5 — the signed-notice helper, against the real verifier (spec §2.4
 /** The two input builders without a fake (the stub's tests need no server). */
 async function setupless() {
   const startOf = (orderId: string): HostedPaymentStart => Object.freeze({
-    orderId, amountMicros: 24_200_000, currency: "USD", description: "DebateAI Plus, one month", payer: PAYER, clientId: CLIENT,
+    orderId, amountMicros: 24_200_000, currency: "USD", description: "Dialectical Engine Plus, one month", payer: PAYER, clientId: CLIENT,
     returnUrl: `https://debateai.test/checkout/return?charge=${orderId}`, notifyUrl: "https://debateai.test/api/v1/billing/netopia/notify", language: "ro"
   });
   const chargeOf = (orderId: string): SavedCardCharge => Object.freeze({

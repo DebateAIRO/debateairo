@@ -5,7 +5,7 @@
   "legal.notice.title": "Impresum",
   "legal.notice.meta": "Tko upravlja uslugom {product} i kako nam se obratiti",
   "legal.notice.s01.title": "Tko smo",
-  "legal.notice.s01.body": "Uslugom {product} (poznatom i kao {alsoCalled}) upravlja {company}, društvo registrirano u Rumunjskoj.",
+  "legal.notice.s01.body": "Uslugom {product} upravlja {company}, društvo registrirano u Rumunjskoj.",
   "legal.notice.s01.seller": "{company} je i prodavatelj plaćenih planova: vaš ugovor, vaša plaćanja i vaši računi vežu se uz {company}.",
   "legal.notice.company.name": "Naziv društva",
   "legal.notice.company.tradingNames": "Trgovački nazivi",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Pamti jezik sučelja koji ste odabrali.",
   "legal.cookies.locale.life": "1 godina",
   "legal.cookies.storageTitle": "Pohranjeno u vašem pregledniku, a ne u kolačiću",
-  "legal.cookies.storageIntro": "U pohrani vašeg preglednika čuvaju se četiri stavke: dvije u lokalnoj pohrani, dok ih ne izbrišete, i dvije u pohrani sesije, dok ne zatvorite karticu. Za razliku od kolačića, ne prilažu se vašim zahtjevima; stavka chata za pomoć čuva kopiju razgovora koji ste vodili s pomoći DebateAI-ja, a njegove su poruke stigle do DebateAI-ja kada ste ih poslali.",
+  "legal.cookies.storageIntro": "U pohrani vašeg preglednika čuvaju se četiri stavke: dvije u lokalnoj pohrani, dok ih ne izbrišete, i dvije u pohrani sesije, dok ne zatvorite karticu. Za razliku od kolačića, ne prilažu se vašim zahtjevima; stavka chata za pomoć čuva kopiju razgovora koji ste vodili s pomoći Dialectical Engine-a, a njegove su poruke stigle do Dialectical Engine-a kada ste ih poslali.",
   "legal.cookies.consent.kind": "Lokalna pohrana",
   "legal.cookies.consent.purpose": "Pamti da ste vidjeli obavijest o kolačićima, pa se prikazuje samo jednom.",
   "legal.cookies.consent.life": "Dok ga ne izbrišete",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Pohrana sesije",
   "legal.cookies.supportConversation.purpose": "Drži vaš razgovor s pomoći na zaslonu dok je kartica otvorena. Briše se kada se bilo tko prijavi ili odjavi u ovoj kartici.",
   "legal.cookies.supportConversation.life": "Dok ne zatvorite karticu",
-  "legal.cookies.recipient.server": "Samo poslužitelju DebateAI-ja",
+  "legal.cookies.recipient.server": "Samo poslužitelju Dialectical Engine-a",
   "legal.cookies.recipient.browser": "ostaje u vašem pregledniku",
   "legal.cookies.refuse": "Da biste ih odbili, blokirajte ili izbrišite kolačiće i podatke za ovu web-lokaciju u postavkama preglednika.",
   "legal.cookies.refuseEffect": "Što tada prestaje raditi: prijava te pamćenje vašeg jezika i postavki prikaza.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Do 30 minuta",
   "legal.cookies.mfaRecovery.life": "Do 299 sekundi",
   "legal.cookies.social.life": "Do 5 minuta",
-  "legal.cookies.phoneDraft.life": "15 minuta ili do ranijeg brisanja"
+  "legal.cookies.phoneDraft.life": "15 minuta ili do ranijeg brisanja",
+  "legal.cookies.exportPending.purpose": "Čuva poveznicu za izvoz poslanu e-poštom u ovoj kartici za prijavu i ponovni pokušaj.",
+  "legal.cookies.exportLinkOutcome.purpose": "Pamti koju poruku o poveznici za preuzimanje treba prikazati u ovoj kartici.",
+  "legal.cookies.exportPending.life": "Do zatvaranja kartice, odjave, nove poveznice, prvog uspješnog preuzimanja ili ishoda nevaljane poveznice ili pogrešnog računa",
+  "legal.cookies.exportLinkOutcome.life": "Do zatvaranja kartice, odjave ili nove poveznice"
 }

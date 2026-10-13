@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Tietosi Dialectical Enginessä",
+  "archive.generated": "Valmisteltu {time} käyttäjälle {pseudonym}.",
+  "archive.accountHeading": "Tili",
+  "archive.email": "Sähköposti",
+  "archive.memberSince": "Liittynyt",
+  "archive.debatesHeading": "Omat väittelysi ({count})",
+  "archive.question": "Kysymys",
+  "archive.verdict": "Johtopäätös",
+  "archive.verdictSupported": "Tuettu",
+  "archive.verdictContested": "Kiistanalainen",
+  "archive.verdictUnsupported": "Tukematon",
+  "archive.story": "Väittely lyhyesti",
+  "archive.arguments": "Perustelut",
+  "archive.visibilityPublic": "Julkaistu",
+  "archive.visibilityPrivate": "Yksityinen",
+  "archive.unreadable": "Tämän väittelyn sisältöä ei voi enää lukea, koska sen avain on tuhottu.",
+  "archive.noDebates": "Sinulla ei ole väittelyjä.",
+  "archive.filesNote": "Tämän ZIP-paketin JSON-tiedostot sisältävät samat tiedot koneellisesti luettavassa muodossa; README.txt sisältää niiden luettelon."
+}

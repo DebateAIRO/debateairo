@@ -5,7 +5,7 @@
   "legal.notice.title": "Інформація про компанію",
   "legal.notice.meta": "Хто керує {product} і як із нами зв’язатися",
   "legal.notice.s01.title": "Хто ми",
-  "legal.notice.s01.body": "Сервісом {product} (інша назва — {alsoCalled}) управляє компанія {company}, зареєстрована в Румунії.",
+  "legal.notice.s01.body": "Сервісом {product} управляє компанія {company}, зареєстрована в Румунії.",
   "legal.notice.s01.seller": "{company} також є продавцем платних планів: ваш договір, ваші платежі та ваші рахунки оформлюються з {company}.",
   "legal.notice.company.name": "Назва компанії",
   "legal.notice.company.tradingNames": "Комерційні найменування",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Запам’ятовує вибрану вами мову інтерфейсу.",
   "legal.cookies.locale.life": "1 рік",
   "legal.cookies.storageTitle": "Зберігається у браузері, а не у файлі cookie",
-  "legal.cookies.storageIntro": "У сховищі вашого браузера зберігаються чотири елементи: два в локальному сховищі, доки ви їх не видалите, і два у сховищі сеансу, доки ви не закриєте вкладку. На відміну від файлів cookie, вони не додаються до ваших запитів; елемент чату допомоги зберігає копію розмови, яку ви вели зі службою допомоги DebateAI, і її повідомлення надійшли до DebateAI тоді, коли ви їх надіслали.",
+  "legal.cookies.storageIntro": "У сховищі вашого браузера зберігаються чотири елементи: два в локальному сховищі, доки ви їх не видалите, і два у сховищі сеансу, доки ви не закриєте вкладку. На відміну від файлів cookie, вони не додаються до ваших запитів; елемент чату допомоги зберігає копію розмови, яку ви вели зі службою допомоги Dialectical Engine, і її повідомлення надійшли до Dialectical Engine тоді, коли ви їх надіслали.",
   "legal.cookies.consent.kind": "Локальне сховище",
   "legal.cookies.consent.purpose": "Запам’ятовує, що ви вже бачили повідомлення про файли cookie, щоб воно показувалося лише один раз.",
   "legal.cookies.consent.life": "Доки ви його не видалите",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Сховище сеансу",
   "legal.cookies.supportConversation.purpose": "Тримає на екрані вашу розмову в чаті допомоги, доки вкладка відкрита. Видаляється, коли в цій вкладці будь-хто входить в обліковий запис або виходить із нього.",
   "legal.cookies.supportConversation.life": "Доки ви не закриєте вкладку",
-  "legal.cookies.recipient.server": "Лише серверу DebateAI",
+  "legal.cookies.recipient.server": "Лише серверу Dialectical Engine",
   "legal.cookies.recipient.browser": "залишається у вашому браузері",
   "legal.cookies.refuse": "Щоб відмовитися від них, заблокуйте або видаліть файли cookie і дані цього сайту в налаштуваннях браузера.",
   "legal.cookies.refuseEffect": "Що тоді перестає працювати: вхід в обліковий запис і запам’ятовування вашої мови та налаштувань відображення.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "До 30 хвилин",
   "legal.cookies.mfaRecovery.life": "До 299 секунд",
   "legal.cookies.social.life": "До 5 хвилин",
-  "legal.cookies.phoneDraft.life": "15 хвилин або до попереднього видалення"
+  "legal.cookies.phoneDraft.life": "15 хвилин або до попереднього видалення",
+  "legal.cookies.exportPending.purpose": "Зберігає посилання для експорту з електронного листа в цій вкладці для входу та повторної спроби.",
+  "legal.cookies.exportLinkOutcome.purpose": "Запам’ятовує, яке повідомлення про посилання для завантаження показувати в цій вкладці.",
+  "legal.cookies.exportPending.life": "До закриття вкладки, виходу, нового посилання, першого успішного завантаження або результату про недійсне посилання чи неправильний обліковий запис",
+  "legal.cookies.exportLinkOutcome.life": "До закриття вкладки, виходу або нового посилання"
 }

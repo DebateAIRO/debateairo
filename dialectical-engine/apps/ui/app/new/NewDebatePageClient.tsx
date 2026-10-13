@@ -151,8 +151,6 @@ function NewDebateForm({
   const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
   const [scrutiny, setScrutiny] = useState<ScrutinyDepth>("standard");
   const [depth, setDepth] = useState(2);
-  const [branching, setBranching] = useState(2);
-  const [concurrency, setConcurrency] = useState(3);
   const [maxTokens, setMaxTokens] = useState(800);
   const [riskTier, setRiskTier] = useState("standard");
   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
@@ -234,8 +232,6 @@ function NewDebateForm({
     setDepth(2);
     setDepthMode("fixed");
     setScrutiny("standard");
-    setBranching(2);
-    setConcurrency(3);
     setMaxTokens(800);
   }
 
@@ -468,8 +464,8 @@ function NewDebateForm({
             <div id="additionalRunOptions" className="ndCard ndLegacy">
               {/*
                 DR-115 honesty: the ruled Tree depth control is on the default
-                surface. The legacy V2 knobs below are named as not carried
-                rather than quietly posted into a config the ask builder drops.
+                surface. The knobs below are named as not sent yet rather than
+                quietly posted into a config the ask builder drops.
               */}
               <p className="ndLegacyNotice">
                 {t(catalog, "newDebate.legacyNotice")}
@@ -495,26 +491,10 @@ function NewDebateForm({
                   label: t(catalog, `newDebate.scrutiny${depth === "standard" ? "Standard" : depth === "deep" ? "Deep" : "Exhaustive"}`)
                 }))}
               />
-              <SliderRow
-                id="branchingWidth"
-                label={t(catalog, "newDebate.branchingWidth")}
-                hint={t(catalog, "newDebate.branchingHint")}
-                min={1}
-                max={4}
-                value={branching}
-                disabled={planTier === "free"}
-                onChange={setBranching}
-              />
-              <SliderRow
-                id="concurrency"
-                label={t(catalog, "newDebate.concurrency")}
-                hint={t(catalog, "newDebate.concurrencyHint")}
-                min={1}
-                max={6}
-                value={concurrency}
-                disabled={planTier === "free"}
-                onChange={setConcurrency}
-              />
+              {/* Parallel calls (owner ruling 2026-10-12): no Branching width and no
+                  Concurrency control here. How many calls run at once is an owner-only
+                  register setting; how wide a claim branches is the algorithm's choice
+                  (one support and one attack reply). */}
               <SliderRow
                 id="maxTokens"
                 label={t(catalog, "newDebate.maxTokens")}

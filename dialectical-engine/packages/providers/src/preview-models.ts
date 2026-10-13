@@ -239,7 +239,9 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
       outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_ANSWER_CAP_TOKENS, efforts: ["high", "low", "none"], jsonObject: false }),
     // Owner approval 2026-10-12: in a live practice run MiMo closed Romanian quotation marks („…) with a straight double
     // quote inside its JSON (nine times in one judging reply), then wrote a second JSON answer in the same reply. Its
-    // DeepInfra page recommends temperature 1.0, top_p 0.95: every request carries those two sampling members (no top_k).
+    // DeepInfra page recommends temperature 1.0, top_p 0.95; owner ruling 2026-10-12 (reply language): temperature 0.7,
+    // after MiMo wrote 10 of its 71 practice replies at 1.0 in another language than the question's. Every request
+    // carries those two sampling members (no top_k).
     // JSON mode was tried the same day and withdrawn (owner, 2026-10-12): when MiMo closed a „ quote with a straight
     // double quote, DeepInfra's JSON constraint ended the string there and forced the rest into garbage (a 141-character
     // reply with 11 issues), while without JSON mode the engine's reader (INNER_QUOTE) repairs that exact slip with no call.
@@ -248,7 +250,7 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
       outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS,
       // Story wording (practice debate 2, 2026-10-12): room for its thinking as the story checker (see the field).
       storyCheckerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["default", "none"], jsonObject: false,
-      sampling: { temperature: 1.0, top_p: 0.95 } }),
+      sampling: { temperature: 0.7, top_p: 0.95 } }),
     // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
     // Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid mid-answer into
     // random multilingual tokens in a live practice run (2 of its first 4 calls unreadable). It thinks by default, so

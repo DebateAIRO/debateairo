@@ -1551,6 +1551,98 @@ class ModelCoolingTests(GateTest):
             spent.call('next')
 
 
+class UnsentBurstTests(GateTest):
+    """Owner ruling O8 (spec 2026-10-12 parallel calls §3.4): failures of calls that were in flight
+    together count once toward UNSENT_HALT_STREAK, so one network blip under 10 parallel calls does
+    not halt the gate. Calls reserved one after another still count one each, as before."""
+
+    def not_busy(self):
+        # Anthropic's 400/500 shape: proved unbilled, not busy (release_unbilled(busy=False)).
+        return patch.multiple(DEEPINFRA, unbilled_refusal=lambda status, _response: status == 500,
+                              busy_refusal=lambda _status, _response: False)
+
+    def burst(self, gate, count, failure, code, prefix='burst'):
+        """count calls in flight at once (each reserved inside the previous one's dispatch), then, a
+        moment later, all of them fail: the last reserved first, as one blip ends them all."""
+        def nested(number):
+            def dispatch(raw, key):
+                if number < count:
+                    with self.refused(code):
+                        gate.call('%s-%d' % (prefix, number + 1), dispatch=nested(number + 1))
+                else:
+                    self.assertEqual(gate.status()['in_flight'], count)
+                    later(gate, 5)
+                return failure(raw, key)
+            return dispatch
+        with self.refused(code):
+            gate.call('%s-1' % prefix, dispatch=nested(1))
+        self.assertEqual(gate.status()['in_flight'], 0)
+
+    def test_ten_calls_in_flight_that_all_fail_unsent_count_once(self):
+        gate = self.gate(max_concurrent_calls=10).ready()
+        self.burst(gate, 10, unreached, 'PROVIDER_NOT_REACHED')
+        status = gate.status()
+        self.assertEqual((status['state'], status['unsent_streak']), ('active', 1))
+        self.assertEqual(gate.control()['unsent_counted_at'], '2026-10-08T09:00:05+00:00')
+
+    def test_five_calls_each_reserved_after_the_previous_failure_still_halt(self):
+        # Today's rule for serial calls. The clock does not move here: a call reserved at the same
+        # instant as the counted failure is not one that was in flight with it, so it counts.
+        gate = self.gate().ready()
+        for number in range(1, 5):
+            with self.refused('PROVIDER_NOT_REACHED'):
+                gate.call('nr-%d' % number, dispatch=unreached)
+            self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', number))
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call('nr-5', dispatch=unreached)
+        self.assertEqual((gate.status()['state'], gate.status()['reason'], gate.status()['unsent_streak']),
+                         ('halted', 'provider_unreachable', 5))
+
+    def test_a_settled_reply_between_failures_resets_the_streak_and_the_counted_time(self):
+        gate = self.gate().ready()
+
+        def straggler(raw, key):
+            # A call sent beside this one fails (counted), a later call settles, then this one fails.
+            # op-b is reserved a second AFTER op-a, so op-a's own failure counts only if the settled
+            # reply popped unsent_counted_at (else op-a, reserved before it, would read as in flight with it).
+            later(gate, 1)
+            with self.refused('PROVIDER_NOT_REACHED'):
+                gate.call('op-b', dispatch=unreached)
+            self.assertEqual((gate.status()['unsent_streak'], gate.control()['unsent_counted_at']),
+                             (1, '2026-10-08T09:00:01+00:00'))
+            later(gate, 5)
+            self.assertEqual(gate.call('op-c')['status'], 200)
+            self.assertEqual(gate.status()['unsent_streak'], 0)
+            self.assertNotIn('unsent_counted_at', gate.control())
+            later(gate, 5)
+            return unreached(raw, key)
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call('op-a', dispatch=straggler)
+        # It was in flight with op-b, but a settled reply came between: it starts a new streak.
+        self.assertEqual((gate.status()['unsent_streak'], gate.control()['unsent_counted_at']),
+                         (1, '2026-10-08T09:00:11+00:00'))
+
+    def test_not_busy_unbilled_errors_of_calls_in_flight_together_count_once(self):
+        def failing(_raw, _key):
+            return 500, {'type': 'error', 'error': {'type': 'api_error', 'message': 'Internal server error'}}
+        with self.not_busy():
+            gate = self.gate(max_concurrent_calls=10).ready()
+            self.burst(gate, 10, failing, 'PROVIDER_ERROR_UNBILLED')
+            self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', 1))
+            # Mixed with a connect failure in the same burst: still one.
+            later(gate, 1)
+            self.burst(gate, 2, unreached, 'PROVIDER_NOT_REACHED', prefix='mixed')
+            self.assertEqual(gate.status()['unsent_streak'], 2)
+            for number in range(3, 6):  # Serial not-busy errors: one each, halting at five.
+                later(gate, 1)
+                with self.refused('PROVIDER_ERROR_UNBILLED'):
+                    gate.call('serial-%d' % number, dispatch=failing)
+            status = gate.status()
+            self.assertEqual((status['state'], status['reason'], status['unsent_streak']),
+                             ('halted', 'provider_unreachable', 5))
+            self.assertEqual(status['today_unbilled_releases'], 13)
+
+
 class HaltedRefusalTests(GateTest):
     """AUTHORITY_HALTED: the state check found the gate halted before anything was reserved."""
 
@@ -1932,11 +2024,12 @@ class ProbeFenceTests(GateTest):
 class SamplingTests(GateTest):
     """Reviewed sampling (2026-10-12): a row may carry its own sampling settings (Qwen, at its makers' thinking-mode
     values, after it slid into random multilingual tokens at DeepInfra's defaults; MiMo, at DeepInfra's recommended
-    temperature 1.0 and top_p 0.95, after it broke its JSON with a straight closing quote). Its requests must
+    top_p 0.95, after it broke its JSON with a straight closing quote, and the owner's temperature 0.7, after it wrote
+    replies in other languages at 1.0). Its requests must
     carry exactly those keys with exactly those values; every other row's requests must carry none of them."""
     QWEN_SAMPLING = (('temperature', 0.6), ('top_p', 0.95), ('top_k', 20))
-    # Owner approval 2026-10-12: DeepInfra's recommended settings for MiMo, with no top_k.
-    MIMO_SAMPLING = (('temperature', 1.0), ('top_p', 0.95))
+    # Owner approval 2026-10-12: DeepInfra's recommended top_p for MiMo and the owner's temperature 0.7, with no top_k.
+    MIMO_SAMPLING = (('temperature', 0.7), ('top_p', 0.95))
 
     def test_only_the_mimo_and_qwen_rows_carry_sampling_and_they_equal_the_independent_copy(self):
         self.assertEqual(DEEPINFRA.rows[QWEN].sampling, self.QWEN_SAMPLING)
@@ -1980,15 +2073,15 @@ class SamplingTests(GateTest):
         exact = body(model=MIMO)
         self.assertEqual({k: exact[k] for k in ('temperature', 'top_p')}, SAMPLING[MIMO])
         self.assertTrue(DEEPINFRA.body_valid(exact, row))
-        self.assertTrue(DEEPINFRA.body_valid({**exact, 'temperature': 1}, row))  # 1 and 1.0: one JSON number (the app writes 1).
 
         def without(name):
             return {k: v for k, v in exact.items() if k != name}
         refused = {'no_sampling': {k: v for k, v in exact.items() if k not in SAMPLING[MIMO]},
                    'no_temperature': without('temperature'), 'no_top_p': without('top_p'),
                    'with_top_k': {**exact, 'top_k': 20}, 'qwen_temperature': {**exact, 'temperature': 0.6},
+                   'temperature_before_2026_10_12': {**exact, 'temperature': 1}, 'temperature_hair': {**exact, 'temperature': 0.700001},
                    'top_p_default': {**exact, 'top_p': 1}, 'top_p_hair': {**exact, 'top_p': 0.950001},
-                   'temperature_true': {**exact, 'temperature': True}, 'temperature_text': {**exact, 'temperature': '1.0'},
+                   'temperature_true': {**exact, 'temperature': True}, 'temperature_text': {**exact, 'temperature': '0.7'},
                    'temperature_null': {**exact, 'temperature': None}, 'effort': {**exact, 'reasoning_effort': 'high'},
                    'json_mode': {**exact, 'response_format': {'type': 'json_object'}},
                    'json_schema': {**exact, 'response_format': {'type': 'json_schema'}},

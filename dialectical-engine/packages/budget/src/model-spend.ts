@@ -146,6 +146,29 @@ export interface ProviderCostSeam {
   }>): Promise<void>;
   /** I4: the hosted requirement, asked only of a successful completion. */
   assertUsageReported(observed: Readonly<{ providerRef: string; usage: unknown }>): Promise<void>;
+  /**
+   * Parallel AI calls (spec 2026-10-12 §3.5): releases the projection this seam
+   * still counts in flight (`CostEnvelopeGuardInput.inFlight`). The gateway's
+   * attempt loop tells the seam about an attempt that produced a body
+   * (`recordCall`), never about one that failed before any arrived, so the
+   * runner's gateway calls this once the whole call has settled. Idempotent; a
+   * no-op without a counter.
+   */
+  releaseInFlight?(): void;
+}
+
+/**
+ * Parallel AI calls (spec 2026-10-12 §3.5) — THE CALLS IN FLIGHT, as the money
+ * seam asks them (`apps/runner/src/run-in-flight.ts` is the shipped one). A
+ * charge is written only after its call, so with several calls of one debate in
+ * flight each would read the same spent total; the seam counts its own call's
+ * projected maximum here before it reads anything, and adds the others'.
+ */
+export interface InFlightSpend {
+  /** Synchronously counts one call and its projected micros; returns an idempotent release. */
+  begin(runId: string, projectedMicros: bigint): () => void;
+  projectedMicros(runId: string): bigint;
+  projectedMicrosAll(): bigint;
 }
 
 /**
@@ -267,6 +290,14 @@ export interface CostEnvelopeGuardInput {
    */
   readonly sharedWall?: SharedWallInput;
   readonly fundingAdmission?: Readonly<{ assertProviderFundingAdmission(runId: string, now: Date): Promise<void> }>;
+  /**
+   * Parallel AI calls (spec 2026-10-12 §3.5): this process's RUN calls in
+   * flight. With it, a run seam's call counts toward its run's spend from its
+   * admission until its charge is written, and the site's day counts every run's.
+   * Absent means no in-flight count: today's checks, byte for byte. It must not
+   * be the gateway's attempt counter (see `InFlightSpend`).
+   */
+  readonly inFlight?: InFlightSpend;
 }
 
 export const DEFAULT_RESERVATION_TTL_MS = 1_800_000 as const;
@@ -440,6 +471,7 @@ export class CostEnvelopeGuard {
   readonly #reservationTtlMs: number;
   readonly #sharedWall: SharedWallInput | null;
   readonly #fundingAdmission: CostEnvelopeGuardInput["fundingAdmission"];
+  readonly #inFlight: InFlightSpend | null;
 
   constructor(input: CostEnvelopeGuardInput) {
     if (input?.store === undefined || input?.policy === undefined) {
@@ -487,6 +519,15 @@ export class CostEnvelopeGuard {
       throw new TypeError("COST_ENVELOPE_GUARD_INPUT_INVALID");
     }
     this.#sharedWall = wall ?? null;
+    const inFlight = input.inFlight;
+    if (inFlight !== undefined && (
+      typeof inFlight?.begin !== "function"
+      || typeof inFlight.projectedMicros !== "function"
+      || typeof inFlight.projectedMicrosAll !== "function"
+    )) {
+      throw new TypeError("COST_ENVELOPE_GUARD_INPUT_INVALID");
+    }
+    this.#inFlight = inFlight ?? null;
   }
 
   /**
@@ -569,27 +610,63 @@ export class CostEnvelopeGuard {
       );
     }
     const admissions = new WeakSet<ProviderCallAdmission>();
+    /**
+     * Parallel AI calls (spec 2026-10-12 §3.5): the RUN's calls in flight. The
+     * story spends its own envelope, after the debate, and is not counted. One
+     * seam serves one gateway call, whose attempts run one after another, so it
+     * holds at most one projection: released when its charge is written, when
+     * the next attempt is admitted (an attempt that failed before any body came
+     * back is never charged), on refusal, or by the gateway once the call settles.
+     */
+    const inFlight = spendSource === "RUN" ? this.#inFlight : null;
+    let releaseCurrent: (() => void) | null = null;
+    const releaseInFlight = (): void => {
+      const release = releaseCurrent;
+      releaseCurrent = null;
+      release?.();
+    };
     return {
       assertCallAllowed: async (projection) => {
+        releaseInFlight();
         const projectedMicros = projectedCallCeilingMicros(input.price, projection);
-        const decision = decideRunCostEnvelope({
-          spentMicros: await envelope.readSpentMicros(input.runId),
-          projectedMicros,
-          ceilingMicros: envelope.ceilingMicros
-        });
-        if (decision.kind === "WOULD_CROSS") throw envelope.refusal(decision);
-        // B9: then the shared wall, for a walled BODY call on a guard that has one.
-        if (walled && this.#sharedWall !== null) {
-          await this.#assertSharedWall(this.#sharedWall, input.runId, projectedMicros);
+        // Counted FIRST, synchronously, then the others are read before the
+        // ledger is: of two calls racing for the last room, the later reader
+        // sees the earlier one, still in flight here or already charged.
+        let othersOfRun = 0;
+        let othersOfRunner = 0;
+        if (inFlight !== null) {
+          const own = BigInt(projectedMicros);
+          releaseCurrent = inFlight.begin(input.runId, own);
+          othersOfRun = Number(inFlight.projectedMicros(input.runId) - own);
+          othersOfRunner = Number(inFlight.projectedMicrosAll() - own);
         }
-        await this.#fundingAdmission?.assertProviderFundingAdmission(input.runId, this.#clock());
-        const callId = randomUUID();
-        if (this.#store.reserveInternalCall === undefined) return;
-        const internal = await this.#store.reserveInternalCall({ callId, runId: input.runId, projectedMicros, spendSource, spendPhase: phase });
-        if (typeof internal !== "boolean") throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Provider funding admission returned no decision");
-        const admission: ProviderCallAdmission = Object.freeze({kind:internal ? "INTERNAL" : "ORDINARY",callId});
-        admissions.add(admission);
-        return admission;
+        try {
+          const decision = decideRunCostEnvelope({
+            spentMicros: await envelope.readSpentMicros(input.runId) + othersOfRun,
+            projectedMicros,
+            ceilingMicros: envelope.ceilingMicros
+          });
+          if (decision.kind === "WOULD_CROSS") throw envelope.refusal(decision);
+          // B9: then the shared wall, for a walled BODY call on a guard that has one.
+          if (walled && this.#sharedWall !== null) {
+            await this.#assertSharedWall(this.#sharedWall, input.runId, projectedMicros, {
+              siteDay: othersOfRunner,
+              person: othersOfRun
+            });
+          }
+          await this.#fundingAdmission?.assertProviderFundingAdmission(input.runId, this.#clock());
+          const callId = randomUUID();
+          if (this.#store.reserveInternalCall === undefined) return;
+          const internal = await this.#store.reserveInternalCall({ callId, runId: input.runId, projectedMicros, spendSource, spendPhase: phase });
+          if (typeof internal !== "boolean") throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Provider funding admission returned no decision");
+          const admission: ProviderCallAdmission = Object.freeze({kind:internal ? "INTERNAL" : "ORDINARY",callId});
+          admissions.add(admission);
+          return admission;
+        } catch (error) {
+          // Refused, or the admission failed: nothing will be sent for it.
+          releaseInFlight();
+          throw error;
+        }
       },
       // I4: charging never refuses. Nothing is written for a call whose vendor
       // said nothing at all about usage — a zero row would read as "this call
@@ -598,61 +675,68 @@ export class CostEnvelopeGuard {
       // cannot read is charged at the call's own projected maximum, because the
       // vendor billed for it either way.
       recordCall: async (observed) => {
-        const admission = observed.admission;
-        if (this.#store.reserveInternalCall !== undefined && (admission === undefined || !admissions.has(admission)))
-          throw new TypedDomainError("INTERNAL_PROVIDER_FRAME_INVALID","Settlement requires this seam's immutable admitted frame");
-        /**
-         * Round 2, Critical B — THE CHARGE COMPUTATION MAY ONLY FAIL TYPED.
-         *
-         * This runs inside the gateway's attempt loop, which decides whether to
-         * retry by asking `error instanceof TypedDomainError`. An untyped throw
-         * from the arithmetic was therefore RETRIED — a second billed call for a
-         * number that will be just as unrepresentable — and none of them was
-         * recorded. Only the pure computation is wrapped: a failure of the STORE
-         * is the ledger's own (the never-charge path) and must keep its name.
-         */
-        let usage: ReturnType<typeof chargeableUsage>;
-        let chargeMicros: number;
         try {
-          usage = chargeableUsage(observed.usage, observed.projection);
-          if (usage === null) return;
-          chargeMicros = chargeMicrosForUsage(input.price, usage);
-        } catch (error) {
-          if (error instanceof TypedDomainError) throw error;
-          throw new TypedDomainError(
-            COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
-            `The charge for ${observed.providerRef} could not be computed:`
-              + ` ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-        const entry = Object.freeze({
-          spendId: admission?.kind === "INTERNAL" ? admission.callId : randomUUID(),
-          spendSource: envelope.spendSource,
-          runId: input.runId,
-          providerRef: observed.providerRef,
-          chargedOn: costEnvelopeDay(this.#clock()),
-          chargeMicros,
-          inputTokens: usage.promptTokens,
-          outputTokens: usage.completionTokens,
-          // Task M1 (R12): a RUN charge says which part of the run spent it.
-          ...(phase === null ? {} : { spendPhase: phase }),
-          attemptId: observed.attemptId ?? null
-        });
-        if (admission?.kind === "INTERNAL") {
-          try { await this.#store.settleInternalCall!(admission.callId, entry); }
-          catch {
-            // The provider already ran. Unknown commit outcome can only replay
-            // this same immutable settlement; retrying provider bytes would pay twice.
-            throw new TypedDomainError("INTERNAL_PROVIDER_SETTLEMENT_UNCERTAIN","The admitted internal provider settlement needs reconciliation");
+          const admission = observed.admission;
+          if (this.#store.reserveInternalCall !== undefined && (admission === undefined || !admissions.has(admission)))
+            throw new TypedDomainError("INTERNAL_PROVIDER_FRAME_INVALID","Settlement requires this seam's immutable admitted frame");
+          /**
+           * Round 2, Critical B — THE CHARGE COMPUTATION MAY ONLY FAIL TYPED.
+           *
+           * This runs inside the gateway's attempt loop, which decides whether to
+           * retry by asking `error instanceof TypedDomainError`. An untyped throw
+           * from the arithmetic was therefore RETRIED — a second billed call for a
+           * number that will be just as unrepresentable — and none of them was
+           * recorded. Only the pure computation is wrapped: a failure of the STORE
+           * is the ledger's own (the never-charge path) and must keep its name.
+           */
+          let usage: ReturnType<typeof chargeableUsage>;
+          let chargeMicros: number;
+          try {
+            usage = chargeableUsage(observed.usage, observed.projection);
+            if (usage === null) return;
+            chargeMicros = chargeMicrosForUsage(input.price, usage);
+          } catch (error) {
+            if (error instanceof TypedDomainError) throw error;
+            throw new TypedDomainError(
+              COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
+              `The charge for ${observed.providerRef} could not be computed:`
+                + ` ${error instanceof Error ? error.message : String(error)}`
+            );
           }
-        } else await this.#store.recordSpend(entry);
+          const entry = Object.freeze({
+            spendId: admission?.kind === "INTERNAL" ? admission.callId : randomUUID(),
+            spendSource: envelope.spendSource,
+            runId: input.runId,
+            providerRef: observed.providerRef,
+            chargedOn: costEnvelopeDay(this.#clock()),
+            chargeMicros,
+            inputTokens: usage.promptTokens,
+            outputTokens: usage.completionTokens,
+            // Task M1 (R12): a RUN charge says which part of the run spent it.
+            ...(phase === null ? {} : { spendPhase: phase }),
+            attemptId: observed.attemptId ?? null
+          });
+          if (admission?.kind === "INTERNAL") {
+            try { await this.#store.settleInternalCall!(admission.callId, entry); }
+            catch {
+              // The provider already ran. Unknown commit outcome can only replay
+              // this same immutable settlement; retrying provider bytes would pay twice.
+              throw new TypedDomainError("INTERNAL_PROVIDER_SETTLEMENT_UNCERTAIN","The admitted internal provider settlement needs reconciliation");
+            }
+          } else await this.#store.recordSpend(entry);
+        } finally {
+          // After the charge is written (or could not be): from here the run's
+          // spent total carries it, so it stops counting in flight.
+          releaseInFlight();
+        }
       },
       assertUsageReported: async (observed) => {
         if (!input.requireReportedUsage) return;
         if (readReportedUsage(observed.usage) === null) {
           throw providerUsageUnreported(observed.providerRef);
         }
-      }
+      },
+      releaseInFlight
     };
   }
 
@@ -718,11 +802,22 @@ export class CostEnvelopeGuard {
    * Real spend only: holds are not counted (budget spec §2.3). The day is read
    * at most once per call and each window once; a run with no pinned owner has
    * no person scope, and its windows are never asked for.
+   *
+   * Parallel AI calls (spec 2026-10-12 §3.5): `inFlight` is the projected
+   * maximum of the OTHER calls in flight, counted before anything was read
+   * (zero without a counter): the site's day adds every run's on this runner,
+   * a person's window only this run's. Another person's debate is not this
+   * person's spend; this person's other debates race as they always have.
    */
-  async #assertSharedWall(wall: SharedWallInput, runId: string, projectedMicros: number): Promise<void> {
+  async #assertSharedWall(
+    wall: SharedWallInput,
+    runId: string,
+    projectedMicros: number,
+    inFlight: Readonly<{ siteDay: number; person: number }>
+  ): Promise<void> {
     const now = this.#clock();
     if (wall.finishBasisPoints !== null && decideSharedWall({
-      spentMicros: await this.#store.readDaySpentMicros(costEnvelopeDay(now)),
+      spentMicros: await this.#store.readDaySpentMicros(costEnvelopeDay(now)) + inFlight.siteDay,
       projectedMicros,
       limitMicros: this.#policy.dailyCeilingMicros,
       finishBasisPoints: wall.finishBasisPoints
@@ -733,7 +828,8 @@ export class CostEnvelopeGuard {
     if (ownerRef === null) return;
     for (const window of await wall.persons.read(ownerRef, now, { runId })) {
       if (decideSharedWall({
-        spentMicros: await wall.owners.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope),
+        spentMicros: await wall.owners.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope)
+          + inFlight.person,
         projectedMicros,
         limitMicros: window.limitMicros,
         finishBasisPoints: window.finishBasisPoints

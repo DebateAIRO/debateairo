@@ -74,7 +74,7 @@ export type Company = Readonly<{
  */
 export const COMPANY: Company = Object.freeze({
   legalName: "DMS Merchandise Shop S.R.L.",
-  tradingNames: Object.freeze(["DebateAI", "Dialectical Engine"]),
+  tradingNames: Object.freeze(["Dialectical Engine"]),
   registeredOffice: "Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, județul Neamț, România",
   tradeRegisterNo: "J2022000426271",
   cui: "45935221",
@@ -139,23 +139,24 @@ export const LEGAL_COOKIES: readonly LegalInventoryItem[] = Object.freeze([
 ]);
 
 /**
- * The four browser-storage keys the UI writes, none ever sent to a server: two in local storage
- * (the notice acknowledgement, the display mode) and two in session storage (the declined
- * language offer, the help-chat conversation — `components/support/conversation.ts`, named here
- * as a literal so the page does not pull the support widget in).
+ * Browser-storage keys the UI writes: two in local storage and five in session storage. The
+ * export link token is sent to the Dialectical Engine server when redeemed; the link outcome stays in the
+ * browser. The help-chat name is literal so this page does not pull in the support widget.
  */
 export const LEGAL_BROWSER_STORAGE: readonly LegalInventoryItem[] = Object.freeze([
   { name: CONSENT_KEY, kindKey: "legal.cookies.consent.kind", purposeKey: "legal.cookies.consent.purpose", lifeKey: "legal.cookies.consent.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: "debateai.mode", kindKey: "legal.cookies.mode.kind", purposeKey: "legal.cookies.mode.purpose", lifeKey: "legal.cookies.mode.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: LANGUAGE_OFFER_DISMISSED_KEY, kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.languageOffer.purpose", lifeKey: "legal.cookies.languageOffer.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: "debateai.support.conversation.v2", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.supportConversation.purpose", lifeKey: "legal.cookies.supportConversation.life", recipientKey: "legal.cookies.recipient.browser" },
-  { name: "debateai.phone-completion-draft.v1", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.phoneDraft.purpose", lifeKey: "legal.cookies.phoneDraft.life", recipientKey: "legal.cookies.recipient.browser" }
+  { name: "debateai.phone-completion-draft.v1", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.phoneDraft.purpose", lifeKey: "legal.cookies.phoneDraft.life", recipientKey: "legal.cookies.recipient.browser" },
+  { name: "debateai.exportPending", kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.exportPending.purpose", lifeKey: "legal.cookies.exportPending.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "debateai.exportLinkOutcome", kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.exportLinkOutcome.purpose", lifeKey: "legal.cookies.exportLinkOutcome.life", recipientKey: "legal.cookies.recipient.browser" }
 ]);
 
 /** All current stored items, cookies first, in the order /cookies and the storage card list them. */
 export const LEGAL_INVENTORY: readonly LegalInventoryItem[] = Object.freeze([...LEGAL_COOKIES, ...LEGAL_BROWSER_STORAGE]);
 
-/** The 24 kind/purpose/life strings of LEGAL_INVENTORY picked out of a legal catalogue (missing keys are left out). */
+/** The kind/purpose/life strings of LEGAL_INVENTORY picked out of a legal catalogue (missing keys are left out). */
 export function inventoryCopy(legal: MessageCatalog): MessageCatalog {
   const copy: Record<string, string> = {};
   for (const { kindKey, purposeKey, lifeKey } of LEGAL_INVENTORY) {
@@ -234,7 +235,9 @@ const UNCHECKED_CLOUD = Object.freeze({
  * A `contact` is filled only where the provider's own privacy policy confirms it; the others stay bracketed.
  * The owner confirmed on 10 October 2026 that each family runs on the provider's direct API under those terms, so the
  * entities lost their brackets and `checkedOn` records that date. Location, retention, zero retention and training stay
- * "unconfirmed" until the production endpoints and account settings are fixed.
+ * "unconfirmed" until the production endpoints and account settings are fixed. Since 12 October 2026 these hosted rows
+ * reach `/providers` only on a build whose flag narrows the roster, and then only the own-servers Qwen row (the GLM-only
+ * first preview keeps it); the Claude, GPT, Gemini and Grok rows never show.
  */
 export const MODEL_PROVIDERS: readonly ProviderRegisterEntry[] = Object.freeze([
   { ...UNCHECKED_CLOUD, key: "claude", provider: "Anthropic", models: "Claude", entity: "Anthropic Ireland, Limited", homeCountryKey: "legal.providers.ireland", contact: "privacy@anthropic.com", checkedOn: "2026-10-10" },
@@ -262,26 +265,31 @@ export const MODEL_PROVIDERS: readonly ProviderRegisterEntry[] = Object.freeze([
 ]);
 
 /**
- * The support chat calls one model of its own (`apps/api/src/support/model.ts`), chosen when the
- * product is hosted; until then every fact about it is a placeholder.
+ * The support chat calls one model of its own (`apps/api/src/support/model.ts`): Claude Haiku 5.5
+ * on Anthropic's API (owner, 12 October 2026). Its facts are the ones checked against Anthropic's
+ * published terms on 10 October 2026 for the preview's Anthropic row (`ANTHROPIC_PREVIEW_PROVIDER`
+ * below; `docs/legal/2026-10-10-preview-provider-facts.md`): a customer in the EEA contracts with
+ * Anthropic Ireland, Limited; API inputs and outputs are deleted within 30 days unless flagged for
+ * misuse or the law requires more; zero data retention needs Anthropic's approval, which we do not
+ * have; no training on customer content; transfers under standard contractual clauses.
  */
 export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
   key: "support",
   provider: null,
   nameKey: "legal.providers.supportName",
-  models: "[…]",
+  models: "Claude Haiku 5.5",
   modelsKey: null,
-  entity: "[…]",
-  homeCountryKey: "legal.providers.unconfirmed",
+  entity: "Anthropic Ireland, Limited",
+  homeCountryKey: "legal.providers.ireland",
   purposes: Object.freeze<ProviderPurpose[]>(["support"]),
   purposesConfirmed: true,
-  locationKey: "legal.providers.unconfirmed",
-  retentionKey: "legal.providers.unconfirmed",
-  zeroRetention: "unconfirmed",
-  training: "unconfirmed",
-  basisKey: "legal.providers.unconfirmed",
-  contact: "[…]",
-  checkedOn: null
+  locationKey: "legal.providers.locationAnthropic",
+  retentionKey: "legal.providers.retentionAnthropic",
+  zeroRetention: "no",
+  training: "no",
+  basisKey: "legal.providers.sccBasis",
+  contact: "privacy@anthropic.com",
+  checkedOn: "2026-10-10"
 });
 
 /**
@@ -320,10 +328,10 @@ const PREVIEW_ROLE_MODELS: ReadonlySet<string> = new Set(["zai-org/GLM-5.3-Flash
 
 /**
  * Serving company for the private preview's open-weight models; terms reviewed 5 October 2026 and
- * rechecked 10 October 2026. Listed only by a preview build (`providerRegister`), which names in
- * `models` the DeepInfra models that build uses. Its jobs are confirmed: every panel member writes
- * and judges arguments, GLM writes the answer and the verdict story, DeepSeek checks both (the
- * first preview's GLM alone does all three).
+ * rechecked 10 October 2026. Listed by any build that offers a DeepInfra model (`providerRegister`),
+ * which names in `models` the DeepInfra models that build uses (all four with no flag). Its jobs are
+ * confirmed: every panel member writes and judges arguments, GLM writes the answer and the verdict
+ * story, DeepSeek checks both (the first preview's GLM alone does all three).
  */
 export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -346,8 +354,8 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
  * outputs are deleted within 30 days unless flagged for misuse or the law requires more (privacy
  * center); zero data retention needs Anthropic's approval, which the preview does not have; no
  * training on customer content (Commercial Terms B); transfers under standard contractual clauses
- * (Data Processing Addendum). On a preview build that offers it, it replaces the hosted-site
- * placeholder row for Claude, so the page never shows Anthropic twice.
+ * (Data Processing Addendum). On any build that offers it, it replaces the hosted-site placeholder
+ * row for Claude, so the page never shows Anthropic twice; with no flag, every build offers it.
  */
 export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -356,6 +364,8 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   models: "Claude Haiku 5.5",
   entity: "Anthropic Ireland, Limited",
   homeCountryKey: "legal.providers.ireland",
+  // One of the five launch models (owner, 12 October 2026): role rotation gives it every debate job.
+  purposesConfirmed: true,
   locationKey: "legal.providers.locationAnthropic",
   retentionKey: "legal.providers.retentionAnthropic",
   zeroRetention: "no",
@@ -432,11 +442,12 @@ function previewModelIds(flag: string): ReadonlySet<string> | null {
 }
 
 /**
- * The whole Register, in the order `/providers` shows it. Only the private preview's build sets
+ * The whole Register, in the order `/providers` shows it. Only a build that narrows the roster sets
  * the public flag the new-debate form reads (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON,
- * `previewPlanRoster`); every other build, the real site included, sets none and gets the
- * hosted-site rows unchanged. A preview build lists only the companies that receive text on it
- * (owner, 10 October 2026): the hosted Anthropic, OpenAI, Google and xAI rows never show there.
+ * `previewPlanRoster`). A build with no flag, the real site included, lists the five models the
+ * product runs (owner, 12 October 2026): Anthropic for Claude Haiku 5.5 and DeepInfra for the other
+ * four. Every build lists only the companies that receive text on it (owner, 10 October 2026): the
+ * hosted Anthropic, OpenAI, Google and xAI rows never show, only their checked preview rows.
  * It lists DeepInfra just before the support chat's model, naming the DeepInfra models its plans
  * offer plus, on a per-plan build, the two role models (GLM writes, DeepSeek checks); it shows the
  * checked Anthropic or Google preview row only when it offers Claude Haiku 5.5 or Gemini 3.8 Flash;
@@ -446,8 +457,7 @@ function previewModelIds(flag: string): ReadonlySet<string> | null {
  * Never throws.
  */
 export function providerRegister(previewFreeModelIdsJson: string | undefined): readonly ProviderRegisterEntry[] {
-  if (previewFreeModelIdsJson === undefined) return Object.freeze([...MODEL_PROVIDERS, SUPPORT_PROVIDER]);
-  const ids = previewModelIds(previewFreeModelIdsJson);
+  const ids = previewFreeModelIdsJson === undefined ? null : previewModelIds(previewFreeModelIdsJson);
   const offers = (id: string): boolean => ids === null || ids.has(id);
   // A per-plan build always uses the role models; the first preview's build (GLM alone) has no others.
   const roleModels = ids !== null && ids.size === 1 && ids.has(LEGACY_PREVIEW_MODEL) ? new Set<string>() : PREVIEW_ROLE_MODELS;

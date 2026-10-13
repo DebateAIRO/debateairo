@@ -641,7 +641,8 @@ export async function runPracticeLane(context: PracticeLaneContext): Promise<Pra
         digest: request.digest,
         servedNodes,
         exemptTokens: idShapedTokensIn(personTexts),
-        wording: synthesisWordingIndex({ request, personTexts })
+        wording: synthesisWordingIndex({ request, personTexts }),
+        questionLine: q.questionLine
       }, reply));
       const response = await context.gateway.call({
         runId: context.runId, subjectItemId: context.workItemId,
@@ -661,7 +662,7 @@ export async function runPracticeLane(context: PracticeLaneContext): Promise<Pra
       const { digest, controls, codeLabel } = synthesisInputs(q);
       const request = buildEvaluatorRequest({ controls, round: 1, digest, codeLabel, candidateStatement: practiceCandidateStatement(q) });
       const framed = buildSynthesisRolePrompt(request, q.languageName);
-      const reading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply));
+      const reading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, q.questionLine));
       const response = await context.gateway.call({
         runId: context.runId, subjectItemId: context.workItemId,
         callSiteKey: synthesisCallSiteKey({ role: "EVALUATOR", round: 1 }),

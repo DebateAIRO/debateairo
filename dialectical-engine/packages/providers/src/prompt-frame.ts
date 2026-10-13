@@ -1,5 +1,5 @@
 import { randomBytes as cryptoRandomBytes } from "node:crypto";
-import { TypedDomainError } from "@debateai/kernel";
+import { TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError } from "@debateai/kernel";
 import type { PromptPacket } from "./index.js";
 import { CONTENT_RULE_HEADING, CONTENT_RULE_TEXT } from "./content-rule.js";
 
@@ -172,8 +172,13 @@ export const PATCH_REPLY_FORM_SENTENCE = "A later block may instead carry machin
  * was seen in its review and story-checker replies). The model reads the example as a backslash followed by a straight
  * double quote: the JSON escape, written correctly. Code's, like the rest of the frame: no sealed contract text, register
  * value or contract fingerprint (`promptContractFingerprintText`) changes.
+ *
+ * Reply language (owner approval 2026-10-12): the sentence used to offer only „ ” and « », the quotation marks of
+ * Polish, German and Romanian and of French, Spanish, Portuguese and Catalan; every language MiMo slipped into in the
+ * English practice debates but Chinese was one of those. It now points at the question's own language, with the
+ * English marks as the example.
  */
-export const TEXT_QUOTE_RULE_SENTENCE = "Inside any text value, write quotation marks as \u201E \u201D or \u00AB \u00BB, or escape a straight double quote as \\\"; never put an unescaped straight double quote inside a text." as const;
+export const TEXT_QUOTE_RULE_SENTENCE = "Inside any text value, write quotation marks the way the question's language writes them (for English \u201C \u201D or \u2018 \u2019), or escape a straight double quote as \\\"; never put an unescaped straight double quote inside a text." as const;
 
 /**
  * The safety frame, verbatim. Everything in it is code's. It refers to the fence and the per-call canary, which the
@@ -411,12 +416,16 @@ export function schemaFailureLocator(rejected: {
   readonly parseStatus: string;
   readonly parseError: string;
 }): FramedRepairLocator {
-  const code = REPAIR_CODE.test(rejected.parseStatus) ? rejected.parseStatus : "CONTENT_REJECTED";
+  let code = REPAIR_CODE.test(rejected.parseStatus) ? rejected.parseStatus : "CONTENT_REJECTED";
   let segments: readonly unknown[];
   try {
-    const issues = JSON.parse(rejected.parseError) as readonly { readonly path?: readonly unknown[] }[];
+    const issues = JSON.parse(rejected.parseError) as readonly { readonly path?: readonly unknown[]; readonly message?: unknown }[];
     const first = Array.isArray(issues) ? issues[0] : undefined;
     segments = Array.isArray(first?.path) ? first.path : [];
+    // Reply language (2026-10-12): a reply refused only for its language is re-asked under that code, the engine's
+    // constant, so the full re-ask says what to fix as the short follow-up does (`planPatchFollowUp`).
+    if (rejected.parseStatus === "SCHEMA_FAILED" && Array.isArray(issues) && issues.length > 0
+      && issues.every((issue) => issue?.message === TEXT_NOT_IN_QUESTION_LANGUAGE)) code = TEXT_NOT_IN_QUESTION_LANGUAGE;
   } catch {
     segments = judgeIssueListPath(rejected.parseError);
   }

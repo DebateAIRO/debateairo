@@ -33,8 +33,11 @@ const MIGRATOR_ROLE_LIMIT = 3; // deploy/postgres/bootstrap.sql: debateai_prod_m
 const OPERATOR_COMMANDS = 10; // billing, support and owner commands, run by hand, one at a time
 // Left free on top of every ceiling: a guarded query that is cancelled opens a
 // short extra connection outside its pool (packages/db/src/private-stream.ts),
-// and the owner needs room to log in during an incident.
-const SPARE = 25;
+// and the owner needs room to log in during an incident. 25 until 2026-10-12;
+// parallel AI calls (spec 2026-10-12-parallel-calls-design.md §3.6) gave the
+// runner 14 more (20 -> 34), and the data export worker (mission data-export
+// S01) took 1 on the API, which leaves 21.
+const SPARE = 21;
 
 function poolCalls(source: string): readonly string[] {
   return [...source.matchAll(/createPool\([^)]*\)/gu)].map((match) => match[0]);
@@ -126,20 +129,35 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
       // Opening a case holds one connection and reads the messages on another.
       support: 2 * 2,
       // Every relay slot the register may allow, plus the queue's bookkeeping.
-      supportRelayLease: relaySlots + 2
+      supportRelayLease: relaySlots + 2,
+      // One export build at a time (single-flight timer) on one connection (V-43): its lease renewal queues behind its snapshot read.
+      dataExport: 1
     };
     for (const [key, floor] of Object.entries(floors)) {
       expect(API_DATABASE_POOLS[key as keyof typeof API_DATABASE_POOLS].max, key).toBeGreaterThanOrEqual(floor);
     }
   });
 
-  it("caps the runner's debates so each one has its two connections", async () => {
+  it("lets the export's lease renewal wait out its snapshot read on one connection", () => {
+    // V-43: one connection. The worker renews its 45 s lease every 15 s; on one connection that renewal queues behind
+    // the snapshot read and must wait the full 15 s, so a read of up to ~30 s keeps its lease (measured, ARCH-FIX r17).
+    expect(API_DATABASE_POOLS.dataExport.max).toBe(1);
+    expect(API_DATABASE_POOLS.dataExport.connectionTimeoutMillis).toBe(15_000);
+  });
+
+  it("caps the runner's debates so each one has its three connections, and claim renewal its own two", async () => {
     // A running debate holds its content lease for the whole debate and takes
     // a second connection for its spend and memory reads
-    // (apps/runner/src/index.ts withDisclosureContentLease); 4 more serve the
-    // claim, the start-up reconciliation and the story writer.
+    // (apps/runner/src/index.ts withDisclosureContentLease); with its AI calls
+    // in flight at once (spec 2026-10-12-parallel-calls-design.md §3.6) their
+    // ledger and spend writes overlap, so a third. 8 more serve the claim, the
+    // start-up reconciliation, the story writer and bursts.
     expect(RUNNER_CAPACITY.concurrentRuns).toBe(8);
-    expect(RUNNER_DATABASE_POOLS.runtime.max).toBeGreaterThanOrEqual(RUNNER_CAPACITY.concurrentRuns * 2 + 4);
+    expect(RUNNER_DATABASE_POOLS.runtime.max).toBe(RUNNER_CAPACITY.concurrentRuns * 3 + 8);
+    expect(RUNNER_DATABASE_POOLS.runtime.max).toBe(32);
+    // Claim renewal never waits behind a burst of a debate's writes: its own pool.
+    expect(RUNNER_DATABASE_POOLS.keepAlive.max).toBe(2);
+    expect(RUNNER_DATABASE_POOLS.keepAlive.name).toBe("runner:keep-alive");
     const runner = await readFile(RUNNER_MAIN, "utf8");
     // Without slots the job system hands one runner up to 100 debates at once
     // (@hatchet-dev/typescript-sdk DEFAULT_DEFAULT_SLOTS).
@@ -170,7 +188,7 @@ describe("the whole server stays under Postgres's limit", () => {
     const api = sum(API_DATABASE_POOLS, ["evaluatorDevMenu"]) + SUPPORT_CONTROL_PLANE_POOL.max;
     const runner = sum(RUNNER_DATABASE_POOLS);
     expect(api).toBeLessThanOrEqual(80);
-    expect(runner).toBeLessThanOrEqual(20);
+    expect(runner).toBe(34);
     const ceiling = api + runner + HATCHET_ROLE_LIMIT + MIGRATOR_ROLE_LIMIT + OPERATOR_COMMANDS;
     expect(ceiling + SPARE).toBeLessThanOrEqual(POSTGRES_MAX_CONNECTIONS - SUPERUSER_RESERVED);
   });

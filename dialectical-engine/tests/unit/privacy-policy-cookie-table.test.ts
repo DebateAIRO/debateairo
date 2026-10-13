@@ -6,7 +6,7 @@ import { LEGAL_BROWSER_STORAGE, LEGAL_COOKIES, type LegalInventoryItem } from ".
 /**
  * S01 PP13 side of R18, and R12-R13 (SPEC-v2; PLAN "PP13 shape", D-34, D-38). Every locale's Privacy Policy §13 —
  * the lines between its `## 13.` and `## 14.` headings in `apps/ui/legal/<loc>/privacy-policy.md` — is five blocks:
- * an intro paragraph, one markdown table of the eight items of record, and three paragraphs. The table names exactly
+ * an intro paragraph, one markdown table of the twenty items of record, and three paragraphs. The table names exactly
  * the items `/cookies` lists (LISTED = LEGAL_COOKIES then LEGAL_BROWSER_STORAGE), and each row's kind and lifetime cells
  * are that locale's own `/cookies` strings (`apps/ui/messages/<loc>/legal.json`), character for character.
  */
@@ -20,7 +20,7 @@ const LOCALES = readdirSync(LEGAL_DIR, { withFileTypes: true })
   .sort();
 
 /** The ASCII digit runs each lifetime cell carries, in LISTED order (SPEC-v2 R12 iv). */
-const DIGIT_RUNS: readonly (readonly string[])[] = [["14"], ["14"], ["30"], ["1"], ["8", "15"], ["8", "15"], ["30"], ["30"], ["299"], ["299"], ["5"], ["5"], ["5"], [], [], [], [], ["15"]];
+const DIGIT_RUNS: readonly (readonly string[])[] = [["14"], ["14"], ["30"], ["1"], ["8", "15"], ["8", "15"], ["30"], ["30"], ["299"], ["299"], ["5"], ["5"], ["5"], [], [], [], [], ["15"], [], []];
 
 type Block = { kind: "p" | "table"; text: string };
 
@@ -85,7 +85,7 @@ function catalog(locale: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(ROOT, "apps/ui/messages", locale, "legal.json"), "utf8")) as Record<string, unknown>;
 }
 
-describe("Privacy Policy §13 — the eighteen actual stored items in every locale (R12, R13, R18)", () => {
+describe("Privacy Policy §13 — the twenty actual stored items in every locale (R12, R13, R18)", () => {
   it("every locale's §13 table names exactly the LISTED items, both ways", () => {
     expect(LOCALES).toHaveLength(35);
     expect(compareNames(LISTED.map(({ name }) => name))).toEqual([]);
@@ -138,7 +138,7 @@ describe("Privacy Policy §13 — the eighteen actual stored items in every loca
     const found = blocks(section);
     expect(found.map(({ kind }) => kind)).toEqual(["p", "table", "p", "p", "p"]);
     const phrases: Record<number, readonly string[]> = {
-      0: ["18 items", "13 cookies", "5 entries", "strictly necessary", "only by Dialectical Engine", "Cookie Policy", "dezbatere.ro/cookies"],
+      0: ["20 items", "13 cookies", "7 entries", "strictly necessary", "only by Dialectical Engine", "Cookie Policy", "dezbatere.ro/cookies"],
       2: ["no other party", "across websites"],
       3: ["Do Not Track", "with or without"],
       4: ["block or delete", "browser settings", "stops working", "signing in", "language", "display"]

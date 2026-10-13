@@ -6,7 +6,7 @@ import { assertFramedPrompt, buildFramedPrompt, promptContractFingerprintText } 
 import {
   STORYTELLER_ANSWER_FORM,
   STORY_CHECKER_ANSWER_FORM,
-  STORY_CHECKER_OBJECTION_MAX_CHARS,
+  STORY_CHECKER_LIMITS,
   StoryCheckerVerdictSchema,
   assembleStorytellerInstruction,
   buildStoryCheckerContract,
@@ -76,7 +76,7 @@ describe("verdict story — the question's language (R1, dev's argument-language
         instruction: `${contract.instruction}\n\n${argumentLanguageDirective("Romanian")}`,
         answerForm: contract.answerForm
       });
-      expect(romanian.instruction).toContain("Write every natural-language field in Romanian.");
+      expect(romanian.instruction).toContain("Write every natural-language field in Romanian, the language of the question, even where the material quotes another language.");
       expect(Object.isFrozen(romanian)).toBe(true);
       // The door still accepts it: the directive holds no token reserved for the frame.
       const framed = buildFramedPrompt({ contract: romanian, material: [{ name: "question", content: JSON.stringify("Ne mut\u0103m?") }] });
@@ -163,8 +163,8 @@ describe("verdict story — each answer form describes what its parser enforces"
       expect(STORY_CHECKER_ANSWER_FORM).toContain(`"${criterion}": boolean`);
     }
     // Checker v3 (R15 practice debate, 2026-10-13): the objection's limit the form states is the schema's, 4000.
-    expect(STORY_CHECKER_ANSWER_FORM).toContain(`"objection": null | non-empty string of at most ${STORY_CHECKER_OBJECTION_MAX_CHARS} characters,`);
-    expect(STORY_CHECKER_OBJECTION_MAX_CHARS).toBe(4000);
+    expect(STORY_CHECKER_ANSWER_FORM).toContain(`"objection": null | non-empty string of at most ${STORY_CHECKER_LIMITS.maxObjectionChars} characters,`);
+    expect(STORY_CHECKER_LIMITS.maxObjectionChars).toBe(4000);
     expect(StoryCheckerVerdictSchema.safeParse({ satisfied: false, objection: "x".repeat(4000), criteria: UNMET }).success).toBe(true);
     expect(StoryCheckerVerdictSchema.safeParse({ satisfied: false, objection: "x".repeat(4001), criteria: UNMET }).success).toBe(false);
     expect(STORY_CHECKER_ANSWER_FORM).toContain("When satisfied is true, every criterion must be true.");

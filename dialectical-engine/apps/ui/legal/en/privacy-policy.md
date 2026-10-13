@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.3 · Effective 12 October 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
-**In short.** We collect what an account needs and what you choose to type. Your questions go to AI providers listed in our Register; they are not used to train models. Debates are private unless you publish them. Deleting your account destroys the keys to your private data; when you schedule it, you choose whether your published debates are taken down too or stay public under your retired pseudonym. You can reach us at privacy@dezbatere.ro, and people named in a debate can ask for removal without an account.
+**In short.** We collect what an account needs and what you choose to type. Your questions go to AI providers listed in our Register; they are not used to train models. Our hosting provider stores your account and your debates in London, in the United Kingdom; section 5 says where else your data goes. Debates are private unless you publish them. Deleting your account destroys the keys to your private data; when you schedule it, you choose whether your published debates are taken down too or stay public under your retired pseudonym. You can reach us at privacy@dezbatere.ro, and people named in a debate can ask for removal without an account.
 
 ## 1. Who is responsible for your data
 
@@ -95,6 +95,8 @@ We do not profile you, we do not use your data for advertising, and we do not se
 
 **Other recipients.** Besides the AI providers, these processors handle data for us. Our hosting provider, OVHcloud, stores and runs the service in its data centre in London, in the United Kingdom. The European Commission has decided that the United Kingdom protects personal data adequately (its adequacy decision runs until December 2031), so this transfer needs no further safeguards. Cloudflare delivers our pages, carries traffic between you and the service, and runs the bot check (section 2); it is a US company certified under the EU–US Data Privacy Framework, and its contract with us adds the EU standard contractual clauses as a fallback. Amazon Simple Email Service, under our contract with Amazon Web Services EMEA SARL in Luxembourg, sends account emails; where Amazon handles that data in the United States, the transfer relies on the EU standard contractual clauses in Amazon's data-processing terms. Payments go through our payment provider, NETOPIA Payments, once paid plans start. Each acts on our documented instructions under a data-processing agreement with the safeguards Article 28 requires. We do not permit any processor to use your data for its own purposes. Where a provider would do so, it is a controller in its own right, and we do not send it your data.
 
+**Where your data is.** Your account and your debates are stored in the United Kingdom, on our hosting provider's servers in London. Cloudflare carries traffic through its own network, and Amazon may handle account emails in the United States. Each AI provider processes the text it receives in the countries the Register names for it, mostly the United States.
+
 **Public authorities.** We disclose personal data to courts, regulators or law-enforcement authorities where the law requires it, and we tell you unless the law prevents us.
 
 ## 6. Publishing and visibility
@@ -148,12 +150,12 @@ You can exercise any of these free of charge by writing to **privacy@dezbatere.r
 
 | Right | What it means here |
 | --- | --- |
-| **Access** (Art. 15) | A copy of the personal data we hold about you, and this information. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Access** (Art. 15) | A copy of the personal data we hold about you, and this information. In Settings, choose Export data: we prepare a ZIP file of JSON files plus one page you can open in any browser, and email you a download link that works for 24 hours and only while you are signed in to your account. |
 | **Rectification** (Art. 16) | Correct your email or recovery email from Settings. Your pseudonym cannot be changed, for the reasons in the Terms; you can close the account and open a new one |
 | **Erasure** (Art. 17) | Delete a private debate at any time from the debate page. Close your account from Settings; section 7 explains exactly what that does. Ask us to remove a published debate that contains your data whether or not you are the author |
 | **Restriction** (Art. 18) | Ask us to stop processing particular data while a dispute about it is resolved |
 | **Objection** (Art. 21) | Object to processing based on legitimate interests — the security and audit processing in section 4 — and we stop unless we can show compelling grounds. Object to marketing at any time, and we stop |
-| **Portability** (Art. 20) | Your debates and account data in a commonly used, machine-readable format. \[Pending: same export as Access.\] Non-personal content you created, such as your questions, is returned to you on request when the contract ends |
+| **Portability** (Art. 20) | Your debates and account data in a commonly used, machine-readable format. Use Export data in Settings: the ZIP holds your data as machine-readable JSON files plus one readable page, sent as an emailed link that works for 24 hours and only while you are signed in. Non-personal content you created, such as your questions, is returned to you on request when the contract ends |
 | **Withdraw consent** (Art. 7(3)) | Withdraw marketing consent from any email or from Settings; withdraw the sensitive-data consent by closing your account from Settings (you can also leave such data out or delete a debate). Withdrawal does not affect processing that already happened |
 | **Complain** | To the Romanian supervisory authority, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bucharest, <anspdcp@dataprotection.ro>, or to the authority in the country where you live. We would rather hear from you first |
 
@@ -174,7 +176,7 @@ Dialectical Engine is for adults. You confirm that you are 18 or over when you r
 ## 13. Cookies
 
 
-Dialectical Engine uses 18 items, all strictly necessary for the service you asked for and all set only by Dialectical Engine: 13 cookies and 5 entries in your browser's storage. We set no analytics, advertising or tracking cookies. The **Cookie Policy** at dezbatere.ro/cookies lists them with what each one does and who receives it, and will change before anything else is added.
+Dialectical Engine uses 20 items, all strictly necessary for the service you asked for and all set only by Dialectical Engine: 13 cookies and 7 entries in your browser's storage. We set no analytics, advertising or tracking cookies. The **Cookie Policy** at dezbatere.ro/cookies lists them with what each one does and who receives it, and will change before anything else is added.
 
 | Name | Type | Purpose | Lasts |
 |---|---|---|---|
@@ -196,6 +198,8 @@ Dialectical Engine uses 18 items, all strictly necessary for the service you ask
 | `debateai.languageOffer.dismissed` | Session storage | Remembers, for this tab, that you declined the offer to show a debate in another language. | Until you close the tab |
 | `debateai.support.conversation.v2` | Session storage | Keeps your help-chat conversation on screen while the tab stays open. It is erased when someone signs in or signs out in this tab. | Until you close the tab |
 | `debateai.phone-completion-draft.v1` | Session storage | Unfinished question during phone completion; cleared on session, sign-out or owner changes | 15 minutes or until earlier clearing |
+| `debateai.exportPending` | Session storage | Keeps the emailed export link in this tab for sign-in and retry. | Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result |
+| `debateai.exportLinkOutcome` | Session storage | Remembers which download-link message to show in this tab. | Until tab close, sign-out, or a new link |
 
 No other party collects information about your online activities over time and across websites through Dialectical Engine.
 
@@ -229,7 +233,7 @@ Our privacy officer, and in Quebec the person in charge of the protection of per
 
 ### B.4 Australia and New Zealand
 
-**Australia.** Overseas recipients of your personal information are the AI providers and processors listed in the Register, located in the United States and the European Union; we take reasonable steps to ensure they handle it in accordance with the Australian Privacy Principles. **Automated decisions:** from 10 December 2026 this policy identifies the kinds of decisions made by computer programs that significantly affect your rights or interests — there are none; scores and verdicts concern arguments, not you — and the personal information used in them. Complaints may be made to the **Office of the Australian Information Commissioner**. **New Zealand.** Our privacy officer is our director, reachable at privacy@dezbatere.ro. Where we collect personal information about you indirectly — because another user included it in a question — this policy and section 11 are the notice we give. We disclose to the AI providers in the Register as our agents, under contracts requiring comparable safeguards. Complaints may be made to the **Office of the Privacy Commissioner**.
+**Australia.** Overseas recipients of your personal information are the processors named in section 5, including our hosting provider in London, in the United Kingdom, and the AI providers listed in the Register. They are located in the United Kingdom, the United States and the European Union, and the Register names each AI provider's countries; we take reasonable steps to ensure they handle it in accordance with the Australian Privacy Principles. **Automated decisions:** from 10 December 2026 this policy identifies the kinds of decisions made by computer programs that significantly affect your rights or interests — there are none; scores and verdicts concern arguments, not you — and the personal information used in them. Complaints may be made to the **Office of the Australian Information Commissioner**. **New Zealand.** Our privacy officer is our director, reachable at privacy@dezbatere.ro. Where we collect personal information about you indirectly — because another user included it in a question — this policy and section 11 are the notice we give. We disclose to the AI providers in the Register as our agents, under contracts requiring comparable safeguards. Complaints may be made to the **Office of the Privacy Commissioner**.
 
 ### B.5 Switzerland
 

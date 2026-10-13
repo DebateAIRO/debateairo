@@ -30,6 +30,25 @@ const BILLING_LEGAL_LINKS = [
 /** DB-IP Lite's CC BY 4.0 licence asks for this credit link on the site (spec §1.5, §2.10); A14 keeps it billing-free. */
 const DBIP_URL = "https://db-ip.com";
 
+/**
+ * ANPC's pictogram for alternative dispute resolution (SAL), the consumer-protection link Romanian law asks a shop to show
+ * (design 15a/15b/15c). The EU's ODR platform (SOL) closed on 20 July 2025, so it has no badge. The artwork and its words
+ * are ANPC's own, in Romanian, so the alt text and the title stay Romanian in every locale, marked `lang="ro"`.
+ */
+const ANPC_SAL_URL = "https://reclamatiisal.anpc.ro/";
+const ANPC_SAL_TITLE = "ANPC – Soluționarea alternativă a litigiilor";
+const ANPC_SAL_ALT = `${ANPC_SAL_TITLE}. Detalii`;
+const ANPC_SAL_SRC = "/consumer-protection/anpc-sal.png";
+
+/** Both footer shapes show it, billing on or off; legal.css sizes it per shape (44px full, 22px one line, 40px phone). */
+function AnpcSalBadge() {
+  return (
+    <a className="siteFooterAnpc" href={ANPC_SAL_URL} target="_blank" rel="noopener noreferrer" title={ANPC_SAL_TITLE} lang="ro">
+      <img src={ANPC_SAL_SRC} alt={ANPC_SAL_ALT} width={337} height={88} />
+    </a>
+  );
+}
+
 const NO_MARKS: PaymentMarks = Object.freeze({ netopia: false, visa: false, mastercard: false });
 
 /** Spec §2.18: NETOPIA's logo first, then the card marks; each brand name stays untranslated in every locale. */
@@ -57,10 +76,11 @@ export function PaymentMarksGroup({ marks }: { marks: PaymentMarks }) {
 /**
  * The site footer (design 15a/15b/15c), one component in two shapes:
  *
- * - `full` — marketing and legal pages: company block, PRODUCT and LEGAL columns, then the
- *   copyright line with the language switcher. On a phone the columns stack (15c) in CSS.
- * - `line` — every other screen: copyright, the seven legal links and cookie preferences on one
- *   line, so the canvas keeps its room (15b).
+ * - `full` — marketing and legal pages: company block, PRODUCT and LEGAL columns, the CONSUMER
+ *   PROTECTION row (ANPC's SAL badge), then the copyright line with the language switcher. On a
+ *   phone the columns stack (15c) in CSS.
+ * - `line` — every other screen: copyright, the seven legal links, cookie preferences and the
+ *   small SAL badge on one line, so the canvas keeps its room (15b).
  *
  * The root layout renders the `line` footer after every page; a page that renders the `full`
  * footer hides it through `.appShell:has(.siteFooterFull) > .siteFooterLine` in `app/legal.css`,
@@ -96,6 +116,7 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
             </li>
           </ul>
         </nav>
+        <AnpcSalBadge />
       </footer>
     );
   }
@@ -158,6 +179,10 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
             </li>
           </ul>
         </nav>
+      </div>
+      <div className="siteFooterConsumer">
+        <span className="siteFooterHead">{t(catalog, "chrome.footer.consumerProtection")}</span>
+        <AnpcSalBadge />
       </div>
       <PaymentMarksGroup marks={marks} />
       <div className="siteFooterBase">

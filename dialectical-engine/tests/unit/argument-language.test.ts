@@ -1,6 +1,7 @@
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { argumentLanguageDirective, detectArgumentLanguage } from "@debateai/kernel";
+import { argumentLanguageDirective, detectArgumentLanguage, foreignLatinLetterCount } from "@debateai/kernel";
 
 const CASES = [
   ["ro", "Romanian", "Ar trebui ca România să investească mai mult în transportul public, deoarece orașele au nevoie de aer mai curat."],
@@ -248,6 +249,11 @@ describe("detectArgumentLanguage", () => {
     expect(detectArgumentLanguage(text)).toMatchObject({ tag, confidence: "high" });
   });
 
+  it("detects the 2026-10-12 practice question as English (it was \"und\", so every step was told \"the same language as the question\")", () => {
+    expect(detectArgumentLanguage("Should a mid-sized city make its central bus lines free to ride?"))
+      .toEqual({ tag: "en", nameEn: "English", confidence: "high" });
+  });
+
   it("detects the packet's short Russian sentence at high confidence", () => {
     expect(detectArgumentLanguage("Следует ли отменить субсидии на топливо?"))
       .toMatchObject({ tag: "ru", confidence: "high" });
@@ -308,10 +314,81 @@ describe("detectArgumentLanguage", () => {
   });
 });
 
+/**
+ * Question language (2026-10-13): a real paid practice run on a Romanian question about the euro had two plain
+ * Romanian sentences read as French with high confidence (they share î and â, "de", "la" and "au"). A language whose
+ * alphabet lacks letters the claim writes in its lowercase words now loses its marker at one such letter and is out at
+ * two; Romanian and Spanish also know a few more of their own small words. Measured on every sentence of six to thirty
+ * words of the site's translated Terms and Privacy pages (35 languages).
+ */
+function legalSentences(locale: string): string[] {
+  const files = locale === "en"
+    ? ["../../apps/ui/lib/termsOfService.ts", "../../apps/ui/lib/privacyPolicy.ts"]
+    : [`../../apps/ui/lib/legal/${locale}/termsOfService.ts`, `../../apps/ui/lib/legal/${locale}/privacyPolicy.ts`];
+  return files.flatMap((file) => [...readFileSync(new URL(file, import.meta.url), "utf8").matchAll(/text: "((?:[^"\\]|\\.)*)"/gu)]
+    .map((match) => JSON.parse(`"${match[1]!}"`) as string)
+    .filter((text) => !text.startsWith("[")))
+    .flatMap((paragraph) => paragraph.split(/(?<=[.!?;:])\s+/u))
+    .filter((sentence) => { const words = sentence.split(/\s+/u).length; return words >= 6 && words <= 30; });
+}
+const LEGAL_LOCALES = ["en", ...readdirSync(new URL("../../apps/ui/lib/legal/", import.meta.url), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory()).map((entry) => entry.name)].sort();
+
+describe("Romanian is not French, and neighbours stay apart (2026-10-13)", () => {
+  it.each([
+    "Renunțarea la leu înseamnă pierderea politicii monetare proprii și a cursului de schimb, instrumente care au amortizat șocurile asimetrice în ultimii douăzeci de ani.",
+    "Impactul social depinde de comunicarea tranziției și de controlul prețurilor în perioada de schimb."
+  ])("reads the Romanian sentence as Romanian: %s", (text) => {
+    expect(detectArgumentLanguage(text)).toEqual({ tag: "ro", nameEn: "Romanian", confidence: "high" });
+  });
+
+  it("a Romanian sentence with too little evidence of its own falls back rather than reading as French", () => {
+    expect(detectArgumentLanguage("Aveți responsabilitatea de a verifica înainte de a vă baza pe rezultate sau de a le republica.").tag)
+      .not.toBe("fr");
+  });
+
+  it("counts only letters a language never writes, in lowercase words, outside codes", () => {
+    expect(foreignLatinLetterCount("Impactul social depinde de comunicarea tranziției și de controlul prețurilor", "fr")).toBe(3);
+    expect(foreignLatinLetterCount("Impactul social depinde de comunicarea tranziției și de controlul prețurilor", "ro")).toBe(0);
+    // A capitalised word is a name; a letter run touching a digit is a code.
+    expect(foreignLatinLetterCount("Fares in Łódź and Wrocław, ticket ţ7 issued", "en")).toBe(0);
+    expect(foreignLatinLetterCount("ce qui est très cher", "en")).toBe(1);
+    expect(foreignLatinLetterCount("any text at all", "xx")).toBe(0);
+  });
+
+  it("no sentence of the Romanian legal pages is read as French, and wrong guesses stay rare in every language", () => {
+    let total = 0;
+    const wrong: string[] = [];
+    for (const locale of LEGAL_LOCALES) {
+      for (const sentence of legalSentences(locale)) {
+        total += 1;
+        const tag = detectArgumentLanguage(sentence).tag;
+        if (tag !== locale && tag !== "und") wrong.push(`${locale}->${tag}`);
+      }
+    }
+    expect(LEGAL_LOCALES).toHaveLength(35);
+    expect(total).toBeGreaterThan(15_000);
+    expect(wrong.filter((pair) => pair === "ro->fr")).toEqual([]);
+    expect(wrong.filter((pair) => pair.startsWith("ro->"))).toEqual([]);
+    // 36 of 17,833 when written (65 before, 17 of them Romanian read as French): a floor to hold, not a target.
+    expect(wrong.length / total).toBeLessThan(0.003);
+  });
+});
+
 describe("argumentLanguageDirective", () => {
+  it("calls a named language the question's, and holds where the material quotes another (owner approval 2026-10-12)", () => {
+    expect(argumentLanguageDirective("English")).toMatch(
+      /^Write every natural-language field in English, the language of the question, even where the material quotes another language\. Keep JSON keys,/u);
+    // The fallback names no language, so it is not called the question's twice.
+    for (const blank of ["", "   "]) {
+      expect(argumentLanguageDirective(blank)).toMatch(
+        /^Write every natural-language field in the same language as the question, even where the material quotes another language\. Keep JSON keys,/u);
+    }
+  });
+
   it("protects every machine-consumed value class while localizing prose", () => {
     expect(argumentLanguageDirective("Romanian")).toBe(
-      "Write every natural-language field in Romanian. Keep JSON keys, enum tokens, JSON literals (null, true, false), and identifier-shaped values (including claim_type, basis, outcome, fatalFlags[].type, segment_id, node_refs, and served_number_refs) in English exactly as specified; never translate an identifier or literal."
+      "Write every natural-language field in Romanian, the language of the question, even where the material quotes another language. Keep JSON keys, enum tokens, JSON literals (null, true, false), and identifier-shaped values (including claim_type, basis, outcome, fatalFlags[].type, segment_id, node_refs, and served_number_refs) in English exactly as specified; never translate an identifier or literal."
     );
   });
 });

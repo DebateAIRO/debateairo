@@ -1,5 +1,5 @@
 {
-  "order.planDescription": "Месячный план DebateAI {plan}",
-  "order.cardCheck": "Проверка карты DebateAI",
-  "invoice.line": "План DebateAI {plan}, с {from} по {to}"
+  "order.planDescription": "Месячный план Dialectical Engine {plan}",
+  "order.cardCheck": "Проверка карты Dialectical Engine",
+  "invoice.line": "План Dialectical Engine {plan}, с {from} по {to}"
 }

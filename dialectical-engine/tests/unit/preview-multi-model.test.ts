@@ -28,12 +28,13 @@ const BARE_BODY = ["max" + "_tokens", "messages", "model"];
 /** Qwen's reviewed sampling (2026-10-12): Qwen's own thinking-mode settings, so its JSON does not slide into noise. */
 const QWEN_SAMPLING = { temperature: 0.6, top_p: 0.95, top_k: 20 };
 /**
- * MiMo's reviewed sampling (owner approval 2026-10-12): DeepInfra's MiMo page recommends temperature 1.0 and top_p 0.95.
+ * MiMo's reviewed sampling (owner approval 2026-10-12): DeepInfra's MiMo page recommends temperature 1.0 and top_p 0.95;
+ * the owner lowered the temperature to 0.7 the same day, after MiMo wrote 10 of 71 practice replies in another language.
  * JSON mode was tried the same day and withdrawn: when MiMo closed a Romanian quote („…) with a straight double quote,
  * DeepInfra's JSON constraint ended the string there and forced the rest into garbage, which the engine's reader
  * (INNER_QUOTE) repairs without any call when JSON mode is off. MiMo's row allows no JSON mode.
  */
-const MIMO_SAMPLING = { temperature: 1.0, top_p: 0.95 };
+const MIMO_SAMPLING = { temperature: 0.7, top_p: 0.95 };
 const DEFAULT_LEVEL = "DEFAULT_ONLY";
 const URL_COMPLETIONS = "https://api.deepinfra.com/v1/openai/chat/completions";
 const BASE = { deployment: "v3-preview", requested_thinking_level: "high",
@@ -557,7 +558,7 @@ describe("reviewed sampling: a row's own sampling settings, exactly, and none on
       const sent = JSON.parse(text) as { max_tokens: number; messages: unknown };
       // The judging (served) call and the story call alike: sampling, and no JSON mode (MiMo's row allows none).
       expect(text).toBe(JSON.stringify({ model: MIMO, max_tokens: sent.max_tokens, ...MIMO_SAMPLING, messages: sent.messages }));
-      expect(text).toContain('"temperature":1,"top_p":0.95,"messages":');
+      expect(text).toContain('"temperature":0.7,"top_p":0.95,"messages":');
       expect(Object.keys(sent)).toEqual(Object.keys(JSON.parse(mimoSent[0]!.body)));
       expect(executions[0]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(MIMO)!, Buffer.byteLength(text))));
     }
@@ -630,23 +631,24 @@ describe("JSON mode stays on the story calls: no debate step asks for it", () =>
     classifyContent: () => parsed, buildRepairPacket: () => RESULT_REQUEST.packet });
   const story = { ...RESULT_REQUEST, lane: "story" as const, callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER" as const,
     preferredResponseFormat: "json_object" as const };
-  function policySees(model: string, request: ProviderCallRequest): ProviderCallRequest {
+  // The policy sends after the busy coordinator admits the call (parallel calls §3.3), one async step later: await it.
+  async function policySees(model: string, request: ProviderCallRequest): Promise<ProviderCallRequest> {
     const seen: ProviderCallRequest[] = [];
     const gateway = withPreviewProviderCallPolicy({ call: async (sent) => { seen.push(sent); return {} as never; } }, parse(MULTI)!, { model });
-    void gateway.call(request);
+    await gateway.call(request);
     expect(seen).toHaveLength(1);
     return seen[0]!;
   }
 
-  it("the preview policy adds no JSON preference to any request, on any row", () => {
+  it("the preview policy adds no JSON preference to any request, on any row", async () => {
     for (const model of [GLM, DEEPSEEK, MIMO, QWEN, HAIKU]) {
       for (const role of ["JUDGE", "SYNTHESIZER", "EVALUATOR"] as const) {
-        expect(Object.hasOwn(policySees(model, structured(role)), "preferredResponseFormat"), `${model} ${role}`).toBe(false);
+        expect(Object.hasOwn(await policySees(model, structured(role)), "preferredResponseFormat"), `${model} ${role}`).toBe(false);
       }
-      expect(Object.hasOwn(policySees(model, RESULT_REQUEST), "preferredResponseFormat"), model).toBe(false);
-      expect(Object.hasOwn(policySees(model, { ...structured("JUDGE"), lane: "evaluator" }), "preferredResponseFormat"), model).toBe(false);
+      expect(Object.hasOwn(await policySees(model, RESULT_REQUEST), "preferredResponseFormat"), model).toBe(false);
+      expect(Object.hasOwn(await policySees(model, { ...structured("JUDGE"), lane: "evaluator" }), "preferredResponseFormat"), model).toBe(false);
       // The story calls ask for themselves, unchanged.
-      expect(policySees(model, story).preferredResponseFormat).toBe("json_object");
+      expect((await policySees(model, story)).preferredResponseFormat).toBe("json_object");
     }
   });
 

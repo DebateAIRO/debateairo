@@ -11,6 +11,9 @@ const verifier = "migrations/lineage/verify-effective-capabilities.sql";
 const supersedingVerifier = "migrations/lineage/verify-effective-capabilities-111.sql";
 const writer = "packages/db/src/identity.ts";
 const socialWriter = "packages/db/src/social-identity.ts";
+const exportMigration = "migrations/0115_data_export.sql";
+const exportSnapshot = "apps/api/src/data-export/snapshot.ts";
+const exportTypes = "apps/api/src/data-export/types.ts";
 
 function productionFiles(): string[] {
   return execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--", "migrations", "apps", "packages"], {
@@ -26,7 +29,16 @@ function source(path: string): string {
 describe("registration region scope", () => {
   it("S1 keeps region writes in the two bounded account-creation paths and reads in the verifier", () => {
     const references = productionFiles().filter((path) => source(path).includes("registration_region"));
-    expect(references.sort()).toEqual([migration, forwardContract, verifier, supersedingVerifier, writer, socialWriter].sort());
+    expect(references.sort()).toEqual([
+      migration, forwardContract, verifier, supersedingVerifier, writer, socialWriter,
+      exportMigration, exportSnapshot, exportTypes,
+    ].sort());
+
+    // The export reads this account's declared region; it never creates or changes a region row.
+    expect(source(exportMigration)).toMatch(/FROM identity\.registration_region r WHERE r\.user_id=v_user/);
+    expect(source(exportMigration)).not.toMatch(/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
+    expect(source(exportSnapshot)).toContain('registration_region: raw.registration_region == null ? null : project(');
+    expect(source(exportTypes)).toContain("registration_region: Row | null");
 
     const contractSource = source(forwardContract);
     expect(source(verifier)).toContain("identity.record_registration_region(uuid,text,text)");

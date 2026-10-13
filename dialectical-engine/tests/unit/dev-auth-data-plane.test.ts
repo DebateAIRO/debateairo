@@ -55,7 +55,7 @@ describe("DEV-08 persistent local-auth data plane", () => {
       migrations: "APPLIED",
       principals: "ATTESTED",
       register: REGISTER_RECEIPT,
-      supportConfiguration: "HERMES_GLM_5_3_FLASH",
+      supportConfiguration: "CLAUDE_HAIKU_5_5",
       secrets: "ATTESTED",
       mailCapture: "ATTESTED"
     });
@@ -89,7 +89,7 @@ describe("DEV-08 persistent local-auth data plane", () => {
       migrations: "APPLIED",
       principals: "ATTESTED",
       register: REGISTER_RECEIPT,
-      supportConfiguration: "HERMES_GLM_5_3_FLASH",
+      supportConfiguration: "CLAUDE_HAIKU_5_5",
       secrets: "ATTESTED",
       mailCapture: "ATTESTED"
     });

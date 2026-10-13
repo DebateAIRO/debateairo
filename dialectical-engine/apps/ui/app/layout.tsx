@@ -20,6 +20,8 @@ import "./globals.css";
 import "./language-switcher.css";
 import "./legal.css";
 import "./billing.css";
+import "./security-confirmation.css";
+import "./data-export.css";
 
 const display = Fraunces({
   subsets: ["latin"],

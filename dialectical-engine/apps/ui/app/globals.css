@@ -1,5 +1,5 @@
 /* ============================================================
-   DebateAI — Terracotta / Chamber design token contract
+   Dialectical Engine — Terracotta / Chamber design token contract
    ============================================================ */
 
 :root {
@@ -10072,7 +10072,7 @@ a:focus-visible {
 
 /* === consent-ui S01 === */
 /* Slice S01 — the cookie notice: the bar (10a) and the storage card (10b), a
-   read-only list of the eight items DebateAI stores (mission cookie-compliance,
+   read-only list of the eight items Dialectical Engine stores (mission cookie-compliance,
    DONE.md artboards S01-01..S01-18). The ONE delimited block this slice may
    append, at the very end of the file (S01-R25). Every colour here is a
    var(--token) reference; the tokens it uses live in the two token blocks at

@@ -143,6 +143,29 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     }
   });
 
+  it("parallel AI calls: both build the call scheduler, the busy coordinator, the call subjects, the attempt counter and the keep-alive renewals", () => {
+    // Spec 2026-10-12-parallel-calls-design.md §3.2-§3.6: the practice measures the runner the preview runs.
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
+      const code = withoutComments(source);
+      expect(code).toContain("effectiveCallConcurrency(await readCallConcurrencyPolicy(");
+      expect(code.match(/createCallScheduler\(/gu) ?? []).toHaveLength(1);
+      expect(code.match(/createPreviewBusyCoordinator\(\)/gu) ?? []).toHaveLength(1);
+      expect(code).toContain("withPreviewProviderCallPolicy(gateway, previewConfig, target");
+      expect(code).toMatch(/busy: previewBusy/u);
+      expect(code).toContain("inFlight: gatewayInFlight");
+      expect(code).toContain("previewCallSubjects(previewConfig)");
+      expect(code).toContain("await applyPreviewGateCapacities({");
+      expect(code).toMatch(/renewals: new WorkItemRepository\(/u);
+      // Ruling R31 and spec §3.4 (final review): the busy wait before the slot, and the gate marked on its first
+      // unsent refusal, on both sides.
+      expect(code).toContain("callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model)");
+      expect(code).toContain("onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); }");
+    }
+    for (const key of ["callScheduler", "callSubjects", "renewals"]) {
+      expect(objectAfter(RUNNER_MAIN, "new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {").has(key), key).toBe(true);
+    }
+  });
+
   it("run resilience is the preview's alone: main.ts sets runResilience only when the preview config is present", () => {
     // Review 2026-10-12, test gap (f) (ruling R-c: hosted and local unchanged). The one place main.ts sets the
     // runner's runResilience is a spread guarded by the preview config, which only the preview's environment carries.
@@ -280,8 +303,13 @@ describe("preview practice lanes: the jobs see the runner's context", () => {
     expect(LANES).toContain("classifyContent: reading.classifyContent,\n        buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)");
     expect(RUNNER).toMatch(/const writerReading = rememberingAcceptedReply\(\(content, reply\) => classifyComposedContent\(content, \{/u);
     expect(LANES).toMatch(/const reading = rememberingAcceptedReply\(\(content, reply\) => classifyComposedContent\(content, \{/u);
-    expect(RUNNER).toContain("const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply));");
-    expect(LANES).toContain("const reading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply));");
+    // Reply language (2026-10-12): both check the objection against the question's language.
+    expect(RUNNER).toContain("const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine));");
+    expect(LANES).toContain("const reading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, q.questionLine));");
+    // R15 into dev (2026-10-13): the writer's classifier also carries Problem 7's wording index (no scores or engine
+    // codes in the prose), so both pins now hold the wording member before the question line.
+    expect(RUNNER).toMatch(/exemptTokens: personIdTokens,\s*wording: writerWording,\s*questionLine: run\.questionLine\s*\}, reply\)\);/u);
+    expect(LANES).toMatch(/wording: synthesisWordingIndex\(\{ request, personTexts \}\),\s*questionLine: q\.questionLine\s*\}, reply\)\);/u);
   });
 
   it("the story snapshot comes from the runner's own builder, and the story must give each position its own path", () => {

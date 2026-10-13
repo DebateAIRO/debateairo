@@ -69,7 +69,7 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | `operator-digest --source <file>` | prints `operatorManifestSha256` (the shared function the launchers use) and the operator file count |
 | `launch-plan --service api\|ui\|runner --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, everything else from `--from`; for `--service runner` the API plan may be `--from` (identity from the runner OS account, runner.env custody); `validateLaunchPlan` before writing |
 | `native-plan --operation apply-and-plan\|verify --from <existing native plan> --source-manifest <candidate api manifest> --out <file>` | new native plan for a candidate API root; `verify` carries the `approval` of `--from` over unchanged; the reviewed `validateNativePlan` before writing |
-| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> [--checker glm\|deepseek --deepseek-enabled-on-gate yes] [--role-rotation on\|off] --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval. The answer checker stays GLM unless `--checker deepseek` is given together with `--deepseek-enabled-on-gate yes` (your statement that the gate's GO switches DeepSeek on). Role rotation stays on unless `--role-rotation off` is given: the rotation row is then published disabled (the preview's rollback for rotation; a later plan without the flag switches it back on, and its delta shows that row changing). `publish` carries the plan's choices |
+| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> [--checker glm\|deepseek --deepseek-enabled-on-gate yes] [--role-rotation on\|off] [--call-concurrency '<JSON object>'] --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval. The answer checker stays GLM unless `--checker deepseek` is given together with `--deepseek-enabled-on-gate yes` (your statement that the gate's GO switches DeepSeek on). Role rotation stays on unless `--role-rotation off` is given: the rotation row is then published disabled (the preview's rollback for rotation; a later plan without the flag switches it back on, and its delta shows that row changing). `--call-concurrency` sets the call-concurrency row as one JSON object; without it the current value is kept, or there is no row if the base has none (see "Publishing the call-concurrency row" below). `publish` carries the plan's choices |
 | `native-plan --operation publish --from <the plan above> --proposal <what the native operator printed for it> --source-manifest <same manifest> --out <file>` | step 2, after the owner reviewed the proposal: re-hashes every value the proposal shows and its `deltaSha256`, checks it belongs to that plan (release, operator digest, base), copies the approval from it, picks a fresh `publicationId`, and prints the approval it wrote |
 | `native-plan --operation verify --from <the publish plan> --publication <what the native operator printed for publish> --source-manifest <manifest> --out <file>` | step 3: the verify plan for the NEW publication (same id, base and snapshot as the publish plan) |
 | `launch-plan … --publication <what the native operator printed for publish>` | launch plans that carry the new publication instead of the old plan's; the `--native-attestation` proof must already name it |
@@ -294,31 +294,133 @@ cp -a "$NP" "$S/native-plan.before.json"
    `PREVIEW_REGISTER_BASE_NOT_CURRENT: …` means a version newer than the plan's base exists: plan
    again (step 1) from the verify plan that names the newest publication.
 
-4. **Verify the new publication and make launch plans that carry it:**
+4. **Verify the new publication and make launch plans that carry it**, for the API, the website
+   and the runner. The runner reads the register too (its call limits among other rows), so it
+   needs its own plan with the new publication. `OLDR` is the runner plan the lifecycle lock names
+   (as `OLDA` and `OLDU` in step 7). If the lock has no runner yet, `jq` prints `null` and the
+   next line uses the API plan instead, as step 7 explains for the first runner plan.
 
    ```sh
    rel native-plan --operation verify --from "$ART/native-plan-publish.json" --publication "$ART/register-published.json" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-verify.json"
    put "$ART/native-plan-verify.json" && nat "$ART/native-first-verify.json"
    rel launch-plan --service api --from "$OLDA" --root "$CAPI" --source-manifest "$ART/candidate-api-source.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/api-launch.json"
    rel launch-plan --service ui --from "$OLDU" --root "$CUI" --source-manifest "$ART/candidate-ui-source.json" --ui-build "$ART/candidate-ui-build.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/ui-launch.json"
+   OLDR=$(jq -r .services.runner.basePlan.path /etc/debateai-v3-preview/lifecycle/release-lock.json); echo "$OLDR"
+   if [ "$OLDR" = null ]; then OLDR=$OLDA; fi
+   rel launch-plan --service runner --from "$OLDR" --root "$CRUN" --source-manifest "$ART/candidate-runner-source.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/runner-launch.json"
    ```
 
-5. **Point both environment files at the new version.** In `api.env`, and in the runner's
-   environment file if this preview has one, replace the `REGISTER_VERSION=` line with `$V`.
-   (The runner is masked on the preview, and `/etc/debateai-v3-preview/auth-dev-v1` holds no
-   `runner.env` today. If the runner is ever unmasked, its own launch plan needs the same
-   `--publication`.) The edit does not print the file:
+5. **Point both environment files at the new version.** In `api.env` and in the runner's
+   `runner.env` (`deploy/preview-auth-dev/v1/README.md` "runner.env recipe"), replace the
+   `REGISTER_VERSION=` line with `$V`. Each launcher refuses to start unless that line equals
+   its plan's publication. The edit does not print the files:
 
    ```sh
    sed -i "s/^REGISTER_VERSION=.*/REGISTER_VERSION=$V/" /etc/debateai-v3-preview/auth-dev-v1/api.env
    grep -c "^REGISTER_VERSION=$V\$" /etc/debateai-v3-preview/auth-dev-v1/api.env   # must print 1
+   sed -i "s/^REGISTER_VERSION=.*/REGISTER_VERSION=$V/" /etc/debateai-v3-preview/auth-dev-v1/runner.env
+   grep -c "^REGISTER_VERSION=$V\$" /etc/debateai-v3-preview/auth-dev-v1/runner.env   # must print 1
    ```
 
-6. **Pin and restart together.** Follow `deploy/preview-lifecycle/v1/README.md` §"Pinning a NEW
-   release": `prestart.mjs pin --from "$ART/api-launch.json"` and the same for the UI; regenerate
-   both drop-ins; `daemon-reload`; then restart the API and the UI (and the runner, if it is
-   active) in one step. Each start's prestart re-verifies natively against the verify plan of
-   step 4. The API refuses to start if `REGISTER_VERSION` differs from the pinned publication.
+6. **Pin all three, then restart the API, the website, then the runner.** This follows
+   `deploy/preview-lifecycle/v1/README.md` §"Pinning a NEW release", with the runner added: pin
+   the three plans first, then regenerate the three release drop-ins from the finished lock,
+   `daemon-reload`, and restart in that order. Each start's prestart re-verifies natively against
+   the verify plan of step 4. The API and the runner each refuse to start if `REGISTER_VERSION`
+   differs from their pinned publication. The `&&` chain stops at the first refusal, and it sets
+   `PINNED=yes` only after every pin, drop-in and restart in it succeeded. The runner block below
+   restarts the runner only when `PINNED` is `yes`. So no service restarts on a half-pinned lock:
+   not the API, not the website, not the runner.
+
+   ```sh
+   PINNED=no
+   L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
+   N=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node
+   $N $L/prestart.mjs pin --from "$ART/api-launch.json" \
+     && $N $L/prestart.mjs pin --from "$ART/ui-launch.json" \
+     && $N $L/prestart.mjs pin --from "$ART/runner-launch.json" \
+     && $N $L/prestart.mjs dropin --service api > /etc/systemd/system/debateai-preview-api.service.d/zzzzzzzzzz-lifecycle-release.conf \
+     && $N $L/prestart.mjs dropin --service ui > /etc/systemd/system/debateai-preview-ui.service.d/zzzzzzzzzz-lifecycle-release.conf \
+     && $N $L/prestart.mjs dropin --service runner > /etc/systemd/system/debateai-preview-runner.service.d/zzzzzzzzzz-lifecycle-release.conf \
+     && systemctl daemon-reload \
+     && systemctl restart debateai-preview-api \
+     && systemctl restart debateai-preview-ui \
+     && PINNED=yes \
+     && echo "pinned; API and website restarted"
+   ```
+
+   Each `pin` prints one `PREVIEW_LIFECYCLE_RELEASE_PINNED` line naming the new register version.
+
+   **Then the runner, only when every pin succeeded and no debate is running.** Paste the next
+   lines in the same root shell, after the block above printed `pinned; API and website
+   restarted`. If that block stopped early, `PINNED` is still `no` and the runner is left exactly
+   as it was: step 5 already pointed `runner.env` at the new version, and a runner restarted
+   without its new pin would refuse to start and stay down. Restarting the runner in the middle of a
+   debate cuts that debate off; another copy may later pick it up again and pay for calls twice. So
+   the next lines first count the debates the runner is working on right now (`CLAIMED`), and
+   restart the runner only when that count is 0. If they print a number above 0, nothing is
+   restarted: wait a few minutes and paste the same lines again. If the number stays above 0 for
+   more than 30 minutes, stop and ask. The runner is never restarted automatically;
+   `try-restart` restarts it only if it is running, so a runner stopped on purpose stays stopped
+   and its next start by hand uses the new version.
+
+   ```sh
+   RUNNING=$(runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc "SELECT count(*) FROM core.work_item WHERE state = 'CLAIMED'"); echo "debates running now: $RUNNING"
+   [ "${PINNED:-}" = yes ] && [ "$RUNNING" = 0 ] && systemctl try-restart debateai-preview-runner && echo "runner restarted (if it was running)"
+   ```
+
+**Publishing the call-concurrency row.** The register row `callConcurrencyPolicy` says how many AI
+calls a debate may run at the same time (spec 2026-10-12, parallel calls; values and bounds in
+`deploy/vps/register/README.md`, "The call-concurrency setting").
+
+**Step 0, before anything else: redeploy BOTH spending gates.** With many calls on their way at
+once, the old gate code counts one short network blip as many failures, and five of them halt the
+gate (`provider_unreachable`). The new gate code counts calls that were on their way together once.
+So, first, redeploy the DeepInfra gate and the Anthropic gate exactly as
+`deploy/preview-gate/v3/README.md` §"Redeploy (2026-10-12): calls on their way together count once"
+says (stop, install the gate files from this release, write the GO again, restart the gate's
+service, `activate` with the owner's yes). The gate file in this release already holds the
+thinking-levels gate changes from dev (#149): one redeploy covers both, and it is needed even if the
+thinking-levels redeploy was done before, because the file's hash changed again. Then check both
+gates against THIS release's gate files (in the candidate API folder `$CAPI` named in step 0 of
+the operator sequence; the gate README installs the same two files from the same place). An old
+gate file with its old GO would agree with each other, so each gate's two installed files and the
+two hashes in its GO must all equal this release's files. The first line must print
+`release gate files found`, each gate's line must say `match this release`, and each `state` line
+must say `active`:
+
+```sh
+NEW=$CAPI/dialectical-engine/packages/providers/ops; test -f "$NEW/preview_budget_authority.py" && test -f "$NEW/preview_budget_helper.py" && echo "release gate files found"
+NB=$(sha256sum "$NEW/preview_budget_authority.py" | cut -d' ' -f1); NH=$(sha256sum "$NEW/preview_budget_helper.py" | cut -d' ' -f1)
+same() { [ -n "$NB" ] && [ -n "$NH" ] && [ "$(sha256sum "$1/preview_budget_authority.py" | cut -d' ' -f1)" = "$NB" ] && [ "$(sha256sum "$1/preview_budget_helper.py" | cut -d' ' -f1)" = "$NH" ] && [ "$(jq -r .bridge_sha256 "$2")" = "$NB" ] && [ "$(jq -r .helper_sha256 "$2")" = "$NH" ]; }
+if same /opt/debateai-v3-preview/operator/deepinfra-budget-v3 /etc/debateai-v3-preview/provider-deepinfra-go-v3.json; then echo "deepinfra gate files and GO match this release"; else echo "deepinfra does NOT match this release: stop"; fi
+echo "deepinfra state $(/usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 | jq -r .state)"
+if same /opt/debateai-v3-preview/operator/anthropic-budget-v1 /etc/debateai-v3-preview/provider-anthropic-go-v1.json; then echo "anthropic gate files and GO match this release"; else echo "anthropic does NOT match this release: stop"; fi
+echo "anthropic state $(/usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 | jq -r .state)"
+```
+
+Anything else means stop: do not publish the row until both gates run the new code.
+
+Then add one option to step 1's `plan` command and follow the same steps 1 to 6: the plan carries the policy, the owner
+sees `callConcurrencyPolicy` in the delta (`added` the first time, `changed` for a new value),
+`publish` copies it from the plan. The runner is the only reader of this row, so do not skip
+the runner's lines: step 4 makes its launch plan with the new publication, step 5 points
+`runner.env` at the new version, and step 6 pins it and restarts it after the API and the
+website. Until the runner restarts on the new version, it keeps the old limits. Give the
+three values without the row kind, in single quotes, with no line break. The owner's start values:
+
+```sh
+rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --call-concurrency '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50,"deepinfra":150,"anthropic":50}}' --out "$ART/native-plan-plan.json"
+```
+
+The tool refuses (`ARGUMENTS_REFUSED` naming `--call-concurrency`, nothing written) text that is
+not one JSON object, a missing or extra key, a number outside its bounds or not whole, a vendor
+name that is not lower case, runner limits without `default`, and the option on any operation but
+`plan`. To turn parallel calls off later, publish again the same way with
+`--call-concurrency '{"perDebate":1,"perModelPerDebate":1,"perModelPerRunner":{"default":1000}}'`.
+A plan without the option keeps the current value: once a version holds the row, the kit copies it
+unchanged from the version the plan is based on, and the delta does not list it. So a publication
+made for another reason never needs the option, and never changes the setting.
 
 **Rolling back.** Re-install the archived `$S/native-plan.before.json`, set `REGISTER_VERSION` back
 to the old version, and re-pin the old launch plans. The new version stays sealed, unused. Later

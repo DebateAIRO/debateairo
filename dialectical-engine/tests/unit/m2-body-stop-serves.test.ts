@@ -225,6 +225,99 @@ describe("M2 — the first root's panel keeps what it heard, and falls back to i
     }
   });
 
+  /*
+   * Parallel calls (spec 2026-10-12 §2.3, owner ruling O6; ruling R32): the
+   * same three rows with `askTogether`, as the runner asks only when the
+   * debate's lane admits more than one call. Every member is asked at once, so
+   * the member after the stop was already asked; its voice came back and is
+   * kept beside the stop (RETURN_HEARD), or dropped with it (RETHROW) once
+   * every member has settled.
+   */
+  it("asked together: hands every stop kind back on the first root's panel and keeps the voice asked alongside it", async () => {
+    for (const code of STOP_CODES) {
+      const reached: string[] = [];
+      const panel = await runJudgePanel({
+        artifactProducerRef: "actor:author",
+        primary: { judgementRef: "j0", assessment: {} as never, memberRole: "author" },
+        askTogether: true,
+        members: [
+          refusingMember("member-1", code, reached),
+          {
+            memberRole: "member-2", actorRef: "actor:two", contractHash: "c2",
+            judge: async () => { reached.push("next member"); return { judgementRef: "j2", assessment: {} as never }; }
+          }
+        ],
+        onRunLevelSpendStop: "RETURN_HEARD"
+      });
+      expect((panel.stoppedBy as TypedDomainError).code, code).toBe(code);
+      expect(panel.notes, code).toEqual([]);
+      expect(panel.judgements.map((entry) => entry.judgementRef), code).toEqual(["j0", "j2"]);
+      expect([...reached].sort(), code).toEqual(["next member", "refused member"]);
+      expect(panelSpendStop(panel.stoppedBy, "AUTHOR_ONLY"), code).toBe(ENVELOPE_STOP_CODES[code]);
+    }
+  });
+
+  it("asked together: keeps every member voice that came back around the stop, with every note", async () => {
+    for (const code of ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED"] as const) {
+      const reached: string[] = [];
+      const panel = await runJudgePanel({
+        artifactProducerRef: "actor:author",
+        primary: { judgementRef: "j0", assessment: {} as never, memberRole: "author" },
+        askTogether: true,
+        members: [
+          {
+            memberRole: "author", actorRef: "actor:author", contractHash: "c0",
+            judge: async () => { reached.push("author seat"); return { judgementRef: "never", assessment: {} as never }; }
+          },
+          {
+            memberRole: "member-1", actorRef: "actor:one", contractHash: "c1",
+            judge: async () => {
+              reached.push("member-1");
+              const assessed = await new Judge(answering()).assess(PANEL_CALL);
+              return { judgementRef: assessed.judgementRef, assessment: assessed.assessment };
+            }
+          },
+          refusingMember("member-2", code, reached),
+          {
+            memberRole: "member-3", actorRef: "actor:three", contractHash: "c3",
+            judge: async () => { reached.push("member-3"); return { judgementRef: "j3", assessment: {} as never }; }
+          }
+        ],
+        onRunLevelSpendStop: "RETURN_HEARD"
+      });
+      expect((panel.stoppedBy as TypedDomainError).code, code).toBe(code);
+      expect(panel.judgements.map((entry) => entry.memberRole), code).toEqual(["author", "member-1", "member-3"]);
+      expect(panel.judgements[2]!.judgementRef, code).toBe("j3");
+      expect(panel.notes.map((note) => note.kind), code).toEqual(["PRODUCER_GRADING_FORBIDDEN"]);
+      expect([...reached].sort(), code).toEqual(["member-1", "member-3", "refused member"]);
+    }
+  });
+
+  it("asked together: still rethrows by default, dropping every voice heard, once every member has settled", async () => {
+    for (const code of ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED"] as const) {
+      const reached: string[] = [];
+      const thrown: unknown = await runJudgePanel({
+        artifactProducerRef: "actor:author",
+        primary: { judgementRef: "j0", assessment: {} as never, memberRole: "author" },
+        askTogether: true,
+        members: [
+          {
+            memberRole: "member-1", actorRef: "actor:one", contractHash: "c1",
+            judge: async () => { reached.push("member-1"); return { judgementRef: "j1", assessment: {} as never }; }
+          },
+          refusingMember("member-2", code, reached),
+          {
+            memberRole: "member-3", actorRef: "actor:three", contractHash: "c3",
+            judge: async () => { reached.push("member-3"); return { judgementRef: "j3", assessment: {} as never }; }
+          }
+        ]
+      }).then(() => null, (error: unknown) => error);
+      expect((thrown as TypedDomainError).code, code).toBe(code);
+      expect(thrown, code).not.toHaveProperty("judgements");
+      expect([...reached].sort(), code).toEqual(["member-1", "member-3", "refused member"]);
+    }
+  });
+
   it("lets a stop travel from every other node's panel", () => {
     // A child node's own authoring call is caught one level up, by the phase
     // that authored it, which records the stop and mints no node.

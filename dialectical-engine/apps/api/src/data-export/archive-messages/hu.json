@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Adatai a Dialectical Engine-ben",
+  "archive.generated": "Elkészült {time} időpontban {pseudonym} számára.",
+  "archive.accountHeading": "Fiók",
+  "archive.email": "E-mail-cím",
+  "archive.memberSince": "Tagság kezdete",
+  "archive.debatesHeading": "Saját viták ({count})",
+  "archive.question": "Kérdés",
+  "archive.verdict": "Ítélet",
+  "archive.verdictSupported": "Alátámasztott",
+  "archive.verdictContested": "Vitatott",
+  "archive.verdictUnsupported": "Alátámasztatlan",
+  "archive.story": "A vita röviden",
+  "archive.arguments": "Érvek",
+  "archive.visibilityPublic": "Közzétéve",
+  "archive.visibilityPrivate": "Privát",
+  "archive.unreadable": "Ennek a vitának a tartalma már nem olvasható, mert a kulcsát megsemmisítették.",
+  "archive.noDebates": "Nincsenek vitái.",
+  "archive.filesNote": "A ZIP-archívumban lévő JSON-fájlok ugyanazokat az adatokat géppel olvasható formában tartalmazzák; a README.txt felsorolja őket."
+}

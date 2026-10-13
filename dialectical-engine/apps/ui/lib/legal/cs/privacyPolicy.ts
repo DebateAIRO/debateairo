@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Stručně",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Shromažďujeme údaje nezbytné pro účet a údaje, které se rozhodnete zadat. Vaše otázky jsou předávány poskytovatelům AI uvedeným v našem Registru; nepoužívají se k trénování modelů. Debaty jsou soukromé, dokud je nezveřejníte. Výmaz účtu zničí klíče k vašim soukromým údajům; při jeho plánování si zvolíte, zda se odstraní i vaše zveřejněné debaty, nebo zůstanou veřejné pod vaším vyřazeným pseudonymem. Můžete nás kontaktovat na privacy@dezbatere.ro a osoby uvedené v debatě mohou požádat o odstranění i bez účtu." }
+      { kind: "p", text: "Shromažďujeme údaje nezbytné pro účet a údaje, které se rozhodnete zadat. Vaše otázky jsou předávány poskytovatelům AI uvedeným v našem Registru; nepoužívají se k trénování modelů. Náš poskytovatel hostingu uchovává váš účet a vaše debaty v Londýně ve Spojeném království; oddíl 5 uvádí, kam dále vaše údaje putují. Debaty jsou soukromé, dokud je nezveřejníte. Výmaz účtu zničí klíče k vašim soukromým údajům; při jeho plánování si zvolíte, zda se odstraní i vaše zveřejněné debaty, nebo zůstanou veřejné pod vaším vyřazeným pseudonymem. Můžete nás kontaktovat na privacy@dezbatere.ro a osoby uvedené v debatě mohou požádat o odstranění i bez účtu." }
     ]
   },
   {
@@ -113,6 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Trénování a uchovávání jsou odlišné věci. Poskytovatele AI využíváme pouze za podmínek, které jim nedovolují používat váš obsah k trénování nebo zlepšování jejich modelů; Registr u každého poskytovatele uvádí, zda jsme to u našeho účtu ověřili, a kdy. Někteří poskytovatelé uchovávají zadání a odpovědi po omezenou dobu kvůli bezpečnosti, prevenci zneužití nebo vlastním právním povinnostem; Registr uvádí jak dlouho a proč. Je-li aktivní nulové uchovávání údajů, Registr uvádí tuto skutečnost i funkce, na které se vztahuje. Nebudeme tvrdit, že obsah není uchováván, pokud tomu tak není." },
       { kind: "p", text: "Předávání mimo EHP. Poskytovatelé usazení ve Spojených státech přijímají údaje na základě jednoho z mechanismů kapitoly V GDPR: rámce EU–USA pro ochranu osobních údajů, pokud je konkrétní smluvní subjekt pro tyto údaje certifikován, nebo standardních smluvních doložek Evropské komise (modul dva, správce zpracovateli), podpořených posouzením rizik předávání a doplňkovými opatřeními. Registr uvádí mechanismus pro každého poskytovatele. Kopii doložek, o které se opíráme, můžete získat písemnou žádostí na privacy@dezbatere.ro. Pokud je mechanismus, o který se opíráme, zneplatněn, před pokračováním v předávání přejdeme na jiný a informujeme vás." },
       { kind: "p", text: "Další příjemci. Vedle poskytovatelů AI pro nás údaje zpracovávají tito zpracovatelé. Náš poskytovatel hostingu, OVHcloud, uchovává a provozuje službu ve svém datovém centru v Londýně ve Spojeném království. Evropská komise rozhodla, že Spojené království zajišťuje odpovídající úroveň ochrany osobních údajů (její rozhodnutí o odpovídající ochraně platí do prosince 2031), takže toto předávání nevyžaduje žádné další záruky. Cloudflare doručuje naše stránky, přenáší provoz mezi vámi a službou a provádí kontrolu proti robotům (oddíl 2); je to americká společnost certifikovaná podle Rámce EU–USA pro ochranu osobních údajů (EU–US Data Privacy Framework) a její smlouva s námi jako záložní základ doplňuje standardní smluvní doložky EU. E-maily týkající se účtu odesílá Amazon Simple Email Service na základě naší smlouvy s Amazon Web Services EMEA SARL v Lucembursku; pokud Amazon tyto údaje zpracovává ve Spojených státech, opírá se předávání o standardní smluvní doložky EU obsažené v podmínkách zpracování údajů společnosti Amazon. Platby probíhají prostřednictvím našeho poskytovatele platebních služeb, NETOPIA Payments, od spuštění placených tarifů. Každý jedná podle našich doložených pokynů na základě smlouvy o zpracování údajů se zárukami vyžadovanými článkem 28. Žádnému zpracovateli nedovolujeme používat vaše údaje pro vlastní účely. Pokud by tak poskytovatel činil, byl by samostatným správcem a vaše údaje bychom mu neposílali." },
+      { kind: "p", text: "Kde jsou vaše údaje. Váš účet a vaše debaty jsou uchovávány ve Spojeném království, na serverech našeho poskytovatele hostingu v Londýně. Cloudflare přenáší provoz prostřednictvím vlastní sítě a Amazon může zpracovávat e-maily týkající se účtu ve Spojených státech. Každý poskytovatel AI zpracovává text, který obdrží, v zemích, které pro něj Registr uvádí, převážně ve Spojených státech." },
       { kind: "p", text: "Orgány veřejné moci. Osobní údaje zpřístupňujeme soudům, regulačním orgánům nebo donucovacím orgánům, pokud to vyžaduje zákon, a informujeme vás o tom, pokud nám v tom zákon nebrání." }
     ]
   },
@@ -179,16 +180,16 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Vaše práva a způsob jejich uplatnění",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Kterékoli z těchto práv můžete bezplatně uplatnit písemnou žádostí na privacy@dezbatere.ro nebo v nabídce Nastavení → Soukromí, pokud je příslušný ovládací prvek k dispozici. Odpovíme do jednoho měsíce; je-li žádost složitá, můžeme lhůtu prodloužit až o další dva měsíce a sdělíme vám proč. Můžeme vás požádat o potvrzení totožnosti prostřednictvím vašeho účtu." },
+      { kind: "p", text: "Kterékoli z těchto práv můžete bezplatně uplatnit písemnou žádostí na privacy@dezbatere.ro nebo v nabídce Nastavení → Ochrana soukromí, pokud je příslušný ovládací prvek k dispozici. Odpovíme do jednoho měsíce; je-li žádost složitá, můžeme lhůtu prodloužit až o další dva měsíce a sdělíme vám proč. Můžeme vás požádat o potvrzení totožnosti prostřednictvím vašeho účtu." },
       {
         kind: "list",
         items: [
-        "Přístup (Art. 15) — Kopie osobních údajů, které o vás uchováváme, a tyto informace. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Přístup (Art. 15) — Kopie osobních údajů, které o vás uchováváme, a tyto informace. V Nastavení zvolte Exportovat data: připravíme soubor ZIP se soubory JSON a jednou stránkou, kterou otevřete v libovolném prohlížeči, a e-mailem vám pošleme odkaz ke stažení platný 24 hodin pouze při přihlášení k vašemu účtu.",
         "Oprava (Art. 16) — Opravte svou e-mailovou adresu nebo e-mailovou adresu pro obnovení v Nastavení. Váš pseudonym nelze z důvodů uvedených v Podmínkách změnit; účet můžete uzavřít a otevřít nový",
         "Výmaz (Art. 17) — Soukromou debatu můžete kdykoli vymazat na její stránce. Uzavřete účet v Nastavení; oddíl 7 přesně vysvětluje následky. Požádejte nás o odstranění zveřejněné debaty obsahující vaše údaje bez ohledu na to, zda jste jejím autorem",
         "Omezení zpracování (Art. 18) — Požádejte nás, abychom přestali zpracovávat určité údaje, dokud nebude vyřešen spor, který se jich týká",
         "Námitka (Art. 21) — Vzneste námitku proti zpracování založenému na oprávněných zájmech — bezpečnostnímu a auditnímu zpracování podle oddílu 4 — a my je ukončíme, pokud neprokážeme závažné oprávněné důvody. Proti marketingu můžete vznést námitku kdykoli a my jej ukončíme",
-        "Přenositelnost (Art. 20) — Vaše debaty a údaje účtu v běžně používaném, strojově čitelném formátu. [Pending: same export as Access.] Neosobní obsah, který jste vytvořili, například vaše otázky, vám na požádání vrátíme při skončení smlouvy",
+        "Přenositelnost (Art. 20) — Vaše debaty a údaje účtu v běžně používaném, strojově čitelném formátu. Použijte Exportovat data v Nastavení: soubor ZIP obsahuje vaše údaje ve strojově čitelných souborech JSON a jednu čitelnou stránku; e-mailem vám pošleme odkaz platný 24 hodin pouze při přihlášení k vašemu účtu. Neosobní obsah, který jste vytvořili, například vaše otázky, vám na požádání vrátíme při skončení smlouvy",
         "Odvolání souhlasu (Art. 7(3)) — Odvolejte souhlas s marketingem v kterémkoli e-mailu nebo v Nastavení; souhlas se zpracováním citlivých údajů odvolejte uzavřením účtu v Nastavení (takové údaje také nemusíte uvádět nebo můžete smazat debatu, která je obsahuje). Odvolání nemá vliv na zpracování, které již proběhlo",
         "Stížnost — Rumunskému dozorovému úřadu ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukurešť, anspdcp@dataprotection.ro, nebo úřadu v zemi vašeho bydliště. Budeme raději, když se nejprve obrátíte na nás"
         ]
@@ -219,7 +220,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Soubory cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine používá 18 položek, všechny nezbytně nutné pro službu, o kterou jste požádali, a všechny nastavované pouze službou Dialectical Engine: 13 souborů cookie a 5 záznamů v úložišti vašeho prohlížeče. Nenastavujeme žádné analytické, reklamní ani sledovací soubory cookie. Zásady používání souborů cookie na adrese dezbatere.ro/cookies je uvádějí spolu s tím, k čemu každá z nich slouží a kdo ji obdrží, a budou změněny dříve, než bude přidáno cokoli dalšího." },
+      { kind: "p", text: "Dialectical Engine používá 20 položek, všechny nezbytně nutné pro službu, o kterou jste požádali, a všechny nastavované pouze službou Dialectical Engine: 13 souborů cookie a 7 záznamů v úložišti vašeho prohlížeče. Nenastavujeme žádné analytické, reklamní ani sledovací soubory cookie. Zásady používání souborů cookie na adrese dezbatere.ro/cookies je uvádějí spolu s tím, k čemu každá z nich slouží a kdo ji obdrží, a budou změněny dříve, než bude přidáno cokoli dalšího." },
       {
         kind: "list",
         items: [
@@ -240,7 +241,9 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Místní úložiště — Zda používáte světlý, nebo tmavý režim zobrazení. — Do vymazání",
         "debateai.languageOffer.dismissed — Úložiště relace — Pamatuje si pro tuto kartu, že jste odmítli nabídku zobrazit debatu v jiném jazyce. — Do zavření karty",
         "debateai.support.conversation.v2 — Úložiště relace — Drží vaši konverzaci s nápovědou na obrazovce, dokud je karta otevřená. Smaže se, když se na této kartě kdokoli přihlásí nebo odhlásí. — Do zavření karty",
-        "debateai.phone-completion-draft.v1 — Úložiště relace — Nedokončená otázka během telefonního kroku; odstraněna při změně relace, odhlášení nebo změně vlastníka — 15 minut nebo do dřívějšího vymazání"
+        "debateai.phone-completion-draft.v1 — Úložiště relace — Nedokončená otázka během telefonního kroku; odstraněna při změně relace, odhlášení nebo změně vlastníka — 15 minut nebo do dřívějšího vymazání",
+        "debateai.exportPending — Úložiště relace — Uchovává odkaz pro export zaslaný e-mailem na této kartě pro přihlášení a opakovaný pokus. — Do zavření karty, odhlášení, otevření nového odkazu, prvního úspěšného stažení nebo výsledku neplatného odkazu či jiného účtu",
+        "debateai.exportLinkOutcome — Úložiště relace — Pamatuje si, která zpráva o odkazu ke stažení se má na této kartě zobrazit. — Do zavření karty, odhlášení nebo otevření nového odkazu"
         ]
       },
       { kind: "p", text: "Žádná jiná strana prostřednictvím Dialectical Engine neshromažďuje informace o vašich online aktivitách v průběhu času a napříč webovými stránkami." },
@@ -295,7 +298,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Austrálie a Nový Zéland",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Austrálie. Zahraničními příjemci vašich osobních údajů jsou poskytovatelé AI a zpracovatelé uvedení v Registru, kteří se nacházejí ve Spojených státech a v Evropské unii; podnikáme přiměřené kroky, abychom zajistili, že s nimi nakládají v souladu s australskými zásadami ochrany soukromí. Automatizovaná rozhodnutí: od 10. prosince 2026 tyto zásady označují druhy rozhodnutí přijímaných počítačovými programy, která významně ovlivňují vaše práva nebo zájmy — žádná taková nejsou; hodnocení a závěry se týkají argumentů, nikoli vás — a osobní údaje, které jsou při nich používány. Stížnosti lze podat Office of the Australian Information Commissioner. Nový Zéland. Naším pracovníkem pro ochranu soukromí je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro. Pokud o vás shromažďujeme osobní údaje nepřímo — protože je jiný uživatel uvedl v otázce — představují tyto zásady a oddíl 11 oznámení, které vám poskytujeme. Údaje zpřístupňujeme poskytovatelům AI v Registru jako našim zástupcům na základě smluv vyžadujících srovnatelné záruky. Stížnosti lze podat Office of the Privacy Commissioner." }
+      { kind: "p", text: "Austrálie. Zahraničními příjemci vašich osobních údajů jsou zpracovatelé uvedení v oddíle 5, včetně našeho poskytovatele hostingu v Londýně ve Spojeném království, a poskytovatelé AI uvedení v Registru. Nacházejí se ve Spojeném království, ve Spojených státech a v Evropské unii a Registr uvádí země každého poskytovatele AI; podnikáme přiměřené kroky, abychom zajistili, že s nimi nakládají v souladu s australskými zásadami ochrany soukromí. Automatizovaná rozhodnutí: od 10. prosince 2026 tyto zásady označují druhy rozhodnutí přijímaných počítačovými programy, která významně ovlivňují vaše práva nebo zájmy — žádná taková nejsou; hodnocení a závěry se týkají argumentů, nikoli vás — a osobní údaje, které jsou při nich používány. Stížnosti lze podat Office of the Australian Information Commissioner. Nový Zéland. Naším pracovníkem pro ochranu soukromí je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro. Pokud o vás shromažďujeme osobní údaje nepřímo — protože je jiný uživatel uvedl v otázce — představují tyto zásady a oddíl 11 oznámení, které vám poskytujeme. Údaje zpřístupňujeme poskytovatelům AI v Registru jako našim zástupcům na základě smluv vyžadujících srovnatelné záruky. Stížnosti lze podat Office of the Privacy Commissioner." }
     ]
   },
   {
@@ -327,7 +330,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.3",
-  sha256: "dfaa0f0fd65b9dca15f243a52e7519585e9c0f410989eac59a3fd782c4f68af4",
+  sha256: "c9c9b2e75fa01ba31f4659cd73876a128eca2fa672ff8d2c6f6f5130bc01b7fb",
   eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.3 · ÚČINNÉ OD 12. ŘÍJNA 2026",
   title: "Co uchováváme a proč",
   lede: "Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.",

@@ -5,7 +5,7 @@
   "legal.notice.title": "Informații legale",
   "legal.notice.meta": "Cine operează {product} și cum ne puteți contacta",
   "legal.notice.s01.title": "Cine suntem",
-  "legal.notice.s01.body": "{product} (numit și {alsoCalled}) este operat de {company}, societate înregistrată în România.",
+  "legal.notice.s01.body": "{product} este operat de {company}, societate înregistrată în România.",
   "legal.notice.s01.seller": "{company} este și vânzătorul abonamentelor plătite: contractul, plățile și facturile dumneavoastră sunt cu {company}.",
   "legal.notice.company.name": "Denumirea societății",
   "legal.notice.company.tradingNames": "Denumiri comerciale",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Reține limba interfeței pe care ați ales-o.",
   "legal.cookies.locale.life": "1 an",
   "legal.cookies.storageTitle": "Stocate în browser, nu într-un cookie",
-  "legal.cookies.storageIntro": "În spațiul de stocare al browserului se păstrează patru elemente: două în stocarea locală, până când le ștergeți, și două în stocarea de sesiune, până când închideți fila. Spre deosebire de modulele cookie, nu sunt atașate cererilor dvs.; elementul chatului de ajutor păstrează o copie a unei conversații purtate cu ajutorul DebateAI, ale cărei mesaje au ajuns la DebateAI în momentul în care le-ați trimis.",
+  "legal.cookies.storageIntro": "În spațiul de stocare al browserului se păstrează patru elemente: două în stocarea locală, până când le ștergeți, și două în stocarea de sesiune, până când închideți fila. Spre deosebire de modulele cookie, nu sunt atașate cererilor dvs.; elementul chatului de ajutor păstrează o copie a unei conversații purtate cu ajutorul Dialectical Engine, ale cărei mesaje au ajuns la Dialectical Engine în momentul în care le-ați trimis.",
   "legal.cookies.consent.kind": "Stocare locală",
   "legal.cookies.consent.purpose": "Reține că ați văzut deja notificarea despre cookie-uri, ca să fie afișată o singură dată.",
   "legal.cookies.consent.life": "Până când îl ștergeți",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Stocare de sesiune",
   "legal.cookies.supportConversation.purpose": "Păstrează pe ecran conversația dvs. din chatul de ajutor cât timp fila rămâne deschisă. Se șterge când cineva se autentifică sau se deconectează în această filă.",
   "legal.cookies.supportConversation.life": "Până când închideți fila",
-  "legal.cookies.recipient.server": "Doar serverul DebateAI",
+  "legal.cookies.recipient.server": "Doar serverul Dialectical Engine",
   "legal.cookies.recipient.browser": "rămâne în browserul dvs.",
   "legal.cookies.refuse": "Pentru a le refuza, blocați sau ștergeți cookie-urile și datele site-ului pentru acest site din setările browserului.",
   "legal.cookies.refuseEffect": "Ce nu mai funcționează atunci: autentificarea și memorarea limbii și a opțiunilor de afișare.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Cel mult 30 de minute",
   "legal.cookies.mfaRecovery.life": "Cel mult 299 de secunde",
   "legal.cookies.social.life": "Cel mult 5 minute",
-  "legal.cookies.phoneDraft.life": "15 minute sau până la ștergere"
+  "legal.cookies.phoneDraft.life": "15 minute sau până la ștergere",
+  "legal.cookies.exportPending.purpose": "Păstrează în această filă linkul de export primit prin e-mail pentru autentificare și reîncercare.",
+  "legal.cookies.exportLinkOutcome.purpose": "Reține ce mesaj despre linkul de descărcare trebuie afișat în această filă.",
+  "legal.cookies.exportPending.life": "Până la închiderea filei, deconectare, un link nou, prima descărcare reușită sau un rezultat de link invalid ori cont greșit",
+  "legal.cookies.exportLinkOutcome.life": "Până la închiderea filei, deconectare sau un link nou"
 }

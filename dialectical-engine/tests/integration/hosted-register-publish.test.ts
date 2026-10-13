@@ -30,11 +30,13 @@ import {
   COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
   assertAskRoomAdmissionSealed,
   assertHostedSupportAdmissionSealed,
+  callConcurrencyPolicyRow,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
   readAdmissionPolicy,
   readAnswerRoleRotationPolicy,
   readAuthPolicy,
+  readCallConcurrencyPolicy,
   readBillingPlans,
   readBillingPolicy,
   readCostEnvelopePolicy,
@@ -505,6 +507,42 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     const before = await versionCount();
     const code = await planOf({ ...hostedFile(), answerRoleRotation: member }).then(() => "NO_REFUSAL", hostedRegisterRefusalCode);
     expect(code).toBe("HOSTED_REGISTER_ROLE_ROTATION_INVALID");
+    expect(await versionCount()).toBe(before);
+  }, 120_000);
+
+  // Parallel calls (spec 2026-10-12 §3.1): the optional callConcurrencyPolicy member becomes one additive row.
+  it("seals callConcurrencyPolicy as the row the publishers build, and a file without the member seals none", async () => {
+    const operations = createPostgresHostedRegisterOperations(database.pool);
+    const absent = await publishHostedRegister({ plan: await planOf(hostedFile()), operations });
+    await expect(readCallConcurrencyPolicy(
+      database.pool, registerVersionToSafeLegacyNumber(absent.registerVersion)
+    )).resolves.toEqual({ state: "ABSENT" });
+
+    const member = { perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50, deepinfra: 150, anthropic: 50 } };
+    const given = await publishHostedRegister({
+      plan: await planOf({ ...hostedFile(), callConcurrencyPolicy: member }),
+      operations
+    });
+    expect(given.outcome).toBe("CREATED");
+    const expected = callConcurrencyPolicyRow(member, "task-14b integration: first hosted register");
+    const sealed = await database.pool.query<{ value_json: unknown; source_ref: string }>(
+      "SELECT value_json,source_ref FROM register.register_row WHERE register_version=$1 AND row_key='callConcurrencyPolicy'",
+      [given.registerVersion]
+    );
+    expect(sealed.rows).toEqual([{ value_json: JSON.parse(expected.valueJsonText), source_ref: expected.sourceRef }]);
+    await expect(readCallConcurrencyPolicy(database.pool, registerVersionToSafeLegacyNumber(given.registerVersion)))
+      .resolves.toEqual({ state: "SET", policy: member });
+  }, 120_000);
+
+  it.each([
+    ["a value above its bound", { perDebate: 65, perModelPerDebate: 3, perModelPerRunner: { default: 50 } }],
+    ["a member without the runner default", { perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { deepinfra: 150 } }],
+    ["a member carrying the row's kind", { kind: "CALL_CONCURRENCY_POLICY", perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50 } }],
+    ["a member present as JSON null", null]
+  ])("refuses %s before anything is sealed", async (_name, member) => {
+    const before = await versionCount();
+    const code = await planOf({ ...hostedFile(), callConcurrencyPolicy: member }).then(() => "NO_REFUSAL", hostedRegisterRefusalCode);
+    expect(code).toBe("HOSTED_REGISTER_CALL_CONCURRENCY_INVALID");
     expect(await versionCount()).toBe(before);
   }, 120_000);
 });

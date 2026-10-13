@@ -4,10 +4,11 @@ import en from "../../apps/ui/messages/en/legal.json";
 import ro from "../../apps/ui/messages/ro/legal.json";
 
 /**
- * DeepInfra serves GLM only on the private preview, so only the preview's GLM build (the public
- * build flag the new-debate form reads, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) lists it in the
- * AI Provider Register. Every other build, the real site included, does not name a company that
- * receives nothing from it.
+ * DeepInfra serves the private preview's open-weight models, so every build that offers one of them
+ * lists it in the AI Provider Register (the public build flag the new-debate form reads,
+ * NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON, narrows the roster). With no flag, the real site included,
+ * it names all four models (owner, 12 October 2026); the preview's GLM build names GLM alone. A build
+ * that offers no DeepInfra model does not name a company that receives nothing from it.
  */
 const FLAG = "NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON";
 const PREVIEW_GLM = "[\"zai-org/GLM-5.3-Flash\"]";
@@ -56,15 +57,18 @@ describe("the DeepInfra serving provider is disclosed on the private preview's G
   }
 });
 
-describe("every other build, the real site included, does not list DeepInfra", () => {
-  it("leaves it out of the register and the page", async () => {
+describe("a build with no flag, the real site included, lists DeepInfra's four models (owner, 12 October 2026)", () => {
+  it("names all four models in the register and the page, just before the support chat's model", async () => {
     const { LegalProvidersBody, PROVIDER_REGISTER } = await build(undefined);
-    expect(PROVIDER_REGISTER.map(row => row.key)).not.toContain("deepinfra");
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
+    expect(PROVIDER_REGISTER.at(-2)?.key).toBe("deepinfra");
+    expect(PROVIDER_REGISTER.at(-2)?.models).toBe(
+      "GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek), MiMo-V2.6-Pro (Xiaomi), Qwen3.8-Flash (Alibaba)"
+    );
     const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} />);
-    expect(html).not.toContain('id="legal-provider-deepinfra"');
-    expect(html).not.toContain("Deep Infra Inc.");
-    expect(html).not.toContain("policy@deepinfra.com");
+    expect(html).toContain('id="legal-provider-deepinfra"');
+    expect(html).toContain("Deep Infra Inc.");
+    expect(html).toContain("policy@deepinfra.com");
   });
 });
 

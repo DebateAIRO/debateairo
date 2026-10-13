@@ -2,7 +2,7 @@ import { z } from "zod";
 import { STORY_BODY_LIMITS, StoryBodySchema, type StoryBody } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import { decodeModelJson, type ContentClassification, type ModelJsonDecoded, type ModelReplyFacts } from "@debateai/providers";
-import { STORY_CHECKER_OBJECTION_MAX_CHARS } from "./contracts.js";
+import { STORY_CHECKER_LIMITS } from "./contracts.js";
 
 /**
  * THE DETERMINISTIC CHECKS (spec §5.3), run as each story call's content
@@ -120,7 +120,7 @@ function storyScorePattern(scoreTexts: ReadonlySet<string>): RegExp | null {
  */
 export const StoryCheckerVerdictSchema = z.object({
   satisfied: z.boolean(),
-  objection: z.string().trim().min(1).max(STORY_CHECKER_OBJECTION_MAX_CHARS).nullable(),
+  objection: z.string().trim().min(1).max(STORY_CHECKER_LIMITS.maxObjectionChars).nullable(),
   criteria: z.object({
     faithful_to_material: z.boolean(),
     agrees_with_label: z.boolean(),
@@ -291,7 +291,22 @@ type StoryDecision =
   | { readonly classification: ContentClassification; readonly body: StoryBody }
   | { readonly classification: ContentClassification; readonly body: null };
 
-function decideStory(content: string, index: StoryMaterialIndex, reply: ModelReplyFacts | undefined): StoryDecision {
+/**
+ * Reply language (2026-10-12): every text of the story a reader meets, checked against the question's language
+ * (`replyLanguageCheck`) after every other check passed. References, fates and the shape id are not prose.
+ */
+export const STORY_BODY_PROSE = Object.freeze([
+  "short.headline", "short.summary", "short.confidence", "short.paths.*.line", "short.change.text",
+  "why.reasons.*.text", "long.sections.*.title", "long.sections.*.paragraphs.*.text", "reviewer_note.text"
+] as const);
+/** The checker's objection: the storyteller's next material, and the reservation a reader may see. */
+export const STORY_CHECKER_PROSE = Object.freeze(["objection"] as const);
+
+/** A step's language check (`replyLanguageCheck`): the issues of an accepted object, empty when it is fine. */
+export type StoryLanguageCheck = (value: unknown) => readonly unknown[];
+
+function decideStory(content: string, index: StoryMaterialIndex, reply: ModelReplyFacts | undefined,
+  inQuestionLanguage: StoryLanguageCheck | undefined): StoryDecision {
   assertStoryMaterialIndex(index);
   const decoded = decodeModelJson(content, reply, { trailingObjectAccepted: (value) => {
     const candidate = StoryBodySchema.safeParse(value);
@@ -300,7 +315,8 @@ function decideStory(content: string, index: StoryMaterialIndex, reply: ModelRep
   if (!decoded.ok) return { classification: { parseStatus: "PARSE_FAILED", parseError: decoded.error }, body: null };
   const parsed = StoryBodySchema.safeParse(decoded.value);
   if (!parsed.success) return { classification: { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message }, body: null };
-  const issues = storyContentIssues(parsed.data, index);
+  const contentIssues = storyContentIssues(parsed.data, index);
+  const issues = contentIssues.length === 0 ? inQuestionLanguage?.(parsed.data) ?? [] : contentIssues;
   return issues.length === 0
     ? { classification: parsedWith(decoded), body: parsed.data }
     : { classification: { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) }, body: null };
@@ -313,8 +329,9 @@ function decideStory(content: string, index: StoryMaterialIndex, reply: ModelRep
  * `STORY_SCORE_TEXTS_INVALID` or `STORY_ENGINE_TOKENS_INVALID` for an index
  * code built wrongly.
  */
-export function classifyStoryContent(content: string, index: StoryMaterialIndex, reply?: ModelReplyFacts): ContentClassification {
-  return decideStory(content, index, reply).classification;
+export function classifyStoryContent(content: string, index: StoryMaterialIndex, reply?: ModelReplyFacts,
+  inQuestionLanguage?: StoryLanguageCheck): ContentClassification {
+  return decideStory(content, index, reply, inQuestionLanguage).classification;
 }
 
 /**
@@ -322,26 +339,28 @@ export function classifyStoryContent(content: string, index: StoryMaterialIndex,
  * `STORY_CONTENT_INVALID` for content the classifier refuses.
  */
 export function parseStoryBody(content: string, index: StoryMaterialIndex, reply?: ModelReplyFacts): StoryBody {
-  const decided = decideStory(content, index, reply);
+  const decided = decideStory(content, index, reply, undefined);
   if (decided.body === null) {
     throw new TypedDomainError("STORY_CONTENT_INVALID", decided.classification.parseStatus);
   }
   return decided.body;
 }
 
-function decideChecker(content: string, reply: ModelReplyFacts | undefined):
+function decideChecker(content: string, reply: ModelReplyFacts | undefined, inQuestionLanguage: StoryLanguageCheck | undefined):
   { readonly classification: ContentClassification; readonly verdict: StoryCheckerVerdict | null } {
   const decoded = decodeModelJson(content, reply, { trailingObjectAccepted: (value) => StoryCheckerVerdictSchema.safeParse(value).success });
   if (!decoded.ok) return { classification: { parseStatus: "PARSE_FAILED", parseError: decoded.error }, verdict: null };
   const parsed = StoryCheckerVerdictSchema.safeParse(decoded.value);
-  return parsed.success
+  if (!parsed.success) return { classification: { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message }, verdict: null };
+  const issues = inQuestionLanguage?.(parsed.data) ?? [];
+  return issues.length === 0
     ? { classification: parsedWith(decoded), verdict: parsed.data }
-    : { classification: { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message }, verdict: null };
+    : { classification: { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) }, verdict: null };
 }
 
-/** The checker's content classifier. */
-export function classifyCheckerContent(content: string, reply?: ModelReplyFacts): ContentClassification {
-  return decideChecker(content, reply).classification;
+/** The checker's content classifier; `inQuestionLanguage` is its language check (`STORY_CHECKER_PROSE`). */
+export function classifyCheckerContent(content: string, reply?: ModelReplyFacts, inQuestionLanguage?: StoryLanguageCheck): ContentClassification {
+  return decideChecker(content, reply, inQuestionLanguage).classification;
 }
 
 /**
@@ -349,7 +368,7 @@ export function classifyCheckerContent(content: string, reply?: ModelReplyFacts)
  * Throws `STORY_CHECKER_CONTENT_INVALID` for refused content.
  */
 export function parseCheckerVerdict(content: string, reply?: ModelReplyFacts): StoryCheckerVerdict {
-  const decided = decideChecker(content, reply);
+  const decided = decideChecker(content, reply, undefined);
   if (decided.verdict === null) {
     throw new TypedDomainError("STORY_CHECKER_CONTENT_INVALID", decided.classification.parseStatus);
   }

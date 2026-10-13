@@ -14,6 +14,7 @@ import type { AskRequest } from "@debateai/contract";
 import { ContentCipher, generateDek, MemoryRunContentKeyStore, type KeyDestroyResult, type ReadableUserDekStore } from "@debateai/crypto";
 import { configureContentEncryption, decryptContentForRun, migrate, readCallPrompt } from "@debateai/db";
 import type { Session } from "@debateai/contract";
+import type { CallConcurrencyPolicy } from "@debateai/register";
 import { PREVIEW_PROVIDER_REF_MODELS, previewModelRow, type PreviewBudgetPorts, type PreviewGateRemaining } from "@debateai/providers";
 import { ServeRepository } from "@debateai/serve";
 import { StoryRepository } from "@debateai/story";
@@ -30,6 +31,7 @@ import {
   recheckReply,
   replyContentOf
 } from "./practice-lanes.js";
+import type { PracticeParallelBlock } from "./practice-parallel.js";
 import { practiceQuestion } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
 import {
@@ -146,6 +148,8 @@ export type PracticeDebateResult = Readonly<{
   refusedCalls: number;
   remaining: Readonly<Record<PracticeGateName, Readonly<{ before: PreviewGateRemaining | null; after: PreviewGateRemaining | null }>>>;
   seconds: Readonly<{ admission: number; debate: number }>;
+  /** Parallel AI calls: the setting the runner ran with and how many calls really went at once (practice-parallel.ts). */
+  parallel?: PracticeParallelBlock;
   /**
    * `--transcript` only: where transcript.json went, how many calls it holds, and what the key-shape safety net
    * blanked (by kind; empty when nothing). `error` names why it could not be written. Not part of report.json.
@@ -312,6 +316,8 @@ export async function runPracticeDebate(input: Readonly<{
   observer: PracticeGateObserver;
   depth: number;
   questionId: string;
+  /** --call-concurrency: handed to the practice's runner as it is (never written to a register). Absent: the register's row. */
+  callConcurrency?: CallConcurrencyPolicy;
   /** Test seams: the runner's cooldown hold and the preview policy's resend wait. */
   wait?: (milliseconds: number) => Promise<void>;
   sleep?: (milliseconds: number) => Promise<void>;
@@ -389,6 +395,8 @@ export async function runPracticeDebate(input: Readonly<{
       dispatcher: { dispatch: async (job) => { dispatched.push({ ...job }); } }, log: progress
     });
     const runner = await composePracticeRunner({ pool, environment: settings.runner, budgetPorts: input.budgetPorts,
+      remaining: remainingPorts, keepAlivePool: database.extraPool(),
+      ...(input.callConcurrency === undefined ? {} : { callConcurrency: input.callConcurrency }),
       ...(input.wait === undefined ? {} : { wait: input.wait }), ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
     const question = practiceQuestion(input.questionId);
     const request = {
@@ -424,7 +432,7 @@ export async function runPracticeDebate(input: Readonly<{
         run: { runId: null, workItemOutcome: null, failureCode: null, answer: null, story: null },
         byModelAndSite: [], probes, failures: [], formatFailures: 0, callsByModel: {}, repairKindsByModel: {}, answersByModel: {}, jsonRepairs: [],
         failedCalls: 0, refusedCalls: 0,
-        remaining, seconds: { admission: admissionSeconds, debate: 0 }
+        remaining, seconds: { admission: admissionSeconds, debate: 0 }, parallel: runner.callStats.summary()
       });
     }
     const runRow = (await pool.query<{ discovered_panel: unknown }>("SELECT discovered_panel FROM core.run WHERE run_id=$1", [job.runId])).rows[0];
@@ -514,6 +522,7 @@ export async function runPracticeDebate(input: Readonly<{
       run: Object.freeze({ runId: job.runId, workItemOutcome, failureCode, answer, story }),
       ...collected, probes: Object.freeze(probes), remaining,
       seconds: Object.freeze({ admission: admissionSeconds, debate: debateSeconds }),
+      parallel: runner.callStats.summary(),
       ...(transcript === undefined ? {} : { transcript })
     });
   } finally {

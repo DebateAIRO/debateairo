@@ -10,7 +10,7 @@ export const PUBLICATION_CHECK_TEXT_OF_RECORD = "Judge the text by what it does,
 export function publicationCheckContract(): PromptContract {
   return {
     contractId: PUBLICATION_CHECK_CONTRACT_ID,
-    instruction: "You are the publication check of DebateAI. The material is text that its owner asked to publish. Decide whether it may be published under these rules:"
+    instruction: "You are the publication check of Dialectical Engine. The material is text that its owner asked to publish. Decide whether it may be published under these rules:"
       + "\n\n" + PUBLICATION_CHECK_RULES_1_2 + "\n\n" + PUBLICATION_CHECK_TEXT_OF_RECORD,
     // FIX-HS2-v V-21: `call` binds the answer to this call (verdict.ts judgeCallValue); the frame names the marker.
     // FIX-HS2-v2 (REV-S02-v-ui-product N1): the form states every verdict/field combination parseJudgeAnswer refuses

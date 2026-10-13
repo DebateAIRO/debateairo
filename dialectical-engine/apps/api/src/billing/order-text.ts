@@ -4,7 +4,7 @@ import type { PlanId } from "@debateai/register";
 
 /**
  * The brand these lines name: the legal notice's first trading name (`COMPANY.tradingNames`,
- * apps/ui/lib/legal/pages.ts:72, today "DebateAI"), read from P6a's API mirror so the seller has one source
+ * apps/ui/lib/legal/pages.ts:72, today "Dialectical Engine"), read from P6a's API mirror so the seller has one source
  * (RULINGS-R3 R3-4). The legal name stands in only if the list were ever emptied.
  */
 const [brand = SELLER_COMPANY.legalName] = SELLER_COMPANY.tradingNames;

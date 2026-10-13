@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Dialectical Engine のあなたのデータ",
+  "archive.generated": "{pseudonym} 向けに {time} に作成しました。",
+  "archive.accountHeading": "アカウント",
+  "archive.email": "メールアドレス",
+  "archive.memberSince": "登録日",
+  "archive.debatesHeading": "自分のディベート ({count})",
+  "archive.question": "質問",
+  "archive.verdict": "判定",
+  "archive.verdictSupported": "支持",
+  "archive.verdictContested": "見解が対立",
+  "archive.verdictUnsupported": "支持なし",
+  "archive.story": "ディベートの概要",
+  "archive.arguments": "論点",
+  "archive.visibilityPublic": "公開済み",
+  "archive.visibilityPrivate": "非公開",
+  "archive.unreadable": "このディベートの鍵は破棄されたため、内容を読み取ることはできません。",
+  "archive.noDebates": "ディベートはありません。",
+  "archive.filesNote": "この ZIP 内の JSON ファイルには同じデータが機械で読み取れる形式で保存されています。ファイルの一覧は README.txt にあります。"
+}

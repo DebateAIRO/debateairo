@@ -43,6 +43,7 @@ describe("Support catalog route coverage", () => {
       "/cookies",
       "/debate/[id]",
       "/enroll-mfa",
+      "/export",
       "/help",
       "/legal",
       "/login",
@@ -77,6 +78,8 @@ describe("Support catalog route coverage", () => {
 
     expect(disposition.get("/verify-email")).toBe("excluded");
     expect(disposition.get("/enroll-mfa")).toBe("excluded");
+    expect(SUPPORT_PAGE_ROUTES).toContain("/export");
+    expect(SUPPORT_CAPABILITIES.find(({ route }) => route === "/export")).toBeUndefined();
     for (const route of ["/reset-password", "/recover-authenticator", "/verify-backup-email"]) {
       expect(SUPPORT_PAGE_ROUTES).toContain(route);
       expect(SUPPORT_CAPABILITIES.find(capability => capability.route === route)).toBeUndefined();

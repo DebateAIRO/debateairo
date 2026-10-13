@@ -121,7 +121,7 @@ describe("S01 placement and contract coverage", () => {
     const contract = judgePromptContract("support", "unknown");
     const packet = framed({ ...contract, instruction: `${contract.instruction} ${argumentLanguageDirective("Romanian")}` }, "Ar trebui…?").packet;
     expectRuleInFrame(packet);
-    expect(packet.messages[0]!.content).toContain("Write every natural-language field in Romanian.");
+    expect(packet.messages[0]!.content).toContain("Write every natural-language field in Romanian, the language of the question, even where the material quotes another language.");
   });
 });
 

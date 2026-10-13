@@ -71,6 +71,15 @@ const subject = Object.freeze({ runId: "run:t", subjectItemId: "node:t", questio
   argumentLanguageName: "English", statement: "Free central buses lower the barrier for low-income riders.", authorMaker: "other",
   providerRef: "preview:mimo-v2-6-pro", contractHash: "contract:t", bound: BOUND });
 
+/**
+ * R15 into dev (2026-10-13): since the reply-language check (#154) the judge refuses prose that is not in the question's
+ * language. The review (Spanish) and the panel reply (Polish) were written to an English question, so on that question
+ * they are now refused for their language, after the shape repair, and re-asked. Their shape repairs are tested on a
+ * question in the reply's own language; the last case of each pins the language refusal on the practice's question.
+ */
+const SPANISH_QUESTION = "¿Debería una ciudad mediana hacer gratuitas las líneas de autobús del centro?";
+const POLISH_QUESTION = "Czy średniej wielkości miasto powinno uczynić centralne linie autobusowe bezpłatnymi?";
+
 describe("debate 3 seq 160 — a review of a node with no edges left out edge_bearings (EMPTY_LIST)", () => {
   const reply = fixture(REVIEW_NO_EDGES);
   const raw = JSON.parse(reply) as { outcome: string; reasons: string[] };
@@ -86,13 +95,21 @@ describe("debate 3 seq 160 — a review of a node with no edges left out edge_be
 
   it("the judge's review accepts it on the first try and measures no edge", async () => {
     const seen = { classified: [] as Classified[], packets: [] as ProviderCallRequest["packet"][] };
-    const reviewed = await new Judge(oneReply(reply, seen)).review({ ...subject, callSiteKey: "JUDGE:review:t", edges: [] });
+    const reviewed = await new Judge(oneReply(reply, seen)).review({ ...subject, questionLine: SPANISH_QUESTION, callSiteKey: "JUDGE:review:t", edges: [] });
     expect(seen.classified).toEqual([{ parseStatus: "PARSED", parseError: null, jsonRepair: "EMPTY_LIST" }]);
     expect(reviewed.parseStrategy).toBe("EMPTY_LIST");
     expect(reviewed.outcome).toBe("agree");
     expect(reviewed.edgeMeasurements).toEqual([]);
     // The practice report reads the edge count back from the call's own prompt.
     expect(practiceReviewEdgeCountOf(seen.packets[0]!.messages)).toBe(0);
+  });
+
+  it("on the practice's English question the same Spanish review is refused for its language, after the shape repair", async () => {
+    const seen = { classified: [] as Classified[], packets: [] as ProviderCallRequest["packet"][] };
+    await expect(new Judge(oneReply(reply, seen)).review({ ...subject, callSiteKey: "JUDGE:review:t", edges: [] }))
+      .rejects.toMatchObject({ code: "REFUSED_IN_TEST" });
+    expect(seen.classified[0]).toMatchObject({ parseStatus: "SCHEMA_FAILED" });
+    expect(seen.classified[0]!.parseError).toContain("TEXT_NOT_IN_QUESTION_LANGUAGE");
   });
 
   it("a node WITH edges never gets bearings filled in: the same reply is refused, by the reader and by the review", async () => {
@@ -142,10 +159,18 @@ describe("debate 3 seq 178 — a panel member wrote its critic under \"critique\
 
   it("the panel accepts it on the first try", async () => {
     const seen = { classified: [] as Classified[], packets: [] as ProviderCallRequest["packet"][] };
-    const assessed = await new Judge(oneReply(reply, seen)).assess({ ...subject, callSiteKey: "PANEL:JUDGE:defender:root0:r1:p0:preview:mimo-v2-6-pro" });
+    const assessed = await new Judge(oneReply(reply, seen)).assess({ ...subject, questionLine: POLISH_QUESTION, callSiteKey: "PANEL:JUDGE:defender:root0:r1:p0:preview:mimo-v2-6-pro" });
     expect(seen.classified).toEqual([{ parseStatus: "PARSED", parseError: null, jsonRepair: "RENAMED_MEMBER" }]);
     expect(assessed.parseStrategy).toBe("RENAMED_MEMBER");
     expect(assessed.assessment.critic.counterargumentStrength).toBe(0.55);
+  });
+
+  it("on the practice's English question the same Polish reply is refused for its language, after the shape repair", async () => {
+    const seen = { classified: [] as Classified[], packets: [] as ProviderCallRequest["packet"][] };
+    await expect(new Judge(oneReply(reply, seen)).assess({ ...subject, callSiteKey: "PANEL:JUDGE:defender:root0:r1:p0:preview:mimo-v2-6-pro" }))
+      .rejects.toThrow();
+    expect(seen.classified[0]).toMatchObject({ parseStatus: "SCHEMA_FAILED" });
+    expect(seen.classified[0]!.parseError).toContain("TEXT_NOT_IN_QUESTION_LANGUAGE");
   });
 
   it("near-misses stay refused: a partial or out-of-range critique, two candidates, a second missing member, an extra key", () => {
