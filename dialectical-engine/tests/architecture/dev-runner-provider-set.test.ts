@@ -183,7 +183,7 @@ describe("production runner provider topology", () => {
      * sits at depth 2 or more within the settings literal — is NOT a composed setting. A spread at
      * depth 1 is resolved by collecting the keys of each object literal inside it, so
      * the conditional `...(x === undefined ? {} : { critique: x })` contributes
-     * `critique`.
+     * `critique`. A shorthand property (`debateShape,`) is a key as well.
      */
     const literalKeys = (source: string, from: number, to: number): readonly string[] => {
       const keys: string[] = [];
@@ -203,7 +203,14 @@ describe("production runner provider topology", () => {
           const word = source.slice(index, wordEnd);
           let after = wordEnd;
           while (after <= to && /\s/u.test(source.charAt(after))) after += 1;
-          if (source.charAt(after) === ":") keys.push(word);
+          // A shorthand property (`debateShape,`) is a key too: the word stands alone between the literal's own
+          // `{`/`,` and `,`/`}`. A spread's operand (`...x,`) is preceded by `.` and a value (`a: x,`) by `:`, so
+          // neither is read as a key.
+          let before = index - 1;
+          while (before >= from && /\s/u.test(source.charAt(before))) before -= 1;
+          const standsAlone = (source.charAt(before) === "{" || source.charAt(before) === ",")
+            && (source.charAt(after) === "," || source.charAt(after) === "}");
+          if (source.charAt(after) === ":" || standsAlone) keys.push(word);
           index = wordEnd - 1;
         }
       }
@@ -282,6 +289,12 @@ describe("production runner provider topology", () => {
     // scan that ignores spreads would wrongly report a composed member as unwired.
     expect(mainSource).toContain("{ critique: providerTopology.critique }");
     expect(composed).toContain("critique");
+    // Shorthand: `debateShape` (25a3bab58) is composed as `debateShape,` with no colon; a colon-only scan reported a
+    // composed member as unwired. The scan must read it, and must not read a value or a spread's operand as a key.
+    expect(settingsLiteral).toMatch(/,\s*debateShape,/u);
+    expect(composed).toContain("debateShape");
+    expect(composed).not.toContain("runnerCallScheduler");
+    expect(composed).not.toContain("previewConfig");
 
     // ---- the enumeration must DISCRIMINATE ------------------------------------
     expect(optionalMembers.length).toBeGreaterThanOrEqual(10);
