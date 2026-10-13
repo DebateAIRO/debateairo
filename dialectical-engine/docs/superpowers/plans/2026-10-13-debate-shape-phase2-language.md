@@ -51,6 +51,10 @@ task text, so every task's steps, tests and interfaces agree with them. Code fac
 - CR-6: the fast check reaches Anthropic only through the preview gate (no key in the API) or the hosted support target that already exists; no question text in any log line. Tasks 6, 12.
 - CR-7: kept defaults listed for the owner at the end (Owner steps 8).
 - Cross-plan amendments: marked as applied to P2b/P2c/P2d on 2026-10-13, with the CR-3 adjustments.
+- P2b pre-flight corrections (2026-10-13, P2b "Pre-flight corrections 2026-10-13"), three follow here:
+  - P2b PF-B53: P2b Task 15 now exports `runShapeDebate(harness, options)` from `tests/support/debate-shape-harness.ts` (options include `language?` and `question?`); Task 17's case calls it with the suite's `harness` and adds only `prompts` to its result.
+  - P2b PF-B47: `mapConditionRecords(result, runId, servedRootNodeId)` takes a third argument (map records name the served root's node); Task 14's test and cross-plan amendment 4 pass it.
+  - P2b PF-B25: Task 19's contract test gains the "never redefines a function an earlier migration owns" case in its corrected form (a `CREATE … FUNCTION` regex, never a bare `FUNCTION <name>` substring, which the migration's own `EXECUTE FUNCTION` lines would contain).
 
 ## Global Constraints
 
@@ -265,7 +269,7 @@ Kept as the record. Folded into the task text on 2026-10-13 (see "Amendments 202
 3. **Task 6 / Owner steps: do not publish the preview's `mapContractHash` before P2L Task 15 lands.**
    - P2L changes the angle planner's instruction and answer form, so `mapPromptContractHash()` changes once more.
    - Dev registers re-seal by themselves.
-4. **Task 12 (`map-stage.ts`).** `mapConditionRecords(result, runId)` must convert EVERY `MapMarkRecord` the result holds, never a fixed list, and never a map note (P2L's record is a note, CR-3). The test's `mapAnglesSpec({ questionLine, languageName, languageTag })` call keeps working: P2L keeps those context fields.
+4. **Task 12 (`map-stage.ts`).** `mapConditionRecords(result, runId, servedRootNodeId)` (third argument: P2b pre-flight PF-B47) must convert EVERY `MapMarkRecord` the result holds, never a fixed list, and never a map note (P2L's record is a note, CR-3). The test's `mapAnglesSpec({ questionLine, languageName, languageTag })` call keeps working: P2L keeps those context fields.
 5. **Task 15 (the harness `tests/support/debate-shape-harness.ts` and `classifyGateRequest`'s `"MAP"` kind).**
    - The harness's admitted runs pass `argumentLanguageTag: "en", argumentLanguageName: "English"` (or the case's language) to `startRun` explicitly.
    - The scripted `MAP:angles` reply starts with `"question_language": "<tag>"`.
@@ -3162,7 +3166,7 @@ describe("the planner-disagreement record is operator-only (question-language sp
   });
 
   it("never becomes a condition record on the answer", () => {
-    const records = mapConditionRecords({ marks: [], notes: [{ note: RECORD, step: "ANGLES", detail: "ro:fr" }] } as never, "run-1");
+    const records = mapConditionRecords({ marks: [], notes: [{ note: RECORD, step: "ANGLES", detail: "ro:fr" }] } as never, "run-1", "node-0");
     expect(records).toEqual([]);
   });
 
@@ -3477,7 +3481,7 @@ In `tests/integration/debate-shape-run.test.ts`, add this case, written like its
 
 ```ts
   it("question language: every captured prompt of a shape run carries the locked sentence and field, never the fallback form", async () => {
-    const { prompts } = await runShapeDebate({ language: { tag: "ro", name: "Romanian" }, question: "Ar trebui sa renuntam la leu?" });
+    const { prompts } = await runShapeDebate(harness, { label: "question-language", language: { tag: "ro", name: "Romanian" }, question: "Ar trebui sa renuntam la leu?" });
     expect(prompts.length).toBeGreaterThan(0);
     for (const prompt of prompts) {
       expect(prompt.system).toContain("in Romanian, the language this debate was set to");
@@ -3487,7 +3491,7 @@ In `tests/integration/debate-shape-run.test.ts`, add this case, written like its
   });
 ```
 
-`runShapeDebate` is the harness function P2b Task 15 defines (`tests/support/debate-shape-harness.ts`). Add the `language` / `question` options to it here, and add `prompts` (every captured packet as `{ system, fields }`, read with `readPromptFrame`) to its result if it does not return them yet.
+`runShapeDebate(harness, options)` is the harness function P2b Task 15 exports from `tests/support/debate-shape-harness.ts` (P2b pre-flight PF-B53); `harness` is the suite's own `previewDebateHarness(...)`, already in scope in `debate-shape-run.test.ts`, and `runShapeDebate` is imported there next to `scriptedShapeAnswers`. Its options already include `language?` and `question?` (both reach `admittedRun`). Add only `prompts` (every captured packet as `{ system, fields }`, read with `readPromptFrame`) to its result (`ShapeDebateRun`).
 
 - [ ] **Step 2: Run them and expect FAIL**
 
@@ -3802,7 +3806,18 @@ describe("0117: the language check's run-less site cost", () => {
     expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION ledger\.record_language_check_spend\([^)]*\) TO debateai_runtime;/u);
     expect(sql).not.toMatch(/CREATE OR REPLACE FUNCTION/u);
   });
+  // P2b pre-flight PF-B25: anchored on CREATE. A bare `FUNCTION <name>` substring check can never pass on a migration
+  // that also says `EXECUTE FUNCTION <name>` or `GRANT EXECUTE ON FUNCTION <name>`.
+  it("never redefines a function an earlier migration owns", () => {
+    for (const owned of ["core.progress_value_is_code_shaped", "core.enforce_erasure_barrier()", "core.reject_mutation()", "core.install_truncate_guard"]) {
+      expect(sql).not.toMatch(new RegExp(String.raw`CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+` + escapeRegExp(owned.replace(/\(\)$/u, "")), "u"));
+    }
+  });
 });
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
 ```
 
 `tests/integration/language-check-spend.test.ts` (embedded Postgres, run alone): migrate. Call the function once with `('…uuid…', 'language-check:anthropic:claude-haiku-5-5', '2026-10-13', 85, 310, 28)`. Assert `PostgresModelSpendStore.readDaySpentMicros("2026-10-13")` grows by 85. Assert a direct `INSERT … spend_source='LANGUAGE_CHECK', run_id=<a run>` is refused by the CHECK. Assert `recordSpend({ spendSource: "LANGUAGE_CHECK", runId: null, … })` succeeds while `spendSource: "RUN", runId: null` still throws `MODEL_SPEND_RUN_REQUIRED`. Add a unit case: `languageCheckChargeMicros({ inputTokens: 310, outputTokens: 28 }, { input: 100000, output: 500000 })` equals `Math.ceil((310*100000 + 28*500000) / 1_000_000)` = 45.
