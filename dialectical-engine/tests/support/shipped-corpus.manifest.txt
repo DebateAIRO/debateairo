@@ -940,6 +940,7 @@ packages/map/src/choose.ts
 packages/map/src/index.ts
 packages/map/src/items.ts
 packages/map/src/keypoints.ts
+packages/map/src/opposite-templates.ts
 packages/map/src/orchestrator.ts
 packages/map/src/prompts.ts
 packages/map/src/replies.ts

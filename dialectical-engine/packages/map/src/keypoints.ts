@@ -1,3 +1,4 @@
+import { TypedDomainError } from "@debateai/kernel";
 import { mapItemsById, mapKeyPoint, mapMergedAnswer } from "./items.js";
 import type { MapMergeReply } from "./replies.js";
 import { mapNormaliseText } from "./text.js";
@@ -10,9 +11,11 @@ const mapKeyPointId = (n: number): string => `kp${String(n).padStart(2, "0")}`;
 const mapAnswerGroupId = (n: number): string => `an${String(n).padStart(2, "0")}`;
 
 function mapGroupByText<T extends MapItem>(items: readonly T[], text: (item: T) => string): readonly (readonly T[])[] {
-  const groups = new Map<string, T[]>();
+  // An item whose text normalises to nothing (only signs, no letters or digits) matches nothing: it is its own group.
+  const groups = new Map<string | symbol, T[]>();
   for (const item of [...items].sort((a, b) => a.itemId.localeCompare(b.itemId))) {
-    const key = mapNormaliseText(text(item));
+    const normalised = mapNormaliseText(text(item));
+    const key = normalised === "" ? Symbol(item.itemId) : normalised;
     const group = groups.get(key);
     if (group === undefined) groups.set(key, [item]);
     else group.push(item);
@@ -77,11 +80,18 @@ export function mapSingletonMap(items: readonly MapItem[]): MapMergedMap {
 export function mapAddGapPoints(current: MapMergedMap, items: readonly MapItem[], gapItems: readonly MapPointItem[]):
   Readonly<{ map: MapMergedMap; newKeyPoints: number }> {
   const byId = mapItemsById(items);
+  for (const item of gapItems) {
+    const known = byId.get(item.itemId);
+    if (known === undefined || known.kind !== "POINT" || known.origin !== "GAP") {
+      throw new TypedDomainError("MAP_GAP_ITEM_UNKNOWN", `MAP_GAP_ITEM_UNKNOWN: ${item.itemId}`);
+    }
+  }
   const keyPoints = [...current.keyPoints];
   let created = 0;
   for (const item of gapItems) {
     const key = mapNormaliseText(item.claim);
-    const at = keyPoints.findIndex((keyPoint) => mapNormaliseText(keyPoint.claim) === key
+    // A claim that normalises to nothing matches nothing: it becomes its own key point.
+    const at = key === "" ? -1 : keyPoints.findIndex((keyPoint) => mapNormaliseText(keyPoint.claim) === key
       || keyPoint.memberItemIds.some((id) => {
         const member = byId.get(id);
         return member?.kind === "POINT" && mapNormaliseText(member.claim) === key;

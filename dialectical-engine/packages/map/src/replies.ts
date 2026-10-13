@@ -188,9 +188,10 @@ export function mapChooseCheck(keyPointIds: ReadonlySet<string>, expected: Reply
       if (rival !== null && (rival === answer.answer_id || !ids.includes(rival))) {
         issues.push({ path: ["answers", index, "strongest_rival"], code: "MAP_UNKNOWN_RIVAL" });
       }
+      // A statement that normalises to nothing (only signs) duplicates nothing.
       const statement = mapNormaliseText(answer.statement);
-      if (statements.has(statement)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_DUPLICATE" });
-      statements.add(statement);
+      if (statement !== "" && statements.has(statement)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_DUPLICATE" });
+      if (statement !== "") statements.add(statement);
     });
     issues.push(...mapLanguageIssues(value.answers.map((answer) => answer.statement), expected, ["answers"]));
     return issues;

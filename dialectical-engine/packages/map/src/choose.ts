@@ -1,6 +1,7 @@
 import { mapRankKeyPoints, mapRankMergedAnswers } from "./items.js";
+import { MAP_OPPOSITE_TEMPLATES } from "./opposite-templates.js";
 import type { MapChooseReply } from "./replies.js";
-import { mapNormaliseText } from "./text.js";
+import { mapNormaliseText, mapPrimarySubtag } from "./text.js";
 import {
   MAP_LIMITS,
   type MapAnswerItem,
@@ -13,12 +14,12 @@ import {
 
 /**
  * The last way to name a second answer when the map offers no different one (ANSWERS_FILLED, source TEMPLATE).
- * Code-owned text; Phase 1 needs Romanian and English only. Phase 2 needs it in every locale the site serves.
+ * Code-owned text in every site locale (`MAP_OPPOSITE_TEMPLATES`), read by the tag's primary subtag ("ro-RO" → "ro");
+ * a language the site does not serve gets English.
  */
 export function mapOppositeTemplate(statement: string, languageTag: string): string {
-  const lead = languageTag === "ro" ? "Opusul acestui răspuns" : "The opposite of this answer";
-  const empty = languageTag === "ro" ? "Un răspuns diferit de cel de mai sus" : "An answer different from the one above";
-  return (statement.trim() === "" ? empty : `${lead}: ${statement.trim()}`).slice(0, MAP_LIMITS.claimMaxChars);
+  const template = MAP_OPPOSITE_TEMPLATES[mapPrimarySubtag(languageTag)] ?? MAP_OPPOSITE_TEMPLATES.en!;
+  return (statement.trim() === "" ? template.empty : `${template.lead}: ${statement.trim()}`).slice(0, MAP_LIMITS.claimMaxChars);
 }
 
 export type MapFinishChoiceInput = Readonly<{
@@ -48,14 +49,17 @@ type MapAnswerDraft = {
 const mapSideOf = (keyPoint: MapKeyPoint): "for" | "against" =>
   keyPoint.leansAgainst || keyPoint.fixedAngleKinds.includes("OPPOSITE_CASE") ? "against" : "for";
 
-/** The first entry of each statement (normalised), in order: one answer worded twice counts once. */
+/**
+ * The first entry of each statement (normalised), in order: one answer worded twice counts once. A statement that
+ * normalises to nothing (only signs) matches nothing, so it is always kept.
+ */
 function mapFirstOfEachStatement<T>(entries: readonly T[], statement: (entry: T) => string): T[] {
   const seen = new Set<string>();
   const out: T[] = [];
   for (const entry of entries) {
     const key = mapNormaliseText(statement(entry));
-    if (seen.has(key)) continue;
-    seen.add(key);
+    if (key !== "" && seen.has(key)) continue;
+    if (key !== "") seen.add(key);
     out.push(entry);
   }
   return out;
@@ -72,7 +76,8 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
     ...input.mergedAnswers.filter((answer) => answer.fromOppositeCase).map((answer) => mapNormaliseText(answer.answer)),
     ...input.items.filter((item): item is MapAnswerItem => item.kind === "ANSWER" && item.angleKind === "OPPOSITE_CASE")
       .map((item) => mapNormaliseText(item.answer))
-  ]);
+  ].filter((key) => key !== ""));
+  // A statement that normalises to nothing matches nothing.
   const isOpposite = (statement: string) => oppositeTexts.has(mapNormaliseText(statement));
   // F-I3: a chooser that reworded an opposite-case merged answer but reused its answer_id still names that answer.
   const oppositeAnswerIds = new Set(input.mergedAnswers.filter((answer) => answer.fromOppositeCase).map((answer) => answer.answerId));

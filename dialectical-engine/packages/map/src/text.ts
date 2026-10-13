@@ -1,11 +1,18 @@
 import { replyTextLanguageVerdict, type ReplyLanguageExpectation } from "@debateai/kernel";
 
+/** The primary language subtag ("ro-RO" → "ro"), lower case; "und" stays "und". */
+export function mapPrimarySubtag(tag: string): string {
+  return tag.trim().toLowerCase().split(/[-_]/u)[0] ?? "und";
+}
+
 /**
- * The text a merge-by-rule compares: letters and digits only, lower case, diacritics dropped (Romanian ș/ş and ț/ţ and
- * their plain letters read alike), single spaces. Used only to group identical claims; never shown to anyone.
+ * The text a merge-by-rule compares: letters and digits only, lower case, single spaces. Combining marks are dropped
+ * only after a LATIN letter (Romanian ș/ş and ț/ţ read alike); in other scripts a mark is part of the letter (Hindi
+ * vowel signs, Japanese dakuten) and is kept. Used only to group identical claims; never shown to anyone.
  */
 export function mapNormaliseText(text: string): string {
-  return text.normalize("NFKD").replace(/\p{M}+/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  return text.normalize("NFKD").replace(/(\p{Script=Latin})\p{M}+/gu, "$1").normalize("NFC")
+    .toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim();
 }
 
 /**
