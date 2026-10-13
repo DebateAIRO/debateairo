@@ -230,7 +230,7 @@ describe("map arm C: the angle map", () => {
   it("drops each angle past the available seats with one LIST_DROPPED note (ruling P8)", async () => {
     const result = await mapRunAngleMap(input(scripted(normal).caller, { seats: SEATS.slice(0, 3) }));
     expect(result.calls.filter((call) => call.step === "LIST").map((call) => call.callSiteKey)).toEqual(["MAP:list:0", "MAP:list:1", "MAP:list:2"]);
-    expect(result.notes.filter((note) => note.note === "LIST_DROPPED").map((note) => note.detail)).toEqual(["3:cost"]);
+    expect(result.notes.filter((note) => note.note === "LIST_DROPPED").map((note) => note.detail)).toEqual(["3:g4"]);
   });
 
   it("a list that fails again after its reassignment is dropped with ONE note, not one per failure", async () => {
@@ -239,7 +239,7 @@ describe("map arm C: the angle map", () => {
     expect(result.calls.filter((call) => (call.callSiteKey === "MAP:list:2" || call.callSiteKey === "MAP:list:2:2")).map((call) => `${call.aiRef}:${call.outcome}`))
       .toEqual(["ai-2:FAILED", "ai-0:FAILED"]);
     expect(notes(result)).toEqual(["LIST_REASSIGNED", "LIST_DROPPED", "GAP_STOPPED"]);
-    expect(result.notes.find((note) => note.note === "LIST_DROPPED")!.detail).toBe("2:do");
+    expect(result.notes.find((note) => note.note === "LIST_DROPPED")!.detail).toBe("2:g3");
   });
 
   it("never shows an AI reference or a maker in any material", async () => {

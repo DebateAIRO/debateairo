@@ -60,7 +60,13 @@ export type MapArm = "A" | "B" | "C";
 /** One AI taking part: its reference (a provider ref) and its maker. */
 export type MapSeat = Readonly<{ aiRef: string; maker: string }>;
 
-export type MapAngle = Readonly<{ angleId: string; kind: MapAngleKind; label: string; focus: string }>;
+export type MapAngle = Readonly<{
+  /** `g1`..`gN` in plan order, minted by code (ruling T7-PRIV): never the planner's own angle_id. */
+  angleId: string;
+  kind: MapAngleKind;
+  label: string;
+  focus: string;
+}>;
 
 /** BLIND: written without seeing anyone's points. SHOWN: written after seeing earlier points (snowball). GAP: a gap round. */
 export type MapItemOrigin = "BLIND" | "SHOWN" | "GAP";
@@ -104,10 +110,12 @@ export type MapMergedAnswer = Readonly<{
 }>;
 
 export type MapChosenAnswer = Readonly<{
+  /** `a1`..`aN` in choice order, minted by code (ruling T7-PRIV): never the chooser's own answer_id. */
   answerId: string;
   statement: string;
   forKeyPointIds: readonly string[];
   againstKeyPointIds: readonly string[];
+  /** Another chosen answer's answerId. */
   strongestRival: string;
   /** Added by the code (ANSWERS_FILLED), not named by the choose AI. */
   filled: boolean;

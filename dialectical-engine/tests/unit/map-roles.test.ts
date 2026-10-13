@@ -85,11 +85,13 @@ describe("map roles: angles", () => {
       { angle_id: "opp", kind: "OPPOSITE_CASE", label: "Opp", focus: "Other side." },
       { angle_id: "worry", kind: "ASKER_WORRY", label: "Worry", focus: "Fear." }
     ] });
-    expect(ordered.map((entry) => entry.angleId)).toEqual(["opp", "worry", "do", "cost"]);
+    // Ruling T7-PRIV: the planner's own angle ids are renamed g1..gN in plan order.
+    expect(ordered.map((entry) => `${entry.angleId}:${entry.label}`)).toEqual(["g1:Opp", "g2:Worry", "g3:Do", "g4:Cost"]);
   });
 
   it("falls back to the three fixed angles and GENERAL", () => {
     expect(MAP_FALLBACK_ANGLES.map((entry) => entry.kind)).toEqual(["OPPOSITE_CASE", "ASKER_WORRY", "PRACTICAL", "GENERAL"]);
+    expect(MAP_FALLBACK_ANGLES.map((entry) => entry.angleId)).toEqual(["g1", "g2", "g3", "g4"]);
   });
 });
 

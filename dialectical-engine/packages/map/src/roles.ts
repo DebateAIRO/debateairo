@@ -1,28 +1,40 @@
 import type { MapAnglesReply } from "./replies.js";
-import { MAP_FIXED_ANGLE_KINDS, type MapAngle, type MapSeat } from "./types.js";
+import { MAP_FIXED_ANGLE_KINDS, MAP_LIMITS, type MapAngle, type MapSeat } from "./types.js";
 
 /**
- * MAP_ANGLES_FALLBACK (spec §1.2): the three fixed angles and GENERAL. Prompt material, written in English; the
- * argument-language directive makes the list AI answer in the question's language.
+ * The angle ids the map gives out (controller ruling T7-PRIV): `g1`..`gN` in plan order, minted by code. An angle id
+ * lands in a readable column (core.map_item.angle_id) on an encrypted run, so it is never a word an AI wrote: the
+ * planner's own angle_id (a slug such as "sell-family-home") is private content and lives only in its raw reply, which
+ * the runner stores encrypted. N is at most MAP_LIMITS.anglesMax; migration 0116's CHECK holds the same bound.
+ */
+export const mapAngleCodeId = (index: number): string => `g${String(index + 1)}`;
+
+/**
+ * MAP_ANGLES_FALLBACK (spec §1.2): the three fixed angles and GENERAL, ids g1..g4 like any planned angles. Prompt
+ * material, written in English; the argument-language directive makes the list AI answer in the question's language.
  */
 export const MAP_FALLBACK_ANGLES: readonly MapAngle[] = Object.freeze([
-  { angleId: "opposite", kind: "OPPOSITE_CASE" as const, label: "Strongest case for a different answer",
+  { angleId: mapAngleCodeId(0), kind: "OPPOSITE_CASE" as const, label: "Strongest case for a different answer",
     focus: "The strongest case for an answer different from the one most people would give first." },
-  { angleId: "worry", kind: "ASKER_WORRY" as const, label: "What the person asking is worried about",
+  { angleId: mapAngleCodeId(1), kind: "ASKER_WORRY" as const, label: "What the person asking is worried about",
     focus: "What the person asking is probably worried about or trying to decide." },
-  { angleId: "practical", kind: "PRACTICAL" as const, label: "What to do in practice",
+  { angleId: mapAngleCodeId(2), kind: "PRACTICAL" as const, label: "What to do in practice",
     focus: "What the person should actually do, and what it would take." },
-  { angleId: "general", kind: "GENERAL" as const, label: "The question as a whole",
+  { angleId: mapAngleCodeId(3), kind: "GENERAL" as const, label: "The question as a whole",
     focus: "The points that matter most for answering the question, from every side." }
 ].map((angle) => Object.freeze(angle)));
 
-/** The planner's angles: the three fixed kinds first, in their fixed order, then its specific angles as written. */
+/**
+ * The planner's angles: the three fixed kinds first, in their fixed order, then its specific angles as written. Each is
+ * renamed g1..gN in that order (ruling T7-PRIV): the planner's angle_id was checked (unique) on its reply, where it stays,
+ * and is dropped here; nothing later refers to it.
+ */
 export function mapOrderAngles(reply: MapAnglesReply): readonly MapAngle[] {
-  const toAngle = (angle: MapAnglesReply["angles"][number]): MapAngle =>
-    Object.freeze({ angleId: angle.angle_id, kind: angle.kind, label: angle.label, focus: angle.focus });
-  const fixed = MAP_FIXED_ANGLE_KINDS.flatMap((kind) => reply.angles.filter((angle) => angle.kind === kind).map(toAngle));
-  const specific = reply.angles.filter((angle) => angle.kind === "SPECIFIC").map(toAngle);
-  return Object.freeze([...fixed, ...specific]);
+  const fixed = MAP_FIXED_ANGLE_KINDS.flatMap((kind) => reply.angles.filter((angle) => angle.kind === kind));
+  const specific = reply.angles.filter((angle) => angle.kind === "SPECIFIC");
+  // The reply's schema already holds it to MAP_LIMITS.anglesMax; the cut keeps the id bound true for any reply.
+  return Object.freeze([...fixed, ...specific].slice(0, MAP_LIMITS.anglesMax).map((angle, index): MapAngle =>
+    Object.freeze({ angleId: mapAngleCodeId(index), kind: angle.kind, label: angle.label, focus: angle.focus })));
 }
 
 /** The seats in this question's order: the list started `rotation` places on (the first AI rotates per question). */

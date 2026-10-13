@@ -43,18 +43,21 @@ export function mapCodeMerge(items: readonly MapItem[]): MapMergedMap {
 /**
  * The merge AI's groups (already checked: known ids, each once). Its group ids are replaced by kp01.. / an01.. in its
  * order; an item it left out is kept as its own key point or answer (nothing is lost), listed in `omittedItemIds`.
+ * Ruling T7-PRIV: nothing the merger named survives as an id. Its key_point_id and answer_id stay in its raw reply only,
+ * and a member id that is not one of the items is dropped (the check refuses one; this holds for any reply).
  */
 export function mapApplyMerge(reply: MapMergeReply, items: readonly MapItem[]): MapMergedMap & Readonly<{ omittedItemIds: readonly string[] }> {
   const byId = mapItemsById(items);
   const used = new Set<string>();
-  const keyPoints: MapKeyPoint[] = reply.key_points.map((group, index) => {
-    for (const id of group.member_item_ids) used.add(id);
-    return mapKeyPoint(mapKeyPointId(index + 1), group.claim, group.member_item_ids, byId);
-  });
-  const mergedAnswers: MapMergedAnswer[] = reply.answers.map((group, index) => {
-    for (const id of group.member_item_ids) used.add(id);
-    return mapMergedAnswer(mapAnswerGroupId(index + 1), group.answer, group.member_item_ids, byId);
-  });
+  const members = (ids: readonly string[]): readonly string[] => {
+    const known = ids.filter((id) => byId.has(id));
+    for (const id of known) used.add(id);
+    return known;
+  };
+  const keyPoints: MapKeyPoint[] = reply.key_points.map((group, index) =>
+    mapKeyPoint(mapKeyPointId(index + 1), group.claim, members(group.member_item_ids), byId));
+  const mergedAnswers: MapMergedAnswer[] = reply.answers.map((group, index) =>
+    mapMergedAnswer(mapAnswerGroupId(index + 1), group.answer, members(group.member_item_ids), byId));
   const omitted = [...items].sort((a, b) => a.itemId.localeCompare(b.itemId)).filter((item) => !used.has(item.itemId));
   for (const item of omitted) {
     if (item.kind === "POINT") keyPoints.push(mapKeyPoint(mapKeyPointId(keyPoints.length + 1), item.claim, [item.itemId], byId));

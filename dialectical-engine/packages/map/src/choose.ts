@@ -25,6 +25,14 @@ export function mapOppositeTemplate(statement: string, languageTag: string): str
   return (statement.trim() === "" ? template.empty : `${template.lead}${separator}${statement.trim()}`).slice(0, MAP_LIMITS.claimMaxChars);
 }
 
+/**
+ * The chosen answers' ids (controller ruling T7-PRIV): `a1`..`aN` in choice order, filled answers included, minted by
+ * code. A chosen answer's id lands in a readable column (core.map_position.answer_id) on an encrypted run, so it is never
+ * the chooser's own answer_id (a slug such as "sell-family-home"): that one stays in the raw reply, which the runner
+ * stores encrypted. N is at most MAP_LIMITS.chooseAnswersMax; migration 0116's CHECK holds the same bound.
+ */
+export const mapChosenAnswerCodeId = (index: number): string => `a${String(index + 1)}`;
+
 export type MapFinishChoiceInput = Readonly<{
   /** The choose AI's checked reply, or null when the step failed (MAP_CHOOSE_FALLBACK). */
   reply: MapChooseReply | null;
@@ -32,13 +40,17 @@ export type MapFinishChoiceInput = Readonly<{
   mergedAnswers: readonly MapMergedAnswer[];
   items: readonly MapItem[];
   languageTag: string;
-  /** P: the most answers the debate argues. */
+  /** P: the most answers the debate argues (never more than MAP_LIMITS.chooseAnswersMax). */
   maxAnswers: number;
   /** K: points per answer, used when the code chooses (the fallback). */
   pointsPerAnswer: number;
 }>;
 
 type MapAnswerDraft = {
+  /**
+   * The answer's id while the choice is built: the chooser's own answer_id (its rivals name it), `a<n>` in the fallback,
+   * `filled-<n>` for a filled one. Never returned: the answers are renamed a1..aN at the end.
+   */
   answerId: string;
   statement: string;
   forIds: string[];
@@ -72,6 +84,10 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
   const marks: MapMarkRecord[] = [];
   const ranked = mapRankKeyPoints(input.keyPoints);
   const byId = new Map(input.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
+  // The answer ids are a1..aN with N at most chooseAnswersMax (0116's CHECK), whatever the caller's P says.
+  const maxAnswers = Math.min(input.maxAnswers, MAP_LIMITS.chooseAnswersMax);
+  // Only the key points the chooser was shown: the check refuses any other id; this holds for any reply (T7-PRIV).
+  const shownKeyPoints = (ids: readonly string[]): string[] => ids.filter((id) => byId.has(id));
   // The texts of the answers that came from the opposite case (a merged answer with fromOppositeCase, or an OPPOSITE_CASE
   // candidate). A chosen answer is opposite when its text matches one of them, or (F-I3) when it reuses the answer_id of a
   // merged answer from the opposite case.
@@ -92,14 +108,14 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
   if (input.reply === null) {
     marks.push(Object.freeze({ mark: "MAP_CHOOSE_FALLBACK", step: "CHOOSE", detail: "choose reply missing" }));
     const candidates = mapFirstOfEachStatement(mapRankMergedAnswers(input.mergedAnswers), (answer) => answer.answer)
-      .slice(0, Math.max(1, input.maxAnswers));
+      .slice(0, Math.max(1, maxAnswers));
     candidates.forEach((answer, index) => {
       drafts.push({ answerId: `a${String(index + 1)}`, statement: answer.answer, forIds: [], againstIds: [], rival: null, filled: false,
         opposite: isOpposite(answer.answer) });
     });
   } else {
-    for (const answer of mapFirstOfEachStatement(input.reply.answers, (entry) => entry.statement).slice(0, input.maxAnswers)) {
-      drafts.push({ answerId: answer.answer_id, statement: answer.statement, forIds: [...answer.for], againstIds: [...answer.against],
+    for (const answer of mapFirstOfEachStatement(input.reply.answers, (entry) => entry.statement).slice(0, maxAnswers)) {
+      drafts.push({ answerId: answer.answer_id, statement: answer.statement, forIds: shownKeyPoints(answer.for), againstIds: shownKeyPoints(answer.against),
         rival: answer.strongest_rival, filled: false, opposite: oppositeAnswerIds.has(answer.answer_id) || isOpposite(answer.statement) });
     }
   }
@@ -157,16 +173,21 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
   quota("OPPOSITE_CASE", (keyPoint) => keyPoint.fixedAngleKinds.includes("OPPOSITE_CASE"), true);
   quota("ASKER_WORRY", (keyPoint) => keyPoint.fixedAngleKinds.includes("ASKER_WORRY"), false);
 
-  const answerIds = drafts.map((draft) => draft.answerId);
-  const answers = drafts.map((draft, index) => Object.freeze({
-    answerId: draft.answerId,
-    statement: draft.statement,
-    forKeyPointIds: Object.freeze([...draft.forIds]),
-    againstKeyPointIds: Object.freeze([...draft.againstIds]),
-    strongestRival: draft.rival !== null && draft.rival !== draft.answerId && answerIds.includes(draft.rival)
-      ? draft.rival : answerIds[(index + 1) % answerIds.length]!,
-    filled: draft.filled
-  }));
+  // Ruling T7-PRIV: the answers are renamed a1..aN in choice order (filled ones too), and each strongest rival with them.
+  // A rival that names no chosen answer (or the answer itself) becomes the next answer, as before.
+  const draftIds = drafts.map((draft) => draft.answerId);
+  const answers = drafts.map((draft, index) => {
+    const named = draft.rival === null || draft.rival === draft.answerId ? -1 : draftIds.indexOf(draft.rival);
+    const rival = named >= 0 && named !== index ? named : (index + 1) % drafts.length;
+    return Object.freeze({
+      answerId: mapChosenAnswerCodeId(index),
+      statement: draft.statement,
+      forKeyPointIds: Object.freeze([...draft.forIds]),
+      againstKeyPointIds: Object.freeze([...draft.againstIds]),
+      strongestRival: mapChosenAnswerCodeId(rival),
+      filled: draft.filled
+    });
+  });
   const finalChosen = chosenIds();
   return Object.freeze({
     choice: Object.freeze({

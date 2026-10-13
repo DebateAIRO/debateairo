@@ -73,7 +73,7 @@ describe("map choose: at least two distinct answers (ANSWERS_FILLED)", () => {
   it("fills from the map's best-supported different answer first", () => {
     const out = mapFinishChoice({ ...BASE, reply: { answers: [chosen("a1", "Yes, with conditions.", [], ["kp01"], null)] } });
     expect(out.choice.answers.map((entry) => `${entry.answerId}:${entry.statement}:${String(entry.filled)}>${entry.strongestRival}`))
-      .toEqual(["a1:Yes, with conditions.:false>filled-2", "filled-2:No, keep it as it is.:true>a1"]);
+      .toEqual(["a1:Yes, with conditions.:false>a2", "a2:No, keep it as it is.:true>a1"]);
     expect(marksOf(out.marks)).toEqual(["ANSWERS_FILLED:MAP_CANDIDATE", "CHOOSE_QUOTA_FILLED:SINGLE_AI:kp02"]);
   });
 
@@ -95,7 +95,7 @@ describe("map choose: at least two distinct answers (ANSWERS_FILLED)", () => {
   it("counts two wordings of one answer once", () => {
     const out = mapFinishChoice({ ...BASE, reply: { answers: [chosen("a1", "Yes, with conditions.", [], [], "a2"),
       chosen("a2", "yes  with conditions", [], [], "a1")] } });
-    expect(out.choice.answers.map((entry) => entry.answerId)).toEqual(["a1", "filled-2"]);
+    expect(out.choice.answers.map((entry) => `${entry.answerId}:${String(entry.filled)}`)).toEqual(["a1:false", "a2:true"]);
   });
 
   it("keeps at most maxAnswers", () => {
@@ -160,8 +160,8 @@ describe("map choose: an empty map (null reply, no merged answers, no OPPOSITE_C
     const pointsOnly = items.filter((item) => item.kind === "POINT");
     const out = mapFinishChoice({ ...BASE, items: pointsOnly, mergedAnswers: [], reply: null });
     expect(out.choice.answers.map((entry) => `${entry.answerId}:${entry.statement}:${String(entry.filled)}>${entry.strongestRival}`))
-      .toEqual(["filled-1:An answer different from the one above:true>filled-2",
-        "filled-2:The opposite of this answer: An answer different from the one above:true>filled-1"]);
+      .toEqual(["a1:An answer different from the one above:true>a2",
+        "a2:The opposite of this answer: An answer different from the one above:true>a1"]);
     expect(marksOf(out.marks).filter((mark) => mark.startsWith("ANSWERS_FILLED"))).toEqual(["ANSWERS_FILLED:TEMPLATE", "ANSWERS_FILLED:TEMPLATE"]);
     expect(marksOf(out.marks)[0]).toBe("MAP_CHOOSE_FALLBACK:choose reply missing");
   });
@@ -171,7 +171,7 @@ describe("map choose (fix round 1): the fallback fills answers before it deals p
   it("gives the filled answer its share of points, and no point with room left goes to alsoRaised", () => {
     const out = mapFinishChoice({ ...BASE, mergedAnswers: [mergedAnswers[0]!], reply: null });
     expect(marksOf(out.marks)).toEqual(["MAP_CHOOSE_FALLBACK:choose reply missing", "ANSWERS_FILLED:OPPOSITE_CASE_LIST"]);
-    expect(out.choice.answers.map((entry) => `${entry.answerId}:${String(entry.filled)}`)).toEqual(["a1:false", "filled-2:true"]);
+    expect(out.choice.answers.map((entry) => `${entry.answerId}:${String(entry.filled)}`)).toEqual(["a1:false", "a2:true"]);
     expect(out.choice.answers[0]!.againstKeyPointIds).toEqual(["kp01"]);
     expect(out.choice.answers[0]!.forKeyPointIds).toEqual(["kp02"]);
     expect(out.choice.answers[1]!.forKeyPointIds).toEqual(["kp04", "kp03"]);
@@ -207,6 +207,8 @@ describe("map choose (F-I3): an opposite-case answer is known by its answer_id a
       chosen("a1", "Yes, with conditions.", ["kp03", "kp02"], [], "an02"),
       chosen("an02", "Leave the system unchanged.", [], [], "a1")] } });
     expect(marksOf(out.marks)).toEqual(["CHOOSE_QUOTA_FILLED:OPPOSITE_CASE:kp01"]);
+    // Ruling T7-PRIV: the reused id is read (above), then the answers are renamed a1..aN and the rivals with them.
+    expect(out.choice.answers.map((entry) => `${entry.answerId}>${entry.strongestRival}`)).toEqual(["a1>a2", "a2>a1"]);
     expect(out.choice.answers[1]!.forKeyPointIds).toEqual(["kp01"]);
     expect(out.choice.answers[1]!.againstKeyPointIds).toEqual([]);
   });
@@ -221,11 +223,12 @@ describe("map choose (F-I3): an opposite-case answer is known by its answer_id a
   });
 });
 
-describe("map choose (fix round 1): filled answer ids are unique", () => {
+describe("map choose (fix round 1, ruling T7-PRIV): filled answer ids are unique", () => {
   it("never reuses an id a reply answer already has, and no answer is its own strongest rival", () => {
+    // A reply id shaped like the old internal filled-N form: the answers still come out a1, a2 (code ids, choice order).
     const out = mapFinishChoice({ ...BASE, reply: { answers: [chosen("filled-2", "Yes, with conditions.", [], [], null)] } });
     const answerIds = out.choice.answers.map((entry) => entry.answerId);
-    expect(answerIds).toEqual(["filled-2", "filled-3"]);
+    expect(answerIds).toEqual(["a1", "a2"]);
     expect(new Set(answerIds).size).toBe(answerIds.length);
     for (const entry of out.choice.answers) expect(entry.strongestRival).not.toBe(entry.answerId);
   });
