@@ -45,16 +45,26 @@ describe("the strict receipt parser reads a debate shape receipt (spec 2026-10-1
       expect(parsed.wire).toEqual(legacy(backup));
     }
   });
-  it("parses every shape receipt admission can mint", () => {
+  it("parses every shape receipt admission can mint, with and without the backup sequence", () => {
     for (const plan of DEBATE_SHAPE_PLAN_KEYS) for (let makers = 2; makers <= 7; makers += 1) for (let depth = 1; depth <= 3; depth += 1) {
-      for (const depthMode of ["adaptive", "fixed"] as const) {
+      for (const depthMode of ["adaptive", "fixed"] as const) for (const backup of [0, 1] as const) {
         const depthParams = normaliseDepthParamsForShape({ depth, depthMode, scrutiny: "exhaustive" }, POLICY, plan);
         const shape = resolveDebateShape({ policy: POLICY, plan, makers, settings: debateShapeSettingsOf(depthParams) })!;
         // Admission mints at the NORMALISED depth (PF9: Free above 2 is stored as 2).
-        const basis = wire(computeStructuralCeilingBasis({ ...TERMS, panelSize: makers, depth: depthParams.depth, shape }));
+        const basis = wire(computeStructuralCeilingBasis({ ...TERMS, panelSize: makers, depth: depthParams.depth,
+          backupSequencesProvisioned: backup, shape }));
         expect(parseCostEnvelopeBasis(basis).shape).toEqual(shape);
+        // I1: every minted receipt splits its synthesis sites evenly between the writer and the checker.
+        expect(basis.serve_leg.synthesis_loop_sites % 2).toBe(0);
       }
     }
+  });
+  it("T4: refuses a backup flag of 0 on a receipt whose per-site attempts show the backup", () => {
+    const basis = shaped(1);
+    basis.shape.backup_sequences = 0;
+    const refused = refusal(basis);
+    expect(refused?.code).toBe("RUN_COST_ENVELOPE_UNRESOLVED");
+    expect(refused?.message).toContain("the backup flag and the per-site attempts disagree");
   });
   it("I1: refuses an odd synthesis-site count on today's receipt too, and keeps today's even one", () => {
     for (const backup of [0, 1] as const) {

@@ -172,6 +172,11 @@ describe("B2 the recent-runs sample (budget spec §2.5)", () => {
       .resolves.toEqual([pro]);
     await expect(read({ ...base, shape: { plan: "pro", depthMode: "fixed", scrutiny: "standard", answerLength: "standard" } }))
       .resolves.toEqual([]);
+    // T7: each of the other two settings filters on its own.
+    await expect(read({ ...base, shape: { plan: "pro", depthMode: "adaptive", scrutiny: "deep", answerLength: "standard" } }))
+      .resolves.toEqual([]);
+    await expect(read({ ...base, shape: { plan: "pro", depthMode: "adaptive", scrutiny: "standard", answerLength: "detailed" } }))
+      .resolves.toEqual([]);
     // M1: no plan's shaped class samples the shapeless one-maker run, whatever its plan.
     for (const plan of ["free", "plus", "pro", "max", "premium"] as const) {
       const sample = await read({ ...base, shape: { plan, depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } });

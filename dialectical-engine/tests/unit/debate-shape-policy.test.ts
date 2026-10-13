@@ -49,11 +49,24 @@ describe("debateShapePolicy: one optional row, absent means today's shape (spec 
     ["an unknown plan field", (v: any) => { v.plans.free.concurrency = 3; }, "plans.free"],
     ["the wrong kind", (v: any) => { v.kind = "CALL_CONCURRENCY_POLICY"; }, "kind"],
     ["another version", (v: any) => { v.version = 2; }, "version"],
-    ["lengths that do not rise", (v: any) => { v.answerLength.short.words = 800; }, "answerLength.words"]
+    ["lengths that do not rise", (v: any) => { v.answerLength.short.words = 800; }, "answerLength.words"],
+    // T2 (final review): the writer bound's own order rule, and the exhaustive budget's own bound.
+    ["a writer bound that falls", (v: any) => { v.answerLength.detailed.writerBound = 8192; }, "answerLength.writerBound"],
+    ["exhaustive rounds above their bound", (v: any) => { v.plans.max.scrutiny.exhaustive.roundsPerPoint = 9; },
+      "plans.max.scrutiny.exhaustive.roundsPerPoint"]
   ])("refuses %s, naming the path", (_name, mutate, path) => {
     const value = plain();
     mutate(value);
     expect(() => parseDebateShapePolicy(value)).toThrow(`DEBATE_SHAPE_POLICY_INVALID:${path}`);
+  });
+  it("T2: the zero values the bounds allow survive the publishers' row and parse back unchanged", () => {
+    const value = plain();
+    value.plans.free.gapRoundsMax = 0;
+    value.plans.free.closeCallExtraGraders = 0;
+    value.plans.free.scrutiny.scrutinyLeverageMin = 0;
+    const parsed = parseDebateShapePolicy(value);
+    expect(parsed.plans.free).toMatchObject({ gapRoundsMax: 0, closeCallExtraGraders: 0, scrutiny: { scrutinyLeverageMin: 0 } });
+    expect(parseDebateShapePolicy(JSON.parse(debateShapePolicyRow(parsed, "t").valueJsonText))).toEqual(value);
   });
   it("X1: a row without mapStepBounds reads the default; a written one is checked strictly (8,192..32,768 tokens each)", () => {
     const without = plain();
