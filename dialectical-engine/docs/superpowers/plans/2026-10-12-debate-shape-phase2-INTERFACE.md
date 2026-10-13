@@ -72,8 +72,8 @@ answerLength }`; `readFrozenHead` returns them; missing keys read as defaults (o
   `mapStepBounds`; the run's `mapMergeBound` / `mapChooseBound`, read from its receipt), NOT the judge bound (X1
   supersedes the earlier "judge bound" wording). `MAP:angles`, `MAP:list:<i>` and `MAP:gap:<k>` keep the judge bound
   (preview floor 8,192).
-- Map contracts fingerprint: `mapPromptContractHash()` sealed as register `policy.hashes.map` (new key in the policy
-  hashes row; new register version).
+- Map contracts fingerprint: `mapPromptContractHash()` sealed as its own OPTIONAL register row `mapContractHash` (a
+  64-hex string; P2b contract deviation 1 supersedes the earlier `policy.hashes.map` idea); new register version.
 - Close-call extension mark: `PANEL-CLOSE-CALL-EXTENDED`; scrutiny mark: `SCRUTINY-EXTENDED`; map marks (answer-scope
   records): `MAP_ANGLES_FALLBACK`, `MAP_MERGE_FALLBACK`, `MAP_CHOOSE_FALLBACK`, `MAP_UNAVAILABLE_TODAYS_OPENING`,
   `ANSWERS_FILLED`, `CHOOSE_QUOTA_FILLED` — added to the kernel's `CONDITION_MARKS` (never at its tail) each with a
