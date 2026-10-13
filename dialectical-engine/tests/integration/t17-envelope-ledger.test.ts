@@ -201,9 +201,17 @@ type RequestKind = "PANEL" | "REVIEW" | "JUDGE" | "CONFORMANCE" | "R9" | "COMPOS
 const ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN = new RegExp(
   argumentLanguageDirective("\u0000")
     .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    .replace("\u0000", "[^.]+?"),
+    // Reply language (2026-10-12): a named language is followed by ", the language of the question"; the fallback is not.
+    .replace("\u0000, the language of the question", "[^.]+?"),
   "gu"
 );
+
+/**
+ * Reply language (#154): the scripted replies are English, checked against the question's language. A UUID's hex
+ * letters made about 1 label in 6 read as Portuguese (lone "e", "a"), so the replies were refused at random; a
+ * label's fresh part is digits only, so the label always reads as no named language ("und", Latin script).
+ */
+const digitsOnlyId = (): string => randomUUID().replace(/[a-f]/gu, (hex) => String(hex.charCodeAt(0) - 87));
 
 function classify(rawBody: string): RequestKind {
   const body = rawBody.replace(ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN, "");
@@ -569,7 +577,7 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
     const primary = await startMaximumPathProvider("primary");
     const secondary = await startMaximumPathProvider("secondary");
     try {
-      const question = `t17-envelope-max-path-${randomUUID()}`;
+      const question = `t17-envelope-max-path-${digitsOnlyId()}`;
       const runRepository = new RunRepository(database.pool);
       const runId = await runRepository.startRun({
         questionLine: question, principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
@@ -883,7 +891,7 @@ describe("T17B · a provider attempt REFUSED at the equality boundary reaches th
     const primary = await startMaximumPathProvider("primary");
     const secondary = await startMaximumPathProvider("secondary");
     try {
-      const question = `t17b-envelope-refusal-${randomUUID()}`;
+      const question = `t17b-envelope-refusal-${digitsOnlyId()}`;
       const runRepository = new RunRepository(database.pool);
       // The undercounting receipt. Only the ceiling moves; the serve-leg
       // disclosure is left exactly as the register minted it, so this is a
@@ -1018,7 +1026,7 @@ describe("T17C · Task M2 — an attempt stop while arguing is answered out of t
     const primary = await startMaximumPathProvider("primary");
     const secondary = await startMaximumPathProvider("secondary");
     try {
-      const question = `t17c-body-attempt-stop-${randomUUID()}`;
+      const question = `t17c-body-attempt-stop-${digitsOnlyId()}`;
       const runRepository = new RunRepository(database.pool);
       // Only the ceiling moves; the reserve and the serve-leg disclosure stay
       // exactly as the register minted them, so the parser's self-consistency

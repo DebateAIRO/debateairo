@@ -209,9 +209,14 @@ export function stubStoryFor(chat: string, defaultShape: string): string {
 
 /* ------------------------------------------------------------------ reading a request */
 
-/** The argument-language directive names the machine keys below, so it is removed before routing (as database.test.ts). */
-const LANGUAGE_DIRECTIVE = new RegExp(argumentLanguageDirective("\u0000")
-  .replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\u0000", "[^.]+?"), "gu");
+/**
+ * The argument-language directive names the machine keys below, so it is removed before routing (as database.test.ts).
+ * Both of its forms (#154): a named language is followed by ", the language of the question," and the fallback (a
+ * question the detector cannot name, as the busy-model run's labels are) reads "the same language as the question,".
+ * With only the first form the fallback directive stayed in, and its "fatalFlags" sent every review call to PANEL.
+ */
+const LANGUAGE_DIRECTIVE = new RegExp([argumentLanguageDirective("\u0000"), argumentLanguageDirective("")]
+  .map((directive) => directive.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\u0000", "[^.]+?")).join("|"), "gu");
 const PROBE_QUESTION = "Reply exactly: OK";
 
 /**
