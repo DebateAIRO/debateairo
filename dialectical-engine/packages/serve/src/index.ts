@@ -162,6 +162,18 @@ export interface ConformanceJudgement {
   readonly conforms: boolean;
 }
 
+/**
+ * M8 (controller ruling, P2a final review): the answer read's `cost_envelope.basis` without the receipt's debate-shape
+ * member. Least disclosure: the member names the asker's plan and the plan's sizes and thresholds, and nothing public
+ * needs them. A copy without `shape`, every other member as stored; a basis with no `shape` member is returned as the
+ * same object, so today's answer body is byte for byte what it was.
+ */
+export function publicCostEnvelopeBasis(basis: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  if (!Object.hasOwn(basis, "shape")) return basis;
+  const { shape: _shape, ...shown } = basis;
+  return shown;
+}
+
 export function deriveConformanceOutcome(
   coverageMode: "EXHAUSTIVE" | "SAMPLED" | "NOT_RUN",
   judgements: readonly Pick<ConformanceJudgement, "conforms">[]
@@ -2996,7 +3008,7 @@ export class ServeRepository {
       tier_source: row.tier_source,
       tier_provenance_ref: row.tier_provenance_ref,
       cost_envelope: {
-        basis: row.envelope_basis,
+        basis: publicCostEnvelopeBasis(row.envelope_basis),
         state: row.envelope_state,
         consumed_model_attempts: Number(row.envelope_consumed),
         protected_core: "NEVER_SKIPPABLE"

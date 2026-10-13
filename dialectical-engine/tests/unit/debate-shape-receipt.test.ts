@@ -1,5 +1,7 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { parseCostEnvelopeBasis } from "@debateai/budget";
+import { publicCostEnvelopeBasis } from "@debateai/serve";
 import { debateShapeSettingsOf } from "@debateai/contract";
 import {
   DEBATE_SHAPE_PLAN_KEYS, computeStructuralCeilingBasis, debateShapePolicyStartValues, normaliseDepthParamsForShape,
@@ -152,5 +154,27 @@ describe("PF9 pin: a Free shaped ask above depth 2 is billed at depth 2", () => 
     expect(parsed.depth).toBe(2);
     expect(parsed.maxModelAttempts).toBe(352);
     expect(parsed.shape).toEqual(shape);
+  });
+});
+
+describe("M8 (controller ruling): the public answer read carries no shape member", () => {
+  it("a shaped receipt's public basis has no shape key and every other member as stored; today's is the same object", () => {
+    const stored = shaped();
+    const shown = publicCostEnvelopeBasis(stored);
+    expect("shape" in shown).toBe(false);
+    const { shape: _shape, ...rest } = stored;
+    expect(shown).toEqual(rest);
+    expect(JSON.stringify(shown)).toBe(JSON.stringify(rest));
+    // The stored receipt itself is never changed.
+    expect(stored.shape).toBeDefined();
+    for (const backup of [0, 1] as const) {
+      const today = legacy(backup);
+      expect(publicCostEnvelopeBasis(today)).toBe(today);
+    }
+  });
+  it("the answer body's cost_envelope.basis is read through it", async () => {
+    const serve = await readFile(new URL("../../packages/serve/src/index.ts", import.meta.url), "utf8");
+    expect(serve).toContain("basis: publicCostEnvelopeBasis(row.envelope_basis),");
+    expect(serve).not.toContain("basis: row.envelope_basis,");
   });
 });

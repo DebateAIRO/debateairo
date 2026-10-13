@@ -22,6 +22,14 @@ describe("debate shape ask settings (spec 2026-10-12 §3.2)", () => {
       .toEqual({ depthMode: "fixed", scrutiny: "exhaustive", answerLength: "short" });
     expect(() => debateShapeSettingsOf({ depth: 1, scrutiny: "max" })).toThrow("DEPTH_PARAMS_SHAPE_INVALID:scrutiny");
   });
+  it("M5: an own key holding undefined reads as missing (an internally built object), and a depth-only parse keeps one key", () => {
+    expect(debateShapeSettingsOf({ depth: 2, scrutiny: undefined, depthMode: undefined, answerLength: undefined }))
+      .toEqual({ depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" });
+    expect(debateShapeSettingsOf({ depth: 2, depthMode: "fixed", scrutiny: undefined }))
+      .toEqual({ depthMode: "fixed", scrutiny: "standard", answerLength: "standard" });
+    // A zod upgrade that added defaults would grow this, and JSON.stringify would hide an undefined-valued key.
+    expect(Object.keys(DepthParamsSchema.parse({ depth: 2 }))).toEqual(["depth"]);
+  });
   it("the room query carries the same three settings, optional", () => {
     const base = { plan_tier: "premium", composition_budget_tier: "low", depth: "2" };
     expect(AskRoomQuerySchema.parse(base)).toEqual({ plan_tier: "premium", composition_budget_tier: "low", depth: 2 });

@@ -6,6 +6,7 @@ import {ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentOptionsResponseSch
 import {AuthMethodsResponseSchema,RecoveryCodesResponseSchema,MfaRecoveryPendingResponseSchema,MfaRecoveryPendingCancelledSchema,type AuthMethodsResponse,type MfaRecoveryPendingResponse} from "./index.js";
 import type {ConsumerAuthenticationCredential} from "./consumer-auth.js";
 import type { StepUpAuthorizationRequest, StepUpResponse } from "./index.js";
+import type { AnswerLength, DepthMode, Scrutiny } from "./index.js";
 import {PasskeyRegistrationOptionsResponseSchema, PasskeyAuthenticationOptionsResponseSchema, PasskeyEnrollmentResponseSchema,
  type BeginPasskeyEnrollmentRequest,type CompletePasskeyEnrollmentRequest,type BeginPasskeyLoginRequest,type CompletePasskeyLoginRequest,
  type PasskeyRegistrationOptionsResponse,type PasskeyAuthenticationOptionsResponse,type PasskeyEnrollmentResponse} from './consumer-auth.js';
@@ -445,10 +446,14 @@ export interface ContractClient {
   cancelEmailChangeByLink(token: string): Promise<{ status: "CANCELLED" }>;
   submitAsk(input: AskRequest): Promise<AskAccepted>;
   /** Budget spec §2.7: the room this ask would find — a word, never a figure. */
+  /** Debate shape (M4): the three shape fields go on the query only when given, so today's query is unchanged. */
   getAskRoom(input: Readonly<{
     plan_tier: PlanTier;
     composition_budget_tier: "low" | "medium" | "high";
     depth: number;
+    depth_mode?: DepthMode;
+    scrutiny?: Scrutiny;
+    answer_length?: AnswerLength;
   }>): Promise<AskRoomResponse>;
   /** Paid-plans spec §1.2 (U1): the person's windows as whole percentages; 404 when billing is off. */
   getBillingUsage(): Promise<BillingUsageResponse>;
@@ -793,10 +798,16 @@ export function createContractClient(
       plan_tier: PlanTier;
       composition_budget_tier: "low" | "medium" | "high";
       depth: number;
+      depth_mode?: DepthMode;
+      scrutiny?: Scrutiny;
+      answer_length?: AnswerLength;
     }>) => request(`/v1/asks/room?${new URLSearchParams({
       plan_tier: input.plan_tier,
       composition_budget_tier: input.composition_budget_tier,
-      depth: String(input.depth)
+      depth: String(input.depth),
+      ...(input.depth_mode === undefined ? {} : { depth_mode: input.depth_mode }),
+      ...(input.scrutiny === undefined ? {} : { scrutiny: input.scrutiny }),
+      ...(input.answer_length === undefined ? {} : { answer_length: input.answer_length })
     }).toString()}`, AskRoomResponseSchema),
     getBillingUsage: () => request("/v1/billing/usage", BillingUsageResponseSchema),
     getBillingPlans: () => request("/v1/billing/plans", BillingPlansResponseSchema),

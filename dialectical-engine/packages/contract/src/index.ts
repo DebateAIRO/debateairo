@@ -192,9 +192,10 @@ export type DepthParams = z.infer<typeof DepthParamsSchema>;
 export type DebateShapeSettings = Readonly<{ depthMode: DepthMode; scrutiny: Scrutiny; answerLength: AnswerLength }>;
 
 function shapeSettingOf<T extends string>(
-  depthParams: Readonly<Record<string, unknown>>, key: string, schema: z.ZodType<T>, fallback: T
+  depthParams: Readonly<Record<string, unknown>>, key: keyof DebateShapeSettings, schema: z.ZodType<T>, fallback: T
 ): T {
-  if (!Object.hasOwn(depthParams, key)) return fallback;
+  // M5: an own key holding `undefined` (an internally built object; JSON cannot carry one) reads as missing too.
+  if (!Object.hasOwn(depthParams, key) || depthParams[key] === undefined) return fallback;
   const parsed = schema.safeParse(depthParams[key]);
   if (!parsed.success) throw new TypeError(`DEPTH_PARAMS_SHAPE_INVALID:${key}`);
   return parsed.data;
