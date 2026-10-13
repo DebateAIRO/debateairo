@@ -376,6 +376,48 @@ export const runRoleRotation = core.table("run_role_rotation", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull()
 });
 
+// Debate shape (0116): the map's material, never graded claims. Append-only. core.map_item (one row per point or
+// candidate answer an AI wrote) and core.map_choice (one per run) are content carriers in 0063's mechanism: on an
+// encrypted run `content` is the JSON sentinel and the text lives in the envelope. core.map_position (which root
+// argued which chosen answer) holds ids and codes only.
+export const mapItem = core.table("map_item", {
+  runId: uuid("run_id").notNull(),
+  itemId: text("item_id").notNull(),
+  step: text("step").notNull(),
+  aiRef: text("ai_ref").notNull(),
+  maker: text("maker").notNull(),
+  origin: text("origin").notNull(),
+  angleId: text("angle_id"),
+  angleKind: text("angle_kind"),
+  kind: text("kind").notNull(),
+  leans: text("leans"),
+  listIndex: integer("list_index"),
+  position: integer("position").notNull(),
+  content: jsonb("content").notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation"),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
+});
+
+export const mapChoice = core.table("map_choice", {
+  runId: uuid("run_id").primaryKey(),
+  opening: text("opening").notNull(),
+  marks: jsonb("marks").notNull(),
+  content: jsonb("content").notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation"),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
+});
+
+export const mapPosition = core.table("map_position", {
+  runId: uuid("run_id").notNull(),
+  answerId: text("answer_id").notNull(),
+  rootIndex: integer("root_index").notNull(),
+  rootNodeId: uuid("root_node_id").notNull(),
+  maker: text("maker").notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
+});
+
 export const nodeReview = ledger.table("node_review", {
   nodeReviewId: uuid("node_review_id").primaryKey(),
   runId: uuid("run_id").notNull(),

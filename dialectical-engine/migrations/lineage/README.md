@@ -10,7 +10,7 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth and the data export (0115, V-41) the fifth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth and the debate shape's map (0116, below) the sixth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
@@ -81,6 +81,21 @@ the per-role one (Task 11). No billing relation or function, so `verify-effectiv
 verifier in force; no `replayVerifierSql`: its checks are its postcondition digest (the pin table's 16 columns, the
 story column, the two disclosure columns and the twelve CHECKs, with 0076's replaced rule absent). If `origin/dev` takes 0114 first, renumber this step at merge time
 (its manifest, loader name and `previous` follow), as C1's recipe above says.
+
+## The debate shape map (0116)
+
+The sixth chain step, after the data export's 0115 (spec `docs/superpowers/specs/2026-10-12-debate-shape-design.md`
+§3.4, plan `docs/superpowers/plans/2026-10-12-debate-shape-phase2b.md` Task 7): `0116_debate_shape_map.sql`,
+`debate-shape-map-forward0116.json`, `packages/db/src/migration-forward0116.ts` (`loadForward0116`, appended last to
+`STEPS`, `MIGRATION_FORWARD0116_*` refusals). It creates three append-only tables (UPDATE and DELETE refused, TRUNCATE
+guarded, `debateai_runtime` may SELECT and INSERT, `debateai_replay` may SELECT): `core.map_item` and `core.map_choice`,
+content carriers in 0063's mechanism (their own attestation and plaintext guards, 0040's erasure barrier), and
+`core.map_position`, ids and codes only, which carries 0040's erasure barrier too. No billing relation or function, so
+`verify-effective-capabilities-111.sql` stays the verifier in force; no `replayVerifierSql`: its checks are its
+postcondition digest (the three tables' columns, constraints, indexes, triggers and ACLs, and the four guard
+functions' definitions and ACLs). Known limit: `maker` keeps 0069's code-token rule (no whitespace), so a maker with a
+space needs a later step before it joins a provider set. If `origin/dev` takes 0116 first, renumber this step at merge
+time (its manifest, loader name and `previous` follow), as C1's recipe above says.
 
 ## Replay: every applied step keeps its own checks
 

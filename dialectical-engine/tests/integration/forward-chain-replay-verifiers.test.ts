@@ -56,18 +56,20 @@ const runtimeMayPublish = async (): Promise<boolean> =>
 it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch (0112) is appended after it", async () => {
   // First in this file: the probe steps below add ledger rows that the real migrate() would refuse as unknown.
   const real = await loadMigrationPlan();
-  // data-export S01 (V-41): the export (0115) follows role rotation and keeps the same effective verifier.
-  expect(real.forwardChain.map((step) => step.name)).toEqual([NETOPIA, AUTH_DB_BATCH_MIGRATION, PART_C, ROLE_ROTATION, "0115_data_export.sql"]);
+  // data-export S01 (V-41): the export (0115) follows role rotation and keeps the same effective verifier; so does the
+  // debate shape's map (0116), after the export.
+  expect(real.forwardChain.map((step) => step.name)).toEqual([NETOPIA, AUTH_DB_BATCH_MIGRATION, PART_C, ROLE_ROTATION, "0115_data_export.sql",
+    "0116_debate_shape_map.sql"]);
   const [netopia, batch, partC, rotation] = real.forwardChain;
   const applied = new Set(await ledger());
   expect(applied.has(NETOPIA) && applied.has(AUTH_DB_BATCH_MIGRATION) && applied.has(PART_C) && applied.has(ROLE_ROTATION)).toBe(true);
-  // The batch, Part C's step, role rotation's and the export's keep 0111's effective-capability verifier: with 0115
-  // last, the verifier in force is 0111's, byte for byte.
+  // The batch, Part C's step, role rotation's, the export's and the map's keep 0111's effective-capability verifier:
+  // with 0116 last, the verifier in force is 0111's, byte for byte.
   expect(batch!.verifierSha256).toBe(netopia!.verifierSha256);
   expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
   expect(rotation!.verifierSha256).toBe(netopia!.verifierSha256);
   expect(effectiveForwardVerifierSql(real, applied)).toBe(netopia!.verifierSql);
-  // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0115 last.
+  // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0116 last.
   await db.pool.query("GRANT SELECT ON billing.card_token TO debateai_authorization_runtime");
   try {
     await expect(migrate(db.pool)).rejects.toThrow("BILLING_NETOPIA_111_TABLE_PRIVILEGE card_token");
