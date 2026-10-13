@@ -48,7 +48,9 @@ describe("synthesizer served-number reference guidance (serve.synthesizer.v3)", 
       expect(() => parseComposerOutput(output([invalid]))).toThrowError(expect.objectContaining({ code: "COMPOSITION_CONTRACT_ERROR" }));
     }
   });
-  it("derives the published composer fingerprint from the framed contract actually sent", () => {
+  // v3 ALONE is the seal checked here (register 12's composer value, history); from the debate shape (2026-10-13)
+  // the published composer row is v3 + its answer-length variant (SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT).
+  it("derives v3's own fingerprint (register 12's composer seal) from the framed contract actually sent", () => {
     expect(sha256(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)))
       .toBe("4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f");
     // v2 history keeps its seal byte for byte (the preview's register versions 10 and 11 carry it).

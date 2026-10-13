@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { promptContractFingerprintText, readPromptFrame } from "@debateai/providers";
+import { buildFramedPrompt, promptContractFingerprintText, readPromptFrame, type PromptContract } from "@debateai/providers";
+import { canonicalPromptFingerprint } from "@debateai/scorecard";
 import {
-  SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_LENGTH_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_SENTENCE, SYNTHESIZER_PROMPT_CONTRACT
+  SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_LENGTH_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_SENTENCE, SYNTHESIZER_PROMPT_CONTRACT,
+  synthesizerAnswerLengthField, toSynthesisPromptMaterial
 } from "@debateai/serve";
 import { buildSynthesisRolePrompt, shapeWriterBound } from "../../apps/runner/src/index.js";
 import { builderFromRecordedPacket, captureMomentPacket } from "../../acceptance/moment-tools.js";
@@ -37,12 +39,40 @@ describe("the answer length (spec §3.3 step 8)", () => {
     expect(shapeWriterBound({ ...sealed, tokenCeiling: 20_000 }, 8_192).tokenCeiling).toBe(20_000);
   });
 
+  it("refuses a writer bound that is not a positive whole number, and an answer length that is not one", () => {
+    const sealed = { maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 };
+    for (const invalid of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53]) {
+      expect(() => shapeWriterBound(sealed, invalid), String(invalid)).toThrowError(new TypeError("SHAPE_WRITER_BOUND_INVALID"));
+      expect(() => synthesizerAnswerLengthField(invalid), String(invalid)).toThrowError(new TypeError("SYNTHESIZER_ANSWER_LENGTH_INVALID"));
+    }
+  });
+
   it("a recorded lengthed writer call replays as the length variant (pre-flight PF-B16)", async () => {
     const recorded = buildSynthesisRolePrompt(synthesisRequestFixture(), "the same language as the question", undefined, 700);
     const builder = builderFromRecordedPacket("ANSWER_WRITER", "COMPOSER:SYNTHESIZER:INITIAL:1", recorded.packet);
     expect(builder).toMatchObject({ family: "SYNTHESIS_WRITER", inputs: { answerWords: 700 } });
-    const replayed = readPromptFrame(await captureMomentPacket(builder));
+    const replayedPacket = await captureMomentPacket(builder);
+    const replayed = readPromptFrame(replayedPacket);
     expect(replayed.contractId).toBe("serve.synthesizer.length.v1");
     expect(replayed.fields.at(-1)).toEqual({ name: "answer_length", content: "about 700 words" });
+    // export-moment's self-check 2: the live builder, fed the read-back inputs, sends the recorded prompt again.
+    expect(canonicalPromptFingerprint(replayedPacket.messages)).toBe(canonicalPromptFingerprint(recorded.packet.messages));
+  });
+
+  /** A writer packet recorded under `contract` with today's material plus `extra` fields. */
+  const recordedWith = (contract: PromptContract, extra: readonly { name: string; content: string }[]) => buildFramedPrompt({
+    contract, material: [...toSynthesisPromptMaterial(synthesisRequestFixture()), ...extra]
+  }).packet;
+
+  it.each([
+    ["the length variant without answer_length", SYNTHESIZER_LENGTH_PROMPT_CONTRACT, [], "MOMENT_FIELD_UNEXPECTED"],
+    ["v3 with answer_length", SYNTHESIZER_PROMPT_CONTRACT, [{ name: "answer_length", content: "about 700 words" }], "MOMENT_FIELD_UNEXPECTED"],
+    ["an unreadable answer_length (words, not digits)", SYNTHESIZER_LENGTH_PROMPT_CONTRACT,
+      [{ name: "answer_length", content: "about seven words" }], "MOMENT_RECORDED_PROMPT_UNREADABLE"],
+    ["an answer_length of zero", SYNTHESIZER_LENGTH_PROMPT_CONTRACT,
+      [{ name: "answer_length", content: "about 0 words" }], "MOMENT_RECORDED_PROMPT_UNREADABLE"]
+  ] as const)("refuses to replay %s", (_name, contract, extra, code) => {
+    expect(() => builderFromRecordedPacket("ANSWER_WRITER", "COMPOSER:SYNTHESIZER:INITIAL:1", recordedWith(contract, extra)))
+      .toThrowError(expect.objectContaining({ code }));
   });
 });

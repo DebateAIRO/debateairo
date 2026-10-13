@@ -87,8 +87,10 @@ describe("S01 seals the content rule", () => {
     expect(v2).toBe("340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70");
   });
   // Practice debate 3 (2026-10-12, owner-approved wording): serve.synthesizer.v3 supersedes v2 and
-  // serve.evaluator.v2 supersedes v1. The composer and conformance rows of every register version
-  // published from this code (the preview's version 12 first) carry the two seals below.
+  // serve.evaluator.v2 supersedes v1. The conformance row of every register version published from this
+  // code carries evaluator v2's seal below. v3 ALONE is the composer seal of the preview's version 12
+  // (history, checked here); from the debate shape (2026-10-13) the published composer row is v3 + its
+  // answer-length variant (the R7-a row above).
   it("seals the current serve.synthesizer.v3 and serve.evaluator.v2, each distinct from the version it supersedes", () => {
     const composer = sha256(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT));
     const conformance = sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT));

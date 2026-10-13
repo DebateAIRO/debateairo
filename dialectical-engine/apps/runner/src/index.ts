@@ -813,7 +813,9 @@ export function buildSynthesisRolePrompt(
  * sealed bound, never under the row's writer bound. Null (no shape): the sealed bound itself, the same object.
  */
 export function shapeWriterBound(bound: CallBound, writerBound: number | null): CallBound {
-  if (writerBound === null || writerBound <= bound.tokenCeiling) return bound;
+  if (writerBound === null) return bound;
+  if (!Number.isSafeInteger(writerBound) || writerBound < 1) throw new TypeError("SHAPE_WRITER_BOUND_INVALID");
+  if (writerBound <= bound.tokenCeiling) return bound;
   return Object.freeze({ ...bound, tokenCeiling: writerBound });
 }
 
