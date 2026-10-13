@@ -54,9 +54,9 @@ describe("map stops (Phase 2 runner contract)", () => {
       : request.callSiteKey === "MAP:list:1" ? { kind: "STOPPED", code: "CALL_LANE_STOPPED" }
       : request.step === "LIST" ? LIST(request.order) : new Error("never asked"));
     const result = await mapRunAngleMap(input(run.caller));
-    // No second-wave list key (MAP:list:<i>:2) was asked: a stop reassigns nothing (pre-flight PF-B3).
-    expect(run.asked.filter((key) => key.split(":").length === 4)).toEqual([]);
-    expect(run.asked).not.toContain("MAP:merge");
+    // Exactly the first wave: no second-wave list key (MAP:list:<i>:2), no merge (a stop reassigns nothing, PF-B3).
+    expect(run.asked).toEqual(["MAP:angles", "MAP:list:0", "MAP:list:1", "MAP:list:2", "MAP:list:3"]);
+    expect(result.notes.map((note) => note.note)).not.toContain("LIST_REASSIGNED");
     expect(result.items.filter((item) => item.kind === "POINT")).toHaveLength(9);
     expect(result.stoppedBy).toBe("CALL_LANE_STOPPED");
   });
@@ -79,6 +79,14 @@ describe("map stops (Phase 2 runner contract)", () => {
     expect(mapErrorCodeOf(new TypedDomainError("CALL_BUDGET_EXHAUSTED", "x"))).toBe("CALL_BUDGET_EXHAUSTED");
     expect(mapErrorCodeOf(new Error("boom"))).toBe("MAP_CALLER_THREW");
     expect(mapErrorCodeOf({ code: "lower case" })).toBe("MAP_CALLER_THREW");
+  });
+
+  it("a thrown typed error the caller does not abandon is recorded FAILED with its own code", async () => {
+    const run = caller((request) => request.step === "ANGLES"
+      ? new TypedDomainError("CALL_BUDGET_EXHAUSTED", "x") : request.step === "LIST" ? LIST(request.order) : { kind: "FAILED", code: "TEST_FAILED" });
+    const result = await mapRunAngleMap(input(run.caller, { abandon: () => false }));
+    expect(result.calls[0]).toMatchObject({ callSiteKey: "MAP:angles", outcome: "FAILED", code: "CALL_BUDGET_EXHAUSTED" });
+    expect(result.stoppedBy).toBeNull();
   });
 
   it("a reassigned list is asked under its own key, after the first wave", async () => {

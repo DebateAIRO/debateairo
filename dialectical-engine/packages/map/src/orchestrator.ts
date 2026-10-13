@@ -51,7 +51,10 @@ import {
 /** One model call the map asks for. `order` is its plan position, given before it is sent. */
 export type MapCallRequest<T> = Readonly<{
   step: MapStep;
-  /** The spec's call-site key (§3.4): MAP:angles, MAP:list:<i>, MAP:merge, MAP:gap:<k>, MAP:choose. */
+  /**
+   * The spec's call-site key (§3.4): MAP:angles, MAP:list:<i>, MAP:list:<i>:2 (a list reassigned to another seat),
+   * MAP:merge, MAP:gap:<k>, MAP:choose.
+   */
   callSiteKey: string;
   seat: MapSeat;
   order: number;
@@ -106,7 +109,10 @@ export type MapRunInput = Readonly<{
   /** K: points per answer when the code chooses. */
   pointsPerAnswer: number;
   contracts?: MapPromptContractSet;
-  /** True for an error that ends the run (claim lost, time limit): rethrown, never a fallback. */
+  /**
+   * True for an error that ends the run (claim lost, time limit): rethrown, never a fallback. Must be a pure predicate:
+   * a throw inside it replaces the original error.
+   */
   abandon?: (error: unknown) => boolean;
 }>;
 
