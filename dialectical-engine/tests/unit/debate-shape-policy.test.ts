@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEBATE_SHAPE_OPENINGS, DEBATE_SHAPE_PLAN_KEYS, DEBATE_SHAPE_POLICY_ROW_KEY, assertDebateShapeRunnerReady,
+  DEBATE_SHAPE_OPENINGS, DEBATE_SHAPE_PLAN_KEYS, DEBATE_SHAPE_POLICY_ROW_KEY,
   debateShapePlanKeyOf, debateShapePolicyRow, debateShapePolicyStartValues, normaliseDepthParamsForShape,
   parseDebateShapePolicy, readDebateShapePolicy, resolveDebateShape
 } from "@debateai/register";
@@ -164,11 +164,5 @@ describe("debateShapePolicy: one optional row, absent means today's shape (spec 
     expect(() => resolveDebateShape({ policy: START, plan: "free", makers: 3, settings: { ...SETTINGS, scrutiny: "deep" } }))
       .toThrow("DEBATE_SHAPE_SETTINGS_NOT_NORMALISED:scrutiny");
     expect(() => resolveDebateShape({ policy: START, plan: "free", makers: 0, settings: SETTINGS })).toThrow("DEBATE_SHAPE_MAKERS_INVALID");
-  });
-
-  it("Phase 2a: a valid row refuses the runner's boot until the runner can run the shape", () => {
-    expect(() => assertDebateShapeRunnerReady(null)).not.toThrow();
-    const refused = (() => { try { assertDebateShapeRunnerReady(START); return null; } catch (error) { return error; } })();
-    expect(refused).toMatchObject({ code: "DEBATE_SHAPE_POLICY_RUNNER_PENDING" });
   });
 });

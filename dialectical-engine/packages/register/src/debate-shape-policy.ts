@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import { z } from "zod";
-import { exhaustive, TypedDomainError } from "@debateai/kernel";
+import { exhaustive } from "@debateai/kernel";
 import {
   debateShapeSettingsOf, type AnswerLength, type DebateShapeSettings, type DepthMode, type DepthParams, type PlanTier, type Scrutiny
 } from "@debateai/contract";
@@ -50,6 +50,11 @@ export type DebateShapePolicy = Readonly<{
   answerLength: Readonly<Record<AnswerLength, DebateShapeLength>>;
   /** A row written without it reads the start values (32,768 each); every other member stays required. */
   mapStepBounds: DebateShapeMapStepBounds;
+  /**
+   * Amendment 2026-10-13 (the preview's rollback): absent = on, so every sealed value keeps its meaning and its bytes;
+   * `false` = no shape for the ASK side (`debateShapeInForce`). Never written by the start values.
+   */
+  readonly enabled?: boolean;
 }>;
 
 /**
@@ -116,7 +121,9 @@ const policySchema = z.object({
   version: z.literal(1),
   plans: z.object({ free: planSchema, plus: planSchema, pro: planSchema, max: planSchema, premium: planSchema }).strict(),
   answerLength: z.object({ short: lengthSchema, standard: lengthSchema, detailed: lengthSchema }).strict(),
-  mapStepBounds: mapStepBoundsSchema.default(mapStepBoundsStartValues)
+  mapStepBounds: mapStepBoundsSchema.default(mapStepBoundsStartValues),
+  // Amendment 2026-10-13: optional with NO default, so a row written without it keeps its exact bytes and reads as on.
+  enabled: z.boolean().optional()
 }).strict().superRefine((policy, ctx) => {
   const { short, standard, detailed } = policy.answerLength;
   if (!(short.words < standard.words && standard.words < detailed.words)) {
@@ -168,6 +175,22 @@ export async function readDebateShapePolicy(pool: Pick<Pool, "query">, registerV
   );
   const row = result.rows[0];
   return row === undefined ? null : parseDebateShapePolicy(row.value_json);
+}
+
+/**
+ * The row as the ASK side must read it (amendment 2026-10-13, the preview's rollback): absent, or written with
+ * `enabled: false`, is no row — today's asks and today's receipts. The runner and the hosted readiness check read the
+ * row raw, so a disabled row still needs its sealed map hash and shaped runs admitted before the switch still finish.
+ */
+export function debateShapeInForce(policy: DebateShapePolicy | null): DebateShapePolicy | null {
+  return policy === null || policy.enabled === false ? null : policy;
+}
+
+/** The largest output bounds a run under this row may ask for: the writer (detailed is never below the others, the
+ * parser checks it) and the larger map step. The Free boot eligibility check asks the WRITER bound (never only the
+ * sealed one); the map bound is not checked at boot (POSITION can fall back; a recorded known limit, pre-flight PF-B22). */
+export function debateShapeLargestBounds(policy: DebateShapePolicy): Readonly<{ writer: number; map: number }> {
+  return Object.freeze({ writer: policy.answerLength.detailed.writerBound, map: Math.max(policy.mapStepBounds.merge, policy.mapStepBounds.choose) });
 }
 
 /** The canonical AST: every number a DECIMAL node (integers and the six-decimal shares alike). */
@@ -311,17 +334,4 @@ export function resolveDebateShape(input: Readonly<{
     mapMergeBound: input.policy.mapStepBounds.merge,
     mapChooseBound: input.policy.mapStepBounds.choose
   });
-}
-
-/**
- * Phase 2a ONLY (contract deviation 7): the runner cannot yet run the shape, so a valid row refuses its boot rather
- * than let it run receipts minted for the shape as today's shape. Phase 2b deletes this function and its one call.
- */
-export function assertDebateShapeRunnerReady(policy: DebateShapePolicy | null): void {
-  if (policy !== null) {
-    throw new TypedDomainError(
-      "DEBATE_SHAPE_POLICY_RUNNER_PENDING",
-      "The register seals a debateShapePolicy row, and this runner cannot run the debate shape yet"
-    );
-  }
 }

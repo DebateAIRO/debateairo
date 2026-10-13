@@ -1209,7 +1209,8 @@ export {
   DEBATE_SHAPE_OPENINGS,
   DEBATE_SHAPE_PLAN_KEYS,
   DEBATE_SHAPE_POLICY_ROW_KEY,
-  assertDebateShapeRunnerReady,
+  debateShapeInForce,
+  debateShapeLargestBounds,
   debateShapePlanKeyOf,
   debateShapePolicyRow,
   debateShapePolicyStartValues,
@@ -1237,6 +1238,7 @@ export {
   type DebateShapeReceipt,
   type DebateShapeSiteCounts
 } from "./debate-shape-ceiling.js";
+export { MAP_CONTRACT_HASH_ROW_KEY, parseMapContractHash, readMapContractHash } from "./map-contract-hash.js";
 export {
   MFA_POLICY_REGISTER_ROW,
   MFA_POLICY_DEPLOYMENT_REGISTER_ROW,
