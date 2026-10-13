@@ -490,9 +490,11 @@ describe("the runner's wiring (source pins)", () => {
 
   it("the lane's beforeSlot is the runner setting, and the panel asks together only when the debate's calls run together", () => {
     expect(RUNNER).toContain("...(this.settings.callBeforeSlot === undefined ? {} : { beforeSlot: this.settings.callBeforeSlot })");
-    // Ruling R32: one place decides it, from the lane.
-    expect(RUNNER.match(/askTogether: /gu) ?? []).toHaveLength(1);
-    expect(RUNNER).toContain("askTogether: callsRunTogether,");
+    // Ruling R32: one place decides it, from the lane. Two panels pass it on, never anything else: the node's panel
+    // and (debate shape, 9602e79c7) its close-call extension, which asks its extra graders the same way.
+    expect(RUNNER.match(/askTogether: /gu) ?? []).toHaveLength(2);
+    expect(RUNNER.match(/askTogether: callsRunTogether,/gu) ?? []).toHaveLength(2);
+    expect(RUNNER.match(/const callsRunTogether = /gu) ?? []).toHaveLength(1);
     expect(RUNNER).toContain("const callsRunTogether = callLane !== undefined && callLane.callsAtOnce > 1;");
   });
 
