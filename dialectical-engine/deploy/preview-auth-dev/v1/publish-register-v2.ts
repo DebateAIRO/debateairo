@@ -42,7 +42,7 @@ import {
   parseRegisterVersionText, buildConfiguredProviderSetSealedRow, buildConfiguredProviderSetDeploymentRow,
   PASSWORD_RESET_POLICY_REGISTER_ROW, BACKUP_EMAIL_POLICY_REGISTER_ROW, MFA_RECOVERY_POLICY_REGISTER_ROW,
   answerRoleRotationPolicyRow, callConcurrencyPolicyRow, callConcurrencyPolicyFromValue, CALL_CONCURRENCY_POLICY_ROW_KEY,
-  DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyRow, parseDebateShapePolicy, type DebateShapePolicy,
+  DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyRow, debateShapePolicyStartValues, parseDebateShapePolicy, type DebateShapePolicy,
   type BootstrapRegister, type CallConcurrencyPolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
@@ -65,9 +65,10 @@ const COMPOSER = 'preview-register-composer-v2' as const;
 export const PREVIEW_BASE_OWNED_KEYS = Object.freeze(['internalAllowancePolicy','staffAccessPolicy'] as const);
 const FORBIDDEN_KEYS = Object.freeze(['modelScorecard','supportActivation']);
 /**
- * The reviewed source closure: exactly the keys buildPreviewSourceRowsV2 must produce (67 at
- * dev 5109a5501 plus role rotation: the 66 of dev b75e4c294 and answerRoleRotationPolicy; the same keys the
- * live v9 holds minus the two base-owned ones, plus that row once it is published).
+ * The reviewed source closure: exactly the keys buildPreviewSourceRowsV2 must produce (68: the 67 at
+ * dev 5109a5501 plus role rotation — the 66 of dev b75e4c294 and answerRoleRotationPolicy — and mapContractHash, the
+ * debate shape's sealed map prompts (P2b Task 6); the same keys the live v9 holds minus the two base-owned ones, plus
+ * those two rows once they are published).
  * A new register row reaches the preview only by being added here.
  */
 export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
@@ -76,7 +77,7 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
   'configuredProviderSet','conformanceContractHash','consumerRecoveryPolicy','costEnvelopePolicy','countryPolicy','disagreementQuantity',
   'disagreementThreshold','dispersionScale','downgradeBands','envelopeFormulaInputs','evaluatorCallBound','evaluatorLoopMaxRounds',
   'evaluatorRoleRef','globalStopDelta','hiddenNodeScoreThreshold','judgeContractHash','judgementSelectionPolicy','livenessPolicy',
-  'mfaPolicy','mfaRecoveryPolicy','nodeRuntimeVersion','panelDiscoveryPolicy','passwordPolicy','passwordResetPolicy',
+  'mapContractHash','mfaPolicy','mfaRecoveryPolicy','nodeRuntimeVersion','panelDiscoveryPolicy','passwordPolicy','passwordResetPolicy',
   'pnpmVersion','postgresMajorVersion','productRolePolicy','propagationContractHash','providerFamilyMap','publicationCheckPolicy',
   'rateLimitPolicy','recoveryPolicy','repeatedFamilyMultiplier','riskTier','runDeathPolicy','scoringOperator',
   'serveContractHash','sessionPolicy','storyCheckerCallBound','storyCheckerRoleRef','storyLoopMaxRounds','storyMaterialBudget',
@@ -135,15 +136,19 @@ const sourceKeysReviewed = (keys:readonly string[]) => {
  * v1's source build (same runtime gate, same provider panel), closed by the reviewed key list instead of a count.
  * `checker` is the reviewed checker choice (default GLM) and `roleRotation` the operator's rotation switch
  * (default 'on'); `callConcurrency` the operator's optional parallel-calls policy (default null: no row, one call at
- * a time); `debateShape` the operator's optional debate shape policy (default null: no row, today's shape). All are
+ * a time); `debateShape` the operator's optional debate shape policy (default null: no row, today's shape; 'off': the
+ * row published disabled, the start values with enabled false — P2b Task 6). All are
  * checked before anything else is built (each policy by the register's own parser, CALL_CONCURRENCY_POLICY_INVALID
  * or DEBATE_SHAPE_POLICY_INVALID).
  */
-export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
+export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null):Promise<readonly RegisterPublicationRow[]> {
   const evaluatorRoleRef=previewCheckerRoleRef(checker);
   const rotationEnabled=previewRoleRotationEnabled(roleRotation);
   const concurrencyRows=callConcurrency===null?[]:[callConcurrencyPolicyRow(callConcurrency,'docs/superpowers/specs/2026-10-12-parallel-calls-design.md; owner 2026-10-12')];
-  const shapeRows=debateShape===null?[]:[debateShapePolicyRow(debateShape,'docs/superpowers/specs/2026-10-12-debate-shape-design.md; owner 2026-10-12')];
+  // Debate shape (P2b Task 6): 'off' = the START VALUES with enabled false (this function never sees the base), so the
+  // row stays present, disabled (the preview's rollback): the API asks today's shape, the runner still finishes the
+  // debates admitted with it, and the base-row-dropped refusal is never hit.
+  const shapeRows=debateShape===null?[]:[debateShapePolicyRow(debateShape==='off'?{...debateShapePolicyStartValues(),enabled:false}:debateShape,'docs/superpowers/specs/2026-10-12-debate-shape-design.md; owner 2026-10-12')];
   if(runtime.nodeVersion!=='v26.8.2'||runtime.pnpmVersion!=='11.20.0'||!/^([0-9a-f]{40})$/.test(runtime.sourceRevision)
     ||!/^([0-9a-f]{40})$/.test(runtime.sourceTree)||!/^([0-9a-f]{64})$/.test(runtime.operatorSha256)
     ||!Number.isFinite(Date.parse(runtime.observedAt))||bootstrap.values.pnpmVersion!==runtime.pnpmVersion||bootstrap.values.postgresMajorVersion!=='18')fail();

@@ -841,6 +841,37 @@ describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify
     expect(existsSync(out)).toBe(false);
   });
 
+  /** Debate shape (P2b Task 6): the owners' start values, with their kind, as the operator would type them. */
+  const SHAPE = JSON.parse(JSON.stringify(registerModule.debateShapePolicyStartValues()));
+
+  it('plan --debate-shape: the plan carries the policy or the word off, publish carries it on, and none is the default', async () => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-shape.json');
+    const plan = read(await run(t.nativePlan('plan', ['--debate-shape', JSON.stringify(SHAPE)]).with(-1, out), t.s.layout));
+    expect(plan).toEqual({ ...t.plan, debateShape: SHAPE });
+    expect(operator.validateNativePlan(plan)).toEqual(plan);
+    const proposal = t.writeProposal(t.proposalOf());
+    const publish = read(await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], out), t.s.layout, deps));
+    expect(publish.debateShape).toEqual(SHAPE);
+    const off = read(await run(t.nativePlan('plan', ['--debate-shape', 'off']).with(-1, join(t.s.art, 'native-plan-shape-off.json')), t.s.layout));
+    expect(off).toEqual({ ...t.plan, debateShape: 'off' });
+    expect(Object.hasOwn(t.plan, 'debateShape')).toBe(false);
+  });
+
+  it.each([
+    ['text that is neither off nor JSON', 'plan', ['--debate-shape', 'OFF']],
+    ['a JSON array', 'plan', ['--debate-shape', '[1]']],
+    ['JSON null', 'plan', ['--debate-shape', 'null']],
+    ['a JSON string other than off', 'plan', ['--debate-shape', '"on"']],
+    ['the option on verify', 'verify', ['--debate-shape', 'off']],
+    ['the option on apply-and-plan', 'apply-and-plan', ['--debate-shape', 'off']]
+  ])('refuses --debate-shape with %s and writes nothing', async (_name, operation, extra) => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-refused.json');
+    await expect(run(t.nativePlan(operation, extra).with(-1, out), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--debate-shape'] });
+    expect(existsSync(out)).toBe(false);
+  });
+
   it('refuses the option on publish: publish takes the policy only from its --from plan', async () => {
     const t = await staged();
     const out = join(t.s.art, 'native-plan-concurrency.json');

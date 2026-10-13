@@ -61,10 +61,10 @@ describe('publish kit v2: source closure', () => {
     const bootstrap = await loadBootstrapRegister();
     const rows = await buildPreviewSourceRowsV2(bootstrap, runtime);
     expect(rows.map(row => row.rowKey).sort()).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2].sort());
-    expect(rows).toHaveLength(67);
+    expect(rows).toHaveLength(68);
     const v1 = await buildPreviewSourceRows(bootstrap, runtime);
     const differing = rows.filter(row => JSON.stringify(row) !== JSON.stringify(v1.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey);
-    expect(differing).toEqual([...MULTI_MODEL_KEYS, 'answerRoleRotationPolicy']);
+    expect([...differing].sort()).toEqual([...MULTI_MODEL_KEYS, 'answerRoleRotationPolicy', 'mapContractHash'].sort());
     const value = (key: string) => JSON.parse(rows.find(row => row.rowKey === key)!.valueJsonText);
     expect(value('answerRoleRotationPolicy')).toEqual({ kind: 'ANSWER_ROLE_ROTATION_POLICY', enabled: true, rule: 'LEAST_SHARE_SEEDED_TIE_V1' });
     expect(value('configuredProviderSet')).toEqual(REVIEWED_PROVIDER_SET);
@@ -92,9 +92,9 @@ describe('publish kit v2: composing from the current version', () => {
     const f = await fixture();
     const v1 = composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v8 as any, baseRegisterVersion: '8', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v8 as any) });
     const v2 = compose(f.source, f.v8, '8');
-    expect(v2.rows.map(row => row.rowKey)).toEqual([...v1.rows.map(row => row.rowKey), ROTATION_KEY].sort((a, b) => a.localeCompare(b, 'en')));
-    for (const row of v2.rows) if (!MULTI_MODEL_KEYS.includes(row.rowKey) && row.rowKey !== ROTATION_KEY) expect(row).toEqual(v1.rows.find(old => old.rowKey === row.rowKey));
-    expect(v2.addedKeys).toEqual([ROTATION_KEY, ...V1_ADDITIONS]);
+    expect(v2.rows.map(row => row.rowKey)).toEqual([...v1.rows.map(row => row.rowKey), ROTATION_KEY, 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
+    for (const row of v2.rows) if (!MULTI_MODEL_KEYS.includes(row.rowKey) && row.rowKey !== ROTATION_KEY && row.rowKey !== 'mapContractHash') expect(row).toEqual(v1.rows.find(old => old.rowKey === row.rowKey));
+    expect(v2.addedKeys).toEqual([ROTATION_KEY, 'consumerRecoveryPolicy', 'mapContractHash', 'publicationCheckPolicy', 'taxAuthorities']);
     expect(v2.changedKeys).toEqual(['configuredProviderSet', 'nodeRuntimeVersion', 'providerFamilyMap']);
     for (const key of V1_ADDITIONS) {
       const entry = v2.delta.find(row => row.rowKey === key)!;
@@ -110,8 +110,8 @@ describe('publish kit v2: composing from the current version', () => {
     expect(() => composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v9 as any, baseRegisterVersion: '9', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v9 as any) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
     const before = structuredClone(f.v9);
     const plan = compose(f.source, f.v9);
-    expect(plan.rows).toHaveLength(69);
-    expect(plan.addedKeys).toEqual([ROTATION_KEY]);
+    expect(plan.rows).toHaveLength(70);
+    expect(plan.addedKeys).toEqual([ROTATION_KEY, 'mapContractHash']);
     expect(plan.rows.find(row => row.rowKey === ROTATION_KEY)).toEqual(f.source.find(row => row.rowKey === ROTATION_KEY));
     expect(plan.changedKeys).toEqual(['composerContractHash', ...MULTI_MODEL_KEYS]);
     const providerSet = plan.delta.find(row => row.rowKey === PROVIDER_SET_ROW)!;
@@ -135,7 +135,7 @@ describe('publish kit v2: composing from the current version', () => {
     expect(plan.deltaSha256).toBe(previewDeltaSha256V2(plan.delta));
     expect(plan.baseRegisterVersion).toBe('9');
     // Every other row, the base-owned ones included, is the base row byte for byte.
-    for (const row of plan.rows) if (row.rowKey !== 'composerContractHash' && row.rowKey !== ROTATION_KEY && !MULTI_MODEL_KEYS.includes(row.rowKey)) expect(row).toEqual(f.v9.find(base => base.rowKey === row.rowKey));
+    for (const row of plan.rows) if (row.rowKey !== 'composerContractHash' && row.rowKey !== ROTATION_KEY && row.rowKey !== 'mapContractHash' && !MULTI_MODEL_KEYS.includes(row.rowKey)) expect(row).toEqual(f.v9.find(base => base.rowKey === row.rowKey));
     for (const key of ['synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef']) expect(plan.delta.map(entry => entry.rowKey)).not.toContain(key);
     expect(f.v9).toEqual(before);
   });
@@ -144,8 +144,8 @@ describe('publish kit v2: composing from the current version', () => {
     const f = await fixture();
     const base = f.v9.filter(row => row.rowKey !== 'taxAuthorities');
     const plan = compose(f.source, base);
-    expect(plan.rows).toHaveLength(69);
-    expect(plan.addedKeys).toEqual([ROTATION_KEY, 'taxAuthorities']);
+    expect(plan.rows).toHaveLength(70);
+    expect(plan.addedKeys).toEqual([ROTATION_KEY, 'mapContractHash', 'taxAuthorities']);
     expect(plan.changedKeys).toEqual(['composerContractHash', ...MULTI_MODEL_KEYS]);
     expect(plan.rows.find(row => row.rowKey === 'taxAuthorities')).toEqual(f.source.find(row => row.rowKey === 'taxAuthorities'));
   });
@@ -228,14 +228,14 @@ describe('publish kit v2: the checker choice (GLM by default, DeepSeek only on t
     const f = await fixture();
     const source = await build(DEEPSEEK);
     const differing = source.filter(row => JSON.stringify(row) !== JSON.stringify(f.v1Source.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey);
-    expect(differing).toEqual([...DEEPSEEK_CHECKER_KEYS, ROTATION_KEY]);
+    expect([...differing].sort()).toEqual([...DEEPSEEK_CHECKER_KEYS, ROTATION_KEY, 'mapContractHash'].sort());
     expect(ref(source, 'evaluatorRoleRef')).toBe('preview:deepseek-v4-1-flash');
     expect(ref(source, 'storyCheckerRoleRef')).toBe('preview:deepseek-v4-1-flash');
     expect(ref(source, 'synthesizerRoleRef')).toBe('preview:fixture-a');
     expect(ref(source, 'storytellerRoleRef')).toBe('preview:fixture-a');
     const plan = compose(source, f.v9);
     expect(plan.changedKeys).toEqual(['composerContractHash', ...DEEPSEEK_CHECKER_KEYS]);
-    expect(plan.addedKeys).toEqual([ROTATION_KEY]);
+    expect(plan.addedKeys).toEqual([ROTATION_KEY, 'mapContractHash']);
     expect(JSON.parse(plan.delta.find(entry => entry.rowKey === 'evaluatorRoleRef')!.oldValueJsonText!).providerRef).toBe('preview:fixture-b');
     expect(JSON.parse(plan.delta.find(entry => entry.rowKey === 'evaluatorRoleRef')!.newValueJsonText).providerRef).toBe('preview:deepseek-v4-1-flash');
   });
@@ -332,7 +332,7 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
   it('composes with or without the row: a base without it and a plan without it give no row, as before', async () => {
     const f = await fixture();
     const given = compose(await build(policy), f.v9);
-    expect(given.addedKeys).toEqual([ROTATION_KEY, CALL_CONCURRENCY_POLICY_ROW_KEY].sort((a, b) => a.localeCompare(b, 'en')));
+    expect(given.addedKeys).toEqual([ROTATION_KEY, CALL_CONCURRENCY_POLICY_ROW_KEY, 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
     const absent = compose(f.source, f.v9);
     expect(absent.rows.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(absent.delta.map(entry => entry.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
@@ -368,11 +368,11 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     expect(compose(await build(policy), base, '10').delta).toEqual([]);
   });
 
-  it('the native operator hands the plan\'s policy to the builder as its fifth argument, so the row is in the reviewed delta', async () => {
+  it('the native operator hands the plan\'s policy to the builder as its fifth and sixth arguments, so the row is in the reviewed delta', async () => {
     const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
     const calls = text.split('publisher.buildPreviewSourceRowsV2(');
     expect(calls).toHaveLength(2); // the operator's one builder call
-    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null\);/);
+    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null\);/);
     // What it hands over is the plan's value exactly as the plan check accepted it.
     const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
     const plan = operator.validateNativePlan({ schema: 'preview-auth-dev-native-plan-v1', operation: 'plan', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api',
@@ -410,13 +410,42 @@ describe('publish kit v2: the optional debateShapePolicy row (absent by default,
   it('R19: a plan without a value keeps the base version\'s row unchanged; a broken base row is refused, never carried', async () => {
     const f = await fixture();
     const published = compose(await build(policy), f.v9);
-    expect(published.addedKeys).toEqual([ROTATION_KEY, DEBATE_SHAPE_POLICY_ROW_KEY].sort((a, b) => a.localeCompare(b, 'en')));
+    expect(published.addedKeys).toEqual([ROTATION_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
     const base = [...published.rows] as Row[];
     const kept = compose(f.source, base, '10');
     expect(kept.rows.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)).toEqual(base.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY));
     expect(kept.delta).toEqual([]);
     const broken = base.map(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"DEBATE_SHAPE_POLICY"', '"X"') } : row);
     expect(() => compose(f.source, broken, '10')).toThrow('DEBATE_SHAPE_POLICY_INVALID:kind');
+  });
+  it('"off" publishes the start values disabled, as one changed row; a policy object switches it back on (P2b Task 6)', async () => {
+    const off = await build('off');
+    expect(JSON.parse(off.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)!.valueJsonText))
+      .toEqual({ ...JSON.parse(JSON.stringify(policy)), enabled: false });
+    const f = await fixture();
+    const on = compose(await build(policy), f.v9);
+    const switched = compose(off, [...on.rows] as Row[], '10');
+    expect(switched.changedKeys).toEqual([DEBATE_SHAPE_POLICY_ROW_KEY]);
+    expect(switched.addedKeys).toEqual([]);
+    const back = compose(await build(policy), [...switched.rows] as Row[], '11');
+    expect(back.changedKeys).toEqual([DEBATE_SHAPE_POLICY_ROW_KEY]);
+    expect(back.snapshotSha256).toBe(on.snapshotSha256);
+  });
+  it('the native plan check takes the word off or a plain object, on plan and publish only; the parser refuses a bad policy when the rows are built', async () => {
+    const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+    const value = JSON.parse(JSON.stringify(policy));
+    expect(operator.validateDebateShapeChoice('off')).toBe('off');
+    expect(operator.validateDebateShapeChoice(value)).toBe(value);
+    for (const bad of ['on', 'OFF', null, [], 7, true]) expect(() => operator.validateDebateShapeChoice(bad)).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    const plan = { schema: 'preview-auth-dev-native-plan-v1', operation: 'plan', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api',
+      sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), sourceManifest: {}, operatorManifestSha256: 'c'.repeat(64), selectedBaseRegisterVersion: '9',
+      selectedBaseSnapshotSha256: 'd'.repeat(64), publicationId: id, approval: null };
+    for (const operation of ['plan', 'publish']) for (const debateShape of ['off', value]) expect(operator.validateNativePlan({ ...plan, operation, debateShape })).toBeTruthy();
+    for (const operation of ['verify', 'apply-and-plan']) expect(() => operator.validateNativePlan({ ...plan, operation, debateShape: 'off' })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    const bad = JSON.parse(JSON.stringify(policy));
+    bad.plans.free.mapAIs = 10;
+    expect(operator.validateNativePlan({ ...plan, debateShape: bad })).toBeTruthy(); // shape only (pre-flight PF-B20)
+    await expect(build(bad)).rejects.toThrow('DEBATE_SHAPE_POLICY_INVALID:plans.free.mapAIs');
   });
 });
 

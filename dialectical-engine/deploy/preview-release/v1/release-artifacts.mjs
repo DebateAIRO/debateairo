@@ -18,10 +18,12 @@
 //   release-artifacts.mjs native-plan --operation apply-and-plan|plan|publish|verify --from <existing native plan>
 //       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
 //       [--publication <publish output>] [--checker glm|deepseek --deepseek-enabled-on-gate yes] --out <file>
-//       [--role-rotation on|off] [--call-concurrency '<JSON object>']
+//       [--role-rotation on|off] [--call-concurrency '<JSON object>'] [--debate-shape off|'<JSON object>']
 //       (--checker, --role-rotation and --call-concurrency only with --operation plan; publish carries the plan's choices;
 //        defaults glm, on and the base's call-concurrency row kept as it is (or none); --role-rotation off publishes the rotation row disabled: the preview's rollback;
 //        --call-concurrency '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}' publishes that row)
+//       (--debate-shape only with --operation plan; publish carries the plan's choice; default: the base's debate shape
+//        row kept as it is, or none; --debate-shape off publishes the row disabled: the preview's rollback)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
@@ -89,7 +91,7 @@ const COMMANDS = Object.freeze({
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency'] }
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape'] }
 });
 
 export class Refusal extends Error {
@@ -426,6 +428,14 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (concurrencyText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--call-concurrency']);
   let concurrencyValue;
   if (concurrencyText !== undefined) try { concurrencyValue = strictJson(Buffer.from(concurrencyText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--call-concurrency']); }
+  // Debate shape (P2b Task 6): changes only when the operator gives it for a new `plan`, as the word off or one JSON
+  // object (native-operator.mjs validateDebateShapeChoice below; publish-register-v2.ts runs the register's parser);
+  // without it the kit keeps the base version's row unchanged, or builds none if the base has none (R19).
+  const shapeText = options['--debate-shape'];
+  if (shapeText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--debate-shape']);
+  let shapeValue;
+  if (shapeText === 'off') shapeValue = 'off';
+  else if (shapeText !== undefined) try { shapeValue = strictJson(Buffer.from(shapeText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--debate-shape']); }
   await assertOutputFree(options['--out'], { layout });
   // Lazy: native-operator.mjs loads tsx and pg, which exist only in an installed release root.
   const nativeOperator = () => import('../../preview-auth-dev/v1/native-operator.mjs');
@@ -434,6 +444,11 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (concurrencyText !== undefined) {
     const check = deps.validateCallConcurrencyChoice ?? (await nativeOperator()).validateCallConcurrencyChoice;
     try { concurrencyChoice = check(concurrencyValue); } catch { refuse('ARGUMENTS_REFUSED', ['--call-concurrency']); }
+  }
+  let shapeChoice;
+  if (shapeText !== undefined) {
+    const check = deps.validateDebateShapeChoice ?? (await nativeOperator()).validateDebateShapeChoice;
+    try { shapeChoice = check(shapeValue); } catch { refuse('ARGUMENTS_REFUSED', ['--debate-shape']); }
   }
   const from = await readJson(options['--from'], { layout, flag: '--from', maxBytes: MAX_PLAN_BYTES, artifact: false });
   try { validateNativePlan(from.value); } catch { refuse('FROM_PLAN_INVALID'); }
@@ -488,13 +503,16 @@ async function nativePlanCommand(options, { layout, deps }) {
   // The same for the call-concurrency policy: present only when the plan's operator gave one.
   const callConcurrency = operation === 'plan' ? concurrencyChoice
     : operation === 'publish' ? from.value.callConcurrency : undefined;
+  // The same for the debate shape choice (P2b Task 6): the word off or the policy object the plan's operator gave.
+  const debateShape = operation === 'plan' ? shapeChoice : operation === 'publish' ? from.value.debateShape : undefined;
   const plan = {
     schema: from.value.schema, operation, sourceRoot: source.value.sourceRoot, sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree,
     sourceManifest: { path: source.path, sha256: source.sha256 }, operatorManifestSha256: operatorDigest,
     selectedBaseRegisterVersion, selectedBaseSnapshotSha256, publicationId, approval,
     ...(checkerChoice === undefined ? {} : { checkerChoice }),
     ...(rotationChoice === undefined ? {} : { roleRotation: rotationChoice }),
-    ...(callConcurrency === undefined ? {} : { callConcurrency })
+    ...(callConcurrency === undefined ? {} : { callConcurrency }),
+    ...(debateShape === undefined ? {} : { debateShape })
   };
   try { validateNativePlan(plan); } catch { refuse('NATIVE_PLAN_INVALID'); }
   await (deps.verifySourceManifest ?? verifySourceManifest)(source.value, sourceBinding(source));

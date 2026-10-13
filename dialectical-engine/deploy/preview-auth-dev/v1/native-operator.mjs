@@ -36,12 +36,26 @@ export function validateCallConcurrencyChoice(value) {
  return {perDebate:value.perDebate,perModelPerDebate:value.perModelPerDebate,
   perModelPerRunner:Object.fromEntries(['default',...vendors.filter(vendor=>vendor!=='default').sort()].map(vendor=>[vendor,runner[vendor]]))};
 }
+/**
+ * The operator's optional debate shape choice (publish-register-v2.ts buildPreviewSourceRowsV2's sixth argument,
+ * spec 2026-10-12 §3.1): the exact word 'off' (the row published disabled: the start values with enabled false, the
+ * preview's rollback) or one plain JSON object (the policy, with its kind). Shape only: the register's own parser
+ * checks the object in buildPreviewSourceRowsV2 (DEBATE_SHAPE_POLICY_INVALID:<path>) before any row is built.
+ * Like the checker choice, only plan and publish may carry it.
+ */
+export const DEBATE_SHAPE_OFF='off';
+export function validateDebateShapeChoice(value) {
+ if(value===DEBATE_SHAPE_OFF)return value;
+ if(value===null||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ return value;
+}
 /** The reviewed native-plan schema check; the release tool runs it before writing a plan. */
 export function validateNativePlan(plan) {
  const chosen=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'checkerChoice');
  const rotation=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'roleRotation');
  const concurrency=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'callConcurrency');
- exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[])]);
+ const shape=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'debateShape');
+ exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[])]);
  if(plan.schema!=='preview-auth-dev-native-plan-v1'||!['apply-and-plan','plan','publish','verify'].includes(plan.operation)
   ||!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(plan.sourceRoot))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  if(chosen){
@@ -51,6 +65,10 @@ export function validateNativePlan(plan) {
  if(rotation&&(plan.roleRotation!==ROLE_ROTATION_OFF||!['plan','publish'].includes(plan.operation)))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  if(concurrency){
   validateCallConcurrencyChoice(plan.callConcurrency);
+  if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ }
+ if(shape){
+  validateDebateShapeChoice(plan.debateShape);
   if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  }
  return plan;
@@ -81,7 +99,7 @@ export async function runNativeOperator() {
   // Publish kit v2: plan and publish compose from the CURRENT published version (nothing sealed above the base but this publication's own replay).
   if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
   const runtimeObservedAt=plan.approval?.runtimeObservedAt??new Date().toISOString();
-  const rows=await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null);
+  const rows=await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null);
   const snapshot=publisher.composePreviewSnapshotV2({sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256});
   const metadata=snapshotProposal({runtimeObservedAt,source,plan,snapshot});
   if(plan.operation==='plan'||plan.operation==='apply-and-plan')return metadata;
