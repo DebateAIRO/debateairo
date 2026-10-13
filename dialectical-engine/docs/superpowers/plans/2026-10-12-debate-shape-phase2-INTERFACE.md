@@ -115,3 +115,34 @@ New migration (next free number at build time) with:
 - Map repairs stay inside each call's own attempt allowance; a reassigned map list may be re-asked once on another AI (counted twice in the ceiling).
 - A position handed on to another maker is handed on before its first call, or the re-ask stays inside the position site's own allowance.
 - A run's frozen sizes are read from its receipt (`envelope_basis.shape`, via the shared reader `parseCostEnvelopeBasis`/`debateShapeOfReceipt`), never recomputed.
+
+## 8. Question language (P2L)
+
+Added 2026-10-13 from `2026-10-13-debate-shape-phase2-language.md` (P2L). Numbered 8 because §7 is P2a's binding list,
+which the P2a ledger cites as "INTERFACE §7". Built only inside the new shape: with `debateShapePolicy` absent (or
+switched off, P2b's `debateShapeInForce`), nothing here runs and every byte is today's.
+
+- Kernel (`packages/kernel/src/question-language.ts`): `QuestionLanguage = Readonly<{ code: string; name: string }>`
+  (ISO 639-1 code, a script subtag for two-script languages such as `sr-Latn`; English name);
+  `questionLanguageSentence(language)` (THE one named sentence every new-shape call carries); `QUESTION_LANGUAGE_FIELD`
+  = `"question_language"` (the material field, `{"code","name"}` JSON, always last); `replyLanguageCheckFor(questionLine,
+  language | null, patterns)` (today's check without a lock, the locked check with one); `languageDirectiveFor`,
+  `questionLanguageOf`, `questionLanguageFromRun`, `withQuestionLanguageField`, `lockedReplyLanguageExpectation`.
+- Register row (optional, its own family): `questionLanguagePolicy`, kind `"QUESTION_LANGUAGE_POLICY"`, `version: 1`,
+  `{ fastCheck: { provider: "anthropic", model, effort, timeoutMs, maxOutputTokens, priceMicrosUsdPerMillionTokens } | null,
+  instruction }`; parser `parseQuestionLanguagePolicy` (`QUESTION_LANGUAGE_POLICY_INVALID:<path>`), reader
+  `readQuestionLanguagePolicy(pool, version)`; absent = the code's start values (Claude Haiku 5.5, effort `low`, 5 s).
+- Ask contract (optional fields of `AskRequestSchema`, read only with the shape row): `site_language` (one of the 35
+  site locales, `SiteLanguageSchema`) and `question_language_choice` (`{ check_ref, choice: "USE_REWRITE" | "KEEP_MINE",
+  original_question_line? }`, strict; never a language or text of the page's own).
+- The offer: `409 QUESTION_LANGUAGE_CHOICE_NEEDED` with `{ error, message, offer: { check_ref, main_language, languages_seen,
+  proposed_question } }` (`QuestionLanguageChoiceNeededSchema`); a stale or forged choice is `409`
+  `QUESTION_LANGUAGE_CHECK_INVALID` / `QUESTION_LANGUAGE_CHECK_EXPIRED` / `QUESTION_LANGUAGE_CHOICE_MISMATCH`. Client:
+  `submitAskOrLanguageChoice(input)`.
+- Storage: the lock goes into `core.run.argument_language_tag` / `argument_language_name`; the stored ask contract
+  gains one member `question_language` (codes and hashes, plus the original question only when a rewrite was used).
+- The planner's record (ruling CR-3): `LANGUAGE_PLANNER_DISAGREES` is an operator-only MAP NOTE (`MAP_NOTES`, detail
+  `<locked>:<planner>`), with `MapResult.plannerLanguage`; it is NOT a condition mark (`CONDITION_MARKS` stays at P2b's
+  46) and never reaches the honesty drawer, the story or any page.
+- Map: the angle planner's answer form names `question_language` FIRST; `mapContractHash` changes once more (publish the
+  preview's map hash only after P2L Task 15).

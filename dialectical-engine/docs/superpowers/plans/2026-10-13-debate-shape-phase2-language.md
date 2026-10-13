@@ -9,7 +9,7 @@
 - only when eld does not settle it, one short fast-AI call names the language;
 - a question that really mixes languages gets a one-language rewrite the person approves.
 
-The locked code and English name go into `core.run.argument_language_tag` / `argument_language_name`. Every AI call of the debate then gets them in two forms: the material field `question_language: {code, name}` and ONE named sentence. Every reply check compares against the locked code instead of guessing the question again. The angle planner also names the language it sees, and a disagreement is recorded, never acted on.
+The locked code and English name go into `core.run.argument_language_tag` / `argument_language_name`. Every AI call of the debate then gets them in two forms: the material field `question_language: {code, name}` and ONE named sentence. Every reply check compares against the locked code instead of guessing the question again. The angle planner also names the language it sees, and a disagreement is recorded for operators only (a map note, never a mark people see), never acted on.
 
 With the row absent, everything stays today's behaviour byte for byte: today's guesser `detectArgumentLanguage` still decides at intake, today's directive and today's reply check are unchanged.
 
@@ -36,6 +36,21 @@ With the row absent, everything stays today's behaviour byte for byte: today's g
 - sibling plans P2a (built), P2b, P2c, P2d (planned, not yet executed). This plan's "Cross-plan amendments" lists the exact edits they need.
 
 All paths are relative to the engine folder `dialectical-engine/` of the worktree `.claude/worktrees/debate-shape-p2` (branch `feat/2026-10-13-debate-shape-phase2`). Every command runs from that folder.
+
+## Amendments 2026-10-13
+
+The controller's rulings CR-1..CR-7 (section "Controller rulings", kept below as the record) are now folded into the
+task text, so every task's steps, tests and interfaces agree with them. Code facts were checked at 803f58128.
+
+- CR-3: `LANGUAGE_PLANNER_DISAGREES` is an operator-only MAP NOTE (`MAP_NOTES`), never a condition mark: Task 14 is reworked (no kernel, serve, label, locale or pin edits; `CONDITION_MARKS` stays at P2b's 46), Task 15 records a note, the honesty-drawer text and its wording pick are removed (Owner-visible defaults, Owner steps), cross-plan amendment 2 is dropped, the execution order no longer moves the mark pins.
+- CR-3: the operator channel is the map's notes, stored (encrypted per run) in `core.map_choice` content and read back with `readMapResultForRun`, plus `MapResult.plannerLanguage`; P2d's practice report reads them (Tasks 14, 15).
+- CR-1: checked: the route's "per-person admission charge" is the admission policy's request limiter (`admitOrRefuse(reply, "asks", …)`, apps/api/src/index.ts, refusal `ADMISSION_RATE_LIMITED`), not the debate allowance or billing, which run inside `submit` after the language step; so charging it for the offer request is accepted. D1, Task 0 Step 4 (re-check at build) and Task 11 (a test that an offer reaches no allowance or billing step).
+- CR-2: the always-ask-the-fast-AI sites are one constant in `decide.ts`, `FAST_CHECK_ALWAYS_SITES` = `ga`, `id`, `mt` (eld lacks them), `hr` (Serbian/Bosnian in Latin script), plus every site Task 3 measures with a confident cross-locale confusion (`ELD_CONFUSED_SITES`, recorded in `eld-tuning.ts`). Tasks 3, 7; Owner-visible defaults; Owner steps.
+- CR-4: Task 0 Step 5 checks, after the origin/dev merge, whether both preview gates accept thinking off for Haiku; pre-checked on origin/dev da35a529b: the Haiku row's menu is `high`, `medium`, `low` (no `default`), so the start value stays `low` unless the check finds otherwise (Task 4 says how to switch). Contract deviation 1.
+- CR-5: the check-reference key is derived with HKDF from the API's existing blind-index key (`blindIndexKey`, main.ts, the same root `SocialAuthService` derives from), purpose label `question-language-check-v1`, so every API process of one deployment shares it; practice and tests keep a per-process random key. A second offer for the same person and question within 15 minutes is answered with the fallback lock (`REPEAT_OFFER`), and the page shows the pop-up at most once per submit. D2, Tasks 8, 10, 12, 18.
+- CR-6: the fast check reaches Anthropic only through the preview gate (no key in the API) or the hosted support target that already exists; no question text in any log line. Tasks 6, 12.
+- CR-7: kept defaults listed for the owner at the end (Owner steps 8).
+- Cross-plan amendments: marked as applied to P2b/P2c/P2d on 2026-10-13, with the CR-3 adjustments.
 
 ## Global Constraints
 
@@ -115,8 +130,9 @@ The six failure modes most likely to ship untested, and where each is caught:
    - Caught by Task 7 (every DOWN reading locks) and Task 10 (the time limit aborts at `timeoutMs`; a slow transport ends in a lock).
 5. **The reply check still re-guesses the question in a shape run.**
    - Caught by Task 1 (the locked check reads the code even when the guesser would read "und") and Task 17 (the shape run's captured prompts carry the named sentence and never the fallback form).
-6. **The planner's language changes the debate.**
-   - Caught by Task 15: a disagreement is one record, and every later call still carries the locked language.
+6. **The planner's language changes the debate, or reaches people.**
+   - Caught by Task 15: a disagreement is one operator-only map note, and every later call still carries the locked language.
+   - Caught by Task 14: the note is never a condition mark, so no honesty drawer, story or page can show it (ruling CR-3).
 
 ## Decisions the spec left to the build
 
@@ -128,7 +144,9 @@ The six failure modes most likely to ship untested, and where each is caught:
 4. **`submit` is also what the practice tool calls** (`tools/preview-practice/practice-debate.ts`). Putting the step inside `submit`, not in the route, gives practice debates the same language flow.
 5. **No lock is held during the call.** The step runs before billing, admission and the preview admission lock, so the up-to-5-second call never holds the advisory lock that serialises preview asks.
 
-The cost: in the real-mix case the person's ask allowance is charged twice, once for the request that returned the offer and once for the resubmission. Accepting a reference as "already charged" would let a reference be replayed to skip admission.
+The cost: in the real-mix case the route's request limiter is charged twice, once for the request that returned the offer and once for the resubmission. Accepting a reference as "already charged" would let a reference be replayed to skip admission.
+
+Ruling CR-1, checked (2026-10-13): that charge is the admission policy's request limiter (`admitOrRefuse(reply, "asks", "POST /v1/asks", …)` in apps/api/src/index.ts, refusal `ADMISSION_RATE_LIMITED`), an anti-spam limit. The person's debate allowance and money (billing hold, daily/monthly debates, credit) are read inside `submit`, AFTER this step, so an offer never touches them; only the resubmission that starts the debate does. Task 0 Step 4 re-checks this at build time and Task 11 pins it with a test.
 
 **D2. The check reference is a stateless signed token, not a stored row.** Reasons:
 
@@ -154,7 +172,7 @@ Binding works like this. The choice is not in the token. Instead, `choice` and t
 
 The locked language is always `m`. A page therefore cannot pick a language, a rewrite, or another person's or another question's reference.
 
-The key is 32 random bytes made when the API process starts. A restart or a second API process makes outstanding references fail with `QUESTION_LANGUAGE_CHECK_INVALID`, and the page then runs the check again without a reference (one extra fast call at most).
+The key (ruling CR-5) is derived, not random: HKDF-SHA-256 over the API's existing blind-index key (`blindIndexKey`, loaded at boot in apps/api/src/main.ts from `BLIND_INDEX_KEY_PATH`, the root `SocialAuthService` already derives its flow key from), salt `debateai:question-language:v1`, info `question-language-check-v1`, 32 bytes. Every API process of one deployment therefore verifies every other's references, and a restart keeps them valid. The practice tool and the tests use a per-process random key (one process). A reference that still fails (expired, edited) makes the page check again without one; a second offer for the same person and question within 15 minutes is then answered with the fallback lock, never a second pop-up (Task 10, `REPEAT_OFFER`; Task 18).
 
 Replay within 15 minutes by the same person, for the same question, gives the same lock, which is harmless.
 
@@ -172,6 +190,7 @@ Replay within 15 minutes by the same person, for the same question, gives the sa
    - The preview Anthropic gate accepts an Anthropic body only with `output_config.effort` from the Haiku row's menu (`high`, `medium`, `low`). It refuses "default"/"none" (packages/providers/src/preview-test.ts `anthropicBodyAccepted`, `preview-models.ts` row menus). The Python gate has the same list (`preview_budget_helper.py` `AnthropicProfile.effort_words`).
    - Real "thinking off" needs a coordinated TypeScript + Python gate change with its parity fixtures. That is out of scope here and listed as an owner follow-up.
    - The row's `effort` field defaults to `"low"`. `timeoutMs` (5,000) still bounds the call, and on timeout the person gets the fallback lock.
+   - Ruling CR-4: after Task 0 merges origin/dev (it brings the owner's thinking-effort setting, PR #149), Task 0 Step 5 checks whether BOTH preview gates accept thinking off for Haiku; if they do, the start value becomes that word (Task 4 says how). Pre-checked on origin/dev da35a529b: the Haiku row's menu is `high`, `medium`, `low`, with no `default`, so `low` stands.
 2. **eld also lacks Irish (`ga`) and Maltese (`mt`), not only Indonesian.**
    - eld 2.1.0's README lists 60 languages. Our 35 minus that list is `ga`, `id`, `mt`. Bosnian is absent but is not one of our 35, and Serbian is Cyrillic only.
    - The spec's default applies to all three: on those sites the fast AI always checks.
@@ -205,21 +224,23 @@ These are the spec's defaults as built. The ones marked **RISK** are where the c
   - **RISK (weaker checking):**
     - The reply check has word lists only for our Latin-script languages (`REPLY_FUNCTION_WORDS`). For an outside Latin-script language (for example Catalan) it checks only the writing system, so a reply drifting into Spanish is not caught.
     - The code-owned opposite-answer template (P2b Task 2) has entries only for our 35. An outside debate whose choose step names one answer gets the English template.
-- **Serbian or Bosnian in Latin script on the Croatian site.**
-  - eld reads them as Croatian and locks Croatian with no fast call.
-  - On any other site the fast AI names Serbian (`sr-Latn`).
-  - **RISK (owner call):** if this matters, list `hr` as a site that always asks the fast AI (one constant in `decide.ts`).
+- **Serbian or Bosnian in Latin script on the Croatian site** (ruling CR-2).
+  - eld would read them as Croatian, so `hr` is a site that ALWAYS asks the fast AI (`FAST_CHECK_ALWAYS_SITES` in `decide.ts`), like `ga`, `id`, `mt` and every site Task 3 measures with a confident near-neighbour confusion.
+  - The fast AI then names Serbian (`sr-Latn`). Each extra check costs about $0.00005.
+  - With the fast AI down, the fallback still reads eld (Croatian): the never-block rule wins there.
 - **Local mode with no paid AI.** eld and the site language decide, and no rewrite is offered.
   - "Paid AI available" means the preview with an Anthropic gate socket, or hosted with an Anthropic support target and Task 19 applied.
   - A plain local install (relays or subscriptions) has no paid fast check.
 - **Each fast check uses one of the preview gate's daily call slots** (`max_paid_posts_per_day`) and briefly holds about $0.0165 of the $2 Anthropic pot until it settles.
-- **The real-mix pop-up charges the person's ask allowance twice** (D1).
+- **The real-mix pop-up charges the route's request limiter twice** (D1, CR-1). The debate allowance and billing are charged once, by the request that starts the debate.
 - **The fast check's instruction text and settings live in the optional row `questionLanguagePolicy`.** Absent means the code's start values (Claude Haiku 5.5 `claude-haiku-5-5`, effort low, 5 s, the default text in Task 4). An owner edit is a new register version.
-- **The planner-disagreement record shows as a plain line in the answer's honesty drawer.** Every condition mark does. Wording option 1 is in Task 14, options 2–3 are in "Owner steps".
+- **The planner-disagreement record never reaches people** (ruling CR-3). It is an operator-only map note, stored with the run's map (encrypted with the run's content) and read by the practice report and operators. It is not a condition mark, so the honesty drawer, the story and the debate page never show it (rule: no engine internals in user-facing text).
 - **An English question on the Romanian site is debated in English with no pop-up (L5).** The debate page's existing language strip (`QuestionLanguageOffer`, spec 2026-09-26 §14.3) still offers to show the page in English. That strip is about the page, not the debate, and is unchanged. Owner call if it should be hidden for shape runs.
 - **A person who presses Esc or clicks outside the pop-up is treated as "Edit"** (back to the question box, nothing sent), never as a choice.
 
 ## Controller rulings (2026-10-13, override the sections above where they differ)
+
+Kept as the record. Folded into the task text on 2026-10-13 (see "Amendments 2026-10-13"): CR-1 → D1, Task 0 Step 4, Task 11; CR-2 → Owner-visible defaults, Tasks 3, 7; CR-3 → Goal, Review Focus, Owner-visible defaults, Tasks 14, 15, Owner steps, cross-plan amendment 2 (dropped); CR-4 → Contract deviation 1, Task 0 Step 5, Task 4; CR-5 → D2, Tasks 8, 10, 12, 18; CR-6 → Tasks 6, 12; CR-7 → Owner steps 8.
 
 - **CR-1 (charged twice, D1).** If the route's "per-person admission charge" is only the anti-spam request limiter, charging it for the offer request is accepted. If it touches the person's debate allowance or money (daily/monthly debates, credit, billing hold), the offer request must NOT consume it: the offer returns before any allowance or billing step, and only the resubmission is charged. Task 0's pre-flight says which one it is, with file:line.
 - **CR-2 (Croatian site and near neighbours).** Sites where eld can be confidently wrong about a near neighbour always ask the fast AI: `ga`, `id`, `mt` (eld lacks them), `hr` (Serbian/Bosnian in Latin script), plus every site Task 3 measures with a confident near-neighbour confusion. One constant in `decide.ts`, filled from Task 3's numbers. Each extra check costs about $0.00005.
@@ -231,6 +252,8 @@ These are the spec's defaults as built. The ones marked **RISK** are where the c
 
 ## Cross-plan amendments (exact edits other plans need; this plan does not edit them)
 
+**Applied 2026-10-13** to P2b, P2c and P2d (each plan's own "Amendments 2026-10-13" log), with ruling CR-3's adjustments: P2b amendment 2 is DROPPED (no ninth mark; `CONDITION_MARKS` stays 46); P2b amendment 5's `question_language` member in the scripted `MAP:angles` reply is added by Task 17 here, not by P2b (P2b's reader is strict until Task 15); P2d records the planner's language from the map note and `plannerLanguage`, never from a condition mark. The text below is the original request, kept as the record.
+
 **P2b (the runner shape)**
 
 1. **Task 2, `mapWrongLanguage`.**
@@ -238,11 +261,11 @@ These are the spec's defaults as built. The ones marked **RISK** are where the c
    - Keep the current body.
    - In `tests/unit/map-multilingual.test.ts`, replace `mapWrongLanguage("Autobuzele gratuite …", "ro-RO")` with `mapWrongLanguage("Autobuzele gratuite …", { tag: "ro", script: "Latin" })`.
    - `mapPrimarySubtag` stays: the opposite template uses it.
-2. **Task 3 (marks): no edit needed.** P2L Task 14 inserts a ninth shape mark, `LANGUAGE_PLANNER_DISAGREES`, right after `"SCRUTINY-EXTENDED"`. It also appends it to `DEBATE_SHAPE_MARKS` and bumps P2b's length pins from 46 to 47. P2b's slice test (`at + 1 .. at + 1 + DEBATE_SHAPE_MARKS.length`) stays true.
+2. **DROPPED by ruling CR-3.** (Was: a ninth shape mark `LANGUAGE_PLANNER_DISAGREES` after `"SCRUTINY-EXTENDED"`, pins 46 → 47.) The disagreement is an operator-only map note; P2b's Task 3 stays at 46 marks and needs no edit.
 3. **Task 6 / Owner steps: do not publish the preview's `mapContractHash` before P2L Task 15 lands.**
    - P2L changes the angle planner's instruction and answer form, so `mapPromptContractHash()` changes once more.
    - Dev registers re-seal by themselves.
-4. **Task 12 (`map-stage.ts`).** `mapConditionRecords(result, runId)` must convert EVERY `MapMarkRecord`, including P2L's new one. It must not be a fixed list of five. The test's `mapAnglesSpec({ questionLine, languageName, languageTag })` call keeps working: P2L keeps those context fields.
+4. **Task 12 (`map-stage.ts`).** `mapConditionRecords(result, runId)` must convert EVERY `MapMarkRecord` the result holds, never a fixed list, and never a map note (P2L's record is a note, CR-3). The test's `mapAnglesSpec({ questionLine, languageName, languageTag })` call keeps working: P2L keeps those context fields.
 5. **Task 15 (the harness `tests/support/debate-shape-harness.ts` and `classifyGateRequest`'s `"MAP"` kind).**
    - The harness's admitted runs pass `argumentLanguageTag: "en", argumentLanguageName: "English"` (or the case's language) to `startRun` explicitly.
    - The scripted `MAP:angles` reply starts with `"question_language": "<tag>"`.
@@ -290,7 +313,7 @@ These are the spec's defaults as built. The ones marked **RISK** are where the c
 5. **Practice `debate` mode** gains `--site-language <one of the 35>` (default: the question's own language) and `--language-choice use|keep` (default `use`, applied when `submit` answers with an offer). The report records the lock, its source and whether a rewrite was used.
 6. **One full practice debate on `lang-ro-en-mix`** with `--shape-policy` before the preview upload. This uses the owner's practice-run rule and budget.
 
-**INTERFACE (binding names)** — add a section "7. Question language (P2L)" listing: `QuestionLanguage`, `questionLanguageSentence`, `QUESTION_LANGUAGE_FIELD` (`"question_language"`), `replyLanguageCheckFor`, row `questionLanguagePolicy` (kind `QUESTION_LANGUAGE_POLICY`), mark `LANGUAGE_PLANNER_DISAGREES`, ask fields `site_language` and `question_language_choice`, the 409 code `QUESTION_LANGUAGE_CHOICE_NEEDED`. Edit it when this plan is executed (it is a binding-names file, not a sibling plan).
+**INTERFACE (binding names)** — APPLIED 2026-10-13 as section "8. Question language (P2L)" (§7 already holds P2a's bindings, cited by the P2a ledger), with the planner record as an operator-only map note (CR-3). Originally asked: add a section "7. Question language (P2L)" listing: `QuestionLanguage`, `questionLanguageSentence`, `QUESTION_LANGUAGE_FIELD` (`"question_language"`), `replyLanguageCheckFor`, row `questionLanguagePolicy` (kind `QUESTION_LANGUAGE_POLICY`), mark `LANGUAGE_PLANNER_DISAGREES`, ask fields `site_language` and `question_language_choice`, the 409 code `QUESTION_LANGUAGE_CHOICE_NEEDED`. Edit it when this plan is executed (it is a binding-names file, not a sibling plan).
 
 ## Execution order (recommendation)
 
@@ -299,7 +322,6 @@ These are the spec's defaults as built. The ones marked **RISK** are where the c
    - `framedJudgePrompt` and its test seam;
    - `buildSynthesisRolePrompt`'s new parameter;
    - `map-stage.ts` and the map package;
-   - the condition-mark pins (46 → 47);
    - the shape harness.
 
    Running P2L first would rewrite them twice.
@@ -319,16 +341,16 @@ Run Task 20 again after Tasks 18 and 19.
 | `packages/kernel/src/question-language.ts` | create | `QuestionLanguage`, language table, sentence, field, locked expectation, `replyLanguageCheckFor`, `languageDirectiveFor` (Task 1) |
 | `packages/kernel/src/argument-language.ts` | modify | export `ARGUMENT_LANGUAGE_NAMES` (the existing table, renamed export only) (Task 1) |
 | `packages/kernel/src/reply-language.ts` | modify | export `replyScriptOfTag` (reads the existing private table) (Task 1) |
-| `packages/kernel/src/index.ts` | modify | `export * from "./question-language.js"`; Task 14's mark |
+| `packages/kernel/src/index.ts` | modify | `export * from "./question-language.js"` (Task 1; no mark: CR-3) |
 | `apps/api/package.json`, `pnpm-lock.yaml` | modify | `eld` 2.1.0 exact (Task 2) |
 | `apps/api/src/question-language/eld.ts` | create | eld reader, the 60-language list, `SITE_LANGUAGES_ELD_LACKS` (Task 2) |
 | `tools/question-language-tune/legal-sentences.ts`, `tools/question-language-tune/measure-eld.ts` | create | the #158 legal-page sentence set; the measurement (Task 3) |
-| `apps/api/src/question-language/eld-tuning.ts` | create | measured numbers: database size, minimum letters, site aliases (Task 3) |
+| `apps/api/src/question-language/eld-tuning.ts` | create | measured numbers: database size, minimum letters, site aliases, confused sites (Task 3, CR-2) |
 | `packages/register/src/question-language-policy.ts` | create | optional row `questionLanguagePolicy`: parse, read, row, start values, default instruction (Task 4) |
 | `apps/api/src/question-language/fast-check.ts` | create | contract, answer form, framing, reply reader, the time-limited check (Task 5) |
-| `apps/api/src/question-language/transport.ts` | create | Anthropic Messages transport over a given fetch (preview gate or hosted key) (Task 6) |
-| `apps/api/src/question-language/decide.ts` | create | the pure decision table (Task 7) |
-| `apps/api/src/question-language/reference.ts` | create | sign and verify the check reference; verify a choice (Task 8) |
+| `apps/api/src/question-language/transport.ts` | create | Anthropic Messages transport over a given fetch (preview gate, or the hosted support target's key) (Task 6, CR-6) |
+| `apps/api/src/question-language/decide.ts` | create | the pure decision table and `FAST_CHECK_ALWAYS_SITES` (Task 7, CR-2) |
+| `apps/api/src/question-language/reference.ts` | create | the reference key derived from the blind-index key (CR-5); sign and verify the check reference; verify a choice (Task 8) |
 | `packages/contract/src/index.ts`, `packages/contract/src/client.ts` | modify | `SiteLanguageSchema`, the two ask fields, the 409 offer schema, `submitAskOrLanguageChoice` (Task 9) |
 | `apps/api/src/question-language/decider.ts` | create | `QuestionLanguageDecider`, `QuestionLanguageLock`, the run-language helpers (Task 10) |
 | `apps/api/src/index.ts` | modify | settings field, `submit` first step, both `startRun` calls, the refusal class and its 409 (Task 11) |
@@ -336,8 +358,8 @@ Run Task 20 again after Tasks 18 and 19.
 | `apps/api/src/main.ts`, `tools/preview-practice/practice-ask-composition.ts` | modify | boot: row, eld, transport choice, decider (Task 12) |
 | `deploy/preview-auth-dev/v1/publish-register-v2.ts`, `apps/runner/src/hosted-register-publish.ts` | modify | the optional row in both publishers (Task 12) |
 | `packages/judgement/src/index.ts`, `apps/runner/src/index.ts` | modify | judge, review, panel, answer writer, answer checker take the locked language (Task 13) |
-| `packages/kernel/src/index.ts`, `packages/serve/src/index.ts`, `apps/ui/lib/v3/labels.ts`, `apps/ui/lib/report/reportModel.ts`, `apps/ui/messages/*/debateChrome.json` | modify | mark `LANGUAGE_PLANNER_DISAGREES` (Task 14) |
-| `packages/map/src/{types,prompts,specs,replies,orchestrator}.ts` | modify | named sentence, field, planner's first field, disagreement record (Task 15) |
+| `packages/map/src/types.ts` | modify | the operator-only map note `LANGUAGE_PLANNER_DISAGREES` and `MapResult.plannerLanguage`; never a condition mark (Task 14, CR-3) |
+| `packages/map/src/{prompts,specs,replies,orchestrator}.ts` | modify | named sentence, field, planner's first field, the disagreement note (Task 15) |
 | `packages/story/src/{contracts,writer,material}.ts`, `apps/runner/src/story-snapshot.ts` | modify | story in the locked language (Task 16) |
 | `apps/runner/src/index.ts`, `tests/support/preview-gate-stubs.ts`, `tests/support/debate-shape-harness.ts` | modify | the shape run's language; doubles (Task 17) |
 | `apps/ui/components/QuestionLanguageChoice.tsx`, `apps/ui/app/new/NewDebatePageClient.tsx`, `apps/ui/lib/api.ts` | create/modify | the pop-up; site language sent (Task 18) |
@@ -369,6 +391,27 @@ Run:
 `pnpm exec tsx -e 'import {createHash} from "node:crypto"; import {JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT as t} from "@debateai/judgement"; console.log(createHash("sha256").update(t).digest("hex"))'`
 
 Write the printed value into the controller's notes as `JUDGE_HASH_AFTER_P2B`. Task 13's test pins it.
+
+- [ ] **Step 4: Pre-flight for ruling CR-1 (what the offer request is charged)**
+
+Run: `grep -n 'admitOrRefuse(reply, "asks"' apps/api/src/index.ts` and `grep -n "const admitOrRefuse" -A9 apps/api/src/index.ts`.
+
+Expected (checked on 803f58128): the `POST /v1/asks` route charges `admitOrRefuse(reply, "asks", "POST /v1/asks", …)` BEFORE `submit`, and that function refuses with `ADMISSION_RATE_LIMITED` (the admission policy's request limiter, anti-spam). The person's debate allowance and money (billing hold, daily/monthly debates, credit) are read inside `submit`, after Task 11's language step. Write the file:line of both into the controller's notes. Then CR-1's first branch holds: charging the limiter for the offer request is accepted, and nothing else changes.
+
+If the route now charges anything that touches the person's debate allowance or money before `submit` (a quota of debates, a billing hold, credit), STOP and report: CR-1 then requires the offer to return before that step, which moves the language step into the route, before that charge. That is a plan change for the controller.
+
+- [ ] **Step 5: Ruling CR-4 (thinking off for the fast check)**
+
+After Step 2's merge, run: `grep -n '"claude-haiku-5-5"' -A8 packages/providers/src/preview-models.ts | grep -n "efforts"` and `grep -n "effort_words" packages/providers/ops/preview_budget_helper.py` (the Python gate's `AnthropicProfile`).
+
+- If BOTH the TypeScript row's `efforts` and the Python gate's list for Haiku accept a "thinking off" word (today the TypeScript menu would have to hold `"default"`, which means "send no `output_config`"), write that word into the controller's notes as `FAST_CHECK_EFFORT_START`. Task 4 then uses it.
+- Otherwise `FAST_CHECK_EFFORT_START` is `low` (Contract deviation 1). Pre-checked on origin/dev da35a529b: the Haiku row's menu is `["high", "medium", "low"]`, so `low`.
+
+- [ ] **Step 6: Ruling CR-5 (the server secret the reference key derives from)**
+
+Run: `grep -n "const blindIndexKey = loadSecretKey" apps/api/src/main.ts` and `grep -n "hkdfSync" apps/api/src/social-auth.ts`.
+
+Expected: one line each (main.ts loads `blindIndexKey` at boot from `BLIND_INDEX_KEY_PATH`; `SocialAuthService` derives its flow key from it with HKDF). Task 8 derives the reference key the same way. If `blindIndexKey` is gone or renamed, use the root the social-auth flow key now derives from and say so in the commit; if there is none, STOP and report (CR-5's fallback, a per-process key with the single-process limit documented, is the controller's call).
 
 ---
 
@@ -835,10 +878,13 @@ export type EldTuningRow = Readonly<{ size: EldDatabaseSize; minLetters: number;
 export async function measureEld(sizes: readonly EldDatabaseSize[], minLetters: readonly number[]): Promise<readonly EldTuningRow[]>;
 export function chooseEldTuning(rows: readonly EldTuningRow[]): EldTuningRow | null;
 export async function siteAliasCandidates(size: EldDatabaseSize, minLetters: number): Promise<Readonly<Record<string, readonly string[]>>>;
+export async function siteConfusions(size: EldDatabaseSize, minLetters: number): Promise<Readonly<Record<string, Readonly<Record<string, number>>>>>; // CR-2
+export function confusedSites(confusions: Readonly<Record<string, Readonly<Record<string, number>>>>): readonly string[];
 // apps/api/src/question-language/eld-tuning.ts
 export const ELD_TUNING: Readonly<{ database: EldDatabaseSize; minLetters: number; measured: Readonly<{ on: string;
   sentences: number; settlesOwnSite: number; wrongLockable: number; wrongLockableRoEn: number }> }>;
 export const ELD_SITE_ALIASES: Readonly<Record<string, readonly string[]>>;
+export const ELD_CONFUSED_SITES: readonly string[];   // CR-2: our sites eld confidently named for another locale's sentence
 export function eldConfident(reading: EldReading): boolean;
 ```
 
@@ -847,6 +893,7 @@ The definitions below are what the test pins:
 - **wrongLockable**: the number of sentences for which eld is confident and names a DIFFERENT one of our 35. Asked on the site of that other language, each would be a wrong lock.
 - **wrongLockableRoEn**: the part of `wrongLockable` where a Romanian sentence reads as English or the reverse.
 - **roPlain\***: the same two figures for the Romanian sentences with every diacritic removed. This is the "Romanian without diacritics" case.
+- **siteConfusions** (ruling CR-2): for each of our sites S, how many sentences of ANOTHER legal locale eld confidently names S, by locale. A site with any such sentence is a site where eld can be confidently wrong about a near neighbour; `confusedSites` lists them, sorted. They join `FAST_CHECK_ALWAYS_SITES` (Task 7): on those sites the fast AI always checks, even when eld names the site language. The choice rule's 0.05% bar still applies to the configuration; this list makes the remaining confusions safe.
 
 **The choice rule** (`chooseEldTuning`):
 1. Keep only the rows with `wrongLockableRoEn === 0`, `roPlainWrong === 0`, and `wrongLockable * 2000 <= sentences` (at most 0.05%).
@@ -890,9 +937,9 @@ In `tests/unit/argument-language.test.ts`, replace the local `legalSentences` an
 ```ts
 import { describe, expect, it } from "vitest";
 import { loadEldReader } from "../../apps/api/src/question-language/eld.js";
-import { ELD_SITE_ALIASES, ELD_TUNING, eldConfident } from "../../apps/api/src/question-language/eld-tuning.js";
+import { ELD_CONFUSED_SITES, ELD_SITE_ALIASES, ELD_TUNING, eldConfident } from "../../apps/api/src/question-language/eld-tuning.js";
 import { LEGAL_LOCALES, legalSentences, withoutDiacritics } from "../../tools/question-language-tune/legal-sentences.js";
-import { chooseEldTuning, type EldTuningRow } from "../../tools/question-language-tune/measure-eld.js";
+import { chooseEldTuning, confusedSites, siteConfusions, type EldTuningRow } from "../../tools/question-language-tune/measure-eld.js";
 
 const row = (over: Partial<EldTuningRow>): EldTuningRow => ({ size: "medium", minLetters: 20, sentences: 20_000, settlesOwnSite: 10_000,
   wrongLockable: 0, wrongLockableRoEn: 0, roPlainSettles: 500, roPlainWrong: 0, ...over });
@@ -928,6 +975,12 @@ describe("eld's confidence, tuned on the legal-page set (question-language spec 
       const reading = reader.read(withoutDiacritics(sentence));
       if (eldConfident(reading)) expect(reading.code, sentence.slice(0, 40)).toBe("ro");
     }
+  }, 120_000);
+
+  it("CR-2: the recorded confused sites are exactly the sites the set confuses at the chosen configuration", async () => {
+    expect(confusedSites({ ro: { en: 0 }, hr: { sl: 2 }, en: {} })).toEqual(["hr"]);
+    expect(ELD_CONFUSED_SITES).toEqual(confusedSites(await siteConfusions(ELD_TUNING.database, ELD_TUNING.minLetters)));
+    for (const site of ELD_CONFUSED_SITES) expect(LEGAL_LOCALES).toContain(site);
   }, 120_000);
 
   it("aliases exist only for the site languages eld lacks, and never name one of our other site languages", () => {
@@ -1013,12 +1066,35 @@ export async function siteAliasCandidates(size: EldDatabaseSize, minLetters: num
   return Object.freeze(out);
 }
 
+/** CR-2: per site S, the confident readings naming S on another legal locale's sentences, by that locale (and the Romanian set without diacritics). */
+export async function siteConfusions(size: EldDatabaseSize, minLetters: number): Promise<Readonly<Record<string, Readonly<Record<string, number>>>>> {
+  const reader = await loadEldReader(size);
+  const confident = confidentAt(minLetters);
+  const out: Record<string, Record<string, number>> = Object.fromEntries(LEGAL_LOCALES.map((site) => [site, {}]));
+  const note = (from: string, sentence: string): void => {
+    const reading = reader.read(sentence);
+    if (!confident(reading) || reading.code === from.split("-")[0] || !LEGAL_LOCALES.includes(reading.code!)) return;
+    out[reading.code!]![from] = (out[reading.code!]![from] ?? 0) + 1;
+  };
+  for (const locale of LEGAL_LOCALES) for (const sentence of legalSentences(locale)) note(locale, sentence);
+  for (const sentence of legalSentences("ro")) note("ro-plain", withoutDiacritics(sentence));
+  return Object.freeze(Object.fromEntries(Object.entries(out).map(([site, from]) => [site, Object.freeze(from)])));
+}
+
+export function confusedSites(confusions: Readonly<Record<string, Readonly<Record<string, number>>>>): readonly string[] {
+  return Object.freeze(Object.entries(confusions).filter(([, from]) => Object.values(from).some((count) => count > 0)).map(([site]) => site).sort());
+}
+
 if (import.meta.url === `file://${process.argv[1] ?? ""}`) {
   const rows = await measureEld(["small", "medium", "large"], [0, 12, 20, 30, 40]);
   console.table(rows);
   const chosen = chooseEldTuning(rows);
   console.log(JSON.stringify({ chosen }, null, 2));
-  if (chosen !== null) console.log(JSON.stringify(await siteAliasCandidates(chosen.size, chosen.minLetters), null, 2));
+  if (chosen !== null) {
+    console.log(JSON.stringify(await siteAliasCandidates(chosen.size, chosen.minLetters), null, 2));
+    const confusions = await siteConfusions(chosen.size, chosen.minLetters);
+    console.log(JSON.stringify({ confusions, confusedSites: confusedSites(confusions) }, null, 2));
+  }
 }
 ```
 
@@ -1029,6 +1105,8 @@ The tool is not shipped runtime code, but it lives under tools/, so check it aga
 Run: `pnpm exec tsx tools/question-language-tune/measure-eld.ts`
 
 Keep the printed table. If `chosen` is `null`, STOP and report the table to the controller. The owner decides between a looser bar and the fast AI on every question.
+
+Keep the printed `confusions` and `confusedSites` too (ruling CR-2): `confusedSites` goes verbatim into `ELD_CONFUSED_SITES` in Step 6, and the counts per locale go in that constant's comment. An empty list is a valid result. Report the list to the controller: it is part of the owner's "always asks" site list.
 
 For the aliases, keep only codes that cover at least 5% of that locale's confident readings. `ms` for `id` is expected. Drop any alias that is one of our 35, and any for `ga`/`mt` that names a major language (for example `en`, `it`): a wrong alias there would turn an English question on the Maltese site into Maltese. Report what was dropped.
 
@@ -1061,6 +1139,13 @@ export const ELD_SITE_ALIASES: Readonly<Record<string, readonly string[]>> = Obj
   mt: Object.freeze([/* measured */])
 });
 
+/**
+ * Ruling CR-2: our sites eld confidently named for another locale's sentence on the legal-page set at the chosen
+ * configuration (Step 5's `confusedSites`, pasted sorted; the measured counts per locale go in the comment above).
+ * On these sites the fast AI always checks (decide.ts FAST_CHECK_ALWAYS_SITES), even when eld names the site language.
+ */
+export const ELD_CONFUSED_SITES: readonly string[] = Object.freeze([/* measured, sorted */]);
+
 export function eldConfident(reading: EldReading): boolean {
   return reading.code !== null && reading.reliable && reading.letters >= ELD_TUNING.minLetters;
 }
@@ -1078,7 +1163,7 @@ Run, one after another:
 
 ```bash
 git add tools/question-language-tune apps/api/src/question-language/eld-tuning.ts tests/unit/question-language-eld-tuning.test.ts tests/unit/argument-language.test.ts tests/support/shipped-corpus.manifest.txt
-git commit -m "Question language: eld tuned on the legal-page set — size, minimum letters and site aliases measured and recorded
+git commit -m "Question language: eld tuned on the legal-page set — size, minimum letters, site aliases and confused sites measured and recorded
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -1239,6 +1324,8 @@ Then add `invalid`, `parseQuestionLanguagePolicy`, `readQuestionLanguagePolicy`,
 - the row builder re-parses and refuses a blank `sourceRef` with `QUESTION_LANGUAGE_POLICY_INVALID:sourceRef`.
 
 The start values are those in the test. In `packages/register/src/index.ts`, export the eight names next to the debate-shape exports. Add the file to the manifest.
+
+Ruling CR-4: the test and the start values above use effort `low`, which is right when Task 0 Step 5 wrote `FAST_CHECK_EFFORT_START = low` (the expected result). If Step 5 found a "thinking off" word that BOTH preview gates accept for Haiku (for example `default`, which `anthropicMessagesRequestBody` turns into a body with no `output_config`), then: add that word to `fastCheckSchema.effort`'s enum and to the `QuestionLanguageFastCheck` type, make it the start value, change the first test's expected `effort` to it, and keep the refusal case `effort = "none"`. Task 12's boot check (`efforts` of the reviewed preview row) then accepts it by construction. Say which in the commit message.
 
 - [ ] **Step 4: Run it and expect PASS**
 
@@ -1489,11 +1576,13 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 6: The transport — Anthropic Messages through the preview gate or a hosted key
+### Task 6: The transport — Anthropic Messages through the preview gate or the hosted support target
 
 The API has no `ProviderGateway`, and the runner's gateway refuses a call with no run (`PROVIDER_RUN_REQUIRED`). The two existing run-less API calls (support chat, publication check) use their own adapter. This transport is the same idea, reduced to one Anthropic Messages POST:
 - through the preview's guarded fetch (`createPreviewGuardedFetch`, the Anthropic gate, no key header), which makes it a site cost in the gate's daily pot;
-- or, on hosted, with the support target's key.
+- or, on hosted, with the key of the support target that already exists (the support chat's Anthropic target, parsed at boot).
+
+Ruling CR-6: these are the ONLY two ways. On the preview the API holds no vendor credential (the gate adds the key; `credential` is `undefined` and a key header is refused by the guarded fetch). No new credential, environment variable or secret file is added anywhere. The transport logs nothing; its errors carry a code and a status, never the question, the rewrite or the reply text.
 
 **Files:**
 - Create: `apps/api/src/question-language/transport.ts`
@@ -1548,6 +1637,13 @@ describe("the fast check's transport", () => {
     const transport = anthropicFastCheckTransport({ fetch: hostedFetch, url: "https://api.anthropic.com/v1/messages", credential: "sk-ant-test", settings });
     await expect(transport({ packet, signal: AbortSignal.timeout(5000) })).rejects.toThrow(/QUESTION_LANGUAGE_FAST_CHECK_HTTP_529/u);
     expect(seen[0]!.headers.get("x-api-key")).toBe("sk-ant-test");
+  });
+
+  it("CR-6: on the preview no key header is ever sent, and a failure carries no question text", async () => {
+    const guarded = createPreviewGuardedFetch({ anthropic: { execute: async () => ({ status: 500, body: "{}" }) } });
+    const transport = anthropicFastCheckTransport({ fetch: guarded, url: PREVIEW_ANTHROPIC_MESSAGES_URL, credential: undefined, settings });
+    const failure = await transport({ packet, signal: AbortSignal.timeout(5000) }).catch((error: unknown) => error);
+    expect(String((failure as Error).message)).not.toContain("Romania");
   });
 });
 ```
@@ -1610,7 +1706,7 @@ Run: `pnpm exec vitest run tests/unit/question-language-transport.test.ts`
 
 ```bash
 git add apps/api/src/question-language/transport.ts tests/unit/question-language-transport.test.ts tests/support/shipped-corpus.manifest.txt
-git commit -m "API: the fast check's Anthropic transport — through the preview gate as a site cost, or with the hosted key
+git commit -m "API: the fast check's Anthropic transport — through the preview gate as a site cost, or the hosted support target
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -1625,13 +1721,14 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test: `tests/unit/question-language-decide.test.ts` (create)
 
 **Interfaces:**
-- Consumes: `EldReading`, `SITE_LANGUAGES_ELD_LACKS` (Task 2); `eldConfident`, `ELD_SITE_ALIASES` (Task 3); `FastCheckReading` (Task 5); `QuestionLanguage`, `questionLanguageOf`, `lockedReplyLanguageExpectation`, `replyTextLanguageVerdict` (`@debateai/kernel`).
+- Consumes: `EldReading`, `SITE_LANGUAGES_ELD_LACKS` (Task 2); `eldConfident`, `ELD_SITE_ALIASES`, `ELD_CONFUSED_SITES` (Task 3); `FastCheckReading` (Task 5); `QuestionLanguage`, `questionLanguageOf`, `lockedReplyLanguageExpectation`, `replyTextLanguageVerdict` (`@debateai/kernel`).
 - Produces:
 ```ts
-export type LockSource = "ELD_SITE" | "FAST" | "FAST_MIX_NO_OFFER" | "FALLBACK_ELD" | "FALLBACK_SITE" | "LOCAL_ELD" | "LOCAL_SITE" | "CHOICE";
+export type LockSource = "ELD_SITE" | "FAST" | "FAST_MIX_NO_OFFER" | "FALLBACK_ELD" | "FALLBACK_SITE" | "LOCAL_ELD" | "LOCAL_SITE" | "CHOICE" | "REPEAT_OFFER";
 export type LanguageDecision =
   | Readonly<{ kind: "LOCK"; language: QuestionLanguage; source: LockSource }>
   | Readonly<{ kind: "OFFER"; main: QuestionLanguage; seen: readonly QuestionLanguage[]; proposed: string }>;
+export const FAST_CHECK_ALWAYS_SITES: readonly string[];   // CR-2: ga, id, mt, hr + ELD_CONFUSED_SITES, sorted, no repeats
 export function eldSettles(site: QuestionLanguage, eld: EldReading): boolean;
 export function fallbackLock(site: QuestionLanguage, eld: EldReading, questionLine: string, local: boolean): LanguageDecision;
 export function decideAfterFast(site: QuestionLanguage, eld: EldReading, fast: FastCheckReading, questionLine: string, maxQuestionBytes: number): LanguageDecision;
@@ -1641,7 +1738,7 @@ The table (spec "The flow", L1–L5):
 
 | eld | fast AI | result |
 |---|---|---|
-| confident, top = site, site is not one eld lacks | not called | LOCK site (`ELD_SITE`) |
+| confident, top = site, site not in `FAST_CHECK_ALWAYS_SITES` (CR-2) | not called | LOCK site (`ELD_SITE`) |
 | anything else, no paid AI | not called | LOCK eld's top (aliased) if confident (`LOCAL_ELD`), else site (`LOCAL_SITE`); never an offer |
 | anything else | DOWN (timeout, transport, unreadable, unknown) | LOCK eld's top (aliased) if confident (`FALLBACK_ELD`), else site (`FALLBACK_SITE`) |
 | anything else | ONE language M | LOCK M (`FAST`), even when M ≠ site (L5), no offer |
@@ -1652,13 +1749,13 @@ The table (spec "The flow", L1–L5):
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { decideAfterFast, eldSettles, fallbackLock } from "../../apps/api/src/question-language/decide.js";
-import { ELD_TUNING } from "../../apps/api/src/question-language/eld-tuning.js";
+import { FAST_CHECK_ALWAYS_SITES, decideAfterFast, eldSettles, fallbackLock } from "../../apps/api/src/question-language/decide.js";
+import { ELD_CONFUSED_SITES, ELD_TUNING } from "../../apps/api/src/question-language/eld-tuning.js";
 import type { EldReading } from "../../apps/api/src/question-language/eld.js";
 import type { FastCheckReading } from "../../apps/api/src/question-language/fast-check.js";
 
 const L = (code: string, name: string) => ({ code, name });
-const RO = L("ro", "Romanian"), EN = L("en", "English"), ID = L("id", "Indonesian"), CA = L("ca", "Catalan");
+const RO = L("ro", "Romanian"), EN = L("en", "English"), ID = L("id", "Indonesian"), CA = L("ca", "Catalan"), HR = L("hr", "Croatian");
 const sure = (code: string): EldReading => ({ code, reliable: true, letters: ELD_TUNING.minLetters + 40 });
 const unsure: EldReading = { code: "ro", reliable: false, letters: 12 };
 const MAX = 8192;
@@ -1677,6 +1774,12 @@ describe("the question-language decision table (question-language spec 2026-10-1
   it("a site language eld lacks is never settled by eld, not even through an alias", () => {
     expect(eldSettles(ID, sure("ms"))).toBe(false);
     expect(eldSettles(ID, sure("id"))).toBe(false);
+  });
+
+  it("CR-2: the always-ask sites are ga, id, mt, hr and every measured confused site; eld never settles them", () => {
+    expect(FAST_CHECK_ALWAYS_SITES).toEqual([...new Set(["ga", "hr", "id", "mt", ...ELD_CONFUSED_SITES])].sort());
+    expect(eldSettles(HR, sure("hr"))).toBe(false);
+    for (const site of FAST_CHECK_ALWAYS_SITES) expect(eldSettles(L(site, site), sure(site)), site).toBe(false);
   });
 
   it("another language wholly (L5): the fast AI's one language is locked, no offer", () => {
@@ -1737,24 +1840,33 @@ Run: `pnpm exec vitest run tests/unit/question-language-decide.test.ts`
 ```ts
 import { lockedReplyLanguageExpectation, questionLanguageOf, replyTextLanguageVerdict, type QuestionLanguage } from "@debateai/kernel";
 import { SITE_LANGUAGES_ELD_LACKS, type EldReading } from "./eld.js";
-import { ELD_SITE_ALIASES, eldConfident } from "./eld-tuning.js";
+import { ELD_CONFUSED_SITES, ELD_SITE_ALIASES, eldConfident } from "./eld-tuning.js";
 import type { FastCheckReading } from "./fast-check.js";
 
 /**
  * The question-language decision (question-language spec 2026-10-13, rulings L1–L5), pure. It never blocks: every
  * path ends in a lock, except a valid real-mix offer, which the person answers.
  */
-export type LockSource = "ELD_SITE" | "FAST" | "FAST_MIX_NO_OFFER" | "FALLBACK_ELD" | "FALLBACK_SITE" | "LOCAL_ELD" | "LOCAL_SITE" | "CHOICE";
+export type LockSource = "ELD_SITE" | "FAST" | "FAST_MIX_NO_OFFER" | "FALLBACK_ELD" | "FALLBACK_SITE" | "LOCAL_ELD" | "LOCAL_SITE" | "CHOICE" | "REPEAT_OFFER";
 export type LanguageDecision =
   | Readonly<{ kind: "LOCK"; language: QuestionLanguage; source: LockSource }>
   | Readonly<{ kind: "OFFER"; main: QuestionLanguage; seen: readonly QuestionLanguage[]; proposed: string }>;
 
+/**
+ * Ruling CR-2: the sites where eld may be confidently wrong about a near neighbour, so the fast AI always checks even
+ * when eld names the site language: the three eld lacks (ga, id, mt), Croatian (Serbian and Bosnian in Latin script
+ * read as Croatian), and every site Task 3 measured with a confident cross-locale confusion (ELD_CONFUSED_SITES).
+ * Each extra check costs about $0.00005. The fallback (fast AI down) still uses eld: never block.
+ */
+export const FAST_CHECK_ALWAYS_SITES: readonly string[] = Object.freeze(
+  [...new Set([...SITE_LANGUAGES_ELD_LACKS, "hr", ...ELD_CONFUSED_SITES])].sort());
+
 const lock = (language: QuestionLanguage, source: LockSource): LanguageDecision => Object.freeze({ kind: "LOCK", language, source });
 const primary = (code: string): string => code.split("-")[0]!.toLowerCase();
 
-/** L1/L2: eld settles a question only when it is confident AND names the site language, which it knows. */
+/** L1/L2: eld settles a question only when it is confident AND names the site language, outside the always-ask sites (CR-2). */
 export function eldSettles(site: QuestionLanguage, eld: EldReading): boolean {
-  return eldConfident(eld) && !SITE_LANGUAGES_ELD_LACKS.includes(primary(site.code)) && eld.code === primary(site.code);
+  return eldConfident(eld) && !FAST_CHECK_ALWAYS_SITES.includes(primary(site.code)) && eld.code === primary(site.code);
 }
 
 /** eld's language for a fallback: an alias of a site language eld lacks reads as that site language. */
@@ -1823,7 +1935,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Produces:
 ```ts
 export type QuestionLanguageReferenceKey = Readonly<{ bytes: Buffer }>;
-export function newQuestionLanguageReferenceKey(): QuestionLanguageReferenceKey;            // 32 random bytes, per API process
+export function questionLanguageReferenceKeyFrom(root: Uint8Array): QuestionLanguageReferenceKey; // CR-5: HKDF from the blind-index key, shared by every API process
+export function newQuestionLanguageReferenceKey(): QuestionLanguageReferenceKey;            // 32 random bytes: the practice tool and tests only
 export function signQuestionLanguageReference(key: QuestionLanguageReferenceKey, input: Readonly<{
   ownerScope: string; site: string; questionLine: string; proposed: string; main: string; now: Date }>): string;
 export type QuestionLanguageChoice = Readonly<{ check_ref: string; choice: "USE_REWRITE" | "KEEP_MINE"; original_question_line?: string }>;
@@ -1838,7 +1951,7 @@ export function verifyQuestionLanguageChoice(key: QuestionLanguageReferenceKey, 
 ```ts
 import { describe, expect, it } from "vitest";
 import {
-  newQuestionLanguageReferenceKey, signQuestionLanguageReference, verifyQuestionLanguageChoice
+  newQuestionLanguageReferenceKey, questionLanguageReferenceKeyFrom, signQuestionLanguageReference, verifyQuestionLanguageChoice
 } from "../../apps/api/src/question-language/reference.js";
 
 const key = newQuestionLanguageReferenceKey();
@@ -1878,8 +1991,20 @@ describe("the check reference (question-language spec 2026-10-13: the server dec
     expect(() => verify({ choice: { check_ref: forged, choice: "USE_REWRITE", original_question_line: ORIGINAL } })).toThrow("QUESTION_LANGUAGE_CHECK_INVALID");
   });
 
-  it("a reference from another API process (another key) is invalid, so the page checks again", () => {
+  it("a reference signed with another key is invalid, so the page checks again", () => {
     expect(() => verify({}, newQuestionLanguageReferenceKey())).toThrow("QUESTION_LANGUAGE_CHECK_INVALID");
+  });
+
+  it("CR-5: two API processes of one deployment derive the same key from the same root, and verify each other", () => {
+    const root = Buffer.alloc(32, 9);
+    const first = questionLanguageReferenceKeyFrom(root);
+    const second = questionLanguageReferenceKeyFrom(Buffer.from(root));
+    const shared = signQuestionLanguageReference(first, { ownerScope: "owner:a", site: "ro", questionLine: ORIGINAL, proposed: REWRITE, main: "ro", now: NOW });
+    expect(verifyQuestionLanguageChoice(second, { ownerScope: "owner:a", questionLine: REWRITE, now: NOW,
+      choice: { check_ref: shared, choice: "USE_REWRITE", original_question_line: ORIGINAL } }).main).toBe("ro");
+    expect(first.bytes.equals(root)).toBe(false);
+    expect(questionLanguageReferenceKeyFrom(Buffer.alloc(32, 8)).bytes.equals(first.bytes)).toBe(false);
+    expect(() => questionLanguageReferenceKeyFrom(Buffer.alloc(16, 9))).toThrow("QUESTION_LANGUAGE_REFERENCE_ROOT_INVALID");
   });
 
   it("carries hashes and codes only, never question text", () => {
@@ -1897,14 +2022,14 @@ Run: `pnpm exec vitest run tests/unit/question-language-reference.test.ts`
 - [ ] **Step 3: Implement** `apps/api/src/question-language/reference.ts`:
 
 ```ts
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, hkdfSync, randomBytes, timingSafeEqual } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
 
 /**
  * The check reference (question-language spec 2026-10-13, "The server decides"; plan decision D2). It is a stateless
  * signed token. It binds the person, the question, the server's own rewrite and the checked language. It never
- * carries a language or text the page could choose. The key lives in this API process only: a restart or another
- * process makes old references invalid, and the page then checks again.
+ * carries a language or text the page could choose. Ruling CR-5: the API's key is derived from its existing
+ * blind-index key, so every API process of one deployment shares it and a restart keeps references valid.
  */
 export type QuestionLanguageReferenceKey = Readonly<{ bytes: Buffer }>;
 export type QuestionLanguageChoice = Readonly<{ check_ref: string; choice: "USE_REWRITE" | "KEEP_MINE"; original_question_line?: string }>;
@@ -1921,6 +2046,18 @@ const refuse = (code: "QUESTION_LANGUAGE_CHECK_INVALID" | "QUESTION_LANGUAGE_CHE
 const mac = (key: QuestionLanguageReferenceKey, payloadPart: string): Buffer =>
   createHmac("sha256", key.bytes).update(`debateai:question-language-ref:v1\0${payloadPart}`, "utf8").digest();
 
+/**
+ * CR-5: HKDF-SHA-256 over a server secret the API already loads (the blind-index key, as SocialAuthService derives its
+ * flow key), with this purpose's own salt and label, so the root is never itself the HMAC key and no other purpose's
+ * key equals this one.
+ */
+export function questionLanguageReferenceKeyFrom(root: Uint8Array): QuestionLanguageReferenceKey {
+  if (root.byteLength < 32) throw new TypedDomainError("QUESTION_LANGUAGE_REFERENCE_ROOT_INVALID", "QUESTION_LANGUAGE_REFERENCE_ROOT_INVALID");
+  return Object.freeze({ bytes: Buffer.from(hkdfSync("sha256", root, Buffer.from("debateai:question-language:v1"),
+    Buffer.from("question-language-check-v1"), 32)) });
+}
+
+/** A per-process key: the practice tool (one process) and tests only. */
 export function newQuestionLanguageReferenceKey(): QuestionLanguageReferenceKey {
   return Object.freeze({ bytes: randomBytes(32) });
 }
@@ -1977,7 +2114,7 @@ Run: `pnpm exec vitest run tests/unit/question-language-reference.test.ts`
 
 ```bash
 git add apps/api/src/question-language/reference.ts tests/unit/question-language-reference.test.ts tests/support/shipped-corpus.manifest.txt
-git commit -m "API: the question-language check reference — signed, fifteen minutes, bound to the person, the question and the server's rewrite
+git commit -m "API: the question-language check reference — key derived from the blind-index key, signed, fifteen minutes, bound to the person, the question and the server's rewrite
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -2234,6 +2371,20 @@ describe("the question-language decider (question-language spec 2026-10-13)", ()
       ownerScope: "owner:b" })).rejects.toThrow("QUESTION_LANGUAGE_CHECK_INVALID");
   });
 
+  it("CR-5: a second offer for the same person and question within 15 minutes is the fallback lock, never a second pop-up", async () => {
+    let now = NOW;
+    const fast = fastSaying({ kind: "MIX", main: { code: "ro", name: "Romanian" }, seen: [{ code: "ro", name: "Romanian" }, { code: "en", name: "English" }], proposed: REWRITE });
+    const decider = new QuestionLanguageDecider({ eld: eldSaying({ code: "ro", reliable: false, letters: 30 }), fastCheck: fast.check,
+      key: newQuestionLanguageReferenceKey(), clock: () => now, maxQuestionBytes: 8192 });
+    const ask = { ask: askOf(MIX_Q, { site_language: "ro" }), ownerScope: "owner:a" };
+    await expect(decider.decide(ask)).rejects.toBeInstanceOf(QuestionLanguageChoiceNeeded);
+    now = new Date(NOW.getTime() + 14 * 60_000);
+    expect(await decider.decide(ask)).toMatchObject({ language: { code: "ro" }, source: "REPEAT_OFFER", rewriteAccepted: false });
+    await expect(decider.decide({ ...ask, ownerScope: "owner:b" })).rejects.toBeInstanceOf(QuestionLanguageChoiceNeeded);
+    now = new Date(NOW.getTime() + 30 * 60_000);
+    await expect(decider.decide(ask)).rejects.toBeInstanceOf(QuestionLanguageChoiceNeeded);
+  });
+
   it("no paid AI (local): eld or the site language, no offer even for a mix", async () => {
     const lock = await deciderWith(eldSaying({ code: null, reliable: false, letters: 0 }), null)
       .decide({ ask: askOf(MIX_Q, { site_language: "ro" }), ownerScope: "owner:a" });
@@ -2272,6 +2423,7 @@ Run: `pnpm exec vitest run tests/unit/question-language-decider.test.ts`
 
 ```ts
 import type { AskRequest, QuestionLanguageOffer } from "@debateai/contract";
+import { createHash } from "node:crypto";
 import { TypedDomainError, detectArgumentLanguage, questionLanguageOf, type QuestionLanguage } from "@debateai/kernel";
 import { decideAfterFast, eldSettles, fallbackLock, type LockSource } from "./decide.js";
 import type { EldReader } from "./eld.js";
@@ -2313,7 +2465,13 @@ const fastTrace = (reading: FastCheckReading): QuestionLanguageTrace["fast"] => 
   ? Object.freeze({ outcome: "DOWN", reason: reading.reason, main: null })
   : Object.freeze({ outcome: reading.kind, reason: null, main: reading.main.code });
 
+/** CR-5: how long an offer is remembered (the reference's own life) and how many are kept at most (oldest dropped first). */
+const OFFER_MEMORY = Object.freeze({ ms: 15 * 60_000, entries: 10_000 });
+
 export class QuestionLanguageDecider implements QuestionLanguagePort {
+  /** CR-5: offers made, by hash of person and question (never the text), with when each expires. */
+  readonly #offered = new Map<string, number>();
+
   constructor(private readonly deps: Readonly<{ eld: EldReader; fastCheck: FastCheck | null; key: QuestionLanguageReferenceKey;
     clock: () => Date; maxQuestionBytes: number; onDecided?: (outcome: QuestionLanguageLock | QuestionLanguageChoiceNeeded) => void }>) {}
 
@@ -2343,6 +2501,18 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
     const trace = Object.freeze({ eld, fast: fastTrace(fast), contractHash: this.deps.fastCheck.contractHash });
     const decision = decideAfterFast(site, reading, fast, questionLine, this.deps.maxQuestionBytes);
     if (decision.kind === "LOCK") return this.#done(Object.freeze({ ...base, language: decision.language, source: decision.source, trace }));
+    // CR-5: the same person, the same question, an offer still alive: never a second pop-up; the fallback lock instead.
+    const offerKey = createHash("sha256").update(`${input.ownerScope}\0${questionLine.trim()}`, "utf8").digest("hex");
+    const nowMs = this.deps.clock().getTime();
+    const alive = this.#offered.get(offerKey);
+    if (alive !== undefined && alive > nowMs) {
+      const fallback = fallbackLock(site, reading, questionLine, false);
+      if (fallback.kind !== "LOCK") throw new TypedDomainError("QUESTION_LANGUAGE_DECISION_INVALID", "QUESTION_LANGUAGE_DECISION_INVALID");
+      return this.#done(Object.freeze({ ...base, language: fallback.language, source: "REPEAT_OFFER", trace }));
+    }
+    this.#offered.delete(offerKey);
+    this.#offered.set(offerKey, nowMs + OFFER_MEMORY.ms);
+    while (this.#offered.size > OFFER_MEMORY.entries) this.#offered.delete(this.#offered.keys().next().value!);
     const checkRef = signQuestionLanguageReference(this.deps.key, { ownerScope: input.ownerScope, site: site.code, questionLine,
       proposed: decision.proposed, main: decision.main.code, now: this.deps.clock() });
     const needed = new QuestionLanguageChoiceNeeded(Object.freeze({ check_ref: checkRef,
@@ -2587,6 +2757,8 @@ Run: `pnpm exec vitest run tests/unit/question-language-submit.test.ts`
 
 - [ ] **Step 4: Run and expect PASS**
 
+Ruling CR-1 (checked in Task 0 Step 4): extend the case "an offer starts no run and nothing else is asked" so it also proves the offer touches neither the person's debate allowance nor money: spy on every port `submit` reads for them after the language step (find them with `grep -n "allowance\|billing\|admission" apps/api/src/index.ts` inside `submit`, for example the billing hold and the person-allowance source) and assert none was called. The route's request limiter (`admitOrRefuse(reply, "asks", …)`) is charged before `submit` and is the only charge the offer request makes; that is accepted by CR-1.
+
 Run, one after another:
 - `pnpm exec vitest run tests/unit/question-language-submit.test.ts`
 - `pnpm exec vitest run tests/unit/debate-shape-submit.test.ts`
@@ -2627,7 +2799,7 @@ export type QuestionLanguagePaidRoute =
   | Readonly<{ kind: "NONE" }>;
 export function assertQuestionLanguagePolicyBootable(policy: QuestionLanguagePolicy, route: QuestionLanguagePaidRoute): void;
 export async function composeQuestionLanguage(input: Readonly<{ policy: QuestionLanguagePolicy | null; route: QuestionLanguagePaidRoute;
-  clock: () => Date; maxQuestionBytes: number }>): Promise<QuestionLanguageDecider>;
+  clock: () => Date; maxQuestionBytes: number; referenceKey: QuestionLanguageReferenceKey }>): Promise<QuestionLanguageDecider>;
 ```
 
 - [ ] **Step 1: Write the failing test** `tests/unit/question-language-boot.test.ts`:
@@ -2636,6 +2808,7 @@ export async function composeQuestionLanguage(input: Readonly<{ policy: Question
 import { describe, expect, it } from "vitest";
 import { questionLanguagePolicyStartValues } from "@debateai/register";
 import { assertQuestionLanguagePolicyBootable, composeQuestionLanguage } from "../../apps/api/src/question-language/boot.js";
+import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
 
 const start = questionLanguagePolicyStartValues();
 const previewRoute = { kind: "PREVIEW" as const, fetch: (async () => new Response("{}", { status: 500 })) as typeof fetch };
@@ -2657,14 +2830,14 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
 
   it("with no paid route, or the check switched off, the decider is built without a fast check (eld + site language)", async () => {
     for (const [policy, route] of [[start, { kind: "NONE" as const }], [{ ...start, fastCheck: null }, previewRoute]] as const) {
-      const decider = await composeQuestionLanguage({ policy, route, clock: () => new Date(), maxQuestionBytes: 8192 });
+      const decider = await composeQuestionLanguage({ policy, route, clock: () => new Date(), maxQuestionBytes: 8192, referenceKey: newQuestionLanguageReferenceKey() });
       const lock = await decider.decide({ ask: { question_line: "Ar trebui România să adopte euro, or should it wait until wages catch up?", site_language: "ro" } as never, ownerScope: "owner:a" });
       expect(lock.source === "LOCAL_SITE" || lock.source === "LOCAL_ELD" || lock.source === "ELD_SITE").toBe(true);
     }
   });
 
   it("the preview route: a failing gate is the fallback, never a refusal of the ask", async () => {
-    const decider = await composeQuestionLanguage({ policy: null, route: previewRoute, clock: () => new Date(), maxQuestionBytes: 8192 });
+    const decider = await composeQuestionLanguage({ policy: null, route: previewRoute, clock: () => new Date(), maxQuestionBytes: 8192, referenceKey: newQuestionLanguageReferenceKey() });
     const lock = await decider.decide({ ask: { question_line: "Ar trebui România să adopte euro, or should it wait until wages catch up?", site_language: "ro" } as never, ownerScope: "owner:a" });
     expect(["FALLBACK_SITE", "FALLBACK_ELD", "ELD_SITE"]).toContain(lock.source);
   });
@@ -2685,13 +2858,14 @@ import { QuestionLanguageDecider } from "./decider.js";
 import { loadEldReader } from "./eld.js";
 import { ELD_TUNING } from "./eld-tuning.js";
 import { assertQuestionLanguageInstructionFrameable, createFastCheck, type FastCheck } from "./fast-check.js";
-import { newQuestionLanguageReferenceKey } from "./reference.js";
+import type { QuestionLanguageReferenceKey } from "./reference.js";
 import { anthropicFastCheckTransport, type FastCheckUsage } from "./transport.js";
 
 /**
  * How a fast check may be paid for, decided once at boot:
  *  - PREVIEW: the guarded fetch, a site cost in the Anthropic gate's daily pot;
- *  - HOSTED: the support target's Anthropic key, with the run-less spend record (Task 19);
+ *  - HOSTED: the existing support target's Anthropic key, with the run-less spend record (Task 19);
+ * nothing else (ruling CR-6): the API gets no new vendor credential, and on the preview it holds none.
  *  - NONE: local mode with no paid AI. eld and the site language decide, and no rewrite is offered.
  */
 export type QuestionLanguagePaidRoute =
@@ -2710,7 +2884,7 @@ export function assertQuestionLanguagePolicyBootable(policy: QuestionLanguagePol
 }
 
 export async function composeQuestionLanguage(input: Readonly<{ policy: QuestionLanguagePolicy | null; route: QuestionLanguagePaidRoute;
-  clock: () => Date; maxQuestionBytes: number }>): Promise<QuestionLanguageDecider> {
+  clock: () => Date; maxQuestionBytes: number; referenceKey: QuestionLanguageReferenceKey }>): Promise<QuestionLanguageDecider> {
   const policy = input.policy ?? questionLanguagePolicyStartValues();
   assertQuestionLanguagePolicyBootable(policy, input.route);
   const eld = await loadEldReader(ELD_TUNING.database);
@@ -2722,24 +2896,26 @@ export async function composeQuestionLanguage(input: Readonly<{ policy: Question
         settings: policy.fastCheck, onUsage: input.route.recordSpend });
     fastCheck = createFastCheck({ transport, instruction: policy.instruction, timeoutMs: policy.fastCheck.timeoutMs });
   }
-  return new QuestionLanguageDecider({ eld, fastCheck, key: newQuestionLanguageReferenceKey(), clock: input.clock, maxQuestionBytes: input.maxQuestionBytes });
+  return new QuestionLanguageDecider({ eld, fastCheck, key: input.referenceKey, clock: input.clock, maxQuestionBytes: input.maxQuestionBytes });
 }
 ```
 
 Check the exact field names on `PreviewModelRow` (`provider`, `efforts`) in `packages/providers/src/preview-models.ts`, and adapt if they differ. Add the file to the manifest.
 
-`apps/api/src/main.ts`, right after `const debateShapePolicy = await boot.run("debate-shape-policy", …)`:
+`apps/api/src/main.ts`, right after P2b's `const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);` (the line after `const debateShapePolicy = await boot.run("debate-shape-policy", …)`; a row switched off with `enabled: false` is no row here, so no decider is built). Import `questionLanguageReferenceKeyFrom` from `./question-language/reference.js`; `blindIndexKey` is already loaded above (CR-5):
 
 ```ts
   // Question language (spec 2026-10-13): only with the debate shape row. The row is optional (absent = start values);
   // a malformed row, an owner text carrying a frame token, or an unreviewed preview model refuses the boot.
-  const questionLanguage = debateShapePolicy === null ? undefined : await boot.run("question-language", async () => composeQuestionLanguage({
+  const questionLanguage = debateShapeInForcePolicy === null ? undefined : await boot.run("question-language", async () => composeQuestionLanguage({
     policy: await readQuestionLanguagePolicy(pool, environment.REGISTER_VERSION),
     route: previewFetch !== undefined && previewConfig !== undefined && previewProviderSocket(previewConfig, "anthropic") !== undefined
       ? { kind: "PREVIEW", fetch: previewFetch }
       : await hostedQuestionLanguageRoute(/* see below */),
     clock: () => new Date(),
-    maxQuestionBytes: ASK_QUESTION_MAX_BYTES
+    maxQuestionBytes: ASK_QUESTION_MAX_BYTES,
+    // CR-5: one key for every API process of this deployment, derived from the blind-index key loaded above.
+    referenceKey: questionLanguageReferenceKeyFrom(blindIndexKey)
   }));
 ```
 
@@ -2752,7 +2928,7 @@ Then spread `...(questionLanguage === undefined ? {} : { questionLanguage })` in
 
 Only then does it return `{ kind: "HOSTED", credential, recordSpend }`. Until Task 19 lands, it returns `{ kind: "NONE" }` unconditionally, with a `// Task 19` comment. Read the support target's fields from `apps/api/src/support/model.ts` (`parseSupportModelTargetJson`); never read a key from anywhere else.
 
-`tools/preview-practice/practice-ask-composition.ts`: compose the same way. The route is `{ kind: "PREVIEW", fetch: <the practice's guarded fetch> }` when the practice runs against the gates, and `{ kind: "NONE" }` in `--dry`. Pass it into the same settings object. Also add an optional `onQuestionLanguage?: (outcome) => void` composition argument wired to the decider's `onDecided`, so P2d's report can record each lock or offer.
+`tools/preview-practice/practice-ask-composition.ts`: compose the same way. The route is `{ kind: "PREVIEW", fetch: <the practice's guarded fetch> }` when the practice runs against the gates, and `{ kind: "NONE" }` in `--dry`. Its `referenceKey` is `newQuestionLanguageReferenceKey()` (one process; the practice loads no blind-index key). Pass it into the same settings object. Also add an optional `onQuestionLanguage?: (outcome) => void` composition argument wired to the decider's `onDecided`, so P2d's report can record each lock or offer.
 
 Publishers: copy every `debateShapePolicy` line P2a Task 10 added in `publish-register-v2.ts` and `hosted-register-publish.ts`, with `questionLanguagePolicy`, `questionLanguagePolicyRow`, `parseQuestionLanguagePolicy` and the refusal `HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID`. Copy the matching test cases too.
 
@@ -2939,104 +3115,105 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 14: The mark `LANGUAGE_PLANNER_DISAGREES` (measurement only), mid-list, with its typed record and label
+### Task 14: The record `LANGUAGE_PLANNER_DISAGREES` — an operator-only map note, never a condition mark
+
+Ruling CR-3 (amendment 2026-10-13): the planner's disagreement is measurement only and never reaches people — not the
+honesty drawer, not the story, not any page (rule: no engine internals in user-facing text). The kernel's condition marks
+have no operator-only kind (every one is shown with a label), so this record is NOT added to `CONDITION_MARKS`. It is a
+map NOTE, the map's existing operator channel: `MAP_NOTES` already holds `LIST_REASSIGNED`, `GAP_SKIPPED` and the
+rest. Notes travel inside the map result, which P2b stores with the run's map choice (`core.map_choice` content, encrypted
+with the run's content) and reads back with `readMapResultForRun`; P2b's `mapConditionRecords` converts marks only,
+never notes, and P2b's `MapChoiceRecord` (what pages read) carries no notes. The practice report (P2d) and operators
+read it. So: no kernel, serve, label, locale or pin edit; `CONDITION_MARKS` stays at P2b's 46 and `DEBATE_SHAPE_MARKS`
+at eight.
 
 **Files:**
-- Modify:
-  - `packages/kernel/src/index.ts` (`CONDITION_MARKS`: insert after `"SCRUTINY-EXTENDED"`; append to `DEBATE_SHAPE_MARKS`);
-  - `packages/serve/src/index.ts` (`REQUIRED_CONDITION_MARK_RECORDS` += the mark);
-  - `apps/ui/lib/v3/labels.ts` (`conditionMarkLabel` case), `apps/ui/lib/report/reportModel.ts` (`pointNote` returns `null` for it);
-  - `apps/ui/messages/*/debateChrome.json` (key `debateChrome.condition.languagePlannerDisagrees`, all 35 locales);
-  - `packages/map/src/types.ts` (`MAP_MARKS` += the mark).
-- Modify pins: every pin P2b Task 3 bumped to 46 becomes 47 (`tests/unit/debate-shape-marks.test.ts`, `tests/unit/a16-backup-model-used-mark.test.ts`, `tests/unit/s14-live-projections.test.ts`, `tests/unit/dr174-resilience.test.ts`, `tests/unit/obs-l2-s02-registry.test.ts`, the `acceptance/grok-relay.ts` comment). Find them with `grep -rn "46" tests/unit/debate-shape-marks.test.ts tests/unit/a16-backup-model-used-mark.test.ts tests/unit/s14-live-projections.test.ts tests/unit/dr174-resilience.test.ts tests/unit/obs-l2-s02-registry.test.ts acceptance/grok-relay.ts`.
-- Test: `tests/unit/question-language-mark.test.ts` (create)
+- Modify: `packages/map/src/types.ts` (`MAP_NOTES` += `"LANGUAGE_PLANNER_DISAGREES"`; `MapResult.plannerLanguage`)
+- Modify: `tests/unit/map-orchestrator.test.ts` only if it pins the exact `MAP_NOTES` list (`grep -n "MAP_NOTES" tests/unit/*.ts`)
+- Test: `tests/unit/question-language-planner-note.test.ts` (create)
 
-**Interfaces:** `"LANGUAGE_PLANNER_DISAGREES"` is a `ConditionMark`, a `DebateShapeMark` and a `MapMark`. Its record is answer scope with `affectedNodeIds: []`, and its reason is `LANGUAGE_PLANNER_DISAGREES:<locked code>:<planner code>` (codes only).
+**Interfaces:**
+```ts
+// packages/map/src/types.ts
+export const MAP_NOTES: readonly [..., "LANGUAGE_PLANNER_DISAGREES"];   // appended last
+MapResult.plannerLanguage: string | null;   // what the planner named, as a primary subtag; null when it named nothing usable
+// The record (Task 15 writes it): { note: "LANGUAGE_PLANNER_DISAGREES", step: "ANGLES", detail: "<locked code>:<planner code>" } — codes only
+```
 
-- [ ] **Step 1: Write the failing test** `tests/unit/question-language-mark.test.ts`:
+- [ ] **Step 1: Write the failing test** `tests/unit/question-language-planner-note.test.ts`:
 
 ```ts
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { CONDITION_MARKS, DEBATE_SHAPE_MARKS } from "@debateai/kernel";
-import { MAP_MARKS } from "@debateai/map";
-import { assertRequiredConditionMarkRecords } from "@debateai/serve";
-import { conditionMarkLabel } from "../../apps/ui/lib/v3/labels.js";
+import { MAP_MARKS, MAP_NOTES } from "@debateai/map";
+import { mapConditionRecords } from "../../apps/runner/src/map-stage.js";
 
-const MARK = "LANGUAGE_PLANNER_DISAGREES" as const;
+const RECORD = "LANGUAGE_PLANNER_DISAGREES" as const;
 const LOCALES = readdirSync(new URL("../../apps/ui/messages/", import.meta.url), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
 
-describe("the planner-disagreement mark (question-language spec 2026-10-13, L7)", () => {
-  it("sits right after SCRUTINY-EXTENDED, mid-list, and the DR-176 tail is untouched", () => {
-    expect(CONDITION_MARKS[CONDITION_MARKS.indexOf("SCRUTINY-EXTENDED") + 1]).toBe(MARK);
-    expect(DEBATE_SHAPE_MARKS.at(-1)).toBe(MARK);
-    expect(MAP_MARKS).toContain(MARK);
-    expect(CONDITION_MARKS.slice(-4)).toEqual(["HIDDEN-UNJUDGEABLE", "DERIVED-STANDING-UNREVIEWED", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"]);
-    expect(CONDITION_MARKS).toHaveLength(47);
+describe("the planner-disagreement record is operator-only (question-language spec 2026-10-13, L7; ruling CR-3)", () => {
+  it("is a map note, never a condition mark, a shape mark or a map mark; the kernel's list keeps P2b's 46", () => {
+    expect(MAP_NOTES).toContain(RECORD);
+    expect(CONDITION_MARKS as readonly string[]).not.toContain(RECORD);
+    expect(DEBATE_SHAPE_MARKS as readonly string[]).not.toContain(RECORD);
+    expect(MAP_MARKS as readonly string[]).not.toContain(RECORD);
+    expect(CONDITION_MARKS).toHaveLength(46);
   });
 
-  it("requires its typed record both ways", () => {
-    const record = Object.freeze({ mark: MARK, scope: "answer" as const, subjectRef: "run-1", reason: `${MARK}:ro:fr`,
-      liftPath: null, servedRootRule: null, affectedNodeIds: [] });
-    expect(() => assertRequiredConditionMarkRecords([MARK], [])).toThrow(/CONDITION_MARK_RECORD_REQUIRED/u);
-    expect(() => assertRequiredConditionMarkRecords([], [record])).toThrow(/CONDITION_MARK_RECORD_WITHOUT_MARK/u);
-    expect(() => assertRequiredConditionMarkRecords([MARK], [record])).not.toThrow();
+  it("never becomes a condition record on the answer", () => {
+    const records = mapConditionRecords({ marks: [], notes: [{ note: RECORD, step: "ANGLES", detail: "ro:fr" }] } as never, "run-1");
+    expect(records).toEqual([]);
   });
 
-  it("has a plain label with no internals, in every locale", () => {
-    expect(conditionMarkLabel(MARK)).toBe("One AI read the question's language differently; the debate stayed in the language set at the start");
+  it("has no label and no text in any locale (nothing to show)", () => {
     for (const locale of LOCALES) {
-      const catalog = JSON.parse(readFileSync(new URL(`../../apps/ui/messages/${locale}/debateChrome.json`, import.meta.url), "utf8"));
-      const text = catalog["debateChrome.condition.languagePlannerDisagrees"] ?? catalog.debateChrome?.condition?.languagePlannerDisagrees;
-      expect(typeof text === "string" && text.trim() !== "", locale).toBe(true);
-      expect(text, locale).not.toMatch(/\d|planner|threshold|mark|LANGUAGE_/u);
+      const text = readFileSync(new URL(`../../apps/ui/messages/${locale}/debateChrome.json`, import.meta.url), "utf8");
+      expect(text, locale).not.toMatch(/languagePlannerDisagrees|LANGUAGE_PLANNER_DISAGREES/u);
     }
   });
 });
 ```
 
-Read one `debateChrome.json` first to see whether keys are flat (`"debateChrome.condition.x"`) or nested, and keep only the matching lookup in the test.
-
 - [ ] **Step 2: Run it and expect FAIL**
 
-Run: `pnpm exec vitest run tests/unit/question-language-mark.test.ts`
+Run: `pnpm exec vitest run tests/unit/question-language-planner-note.test.ts`
+
+Expected: FAIL (the note is not in `MAP_NOTES` yet).
 
 - [ ] **Step 3: Implement**
-1. **`packages/kernel/src/index.ts`:**
-   - right after the line `"SCRUTINY-EXTENDED",` in `CONDITION_MARKS`, add the comment `// Question language (spec 2026-10-13, L7): the angle planner named another language than the lock; measurement only, never acted on.` and then the line `"LANGUAGE_PLANNER_DISAGREES",`;
-   - append `"LANGUAGE_PLANNER_DISAGREES"` as the last element of `DEBATE_SHAPE_MARKS`.
-2. **`packages/serve/src/index.ts`:** append the string to `REQUIRED_CONDITION_MARK_RECORDS` with the comment `// Question language: the planner's disagreement always carries its record (answer scope, codes only).` (`ConditionMarkRecord["mark"]` already includes `DebateShapeMark`).
-3. **`packages/map/src/types.ts`:** append `"LANGUAGE_PLANNER_DISAGREES"` to `MAP_MARKS`.
-4. **`apps/ui/lib/v3/labels.ts`:** after the `"SCRUTINY-EXTENDED"` case, add `case "LANGUAGE_PLANNER_DISAGREES": return t(catalog, "debateChrome.condition.languagePlannerDisagrees");`.
-5. **`apps/ui/lib/report/reportModel.ts`:** in `pointNote`, return `null` for it beside the map marks.
-6. **`apps/ui/messages/en/debateChrome.json`:** add `"…languagePlannerDisagrees": "One AI read the question's language differently; the debate stayed in the language set at the start"` (wording option 1; options 2–3 are in Owner steps). Add `ro`: `"Un AI a citit altfel limba întrebării; dezbaterea a rămas în limba stabilită la început"`.
-7. **The 33 other locales:** one Haiku worker (effort `xhigh`, foreground) per P2c Task 10 language group. Each gets the English and Romanian texts, the meaning ("one of the AIs thought the question was written in a different language; the debate continued in the language chosen when it started"), the rules "plain words, no numbers, no engine words, polite register of the catalogue", and writes one packet file inside `$(git rev-parse --absolute-git-dir)/p2l-translations`. Then one Opus (effort `high`) spot-check of mt, ga, et, lv, lt, ar, he, hi, ja, zh, ko. Merge the packets into the catalogues; the packets are never committed.
-8. **Pins:** 46 → 47 in the files listed above. Do not touch any `slice(-4)` expectation.
+
+`packages/map/src/types.ts`:
+- append `"LANGUAGE_PLANNER_DISAGREES"` as the LAST element of `MAP_NOTES`, with the comment
+  `// Question language (spec 2026-10-13, L7; ruling CR-3): the angle planner named another language than the lock. Measurement only, for operators: never a condition mark, never shown, never acted on.`;
+- add `plannerLanguage: string | null;` to `MapResult`, after `stoppedBy` (P2b), with the doc comment
+  `/** What the angle planner named in question_language, as a primary subtag; null when it named nothing usable (operators only). */`.
+  Every place that builds a `MapResult` sets it (Task 15 sets the real value; give every other return path `null`).
+
+If a test pins the exact `MAP_NOTES` list, append the new note there too. Nothing else changes: no kernel, serve, UI,
+locale or pin file (P2b's 46 stays).
 
 - [ ] **Step 4: Run and expect PASS**
 
 Run, one after another:
-- `pnpm exec vitest run tests/unit/question-language-mark.test.ts`
-- `pnpm exec vitest run tests/unit/debate-shape-marks.test.ts`
-- `pnpm exec vitest run tests/unit/a16-backup-model-used-mark.test.ts`
-- `pnpm exec vitest run tests/unit/s14-live-projections.test.ts`
-- `pnpm exec vitest run tests/unit/dr174-resilience.test.ts`
-- `pnpm exec vitest run tests/unit/obs-l2-s02-registry.test.ts`
-
-Then run the UI catalogue checks for debateChrome: `node apps/ui/scripts/run-node-tests.mjs` only if it accepts one file. Otherwise run `node --test apps/ui/lib/i18n/catalog.test.mjs`.
+- `pnpm exec vitest run tests/unit/question-language-planner-note.test.ts`
+- `pnpm exec vitest run tests/unit/map-orchestrator.test.ts`
+- `pnpm exec vitest run tests/unit/debate-shape-marks.test.ts` (P2b's 46 marks, unchanged)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/kernel/src/index.ts packages/serve/src/index.ts packages/map/src/types.ts apps/ui/lib/v3/labels.ts apps/ui/lib/report/reportModel.ts apps/ui/messages acceptance/grok-relay.ts tests/unit/question-language-mark.test.ts tests/unit/debate-shape-marks.test.ts tests/unit/a16-backup-model-used-mark.test.ts tests/unit/s14-live-projections.test.ts tests/unit/dr174-resilience.test.ts tests/unit/obs-l2-s02-registry.test.ts
-git commit -m "Kernel: LANGUAGE_PLANNER_DISAGREES mid-list (measurement only) with its typed record and a plain label in every locale
+git add packages/map/src/types.ts tests/unit/question-language-planner-note.test.ts
+git commit -m "Map: LANGUAGE_PLANNER_DISAGREES is an operator-only map note (never a condition mark) and MapResult.plannerLanguage
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
+Also `git add tests/unit/map-orchestrator.test.ts` if Step 3 touched it.
+
 ---
 
-### Task 15: The map speaks the locked language; the planner names the language FIRST; a disagreement is one record
+### Task 15: The map speaks the locked language; the planner names the language FIRST; a disagreement is one operator-only note
 
 The map only runs in shape runs (and Phase 1's `openings` practice, whose questions carry fixed `ro`/`en` tags). So the map switches to the locked form for every call, keyed on its context's tag. A tag of `"und"` keeps today's directive and expectation, which can happen only in old practice data.
 
@@ -3045,8 +3222,7 @@ The map only runs in shape runs (and Phase 1's `openings` practice, whose questi
   - `packages/map/src/prompts.ts`: `MAP_DEFAULT_INSTRUCTIONS.angles` gains one sentence; `MAP_ANSWER_FORMS.angles` gains the first field; `mapContractInLanguage` takes the language.
   - `packages/map/src/specs.ts`: `mapSpecOf` appends the field and uses the locked language.
   - `packages/map/src/replies.ts`: `mapAnglesReplySchema` gains an optional `question_language`.
-  - `packages/map/src/orchestrator.ts`: `replyLanguage` from the lock; the planner comparison.
-  - `packages/map/src/types.ts`: `MapResult.plannerLanguage`.
+  - `packages/map/src/orchestrator.ts`: `replyLanguage` from the lock; the planner comparison and its note (Task 14 added the note and `MapResult.plannerLanguage`).
 - Modify tests whose scripted ANGLES replies or hash pins change: `grep -rln "mapPromptContractHash\|map.angles.v1" tests` lists them. A hash pin is re-pinned to the new printed value. A scripted reply needs no change (the field is optional).
 - Test: `tests/unit/map-question-language.test.ts` (create)
 
@@ -3055,8 +3231,8 @@ The map only runs in shape runs (and Phase 1's `openings` practice, whose questi
 // packages/map
 export function mapLockedLanguage(ctx: Pick<MapSpecContext, "languageTag" | "languageName">): QuestionLanguage | null; // null for "und"
 export function mapContractInLanguage(contract: PromptContract, language: QuestionLanguage | null, languageName: string): PromptContract;
-MapResult.plannerLanguage: string | null;   // what the planner named, normalised to its primary subtag; null when absent
-// MapMarkRecord { mark: "LANGUAGE_PLANNER_DISAGREES", step: "ANGLES", detail: "<locked>:<planner>" }
+MapResult.plannerLanguage: string | null;   // (Task 14) what the planner named, normalised to its primary subtag; null when absent
+// MapNoteRecord { note: "LANGUAGE_PLANNER_DISAGREES", step: "ANGLES", detail: "<locked>:<planner>" } — a NOTE (CR-3), never a mark
 ```
 
 - [ ] **Step 1: Write the failing test** `tests/unit/map-question-language.test.ts`:
@@ -3094,7 +3270,7 @@ describe("the map in the locked language (question-language spec 2026-10-13, L6,
     expect(mapPromptContractHash()).toMatch(/^[0-9a-f]{64}$/u);
   });
 
-  it("a planner that names another language is ONE record, and every later call stays in the locked language", async () => {
+  it("a planner that names another language is ONE operator-only note (no mark), and every later call stays in the locked language", async () => {
     const seen: MapCallRequest<unknown>[] = [];
     const caller: MapCaller = { call: async <T>(request: MapCallRequest<T>): Promise<MapCallOutcome<T>> => {
       seen.push(request as MapCallRequest<unknown>);
@@ -3105,19 +3281,20 @@ describe("the map in the locked language (question-language spec 2026-10-13, L6,
     const result = await runMapArm("C", { ...RO_CTX, seats: [{ aiRef: "a", maker: "ma" }, { aiRef: "b", maker: "mb" }], caller, seed: "q1",
       gapRoundsMax: 1, maxAnswers: 2, pointsPerAnswer: 2 } as never);
     expect(result.plannerLanguage).toBe("fr");
-    expect(result.marks.filter((mark) => mark.mark === "LANGUAGE_PLANNER_DISAGREES")).toEqual([
-      { mark: "LANGUAGE_PLANNER_DISAGREES", step: "ANGLES", detail: "ro:fr" }]);
+    expect(result.notes.filter((note) => note.note === "LANGUAGE_PLANNER_DISAGREES")).toEqual([
+      { note: "LANGUAGE_PLANNER_DISAGREES", step: "ANGLES", detail: "ro:fr" }]);
+    expect(result.marks.some((mark) => (mark.mark as string) === "LANGUAGE_PLANNER_DISAGREES")).toBe(false);
     for (const request of seen.slice(1)) expect(request.spec.contract.instruction).toContain("in Romanian, the language this debate was set to");
   });
 
-  it("the same language, a regional form, 'unknown' or nothing: no record", async () => {
+  it("the same language, a regional form, 'unknown' or nothing: no note", async () => {
     for (const named of ["ro", "ro-RO", "unknown", undefined]) {
       const caller: MapCaller = { call: async <T>(request: MapCallRequest<T>): Promise<MapCallOutcome<T>> => request.step === "ANGLES"
         ? { kind: "OK", value: request.spec.read(ANGLES(named)) } as MapCallOutcome<T>
         : { kind: "FAILED", code: "TEST_STOP" } as MapCallOutcome<T> };
       const result = await runMapArm("C", { ...RO_CTX, seats: [{ aiRef: "a", maker: "ma" }, { aiRef: "b", maker: "mb" }], caller, seed: "q1",
         gapRoundsMax: 1, maxAnswers: 2, pointsPerAnswer: 2 } as never);
-      expect(result.marks.some((mark) => mark.mark === "LANGUAGE_PLANNER_DISAGREES"), String(named)).toBe(false);
+      expect(result.notes.some((note) => note.note === "LANGUAGE_PLANNER_DISAGREES"), String(named)).toBe(false);
     }
   });
 });
@@ -3152,10 +3329,10 @@ export function mapContractInLanguage(contract: PromptContract, language: Questi
 `packages/map/src/orchestrator.ts`:
 - In the `MapRun` constructor, set `replyLanguage: input.languageTag === "und" ? replyLanguageExpectation(input.questionLine) : lockedReplyLanguageExpectation(questionLanguageFromRun(input.languageTag, input.languageName)!, input.questionLine)`. Keep the R-5 comment and add "(question-language spec 2026-10-13: the lock, never a re-guess)".
 - Where the ANGLES reply is accepted, compute `const named = reply.question_language === undefined ? null : mapPrimarySubtag(reply.question_language);`. Keep `named` when `questionLanguageOf(named) !== null`, else `null`, and set it as the result's `plannerLanguage`.
-- When `named !== null && named !== mapPrimarySubtag(input.languageTag) && input.languageTag !== "und"`, push `{ mark: "LANGUAGE_PLANNER_DISAGREES", step: "ANGLES", detail: `${mapPrimarySubtag(input.languageTag)}:${named}` }` to `marks`. Nothing else reads `named`.
-- `MapResult` (types.ts) gains `plannerLanguage: string | null`, set on every return path (`null` where no planner reply was accepted).
+- When `named !== null && named !== mapPrimarySubtag(input.languageTag) && input.languageTag !== "und"`, record ONE note: `run.mapNote("LANGUAGE_PLANNER_DISAGREES", "ANGLES", `${mapPrimarySubtag(input.languageTag)}:${named}`)` (codes only; ruling CR-3: a note, never a mark). Nothing else reads `named`.
+- Set `MapResult.plannerLanguage` (Task 14) to `named` on every return path after the planner's reply was accepted, and `null` where none was.
 
-P2b's `mapConditionRecords` already converts every mark record (amendment P2b-4). Confirm with `grep -n "mapConditionRecords" -A12 apps/runner/src/map-stage.ts`. The resulting record's `reason` must be `LANGUAGE_PLANNER_DISAGREES:<detail>`. If the function lists marks one by one, add this one the same way.
+P2b's `mapConditionRecords` converts marks only (P2b amendment 2026-10-13, P2L amendment 4), so the note never reaches the answer. Confirm with `grep -n "result.marks" apps/runner/src/map-stage.ts` (one line, and no `notes` there). Task 14's test pins it.
 
 Print the new map hash and re-pin every test that pins it:
 
@@ -3176,7 +3353,7 @@ Run, one after another:
 
 ```bash
 git add packages/map tests/unit
-git commit -m "Map: every step in the locked language; the angle planner names the language first; a disagreement is one record, never a switch
+git commit -m "Map: every step in the locked language; the angle planner names the language first; a disagreement is one operator-only note, never a switch
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -3407,6 +3584,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
 /* the same next/navigation, AuthGate and SupportWidget mocks as tests/render/sensitive-data-consent.test.tsx */
 
 import { QuestionLanguageChoiceNeededError } from "../../apps/ui/lib/api.js";
+import { ContractHttpError } from "@debateai/contract";
 import NewDebatePageClient from "../../apps/ui/app/new/NewDebatePageClient.js";
 import { catalogsFor } from "../support/newDebateCatalogs.js"; // or inline the loader the consent test uses
 
@@ -3463,6 +3641,21 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
     await act(async () => { button("Keep my wording").click(); });
     expect(createDebate).toHaveBeenLastCalledWith(MIXED, expect.anything(), "test-token", undefined,
       { siteLanguage: "en", choice: { check_ref: "ref.sig", choice: "KEEP_MINE" } });
+  });
+
+  it("CR-5: the pop-up shows at most once per submit; a second offer is answered with the person's own wording", async () => {
+    const SECOND = { ...OFFER, check_ref: "ref2.sig" };
+    createDebate.mockRejectedValueOnce(new QuestionLanguageChoiceNeededError(OFFER))
+      // The client's 409 for a stale reference: codeForStatus (packages/contract/src/client.ts) gives a 409 "SERVER_FAILURE".
+      .mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 409, "QUESTION_LANGUAGE_CHECK_EXPIRED: QUESTION_LANGUAGE_CHECK_EXPIRED", "QUESTION_LANGUAGE_CHECK_EXPIRED"))
+      .mockRejectedValueOnce(new QuestionLanguageChoiceNeededError(SECOND))
+      .mockResolvedValueOnce({ run_ref: "11111111-1111-4111-8111-111111111111", status: "QUEUED" });
+    const { host } = await renderNew("en");
+    await askWith(host, MIXED);
+    await act(async () => { button("Use this version").click(); });
+    expect(document.querySelectorAll('[data-dialog="question-language"]').length).toBe(0);
+    expect(createDebate).toHaveBeenLastCalledWith(MIXED, expect.anything(), "test-token", undefined,
+      { siteLanguage: "en", choice: { check_ref: "ref2.sig", choice: "KEEP_MINE" } });
   });
 
   it("'Edit' and Esc send nothing more and put the person back in the question box", async () => {
@@ -3530,7 +3723,8 @@ In `createDebate`, add the fifth parameter `language?`. When it is given, the bo
     - `"EDIT"`: focus the question textarea and return (the debate is not created; the next submit checks again);
     - `"USE"`: call again with the offer's `proposed_question` and `{ check_ref, choice: "USE_REWRITE", original_question_line: topic.trim() }`;
     - `"KEEP"`: call again with `topic.trim()` and `{ check_ref, choice: "KEEP_MINE" }`;
-  - on `isQuestionLanguageCheckStale(error)` after a choice: call once more with no choice (the server checks again, and may offer again);
+  - on `isQuestionLanguageCheckStale(error)` after a choice: call once more with no choice (the server checks again; a second offer for the same question within 15 minutes is answered by the server with its fallback lock, `REPEAT_OFFER`, ruling CR-5);
+  - ruling CR-5, page side: the pop-up shows at most ONCE per press of "Start debate". If a second offer still arrives in the same submit (an API process that did not see the first offer), the page does not show it: it answers that offer with `{ check_ref: <the new reference>, choice: "KEEP_MINE" }` and the person's own wording;
   - the existing consent refusal branch stays as it is, inside the loop.
 - Keep `buildNewDebateAskConfig` and the config object untouched: `tests/render/ux01-new-debate-form.test.tsx` pins its keys.
 
@@ -3717,9 +3911,10 @@ Print the map hash with `pnpm exec tsx -e 'import {mapPromptContractHash} from "
 5. **Wording picks:**
    - **(a) The pop-up title.** Option 1 «Your question's language / Limba întrebării» (in code); 2 «One language for your question / O singură limbă pentru întrebare»; 3 «Check your question's language / Verifică limba întrebării».
    - **(b) The Romanian body's register.** The spec's text uses «ta» (informal) while the RO catalogue elsewhere uses the polite plural. In code: the spec's informal text, adjusted for filled names (Contract deviation 4).
-   - **(c) The planner-disagreement label.** Option 1 (in code) «One AI read the question's language differently; the debate stayed in the language set at the start»; 2 «An AI named another language for the question; the debate kept its language»; 3 «The question's language was read differently by one AI; nothing changed».
-6. **"Thinking off" for the fast check** (Contract deviation 1) needs a gate change on both sides (TypeScript `anthropicBodyAccepted` and the Python `AnthropicProfile`) with parity fixtures. It is a separate owner-approved task. Until then the check uses effort `low`.
-7. **The Croatian-site default** for Serbian or Bosnian in Latin script, and whether the debate page's existing language strip should show for an L5 question (Owner-visible defaults).
+   - (The planner-disagreement label pick is gone: ruling CR-3 keeps that record operator-only, so it has no user text.)
+6. **"Thinking off" for the fast check** (Contract deviation 1, ruling CR-4). Task 0 Step 5 checks whether both preview gates already accept it for Haiku after the origin/dev merge; if not (the expected result: on origin/dev da35a529b the Haiku menu is high/medium/low), it needs a gate change on both sides (TypeScript `anthropicBodyAccepted` and the Python `AnthropicProfile` in packages/providers/ops/preview_budget_helper.py) with parity fixtures, a separate owner-approved task. Until then the check uses effort `low`.
+7. **Sites that always ask the fast AI** (ruling CR-2): `ga`, `id`, `mt`, `hr` and every site Task 3 measured as confused (`ELD_CONFUSED_SITES`). The controller reports the measured list; the owner may add or remove a site (one constant in `decide.ts`).
+8. **Kept defaults the owner is told about at the end** (ruling CR-7): the Romanian pop-up keeps the owner's informal «ta» text, adjusted for filled names (Contract deviation 4); the debate page's existing language strip (`QuestionLanguageOffer`) stays for an L5 question (another language wholly); weaker reply checking for languages outside our 35 is accepted (Owner-visible defaults). Also: the planner's language disagreement is recorded for operators only (CR-3), and the offer request is charged only on the route's request limiter (CR-1).
 
 ## Self-review: spec → tasks
 
@@ -3736,7 +3931,7 @@ Print the map hash with `pnpm exec tsx -e 'import {mapPromptContractHash} from "
 | The server decides: signed reference binding question, result and choice; endpoint vs first half of POST | D1, D2, 8, 10, 11 |
 | Storing: tag/name in `core.run`; original question + rewrite accepted | D3, 10, 11 |
 | L6 every AI call: field + ONE named sentence (judge, map, story, answer writer, synthesizer/checker) | 1, 13, 15, 16, 17 |
-| L7 planner's FIRST field; `LANGUAGE_PLANNER_DISAGREES` recorded, never acted on, mid-list mark | 14, 15 |
+| L7 planner's FIRST field; `LANGUAGE_PLANNER_DISAGREES` recorded, never acted on — an operator-only map note, never a mark (ruling CR-3) | 14, 15 |
 | `replyLanguageCheck` against the locked code, no re-guess (new shape only) | 1, 13, 15, 16, 17 |
 | Test doubles answer the planner's field; tests set the language on `startRun` | 17 |
 | Site cost in the provider's daily pot (preview) and hosted equivalent | 6, 12, 19 |
@@ -3746,4 +3941,5 @@ Print the map hash with `pnpm exec tsx -e 'import {mapPromptContractHash} from "
 | Contract hash consequences | 13, 15, Owner steps 1 |
 | Row absent = today byte for byte | Global Constraints, 11, 13, 16, 17, 20 |
 | Questions outside the 35 | Owner-visible defaults, 1, 7 |
-| Practice language cases and pass bar | P2d amendments |
+| Practice language cases and pass bar | P2d amendments (applied to P2d, Task 7b) |
+| Controller rulings CR-1..CR-7 | CR-1: D1, 0, 11; CR-2: 3, 7; CR-3: 14, 15; CR-4: 0, 4; CR-5: D2, 8, 10, 12, 18; CR-6: 6, 12; CR-7: Owner steps 8 |

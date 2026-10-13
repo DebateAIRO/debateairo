@@ -26,6 +26,34 @@ All paths are relative to `dialectical-engine/` on branch `feat/2026-10-13-debat
 `.claude/worktrees/debate-shape-p2/dialectical-engine`). P2a is built first (its names are used below as written in
 `2026-10-12-debate-shape-phase2a.md`, including the Cross-plan changes this plan asks of it).
 
+## Amendments 2026-10-13
+
+Applied after P2a's final review (`.superpowers/sdd/2026-10-12-debate-shape-phase2a/final-review.md`, "Names vs
+P2b/P2c/P2d" and "Notes for P2b", plus the ledger NOTES) and for P2L (`2026-10-13-debate-shape-phase2-language.md`,
+"Cross-plan amendments" P2b-1..5, adjusted for its controller ruling CR-3). Every code fact below was checked on
+`feat/2026-10-13-debate-shape-phase2` at 803f58128.
+
+- Cross-plan changes: the P2a items are marked as built; item 2's price type is `MAP_MERGE` / `MAP_CHOOSE` (as built), not `MAP_LONG`; item 5 lists every guard site (final review, M10).
+- Cross-plan P2c-3: P2b ADDS the `@debateai/map` import line to apps/runner/src/index.ts; none exists today (final review).
+- Cross-plan P2d-2: ruling X3 is made (yes): the practice register carries the code's judge, composer and map hashes (ledger ruling X3).
+- New cross-plan block "P2L (question language)": what P2L needs from this plan; P2L's amendment 2 (a ninth mark) is dropped by its ruling CR-3 (P2L).
+- Task 2: keep the branch's `mapWrongLanguage(text, expected: ReplyLanguageExpectation)` (fix R-5) instead of the `detectArgumentLanguage` version; the multilingual test passes an expectation object (P2L amendment 1).
+- Task 3: the mark count stays 46; P2L adds no condition mark (P2L CR-3).
+- Task 6: removes the Phase-2a guard at ALL six sites (runner boot, practice runner, hosted readiness, API boot step `debate-shape-runner-pending`, practice ask, the runner's per-run `refuseDebateShapeReceiptInPhase2a`) with their imports, comments and the tests that pin them (final review I2, ledger NOTE for P2b Task 6).
+- Task 6: the hosted readiness check resolves the shape settings exactly as the runner's boot does, and the dry run's `debate_shape=present` line loses its RUNNER_PENDING text (final review, row P2b:150; M3).
+- Task 6: the v1 kit (`publish-register.ts`, kept unchanged since v2) filters out `mapContractHash` so its 66/65 counts hold (final review, row "v1 kit").
+- Task 6: the preview native operator wires `debateShape` (exactKeys + the sixth argument of `buildPreviewSourceRowsV2`) (ledger NOTE; final review).
+- Task 6: the preview's "no shape" rollback, DECIDED: an optional `enabled` member on the row (absent = on) and `debateShapeInForce(policy)`; the plan choice `debateShape: "off"` republishes the row disabled, like `roleRotation: "off"` (R19 keeps a sealed row forever) (controller decision).
+- Task 6: Free answer-job boot eligibility checks the LARGEST bounds the row allows (writer and map), at the API boot and at the hosted publish (ledger NOTE; final review note 2).
+- Task 6: map step bounds are 8192..32768 (X1); the window note for merge/choose inputs (final review note 2c).
+- Task 6 / Owner steps: do not publish the preview's `mapContractHash` before P2L Task 15 lands (P2L amendment 3).
+- Task 10: the adaptive choice is capped at the points that exist (a test row) (final review note 5).
+- Task 11: the preview estimate charges each gate the largest share its members can take of the panel steps, not an even split (final review note 1); fallback seats are not window-checked: recorded as a known limit (final review note 3).
+- Task 12: `mapConditionRecords` converts every mark the map returns, never a fixed list; map NOTES never become records (P2L amendment 4, CR-3).
+- Task 15: the harness passes the run's language to `startRun` (the scripted `MAP:angles` reply gains `question_language` only in P2L, because today's reader is strict); one measured check that the run made no more nodes and map sites than the receipt priced (P2L amendment 5; final review note 6).
+- Task 17: README rows for the new boot refusals replace RUNNER_PENDING; the runbook line for a malformed shaped unfinished receipt (final review notes 4, 7).
+- Owner steps: the rollback, the P2L publish order, and the open owner questions (Free depth ceiling as a row member) (final review note 8).
+
 ## Global Constraints
 
 - **Row absent = today, byte for byte.** A run whose `parseCostEnvelopeBasis(run.envelopeBasis).shape` is `undefined`
@@ -133,7 +161,7 @@ Five failure modes most likely to ship untested, and where they are caught:
 
 ## Cross-plan changes
 
-**P2a (settings and money) must absorb, in the same build:**
+**P2a (settings and money) — items 1–4 are BUILT (P2a, 2026-10-13); item 5 is this plan's Task 6:**
 
 1. `DebateShapePolicy` gains a top-level member `mapStepBounds: { merge: int 8192..32768, choose: int 8192..32768 }`
    (start values `{ merge: 32768, choose: 32768 }`, ruling R-2; range per controller ruling X1, as P2a built it), parsed
@@ -142,15 +170,17 @@ Five failure modes most likely to ship untested, and where they are caught:
    `mapChooseBound: number` (copied by `resolveDebateShape`); `debateShapeReceiptSchema` gains `map_merge_bound` and
    `map_choose_bound` (ints ≥ 1); `debateShapeReceipt` / `debateShapeOfReceipt` carry them.
 2. The preview estimate (`apps/api/src/preview-budget-estimate.ts`) prices the two sites `MAP:merge` and `MAP:choose`
-   at `max(output.debate, map_merge_bound | map_choose_bound)` output tokens (a new `PreviewCallType` `"MAP_LONG"`; the
-   other map sites stay `DEBATE`). The attempt ceiling and the per-role shares are unchanged.
+   at `max(output.debate, map_merge_bound | map_choose_bound)` output tokens (as built: two `PreviewCallType`s,
+   `"MAP_MERGE"` and `"MAP_CHOOSE"`, apps/api/src/preview-budget-estimate.ts; the other map sites stay `DEBATE`). The
+   attempt ceiling is unchanged; the per-member split of the panel steps is fixed by this plan's Task 11 Step 3b.
 3. Deviation 4's text: a failed list is handed to another seat under **its own key `MAP:list:<i>:2`** (P2b Task 1);
    the `2A + G + 3` formula is unchanged and now exact.
 4. P2a's `PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2` is unchanged; P2b adds `mapContractHash` to the REQUIRED preview list
    `PREVIEW_SOURCE_ROW_KEYS_V2` (P2b Task 6 updates the pins).
-5. P2b deletes `assertDebateShapeRunnerReady`, its call in `apps/runner/src/main.ts`, its test case in
-   `tests/unit/debate-shape-policy.test.ts`, the stand-in export in `tests/integration/obs-l3-s06-runner-binding.test.ts`,
-   and rewrites `tests/unit/debate-shape-runner-boot.test.ts` and the `deploy/vps/register/README.md` sentence (Task 6).
+5. P2b deletes `assertDebateShapeRunnerReady` and the Phase-2a guard at EVERY site P2a put it (six: runner boot,
+   practice runner, hosted readiness, API boot step `debate-shape-runner-pending`, practice ask, and the runner's per-run
+   `refuseDebateShapeReceiptInPhase2a`), with their imports, comments and pinning tests, and rewrites the README rows
+   (Task 6 Step 3b lists each one).
 
 **P2c (what people see) must change:**
 
@@ -161,8 +191,9 @@ Five failure modes most likely to ship untested, and where they are caught:
    `rootNodeId: string | null` (plus `answerId`, `rootIndex`, `maker`, `filled`); `alsoRaised[]` has `claim` and
    `makers` (plus `keyPointId`), most-raised first. P2c's `MapChoiceRecord` port is satisfied structurally.
 3. Task 3 (L758–L941): the variable is **`debateShapeMap: MapResult | null`**, in scope at the story hook
-   (`buildStoryRunSnapshot({`), null when the run has no shape or the map was unavailable. P2b changes the
-   `@debateai/map` import line of `apps/runner/src/index.ts`; P2c adds `storyAlsoRaisedFrom` to it (textual merge).
+   (`buildStoryRunSnapshot({`), null when the run has no shape or the map was unavailable. P2b ADDS an
+   `@debateai/map` import line to `apps/runner/src/index.ts` (none exists today). P2c's `storyAlsoRaisedFrom` lives in
+   `apps/runner/src/story-snapshot.ts`, so P2c imports it from `./story-snapshot.js`, not on P2b's map line.
 4. Labels for the eight new marks (`apps/ui/lib/v3/labels.ts`, `debateChrome.condition.*` in every locale) and the
    `reportModel` `pointNote` cases are P2b's (Task 3); P2c adds none. The opposite-answer template in every site
    language and the synthesizer length sentence are P2b's (Tasks 2, 5).
@@ -177,13 +208,28 @@ Five failure modes most likely to ship untested, and where they are caught:
    and refuses to boot when a `debateShapePolicy` row is present without it. The practice throwaway register version
    must therefore ALSO supersede `judgeContractHash` and `composerContractHash` with the code's values and add
    `mapContractHash = mapPromptContractHash()` (throwaway database only; the copies come from
-   `buildDevelopmentRunnerRegisterRows()`). This is a ruling for the P2d controller; P2b recommends yes.
+   `buildDevelopmentRunnerRegisterRows()`). Ruled YES (controller ruling X3, 2026-10-13); P2d's plan carries it.
 3. The report counts: `SCRUTINY-EXTENDED` is one row per scrutinised node (L1216, L1786: "scrutinised points", not
    "extra exchanges"); `PANEL-CLOSE-CALL-EXTENDED` one row per extended node.
 4. Task 6 (L1547, L1601): P2b's Task 15 already teaches `classifyGateRequest` a `"MAP"` kind (by `MAP_CONTRACT_IDS`)
    and the new judge contracts still classify as `"JUDGE"`; P2d reuses it instead of adding its own.
 5. Reassigned lists use `MAP:list:<i>:2`; `practiceMapStepOf` reads the second segment, so it still counts as `list`.
 6. The migration is `0116_debate_shape_map.sql` (renumbered at merge if the preview applied another 0116).
+
+**P2L (question language) runs after this whole plan and needs from it** (P2L "Cross-plan amendments" P2b-1..5):
+
+1. Task 2 keeps the branch's reply-side `mapWrongLanguage(text, expected: ReplyLanguageExpectation)` (Task 2 below).
+2. P2L adds NO condition mark (its ruling CR-3: the planner's language disagreement is an operator-only map NOTE,
+   `MAP_NOTES` += `"LANGUAGE_PLANNER_DISAGREES"`). `CONDITION_MARKS` stays at this plan's 46, and `DEBATE_SHAPE_MARKS` at
+   eight. P2L's old amendment 2 (a ninth shape mark) is dropped.
+3. The preview's `mapContractHash` is not published before P2L Task 15 lands: P2L changes the angle planner's instruction
+   and answer form, so `mapPromptContractHash()` moves once more (Owner steps 1). Dev registers re-seal by themselves.
+4. `mapConditionRecords(result, runId)` (Task 12) converts every `MapMarkRecord` the result holds, never a fixed list;
+   map notes (`result.notes`) never become condition records.
+5. The shape harness (Task 15) passes `argumentLanguageTag` / `argumentLanguageName` to `startRun` explicitly (default
+   `"en"` / `"English"`). The scripted `MAP:angles` reply does NOT carry `question_language` in this plan: today's
+   `mapAnglesReplySchema` is strict and would refuse it. P2L Task 15 makes the member optional and P2L Task 17 adds it
+   to the scripted reply.
 
 ## File Structure
 
@@ -464,10 +510,11 @@ const SITE_LOCALES = readdirSync(new URL("../../apps/ui/messages/", import.meta.
   .filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
 
 describe("the map in every language", () => {
-  it("compares primary subtags: a ro-RO question accepts Romanian text", () => {
+  it("reads primary subtags, and Romanian text passes a Romanian expectation", () => {
     expect(mapPrimarySubtag("ro-RO")).toBe("ro");
     expect(mapPrimarySubtag("und")).toBe("und");
-    expect(mapWrongLanguage("Autobuzele gratuite ar costa orașul foarte mult în fiecare an.", "ro-RO")).toBe(false);
+    // The branch's reply-side check (fix R-5) takes an expectation, never a tag: the question guesser stays out of the map.
+    expect(mapWrongLanguage("Autobuzele gratuite ar costa orașul foarte mult în fiecare an.", { tag: "ro", script: "Latin" })).toBe(false);
   });
 
   it("keeps the vowel signs of non-Latin scripts and still folds Romanian diacritics", () => {
@@ -519,14 +566,15 @@ export function mapNormaliseText(text: string): string {
   return text.normalize("NFKD").replace(/(\p{Script=Latin})\p{M}+/gu, "$1").normalize("NFC")
     .toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim();
 }
-
-export function mapWrongLanguage(text: string, languageTag: string): boolean {
-  const expected = mapPrimarySubtag(languageTag);
-  if (expected === "und" || text.trim() === "") return false;
-  const detected = detectArgumentLanguage(text);
-  return detected.confidence === "high" && detected.tag !== "und" && mapPrimarySubtag(detected.tag) !== expected;
-}
 ```
+
+**Do NOT change `mapWrongLanguage`** (amendment 2026-10-13, P2L amendment 1). The branch already has
+`mapWrongLanguage(text: string, expected: ReplyLanguageExpectation): boolean`, which asks the kernel's reply-side
+`replyTextLanguageVerdict` and refuses only on `"OTHER"` (fix R-5), and every map check joins a field's texts before
+checking (fix R-3, `mapLanguageIssues` in replies.ts). An earlier draft of this step replaced it with a
+`detectArgumentLanguage` version: that would bring the question guesser back into the map. Keep its body and signature;
+`mapPrimarySubtag` is still added, because the opposite template below uses it. `text.ts` keeps its kernel import line
+as it is (no `detectArgumentLanguage` import).
 
 `packages/map/src/replies.ts` and `keypoints.ts`: wherever two texts are compared by `mapNormaliseText` (the
 `MAP_ANSWER_DUPLICATE` check in `mapChooseCheck`, `mapCodeMerge`'s grouping, `mapAddGapPoints`' match), treat an EMPTY
@@ -593,7 +641,7 @@ Expected: PASS (existing `en`/`ro` template expectations are unchanged).
 
 ```bash
 git add packages/map tests/unit/map-multilingual.test.ts tests/support/shipped-corpus.manifest.txt
-git commit -m "map: primary-subtag language check, non-Latin normalisation, gap guard, opposite template in every site language
+git commit -m "map: primary subtags, non-Latin normalisation, gap guard, opposite template in every site language
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -726,7 +774,8 @@ map marks are answer-level and carry no node; the two extensions are engine deta
 only), added beside the other `return null` answer-level cases.
 
 Pins: bump the CONDITION_MARKS length pins from 38 to 46 in the four tests named above and the comment in
-`acceptance/grok-relay.ts`. Do not touch any `slice(-4)` expectation.
+`acceptance/grok-relay.ts`. Do not touch any `slice(-4)` expectation. 46 is final for Phase 2: P2L adds no condition
+mark (its ruling CR-3 keeps the planner's language disagreement operator-only, as a map note).
 
 - [ ] **Step 4: Run — expect PASS**
 
@@ -1117,11 +1166,19 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Files:**
 - Create: `packages/register/src/map-contract-hash.ts`, `apps/runner/src/debate-shape-boot.ts`, `tests/unit/debate-shape-boot.test.ts`
-- Modify: `packages/register/src/index.ts` (export), `packages/register/src/debate-shape-policy.ts` (delete `assertDebateShapeRunnerReady`)
+- Modify: `packages/register/src/index.ts` (exports), `packages/register/src/debate-shape-policy.ts` (delete `assertDebateShapeRunnerReady`; add the optional `enabled` member, `debateShapeInForce` and `debateShapeLargestBounds`)
 - Modify: `apps/runner/src/dev-deployment-register.ts` (`computeDevelopmentContractRows` emits `mapContractHash`), `apps/runner/package.json` (`"@debateai/map": "workspace:*"`), `tools/orphan-audit/src/index.ts` (apps/runner row gains `"map"`)
-- Modify: `apps/runner/src/main.ts`, `tools/preview-practice/practice-runner-composition.ts`, `apps/runner/src/index.ts` (`WalkingSkeletonSettings.debateShape`)
-- Modify: `deploy/preview-auth-dev/v1/publish-register-v2.ts` (`PREVIEW_SOURCE_ROW_KEYS_V2` += `"mapContractHash"`), `deploy/preview-auth-dev/v1/README.md` ("68 keys")
-- Modify pins: `tests/unit/preview-register-publish-v2.test.ts:63-64,113,147` (67→68 keys, 69→70 rows), `tests/integration/dev-deployment-register.test.ts:749,881` (key lists), `tests/unit/debate-shape-runner-boot.test.ts` (rewritten), `tests/unit/debate-shape-policy.test.ts` (delete the P2a guard case), `tests/integration/obs-l3-s06-runner-binding.test.ts` (~538: stand-in `export function readDebateShapePolicy() {} export function readMapContractHash() {}`), `deploy/vps/register/README.md` (the optional-member sentence)
+- Modify, the SIX Phase-2a guard sites (all removed in this task; amendment 2026-10-13, final review I2):
+  1. `apps/runner/src/main.ts` (the `assertDebateShapeRunnerReady(await readDebateShapePolicy(…))` line, its import, its comment block);
+  2. `tools/preview-practice/practice-runner-composition.ts` (same line, import and comment);
+  3. `apps/runner/src/hosted-register-publish.ts` (`verifyHostedRegisterBootReadiness`: the guard line, its import and comment; and the dry run's `debate_shape=present (… RUNNER_PENDING)` line in `renderHostedRegisterPlan`);
+  4. `apps/api/src/main.ts` (the boot step `boot.runSync("debate-shape-runner-pending", …)`, its import and comment);
+  5. `tools/preview-practice/practice-ask-composition.ts` (`assertDebateShapeRunnerReady(debateShapePolicy);`, import, comment);
+  6. `apps/runner/src/index.ts` (the exported `refuseDebateShapeReceiptInPhase2a` function and its call right after the strict parse of `envelopeBasis`; and `WalkingSkeletonSettings.debateShape`).
+- Modify: `apps/api/src/ask-model-picker.ts` and `apps/api/src/main.ts` / `tools/preview-practice/practice-ask-composition.ts` (Free answer-job eligibility at the row's largest bounds; the API's settings hold only the in-force policy)
+- Modify: `deploy/preview-auth-dev/v1/publish-register-v2.ts` (`PREVIEW_SOURCE_ROW_KEYS_V2` += `"mapContractHash"`; the `debateShape` choice may be `"off"`), `deploy/preview-auth-dev/v1/publish-register.ts` (v1 filters out `mapContractHash`), `deploy/preview-auth-dev/v1/native-operator.mjs` (the plan's optional `debateShape` key and the sixth argument), `deploy/preview-auth-dev/v1/README.md` ("68 keys"; the `debateShape` plan key and its rollback)
+- Modify pins and the tests that pin the Phase-2a guard: `tests/unit/preview-register-publish-v2.test.ts:63-64,113,147` (67→68 keys, 69→70 rows), `tests/integration/dev-deployment-register.test.ts:749,881` (key lists), `tests/unit/debate-shape-runner-boot.test.ts` (rewritten: it pins the main.ts guard line and the per-run refusal today), `tests/unit/debate-shape-policy.test.ts` (delete the P2a guard case ~:170; add the `enabled` cases), `tests/unit/debate-shape-submit.test.ts` (the "I2(a)" text-pin case ~:350–365 and the case ~:368–386 that expects `DEBATE_SHAPE_POLICY_RUNNER_PENDING` from the practice ask composition: rewritten; its `rowPool` throws on any read other than the shape row, so the rewritten case must answer the `mapContractHash` read too if the composition reads it), `tests/integration/hosted-register-publish.test.ts` (~:555–567: the sealed-row case expecting `HOSTED_REGISTER_BOOT_CHECK_FAILED:DEBATE_SHAPE_POLICY_RUNNER_PENDING`), `tests/unit/hosted-register-publish.test.ts` (~:404: the M3 dry-run pin `/^debate_shape=present .*RUNNER_PENDING\)$/mu`), `tests/integration/obs-l3-s06-runner-binding.test.ts` (~:543: the `@debateai/register` stand-in drops `assertDebateShapeRunnerReady` and gains `readMapContractHash`; update its comment line), `deploy/vps/register/README.md` (the `debateShapePolicy` row, ~:54), `deploy/vps/README.md` (the `DEBATE_SHAPE_POLICY_RUNNER_PENDING` row, ~:1880)
+- Modify, v1 kit users that must stay green unchanged: `tests/unit/preview-auth-dev-snapshot.test.ts` (expects 66 rows), `tests/integration/preview-auth-dev-fallback.test.ts` (~:77, ~:126), `tests/integration/preview-auth-dev-native-verify.test.ts`, `deploy/preview-auth-dev/v1/stage-fixture.ts` — no edit; they prove the v1 filter
 
 **Interfaces:**
 
@@ -1137,7 +1194,23 @@ export function resolveDebateShapeRunnerSettings(input: Readonly<{
 }>): DebateShapeRunnerSettings | null;
 // apps/runner/src/index.ts, WalkingSkeletonSettings
 readonly debateShape?: DebateShapeRunnerSettings | null;
+// packages/register/src/debate-shape-policy.ts (amendment 2026-10-13)
+//   DebateShapePolicy gains `enabled?: boolean` (optional; absent = on; never written by the start values)
+export function debateShapeInForce(policy: DebateShapePolicy | null): DebateShapePolicy | null;   // null when absent or enabled === false
+export function debateShapeLargestBounds(policy: DebateShapePolicy): Readonly<{ writer: number; map: number }>;
+// apps/api/src/ask-model-picker.ts: the boot input gains `debateShapePolicy?: DebateShapePolicy | null` (the in-force one)
 ```
+
+**What "the row" means after this task (amendment 2026-10-13, the preview rollback).** R19 carries a sealed optional
+row forward forever, so a published `debateShapePolicy` can never be dropped by a later preview publish. The rollback is
+the role-rotation precedent: the row gains an optional `enabled` member (absent = on, so every sealed value keeps its
+meaning and its bytes), and `{ …, "enabled": false }` means "no shape" for the ASK side:
+- the API (and the practice ask composition) hands `debateShapeInForce(row)` to its settings, the picker and the room
+  read: a disabled row is exactly an absent row there (today's asks, today's receipts, byte for byte);
+- the runner and the hosted readiness check read the row RAW: a disabled row still requires the sealed map hash, so a
+  runner on that version can finish the shaped runs admitted before the switch (no in-flight run fails);
+- the preview plan's `debateShape` choice may be the word `"off"`: the source then carries the base's row (or the start
+  values) with `enabled: false`, the delta shows that one row changed, and the base-row-dropped refusal is never hit.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1183,8 +1256,47 @@ describe("the runner's boot with the debate shape", () => {
       expect(text, file).not.toContain("assertDebateShapeRunnerReady");
     }
   });
+
+  it("the Phase 2a guard is gone from EVERY site, and the hosted readiness check resolves the shape like the runner", () => {
+    const sites = ["apps/runner/src/main.ts", "tools/preview-practice/practice-runner-composition.ts",
+      "apps/runner/src/hosted-register-publish.ts", "apps/api/src/main.ts", "tools/preview-practice/practice-ask-composition.ts",
+      "apps/runner/src/index.ts", "packages/register/src/debate-shape-policy.ts", "packages/register/src/index.ts"];
+    for (const file of sites) {
+      const text = readFileSync(new URL(`../../${file}`, import.meta.url), "utf8");
+      for (const gone of ["assertDebateShapeRunnerReady", "refuseDebateShapeReceiptInPhase2a", "debate-shape-runner-pending", "DEBATE_SHAPE_POLICY_RUNNER_PENDING"]) {
+        expect(text, `${file}: ${gone}`).not.toContain(gone);
+      }
+    }
+    const hosted = readFileSync(new URL("../../apps/runner/src/hosted-register-publish.ts", import.meta.url), "utf8");
+    expect(hosted).toContain("resolveDebateShapeRunnerSettings({");
+    expect(hosted).toContain("readMapContractHash(pool, version)");
+  });
+
+  it("a disabled row is no row for the ask side, and still a row for the runner (the preview's rollback)", () => {
+    const off = { ...policy, enabled: false };
+    expect(debateShapeInForce(null)).toBeNull();
+    expect(debateShapeInForce(off)).toBeNull();
+    expect(debateShapeInForce(policy)).toBe(policy);
+    expect(debateShapeInForce({ ...policy, enabled: true })).toEqual({ ...policy, enabled: true });
+    expect(() => resolveDebateShapeRunnerSettings({ policy: off, mapContractHash: null, codeMapContractHash: code })).toThrow(/DEBATE_SHAPE_MAP_HASH_UNSEALED/u);
+    expect(resolveDebateShapeRunnerSettings({ policy: off, mapContractHash: code, codeMapContractHash: code })).toEqual({ mapContractHash: code });
+    expect(Object.hasOwn(debateShapePolicyStartValues(), "enabled")).toBe(false);
+    expect(parseDebateShapePolicy(JSON.parse(debateShapePolicyRow(off, "t").valueJsonText))).toEqual(off);
+    expect(() => parseDebateShapePolicy({ ...policy, enabled: "no" })).toThrow("DEBATE_SHAPE_POLICY_INVALID:enabled");
+  });
+
+  it("the largest bounds the row allows: the detailed writer bound and the larger map step bound", () => {
+    expect(debateShapeLargestBounds(policy)).toEqual({
+      writer: policy.answerLength.detailed.writerBound,
+      map: Math.max(policy.mapStepBounds.merge, policy.mapStepBounds.choose)
+    });
+  });
 });
 ```
+
+Add `debateShapeInForce`, `debateShapeLargestBounds`, `debateShapePolicyRow` and `parseDebateShapePolicy` to the test's
+`@debateai/register` import. (Each `gone` string is checked only in these files; the test files that pinned them are
+rewritten in Step 3b.)
 
 (If `practice-runner-composition.ts` names its pool or environment differently, the assertion uses its own names — read
 the file's existing `readCallConcurrencyPolicy(` line and mirror its argument names.)
@@ -1223,7 +1335,33 @@ export async function readMapContractHash(pool: Pick<Pool, "query">, registerVer
 ```
 
 Export it from `packages/register/src/index.ts`. Delete `assertDebateShapeRunnerReady` from
-`packages/register/src/debate-shape-policy.ts` and its export line.
+`packages/register/src/debate-shape-policy.ts` and its export line in `packages/register/src/index.ts`.
+
+`packages/register/src/debate-shape-policy.ts` (amendment 2026-10-13, the rollback and the largest bounds):
+- `policySchema` gains `enabled: z.boolean().optional()` (NO `.default`: a row written without it keeps its exact bytes
+  and reads as on; `debateShapePolicyStartValues()` never writes it). The `DebateShapePolicy` type gains
+  `readonly enabled?: boolean`. A wrong type refuses with `DEBATE_SHAPE_POLICY_INVALID:enabled` (the parser's own path rule).
+- Add, below `readDebateShapePolicy`:
+
+```ts
+/**
+ * The row as the ASK side must read it (amendment 2026-10-13, the preview's rollback): absent, or written with
+ * `enabled: false`, is no row — today's asks and today's receipts. The runner and the hosted readiness check read the
+ * row raw, so a disabled row still needs its sealed map hash and shaped runs admitted before the switch still finish.
+ */
+export function debateShapeInForce(policy: DebateShapePolicy | null): DebateShapePolicy | null {
+  return policy === null || policy.enabled === false ? null : policy;
+}
+
+/** The largest output bounds a run under this row may ask for: the writer (detailed is never below the others, the
+ * parser checks it) and the larger map step. Boot eligibility checks these, never only the sealed bounds. */
+export function debateShapeLargestBounds(policy: DebateShapePolicy): Readonly<{ writer: number; map: number }> {
+  return Object.freeze({ writer: policy.answerLength.detailed.writerBound, map: Math.max(policy.mapStepBounds.merge, policy.mapStepBounds.choose) });
+}
+```
+
+Export both from `packages/register/src/index.ts` next to the other debate-shape names. The hosted publisher's member
+and the preview kit pass `enabled` through the same parser, so nothing else in the register changes.
 
 `apps/runner/src/debate-shape-boot.ts`:
 
@@ -1256,7 +1394,10 @@ export function resolveDebateShapeRunnerSettings(input: Readonly<{
 `apps/runner/src/dev-deployment-register.ts`, in `computeDevelopmentContractRows`'s `values`:
 `mapContractHash: mapPromptContractHash(),` (import from `@debateai/map`).
 
-`apps/runner/src/main.ts`: replace P2a's line `assertDebateShapeRunnerReady(await readDebateShapePolicy(pool, environment.REGISTER_VERSION));` with
+`apps/runner/src/main.ts`: replace P2a's line `assertDebateShapeRunnerReady(await readDebateShapePolicy(pool, environment.REGISTER_VERSION));`
+AND the comment block above it ("Phase 2a: a valid row refuses it too …"), and drop `assertDebateShapeRunnerReady`
+from the `@debateai/register` import (add `readMapContractHash` there; import `mapPromptContractHash` from
+`@debateai/map` and `resolveDebateShapeRunnerSettings` from `./debate-shape-boot.js`), with
 
 ```ts
 /**
@@ -1284,20 +1425,170 @@ three reads and the setting in `tools/preview-practice/practice-runner-compositi
   readonly debateShape?: DebateShapeRunnerSettings | null;
 ```
 
-Rewrite `tests/unit/debate-shape-runner-boot.test.ts` to assert the `resolveDebateShapeRunnerSettings({` block occurs
-once in main.ts before `new WalkingSkeletonRunner(` (same reading technique the P2a test used).
+Rewrite `tests/unit/debate-shape-runner-boot.test.ts`: it pins P2a's main.ts guard line and imports
+`refuseDebateShapeReceiptInPhase2a` from `@debateai/runner` today. The rewrite asserts the `resolveDebateShapeRunnerSettings({`
+block occurs once in main.ts before `new WalkingSkeletonRunner(` (same reading technique the P2a test used), and that
+`apps/runner/src/index.ts` no longer contains `refuseDebateShapeReceiptInPhase2a` (the shaped receipt now takes the shape
+path, Task 12).
+
+- [ ] **Step 3b: Remove the guard at the other four sites, and fix what pinned them** (amendment 2026-10-13)
+
+Find each by name (`grep -rn "assertDebateShapeRunnerReady\|refuseDebateShapeReceiptInPhase2a\|debate-shape-runner-pending\|RUNNER_PENDING" apps tools packages tests deploy`); the line numbers below are as of 803f58128.
+
+1. **The runner's per-run refusal** (`apps/runner/src/index.ts`): delete the exported function
+   `refuseDebateShapeReceiptInPhase2a` (~:236–249) and its call right after the strict parse of `envelopeBasis` (~:4975,
+   with the comment "P2b replaces this line"). Task 12 puts the shape gate there instead (`DEBATE_SHAPE_RUNNER_UNCONFIGURED`).
+2. **The API boot** (`apps/api/src/main.ts`): delete the step
+   `boot.runSync("debate-shape-runner-pending", () => assertDebateShapeRunnerReady(debateShapePolicy));` (~:968), its
+   comment block ("I2(a), Phase 2a: …") and the import (~:94). The read line
+   `const debateShapePolicy = await boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION));`
+   stays exactly as it is (tests/unit/debate-shape-submit.test.ts pins its text). Right after it add
+   `const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);`, and the two spreads that hand the row to the
+   ask application's settings (~:992) and to the room read's options (~:1536) become
+   `...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),`.
+3. **The practice ask** (`tools/preview-practice/practice-ask-composition.ts`): delete
+   `assertDebateShapeRunnerReady(debateShapePolicy);` (~:138), its comment and import; hand
+   `debateShapeInForce(debateShapePolicy)` to `runSettings` exactly as main.ts does (the wiring-drift test compares the two).
+4. **The hosted readiness check** (`apps/runner/src/hosted-register-publish.ts`, `verifyHostedRegisterBootReadiness`,
+   ~:1352–1355): replace the comment and `assertDebateShapeRunnerReady(await readDebateShapePolicy(pool, version));` with
+
+```ts
+  // Debate shape (spec 2026-10-12 §3.1, §4): the runner's own boot resolution (apps/runner/src/main.ts), so a version
+  // the runner would refuse (DEBATE_SHAPE_MAP_HASH_UNSEALED / MAP_CONTRACT_HASH_MISMATCH) is never reported ready. The
+  // row is read raw, as the runner reads it: a disabled row (enabled: false) still needs its sealed map hash.
+  resolveDebateShapeRunnerSettings({
+    policy: await readDebateShapePolicy(pool, version),
+    mapContractHash: await readMapContractHash(pool, version),
+    codeMapContractHash: mapPromptContractHash()
+  });
+```
+
+   (imports: `readMapContractHash` from `@debateai/register`, `mapPromptContractHash` from `@debateai/map`,
+   `resolveDebateShapeRunnerSettings` from `./debate-shape-boot.js`; drop `assertDebateShapeRunnerReady`). The hosted
+   plan seeds its contract rows from `buildDevelopmentDeploymentRegisterPublicationRows` (which reaches
+   `computeDevelopmentContractRows`), so it seals the code's `mapContractHash` with no other edit; any row-count pin in
+   `tests/unit/hosted-register-publish.test.ts` / `tests/integration/hosted-register-publish.test.ts` that moves by one
+   is bumped, never worked around.
+   In `renderHostedRegisterPlan` (~:1219–1224), the line becomes
+   `"debate_shape=present (the runner argues the debate shape; this version also seals mapContractHash)"`, still printed
+   only when the plan carries the row.
+5. **The tests that pin the guard**, rewritten (never deleted without a replacement):
+   - `tests/unit/debate-shape-policy.test.ts` (~:170): delete the `assertDebateShapeRunnerReady` case and its import;
+     add the `enabled` cases of Step 1 there if you prefer them beside the parser cases (one place only).
+   - `tests/unit/debate-shape-submit.test.ts`, three cases in the describe "the boot reads the optional row …":
+     (a) the main.ts pin (~:342–349) keeps its `read` assertions; its spread assertion becomes
+     `expect(main.split("...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),")).toHaveLength(3);`
+     plus `expect(main).toContain("const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);")`;
+     (b) the "I2(a) … refuse a present row right after reading it" pin (~:351–365) becomes "the API boot and the practice
+     ask hand the IN-FORCE row on and carry no Phase-2a guard": neither file contains `assertDebateShapeRunnerReady`,
+     and practice-ask-composition.ts contains `debateShapeInForce(debateShapePolicy)` after its read line and before
+     `new PostgresAskApplication(`;
+     (c) the case "a valid row refuses the practice runner before anything else is read" (~:380–389, it drives
+     `composePracticeRunner` and expects `DEBATE_SHAPE_POLICY_RUNNER_PENDING`) becomes: a valid row with no
+     `mapContractHash` row refuses `DEBATE_SHAPE_MAP_HASH_UNSEALED` after exactly the two reads
+     `[[7, "debateShapePolicy"], [7, "mapContractHash"]]`; a valid row with the code's hash (`mapPromptContractHash()`)
+     passes on to the next read (`PRACTICE_TEST_NEXT_READ`); a malformed row still refuses `DEBATE_SHAPE_POLICY_INVALID:`;
+     no row passes on. Extend `rowPool` to answer `values[1] === "mapContractHash"` from a second optional argument and
+     keep it throwing on every other read. Rename the describe's title ("… and the practice runner resolves the shape").
+   - `tests/integration/hosted-register-publish.test.ts` (~:555–567): the case that seals the row and expects
+     `HOSTED_REGISTER_BOOT_CHECK_FAILED:DEBATE_SHAPE_POLICY_RUNNER_PENDING` now expects the version to be boot-ready
+     (the plan seals the code's `mapContractHash`), and a second case seals a register whose `mapContractHash` row is
+     removed by hand and expects `HOSTED_REGISTER_BOOT_CHECK_FAILED:DEBATE_SHAPE_MAP_HASH_UNSEALED`.
+   - `tests/unit/hosted-register-publish.test.ts` (~:404, M3): the pin becomes `/^debate_shape=present \(the runner argues the debate shape; this version also seals mapContractHash\)$/mu`; the "no line without the member" half stays.
+   - `tests/integration/obs-l3-s06-runner-binding.test.ts` (~:543): in the `@debateai/register` stand-in, replace
+     `export function assertDebateShapeRunnerReady() {}` with `export function readMapContractHash() {}` and update
+     the comment line above it ("Phase 2b replaced the guard with `readMapContractHash`"). `@debateai/map` and
+     `./debate-shape-boot.js` load for real (neither touches a database at import); if the case then fails at link time
+     on another new named import, add that name to its stand-in, as the comment there explains.
+
+- [ ] **Step 3c: The v1 kit keeps its closure** (final review, row "v1 kit")
+
+`deploy/preview-auth-dev/v1/publish-register.ts` (the v1 composer, kept unchanged since v2 replaced it) refuses any
+source but 66 rows (`if(rows.length!==66)fail();`) and `composePreviewSnapshot` refuses `source.length!==66||base.length!==65`.
+Its builder calls `buildDevelopmentDeploymentRegisterPublicationRows`, which now also emits `mapContractHash`. Do not
+bump the counts (the v1 fixtures build a historical v4 base from it): filter the new row out where the rows are built,
+
+```ts
+  const rows=[...(await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:PREVIEW_GLM_PROVIDER_REFS[0],evaluatorRoleRef:PREVIEW_GLM_PROVIDER_REFS[1]},'local'))
+    // P2b: the v1 kit predates the debate shape; its reviewed closure stays the 66 keys it was written for.
+    .filter(row=>row.rowKey!==MAP_CONTRACT_HASH_ROW_KEY),
+```
+
+(import `MAP_CONTRACT_HASH_ROW_KEY` from the register module the file already imports from). Then
+`tests/unit/preview-auth-dev-snapshot.test.ts` (66 rows), `tests/integration/preview-auth-dev-fallback.test.ts`,
+`tests/integration/preview-auth-dev-native-verify.test.ts` and `deploy/preview-auth-dev/v1/stage-fixture.ts` stay
+unchanged and green; that is the check.
+
+- [ ] **Step 3d: The preview kit can publish the row, and switch it off** (ledger NOTE; the rollback decision)
+
+`deploy/preview-auth-dev/v1/native-operator.mjs`:
+- `validateNativePlan`: a plan may carry an optional `debateShape` key (like `callConcurrency`): add it to the
+  `exactKeys` list when present; it is allowed only for the `plan` and `publish` operations; its value is either the
+  exact word `"off"` or an object checked by a new `validateDebateShapeChoice(value)` that runs the register's own
+  parser through the tsx-imported register module before anything is built (refusal `PREVIEW_NATIVE_PLAN_REFUSED`).
+- `runNativeOperator`: pass it as the SIXTH argument of `buildPreviewSourceRowsV2`:
+  `…,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null)`.
+
+`deploy/preview-auth-dev/v1/publish-register-v2.ts`, `buildPreviewSourceRowsV2`: the sixth parameter becomes
+`debateShape: DebateShapePolicy | "off" | null = null`. `"off"` builds the row from
+`{ ...debateShapePolicyStartValues(), enabled: false }` (the row stays present, disabled; the delta shows that one row
+changed, so the base-row-dropped refusal is never hit, exactly like `roleRotation: "off"`). A later plan with a policy
+object switches it back on; a plan with neither keeps the base's row unchanged (R19).
+
+Tests, in `tests/unit/preview-register-publish-v2.test.ts` (copy the `callConcurrency` cases' style): the sixth
+argument `"off"` gives a row whose parsed value has `enabled: false`; a policy object gives that policy's row; the plan
+validator accepts `debateShape: "off"` and a valid policy for `plan`/`publish`, and refuses it for `verify`, refuses
+any other word, and refuses an object the parser refuses. If `native-operator.mjs` has its own unit test file
+(`grep -rln "validateNativePlan" tests`), add the validator cases there instead.
+
+`deploy/preview-auth-dev/v1/README.md`: next to the role-rotation rollback paragraph, add: "**Debate shape on the
+preview: on = republish with a policy file; rollback = republish with `debateShape: "off"`.** The row stays, disabled:
+the API then asks today's shape, and a runner on that version still finishes the debates admitted with the shape.
+Publish it only after P2L Task 15 has landed (the map hash moves once more there)."
+
+- [ ] **Step 3e: Free answer-job eligibility checks the row's largest bounds** (ledger NOTE; final review note 2)
+
+Today `freeAnswerJobsFollowPaidSiteRule` (packages/scorecard/src/plan-caps.ts) is asked with the SEALED bounds only, at
+the API boot (`apps/api/src/ask-model-picker.ts`, the `SCORECARD_FREE_ANSWER_UNSCORED` check) and at the hosted publish
+(`apps/runner/src/hosted-register-publish.ts`, the same check). With a shape row in force a Free `detailed` answer asks
+the writer for up to 16,384 tokens, and Free ANSWER_WRITER has no fallback: boot would pass and those asks would be
+refused `ASK_MODEL_CANDIDATE_UNAVAILABLE`.
+- `freeAnswerJobsFollowPaidSiteRule`'s `answerTokenCeilingByRole` accepts an optional `POSITION` entry
+  (`Readonly<Record<"ANSWER_WRITER" | "ANSWER_CHECKER", number> & Partial<Record<"POSITION", number>>>`); the roles it
+  checks are the two answer jobs plus `POSITION` when that entry is given. Without it, today's result, unchanged.
+- The API's picker boot (`composeAskModelPicker` and the function that holds the check) gains the input
+  `debateShapePolicy?: DebateShapePolicy | null` (the IN-FORCE policy). With one, the check is asked with
+  `ANSWER_WRITER: max(sealed writer, debateShapeLargestBounds(policy).writer)` and
+  `POSITION: max(sealed judge bound, debateShapeLargestBounds(policy).map)` (map merge and choose are POSITION-priced
+  calls); the checker keeps its sealed bound. main.ts and the practice ask composition pass it. In both files the shape
+  read comes AFTER the picker step today (main.ts: picker ~:629, read ~:962; practice-ask-composition.ts: picker ~:120,
+  read ~:135): move each read line, text unchanged, above its picker step, together with the in-force line.
+- `verifyHostedRegisterBootReadiness` / the hosted plan's check asks the same, with the sealed row read through
+  `debateShapeInForce(await readDebateShapePolicy(pool, version))`.
+- Test (new cases in `tests/unit/ask-model-picker.test.ts`, written first): a scorecard whose only Free writer
+  candidate holds 12,288 output tokens boots with no row and refuses `SCORECARD_FREE_ANSWER_UNSCORED` with the start
+  values' row (detailed = 16,384); with `{ ...row, enabled: false }` passed through `debateShapeInForce` it boots.
+- Known limit, recorded, not built (final review note 2c): the picker's window check sizes POSITION's input at its
+  typical call × 4, while a merge reads every list and the checker reads a detailed answer. A too-small window ends in
+  a format failure and the map's code fallback (always an answer); measure it in P2d's practice before changing it.
 
 - [ ] **Step 4: Run — expect PASS**
 
-Run (one at a time): `pnpm exec vitest run tests/unit/debate-shape-boot.test.ts tests/unit/debate-shape-runner-boot.test.ts tests/unit/debate-shape-policy.test.ts tests/unit/preview-register-publish-v2.test.ts tests/unit/map-package.test.ts tests/architecture/scaffold.test.ts`
-then `pnpm exec vitest run tests/integration/dev-deployment-register.test.ts` (heavy: alone)
-then `pnpm exec vitest run tests/integration/obs-l3-s06-runner-binding.test.ts` (alone). Expected: PASS.
+Run, ONE FILE PER COMMAND: `tests/unit/debate-shape-boot.test.ts`, `tests/unit/debate-shape-runner-boot.test.ts`,
+`tests/unit/debate-shape-policy.test.ts`, `tests/unit/debate-shape-submit.test.ts`, `tests/unit/preview-register-publish-v2.test.ts`,
+`tests/unit/preview-auth-dev-snapshot.test.ts`, `tests/unit/hosted-register-publish.test.ts`, `tests/unit/ask-model-picker.test.ts`,
+`tests/unit/preview-practice-wiring-drift.test.ts`, `tests/unit/map-package.test.ts`, `tests/architecture/scaffold.test.ts`
+(each as `pnpm exec vitest run <file>`); then, each ALONE: `tests/integration/dev-deployment-register.test.ts`,
+`tests/integration/hosted-register-publish.test.ts`, `tests/integration/preview-auth-dev-fallback.test.ts`,
+`tests/integration/obs-l3-s06-runner-binding.test.ts`. Expected: PASS. Finally
+`grep -rn "assertDebateShapeRunnerReady\|refuseDebateShapeReceiptInPhase2a\|debate-shape-runner-pending" apps tools packages tests deploy`
+prints nothing.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/register apps/runner tools deploy tests
-git commit -m "register/runner: optional mapContractHash row, boot resolves the shape settings, Phase 2a guard removed
+git add packages/register packages/scorecard apps/runner apps/api tools deploy tests
+git commit -m "register/runner/API: optional mapContractHash row, boot resolves the shape settings, the Phase 2a guard removed at every site, the preview's off switch
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -2290,6 +2581,12 @@ describe("adaptive chains (spec §3.3 step 5)", () => {
     const selected = shapeSelectChains({ chainsByRoot: new Map([[0, [12, 10, 11]]]), leverageOf: () => 0.3, frozen: new Set(), perRoot: 1 });
     expect([...selected]).toEqual([10]);
   });
+  // Amendment 2026-10-13 (final review note 5): the row allows deeperTopPoints (X) above the points a position has (K);
+  // the choice is capped at the chains that exist, never padded (the ceiling then over-counts, the safe side).
+  it("keeps at most the chains that exist when X is larger than K", () => {
+    const selected = shapeSelectChains({ chainsByRoot: new Map([[0, [10, 11]], [1, [20]]]), leverageOf: () => 0.2, frozen: new Set(), perRoot: 6 });
+    expect([...selected].sort()).toEqual([10, 11, 20]);
+  });
 });
 
 describe("scrutiny needs (spec §3.3 step 7)", () => {
@@ -2549,6 +2846,45 @@ with `const closeCallExtensions: { readonly nodeId: string; readonly added: numb
 
 With `shapeShape === null` every line above is today's (cap, one `runJudgePanel`, one reduction, `closeCallAdded: 0`).
 
+**Known limit, recorded (final review note 3; amendment 2026-10-13):** the scorecard picker turns a seat whose model's
+window is too small into a ROLE_FALLBACK seat, and fallback seats are not window-checked (packages/scorecard/src/picker.ts,
+the window-skip branch and the fallback branch). A shaped writer bound or map bound is therefore a PREFERENCE there,
+not a guarantee. This plan does not add a hard window refusal for shaped roles: an oversized call that a fallback model
+cannot hold fails its format check and ends in the step's fallback (always an answer). If P2d's practice shows it, the
+owners decide whether shaped roles refuse instead.
+
+- [ ] **Step 3b: The preview estimate charges each gate the largest share its members can take** (final review note 1; amendment 2026-10-13)
+
+`apps/api/src/preview-budget-estimate.ts`, in the shares function (find `for (const model of panelModels) addDebate(model, (BigInt(sites.panel - sites.reviewer) - mapLongSites) * debate);`)
+splits every non-review panel site EVENLY over all members. Its comment ("each member states one position … judges
+every node another maker authored") is false for a shaped run: with A answers, J graders and A map AIs fewer than the M
+makers, one member can author a whole position's tree (about 1/A of the authored nodes, not 1/M) and the seats rotate,
+so an even split under-counts a gate (the owner's never-under-count rule). Example: a 4-maker panel with 3 answers,
+where Haiku authors about 1/3 of the nodes but is charged 1/4.
+
+For a SHAPED receipt only (`shaped === true`; today's receipt keeps today's line and comment byte for byte):
+1. Split the non-review panel sites by role with `expectedCallsByRoleFromBasis(basis)` (already read by
+   `debateSitesByRole`): authored sites = `POSITION + SUPPORT_ATTACK + CROSS_EXCHANGE` (minus the two map long sites,
+   which stay priced as `MAP_MERGE` / `MAP_CHOOSE`), grading sites = `JUDGE`.
+2. Charge each GATE, at its dearest panel member (`dearestPanelMemberPerGate`, as the review leg does), the largest
+   share its members can take, never the even 1/M:
+   - grading: a member grades a node at most once and each node has J graders (plus at most E close-call extras), so a
+     member's share of the grading sites is at most `min(1, (J + E) / (M − 1))`, and a gate with g members carries
+     `min(1, g × (J + E) / (M − 1))` of them;
+   - authoring: derive the bound from this plan's own seat rules (`shapeHandOverRoot`, `shapeWriterSeat`, Task 9):
+     write a test (in `tests/unit/shape-plan.test.ts`) that enumerates every seat order and sit-out set those helpers can produce for M ∈ {2,…,5} and
+     A ∈ {2,…,min(5, M)} and records the most authored sites any one member gets; use that bound (as a fraction with a
+     ceiling) in the shares. If no bound below "all of them" can be proven for a role, charge that role's sites in full
+     to every gate (the review leg's rule).
+3. Rewrite the comment above the line so it says what the shaped and the unshaped split each assume.
+
+Test first, in `tests/unit/debate-shape-preview-estimate.test.ts` (P2a's file; its `sharesOf` helper already passes
+`dearestFor`): "note 1: a shaped run's gate is charged at least the largest share one of its members can take" — a
+4-maker panel (GLM, DeepSeek, Qwen, Haiku), a receipt minted with `answers: 3`, and the assertion that the Anthropic
+gate's DEBATE numerator for authored sites is at least 1/3 of them (it was 1/4); plus "today's receipt: shares
+unchanged" (the existing expectations, untouched). Run `pnpm exec vitest run tests/unit/debate-shape-preview-estimate.test.ts`
+and `pnpm exec vitest run tests/unit/preview-budget-estimate.test.ts` (the second proves today's shares did not move).
+
 - [ ] **Step 4: Run — expect PASS**
 
 Run: `pnpm exec vitest run tests/unit/shape-close-call.test.ts tests/unit/t03-judge-panel.test.ts` then the light typecheck
@@ -2557,7 +2893,7 @@ Run: `pnpm exec vitest run tests/unit/shape-close-call.test.ts tests/unit/t03-ju
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/runner/src/shape-select.ts apps/runner/src/index.ts tests/unit/shape-close-call.test.ts
+git add apps/runner/src/shape-select.ts apps/runner/src/index.ts tests/unit/shape-close-call.test.ts apps/api/src/preview-budget-estimate.ts tests/unit/debate-shape-preview-estimate.test.ts
 git commit -m "runner: J graders per node and the close-call extension (re-reduced, highest-voice rule unchanged)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -2684,6 +3020,18 @@ describe("the runner's map caller", () => {
       { mark: "MAP_MERGE_FALLBACK", scope: "answer", subjectRef: "run-1", reason: "MAP_MERGE_FALLBACK:MERGE", liftPath: null, servedRootRule: null, affectedNodeIds: [] },
       { mark: "CHOOSE_QUOTA_FILLED", scope: "answer", subjectRef: "run-1", reason: "CHOOSE_QUOTA_FILLED:CHOOSE", liftPath: null, servedRootRule: null, affectedNodeIds: [] }]);
   });
+
+  // Amendment 2026-10-13 (P2L amendment 4, CR-3): every MARK the map returns becomes a record, never a fixed list of
+  // them; the map's NOTES (operator facts such as LIST_REASSIGNED, and P2L's LANGUAGE_PLANNER_DISAGREES) never do.
+  it("converts every mark the result holds, and never a note", () => {
+    const records = mapConditionRecords({
+      marks: ["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK", "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED"]
+        .map((mark) => ({ mark, step: "MAP", detail: "x" })),
+      notes: [{ note: "LIST_REASSIGNED", step: "LIST", detail: "2" }]
+    } as never, "run-1");
+    expect(records.map((record) => record.mark)).toEqual(["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK",
+      "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED"]);
+  });
 });
 ```
 
@@ -2785,7 +3133,11 @@ export function runMapStage(input: Readonly<{ opening: DebateShapeOpening; map: 
 }
 const exhaustiveOpening = (opening: never): never => { throw new TypedDomainError("DEBATE_SHAPE_OPENING_UNKNOWN", String(opening)); };
 
-/** Spec §3.3: every map mark rides the answer with its typed record — the step as a code, never the detail text. */
+/**
+ * Spec §3.3: every map mark rides the answer with its typed record — the step as a code, never the detail text. It maps
+ * `result.marks` as a whole, never a fixed list (P2L adds no mark, but any later map mark needs no edit here); the
+ * map's notes (`result.notes`) are operator facts stored with the map choice and never become condition records.
+ */
 export function mapConditionRecords(result: MapResult, runId: string): readonly ConditionMarkRecord[] {
   return Object.freeze(result.marks.map((record): ConditionMarkRecord => Object.freeze({
     mark: record.mark, scope: "answer" as const, subjectRef: runId, reason: `${record.mark}:${record.step}`,
@@ -2997,6 +3349,12 @@ Hand-over (spec §3.3 step 2). Replace `dropSatOutRoot`:
 
 (`rootSitsOut` reads `rootSeats`, so after a swap the root's seat is a working one; with `SHARE` two roots share a seat
 and its maker argues two answers.)
+
+P2a's ceiling binds three things here (ruling B1; final review note 6, amendment 2026-10-13): at most ONE cross-reply per
+position, also in `MAP_UNAVAILABLE_TODAYS_OPENING` (the plan builds exactly one `CROSS` leg per position, and nothing
+else may add one); a hand-over happens BEFORE the position's first call, never after a call was made under the old
+seat; and every repair (patch, full re-ask) stays inside its own site's attempt allowance. Task 15's measured case checks
+the run against `debateShapeSiteCounts`.
 
 Map positions: in `rootZeroChain` and `rootChain`, inside the `nodeRecorder.commit(...)` closure right after
 `saveAuthored(...)` returns the node, when `shapePositions?.[i]?.answerId` is a string:
@@ -3308,6 +3666,11 @@ instruction still names `restatement_text`).
 `settings?: DebateShapeSettings`; with them `depthParams` is `{ depth, ...settings }` and `envelopeBasis` is
 `computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize: panel.length, depth, shape })`. `previewRunner(gates, claim, options)`
 accepts `debateShape?: DebateShapeRunnerSettings` and passes it into the runner settings (as main.ts does).
+`admittedRun` also accepts `language?: Readonly<{ tag: string; name: string }>` (default `{ tag: "en", name: "English" }`)
+and passes `argumentLanguageTag` / `argumentLanguageName` to `startRun` EXPLICITLY for a shaped run, never through the
+question guesser (amendment 2026-10-13, P2L amendment 5: P2L locks the language before `startRun`, and its tests set it
+here). The scripted `MAP:angles` reply below carries no `question_language` member: today's `mapAnglesReplySchema` is
+strict; P2L Task 15 makes the member optional and P2L Task 17 adds it here.
 
 `tests/support/debate-shape-harness.ts`:
 
@@ -3415,6 +3778,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createPool, migrate, type Pool } from "@debateai/db";
 import { mapPromptContractHash } from "@debateai/map";
 import { readFramedMaterial } from "@debateai/providers";
+import { debateShapeSiteCounts } from "@debateai/register";
 import { OWNER_CALL_CONCURRENCY, PANEL_REFS, previewDebateHarness } from "../support/preview-debate-harness.js";
 import { wirePacket } from "../support/preview-gate-stubs.js";
 import { scriptedShapeAnswers, shapeForTest } from "../support/debate-shape-harness.js";
@@ -3465,6 +3829,20 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
     const positions = await q(database.pool, `SELECT answer_id, root_index FROM core.map_position WHERE run_id=$1 ORDER BY root_index`, debate.runId);
     expect(positions.map((row) => row.root_index)).toEqual(Array.from({ length: shape.answers }, (_unused, index) => index));
+  }, 600_000);
+
+  // Amendment 2026-10-13 (final review note 6): the measured, independent check of P2a's ceiling — what the run really
+  // made, against what the receipt priced (`debateShapeSiteCounts`), at depth 2 with fixed rounds (every chain runs).
+  it("never makes more nodes or map sites than the receipt priced (measured on the ledger)", async () => {
+    const fixed = { depthMode: "fixed", scrutiny: "standard", answerLength: "standard" } as const;
+    const { debate, shape, calls } = await argue("measured", "pro", fixed, 2);
+    const priced = debateShapeSiteCounts(shape, 2);
+    const nodes = await q(database.pool, `SELECT count(*)::int AS n FROM core.node WHERE run_id=$1`, debate.runId);
+    expect(nodes[0]!.n).toBeLessThanOrEqual(priced.nodes);
+    const mapKeys = new Set(calls.filter((call) => call.call_site_key.startsWith("MAP:")).map((call) => call.call_site_key));
+    expect(mapKeys.size).toBeLessThanOrEqual(priced.mapSites);
+    const crossKeys = new Set(calls.filter((call) => call.call_site_key.startsWith("JUDGE:cross-root:")).map((call) => call.call_site_key));
+    expect(crossKeys.size).toBeLessThanOrEqual(priced.crossNodes);
   }, 600_000);
 
   it("keeps every invariant: roots alone servable, every counting node judged, reviewed by another maker and restated, an acyclic graph", async () => {
@@ -3689,7 +4067,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 17: Whole-branch verification and the owner's documents
 
 **Files:**
-- Modify: `deploy/vps/register/README.md` (the debateShapePolicy sentence: the runner now argues the shape; the register must also seal `mapContractHash`, `judgeContractHash` and `composerContractHash` from the same code), `deploy/preview-auth-dev/v1/README.md` (key count, the new required key)
+- Modify: `deploy/vps/register/README.md` (the debateShapePolicy row, ~:54: the runner now argues the shape; the register must also seal `mapContractHash`, `judgeContractHash` and `composerContractHash` from the same code; drop "the runner refuses to start (`DEBATE_SHAPE_POLICY_RUNNER_PENDING`)"; keep "the plan prints `debate_shape=present`"; add the optional `enabled: false` switch), `deploy/preview-auth-dev/v1/README.md` (key count, the new required key)
+- Modify: `deploy/vps/README.md` (amendment 2026-10-13, final review): the refusal table row `DEBATE_SHAPE_POLICY_RUNNER_PENDING` (~:1880) is replaced by rows for `DEBATE_SHAPE_MAP_HASH_UNSEALED` (a version seals the shape row without `mapContractHash`: the runner and the publish's boot check refuse it; publish again from this code), `MAP_CONTRACT_HASH_MISMATCH` (the sealed map hash is not this runner's: deploy the matching runner or republish), and `DEBATE_SHAPE_RUNNER_UNCONFIGURED` (a run admitted with the shape was claimed by a runner without the shape settings: restart the runner on the version that seals the row); plus one runbook line (final review note 7): "**A malformed shaped unfinished receipt** — every preview ask is refused and the API logs `preview.estimate.refused` with \"malformed debate shape\": fail that run's job (its work item), which drops it from `PREVIEW_UNFINISHED_RUNS_SQL`; nothing else is needed."
 
 - [ ] **Step 1: Light checks (one at a time)**
 
@@ -3720,7 +4099,14 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
    variant) get new values, and the optional row `mapContractHash` is new. Dev registers re-seal on their own; the
    preview and hosted registers need a republish (a new register version) before a runner built from this branch is
    deployed — the same republish that would carry `debateShapePolicy`. Runs in flight should drain first (resume reads
-   ledger rows by contract hash).
+   ledger rows by contract hash). **Preview order (amendment 2026-10-13, P2L amendment 3):** publish the preview's
+   `mapContractHash` (and the `debateShapePolicy` row) only after P2L Task 15 has landed, because P2L changes the angle
+   planner's instruction and answer form and so moves `mapPromptContractHash()` once more; one republish then carries
+   P2b's and P2L's hashes together. Migration 0116 (this plan) and 0117 (P2L Task 19) may need renumbering at merge.
+1b. **Switching the shape off (the rollback, amendment 2026-10-13).** Preview: republish with the plan choice
+   `debateShape: "off"` (the row stays, `enabled: false`). Hosted: publish a version whose `debateShapePolicy` member
+   carries `"enabled": false`. Either way the API asks today's shape again, and a runner on that version still finishes
+   the debates admitted with the shape. Switching back on is a republish with a policy file.
 2. **Wording, option 1 shipped, 3 phrasings offered** (no internals in any):
    - Opposite-answer template (all site languages): (1) "The opposite of this answer: …" / "An answer different from the one above";
      (2) "The other side of this answer: …" / "Another answer to the same question"; (3) "Not this answer: …" / "A different answer".
@@ -3729,6 +4115,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
    - The eight mark labels (Task 3), e.g. "More AIs graded this close call" / "Extra graders were asked because the graders disagreed" / "A close call got a second look".
 3. **Thinking for the map** stays the "opening" step; a separate "map" step in the thinking table is an owner choice for later.
 4. **Migration 0116** must be renumbered at merge if the preview has applied another 0116 (lineage README rule).
+5. **Open owner questions carried from P2a's final review (amendment 2026-10-13):** (a) whether Free's depth ceiling 2
+   (code today) becomes an optional row member with a default, like `mapStepBounds`; (b) the window sizing of map merge,
+   map choose and the answer checker (Task 6 Step 3e's known limit) once P2d's practice has measured it; (c) whether
+   shaped roles should refuse a fallback seat whose window is too small (Task 11's known limit). Already settled:
+   the public answer body strips `cost_envelope.basis.shape` (P2a ruling M8), and a shape setting chosen on /new is no
+   longer dropped silently when the row is absent (P2c's room flag `shape_settings`).
 
 ## Self-review: spec items → tasks
 
@@ -3755,3 +4147,6 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 | §5 unit tests listed (schemas, counting, quotas, fallbacks, caps, panels, rounds, scrutiny, length) | 1, 2, 9, 10, 11, 5 (Phase 1 tests keep the schema/counting cases) |
 | §5 integration: full debate, row-absent byte identity, each fallback, money stop mid-map, finish order | 15, 16 |
 | Phase-2 notes: STOPPED/abandon/codes; reassigned keys; primary subtags; non-Latin normalisation; gap guard; choose "reuse answer_id" (already in) | 1, 2 |
+| P2a final review (amendments 2026-10-13): the guard gone at all six sites, hosted readiness = runner boot, v1 kit closure, native operator's sixth argument, the preview rollback (`enabled`), Free eligibility at the largest bounds | 6 |
+| P2a final review notes 1, 3, 5, 6, 7 (panel shares, fallback windows, X > K, measured ceiling, runbook line) | 11, 10, 13, 15, 17 |
+| P2L amendments P2b-1..5 (map language check kept, no new mark, publish order, `mapConditionRecords` generic, harness language) | 2, 3, 12, 15, Owner steps |

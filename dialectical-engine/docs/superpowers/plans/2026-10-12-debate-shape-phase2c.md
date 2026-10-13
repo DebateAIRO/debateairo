@@ -10,7 +10,7 @@
   - The owner reads it through a new route, `GET /v1/answers/{id}/map`.
   - Published snapshots carry a copy in `map_view`. That copy is checked by the publication content check.
   - The UI reads it beside the answer, the way it reads the floor. It renders an "Also raised, not debated" section, and it titles each opening position through a React context, in the question's language.
-- **/new page.** After Project 1 and P2a land, the three controls are wired through `buildNewDebateAskConfig` and `createDebate` into `depth_params`. The legacy notice, the Max tokens slider and `lib/scrutinyDepth.ts` go away.
+- **/new page.** After Project 1 and P2a land, the three controls are wired through `buildNewDebateAskConfig` and `createDebate` into `depth_params`. They are shown and sent only when the room read says the deployment's shape row is in force (`shape_settings: true`, Contract deviation 7). The legacy notice, the Max tokens slider and `lib/scrutinyDepth.ts` go away.
 - **Locales.** All 35 locales get every new string through grouped Haiku translators and one Opus spot-check.
 
 **Tech Stack:** TypeScript (strict), zod 4, Fastify (apps/api), Next.js/React 19 (apps/ui), vitest (jsdom render tests), node:test (apps/ui i18n catalog tests), pnpm.
@@ -26,13 +26,44 @@ Binding names come from `docs/superpowers/plans/2026-10-12-debate-shape-phase2-I
 
 ---
 
+## Amendments 2026-10-13
+
+Every code fact below was checked against the branch's code on 2026-10-13.
+
+1. Project 1 gate: `grep -q "RETIRED_FORM_KEYS" … && echo IN` instead of `grep -c` = `1`; the name appears 3 times today, so the old gate was a false BLOCKED. Checked before Tasks 8 and 9 only, because Task 9 removes the name. Source: P2a final review, row "P2c:33".
+2. Where to work: names the worktree `.claude/worktrees/debate-shape-p2` and branch `feat/2026-10-13-debate-shape-phase2`. No stale path or branch was present. Source: controller item 7.
+3. P2b gate: greps `packages/map/src`; the reader is in `@debateai/map`, never `@debateai/db`. Source: P2b cross-plan change 1.
+4. New "P2b in-force gate" (`debateShapeInForce` in `@debateai/register`, used by `apps/api/src/main.ts`) before Task 8 Step 5b. Source: controller decision (room flag).
+5. Global Constraints: the public answer body carries no `cost_envelope.basis.shape`; no P2c task read it, so nothing else changed. Source: P2a final review M8 (done in the fix wave).
+6. Global Constraints: the eight new mark labels, `debateChrome.condition.*`, the `reportModel` cases, the opposite-answer template and the length sentence are P2b's; P2c adds none. Source: P2b cross-plan change 4.
+7. Architecture "/new page" bullet and Review Focus item 6 ("a choice shown but silently dropped"). Source: controller decision; P2a final review row "P2c:85".
+8. Contract deviation 4: P2b's settled home (`packages/map/src/repository.ts`) and its `MapChoiceRecord` fields; P2c's port reads a structural subset. Source: P2b cross-plan changes 1–2 (P2b Task 8).
+9. Contract deviation 7 rewritten: one optional room-response member `shape_settings: z.literal(true).optional()` on both room schemas, written by the API only with the row in force; /new offers and sends the three settings only after a room has said so; Fixed stays UI-derived. Source: controller decision; P2a final review row "P2c:85" and owner question 8.
+10. Contract deviation 9 rewritten: P2a already added the three fields to `AskRoomQuerySchema` and to `getAskRoom` (M4); P2c passes them from `useAskRoom` and the ALREADY_WAITING `readAskRoom`, and the phone draft compares them. Source: P2a final review M4 and row "P2c:87".
+11. File Structure: rows for the room flag (contract, API, new test), apps/api's `@debateai/map` dependency, the six P2L keys and the draft's room query. Source: follows items 8–10, 13, 18.
+12. Task 3 gate: the variable is fixed as `debateShapeMap: MapResult | null` (P2b Task 12); P2b ADDS the `@debateai/map` import to `apps/runner/src/index.ts` (none exists today); the story hook is at about line 9441 now, not 8545. Source: P2b cross-plan change 3; P2a final review ("say adds"); code check.
+13. Task 3 Step 4a: `storyAlsoRaisedFrom` joins the `./story-snapshot.js` import (line ~203 today), not P2b's `@debateai/map` line, because P2c exports it from `story-snapshot.ts`. Source: my reading of P2b cross-plan change 3 against the code (see the report).
+14. Task 5: `MapChoiceRepository` is imported from `@debateai/map`; `apps/api/package.json` gains `"@debateai/map": "workspace:*"`; `pnpm install --offline` updates `pnpm-lock.yaml`; the `tools/orphan-audit/src/index.ts` apps/api row gains `"map"`; `pnpm run audit:architecture`; commit list updated. Source: P2b cross-plan change 1.
+15. Task 5 Interfaces: P2b's record fields named. Source: P2b cross-plan change 2.
+16. Task 5 Step 6d: the anchor is `disclosures: ownerDisclosures,` (the old `new RepositoryAnswerDisclosureApplication(…)` line no longer exists). Source: code check.
+17. Task 8: Step 1b (new `tests/unit/debate-shape-room-flag.test.ts`: contract and API), Step 5b (`shape_settings` in `packages/contract/src/index.ts` and the room handler in `apps/api/src/index.ts`, then `generate:contract`), Step 6c-2/6e/6f (the `shapeSettings` latch, room query with the three choices, controls and ask only with the flag), render-test additions (mock `getAskRoom`, 3 new cases), Steps 3, 10 and 11. Source: controller decision; P2a final review rows "P2c:85" and "P2c:87".
+18. Task 8 Step 8: the six `newDebate.languageCheck.*` keys with P2L Task 18's English texts. Source: P2L amendment P2c-1.
+19. Task 8 Step 9h: `tier01-new-plan-tier.test.tsx` mocks a room with `shape_settings: true` so the controls it counts render; `b10-room-notice.test.tsx` stays unchanged. Source: follows item 17.
+20. Task 9: `SubmittedPhoneDraft.query` may carry the three choices; `validSubmitted` compares them with the config's, refuses them on one side only, and keeps an older draft valid; the test gains one case (7 → 8). Source: P2a final review M4 / row "P2c:87"; controller item 2.
+21. Task 10: the six keys join the batch (13 + 6 = 19 per locale; 13 for `ro`); `ro` gets P2L's Romanian texts as given through the merge script; a translator rule for `{languages}` / `{language}`; the Opus spot-check covers them and leaves `ro`'s six alone; order note (P2L Task 18 runs after Task 10 and edits the same /new files later). Source: P2L amendments P2c-2 and P2c-3; P2L controller ruling CR-7.
+22. Task 11: Step 1 adds the `@debateai/map` catch and `audit:architecture`; Step 2 lists the new and touched test files; new Step 6 (room flag, M8 and six-key checks). Source: controller item 8.
+23. Self-review: rows for the room flag, the room query, P2L's six keys, the map reader's home and M8; the placeholders list names P2b's settled names. Source: controller item 8.
+
 ## Global Constraints
 
-- **Where to work.** Work only in this worktree's engine folder. Every command below starts with `cd "$(git rev-parse --show-toplevel)/dialectical-engine"`. The git toplevel is the worktree; the engine is its `dialectical-engine/` folder. Never touch the main checkout. Never read `settings.env` or key files.
+- **Where to work.** Work only in this worktree's engine folder: worktree `.claude/worktrees/debate-shape-p2`, branch `feat/2026-10-13-debate-shape-phase2`, engine folder `.claude/worktrees/debate-shape-p2/dialectical-engine`. Every command below starts with `cd "$(git rev-parse --show-toplevel)/dialectical-engine"`. The git toplevel is the worktree; the engine is its `dialectical-engine/` folder. Never touch the main checkout. Never read `settings.env` or key files.
 - **Order and gates.** Run the tasks in order. Each gate is a check command that must pass before the task's first edit. When a gate fails, stop and report BLOCKED with the command output; do not work around it.
-  - **Project 1 gate** (Tasks 8–9): `grep -c 'id="concurrency"' apps/ui/app/new/NewDebatePageClient.tsx` prints `0`, and `grep -c "RETIRED_FORM_KEYS" apps/ui/lib/phoneCompletionDraft.ts` prints `1`. This means Project 1, branch `feat/2026-10-12-parallel-calls`, has been merged into this branch.
+  - **Project 1 gate** (Tasks 8–9): `grep -c 'id="concurrency"' apps/ui/app/new/NewDebatePageClient.tsx` prints `0`, and `grep -q "RETIRED_FORM_KEYS" apps/ui/lib/phoneCompletionDraft.ts && echo IN` prints `IN` (the name appears 3 times in Project 1's file, so do not compare a count). This means Project 1, branch `feat/2026-10-12-parallel-calls`, has been merged into this branch. Task 9 replaces `RETIRED_FORM_KEYS` by design, so this gate is checked before Task 8 and before Task 9, never after Task 9.
   - **P2a gate** (Tasks 8–9): `pnpm exec tsx -e 'import("@debateai/contract").then((m) => console.log(Object.keys(m.DepthParamsSchema.shape).join(",")))'` prints `depth,depthMode,scrutiny,answerLength`.
-  - **P2b gate** (Task 3, and Task 5 step "wire main.ts"): `grep -rn "readMapChoiceForRun" packages apps --include='*.ts' | grep -v node_modules` shows P2b's reader definition.
+  - **P2b gate** (Task 3, and Task 5 step "wire main.ts"): `grep -rn "readMapChoiceForRun" packages/map/src --include='*.ts'` shows P2b's reader in `packages/map/src/repository.ts` (the `MapChoiceRepository` method and the free function `readMapChoiceForRun(pool, runId)`, P2b Task 8). The reader lives in `@debateai/map`, never in `@debateai/db`.
+  - **P2b in-force gate** (Task 8, the room flag steps): `grep -rn "export function debateShapeInForce" packages/register/src` prints one line, and `grep -c "debateShapeInForce" apps/api/src/main.ts` prints at least `1`. This means P2b Task 6 has landed: `apps/api/src/main.ts` hands the API (`ApiOptions.debateShapePolicy` and the ask application's settings) only a row that is in force (present, and its optional `enabled` member is not `false`).
+- **The public answer body carries no `cost_envelope.basis.shape`** (P2a final review M8, done: `publicCostEnvelopeBasis` in `packages/serve/src/index.ts` strips it). P2c never reads it. A run's settings, where a task needs them, come from the run's `depth_params`.
+- **Mark labels are P2b's.** The labels of the eight new condition marks (`apps/ui/lib/v3/labels.ts`, `debateChrome.condition.*` in every locale), the `reportModel` `pointNote` cases, the opposite-answer template and the synthesizer's length sentence are P2b's (P2b Tasks 2, 3, 5). P2c adds no mark label and no `debateChrome` key.
 - **Heavy commands.** Run one at a time on the owner's Mac (16 GB):
   - Before any `vitest run` or `tsc`, check `memory_pressure | tail -1`. Free memory must be at least 40%.
   - At most one other `vitest run` may be going (count runs, not processes): `ps -A -o command | grep -c 'vitest[ ]run'` prints `0` or `1`.
@@ -48,7 +79,7 @@ Binding names come from `docs/superpowers/plans/2026-10-12-debate-shape-phase2-I
 
 ## Review Focus
 
-Five failure modes that could slip past ordinary tests. Each one has a named test in the task that owns it.
+Six failure modes that could slip past ordinary tests. Each one has a named test in the task that owns it.
 
 1. **Today's story prompt changes when there is no map.** An empty `also_raised` field, or a reordered field list, would change the bytes and the contract hash of every story on a run without the new shape. Test: Task 1, `keeps the material byte for byte when nothing was also raised`.
 2. **The also-raised points push the debate's own material down the shrink ladder.** That would cut judge texts and claims to make room for points nobody argued. Test: Task 1, `never moves the ladder: also-raised points only use the bytes the debate leaves free`.
@@ -60,6 +91,7 @@ Five failure modes that could slip past ordinary tests. Each one has a named tes
    - a title lost on the page's own refresh, when the map read fails.
 
    Tests: Task 5, `drops positions whose root node is not in the answer`; Task 7, `titles each position in the question's language` and `keeps the titles when a refresh cannot read the map`.
+6. **A choice is shown but silently dropped.** With no `debateShapePolicy` row in force, the API's normalisation drops `depth_mode`, `scrutiny` and `answer_length` without a word, so a person who picked "Detailed" or "Fixed" would get today's debate. The page therefore shows the three controls only when the room read says `shape_settings: true`, and otherwise sends none of them. Tests: Task 8, `keeps today's room body when no shape row is in force` (API), `shows none of the three controls and sends none of them when the room does not say they are in force` (render).
 
 ## Contract deviations
 
@@ -79,12 +111,24 @@ From `2026-10-12-debate-shape-phase2-INTERFACE.md`:
    - `alsoRaised[]` with `claim` and `makers`.
 
    P2c consumes this through one structural port, `MapChoiceReader` (`apps/api/src/map-views.ts`). If P2b's row differs, only that module and the one `main.ts` line change. Without `rootNodeId`, no position title can be shown.
+
+   P2b settled it (P2b Contract deviations 4–5, Task 8): `MapChoiceRepository` (constructor `(pool)`, method `readMapChoiceForRun(runId)`) and the free function `readMapChoiceForRun(pool, runId)` live in **`@debateai/map`** (`packages/map/src/repository.ts`), not `@debateai/db`. The method returns P2b's `MapChoiceRecord | null`:
+   - `opening: "MAP" | "TODAYS_OPENING"`;
+   - `answers[]`: `answerId`, `statement`, `rootIndex`, `rootNodeId: string | null` (from `core.map_position`), `maker: string | null`, `filled`;
+   - `alsoRaised[]`: `keyPointId`, `claim`, `makers[]`, most-raised first;
+   - `marks[]`.
+
+   P2c's port reads only `answers[].statement`, `answers[].rootNodeId`, `alsoRaised[].claim` and `alsoRaised[].makers`, so P2b's record satisfies it structurally. `maker`, `answerId`, `keyPointId` and `marks` never leave `map-views.ts`.
 5. **The read model is a new owner route plus a snapshot field.** These are `GET /v1/answers/{id}/map` → `DebateMapViewSchema` and an optional `PublicDebateSchema.map_view`. §3.3 says only "read model + adapter field".
    - The route mirrors `GET /v1/answers/{id}/disclosure`: the answer read is the ownership check, and "not yours", "no map" and "malformed" all return one closed 404.
 6. **Position titles go through a React context** (`PositionTitlesContext`), not a field on `DebateNode`. Built with the question's catalogue, they reach the canvas and thread views without threading a catalogue through four views.
-7. **Fixed is derived from the tier on the UI** (`fixedDepthAllowedFor(planTier)`: Free → no). With today's start values, only Free disallows it. The API's normalisation (P2a) remains the authority, and no server capability field is added.
+7. **One deployment-level flag on the room read; Fixed is still derived from the tier on the UI.**
+   - **The flag.** With no `debateShapePolicy` row in force, the API's normalisation (P2a) silently drops `depth_mode`, `scrutiny` and `answer_length` (final review row "P2c:85"). So the room RESPONSE gains one optional member, `shape_settings: z.literal(true).optional()`, on BOTH `CustomerAskRoomResponseSchema` and `InternalAskRoomResponseSchema` (`packages/contract/src/index.ts`). The API's room read (`GET /v1/asks/room` in `apps/api/src/index.ts`, the handler that calls `roomDepthParams`) writes `shape_settings: true` only when `options.debateShapePolicy !== undefined`. That is the same value the handler's normalisation already reads, and after P2b `apps/api/src/main.ts` hands it only a row that `debateShapeInForce` (`@debateai/register`, P2b Task 6) says is in force. With no row in force, the member is never written, so today's room body is byte for byte the same.
+   - **The page.** /new shows Depth mode, Depth of scrutiny and Answer length ONLY once a room read has said `shape_settings === true`. Otherwise (no row, the room read failed or was refused, an older API) none of the three controls is shown, and `buildNewDebateAskConfig` gets none of them, so the ask carries none and nothing can be dropped silently. Once seen, the flag is kept for the page's life, like the decided plan, so a later failed or ALREADY_WAITING re-read does not hide the controls mid-edit.
+   - **Fixed per tier** stays UI-derived (`fixedDepthAllowedFor(planTier)`: Free → no). With today's start values, only Free disallows it. The API's normalisation (P2a) remains the authority for the values.
+   - Controller decision 2026-10-13. It replaces the earlier "no server capability field is added".
 8. **The UI config uses snake-case keys.** `buildNewDebateAskConfig` emits `depth_mode`, `scrutiny` and `answer_length`, matching its other keys. `createDebate` maps them into `depth_params.{depthMode, scrutiny, answerLength}` (§2).
-9. **The waiting-room query (`AskRoomQuerySchema`) is not changed.** If P2a adds the fields to the room query, that is P2a's change.
+9. **The waiting-room query already carries the three fields (P2a).** P2a added `depth_mode`, `scrutiny` and `answer_length` (each optional) to the server's `AskRoomQuerySchema`, and its fix wave (final review M4) added them to the typed client `getAskRoom` (`packages/contract/src/client.ts`), which appends each only when present. P2c changes neither. P2c's job is to pass them: the /new page reads the room through `useAskRoom` (`apps/ui/lib/billing/room.ts`) and, after an ALREADY_WAITING refusal, `readAskRoom`. Both get the three fields whenever the controls are shown, and only then (Task 8). The phone hand-off draft's room-query check compares them too (Task 9).
 10. **The phone hand-off draft stays `version: 1`.** It reads the two older shapes and upgrades them (Max tokens → Answer length `standard`; depth mode `manual`/`recommended` → `adaptive`), following Project 1's `RETIRED_FORM_KEYS` precedent.
 
 ## Wording picks
@@ -148,7 +192,8 @@ Fixed by ruling S8, so there is no pick: `newDebate.answerLengthShort` "Short", 
 | `apps/api/src/map-views.ts` (new) | 5 | `MapChoiceReader` port, `debateMapViewFrom`, `RepositoryAnswerMapViewApplication` |
 | `apps/api/src/index.ts` | 5 | route `GET /v1/answers/{id}/map`, policy row, `mapViews` option |
 | `apps/api/src/publications.ts` | 5 | `readPublishableMapView`, snapshot `map_view` |
-| `apps/api/src/main.ts` | 5 | wiring with P2b's reader |
+| `apps/api/src/main.ts` | 5 | wiring with P2b's reader (`MapChoiceRepository` from `@debateai/map`) |
+| `apps/api/package.json`, `pnpm-lock.yaml`, `tools/orphan-audit/src/index.ts` | 5 | apps/api depends on `@debateai/map` (P2b cross-plan change 1) |
 | `tests/unit/s7-authorization.test.ts` | 5 | policy row |
 | `tests/unit/debate-shape-map-view-api.test.ts` (new) | 5 | API tests |
 | `apps/ui/lib/v3/mapView.ts` (new) | 6 | `readAnswerMapView`, `positionTitlesFrom`, `PositionTitlesContext` |
@@ -160,12 +205,15 @@ Fixed by ruling S8, so there is no pick: `newDebate.answerLengthShort` "Short", 
 | `apps/ui/components/PublicDebateOverview.tsx`, `apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx` | 7 | public section and titles |
 | `apps/ui/messages/en/public.json`, `apps/ui/lib/i18n/public.test.mjs`, `apps/ui/app/globals.css` | 7 | English keys, source list, styles |
 | `tests/render/debate-shape-also-raised.test.tsx` (new) | 7 | render tests |
-| `apps/ui/app/new/NewDebatePageClient.tsx`, `apps/ui/app/new/defaults.tsx`, `apps/ui/lib/api.ts` | 8 | real controls, ask config, wire |
+| `packages/contract/src/index.ts` | 8 | `shape_settings` on both room responses (Contract deviation 7) |
+| `apps/api/src/index.ts` | 8 | the room read writes `shape_settings: true` only with the row in force |
+| `tests/unit/debate-shape-room-flag.test.ts` (new) | 8 | contract and API tests of the room flag |
+| `apps/ui/app/new/NewDebatePageClient.tsx`, `apps/ui/app/new/defaults.tsx`, `apps/ui/lib/api.ts` | 8 | real controls behind the room flag, room query, ask config, wire |
 | `apps/ui/lib/scrutinyDepth.ts` (deleted), `apps/ui/lib/i18n/compose.test.mjs`, `apps/ui/lib/i18n/catalog.test.mjs` | 8 | dead code and its guards |
-| `apps/ui/messages/en/newDebate.json`, `apps/ui/messages/en/compose.json`, `apps/ui/app/globals.css` | 8 | English keys; retired keys; notice style |
+| `apps/ui/messages/en/newDebate.json`, `apps/ui/messages/en/compose.json`, `apps/ui/app/globals.css` | 8 | English keys (incl. P2L's six `newDebate.languageCheck.*`); retired keys; notice style |
 | `tests/render/tier01-new-plan-tier.test.tsx`, `tests/render/debate-shape-new-controls.test.tsx` (new), `tests/unit/debate-shape-new-ask-wire.test.ts` (new) | 8 | tests |
-| `apps/ui/lib/phoneCompletionDraft.ts`, `tests/unit/phone-completion-draft-legacy.test.ts` | 9 | draft shape and legacy upgrade |
-| `apps/ui/messages/<34 locales>/{newDebate,public,compose}.json` | 10 | translations and removals |
+| `apps/ui/lib/phoneCompletionDraft.ts`, `tests/unit/phone-completion-draft-legacy.test.ts` | 9 | draft shape, legacy upgrade, room-query choices |
+| `apps/ui/messages/<34 locales>/{newDebate,public,compose}.json` | 10 | translations (incl. P2L's six keys; `ro`'s six as given) and removals |
 
 ---
 
@@ -755,14 +803,14 @@ EOF
 
 ## Task 3: The runner hands the map's also-raised points to the story
 
-**Gate:** the P2b gate in Global Constraints. P2b's map stage must exist in `apps/runner/src/index.ts`. Find the variable that holds its `MapResult` from `@debateai/map` in the scope of the story hook (`input: buildStoryRunSnapshot({`, about line 8545):
+**Gate:** the P2b gate in Global Constraints. P2b's map stage must exist in `apps/runner/src/index.ts`. P2b names the variable (P2b cross-plan change 3, Task 12): `let debateShapeMap: MapResult | null = null;`, declared before root 0 and in scope at the story hook (`input: buildStoryRunSnapshot({`, about line 9441 today; P2b moves it, so find it by its text). It is null when the run has no shape or the map was unavailable. Check that it is there:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/dialectical-engine"
-grep -n "MapResult\|runMapStage\|mapResult\|debateShapeMap" apps/runner/src/index.ts | head -20
+grep -n "let debateShapeMap: MapResult | null\|from \"@debateai/map\"" apps/runner/src/index.ts | head -5
 ```
 
-The code below calls that variable `debateShapeMap` (type `MapResult | null`, null when the shape row is absent or the map was unavailable). If P2b named it differently, use P2b's name in Step 4; nothing else changes.
+Both lines must print. The `@debateai/map` import line of `apps/runner/src/index.ts` is NEW in P2b (P2b Task 12 adds it; no such import exists before P2b) and brings `MapResult`. P2c does not touch that line. If P2b named the variable differently after all, use P2b's name in Step 4b; nothing else changes.
 
 **Files:**
 - Modify: `apps/runner/src/story-snapshot.ts`
@@ -926,11 +974,13 @@ with
 
 - [ ] **Step 4: Wire it in `apps/runner/src/index.ts`**
 
-4a. Change the import on line ~201 to:
+4a. Change the `./story-snapshot.js` import (line ~203 today; find it by `from "./story-snapshot.js"`) to:
 
 ```ts
 import { buildStoryRunSnapshot, storyAlsoRaisedFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 ```
+
+`storyAlsoRaisedFrom` is P2c's own export from `apps/runner/src/story-snapshot.ts` (Step 3b), so it joins this line, not P2b's `@debateai/map` line. `story-snapshot.ts` imports nothing from `@debateai/map`: `StoryMapSource` is structural.
 
 4b. Inside `input: buildStoryRunSnapshot({ … })`, directly after `positionNodeIds: makerPositionNodeIds,`, add:
 
@@ -940,7 +990,7 @@ import { buildStoryRunSnapshot, storyAlsoRaisedFrom, storyRotationRoleMakers, st
               alsoRaised: storyAlsoRaisedFrom(debateShapeMap),
 ```
 
-Here `debateShapeMap` is P2b's in-scope `MapResult | null` (see the gate).
+Here `debateShapeMap` is P2b's in-scope `MapResult | null` (see the gate). P2b sets it only when `shapeMapResult.kind === "MAP" && shapeMapResult.choice !== null`, so a map fallback gives `null` and the story's material stays today's.
 
 - [ ] **Step 5: Run the tests**
 
@@ -1249,11 +1299,13 @@ EOF
 - Modify: `apps/api/src/index.ts`
 - Modify: `apps/api/src/publications.ts`
 - Modify: `apps/api/src/main.ts`
+- Modify: `apps/api/package.json` (`"@debateai/map": "workspace:*"`), `pnpm-lock.yaml` (its apps/api importer, written by `pnpm install --offline`)
+- Modify: `tools/orphan-audit/src/index.ts` (the `apps/api` row gains `"map"`)
 - Modify: `tests/unit/s7-authorization.test.ts`
 - Test: `tests/unit/debate-shape-map-view-api.test.ts` (new)
 
 **Interfaces:**
-- `MapChoiceReader { readMapChoiceForRun(runId): Promise<MapChoiceRecord | null> }`, where `MapChoiceRecord = { answers: { statement, rootNodeId | null }[]; alsoRaised: { claim, makers[] }[] }`. P2b's repository satisfies this structurally; see Contract deviation 4.
+- `MapChoiceReader { readMapChoiceForRun(runId): Promise<MapChoiceRecord | null> }`, where P2c's `MapChoiceRecord = { answers: { statement, rootNodeId | null }[]; alsoRaised: { claim, makers[] }[] }`. P2b's `MapChoiceRepository` from `@debateai/map` (`packages/map/src/repository.ts`, P2b Task 8) satisfies this structurally: its record also carries `opening`, `answers[].answerId|rootIndex|maker|filled`, `alsoRaised[].keyPointId` and `marks`, which this module never reads. See Contract deviation 4.
 - `debateMapViewFrom(record, nodeIds): DebateMapView`.
 - `AnswerMapViewApplication.readMapView({ runId, nodeIds }): Promise<DebateMapView | null>`.
 - `RepositoryAnswerMapViewApplication`, `NO_MAP_VIEWS`.
@@ -1664,13 +1716,20 @@ Then replace `      ...(floor === null ? {} : { floor })` with:
 
 - [ ] **Step 6: Wire main.ts with P2b's reader** (P2b gate)
 
-Find P2b's reader class: `grep -rn "readMapChoiceForRun" packages/db/src | head`. The lines below assume it is `MapChoiceRepository` from `@debateai/db`, constructed with the runtime pool. If P2b's name or constructor differ, change only these lines. Its row must expose the `MapChoiceRecord` members (Contract deviation 4), or `tsc` refuses the assignment.
+Find P2b's reader class: `grep -rn "readMapChoiceForRun" packages/map/src | head`. It is `MapChoiceRepository` from **`@debateai/map`** (`packages/map/src/repository.ts`, P2b Task 8; P2b cross-plan change 1), constructed with the runtime pool: `new MapChoiceRepository(pool)`. It is NOT in `@debateai/db`: do not add it to any `@debateai/db` import. Its record must expose the `MapChoiceRecord` members (Contract deviation 4), or `tsc` refuses the assignment.
 
-6a. Add `MapChoiceRepository` to the big `@debateai/db` import in `apps/api/src/main.ts` (line ~47). After `import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";`, add:
+6a. In `apps/api/src/main.ts`, after `import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";`, add:
 
 ```ts
+import { MapChoiceRepository } from "@debateai/map";
 import { RepositoryAnswerMapViewApplication } from "./map-views.js";
 ```
+
+6a-2. apps/api now depends on `@debateai/map`:
+- `apps/api/package.json` (one line of JSON): in `"dependencies"`, after `"@debateai/mail-templates":"workspace:*",`, add `"@debateai/map":"workspace:*",`.
+- `tools/orphan-audit/src/index.ts`: in the `["apps/api", "apps/api", [ … ]]` row, add `"map"` after `"judgement"`.
+- Run `cd "$(git rev-parse --show-toplevel)/dialectical-engine" && pnpm install --offline`. It links the workspace package and updates `pnpm-lock.yaml`'s `apps/api` importer; nothing is downloaded. If it refuses offline, stop and report BLOCKED with its output.
+- Then `pnpm run audit:architecture` must exit 0.
 
 6b. Before `const publications = publicationCipher === undefined`, add:
 
@@ -1682,7 +1741,7 @@ const mapViews = new RepositoryAnswerMapViewApplication(new MapChoiceRepository(
 
 6c. In `new PostgresPublicationApplication(…)`, after `new RepositoryPublicationStoryReader(storyRepository)`, add `,\n      mapViews`.
 
-6d. In `buildApi({ … })`, after the `disclosures: new RepositoryAnswerDisclosureApplication(…),` line, add:
+6d. In `buildApi({ … })`, after the `  disclosures: ownerDisclosures,` line (line ~1498 today; `ownerDisclosures` is built at line ~1440), add:
 
 ```ts
   mapViews,
@@ -1709,6 +1768,7 @@ Run each, one at a time:
 ```bash
 cd "$(git rev-parse --show-toplevel)/dialectical-engine"
 git add apps/api/src/map-views.ts apps/api/src/index.ts apps/api/src/publications.ts apps/api/src/main.ts \
+  apps/api/package.json pnpm-lock.yaml tools/orphan-audit/src/index.ts \
   tests/unit/s7-authorization.test.ts tests/unit/debate-shape-map-view-api.test.ts
 git commit -m "$(cat <<'EOF'
 API: the owner's map view route and the published copy (debate shape P2c)
@@ -2645,9 +2705,13 @@ EOF
 **Gates:** the Project 1 gate and the P2a gate in Global Constraints.
 - **Project 1** removes the Concurrency and Branching width controls and rewrites `newDebate.legacyNotice`. This task assumes its version of `NewDebatePageClient.tsx`, `newDebate.json` and `tier01-new-plan-tier.test.tsx`. It touches only the three controls, the notice and Max tokens.
 - **Merge with Project 1:** if Project 1 is not yet merged into this branch, stop. Do not cherry-pick or recreate its edits here.
-- **P2a** adds `depthMode`, `scrutiny` and `answerLength` to `DepthParamsSchema`.
+- **P2a** adds `depthMode`, `scrutiny` and `answerLength` to `DepthParamsSchema`, and the same three (snake case, optional) to `AskRoomQuerySchema` and the typed client's `getAskRoom` (Contract deviation 9).
+- **P2b in-force gate** (Global Constraints) before Step 5b: the room flag mirrors the row `apps/api/src/main.ts` hands the API, which must be the in-force row only.
 
 **Files:**
+- Modify: `packages/contract/src/index.ts` (`shape_settings` on both room responses)
+- Modify: `apps/api/src/index.ts` (the `GET /v1/asks/room` handler)
+- Test: `tests/unit/debate-shape-room-flag.test.ts` (new)
 - Modify: `apps/ui/app/new/NewDebatePageClient.tsx`
 - Modify: `apps/ui/app/new/defaults.tsx`
 - Modify: `apps/ui/lib/api.ts`
@@ -2668,6 +2732,9 @@ EOF
   - `fixedDepthAllowedFor(planTier)`.
 - `NewDebateAskDefaults` gets the optional fields `depthMode`, `scrutiny` and `answerLength`. The config keys are `depth_mode`, `scrutiny` and `answer_length`.
 - `createDebate` puts these into `depth_params.depthMode`, `depth_params.scrutiny` and `depth_params.answerLength`.
+- Contract: `CustomerAskRoomResponseSchema` and `InternalAskRoomResponseSchema` each gain `shape_settings: z.literal(true).optional()` (last member). `AskRoomResponse` therefore has an optional `shape_settings?: true` on both union members.
+- API: the room read adds `shape_settings: true` as the LAST member of its body only when `options.debateShapePolicy !== undefined` (`ApiOptions`, the value the handler's normalisation already reads). Without it the member is never written.
+- Page: `shapeSettings` (boolean state, false at first) turns true the first time a room read says `shape_settings === true` and stays true. Only then are the three controls rendered, the room query (`useAskRoom` and the ALREADY_WAITING `readAskRoom`) carries `depth_mode`, `scrutiny` and `answer_length`, and `buildNewDebateAskConfig` gets `depthMode`, `scrutiny` and `answerLength`.
 
 - [ ] **Step 1: Write the failing wire test**
 
@@ -2735,6 +2802,94 @@ describe("debate shape P2c — the ask carries depth mode, scrutiny and answer l
 });
 ```
 
+- [ ] **Step 1b: Write the failing room-flag test (contract and API)**
+
+Create `tests/unit/debate-shape-room-flag.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { buildApi, type AskApplication } from "@debateai/api";
+import { AskRoomResponseSchema } from "@debateai/contract";
+import { debateShapePolicyStartValues } from "@debateai/register";
+import type { AskRoomReader } from "../../apps/api/src/ask-room.js";
+import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+
+/**
+ * Debate shape P2c (Contract deviation 7; P2a final review row "P2c:85"): with no debateShapePolicy row in force, the
+ * API drops depth_mode, scrutiny and answer_length without a word. So the room read says, with one optional member,
+ * whether they are in force, and /new offers them only then. Without the row the member is never written: today's
+ * room body, byte for byte.
+ */
+
+const CUSTOMER_FITS = { room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null } as const;
+const INTERNAL_FITS = { ...CUSTOMER_FITS, funding: { kind: "INTERNAL", expires_at: "2026-10-14T00:00:00.000Z" } } as const;
+const ROOM_URL = "/v1/asks/room?plan_tier=premium&composition_budget_tier=low&depth=2";
+
+function fixtureApplication(): AskApplication {
+  return {
+    withContentLease: async (_runId, use) => use(),
+    submit: async () => ({ run_ref: "11111111-1111-4111-8111-111111111111", status: "QUEUED" as const }),
+    readAnswer: async () => null,
+    readRunAnswer: async () => null,
+    readRun: async () => null,
+    readAnswerIndex: async (_session, limit, offset) => ({ items: [], open_runs: [], limit, offset, total: 0 }),
+    readInspection: async () => null,
+    readLedgerDigest: async () => null,
+    readNode: async () => null,
+    recordInvestigation: async () => null,
+    unlinkMemoryLink: async () => null,
+    readDeployment: async () => ({
+      register: { register_version: 1, rows: [] }, scorecards: [], model_ledger: [],
+      fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
+    }),
+    events: async function* () {}
+  };
+}
+
+async function roomBody(input: Readonly<{ policy: boolean; internal?: boolean }>): Promise<string> {
+  const identity = testHttpIdentity("shape-room-flag");
+  const askRoom: AskRoomReader = {
+    readRoom: async () => ({
+      room: "FITS", scope: null, resetsAt: null, waitingRunRef: null, planId: null,
+      ...(input.internal === true ? { funding: { kind: "INTERNAL" as const, expiresAt: new Date(INTERNAL_FITS.funding.expires_at) } } : {})
+    })
+  };
+  const api = buildApi({
+    application: fixtureApplication(), sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN, askRoom,
+    ...(input.policy ? { debateShapePolicy: debateShapePolicyStartValues() } : {})
+  });
+  try {
+    const response = await api.inject({ method: "GET", url: ROOM_URL, headers: testSessionHeaders(identity) });
+    expect(response.statusCode).toBe(200);
+    return response.body;
+  } finally {
+    await api.close();
+  }
+}
+
+describe("debate shape P2c — the room says whether the shape settings are in force", () => {
+  it.each([["customer", CUSTOMER_FITS], ["internal", INTERNAL_FITS]] as const)(
+    "the %s room: the member absent parses, true parses, false is refused", (_kind, room) => {
+      expect("shape_settings" in AskRoomResponseSchema.parse(room)).toBe(false);
+      expect(AskRoomResponseSchema.parse({ ...room, shape_settings: true })).toMatchObject({ shape_settings: true });
+      expect(AskRoomResponseSchema.safeParse({ ...room, shape_settings: false }).success).toBe(false);
+    }
+  );
+
+  it("keeps today's room body when no shape row is in force", async () => {
+    expect(await roomBody({ policy: false })).toBe(JSON.stringify(CUSTOMER_FITS));
+    expect(await roomBody({ policy: false, internal: true })).toBe(JSON.stringify(INTERNAL_FITS));
+  });
+
+  it("says shape_settings: true, last, on the customer and the internal room when the row is in force", async () => {
+    expect(await roomBody({ policy: true })).toBe(JSON.stringify({ ...CUSTOMER_FITS, shape_settings: true }));
+    expect(await roomBody({ policy: true, internal: true })).toBe(JSON.stringify({ ...INTERNAL_FITS, shape_settings: true }));
+  });
+});
+```
+
+The internal room (with `funding`) is refused by the strict customer schema, so its cases prove that `InternalAskRoomResponseSchema` itself carries the member.
+
 - [ ] **Step 2: Write the failing render test**
 
 Create `tests/render/debate-shape-new-controls.test.tsx`:
@@ -2750,9 +2905,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * Debate shape P2c (spec 2026-10-12 §3.2, rulings S6–S8): /new's Depth mode, Depth of scrutiny and
  * Answer length are real choices sent with the ask. Fixed and the scrutiny levels are Premium's;
  * Answer length is every plan's. Nothing on the page still says "not sent", and Max tokens is gone.
+ * The three are offered only once the room read says the settings are in force (`shape_settings`);
+ * otherwise the API would drop them silently, so the page shows and sends none of them.
  */
 
-const mocks = vi.hoisted(() => ({ createDebate: vi.fn(), push: vi.fn(), readSession: vi.fn() }));
+const mocks = vi.hoisted(() => ({ createDebate: vi.fn(), push: vi.fn(), readSession: vi.fn(), getAskRoom: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push }),
@@ -2763,8 +2920,18 @@ vi.mock("@/components/AuthGate", () => ({
 }));
 vi.mock("@/lib/api", () => ({
   createDebate: mocks.createDebate,
-  contractClient: { readSession: mocks.readSession, readSensitiveDataConsent: async () => ({ status: "given" as const }) }
+  contractClient: {
+    readSession: mocks.readSession,
+    getAskRoom: mocks.getAskRoom,
+    readSensitiveDataConsent: async () => ({ status: "given" as const })
+  }
 }));
+
+/** A room read from an API whose debate shape row is in force (Contract deviation 7). */
+const SHAPE_ROOM = { room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null, shape_settings: true } as const;
+/** The same room from an API with no row in force: the member is absent. */
+const { shape_settings: _flag, ...PLAIN_ROOM } = SHAPE_ROOM;
+const CHOICE_KEYS = ["depth_mode", "scrutiny", "answer_length"] as const;
 
 import NewDebatePage from "../../apps/ui/app/new/NewDebatePageClient.js";
 import homeCatalog from "../../apps/ui/messages/en/home.json" with { type: "json" };
@@ -2789,6 +2956,7 @@ describe("debate shape P2c — the /new controls", () => {
     mocks.createDebate.mockReset().mockResolvedValue({ id: "run-shape" });
     mocks.push.mockReset();
     mocks.readSession.mockReset().mockRejectedValue(new Error("session unavailable in render test"));
+    mocks.getAskRoom.mockReset().mockResolvedValue(SHAPE_ROOM);
     const container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -2805,7 +2973,14 @@ describe("debate shape P2c — the /new controls", () => {
     await act(async () => root!.render(
       <NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />
     ));
+    // Two settles: the first room read resolves, then the flag shows the controls and the room is read again.
     await settle();
+    await settle();
+  }
+
+  /** Every room query the page sent, in order. */
+  function roomQueries(): Record<string, unknown>[] {
+    return mocks.getAskRoom.mock.calls.map((call) => call[0] as Record<string, unknown>);
   }
 
   async function click(selector: string): Promise<void> {
@@ -2909,15 +3084,53 @@ describe("debate shape P2c — the /new controls", () => {
       plan_tier: "free", depth_mode: "adaptive", scrutiny: "standard", answer_length: "short"
     });
   });
+
+  it.each([
+    ["the room has no shape_settings (no row in force)", () => mocks.getAskRoom.mockResolvedValue(PLAIN_ROOM)],
+    ["the room read fails", () => mocks.getAskRoom.mockRejectedValue(new Error("room unavailable in render test"))]
+  ])("shows none of the three controls and sends none of them when the room does not say they are in force: %s", async (_state, arrange) => {
+    arrange();
+    await renderPage();
+    await inputValue("#topic", "Should the city fund the tram extension?");
+    await click("#planTier-premium");
+    await click(".ndOptionsToggle");
+    expect(document.querySelector("#depthMode")).toBeNull();
+    expect(document.querySelector("#scrutinyDepth")).toBeNull();
+    expect(document.querySelectorAll('[data-field="answerLength"]')).toHaveLength(0);
+    // The retired controls are gone either way: they were never sent.
+    expect(document.querySelector(".ndLegacyNotice")).toBeNull();
+    expect(document.querySelector("#maxTokens")).toBeNull();
+    await submitForm();
+    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
+    for (const key of CHOICE_KEYS) expect(mocks.createDebate.mock.calls[0]?.[1]).not.toHaveProperty(key);
+    // The room is read for today's query only.
+    expect(roomQueries().length).toBeGreaterThan(0);
+    for (const query of roomQueries()) for (const key of CHOICE_KEYS) expect(query).not.toHaveProperty(key);
+  });
+
+  it("reads the room with the three choices only once it says they are in force, and keeps them shown when a later read fails", async () => {
+    await renderPage();
+    expect(Object.keys(roomQueries()[0]!).sort()).toEqual(["composition_budget_tier", "depth", "plan_tier"]);
+    expect(roomQueries().at(-1)).toMatchObject({ depth_mode: "adaptive", scrutiny: "standard", answer_length: "standard" });
+    // A later read fails (advisory: null), or is refused: the flag already seen is kept.
+    mocks.getAskRoom.mockRejectedValue(new Error("room unavailable in render test"));
+    await click(".ndOptionsToggle");
+    await click("#answerLength-detailed");
+    expect(roomQueries().at(-1)).toMatchObject({ answer_length: "detailed" });
+    expect(document.querySelector("#depthMode")).not.toBeNull();
+    expect(document.querySelector("#answerLength-detailed")?.getAttribute("aria-checked")).toBe("true");
+  });
 });
 ```
 
-- [ ] **Step 3: Run both to see them fail**
+- [ ] **Step 3: Run the three to see them fail**
 
 Run: `cd "$(git rev-parse --show-toplevel)/dialectical-engine" && pnpm exec vitest run tests/unit/debate-shape-new-ask-wire.test.ts`
 Expected: FAIL. `fixedDepthAllowedFor` is not a function, and `depth_mode` is missing.
+Then run: `pnpm exec vitest run tests/unit/debate-shape-room-flag.test.ts`
+Expected: FAIL. `shape_settings: true` is refused by both strict room schemas, and the in-force room body has no `shape_settings`. The two "absent"/"false" checks and `keeps today's room body` already pass.
 Then run: `pnpm exec vitest run tests/render/debate-shape-new-controls.test.tsx`
-Expected: FAIL. The depth mode is `fixed`, and `#answerLength-standard` does not exist.
+Expected: FAIL. The depth mode is `fixed`, `#answerLength-standard` does not exist, and no room query carries the three choices.
 
 - [ ] **Step 4: `apps/ui/app/new/defaults.tsx`**
 
@@ -3013,9 +3226,44 @@ function optionalDepthChoice<K extends "depthMode" | "scrutiny" | "answerLength"
     },
 ```
 
+- [ ] **Step 5b: The room says whether the settings are in force (contract and API)** (P2b in-force gate first)
+
+5b-1. `packages/contract/src/index.ts`, `CustomerAskRoomResponseSchema`: after the `waits_for: WaitsForSchema.optional()` member (and its comment), add a member, so the object ends:
+
+```ts
+  waits_for: WaitsForSchema.optional(),
+  // Debate shape P2c (Contract deviation 7): present, and only ever `true`, when the deployment's
+  // debateShapePolicy row is in force, so the /new page may offer depth mode, scrutiny and answer
+  // length. Absent otherwise: the API would drop them, so the page offers none of them.
+  shape_settings: z.literal(true).optional()
+}).strict().superRefine((answer, context) => {
+```
+
+5b-2. Same file, `InternalAskRoomResponseSchema` (written on few lines): replace `funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional()` with `funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional(),shape_settings:z.literal(true).optional()`. Neither `superRefine` changes.
+
+5b-3. `apps/api/src/index.ts`, the `GET /v1/asks/room` handler (find it by `"/v1/asks/room", routePolicy(`; it is the handler that calls `roomDepthParams(query.data)`). In its `reply.send(AskRoomResponseSchema.parse({ … }))`, replace the last member
+
+```ts
+      ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor })
+    }));
+```
+
+with
+
+```ts
+      ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor }),
+      // Debate shape P2c (Contract deviation 7): the same row the normalisation above reads. After P2b, main.ts hands
+      // the API only an in-force row (`debateShapeInForce`); without one the member is never written, so the body is
+      // today's byte for byte, and the page offers none of the three settings it would drop.
+      ...(options.debateShapePolicy === undefined ? {} : { shape_settings: true as const })
+    }));
+```
+
+5b-4. Regenerate the contract: `cd "$(git rev-parse --show-toplevel)/dialectical-engine" && pnpm run generate:contract` exits 0 (it rewrites the git-ignored `packages/contract/generated/*`).
+
 - [ ] **Step 6: `apps/ui/app/new/NewDebatePageClient.tsx` (Project 1's version)**
 
-6a. Delete the line `import { SCRUTINY_DEPTHS, ScrutinyDepth } from "@/lib/scrutinyDepth";`. In the `./defaults` import, add `ANSWER_LENGTHS,` `DEPTH_MODES,` `SCRUTINY_LEVELS,` `fixedDepthAllowedFor,` `type AnswerLength,` `type DepthMode,` `type Scrutiny,` beside the existing names.
+6a. Delete the line `import { SCRUTINY_DEPTHS, ScrutinyDepth } from "@/lib/scrutinyDepth";`. In the `./defaults` import, add `ANSWER_LENGTHS,` `DEPTH_MODES,` `SCRUTINY_LEVELS,` `fixedDepthAllowedFor,` `type AnswerLength,` `type DepthMode,` `type Scrutiny,` beside the existing names. In the `@/lib/billing/room` import, add `type AskRoomQuery,` (it becomes `import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom, type AskRoomQuery } from "@/lib/billing/room";`).
 
 6b. Replace
 
@@ -3075,6 +3323,48 @@ Replace `  const [maxTokens, setMaxTokens] = useState(800);` with:
   const [answerLength, setAnswerLength] = useState<AnswerLength>("standard");
 ```
 
+6c-2. The room flag and the room query (Contract deviations 7 and 9). Replace
+
+```ts
+  const [room, setRoom] = useAskRoom(contractClient, {
+    plan_tier: planTier, composition_budget_tier: budgetTier, depth
+  });
+```
+
+with
+
+```ts
+  // Debate shape P2c (Contract deviation 7): true once a room read has said the deployment's shape row is
+  // in force. Kept for the page's life, like the decided plan below: a later failed, refused or
+  // ALREADY_WAITING read never hides the controls mid-edit. Without it the page offers and sends none of
+  // the three settings, which the API would otherwise drop without a word.
+  const [shapeSettings, setShapeSettings] = useState(false);
+  // Contract deviation 9: the room is read for the ask this form would send, the three choices included
+  // exactly when they are shown (and so sent).
+  const roomQuery: AskRoomQuery = {
+    plan_tier: planTier, composition_budget_tier: budgetTier, depth,
+    ...(shapeSettings ? { depth_mode: depthMode, scrutiny, answer_length: answerLength } : {})
+  };
+  const [room, setRoom] = useAskRoom(contractClient, roomQuery);
+  useEffect(() => {
+    if (room?.shape_settings === true) setShapeSettings(true);
+  }, [room]);
+```
+
+In `submit`'s ALREADY_WAITING branch, replace
+
+```ts
+        const fresh = await readAskRoom(contractClient, {
+          plan_tier: planTier, composition_budget_tier: budgetTier, depth
+        });
+```
+
+with
+
+```ts
+        const fresh = await readAskRoom(contractClient, roomQuery);
+```
+
 6d. In `choosePlanTier`, replace `    setDepthMode("fixed");` with `    setDepthMode("adaptive");`, and delete the line `    setMaxTokens(800);`.
 
 6e. In the `buildNewDebateAskConfig({ … })` call in `submit`, replace
@@ -3088,15 +3378,22 @@ with
 
 ```ts
         depth,
-        depthMode,
-        scrutiny,
-        answerLength,
+        // Debate shape P2c (Contract deviation 7): sent only when the room says the settings are in force.
+        ...(shapeSettings ? { depthMode, scrutiny, answerLength } : {}),
         asOfWasEdited: false,
 ```
 
-6f. In the OPTIONS panel, replace everything between the line `            <div id="additionalRunOptions" className="ndCard ndLegacy">` and the line `              <p className="ndProvenance">`. That span is the DR-115 comment, the `ndLegacyNotice` paragraph, both `SelectRow`s, Project 1's comment and the `maxTokens` `SliderRow`. Replace it with:
+6f. In the OPTIONS panel, replace everything between the line `            <div id="additionalRunOptions" className="ndCard ndLegacy">` and the line `              <p className="ndProvenance">`. That span is the DR-115 comment, the `ndLegacyNotice` paragraph, both `SelectRow`s, Project 1's comment and the `maxTokens` `SliderRow`. The notice and Max tokens go in every case (they were never sent); the three new controls render only with `shapeSettings`. Replace it with:
 
 ```tsx
+              {/* Parallel calls (owner ruling 2026-10-12): no Branching width and no
+                  Concurrency control here. How many calls run at once is an owner-only
+                  register setting; how wide a claim branches is the algorithm's choice
+                  (one support and one attack reply). */}
+              {/* Debate shape P2c (Contract deviation 7): the three settings are offered only when the
+                  room says they are in force; otherwise the API would drop them silently. */}
+              {shapeSettings ? (
+                <>
               <SelectRow
                 id="depthMode"
                 label={t(catalog, "newDebate.depthMode")}
@@ -3120,10 +3417,6 @@ with
                 onChange={(value) => setScrutiny(value as Scrutiny)}
                 options={SCRUTINY_LEVELS.map((level) => ({ value: level, label: t(catalog, SCRUTINY_WORDS[level].label) }))}
               />
-              {/* Parallel calls (owner ruling 2026-10-12): no Branching width and no
-                  Concurrency control here. How many calls run at once is an owner-only
-                  register setting; how wide a claim branches is the algorithm's choice
-                  (one support and one attack reply). */}
               {/* S8: Answer length replaces Max tokens and is every plan's choice, Free's included. */}
               <SegmentedRow
                 field="answerLength"
@@ -3133,7 +3426,11 @@ with
                 value={answerLength}
                 onChange={(value) => setAnswerLength(value as AnswerLength)}
               />
+                </>
+              ) : null}
 ```
+
+Keep the JSX indentation the file's linter wants; the structure is: Project 1's comment, the P2c comment, then `{shapeSettings ? (<> … three controls … </>) : null}`.
 
 6g. In `SelectRow`, change the `options` prop type (in its props type) to `options: ReadonlyArray<{ value: string; label: string; disabled?: boolean }>;`. Change its `<option …>` line to:
 
@@ -3192,11 +3489,34 @@ Replace every line from `  "newDebate.legacyNotice": …` through `  "newDebate.
   "newDebate.answerLengthShort": "Short",
   "newDebate.answerLengthStandard": "Standard",
   "newDebate.answerLengthDetailed": "Detailed",
+  "newDebate.languageCheck.title": "Your question's language",
+  "newDebate.languageCheck.body": "Your question mixes {languages}. The AIs debate best when the whole question is in one language, so we suggest this version in {language}:",
+  "newDebate.languageCheck.use": "Use this version",
+  "newDebate.languageCheck.keep": "Keep my wording",
+  "newDebate.languageCheck.edit": "Edit",
+  "newDebate.languageCheck.proposalLabel": "Suggested version",
 ```
 
-That span has nine keys removed (`legacyNotice`, `selectionStrategy`, `manual`, `recommended`, the three `scrutiny*Hint` and the two `maxTokens*`). Ten keys are new. `depthMode`, `fixed`, `adaptive`, `scrutinyDepth`, `scrutinyStandard`, `scrutinyDeep` and `scrutinyExhaustive` keep their values.
+That span has nine keys removed (`legacyNotice`, `selectionStrategy`, `manual`, `recommended`, the three `scrutiny*Hint` and the two `maxTokens*`). Sixteen keys are new: ten for the three controls, and the six `newDebate.languageCheck.*` keys of P2L Task 18 (amendment P2c-1; English text exactly as in P2L Task 18's table). `depthMode`, `fixed`, `adaptive`, `scrutinyDepth`, `scrutinyStandard`, `scrutinyDeep` and `scrutinyExhaustive` keep their values.
+
+The six `languageCheck` keys have no reader until P2L Task 18 (the one-language pop-up), which runs after Task 10 and reuses them. The `newDebate` catalogue has no unused-key test (`catalog.test.mjs` checks only key parity and placeholders), so they are safe to land first. Do not write any code that reads them here.
 
 - [ ] **Step 9: Update `tests/render/tier01-new-plan-tier.test.tsx` (Project 1's version)**
+
+9h (do this one first). The file's room read must say the shape settings are in force, or the three controls this step counts are not rendered (Contract deviation 7). Today its `contractClient` mock has no `getAskRoom`, so every room read fails and is `null`.
+- In `vi.hoisted(() => ({ … }))`, add `getAskRoom: vi.fn(),` after `readSession: vi.fn(),`.
+- In the `vi.mock("@/lib/api", …)` factory, change the `contractClient` line to `contractClient: { readSession: mocks.readSession, getAskRoom: mocks.getAskRoom, readSensitiveDataConsent: async () => ({ status: "given" as const }) }`.
+- In `beforeEach`, after `mocks.readSession.mockReset()…;`, add:
+
+```ts
+    // Debate shape P2c (Contract deviation 7): a deployment whose shape row is in force, so the three settings show.
+    mocks.getAskRoom.mockReset().mockResolvedValue({
+      room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null, shape_settings: true
+    });
+```
+
+- In `renderPage`, after its `await settle();`, add a second `await settle();` (the first room read resolves, then the controls render and the room is read again).
+- `tests/render/b10-room-notice.test.tsx` is NOT changed: its rooms carry no `shape_settings`, so its exact room-query pins (`toHaveBeenCalledWith({ plan_tier, composition_budget_tier, depth })`) stay true.
 
 9a. S01-27: change the title to `"S01-27 R4 locks all twelve controls while Free is chosen, when %s"`. Delete `      "maxTokens"` from `lockedIds`, and remove the trailing comma it leaves after `"scrutinyDepth"`. Change `.toHaveLength(13)` to `.toHaveLength(12)` and `Array.from({ length: 13 }, …)` to `Array.from({ length: 12 }, …)`. Before `expect(document.querySelector('#modelStrength-hint')…`, add:
 
@@ -3280,7 +3600,12 @@ with
 - [ ] **Step 10: Run the tests (one at a time)**
 
 - `cd "$(git rev-parse --show-toplevel)/dialectical-engine" && pnpm exec vitest run tests/unit/debate-shape-new-ask-wire.test.ts` → PASS (5).
-- `pnpm exec vitest run tests/render/debate-shape-new-controls.test.tsx` → PASS (5).
+- `pnpm exec vitest run tests/unit/debate-shape-room-flag.test.ts` → PASS (4).
+- `pnpm exec vitest run tests/unit/debate-shape-submit.test.ts` → PASS (P2a's room-read cases, unchanged).
+- `pnpm exec vitest run tests/unit/b7a-room-read.test.ts` → PASS.
+- `pnpm exec vitest run tests/unit/b7a-contract-client.test.ts` → PASS.
+- `pnpm exec vitest run tests/render/debate-shape-new-controls.test.tsx` → PASS (8).
+- `pnpm exec vitest run tests/render/b10-room-notice.test.tsx` → PASS, unchanged.
 - `pnpm exec vitest run tests/render/tier01-new-plan-tier.test.tsx` → PASS.
 - `pnpm exec vitest run tests/unit/tier01-ask-wire.test.ts` → PASS.
 - `pnpm exec vitest run tests/render/ux01-new-debate-form.test.tsx` → PASS.
@@ -3294,7 +3619,8 @@ with
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/dialectical-engine"
-git add apps/ui/app/new/NewDebatePageClient.tsx apps/ui/app/new/defaults.tsx apps/ui/lib/api.ts apps/ui/lib/i18n/compose.test.mjs \
+git add packages/contract/src/index.ts apps/api/src/index.ts tests/unit/debate-shape-room-flag.test.ts \
+  apps/ui/app/new/NewDebatePageClient.tsx apps/ui/app/new/defaults.tsx apps/ui/lib/api.ts apps/ui/lib/i18n/compose.test.mjs \
   apps/ui/lib/i18n/catalog.test.mjs apps/ui/messages/en/newDebate.json apps/ui/messages/en/compose.json apps/ui/app/globals.css \
   tests/render/tier01-new-plan-tier.test.tsx tests/render/debate-shape-new-controls.test.tsx tests/unit/debate-shape-new-ask-wire.test.ts
 git commit -m "$(cat <<'EOF'
@@ -3302,9 +3628,14 @@ New debate: depth mode, scrutiny and answer length are real (debate shape P2c)
 
 The three /new controls are sent in depth_params (Adaptive and Standard by
 default; Fixed and the scrutiny levels on Premium; Answer length Short /
-Standard / Detailed for every plan, replacing Max tokens). The "not sent"
-notice and the dead scrutiny presets are gone. English words only; the other
-34 locales follow in the translation task.
+Standard / Detailed for every plan, replacing Max tokens), and are offered
+only when the room read says the deployment's shape row is in force
+(shape_settings: true; absent, the room body is today's and the ask carries
+none of them, so nothing is dropped silently). The room is read with the
+three choices whenever they are shown. The "not sent" notice and the dead
+scrutiny presets are gone. English words only, including the six
+languageCheck keys P2L's pop-up will read; the other 34 locales follow in
+the translation task.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 EOF
@@ -3329,6 +3660,7 @@ The `git rm` of Step 7a is already staged and goes into this commit.
   - Project 1's shape (with `maxTokens`);
   - the shape from before parallel calls (with `maxTokens`, `branching` and `concurrency`).
 - A submitted config may carry `depth_mode`, `scrutiny` and `answer_length`. An older one without them stays valid.
+- `SubmittedPhoneDraft.query` (the room query) may carry the same three (`depth_mode?`, `scrutiny?`, `answer_length?`), as /new now sends them (Contract deviation 9). The check compares them with the config's when present, as it already compares `plan_tier`, `composition_budget_tier` and `depth`. The page sends them in both or in neither (both follow the one room flag), so a draft with the three on one side only is refused. An older draft with none on either side stays valid.
 
 - [ ] **Step 1: Rewrite the test**
 
@@ -3394,10 +3726,14 @@ const legacyConfig = {
   steering_annotations: []
 };
 
+const choices = { depth_mode: "fixed", scrutiny: "deep", answer_length: "detailed" } as const;
+/** The room query as the page sent it before debate shape P2c (and still sends it with no shape row in force). */
+const legacyQuery = { plan_tier: "premium", composition_budget_tier: "low", depth: 2 } as const;
+
 const submitted: SubmittedPhoneDraft = {
   topic: form.topic,
-  config: { ...legacyConfig, depth_mode: "fixed", scrutiny: "deep", answer_length: "detailed" },
-  query: { plan_tier: "premium", composition_budget_tier: "low", depth: 2 }
+  config: { ...legacyConfig, ...choices },
+  query: { ...legacyQuery, ...choices }
 };
 
 function storeRecord(recordForm: Record<string, unknown>, recordSubmitted: SubmittedPhoneDraft = submitted): string {
@@ -3454,9 +3790,26 @@ describe("phone-completion draft with Answer length and the two depth modes", ()
   });
 
   it("accepts a submitted ask with or without the three choices, and refuses an unknown one", () => {
-    storeRecord({ ...form }, { ...submitted, config: legacyConfig });
+    storeRecord({ ...form }, { ...submitted, config: legacyConfig, query: legacyQuery });
     expect(phoneCompletionDraftForOwner(OWNER)).not.toBeNull();
     storeRecord({ ...form }, { ...submitted, config: { ...submitted.config, scrutiny: "infinite" } });
+    expect(phoneCompletionDraftForOwner(OWNER)).toBeNull();
+  });
+
+  it("compares the room query's three choices with the ask's, as it compares the depth", () => {
+    storeRecord({ ...form }, submitted);
+    expect(phoneCompletionDraftForOwner(OWNER)).not.toBeNull();
+    // A room query whose choice differs from the ask's is refused, like a differing depth.
+    storeRecord({ ...form }, { ...submitted, query: { ...submitted.query, scrutiny: "exhaustive" } });
+    expect(phoneCompletionDraftForOwner(OWNER)).toBeNull();
+    // The three on one side only: the page sends them in both or in neither.
+    storeRecord({ ...form }, { ...submitted, query: legacyQuery });
+    expect(phoneCompletionDraftForOwner(OWNER)).toBeNull();
+    storeRecord({ ...form }, { ...submitted, config: legacyConfig });
+    expect(phoneCompletionDraftForOwner(OWNER)).toBeNull();
+    // A partial set is not a shape the page sends.
+    const { answer_length: _length, ...twoChoices } = choices;
+    storeRecord({ ...form }, { ...submitted, query: { ...legacyQuery, ...twoChoices } });
     expect(phoneCompletionDraftForOwner(OWNER)).toBeNull();
   });
 
@@ -3488,6 +3841,15 @@ export type PhoneDraftForm = {
 };
 ```
 
+Then replace the `SubmittedPhoneDraft` type with (the room query may carry the three choices, Contract deviation 9):
+
+```ts
+export type SubmittedPhoneDraft = { topic: string; config: Record<string, unknown>; query: {
+    plan_tier: 'free' | 'premium'; composition_budget_tier: 'low' | 'medium' | 'high'; depth: number;
+    depth_mode?: 'fixed' | 'adaptive'; scrutiny?: 'standard' | 'deep' | 'exhaustive'; answer_length?: 'short' | 'standard' | 'detailed';
+} };
+```
+
 3b. Delete the now-unused `const finiteInt = …;` line.
 
 3c. Replace `function validSubmitted(…) { … }` with:
@@ -3496,6 +3858,7 @@ export type PhoneDraftForm = {
 const ASK_CONFIG_KEYS = ['plan_tier', 'risk_tier', 'tier_source', 'tier_provenance_ref', 'composition_budget_tier', 'depth', 'decision_scope', 'as_of', 'steering_presets', 'steering_annotations'];
 /** Debate shape P2c: the ask now also carries the three depth choices; an ask saved before carries none. */
 const DEPTH_CHOICE_CONFIG_KEYS = ['depth_mode', 'scrutiny', 'answer_length'];
+const ROOM_QUERY_KEYS = ['plan_tier', 'composition_budget_tier', 'depth'];
 function validSubmitted(value: unknown): value is SubmittedPhoneDraft {
     if (!keys(value, ['topic', 'config', 'query']) || typeof value.topic !== 'string') return false;
     const withChoices = keys(value.config, [...ASK_CONFIG_KEYS, ...DEPTH_CHOICE_CONFIG_KEYS]);
@@ -3505,9 +3868,15 @@ function validSubmitted(value: unknown): value is SubmittedPhoneDraft {
     if (c.tier_provenance_ref !== (c.tier_source === 'ASKER' ? 'asker:ui-selection' : c.tier_source === 'MACHINE_DEFAULT' ? 'machine:plan-tier-free' : null)) return false;
     const depthParams = withChoices ? {depth:c.depth, depthMode:c.depth_mode, scrutiny:c.scrutiny, answerLength:c.answer_length} : {depth:c.depth};
     const ask = AskRequestSchema.safeParse({question_line:value.topic, risk_tier:c.risk_tier,tier_source:c.tier_source,tier_provenance_ref:c.tier_provenance_ref,composition_budget_tier:c.composition_budget_tier,depth_params:depthParams,decision_scope:c.decision_scope,as_of:c.as_of,steering_presets:c.steering_presets,plan_tier:c.plan_tier,steering_annotations:c.steering_annotations});
-    if (!keys(value.query, ['plan_tier','composition_budget_tier','depth']) || typeof value.query.depth !== 'number') return false;
-    const room = AskRoomQuerySchema.safeParse({...value.query, depth: String(value.query.depth)});
-    return ask.success && room.success && room.data.plan_tier === c.plan_tier && room.data.composition_budget_tier === c.composition_budget_tier && room.data.depth === c.depth;
+    // Debate shape P2c (Contract deviation 9): the room query carries the three choices exactly when the ask does
+    // (both follow the page's one room flag); an older draft carries them in neither.
+    const queryWithChoices = keys(value.query, [...ROOM_QUERY_KEYS, ...DEPTH_CHOICE_CONFIG_KEYS]);
+    if ((!queryWithChoices && !keys(value.query, ROOM_QUERY_KEYS)) || queryWithChoices !== withChoices) return false;
+    const q = value.query as Record<string, unknown>;
+    if (typeof q.depth !== 'number') return false;
+    const room = AskRoomQuerySchema.safeParse({...q, depth: String(q.depth)});
+    return ask.success && room.success && room.data.plan_tier === c.plan_tier && room.data.composition_budget_tier === c.composition_budget_tier && room.data.depth === c.depth
+        && (!withChoices || (room.data.depth_mode === c.depth_mode && room.data.scrutiny === c.scrutiny && room.data.answer_length === c.answer_length));
 }
 ```
 
@@ -3547,7 +3916,7 @@ function validForm(value: unknown): value is PhoneDraftForm {
 - [ ] **Step 4: Run the tests**
 
 Run each, one at a time:
-- `cd "$(git rev-parse --show-toplevel)/dialectical-engine" && pnpm exec vitest run tests/unit/phone-completion-draft-legacy.test.ts` → PASS (7).
+- `cd "$(git rev-parse --show-toplevel)/dialectical-engine" && pnpm exec vitest run tests/unit/phone-completion-draft-legacy.test.ts` → PASS (8).
 - `pnpm exec vitest run tests/render/phone-completion.test.tsx` → PASS. /new still does not use the module.
 
 - [ ] **Step 5: Commit**
@@ -3561,6 +3930,8 @@ Phone draft: Answer length and the two depth modes (debate shape P2c)
 Today's draft carries answerLength instead of maxTokens and only fixed or
 adaptive; a draft saved in either older shape is read in today's (Standard
 answer, retired modes as Adaptive) and never written back in an old shape.
+The saved room query may carry the three choices, and must then match the
+ask's; an older draft carries them on neither side.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 EOF
@@ -3579,8 +3950,12 @@ EOF
   - `newDebate.json`: `newDebate.legacyNotice`, `newDebate.selectionStrategy`, `newDebate.manual`, `newDebate.recommended`, `newDebate.maxTokens`, `newDebate.maxTokensHint`, `newDebate.scrutinyStandardHint`, `newDebate.scrutinyDeepHint`, `newDebate.scrutinyExhaustiveHint`.
   - `compose.json`: the six `compose.scrutinyDepth.*` keys.
 - **Added** (translated):
-  - `newDebate.json`: the 10 keys of Task 8 Step 8.
+  - `newDebate.json`: the 10 control keys of Task 8 Step 8.
+  - `newDebate.json`: the six `newDebate.languageCheck.*` keys of P2L Task 18 (`title`, `body`, `use`, `keep`, `edit`, `proposalLabel`; amendment P2c-2), in the same batch. For `ro` they are NOT translated: `ro` gets P2L Task 18's Romanian texts exactly as given (controller ruling CR-7 keeps the informal «ta» text); the merge script below carries them.
   - `public.json`: `public.alsoRaised.title`, `public.alsoRaised.empty`, `public.positionTitle`.
+  - So each locale gets 13 + 6 = 19 new keys (`ro`: 13 translated + 6 given).
+
+**Order with P2L (amendment P2c-3):** P2L Task 18 (the one-language pop-up) runs after this task and reuses these six keys; it also edits `NewDebatePageClient.tsx` and `apps/ui/lib/api.ts` after Task 8. Nothing in P2c reads the six keys.
 
 **Language groups** (one Haiku worker each, effort `xhigh`, in the foreground, all six in ONE message so they run in parallel):
 
@@ -3607,9 +3982,9 @@ mkdir -p "$PACKETS" && echo "$PACKETS"
 
 Send one prompt per worker. The prompt is the same for all six, with `<LOCALES>`, `<GROUP>` and `<PACKETS>` filled in:
 
-> You are translating 13 short UI strings for a debate website, for these locales only: `<LOCALES>`. Work ONLY in `<engine folder>` (absolute path given). Read but do not edit any catalogue. Write exactly one file, `<PACKETS>/<GROUP>.json`, shaped `{ "<locale>": { "<key>": "<text>", … 13 keys }, … }`. Never read settings.env or key files. You may spawn your own haiku subagents (effort "xhigh") in the foreground if useful; pass these same rules on.
+> You are translating 19 short UI strings for a debate website, for these locales only: `<LOCALES>`. Work ONLY in `<engine folder>` (absolute path given). Read but do not edit any catalogue. Write exactly one file, `<PACKETS>/<GROUP>.json`, shaped `{ "<locale>": { "<key>": "<text>", … 19 keys }, … }`. Exception: for `ro`, write only 13 keys (the 10 newDebate control keys and the 3 public keys); the six `newDebate.languageCheck.*` keys for `ro` are the owner's fixed text and are added by the merge, so leave them out. Never read settings.env or key files. You may spawn your own haiku subagents (effort "xhigh") in the foreground if useful; pass these same rules on.
 >
-> The English source is `apps/ui/messages/en/newDebate.json`, keys `newDebate.depthModeAdaptiveHelp`, `newDebate.depthModeFixedHelp`, `newDebate.scrutinyStandardHelp`, `newDebate.scrutinyDeepHelp`, `newDebate.scrutinyExhaustiveHelp`, `newDebate.answerLength`, `newDebate.answerLengthHint`, `newDebate.answerLengthShort`, `newDebate.answerLengthStandard`, `newDebate.answerLengthDetailed`, plus `apps/ui/messages/en/public.json` keys `public.alsoRaised.title`, `public.alsoRaised.empty`, `public.positionTitle`.
+> The English source is `apps/ui/messages/en/newDebate.json`, keys `newDebate.depthModeAdaptiveHelp`, `newDebate.depthModeFixedHelp`, `newDebate.scrutinyStandardHelp`, `newDebate.scrutinyDeepHelp`, `newDebate.scrutinyExhaustiveHelp`, `newDebate.answerLength`, `newDebate.answerLengthHint`, `newDebate.answerLengthShort`, `newDebate.answerLengthStandard`, `newDebate.answerLengthDetailed`, `newDebate.languageCheck.title`, `newDebate.languageCheck.body`, `newDebate.languageCheck.use`, `newDebate.languageCheck.keep`, `newDebate.languageCheck.edit`, `newDebate.languageCheck.proposalLabel`, plus `apps/ui/messages/en/public.json` keys `public.alsoRaised.title`, `public.alsoRaised.empty`, `public.positionTitle`.
 >
 > Rules:
 > 1. Keep `{answer}` and `{ai}` exactly as written, untranslated. Place them where the language's word order needs them. Add no quotation marks around `{answer}` unless the language requires them.
@@ -3618,13 +3993,14 @@ Send one prompt per worker. The prompt is the same for all six, with `<LOCALES>`
 > 4. Use the polite, formal register the locale's catalogue already uses. For Romanian, use the polite plural and correct diacritics (ă, â, î, ș, ț with comma below).
 > 5. The text is for ordinary readers. Never introduce words such as score, threshold, judge, model ranking, engine or token.
 > 6. "Also raised, not debated" means: points that came up while the question was being explored but that the debate did not argue. "The case for {answer}, argued by {ai}" titles the argument for one answer, written by the named AI.
-> 7. Reply with only the path you wrote and the count of keys per locale (13 each).
+> 7. The six `newDebate.languageCheck.*` keys are a small pop-up on the new-debate page, shown when a question mixes languages; it offers a version of the question in one language. Keep `{languages}` and `{language}` exactly as written, untranslated. The page fills `{languages}` with one language name or a list of names (joined the locale's own way, for example "French and German") and `{language}` with one name, both in the locale's own form (for example lowercase where the language writes language names in lowercase). The sentence must read naturally with one name or a list of names filled in, so pick a construction that works for both (for example "in {language}" or "the language {language}" where grammar needs it). `body` ends with a colon: the suggested version is shown right after it. `edit` is a button that opens the question for editing; `proposalLabel` labels the suggested version.
+> 8. Reply with only the path you wrote and the count of keys per locale (19 each; 13 for `ro`).
 
 - [ ] **Step 3: One Opus spot-check of the risky locales**
 
 Dispatch one Opus subagent (effort `high`, foreground) with this prompt:
 
-> Review and, where wrong, correct in place the translation packets in `<PACKETS>/*.json` for these locales only: mt, ga, et, lv, lt, ar, he, hi, ja, zh, ko, plus ro (check its formal register and diacritics). Check meaning against the English in `apps/ui/messages/en/{newDebate,public}.json`. Check placeholders `{answer}` and `{ai}`, the register, natural word order, right-to-left safety for ar and he (no stray direction marks), and agreement with each locale's existing words for Fixed, Adaptive, Standard, Deep and Exhaustive. Edit only the packet files. Never read settings.env or key files. You may spawn your own haiku or opus subagents in the foreground when useful; pass these rules on. Report per locale "ok" or what you changed and why.
+> Review and, where wrong, correct in place the translation packets in `<PACKETS>/*.json` for these locales only: mt, ga, et, lv, lt, ar, he, hi, ja, zh, ko, plus ro (check its formal register and diacritics). Check meaning against the English in `apps/ui/messages/en/{newDebate,public}.json`. Check placeholders `{answer}` and `{ai}`, and in the six `newDebate.languageCheck.*` keys `{languages}` and `{language}` (untranslated, and the sentence reads naturally with one language name or a list of names filled in, in the locale's own form). Check the register, natural word order, right-to-left safety for ar and he (no stray direction marks), and agreement with each locale's existing words for Fixed, Adaptive, Standard, Deep and Exhaustive. For `ro`, check only its 13 packet keys: its six `languageCheck` texts are the owner's fixed informal text (controller ruling CR-7), are not in the packets, and must not be changed or added. Edit only the packet files. Never read settings.env or key files. You may spawn your own haiku or opus subagents in the foreground when useful; pass these rules on. Report per locale "ok" or what you changed and why.
 
 - [ ] **Step 4: Merge the packets, removing the retired keys**
 
@@ -3647,8 +4023,21 @@ const dropped = {
 const added = {
   newDebate: ["newDebate.depthModeAdaptiveHelp", "newDebate.depthModeFixedHelp", "newDebate.scrutinyStandardHelp",
     "newDebate.scrutinyDeepHelp", "newDebate.scrutinyExhaustiveHelp", "newDebate.answerLength", "newDebate.answerLengthHint",
-    "newDebate.answerLengthShort", "newDebate.answerLengthStandard", "newDebate.answerLengthDetailed"],
+    "newDebate.answerLengthShort", "newDebate.answerLengthStandard", "newDebate.answerLengthDetailed",
+    "newDebate.languageCheck.title", "newDebate.languageCheck.body", "newDebate.languageCheck.use",
+    "newDebate.languageCheck.keep", "newDebate.languageCheck.edit", "newDebate.languageCheck.proposalLabel"],
   public: ["public.alsoRaised.title", "public.alsoRaised.empty", "public.positionTitle"]
+};
+// P2L Task 18's Romanian texts, as given (controller ruling CR-7: the owner's informal «ta» text), never translated.
+const fixed = {
+  ro: {
+    "newDebate.languageCheck.title": "Limba întrebării",
+    "newDebate.languageCheck.body": "Întrebarea ta amestecă limbile {languages}. AI-urile dezbat cel mai bine când toată întrebarea e într-o singură limbă, așa că îți propunem această variantă în limba {language}:",
+    "newDebate.languageCheck.use": "Folosește varianta propusă",
+    "newDebate.languageCheck.keep": "Păstrează formularea mea",
+    "newDebate.languageCheck.edit": "Editează",
+    "newDebate.languageCheck.proposalLabel": "Varianta propusă"
+  }
 };
 const packetsDir = process.argv[2];
 const translations = Object.assign({}, ...readdirSync(packetsDir).filter((name) => name.endsWith(".json"))
@@ -3662,7 +4051,7 @@ for (const locale of locales) {
     const entries = Object.entries(JSON.parse(readFileSync(path, "utf8"))).filter(([key]) => !(dropped[namespace] ?? []).includes(key));
     for (const key of added[namespace] ?? []) {
       if (entries.some(([existing]) => existing === key)) continue;
-      const text = translations[locale]?.[key];
+      const text = fixed[locale]?.[key] ?? translations[locale]?.[key];
       if (typeof text !== "string" || text.trim() === "") throw new Error(`MISSING ${locale} ${key}`);
       // Insert after the nearest earlier English key the locale already has, so each file keeps English's order.
       const before = englishKeys.slice(0, englishKeys.indexOf(key)).reverse().find((candidate) => entries.some(([existing]) => existing === candidate));
@@ -3681,7 +4070,8 @@ Expected: `merged 34 locales`. A `MISSING <locale> <key>` error means a packet i
 - [ ] **Step 5: Run every catalogue test that covers the three namespaces**
 
 Run each, one at a time, from `apps/ui`:
-- `node --import tsx --test lib/i18n/catalog.test.mjs` → PASS. This covers newDebate's 35 locales, placeholders and the retired keys.
+- `node --import tsx --test lib/i18n/catalog.test.mjs` → PASS. This covers newDebate's 35 locales, placeholders (including `{languages}` and `{language}` in the six `languageCheck` keys) and the retired keys.
+- `grep -c "newDebate.languageCheck" messages/ro/newDebate.json` → `6`, and `grep -n "Întrebarea ta amestecă" messages/ro/newDebate.json` shows P2L's Romanian body unchanged.
 - `node --import tsx --test lib/i18n/public.test.mjs` → PASS. This covers 35 locales, unused keys, the sample check (ar, de, es, fr, ja differ from English) and no hard-coded English.
 - `node --import tsx --test lib/i18n/compose.test.mjs` → PASS.
 - `node --import tsx --test lib/i18n/catalogNamespaces.test.mjs` → PASS.
@@ -3697,9 +4087,10 @@ git commit -m "$(cat <<'EOF'
 Locales: debate shape P2c words in all 35 languages
 
 The /new controls' new help lines and Answer length, the debate page's
-"Also raised, not debated" and position title, translated by language group
-with one spot-check of the risky locales; the retired /new and compose keys
-removed everywhere.
+"Also raised, not debated" and position title, and the six languageCheck
+keys of the question-language pop-up (P2L; Romanian as the owner wrote it),
+translated by language group with one spot-check of the risky locales; the
+retired /new and compose keys removed everywhere.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 EOF
@@ -3724,11 +4115,14 @@ pnpm run generate:contract && pnpm run typecheck
 
 Expected: exit 0. Typical first-run catches:
 - a test double typed as `ContractClient` now missing `readAnswerMapView`; add `readAnswerMapView: async () => { throw new ContractHttpError("NOT_FOUND", 404, "MAP_VIEW_NOT_FOUND"); }` to it;
-- P2b's `MapChoiceRepository` row not satisfying `MapChoiceRecord` (Task 5 Step 6).
+- P2b's `MapChoiceRepository` record (from `@debateai/map`) not satisfying `MapChoiceRecord` (Task 5 Step 6);
+- `Cannot find module '@debateai/map'` from apps/api: Task 5 Step 6a-2's `pnpm install --offline` was not run, or `pnpm-lock.yaml` was not committed.
+
+Then `pnpm run audit:architecture` → exit 0 (apps/api's row lists `"map"`).
 
 - [ ] **Step 2: Re-run this plan's tests, one file at a time**
 
-`tests/unit/debate-shape-story-also-raised.test.ts`, `tests/unit/story-pack.test.ts`, `tests/unit/debate-shape-story-snapshot.test.ts`, `tests/unit/debate-shape-map-view-contract.test.ts`, `tests/unit/hs-s02-check.test.ts`, `tests/unit/debate-shape-map-view-api.test.ts`, `tests/unit/s7-authorization.test.ts`, `tests/unit/debate-shape-map-view-ui.test.ts`, `tests/render/debate-shape-also-raised.test.tsx`, `tests/unit/debate-shape-new-ask-wire.test.ts`, `tests/render/debate-shape-new-controls.test.tsx`, `tests/render/tier01-new-plan-tier.test.tsx`, `tests/unit/phone-completion-draft-legacy.test.ts`. Each run is `pnpm exec vitest run <file>` and must PASS.
+`tests/unit/debate-shape-story-also-raised.test.ts`, `tests/unit/story-pack.test.ts`, `tests/unit/debate-shape-story-snapshot.test.ts`, `tests/unit/debate-shape-map-view-contract.test.ts`, `tests/unit/hs-s02-check.test.ts`, `tests/unit/debate-shape-map-view-api.test.ts`, `tests/unit/s7-authorization.test.ts`, `tests/unit/debate-shape-map-view-ui.test.ts`, `tests/render/debate-shape-also-raised.test.tsx`, `tests/unit/debate-shape-room-flag.test.ts`, `tests/unit/debate-shape-submit.test.ts`, `tests/unit/b7a-room-read.test.ts`, `tests/unit/debate-shape-new-ask-wire.test.ts`, `tests/render/debate-shape-new-controls.test.tsx`, `tests/render/b10-room-notice.test.tsx`, `tests/render/tier01-new-plan-tier.test.tsx`, `tests/unit/phone-completion-draft-legacy.test.ts`. Each run is `pnpm exec vitest run <file>` and must PASS.
 
 - [ ] **Step 3: The CI gate's three folders** (heavy; alone)
 
@@ -3752,6 +4146,12 @@ Expected: PASS.
 
 - `git diff <base>..HEAD -- story-shapes/` shows only the "also_raised" line, the new section, the checker sentence and the version bump.
 - `grep -n "also_raised\|raised_by" story-shapes/common.md story-shapes/checker.md` shows the expected lines.
+
+- [ ] **Step 6: Room flag and P2L keys sanity**
+
+- `grep -n "shape_settings" packages/contract/src/index.ts apps/api/src/index.ts` shows exactly the two schema members and the one room-handler line (Task 8 Step 5b).
+- `grep -rn "cost_envelope.basis.shape\|basis\.shape" apps/ui --include='*.ts' --include='*.tsx' | grep -v node_modules` prints nothing (Global Constraints, P2a M8).
+- `for l in apps/ui/messages/*/; do printf '%s %s\n' "$l" "$(grep -c 'newDebate.languageCheck' "$l/newDebate.json")"; done` prints `6` for all 35 locales.
 
 ---
 
@@ -3777,7 +4177,13 @@ Expected: PASS.
 | Owner rule: owner-editable pack text is a new sealed version | 2 (`pack.json` 2026-10-12.1; the fingerprint changes) |
 | Owner rule: 3 phrasings per new sentence, option 1 in code | Wording picks; 2, 7, 8 ship option 1 |
 | Project 1 coordination | Gates on Tasks 8–9; only the three controls, the notice and Max tokens are touched; Project 1's comment and its test case are kept and updated |
+| Row absent: no setting dropped silently (P2a final review "P2c:85"; controller decision) | 8 (Step 1b contract and API tests, Step 5b `shape_settings`, Step 6c-2/6e/6f controls and ask only with the flag; render tests "shows none of the three controls…" and "reads the room with the three choices only once…") |
+| §3.2 room read for the settings it will send (P2a deviation 9, final review M4) | 8 (`useAskRoom` and the ALREADY_WAITING `readAskRoom` carry the three choices with the flag), 9 (draft's room-query check compares them; older drafts stay valid) |
+| P2L's six `newDebate.languageCheck.*` keys (P2L amendments P2c-1/2/3) | 8 Step 8 (English), 10 (33 translated, `ro` as given per CR-7, Opus spot-check), 11 Step 6 (count in all 35) |
+| P2b's map reader home (`@debateai/map`) and record fields | 5 (Step 6 import, `apps/api/package.json`, `pnpm-lock.yaml`, orphan-audit row), Contract deviation 4 |
+| Public answer without `cost_envelope.basis.shape` (P2a M8) | Global Constraints (P2c never reads it), 11 Step 6 |
 
 Placeholders: none. Each cross-plan name that may differ is resolved by a gate command plus a single named edit point:
-- P2b's `MapResult` variable: Task 3, gate and Step 4b.
-- P2b's reader class: Task 5, Step 6.
+- P2b's `MapResult` variable (`debateShapeMap`): Task 3, gate and Step 4b.
+- P2b's reader class (`MapChoiceRepository` from `@debateai/map`): Task 5, Step 6.
+- P2b's in-force helper (`debateShapeInForce`): the P2b in-force gate, before Task 8 Step 5b.
