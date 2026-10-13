@@ -37,7 +37,7 @@ No migration, no sealed value changed, no dev/local row.
 
 **Spec:** docs/superpowers/specs/2026-10-12-debate-shape-design.md (rulings S5–S9, §3.1, §3.2, §3.6, §5). Binding names: docs/superpowers/plans/2026-10-12-debate-shape-phase2-INTERFACE.md §1, §2. Money law: docs/superpowers/specs/2026-09-28-budget-never-stops-a-debate-design.md (the estimate is a ceiling and never under-counts).
 
-All paths below are relative to the engine folder `dialectical-engine/` of the worktree `.claude/worktrees/debate-shape` (branch `design/2026-10-12-debate-shape`). Every command runs from that folder.
+All paths below are relative to the engine folder `dialectical-engine/` of the worktree `.claude/worktrees/debate-shape-p2` (branch `feat/2026-10-13-debate-shape-phase2`; Phase 1 + origin/dev + Project 1 already merged). Every command runs from that folder.
 
 ## Global Constraints
 
