@@ -135,9 +135,10 @@ Five failure modes most likely to ship untested, and where they are caught:
 
 **P2a (settings and money) must absorb, in the same build:**
 
-1. `DebateShapePolicy` gains a top-level member `mapStepBounds: { merge: int 2048..65536, choose: int 2048..65536 }`
-   (start values `{ merge: 32768, choose: 32768 }`, ruling R-2), parsed strictly in `parseDebateShapePolicy`
-   (`DEBATE_SHAPE_POLICY_INVALID:$.mapStepBounds.<k>`). `DebateShapeCeilingInput` gains `mapMergeBound: number` and
+1. `DebateShapePolicy` gains a top-level member `mapStepBounds: { merge: int 8192..32768, choose: int 8192..32768 }`
+   (start values `{ merge: 32768, choose: 32768 }`, ruling R-2; range per controller ruling X1, as P2a built it), parsed
+   strictly in `parseDebateShapePolicy` (`DEBATE_SHAPE_POLICY_INVALID:mapStepBounds.merge` / `:mapStepBounds.choose`,
+   no `$.`). The member is optional: an absent member reads the defaults `{ merge: 32768, choose: 32768 }`. `DebateShapeCeilingInput` gains `mapMergeBound: number` and
    `mapChooseBound: number` (copied by `resolveDebateShape`); `debateShapeReceiptSchema` gains `map_merge_bound` and
    `map_choose_bound` (ints ≥ 1); `debateShapeReceipt` / `debateShapeOfReceipt` carry them.
 2. The preview estimate (`apps/api/src/preview-budget-estimate.ts`) prices the two sites `MAP:merge` and `MAP:choose`

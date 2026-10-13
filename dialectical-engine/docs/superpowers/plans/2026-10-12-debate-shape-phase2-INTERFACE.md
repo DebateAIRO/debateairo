@@ -29,7 +29,8 @@ Sub-plans (each its own plan file, its own SDD run, in this order):
 { kind: "DEBATE_SHAPE_POLICY", version: 1,
   plans: { free: PlanShape, plus: PlanShape, pro: PlanShape, max: PlanShape, premium: PlanShape },
   answerLength: { short: { words: 300, writerBound: 8192 }, standard: { words: 700, writerBound: 12288 },
-                  detailed: { words: 1500, writerBound: 16384 } } }
+                  detailed: { words: 1500, writerBound: 16384 } },
+  mapStepBounds: { merge: int 8192..32768, choose: int 8192..32768 } }   // optional member, X1
 PlanShape = { mapAIs: int 2..9, answers: int 2..5, graders: int 1..5, pointsPerAnswer: int 1..6, deeperTopPoints: int 1..6,
               gapRoundsMax: int 0..3, closeCallExtraGraders: int 0..4, fixedDepthAllowed: boolean,
               scrutiny: { deep: null | { roundsPerPoint: int 1..5, pointsPerDebate: int 1..30 },
@@ -41,6 +42,11 @@ PlanShape = { mapAIs: int 2..9, answers: int 2..5, graders: int 1..5, pointsPerA
   plus {4,3,3,4,2,2,2,true, deep {2,6}, exhaustive {3,15}, 0.05, 0.5, ANGLE_MAP};
   pro {5,4,3,4,2,2,2,true, …same}; max {7,4,3,4,2,2,2,true, …same}; premium = pro (fallback for unknown premium ids).
   `opening` is filled from the Phase 1 measurement (default ANGLE_MAP = ruling S1).
+- `mapStepBounds` (controller ruling X1): the output bound of the map's `MAP:merge` and `MAP:choose` calls, each a whole
+  number of tokens from 8,192 to 32,768. The member is optional: absent, it reads the defaults `{ merge: 32768, choose:
+  32768 }`. A written member is checked strictly (the refusal path is `mapStepBounds.merge` / `mapStepBounds.choose`).
+  The publishers' row always writes it. The resolved shape carries `mapMergeBound` / `mapChooseBound`; the receipt carries
+  `shape.map_merge_bound` / `shape.map_choose_bound`.
 - Plan lookup: the run's plan id (FREE/PLUS/PRO/MAX) when billing is on, else tier free → `free`, premium → `premium`.
 - Sizes are capped at run time: `answers ≤ distinct makers`, `graders ≤ distinct makers − 1`, `mapAIs ≤ makers present`.
 
@@ -62,7 +68,10 @@ answerLength }`; `readFrozenHead` returns them; missing keys read as defaults (o
   directive sentence appended: "Build your reply on the consideration named in consideration." Closed-table change →
   the sealed judge contract hash changes (new register version; register `policy.hashes.judge`).
 - Map call-site keys (as Phase 1): `MAP:angles`, `MAP:list:<i>`, `MAP:merge`, `MAP:gap:<k>`, `MAP:choose`.
-  Gateway role `JUDGE`, lane `served`, bound = the judge bound (preview floor 8,192).
+  Gateway role `JUDGE`, lane `served`. Bound: `MAP:merge` and `MAP:choose` answer at the row's map step bounds (§1
+  `mapStepBounds`; the run's `mapMergeBound` / `mapChooseBound`, read from its receipt), NOT the judge bound (X1
+  supersedes the earlier "judge bound" wording). `MAP:angles`, `MAP:list:<i>` and `MAP:gap:<k>` keep the judge bound
+  (preview floor 8,192).
 - Map contracts fingerprint: `mapPromptContractHash()` sealed as register `policy.hashes.map` (new key in the policy
   hashes row; new register version).
 - Close-call extension mark: `PANEL-CLOSE-CALL-EXTENDED`; scrutiny mark: `SCRUTINY-EXTENDED`; map marks (answer-scope

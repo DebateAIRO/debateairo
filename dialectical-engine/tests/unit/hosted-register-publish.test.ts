@@ -46,6 +46,7 @@ import {
   parseRegisterVersionText,
   readEngineVersion,
   readStoryPolicy,
+  debateShapePolicyStartValues,
   type GeneralRegisterPublication
 } from "../../packages/register/src/index.js";
 import { compatibleExampleScorecard } from "../support/modelScorecardFixture.js";
@@ -392,6 +393,25 @@ describe("Task 14b · the operator's hosted register file", () => {
   it("says in the plan that the code-owned rows carry development provenance", async () => {
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
     expect(renderHostedRegisterPlan(plan)).toMatch(/^provenance=development-source-refs \(known limitation\)$/mu);
+  });
+
+  it("M3: says debate_shape=present before sealing a version a Phase-2a runner refuses; no line without the member", async () => {
+    const without = renderHostedRegisterPlan(await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile()))));
+    expect(without).not.toMatch(/^debate_shape/mu);
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(debateShapePolicyStartValues())) as Record<string, unknown>;
+    const withShape = renderHostedRegisterPlan(await planHostedRegisterPublication(
+      parseHostedRegisterFile(bytesOf({ ...validFile(), debateShapePolicy: member }))));
+    expect(withShape).toMatch(/^debate_shape=present .*RUNNER_PENDING\)$/mu);
+    // Only the new line differs: everything else is printed as without the member, apart from the row it adds.
+    const strip = (text: string) => text.split("\n").filter((line) => !/^(debate_shape=|row_keys=|row_count=|snapshot_sha256=|publication_id=)/u.test(line));
+    expect(strip(withShape)).toEqual(strip(without));
+    // T10: both runbooks name the member's refused key as code, and the register's says the plan prints the line.
+    const registerReadme = await readFile(new URL("../../deploy/vps/register/README.md", import.meta.url), "utf8");
+    const runbook = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    const shapeLines = [registerReadme, runbook].flatMap((text) => text.split("\n").filter((line) => line.includes("`debateShapePolicy`")));
+    expect(shapeLines.length).toBeGreaterThanOrEqual(2);
+    for (const line of shapeLines) expect(line).not.toContain('"kind"');
+    expect(registerReadme).toContain("the plan prints `debate_shape=present`");
   });
 
   it("prints a plan with no credential path and no secret", async () => {

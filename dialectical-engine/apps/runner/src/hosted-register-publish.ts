@@ -1217,6 +1217,11 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
     `synthesis_roles synthesizer=${plan.synthesisRoles.synthesizerRoleRef}`
       + ` evaluator=${plan.synthesisRoles.evaluatorRoleRef}`,
     ...renderModelScorecardLines(plan.modelScorecard),
+    // Debate shape (PF4, M3): said BEFORE sealing, because a Phase-2a runner refuses this version. Absent: no line
+    // (today's text). P2b changes the wording when its runner can run the shape.
+    ...(plan.rows.some((row) => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)
+      ? ["debate_shape=present (this runner refuses the version until Phase 2b: DEBATE_SHAPE_POLICY_RUNNER_PENDING)"]
+      : []),
     `row_keys=${plan.rows.map((row) => row.rowKey).sort().join(",")}`
   ].join("\n") + "\n";
 }
