@@ -1,15 +1,18 @@
 import type { Pool } from "pg";
 import { z } from "zod";
-import { mostOneRunMaySpendMicros } from "@debateai/budget";
+import { mostOneRunMaySpendMicros, parseCostEnvelopeBasis, type CostEnvelopeBasis } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import type { DiscoveredPanelMember } from "@debateai/db";
 import { TypedDomainError, type DebateRole, type ModelStrength } from "@debateai/kernel";
 import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
 import {
   BUNDLED_MODEL_SCORECARD_SOURCE_REF,
+  debateShapeSiteCounts,
   readBundledModelScorecard,
   readEngineVersion,
   readModelScorecard,
+  type DebateShapeCeilingInput,
+  type DebateShapeSiteCounts,
   type ModelScorecardReadResult
 } from "@debateai/register";
 import {
@@ -122,6 +125,19 @@ export function answerTokenCeilingsByRole(ceilings: CallTokenCeilings): Readonly
     ANSWER_WRITER: ceilings.synthesizer,
     ANSWER_CHECKER: ceilings.evaluator
   });
+}
+
+/**
+ * Debate shape (spec 2026-10-12 §3.3 step 8): the answer writer's call bound becomes max(sealed bound, the run's
+ * answer length's writer bound), so the picker seats only writers whose window holds the longer answer. A receipt
+ * without a shape keeps the sealed table (the same object).
+ */
+export function answerTokenCeilingsForBasis(
+  ceilings: Readonly<Record<DebateRole, number>>,
+  basis: Readonly<Record<string, unknown>>
+): Readonly<Record<DebateRole, number>> {
+  const shaped = admittedShapeOf(basis);
+  return shaped === null ? ceilings : Object.freeze({ ...ceilings, ANSWER_WRITER: Math.max(ceilings.ANSWER_WRITER, shaped.shape.writerBound) });
 }
 
 /** S2: the sealed money terms the picker's limits are cut from — the API's `CostEnvelopeGuard` policy. */
@@ -414,6 +430,31 @@ const admittedStructureSchema = z.object({
 
 const SYNTHESIS_ROLES = Object.freeze(["ANSWER_WRITER", "ANSWER_CHECKER"] as const);
 
+function malformedDebateShape(): TypedDomainError {
+  return new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, "The admitted structural basis carries a malformed debate shape");
+}
+
+/**
+ * Debate shape (spec 2026-10-12 §3.6, PF7): the run's shaped receipt, read ONLY through the strict receipt parser
+ * (`parseCostEnvelopeBasis`), never through a loose reader of this module's own. A basis with no shape member is
+ * today's receipt (null). A shape member the parser refuses is an engine fault, never read as today's.
+ */
+function admittedShapeOf(basis: Readonly<Record<string, unknown>>): Readonly<{
+  shape: DebateShapeCeilingInput;
+  counts: DebateShapeSiteCounts;
+}> | null {
+  if (basis.shape === undefined) return null;
+  let parsed: CostEnvelopeBasis;
+  try {
+    parsed = parseCostEnvelopeBasis(basis);
+  } catch {
+    throw malformedDebateShape();
+  }
+  const shape = parsed.shape;
+  if (shape === undefined) throw malformedDebateShape();
+  return Object.freeze({ shape, counts: debateShapeSiteCounts(shape, parsed.depth) });
+}
+
 /**
  * Expected calls per role, one per call site, from the basis admission pinned.
  * Mapping (panelSize = debaters):
@@ -424,6 +465,8 @@ const SYNTHESIS_ROLES = Object.freeze(["ANSWER_WRITER", "ANSWER_CHECKER"] as con
  *   REVIEWER       = call_sites.reviewer
  *   ANSWER_WRITER  = ANSWER_CHECKER = serve_leg.synthesis_loop_sites ÷ 2
  *                    (SERVE_LEG requires the two round bounds to be equal)
+ * With a shape receipt (debate shape): POSITION = answers + map sites (the debaters also write the map),
+ * CROSS_EXCHANGE = cross_nodes; SUPPORT_ATTACK is the rest of the author sites, as before.
  */
 export function expectedCallsByRoleFromBasis(
   basis: Readonly<Record<string, unknown>>
@@ -433,14 +476,16 @@ export function expectedCallsByRoleFromBasis(
     throw new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, "The admitted structural basis carries no call-site split");
   }
   const { panel_size: panelSize, call_sites: sites, serve_leg: serveLeg } = parsed.data;
-  const crossExchange = panelSize >= 2 ? panelSize * (panelSize - 1) : 0;
-  const supportAttack = sites.author - panelSize - crossExchange;
+  const shaped = admittedShapeOf(basis);
+  const positions = shaped === null ? panelSize : shaped.shape.answers + shaped.counts.mapSites;
+  const crossExchange = shaped !== null ? shaped.counts.crossNodes : panelSize >= 2 ? panelSize * (panelSize - 1) : 0;
+  const supportAttack = sites.author - positions - crossExchange;
   const perSynthesisRole = serveLeg.synthesis_loop_sites / SYNTHESIS_ROLES.length;
   if (supportAttack < 0 || !Number.isInteger(perSynthesisRole)) {
     throw new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, "The admitted structural basis does not split into roles");
   }
   return Object.freeze({
-    POSITION: panelSize,
+    POSITION: positions,
     SUPPORT_ATTACK: supportAttack,
     CROSS_EXCHANGE: crossExchange,
     JUDGE: sites.panel,
