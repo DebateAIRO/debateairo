@@ -188,7 +188,7 @@
   "debateChrome.condition.mapUnavailable": "Kiekvienas DI modelis pradėjo nuo savo atsakymo",
   "debateChrome.condition.answersFilled": "Pridėtas antras atsakymas, kad būtų galima palyginti du atsakymus",
   "debateChrome.condition.chooseQuotaFilled": "Pridėtas dar vienas punktas, kad būtų išklausyta kiekviena pusė",
-  "debateChrome.condition.closeCallExtended": "Šis punktas buvo beveik lygus, todėl į jį pažvelgė daugiau DI modelių",
+  "debateChrome.condition.closeCallExtended": "Šiame punkte pozicijos buvo beveik lygios, todėl jį išnagrinėjo daugiau DI modelių",
   "debateChrome.condition.scrutinyExtended": "DI modeliai atidžiau išanalizavo šį punktą",
   "debateChrome.condition.ambiguousAttribution": "Neaiški autorystė",
   "debateChrome.condition.stale": "Pasenę",

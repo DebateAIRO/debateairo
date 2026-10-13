@@ -188,7 +188,7 @@
   "debateChrome.condition.mapChooseFallback": "As respostas a debater foram escolhidas por uma regra simples",
   "debateChrome.condition.mapUnavailable": "Cada IA começou com a sua própria resposta",
   "debateChrome.condition.answersFilled": "Foi acrescentada uma segunda resposta para que duas respostas pudessem ser comparadas",
-  "debateChrome.condition.chooseQuotaFilled": "Foi acrescentado um ponto para que cada lado fosse ouvido",
+  "debateChrome.condition.chooseQuotaFilled": "Foi acrescentado um argumento para que cada lado fosse ouvido",
   "debateChrome.condition.closeCallExtended": "Este ponto estava quase empatado, por isso mais modelos de IA o analisaram",
   "debateChrome.condition.scrutinyExtended": "Os modelos de IA examinaram este ponto com mais pormenor",
   "debateChrome.condition.ambiguousAttribution": "Atribuição ambígua",

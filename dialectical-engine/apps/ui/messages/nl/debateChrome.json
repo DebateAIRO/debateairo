@@ -187,7 +187,7 @@
   "debateChrome.condition.mapChooseFallback": "De antwoorden om over te debatteren werden met een eenvoudige regel gekozen",
   "debateChrome.condition.mapUnavailable": "Elk AI-model begon met zijn eigen antwoord",
   "debateChrome.condition.answersFilled": "Er werd een tweede antwoord toegevoegd, zodat twee antwoorden vergeleken konden worden",
-  "debateChrome.condition.chooseQuotaFilled": "Er werd een punt toegevoegd, zodat elke kant aan bod kwam",
+  "debateChrome.condition.chooseQuotaFilled": "Er werd een argument toegevoegd, zodat elke kant aan bod kwam",
   "debateChrome.condition.closeCallExtended": "Bij dit punt was het nipt, dus keken meer AI-modellen ernaar",
   "debateChrome.condition.scrutinyExtended": "De AI-modellen bestudeerden dit punt grondiger",
   "debateChrome.condition.ambiguousAttribution": "Bronvermelding dubbelzinnig",

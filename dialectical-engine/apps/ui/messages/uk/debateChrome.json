@@ -188,7 +188,7 @@
   "debateChrome.condition.mapUnavailable": "Кожна модель ШІ почала зі своєї відповіді",
   "debateChrome.condition.answersFilled": "Додано другу відповідь, щоб можна було порівняти дві відповіді",
   "debateChrome.condition.chooseQuotaFilled": "Додано ще один пункт, щоб була почута кожна сторона",
-  "debateChrome.condition.closeCallExtended": "Цей пункт був майже рівним, тому його розглянуло більше моделей ШІ",
+  "debateChrome.condition.closeCallExtended": "Щодо цього пункту позиції були майже рівні, тому його розглянуло більше моделей ШІ",
   "debateChrome.condition.scrutinyExtended": "Моделі ШІ уважніше вивчили цей пункт",
   "debateChrome.condition.ambiguousAttribution": "Неоднозначна атрибуція",
   "debateChrome.condition.stale": "Застаріле",

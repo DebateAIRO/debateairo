@@ -188,7 +188,7 @@
   "debateChrome.condition.mapUnavailable": "Her yapay zekâ modeli kendi yanıtıyla başladı",
   "debateChrome.condition.answersFilled": "Yanıtların birbiriyle karşılaştırılabilmesi için bir yanıt daha eklendi",
   "debateChrome.condition.chooseQuotaFilled": "Her tarafın sesi duyulsun diye bir nokta eklendi",
-  "debateChrome.condition.closeCallExtended": "Bu nokta kıl payıydı, bu yüzden daha fazla yapay zekâ modeli inceledi",
+  "debateChrome.condition.closeCallExtended": "Bu noktada taraflar neredeyse başa baştı, bu yüzden daha fazla yapay zekâ modeli inceledi",
   "debateChrome.condition.scrutinyExtended": "Yapay zekâ modelleri bu noktayı daha yakından inceledi",
   "debateChrome.condition.ambiguousAttribution": "Atıf belirsiz",
   "debateChrome.condition.stale": "Güncelliğini yitirmiş",
