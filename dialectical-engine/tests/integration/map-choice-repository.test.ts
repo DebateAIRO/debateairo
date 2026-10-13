@@ -288,9 +288,25 @@ describe("MapChoiceRepository (0116)", () => {
       index === 1 ? { ...answer, answerId: SLUG } : answer) } } as MapResult;
     const slugItem = { ...RESULT, items: RESULT.items.map((item, index) => index === 2 ? { ...item, itemId: SLUG } as MapItem : item) } as MapResult;
     const spacedMaker = { ...RESULT, items: RESULT.items.map((item, index) => index === 1 ? { ...item, seat: { aiRef: "preview:ref-1", maker: "It helps riders" } } : item) } as MapResult;
-    for (const result of [slugAngle, slugAnswer, slugItem, spacedMaker]) {
+    // 0116's closed sets and the int4 range, held by the repository too (Task 8 review): no CHECK or range error is
+    // reachable from repository input. Each value is cast past the types, as a malformed reply could be.
+    const withItem = (index: number, patch: Record<string, unknown>): MapResult =>
+      ({ ...RESULT, items: RESULT.items.map((item, at) => at === index ? { ...item, ...patch } as unknown as MapItem : item) }) as MapResult;
+    const cases: readonly (readonly [MapResult, string])[] = [
+      [slugAngle, "MAP_RECORD_INVALID: items[0].angleId"],
+      [slugAnswer, "MAP_RECORD_INVALID: choice.answers[1].answerId"],
+      [slugItem, "MAP_RECORD_INVALID: items[2].itemId"],
+      [spacedMaker, "MAP_RECORD_INVALID: items[1].seat.maker"],
+      [withItem(0, { leans: "It costs a lot" }), "MAP_RECORD_INVALID: items[0].leans"],
+      [withItem(1, { angleKind: "It helps riders" }), "MAP_RECORD_INVALID: items[1].angleKind"],
+      [withItem(2, { kind: "Night buses" }), "MAP_RECORD_INVALID: items[2].kind"],
+      [withItem(3, { origin: "Money." }), "MAP_RECORD_INVALID: items[3].origin"],
+      [withItem(0, { listIndex: 2 ** 31 }), "MAP_RECORD_INVALID: items[0].listIndex"],
+      [withItem(0, { listIndex: -1 }), "MAP_RECORD_INVALID: items[0].listIndex"]
+    ];
+    for (const [result, expected] of cases) {
       const refusal = await repository.writeMapRun({ runId, result, answerCount: 2 }).then(() => null, (error: unknown) => error);
-      expect(refusal).toMatchObject({ name: "TypedDomainError", code: "MAP_RECORD_INVALID" });
+      expect(refusal).toMatchObject({ name: "TypedDomainError", code: "MAP_RECORD_INVALID", message: expected });
       const message = (refusal as Error).message;
       for (const text of [SLUG, "It costs a lot", "It helps riders", "Night buses", "Money", "No."]) expect(message).not.toContain(text);
     }
@@ -302,6 +318,48 @@ describe("MapChoiceRepository (0116)", () => {
       .then(() => null, (error: unknown) => error);
     expect(positionRefusal).toMatchObject({ code: "MAP_RECORD_INVALID", message: "MAP_RECORD_INVALID: answerId" });
     expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
+  });
+});
+
+describe("MapChoiceRepository: one write per run (pre-flight PF-B28a, Task 8 review)", () => {
+  it("is atomic: an item the database refuses AFTER the choice insert leaves neither the choice nor any item", async () => {
+    // Every column the repository writes is pre-checked, so the refusal is injected: a test-only trigger on
+    // core.map_item refuses one marked seat. It fires after the choice row is already inserted in the same transaction.
+    const runId = await newRun("legacy");
+    const failing = { ...RESULT, items: RESULT.items.map((item, at) => at === 2 ? { ...item, seat: seat(9) } : item) } as MapResult;
+    await database.pool.query(`
+      CREATE FUNCTION public.map_test_refuse() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.ai_ref = 'preview:ref-9' THEN RAISE EXCEPTION 'MAP_TEST_INJECTED_REFUSAL' USING ERRCODE = '23514'; END IF;
+        RETURN NEW;
+      END $$;
+      CREATE TRIGGER zzz_map_test_refuse BEFORE INSERT ON core.map_item FOR EACH ROW EXECUTE FUNCTION public.map_test_refuse();
+    `);
+    try {
+      await expect(new MapChoiceRepository(database.pool).writeMapRun({ runId, result: failing, answerCount: 2 }))
+        .rejects.toThrowError(/^MAP_TEST_INJECTED_REFUSAL$/u);
+    } finally {
+      await database.pool.query("DROP TRIGGER zzz_map_test_refuse ON core.map_item; DROP FUNCTION public.map_test_refuse()");
+    }
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
+    // The run is not poisoned: the next write stores the whole map.
+    expect(await new MapChoiceRepository(database.pool).writeMapRun({ runId, result: RESULT, answerCount: 2 })).toBe("INSERTED");
+    expect(await rowCounts(runId)).toEqual({ items: 4, choices: 1, positions: 0 });
+  });
+
+  it.each(["legacy", "encrypted"] as const)("two concurrent writers of one %s run: one INSERTED, one ALREADY_PRESENT, the items of one write only", async (mode) => {
+    const runId = await newRun(mode);
+    const other = { ...RESULT, items: RESULT.items.map((item) => item.kind === "POINT"
+      ? { ...item, claim: `${item.claim} (other)` } : { ...item, answer: `${item.answer} (other)` }) } as MapResult;
+    const outcomes = await Promise.all([
+      new MapChoiceRepository(database.pool).writeMapRun({ runId, result: RESULT, answerCount: 2 }),
+      new MapChoiceRepository(database.pool).writeMapRun({ runId, result: other, answerCount: 2 })
+    ]);
+    expect([...outcomes].sort()).toEqual(["ALREADY_PRESENT", "INSERTED"]);
+    expect(await rowCounts(runId)).toEqual({ items: 4, choices: 1, positions: 0 });
+    const winner = outcomes[0] === "INSERTED" ? RESULT : other;
+    const items = await readMapItemsForRun(database.pool, runId);
+    expect(items).toEqual([winner.items[3], ...winner.items.slice(0, 3)]);
   });
 });
 

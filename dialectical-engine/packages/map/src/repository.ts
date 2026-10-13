@@ -1,7 +1,6 @@
 import { z } from "zod";
 import {
   CONTENT_JSON_SENTINEL,
-  assertPrivateContentLive,
   decryptLeasedContentForRun,
   encryptAttestedLeasedContentForRun,
   prepareLeasedContentEncryptionForRun,
@@ -13,7 +12,10 @@ import {
 } from "@debateai/db";
 import { TypedDomainError, exhaustive } from "@debateai/kernel";
 import { mapRankKeyPoints } from "./items.js";
-import { MAP_LEANS, MAP_LIMITS, MAP_MARKS, type MapItem, type MapItemOrigin, type MapMark, type MapResult } from "./types.js";
+import {
+  MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS, MAP_MARKS, type MapAngleKind, type MapItem, type MapItemOrigin, type MapMark,
+  type MapResult
+} from "./types.js";
 
 /**
  * Debate shape (spec §3.4): the map's storage. Items, the run's choice and the roots that argued each answer, in the
@@ -40,6 +42,13 @@ const ANSWER_ID = /^a[1-4]$/u;
 const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 /** 0069's core.jsonb_is_code_token: one token of 1..256 characters from a closed set (no whitespace). */
 const CODE_TOKEN = /^[[\]A-Za-z0-9_.:@/+>=#-]{1,256}$/u;
+/** 0116's closed sets (map_item_origin_closed, _kind_closed, _leans_closed, _angle_kind_closed). */
+const ORIGINS: ReadonlySet<string> = new Set<MapItemOrigin>(["BLIND", "SHOWN", "GAP"]);
+const KINDS: ReadonlySet<string> = new Set<MapItem["kind"]>(["POINT", "ANSWER"]);
+const LEANS: ReadonlySet<string> = new Set<string>(MAP_LEANS);
+const ANGLE_KINDS: ReadonlySet<string> = new Set<MapAngleKind>([...MAP_FIXED_ANGLE_KINDS, "SPECIFIC", "GENERAL"]);
+/** map_item.list_index is a PostgreSQL integer. */
+const PG_INTEGER_MAX = 2_147_483_647;
 
 const itemContent = z.union([z.object({ claim: z.string(), why: z.string() }).strict(), z.object({ answer: z.string() }).strict()]);
 /** The run's map without its items (they are rows of core.map_item) and without its call records (they are ledger rows). */
@@ -94,8 +103,14 @@ function mapRecordBreach(result: MapResult, answerCount: number): string | null 
     if (!ITEM_ID.test(item.itemId)) return `items[${String(index)}].itemId`;
     if (!CODE_TOKEN.test(item.seat.aiRef)) return `items[${String(index)}].seat.aiRef`;
     if (!CODE_TOKEN.test(item.seat.maker)) return `items[${String(index)}].seat.maker`;
+    if (!ORIGINS.has(item.origin)) return `items[${String(index)}].origin`;
+    if (!KINDS.has(item.kind)) return `items[${String(index)}].kind`;
+    if (item.kind === "POINT" && !LEANS.has(item.leans)) return `items[${String(index)}].leans`;
     if (item.angleId !== null && !ANGLE_ID.test(item.angleId)) return `items[${String(index)}].angleId`;
-    if (!Number.isSafeInteger(item.listIndex) || item.listIndex < 0) return `items[${String(index)}].listIndex`;
+    if (item.angleKind !== null && !ANGLE_KINDS.has(item.angleKind)) return `items[${String(index)}].angleKind`;
+    if (!Number.isSafeInteger(item.listIndex) || item.listIndex < 0 || item.listIndex > PG_INTEGER_MAX) {
+      return `items[${String(index)}].listIndex`;
+    }
   }
   if (new Set(result.items.map((item) => item.itemId)).size !== result.items.length) return "items.itemId";
   for (const [index, answer] of (result.choice?.answers ?? []).entries()) {
@@ -195,7 +210,7 @@ export class MapChoiceRepository {
   }
 
   async readMapChoiceForRun(runId: string): Promise<MapChoiceRecord | null> {
-    const read = await this.#readChoice(runId);
+    const read = await this.#leasedRead(runId, null, () => this.#readChoiceLeased(runId));
     if (read === null) return null;
     const positions = await this.pool.query<{ answer_id: string; root_node_id: string; maker: string }>(
       `SELECT answer_id, root_node_id::text AS root_node_id, maker FROM core.map_position WHERE run_id = $1`, [runId]);
@@ -210,75 +225,81 @@ export class MapChoiceRepository {
   }
 
   /** The run's items, ordered by item id; an erased run (or one with no map) has none. */
-  async readMapItemsForRun(runId: string): Promise<readonly MapItem[]> {
+  readMapItemsForRun(runId: string): Promise<readonly MapItem[]> {
+    return this.#leasedRead(runId, Object.freeze([]), () => this.#readItemsLeased(runId));
+  }
+
+  /**
+   * The whole map, as the orchestrator returned it (minus its call records): a re-claimed run reuses it, calling nothing.
+   * The choice and the items are read under ONE content lease: both or neither (null), never a choice without its items.
+   */
+  readMapResultForRun(runId: string): Promise<MapResult | null> {
+    return this.#leasedRead(runId, null, async () => {
+      const read = await this.#readChoiceLeased(runId);
+      if (read === null) return null;
+      const items = await this.#readItemsLeased(runId);
+      return Object.freeze({ ...(read.content.result as Omit<MapResult, "items" | "calls">), items, calls: Object.freeze([]) }) as MapResult;
+    });
+  }
+
+  /** `read` under the run's content lease; an erased run reads as `absent`. */
+  async #leasedRead<T>(runId: string, absent: T, read: () => Promise<T>): Promise<T> {
     try {
-      return await withRunContentLease(this.pool, [runId], async () => {
-        const rows = await this.pool.query<ItemRow>(
-          `SELECT item_id, ai_ref, maker, origin, angle_id, angle_kind, kind, leans, list_index, content, content_ciphertext
-             FROM core.map_item WHERE run_id = $1 ORDER BY item_id`, [runId]);
-        if (rows.rows.length === 0) return Object.freeze([]);
-        const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
-        try {
-          const items = rows.rows.map((row) => itemOf(row,
-            itemContent.safeParse(decryptLeasedContentForRun<unknown>(leased, "core.map_item", row.item_id, row.content_ciphertext, row.content))));
-          await leased.assertLive();
-          return Object.freeze(items);
-        } finally {
-          await leased.close();
-        }
-      });
+      return await withRunContentLease(this.pool, [runId], read);
     } catch (error) {
-      if (isPrivateContentErased(error)) return Object.freeze([]);
+      if (isPrivateContentErased(error)) return absent;
       throw error;
     }
   }
 
-  /** The whole map, as the orchestrator returned it (minus its call records): a re-claimed run reuses it, calling nothing. */
-  async readMapResultForRun(runId: string): Promise<MapResult | null> {
-    const read = await this.#readChoice(runId);
-    if (read === null) return null;
-    const items = await this.readMapItemsForRun(runId);
-    return Object.freeze({ ...(read.content.result as Omit<MapResult, "items" | "calls">), items, calls: Object.freeze([]) }) as MapResult;
+  /** Inside the run's content lease (the caller holds it). */
+  async #readItemsLeased(runId: string): Promise<readonly MapItem[]> {
+    const rows = await this.pool.query<ItemRow>(
+      `SELECT item_id, ai_ref, maker, origin, angle_id, angle_kind, kind, leans, list_index, content, content_ciphertext
+         FROM core.map_item WHERE run_id = $1 ORDER BY item_id`, [runId]);
+    if (rows.rows.length === 0) return Object.freeze([]);
+    const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+    try {
+      const items = rows.rows.map((row) => itemOf(row,
+        itemContent.safeParse(decryptLeasedContentForRun<unknown>(leased, "core.map_item", row.item_id, row.content_ciphertext, row.content))));
+      await leased.assertLive();
+      return Object.freeze(items);
+    } finally {
+      await leased.close();
+    }
   }
 
-  async #readChoice(runId: string): Promise<{ opening: "MAP" | "TODAYS_OPENING"; marks: MapMark[]; content: ChoiceContent } | null> {
+  /** Inside the run's content lease (the caller holds it). */
+  async #readChoiceLeased(runId: string): Promise<{ opening: "MAP" | "TODAYS_OPENING"; marks: MapMark[]; content: ChoiceContent } | null> {
+    const row = (await this.pool.query<{ opening: "MAP" | "TODAYS_OPENING"; marks: unknown; content: unknown; content_ciphertext: CryptoEnvelope | null }>(
+      `SELECT opening, marks, content, content_ciphertext FROM core.map_choice WHERE run_id = $1`, [runId])).rows[0];
+    if (row === undefined) return null;
+    const marks = z.array(z.enum(MAP_MARKS)).safeParse(row.marks);
+    if (!marks.success) throw rowInvalid("core.map_choice marks");
+    const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
     try {
-      return await withRunContentLease(this.pool, [runId], async () => {
-        const row = (await this.pool.query<{ opening: "MAP" | "TODAYS_OPENING"; marks: unknown; content: unknown; content_ciphertext: CryptoEnvelope | null }>(
-          `SELECT opening, marks, content, content_ciphertext FROM core.map_choice WHERE run_id = $1`, [runId])).rows[0];
-        if (row === undefined) return null;
-        const marks = z.array(z.enum(MAP_MARKS)).safeParse(row.marks);
-        if (!marks.success) throw rowInvalid("core.map_choice marks");
-        const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
-        try {
-          const content = choiceContent.safeParse(
-            decryptLeasedContentForRun<unknown>(leased, "core.map_choice", runId, row.content_ciphertext, row.content));
-          if (!content.success) throw rowInvalid("core.map_choice content");
-          await leased.assertLive();
-          return { opening: row.opening, marks: marks.data, content: content.data };
-        } finally {
-          await leased.close();
-        }
-      });
-    } catch (error) {
-      if (isPrivateContentErased(error)) return null;
-      throw error;
+      const content = choiceContent.safeParse(
+        decryptLeasedContentForRun<unknown>(leased, "core.map_choice", runId, row.content_ciphertext, row.content));
+      if (!content.success) throw rowInvalid("core.map_choice content");
+      await leased.assertLive();
+      return { opening: row.opening, marks: marks.data, content: content.data };
+    } finally {
+      await leased.close();
     }
   }
 
   /**
    * RUN_ERASED for 0040's barrier (or the lease's own check), and for 0116's attestation guard's missing secret ONLY
-   * when the run's content is in fact no longer live: on a live run a missing secret is a defect, and stays loud.
+   * when the run is an ENCRYPTED run (content_encryption_version = 1) whose private content is no longer live: a legacy
+   * run is never classed as erased here, and on a live run a missing secret is a defect, and stays loud.
    */
   async #erased(error: unknown, runId: string): Promise<boolean> {
     if (isPrivateContentErased(error)) return true;
     if (!isAttestationSecretUnresolved(error)) return false;
-    try {
-      await assertPrivateContentLive(this.pool, runId);
-      return false;
-    } catch (check) {
-      return isPrivateContentErased(check);
-    }
+    const confirmed = await this.pool.query<{ erased: boolean }>(
+      `SELECT COALESCE(run.content_encryption_version = 1 AND NOT core.run_private_content_is_live(run.run_id), false) AS erased
+         FROM core.run AS run WHERE run.run_id = $1`, [runId]);
+    return confirmed.rows[0]?.erased === true;
   }
 }
 
