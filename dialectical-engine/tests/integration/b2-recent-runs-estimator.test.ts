@@ -28,6 +28,8 @@ type RunShape = Readonly<{
   makers?: number;
   panel?: readonly DiscoveredPanelMember[];
   compositionBudgetTier?: "low" | "medium" | "high";
+  depthParams?: Readonly<Record<string, unknown>>;
+  envelopeBasis?: Readonly<Record<string, unknown>>;
 }>;
 
 async function run(shape: RunShape = {}): Promise<string> {
@@ -43,10 +45,10 @@ async function run(shape: RunShape = {}): Promise<string> {
     tierProvenanceRef: "asker:test",
     compositionBudgetTier: shape.compositionBudgetTier ?? "low",
     planTier: shape.planTier ?? "free",
-    depthParams: { depth: shape.depth ?? 1 },
+    depthParams: shape.depthParams ?? { depth: shape.depth ?? 1 },
     discoveredPanel: shape.panel ?? fixtureDiscoveredPanel(shape.makers ?? 2),
     strangerSampleRate: 0,
-    envelopeBasis: fixtureStructuralCeiling(4),
+    envelopeBasis: shape.envelopeBasis ?? fixtureStructuralCeiling(4),
     registerVersion: 1,
     batteryVersion: "test",
     askContract: {},
@@ -144,5 +146,27 @@ describe("B2 the recent-runs sample (budget spec §2.5)", () => {
       settings: cls, since: new Date(now.getTime() - 24 * HOUR), limit: 20
     });
     expect(read.map((sample) => sample.runId)).toEqual([runId]);
+  });
+
+  it("debate shape: shaped runs and today's runs of one depth are sampled apart, and a shaped class by its plan", async () => {
+    const now = new Date();
+    const shapedParams = { depth: 1, depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" };
+    const receipt = (plan: string) => ({ ...fixtureStructuralCeiling(4), shape: { plan } });
+    const today = await run({ compositionBudgetTier: "medium", makers: 3 });
+    const pro = await run({ compositionBudgetTier: "medium", makers: 3, depthParams: shapedParams, envelopeBasis: receipt("pro") });
+    const max = await run({ compositionBudgetTier: "medium", makers: 3, depthParams: shapedParams, envelopeBasis: receipt("max") });
+    for (const runId of [today, pro, max]) {
+      await job(runId, "DONE");
+      await spend({ runId, recordedAt: new Date(now.getTime() - HOUR) });
+    }
+    const read = (settings: RunSettingsClass) => new PostgresRecentRunUsageSource(database.pool).readRecentRunUsage({
+      settings, since: new Date(now.getTime() - 24 * HOUR), limit: 20
+    }).then((samples) => samples.map((sample) => sample.runId));
+    const base: RunSettingsClass = { planTier: "free", compositionBudgetTier: "medium", makerCount: 3, depth: 1 };
+    await expect(read(base)).resolves.toEqual([today]);
+    await expect(read({ ...base, shape: { plan: "pro", depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } }))
+      .resolves.toEqual([pro]);
+    await expect(read({ ...base, shape: { plan: "pro", depthMode: "fixed", scrutiny: "standard", answerLength: "standard" } }))
+      .resolves.toEqual([]);
   });
 });

@@ -320,6 +320,30 @@ describe("B3 the waiting line (budget spec §2.7)", () => {
     await database.pool.query(`UPDATE identity."user" SET state='active' WHERE owner_ref=$1`, [suspended]);
     expect((await waits.waitingForOwner(suspended)).map((run) => run.runId)).toEqual([runs[0]]);
   });
+
+  it("debate shape: a waiting run's stored settings and receipt plan come with it; today's run has none", async () => {
+    const waits = new RunWaitRepository(database.pool);
+    const shaped = await new RunRepository(database.pool).startRun({
+      questionLine: "Does a waiting run keep its shape settings?",
+      principal: { kind: "legacy", legacyAskerId: `shape:${randomUUID()}` },
+      sessionId: randomUUID(), callerScope: "ASKER", asOf: new Date(), askerRiskTier: "casual", effectiveRiskTier: "casual",
+      tierSource: "ASKER", tierProvenanceRef: "asker:test", compositionBudgetTier: "low", planTier: "premium",
+      depthParams: { depth: 2, depthMode: "fixed", scrutiny: "deep", answerLength: "detailed" },
+      discoveredPanel: fixtureDiscoveredPanel(2), strangerSampleRate: 0,
+      envelopeBasis: { ...fixtureStructuralCeiling(4), shape: { plan: "pro" } },
+      registerVersion: 1, batteryVersion: "test", askContract: {}, batteryRows: []
+    });
+    const today = await legacyRun();
+    await inTransaction(async (client) => {
+      await waits.enterWait(client, shaped, new Date("2031-02-01T10:00:00.000Z"));
+      await waits.enterWait(client, today, new Date("2031-02-01T10:00:01.000Z"));
+    });
+    expect((await waits.readWaiting(shaped))?.shapeSettings)
+      .toEqual({ depthMode: "fixed", scrutiny: "deep", answerLength: "detailed", plan: "pro" });
+    expect(await waits.readWaiting(today)).not.toHaveProperty("shapeSettings");
+    const line = await waits.oldestWaiting(1_000);
+    expect(line.find((run) => run.runId === shaped)?.shapeSettings).toMatchObject({ plan: "pro" });
+  });
 });
 
 describe("B3 why a run waits (budget spec §2.3 rule 1)", () => {

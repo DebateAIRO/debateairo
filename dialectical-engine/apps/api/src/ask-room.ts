@@ -15,10 +15,12 @@ import {
   type RunSettingsClass,
   type ScopeRoom,
   type SpendScope,
-  type WaitsFor
+  type WaitsFor,
+  waitingShapeClassOf
 } from "@debateai/budget";
 import type { RunOwnershipAccess, WaitReason, WaitingRun, WaitingRunCursor, WaitingRunRef } from "@debateai/db";
-import { planById, type BillingPlans, type PlanId } from "@debateai/register";
+import { debateShapePlanKeyOf, planById, type BillingPlans, type DebateShapePlanKey, type PlanId } from "@debateai/register";
+import { runShapeClassOf } from "./debate-shape-ask.js";
 
 /**
  * Budget spec 2026-09-28 §2.4–§2.7, amended by the paid-plans spec 2026-09-29
@@ -276,23 +278,29 @@ export function nextUtcMidnight(now: Date): Date {
  */
 export function runSettingsClassOfAsk(
   ask: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">,
-  previewConfig?: PreviewProviderTestConfig
+  previewConfig?: PreviewProviderTestConfig,
+  shapePlan?: DebateShapePlanKey
 ): RunSettingsClass {
+  const shape = runShapeClassOf(ask.depth_params, shapePlan ?? debateShapePlanKeyOf(null, ask.plan_tier));
   return Object.freeze({
     planTier: ask.plan_tier,
     compositionBudgetTier: ask.composition_budget_tier,
     makerCount: previewPlanTierRosters(validatePreviewProviderTestConfig(previewConfig),PLAN_TIER_ROSTERS)[ask.plan_tier].length,
-    depth: ask.depth_params.depth
+    depth: ask.depth_params.depth,
+    ...(shape === null ? {} : { shape })
   });
 }
 
 /** A waiting run's class, from the columns it was asked with; a run with no plan tier is estimated as premium, the careful side. */
 export function settingsClassOfWaitingRun(run: WaitingRun): RunSettingsClass {
+  const planTier = run.planTier ?? "premium";
+  const shape = waitingShapeClassOf(run.shapeSettings ?? null, debateShapePlanKeyOf(null, planTier));
   return Object.freeze({
-    planTier: run.planTier ?? "premium",
+    planTier,
     compositionBudgetTier: run.compositionBudgetTier,
     makerCount: run.makerCount,
-    depth: run.depth
+    depth: run.depth,
+    ...(shape === null ? {} : { shape })
   });
 }
 

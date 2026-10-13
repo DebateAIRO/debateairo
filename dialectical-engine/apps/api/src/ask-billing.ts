@@ -2,7 +2,8 @@ import { PLAN_TIER_ROSTERS, type AskApplied, type AskRequest, type PlanTier } fr
 import { previewPlanTierRosters, validatePreviewProviderTestConfig, type PreviewProviderTestConfig } from "@debateai/providers";
 import type { CostEstimator, PersonAllowanceSource } from "@debateai/budget";
 import { TypedDomainError, type FundingBasis } from "@debateai/kernel";
-import { planById, type BillingPlan, type BillingPlans, type PlanId } from "@debateai/register";
+import { planById, type BillingPlan, type BillingPlans, type DebateShapePlanKey, type PlanId } from "@debateai/register";
+import { runShapeClassOf } from "./debate-shape-ask.js";
 
 /**
  * PAID PLANS (spec 2026-09-29 §2.3.4, §2.6 item 7; amendment R1 A5; ruling
@@ -201,7 +202,8 @@ export function decideCoarseFit(input: Readonly<{
  * whatever this chose (`#submitWithRoom`).
  */
 export async function coarseFitFor(
-  ask: AskRequest, ownerRef: string, billing: AskBilling, now: Date, previewConfig?: PreviewProviderTestConfig
+  ask: AskRequest, ownerRef: string, billing: AskBilling, now: Date, previewConfig?: PreviewProviderTestConfig,
+  shapePlan?: DebateShapePlanKey
 ): Promise<CoarseFit> {
   if (ask.plan_tier !== "premium") return "AS_ASKED";
   const windows = await billing.coarseFit.personAllowance.read(ownerRef, now);
@@ -213,7 +215,8 @@ export async function coarseFitFor(
       compositionBudgetTier: ask.composition_budget_tier,
       // Step 1: the roster this deployment really runs (one GLM on the private preview).
       makerCount: previewPlanTierRosters(validatePreviewProviderTestConfig(previewConfig), PLAN_TIER_ROSTERS).premium.length,
-      depth: ask.depth_params.depth
+      depth: ask.depth_params.depth,
+      ...((shape) => shape === null ? {} : { shape })(runShapeClassOf(ask.depth_params, shapePlan ?? "premium"))
     }),
     Promise.all(windows.map((window) => billing.coarseFit.spend.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope)))
   ]);

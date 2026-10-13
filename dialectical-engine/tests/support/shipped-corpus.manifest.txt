@@ -102,6 +102,7 @@ apps/api/src/data-export/snapshot.ts
 apps/api/src/data-export/store.ts
 apps/api/src/data-export/types.ts
 apps/api/src/data-export/zip.ts
+apps/api/src/debate-shape-ask.ts
 apps/api/src/disclosures.ts
 apps/api/src/email-change.ts
 apps/api/src/email-mfa-mail.ts

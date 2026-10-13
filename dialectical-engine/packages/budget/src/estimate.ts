@@ -1,4 +1,6 @@
 import type { Pool } from "pg";
+import { AnswerLengthSchema, DepthModeSchema, ScrutinySchema, type AnswerLength, type DepthMode, type Scrutiny } from "@debateai/contract";
+import { DEBATE_SHAPE_PLAN_KEYS, type DebateShapePlanKey } from "@debateai/register";
 import { chargeMicrosForUsage, type ProviderTargetPrice } from "./cost-envelope.js";
 
 /**
@@ -28,7 +30,15 @@ export type RunSettingsClass = Readonly<{
    */
   makerCount: number;
   depth: number;
+  /** Debate shape: present only for a shaped run (see RunShapeClass). */
+  shape?: RunShapeClass;
 }>;
+
+/**
+ * Debate shape (spec 2026-10-12 §3.6): what a shaped run's cost depends on beyond today's class — its plan's sizes and
+ * its three settings. A run asked without the register's row has none, and is sampled only among runs that had none.
+ */
+export type RunShapeClass = Readonly<{ plan: DebateShapePlanKey; depthMode: DepthMode; scrutiny: Scrutiny; answerLength: AnswerLength }>;
 
 export interface CostEstimator {
   estimateMicros(settings: RunSettingsClass): Promise<number>;
@@ -55,7 +65,33 @@ export function settingsClassKey(settings: RunSettingsClass): string {
     || !Number.isSafeInteger(settings.depth) || settings.depth < 1) {
     throw new TypeError("COST_ESTIMATE_SETTINGS_INVALID");
   }
-  return `${settings.planTier}|${settings.compositionBudgetTier}|${settings.makerCount}|${settings.depth}`;
+  const base = `${settings.planTier}|${settings.compositionBudgetTier}|${settings.makerCount}|${settings.depth}`;
+  const shape = settings.shape;
+  if (shape === undefined) return base;
+  if (!(DEBATE_SHAPE_PLAN_KEYS as readonly string[]).includes(shape?.plan) || !DepthModeSchema.safeParse(shape.depthMode).success
+    || !ScrutinySchema.safeParse(shape.scrutiny).success || !AnswerLengthSchema.safeParse(shape.answerLength).success) {
+    throw new TypeError("COST_ESTIMATE_SETTINGS_INVALID");
+  }
+  return `${base}|${shape.plan}|${shape.depthMode}|${shape.scrutiny}|${shape.answerLength}`;
+}
+
+/**
+ * A waiting run's stored shape settings, read the CAREFUL way (contract deviation 8): a value this code does not know
+ * reads as the dearest one, so one odd row can never stop the whole waiting line (the reason migration 0085's trigger
+ * exists for the depth cast); the dearest class has few samples, so it is estimated at the run's maximum. No settings
+ * (a run asked without the row) is null. A shaped run with no plan on its receipt (one maker) takes `fallbackPlan`.
+ */
+export function waitingShapeClassOf(raw: unknown, fallbackPlan: DebateShapePlanKey): RunShapeClass | null {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const value = raw as Record<string, unknown>;
+  const known = <T extends string>(options: readonly T[], found: unknown, dearest: T): T =>
+    (options as readonly unknown[]).includes(found) ? found as T : dearest;
+  return Object.freeze({
+    plan: value.plan === null || value.plan === undefined ? fallbackPlan : known(DEBATE_SHAPE_PLAN_KEYS, value.plan, "max"),
+    depthMode: known(DepthModeSchema.options, value.depthMode, "fixed"),
+    scrutiny: known(ScrutinySchema.options, value.scrutiny, "exhaustive"),
+    answerLength: known(AnswerLengthSchema.options, value.answerLength, "detailed")
+  });
 }
 
 export function estimateFromSampleCosts(input: Readonly<{
@@ -199,6 +235,10 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
            AND run.composition_budget_tier = $2
            AND run.depth_params->>'depth' = $3
            AND jsonb_array_length(run.discovered_panel) = $4
+           AND COALESCE(run.depth_params->>'depthMode', '') = $7
+           AND COALESCE(run.depth_params->>'scrutiny', '') = $8
+           AND COALESCE(run.depth_params->>'answerLength', '') = $9
+           AND (run.envelope_basis->'shape' IS NULL OR run.envelope_basis->'shape'->>'plan' = $10)
            AND EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = run.run_id)
            AND NOT EXISTS (
              SELECT 1 FROM core.work_item AS work
@@ -221,7 +261,11 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
         String(input.settings.depth),
         input.settings.makerCount,
         input.since,
-        input.limit
+        input.limit,
+        input.settings.shape?.depthMode ?? "",
+        input.settings.shape?.scrutiny ?? "",
+        input.settings.shape?.answerLength ?? "",
+        input.settings.shape?.plan ?? ""
       ]
     );
     const runs = new Map<string, RecentRunCharge[]>();

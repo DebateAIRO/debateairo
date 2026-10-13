@@ -112,7 +112,9 @@ export {
   type RecentRunCharge,
   type RecentRunUsage,
   type RecentRunUsageSource,
-  type RunSettingsClass
+  type RunSettingsClass,
+  type RunShapeClass,
+  waitingShapeClassOf
 } from "./estimate.js";
 
 /** Budget spec 2026-09-28 §2.6 (B3): the day lock, then the person lock, for every room decision. */
