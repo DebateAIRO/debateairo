@@ -143,6 +143,9 @@ import {
   ServeRepository,
   toSynthesisPromptMaterial,
   SYNTHESIZER_PROMPT_CONTRACT,
+  SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
+  SYNTHESIZER_LENGTH_PROMPT_CONTRACT,
+  synthesizerAnswerLengthField,
   EVALUATOR_INSTRUCTIONS,
   EVALUATOR_V1_INSTRUCTIONS,
   type BandCeilingRegisterRow,
@@ -684,7 +687,7 @@ export function codePromptContractHashes(): Readonly<{ judge: string; composer: 
   const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
   return Object.freeze({
     judge: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
-    composer: digest(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)),
+    composer: digest(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
     conformance: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
   });
 }
@@ -785,16 +788,33 @@ export const evaluatorVerdictSchema = z.object({
 export function buildSynthesisRolePrompt(
   request: SynthesizerRequest | EvaluatorRequest,
   argumentLanguageName: string,
-  randomBytes?: (size: number) => Buffer
+  randomBytes?: (size: number) => Buffer,
+  answerWords: number | null = null
 ): FramedPrompt {
+  // Debate shape (spec §3.3 step 8): only a writer call with an answer length takes the length variant; without one
+  // (every run without a shape, and every checker call) the packet is today's, byte for byte.
+  const lengthed = request.role === "SYNTHESIZER" && answerWords !== null;
   return buildFramedPrompt({
     contract: promptContractInArgumentLanguage(
-      request.role === "SYNTHESIZER" ? SYNTHESIZER_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT,
+      request.role === "SYNTHESIZER"
+        ? (lengthed ? SYNTHESIZER_LENGTH_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT)
+        : EVALUATOR_PROMPT_CONTRACT,
       argumentLanguageName
     ),
-    material: toSynthesisPromptMaterial(request),
+    material: lengthed
+      ? [...toSynthesisPromptMaterial(request), synthesizerAnswerLengthField(answerWords)]
+      : toSynthesisPromptMaterial(request),
     ...(randomBytes === undefined ? {} : { randomBytes })
   });
+}
+
+/**
+ * Spec §3.3 step 8: the writer's call bound is max(sealed bound, the answer length's writerBound) — never under the
+ * sealed bound, never under the row's writer bound. Null (no shape): the sealed bound itself, the same object.
+ */
+export function shapeWriterBound(bound: CallBound, writerBound: number | null): CallBound {
+  if (writerBound === null || writerBound <= bound.tokenCeiling) return bound;
+  return Object.freeze({ ...bound, tokenCeiling: writerBound });
 }
 
 /** A17: the classification a live synthesis call applies, exported for replay. */

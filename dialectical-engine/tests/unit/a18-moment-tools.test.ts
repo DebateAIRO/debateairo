@@ -17,7 +17,7 @@ import {
 import { EVALUATOR_PROMPT_CONTRACT, buildSynthesisRolePrompt } from "@debateai/runner";
 import { canonicalPromptFingerprint, type MomentBuilder } from "@debateai/scorecard";
 import {
-  SYNTHESIZER_PROMPT_CONTRACT,
+  SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
   buildSynthesisDigest,
   buildSynthesizerRequest,
   type SynthesisDigest
@@ -170,7 +170,7 @@ describe("A18 · contract hashes, grader context, outcomes and runtime", () => {
     expect(currentContractHash("JUDGE_JUDGE")).toBe(sha(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT));
     expect(currentContractHash("JUDGE_REVIEW")).toBe(sha(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT));
     expect(currentContractHash("JUDGE_ASSESS")).toBe(sha(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT));
-    expect(currentContractHash("SYNTHESIS_WRITER")).toBe(sha(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)));
+    expect(currentContractHash("SYNTHESIS_WRITER")).toBe(sha(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT));
     expect(currentContractHash("SYNTHESIS_CHECKER")).toBe(sha(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT)));
   });
 

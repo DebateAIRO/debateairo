@@ -1,6 +1,6 @@
 import type { WayOfKnowing } from "@debateai/kernel";
 import { TypedDomainError, isRunLevelSpendStop } from "@debateai/kernel";
-import type { PromptContract } from "@debateai/providers";
+import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 
 /**
  * T9 — the synthesis serve chain (goal-v4 222-270; rulings S6-1..S6-4,
@@ -1876,3 +1876,28 @@ export const SYNTHESIZER_PROMPT_CONTRACT: PromptContract = Object.freeze({
   instruction: SYNTHESIZER_INSTRUCTIONS,
   answerForm: SYNTHESIZER_ANSWER_FORM
 });
+
+/**
+ * Debate shape (spec §3.3 step 8): the answer length. A VARIANT of serve.synthesizer.v3 — v3's instruction, then one
+ * sentence; the target arrives as the material field `answer_length` ("about N words"). A run without a shape never
+ * sends it, so its writer prompt is v3's to the byte. Sealed with v3 by `composerContractHash`
+ * (SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT).
+ */
+export const SYNTHESIZER_LENGTH_CONTRACT_ID = "serve.synthesizer.length.v1" as const;
+export const SYNTHESIZER_LENGTH_SENTENCE = "Write the answer in about the number of words named in answer_length; "
+  + "it is a target, never a reason to leave out a point the answer needs.";
+export const SYNTHESIZER_LENGTH_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_LENGTH_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE}`,
+  answerForm: SYNTHESIZER_ANSWER_FORM
+});
+/** What `composerContractHash` seals from the debate shape on: v3, then the length variant. */
+export const SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT: string = [
+  promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT),
+  promptContractFingerprintText(SYNTHESIZER_LENGTH_PROMPT_CONTRACT)
+].join("\n---\n");
+/** The material field that carries the answer length the writer aims at ("about N words"; a target, never a cut). */
+export function synthesizerAnswerLengthField(words: number): Readonly<{ name: "answer_length"; content: string }> {
+  if (!Number.isSafeInteger(words) || words < 1) throw new TypeError("SYNTHESIZER_ANSWER_LENGTH_INVALID");
+  return Object.freeze({ name: "answer_length", content: `about ${String(words)} words` });
+}

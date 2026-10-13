@@ -21,7 +21,8 @@ import {
  * 2026-10-12). The runner records every answer-writer and answer-checker call under the REGISTER's
  * fingerprint, so this file pins three things:
  *  1. the register 12 the preview publish kit composes on a version-11-shaped base changes exactly three
- *     rows: the judge's (debate shape) and the two synthesis rows, to the v3/v2 seals (the development register carries the same seals);
+ *     rows: the judge's (debate shape) and the two synthesis rows, the composer's to v3 + its answer-length variant
+ *     (debate shape) and the checker's to v2 (the development register carries the same seals);
  *  2. the runner refuses to start on a register that does not carry the fingerprints this code sends;
  *  3. the practice can compose that same version 12 itself (`--register-next`), before any upload.
  */
@@ -30,6 +31,8 @@ const canonical = (value: unknown) => parseCanonicalRegisterJson(Buffer.from(JSO
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
 
 const V3_COMPOSER = "4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f";
+/** The composer seal this code sends after the debate shape (Task 5): v3 + the length variant. */
+const COMPOSER_P2B = "9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08b25662";
 const V2_CONFORMANCE = "660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f";
 /** What the live register version 11 carries (sealed history; never edited). */
 const LIVE_11 = Object.freeze({
@@ -73,12 +76,12 @@ function exportOf(base: readonly Row[]): PracticeRegisterExport {
 
 describe("register 12: the new prompt seals reach the register as a new version", () => {
   it("the code's prompt fingerprints are the current seals", () => {
-    expect(codePromptContractHashes()).toEqual({ judge: JUDGE_P2B, composer: V3_COMPOSER, conformance: V2_CONFORMANCE });
+    expect(codePromptContractHashes()).toEqual({ judge: JUDGE_P2B, composer: COMPOSER_P2B, conformance: V2_CONFORMANCE });
   });
 
   it("the development register's builder seals the same values the code sends", async () => {
     const rows = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((row) => [row.rowKey, row.value]));
-    expect(rows.composerContractHash).toBe(V3_COMPOSER);
+    expect(rows.composerContractHash).toBe(COMPOSER_P2B);
     expect(rows.conformanceContractHash).toBe(V2_CONFORMANCE);
     expect(rows.judgeContractHash).toBe(JUDGE_P2B);
   });
@@ -92,7 +95,7 @@ describe("register 12: the new prompt seals reach the register as a new version"
     expect([...plan.changedKeys].sort()).toEqual(["composerContractHash", "conformanceContractHash", "judgeContractHash"]);
     const entry = (key: string) => plan.delta.find((row) => row.rowKey === key)!;
     expect([entry("composerContractHash").oldValueJsonText, entry("composerContractHash").newValueJsonText])
-      .toEqual([`"${LIVE_11.composer}"`, `"${V3_COMPOSER}"`]);
+      .toEqual([`"${LIVE_11.composer}"`, `"${COMPOSER_P2B}"`]);
     expect([entry("conformanceContractHash").oldValueJsonText, entry("conformanceContractHash").newValueJsonText])
       .toEqual([`"${LIVE_11.conformance}"`, `"${V2_CONFORMANCE}"`]);
     expect([entry("judgeContractHash").oldValueJsonText, entry("judgeContractHash").newValueJsonText])
@@ -114,7 +117,7 @@ describe("the runner refuses a register that does not carry the code's prompt fi
     expect(caught).toMatchObject({ code: "REGISTER_PROMPT_CONTRACT_HASH_MISMATCH" });
     const message = (caught as Error).message;
     expect(message).toContain("Register version 11");
-    expect(message).toContain(`composerContractHash is ${LIVE_11.composer}, the code's is ${V3_COMPOSER}`);
+    expect(message).toContain(`composerContractHash is ${LIVE_11.composer}, the code's is ${COMPOSER_P2B}`);
     expect(message).toContain(`conformanceContractHash is ${LIVE_11.conformance}, the code's is ${V2_CONFORMANCE}`);
     expect(message).toContain(`judgeContractHash is ${LIVE_11.judge}, the code's is ${JUDGE_P2B}`);
   });
@@ -159,7 +162,7 @@ describe("the practice can practise register 12 before it is published (--regist
     expect(next.deltaSha256).toBe(kit.deltaSha256);
     expect(next.deltaSha256).toBe(sha(JSON.stringify(kit.delta)));
     const value = (key: string) => JSON.parse(next.rows.find((row) => row.rowKey === key)!.valueJsonText);
-    expect([value("composerContractHash"), value("conformanceContractHash")]).toEqual([V3_COMPOSER, V2_CONFORMANCE]);
+    expect([value("composerContractHash"), value("conformanceContractHash")]).toEqual([COMPOSER_P2B, V2_CONFORMANCE]);
     expect(value("evaluatorRoleRef").providerRef).toBe("preview:deepseek-v4-1-flash");
     expect(value("answerRoleRotationPolicy").enabled).toBe(true);
   });
@@ -178,7 +181,7 @@ describe("the practice can practise register 12 before it is published (--regist
 
   it("refuses when the code changes no row, or when the base cannot be read back", async () => {
     const unchanged = await live11Base({
-      judgeContractHash: canonical(JUDGE_P2B), composerContractHash: canonical(V3_COMPOSER), conformanceContractHash: canonical(V2_CONFORMANCE)
+      judgeContractHash: canonical(JUDGE_P2B), composerContractHash: canonical(COMPOSER_P2B), conformanceContractHash: canonical(V2_CONFORMANCE)
     });
     await expect(composePracticeNextRegisterVersion(exportOf(unchanged)))
       .rejects.toMatchObject({ code: "PRACTICE_REGISTER_NEXT_UNSUPPORTED" });

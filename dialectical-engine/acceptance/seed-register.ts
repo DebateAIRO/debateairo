@@ -4,7 +4,7 @@ import type { Pool } from "pg";
 import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
 import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "@debateai/judgement";
 import { promptContractFingerprintText } from "@debateai/providers";
-import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
+import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT } from "@debateai/serve";
 import {
   ENGINE_BAND_ORDER,
   buildAlgorithmRegisterRows,
@@ -168,7 +168,8 @@ async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]
     // answer form, or to an owner's instruction slot is a NEW sealed version
     // and none of them can ship under an old hash.
     judgeContractHash: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
-    composerContractHash: digest(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)),
+    // Debate shape (2026-10-13): the writer's seal is v3 then its answer-length variant.
+    composerContractHash: digest(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
     conformanceContractHash: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT)),
     // codex r2 B1a: the fingerprint is taken from the constant the runner
     // SENDS, not from a search of the runner's source. There is nothing left

@@ -5,7 +5,9 @@ import {
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1
 } from "../../packages/judgement/src/prompts.js";
-import { SYNTHESIZER_PROMPT_CONTRACT, SYNTHESIZER_V1_PROMPT_CONTRACT, SYNTHESIZER_V2_PROMPT_CONTRACT } from "@debateai/serve";
+import {
+  SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_PROMPT_CONTRACT, SYNTHESIZER_V1_PROMPT_CONTRACT, SYNTHESIZER_V2_PROMPT_CONTRACT
+} from "@debateai/serve";
 import { EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import { BLIND_JUDGE_GRADE_CONTRACT_HASH, DOMAIN_TAGGER_CONTRACT_HASH } from "../../packages/evaluator/src/index.js";
 import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
@@ -57,6 +59,9 @@ describe("S01 seals the content rule", () => {
     // shape's six contracts to it, so the judge family moves once more, from e7f7e4b0... to its debate-shape seal.
     ["judgeContractHash", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1), "3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69", "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365"],
     ["judgeContractHash (debate shape)", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT), "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365", "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612"],
+    // Debate shape (Phase 2b Task 5): the composer row now seals v3 then its answer-length variant; v3's own seal
+    // (the base here, register 12's value) stays pinned below as history.
+    ["composerContractHash serve.synthesizer.v3 + length.v1", () => sha256(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT), "4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f", "9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08b25662"],
     // Practice debate 3 (2026-10-12): the v1 and evaluator-v1 rows now read the exported HISTORY contracts
     // (`SYNTHESIZER_V1_PROMPT_CONTRACT`, `EVALUATOR_V1_PROMPT_CONTRACT`): the current contracts carry the v3/v2
     // instruction, and spreading them would hash a contract that never shipped. The sealed values are unchanged.

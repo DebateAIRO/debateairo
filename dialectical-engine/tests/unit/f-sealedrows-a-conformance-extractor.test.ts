@@ -5,7 +5,7 @@ import { buildAcceptanceRegisterRows } from "../../acceptance/seed-register.js";
 import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
 import { EVALUATOR_CONTRACT_TEXT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
-import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
+import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
 
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 const sourceOf = (relative: string): Promise<string> =>
@@ -104,9 +104,10 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
     // serve.synthesizer.v2 (2026-10-09) superseded the v1 composer seal
     // d96e7cc9…c866, and serve.synthesizer.v3 (2026-10-12, practice debate 3)
     // superseded v2's 340e11a6…8b70 (register versions sealed before each keep
-    // the value they carry).
+    // the value they carry). The debate shape's length variant (2026-10-13)
+    // joined v3 in this seal; v3's 4b141d3a…f90f is history.
     expect(acceptance.composerContractHash)
-      .toBe("4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f");
+      .toBe("9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08b25662");
     // Both deployments seal the same values, or one of them is seeding a prompt
     // the other never sends.
     expect(development.judgeContractHash).toBe(acceptance.judgeContractHash);
@@ -119,7 +120,7 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
     // runner's source, so the slot separation is asserted against the objects.
     expect(acceptance.conformanceContractHash).not.toBe(acceptance.composerContractHash);
     expect(acceptance.composerContractHash)
-      .toBe(sha256(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)));
+      .toBe(sha256(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT));
     expect(acceptance.conformanceContractHash).not.toBe(
       sha256([
         promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT),

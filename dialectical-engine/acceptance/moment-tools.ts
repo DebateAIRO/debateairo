@@ -33,6 +33,8 @@ import {
 } from "@debateai/runner";
 import type { MomentBuilder, MomentBuilderFamily, MomentFile, ReplayOutcome } from "@debateai/scorecard";
 import {
+  SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
+  SYNTHESIZER_LENGTH_CONTRACT_ID,
   SYNTHESIZER_PROMPT_CONTRACT,
   buildEvaluatorRequest,
   buildSynthesizerRequest,
@@ -115,7 +117,10 @@ export const SynthesisWriterInputsSchema = z.object({
   digest: digestSchema,
   codeLabel: codeLabelSchema,
   priorObjection: z.string().nullable(),
-  argumentLanguageName: languageName.optional()
+  argumentLanguageName: languageName.optional(),
+  // Debate shape: the answer length a lengthed writer call carried. Absent on every moment recorded before the shape,
+  // so their ids are unchanged.
+  answerWords: z.number().int().positive().optional()
 }).strict();
 export const SynthesisCheckerInputsSchema = z.object({
   round: z.number().int().positive(),
@@ -136,6 +141,11 @@ export type TypedMomentBuilder =
 /** Paid plans S1a: the language a moment's live builder writes in — the moment's own, or dev's default. */
 export function momentArgumentLanguageName(builder: TypedMomentBuilder): string {
   return builder.inputs.argumentLanguageName ?? DEFAULT_ARGUMENT_LANGUAGE_NAME;
+}
+
+/** The answer length a recorded writer call carried (debate shape), or null: a writer call without one, or a checker call. */
+function momentAnswerWords(builder: TypedMomentBuilder): number | null {
+  return builder.family === "SYNTHESIS_WRITER" ? builder.inputs.answerWords ?? null : null;
 }
 
 /**
@@ -281,7 +291,16 @@ export function builderFromRecordedPacket(
       return parseMomentBuilder({ family, inputs: { questionLine: field("question_line"), statement: field("statement"), ...language } });
     }
     case "SYNTHESIS_WRITER": {
-      if (frame.contractId !== SYNTHESIZER_PROMPT_CONTRACT.contractId) mismatch();
+      const lengthed = frame.contractId === SYNTHESIZER_LENGTH_CONTRACT_ID;
+      if (!lengthed && frame.contractId !== SYNTHESIZER_PROMPT_CONTRACT.contractId) mismatch();
+      // The length variant and its `answer_length` field travel together.
+      if (lengthed !== has("answer_length")) {
+        throw new TypedDomainError("MOMENT_FIELD_UNEXPECTED", `${callSiteKey}: answer_length does not match the contract`);
+      }
+      const words = lengthed ? /^about ([1-9][0-9]*) words$/u.exec(field("answer_length"))?.[1] : undefined;
+      if (lengthed && words === undefined) {
+        throw new TypedDomainError("MOMENT_RECORDED_PROMPT_UNREADABLE", `${callSiteKey}: answer_length`);
+      }
       const site = /^COMPOSER:SYNTHESIZER:(INITIAL|RETRY):(\d+)$/u.exec(siteKey);
       if (site === null) return mismatch();
       const retry = site[1] === "RETRY";
@@ -295,6 +314,7 @@ export function builderFromRecordedPacket(
           digest: json("digest"),
           codeLabel: json("code_label"),
           priorObjection: retry ? field("prior_objection") : null,
+          ...(words === undefined ? {} : { answerWords: Number(words) }),
           ...language
         }
       });
@@ -372,7 +392,7 @@ const sha256 = (value: string): string => createHash("sha256").update(value, "ut
 /** The family's contract hash as the seeders seal it (`apps/runner/src/dev-deployment-register.ts:524-526`). */
 export function currentContractHash(family: MomentBuilderFamily): string {
   return family === "SYNTHESIS_WRITER"
-    ? sha256(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT))
+    ? sha256(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT)
     : family === "SYNTHESIS_CHECKER"
       ? sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
       : sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT);
@@ -483,7 +503,7 @@ export async function invokeMomentBuilder(builder: TypedMomentBuilder, gateway: 
     case "SYNTHESIS_WRITER":
     case "SYNTHESIS_CHECKER": {
       const request = synthesisRequestOf(builder);
-      const framed = buildSynthesisRolePrompt(request, momentArgumentLanguageName(builder));
+      const framed = buildSynthesisRolePrompt(request, momentArgumentLanguageName(builder), undefined, momentAnswerWords(builder));
       const role = request.role;
       const response = await gateway.call({
         runId: null,
@@ -514,7 +534,9 @@ export async function invokeMomentBuilder(builder: TypedMomentBuilder, gateway: 
 /** The packet the live builder produces for a moment, captured before any byte could leave. */
 export async function captureMomentPacket(builder: TypedMomentBuilder): Promise<PromptPacket> {
   if (builder.family === "SYNTHESIS_WRITER" || builder.family === "SYNTHESIS_CHECKER") {
-    return buildSynthesisRolePrompt(synthesisRequestOf(builder), momentArgumentLanguageName(builder)).packet;
+    return buildSynthesisRolePrompt(
+      synthesisRequestOf(builder), momentArgumentLanguageName(builder), undefined, momentAnswerWords(builder)
+    ).packet;
   }
   const captured: { packet: PromptPacket | null } = { packet: null };
   const capture: ProviderGateway = {

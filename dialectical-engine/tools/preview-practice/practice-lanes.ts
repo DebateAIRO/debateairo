@@ -50,7 +50,7 @@ import {
   parseEvaluatorOutput
 } from "@debateai/runner";
 import {
-  SYNTHESIZER_PROMPT_CONTRACT,
+  SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
   assertEvaluatorVerdict,
   buildEvaluatorRequest,
   buildSynthesisDigest,
@@ -291,7 +291,7 @@ const digestHex = (text: string): string => createHash("sha256").update(text).di
 /** The sealed contract hashes, derived exactly as the register's builder derives them (dev-deployment-register.ts). */
 export const PRACTICE_CONTRACT_HASHES = Object.freeze({
   judge: digestHex(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
-  composer: digestHex(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)),
+  composer: digestHex(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
   conformance: digestHex(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
 });
 
