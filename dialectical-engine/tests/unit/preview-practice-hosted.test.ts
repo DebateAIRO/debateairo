@@ -144,8 +144,8 @@ describe("--register-next on the hosted preview: publish kit v3, as the server's
     expect(next.deltaSha256).toBe(server.deltaSha256);
     expect(next).toMatchObject({ composer: "preview-register-composer-v3", checker: "glm", roleRotation: "on", hostedBilling: OFF, notes: [],
       addedKeys: [STORY_COST_ENVELOPE_POLICY_ROW_KEY], changedKeys: ["admissionPolicy", "costEnvelopePolicy"] });
-    expect(value(next.rows as Row[], "costEnvelopePolicy")).toMatchObject({ per_run_ceiling_micros: 3_000_000, daily_ceiling_micros: 10_000_000 });
-    expect(value(next.rows as Row[], "billingPolicy").enabled).toBe(false);
+    expect(value(next.rows as readonly Row[], "costEnvelopePolicy")).toMatchObject({ per_run_ceiling_micros: 3_000_000, daily_ceiling_micros: 10_000_000 });
+    expect(value(next.rows as readonly Row[], "billingPolicy").enabled).toBe(false);
   });
 
   it("then billing on over that hosted version (H7): only the billing row changes, as the runbook tells the owner to expect", async () => {
@@ -160,7 +160,7 @@ describe("--register-next on the hosted preview: publish kit v3, as the server's
     // The server's proposal adds nodeRuntimeVersion's source reference (it measures its runtime again; the practice
     // reads the base's): runbook H7's "billingPolicy ... and nodeRuntimeVersion's source reference".
     expect(next.changedKeys).toEqual(["billingPolicy"]);
-    expect(value(next.rows as Row[], "billingPolicy")).toMatchObject({ enabled: true });
+    expect(value(next.rows as readonly Row[], "billingPolicy")).toMatchObject({ enabled: true });
     // The same inputs again change nothing: there is no next version to practise.
     await expect(composePracticeHostedNextRegisterVersion(document, OFF)).rejects.toMatchObject({ code: "PRACTICE_REGISTER_NEXT_UNSUPPORTED" });
   });
@@ -183,7 +183,7 @@ describe("--register-next on the hosted preview: publish kit v3, as the server's
     const policy = { perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50, anthropic: 50, deepinfra: 150 } };
     const next = await composePracticeHostedNextRegisterVersion(exportOf(base), OFF, { callConcurrency: policy });
     expect(next.addedKeys).toContain("callConcurrencyPolicy");
-    expect(value(next.rows as Row[], "callConcurrencyPolicy")).toMatchObject(policy);
+    expect(value(next.rows as readonly Row[], "callConcurrencyPolicy")).toMatchObject(policy);
   });
 
   it("kit v2 refuses a hosted base (the server's HOSTED_BILLING_REQUIRED), and keeps reading a local base as before", async () => {
