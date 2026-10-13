@@ -44,3 +44,8 @@ export function shapeWriterSeat(input: Readonly<{ seatMakers: readonly string[];
   }
   return null;
 }
+
+/** The distinct makers among the seats that do not sit out: the most positions the shape can argue (spec §3.3 step 2). */
+export function shapeDistinctMakers<T extends Readonly<{ main: Readonly<{ maker: string }> }>>(seats: readonly T[], sitsOut: (seat: T) => boolean): number {
+  return new Set(seats.filter((seat) => !sitsOut(seat)).map((seat) => seat.main.maker)).size;
+}

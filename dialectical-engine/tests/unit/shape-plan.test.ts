@@ -9,7 +9,7 @@ import {
   buildScrutinyLegs, buildShapePlan, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap, shapeRoundOnePoints,
   shapeRunnableLegs, shapeRunnableNodeCount, type ShapeLeg, type ShapePlan
 } from "../../apps/runner/src/shape-plan.js";
-import { shapeHandOverRoot, shapeSeatOrder, shapeWriterSeat } from "../../apps/runner/src/shape-seats.js";
+import { shapeDistinctMakers, shapeHandOverRoot, shapeSeatOrder, shapeWriterSeat } from "../../apps/runner/src/shape-seats.js";
 
 const KEY_0069 = /^JUDGE(:root:(secondary|[0-9]{1,4})|:(defender|critic):root[0-9]{1,4}:r[0-9]{1,4}:p[0-9]{1,4}|:cross-root:[0-9]{1,4}->[0-9]{1,4})?$/u;
 const kp = (id: string) => ({ keyPointId: id, claim: `Claim ${id}.`, memberItemIds: [], blindMakers: [], gapMakers: [], makers: [], fixedAngleKinds: [], leansAgainst: false });
@@ -143,6 +143,11 @@ describe("the breadth-first plan (spec §3.3 steps 3–5, INTERFACE §3 round or
 
 describe("seats", () => {
   const seat = (maker: string) => ({ main: { maker } });
+  it("counts the distinct makers among the seats that do not sit out", () => {
+    expect(shapeDistinctMakers([seat("glm"), seat("glm"), seat("ds")], () => false)).toBe(2);
+    expect(shapeDistinctMakers([seat("glm"), seat("ds"), seat("qw")], (entry) => entry.main.maker === "ds")).toBe(2);
+    expect(shapeDistinctMakers([seat("glm"), seat("ds")], () => true)).toBe(0);
+  });
   it("puts distinct makers first, keeping the opener first", () => {
     expect(shapeSeatOrder([seat("glm"), seat("glm"), seat("ds"), seat("qw")]).map((entry) => entry.main.maker)).toEqual(["glm", "ds", "qw", "glm"]);
   });

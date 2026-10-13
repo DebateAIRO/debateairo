@@ -168,7 +168,8 @@ import {
   type VerdictLabelBasis,
   type VerdictLabelDerivation
 } from "@debateai/serve";
-import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from "@debateai/contract";
+import { MapChoiceRepository, type MapResult } from "@debateai/map";
 import {
   argumentLanguageDirective,
   replyLanguageCheck,
@@ -212,6 +213,8 @@ import {
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions } from "./shape-select.js";
+import { createRunnerMapCaller, mapStageSeats, runMapStage } from "./map-stage.js";
+import { shapeDistinctMakers, shapeSeatOrder } from "./shape-seats.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
@@ -2346,6 +2349,13 @@ export interface WalkingSkeletonSettings {
   readonly costSubstitutions?: Readonly<{
     store?: Pick<RunCostSubstitutionRepository, "record">;
     log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
+  }>;
+  /**
+   * Debate shape (spec 2026-10-12 §3.3 step 1): where a shaped run's map is stored and read back (a re-claimed run
+   * reuses its stored map and asks nothing again). Absent: the runner's pool. Never read by a run without a shape.
+   */
+  readonly mapChoices?: Readonly<{
+    store: Pick<MapChoiceRepository, "writeMapRun" | "writeMapPosition" | "readMapResultForRun">;
   }>;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
@@ -4507,6 +4517,7 @@ export class WalkingSkeletonRunner {
   readonly #providerProbes: ProviderProbeRepository;
   readonly #serveDisclosure: Pick<ServeDisclosureRepository, "insert">;
   readonly #costSubstitutions: Pick<RunCostSubstitutionRepository, "record">;
+  readonly #mapChoices: Pick<MapChoiceRepository, "writeMapRun" | "writeMapPosition" | "readMapResultForRun">;
   readonly #configuredMakers: readonly {
     readonly judge: Judge;
     readonly provider: ProviderGateway;
@@ -4535,6 +4546,7 @@ export class WalkingSkeletonRunner {
     this.#providerProbes = new ProviderProbeRepository(pool);
     this.#serveDisclosure = settings.serveDisclosure?.store ?? new ServeDisclosureRepository(pool);
     this.#costSubstitutions = settings.costSubstitutions?.store ?? new RunCostSubstitutionRepository(pool);
+    this.#mapChoices = settings.mapChoices?.store ?? new MapChoiceRepository(pool);
     const critique = settings.critique === undefined ? undefined
       : { ...settings.critique, provider: keepAliveProviderGateway(settings.critique.provider) };
     this.#configuredMakers = Object.freeze([
@@ -5110,10 +5122,17 @@ export class WalkingSkeletonRunner {
     // I2(b), Phase 2a: a debate-shape receipt is never argued as today's shape. P2b replaces this line.
     refuseDebateShapeReceiptInPhase2a(envelopeBasis);
     /**
-     * Debate shape (P2b): the receipt's frozen sizes, or null — today's run. Until Task 13 lifts the per-run refusal
-     * above, it is null in every run that reaches the code below; Task 12 wraps it into the run's shape context.
+     * Debate shape (spec 2026-10-12 §3): the sizes this run was admitted with (P2a: its receipt's `shape`), or null —
+     * today's run, byte for byte. A shaped run needs the runner's shape settings (the sealed map hash) and a call
+     * scheduler (its chains run through the lane; with no concurrency row the lane holds one call at a time). Until
+     * Task 13 lifts the per-run refusal above, it is null in every run that reaches this line.
      */
     const shapeShape = envelopeBasis.shape ?? null;
+    if (shapeShape !== null && (this.settings.debateShape == null || callScheduler === undefined)) {
+      throw new TypedDomainError("DEBATE_SHAPE_RUNNER_UNCONFIGURED",
+        "This run was admitted with the debate shape, and this runner has no sealed map contracts or no call scheduler");
+    }
+    const shapeSettings = shapeShape === null ? null : debateShapeSettingsOf(run.depthParams);
     const expansionDepth = resolveExpansionDepth(run.depthParams);
     /**
      * Model scorecard A15 (spec §2.7) — the role assignment the picker pinned at
@@ -5655,6 +5674,13 @@ export class WalkingSkeletonRunner {
     }
     const effectiveMakerCount = seatBook.position.length;
     /**
+     * Debate shape (spec §3.3 step 1): the run's shape context — its frozen sizes, its settings and the sealed map
+     * hash — or null. A shaped run left with one maker at claim keeps today's single-position path (null).
+     */
+    const shapeRun = shapeShape !== null && shapeSettings !== null && this.settings.debateShape != null && effectiveMakerCount >= 2
+      ? Object.freeze({ shape: shapeShape, settings: shapeSettings, mapContractHash: this.settings.debateShape.mapContractHash })
+      : null;
+    /**
      * A15 (R5) and controller ruling A14 (carry 1): debaters come from distinct
      * makers. On an assigned run a POSITION member may answer only when no OTHER
      * POSITION seat holds its maker — read off the CLAIMED book, never off who
@@ -6049,9 +6075,9 @@ export class WalkingSkeletonRunner {
       const notTheAuthor = (member: SeatIdentity): boolean => member.maker !== input.authorMaker;
       // Debate shape (spec §3.3 step 6): a shaped run asks J graders per node (never more than the makers who are not
       // the author); today's run keeps today's cap.
-      const panelCallCap = shapeShape === null
+      const panelCallCap = shapeRun === null
         ? Math.max(effectiveMakerCount, envelopeBasis.panelSize) - 1
-        : Math.min(shapeShape.graders, effectiveMakerCount - 1);
+        : Math.min(shapeRun.shape.graders, effectiveMakerCount - 1);
       const panelKeyFor = (member: SeatMember): string => `${input.callSiteKey}:${member.providerRef}`;
       // Run resilience (spec 2026-10-12, fix (d)): a member that sits out the rest of the run has no panel seat; it
       // is disclosed once, on the answer (RUN_PANEL_REVISED), not as a failed seat on every node.
@@ -6143,7 +6169,7 @@ export class WalkingSkeletonRunner {
           }];
         }
         if (calledSeats[seatPosition] !== true) return [];
-        return [memberFor(seat, shapeDistinctMakerOptions(panelOptions, shapeShape === null
+        return [memberFor(seat, shapeDistinctMakerOptions(panelOptions, shapeRun === null
           ? null
           : { ownMaker: planned.maker, taken: new Set([input.authorMaker, ...calledMakers]) }), planned)];
       });
@@ -6263,14 +6289,14 @@ export class WalkingSkeletonRunner {
       // Debate shape (spec §3.3 step 6; §6: the highest-voice rule is unchanged) — THE CLOSE-CALL EXTENSION. A
       // measured spread at or above the disagreement threshold calls up to E more graders, of makers neither the
       // author's nor already called at this node; their voices come AFTER every voice heard and the node is reduced
-      // again. Never on today's run (`shapeShape === null`).
+      // again. Never on today's run (`shapeRun === null`).
       let heard = panel.judgements;
       let notes = panel.notes;
       let closeCallAdded = 0;
       let closeCallStop: EnvelopeStopKind | null = null;
       const firstDispersion = reduced.dispersion.kind === "MEASURED" ? reduced.dispersion.value : null;
-      if (shapeShape !== null && spendStop === null
-        && shapeCloseCallFires(firstDispersion, panelPolicy.disagreementThreshold, shapeShape.closeCallExtraGraders)) {
+      if (shapeRun !== null && spendStop === null
+        && shapeCloseCallFires(firstDispersion, panelPolicy.disagreementThreshold, shapeRun.shape.closeCallExtraGraders)) {
         // Pre-flight PF-B34: every maker already CALLED at this node — the ones heard and the ones that failed — so no
         // panel key (`PANEL:<node>:<providerRef>`, `panelKeyFor`) is ever asked twice.
         const onPanelMakers = [...heard.map((entry) => entry.memberRole), ...calledMakers];
@@ -6279,7 +6305,7 @@ export class WalkingSkeletonRunner {
           called: calledSeats,
           authorMaker: input.authorMaker,
           onPanelMakers,
-          extra: shapeShape.closeCallExtraGraders,
+          extra: shapeRun.shape.closeCallExtraGraders,
           offset: seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: `${input.callSiteKey}:close-call` })
         });
         if (extraSeats.length > 0) {
@@ -6637,6 +6663,69 @@ export class WalkingSkeletonRunner {
      * sits out (`rootSitsOut`). Without the sit-out book nothing ever trades and this is the seat book's own order.
      */
     const rootSeats: RunSeat[] = [...seatBook.position];
+    // Debate shape (spec §3.3 step 2): positions go to different makers first, the opener (seat 0) staying first.
+    if (shapeRun !== null) rootSeats.splice(0, rootSeats.length, ...shapeSeatOrder(rootSeats));
+    /**
+     * Debate shape, Stage 1 (spec §1, §3.3 step 1, §3.5): the map, before root 0. A re-claimed run finds its stored map
+     * and asks nothing again. A stop during the map (money, attempts, lane) ends it with the code's fallbacks; the
+     * arguing then stops after root 0 and the answer is written (O6). A keep-alive refusal abandons the run, as today:
+     * the lane is stopped (a call still waiting is never sent), and the map calls already sent are awaited before the
+     * refusal is rethrown, so their receipts land and nothing of the map runs on after the run is abandoned (Task 1
+     * note). Never on today's run (`shapeRun === null`): no map, no call, no storage.
+     */
+    let debateShapeMap: MapResult | null = null;
+    let shapeMapResult: MapResult | null = null;
+    let mapSpendStop: EnvelopeStopKind | null = null;
+    if (shapeRun !== null) {
+      shapeMapResult = await this.#mapChoices.readMapResultForRun(run.runId);
+      if (shapeMapResult === null) {
+        /** PF-B40: map seats outside the claim-eligible list, wrapped once each. */
+        const mapOnlyMembers = new Map<string, ConfiguredSeatMaker>();
+        const mapCaller = createRunnerMapCaller({
+          runId: run.runId, subjectItemId: claimed.workItemId, mapContractHash: shapeRun.mapContractHash,
+          judgeBound: this.settings.judgeBound,
+          longBounds: { merge: shapeRun.shape.mapMergeBound, choose: shapeRun.shape.mapChooseBound },
+          // Pre-flight PF-B40: an assigned (scorecard) seat book is built from `configuredByProviderRef` and can name a
+          // route outside the claim-eligible `configuredMakers`; such a map seat calls through the same wrappers
+          // (`sitOutMaker`: the sit-out book, `throughCallLane`, the failure observer), never as BUSY for good.
+          memberOf: (aiRef) => {
+            const eligible = configuredMakers.find((maker) => maker.providerRef === aiRef);
+            if (eligible !== undefined) return eligible;
+            const configured = configuredByProviderRef.get(aiRef);
+            if (configured === undefined) return null;
+            const wrapped = mapOnlyMembers.get(aiRef) ?? sitOutMaker(configured);
+            mapOnlyMembers.set(aiRef, wrapped);
+            return wrapped;
+          },
+          sitsOut: (aiRef) => sitOut !== null && sitOut.sitsOut(aiRef),
+          satOutBy: (error) => sitOut !== null && sitOut.haltsAtOnce(error),
+          spendStopOf: expansionPhaseStop,
+          laneStopped: (error) => callHeldBack(error) || (error instanceof TypedDomainError && error.code === CALL_LANE_STOPPED),
+          abandon: keepAliveStop,
+          serial: !callsRunTogether
+        });
+        // Spec §2.3 (O6), the map's own guard: once the map has stopped, no queued map call starts.
+        callLane?.guardStarts(() => !mapCaller.stopped());
+        try {
+          shapeMapResult = await runMapStage({ opening: shapeRun.shape.opening, map: {
+            questionLine: run.questionLine, languageName: run.argumentLanguageName, languageTag: run.argumentLanguageTag,
+            seats: mapStageSeats(rootSeats, shapeRun.shape.mapAIs), caller: mapCaller, abandon: keepAliveStop, seed: run.runId,
+            gapRoundsMax: shapeRun.shape.gapRounds, maxAnswers: shapeRun.shape.answers, pointsPerAnswer: shapeRun.shape.pointsPerAnswer
+          } });
+        } catch (error) {
+          callLane?.stop();
+          await mapCaller.settled();
+          throw error;
+        } finally {
+          callLane?.guardStarts(null);
+        }
+        mapSpendStop = mapCaller.spendStop();
+        // Pre-flight PF-B31: never fewer than two positions (buildShapePlan refuses fewer; the receipt's answers is ≥ 2).
+        await this.#mapChoices.writeMapRun({ runId: run.runId, result: shapeMapResult,
+          answerCount: Math.max(2, Math.min(shapeRun.shape.answers, shapeDistinctMakers(rootSeats, seatSitsOut))) });
+      }
+      if (shapeMapResult.kind === "MAP" && shapeMapResult.choice !== null) debateShapeMap = shapeMapResult;
+    }
     /** True when every member of root `rootIndex`'s seat sits out the rest of the run (never without the book). */
     const rootSitsOut = (rootIndex: number): boolean => rootSeats[rootIndex] !== undefined && seatSitsOut(rootSeats[rootIndex]!);
     /**
@@ -6765,6 +6854,8 @@ export class WalkingSkeletonRunner {
      */
     const spendStopRanks: ChainRank[] = [];
     const noteSpendStop = (rank: ChainRank): void => { spendStopRanks.push(rank); };
+    // Debate shape (spec §3.3 / O6): a stop during the map is a stop before everything in today's order.
+    if (mapSpendStop !== null) { runBodyBudgetStop ??= mapSpendStop; noteSpendStop([]); }
     /** Spec §2.3 (O6): no chain starts an AUTHOR or a REVIEW call once this is true. */
     const arguingStopped = (): boolean => bodyFailed || runBodyBudgetStop !== null || tooFewLeftToArgue();
     /**
@@ -10027,6 +10118,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "DEBATE_EXPANSION_PARENT_MISSING",
   "DEBATE_MAKER_UNRESOLVED",
   "DEBATE_ROOT_MISSING",
+  "DEBATE_SHAPE_RUNNER_UNCONFIGURED",
   "DECISION_IDEMPOTENCY_CONFLICT",
   "DECISION_IDENTITY_UNSERIALIZABLE",
   "DECISION_SPAWN_COUNT_INVALID",
@@ -10142,6 +10234,8 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
+  "MAP_GAP_ITEM_UNKNOWN",
+  "MAP_ROW_INVALID",
   "MEMORY_ASKER_SCOPE_MISMATCH",
   "MEMORY_DIFFERENCE_REQUIRED",
   "MEMORY_DISCLOSURE_GATE_FAILED",
