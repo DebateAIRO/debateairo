@@ -75,9 +75,10 @@ const DEFAULT_ARGUMENT_LANGUAGE_NAME = "the same language as the question";
 const judgeLegSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("primary-root") }).strict(),
   z.object({ kind: z.literal("independent-root") }).strict(),
-  z.object({ kind: z.literal("support"), positionUnderDebate: text }).strict(),
-  z.object({ kind: z.literal("attack"), positionUnderDebate: text }).strict(),
-  z.object({ kind: z.literal("cross-root"), ownPosition: text, otherMakersPosition: text }).strict()
+  z.object({ kind: z.literal("support"), positionUnderDebate: text, consideration: text.optional() }).strict(),
+  z.object({ kind: z.literal("attack"), positionUnderDebate: text, consideration: text.optional() }).strict(),
+  z.object({ kind: z.literal("cross-root"), ownPosition: text, otherMakersPosition: text }).strict(),
+  z.object({ kind: z.literal("assigned-root"), assignedAnswer: text, mapPoints: text }).strict()
 ]);
 /** The code label AS THE MODEL SAW IT: the projection withholds `registerVersion`. */
 const codeLabelSchema = z.object({
@@ -231,14 +232,24 @@ export function builderFromRecordedPacket(
   const siteKey = seatBaseCallSiteKey(callSiteKey);
   switch (family) {
     case "JUDGE_JUDGE": {
-      const kind = /^judge\.([a-z-]+)\.(?:unknown|resolved)\.v1$/u.exec(frame.contractId)?.[1];
+      const parsed = /^judge\.([a-z-]+)(\.consideration)?\.(?:unknown|resolved)\.v1$/u.exec(frame.contractId);
+      const kind = parsed?.[1];
+      const withConsideration = parsed?.[2] !== undefined;
+      // The variant contract and the `consideration` field travel together, and only on a support or attack leg.
+      if (withConsideration !== has("consideration")) mismatch();
+      if (withConsideration && kind !== "support" && kind !== "attack") mismatch();
       const leg: JudgeLeg = kind === "support" || kind === "attack"
-        ? { kind, positionUnderDebate: field("position_under_debate") }
-        : kind === "cross-root"
-          ? { kind, ownPosition: field("own_position"), otherMakersPosition: field("other_makers_position") }
-          : kind === "primary-root" || kind === "independent-root"
-            ? { kind }
-            : mismatch();
+        ? {
+            kind, positionUnderDebate: field("position_under_debate"),
+            ...(withConsideration ? { consideration: field("consideration") } : {})
+          }
+        : kind === "assigned-root"
+          ? { kind, assignedAnswer: field("assigned_answer"), mapPoints: field("map_points") }
+          : kind === "cross-root"
+            ? { kind, ownPosition: field("own_position"), otherMakersPosition: field("other_makers_position") }
+            : kind === "primary-root" || kind === "independent-root"
+              ? { kind }
+              : mismatch();
       if (judgeLegModelRole(leg) !== role) mismatch();
       return parseMomentBuilder({ family, inputs: { questionLine: field("question_line"), leg, ...language } });
     }
@@ -313,6 +324,9 @@ export function graderContextOf(question: string, builder: TypedMomentBuilder): 
       const leg = builder.inputs.leg;
       if (leg.kind === "support" || leg.kind === "attack") {
         excerpts.push({ label: "position_under_debate", text: leg.positionUnderDebate });
+        if (leg.consideration !== undefined) excerpts.push({ label: "consideration", text: leg.consideration });
+      } else if (leg.kind === "assigned-root") {
+        excerpts.push({ label: "assigned_answer", text: leg.assignedAnswer }, { label: "map_points", text: leg.mapPoints });
       } else if (leg.kind === "cross-root") {
         excerpts.push(
           { label: "own_position", text: leg.ownPosition },

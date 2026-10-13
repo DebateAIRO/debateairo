@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   PANEL_PROMPT_CONTRACT,
+  judgeConsiderationPromptContract,
   judgePromptContract,
   reviewPromptContract,
+  JUDGE_CONSIDERATION_SENTENCE,
   JUDGE_LEG_KINDS
 } from "@debateai/judgement";
 import {
@@ -132,7 +134,9 @@ const LEG_DIRECTIVES: Readonly<Record<string, string>> = {
     + "State and defend the strongest genuine counter-position to the position named in position_under_debate.",
   // REWORDED: base said "defend your own position and attack the other maker's position."
   "cross-root": "Author one direct cross-root response: defend the position named in own_position and attack "
-    + "the position named in other_makers_position."
+    + "the position named in other_makers_position.",
+  // NEW with the debate shape (Phase 2b Task 4): the root the map assigns.
+  "assigned-root": "Author the strongest case for the answer named in assigned_answer."
 };
 
 describe("REVIEW ITEM 4 — every judge leg's instruction text, pinned exactly", () => {
@@ -155,6 +159,16 @@ describe("REVIEW ITEM 4 — every judge leg's instruction text, pinned exactly",
         .toBe(`${LEG_DIRECTIVES[leg]} ${JUDGE_SHARED_RULES} ${CLAIM_TYPE_RESOLVED}`);
     }
   );
+
+  it("pins the debate shape's consideration sentence exactly, appended to the support and attack directives", () => {
+    expect(JUDGE_CONSIDERATION_SENTENCE).toBe("Build your reply on the consideration named in consideration.");
+    for (const leg of ["support", "attack"] as const) {
+      expect(judgeConsiderationPromptContract(leg, "unknown").instruction)
+        .toBe(`${LEG_DIRECTIVES[leg]} ${JUDGE_CONSIDERATION_SENTENCE} ${JUDGE_SHARED_RULES} ${CLAIM_TYPE_UNKNOWN}`);
+      expect(judgeConsiderationPromptContract(leg, "resolved").instruction)
+        .toBe(`${LEG_DIRECTIVES[leg]} ${JUDGE_CONSIDERATION_SENTENCE} ${JUDGE_SHARED_RULES} ${CLAIM_TYPE_RESOLVED}`);
+    }
+  });
 
   it("keeps the judge's answer form byte-identical to base", () => {
     // Base `packages/judgement/src/index.ts:269-283`, schema block unchanged.

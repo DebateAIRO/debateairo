@@ -37,6 +37,8 @@ const LIVE_11 = Object.freeze({
   composer: "340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70",
   conformance: "f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc"
 });
+/** The judge seal this code sends after the debate shape (Task 4): V1 + six contracts. */
+const JUDGE_P2B = "ee5bf2dc9eb7b70efe00e7a12115aacfdbee4959da5882a50c14e4625c42e7ea";
 
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-11T10:42:25.561Z" };
@@ -52,6 +54,7 @@ const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(
 async function live11Base(extra: Readonly<Record<string, string>> = {}): Promise<Row[]> {
   const source = await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, DEEPSEEK) as unknown as Row[];
   const replaced: Record<string, string> = {
+    judgeContractHash: canonical(LIVE_11.judge),
     composerContractHash: canonical(LIVE_11.composer), conformanceContractHash: canonical(LIVE_11.conformance), ...extra
   };
   return sorted([...source.map((row) => replaced[row.rowKey] === undefined ? row : { ...row, valueJsonText: replaced[row.rowKey]! }), ...owned()]);
@@ -69,15 +72,15 @@ function exportOf(base: readonly Row[]): PracticeRegisterExport {
 }
 
 describe("register 12: the new prompt seals reach the register as a new version", () => {
-  it("the code's prompt fingerprints are the v3/v2 seals, and the judge's is unchanged from version 11", () => {
-    expect(codePromptContractHashes()).toEqual({ judge: LIVE_11.judge, composer: V3_COMPOSER, conformance: V2_CONFORMANCE });
+  it("the code's prompt fingerprints are the current seals", () => {
+    expect(codePromptContractHashes()).toEqual({ judge: JUDGE_P2B, composer: V3_COMPOSER, conformance: V2_CONFORMANCE });
   });
 
   it("the development register's builder seals the same values the code sends", async () => {
     const rows = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((row) => [row.rowKey, row.value]));
     expect(rows.composerContractHash).toBe(V3_COMPOSER);
     expect(rows.conformanceContractHash).toBe(V2_CONFORMANCE);
-    expect(rows.judgeContractHash).toBe(LIVE_11.judge);
+    expect(rows.judgeContractHash).toBe(JUDGE_P2B);
   });
 
   it("the preview publish kit, on a version-11-shaped base, changes exactly the two synthesis fingerprints", async () => {
@@ -86,12 +89,14 @@ describe("register 12: the new prompt seals reach the register as a new version"
     const plan = composePreviewSnapshotV2({ sourceRows: source, baseRows: base as never, baseRegisterVersion: "11",
       baseSnapshotSha256: computeRegisterSnapshotSha256(base as never) });
     expect(plan.addedKeys).toEqual([]);
-    expect(plan.changedKeys).toEqual(["composerContractHash", "conformanceContractHash"]);
+    expect([...plan.changedKeys].sort()).toEqual(["composerContractHash", "conformanceContractHash", "judgeContractHash"]);
     const entry = (key: string) => plan.delta.find((row) => row.rowKey === key)!;
     expect([entry("composerContractHash").oldValueJsonText, entry("composerContractHash").newValueJsonText])
       .toEqual([`"${LIVE_11.composer}"`, `"${V3_COMPOSER}"`]);
     expect([entry("conformanceContractHash").oldValueJsonText, entry("conformanceContractHash").newValueJsonText])
       .toEqual([`"${LIVE_11.conformance}"`, `"${V2_CONFORMANCE}"`]);
+    expect([entry("judgeContractHash").oldValueJsonText, entry("judgeContractHash").newValueJsonText])
+      .toEqual([`"${LIVE_11.judge}"`, `"${JUDGE_P2B}"`]);
     // The base is not edited: version 11 keeps its values; the new rows are a new snapshot.
     expect(base.find((row) => row.rowKey === "composerContractHash")!.valueJsonText).toBe(`"${LIVE_11.composer}"`);
     expect(plan.snapshotSha256).not.toBe(computeRegisterSnapshotSha256(base as never));
@@ -103,7 +108,7 @@ describe("the runner refuses a register that does not carry the code's prompt fi
     expect(() => assertRegisterPromptContractHashes(codePromptContractHashes(), 12)).not.toThrow();
   });
 
-  it("refuses version 11's fingerprints, naming both synthesis rows and both values", () => {
+  it("refuses version 11's fingerprints, naming all three rows and their values", () => {
     let caught: unknown = null;
     try { assertRegisterPromptContractHashes(LIVE_11, "11"); } catch (error) { caught = error; }
     expect(caught).toMatchObject({ code: "REGISTER_PROMPT_CONTRACT_HASH_MISMATCH" });
@@ -111,7 +116,7 @@ describe("the runner refuses a register that does not carry the code's prompt fi
     expect(message).toContain("Register version 11");
     expect(message).toContain(`composerContractHash is ${LIVE_11.composer}, the code's is ${V3_COMPOSER}`);
     expect(message).toContain(`conformanceContractHash is ${LIVE_11.conformance}, the code's is ${V2_CONFORMANCE}`);
-    expect(message).not.toContain("judgeContractHash");
+    expect(message).toContain(`judgeContractHash is ${LIVE_11.judge}, the code's is ${JUDGE_P2B}`);
   });
 
   it("refuses a single differing row, the judge's included", () => {
@@ -146,8 +151,8 @@ describe("the practice can practise register 12 before it is published (--regist
     const source = await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, DEEPSEEK);
     const kit = composePreviewSnapshotV2({ sourceRows: source, baseRows: base as never, baseRegisterVersion: "11",
       baseSnapshotSha256: computeRegisterSnapshotSha256(base as never) });
-    expect(next).toMatchObject({ baseRegisterVersion: "11", checker: "deepseek", roleRotation: "on",
-      addedKeys: [], changedKeys: ["composerContractHash", "conformanceContractHash"] });
+    expect(next).toMatchObject({ baseRegisterVersion: "11", checker: "deepseek", roleRotation: "on", addedKeys: [] });
+    expect([...next.changedKeys].sort()).toEqual(["composerContractHash", "conformanceContractHash", "judgeContractHash"]);
     // Byte for byte what the server's plan composes from the same inputs.
     expect(next.rows).toEqual(kit.rows);
     expect(next.snapshotSha256).toBe(kit.snapshotSha256);
@@ -172,7 +177,9 @@ describe("the practice can practise register 12 before it is published (--regist
   });
 
   it("refuses when the code changes no row, or when the base cannot be read back", async () => {
-    const unchanged = await live11Base({ composerContractHash: canonical(V3_COMPOSER), conformanceContractHash: canonical(V2_CONFORMANCE) });
+    const unchanged = await live11Base({
+      judgeContractHash: canonical(JUDGE_P2B), composerContractHash: canonical(V3_COMPOSER), conformanceContractHash: canonical(V2_CONFORMANCE)
+    });
     await expect(composePracticeNextRegisterVersion(exportOf(unchanged)))
       .rejects.toMatchObject({ code: "PRACTICE_REGISTER_NEXT_UNSUPPORTED" });
     const strangeChecker = await live11Base({

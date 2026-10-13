@@ -93,9 +93,19 @@ export const JUDGE_CLAIM_TYPE_INSTRUCTIONS = Object.freeze({
  * rewording; `primary-root` is the previously-unstated default (the primary
  * maker's first position, which carried no directive at all).
  */
-export const JUDGE_LEG_KINDS = [
+/**
+ * Today's five legs, frozen: the V1 fingerprint is built from them only, so
+ * today's sealed hash (register judgeContractHash e7f7e4b0…) stays reproducible.
+ */
+export const JUDGE_LEG_KINDS_V1 = [
   "primary-root", "independent-root", "support", "attack", "cross-root"
 ] as const;
+/**
+ * Every leg the code can frame. `assigned-root` (debate shape, spec §3.3) is a
+ * root position the map assigns: the maker authors the strongest case for one
+ * named answer, with the map's points as material.
+ */
+export const JUDGE_LEG_KINDS = [...JUDGE_LEG_KINDS_V1, "assigned-root"] as const;
 export type JudgeLegKind = typeof JUDGE_LEG_KINDS[number];
 
 export const JUDGE_LEG_DIRECTIVES: Readonly<Record<JudgeLegKind, string>> = Object.freeze({
@@ -106,7 +116,8 @@ export const JUDGE_LEG_DIRECTIVES: Readonly<Record<JudgeLegKind, string>> = Obje
   attack: "A fair debate requires the strongest genuine counter-position, judged on its own merits. "
     + "State and defend the strongest genuine counter-position to the position named in position_under_debate.",
   "cross-root": "Author one direct cross-root response: defend the position named in own_position and attack the "
-    + "position named in other_makers_position."
+    + "position named in other_makers_position.",
+  "assigned-root": "Author the strongest case for the answer named in assigned_answer."
 });
 
 /**
@@ -119,7 +130,8 @@ export const JUDGE_LEG_MATERIAL_FIELDS: Readonly<Record<JudgeLegKind, readonly s
   "independent-root": Object.freeze(["question_line"]),
   support: Object.freeze(["question_line", "position_under_debate"]),
   attack: Object.freeze(["question_line", "position_under_debate"]),
-  "cross-root": Object.freeze(["question_line", "own_position", "other_makers_position"])
+  "cross-root": Object.freeze(["question_line", "own_position", "other_makers_position"]),
+  "assigned-root": Object.freeze(["question_line", "assigned_answer", "map_points"])
 });
 
 export function judgePromptContract(
@@ -130,6 +142,36 @@ export function judgePromptContract(
     contractId: `judge.${leg}.${claimType}.v1`,
     instruction: [
       JUDGE_LEG_DIRECTIVES[leg],
+      JUDGE_INSTRUCTIONS,
+      JUDGE_CLAIM_TYPE_INSTRUCTIONS[claimType]
+    ].join(" "),
+    answerForm: JUDGE_ANSWER_FORM
+  });
+}
+
+/**
+ * Debate shape (spec §3.3 step 3): a support or attack reply built on ONE chosen
+ * map point. It is a VARIANT contract (its own id, its own material table), not
+ * an edit of the leg's directive, so today's support and attack legs keep their
+ * bytes and a leg without a consideration frames exactly as before.
+ */
+export const JUDGE_CONSIDERATION_SENTENCE = "Build your reply on the consideration named in consideration.";
+export type JudgeConsiderationLegKind = "support" | "attack";
+
+export const JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS: Readonly<Record<JudgeConsiderationLegKind, readonly string[]>> =
+  Object.freeze({
+    support: Object.freeze(["question_line", "position_under_debate", "consideration"]),
+    attack: Object.freeze(["question_line", "position_under_debate", "consideration"])
+  });
+
+export function judgeConsiderationPromptContract(
+  leg: JudgeConsiderationLegKind,
+  claimType: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS
+): PromptContract {
+  return Object.freeze({
+    contractId: `judge.${leg}.consideration.${claimType}.v1`,
+    instruction: [
+      `${JUDGE_LEG_DIRECTIVES[leg]} ${JUDGE_CONSIDERATION_SENTENCE}`,
       JUDGE_INSTRUCTIONS,
       JUDGE_CLAIM_TYPE_INSTRUCTIONS[claimType]
     ].join(" "),
@@ -177,7 +219,8 @@ export const PANEL_PROMPT_CONTRACT: PromptContract = Object.freeze({
 });
 
 /**
- * THE fingerprint the register seals as `policy.hashes.judge`.
+ * THE fingerprint the register sealed as `policy.hashes.judge` up to the debate
+ * shape (V1, frozen; `JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT` below extends it).
  *
  * One row covers the whole judgement prompt family, because that is what the
  * register has always had: every leg, both classifier branches, the review and
@@ -189,11 +232,26 @@ export const PANEL_PROMPT_CONTRACT: PromptContract = Object.freeze({
  * fingerprint pins the count at zero so the row stays a constant; the count
  * itself is not a prompt decision, it is the caller's edge list.
  */
-export const JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT: string = [
-  ...JUDGE_LEG_KINDS.flatMap((leg) => ([
+export const JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1: string = [
+  ...JUDGE_LEG_KINDS_V1.flatMap((leg) => ([
     promptContractFingerprintText(judgePromptContract(leg, "unknown")),
     promptContractFingerprintText(judgePromptContract(leg, "resolved"))
   ])),
   promptContractFingerprintText(reviewPromptContract(0)),
   promptContractFingerprintText(PANEL_PROMPT_CONTRACT)
+].join("\n---\n");
+
+/**
+ * What the register seals NOW: the frozen V1 text (today's sealed value, never
+ * edited), then the debate shape's six contracts — `assigned-root` and the
+ * support/attack consideration variants, each in both classifier branches. A
+ * later leg or variant is appended the same way; any change is a new register
+ * version.
+ */
+export const JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT: string = [
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1,
+  ...(["unknown", "resolved"] as const)
+    .map((claim) => promptContractFingerprintText(judgePromptContract("assigned-root", claim))),
+  ...(["support", "attack"] as const).flatMap((leg) => (["unknown", "resolved"] as const)
+    .map((claim) => promptContractFingerprintText(judgeConsiderationPromptContract(leg, claim))))
 ].join("\n---\n");

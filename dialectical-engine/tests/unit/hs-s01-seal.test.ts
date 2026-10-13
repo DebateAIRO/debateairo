@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { PROMPT_FRAME_VERSION, buildFramedPrompt, promptContractFingerprintText } from "@debateai/providers";
-import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "../../packages/judgement/src/prompts.js";
+import {
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1
+} from "../../packages/judgement/src/prompts.js";
 import { SYNTHESIZER_PROMPT_CONTRACT, SYNTHESIZER_V1_PROMPT_CONTRACT, SYNTHESIZER_V2_PROMPT_CONTRACT } from "@debateai/serve";
 import { EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import { BLIND_JUDGE_GRADE_CONTRACT_HASH, DOMAIN_TAGGER_CONTRACT_HASH } from "../../packages/evaluator/src/index.js";
@@ -50,7 +53,10 @@ describe("S01 seals the content rule", () => {
   // Property: all eight sealed families move from their independently measured base
   // hashes to the PLAN's exact post-change hashes, with no unsealed family left behind.
   it.each([
-    ["judgeContractHash", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT), "3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69", "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365"],
+    // Debate shape (Phase 2b Task 4): the judge text R7-a sealed is now frozen as V1; the current text appends the
+    // shape's six contracts to it, so the judge family moves once more, from e7f7e4b0... to its debate-shape seal.
+    ["judgeContractHash", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1), "3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69", "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365"],
+    ["judgeContractHash (debate shape)", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT), "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365", "ee5bf2dc9eb7b70efe00e7a12115aacfdbee4959da5882a50c14e4625c42e7ea"],
     // Practice debate 3 (2026-10-12): the v1 and evaluator-v1 rows now read the exported HISTORY contracts
     // (`SYNTHESIZER_V1_PROMPT_CONTRACT`, `EVALUATOR_V1_PROMPT_CONTRACT`): the current contracts carry the v3/v2
     // instruction, and spreading them would hash a contract that never shipped. The sealed values are unchanged.

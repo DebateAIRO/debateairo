@@ -42,7 +42,8 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
     readFile(new URL("../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
   return {
-    judgeContractHash: "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365",
+    // Debate shape (Phase 2b Task 4): V1's e7f7e4b0…1365 plus six contracts; e7f7e4b0… is history.
+    judgeContractHash: "ee5bf2dc9eb7b70efe00e7a12115aacfdbee4959da5882a50c14e4625c42e7ea",
     // serve.synthesizer.v3 (2026-10-12, practice debate 3); v1's d96e7cc9…c866
     // and v2's 340e11a6…8b70 are history.
     composerContractHash: "4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f",

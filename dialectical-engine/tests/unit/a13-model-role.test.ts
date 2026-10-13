@@ -29,7 +29,8 @@ const LEGS: Readonly<Record<JudgeLegKind, JudgeLeg>> = {
   "independent-root": { kind: "independent-root" },
   support: { kind: "support", positionUnderDebate: STATEMENT },
   attack: { kind: "attack", positionUnderDebate: STATEMENT },
-  "cross-root": { kind: "cross-root", ownPosition: STATEMENT, otherMakersPosition: "The proposal fails on cost." }
+  "cross-root": { kind: "cross-root", ownPosition: STATEMENT, otherMakersPosition: "The proposal fails on cost." },
+  "assigned-root": { kind: "assigned-root", assignedAnswer: STATEMENT, mapPoints: "{\"for\":[],\"against\":[]}" }
 };
 
 const EXPECTED_LEG_ROLE: Readonly<Record<JudgeLegKind, DebateRole>> = {
@@ -37,7 +38,8 @@ const EXPECTED_LEG_ROLE: Readonly<Record<JudgeLegKind, DebateRole>> = {
   "independent-root": "POSITION",
   support: "SUPPORT_ATTACK",
   attack: "SUPPORT_ATTACK",
-  "cross-root": "CROSS_EXCHANGE"
+  "cross-root": "CROSS_EXCHANGE",
+  "assigned-root": "POSITION"
 };
 
 function capturing(requests: ProviderCallRequest[]): ProviderGateway {

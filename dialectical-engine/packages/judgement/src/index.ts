@@ -29,8 +29,10 @@ import {
 } from "@debateai/providers";
 import {
   JUDGE_WAYS_OF_KNOWING,
+  JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS,
   JUDGE_LEG_MATERIAL_FIELDS,
   PANEL_PROMPT_CONTRACT,
+  judgeConsiderationPromptContract,
   judgePromptContract,
   reviewPromptContract,
   type JudgeClaimedWayOfKnowing,
@@ -232,7 +234,23 @@ function buildContentRepairPacket(framed: FramedPrompt, rejected: {
 export type JudgeLeg =
   | { readonly kind: "primary-root" }
   | { readonly kind: "independent-root" }
-  | { readonly kind: "support" | "attack"; readonly positionUnderDebate: string }
+  /**
+   * Debate shape: a root the map assigns. `assignedAnswer` is the answer the
+   * maker must make the strongest case for; `mapPoints` is the map's points as
+   * one JSON text. Both are material, fenced like every other statement.
+   */
+  | { readonly kind: "assigned-root"; readonly assignedAnswer: string; readonly mapPoints: string }
+  /**
+   * `consideration` (debate shape) is the one map point the reply is built on.
+   * Absent = today's leg, byte for byte; present = the consideration variant
+   * contract. `string | undefined` because the repo compiles with
+   * `exactOptionalPropertyTypes` and the moment replay's zod reads it so.
+   */
+  | {
+      readonly kind: "support" | "attack";
+      readonly positionUnderDebate: string;
+      readonly consideration?: string | undefined;
+    }
   | {
       readonly kind: "cross-root";
       readonly ownPosition: string;
@@ -362,13 +380,22 @@ function judgeLegMaterial(
         { name: "own_position", content: leg.ownPosition },
         { name: "other_makers_position", content: leg.otherMakersPosition }
       ]
-    : leg.kind === "support" || leg.kind === "attack"
+    : leg.kind === "assigned-root"
       ? [
           { name: "question_line", content: questionLine },
-          { name: "position_under_debate", content: leg.positionUnderDebate }
+          { name: "assigned_answer", content: leg.assignedAnswer },
+          { name: "map_points", content: leg.mapPoints }
         ]
-      : [{ name: "question_line", content: questionLine }];
-  const declared = JUDGE_LEG_MATERIAL_FIELDS[leg.kind as JudgeLegKind];
+      : leg.kind === "support" || leg.kind === "attack"
+        ? [
+            { name: "question_line", content: questionLine },
+            { name: "position_under_debate", content: leg.positionUnderDebate },
+            ...(leg.consideration === undefined ? [] : [{ name: "consideration", content: leg.consideration }])
+          ]
+        : [{ name: "question_line", content: questionLine }];
+  const declared = (leg.kind === "support" || leg.kind === "attack") && leg.consideration !== undefined
+    ? JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS[leg.kind]
+    : JUDGE_LEG_MATERIAL_FIELDS[leg.kind as JudgeLegKind];
   if (fields.length !== declared.length || fields.some((field, index) => field.name !== declared[index])) {
     throw new TypedDomainError(
       "JUDGE_LEG_MATERIAL_UNDECLARED",
@@ -389,11 +416,17 @@ function framedJudgePrompt(
   argumentLanguageName: string | undefined,
   claim: "unknown" | "resolved"
 ): FramedPrompt {
+  const contract = (leg.kind === "support" || leg.kind === "attack") && leg.consideration !== undefined
+    ? judgeConsiderationPromptContract(leg.kind, claim)
+    : judgePromptContract(leg.kind, claim);
   return buildFramedPrompt({
-    contract: promptContractInArgumentLanguage(judgePromptContract(leg.kind, claim), argumentLanguageName),
+    contract: promptContractInArgumentLanguage(contract, argumentLanguageName),
     material: judgeLegMaterial(leg, questionLine)
   });
 }
+
+/** Test seam: the same function `Judge.judge` frames with, so a test reads the exact packet a leg sends. */
+export const framedJudgePromptForTest: typeof framedJudgePrompt = framedJudgePrompt;
 
 /**
  * B9 (budget spec §2.10) — WHAT THE FIRST POSITION'S OWN CALL COSTS AT MOST,
@@ -482,6 +515,7 @@ export function judgeLegModelRole(leg: JudgeLeg): DebateRole {
   switch (leg.kind) {
     case "primary-root":
     case "independent-root":
+    case "assigned-root":
       return "POSITION";
     case "support":
     case "attack":
