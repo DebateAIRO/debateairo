@@ -6,6 +6,7 @@ import { assertFramedPrompt, buildFramedPrompt, promptContractFingerprintText } 
 import {
   STORYTELLER_ANSWER_FORM,
   STORY_CHECKER_ANSWER_FORM,
+  STORY_CHECKER_OBJECTION_MAX_CHARS,
   StoryCheckerVerdictSchema,
   assembleStorytellerInstruction,
   buildStoryCheckerContract,
@@ -24,6 +25,10 @@ import { STORYTELLER_V2_ANSWER_FORM } from "../../packages/story/src/contracts.j
  */
 
 const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
+const UNMET = Object.freeze({
+  faithful_to_material: false, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: true,
+  citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
+});
 
 describe("verdict story — the storyteller and checker contracts", () => {
   it("puts the owners' pack in the instruction slot and code's form in the answer slot", () => {
@@ -33,7 +38,7 @@ describe("verdict story — the storyteller and checker contracts", () => {
       answerForm: STORYTELLER_ANSWER_FORM
     });
     expect(buildStoryCheckerContract(PACK)).toEqual({
-      contractId: "story.checker.v2",
+      contractId: "story.checker.v3",
       instruction: PACK.checker,
       answerForm: STORY_CHECKER_ANSWER_FORM
     });
@@ -157,7 +162,11 @@ describe("verdict story — each answer form describes what its parser enforces"
     for (const criterion of Object.keys(StoryCheckerVerdictSchema.shape.criteria.shape)) {
       expect(STORY_CHECKER_ANSWER_FORM).toContain(`"${criterion}": boolean`);
     }
-    expect(STORY_CHECKER_ANSWER_FORM).toContain("at most 2000 characters");
+    // Checker v3 (R15 practice debate, 2026-10-13): the objection's limit the form states is the schema's, 4000.
+    expect(STORY_CHECKER_ANSWER_FORM).toContain(`"objection": null | non-empty string of at most ${STORY_CHECKER_OBJECTION_MAX_CHARS} characters,`);
+    expect(STORY_CHECKER_OBJECTION_MAX_CHARS).toBe(4000);
+    expect(StoryCheckerVerdictSchema.safeParse({ satisfied: false, objection: "x".repeat(4000), criteria: UNMET }).success).toBe(true);
+    expect(StoryCheckerVerdictSchema.safeParse({ satisfied: false, objection: "x".repeat(4001), criteria: UNMET }).success).toBe(false);
     expect(STORY_CHECKER_ANSWER_FORM).toContain("When satisfied is true, every criterion must be true.");
     expect(STORY_CHECKER_ANSWER_FORM).toContain("When satisfied is false, objection must be a non-empty string.");
     // The reservation is read beside the report, whose appendix numbers points the same way.

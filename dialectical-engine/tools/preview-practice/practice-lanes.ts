@@ -157,7 +157,10 @@ export function practiceJsonRepairOf(content: string, finishReason: unknown, cal
   // An ACCEPTED review with no `edge_bearings` was accepted only by EMPTY_LIST, which needs a node with no edges: 0.
   const structured = callSiteKey === undefined ? null : structuredReadingOf(callSiteKey, content, ending, { whenMissing: 0 });
   if (structured !== null) return structured.kind === "PARSED" ? structuredParseRepair(structured.strategy) : null;
-  const decoded = decodeModelJson(content, ending);
+  // R15 practice debate (2026-10-13): the two story sites also read a reply that ends with its one object after prose
+  // (TRAILING_OBJECT), and only when that object passed their full checks; this reply WAS accepted, so the object the
+  // decode finds there is the one the site took, and the repair is named.
+  const decoded = decodeModelJson(content, ending, callSiteKey?.startsWith("STORY:") === true ? { trailingObjectAccepted: () => true } : undefined);
   return decoded.ok ? decoded.repair : null;
 }
 

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { decodeModelJson, type ModelJsonDecoded } from "@debateai/providers";
 
@@ -135,5 +135,108 @@ describe("decodeModelJson — what it never repairs", () => {
 
   it("a value that is not an object is never taken out of prose", () => {
     expect(decodeModelJson("The answer is [1, 2].", STOP).ok).toBe(false);
+  });
+});
+
+/**
+ * R15 practice debate (2026-10-12, seq 644): MiMo-V2.6-Pro's story checker wrote its whole check out as prose, then its
+ * verdict in a ```json fence at the very end, with straight quotes closing „…" quotations inside the objection. The
+ * reply is the real one (our own practice text, no secret). TRAILING_OBJECT, the decode's last resort, reads it only
+ * when the caller asks (`trailingObjectAccepted`) and its check accepts the object.
+ */
+describe("decodeModelJson — (vii) TRAILING_OBJECT, the one object that ends a reply opening with prose", () => {
+  const R15_644 = fixture("mimo-checker-r15-644-reasoning-then-fenced-verdict.txt");
+  const ANY = Object.freeze({ trailingObjectAccepted: () => true });
+  const NONE = Object.freeze({ trailingObjectAccepted: () => false });
+  const FENCE = "```";
+  const tail = (text: string): string => text.slice(text.indexOf(FENCE));
+  const verdictBody = (text: string): string => tail(text).slice(`${FENCE}json\n`.length, -`\n${FENCE}`.length);
+  const prose = (text: string): string => text.slice(0, text.indexOf(FENCE));
+
+  it("reads the real reply 644, its object only, with the straight quotes inside its texts escaped", () => {
+    expect(decodeModelJson(R15_644, STOP).ok).toBe(false);
+    const { value, repair } = accepted(decodeModelJson(R15_644, STOP, ANY));
+    expect(repair).toBe("TRAILING_OBJECT");
+    const verdict = value as { satisfied: boolean; objection: string };
+    expect(verdict.satisfied).toBe(false);
+    expect(verdict.objection.startsWith("1) The third reason in why cites P23")).toBe(true);
+    expect(verdict.objection).toContain("„a dedicated source is easy to promise and easy to divert later\" is cited to P9");
+    expect(verdict.objection.endsWith("make it a caveat, not a reason.")).toBe(true);
+    expect(Object.keys(verdict)).toEqual(["satisfied", "objection"]);
+  });
+
+  it("is made only when asked, only when the check accepts it, and only for a reply that finished normally", () => {
+    expect(decodeModelJson(R15_644, STOP, {}).ok).toBe(false);
+    expect(decodeModelJson(R15_644, STOP, NONE).ok).toBe(false);
+    expect(decodeModelJson(R15_644, LENGTH, ANY).ok).toBe(false);
+    expect(decodeModelJson(R15_644, undefined, ANY).ok).toBe(false);
+    expect(decodeModelJson(R15_644, { finishReason: null }, ANY).ok).toBe(false);
+    expect(decodeModelJson(R15_644, { finishReason: "content_filter" }, ANY).ok).toBe(false);
+    // A refusal keeps the strict parser's own error, exactly as before.
+    expect(decodeModelJson(R15_644, STOP, NONE)).toEqual(decodeModelJson(R15_644, STOP));
+    // The check sees the object the decode found.
+    const seen: unknown[] = [];
+    decodeModelJson(R15_644, STOP, { trailingObjectAccepted: (value) => { seen.push(value); return true; } });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ satisfied: false });
+  });
+
+  it("reads the same object bare (no fence) at the end, and inside a plain fence", () => {
+    expect(verdictBody(R15_644).startsWith("{")).toBe(true);
+    expect(verdictBody(R15_644).endsWith("}")).toBe(true);
+    const bare = `${prose(R15_644)}${verdictBody(R15_644)}`;
+    expect(accepted(decodeModelJson(bare, STOP, ANY)).repair).toBe("TRAILING_OBJECT");
+    const plainFence = `${prose(R15_644)}${FENCE}\n${verdictBody(R15_644)}\n${FENCE}\n`;
+    expect(accepted(decodeModelJson(plainFence, STOP, ANY)).repair).toBe("TRAILING_OBJECT");
+  });
+
+  it.each([
+    ["an object followed by more prose", (text: string) => `${text}\n\nOn reflection the verdict above is wrong; let me redo it.`],
+    ["two objects in the one fence", (text: string) => `${prose(text)}${FENCE}json\n${verdictBody(text)}\n${verdictBody(text)}\n${FENCE}`],
+    ["two fences, each with an object", (text: string) => `${prose(text)}${tail(text)}\n\nCorrected:\n${tail(text)}`],
+    ["two bare objects at the end", (text: string) => `${prose(text)}${verdictBody(text)}\n${verdictBody(text)}`],
+    ["an earlier draft object in the prose", (text: string) => `${prose(text)}Draft: ${verdictBody(text)}\nFinal:\n${tail(text)}`],
+    ["an object missing its closing brace", (text: string) => `${prose(text)}${FENCE}json\n${verdictBody(text).slice(0, -1)}\n${FENCE}`],
+    ["a fence tag other than json", (text: string) => `${prose(text)}${FENCE}jsonc\n${verdictBody(text)}\n${FENCE}`],
+    ["an object that is not one JSON value even with its quotes escaped", (text: string) => text.replace("\"satisfied\": false,", "\"satisfied\": false")]
+  ])("refuses %s", (_name, edit) => {
+    const text = edit(R15_644);
+    expect(text).not.toBe(R15_644);
+    expect(decodeModelJson(text, STOP, ANY).ok).toBe(false);
+  });
+
+  it("a fence with no prose before it is not this repair's form: the earlier fence-body repair reads it, as before", () => {
+    const fenceOnly = tail(R15_644);
+    expect(decodeModelJson(fenceOnly, STOP, ANY)).toEqual(decodeModelJson(fenceOnly, STOP));
+    expect(accepted(decodeModelJson(fenceOnly, STOP, ANY)).repair).toBe("INNER_QUOTE");
+  });
+
+  it("refuses the debate 2 checker reply whose later prose disowned its first object (seq 645), however it ended", () => {
+    const disowned = readFileSync(new URL("../support/fixtures/judge-format-replies/mimo-checker-en-length-cut-object-then-thinking.txt", import.meta.url), "utf8");
+    for (const ending of [LENGTH, STOP, undefined]) {
+      const before = decodeModelJson(disowned, ending);
+      const after = decodeModelJson(disowned, ending, ANY);
+      expect(after).toEqual(before);
+      expect(after.ok && after.repair === "TRAILING_OBJECT").toBe(false);
+    }
+    expect(decodeModelJson(disowned, LENGTH, ANY).ok).toBe(false);
+  });
+
+  it("never changes how a reply an earlier step reads is read: every real fixture decodes the same with it asked for", () => {
+    let compared = 0;
+    for (const dir of ["story-format-replies", "judge-format-replies", "writer-format-replies"]) {
+      const base = new URL(`../support/fixtures/${dir}/`, import.meta.url);
+      for (const name of readdirSync(base)) {
+        const text = readFileSync(new URL(name, base), "utf8");
+        for (const ending of [STOP, LENGTH, undefined]) {
+          const before = decodeModelJson(text, ending);
+          const after = decodeModelJson(text, ending, ANY);
+          if (before.ok) expect(after, `${dir}/${name}`).toEqual(before);
+          else if (after.ok) expect(`${dir}/${name}:${after.repair}`).toBe(`story-format-replies/mimo-checker-r15-644-reasoning-then-fenced-verdict.txt:TRAILING_OBJECT`);
+          compared += 1;
+        }
+      }
+    }
+    expect(compared).toBe(3 * 19);
   });
 });

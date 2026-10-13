@@ -14,6 +14,7 @@ export {
   STORYTELLER_V1_CONTRACT_ID,
   STORY_CHECKER_ANSWER_FORM,
   STORY_CHECKER_CONTRACT_ID,
+  STORY_CHECKER_OBJECTION_MAX_CHARS,
   buildStoryCheckerContract,
   buildStorytellerContract,
   storyContractHash,

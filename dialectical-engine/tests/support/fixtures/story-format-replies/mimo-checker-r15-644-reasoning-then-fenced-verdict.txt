@@ -1,0 +1,16 @@
+Let me check the story in full against the material before deciding.
+
+Checking fates: P1 0.9205, P2 0.8708, P3 0.8687, P4 0.7663 — all at or above high_cut (0.7), so all four HELD_UP fates are correct, and the story's plain-word explanations ("held up best / reasonably / moderately") explain them without contradicting the close call.
+
+Checking the closest rival: P2 is the runner-up, and the summary and long story both name the unconditional free-fare case as the one that finished almost level — correct.
+
+Now the details. In "the options" first paragraph, "a dedicated source is easy to promise and easy to divert later" is cited to P9 but comes from P9's objection, not its claim, and the text presents it as the option's own worry rather than as the objection raised against it. In the second why-reason, "the pilot results they cite could not be confirmed" cites P23 alongside P4 and P7, but P23 argues the opposite way (it attacks P4 and offers Tallinn and Dunkirk), so it does not say what that sentence says. In the uncertainty section, P15's figure of 10–30 percent is printed as "a tenth to a third", which changes the range. Two texts say "the material holds no data", which speaks of the debate's own workings rather than the question.
+
+These are the problems I need to raise.
+
+```json
+{
+  "satisfied": false,
+  "objection": "1) The third reason in why cites P23 for the claim that frequency, not price, is the barrier and that pilot results could not be confirmed; P23 argues the opposite (it attacks P4 and cites Tallinn and Dunkirk), so drop it there or use it only for what it actually says. 2) In the options section on P1, the line „a dedicated source is easy to promise and easy to divert later" is cited to P9, but that is P9's objection, not its claim, and it is written as if it were the option's own worry; present it as the objection raised against the position or cite it correctly. 3) The uncertainty section gives P15's figure as „roughly a tenth to a third" of operating cost; P15 says 10–30 percent, so print that range instead. 4) Two texts say „the material holds no data" (the pilots paragraph and the reviewer note); this speaks of the debate's own workings — say instead that we could not confirm the pilot results and why. 5) The confidence sentence reads „we lean toward the conditional one, because its funding case rests on argument rather than on figures we could confirm"; as written the unconfirmed figures are given as the reason for leaning toward it, which is backwards — make it a caveat, not a reason."
+}
+```

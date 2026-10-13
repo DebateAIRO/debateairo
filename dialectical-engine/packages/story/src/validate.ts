@@ -2,6 +2,7 @@ import { z } from "zod";
 import { STORY_BODY_LIMITS, StoryBodySchema, type StoryBody } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import { decodeModelJson, type ContentClassification, type ModelJsonDecoded, type ModelReplyFacts } from "@debateai/providers";
+import { STORY_CHECKER_OBJECTION_MAX_CHARS } from "./contracts.js";
 
 /**
  * THE DETERMINISTIC CHECKS (spec §5.3), run as each story call's content
@@ -113,9 +114,13 @@ function storyScorePattern(scoreTexts: ReadonlySet<string>): RegExp | null {
   return new RegExp(`(?<!\\p{Nd})(?:${alternatives.join("|")})(?!\\p{Nd})(?![\\p{Zs}]?%)`, "u");
 }
 
+/**
+ * The objection's limit is the current answer form's (checker v3, 2026-10-13: 4000 characters, raised from 2000 because
+ * the checker lists every problem in one objection). Raising it accepts every verdict the older limit accepted.
+ */
 export const StoryCheckerVerdictSchema = z.object({
   satisfied: z.boolean(),
-  objection: z.string().trim().min(1).max(2000).nullable(),
+  objection: z.string().trim().min(1).max(STORY_CHECKER_OBJECTION_MAX_CHARS).nullable(),
   criteria: z.object({
     faithful_to_material: z.boolean(),
     agrees_with_label: z.boolean(),
@@ -268,6 +273,12 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
  * artifact stays the vendor's own bytes. `reply` is how the call ended, as the gateway saw it; without it the
  * ending is unknown and the last repair is not made.
  *
+ * R15 practice debate (2026-10-13): both sites also ask for the decode's last resort, TRAILING_OBJECT (a reply that
+ * finished normally, wrote its reasoning out as prose, and ENDS with one complete object, bare or in its one code
+ * fence), and accept it only when that object passes the site's full checks (schema, and for the story its content
+ * checks too): otherwise the reply stays the PARSE_FAILED it was, so the repair never turns a refused reply into a
+ * differently refused one. It comes after every other repair, so no reply those read is read differently.
+ *
  * A PARSED classification carries the repair code only when one was needed.
  */
 function parsedWith(decoded: Extract<ModelJsonDecoded, { ok: true }>): ContentClassification {
@@ -282,7 +293,10 @@ type StoryDecision =
 
 function decideStory(content: string, index: StoryMaterialIndex, reply: ModelReplyFacts | undefined): StoryDecision {
   assertStoryMaterialIndex(index);
-  const decoded = decodeModelJson(content, reply);
+  const decoded = decodeModelJson(content, reply, { trailingObjectAccepted: (value) => {
+    const candidate = StoryBodySchema.safeParse(value);
+    return candidate.success && storyContentIssues(candidate.data, index).length === 0;
+  } });
   if (!decoded.ok) return { classification: { parseStatus: "PARSE_FAILED", parseError: decoded.error }, body: null };
   const parsed = StoryBodySchema.safeParse(decoded.value);
   if (!parsed.success) return { classification: { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message }, body: null };
@@ -317,7 +331,7 @@ export function parseStoryBody(content: string, index: StoryMaterialIndex, reply
 
 function decideChecker(content: string, reply: ModelReplyFacts | undefined):
   { readonly classification: ContentClassification; readonly verdict: StoryCheckerVerdict | null } {
-  const decoded = decodeModelJson(content, reply);
+  const decoded = decodeModelJson(content, reply, { trailingObjectAccepted: (value) => StoryCheckerVerdictSchema.safeParse(value).success });
   if (!decoded.ok) return { classification: { parseStatus: "PARSE_FAILED", parseError: decoded.error }, verdict: null };
   const parsed = StoryCheckerVerdictSchema.safeParse(decoded.value);
   return parsed.success

@@ -13,7 +13,9 @@ import {
   STORYTELLER_V2_ANSWER_FORM,
   STORYTELLER_V2_CONTRACT_ID,
   STORY_CHECKER_V1_ANSWER_FORM,
-  STORY_CHECKER_V1_CONTRACT_ID
+  STORY_CHECKER_V1_CONTRACT_ID,
+  STORY_CHECKER_V2_ANSWER_FORM,
+  STORY_CHECKER_V2_CONTRACT_ID
 } from "../../packages/story/src/contracts.js";
 
 // Independent frozen oracle from SPEC-v2 §2, never imported from product code.
@@ -94,13 +96,24 @@ describe("S01 seals the content rule", () => {
   });
   // Story format robustness (2026-10-12): storyteller v3 and checker v2 supersede v2 and v1 (how to quote; the
   // checker's criteria always required). The earlier seals above stay as history; these are the current ones.
-  it("seals the current storyteller v3 and checker v2, each distinct from the version it supersedes", () => {
+  // Checker v3 (R15 practice debate, 2026-10-13) supersedes checker v2, so this row now reads v2 from its exported
+  // HISTORY form: its seal is unchanged (c5d7860d...), only where it is read from moved.
+  it("seals the current storyteller v3 and the shipped checker v2, each distinct from the version it supersedes", () => {
     const storyteller = storyContractHash(buildStorytellerContract(pack));
-    const checker = storyContractHash(buildStoryCheckerContract(pack));
+    const checker = storyContractHash({ ...buildStoryCheckerContract(pack), contractId: STORY_CHECKER_V2_CONTRACT_ID, answerForm: STORY_CHECKER_V2_ANSWER_FORM });
     expect(buildStorytellerContract(pack).contractId).toBe("story.storyteller.v3");
-    expect(buildStoryCheckerContract(pack).contractId).toBe("story.checker.v2");
+    expect(STORY_CHECKER_V2_CONTRACT_ID).toBe("story.checker.v2");
     expect(storyteller).not.toBe("68dd9b31344f93d1f29e2db5bb49a2c24c4d659ec7568dd381f87dfb8183321a");
     expect(checker).not.toBe("403a837adc5d4cc813cc21b13ce4be4961c6ff0476f9a0014d42b21e5d947172");
     expect([storyteller, checker]).toEqual(["73b2caba3018cf663b86315b22afa82cc158162f611807c171d0e1d51028e81e", "c5d7860d12c839e14094dd5bb0fa052c6b27d5f3509289a22e320bb5f79e5530"]);
+  });
+  // Checker v3 (R15 practice debate, 2026-10-13): v2's form with the objection's limit raised from 2000 to 4000
+  // characters, because the checker now lists every problem in one objection and a real 2,739-character verdict was
+  // refused for its length alone. A new contract id, so a new seal; no register row carries a story hash.
+  it("seals the current checker v3, distinct from the checker v2 it supersedes", () => {
+    const checker = storyContractHash(buildStoryCheckerContract(pack));
+    expect(buildStoryCheckerContract(pack).contractId).toBe("story.checker.v3");
+    expect(checker).not.toBe("c5d7860d12c839e14094dd5bb0fa052c6b27d5f3509289a22e320bb5f79e5530");
+    expect(checker).toBe("37df1d19fa32ad6efbace9a837ebeaf2728457c905d9941d91b8eeed82e80fd3");
   });
 });
