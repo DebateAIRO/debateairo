@@ -231,6 +231,9 @@ export async function coarseFitFor(
   if (ask.plan_tier !== "premium") return "AS_ASKED";
   const windows = await billing.coarseFit.personAllowance.read(ownerRef, now);
   if (windows.length === 0) return "AS_ASKED";
+  // Debate shape: the class's optional shape member, built before the class so no conditional sits beside the roster pick.
+  const coarseShape = runShapeClassOf(ask.depth_params, shapePlan ?? "premium");
+  const coarseShapeMember = coarseShape === null ? {} : { shape: coarseShape };
   const [holdsMicros, estimateMicros, spent] = await Promise.all([
     billing.coarseFit.spend.readOwnerCountedHoldsMicros(ownerRef,windows[0]?.funding),
     billing.coarseFit.estimator.estimateMicros({
@@ -239,7 +242,7 @@ export async function coarseFitFor(
       // Step 1: the roster this deployment really runs (one GLM on the private preview).
       makerCount: previewPlanTierRosters(validatePreviewProviderTestConfig(previewConfig), PLAN_TIER_ROSTERS).premium.length,
       depth: ask.depth_params.depth,
-      ...((shape) => shape === null ? {} : { shape })(runShapeClassOf(ask.depth_params, shapePlan ?? "premium"))
+      ...coarseShapeMember
     }),
     Promise.all(windows.map((window) => billing.coarseFit.spend.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope)))
   ]);

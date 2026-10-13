@@ -282,12 +282,14 @@ export function runSettingsClassOfAsk(
   shapePlan?: DebateShapePlanKey
 ): RunSettingsClass {
   const shape = runShapeClassOf(ask.depth_params, shapePlan ?? debateShapePlanKeyOf(null, ask.plan_tier));
+  // Debate shape: the optional member is built before the class so no conditional sits beside the roster pick.
+  const shapeMember = shape === null ? {} : { shape };
   return Object.freeze({
     planTier: ask.plan_tier,
     compositionBudgetTier: ask.composition_budget_tier,
     makerCount: previewPlanTierRosters(validatePreviewProviderTestConfig(previewConfig),PLAN_TIER_ROSTERS)[ask.plan_tier].length,
     depth: ask.depth_params.depth,
-    ...(shape === null ? {} : { shape })
+    ...shapeMember
   });
 }
 
