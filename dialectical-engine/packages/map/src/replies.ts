@@ -102,7 +102,12 @@ export function mapClassifyReply<T>(content: string, reply: ModelReplyFacts | un
   return Object.freeze({ classification, value: parsed.data });
 }
 
-/** One issue at `path` when the texts together are confidently in another language than the question's. */
+/**
+ * One issue at `path` when the texts together are confidently in another language than the question's. Always called
+ * with ALL the texts of one field and that field's path (ruling R-3): the engine's detector misreads a single short
+ * sentence with high confidence (a real run refused a valid Romanian merge three times over two short claims), so a
+ * field's language is never judged on one member alone.
+ */
 export function mapLanguageIssues(texts: readonly string[], languageTag: string, path: readonly (string | number)[]): readonly MapReplyIssue[] {
   return mapWrongLanguage(texts.join(" "), languageTag) ? [Object.freeze({ path, code: "MAP_WRONG_LANGUAGE" })] : [];
 }
@@ -122,7 +127,7 @@ export const mapAnglesCheck: MapReplyCheck<MapAnglesReply> = (value) => {
   return issues;
 };
 
-/** Points and candidate answers are read apart, so a wrong-language member is named at its own path. */
+/** Points and candidate answers are read apart, each field judged on all its texts joined, at the field's path. */
 export function mapListCheck(languageTag: string): MapReplyCheck<MapListReply | MapSnowballReply> {
   return (value) => [
     ...mapLanguageIssues(value.points.flatMap((point) => [point.claim, point.why_it_matters]), languageTag, ["points"]),
@@ -153,8 +158,8 @@ export function mapMergeCheck(pointIds: ReadonlySet<string>, answerIds: Readonly
     }
     value.key_points.forEach((group, index) => visit("key_points", index, group.key_point_id, "key_point_id", group.member_item_ids, pointIds));
     value.answers.forEach((group, index) => visit("answers", index, group.answer_id, "answer_id", group.member_item_ids, answerIds));
-    value.key_points.forEach((group, index) => issues.push(...mapLanguageIssues([group.claim], languageTag, ["key_points", index, "claim"])));
-    value.answers.forEach((group, index) => issues.push(...mapLanguageIssues([group.answer], languageTag, ["answers", index, "answer"])));
+    issues.push(...mapLanguageIssues(value.key_points.map((group) => group.claim), languageTag, ["key_points"]));
+    issues.push(...mapLanguageIssues(value.answers.map((group) => group.answer), languageTag, ["answers"]));
     return issues;
   };
 }
@@ -185,8 +190,8 @@ export function mapChooseCheck(keyPointIds: ReadonlySet<string>, languageTag: st
       const statement = mapNormaliseText(answer.statement);
       if (statements.has(statement)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_DUPLICATE" });
       statements.add(statement);
-      issues.push(...mapLanguageIssues([answer.statement], languageTag, ["answers", index, "statement"]));
     });
+    issues.push(...mapLanguageIssues(value.answers.map((answer) => answer.statement), languageTag, ["answers"]));
     return issues;
   };
 }

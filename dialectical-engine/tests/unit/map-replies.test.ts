@@ -12,7 +12,8 @@ import {
   mapListReplySchema,
   mapMergeCheck,
   mapMergeReplySchema,
-  mapSnowballReplySchema
+  mapSnowballReplySchema,
+  mapWrongLanguage
 } from "@debateai/map";
 
 const STOP = { finishReason: "stop" };
@@ -145,20 +146,77 @@ describe("map replies: merge check: unknown, reused and wrong-kind ids", () => {
     expect(mapClassifyReply(content, STOP, mapMergeReplySchema, mapMergeCheck(new Set(), new Set(), "en")).classification.parseStatus).toBe("PARSED");
   });
 
-  it("refuses a merged claim written in the wrong language at its key_points path", () => {
-    const roCheck = mapMergeCheck(new Set(["pt01", "pt02", "pt03"]), new Set(["ca01"]), "ro");
-    const content = merge([{ key_point_id: "k1", claim: "The cost of the change is high and the state should pay it.", member_item_ids: ["pt01"] }],
-      [{ answer_id: "a1", answer: "Da, cu condiții.", member_item_ids: ["ca01"] }]);
-    const out = mapClassifyReply(content, STOP, mapMergeReplySchema, roCheck);
-    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@key_points.0.claim"]);
+  // Ruling R-3 (real paid run, 2026-10-13): the language of a field is judged on ALL its texts joined, never on one
+  // short claim — the engine's detector misreads single short Romanian sentences with high confidence.
+  const roCheckFor = (pointCount: number) => mapMergeCheck(new Set(Array.from({ length: pointCount }, (_, at) => `pt${String(at + 1).padStart(2, "0")}`)),
+    new Set(["ca01", "ca02"]), "ro");
+  const roGroups = (claims: readonly string[]) => claims.map((claim, at) => ({ key_point_id: `k${at + 1}`, claim,
+    member_item_ids: [`pt${String(at + 1).padStart(2, "0")}`] }));
+  const REAL_RUN_CLAIM_9 = "Renunțarea la leu înseamnă pierderea politicii monetare proprii și a cursului de schimb, instrumente care au amortizat șocurile asimetrice în ultimii douăzeci de ani.";
+  const REAL_RUN_CLAIM_16 = "Impactul social depinde de comunicarea tranziției și de controlul prețurilor în perioada de schimb.";
+  const RO_CLAIMS = [
+    "Adoptarea euro ar reduce costurile de tranzacție pentru firmele care exportă în zona euro.",
+    "Dobânzile la credite ar putea scădea dacă riscul valutar dispare.",
+    "România nu îndeplinește încă toate criteriile de convergență, mai ales deficitul bugetar.",
+    "Prețurile ar putea crește la trecerea la euro, prin rotunjiri în sus.",
+    "Investitorii străini preferă de obicei țările cu monedă comună și stabilă.",
+    "Salariile sunt încă mult sub media din zona euro, deci convergența reală lipsește.",
+    "Banca Națională ar pierde controlul asupra dobânzii de politică monetară.",
+    "Bulgaria și Croația au trecut deja la euro, iar experiența lor poate fi studiată.",
+    "Încrederea populației în euro este mare, potrivit sondajelor recente.",
+    REAL_RUN_CLAIM_9,
+    "Disciplina bugetară cerută de zona euro ar putea limita cheltuielile publice.",
+    "Trecerea la euro cere ani de pregătire și o dată fixă anunțată din timp.",
+    "Turismul și comerțul cu vecinii din zona euro ar deveni mai simple.",
+    "Economiile în lei ar fi convertite la un curs fix stabilit la intrare.",
+    "Fondurile europene se gestionează mai ușor într-o monedă comună.",
+    "Regiunile sărace ar putea suferi dacă nu există transferuri compensatorii.",
+    REAL_RUN_CLAIM_16
+  ];
+  const RO_ANSWERS = [{ answer_id: "a1", answer: "Da, dar numai după ce România îndeplinește criteriile și pregătește bine tranziția.", member_item_ids: ["ca01"] },
+    { answer_id: "a2", answer: "Nu acum; leul păstrează instrumente utile până când salariile se apropie de media europeană.", member_item_ids: ["ca02"] }];
+  const EN_CLAIMS = ["The cost of the change is high and the state should pay it.", "The people who use it most are poor.",
+    "The change can be undone later if it fails."];
+  const EN_ANSWERS = [{ answer_id: "a1", answer: "Yes, the change should go ahead, but only with clear conditions on who pays for it.", member_item_ids: ["ca01"] },
+    { answer_id: "a2", answer: "No, the city should keep the current system until there is a plan to pay for the change.", member_item_ids: ["ca02"] }];
+
+  it("accepts the real run's Romanian merge reply whose short claims 9 and 16 the detector misreads alone (regression)", () => {
+    // Control: each real claim alone is misread as another language; this is what refused the real reply three times.
+    expect(mapWrongLanguage(REAL_RUN_CLAIM_9, "ro")).toBe(true);
+    expect(mapWrongLanguage(REAL_RUN_CLAIM_16, "ro")).toBe(true);
+    const content = merge(roGroups(RO_CLAIMS), RO_ANSWERS);
+    const out = mapClassifyReply(content, STOP, mapMergeReplySchema, roCheckFor(RO_CLAIMS.length));
+    expect(out.classification).toEqual({ parseStatus: "PARSED", parseError: null });
+    expect(out.value?.key_points[9]?.claim).toBe(REAL_RUN_CLAIM_9);
+    expect(out.value?.key_points[16]?.claim).toBe(REAL_RUN_CLAIM_16);
   });
 
-  it("refuses a merged answer written in the wrong language at its answers path", () => {
-    const roCheck = mapMergeCheck(new Set(["pt01", "pt02", "pt03"]), new Set(["ca01"]), "ro");
-    const content = merge([{ key_point_id: "k1", claim: "Costul schimbării este mare și statul ar trebui să îl plătească.", member_item_ids: ["pt01"] }],
-      [{ answer_id: "a1", answer: "Yes, the change should go ahead, but only with clear conditions on who pays for it.", member_item_ids: ["ca01"] }]);
-    const out = mapClassifyReply(content, STOP, mapMergeReplySchema, roCheck);
-    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@answers.0.answer"]);
+  it("refuses all-English merged claims for a Romanian question at key_points (the whole field), and the patch asks for that field", () => {
+    const content = merge(roGroups(EN_CLAIMS), RO_ANSWERS);
+    const out = mapClassifyReply(content, STOP, mapMergeReplySchema, roCheckFor(EN_CLAIMS.length));
+    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@key_points"]);
+    if (out.classification.parseStatus !== "SCHEMA_FAILED") throw new Error("unreachable");
+    const plan = planPatchFollowUp({ content, reply: STOP, parseStatus: out.classification.parseStatus, parseError: out.classification.parseError });
+    expect(plan?.locator).toEqual({ code: "MAP_WRONG_LANGUAGE", paths: ["key_points"] });
+  });
+
+  it("refuses all-English merged answers for a Romanian question at answers (the whole field), and the patch asks for that field", () => {
+    const content = merge(roGroups(RO_CLAIMS.slice(0, 3)), EN_ANSWERS);
+    const out = mapClassifyReply(content, STOP, mapMergeReplySchema, roCheckFor(3));
+    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@answers"]);
+    if (out.classification.parseStatus !== "SCHEMA_FAILED") throw new Error("unreachable");
+    const plan = planPatchFollowUp({ content, reply: STOP, parseStatus: out.classification.parseStatus, parseError: out.classification.parseError });
+    expect(plan?.locator).toEqual({ code: "MAP_WRONG_LANGUAGE", paths: ["answers"] });
+  });
+
+  it("refuses both fields, each at its own whole-field path, when both are English", () => {
+    const content = merge(roGroups(EN_CLAIMS), EN_ANSWERS);
+    const out = mapClassifyReply(content, STOP, mapMergeReplySchema, roCheckFor(EN_CLAIMS.length));
+    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`))
+      .toEqual(["MAP_WRONG_LANGUAGE@key_points", "MAP_WRONG_LANGUAGE@answers"]);
+    if (out.classification.parseStatus !== "SCHEMA_FAILED") throw new Error("unreachable");
+    const plan = planPatchFollowUp({ content, reply: STOP, parseStatus: out.classification.parseStatus, parseError: out.classification.parseError });
+    expect(plan?.locator).toEqual({ code: "MAP_WRONG_LANGUAGE", paths: ["key_points", "answers"] });
   });
 });
 
@@ -194,13 +252,26 @@ describe("map replies: choose check", () => {
     ]);
   });
 
-  it("reports a statement in the wrong language at its own answers path", () => {
-    const roCheck = mapChooseCheck(new Set(["kp01", "kp02", "kp03"]), "ro");
-    const content = JSON.stringify({ answers: [
-      { answer_id: "a1", statement: "Da, schimbarea trebuie făcută, cu condiții clare.", for: ["kp01"], against: [], strongest_rival: null },
-      { answer_id: "a2", statement: "The change should be made, but only with clear conditions on who pays.", for: ["kp02"], against: [], strongest_rival: null }] });
-    const out = mapClassifyReply(content, STOP, mapChooseReplySchema, roCheck);
-    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@answers.1.statement"]);
+  // Ruling R-3: statements are judged joined, at ["answers"], never one short statement alone.
+  const roChoose = mapChooseCheck(new Set(["kp01", "kp02", "kp03"]), "ro");
+  const stated = (statements: readonly string[]) => JSON.stringify({ answers: statements.map((statement, at) => ({
+    answer_id: `a${at + 1}`, statement, for: [`kp0${at + 1}`], against: [], strongest_rival: null })) });
+
+  it("accepts Romanian statements, including the real run's short sentence the detector misreads alone", () => {
+    const shortRomanian = "Impactul social depinde de comunicarea tranziției și de controlul prețurilor în perioada de schimb.";
+    expect(mapWrongLanguage(shortRomanian, "ro")).toBe(true);
+    const content = stated(["Da, România ar trebui să adopte euro, dar numai după ce îndeplinește criteriile de convergență.", shortRomanian]);
+    expect(mapClassifyReply(content, STOP, mapChooseReplySchema, roChoose).classification).toEqual({ parseStatus: "PARSED", parseError: null });
+  });
+
+  it("refuses all-English statements for a Romanian question at answers (the whole field), and the patch asks for that field", () => {
+    const content = stated(["Yes, the change should be made, but only with clear conditions on who pays for it.",
+      "No, the city should keep the current system until there is a plan to pay for the change."]);
+    const out = mapClassifyReply(content, STOP, mapChooseReplySchema, roChoose);
+    expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@answers"]);
+    if (out.classification.parseStatus !== "SCHEMA_FAILED") throw new Error("unreachable");
+    const plan = planPatchFollowUp({ content, reply: STOP, parseStatus: out.classification.parseStatus, parseError: out.classification.parseError });
+    expect(plan?.locator).toEqual({ code: "MAP_WRONG_LANGUAGE", paths: ["answers"] });
   });
 
   it("refuses a second answer whose statement repeats the first once case, punctuation and diacritics are set aside", () => {

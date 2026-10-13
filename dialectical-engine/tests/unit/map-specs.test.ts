@@ -197,9 +197,9 @@ describe("map specs: each field's language follows the question's tag", () => {
     expect(mapGapSpec(CTX, keyPoints, answers).classify(JSON.stringify({ new_points: EN_POINTS, framing_challenges: [] }), STOP).parseStatus).toBe("PARSED");
   });
 
-  it("choose refuses an English statement for a Romanian question, at its own answers path", () => {
+  it("choose refuses an English statement for a Romanian question, at the whole answers field", () => {
     const body = (statement: string) => JSON.stringify({ answers: [{ answer_id: "a1", statement, for: ["kp01"], against: ["kp02"], strongest_rival: null }] });
-    expect(refusals(mapChooseSpec(RO, keyPoints, answers), body(EN_ANSWER))).toEqual(["MAP_WRONG_LANGUAGE@answers.0.statement"]);
+    expect(refusals(mapChooseSpec(RO, keyPoints, answers), body(EN_ANSWER))).toEqual(["MAP_WRONG_LANGUAGE@answers"]);
     expect(mapChooseSpec(RO, keyPoints, answers).classify(body(RO_ANSWER), STOP).parseStatus).toBe("PARSED");
     expect(mapChooseSpec(CTX, keyPoints, answers).classify(body(EN_ANSWER), STOP).parseStatus).toBe("PARSED");
   });
