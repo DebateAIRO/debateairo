@@ -481,10 +481,22 @@ describe("the runner's wiring (source pins)", () => {
     // The assigned book reads the configured makers (never the sit-out copies, which are already laned).
     const assigned = code.slice(code.indexOf("const assignedConfigured: ReadonlyMap<string, ConfiguredSeatMaker>"), code.indexOf("assignedSeats = buildAssignedRunSeatBook({"));
     expect(assigned).toContain("new Map([...configuredByProviderRef].map(([ref, maker]) => {\n          const provider = throughCallLane(ref, maker.provider);");
-    // sitOutMaker (which lanes) runs over the configured makers once, and on an out-of-panel role's UNWRAPPED maker.
-    expect(code.match(/\bsitOutMaker\(/gu) ?? []).toHaveLength(2);
+    // sitOutMaker (which lanes) runs over the configured makers once, on an out-of-panel role's UNWRAPPED maker, and
+    // (debate shape, c5e0b2862, PF-B40) on a map seat's UNWRAPPED maker outside the claim-eligible list — kept, so that
+    // map-only member is wrapped once per run; a claim-eligible map seat takes the already-wrapped maker as it is.
+    expect(code.match(/\bsitOutMaker\(/gu) ?? []).toHaveLength(3);
     expect(code).toContain("configuredMakers.forEach((maker, index) => { configuredMakers[index] = sitOutMaker(maker); });");
     expect(code).toContain("const unwrapped = configuredByProviderRef.get(roleRef);\n      const configured = unwrapped === undefined ? undefined : sitOutMaker(unwrapped);");
+    expect(code).toContain([
+      "const eligible = configuredMakers.find((maker) => maker.providerRef === aiRef);",
+      "            if (eligible !== undefined) return eligible;",
+      "            const configured = configuredByProviderRef.get(aiRef);",
+      "            if (configured === undefined) return null;",
+      "            const wrapped = mapOnlyMembers.get(aiRef) ?? sitOutMaker(configured);",
+      "            mapOnlyMembers.set(aiRef, wrapped);"
+    ].join("\n"));
+    // ...and that book is the runner's UNWRAPPED makers (never the sit-out copies, which are already laned).
+    expect(code).toContain("const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, maker] as const));");
     expect(code).toContain("const sitOutMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {");
   });
 
