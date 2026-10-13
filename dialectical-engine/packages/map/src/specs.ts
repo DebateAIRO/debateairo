@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, type ReplyLanguageExpectation } from "@debateai/kernel";
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
@@ -50,8 +50,13 @@ export type MapSpecContext = Readonly<{
   questionLine: string;
   /** detectArgumentLanguage's English name, e.g. "Romanian". */
   languageName: string;
-  /** Its tag, e.g. "ro" ("und" when unknown: the language check then never refuses). */
+  /** Its tag, e.g. "ro" (kept with the name; the language check reads `replyLanguage`, never this tag). */
   languageTag: string;
+  /**
+   * What every reply's prose is checked against (ruling R-5): `replyLanguageExpectation(questionLine)`, built ONCE per
+   * question by the caller and threaded through. A field is refused only when the kernel's verdict is "OTHER".
+   */
+  replyLanguage: ReplyLanguageExpectation;
   /** The owners' contracts; default the shipped text. */
   contracts?: MapPromptContractSet;
 }>;
@@ -81,16 +86,16 @@ export function mapAnglesSpec(ctx: MapSpecContext): MapStepSpec<MapAnglesReply> 
 
 export function mapListSpec(ctx: MapSpecContext, angle: MapAngle | null): MapStepSpec<MapListReply> {
   return angle === null
-    ? mapSpecOf("LIST", ctx, "listOpen", [mapQuestionField(ctx)], mapListReplySchema, mapListCheck(ctx.languageTag))
+    ? mapSpecOf("LIST", ctx, "listOpen", [mapQuestionField(ctx)], mapListReplySchema, mapListCheck(ctx.replyLanguage))
     : mapSpecOf("LIST", ctx, "listAngle", [mapQuestionField(ctx), { name: "angle_label", content: angle.label },
-      { name: "angle_focus", content: angle.focus }], mapListReplySchema, mapListCheck(ctx.languageTag));
+      { name: "angle_focus", content: angle.focus }], mapListReplySchema, mapListCheck(ctx.replyLanguage));
 }
 
 /** Snowball (arm A): the claims so far as a short plain list, never who wrote them. */
 export function mapSnowballSpec(ctx: MapSpecContext, pointsSoFar: readonly MapPointItem[]): MapStepSpec<MapSnowballReply> {
   return mapSpecOf("SNOWBALL", ctx, "listSnowball", [mapQuestionField(ctx),
     { name: "points_so_far", content: JSON.stringify(mapByItemId(pointsSoFar).map((point) => point.claim)) }],
-  mapSnowballReplySchema, mapListCheck(ctx.languageTag));
+  mapSnowballReplySchema, mapListCheck(ctx.replyLanguage));
 }
 
 /** Merge: every item with its opaque id, in id order; never its author, list or angle. */
@@ -100,7 +105,7 @@ export function mapMergeSpec(ctx: MapSpecContext, items: readonly MapItem[]): Ma
   return mapSpecOf("MERGE", ctx, "merge", [mapQuestionField(ctx),
     { name: "points", content: JSON.stringify(points.map((point) => ({ item_id: point.itemId, claim: point.claim, why_it_matters: point.whyItMatters }))) },
     { name: "candidate_answers", content: JSON.stringify(answers.map((answer) => ({ item_id: answer.itemId, answer: answer.answer }))) }],
-  mapMergeReplySchema, mapMergeCheck(new Set(points.map((point) => point.itemId)), new Set(answers.map((answer) => answer.itemId)), ctx.languageTag));
+  mapMergeReplySchema, mapMergeCheck(new Set(points.map((point) => point.itemId)), new Set(answers.map((answer) => answer.itemId)), ctx.replyLanguage));
 }
 
 /** Gap: plain labels only, never counts or authors. */
@@ -108,7 +113,7 @@ export function mapGapSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoint[
   return mapSpecOf("GAP", ctx, "gap", [mapQuestionField(ctx),
     { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => keyPoint.claim)) },
     { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => answer.answer)) }],
-  mapGapReplySchema, mapGapCheck(ctx.languageTag));
+  mapGapReplySchema, mapGapCheck(ctx.replyLanguage));
 }
 
 /**
@@ -128,7 +133,7 @@ export function mapChooseSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoi
     { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => ({ key_point_id: keyPoint.keyPointId, claim: keyPoint.claim,
       raised_by: raisedBy(keyPoint), angle_kind: keyPoint.fixedAngleKinds[0] ?? null }))) },
     { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => ({ answer_id: answer.answerId, answer: answer.answer }))) }],
-  mapChooseReplySchema, mapChooseCheck(new Set(keyPoints.map((keyPoint) => keyPoint.keyPointId)), ctx.languageTag));
+  mapChooseReplySchema, mapChooseCheck(new Set(keyPoints.map((keyPoint) => keyPoint.keyPointId)), ctx.replyLanguage));
 }
 
 /**

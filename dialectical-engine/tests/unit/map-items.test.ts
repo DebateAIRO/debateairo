@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { replyLanguageExpectation } from "@debateai/kernel";
 import {
   mapAssignItemIds,
   mapItemsById,
@@ -37,15 +38,26 @@ describe("map text: normalisation for grouping", () => {
   });
 });
 
-describe("map text: the wrong-language detector", () => {
-  it("flags confident English for a Romanian question", () => {
-    expect(mapWrongLanguage("The cost of the change is high and it should be paid by the state because the people want it.", "ro")).toBe(true);
+describe("map text: the wrong-language check (the kernel's reply-side verdict, ruling R-5)", () => {
+  const RO = replyLanguageExpectation("Ar trebui România să adopte euro în următorii cinci ani?");
+  const EN = replyLanguageExpectation("Should a city make its central buses free to ride?");
+  const english = "The cost of the change is high and it should be paid by the state because the people want it.";
+  const romanian = "Costul schimbării este mare și ar trebui plătit de stat pentru că oamenii vor asta.";
+
+  it("flags English for a Romanian question, and Romanian for an English one", () => {
+    expect(mapWrongLanguage(english, RO)).toBe(true);
+    expect(mapWrongLanguage(romanian, EN)).toBe(true);
   });
 
-  it("accepts Romanian for a Romanian question, and never refuses when the question's language is unknown", () => {
-    expect(mapWrongLanguage("Costul schimbării este mare și ar trebui plătit de stat pentru că oamenii vor asta.", "ro")).toBe(false);
-    expect(mapWrongLanguage("The cost of the change is high and it should be paid by the state because the people want it.", "und")).toBe(false);
-    expect(mapWrongLanguage("", "ro")).toBe(false);
+  it("accepts the question's language, and lets an empty or short (UNSURE) text pass", () => {
+    expect(mapWrongLanguage(romanian, RO)).toBe(false);
+    expect(mapWrongLanguage(english, EN)).toBe(false);
+    expect(mapWrongLanguage("", RO)).toBe(false);
+    expect(mapWrongLanguage("Yes, it is.", RO)).toBe(false);
+  });
+
+  it("never refuses when the question's writing system is unknown", () => {
+    expect(mapWrongLanguage(english, { tag: "und", script: null })).toBe(false);
   });
 });
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { replyLanguageExpectation } from "@debateai/kernel";
 import { planPatchFollowUp } from "@debateai/providers";
 import {
   mapAnglesCheck,
@@ -17,6 +18,9 @@ import {
 } from "@debateai/map";
 
 const STOP = { finishReason: "stop" };
+// Ruling R-5: the expectation is built once per question from its line, by the kernel's reply-side check.
+const RO = replyLanguageExpectation("Ar trebui România să adopte euro în următorii cinci ani?");
+const EN = replyLanguageExpectation("Should a city make its central buses free to ride?");
 const RO_WHY = "Ar putea schimba răspunsul la întrebare.";
 const point = (claim: string, why = "It could change the answer.") => ({ claim, why_it_matters: why, leans: "context" });
 const ANGLES = { angles: [
@@ -56,14 +60,14 @@ describe("map replies: angles", () => {
 describe("map replies: lists", () => {
   it("accepts 3 points and one candidate answer, and reads a code fence (recording the repair)", () => {
     const body = JSON.stringify({ points: EN_POINTS, candidate_answers: ["Yes, with conditions."] });
-    expect(mapClassifyReply(body, STOP, mapListReplySchema, mapListCheck("en")).classification.parseStatus).toBe("PARSED");
-    expect(mapClassifyReply(`\`\`\`json\n${body}\n\`\`\``, STOP, mapListReplySchema, mapListCheck("en")).classification)
+    expect(mapClassifyReply(body, STOP, mapListReplySchema, mapListCheck(EN)).classification.parseStatus).toBe("PARSED");
+    expect(mapClassifyReply(`\`\`\`json\n${body}\n\`\`\``, STOP, mapListReplySchema, mapListCheck(EN)).classification)
       .toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "CODE_FENCE" });
   });
 
   it("refuses a 241-character claim at points.0.claim, and the gateway would patch exactly that member", () => {
     const content = JSON.stringify({ points: [point("x".repeat(241)), ...EN_POINTS.slice(1), EN_POINTS[0]], candidate_answers: ["Yes."] });
-    const out = mapClassifyReply(content, STOP, mapListReplySchema, mapListCheck("en"));
+    const out = mapClassifyReply(content, STOP, mapListReplySchema, mapListCheck(EN));
     expect(out.classification.parseStatus).toBe("SCHEMA_FAILED");
     if (out.classification.parseStatus !== "SCHEMA_FAILED") throw new Error("unreachable");
     const plan = planPatchFollowUp({ content, reply: STOP, parseStatus: out.classification.parseStatus, parseError: out.classification.parseError });
@@ -72,16 +76,16 @@ describe("map replies: lists", () => {
 
   it("refuses English points for a Romanian question at a patchable path", () => {
     const content = JSON.stringify({ points: EN_POINTS, candidate_answers: ["Yes, with conditions."] });
-    const out = mapClassifyReply(content, STOP, mapListReplySchema, mapListCheck("ro"));
+    const out = mapClassifyReply(content, STOP, mapListReplySchema, mapListCheck(RO));
     expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@points"]);
     const ro = JSON.stringify({ points: RO_POINTS, candidate_answers: ["Da, cu condiții."] });
-    expect(mapClassifyReply(ro, STOP, mapListReplySchema, mapListCheck("ro")).classification.parseStatus).toBe("PARSED");
+    expect(mapClassifyReply(ro, STOP, mapListReplySchema, mapListCheck(RO)).classification.parseStatus).toBe("PARSED");
   });
 
   it("checks points and candidate answers apart: English candidate answers for a Romanian question are refused at candidate_answers only, and the patch asks for that member", () => {
     const englishAnswer = "Yes, the change should go ahead, but only with clear conditions on who pays for it.";
     const content = JSON.stringify({ points: RO_POINTS, candidate_answers: [englishAnswer] });
-    const out = mapClassifyReply(content, STOP, mapListReplySchema, mapListCheck("ro"));
+    const out = mapClassifyReply(content, STOP, mapListReplySchema, mapListCheck(RO));
     expect(out.classification.parseStatus).toBe("SCHEMA_FAILED");
     expect(issuesOf(out.classification.parseError).map((issue) => `${issue.message}@${issue.path.join(".")}`)).toEqual(["MAP_WRONG_LANGUAGE@candidate_answers"]);
     if (out.classification.parseStatus !== "SCHEMA_FAILED") throw new Error("unreachable");
@@ -91,27 +95,27 @@ describe("map replies: lists", () => {
 
   it("reads Romanian quotes: „…” inside text, and „…\" closed with a straight quote (the tolerant decode)", () => {
     const quoted = JSON.stringify({ points: [point("Mulți spun „da” și pleacă.", RO_WHY), ...RO_POINTS.slice(1)], candidate_answers: ["Da."] });
-    expect(mapClassifyReply(quoted, STOP, mapListReplySchema, mapListCheck("ro")).value?.points[0]?.claim).toBe("Mulți spun „da” și pleacă.");
+    expect(mapClassifyReply(quoted, STOP, mapListReplySchema, mapListCheck(RO)).value?.points[0]?.claim).toBe("Mulți spun „da” și pleacă.");
     const straight = quoted.replace("„da”", "„da\"");
-    const out = mapClassifyReply(straight, STOP, mapListReplySchema, mapListCheck("ro"));
+    const out = mapClassifyReply(straight, STOP, mapListReplySchema, mapListCheck(RO));
     expect(out.classification).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "INNER_QUOTE" });
     expect(out.value?.points[0]?.claim).toContain("„da\"");
   });
 
   it("refuses prose with no JSON as a parse failure that names no model text", () => {
-    expect(mapClassifyReply("Here are my points: costs.", STOP, mapListReplySchema, mapListCheck("en")).classification)
+    expect(mapClassifyReply("Here are my points: costs.", STOP, mapListReplySchema, mapListCheck(EN)).classification)
       .toEqual({ parseStatus: "PARSE_FAILED", parseError: "MAP_REPLY_NOT_JSON" });
   });
 
   it("lets a snowball list be empty when nothing new is left", () => {
     const empty = JSON.stringify({ points: [], candidate_answers: [] });
-    expect(mapClassifyReply(empty, STOP, mapSnowballReplySchema, mapListCheck("en")).classification.parseStatus).toBe("PARSED");
-    expect(mapClassifyReply(empty, STOP, mapListReplySchema, mapListCheck("en")).classification.parseStatus).toBe("SCHEMA_FAILED");
+    expect(mapClassifyReply(empty, STOP, mapSnowballReplySchema, mapListCheck(EN)).classification.parseStatus).toBe("PARSED");
+    expect(mapClassifyReply(empty, STOP, mapListReplySchema, mapListCheck(EN)).classification.parseStatus).toBe("SCHEMA_FAILED");
   });
 });
 
 describe("map replies: merge check: unknown, reused and wrong-kind ids", () => {
-  const check = mapMergeCheck(new Set(["pt01", "pt02", "pt03"]), new Set(["ca01"]), "en");
+  const check = mapMergeCheck(new Set(["pt01", "pt02", "pt03"]), new Set(["ca01"]), EN);
   const merge = (keyPoints: unknown[], answers: unknown[]) => JSON.stringify({ key_points: keyPoints, answers });
 
   it("accepts groups that use known ids once", () => {
@@ -143,13 +147,13 @@ describe("map replies: merge check: unknown, reused and wrong-kind ids", () => {
     const plan = planPatchFollowUp({ content, reply: STOP, parseStatus: out.classification.parseStatus, parseError: out.classification.parseError });
     expect(plan?.locator).toEqual({ code: "MAP_MERGE_EMPTY", paths: ["key_points", "answers"] });
     // With nothing to place, empty lists stay acceptable.
-    expect(mapClassifyReply(content, STOP, mapMergeReplySchema, mapMergeCheck(new Set(), new Set(), "en")).classification.parseStatus).toBe("PARSED");
+    expect(mapClassifyReply(content, STOP, mapMergeReplySchema, mapMergeCheck(new Set(), new Set(), EN)).classification.parseStatus).toBe("PARSED");
   });
 
   // Ruling R-3 (real paid run, 2026-10-13): the language of a field is judged on ALL its texts joined, never on one
   // short claim — the engine's detector misreads single short Romanian sentences with high confidence.
   const roCheckFor = (pointCount: number) => mapMergeCheck(new Set(Array.from({ length: pointCount }, (_, at) => `pt${String(at + 1).padStart(2, "0")}`)),
-    new Set(["ca01", "ca02"]), "ro");
+    new Set(["ca01", "ca02"]), RO);
   const roGroups = (claims: readonly string[]) => claims.map((claim, at) => ({ key_point_id: `k${at + 1}`, claim,
     member_item_ids: [`pt${String(at + 1).padStart(2, "0")}`] }));
   const REAL_RUN_CLAIM_9 = "Renunțarea la leu înseamnă pierderea politicii monetare proprii și a cursului de schimb, instrumente care au amortizat șocurile asimetrice în ultimii douăzeci de ani.";
@@ -180,10 +184,28 @@ describe("map replies: merge check: unknown, reused and wrong-kind ids", () => {
   const EN_ANSWERS = [{ answer_id: "a1", answer: "Yes, the change should go ahead, but only with clear conditions on who pays for it.", member_item_ids: ["ca01"] },
     { answer_id: "a2", answer: "No, the city should keep the current system until there is a plan to pay for the change.", member_item_ids: ["ca02"] }];
 
-  it("accepts the real run's Romanian merge reply whose short claims 9 and 16 the detector misreads alone (regression)", () => {
-    // Control: each real claim alone is misread as another language; this is what refused the real reply three times.
-    expect(mapWrongLanguage(REAL_RUN_CLAIM_9, "ro")).toBe(true);
-    expect(mapWrongLanguage(REAL_RUN_CLAIM_16, "ro")).toBe(true);
+  // Ruling R-5: the reply-side verdict reads each real claim ALONE as Romanian (the question detector read it as French).
+  it.each([["9", REAL_RUN_CLAIM_9], ["16", REAL_RUN_CLAIM_16]])("accepts the real run's Romanian claim %s ALONE as a one-claim key_points field", (_, claim) => {
+    expect(mapWrongLanguage(claim, RO)).toBe(false);
+    const content = merge(roGroups([claim]), RO_ANSWERS);
+    const out = mapClassifyReply(content, STOP, mapMergeReplySchema, roCheckFor(1));
+    expect(out.classification).toEqual({ parseStatus: "PARSED", parseError: null });
+    expect(out.value?.key_points[0]?.claim).toBe(claim);
+  });
+
+  it("accepts an English merge for an English question", () => {
+    const enCheck = mapMergeCheck(new Set(["pt01", "pt02", "pt03"]), new Set(["ca01", "ca02"]), EN);
+    expect(mapClassifyReply(merge(roGroups(EN_CLAIMS), EN_ANSWERS), STOP, mapMergeReplySchema, enCheck).classification)
+      .toEqual({ parseStatus: "PARSED", parseError: null });
+  });
+
+  it("lets a short field the verdict cannot judge (UNSURE) pass, whatever its language", () => {
+    const content = merge(roGroups(["Costs."]), [{ answer_id: "a1", answer: "Yes.", member_item_ids: ["ca01"] }]);
+    expect(mapWrongLanguage("Costs. Yes.", RO)).toBe(false);
+    expect(mapClassifyReply(content, STOP, mapMergeReplySchema, roCheckFor(1)).classification).toEqual({ parseStatus: "PARSED", parseError: null });
+  });
+
+  it("accepts the real run's whole Romanian merge reply (regression)", () => {
     const content = merge(roGroups(RO_CLAIMS), RO_ANSWERS);
     const out = mapClassifyReply(content, STOP, mapMergeReplySchema, roCheckFor(RO_CLAIMS.length));
     expect(out.classification).toEqual({ parseStatus: "PARSED", parseError: null });
@@ -222,15 +244,15 @@ describe("map replies: merge check: unknown, reused and wrong-kind ids", () => {
 
 describe("map replies: gap", () => {
   it("accepts empty lists, and up to three framing challenges", () => {
-    expect(mapClassifyReply(JSON.stringify({ new_points: [], framing_challenges: [] }), STOP, mapGapReplySchema, mapGapCheck("en"))
+    expect(mapClassifyReply(JSON.stringify({ new_points: [], framing_challenges: [] }), STOP, mapGapReplySchema, mapGapCheck(EN))
       .classification.parseStatus).toBe("PARSED");
     const four = JSON.stringify({ new_points: [], framing_challenges: ["a", "b", "c", "d"] });
-    expect(mapClassifyReply(four, STOP, mapGapReplySchema, mapGapCheck("en")).classification.parseStatus).toBe("SCHEMA_FAILED");
+    expect(mapClassifyReply(four, STOP, mapGapReplySchema, mapGapCheck(EN)).classification.parseStatus).toBe("SCHEMA_FAILED");
   });
 });
 
 describe("map replies: choose check", () => {
-  const check = mapChooseCheck(new Set(["kp01", "kp02", "kp03"]), "en");
+  const check = mapChooseCheck(new Set(["kp01", "kp02", "kp03"]), EN);
   const answer = (answerId: string, rival: string | null, forIds: string[], against: string[] = []) => ({
     answer_id: answerId, statement: `Yes, because of the plan ${answerId}.`, for: forIds, against, strongest_rival: rival });
 
@@ -253,13 +275,13 @@ describe("map replies: choose check", () => {
   });
 
   // Ruling R-3: statements are judged joined, at ["answers"], never one short statement alone.
-  const roChoose = mapChooseCheck(new Set(["kp01", "kp02", "kp03"]), "ro");
+  const roChoose = mapChooseCheck(new Set(["kp01", "kp02", "kp03"]), RO);
   const stated = (statements: readonly string[]) => JSON.stringify({ answers: statements.map((statement, at) => ({
     answer_id: `a${at + 1}`, statement, for: [`kp0${at + 1}`], against: [], strongest_rival: null })) });
 
-  it("accepts Romanian statements, including the real run's short sentence the detector misreads alone", () => {
+  it("accepts Romanian statements, including the real run's short sentence the question detector misread alone", () => {
     const shortRomanian = "Impactul social depinde de comunicarea tranziției și de controlul prețurilor în perioada de schimb.";
-    expect(mapWrongLanguage(shortRomanian, "ro")).toBe(true);
+    expect(mapWrongLanguage(shortRomanian, RO)).toBe(false);
     const content = stated(["Da, România ar trebui să adopte euro, dar numai după ce îndeplinește criteriile de convergență.", shortRomanian]);
     expect(mapClassifyReply(content, STOP, mapChooseReplySchema, roChoose).classification).toEqual({ parseStatus: "PARSED", parseError: null });
   });

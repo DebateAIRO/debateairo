@@ -1,3 +1,4 @@
+import { replyLanguageExpectation } from "@debateai/kernel";
 import { mapFinishChoice } from "./choose.js";
 import { mapAssignItemIds, mapNextItemNumbers, type MapItemDraft } from "./items.js";
 import { mapAddGapPoints, mapApplyMerge, mapCodeMerge, mapSingletonMap, type MapMergedMap } from "./keypoints.js";
@@ -110,7 +111,9 @@ class MapRun {
   #next = 0;
 
   constructor(readonly input: MapRunInput, readonly arm: MapArm) {
+    // Ruling R-5: the reply-language expectation is built once, from the question line, and every step's check reads it.
     this.ctx = Object.freeze({ questionLine: input.questionLine, languageName: input.languageName, languageTag: input.languageTag,
+      replyLanguage: replyLanguageExpectation(input.questionLine),
       ...(input.contracts === undefined ? {} : { contracts: input.contracts }) });
   }
 

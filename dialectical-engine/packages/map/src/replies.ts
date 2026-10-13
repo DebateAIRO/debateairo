@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ReplyLanguageExpectation } from "@debateai/kernel";
 import { decodeModelJson, type ContentClassification, type ModelReplyFacts } from "@debateai/providers";
 import { mapNormaliseText, mapWrongLanguage } from "./text.js";
 import { MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS } from "./types.js";
@@ -106,10 +107,10 @@ export function mapClassifyReply<T>(content: string, reply: ModelReplyFacts | un
  * One issue at `path` when the texts together are confidently in another language than the question's. Always called
  * with ALL the texts of one field and that field's path (ruling R-3): the engine's detector misreads a single short
  * sentence with high confidence (a real run refused a valid Romanian merge three times over two short claims), so a
- * field's language is never judged on one member alone.
+ * field's language is never judged on one member alone. The verdict itself is the kernel's reply-side check (R-5).
  */
-export function mapLanguageIssues(texts: readonly string[], languageTag: string, path: readonly (string | number)[]): readonly MapReplyIssue[] {
-  return mapWrongLanguage(texts.join(" "), languageTag) ? [Object.freeze({ path, code: "MAP_WRONG_LANGUAGE" })] : [];
+export function mapLanguageIssues(texts: readonly string[], expected: ReplyLanguageExpectation, path: readonly (string | number)[]): readonly MapReplyIssue[] {
+  return mapWrongLanguage(texts.join(" "), expected) ? [Object.freeze({ path, code: "MAP_WRONG_LANGUAGE" })] : [];
 }
 
 export const mapAnglesCheck: MapReplyCheck<MapAnglesReply> = (value) => {
@@ -128,14 +129,14 @@ export const mapAnglesCheck: MapReplyCheck<MapAnglesReply> = (value) => {
 };
 
 /** Points and candidate answers are read apart, each field judged on all its texts joined, at the field's path. */
-export function mapListCheck(languageTag: string): MapReplyCheck<MapListReply | MapSnowballReply> {
+export function mapListCheck(expected: ReplyLanguageExpectation): MapReplyCheck<MapListReply | MapSnowballReply> {
   return (value) => [
-    ...mapLanguageIssues(value.points.flatMap((point) => [point.claim, point.why_it_matters]), languageTag, ["points"]),
-    ...mapLanguageIssues(value.candidate_answers, languageTag, ["candidate_answers"])
+    ...mapLanguageIssues(value.points.flatMap((point) => [point.claim, point.why_it_matters]), expected, ["points"]),
+    ...mapLanguageIssues(value.candidate_answers, expected, ["candidate_answers"])
   ];
 }
 
-export function mapMergeCheck(pointIds: ReadonlySet<string>, answerIds: ReadonlySet<string>, languageTag: string): MapReplyCheck<MapMergeReply> {
+export function mapMergeCheck(pointIds: ReadonlySet<string>, answerIds: ReadonlySet<string>, expected: ReplyLanguageExpectation): MapReplyCheck<MapMergeReply> {
   return (value) => {
     const issues: MapReplyIssue[] = [];
     const usedItems = new Set<string>();
@@ -158,17 +159,17 @@ export function mapMergeCheck(pointIds: ReadonlySet<string>, answerIds: Readonly
     }
     value.key_points.forEach((group, index) => visit("key_points", index, group.key_point_id, "key_point_id", group.member_item_ids, pointIds));
     value.answers.forEach((group, index) => visit("answers", index, group.answer_id, "answer_id", group.member_item_ids, answerIds));
-    issues.push(...mapLanguageIssues(value.key_points.map((group) => group.claim), languageTag, ["key_points"]));
-    issues.push(...mapLanguageIssues(value.answers.map((group) => group.answer), languageTag, ["answers"]));
+    issues.push(...mapLanguageIssues(value.key_points.map((group) => group.claim), expected, ["key_points"]));
+    issues.push(...mapLanguageIssues(value.answers.map((group) => group.answer), expected, ["answers"]));
     return issues;
   };
 }
 
-export function mapGapCheck(languageTag: string): MapReplyCheck<MapGapReply> {
-  return (value) => mapLanguageIssues(value.new_points.flatMap((point) => [point.claim, point.why_it_matters]), languageTag, ["new_points"]);
+export function mapGapCheck(expected: ReplyLanguageExpectation): MapReplyCheck<MapGapReply> {
+  return (value) => mapLanguageIssues(value.new_points.flatMap((point) => [point.claim, point.why_it_matters]), expected, ["new_points"]);
 }
 
-export function mapChooseCheck(keyPointIds: ReadonlySet<string>, languageTag: string): MapReplyCheck<MapChooseReply> {
+export function mapChooseCheck(keyPointIds: ReadonlySet<string>, expected: ReplyLanguageExpectation): MapReplyCheck<MapChooseReply> {
   return (value) => {
     const issues: MapReplyIssue[] = [];
     const ids = value.answers.map((answer) => answer.answer_id);
@@ -191,7 +192,7 @@ export function mapChooseCheck(keyPointIds: ReadonlySet<string>, languageTag: st
       if (statements.has(statement)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_DUPLICATE" });
       statements.add(statement);
     });
-    issues.push(...mapLanguageIssues(value.answers.map((answer) => answer.statement), languageTag, ["answers"]));
+    issues.push(...mapLanguageIssues(value.answers.map((answer) => answer.statement), expected, ["answers"]));
     return issues;
   };
 }

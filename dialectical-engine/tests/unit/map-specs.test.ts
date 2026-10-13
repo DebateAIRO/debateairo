@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { argumentLanguageDirective } from "@debateai/kernel";
+import { argumentLanguageDirective, replyLanguageExpectation } from "@debateai/kernel";
 import { readPromptFrame } from "@debateai/providers";
 import {
   MAP_CONTRACT_IDS,
@@ -21,8 +21,11 @@ import {
   type MapStepSpec
 } from "@debateai/map";
 
-const CTX: MapSpecContext = { questionLine: "Should a city make its central buses free to ride?", languageName: "English", languageTag: "en" };
-const RO: MapSpecContext = { ...CTX, languageName: "Romanian", languageTag: "ro" };
+const EN_Q = "Should a city make its central buses free to ride?";
+const RO_Q = "Ar trebui orașul să facă gratuite autobuzele din centru?";
+// Ruling R-5: the reply-language expectation is built once per question, from its line.
+const CTX: MapSpecContext = { questionLine: EN_Q, languageName: "English", languageTag: "en", replyLanguage: replyLanguageExpectation(EN_Q) };
+const RO: MapSpecContext = { questionLine: RO_Q, languageName: "Romanian", languageTag: "ro", replyLanguage: replyLanguageExpectation(RO_Q) };
 const S1: MapSeat = { aiRef: "AIREF-SENTINEL-1", maker: "MAKER-SENTINEL-1" };
 const S2: MapSeat = { aiRef: "AIREF-SENTINEL-2", maker: "MAKER-SENTINEL-2" };
 const S3: MapSeat = { aiRef: "AIREF-SENTINEL-3", maker: "MAKER-SENTINEL-3" };
@@ -165,13 +168,13 @@ describe("map specs: what each step sends", () => {
   it("merge's language check follows the question's language, not a fixed one", () => {
     const englishClaim = JSON.stringify({ key_points: [{ key_point_id: "k1", claim: "The cost of the change is high and the state should pay it.",
       member_item_ids: [points[0]!.itemId] }], answers: [] });
-    const romanian = mapMergeSpec({ ...CTX, languageName: "Romanian", languageTag: "ro" }, items);
+    const romanian = mapMergeSpec(RO, items);
     expect(romanian.classify(englishClaim, { finishReason: "stop" }).parseError).toContain("MAP_WRONG_LANGUAGE");
     expect(mapMergeSpec(CTX, items).classify(englishClaim, { finishReason: "stop" }).parseStatus).toBe("PARSED");
   });
 });
 
-describe("map specs: each field's language follows the question's tag", () => {
+describe("map specs: each field's language follows the question's line", () => {
   it("list (open and with an angle) refuses English points and English candidate answers for a Romanian question", () => {
     for (const spec of [mapListSpec(RO, null), mapListSpec(RO, ANGLE)]) {
       expect(refusals(spec, JSON.stringify({ points: EN_POINTS, candidate_answers: [RO_ANSWER] }))).toEqual(["MAP_WRONG_LANGUAGE@points"]);
