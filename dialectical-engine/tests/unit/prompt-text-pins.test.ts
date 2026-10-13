@@ -136,7 +136,8 @@ const LEG_DIRECTIVES: Readonly<Record<string, string>> = {
   "cross-root": "Author one direct cross-root response: defend the position named in own_position and attack "
     + "the position named in other_makers_position.",
   // NEW with the debate shape (Phase 2b Task 4): the root the map assigns.
-  "assigned-root": "Author the strongest case for the answer named in assigned_answer."
+  "assigned-root": "Author the strongest case for the answer named in assigned_answer. "
+    + "Use the points in map_points where they help; never mention field names or the map in your reply."
 };
 
 describe("REVIEW ITEM 4 — every judge leg's instruction text, pinned exactly", () => {

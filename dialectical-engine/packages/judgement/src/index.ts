@@ -29,6 +29,7 @@ import {
 } from "@debateai/providers";
 import {
   JUDGE_WAYS_OF_KNOWING,
+  JUDGE_CLAIM_TYPE_INSTRUCTIONS,
   JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS,
   JUDGE_LEG_MATERIAL_FIELDS,
   PANEL_PROMPT_CONTRACT,
@@ -366,13 +367,39 @@ export interface ReviewedNode {
 }
 
 /**
- * The closed material table, applied. A leg's fields are fixed by
- * `JUDGE_LEG_MATERIAL_FIELDS`, and this function is the only place that fills
- * them — so a new field cannot reach a model without appearing in that table.
+ * THE ONE DECISION of which sealed contract a leg is framed under and which
+ * closed material table it may send: a support or attack leg WITH a
+ * consideration takes the debate shape's variant (`judgeConsiderationPromptContract`
+ * + `JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS`); every other leg, a support or
+ * attack leg without one included, takes today's contract and table. The framer
+ * and the moment replay both read it, so the two cannot disagree.
+ */
+export function judgeLegFrameSpec(
+  leg: JudgeLeg,
+  claim: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS
+): Readonly<{ contract: PromptContract; materialFields: readonly string[] }> {
+  if ((leg.kind === "support" || leg.kind === "attack") && leg.consideration !== undefined) {
+    return Object.freeze({
+      contract: judgeConsiderationPromptContract(leg.kind, claim),
+      materialFields: JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS[leg.kind]
+    });
+  }
+  return Object.freeze({
+    contract: judgePromptContract(leg.kind, claim),
+    materialFields: JUDGE_LEG_MATERIAL_FIELDS[leg.kind as JudgeLegKind]
+  });
+}
+
+/**
+ * The closed material table, applied. A leg's fields are fixed by the table
+ * `judgeLegFrameSpec` names (`JUDGE_LEG_MATERIAL_FIELDS`, or the consideration
+ * variant's), and this function is the only place that fills them — so a new
+ * field cannot reach a model without appearing in that table.
  */
 function judgeLegMaterial(
   leg: JudgeLeg,
-  questionLine: string
+  questionLine: string,
+  declared: readonly string[]
 ): readonly { readonly name: string; readonly content: string }[] {
   const fields = leg.kind === "cross-root"
     ? [
@@ -393,9 +420,6 @@ function judgeLegMaterial(
             ...(leg.consideration === undefined ? [] : [{ name: "consideration", content: leg.consideration }])
           ]
         : [{ name: "question_line", content: questionLine }];
-  const declared = (leg.kind === "support" || leg.kind === "attack") && leg.consideration !== undefined
-    ? JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS[leg.kind]
-    : JUDGE_LEG_MATERIAL_FIELDS[leg.kind as JudgeLegKind];
   if (fields.length !== declared.length || fields.some((field, index) => field.name !== declared[index])) {
     throw new TypedDomainError(
       "JUDGE_LEG_MATERIAL_UNDECLARED",
@@ -416,12 +440,10 @@ function framedJudgePrompt(
   argumentLanguageName: string | undefined,
   claim: "unknown" | "resolved"
 ): FramedPrompt {
-  const contract = (leg.kind === "support" || leg.kind === "attack") && leg.consideration !== undefined
-    ? judgeConsiderationPromptContract(leg.kind, claim)
-    : judgePromptContract(leg.kind, claim);
+  const spec = judgeLegFrameSpec(leg, claim);
   return buildFramedPrompt({
-    contract: promptContractInArgumentLanguage(contract, argumentLanguageName),
-    material: judgeLegMaterial(leg, questionLine)
+    contract: promptContractInArgumentLanguage(spec.contract, argumentLanguageName),
+    material: judgeLegMaterial(leg, questionLine, spec.materialFields)
   });
 }
 

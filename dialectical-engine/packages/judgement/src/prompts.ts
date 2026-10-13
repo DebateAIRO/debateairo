@@ -89,11 +89,6 @@ export const JUDGE_CLAIM_TYPE_INSTRUCTIONS = Object.freeze({
 });
 
 /**
- * One entry per authoring leg. The four runner template literals, moved without
- * rewording; `primary-root` is the previously-unstated default (the primary
- * maker's first position, which carried no directive at all).
- */
-/**
  * Today's five legs, frozen: the V1 fingerprint is built from them only, so
  * today's sealed hash (register judgeContractHash e7f7e4b0…) stays reproducible.
  */
@@ -108,6 +103,12 @@ export const JUDGE_LEG_KINDS_V1 = [
 export const JUDGE_LEG_KINDS = [...JUDGE_LEG_KINDS_V1, "assigned-root"] as const;
 export type JudgeLegKind = typeof JUDGE_LEG_KINDS[number];
 
+/**
+ * One entry per authoring leg. The four runner template literals, moved without
+ * rewording; `primary-root` is the previously-unstated default (the primary
+ * maker's first position, which carried no directive at all); `assigned-root`
+ * is the debate shape's, new with it.
+ */
 export const JUDGE_LEG_DIRECTIVES: Readonly<Record<JudgeLegKind, string>> = Object.freeze({
   "primary-root": "Author your position on the question under debate.",
   "independent-root": "Independently author your own position on the question. Do not grade or imitate another maker.",
@@ -117,7 +118,8 @@ export const JUDGE_LEG_DIRECTIVES: Readonly<Record<JudgeLegKind, string>> = Obje
     + "State and defend the strongest genuine counter-position to the position named in position_under_debate.",
   "cross-root": "Author one direct cross-root response: defend the position named in own_position and attack the "
     + "position named in other_makers_position.",
-  "assigned-root": "Author the strongest case for the answer named in assigned_answer."
+  "assigned-root": "Author the strongest case for the answer named in assigned_answer. "
+    + "Use the points in map_points where they help; never mention field names or the map in your reply."
 });
 
 /**

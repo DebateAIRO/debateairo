@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { readPromptFrame, promptContractFingerprintText } from "@debateai/providers";
+import { buildFramedPrompt, readPromptFrame, promptContractFingerprintText } from "@debateai/providers";
 import {
   JUDGE_CONSIDERATION_SENTENCE, JUDGE_LEG_KINDS, JUDGE_LEG_MATERIAL_FIELDS, JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1, judgeConsiderationPromptContract, judgeLegModelRole, judgePromptContract,
@@ -64,5 +64,20 @@ describe("judge legs for the debate shape", () => {
       .toEqual([{ label: "assigned_answer", text: "Yes, with conditions." }, { label: "map_points", text: "{\"for\":[],\"against\":[]}" }]);
     expect(graderContextOf("Q?", parseMomentBuilder({ family: "JUDGE_JUDGE", inputs: { questionLine: "Q?", leg: cases[1][2] } })).excerpts)
       .toEqual([{ label: "position_under_debate", text: "P" }, { label: "consideration", text: "Cost" }]);
+  });
+
+  it("the moment replay refuses a consideration contract without its field, and the field without its contract", () => {
+    const question = { name: "question_line", content: "Q?" };
+    const position = { name: "position_under_debate", content: "P" };
+    const variantWithoutField = buildFramedPrompt({
+      contract: judgeConsiderationPromptContract("attack", "unknown"), material: [question, position]
+    }).packet;
+    const fieldWithoutVariant = buildFramedPrompt({
+      contract: judgePromptContract("attack", "unknown"), material: [question, position, { name: "consideration", content: "Cost" }]
+    }).packet;
+    for (const packet of [variantWithoutField, fieldWithoutVariant]) {
+      expect(() => builderFromRecordedPacket("SUPPORT_ATTACK", "JUDGE:critic:root0:r1:p2", packet))
+        .toThrowError(expect.objectContaining({ code: "MOMENT_CONTRACT_MISMATCH" }));
+    }
   });
 });

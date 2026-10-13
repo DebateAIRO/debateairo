@@ -43,7 +43,7 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
   ]);
   return {
     // Debate shape (Phase 2b Task 4): V1's e7f7e4b0…1365 plus six contracts; e7f7e4b0… is history.
-    judgeContractHash: "ee5bf2dc9eb7b70efe00e7a12115aacfdbee4959da5882a50c14e4625c42e7ea",
+    judgeContractHash: "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612",
     // serve.synthesizer.v3 (2026-10-12, practice debate 3); v1's d96e7cc9…c866
     // and v2's 340e11a6…8b70 are history.
     composerContractHash: "4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f",

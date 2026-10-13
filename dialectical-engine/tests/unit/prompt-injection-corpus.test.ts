@@ -457,6 +457,45 @@ const HAND_OFFS = [
     }
   },
   {
+    name: "judge:attack+consideration (consideration — a map point another model wrote)",
+    payloadIn: "consideration",
+    render: async (attack: string): Promise<readonly PromptPacket[]> => {
+      const sink: PromptPacket[] = [];
+      await new Judge(capturingGateway(sink)).judge({
+        ...SUBJECT,
+        questionLine: QUESTION,
+        leg: { kind: "attack", positionUnderDebate: CLEAN_STATEMENT, consideration: attack }
+      }).catch(() => undefined);
+      return sink;
+    }
+  },
+  {
+    name: "judge:assigned-root (assigned_answer — an answer the map's models wrote)",
+    payloadIn: "assigned_answer",
+    render: async (attack: string): Promise<readonly PromptPacket[]> => {
+      const sink: PromptPacket[] = [];
+      await new Judge(capturingGateway(sink)).judge({
+        ...SUBJECT,
+        questionLine: QUESTION,
+        leg: { kind: "assigned-root", assignedAnswer: attack, mapPoints: "{\"for\":[],\"against\":[]}" }
+      }).catch(() => undefined);
+      return sink;
+    }
+  },
+  {
+    name: "judge:assigned-root (map_points — the map's points, model-written)",
+    payloadIn: "map_points",
+    render: async (attack: string): Promise<readonly PromptPacket[]> => {
+      const sink: PromptPacket[] = [];
+      await new Judge(capturingGateway(sink)).judge({
+        ...SUBJECT,
+        questionLine: QUESTION,
+        leg: { kind: "assigned-root", assignedAnswer: CLEAN_STATEMENT, mapPoints: JSON.stringify({ for: [attack], against: [] }) }
+      }).catch(() => undefined);
+      return sink;
+    }
+  },
+  {
     name: "judge:review (statement — the reviewed maker's output)",
     payloadIn: "statement",
     render: async (attack: string): Promise<readonly PromptPacket[]> => {
@@ -714,8 +753,11 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     // Verdict story: 17 -> 21 and 13 -> 16, with the storyteller's three rows
     // (question, points, prior_objection) and the checker's one (candidate_story).
     // prior_objection is not new: the synthesizer's retry row already names it.
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(21);
-    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(16);
+    // Debate shape (Phase 2b Task 4): 21 -> 24 and 16 -> 19, with the attack leg's
+    // consideration (a map point another model wrote) and the assigned root's
+    // assigned_answer and map_points.
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(24);
+    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(19);
     // Every row's name says which lane it belongs to, so the count above cannot
     // be satisfied by three more copies of one lane.
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(3);
@@ -783,8 +825,9 @@ for (const row of HAND_OFFS) {
 /**
  * FW-B (final review B, Minor 4) — WHAT THIS ROW ACTUALLY MEASURES.
  *
- * The title used to read as "for every hand-off". It is not: only the eight
- * JUDGE rows drive a gateway, and only a gateway calls `buildRepairPacket`.
+ * The title used to read as "for every hand-off". It is not: only the JUDGE
+ * rows (eight then; eleven since the debate shape's three) drive a gateway, and
+ * only a gateway calls `buildRepairPacket`.
  * The other nine rows render one packet each, so `packets.slice(1)` was empty
  * for them and the loop asserted nothing at all — nine rows of silent pass.
  *
@@ -816,7 +859,7 @@ describe("V-11 layer 4 — the repair path carries no model text under attack", 
     // One repair packet per judge row, and the judge rows are the only ones
     // that produce one. A loop that asserted nothing would leave this at zero.
     expect(repairPackets).toBe(HAND_OFFS.filter(({ name }) => name.startsWith("judge:")).length);
-    expect(repairPackets).toBe(8);
+    expect(repairPackets).toBe(11);
   });
 });
 

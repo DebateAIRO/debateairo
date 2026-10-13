@@ -6,6 +6,7 @@ import {
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
   Judge,
   PanelMemberFailure,
+  judgeLegFrameSpec,
   judgeLegModelRole,
   type JudgeLeg
 } from "@debateai/judgement";
@@ -232,16 +233,13 @@ export function builderFromRecordedPacket(
   const siteKey = seatBaseCallSiteKey(callSiteKey);
   switch (family) {
     case "JUDGE_JUDGE": {
-      const parsed = /^judge\.([a-z-]+)(\.consideration)?\.(?:unknown|resolved)\.v1$/u.exec(frame.contractId);
+      const parsed = /^judge\.([a-z-]+)(?:\.consideration)?\.(unknown|resolved)\.v1$/u.exec(frame.contractId);
       const kind = parsed?.[1];
-      const withConsideration = parsed?.[2] !== undefined;
-      // The variant contract and the `consideration` field travel together, and only on a support or attack leg.
-      if (withConsideration !== has("consideration")) mismatch();
-      if (withConsideration && kind !== "support" && kind !== "attack") mismatch();
+      const claim = parsed?.[2] === "unknown" || parsed?.[2] === "resolved" ? parsed[2] : mismatch();
       const leg: JudgeLeg = kind === "support" || kind === "attack"
         ? {
             kind, positionUnderDebate: field("position_under_debate"),
-            ...(withConsideration ? { consideration: field("consideration") } : {})
+            ...(has("consideration") ? { consideration: field("consideration") } : {})
           }
         : kind === "assigned-root"
           ? { kind, assignedAnswer: field("assigned_answer"), mapPoints: field("map_points") }
@@ -250,6 +248,11 @@ export function builderFromRecordedPacket(
             : kind === "primary-root" || kind === "independent-root"
               ? { kind }
               : mismatch();
+      // The framer's own decision (`judgeLegFrameSpec`): the rebuilt leg must name the recorded contract and send
+      // exactly the recorded fields, so a variant id without its consideration (or the reverse) is refused.
+      const spec = judgeLegFrameSpec(leg, claim);
+      if (spec.contract.contractId !== frame.contractId) mismatch();
+      if (frame.fields.map((entry) => entry.name).join("\n") !== spec.materialFields.join("\n")) mismatch();
       if (judgeLegModelRole(leg) !== role) mismatch();
       return parseMomentBuilder({ family, inputs: { questionLine: field("question_line"), leg, ...language } });
     }

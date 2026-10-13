@@ -20,8 +20,8 @@ import {
  * `conformanceContractHash` is evaluator v1's f205421c…9dcc (measured on the practice export of
  * 2026-10-12). The runner records every answer-writer and answer-checker call under the REGISTER's
  * fingerprint, so this file pins three things:
- *  1. the register 12 the preview publish kit composes on a version-11-shaped base changes exactly those
- *     two rows, to the v3/v2 seals (and the development register carries the same seals);
+ *  1. the register 12 the preview publish kit composes on a version-11-shaped base changes exactly three
+ *     rows: the judge's (debate shape) and the two synthesis rows, to the v3/v2 seals (the development register carries the same seals);
  *  2. the runner refuses to start on a register that does not carry the fingerprints this code sends;
  *  3. the practice can compose that same version 12 itself (`--register-next`), before any upload.
  */
@@ -38,7 +38,7 @@ const LIVE_11 = Object.freeze({
   conformance: "f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc"
 });
 /** The judge seal this code sends after the debate shape (Task 4): V1 + six contracts. */
-const JUDGE_P2B = "ee5bf2dc9eb7b70efe00e7a12115aacfdbee4959da5882a50c14e4625c42e7ea";
+const JUDGE_P2B = "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612";
 
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-11T10:42:25.561Z" };
@@ -83,7 +83,7 @@ describe("register 12: the new prompt seals reach the register as a new version"
     expect(rows.judgeContractHash).toBe(JUDGE_P2B);
   });
 
-  it("the preview publish kit, on a version-11-shaped base, changes exactly the two synthesis fingerprints", async () => {
+  it("the preview publish kit, on a version-11-shaped base, changes exactly the judge's and the two synthesis fingerprints", async () => {
     const base = await live11Base();
     const source = await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, DEEPSEEK);
     const plan = composePreviewSnapshotV2({ sourceRows: source, baseRows: base as never, baseRegisterVersion: "11",
