@@ -38,10 +38,13 @@ async function exchange(port: number, text: string, waitMs = 300) {
   });
 }
 const PUBLIC = [{ address: '93.184.216.34', family: 4 }];
+/** The preview's one Quaderno sandbox account (the unit's --quaderno-account). */
+const ACCOUNT = 'dezbatere-test';
 async function proxy(options: Record<string, unknown> = {}) {
   const log: unknown[] = [], resolved: string[] = [], connected: unknown[] = [];
   const target = await upstream();
   const server = egress.createEgressProxy({
+    quadernoAccount: ACCOUNT,
     resolve: async (host: string) => { resolved.push(host); return PUBLIC; },
     connect: (port: number, address: string) => { connected.push({ port, address }); return net.connect({ host: '127.0.0.1', port: target.port }); },
     log: (line: unknown) => log.push(line), ...options
@@ -56,12 +59,13 @@ describe('the preview egress proxy: what it admits', () => {
     ['CONNECT secure.sandbox.netopia-payments.com:443 HTTP/1.1', 'secure.sandbox.netopia-payments.com'],
     ['CONNECT dezbatere-test.sandbox-quadernoapp.com:443 HTTP/1.1', 'dezbatere-test.sandbox-quadernoapp.com'],
     ['CONNECT secure-sandbox.netopia-payments.com:443 HTTP/1.0', 'secure-sandbox.netopia-payments.com']
-  ])('admits %s', (line, host) => expect(egress.admittedTarget(line)).toBe(host));
+  ])('admits %s', (line, host) => expect(egress.admittedTarget(line, ACCOUNT)).toBe(host));
   it.each([
     'CONNECT secure.netopia-payments.com:443 HTTP/1.1',
     'CONNECT secure.mobilpay.ro:443 HTTP/1.1',
     'CONNECT dezbatere.quadernoapp.com:443 HTTP/1.1',
     'CONNECT a.b.sandbox-quadernoapp.com:443 HTTP/1.1',
+    'CONNECT another-account.sandbox-quadernoapp.com:443 HTTP/1.1',
     'CONNECT sandbox-quadernoapp.com:443 HTTP/1.1',
     'CONNECT x.sandbox-quadernoapp.com.evil.example:443 HTTP/1.1',
     'CONNECT secure-sandbox.netopia-payments.com:80 HTTP/1.1',
@@ -74,7 +78,7 @@ describe('the preview egress proxy: what it admits', () => {
     'CONNECT secure-sandbox.netopia-payments.com:443 HTTP/2',
     'CONNECT secure-sandbox.netopia-payments.com:443  HTTP/1.1',
     'smartbill.invalid:443'
-  ])('refuses %s', line => expect(egress.admittedTarget(line)).toBeNull());
+  ])('refuses %s', line => expect(egress.admittedTarget(line, ACCOUNT)).toBeNull());
   it.each([
     ['93.184.216.34', 4, true], ['2606:2800:220:1:248:1893:25c8:1946', 6, true],
     ['127.0.0.1', 4, false], ['10.1.2.3', 4, false], ['172.20.0.1', 4, false], ['192.168.1.1', 4, false], ['169.254.169.254', 4, false],
@@ -123,6 +127,35 @@ describe('the preview egress proxy: what it does', () => {
     expect(answer).toBe('HTTP/1.1 200 Connection Established\r\n\r\n');
     expect(p.connected).toEqual([{ port: 443, address: '2606:2800:220:1:248:1893:25c8:1946' }]);
   });
+  it('tries the next public address when one does not answer', async () => {
+    const tried: string[] = [];
+    const target = await upstream();
+    const server = egress.createEgressProxy({ quadernoAccount: ACCOUNT, log: () => undefined,
+      resolve: async () => [{ address: '93.184.216.34', family: 4 }, { address: '93.184.216.35', family: 4 }],
+      connect: (_port: number, address: string) => { tried.push(address); return net.connect({ host: '127.0.0.1', port: address.endsWith('.34') ? 1 : target.port }); } });
+    const port = await listen(server);
+    expect(await exchange(port, 'CONNECT secure-sandbox.netopia-payments.com:443 HTTP/1.1\r\n\r\n')).toBe('HTTP/1.1 200 Connection Established\r\n\r\n');
+    expect(tried).toEqual(['93.184.216.34', '93.184.216.35']);
+  });
+  it('never connects for a client that left while the name was being resolved, and bounds the lookup', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    const p = await proxy({ resolve: () => new Promise(done => { release = done; }) });
+    const socket = net.connect({ host: '127.0.0.1', port: p.port });
+    socket.on('error', () => undefined);
+    socket.write('CONNECT secure-sandbox.netopia-payments.com:443 HTTP/1.1\r\n\r\n');
+    await new Promise(r => setTimeout(r, 100)); socket.destroy(); await new Promise(r => setTimeout(r, 100));
+    release(PUBLIC); await new Promise(r => setTimeout(r, 100));
+    expect(p.connected).toEqual([]);
+    const slow = await proxy({ resolve: () => new Promise(() => undefined), limits: { ...egress.PREVIEW_EGRESS_LIMITS, resolveTimeoutMs: 50 } });
+    expect((await exchange(slow.port, 'CONNECT secure-sandbox.netopia-payments.com:443 HTTP/1.1\r\n\r\n', 400)).startsWith('HTTP/1.1 403 Forbidden')).toBe(true);
+    expect(slow.log).toEqual([{ event: 'preview.egress', host: 'secure-sandbox.netopia-payments.com', outcome: 'RESOLVE_FAILED' }]);
+  });
+  it('takes exactly one Quaderno account as its argument', () => {
+    expect(egress.parseEgressArguments(['--quaderno-account', ACCOUNT])).toEqual({ quadernoAccount: ACCOUNT });
+    for (const argv of [[], ['--quaderno-account'], ['--quaderno-account', 'a.b'], ['--quaderno-account', 'Upper'], ['--account', ACCOUNT], ['--quaderno-account', ACCOUNT, 'x']])
+      expect(() => egress.parseEgressArguments(argv)).toThrow('PREVIEW_EGRESS_REFUSED');
+    expect(() => egress.createEgressProxy({})).toThrow('PREVIEW_EGRESS_REFUSED');
+  });
   it('closes a client that never finishes its request line', async () => {
     const p = await proxy({ limits: { ...egress.PREVIEW_EGRESS_LIMITS, headerTimeoutMs: 50 } });
     const answer = await exchange(p.port, 'CONNECT secure-sandbox.netopia', 400);
@@ -145,7 +178,9 @@ describe('debateai-preview-egress.service template', () => {
     const at = line.indexOf('='); (unit[section + line.slice(0, at)] ??= []).push(line.slice(at + 1));
   }
   it('runs the installed standalone copy with the preview\'s Node, as a throwaway user', () => {
-    expect(unit['[Service]ExecStart']).toEqual(['/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/egress-v1/egress-proxy.mjs']);
+    expect(unit['[Service]ExecStart']).toEqual(['/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/egress-v1/egress-proxy.mjs --quaderno-account @QUADERNO_ACCOUNT@']);
+    // Left unreplaced, the placeholder is refused: the proxy never starts for every account.
+    expect(() => egress.parseEgressArguments(['--quaderno-account', '@QUADERNO_ACCOUNT@'])).toThrow('PREVIEW_EGRESS_REFUSED');
     expect(unit['[Service]DynamicUser']).toEqual(['yes']);
     expect(unit['[Service]User']).toBeUndefined();
     expect(unit['[Service]EnvironmentFile']).toBeUndefined();

@@ -489,7 +489,7 @@ What the repository adds for it (each in `deploy/preview-auth-dev/v1/README.md`)
 | Ceiling per day, for the whole site | `dailyCeilingMicros` in `--hosted-billing` | `10000000` ($10) |
 | The room read's budget (`GET /v1/asks/room`) | `askRoomReads` in `--hosted-billing` | `{"limit":60,"windowMs":60000,"capacity":65536}` (the hosted kit's example) |
 | NETOPIA sandbox POS signature, API key, public key | step H6, step H5 | from NETOPIA's sandbox admin |
-| Quaderno sandbox account address and API key | step H7, step H5 | `https://<account>.sandbox-quadernoapp.com/api` |
+| Quaderno sandbox account (its label) and API key | steps H3 and H7, step H5 | the label in `https://<label>.sandbox-quadernoapp.com/api` |
 | SmartBill series | step H7 | `DBAI` (the dummy never receives it) |
 | The owner-report address | step H5 | one of the allow-listed addresses |
 
@@ -514,8 +514,10 @@ plus its story: with $3 per debate that is at least $3.66, and the plan refuses 
 
 ### H1. Names and copies, in the release's root shell
 
-Use the root shell of step 0 (`LABEL`, `ART`, `CAPI`, `CUI`, `CRUN`, `rel`) and the publish
-sequence's names (`S`, `NP`, `nat`, `put`). Then:
+H0 must be finished first: the provisioner rotates the database passwords, and the copies below
+must hold the current ones (after any later rotation, take them again). Use the root shell of step 0
+(`LABEL`, `ART`, `CAPI`, `CUI`, `CRUN`, `rel`) and the publish sequence's names (`S`, `NP`, `nat`,
+`put`). Then:
 
 ```sh
 E=/etc/debateai-v3-preview/auth-dev-v1
@@ -530,11 +532,12 @@ rollback returns to (all four files must be new, so a second run never overwrite
 
 ```sh
 ( set -euo pipefail
-  for F in native-plan.before-hosted.json api.env.before-hosted runner.env.before-hosted release-lock.before-hosted.json; do [ ! -e "$S/$F" ]; done
+  for F in native-plan.before-hosted.json api.env.before-hosted runner.env.before-hosted release-lock.before-hosted.json Caddyfile.before-hosted; do [ ! -e "$S/$F" ]; done
   cp -a "$NP" "$S/native-plan.before-hosted.json"
   cp -a "$E/api.env" "$S/api.env.before-hosted"
   cp -a "$E/runner.env" "$S/runner.env.before-hosted"
   cp -a /etc/debateai-v3-preview/lifecycle/release-lock.json "$S/release-lock.before-hosted.json"
+  cp -a /etc/caddy/Caddyfile "$S/Caddyfile.before-hosted"
   echo "rollback state kept" )
 ```
 
@@ -546,6 +549,7 @@ grep -cE '^(GEOIP_COUNTRY_DB_PATH|TOR_EXIT_LIST_PATH|NETOPIA_[A-Z_]+|QUADERNO_[A
 grep -c '^TURNSTILE_SOCKET_PATH=/run/debateai-preview-turnstile/siteverify.sock$' "$E/api.env"   # must print 1
 grep -c '^DEBATEAI_DEPLOYMENT_MODE=local$' "$E/api.env" "$E/runner.env"   # 1 for each file
 systemctl show -p IPAddressAllow -p IPAddressDeny -p RestrictAddressFamilies -p ProtectSystem -p InaccessiblePaths debateai-preview-api
+postconf -h message_size_limit   # 0 (no limit) or at least 12582912
 ```
 
 The first must be 0: a hosted API refuses to start when the staff settings name an internal
@@ -553,7 +557,9 @@ allowance the database does not select (`INTERNAL_FUNDING_UNAVAILABLE`), and tea
 built. The last line must show the API's Internet denial with loopback allowed (`IPAddressDeny`
 `0.0.0.0/0 ::/0`, `IPAddressAllow` loopback), `AF_INET` among the families, and no
 `InaccessiblePaths` entry covering `/var/lib/debateai-geoip` or `/etc/debateai-v3-preview/billing`.
-Anything else: stop and ask.
+The Postfix limit matters because a billing email may carry the Terms PDF: the hand-off admits up to
+12 MiB, and Postfix's default (10240000 bytes) would bounce a message near the API's 8 MiB attachment
+limit. Anything else: stop and ask.
 
 ### H2. Country files
 
@@ -587,18 +593,25 @@ create either file by hand (the kit's section says why). After a release that ch
 ### H3. The egress proxy
 
 The API keeps `IPAddressDeny=any`. In hosted mode its launcher sends every https call through the
-loopback proxy `127.0.0.1:3180`, which lets through only NETOPIA's two sandbox hosts and Quaderno
-sandbox account hosts (`deploy/preview-auth-dev/v1/README.md` "Hosted egress"). systemd cannot allow a
+loopback proxy `127.0.0.1:3180`, which lets through only NETOPIA's two sandbox hosts and the owner's one
+Quaderno sandbox account (`deploy/preview-auth-dev/v1/README.md` "Hosted egress"). systemd cannot allow a
 host name, and these services change addresses, so the proxy decides by name and refuses any inside
-address a name resolves to. Install the one file, the unit and the API's ordering drop-in:
+address a name resolves to. It admits one Quaderno sandbox account only, the owner's: `QACCOUNT` is
+its label, the part before `.sandbox-quadernoapp.com` in the account's API address (step H7 writes the
+same account into `api.env`; keep `QACCOUNT` set in this shell). Install the one file, the unit and the
+API's ordering drop-in:
 
 ```sh
+read -r -p 'Quaderno sandbox account label: ' QACCOUNT
 ( set -euo pipefail
   SRC="$CAPI/dialectical-engine/deploy/preview-auth-dev/v1"; EG=/opt/debateai-v3-preview/operator/egress-v1
   ss -ltnH 'sport = :3180' | grep -q . && { echo "port 3180 is taken: stop"; exit 1; }
   install -d -o root -g root -m 0755 "$EG"
   install -o root -g root -m 0644 "$SRC/egress-proxy.mjs" "$EG/egress-proxy.mjs" && cmp "$SRC/egress-proxy.mjs" "$EG/egress-proxy.mjs"
-  install -o root -g root -m 0644 "$SRC/debateai-preview-egress.service" /etc/systemd/system/debateai-preview-egress.service
+  printf '%s\n' "$QACCOUNT" | grep -qxE '[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?'
+  sed "s/@QUADERNO_ACCOUNT@/$QACCOUNT/" "$SRC/debateai-preview-egress.service" > /etc/systemd/system/debateai-preview-egress.service
+  chmod 0644 /etc/systemd/system/debateai-preview-egress.service
+  grep -q -- "--quaderno-account $QACCOUNT\$" /etc/systemd/system/debateai-preview-egress.service
   install -d -o root -g root -m 0755 /etc/systemd/system/debateai-preview-api.service.d
   printf '[Unit]\nWants=debateai-preview-egress.service\nAfter=debateai-preview-egress.service\n' > /etc/systemd/system/debateai-preview-api.service.d/60-hosted-egress.conf
   systemctl daemon-reload
@@ -622,14 +635,15 @@ one `OPENED` line for `secure-sandbox.netopia-payments.com` and one `HOST_REFUSE
 
 If an update of `egress-proxy.mjs` comes with a release, install it the same way and
 `systemctl restart debateai-preview-egress.service`. Known gap: every loopback process can reach the
-proxy (the runner too); the host list confines it to the two sandboxes.
+proxy (the runner too); the host list confines it to NETOPIA's sandbox and the one Quaderno sandbox
+account.
 
 ### H4. Caddy: NETOPIA's notify message past the basic-auth gate
 
 NETOPIA posts each payment message to `https://v3-preview.dezbatere.ro/api/v1/billing/netopia/notify`
 (the website's `/api` proxy in front of the API's route). NETOPIA has no basic-auth password, so that
 one POST must pass the gate; everything else stays behind it. In `/etc/caddy/Caddyfile` (keep a copy
-first), inside the preview's site block, add the named matcher and its `handle`, and move the site's
+first: H1 kept `$S/Caddyfile.before-hosted`), inside the preview's site block, add the named matcher and its `handle`, and move the site's
 existing `basic_auth` and `reverse_proxy` blocks, unchanged, into a plain `handle` after it. The
 notify `handle` proxies to the same upstream with the same `header_up` lines as the existing
 `reverse_proxy` block, copied unchanged (a missing edge line makes the website refuse the hop):
@@ -655,7 +669,6 @@ always runs for everything else. A `basic_auth` left outside the second `handle`
 notify message. Then:
 
 ```sh
-cp -a /etc/caddy/Caddyfile "$S/Caddyfile.before-hosted"
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile && systemctl reload caddy && echo "caddy reloaded"
 for M in GET POST; do printf '%s / ' "$M"; curl -s -o /dev/null -w '%{http_code}\n' -X "$M" https://v3-preview.dezbatere.ro/; done
 printf 'GET notify '; curl -s -o /dev/null -w '%{http_code}\n' https://v3-preview.dezbatere.ro/api/v1/billing/netopia/notify
@@ -666,7 +679,7 @@ printf 'POST notify '; curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Cont
 The first four must print `401` (the gate). The last must NOT be `401`: `404` while the API is still
 in local mode (the route is not served), `503` once it runs hosted with NETOPIA's settings (an
 unsigned message: "try again", logged once as `billing.notice.unverified` with
-`NOTICE_HEADER_MISSING`). To undo: put the copy back and reload.
+`NOTICE_HEADER_MISSING`). To undo: put `$S/Caddyfile.before-hosted` back and reload.
 
 ### H5. The key files (the owner, by hand; never printed, never on a command line)
 
@@ -702,7 +715,10 @@ public key. To replace a key later, remove that one file first, then write it ag
 This is "Publishing a new register version on the preview" above, steps 1 to 6, with three changes.
 
 **Step 1, the plan, carries the owner's inputs** (the values below are the suggested ones: use the
-owner's):
+owner's). The kit rebuilds the answer checker and role rotation from the plan, never from the base: if
+the live version runs the DeepSeek checker or rotation off, add the same `--checker deepseek
+--deepseek-enabled-on-gate yes` or `--role-rotation off` here (and in H7), or the delta shows those rows
+changing back. The call-concurrency row is carried from the base as always:
 
 ```sh
 HB='{"billing":"off","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
@@ -712,7 +728,8 @@ rel native-plan --operation plan --from "$S/native-plan.before.json" --source-ma
 **Step 2, the owner's review.** Besides what the release itself changes, expect exactly:
 - `storyCostEnvelopePolicy` added (the story's money row: $0.05 per story, 20% over at most);
 - `costEnvelopePolicy` changed, reason `owner-hosted-billing-input`: the two ceilings become the
-  owner's values; every other member (the band 9500 / 11500 / 1 among them) stays;
+  owner's values and `provisional_reason` names them as the preview's sandbox ceilings (`provisional`
+  stays `true`); every other member (the band 9500 / 11500 / 1 among them) stays;
 - `admissionPolicy` changed, reason `owner-hosted-billing-input`: `ask_room_reads` added, nothing else;
 - `nodeRuntimeVersion`: its source reference only.
 
@@ -732,7 +749,7 @@ from step 3 (the POS signature is not a secret: NETOPIA prints it in its admin):
   printf '%s\n' 'GEOIP_COUNTRY_DB_PATH=/var/lib/debateai-geoip/dbip-country-lite.mmdb' 'TOR_EXIT_LIST_PATH=/var/lib/debateai-geoip/tor-exit-list.txt' \
     'NETOPIA_API_BASE_URL=https://secure-sandbox.netopia-payments.com' "NETOPIA_API_KEY_PATH=$B/netopia-api-key" "NETOPIA_IPN_KEYS_PATH=$B/netopia-ipn-keys.pem" >> "$E/api.env"
   echo "api.env and runner.env: version $V, hosted" )
-read -r -p 'NETOPIA sandbox POS signature: ' POS && [ -n "$POS" ] && printf 'NETOPIA_POS_SIGNATURE=%s\n' "$POS" >> "$E/api.env"; unset POS
+[ "$(grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' "$E/api.env")" = 1 ] && [ "$(grep -c '^NETOPIA_POS_SIGNATURE=' "$E/api.env")" = 0 ] && read -r -p 'NETOPIA sandbox POS signature: ' POS && [ -n "$POS" ] && printf 'NETOPIA_POS_SIGNATURE=%s\n' "$POS" >> "$E/api.env"; unset POS
 grep -oE '^[A-Z_][A-Z0-9_]*=' "$E/api.env" | sort | uniq -d   # must print nothing
 ```
 
@@ -770,16 +787,20 @@ short debate as usual: it must finish as it did in local mode.
 
 ### H7. Billing on
 
-1. **The plan**, the same command with `"billing":"on"`:
+1. **The plan**, the same command with `"billing":"on"`. Every output of this second publication
+   (plans, proposal, receipts, launch plans) goes into a new folder `$ART2`, because the tool never
+   overwrites a file and the launch plans' names are fixed: in steps 1 to 6 read `$ART2` wherever an
+   output is written or read, and keep `$ART` only for the source manifests and the UI build. Run the
+   publish sequence's preamble again first (it archives the provider-only verify plan as
+   `$S/native-plan.before.json`; H1's `native-plan.before-hosted.json` stays untouched).
 
    ```sh
+   ART2="$ART-billing-on"; ( set -euo pipefail; [ ! -e "$ART2" ]; install -d -o root -g root -m 0755 "$ART2"; echo "created $ART2" )
    HB='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
-   rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --hosted-billing "$HB" --out "$ART/native-plan-plan.json"
+   rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --hosted-billing "$HB" --out "$ART2/native-plan-plan.json"
    ```
 
-   Here `$S/native-plan.before.json` is the archive the publish sequence's preamble wrote again
-   (it names the provider-only version). Use new output names if the H6 files are still in `$ART`
-   (the tool never overwrites a file). The owner's review expects `billingPolicy` changed (reason
+   The owner's review expects `billingPolicy` changed (reason
    `owner-hosted-billing-input`: `enabled` becomes `true` and `"US"` joins `withdrawal_countries`, on
    this sandbox host only) and `nodeRuntimeVersion`'s source reference; with the same ceilings, nothing
    else.
@@ -789,12 +810,13 @@ short debate as usual: it must finish as it did in local mode.
 
    ```sh
    ( set -euo pipefail
-     [ -n "${V:-}" ]
+     [ -n "${V:-}" ] && [ -n "${QACCOUNT:-}" ]
+     [ "$(grep -cE '^(QUADERNO_|SMARTBILL_|OWNER_REPORT_EMAIL_PATH=)' "$E/api.env")" = 0 ]
      for F in "$E/api.env" "$E/runner.env"; do sed -i "s/^REGISTER_VERSION=.*/REGISTER_VERSION=$V/" "$F"; [ "$(grep -c "^REGISTER_VERSION=$V\$" "$F")" = 1 ]; done
-     printf '%s\n' "QUADERNO_API_KEY_PATH=$B/quaderno-api-key" 'SMARTBILL_API_BASE_URL=https://smartbill.invalid' "SMARTBILL_CREDENTIALS_PATH=$B/smartbill-credentials" \
+     printf '%s\n' "QUADERNO_API_BASE_URL=https://$QACCOUNT.sandbox-quadernoapp.com/api" "QUADERNO_API_KEY_PATH=$B/quaderno-api-key" \
+       'SMARTBILL_API_BASE_URL=https://smartbill.invalid' "SMARTBILL_CREDENTIALS_PATH=$B/smartbill-credentials" \
        'SMARTBILL_SERIES=DBAI' "OWNER_REPORT_EMAIL_PATH=$B/owner-report-email" >> "$E/api.env"
      echo "api.env and runner.env: version $V, billing settings added" )
-   read -r -p 'Quaderno sandbox API address (https://<account>.sandbox-quadernoapp.com/api): ' QA && [ -n "$QA" ] && printf 'QUADERNO_API_BASE_URL=%s\n' "$QA" >> "$E/api.env"; unset QA
    grep -oE '^[A-Z_][A-Z0-9_]*=' "$E/api.env" | sort | uniq -d   # must print nothing
    ```
 

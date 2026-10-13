@@ -11,7 +11,9 @@ Wants=network-online.target
 Type=simple
 # Its own throwaway identity: it reads no key, no environment file and no database.
 DynamicUser=yes
-ExecStart=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/egress-v1/egress-proxy.mjs
+# @QUADERNO_ACCOUNT@ is replaced at install by the one Quaderno sandbox account's label (https://<label>.sandbox-quadernoapp.com/api);
+# left as it is, the proxy refuses to start.
+ExecStart=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/egress-v1/egress-proxy.mjs --quaderno-account @QUADERNO_ACCOUNT@
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=10
