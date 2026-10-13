@@ -7,6 +7,7 @@ import { TypedDomainError, type DebateRole, type ModelStrength } from "@debateai
 import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
 import {
   BUNDLED_MODEL_SCORECARD_SOURCE_REF,
+  DEBATE_SHAPE_FORMULA_VERSION,
   debateShapeSiteCounts,
   readBundledModelScorecard,
   readEngineVersion,
@@ -430,28 +431,33 @@ const admittedStructureSchema = z.object({
 
 const SYNTHESIS_ROLES = Object.freeze(["ANSWER_WRITER", "ANSWER_CHECKER"] as const);
 
-function malformedDebateShape(): TypedDomainError {
-  return new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, "The admitted structural basis carries a malformed debate shape");
+/** The strict reader's own refusal code (`parseCostEnvelopeBasis`); any other error is not a receipt refusal. */
+const COST_ENVELOPE_UNRESOLVED = "RUN_COST_ENVELOPE_UNRESOLVED" as const;
+
+function malformedDebateShape(reason: string): TypedDomainError {
+  return new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, `The admitted structural basis carries a malformed debate shape: ${reason}`);
 }
 
 /**
  * Debate shape (spec 2026-10-12 §3.6, PF7): the run's shaped receipt, read ONLY through the strict receipt parser
- * (`parseCostEnvelopeBasis`), never through a loose reader of this module's own. A basis with no shape member is
- * today's receipt (null). A shape member the parser refuses is an engine fault, never read as today's.
+ * (`parseCostEnvelopeBasis`), never through a loose reader of this module's own. A receipt is shaped when it carries
+ * a shape member OR names the shape formula, so a shape-formula receipt with its member missing is refused by the
+ * parser, never priced as today's. A basis with neither is today's receipt (null). The parser's reason is kept.
  */
 function admittedShapeOf(basis: Readonly<Record<string, unknown>>): Readonly<{
   shape: DebateShapeCeilingInput;
   counts: DebateShapeSiteCounts;
 }> | null {
-  if (basis.shape === undefined) return null;
+  if (basis.shape === undefined && basis.formula_version !== DEBATE_SHAPE_FORMULA_VERSION) return null;
   let parsed: CostEnvelopeBasis;
   try {
     parsed = parseCostEnvelopeBasis(basis);
-  } catch {
-    throw malformedDebateShape();
+  } catch (error) {
+    if (error instanceof TypedDomainError && error.code === COST_ENVELOPE_UNRESOLVED) throw malformedDebateShape(error.message);
+    throw error;
   }
   const shape = parsed.shape;
-  if (shape === undefined) throw malformedDebateShape();
+  if (shape === undefined) throw malformedDebateShape("the receipt carries no shape member");
   return Object.freeze({ shape, counts: debateShapeSiteCounts(shape, parsed.depth) });
 }
 
