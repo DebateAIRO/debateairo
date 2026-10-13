@@ -11,6 +11,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   PREVIEW_REVIEWED_PROVIDER_REFS,
   createPreviewBudgetRpcPort,
+  createPreviewBusyCoordinator,
   PreviewChargeBookedMax,
   PreviewGateUnavailable,
   PreviewModelCooling,
@@ -39,20 +40,29 @@ import {
   type PracticeLogLine
 } from "../../tools/preview-practice/practice-samples-log.js";
 import { stubVendorReply } from "../support/preview-gate-stubs.js";
-import { reportMarkdown } from "../../tools/preview-practice/practice-report.js";
 import { issueListFromParseError, recheckReply, replyContentOf, callFamilyOf } from "../../tools/preview-practice/practice-lanes.js";
 import { capReplyText, redactKeyShapes, reportableReplyText } from "../../tools/preview-practice/practice-redaction.js";
 import { parsePracticeRegisterExport } from "../../tools/preview-practice/practice-register-import.js";
-import { assertOutsideRepository } from "../../tools/preview-practice/practice-report.js";
+import { assertOutsideRepository, debateReport, reportMarkdown } from "../../tools/preview-practice/practice-report.js";
+import type { PracticeDebateResult } from "../../tools/preview-practice/practice-debate.js";
+import {
+  formatPracticeCallConcurrency,
+  parsePracticeCallConcurrency,
+  PracticeCallStats,
+  practiceParallelBlock
+} from "../../tools/preview-practice/practice-parallel.js";
+import { parsePracticeArgs, runPractice } from "../../tools/preview-practice/practice.js";
+import { createCallScheduler } from "../../apps/runner/src/call-scheduler.js";
+import { applyPreviewGateCapacities } from "../../apps/runner/src/call-lane-gateway.js";
 import {
   assertGateStatusAllowsPractice,
+  PracticeRefusal,
   parseGateStatus,
   parsePracticeSettings,
   practiceSocketsFromEnvironment
 } from "../../tools/preview-practice/practice-settings.js";
 import { latencySummary, percentile, practiceVerdict, type PracticeVerdictInput } from "../../tools/preview-practice/practice-verdict.js";
 import { parsePracticeLevels } from "../../tools/preview-practice/practice-levels.js";
-import { parsePracticeArgs, runPractice } from "../../tools/preview-practice/practice.js";
 
 const CLEAN: PracticeVerdictInput = Object.freeze({
   harnessError: null, completed: true, servedAnswer: true, storyOutcome: "READY", formatFailures: 0, failedCalls: 0,
@@ -1062,6 +1072,156 @@ describe("practice report: busy waits per model", () => {
     expect(report.verdict).toBe("NOT_PROVEN");
     expect(report.reasons).toContain("MODEL_BUSY:glm");
     expect(report.busyByModel.glm).toMatchObject({ recovered: false, gaveUp: true });
+  });
+});
+
+/*
+ * Parallel AI calls (spec 2026-10-12, plan Task 14): the debate practice can be given the call-concurrency setting on
+ * the command line (never written to any register), and its report shows how many calls really went at once, how long
+ * calls waited for a slot, each gate's slots as read at the start, and each model's busy probes.
+ */
+describe("practice debate: --call-concurrency and the parallel stats", () => {
+  it("reads <perDebate>/<perModelPerDebate>/<vendor>=<n>,… into the register's policy, and writes it back the same way", () => {
+    const policy = parsePracticeCallConcurrency("12/3/default=50,deepinfra=150,anthropic=50");
+    expect(policy).toEqual({ perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50, deepinfra: 150, anthropic: 50 } });
+    expect(formatPracticeCallConcurrency(policy)).toBe("12/3/default=50,deepinfra=150,anthropic=50");
+    expect(parsePracticeCallConcurrency("1/1/default=1")).toEqual({ perDebate: 1, perModelPerDebate: 1, perModelPerRunner: { default: 1 } });
+    expect(parsePracticeCallConcurrency("64/16/deepinfra=1000,default=1000").perModelPerRunner).toEqual({ deepinfra: 1000, default: 1000 });
+    // The default is always written first.
+    expect(formatPracticeCallConcurrency(parsePracticeCallConcurrency("2/1/deepinfra=9,default=3"))).toBe("2/1/default=3,deepinfra=9");
+  });
+
+  it("refuses every other form (PRACTICE_FLAG_VALUE_INVALID), the register's bounds included", () => {
+    for (const text of ["", "12/3", "12/3/default=50/4", "0/3/default=50", "65/3/default=50", "12/0/default=50", "12/17/default=50",
+      "12/3/deepinfra=150", "12/3/default=0", "12/3/default=1001", "12/3/default=50,default=60", "12/3/Default=50",
+      "12/3/default=5x", "12/ 3/default=50", "1.5/3/default=50", "012/3/default=50", "+12/3/default=50", "12/3/default=50,",
+      "12/3/default", "12/3/default==50", "12/3/=50,default=1", "1e1/3/default=50", "12/3/default=-1",
+      // Final review T14: a "__proto__" pair is a key the register's parser sees (and refuses), never a silent no-op.
+      "12/3/__proto__=5,default=50", "12/3/default=50,__proto__=5"]) {
+      let caught: unknown = null;
+      try { parsePracticeCallConcurrency(text); } catch (error) { caught = error; }
+      expect(caught, text).toBeInstanceOf(PracticeRefusal);
+      expect((caught as PracticeRefusal).code, text).toBe("PRACTICE_FLAG_VALUE_INVALID");
+    }
+  });
+
+  it("the command takes the flag in debate mode, refuses a bad value before anything is read or sent, and refuses it in formats mode", async () => {
+    expect(parsePracticeArgs(["debate", "--call-concurrency", "12/3/default=50"]).flags.get("--call-concurrency")).toBe("12/3/default=50");
+    for (const argv of [["debate", "--call-concurrency", "0/3/default=50"], ["formats", "--call-concurrency", "12/3/default=50"]]) {
+      const out = mkdtempSync(join(tmpdir(), "practice-cc-"));
+      try {
+        // No socket, no acknowledgement, no settings file: the refusal comes first.
+        const result = await runPractice([...argv, "--out", join(out, "report")], {}, { log: () => undefined });
+        expect(result.report.verdict, argv.join(" ")).toBe("HARNESS_ERROR");
+        expect(result.report.reasons, argv.join(" ")).toEqual(["HARNESS_ERROR:PRACTICE_FLAG_VALUE_INVALID"]);
+      } finally {
+        rmSync(out, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("the composition takes the flag's policy as it is, else the imported register's row (one at a time when absent); the debate passes it on", () => {
+    const composition = readFileSync(new URL("../../tools/preview-practice/practice-runner-composition.ts", import.meta.url), "utf8");
+    expect(composition).toMatch(/input\.callConcurrency\s*\?\?\s*effectiveCallConcurrency\(await readCallConcurrencyPolicy\(pool, environment\.REGISTER_VERSION\)/u);
+    const debate = readFileSync(new URL("../../tools/preview-practice/practice-debate.ts", import.meta.url), "utf8");
+    expect(debate).toMatch(/callConcurrency: input\.callConcurrency/u);
+    const command = readFileSync(new URL("../../tools/preview-practice/practice.ts", import.meta.url), "utf8");
+    expect(command).toMatch(/parsePracticeCallConcurrency\(/u);
+  });
+
+  it("counts the lanes' calls, each gate's slots as read at the start (an unread gate runs at 1 slot), and each model's busy probes", async () => {
+    const stats = new PracticeCallStats();
+    stats.noteRegisterRow({ state: "ABSENT" });
+    const policy = parsePracticeCallConcurrency("4/2/default=50");
+    const scheduler = stats.observeScheduler(createCallScheduler({ policy }));
+    stats.notePolicy(policy, "REGISTER");
+    await applyPreviewGateCapacities({ scheduler, log: stats.gateCapacityLog, gates: [
+      { gate: "deepinfra", remaining: async () => ({ maxConcurrentCalls: 4 }) as never },
+      { gate: "anthropic", remaining: async () => { throw new Error("socket gone"); } }
+    ] });
+    const lane = scheduler.openLane("run-1");
+    const gates: Array<() => void> = [];
+    const hold = () => new Promise<void>((resolve) => { gates.push(resolve); });
+    const subject = { model: "glm", vendor: "deepinfra", gate: "deepinfra", priority: "PANEL" as const };
+    const calls = [lane.run(subject, hold), lane.run(subject, hold), lane.run({ ...subject, model: "haiku", vendor: "anthropic", gate: "anthropic" }, hold)];
+    await Promise.resolve();
+    expect(gates).toHaveLength(3);
+    for (const release of gates) release();
+    await Promise.all(calls);
+    lane.close();
+    const busy = stats.observeBusy(createPreviewBusyCoordinator());
+    expect(await busy.refusedBusy("glm", undefined)).toBe("PROBE");
+    const waiter = busy.refusedBusy("glm", undefined);
+    busy.probeOutcome("glm", "ANSWERED");
+    expect(await waiter).toBe("RESEND");
+    expect(await busy.refusedBusy("glm", undefined)).toBe("PROBE");
+    const summary = stats.summary();
+    expect(summary).toMatchObject({
+      setting: "4/2/default=50", source: "REGISTER", registerRow: "ABSENT",
+      gateSlotsAtStart: { deepinfra: { slots: 4, read: true }, anthropic: { slots: 1, read: false } },
+      lanes: 1, calls: 3, peakInFlight: 3, peakByModel: { glm: 2, haiku: 1 },
+      peakByGate: { deepinfra: 2, anthropic: 1 }, busyProbesByModel: { glm: 2 }
+    });
+    expect(Object.keys(summary.waitedMsByModel).sort()).toEqual(["glm", "haiku"]);
+  });
+
+  it("the report block from lane stats: peaks are the highest, waits and calls add up, waits in whole milliseconds", () => {
+    const block = practiceParallelBlock({
+      policy: parsePracticeCallConcurrency("12/3/default=50,deepinfra=150,anthropic=50"), source: "FLAG", registerRow: null,
+      gateSlotsAtStart: { deepinfra: { slots: 6, read: true }, anthropic: { slots: 1, read: false } },
+      lanes: [
+        { running: 0, heldBack: 0, peakInFlight: 5, peakByModel: { glm: 3, haiku: 1 }, waitedMsByModel: { glm: 1200.4, haiku: 0.2 }, calls: 40 },
+        { running: 0, heldBack: 0, peakInFlight: 2, peakByModel: { glm: 1, qwen: 2 }, waitedMsByModel: { glm: 100.3, qwen: 7.6 }, calls: 3 }
+      ],
+      scheduler: { peakByGate: { deepinfra: 6, anthropic: 1 }, peakByModel: { glm: 3 } },
+      busyProbesByModel: { glm: 1 }
+    });
+    expect(block).toEqual({
+      setting: "12/3/default=50,deepinfra=150,anthropic=50", source: "FLAG", registerRow: null,
+      gateSlotsAtStart: { deepinfra: { slots: 6, read: true }, anthropic: { slots: 1, read: false } },
+      lanes: 2, calls: 43, peakInFlight: 5, peakByModel: { glm: 3, haiku: 1, qwen: 2 },
+      waitedMsByModel: { glm: 1301, haiku: 0, qwen: 8 }, peakByGate: { deepinfra: 6, anthropic: 1 }, busyProbesByModel: { glm: 1 }
+    });
+    // No lane (the ask was refused): the setting and the gates' slots are still reported.
+    expect(practiceParallelBlock({ policy: parsePracticeCallConcurrency("1/1/default=1000"), source: "REGISTER", registerRow: "ABSENT",
+      gateSlotsAtStart: {}, lanes: [], scheduler: { peakByGate: {}, peakByModel: {} }, busyProbesByModel: {} }))
+      .toMatchObject({ lanes: 0, calls: 0, peakInFlight: 0, peakByModel: {}, waitedMsByModel: {} });
+  });
+
+  it("the debate report carries the block, and its summary says it in plain words (an unread gate named as running at 1 slot)", () => {
+    const parallel = practiceParallelBlock({
+      policy: parsePracticeCallConcurrency("12/3/default=50,deepinfra=150,anthropic=50"), source: "FLAG", registerRow: null,
+      gateSlotsAtStart: { deepinfra: { slots: 6, read: true }, anthropic: { slots: 1, read: false } },
+      lanes: [{ running: 0, heldBack: 0, peakInFlight: 5, peakByModel: { glm: 3 }, waitedMsByModel: { glm: 12_400 }, calls: 40 }],
+      scheduler: { peakByGate: { deepinfra: 6, anthropic: 1 }, peakByModel: { glm: 3 } },
+      busyProbesByModel: { glm: 2 }
+    });
+    const none = { before: null, after: null };
+    const result = {
+      register: null, questionId: "ro", depth: 1,
+      admission: { admitted: true, refusalCode: null, panel: [], satOut: [], rotation: null },
+      run: { runId: "r", workItemOutcome: "COMPLETED", failureCode: null,
+        answer: { served: true, terminal: "SERVED", serveState: null, verdictState: null, conditionMarks: [] },
+        story: { outcome: "READY", failureCode: null } },
+      byModelAndSite: [], probes: [], failures: [], formatFailures: 0, callsByModel: {}, answersByModel: {}, jsonRepairs: [],
+      failedCalls: 0, refusedCalls: 0, remaining: { deepinfra: none, anthropic: none }, seconds: { admission: 1, debate: 2 },
+      parallel
+    } as unknown as PracticeDebateResult;
+    const report = debateReport({ result, observer: new PracticeGateObserver(), startedAt: new Date(0), finishedAt: new Date(1_000) });
+    expect(report.parallel).toEqual(parallel);
+    const text = reportMarkdown(report);
+    expect(text).toContain("Calls at once");
+    expect(text).toContain("12/3/default=50,deepinfra=150,anthropic=50 (from --call-concurrency)");
+    expect(text).toContain("- deepinfra gate: 6 slots, read from the gate at the start");
+    expect(text).toContain("- anthropic gate: could not be read at the start, so it ran with 1 slot");
+    expect(text).toContain("most calls at once in the debate: 5");
+    expect(text).toContain("glm: most at once 3, waited for a slot 12.4 s in all, busy probes 2");
+    expect(text).toContain("most calls at once through each gate: deepinfra 6, anthropic 1");
+    // The register's own setting, and the register with no row.
+    const fromRegister = reportMarkdown({ ...report, parallel: { ...parallel, source: "REGISTER", registerRow: "ABSENT", setting: "1/1/default=1000" } });
+    expect(fromRegister).toContain("1/1/default=1000 (the register has no call-concurrency row: one call at a time)");
+    const setRow = reportMarkdown({ ...report, parallel: { ...parallel, source: "REGISTER", registerRow: "SET" } });
+    expect(setRow).toContain("(from the register's call-concurrency row)");
   });
 });
 

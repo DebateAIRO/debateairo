@@ -631,23 +631,24 @@ describe("JSON mode stays on the story calls: no debate step asks for it", () =>
     classifyContent: () => parsed, buildRepairPacket: () => RESULT_REQUEST.packet });
   const story = { ...RESULT_REQUEST, lane: "story" as const, callSiteKey: "STORY:STORYTELLER:1", role: "SYNTHESIZER" as const,
     preferredResponseFormat: "json_object" as const };
-  function policySees(model: string, request: ProviderCallRequest): ProviderCallRequest {
+  // The policy sends after the busy coordinator admits the call (parallel calls §3.3), one async step later: await it.
+  async function policySees(model: string, request: ProviderCallRequest): Promise<ProviderCallRequest> {
     const seen: ProviderCallRequest[] = [];
     const gateway = withPreviewProviderCallPolicy({ call: async (sent) => { seen.push(sent); return {} as never; } }, parse(MULTI)!, { model });
-    void gateway.call(request);
+    await gateway.call(request);
     expect(seen).toHaveLength(1);
     return seen[0]!;
   }
 
-  it("the preview policy adds no JSON preference to any request, on any row", () => {
+  it("the preview policy adds no JSON preference to any request, on any row", async () => {
     for (const model of [GLM, DEEPSEEK, MIMO, QWEN, HAIKU]) {
       for (const role of ["JUDGE", "SYNTHESIZER", "EVALUATOR"] as const) {
-        expect(Object.hasOwn(policySees(model, structured(role)), "preferredResponseFormat"), `${model} ${role}`).toBe(false);
+        expect(Object.hasOwn(await policySees(model, structured(role)), "preferredResponseFormat"), `${model} ${role}`).toBe(false);
       }
-      expect(Object.hasOwn(policySees(model, RESULT_REQUEST), "preferredResponseFormat"), model).toBe(false);
-      expect(Object.hasOwn(policySees(model, { ...structured("JUDGE"), lane: "evaluator" }), "preferredResponseFormat"), model).toBe(false);
+      expect(Object.hasOwn(await policySees(model, RESULT_REQUEST), "preferredResponseFormat"), model).toBe(false);
+      expect(Object.hasOwn(await policySees(model, { ...structured("JUDGE"), lane: "evaluator" }), "preferredResponseFormat"), model).toBe(false);
       // The story calls ask for themselves, unchanged.
-      expect(policySees(model, story).preferredResponseFormat).toBe("json_object");
+      expect((await policySees(model, story)).preferredResponseFormat).toBe("json_object");
     }
   });
 

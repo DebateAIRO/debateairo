@@ -88,6 +88,11 @@ export type GateOverride = Readonly<{ content: string }> | Readonly<{ unbilled: 
   /** Gate v4's own refusals: this model cooling off (COOLING, with retry_after 60), or the gate halted (HALTED). */
   | Readonly<{ gateRefuses: "MODEL_COOLING" | "AUTHORITY_HALTED" }>
   /**
+   * The gate's STOPPED refusal for this one call while the gate itself stays active (its /remaining says so): the runner
+   * reads it as the run's money ceiling, a spend stop (parallel calls, Task 11 fix round 1).
+   */
+  | Readonly<{ gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" }>
+  /**
    * Slow answer (owner ruling 2026-10-12): the call was sent, then its vendor connection failed or ran past the gate's
    * 1,200 s; the gate booked its whole reservation as its charge and stays active (409 PROVIDER_CHARGE_BOOKED_MAX).
    */
@@ -261,6 +266,13 @@ export function stubVendorReply(provider: GateProvider, model: string, content: 
 
 /* ------------------------------------------------------------------ the gates */
 
+/**
+ * When a /complete request reached its gate and when the gate answered it (performance.now() milliseconds), in arrival
+ * order: the parallel-calls proof that calls overlap (docs/superpowers/specs/2026-10-12-parallel-calls-design.md §2.1).
+ */
+export type GateArrival = Readonly<{ provider: GateProvider; model: string; kind: GateRequestKind | "UNKNOWN"; at: number }>
+  & { answeredAt: number | null };
+
 /** How many /complete requests the doubles held at once: now, the most ever, and the most per gate and per model. */
 export type GateConcurrency = {
   now: number;
@@ -272,8 +284,10 @@ export type GateConcurrency = {
 export type PreviewGateStubs = Readonly<{
   /** The /complete requests in flight at once (they overlap only when `delayMs` holds them). */
   concurrency: Readonly<GateConcurrency>;
-  /** Every /complete request, in arrival order, with how it was answered. */
+  /** Every /complete request, in the order it was ANSWERED, with how it was answered. */
   requests: GateRecord[];
+  /** Every /complete request, in the order it ARRIVED, with when it arrived and when it was answered. */
+  arrivals: readonly GateArrival[];
   /** Every /remaining read, in arrival order. */
   remainingReads: GateRemainingRead[];
   /** The DeepInfra gate's halt (only ever moves with `debate.deepInfraHaltAt`). */
@@ -316,6 +330,7 @@ export async function startPreviewGateStubs(input: Readonly<{
   const holding = { deepinfra: 0, anthropic: 0 } as Record<GateProvider, number>;
   const holdingByModel = new Map<string, number>();
   const requests: GateRecord[] = [];
+  const arrivals: GateArrival[] = [];
   const remainingReads: GateRemainingRead[] = [];
   const queues = new Map<string, ("OK" | "UNBILLED")[]>(Object.entries(input.probeScripts ?? {}).map(([model, steps]) => [model, [...steps]]));
   const halt: GateHalt = { unbilledReleases: 0, haltedAt: null, firstStoppedAt: null };
@@ -371,8 +386,10 @@ export async function startPreviewGateStubs(input: Readonly<{
         let kind: GateRequestKind | "UNKNOWN";
         try { kind = classifyGateRequest(chat); } catch { kind = "UNKNOWN"; }
         const seen: GateRequest = Object.freeze({ provider, model, kind, body });
+        const arrival: GateArrival = { provider, model, kind, at: performance.now(), answeredAt: null };
+        arrivals.push(arrival);
         const delay = input.delayMs?.(seen) ?? 0;
-        if (delay <= 0) { answer(seen, chat); return; }
+        if (delay <= 0) { answer(seen, chat, arrival); return; }
         concurrency.now += 1;
         holding[provider] += 1;
         holdingByModel.set(model, (holdingByModel.get(model) ?? 0) + 1);
@@ -383,11 +400,12 @@ export async function startPreviewGateStubs(input: Readonly<{
           concurrency.now -= 1;
           holding[provider] -= 1;
           holdingByModel.set(model, holdingByModel.get(model)! - 1);
-          answer(seen, chat);
+          answer(seen, chat, arrival);
         }, delay);
       });
-      const answer = (seen: GateRequest, chat: string): void => {
+      const answer = (seen: GateRequest, chat: string, arrival: GateArrival): void => {
         // Answered now (at once, or after the scenario's delay); `provider` is this socket's.
+        arrival.answeredAt = performance.now();
         const { model, kind } = seen;
         const json = (status: number, payload: string) => response.writeHead(status, { "content-type": "application/json" }).end(payload);
         const record = (answer: GateAnswer): number => {
@@ -438,6 +456,7 @@ export async function startPreviewGateStubs(input: Readonly<{
             if (override.gateRefuses === "MODEL_COOLING") { coolingRefusal(); return; }
             if (override.gateRefuses === "AUTHORITY_HALTED") { record("HALTED"); refuse("AUTHORITY_HALTED"); return; }
             if (override.gateRefuses === "PROVIDER_ERROR_UNBILLED") { record("ERROR_UNBILLED"); refuse("PROVIDER_ERROR_UNBILLED"); return; }
+            if (override.gateRefuses === "PREVIEW_TEST_AUTHORITY_STOPPED") { record("STOPPED"); refuse("PREVIEW_TEST_AUTHORITY_STOPPED"); return; }
             if (override.gateRefuses === "PROVIDER_CHARGE_BOOKED_MAX") { record("BOOKED_MAX"); refuse("PROVIDER_CHARGE_BOOKED_MAX"); return; }
             record("GATE_REFUSED"); refuse(override.gateRefuses); return;
           }
@@ -464,6 +483,7 @@ export async function startPreviewGateStubs(input: Readonly<{
   const sockets = Object.freeze({ deepinfra: await socketFor("deepinfra"), anthropic: await socketFor("anthropic") });
   return Object.freeze({
     requests,
+    arrivals,
     remainingReads,
     halt,
     cooling,

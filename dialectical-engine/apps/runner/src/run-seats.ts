@@ -500,14 +500,21 @@ export interface SeatCaller {
   /** The member `callSeat` would call first for this call site, or null when none is eligible. */
   plan(seat: RunSeat, callSiteKey: string, options?: SeatPlanOptions): SeatMember | null;
   callSeat<T>(input: SeatCall<T>): Promise<SeatAnswer<T>>;
-  /** The routes that answered this role's calls, in call order. */
+  /**
+   * The routes that answered this role's calls, one per answer, sorted
+   * (parallel calls, O7: never the order the calls happened to finish in).
+   */
   answered(role: DebateRole): readonly string[];
   /**
-   * Every switch of this run pass: the ones made at claim, then the ones made
-   * during calls or through the ledger — exactly what this pass announces.
+   * Every switch of this run pass — exactly what this pass announces: the ones
+   * made at claim, in claim order, then the ones made during calls or through
+   * the ledger, those sorted by (role, seat index, call-site key) (O7).
    */
   switches(): readonly BackupSwitchRecord[];
-  /** A16c: every call a member answered in place of the one the assignment planned (see `BackupAnswer`). */
+  /**
+   * A16c: every call a member answered in place of the one the assignment
+   * planned (see `BackupAnswer`), sorted by (role, seat index, call-site key) (O7).
+   */
   backupAnswers(): readonly BackupAnswer[];
 }
 
@@ -724,15 +731,26 @@ export function plannedSeatSlot(
  * site — the pinned seat's own share, so a runner-up absent at claim still owns
  * its sites — is a `BackupAnswer`, unless the call's fairness rule (`fair`)
  * barred the planned member.
+ *
+ * Parallel calls (owner ruling O7) — calls on one seat may be in flight
+ * together. Two of them can fail on the same member at once: the switch is
+ * recorded and announced ONCE per seat slot, by whichever call fails first; the
+ * other call still goes to the backup, but only after that one announcement has
+ * been awaited, so R4's "announced BEFORE the other member is called" holds for
+ * every call. The record lists come back sorted (`orderedRecords`), so what a
+ * pass saves never depends on which call finished first.
  */
 export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
   const answeredRefs = new Map<DebateRole, string[]>();
-  const switchRecords: BackupSwitchRecord[] = [...(options.claimSwitches ?? [])];
+  const claimSwitchRecords: readonly BackupSwitchRecord[] = Object.freeze([...(options.claimSwitches ?? [])]);
+  const switchRecords: BackupSwitchRecord[] = [];
   const backupAnswerRecords: BackupAnswer[] = [];
   const runId = options.runId ?? null;
-  // Pre-flight fix F12: why each downed slot went down, and which slots a switch record already names.
+  // Pre-flight fix F12: why each downed slot went down, and which slots a switch record already names —
+  // each with its announcement, settled either way (O7: a call that finds the slot already switched waits
+  // for that announcement; a failed announcement is the error of the call that made it, never this one's).
   const downFailures = new Map<string, Readonly<{ cause: BackupSwitchCause; callSiteKey: string }>>();
-  const switchedFrom = new Set<string>();
+  const switchedFrom = new Map<string, Promise<void>>();
   // The slot that ran each site's first sequence on this pass (DR-184-v5, above).
   const firstSlotAt = new Map<string, SeatSlot>();
   const always = (): boolean => true;
@@ -838,17 +856,20 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
           callSiteKey: failedKey
         });
         switchRecords.push(record);
-        switchedFrom.add(slotId(input.seat, from));
-        await options.onSwitch?.(record);
+        const announcement = (async () => { await options.onSwitch?.(record); })();
+        switchedFrom.set(slotId(input.seat, from), announcement.then(() => undefined, () => undefined));
+        await announcement;
       };
       // Pre-flight fix F12: a member marked down on a call its other member could
       // not take (a fairness rule barred it) has no switch record yet. The first
       // call that skips it IS the switch: record and announce it before the other
       // member answers, so no backup ever answers undisclosed.
       const skipped = members[0];
-      if (skipped !== undefined && skipped !== first && !switchedFrom.has(slotId(input.seat, skipped))) {
+      if (skipped !== undefined && skipped !== first) {
+        const announced = switchedFrom.get(slotId(input.seat, skipped));
         const downed = downFailures.get(slotId(input.seat, skipped));
-        if (downed !== undefined) await recordSwitch(skipped, first, downed.cause, downed.callSiteKey);
+        if (announced !== undefined) await announced;
+        else if (downed !== undefined) await recordSwitch(skipped, first, downed.cause, downed.callSiteKey);
       }
       // A16c (carry 8c): a resumed pass's own hand-off, made through the ledger — recorded and
       // announced before the other member answers, once per seat slot per pass, never on a retry.
@@ -856,9 +877,9 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
       if (!retry && moved !== undefined && first.pinnedAs !== moved.from) {
         const from = [input.seat.main, input.seat.runnerUp]
           .find((member): member is SeatMember => member !== null && member.pinnedAs === moved.from);
-        if (from !== undefined && !switchedFrom.has(slotId(input.seat, from))) {
-          await recordSwitch(from, first, "SPENT_ON_EARLIER_PASS", moved.callSiteKey);
-        }
+        const announced = from === undefined ? undefined : switchedFrom.get(slotId(input.seat, from));
+        if (announced !== undefined) await announced;
+        else if (from !== undefined) await recordSwitch(from, first, "SPENT_ON_EARLIER_PASS", moved.callSiteKey);
       }
       /** R4: a member that fails with a switching cause stays down for the rest of this pass. */
       const failed = (member: SeatMember, error: unknown): BackupSwitchCause | null => {
@@ -871,13 +892,20 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
       try {
         return await answer(first);
       } catch (error) {
+        const wasDown = isDown(input.seat, first);
         const cause = failed(first, error);
         if (cause === null) throw error;
         // DR-184-v5: the post-cooldown retry belongs to ONE key; it never opens the backup's.
         if (retry) throw error;
         const second = members.find((member) => member !== first && !isDown(input.seat, member));
         if (second === undefined) throw error;
-        await recordSwitch(first, second, cause, keyOf(input, first));
+        // O7: another call in flight on this seat may have downed and switched this slot already —
+        // one notice per seat slot; this call waits for that notice, then goes to the backup too.
+        // Only a slot that was DOWN when this call failed counts: a ledger hand-off names the slot
+        // without downing it, and the member's own outage at another site is a switch of its own.
+        const announced = wasDown ? switchedFrom.get(slotId(input.seat, first)) : undefined;
+        if (announced === undefined) await recordSwitch(first, second, cause, keyOf(input, first));
+        else await announced;
         try {
           return await answer(second);
         } catch (backupError) {
@@ -888,10 +916,30 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
         }
       }
     },
-    answered: (role: DebateRole) => Object.freeze([...(answeredRefs.get(role) ?? [])]),
-    switches: () => Object.freeze([...switchRecords]),
-    backupAnswers: () => Object.freeze([...backupAnswerRecords])
+    answered: (role: DebateRole) => Object.freeze([...(answeredRefs.get(role) ?? [])].sort(compareText)),
+    switches: () => Object.freeze([...claimSwitchRecords, ...orderedRecords(switchRecords)]),
+    backupAnswers: () => Object.freeze(orderedRecords(backupAnswerRecords))
   });
+}
+
+/** Code-unit order — the same on every machine and locale (`localeCompare` is not). */
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/**
+ * Parallel calls (O7) — a seat caller's records in one fixed order: by role,
+ * seat index and call-site key, then by the whole record, so two records that
+ * share those three still come back the same way whichever call finished first.
+ */
+function orderedRecords<T extends { readonly role: string; readonly seatIndex: number; readonly callSiteKey: string | null }>(
+  records: readonly T[]
+): T[] {
+  return [...records].sort((left, right) =>
+    compareText(left.role, right.role)
+    || left.seatIndex - right.seatIndex
+    || compareText(left.callSiteKey ?? "", right.callSiteKey ?? "")
+    || compareText(JSON.stringify(left), JSON.stringify(right)));
 }
 
 /**

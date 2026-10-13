@@ -141,6 +141,15 @@ model and job. Input tokens count the way the app counts them: for Anthropic its
 included (Anthropic's own `input_tokens` leaves them out). The database keeps no cached count (only four counters are
 stored per call), so it is read from the gates' answers as the practice watches them.
 
+Calls at once (debate only, information only): `parallel` in report.json, "Calls at once" in report.md. It gives the
+setting the runner ran with (`setting`, written the way `--call-concurrency` takes it, and where it came from: `source`
+`FLAG` or `REGISTER`, and `registerRow` `SET` or `ABSENT`), each gate's number of calls at once as read at the start
+(`gateSlotsAtStart.<gate>`: `slots`, and `read: false` when the gate could not be read, so it ran with 1), the most
+calls that really went at once in the debate (`peakInFlight`), per model (`peakByModel`) and per gate (`peakByGate`),
+how long each model's calls waited for a free slot in all (`waitedMsByModel`, milliseconds), the calls (`calls`), and
+how many times a model's "too busy" refusal made one call wait and try again while the model's other calls waited for
+it (`busyProbesByModel`).
+
 ## Safety rules built in
 
 - It refuses to start unless `PRACTICE_ACK=spends-real-money` is set and both forwarded sockets exist.
@@ -187,9 +196,25 @@ stored per call), so it is read from the gates' answers as the practice watches 
 - Formats mode: one call at a time per model, about a second apart (a slightly random gap, `--gap-ms`, default 1000),
   at most the gate's own number of calls at once per gate (root's status `max_concurrent_calls` when it names it, else
   4 for DeepInfra and 1 for Anthropic), and at most 5 calls at once in all (`--max-in-flight`). The relay must accept
-  at least 3 more connections than `--max-in-flight` (S-4 starts it with `--max-connections 8`); a relay that refuses a
-  connection makes that call fail and stops the gate. `--sequential`: one call at a time, a 2-second gap. Debate mode
-  is unchanged: the runner sends one call at a time.
+  at least 3 more connections than `--max-in-flight` (S-4 starts it with `--max-connections 20`, enough for either
+  mode); a relay that refuses a connection makes that call fail and stops the gate. `--sequential`: one call at a time, a 2-second gap.
+- Debate mode: the runner sends a debate's AI calls at the same time, as the live preview does, within the
+  call-concurrency setting: how many calls at once in the debate, how many to one model in the debate, and how many to
+  one model across the runner (by vendor, with a `default`). Each gate's own number of calls at once
+  (`max_concurrent_calls`, read from the gate at the start) is never passed: extra calls wait their turn on the Mac
+  instead of being refused by the gate. A gate whose number cannot be read at the start runs with 1 call at a time, and
+  the report says so. Without `--call-concurrency` the practice uses the live register's own setting, and one call at
+  a time when the register has none (today's preview). `--call-concurrency 12/3/default=50,deepinfra=150,anthropic=50`
+  sets it for this practice only; it is never written to any register. The relay must accept at least 3 more
+  connections than the two gates' numbers added up: today 10 DeepInfra and 2 Anthropic calls at once, so at least 15
+  (S-4 starts it with `--max-connections 20`); if a gate's `max_concurrent_calls` is raised, raise
+  `--max-connections` with it.
+- Debate mode with calls at the same time (`--call-concurrency`, or a register that has the setting): first make sure
+  both gates run the gate code of this release (`deploy/preview-gate/v3/README.md` §"Redeploy (2026-10-12): calls on
+  their way together count once"; the checks are in `deploy/preview-release/v1/README.md` "Publishing the
+  call-concurrency row", Step 0). With the old gate code, one short network blip while 5 or more DeepInfra calls are
+  on their way counts as 5 failures and halts the DeepInfra gate (`provider_unreachable`). If that happens, re-open it
+  as that gate README's "Re-open after a halt" says (owner's yes).
 
 ## Money and time (rough)
 
@@ -197,8 +222,9 @@ stored per call), so it is read from the gates' answers as the practice watches 
   it takes about as long as the slowest model's 18 jobs: about 15 to 50 minutes (GLM, Qwen and MiMo take 30 to 170
   seconds a call), plus up to `--busy-wait-minutes` (default 30) when a model is busy. With `--sequential`, about 1
   to 2 hours, plus the same.
-- debate, depth 1: up to about 230 calls, about $0.15 to $0.70, about 1 to 2 hours. Depth 2: about 350 calls, up to
-  about 3 hours. The start-of-debate estimate needs much more room left in the pots than is actually spent (about
+- debate, depth 1: up to about 230 calls, about $0.15 to $0.70, about 1 to 2 hours one call at a time. Depth 2: about
+  350 calls, up to about 3 hours. Calls at the same time (`--call-concurrency`, or the register's setting) cost the
+  same and should take less time; the report's "Calls at once" part shows how much the calls overlapped. The start-of-debate estimate needs much more room left in the pots than is actually spent (about
   $4 DeepInfra and $0.90 Anthropic left for depth 1), so run early in the Bucharest day.
 
 ## Operator steps
@@ -275,7 +301,7 @@ call in flight finish for up to 1,500 s: a model call may take up to the gate's 
 install -d -o root -g root -m 0755 /usr/local/lib/debateai-practice
 install -o root -g root -m 0644 /home/ubuntu/gate-relay.py /usr/local/lib/debateai-practice/gate-relay.py
 sha256sum /usr/local/lib/debateai-practice/gate-relay.py
-systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=debateai-practice -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30600 -p TimeoutStopSec=1560 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group debateai-practice --mode 0660 --max-connections 8 --lifetime-seconds 28800 --drain-seconds 1500 --idle-timeout-seconds 1500
+systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=debateai-practice -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30600 -p TimeoutStopSec=1560 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group debateai-practice --mode 0660 --max-connections 20 --lifetime-seconds 28800 --drain-seconds 1500 --idle-timeout-seconds 1500
 systemctl status debateai-preview-practice-relay --no-pager
 journalctl -u debateai-preview-practice-relay -o cat --no-pager
 ls -l /run/debateai-practice
@@ -325,8 +351,11 @@ Optional flags:
   JUDGE_POSITION, JUDGE_ATTACK, JUDGE_CROSS, PANEL, REVIEW, SYNTHESIZER, EVALUATOR, STORYTELLER, STORY_CHECKER).
   `--levels "<model>=<level>,...;..."` (the same jobs at several thinking levels, see S-6b).
 - report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/samples.jsonl.
-- debate: `--depth 1|2`, `--question ro|en`, `--transcript` (also write `transcript.json`: every prompt and every
-  answer, see "The whole debate, word for word" above). The register is copied only through the register's own publication
+- debate: `--depth 1|2`, `--question ro|en`, `--call-concurrency A/B/default=N,deepinfra=N,anthropic=N` (A: calls at
+  once in the debate, 1 to 64; B: calls at once to one model in the debate, 1 to 16; each N: calls at once to one model
+  across the runner for that vendor, 1 to 1000, `default` required; for example `12/3/default=50,deepinfra=150,anthropic=50`;
+  formats mode refuses it), `--transcript` (also write `transcript.json`: every prompt and every answer, see "The whole
+  debate, word for word" above). The register is copied only through the register's own publication
   paths; an export holding a support-configuration version refuses (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
 
 ### S-6b, Mac: thinking levels side by side (formats, `--levels`)
@@ -418,8 +447,9 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode; `practice-transcript.ts`: its
   `--transcript` file.
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
-  `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (models at once,
-  the per-gate and overall limits), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
+  `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (formats: models at once,
+  the per-gate and overall limits), `practice-parallel.ts` (debate: `--call-concurrency` and the report's
+  "Calls at once"), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
   `practice-questions.ts`.
 - `check-thinking-levels.ts`: the offline check of a `thinking_levels` table before any API or runner restart
   (deploy/preview-auth-dev/v1/README.md, "The optional `thinking_levels` table"; it sends nothing and needs no gate):

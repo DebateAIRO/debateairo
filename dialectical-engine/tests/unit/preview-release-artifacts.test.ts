@@ -777,6 +777,110 @@ describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify
     for (const operation of ['verify', 'apply-and-plan']) expect(() => operator.validateNativePlan({ ...t.plan, operation, roleRotation: 'off' })).toThrow();
   });
 
+  /** Parallel calls (Task 16): the owner's start values, and the preview's off switch (values equal to an absent row). */
+  const CONCURRENCY = { perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50, deepinfra: 150, anthropic: 50 } };
+  const CONCURRENCY_OFF = { perDebate: 1, perModelPerDebate: 1, perModelPerRunner: { default: 1000 } };
+  /** Malformed values: each one the register's own parser refuses too (checked below). */
+  const BAD_CONCURRENCY: [string, unknown][] = [
+    ['perDebate above 64', { ...CONCURRENCY, perDebate: 65 }],
+    ['perDebate 0', { ...CONCURRENCY, perDebate: 0 }],
+    ['a fraction', { ...CONCURRENCY, perDebate: 1.5 }],
+    ['a number as text', { ...CONCURRENCY, perDebate: '12' }],
+    ['perModelPerDebate above 16', { ...CONCURRENCY, perModelPerDebate: 17 }],
+    ['a runner limit above 1000', { ...CONCURRENCY, perModelPerRunner: { default: 1001 } }],
+    ['a runner limit of 0', { ...CONCURRENCY, perModelPerRunner: { default: 50, deepinfra: 0 } }],
+    ['no default', { ...CONCURRENCY, perModelPerRunner: { deepinfra: 150 } }],
+    ['an upper-case vendor', { ...CONCURRENCY, perModelPerRunner: { default: 50, DeepInfra: 150 } }],
+    ['a vendor with an underscore', { ...CONCURRENCY, perModelPerRunner: { default: 50, deep_infra: 150 } }],
+    ['runner limits as an array', { ...CONCURRENCY, perModelPerRunner: [50] }],
+    ['a missing key', { perDebate: 12, perModelPerRunner: { default: 50 } }],
+    ['an extra key', { ...CONCURRENCY, perRunner: 5 }],
+    ['the row kind inside', { kind: 'CALL_CONCURRENCY_POLICY', ...CONCURRENCY }],
+    ['null', null],
+    ['an array', [CONCURRENCY]],
+    ['a number', 12]
+  ];
+
+  it('plan --call-concurrency: the plan carries the policy, publish carries it on, and none is the default', async () => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-concurrency.json');
+    const plan = read(await run(t.nativePlan('plan', ['--call-concurrency', JSON.stringify(CONCURRENCY)]).with(-1, out), t.s.layout));
+    expect(plan).toEqual({ ...t.plan, callConcurrency: CONCURRENCY });
+    expect(operator.validateNativePlan(plan)).toEqual(plan);
+    const proposal = t.writeProposal(t.proposalOf());
+    const publish = read(await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], out), t.s.layout, deps));
+    expect(publish.callConcurrency).toEqual(CONCURRENCY);
+    expect(operator.validateNativePlan(publish)).toEqual(publish);
+    // The preview's off switch is a value like any other (the row stays, with values equal to absent).
+    const off = read(await run(t.nativePlan('plan', ['--call-concurrency', JSON.stringify(CONCURRENCY_OFF)]).with(-1, join(t.s.art, 'native-plan-concurrency-off.json')), t.s.layout));
+    expect(off).toEqual({ ...t.plan, callConcurrency: CONCURRENCY_OFF });
+    // Spaces and key order as typed do not matter: the plan holds the policy in one fixed order.
+    const typed = '{ "perModelPerRunner": { "deepinfra": 150, "anthropic": 50, "default": 50 }, "perModelPerDebate": 3, "perDebate": 12 }';
+    const reordered = await run(t.nativePlan('plan', ['--call-concurrency', typed]).with(-1, join(t.s.art, 'native-plan-concurrency-typed.json')), t.s.layout);
+    expect(readFileSync(reordered.path, 'utf8')).toBe(readFileSync(out, 'utf8'));
+    // It combines with the checker choice and the rotation switch.
+    const all = read(await run(t.nativePlan('plan', ['--checker', 'deepseek', '--deepseek-enabled-on-gate', 'yes', '--role-rotation', 'off', '--call-concurrency', JSON.stringify(CONCURRENCY)]).with(-1, join(t.s.art, 'native-plan-all.json')), t.s.layout));
+    expect(all).toEqual({ ...t.plan, checkerChoice: { checker: 'deepseek', deepseekEnabledOnGate: true }, roleRotation: 'off', callConcurrency: CONCURRENCY });
+    expect(operator.validateNativePlan(all)).toEqual(all);
+    // A plan without the option is byte for byte the plan this tool always wrote: no field at all.
+    expect(Object.hasOwn(t.plan, 'callConcurrency')).toBe(false);
+    const again = await run(t.nativePlan('plan').with(-1, join(t.s.art, 'native-plan-again.json')), t.s.layout);
+    expect(readFileSync(again.path, 'utf8')).toBe(JSON.stringify(t.plan));
+  });
+
+  it.each([
+    ['text that is not JSON', 'plan', ['--call-concurrency', 'perDebate=12']],
+    ['JSON with a duplicate key', 'plan', ['--call-concurrency', '{"perDebate":12,"perDebate":13,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}']],
+    ...BAD_CONCURRENCY.map(([name, value]) => [name, 'plan', ['--call-concurrency', JSON.stringify(value)]] as [string, string, string[]]),
+    ['the option on verify', 'verify', ['--call-concurrency', JSON.stringify(CONCURRENCY)]],
+    ['the option on apply-and-plan', 'apply-and-plan', ['--call-concurrency', JSON.stringify(CONCURRENCY)]]
+  ])('refuses --call-concurrency with %s and writes nothing', async (_name, operation, extra) => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-refused.json');
+    await expect(run(t.nativePlan(operation, extra).with(-1, out), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--call-concurrency'] });
+    expect(existsSync(out)).toBe(false);
+  });
+
+  it('refuses the option on publish: publish takes the policy only from its --from plan', async () => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-concurrency.json');
+    await run(t.nativePlan('plan', ['--call-concurrency', JSON.stringify(CONCURRENCY)]).with(-1, out), t.s.layout);
+    const proposal = t.writeProposal(t.proposalOf());
+    const refused = join(t.s.art, 'native-plan-publish-refused.json');
+    await expect(run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256, '--call-concurrency', JSON.stringify(CONCURRENCY_OFF)], out).with(-1, refused), t.s.layout, deps))
+      .rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--call-concurrency'] });
+    expect(existsSync(refused)).toBe(false);
+  });
+
+  it('publish refuses a --from plan whose policy was edited by hand into a malformed value', async () => {
+    const t = await staged();
+    const edited = t.s.write(join(t.s.art, 'native-plan-edited.json'), JSON.stringify({ ...t.plan, callConcurrency: { ...CONCURRENCY, perDebate: 65 } }));
+    const proposal = t.writeProposal(t.proposalOf());
+    const out = join(t.s.art, 'native-plan-publish.json');
+    await expect(run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], edited.path), t.s.layout, deps)).rejects.toMatchObject({ code: 'FROM_PLAN_INVALID' });
+    expect(existsSync(out)).toBe(false);
+  });
+
+  it('the native plan check accepts the call-concurrency policy only well formed, and only on plan and publish', async () => {
+    const t = await staged();
+    const registerModule = await import('@debateai/register');
+    for (const good of [CONCURRENCY, CONCURRENCY_OFF, { perDebate: 64, perModelPerDebate: 16, perModelPerRunner: { default: 1000, 'a-1': 1 } }]) {
+      expect(operator.validateNativePlan({ ...t.plan, callConcurrency: good })).toBeTruthy();
+      expect(operator.validateNativePlan({ ...t.plan, operation: 'publish', callConcurrency: good })).toBeTruthy();
+      // The register's own parser (the authority the publisher checks with again) accepts the same value.
+      expect(registerModule.callConcurrencyPolicyFromValue({ kind: 'CALL_CONCURRENCY_POLICY', ...good })).toEqual(good);
+    }
+    for (const [name, bad] of BAD_CONCURRENCY) {
+      expect(() => operator.validateNativePlan({ ...t.plan, callConcurrency: bad }), name).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+      // Never stricter than the authority by accident: the register's parser refuses every one of them too
+      // (the row kind inside is the one difference: the plan names the three values, the row adds its kind).
+      if (name !== 'the row kind inside') expect(() => registerModule.callConcurrencyPolicyFromValue(bad !== null && typeof bad === 'object' && !Array.isArray(bad) ? { kind: 'CALL_CONCURRENCY_POLICY', ...bad } : bad), name).toThrow('CALL_CONCURRENCY_POLICY_INVALID');
+    }
+    for (const operation of ['verify', 'apply-and-plan']) {
+      expect(() => operator.validateNativePlan({ ...t.plan, operation, callConcurrency: CONCURRENCY })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    }
+  });
+
   it('launch-plan --publication: the new publication replaces the old one and the proof must bind to it', async () => {
     const t = await staged();
     const published = t.s.write(join(t.s.art, 'native-publish.json'), JSON.stringify(attestation({ publication: t.newPublication })));

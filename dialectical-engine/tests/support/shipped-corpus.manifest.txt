@@ -292,6 +292,8 @@ apps/observation-agent/src/store/status.ts
 apps/replay/src/cli.ts
 apps/replay/src/database-url.ts
 apps/replay/src/index.ts
+apps/runner/src/call-lane-gateway.ts
+apps/runner/src/call-scheduler.ts
 apps/runner/src/dev-api-environment-cli.ts
 apps/runner/src/dev-api-environment.ts
 apps/runner/src/dev-api-process-cli.ts
@@ -326,6 +328,7 @@ apps/runner/src/hosted-register-publish.ts
 apps/runner/src/index.ts
 apps/runner/src/main.ts
 apps/runner/src/migrate-cli.ts
+apps/runner/src/ordered-recorder.ts
 apps/runner/src/owner-bootstrap-cli.ts
 apps/runner/src/owner-cli.ts
 apps/runner/src/owner-command.ts
@@ -338,6 +341,7 @@ apps/runner/src/production-database-url.ts
 apps/runner/src/provider-topology.ts
 apps/runner/src/rotate-kek-cli.ts
 apps/runner/src/rotate-kek.ts
+apps/runner/src/run-in-flight.ts
 apps/runner/src/run-keep-alive.ts
 apps/runner/src/run-seats.ts
 apps/runner/src/run-sit-out.ts
@@ -969,6 +973,7 @@ packages/providers/src/content-rule.ts
 packages/providers/src/index.ts
 packages/providers/src/model-json.ts
 packages/providers/src/patch-follow-up.ts
+packages/providers/src/preview-busy.ts
 packages/providers/src/preview-models.ts
 packages/providers/src/preview-remaining.ts
 packages/providers/src/preview-test.ts
@@ -983,6 +988,7 @@ packages/register/src/answer-role-rotation-policy.ts
 packages/register/src/auth-policy.ts
 packages/register/src/billing-plans.ts
 packages/register/src/billing-policy.ts
+packages/register/src/call-concurrency-policy.ts
 packages/register/src/compose-env.ts
 packages/register/src/configured-provider-set.ts
 packages/register/src/consumer-recovery-policy.ts

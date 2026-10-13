@@ -498,7 +498,8 @@ console.log(JSON.stringify({
     // `RUNNER_DATABASE_POOLS` to main.ts's @debateai/db line; this stand-in
     // missed them and the case went RED at link time. Their values copy the
     // shape of packages/db/src/pool-budget.ts, although the throw below fires
-    // before anything reads them.
+    // before anything reads them (parallel AI calls, 2026-10-12: runtime 32 and
+    // the claim renewals' own keepAlive pool of 2).
     const throwingDb = `data:text/javascript,${encodeURIComponent(`
 export function createPool() {}
 export function configureContentEncryption() {}
@@ -507,7 +508,8 @@ export class EntitlementRepository {}
 export class PostgresInternalAllowanceRepository {}
 export const RUNNER_CAPACITY = Object.freeze({ concurrentRuns: 8 });
 export const RUNNER_DATABASE_POOLS = Object.freeze({
-  runtime: Object.freeze({ name: "runner:runtime", max: 20, connectionTimeoutMillis: 5000 })
+  runtime: Object.freeze({ name: "runner:runtime", max: 32, connectionTimeoutMillis: 5000 }),
+  keepAlive: Object.freeze({ name: "runner:keep-alive", max: 2, connectionTimeoutMillis: 5000 })
 });
 const uncaught = process.listenerCount("uncaughtExceptionMonitor");
 const exitSink = process.listenerCount("exit");
@@ -535,7 +537,9 @@ export async function resolve(specifier, context, nextResolve) {
       // \`readStoryPolicyFromRegister\`, the optional story rows' boot read.
       // Paid plans B9b added \`EntitlementRepository\` (@debateai/db, above),
       // \`costEnvelopeBand\` and \`readBillingPlans\`; B9d added \`costEnvelopeCeilings\`.
-      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {} export function readEngineVersion() {} export function readModelScorecard() {} export function costEnvelopeBand() {} export function costEnvelopeCeilings() {} export function readBillingPlans() {}",
+      // Parallel AI calls (2026-10-12, Task 9) added \`readCallConcurrencyPolicy\` and
+      // \`effectiveCallConcurrency\`, the call scheduler's boot read of the optional row.
+      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {} export function readEngineVersion() {} export function readModelScorecard() {} export function costEnvelopeBand() {} export function costEnvelopeCeilings() {} export function readBillingPlans() {} export function readCallConcurrencyPolicy() {} export function effectiveCallConcurrency() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
     };
     if (Object.hasOwn(stubs, specifier)) {

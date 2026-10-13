@@ -5,7 +5,7 @@ const MAX_BYTES = 32_768;
 export type PhoneDraftForm = {
     topic: string; planTier: 'free' | 'premium'; optionsOpen: boolean;
     depthMode: 'fixed' | 'manual' | 'recommended' | 'adaptive'; scrutiny: 'standard' | 'deep' | 'exhaustive';
-    depth: number; branching: number; concurrency: number; maxTokens: number;
+    depth: number; maxTokens: number;
     riskTier: string; riskTierWasEdited: boolean; budgetTier: 'low' | 'medium' | 'high';
     decisionScope: string; asOf: string;
 };
@@ -26,9 +26,20 @@ function validSubmitted(value: unknown): value is SubmittedPhoneDraft {
     const room = AskRoomQuerySchema.safeParse({...value.query, depth: String(value.query.depth)});
     return ask.success && room.success && room.data.plan_tier === c.plan_tier && room.data.composition_budget_tier === c.composition_budget_tier && room.data.depth === c.depth;
 }
+const FORM_KEYS = ['topic','planTier','optionsOpen','depthMode','scrutiny','depth','maxTokens','riskTier','riskTierWasEdited','budgetTier','decisionScope','asOf'];
+/** Parallel calls (owner ruling 2026-10-12): /new no longer has Branching width or Concurrency.
+ *  A draft saved before that still carries both; it is READ (the two values ignored, then
+ *  dropped), never WRITTEN again in that shape. */
+const RETIRED_FORM_KEYS = ['branching','concurrency'] as const;
+function withoutRetiredKeys(value: unknown): unknown {
+    if (!keys(value, [...FORM_KEYS, ...RETIRED_FORM_KEYS])) return value;
+    const form: Record<string, unknown> = { ...value };
+    for (const name of RETIRED_FORM_KEYS) delete form[name];
+    return form;
+}
 function validForm(value: unknown): value is PhoneDraftForm {
-    if (!keys(value, ['topic','planTier','optionsOpen','depthMode','scrutiny','depth','branching','concurrency','maxTokens','riskTier','riskTierWasEdited','budgetTier','decisionScope','asOf'])) return false;
-    return typeof value.topic === 'string' && oneOf(value.planTier,['free','premium']) && typeof value.optionsOpen === 'boolean' && oneOf(value.depthMode,['fixed','manual','recommended','adaptive']) && oneOf(value.scrutiny,['standard','deep','exhaustive']) && DepthParamsSchema.safeParse({depth:value.depth}).success && finiteInt(value.branching) && Number(value.branching)<=4 && finiteInt(value.concurrency) && Number(value.concurrency)<=6 && finiteInt(value.maxTokens) && Number(value.maxTokens)>=128 && Number(value.maxTokens)<=4000 && Number(value.maxTokens)%32===0 && oneOf(value.riskTier,['casual','standard','high-stakes']) && typeof value.riskTierWasEdited === 'boolean' && oneOf(value.budgetTier,['low','medium','high']) && typeof value.decisionScope === 'string' && value.decisionScope.length > 0 && typeof value.asOf === 'string' && Number.isFinite(new Date(value.asOf).valueOf());
+    if (!keys(value, FORM_KEYS)) return false;
+    return typeof value.topic === 'string' && oneOf(value.planTier,['free','premium']) && typeof value.optionsOpen === 'boolean' && oneOf(value.depthMode,['fixed','manual','recommended','adaptive']) && oneOf(value.scrutiny,['standard','deep','exhaustive']) && DepthParamsSchema.safeParse({depth:value.depth}).success && finiteInt(value.maxTokens) && Number(value.maxTokens)>=128 && Number(value.maxTokens)<=4000 && Number(value.maxTokens)%32===0 && oneOf(value.riskTier,['casual','standard','high-stakes']) && typeof value.riskTierWasEdited === 'boolean' && oneOf(value.budgetTier,['low','medium','high']) && typeof value.decisionScope === 'string' && value.decisionScope.length > 0 && typeof value.asOf === 'string' && Number.isFinite(new Date(value.asOf).valueOf());
 }
 function validRecord(value: unknown): value is PhoneCompletionDraft {
     return keys(value,['version','id','owner','created_at','expires_at','phase','form','submitted']) && value.version === 1 && typeof value.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.id) && typeof value.owner === 'string' && value.owner.length > 0 && value.owner.length <= 256 && typeof value.created_at === 'number' && Number.isFinite(value.created_at) && value.created_at <= Date.now() && typeof value.expires_at === 'number' && value.expires_at - value.created_at === PHONE_COMPLETION_DRAFT_MS && value.expires_at > Date.now() && oneOf(value.phase,['phone-required','updated','draft']) && validForm(value.form) && validSubmitted(value.submitted);
@@ -43,7 +54,8 @@ function readRecord(): PhoneCompletionDraft | null {
         const text = window.sessionStorage.getItem(PHONE_COMPLETION_DRAFT_KEY);
         if (!text) return null;
         if (new TextEncoder().encode(text).byteLength > MAX_BYTES) { clearPhoneCompletionDraft(); return null; }
-        const value: unknown = JSON.parse(text);
+        const parsed: unknown = JSON.parse(text);
+        const value: unknown = plain(parsed) ? { ...parsed, form: withoutRetiredKeys(parsed.form) } : parsed;
         if (!validRecord(value)) { clearPhoneCompletionDraft(); return null; }
         return value;
     } catch { clearPhoneCompletionDraft(); return null; }
