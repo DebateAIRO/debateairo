@@ -8,6 +8,7 @@ import { EVALUATOR_PROMPT_CONTRACT } from "./index.js";
 import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "@debateai/judgement";
 import { promptContractFingerprintText } from "@debateai/providers";
 import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT } from "@debateai/serve";
+import { mapPromptContractHash } from "@debateai/map";
 import { CLAIM_TYPES } from "@debateai/kernel";
 import {
   ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
@@ -555,6 +556,9 @@ async function computeDevelopmentContractRows(): Promise<readonly DevelopmentDep
     judgeContractHash: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
     // Debate shape (2026-10-13): the writer's seal is v3 then its answer-length variant.
     composerContractHash: digest(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
+    // Debate shape (P2b Task 6, spec 2026-10-12 §4): the map's prompt contracts, sealed. An optional row: the runner
+    // requires it only beside a debateShapePolicy row (apps/runner/src/debate-shape-boot.ts).
+    mapContractHash: mapPromptContractHash(),
     conformanceContractHash: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT)),
     // codex r2 B1a: the fingerprint is taken from the constant the runner
     // SENDS, not from a search of the runner's source. There is nothing left

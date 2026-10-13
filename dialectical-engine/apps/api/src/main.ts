@@ -91,7 +91,7 @@ import {
   readPublicationCheckPolicy,
   readAnswerRoleRotationPolicy,
   readDebateShapePolicy,
-  assertDebateShapeRunnerReady,
+  debateShapeInForce,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -626,6 +626,10 @@ const askRoom = askRoomComposition?.room;
  */
 const billingEnabled = (askRoomComposition?.billingPlans ?? null) !== null;
 const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTokenCeilings(pool, environment.REGISTER_VERSION));
+// Debate shape (spec 2026-10-12 §3.1): the optional row; absent = today's shape byte for byte, a malformed row refuses the boot.
+const debateShapePolicy = await boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION));
+// The row in force for the ask side (amendment 2026-10-13, the preview's rollback): `enabled: false` is no row here.
+const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
 const modelPicker = await composeAskModelPicker({
   boot,
   pool,
@@ -636,6 +640,8 @@ const modelPicker = await composeAskModelPicker({
   callTokenCeilings,
   moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,
   billingEnabled,
+  // Debate shape (P2b Task 6, pre-flight PF-B22): only the Free answer-job check reads it (the row's largest writer bound).
+  debateShapePolicy: debateShapeInForcePolicy,
   log: (line) => console.error(line)
 });
 /**
@@ -958,14 +964,6 @@ const legacyRunClaim=new PostgresLegacyRunClaimApplication(
 );
 // Role rotation (spec 2026-10-11): the optional row; ABSENT/OFF is today's engine, a malformed row refuses the boot.
 const answerRoleRotation = await boot.run("answer-role-rotation-policy", () => readAnswerRoleRotationPolicy(pool, environment.REGISTER_VERSION));
-// Debate shape (spec 2026-10-12 §3.1): the optional row; absent = today's shape byte for byte, a malformed row refuses the boot.
-const debateShapePolicy = await boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION));
-/**
- * I2(a), Phase 2a: the runner's guard, here too. A present row would make this API mint debate-shape receipts that a
- * Phase-2a runner (booted on an older version) would claim and argue as today's shape, so the API refuses the version
- * at boot (DEBATE_SHAPE_POLICY_RUNNER_PENDING), as the runner does. P2b removes it with the runner's guard.
- */
-boot.runSync("debate-shape-runner-pending", () => assertDebateShapeRunnerReady(debateShapePolicy));
 const application = new PostgresAskApplication(pool, dispatcher, {
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   ...(previewBudgetGate === undefined ? {} : { previewBudgetGate }),
@@ -989,7 +987,7 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   // Role rotation (spec 2026-10-11 Part 4): admission reads the counts only with the row ON.
   ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
   // Debate shape (spec 2026-10-12 §3.1): admission sizes a shaped basis only with the row in force.
-  ...(debateShapePolicy === null ? {} : { debateShapePolicy }),
+  ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
     panelSize: input.panelSize,
@@ -1533,7 +1531,7 @@ const api = buildApi({
   ...(askRoom === undefined ? {} : { askRoom }),
   ...(askBilling === undefined ? {} : { askBilling }),
   // Debate shape: the room read normalises its query under the same row as submit.
-  ...(debateShapePolicy === null ? {} : { debateShapePolicy }),
+  ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
   ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
   // P15, W7: scheduling an account erasure stops the owner's renewal at once (the reconciler's sweep repeats it, and
   // ends the plan once the erasure commits).

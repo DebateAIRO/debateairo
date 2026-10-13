@@ -4,13 +4,14 @@ import { parseCostEnvelopeBasis } from "@debateai/budget";
 import { computeStructuralCeilingBasis, debateShapePolicyStartValues, resolveDebateShape } from "@debateai/register";
 import { refuseDebateShapeReceiptInPhase2a } from "@debateai/runner";
 
-describe("the runner reads the debate shape row at its register version (spec 2026-10-12 §3.1)", () => {
-  it("reads it once, at boot, and refuses a present row until Phase 2b", async () => {
+describe("the runner resolves the debate shape at its register version, at boot (spec 2026-10-12 §3.1, §4)", () => {
+  it("reads the row and the map hash once, before the runner is built, and carries no Phase 2a boot guard", async () => {
     const main = await readFile("apps/runner/src/main.ts", "utf8");
-    const call = "assertDebateShapeRunnerReady(await readDebateShapePolicy(pool, environment.REGISTER_VERSION));";
-    expect(main.split(call)).toHaveLength(2);
+    const resolve = "const debateShape = resolveDebateShapeRunnerSettings({";
+    expect(main.split(resolve)).toHaveLength(2);
     // Before the runner is built, so a refused boot claims no debate.
-    expect(main.indexOf(call)).toBeLessThan(main.indexOf("new WalkingSkeletonRunner("));
+    expect(main.indexOf(resolve)).toBeLessThan(main.indexOf("new WalkingSkeletonRunner("));
+    expect(main).not.toContain("assertDebateShapeRunnerReady");
   });
 });
 

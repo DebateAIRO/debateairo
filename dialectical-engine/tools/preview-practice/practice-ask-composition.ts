@@ -35,8 +35,8 @@ import {
   type PreviewGateRemaining
 } from "@debateai/providers";
 import {
-  assertDebateShapeRunnerReady,
   computeStructuralCeilingBasis,
+  debateShapeInForce,
   readAnswerRoleRotationPolicy,
   readCallTokenCeilings,
   readDebateShapePolicy,
@@ -117,6 +117,10 @@ export async function composePracticeAsk(input: Readonly<{
     probeControlsFor: previewProbeControls, fetchImplementation: previewFetch, previewRound: true
   });
   const callTokenCeilings = await readCallTokenCeilings(pool, version);
+  // Debate shape (spec 2026-10-12 §3.1): as main.ts reads it; the practice runner's composition resolves the shape.
+  const debateShapePolicy = await readDebateShapePolicy(pool, version);
+  // As main.ts: the row in force for the ask side (amendment 2026-10-13, the preview's rollback).
+  const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
   const modelPicker = await composeAskModelPicker({
     boot: BOOT,
     pool,
@@ -127,15 +131,11 @@ export async function composePracticeAsk(input: Readonly<{
     callTokenCeilings,
     moneyPolicy: null,
     billingEnabled: false,
+    debateShapePolicy: debateShapeInForcePolicy,
     log: (line) => input.log?.(line)
   });
   const deploymentRiskTier = await readDeploymentRiskTier(pool, version);
   const answerRoleRotation = await readAnswerRoleRotationPolicy(pool, version);
-  // Debate shape (spec 2026-10-12 §3.1): as main.ts reads it; the practice runner's composition refuses a present row.
-  const debateShapePolicy = await readDebateShapePolicy(pool, version);
-  // I2(a), Phase 2a: as apps/api/src/main.ts, the ask side refuses a present row too, so no shape receipt is minted
-  // for a runner that would argue it as today's shape. P2b removes it with the runner's guard.
-  assertDebateShapeRunnerReady(debateShapePolicy);
   const runSettings: RunCreationSettings = {
     previewProviderTestConfig: previewConfig, previewTeamUserIds: [...input.teamUserIds],
     previewBudgetGate,
@@ -146,7 +146,7 @@ export async function composePracticeAsk(input: Readonly<{
     resolveDiscoveredPanel: resolveProviderPanel,
     modelPicker,
     ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
-    ...(debateShapePolicy === null ? {} : { debateShapePolicy }),
+    ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
     resolveEnvelopeBasis: async (basis) => computeStructuralCeilingBasis({
       ...structuralInputs,
       panelSize: basis.panelSize,

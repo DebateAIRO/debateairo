@@ -29,8 +29,11 @@ describe("A20 · the picker is composed where runs are created", () => {
     // exactly when the room's composition carries the plans. Dropped, the picker would silently fall back to the
     // bare per-run ceiling, and a scorecard capping Free above ECONOMY would boot with billing on.
     expect(source).toContain("const billingEnabled = (askRoomComposition?.billingPlans ?? null) !== null;\n");
+    // Debate shape (P2b Task 6, pre-flight PF-B22): the row in force reaches the Free answer-job check.
     expect(source).toContain(
-      "  callTokenCeilings,\n  moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,\n  billingEnabled,\n  log: (line) => console.error(line)\n});"
+      "  callTokenCeilings,\n  moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,\n  billingEnabled,\n"
+      + "  // Debate shape (P2b Task 6, pre-flight PF-B22): only the Free answer-job check reads it (the row's largest writer bound).\n"
+      + "  debateShapePolicy: debateShapeInForcePolicy,\n  log: (line) => console.error(line)\n});"
     );
     expect(source.indexOf("const billingEnabled = ")).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
     expect(source.indexOf('boot.run("call-token-ceilings"')).toBeLessThan(source.indexOf("await composeAskModelPicker({"));

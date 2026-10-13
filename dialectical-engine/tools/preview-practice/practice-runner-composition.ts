@@ -28,17 +28,18 @@ import { RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  assertDebateShapeRunnerReady,
   effectiveCallConcurrency,
   readCallConcurrencyPolicy,
   readDebateShapePolicy,
   readEngineVersion,
+  readMapContractHash,
   readModelScorecard,
   readStoryPolicyFromRegister,
   type CallConcurrencyPolicy,
   type DeploymentMode
 } from "@debateai/register";
 import { readDeploymentMakerCapability } from "@debateai/critique";
+import { mapPromptContractHash } from "@debateai/map";
 import {
   assertDeploymentProviderTargets,
   assertPreviewProviderTargets,
@@ -76,6 +77,7 @@ import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-po
 import { createCallScheduler, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
+import { resolveDebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
 import { PracticeCallStats } from "./practice-parallel.js";
 
 /** The runner settings the practice needs: the non-secret runner.env keys the operator exports (README step S-2). */
@@ -124,11 +126,15 @@ export async function composePracticeRunner(input: Readonly<{
   const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
   if (environment.DEPLOYMENT_MODE !== "local") throw new TypeError("PRACTICE_REQUIRES_LOCAL_MODE");
   /**
-   * Debate shape (spec 2026-10-12 §3.1; controller ruling PF10): the runner's Phase-2a guard, as apps/runner/src/main.ts
-   * carries it. Absent = today's shape; a malformed row refuses (DEBATE_SHAPE_POLICY_INVALID), and in Phase 2a a valid
-   * one too (DEBATE_SHAPE_POLICY_RUNNER_PENDING), so practice never runs shape receipts as today's shape. P2b removes it.
+   * Debate shape (spec 2026-10-12 §3.1, §4; controller ruling PF10), as apps/runner/src/main.ts resolves it: the
+   * optional row (absent = today's shape; malformed = refused, DEBATE_SHAPE_POLICY_INVALID) and, with it, the sealed
+   * map contracts (DEBATE_SHAPE_MAP_HASH_UNSEALED / MAP_CONTRACT_HASH_MISMATCH).
    */
-  assertDebateShapeRunnerReady(await readDebateShapePolicy(pool, environment.REGISTER_VERSION));
+  const debateShape = resolveDebateShapeRunnerSettings({
+    policy: await readDebateShapePolicy(pool, environment.REGISTER_VERSION),
+    mapContractHash: await readMapContractHash(pool, environment.REGISTER_VERSION),
+    codeMapContractHash: mapPromptContractHash()
+  });
   const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);
   // As main.ts: a register that does not carry this code's prompt fingerprints refuses the start.
   assertRegisterPromptContractHashes(policy.hashes, environment.REGISTER_VERSION);
@@ -299,6 +305,8 @@ export async function composePracticeRunner(input: Readonly<{
     // Parallel AI calls (spec 2026-10-12 §3.2, §3.6), as main.ts: the one scheduler's lane per debate, each ref's
     // model, vendor and gate, and the claim renewals on their own pool.
     callScheduler: runnerCallScheduler,
+    // Debate shape, as main.ts: resolved at boot above; null without the row (today's runner).
+    debateShape,
     callSubjects: previewCallSubjects(previewConfig),
     // Ruling R31, as main.ts: a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
     callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model),

@@ -14,7 +14,6 @@ import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  assertDebateShapeRunnerReady,
   assertHostedCostEnvelopesSealed,
   costEnvelopeBand,
   costEnvelopeCeilings,
@@ -23,6 +22,7 @@ import {
   readCostEnvelopePolicy,
   readDebateShapePolicy,
   readEngineVersion,
+  readMapContractHash,
   readModelScorecard,
   readStoryPolicyFromRegister,
   effectiveCallConcurrency,
@@ -38,6 +38,7 @@ import {
 } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
+import { mapPromptContractHash } from "@debateai/map";
 import { firstCallPlanModels } from "@debateai/scorecard";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
@@ -55,6 +56,7 @@ import { assertRegisterPromptContractHashes, buildProviderPriceMap, createPostgr
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
+import { resolveDebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -129,11 +131,15 @@ const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER
   });
 const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
 /**
- * Debate shape (spec 2026-10-12 §3.1): the optional register row. Absent = today's shape, byte for byte; a malformed
- * row refuses this boot (DEBATE_SHAPE_POLICY_INVALID). Phase 2a: a valid row refuses it too
- * (DEBATE_SHAPE_POLICY_RUNNER_PENDING), until Phase 2b teaches this runner the shape and replaces this line.
+ * Debate shape (spec 2026-10-12 §3.1, §4): the optional row (absent = today's shape, byte for byte; malformed = boot
+ * refused, DEBATE_SHAPE_POLICY_INVALID) and, with it, the sealed map contracts (DEBATE_SHAPE_MAP_HASH_UNSEALED /
+ * MAP_CONTRACT_HASH_MISMATCH). A run's sizes are read from its own receipt, never from this row.
  */
-assertDebateShapeRunnerReady(await readDebateShapePolicy(pool, environment.REGISTER_VERSION));
+const debateShape = resolveDebateShapeRunnerSettings({
+  policy: await readDebateShapePolicy(pool, environment.REGISTER_VERSION),
+  mapContractHash: await readMapContractHash(pool, environment.REGISTER_VERSION),
+  codeMapContractHash: mapPromptContractHash()
+});
 /**
  * Codes and ids only: a story log line never carries story or debate text. The
  * detail goes FIRST, so no detail key can overwrite the line's kind or event.
@@ -552,6 +558,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // Parallel AI calls (spec 2026-10-12 §3.2, §3.6): every debate's calls through its lane of the one scheduler above,
   // each provider ref's model, vendor and (preview) gate, and the claim renewals on their own pool.
   callScheduler: runnerCallScheduler,
+  // Debate shape (spec 2026-10-12 §3): resolved at boot above; null without the row (today's runner).
+  debateShape,
   callSubjects: previewConfig === undefined ? targetCallSubjects(providerTargets) : previewCallSubjects(previewConfig),
   // Ruling R31 (preview only): a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
   ...(previewConfig === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),

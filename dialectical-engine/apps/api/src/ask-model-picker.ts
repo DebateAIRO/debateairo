@@ -8,11 +8,13 @@ import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/pro
 import {
   BUNDLED_MODEL_SCORECARD_SOURCE_REF,
   DEBATE_SHAPE_FORMULA_VERSION,
+  debateShapeLargestBounds,
   debateShapeSiteCounts,
   readBundledModelScorecard,
   readEngineVersion,
   readModelScorecard,
   type DebateShapeCeilingInput,
+  type DebateShapePolicy,
   type DebateShapeSiteCounts,
   type ModelScorecardReadResult
 } from "@debateai/register";
@@ -229,6 +231,11 @@ export function askModelPickerSettings(input: Readonly<{
   moneyPolicy?: AskMoneyPolicy | null;
   /** S2 (hosted): billing is on — the site sells plans, so the scorecard must follow the owners' plan-cap rule. */
   billingEnabled?: boolean;
+  /**
+   * Debate shape (P2b Task 6, pre-flight PF-B22): the row IN FORCE (`debateShapeInForce`; absent or disabled = none).
+   * Only the Free answer-job check reads it.
+   */
+  debateShapePolicy?: DebateShapePolicy | null;
   log?: (line: string) => void;
 }>): AskModelPickerSettings {
   const hosted = input.deploymentMode === "hosted";
@@ -258,6 +265,15 @@ export function askModelPickerSettings(input: Readonly<{
     throw new TypeError("ASK_MODEL_PICKER_MONEY_POLICY_MISMATCH");
   }
   const answerTokenCeilings = answerTokenCeilingsByRole(input.callTokenCeilings);
+  // Debate shape (P2b Task 6, pre-flight PF-B22): with a row in force a Free `detailed` answer asks the writer for up to
+  // the row's largest writer bound, and Free's writer has no fallback. Only this check reads it: `answerTokenCeilings`
+  // (the settings the picker seats with) keep the sealed bounds; a run's own writer bound comes from its receipt.
+  const freeAnswerCeilings = Object.freeze({
+    ANSWER_WRITER: input.debateShapePolicy === undefined || input.debateShapePolicy === null
+      ? answerTokenCeilings.ANSWER_WRITER
+      : Math.max(answerTokenCeilings.ANSWER_WRITER, debateShapeLargestBounds(input.debateShapePolicy).writer),
+    ANSWER_CHECKER: answerTokenCeilings.ANSWER_CHECKER
+  });
   // Paid plans P4-E (Part 3b re-review M-4; ruling C4): the backstop of the publish-time
   // check. With billing on a Free ask's answer writer and checker take a scored Free-roster
   // model or none, so a scorecard under which no declared Free-roster model can take one of
@@ -268,7 +284,7 @@ export function askModelPickerSettings(input: Readonly<{
       scorecard: input.scorecard.scorecard,
       targets: input.targets,
       freeRosterModelIds: PLAN_TIER_ROSTERS.free,
-      answerTokenCeilingByRole: answerTokenCeilings
+      answerTokenCeilingByRole: freeAnswerCeilings
     })) {
     throw new TypeError(SCORECARD_FREE_ANSWER_UNSCORED);
   }
@@ -321,6 +337,8 @@ export async function composeAskModelPicker(input: Readonly<{
   moneyPolicy?: AskMoneyPolicy | null;
   /** S2 (hosted): billing is on — the plan-cap rule is checked at this stage. */
   billingEnabled?: boolean;
+  /** Debate shape (P2b Task 6): the row in force, handed to `askModelPickerSettings`'s Free answer-job check. */
+  debateShapePolicy?: DebateShapePolicy | null;
   log: (line: string) => void;
   engineManifest?: URL;
   bundledScorecard?: URL;
@@ -339,6 +357,7 @@ export async function composeAskModelPicker(input: Readonly<{
     perRunCeilingMicros: input.perRunCeilingMicros,
     ...(input.moneyPolicy === undefined ? {} : { moneyPolicy: input.moneyPolicy }),
     ...(input.billingEnabled === undefined ? {} : { billingEnabled: input.billingEnabled }),
+    ...(input.debateShapePolicy === undefined ? {} : { debateShapePolicy: input.debateShapePolicy }),
     callTokenCeilings: input.callTokenCeilings,
     log: input.log
   }));

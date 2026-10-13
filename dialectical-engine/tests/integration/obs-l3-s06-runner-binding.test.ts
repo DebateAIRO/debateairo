@@ -539,8 +539,9 @@ export async function resolve(specifier, context, nextResolve) {
       // \`costEnvelopeBand\` and \`readBillingPlans\`; B9d added \`costEnvelopeCeilings\`.
       // Parallel AI calls (2026-10-12, Task 9) added \`readCallConcurrencyPolicy\` and
       // \`effectiveCallConcurrency\`, the call scheduler's boot read of the optional row.
-      // Debate shape (2026-10-12, Phase 2a Task 9) added \`readDebateShapePolicy\` and \`assertDebateShapeRunnerReady\`, the runner's boot guard on the optional row.
-      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {} export function readEngineVersion() {} export function readModelScorecard() {} export function costEnvelopeBand() {} export function costEnvelopeCeilings() {} export function readBillingPlans() {} export function readCallConcurrencyPolicy() {} export function effectiveCallConcurrency() {} export function readDebateShapePolicy() {} export function assertDebateShapeRunnerReady() {}",
+      // Debate shape (2026-10-12, Phase 2a Task 9) added \`readDebateShapePolicy\` and the runner's boot guard on the optional row;
+      // Phase 2b replaced the guard with \`readMapContractHash\` (the boot resolves the shape settings, apps/runner/src/debate-shape-boot.ts).
+      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {} export function readEngineVersion() {} export function readModelScorecard() {} export function costEnvelopeBand() {} export function costEnvelopeCeilings() {} export function readBillingPlans() {} export function readCallConcurrencyPolicy() {} export function effectiveCallConcurrency() {} export function readDebateShapePolicy() {} export function readMapContractHash() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
     };
     if (Object.hasOwn(stubs, specifier)) {

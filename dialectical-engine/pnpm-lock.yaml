@@ -331,6 +331,9 @@ importers:
       '@debateai/ledger':
         specifier: workspace:*
         version: link:../../packages/ledger
+      '@debateai/map':
+        specifier: workspace:*
+        version: link:../../packages/map
       '@debateai/memory':
         specifier: workspace:*
         version: link:../../packages/memory

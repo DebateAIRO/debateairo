@@ -295,6 +295,7 @@ apps/replay/src/database-url.ts
 apps/replay/src/index.ts
 apps/runner/src/call-lane-gateway.ts
 apps/runner/src/call-scheduler.ts
+apps/runner/src/debate-shape-boot.ts
 apps/runner/src/dev-api-environment-cli.ts
 apps/runner/src/dev-api-environment.ts
 apps/runner/src/dev-api-process-cli.ts
@@ -1014,6 +1015,7 @@ packages/register/src/email-mfa-policy.ts
 packages/register/src/engine-shape.ts
 packages/register/src/index.ts
 packages/register/src/internal-allowance-policy.ts
+packages/register/src/map-contract-hash.ts
 packages/register/src/mfa-policy.ts
 packages/register/src/model-scorecard-policy.ts
 packages/register/src/password-reset-policy.ts

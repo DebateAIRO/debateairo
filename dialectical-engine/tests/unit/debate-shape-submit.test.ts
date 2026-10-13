@@ -19,6 +19,7 @@ import { AskAcceptedSchema, PLAN_TIER_ROSTERS, type AskRequest, type Session } f
 import { RunCostSubstitutionRepository, RunRepository } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
+import { mapPromptContractHash } from "@debateai/map";
 import {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, computeStructuralCeilingBasis, debateShapePolicyStartValues, type PlanId
 } from "@debateai/register";
@@ -338,39 +339,38 @@ describe("a refusal naming the ceiling's figures tells the caller its code only 
   });
 });
 
-describe("the boot reads the optional row (note 8) and the practice runner refuses a present one (note 7, PF10)", () => {
+describe("the boot reads the optional row (note 8) and the practice runner resolves the shape (note 7, PF10; P2b Task 6)", () => {
   it("apps/api/src/main.ts reads the row once at its register version, before the ask application, and hands it on", () => {
     const main = readFileSync(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
     const read = 'boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION))';
     expect(main.split(read)).toHaveLength(2);
     expect(main.indexOf(read)).toBeLessThan(main.indexOf("new PostgresAskApplication("));
-    // Once into the ask application's settings, once into the room read's options; absent = neither key.
-    expect(main.split("...(debateShapePolicy === null ? {} : { debateShapePolicy }),")).toHaveLength(3);
+    // Once into the ask application's settings, once into the room read's options; absent (or disabled) = neither key.
+    expect(main.split("...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),")).toHaveLength(3);
+    expect(main).toContain("const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);");
     expect(main).toContain("...(input.shape === null ? {} : { shape: input.shape })");
   });
 
-  it("I2(a): in Phase 2a the API boot and the practice ask refuse a present row right after reading it, before the ask application", () => {
+  it("the API boot and the practice ask hand the IN-FORCE row on and carry no Phase-2a guard (P2b Task 6)", () => {
     const main = readFileSync(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
-    const read = 'boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION))';
-    const guard = 'boot.runSync("debate-shape-runner-pending", () => assertDebateShapeRunnerReady(debateShapePolicy));';
-    expect(main.split(guard)).toHaveLength(2);
-    expect(main.indexOf(read)).toBeLessThan(main.indexOf(guard));
-    expect(main.indexOf(guard)).toBeLessThan(main.indexOf("new PostgresAskApplication("));
+    expect(main).not.toContain("assertDebateShapeRunnerReady");
     const practice = readFileSync(new URL("../../tools/preview-practice/practice-ask-composition.ts", import.meta.url), "utf8");
+    expect(practice).not.toContain("assertDebateShapeRunnerReady");
     const practiceRead = "const debateShapePolicy = await readDebateShapePolicy(pool, version);";
-    const practiceGuard = "assertDebateShapeRunnerReady(debateShapePolicy);";
-    expect(practice.split(practiceGuard)).toHaveLength(2);
-    expect(practice.indexOf(practiceRead)).toBeGreaterThan(-1);
-    expect(practice.indexOf(practiceRead)).toBeLessThan(practice.indexOf(practiceGuard));
-    expect(practice.indexOf(practiceGuard)).toBeLessThan(practice.indexOf("new PostgresAskApplication("));
+    const inForce = "debateShapeInForce(debateShapePolicy)";
+    expect(practice.split(practiceRead)).toHaveLength(2);
+    expect(practice.split(inForce)).toHaveLength(2);
+    expect(practice.indexOf(practiceRead)).toBeLessThan(practice.indexOf(inForce));
+    expect(practice.indexOf(inForce)).toBeLessThan(practice.indexOf("new PostgresAskApplication("));
   });
 
-  function rowPool(row: unknown) {
+  function rowPool(row: unknown, mapHash?: unknown) {
     const asked: unknown[][] = [];
     const pool = {
       query: vi.fn(async (_sql: string, values: unknown[]) => {
         asked.push(values);
         if (values[1] === "debateShapePolicy") return { rows: row === undefined ? [] : [{ value_json: row }] };
+        if (values[1] === "mapContractHash") return { rows: mapHash === undefined ? [] : [{ value_json: mapHash }] };
         throw new Error("PRACTICE_TEST_NEXT_READ");
       })
     } as unknown as Pool;
@@ -381,10 +381,13 @@ describe("the boot reads the optional row (note 8) and the practice runner refus
     environment: { DEPLOYMENT_MODE: "local", REGISTER_VERSION: 7 } as never
   });
 
-  it("a valid row refuses the practice runner before anything else is read; a malformed one too; no row passes on", async () => {
-    const valid = rowPool(JSON.parse(JSON.stringify(POLICY)));
-    await expect(compose(valid.pool)).rejects.toMatchObject({ code: "DEBATE_SHAPE_POLICY_RUNNER_PENDING" });
-    expect(valid.asked).toEqual([[7, "debateShapePolicy"]]);
+  it("a valid row without its map hash refuses the practice runner after the two reads; with the code's hash it passes on; a malformed one refuses; no row passes on", async () => {
+    const unsealed = rowPool(JSON.parse(JSON.stringify(POLICY)));
+    await expect(compose(unsealed.pool)).rejects.toMatchObject({ code: "DEBATE_SHAPE_MAP_HASH_UNSEALED" });
+    expect(unsealed.asked).toEqual([[7, "debateShapePolicy"], [7, "mapContractHash"]]);
+    const sealed = rowPool(JSON.parse(JSON.stringify(POLICY)), mapPromptContractHash());
+    await expect(compose(sealed.pool)).rejects.toThrow("PRACTICE_TEST_NEXT_READ");
+    expect(sealed.asked.slice(0, 2)).toEqual([[7, "debateShapePolicy"], [7, "mapContractHash"]]);
     await expect(compose(rowPool({ kind: "DEBATE_SHAPE_POLICY" }).pool)).rejects.toThrow(/^DEBATE_SHAPE_POLICY_INVALID:/u);
     const absent = rowPool(undefined);
     await expect(compose(absent.pool)).rejects.toThrow("PRACTICE_TEST_NEXT_READ");

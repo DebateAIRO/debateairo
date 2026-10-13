@@ -62,7 +62,7 @@ const rows: readonly Row[] = [
   // lagged the product only because this audit was crashing on the retired `web`
   // manifest read and had never reported a verdict. Both rows are the same commit.
   ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "judgement", "providers", "support-kb", "story", "legal-manifest", "geo", "billing-core", "payments-netopia", "tax-quaderno", "invoice-smartbill", "mail-templates", "scorecard"]],
-  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "billing-core", "contract", "support-kb", "story", "scorecard"]],
+  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "billing-core", "contract", "support-kb", "story", "scorecard", "map"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
   // The `web` row retired with its surface: `web/` is retired in favour of

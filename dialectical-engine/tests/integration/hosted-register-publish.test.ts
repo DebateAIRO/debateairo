@@ -13,6 +13,7 @@
  *  - the pnpm entry point runs the same path, and its dry run writes nothing.
  */
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -45,6 +46,7 @@ import {
   readCostEnvelopePolicy,
   readDeploymentRiskTier,
   readEnvelopeFormulaInputs,
+  readMapContractHash,
   readMfaPolicy,
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
@@ -55,6 +57,7 @@ import {
   readStructuralCeilingPolicyInputs,
   registerVersionToSafeLegacyNumber
 } from "../../packages/register/src/index.js";
+import { mapPromptContractHash } from "../../packages/map/src/index.js";
 import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
 import {
   HOSTED_REGISTER_FILE_FORMAT,
@@ -550,10 +553,10 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     expect(await versionCount()).toBe(before);
   }, 120_000);
 
-  // Debate shape (spec 2026-10-12 §3.1): the optional debateShapePolicy member becomes one additive row. Controller
-  // ruling PF4: in Phase 2a the boot check also asks the runner's own guard, so a version that seals the row is sealed
-  // (it can never be withdrawn) and then refused as not boot-ready: DEBATE_SHAPE_POLICY_RUNNER_PENDING. P2b removes it.
-  it("seals debateShapePolicy as the row the publishers build (refused as not boot-ready in Phase 2a), and a file without the member seals none", async () => {
+  // Debate shape (spec 2026-10-12 §3.1, §4): the optional debateShapePolicy member becomes one additive row, and the
+  // plan seals the code's mapContractHash with it (P2b Task 6), so the boot check asks the runner's own resolution and
+  // the version is boot-ready. A version that seals the row without the map hash is sealed and then refused.
+  it("seals debateShapePolicy as the row the publishers build, with the code's mapContractHash, boot-ready; a file without the member seals none", async () => {
     const operations = createPostgresHostedRegisterOperations(database.pool);
     const absent = await publishHostedRegister({ plan: await planOf(hostedFile()), operations });
     expect(absent.outcome).toBe("CREATED");
@@ -561,12 +564,7 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
 
     const { kind: _kind, ...member } = JSON.parse(JSON.stringify(debateShapePolicyStartValues())) as Record<string, unknown>;
     const before = await versionCount();
-    const failure = await publishHostedRegister({ plan: await planOf({ ...hostedFile(), debateShapePolicy: member }), operations })
-      .then(() => null, (error: unknown) => error);
-    expect(failure).toBeInstanceOf(HostedRegisterBootCheckFailedError);
-    expect(failure).toMatchObject({ code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:DEBATE_SHAPE_POLICY_RUNNER_PENDING" });
-    // The error carries the sealed version's result (the CLI prints it as HOSTED_REGISTER_NOT_BOOT_READY).
-    const given = (failure as HostedRegisterBootCheckFailedError).result;
+    const given = await publishHostedRegister({ plan: await planOf({ ...hostedFile(), debateShapePolicy: member }), operations });
     expect(given.outcome).toBe("CREATED");
     expect(await versionCount()).toBe(before + 1);
     const expected = debateShapePolicyRow(debateShapePolicyStartValues(), "task-14b integration: first hosted register");
@@ -575,8 +573,26 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
       [given.registerVersion]
     );
     expect(sealed.rows).toEqual([{ value_json: JSON.parse(expected.valueJsonText), source_ref: expected.sourceRef }]);
-    await expect(readDebateShapePolicy(database.pool, registerVersionToSafeLegacyNumber(given.registerVersion)))
-      .resolves.toEqual(debateShapePolicyStartValues());
+    const version = registerVersionToSafeLegacyNumber(given.registerVersion);
+    await expect(readDebateShapePolicy(database.pool, version)).resolves.toEqual(debateShapePolicyStartValues());
+    await expect(readMapContractHash(database.pool, version)).resolves.toBe(mapPromptContractHash());
+  }, 120_000);
+
+  it("a version sealing debateShapePolicy without its mapContractHash (a hand-made plan) is sealed, then refused DEBATE_SHAPE_MAP_HASH_UNSEALED", async () => {
+    const operations = createPostgresHostedRegisterOperations(database.pool);
+    // A first publication imports the historical bootstrap, so the count below measures the hand-made version alone.
+    expect((await publishHostedRegister({ plan: await planOf(hostedFile()), operations })).outcome).toBe("CREATED");
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(debateShapePolicyStartValues())) as Record<string, unknown>;
+    const plan = await planOf({ ...hostedFile(), debateShapePolicy: member });
+    expect(plan.rows.some((row) => row.rowKey === "mapContractHash")).toBe(true);
+    const handMade = { ...plan, publicationId: randomUUID(), rows: plan.rows.filter((row) => row.rowKey !== "mapContractHash") };
+    const before = await versionCount();
+    const failure = await publishHostedRegister({ plan: handMade, operations }).then(() => null, (error: unknown) => error);
+    expect(failure).toBeInstanceOf(HostedRegisterBootCheckFailedError);
+    expect(failure).toMatchObject({ code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:DEBATE_SHAPE_MAP_HASH_UNSEALED" });
+    // The error carries the sealed version's result (the CLI prints it as HOSTED_REGISTER_NOT_BOOT_READY).
+    expect((failure as HostedRegisterBootCheckFailedError).result.outcome).toBe("CREATED");
+    expect(await versionCount()).toBe(before + 1);
   }, 120_000);
 
   it.each([

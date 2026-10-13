@@ -213,6 +213,7 @@ import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-s
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunInFlight } from "./run-in-flight.js";
+import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
 import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
@@ -2392,6 +2393,13 @@ export interface WalkingSkeletonSettings {
    * nothing is wrapped, today's runner (and, like an absent row, today's one-call-after-another debate: Task 10).
    */
   readonly callScheduler?: CallScheduler;
+  /**
+   * Debate shape (spec 2026-10-12 §3): set at boot when the register seals debateShapePolicy (with its map hash).
+   * A run whose receipt carries a shape needs it (DEBATE_SHAPE_RUNNER_UNCONFIGURED otherwise, Task 12); a run without
+   * one never reads it. Absent: today's runner. Until Task 13 a shaped receipt is still refused per run
+   * (the Phase 2a per-run refusal in the claim path), so nothing reads this member yet.
+   */
+  readonly debateShape?: DebateShapeRunnerSettings | null;
   /**
    * The model, vendor and preview gate each provider ref's calls use (`previewCallSubjects` on the preview,
    * `targetCallSubjects` elsewhere). Read only with `callScheduler`; absent, each ref is its own model behind no gate.

@@ -395,13 +395,13 @@ describe("Task 14b · the operator's hosted register file", () => {
     expect(renderHostedRegisterPlan(plan)).toMatch(/^provenance=development-source-refs \(known limitation\)$/mu);
   });
 
-  it("M3: says debate_shape=present before sealing a version a Phase-2a runner refuses; no line without the member", async () => {
+  it("M3: says debate_shape=present before sealing a version that carries the shape (and its sealed map hash); no line without the member", async () => {
     const without = renderHostedRegisterPlan(await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile()))));
     expect(without).not.toMatch(/^debate_shape/mu);
     const { kind: _kind, ...member } = JSON.parse(JSON.stringify(debateShapePolicyStartValues())) as Record<string, unknown>;
     const withShape = renderHostedRegisterPlan(await planHostedRegisterPublication(
       parseHostedRegisterFile(bytesOf({ ...validFile(), debateShapePolicy: member }))));
-    expect(withShape).toMatch(/^debate_shape=present .*RUNNER_PENDING\)$/mu);
+    expect(withShape).toMatch(/^debate_shape=present \(the runner argues the debate shape; this version also seals mapContractHash\)$/mu);
     // Only the new line differs: everything else is printed as without the member, apart from the row it adds.
     const strip = (text: string) => text.split("\n").filter((line) => !/^(debate_shape=|row_keys=|row_count=|snapshot_sha256=|publication_id=)/u.test(line));
     expect(strip(withShape)).toEqual(strip(without));
@@ -1360,6 +1360,20 @@ describe("Paid plans P4-E · a scorecard published with billing on can seat Free
   ])("refuses Free-plan models scored but %s", async (_name, change) => {
     expect(await planCodeOf(sellingPlans(serveFreeRoster(validFile())), (example) => change(freeRosterScored(example))))
       .toBe("SCORECARD_FREE_ANSWER_UNSCORED");
+  });
+
+  it("with a debateShapePolicy member in force, reads the member's largest writer bound; enabled false reads the sealed one (P2b Task 6)", async () => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(debateShapePolicyStartValues())) as Record<string, unknown>;
+    const rows = (await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(serveFreeRoster(validFile()))))).rows;
+    const bound = (JSON.parse(rows.find((row) => row.rowKey === "synthesizerCallBound")!.valueJsonText) as { tokenCeiling: number }).tokenCeiling;
+    const shaped = debateShapePolicyStartValues().answerLength.detailed.writerBound;
+    expect(shaped).toBeGreaterThan(bound);
+    const windowOf = (tokens: number) => (example: Record<string, unknown>) =>
+      withFreeCandidates(freeRosterScored(example), { contextWindowTokens: tokens });
+    const withShape = (shape: Record<string, unknown>) => sellingPlans(serveFreeRoster({ ...validFile(), debateShapePolicy: shape }));
+    expect(await planCodeOf(withShape(member), windowOf(9_000 * 4 + shaped - 1))).toBe("SCORECARD_FREE_ANSWER_UNSCORED");
+    expect(await planCodeOf(withShape(member), windowOf(9_000 * 4 + shaped))).toBe("NO_REFUSAL");
+    expect(await planCodeOf(withShape({ ...member, enabled: false }), windowOf(9_000 * 4 + bound))).toBe("NO_REFUSAL");
   });
 
   it("reads the version's own sealed answer bound against the window", async () => {
