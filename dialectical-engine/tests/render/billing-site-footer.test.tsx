@@ -48,16 +48,16 @@ describe("P21 the site footer, extended for paid plans (R3-4; the card processor
   it("with billing off, or with no billing facts at all (local mode alike): no pricing, cancel or withdraw link and no card mark", () => {
     for (const root of [fullWithoutProp(), full(null), full(OFF_WITH_MARKS)]) {
       for (const href of BILLING_LINKS) expect(root.querySelector(`a[href="${href}"]`), href).toBeNull();
-      expect(root.querySelectorAll("img")).toHaveLength(0);
+      expect(root.querySelectorAll(".siteFooterMarks img")).toHaveLength(0);
       expect(hrefs(root)).toEqual(expect.arrayContaining(LEGAL_PAGES.map(({ href }) => href)));
     }
   });
 
   it("shows exactly the card marks whose files the owner supplied", () => {
-    expect(full(on(false, false)).querySelectorAll("img")).toHaveLength(0);
-    expect([...full(on(true, false)).querySelectorAll("img")].map((image) => image.getAttribute("src"))).toEqual(["/payment-marks/visa.svg"]);
+    expect(full(on(false, false)).querySelectorAll(".siteFooterMarks img")).toHaveLength(0);
+    expect([...full(on(true, false)).querySelectorAll(".siteFooterMarks img")].map((image) => image.getAttribute("src"))).toEqual(["/payment-marks/visa.svg"]);
     const both = full(on(true, true));
-    expect([...both.querySelectorAll("img")].map((image) => image.getAttribute("alt"))).toEqual(["Visa", "Mastercard"]);
+    expect([...both.querySelectorAll(".siteFooterMarks img")].map((image) => image.getAttribute("alt"))).toEqual(["Visa", "Mastercard"]);
     expect(both.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("Cards we accept");
   });
 
@@ -81,9 +81,9 @@ describe("P21 the site footer, extended for paid plans (R3-4; the card processor
     }
   });
 
-  it("leaves the one-line footer exactly as it was: the seven legal links, and nothing about paying", () => {
+  it("leaves the one-line footer to the seven legal links and ANPC's SAL badge (15b), and nothing about paying", () => {
     const line = markup(<SiteFooter variant="line" />).querySelector("footer.siteFooterLine")!;
-    expect(hrefs(line)).toEqual(LEGAL_PAGES.map(({ href }) => href));
+    expect(hrefs(line)).toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://anpc.ro/ce-este-sal/"]);
   });
 
   it("takes billing's state from the one plans read, and the marks from the owner's files (none in the repository)", async () => {
