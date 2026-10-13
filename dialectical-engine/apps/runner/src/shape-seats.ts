@@ -49,3 +49,14 @@ export function shapeWriterSeat(input: Readonly<{ seatMakers: readonly string[];
 export function shapeDistinctMakers<T extends Readonly<{ main: Readonly<{ maker: string }> }>>(seats: readonly T[], sitsOut: (seat: T) => boolean): number {
   return new Set(seats.filter((seat) => !sitsOut(seat)).map((seat) => seat.main.maker)).size;
 }
+
+/**
+ * Task 13 fix round 1 (spec §3.3 step 3: a leg is written by a maker other than the one it answers) — the bar a shaped
+ * leg puts on WHO may answer it: every member of the writer's seat (its main and its backup) and any cheaper maker a
+ * refused call moves to (B9). Undefined when nothing is to be avoided (today's call: no rule).
+ */
+export function shapeMakerBar(avoidMakers: readonly (string | null | undefined)[]):
+  ((member: Readonly<{ maker: string }>) => boolean) | undefined {
+  const barred = avoidMakers.filter((maker): maker is string => typeof maker === "string" && maker !== "");
+  return barred.length === 0 ? undefined : (member) => !barred.includes(member.maker);
+}

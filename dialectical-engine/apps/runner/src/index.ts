@@ -222,10 +222,10 @@ import {
   shapeRootMaterial
 } from "./map-stage.js";
 import {
-  buildShapePlan, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
+  buildShapePlan, shapeLegCanRun, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
   type ShapeLeg, type ShapePlan, type ShapePositionPlan
 } from "./shape-plan.js";
-import { shapeDistinctMakers, shapeHandOverRoot, shapeSeatOrder, shapeWriterSeat } from "./shape-seats.js";
+import { shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeSeatOrder, shapeWriterSeat } from "./shape-seats.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
@@ -2403,8 +2403,8 @@ export interface WalkingSkeletonSettings {
   /**
    * Debate shape (spec 2026-10-12 §3): set at boot when the register seals debateShapePolicy (with its map hash).
    * A run whose receipt carries a shape needs it (DEBATE_SHAPE_RUNNER_UNCONFIGURED otherwise, Task 12); a run without
-   * one never reads it. Absent: today's runner. Until Task 13 a shaped receipt is still refused per run
-   * (the Phase 2a per-run refusal in the claim path), so nothing reads this member yet.
+   * one never reads it. Absent: today's runner. A shaped run reads its map hash (the map's calls are checked against
+   * it) and argues the shape (Task 13: the Phase 2a per-run refusal is gone).
    */
   readonly debateShape?: DebateShapeRunnerSettings | null;
   /**
@@ -5310,6 +5310,11 @@ export class WalkingSkeletonRunner {
      */
     const bodyServedBy = new Map<string, string>();
     const reviewAuthorMakers = new Map<string, string>();
+    /**
+     * Debate shape (Task 13 fix round 1): a shaped leg's maker bar (`shapeMakerBar`), by call site, so a call moved to
+     * a cheaper maker never lands on the maker the leg must avoid. Empty on today's run.
+     */
+    const movedCallBars = new Map<string, (member: Readonly<{ maker: string }>) => boolean>();
     const bodyMakers = Object.freeze([...configuredMakers]);
     const bodyPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
     const bodyGatewayFor = (planned: ConfiguredSeatMaker, provider: ProviderGateway): ProviderGateway =>
@@ -5318,7 +5323,9 @@ export class WalkingSkeletonRunner {
         prices: bodyPrices,
         eligibleFor: (request) => {
           const author = reviewAuthorMakers.get(seatBaseCallSiteKey(request.callSiteKey));
-          return author === undefined ? bodyMakers : bodyMakers.filter((candidate) => candidate.maker !== author);
+          const bar = movedCallBars.get(seatBaseCallSiteKey(request.callSiteKey));
+          return author === undefined && bar === undefined ? bodyMakers
+            : bodyMakers.filter((candidate) => candidate.maker !== author && (bar === undefined || bar(candidate)));
         },
         onServed: (callSiteKey, servedBy) => { bodyServedBy.set(seatBaseCallSiteKey(callSiteKey), servedBy.providerRef); },
         onMoved: (moved) => this.#recordCostSubstitution(run.runId, moved)
@@ -6573,8 +6580,11 @@ export class WalkingSkeletonRunner {
        * answered it, or an untried one next to a spent main, answers it again.
        */
       const spentSites: { readonly row: SeatKeyRow }[] = [];
+      // Task 13 fix round 1: a shaped run's root i is the i-th seat in the shape's root order (`shapeSeatOrder`, as
+      // `rootSeats` below), so its roots 0 and 1 are read there; today's run reads the seat book's own order.
+      const claimRootSeats: readonly RunSeat[] = shapeRun === null ? seatBook.position : shapeSeatOrder(seatBook.position);
       for (const [rootIndex, siteKey] of [[0, "JUDGE"], [1, "JUDGE:root:secondary"]] as const) {
-        const seat = seatBook.position[rootIndex];
+        const seat = claimRootSeats[rootIndex];
         const spent = seat === undefined ? null : seatCallPlan(seat, siteKey, positionRule(seat)).spent;
         // A16c (controller carry 14c): the terminal cites the site's latest FAILURE — an OK row
         // would settle a FAILED work item on an answer's attempt. Only a site whose spent keys hold
@@ -7105,6 +7115,11 @@ export class WalkingSkeletonRunner {
        */
       readonly leg: JudgeLeg;
       readonly callSiteKey: string;
+      /**
+       * Debate shape (Task 13 fix round 1): the makers this leg must not be written by, as a rule on every member of
+       * its seat (main and backup) and on a call moved to a cheaper maker. Absent on today's legs.
+       */
+      readonly makerBar?: (member: Readonly<{ maker: string }>) => boolean;
       readonly role: string;
       readonly parentNodeId: string | null;
       readonly childKind: "support" | "defeater" | null;
@@ -7177,8 +7192,9 @@ export class WalkingSkeletonRunner {
       const childPlan = seatCallPlan(
         input.seat,
         input.callSiteKey,
-        input.seat.role === "POSITION" ? positionRule(input.seat) : undefined
+        input.seat.role === "POSITION" ? positionRule(input.seat) : input.makerBar
       );
+      if (input.makerBar !== undefined) movedCallBars.set(seatBaseCallSiteKey(input.callSiteKey), input.makerBar);
       const childAttempt = await cooldownAttempt({
         callSiteKey: input.callSiteKey,
         parentNodeId: input.parentNodeId,
@@ -7912,6 +7928,10 @@ export class WalkingSkeletonRunner {
         if (leg.chain !== null && !kept.has(leg.chain)) deselectedIndices.add(leg.childIndex);
       }
     };
+    /** Task 13 fix round 1: whether plan position `index` can still be asked (`shapeLegCanRun`); always on today's run. */
+    const legCanRun = (index: number): boolean => shapeLegCanRun(shapeLegAt(index), {
+      deselected: deselectedIndices.has(index), adaptive: adaptiveShape, chosen: adaptiveChosen, depth: expansionDepth
+    });
     /** At round 1 of an adaptive shaped run, a boundary that cannot be measured keeps no chain (never more than priced). */
     const keepNoChainAtRoundOne = (completedRounds: number): void => {
       if (adaptiveShape && completedRounds === 1) keepAdaptiveChains(() => null);
@@ -8146,6 +8166,11 @@ export class WalkingSkeletonRunner {
           : seatBook.supportAttack[writerIndex!]!;
         const role = leg.polarity === "support" ? "defender" : "critic";
         const plannedSubtreeIndices = subtreeIndices(leg.childIndex);
+        // Task 13 fix round 1: the planned count holds only the legs that can still be asked (never a dropped chain's).
+        const plannedLegCount = plannedSubtreeIndices.filter(legCanRun).length;
+        // Task 13 fix round 1 (spec §3.3 step 3): the maker this leg answers never writes it — not the seat's backup,
+        // not a call moved to a cheaper maker.
+        const makerBar = shapeLeg === null ? undefined : shapeMakerBar([answeredMakers[leg.parentIndex]]);
         const call = {
           authorIndex: shapeLeg === null ? leg.authorIndex : seat.seatIndex,
           seat,
@@ -8155,10 +8180,11 @@ export class WalkingSkeletonRunner {
               consideration: shapeLeg.consideration }
             : { kind: leg.polarity === "support" ? "support" as const : "attack" as const, positionUnderDebate: parentStatement },
           callSiteKey: shapeLeg?.callSiteKey ?? `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
+          ...(makerBar === undefined ? {} : { makerBar }),
           role,
           childKind: leg.polarity === "support" ? "support" as const : "defeater" as const,
           siblingOrdinal: shapeLeg?.siblingOrdinal ?? (leg.polarity === "support" ? 1 : 2),
-          plannedLegCount: plannedSubtreeIndices.length,
+          plannedLegCount,
           explorationDecision: leg.polarity === "support" ? "deepen" as const : "challenge" as const
         };
         let authored: Awaited<ReturnType<typeof authorAndPanel>>;
@@ -8180,7 +8206,7 @@ export class WalkingSkeletonRunner {
           // As today: nothing beneath a halted reply is asked, and its halt is recorded in plan order.
           plannedSubtreeIndices.forEach((index) => haltedIndices.add(index));
           statements[position]!.resolve(null);
-          const halted = { ...authored.record, plannedLegCount: plannedSubtreeIndices.length };
+          const halted = { ...authored.record, plannedLegCount };
           await nodeRecorder.commit(position, async () => {
             if (!bodyFailed) haltedExpansionRecords.push(halted);
           });
@@ -8220,7 +8246,10 @@ export class WalkingSkeletonRunner {
         if (ownPosition === null || otherMakersPosition === null || arguingStopped()) return;
         // Pre-flight PF-B42: keyed by root index in a shaped run.
         const writer = positionAnswerers.get(shapeLeg.rootIndex);
-        if (writer === undefined) return;
+        if (writer === undefined) {
+          // As `crossExchangeSeatFor`: a written root always has its answerer recorded; none is a defect, never a skip.
+          throw new TypedDomainError("DEBATE_ROOT_MISSING", `Cross-reply ${shapeLeg.callSiteKey} has no written root ${String(shapeLeg.rootIndex)}`);
+        }
         // Pre-flight PF-B43, as `crossExchangeSeatFor`: a site an earlier pass already recorded keeps its slot (the
         // attempt ceiling is exact only under that precondition, packages/register/src/index.ts).
         const recorded = recordedSlotBySite.get(shapeLeg.callSiteKey);

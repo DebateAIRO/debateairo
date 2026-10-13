@@ -198,3 +198,16 @@ export function shapeRunnableLegs(plan: ShapePlan, depth: number, depthMode: "fi
   }
   return Object.freeze(plan.legs.filter((leg) => leg.kind === "POINT" || leg.chain === null || !dropped.has(leg.chain)));
 }
+
+/**
+ * Task 13 fix round 1 — WHETHER A PLAN POSITION CAN STILL BE ASKED, for a halted leg's planned count: a root or a leg
+ * of today's plan always (`leg === null`); a deeper leg of a chain the adaptive choice dropped never; and, on an
+ * adaptive run, a planned deeper leg (round 2..depth) only once the round-1 choice was made — a halted point is never
+ * kept, so nothing under it can run. Scrutiny legs (past the depth) and fixed-mode legs are priced on their own.
+ */
+export function shapeLegCanRun(leg: Pick<ShapeLeg, "round"> | null, input: Readonly<{ deselected: boolean; adaptive: boolean;
+  chosen: boolean; depth: number }>): boolean {
+  if (leg === null) return true;
+  if (input.deselected) return false;
+  return !(input.adaptive && leg.round > 1 && leg.round <= input.depth && !input.chosen);
+}
