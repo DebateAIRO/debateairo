@@ -17,6 +17,7 @@ import {
   rootZeroMapMaterialChars,
   rootZeroRoomRefs,
   runMapStage,
+  shapeRootMaterial,
   type MapStageDeps
 } from "../../apps/runner/src/map-stage.js";
 import { framedFixturePacket } from "../support/framed-packet.js";
@@ -270,5 +271,45 @@ describe("the map under a ceiling that leaves too little for it and root 0", () 
 
   it("keeps root 0 its room after a room-only stop", () => {
     expect(decideRunCostEnvelope({ spentMicros: BODY_CEILING - ROOM, projectedMicros: ROOM, ceilingMicros: BODY_CEILING }).kind).toBe("WITHIN");
+  });
+});
+
+/**
+ * Binding note 2 (Task 13): root 0's material is ENFORCED within `rootZeroMapMaterialChars`, so the room the map keeps
+ * for root 0 stays a ceiling whatever the map (or a stored map) hands the runner: the answer is clipped at a character
+ * boundary, and whole map points are dropped from the end of the longer side until the points' JSON fits.
+ */
+describe("a root's assigned material is held within root 0's limits", () => {
+  const points = (forClaims: readonly string[], againstClaims: readonly string[]) => JSON.stringify({ for: forClaims, against: againstClaims });
+
+  it("passes material within the limits through unchanged", () => {
+    const material = { assignedAnswer: "Yes, keep it.", mapPoints: points(["A point for."], ["A point against."]) };
+    expect(shapeRootMaterial(material)).toEqual(material);
+  });
+
+  it("clips an over-long answer to the limit, never splitting a character", () => {
+    const fitted = shapeRootMaterial({ assignedAnswer: `${"a".repeat(rootZeroMapMaterialChars.answer - 1)}\u{1F600}tail`, mapPoints: points([], []) });
+    expect(fitted.assignedAnswer).toBe("a".repeat(rootZeroMapMaterialChars.answer - 1));
+  });
+
+  it("drops whole points from the end of the longer side until the points fit, keeping the JSON readable", () => {
+    // Claims of double quotes: each is two characters once JSON-escaped, so points within the map's own claim limit overflow.
+    const claim = (tag: string) => `${tag}${"\"".repeat(MAP_LIMITS.claimMaxChars - tag.length)}`;
+    const forClaims = Array.from({ length: MAP_LIMITS.choosePointsPerSideMax }, (_unused, index) => claim(`f${String(index)}`));
+    const againstClaims = Array.from({ length: MAP_LIMITS.choosePointsPerSideMax + 3 }, (_unused, index) => claim(`a${String(index)}`));
+    const fitted = shapeRootMaterial({ assignedAnswer: "Yes.", mapPoints: points(forClaims, againstClaims) });
+    expect(fitted.mapPoints.length).toBeLessThanOrEqual(rootZeroMapMaterialChars.points);
+    const kept = JSON.parse(fitted.mapPoints) as { for: string[]; against: string[] };
+    expect(kept.for).toEqual(forClaims.slice(0, kept.for.length));
+    expect(kept.against).toEqual(againstClaims.slice(0, kept.against.length));
+    expect(kept.for.length + kept.against.length).toBeGreaterThan(0);
+    // Nothing was dropped that did not have to be: every claim is as long, so one more point would not fit.
+    const restored = { for: kept.for, against: againstClaims.slice(0, kept.against.length + 1) };
+    expect(JSON.stringify(restored).length).toBeGreaterThan(rootZeroMapMaterialChars.points);
+  });
+
+  it("reads over-long map points it cannot parse as none", () => {
+    expect(shapeRootMaterial({ assignedAnswer: "Yes.", mapPoints: "x".repeat(rootZeroMapMaterialChars.points + 1) }).mapPoints)
+      .toBe(points([], []));
   });
 });

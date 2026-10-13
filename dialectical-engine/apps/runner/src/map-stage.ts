@@ -1,6 +1,6 @@
 import { projectedCallCeilingMicros, type ProviderTargetPrice } from "@debateai/budget";
 import { rootPositionRequestBytesBound } from "@debateai/judgement";
-import { exhaustive } from "@debateai/kernel";
+import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import {
   MAP_LIMITS, mapErrorCodeOf, mapProviderPieces, mapRunAngleMap, mapRunBlindLists, mapRunSnowball,
   type MapCallOutcome, type MapCallRequest, type MapCaller, type MapChoiceRepository, type MapResult, type MapRunInput, type MapSeat,
@@ -170,6 +170,44 @@ export const rootZeroMapMaterialChars = Object.freeze({
   points: (2 * MAP_LIMITS.choosePointsPerSideMax + 3) * (MAP_LIMITS.claimMaxChars + 64) + 64
 });
 
+/**
+ * Binding note 2 (Task 13) — ROOT 0'S MATERIAL, ENFORCED: what a root is asked to argue, held within
+ * `rootZeroMapMaterialChars` (counted in UTF-16 code units, the unit the bound's own worst-case material is made of), so
+ * the room the map kept for root 0 stays a ceiling whatever the map, or a stored map, hands the runner. The answer is
+ * clipped at a character boundary; whole map points are dropped from the end of the side with more of them (the `for`
+ * side on a tie: round 1 asks the points against first) until the points' JSON fits. Over-long points that are not the
+ * `{ for, against }` JSON the plan writes are read as none. Material within the limits is returned unchanged.
+ */
+export function shapeRootMaterial(material: Readonly<{ assignedAnswer: string; mapPoints: string }>,
+  limits: Readonly<{ answer: number; points: number }> = rootZeroMapMaterialChars): Readonly<{ assignedAnswer: string; mapPoints: string }> {
+  let assignedAnswer = material.assignedAnswer;
+  if (assignedAnswer.length > limits.answer) {
+    let clipped = "";
+    for (const character of assignedAnswer) {
+      if (clipped.length + character.length > limits.answer) break;
+      clipped += character;
+    }
+    assignedAnswer = clipped;
+  }
+  if (assignedAnswer === material.assignedAnswer && material.mapPoints.length <= limits.points) return material;
+  let sides: { for: string[]; against: string[] };
+  try {
+    const parsed = JSON.parse(material.mapPoints) as unknown;
+    const strings = (value: unknown): string[] | null =>
+      Array.isArray(value) && value.every((entry) => typeof entry === "string") ? [...value as string[]] : null;
+    const record = parsed !== null && typeof parsed === "object" ? parsed as Record<string, unknown> : {};
+    sides = { for: strings(record.for) ?? [], against: strings(record.against) ?? [] };
+  } catch {
+    sides = { for: [], against: [] };
+  }
+  let mapPoints = material.mapPoints.length <= limits.points ? material.mapPoints : JSON.stringify(sides);
+  while (mapPoints.length > limits.points && sides.for.length + sides.against.length > 0) {
+    if (sides.against.length > sides.for.length) sides.against.pop(); else sides.for.pop();
+    mapPoints = JSON.stringify(sides);
+  }
+  return Object.freeze({ assignedAnswer, mapPoints });
+}
+
 /** Room for the target's own `model` member, which `rootPositionRequestBytesBound` leaves empty. */
 const ROOT_ZERO_BODY_ALLOWANCES = Object.freeze({ modelIdBytes: 256 });
 
@@ -217,7 +255,9 @@ export function rootZeroKeepRoomMicros(input: Readonly<{ prices: readonly Provid
  * nothing; a spend stop the stored map met (`stoppedBy`) is restored, so the arguing stops after root 0 exactly as on the
  * first claim (Task 12 fix round 1, Minor 2). Otherwise the map is asked and stored; when another copy of the run stored
  * its map first (ALREADY_PRESENT), this copy argues the STORED map, never its own (Important 1), and keeps its own spend
- * stop too: what it spent is spent. RUN_ERASED keeps this copy's map: nothing more of the run is stored.
+ * stop too: what it spent is spent. Binding note 4 (Task 13): RUN_ERASED stops the run, as every other writer of an erased
+ * run does — the graph's own write refuses it (`assertLive` in the content lease, packages/db): PRIVATE_CONTENT_ERASED,
+ * before root 0 is asked.
  */
 export async function resolveShapeMap(input: Readonly<{
   store: Pick<MapChoiceRepository, "writeMapRun" | "readMapResultForRun">;
@@ -232,6 +272,7 @@ export async function resolveShapeMap(input: Readonly<{
   if (stored !== null) return Object.freeze({ result: stored, spendStop: storedStop(stored) });
   const own = await input.runMap();
   const written = await input.store.writeMapRun({ runId: input.runId, result: own.result, answerCount: input.answerCount() });
+  if (written === "RUN_ERASED") throw new TypedDomainError("PRIVATE_CONTENT_ERASED", "Private content is no longer available");
   if (written !== "ALREADY_PRESENT") return own;
   const winner = await input.store.readMapResultForRun(input.runId);
   if (winner === null) return own;

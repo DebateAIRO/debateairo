@@ -62,7 +62,8 @@ describe("V-28 round 4 — the post-authoring serve decision is one function, ca
     const source = await readFile(RUNNER, "utf8");
 
     expect(source).toMatch(
-      /const makerPositionServe = decideMakerPositionServe\(\{[\s\S]*?effectiveMakerCount,[\s\S]*?runBodyBudgetStop,[\s\S]*?authoredMakerPositions,[\s\S]*?\}\);/u
+      // Debate shape (plan Task 13): the decision counts the servable ROOTS — the shape's P, or today's one per maker.
+      /const makerPositionServe = decideMakerPositionServe\(\{[\s\S]*?effectiveMakerCount: rootCount,[\s\S]*?runBodyBudgetStop,[\s\S]*?authoredMakerPositions,[\s\S]*?\}\);/u
     );
     // The projection and the propagation are READ from the decision, never
     // recomputed beside it from the planned panel size.
@@ -247,7 +248,15 @@ const RUN_BODY_STOP_SITES: readonly RunBodyStopSite[] = Object.freeze([
   },
   {
     site: "the cross-root response author (one chain each)",
-    anchor: "leg: { kind: \"cross-root\" as const, ownPosition, otherMakersPosition },",
+    anchor: "seat: crossExchangeSeatFor(exchange),\n          leg: { kind: \"cross-root\" as const, ownPosition, otherMakersPosition },",
+    decides: "expansionPhaseStop(error)",
+    guard: PHASE_GUARD,
+    assignment: "runBodyBudgetStop = stop;"
+  },
+  {
+    // Debate shape (plan Task 13): a position's ONE cross-reply is its own chain (`argueShapeCross`), with its own catch.
+    site: "the shape's cross-reply author (one chain each)",
+    anchor: "callSiteKey: shapeLeg.callSiteKey,\n          role: \"cross-root response\",",
     decides: "expansionPhaseStop(error)",
     guard: PHASE_GUARD,
     assignment: "runBodyBudgetStop = stop;"
@@ -291,15 +300,19 @@ const PANEL_PARTIAL_RULE = "else if (memberFailures.length > 0 || spendStop !== 
 const CHAIN_STOP = "const arguingStopped = (): boolean => bodyFailed || runBodyBudgetStop !== null || tooFewLeftToArgue();";
 const ROOT_CHAIN = "const rootChain = async (rootIndex: number, stage: { rank: ChainRank }): Promise<void> => {";
 const ROOT_CHAIN_GUARD = "if (arguingStopped()) return;";
-const ROOT_AUTHOR_CALL = "authoredRoot = await authorAndPanel(input, (statement) => statements[rootIndex]!.resolve(statement));";
+const ROOT_AUTHOR_CALL = "authoredRoot = await authorAndPanel(input, (statement, maker) => {";
 /**
  * Parallel calls (Task 11, O6): a reply's chain and a cross-exchange's chain ask the stop right before their author
  * call too — after any wait for a parent or a round boundary, which a stop may land during.
  */
-const REPLY_CHAIN = "const legChain = async (legIndex: number, stage: { rank: ChainRank }): Promise<void> => {";
+// Debate shape (plan Task 13): the leg chain's body is `argueLeg` (`legChain` hands it the planned leg and its boundary).
+const REPLY_CHAIN = "const argueLeg = async (leg: MultiMakerExpansionLeg, decision: Promise<void> | undefined, stage: { rank: ChainRank }): Promise<void> => {";
 const REPLY_CHAIN_GUARD = "// Spec §2.3 (O6): right before the reply's author call.\n        if (arguingStopped()) return;";
 const EXCHANGE_CHAIN = "const crossChain = async (exchangeIndex: number, stage: { rank: ChainRank }): Promise<void> => {";
 const EXCHANGE_CHAIN_GUARD = "// Spec §2.3 (O6): right before the exchange's author call.\n        if (arguingStopped()) return;";
+/** Debate shape (plan Task 13): a position's cross-reply asks the stop once both positions are known, before its call. */
+const SHAPE_CROSS_CHAIN = "const argueShapeCross = async (shapeLeg: ShapeLeg, stage: { rank: ChainRank }): Promise<void> => {";
+const SHAPE_CROSS_CHAIN_GUARD = "if (ownPosition === null || otherMakersPosition === null || arguingStopped()) return;";
 const CHAIN_AUTHOR_CALL = "authored = await authorAndPanel({ ...call,";
 const REVIEW_CHAIN = "const reviewInChain = async (slot: ReviewSlot, authoredNode: AuthoredDebateNode): Promise<void> => {";
 const REVIEW_CHAIN_GUARD = "if (arguingStopped()) {";
@@ -415,7 +428,7 @@ function assertRunBodyStopWiring(source: string): void {
 
   // Every assignment in the file belongs to one of the sites above, or to the
   // first root's panel record below.
-  expect(statementOccurrences(source, "runBodyBudgetStop = stop;"), "five `= stop`").toBe(5);
+  expect(statementOccurrences(source, "runBodyBudgetStop = stop;"), "six `= stop`").toBe(6);
   expect(statementOccurrences(source, "runBodyBudgetStop = outcome.stop;"), "one `= outcome.stop`").toBe(1);
 
   // 3. The first root's panel: the voices heard are kept, the stop is recorded,
@@ -450,7 +463,8 @@ function assertRunBodyStopWiring(source: string): void {
   const reviewCallAt = source.indexOf(REVIEW_CHAIN_CALL, reviewChainAt);
   expect(reviewCallAt, "the review chain's call").toBeGreaterThan(reviewChainAt);
   expect(statementOccurrences(source.slice(reviewChainAt, reviewCallAt), REVIEW_CHAIN_GUARD), "asked before a review call").toBe(1);
-  for (const [chain, guard] of [[REPLY_CHAIN, REPLY_CHAIN_GUARD], [EXCHANGE_CHAIN, EXCHANGE_CHAIN_GUARD]] as const) {
+  for (const [chain, guard] of [[REPLY_CHAIN, REPLY_CHAIN_GUARD], [EXCHANGE_CHAIN, EXCHANGE_CHAIN_GUARD],
+    [SHAPE_CROSS_CHAIN, SHAPE_CROSS_CHAIN_GUARD]] as const) {
     const chainAt = source.indexOf(chain);
     expect(chainAt, chain).toBeGreaterThanOrEqual(0);
     const authorAt = source.indexOf(CHAIN_AUTHOR_CALL, chainAt);

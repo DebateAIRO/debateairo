@@ -17,12 +17,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { argumentLanguageDirective } from "@debateai/kernel";
+import { MAP_CONTRACT_IDS } from "@debateai/map";
 import { STORY_CHECKER_CONTRACT_ID, STORYTELLER_CONTRACT_ID } from "@debateai/story";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import { reviewArtifact, withRequestDerivedBearings } from "./reviewBearings.js";
 
 export type GateProvider = "deepinfra" | "anthropic";
-export type GateRequestKind = "PROBE" | "STORYTELLER" | "STORY_CHECKER" | "PANEL" | "REVIEW" | "JUDGE" | "EVALUATOR" | "COMPOSE";
+export type GateRequestKind = "PROBE" | "STORYTELLER" | "STORY_CHECKER" | "MAP" | "PANEL" | "REVIEW" | "JUDGE" | "EVALUATOR" | "COMPOSE";
 /** A /complete request as the gate saw it (what a scenario's `override` is handed). */
 export type GateRequest = Readonly<{ provider: GateProvider; model: string; kind: GateRequestKind | "UNKNOWN"; body: Readonly<Record<string, unknown>> }>;
 /**
@@ -245,6 +246,8 @@ export function classifyGateRequest(chat: string): GateRequestKind | "UNKNOWN" {
   const contractId = readFramedMaterial(wirePacket(chat)).contractId;
   if (contractId === STORYTELLER_CONTRACT_ID) return "STORYTELLER";
   if (contractId === STORY_CHECKER_CONTRACT_ID) return "STORY_CHECKER";
+  // Debate shape (plan Task 15): the map's six contracts, by their ids. The new judge contracts stay "JUDGE" below.
+  if ((Object.values(MAP_CONTRACT_IDS) as string[]).includes(contractId)) return "MAP";
   const instruction = (messages[0]?.content ?? "").replace(LANGUAGE_DIRECTIVE, "");
   // The panel's assessment is the judge's schema WITHOUT restatement_text (tests/unit/t03-judge-panel.test.ts).
   if (instruction.includes("fatalFlags") && !instruction.includes("restatement_text")) return "PANEL";

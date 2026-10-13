@@ -46,8 +46,10 @@ import {
   computeStructuralCeilingBasis,
   effectiveCallConcurrency,
   readStoryPolicy,
-  type CallConcurrencyPolicy
+  type CallConcurrencyPolicy,
+  type DebateShapeCeilingInput
 } from "@debateai/register";
+import type { DebateShapeSettings } from "@debateai/contract";
 import { createPostgresProviderGateway, WalkingSkeletonRunner, type WalkingSkeletonSettings } from "@debateai/runner";
 import {
   pickRotatedRoles,
@@ -69,6 +71,7 @@ import { createRunnerProviderTopology } from "../../apps/runner/src/provider-top
 import { createCallScheduler, type CallPriority, type CallScheduler, type DebateCallLane } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
+import type { DebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
 import {
   startPreviewGateStubs,
   type GateDebateScripts,
@@ -294,6 +297,8 @@ export function previewDebateHarness(input: Readonly<{
       resilience?: typeof RUN_RESILIENCE; callConcurrency?: CallConcurrencyPolicy;
       /** The adaptive stopping row (δ, ε); absent, δ = ε = 0: nothing freezes, the requested depth is expanded in full. */
       stoppingPolicy?: Readonly<{ delta: number; epsilon: number }>;
+      /** Debate shape (plan Task 15): the runner's shape settings (the sealed map hash), passed as main.ts passes them. */
+      debateShape?: DebateShapeRunnerSettings;
     }> = {}
   ) {
     const probeSleeps: number[] = [];
@@ -401,6 +406,7 @@ export function previewDebateHarness(input: Readonly<{
       answerRoleFallbackCovered: ({ roleRef, panel }) => previewSealedRoleFallbackCovered(roleRef, panel),
       ...(options.resilience === undefined ? {} : { runResilience: options.resilience }),
       callScheduler,
+      ...(options.debateShape === undefined ? {} : { debateShape: options.debateShape }),
       callSubjects: previewCallSubjects(PREVIEW),
       holdRecorder: {
         countCooldownHolds: async () => holdWaits.length,
@@ -420,9 +426,14 @@ export function previewDebateHarness(input: Readonly<{
    * A run on `panelRefs` (default: the four-member panel) at `depth` (default 2), with the rotation pin admission
    * writes (counts empty: the first rotated debate), or with `pin` written by hand (the incident's, INCIDENT_PIN).
    * `question` (default: a fresh label) is the run's question line.
+   *
+   * Debate shape (plan Task 15): with `shape` (the sizes P2a freezes on the receipt) and `settings`, the run is admitted
+   * shaped — `depthParams` carries the settings and the receipt the shape — and its argument language is passed to
+   * `startRun` EXPLICITLY (`language`, default English), never through the question guesser (amendment 2026-10-13).
    */
   async function admittedRun(label: string, admission: Readonly<{
     panelRefs: readonly string[]; pin?: RotatedRoles; depth?: number; question?: string;
+    shape?: DebateShapeCeilingInput; settings?: DebateShapeSettings; language?: Readonly<{ tag: string; name: string }>;
   }> = { panelRefs: PANEL_REFS }): Promise<{ runId: string; workItemId: string; askerId: string; rotated: RotatedRoles; question: string }> {
     const asOf = "2026-10-11T19:30:00.000Z";
     const depth = admission.depth ?? 2;
@@ -440,8 +451,13 @@ export function previewDebateHarness(input: Readonly<{
       questionLine: question, principal: { kind: "legacy", legacyAskerId: askerId }, sessionId: `session:${askerId}`,
       callerScope: "ASKER", asOf: new Date(asOf), askerRiskTier: "casual", effectiveRiskTier: "casual", tierSource: "ASKER",
       tierProvenanceRef: `asker-declaration:${askerId}`, compositionBudgetTier: "high",
-      depthParams: { depth }, discoveredPanel: panel, strangerSampleRate: 1,
-      envelopeBasis: computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize: panel.length, depth }),
+      depthParams: { depth, ...(admission.settings ?? {}) }, discoveredPanel: panel, strangerSampleRate: 1,
+      envelopeBasis: computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize: panel.length, depth,
+        ...(admission.shape === undefined ? {} : { shape: admission.shape }) }),
+      ...(admission.shape === undefined ? {} : {
+        argumentLanguageTag: (admission.language ?? { tag: "en" }).tag,
+        argumentLanguageName: (admission.language ?? { name: "English" }).name
+      }),
       registerVersion: 1, batteryVersion: "s00", batteryRows
     });
     await insertRunRoleRotation(pool(), { runId, ...rotationPinFields(rotated) });

@@ -222,6 +222,12 @@ describe("resolveShapeMap", () => {
     expect(written).toEqual([{ runId: "run-1", result: result("RUN_COST_ENVELOPE_EXHAUSTED", "new"), answerCount: 3 }]);
   });
 
+  it("an erased run stops the run as the graph's own write does: PRIVATE_CONTENT_ERASED (binding note 4)", async () => {
+    const { store } = storeOf(null, () => "RUN_ERASED");
+    await expect(resolveShapeMap({ store, runId: "run-1", answerCount: () => 2, spendStopOfCode,
+      runMap: async () => ({ result: result(null, "own"), spendStop: null }) })).rejects.toMatchObject({ code: "PRIVATE_CONTENT_ERASED" });
+  });
+
   it("a second writer that loses the race argues the STORED map, not its own (Important 1)", async () => {
     const { store } = storeOf(null, () => "ALREADY_PRESENT");
     const resolved = await resolveShapeMap({ store, runId: "run-1", answerCount: () => 2, spendStopOfCode,
