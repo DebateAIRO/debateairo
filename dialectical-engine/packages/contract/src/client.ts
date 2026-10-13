@@ -445,8 +445,10 @@ export interface ContractClient {
   confirmEmailChange(token: string): Promise<{ status: "CONFIRMED" }>;
   cancelEmailChangeByLink(token: string): Promise<{ status: "CANCELLED" }>;
   submitAsk(input: AskRequest): Promise<AskAccepted>;
-  /** Budget spec §2.7: the room this ask would find — a word, never a figure. */
-  /** Debate shape (M4): the three shape fields go on the query only when given, so today's query is unchanged. */
+  /**
+   * Budget spec §2.7: the room this ask would find — a word, never a figure. Debate shape (M4): the three shape
+   * fields go on the query only when given, so today's query is unchanged.
+   */
   getAskRoom(input: Readonly<{
     plan_tier: PlanTier;
     composition_budget_tier: "low" | "medium" | "high";

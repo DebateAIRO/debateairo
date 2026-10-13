@@ -243,7 +243,7 @@ export function refuseDebateShapeReceiptInPhase2a(envelopeBasis: ReturnType<type
   if (envelopeBasis.shape !== undefined) {
     throw new TypedDomainError(
       "RUN_ENVELOPE_BASIS_INVALID",
-      "This runner cannot run a debate-shape receipt yet (Phase 2a); a Phase 2b runner must claim this run"
+      "This runner cannot run a debate-shape receipt yet (Phase 2a); the run is refused for good, ask again once a Phase 2b runner is deployed"
     );
   }
 }

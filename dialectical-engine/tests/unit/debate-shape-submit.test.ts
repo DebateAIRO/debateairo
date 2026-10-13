@@ -352,7 +352,7 @@ describe("the boot reads the optional row (note 8) and the practice runner refus
   it("I2(a): in Phase 2a the API boot and the practice ask refuse a present row right after reading it, before the ask application", () => {
     const main = readFileSync(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
     const read = 'boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION))';
-    const guard = 'boot.runSync("debate-shape-policy", () => assertDebateShapeRunnerReady(debateShapePolicy));';
+    const guard = 'boot.runSync("debate-shape-runner-pending", () => assertDebateShapeRunnerReady(debateShapePolicy));';
     expect(main.split(guard)).toHaveLength(2);
     expect(main.indexOf(read)).toBeLessThan(main.indexOf(guard));
     expect(main.indexOf(guard)).toBeLessThan(main.indexOf("new PostgresAskApplication("));

@@ -588,7 +588,7 @@ export type PreviewCallShares = Readonly<{ denominator: bigint; shares: readonly
  * A debate-shape receipt (spec 2026-10-12, read only through the strict reader, PF7): the writer's sites are
  * ANSWER_WRITER calls, and the map's one merge and one choose (controller ruling X1) are taken out of the panel's even
  * share and charged, as MAP_MERGE / MAP_CHOOSE, one whole call each on every gate at its dearest panel member
- * (`dearestFor` at that call's price, else the reviewers' dearest member): whichever member holds that seat, its gate
+ * (`dearestFor` at that call's price; a shaped receipt requires it): whichever member holds that seat, its gate
  * is never under-charged. Every other map site (the angles, the lists, a list asked again, the gap rounds) stays an
  * evenly shared debate call. Today's receipt: today's shares exactly.
  * Fractions are kept exact: every numerator is over the one `denominator`.

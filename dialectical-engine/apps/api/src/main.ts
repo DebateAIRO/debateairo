@@ -965,7 +965,7 @@ const debateShapePolicy = await boot.run("debate-shape-policy", () => readDebate
  * Phase-2a runner (booted on an older version) would claim and argue as today's shape, so the API refuses the version
  * at boot (DEBATE_SHAPE_POLICY_RUNNER_PENDING), as the runner does. P2b removes it with the runner's guard.
  */
-boot.runSync("debate-shape-policy", () => assertDebateShapeRunnerReady(debateShapePolicy));
+boot.runSync("debate-shape-runner-pending", () => assertDebateShapeRunnerReady(debateShapePolicy));
 const application = new PostgresAskApplication(pool, dispatcher, {
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   ...(previewBudgetGate === undefined ? {} : { previewBudgetGate }),

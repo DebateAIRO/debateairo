@@ -82,7 +82,7 @@ All paths below are relative to the engine folder `dialectical-engine/` of the w
   - deep or exhaustive becomes standard when that budget is `null`;
   - the stored `depth_params` is exactly `{ depth, depthMode, scrutiny, answerLength }`, in that key order.
 - Normalisation with the row absent: the stored `depth_params` is exactly `{ depth }`. A depth-only ask is returned as the same object.
-- Depth is never changed by shape normalisation. With billing on, Free's depth 2 stays the billing plan's sealed fixed gauge.
+- Depth is never raised by shape normalisation; with the row present, Free's depth is capped at 2 (controller ruling PF9 supersedes the earlier "never changed" line). With billing on, Free's depth 2 stays the billing plan's sealed fixed gauge.
 
 **The ceiling**
 
@@ -819,7 +819,7 @@ function scrutinyBudgetOf(plan: DebateShapePlan, scrutiny: Scrutiny): DebateShap
 /**
  * The plan's normalisation (spec §3.2). With the row: fixed -> adaptive where the plan does not allow it, a scrutiny
  * the plan has no budget for -> standard, and every key written in one order. Without it: `{ depth }` exactly (the same
- * object for a depth-only ask), so nothing a client sends can change today's stored bytes. Depth is never changed here.
+ * object for a depth-only ask), so nothing a client sends can change today's stored bytes. Depth is only capped (Free at 2, ruling PF9), never raised.
  */
 export function normaliseDepthParamsForShape(depthParams: DepthParams, policy: DebateShapePolicy | null, plan: DebateShapePlanKey): DepthParams {
   if (policy === null) return Object.keys(depthParams).length === 1 ? depthParams : Object.freeze({ depth: depthParams.depth });
