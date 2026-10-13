@@ -9,6 +9,13 @@
 -- codes (steps, makers, refs, ids, marks) stay readable under code-shape CHECKs. Erasure is inherited: shredding the
 -- run key leaves ciphertext, and 0040's barrier refuses new rows once private content is gone.
 --
+-- Every id in a readable column is CODE-MINTED, never written by an AI (controller ruling T7-PRIV): an AI's own id (a
+-- slug such as "sell-family-home") is private content in token form, and a readable column outlives erasure (erasure
+-- destroys keys only; these tables are append-only). packages/map renames at its boundary: angles g1..gN in plan order
+-- (N <= MAP_LIMITS.anglesMax = 7), chosen answers a1..aN in choice order (N <= MAP_LIMITS.chooseAnswersMax = 4); items
+-- are pt01../ca01.. from the start. The CHECKs below accept those forms only; the AI's own ids live only inside the raw
+-- reply text, which the runner stores encrypted.
+--
 -- Known limit (pre-flight PF-B27, recorded, not relaxed): map_item.maker and map_position.maker keep 0069's code-token
 -- rule (one token, no whitespace, at most 256 characters). Every maker sealed or configured today passes; a maker
 -- with a space would need a later migration (an owner decision) before it joins any provider set.
@@ -46,7 +53,7 @@ CREATE TABLE IF NOT EXISTS core.map_item (
   CONSTRAINT map_item_leans_closed CHECK (leans IS NULL OR leans IN ('for_some_answer', 'against_some_answer', 'context')),
   CONSTRAINT map_item_angle_kind_closed CHECK (angle_kind IS NULL OR angle_kind IN ('OPPOSITE_CASE', 'ASKER_WORRY', 'PRACTICAL', 'SPECIFIC', 'GENERAL')),
   CONSTRAINT map_item_codes_shape CHECK (core.jsonb_is_code_token(to_jsonb(ai_ref)) AND core.jsonb_is_code_token(to_jsonb(maker))
-    AND (angle_id IS NULL OR angle_id ~ '^[a-z0-9][a-z0-9-]{0,23}$')),
+    AND (angle_id IS NULL OR angle_id ~ '^g[1-7]$')),
   CONSTRAINT map_item_numbers CHECK (position >= 0 AND (list_index IS NULL OR list_index >= 0))
 );
 
@@ -69,12 +76,14 @@ CREATE TABLE IF NOT EXISTS core.map_position (
   run_id uuid NOT NULL REFERENCES core.run(run_id),
   answer_id text NOT NULL,
   root_index integer NOT NULL,
-  root_node_id uuid NOT NULL REFERENCES core.node(node_id),
+  root_node_id uuid NOT NULL,
   maker text NOT NULL,
   recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   PRIMARY KEY (run_id, answer_id),
   CONSTRAINT map_position_root_unique UNIQUE (run_id, root_index),
-  CONSTRAINT map_position_answer_shape CHECK (answer_id ~ '^[a-z0-9][a-z0-9-]{0,23}$'),
+  -- The root is a node of THIS run (core.node's UNIQUE (run_id, node_id), 0000): never another run's node.
+  CONSTRAINT map_position_root_node_same_run FOREIGN KEY (run_id, root_node_id) REFERENCES core.node(run_id, node_id),
+  CONSTRAINT map_position_answer_shape CHECK (answer_id ~ '^a[1-4]$'),
   CONSTRAINT map_position_codes CHECK (root_index >= 0 AND core.jsonb_is_code_token(to_jsonb(maker)))
 );
 

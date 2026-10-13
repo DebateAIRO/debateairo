@@ -189,7 +189,7 @@ describe("data export forward115", () => {
       await writeFile(manifest, JSON.stringify(json));
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_FORWARD115_MANIFEST") });
       await writeFile(manifest, manifestBytes);
-      const extra = join(root, "migrations/0116_undeclared_probe.sql");
+      const extra = join(root, "migrations/0199_undeclared_probe.sql");
       await writeFile(extra, "SELECT 1;\n");
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_LINEAGE_REFUSED SOURCE_INVENTORY") });
     } finally { await rm(root, { recursive: true, force: true }); }

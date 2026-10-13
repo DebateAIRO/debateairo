@@ -14,8 +14,8 @@ below) the fourth, the data export (0115, V-41) the fifth and the debate shape's
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0114: 0114,
-   `role-rotation-forward0114.json`, and `verify-effective-capabilities-111.sql`, which 0112, 0113 and 0114 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0116: 0116,
+   `debate-shape-map-forward0116.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0116 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -90,7 +90,10 @@ The sixth chain step, after the data export's 0115 (spec `docs/superpowers/specs
 `STEPS`, `MIGRATION_FORWARD0116_*` refusals). It creates three append-only tables (UPDATE and DELETE refused, TRUNCATE
 guarded, `debateai_runtime` may SELECT and INSERT, `debateai_replay` may SELECT): `core.map_item` and `core.map_choice`,
 content carriers in 0063's mechanism (their own attestation and plaintext guards, 0040's erasure barrier), and
-`core.map_position`, ids and codes only, which carries 0040's erasure barrier too. No billing relation or function, so
+`core.map_position`, ids and codes only, which carries 0040's erasure barrier too, and whose root is a node of the same
+run (foreign key `(run_id, root_node_id)` to `core.node(run_id, node_id)`). Every id in a readable column is code-minted
+(ruling T7-PRIV): `map_item.angle_id` is `g1`..`g7`, `map_position.answer_id` `a1`..`a4` (packages/map renames the AIs'
+own ids at its boundary; they stay only in the encrypted raw replies). No billing relation or function, so
 `verify-effective-capabilities-111.sql` stays the verifier in force; no `replayVerifierSql`: its checks are its
 postcondition digest (the three tables' columns, constraints, indexes, triggers and ACLs, and the four guard
 functions' definitions and ACLs). Known limit: `maker` keeps 0069's code-token rule (no whitespace), so a maker with a
@@ -105,8 +108,8 @@ own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again 
 COMMIT — so a step's promises (for example the batch's "no runtime may
 publish staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
 changes something an earlier step's verifier pins must change that verifier through its own reviewed step design; it
-cannot silently pass. The effective-capability verifier of the last applied step (after 0114: 0111's, which the batch,
-Part C's step and role rotation keep) still runs at the end of every `migrate()`.
+cannot silently pass. The effective-capability verifier of the last applied step (after 0116: 0111's, which the batch,
+Part C's step, role rotation, the data export and the debate shape map keep) still runs at the end of every `migrate()`.
 
 ## Merge order: check the preview first
 
