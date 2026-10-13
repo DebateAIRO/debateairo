@@ -169,9 +169,45 @@ export const EXPANSION_DEPTH_VALUES: readonly number[] = Object.freeze(
   )
 );
 
-/** Closed at the contract door: exactly one key, an integer inside the range. */
-export const DepthParamsSchema = z.object({ depth: ExpansionDepthSchema }).strict();
+/** Debate shape (spec 2026-10-12 §3.2): how the deeper rounds are chosen. Missing reads as "adaptive". */
+export const DepthModeSchema = z.enum(["fixed", "adaptive"]);
+export type DepthMode = z.infer<typeof DepthModeSchema>;
+/** Debate shape (spec §3.2, ruling S7): the scrutiny budget asked for. Missing reads as "standard". */
+export const ScrutinySchema = z.enum(["standard", "deep", "exhaustive"]);
+export type Scrutiny = z.infer<typeof ScrutinySchema>;
+/** Debate shape (spec §3.2, ruling S8): the answer's target length. Missing reads as "standard". */
+export const AnswerLengthSchema = z.enum(["short", "standard", "detailed"]);
+export type AnswerLength = z.infer<typeof AnswerLengthSchema>;
+
+/** Closed at the contract door: the depth, plus the three optional shape settings (spec 2026-10-12 §3.2). */
+export const DepthParamsSchema = z.object({
+  depth: ExpansionDepthSchema,
+  depthMode: DepthModeSchema.optional(),
+  scrutiny: ScrutinySchema.optional(),
+  answerLength: AnswerLengthSchema.optional()
+}).strict();
 export type DepthParams = z.infer<typeof DepthParamsSchema>;
+
+/** The three shape settings of an asked or stored depth_params. */
+export type DebateShapeSettings = Readonly<{ depthMode: DepthMode; scrutiny: Scrutiny; answerLength: AnswerLength }>;
+
+function shapeSettingOf<T extends string>(
+  depthParams: Readonly<Record<string, unknown>>, key: string, schema: z.ZodType<T>, fallback: T
+): T {
+  if (!Object.hasOwn(depthParams, key)) return fallback;
+  const parsed = schema.safeParse(depthParams[key]);
+  if (!parsed.success) throw new TypeError(`DEPTH_PARAMS_SHAPE_INVALID:${key}`);
+  return parsed.data;
+}
+
+/** A missing key reads as its default (every run stored before the shape); a present value outside its enum is refused. */
+export function debateShapeSettingsOf(depthParams: Readonly<Record<string, unknown>>): DebateShapeSettings {
+  return Object.freeze({
+    depthMode: shapeSettingOf(depthParams, "depthMode", DepthModeSchema, "adaptive"),
+    scrutiny: shapeSettingOf(depthParams, "scrutiny", ScrutinySchema, "standard"),
+    answerLength: shapeSettingOf(depthParams, "answerLength", AnswerLengthSchema, "standard")
+  });
+}
 
 export const AskRequestSchema = z.object({
   question_line: z.string().trim().min(1),
@@ -286,7 +322,11 @@ export const FundingBasisSchema = z.discriminatedUnion("kind", [
 export const AskRoomQuerySchema = z.object({
   plan_tier: PlanTierSchema,
   composition_budget_tier: CompositionBudgetTierSchema,
-  depth: z.string().regex(/^[0-9]{1,2}$/u).transform(Number).pipe(ExpansionDepthSchema)
+  depth: z.string().regex(/^[0-9]{1,2}$/u).transform(Number).pipe(ExpansionDepthSchema),
+  // Debate shape (spec 2026-10-12 §3.2): the /new page reads the room for the settings it will send.
+  depth_mode: DepthModeSchema.optional(),
+  scrutiny: ScrutinySchema.optional(),
+  answer_length: AnswerLengthSchema.optional()
 }).strict();
 
 /**
