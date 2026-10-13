@@ -60,6 +60,11 @@ export function assertDebateShapeCeilingInput(shape: DebateShapeCeilingInput, pa
 }
 
 const count = z.number().int().min(0);
+/** A share from 0 to 1 that names itself when refused (a NaN, an Infinity or a null is refused too). */
+const share = (name: string) => {
+  const error = `${name} must be a share from 0 to 1`;
+  return z.number({ error }).min(0, { error }).max(1, { error });
+};
 /** The receipt's `shape` member: the run's frozen sizes (contract deviation 3) and the site counts it was billed for. */
 export const debateShapeReceiptSchema = z.object({
   version: z.literal(1),
@@ -76,8 +81,8 @@ export const debateShapeReceiptSchema = z.object({
   close_call_extra_graders: count,
   scrutiny_rounds_per_point: count,
   scrutiny_points_per_debate: count,
-  scrutiny_leverage_min: z.number().min(0).max(1),
-  scrutiny_weak_below: z.number().min(0).max(1),
+  scrutiny_leverage_min: share("scrutiny_leverage_min"),
+  scrutiny_weak_below: share("scrutiny_weak_below"),
   opening: z.enum(DEBATE_SHAPE_OPENINGS),
   answer_words: z.number().int().positive(),
   writer_bound: z.number().int().positive(),
@@ -88,8 +93,12 @@ export const debateShapeReceiptSchema = z.object({
 }).strict();
 export type DebateShapeReceipt = z.infer<typeof debateShapeReceiptSchema>;
 
+/**
+ * The receipt member, parsed with its OWN schema before it is handed back (T4-ABSORB a): a receipt the strict parser
+ * would later refuse (`parseCostEnvelopeBasis`) is never minted, it is refused here, at admission, before any spend.
+ */
 export function debateShapeReceipt(shape: DebateShapeCeilingInput, counts: DebateShapeSiteCounts, backupSequences: 0 | 1): DebateShapeReceipt {
-  return Object.freeze({
+  const receipt: DebateShapeReceipt = Object.freeze({
     version: 1 as const,
     plan: shape.plan,
     depth_mode: shape.depthMode,
@@ -114,6 +123,12 @@ export function debateShapeReceipt(shape: DebateShapeCeilingInput, counts: Debat
     cross_nodes: counts.crossNodes,
     backup_sequences: backupSequences
   });
+  const parsed = debateShapeReceiptSchema.safeParse(receipt);
+  if (!parsed.success) {
+    throw new TypedDomainError("STRUCTURAL_CEILING_SHAPE_INVALID", "The debate shape's receipt does not parse: "
+      + parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "));
+  }
+  return receipt;
 }
 
 /** The sizes a run was admitted with, read back from its receipt (the runner's source of truth, P2b). */
