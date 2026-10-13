@@ -1247,6 +1247,13 @@ describe("practice formats --levels: the same jobs at several thinking levels (s
     locator: null, restatement_text: "Should central buses be free?", restatement_status: "PASS", value_laden: true, claim_type: "normative",
     steelman: { summary: "Fares are a barrier.", fidelity: 0.8 }, critic: { summary: "Lost fares cut service.", counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" },
     evidence: { quality: 0.4, relevance: 0.8 }, context: { fit: 0.8, ambiguityFlags: [] }, fallacy: { severity: 0.1, fatalFlags: [] } });
+  // Reply language (2026-10-12): the Romanian practice question is answered in Romanian, or the engine re-asks it.
+  const GOOD_RO = JSON.stringify({ ...JSON.parse(GOOD) as object,
+    statement: `Liniile centrale gratuite merită dacă bani noi le plătesc. ${vendorKey}`,
+    restatement_text: "Ar trebui ca autobuzele centrale să fie gratuite?",
+    steelman: { summary: "Prețul biletului este o barieră.", fidelity: 0.8 },
+    critic: { summary: "Banii pierduți din bilete reduc serviciul.", counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" } });
+  const goodFor = (questionId: string | undefined): string => questionId === "ro" ? GOOD_RO : GOOD;
   const THINKING: Readonly<Record<string, number>> = { high: 400, low: 40 };
 
   /**
@@ -1260,8 +1267,9 @@ describe("practice formats --levels: the same jobs at several thinking levels (s
       calls += 1;
       const effort = body.reasoning_effort ?? null;
       efforts.push(effort);
+      const content = goodFor(input.requestBody.includes("Ar trebui un ") ? "ro" : "en");
       return { status: 200, body: JSON.stringify({ id: `lv-${String(calls)}`, model: body.model,
-        choices: [{ message: { role: "assistant", content: GOOD }, finish_reason: calls === cutAt ? "length" : "stop" }],
+        choices: [{ message: { role: "assistant", content }, finish_reason: calls === cutAt ? "length" : "stop" }],
         usage: { prompt_tokens: 100, completion_tokens: 500, completion_tokens_details: { reasoning_tokens: THINKING[effort ?? ""] ?? 0 } } }) };
     } };
   }
@@ -1285,7 +1293,7 @@ describe("practice formats --levels: the same jobs at several thinking levels (s
       expect(sample.status).toBe("PARSED");
       expect(sample.reasoningTokens).toBe(THINKING[sample.thinkingLevel!]);
       expect(sample.cutOff).toBe(false);
-      expect(sample.answerText).toBe(reportableReplyText(GOOD));
+      expect(sample.answerText).toBe(reportableReplyText(goodFor(sample.questionId)));
       expect(sample.answerText).not.toContain(vendorKey);
     }
     // The same question for the same sample index at every level.

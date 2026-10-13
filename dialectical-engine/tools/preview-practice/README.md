@@ -127,6 +127,10 @@ question again (the full re-ask), which may take a third try. The report says wh
 - In `failures`, a refused reply to the short follow-up (e.g. the AI sent its whole answer again: `PATCH_KEY_NOT_REQUESTED`)
   is listed too (debate: with `replyForm` `PATCH` and no re-check, since it holds only the parts asked for); formats
   shows each job's first wrong reply, the slip itself.
+- A reply written in another language than the question's (2026-10-12: MiMo answered 10 of 71 replies in Polish,
+  French, Spanish, Catalan, German, Portuguese or Chinese) is a slip like any other: its issues read
+  `TEXT_NOT_IN_QUESTION_LANGUAGE@<member>` (e.g. `TEXT_NOT_IN_QUESTION_LANGUAGE@reasons`), and the short follow-up
+  and the full re-ask carry that code, so the AI is asked for the same answer in the question's language.
 
 The prompt cache (information only): the start of each prompt now stays the same from call to call, so the AI
 companies can reuse it from their cache, cheaper and faster. `cacheByModel.<model>` (both modes) gives the calls each AI answered,

@@ -161,6 +161,7 @@ import {
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import {
   argumentLanguageDirective,
+  replyLanguageCheck,
   SERVED_ROOT_SELECTION_RULE,
   TypedDomainError,
   exhaustive,
@@ -2479,7 +2480,17 @@ interface ComposedCitationContext {
    * the person's and the debaters' own words, so the prose may repeat them.
    */
   readonly exemptTokens: ReadonlySet<string>;
+  /**
+   * Reply language (2026-10-12): the person's question, whose language every
+   * segment's prose must be in (`replyLanguageCheck`). Without it the prose's
+   * language is not checked.
+   */
+  readonly questionLine?: string;
 }
+
+/** Reply language (2026-10-12): the answer's prose, and the checker's objection (the next round's material). */
+export const COMPOSED_PROSE = Object.freeze(["segments.*.text"] as const);
+export const EVALUATOR_PROSE = Object.freeze(["objection"] as const);
 
 /**
  * The writer's content classifier: the composition schema first (unchanged),
@@ -2502,9 +2513,12 @@ export function classifyComposedContent(content: string, citation: ComposedCitat
       }
     }
   }
-  return issues.length === 0
+  if (issues.length > 0) return { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
+  // Reply language (2026-10-12): checked once the citations hold, so a refusal names one kind of fix.
+  const language = citation.questionLine === undefined ? [] : replyLanguageCheck(citation.questionLine, COMPOSED_PROSE)(composed);
+  return language.length === 0
     ? structured
-    : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
+    : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(language) };
 }
 
 /** The citation rejection a classifier error names first, or null for any other rejection. */
@@ -3416,9 +3430,15 @@ export function parseEvaluatorOutput(content: string, reply?: ModelReplyFacts): 
   return parseContent(content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR", reply);
 }
 
-/** The EVALUATOR call's content classifier: the same reading as `parseEvaluatorOutput`. */
-export function classifyEvaluatorContent(content: string, reply?: ModelReplyFacts): ContentClassification {
-  return classifyStructuredContent(content, evaluatorVerdictSchema, reply);
+/**
+ * The EVALUATOR call's content classifier: the same reading as `parseEvaluatorOutput`. Reply language (2026-10-12):
+ * with the person's question, an objection must be in its language (`EVALUATOR_PROSE`).
+ */
+export function classifyEvaluatorContent(content: string, reply?: ModelReplyFacts, questionLine?: string): ContentClassification {
+  const structured = classifyStructuredContent(content, evaluatorVerdictSchema, reply);
+  if (structured.parseStatus !== "PARSED" || questionLine === undefined) return structured;
+  const language = replyLanguageCheck(questionLine, EVALUATOR_PROSE)(parseEvaluatorOutput(content, reply));
+  return language.length === 0 ? structured : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(language) };
 }
 
 export interface DebateExpansionLeg {
@@ -8767,7 +8787,8 @@ export class WalkingSkeletonRunner {
         const writerReading = rememberingAcceptedReply((content, reply) => classifyComposedContent(content, {
           digest: request.digest,
           servedNodes,
-          exemptTokens: personIdTokens
+          exemptTokens: personIdTokens,
+          questionLine: run.questionLine
         }, reply));
         const composedSegmentsOf = (content: string): readonly ComposedSegment[] => {
           const parsed = parseComposerOutput(content, writerReading.acceptedAs(content).reply);
@@ -8934,7 +8955,7 @@ export class WalkingSkeletonRunner {
          * verdict this reading refuses has left nothing to serve.
          */
         // All-steps format robustness (2026-10-12): remembered as the writer's is.
-        const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply));
+        const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine));
         const evaluatorVerdictOf = (content: string): EvaluatorVerdict => {
           const parsed = parseEvaluatorOutput(content, checkerReading.acceptedAs(content).reply);
           return assertEvaluatorVerdict(Object.freeze({

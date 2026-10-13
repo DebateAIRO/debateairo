@@ -71,7 +71,7 @@ describe("verdict story — the question's language (R1, dev's argument-language
         instruction: `${contract.instruction}\n\n${argumentLanguageDirective("Romanian")}`,
         answerForm: contract.answerForm
       });
-      expect(romanian.instruction).toContain("Write every natural-language field in Romanian.");
+      expect(romanian.instruction).toContain("Write every natural-language field in Romanian, the language of the question, even where the material quotes another language.");
       expect(Object.isFrozen(romanian)).toBe(true);
       // The door still accepts it: the directive holds no token reserved for the frame.
       const framed = buildFramedPrompt({ contract: romanian, material: [{ name: "question", content: JSON.stringify("Ne mut\u0103m?") }] });

@@ -465,12 +465,13 @@ class DeepInfraProfile:
         ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 32768,
                  ('high', 'low', 'none'), False),
         # Owner approval 2026-10-12: MiMo closed Romanian quotation marks with a straight double quote inside its JSON
-        # in a live practice run. Its DeepInfra page recommends temperature 1.0 and top_p 0.95: every request carries
-        # exactly those two (no top_k). JSON mode was tried the same day and withdrawn: DeepInfra's JSON constraint
+        # in a live practice run. Its DeepInfra page recommends temperature 1.0 and top_p 0.95; owner ruling 2026-10-12
+        # (reply language): temperature 0.7, after MiMo wrote 10 of its 71 practice replies at 1.0 in another language
+        # than the question's. Every request carries exactly those two (no top_k). JSON mode was tried the same day and withdrawn: DeepInfra's JSON constraint
         # turned that slip into garbage, which the app's reader repairs when JSON mode is off.
         # Thinking levels: Xiaomi documents thinking on or off only, no levels.
         ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 32768, (None, 'none'), False,
-                 (('temperature', 1.0), ('top_p', 0.95))),
+                 (('temperature', 0.7), ('top_p', 0.95))),
         # Owner swap 2026-10-10 (Qwen in place of Gemini): flat list price over the whole 1M window,
         # no promotion, no tiers; reasoning_effort is not listed, so none is sent.
         # Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid

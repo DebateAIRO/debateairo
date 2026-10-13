@@ -31,8 +31,8 @@ ROWS = {MODEL: ('Z.AI', '0.15', '0.50', 32768, ('high', 'low'), True),
         QWEN: ('Alibaba', '0.113', '0.382', 32768, (None, 'low', 'medium', 'none'), False)}
 # The reviewed sampling (2026-10-12), written out independently of the gate: model -> the exact keys and
 # values its request must carry. A row not listed carries none of them. MiMo's (owner approval 2026-10-12) are
-# DeepInfra's recommended temperature 1.0 and top_p 0.95, with no top_k.
-SAMPLING = {MIMO: {'temperature': 1.0, 'top_p': 0.95},
+# DeepInfra's recommended top_p 0.95 with the owner's temperature 0.7 (reply language, 2026-10-12), with no top_k.
+SAMPLING = {MIMO: {'temperature': 0.7, 'top_p': 0.95},
             QWEN: {'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}}
 HOST = 'synthetic-host'
 SCOPE = 'preview-team-synthetic'

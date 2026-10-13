@@ -303,8 +303,11 @@ describe("preview practice lanes: the jobs see the runner's context", () => {
     expect(LANES).toContain("classifyContent: reading.classifyContent,\n        buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)");
     expect(RUNNER).toMatch(/const writerReading = rememberingAcceptedReply\(\(content, reply\) => classifyComposedContent\(content, \{/u);
     expect(LANES).toMatch(/const reading = rememberingAcceptedReply\(\(content, reply\) => classifyComposedContent\(content, \{/u);
-    expect(RUNNER).toContain("const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply));");
-    expect(LANES).toContain("const reading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply));");
+    // Reply language (2026-10-12): both check the objection against the question's language.
+    expect(RUNNER).toContain("const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine));");
+    expect(LANES).toContain("const reading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, q.questionLine));");
+    expect(RUNNER).toMatch(/exemptTokens: personIdTokens,\s*questionLine: run\.questionLine\s*\}, reply\)\);/u);
+    expect(LANES).toMatch(/questionLine: q\.questionLine\s*\}, reply\)\);/u);
   });
 
   it("the story snapshot comes from the runner's own builder, and the story must give each position its own path", () => {

@@ -7,6 +7,7 @@ import {
   TypedDomainError,
   exhaustive,
   isRunLevelSpendStop,
+  replyLanguageCheck,
   type DebateRole,
   type ReviewOutcome,
   type WayOfKnowing
@@ -141,6 +142,22 @@ export const judgeArtifactSchema = z.object({
  * not ask for it.
  */
 export const JUDGE_ARTIFACT_READING: StructuredReadingOptions = Object.freeze({ nestedFields: true });
+
+/**
+ * Reply language (2026-10-12): the members of each judge-family reply a reader meets, checked against the question's
+ * language (`replyLanguageCheck`). The statement is the node's card; the steelman and critic summaries, the ambiguity
+ * flags and the fatal-flag descriptions are the node's assessment (its drawer, the story's material, and the material
+ * of every later call about the node); a review's reasons go to the story. Enum tokens, scores, the locator (a
+ * source's own reference) and the fatal-flag type (identifier-shaped) are not prose and are never checked.
+ */
+export const JUDGE_ARTIFACT_PROSE = Object.freeze([
+  "statement", "restatement_text", "steelman.summary", "critic.summary", "context.ambiguityFlags.*",
+  "fallacy.fatalFlags.*.description"
+] as const);
+export const JUDGE_ASSESSMENT_PROSE = Object.freeze([
+  "steelman.summary", "critic.summary", "context.ambiguityFlags.*", "fallacy.fatalFlags.*.description"
+] as const);
+export const NODE_REVIEW_PROSE = Object.freeze(["reasons.*"] as const);
 
 /**
  * T5 / S3-1 — the review artifact carries the edge measurements.
@@ -493,8 +510,9 @@ export class Judge {
     // exactly as the classifier read it (the last repair depends on how the reply ended). Judge nested fields
     // (2026-10-12): the author legs alone also nest flattened members (NESTED_FIELDS); the re-read below uses the same
     // options, so the accepted content reads as the repaired object.
+    const inQuestionLanguage = replyLanguageCheck(input.questionLine, JUDGE_ARTIFACT_PROSE);
     const reading = rememberingAcceptedReply((content, reply) =>
-      classifyStructuredArtifact(content, judgeArtifactSchema, reply, JUDGE_ARTIFACT_READING));
+      classifyStructuredArtifact(content, judgeArtifactSchema, reply, JUDGE_ARTIFACT_READING, inQuestionLanguage));
     let response;
     try {
       response = await this.provider.call({
@@ -590,7 +608,9 @@ export class Judge {
     const packet = framed.packet;
     // All-steps format robustness (2026-10-12): the tolerant reading, remembered so the accepted reply is read again
     // exactly as the classifier read it (the last repair depends on how the reply ended).
-    const reading = rememberingAcceptedReply((content, reply) => classifyStructuredArtifact(content, schema, reply));
+    const inQuestionLanguage = replyLanguageCheck(input.questionLine, NODE_REVIEW_PROSE);
+    const reading = rememberingAcceptedReply((content, reply) =>
+      classifyStructuredArtifact(content, schema, reply, undefined, inQuestionLanguage));
     let response;
     try {
       response = await this.provider.call({
@@ -663,8 +683,9 @@ export class Judge {
     // exactly as the classifier read it (the last repair depends on how the reply ended).
     // Judge nested fields (2026-10-12): the panel reads its assessment as the author legs do (NESTED_FIELDS), and the
     // re-read below uses the same options.
+    const inQuestionLanguage = replyLanguageCheck(input.questionLine, JUDGE_ASSESSMENT_PROSE);
     const reading = rememberingAcceptedReply((content, reply) =>
-      classifyStructuredArtifact(content, judgeAssessmentSchema, reply, JUDGE_ARTIFACT_READING));
+      classifyStructuredArtifact(content, judgeAssessmentSchema, reply, JUDGE_ARTIFACT_READING, inQuestionLanguage));
     let response;
     try {
       response = await this.provider.call({

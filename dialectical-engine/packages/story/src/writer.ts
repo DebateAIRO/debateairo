@@ -1,7 +1,7 @@
 import { STORY_COST_ENVELOPE_REACHED } from "@debateai/budget";
 import { StoryLanguageTagSchema, type MakerLineage, type StoryBody } from "@debateai/contract";
 import type { Pool } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, replyLanguageCheck } from "@debateai/kernel";
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
@@ -38,7 +38,14 @@ import {
 } from "./material.js";
 import type { StoryPack } from "./pack.js";
 import { StoryRepository, isPrivateContentErased, type StoryRecordInput } from "./repository.js";
-import { classifyCheckerContent, classifyStoryContent, parseCheckerVerdict, parseStoryBody } from "./validate.js";
+import {
+  STORY_BODY_PROSE,
+  STORY_CHECKER_PROSE,
+  classifyCheckerContent,
+  classifyStoryContent,
+  parseCheckerVerdict,
+  parseStoryBody
+} from "./validate.js";
 
 /**
  * THE VERDICT STORY WRITER (spec §3, §3.1). The runner calls it once, after the
@@ -548,9 +555,13 @@ export class StoryWriter {
      * format repair try. Rounds, not repair packets; a gateway that reports no count reported none.
      */
     const repairedRounds = new Set<number>();
+    // Reply language (2026-10-12): each draft and each objection is checked against the question's language.
+    const storyInQuestionLanguage = replyLanguageCheck(input.questionLine, STORY_BODY_PROSE);
+    const checkerInQuestionLanguage = replyLanguageCheck(input.questionLine, STORY_CHECKER_PROSE);
     const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds }, {
       writeStory: async ({ round, priorObjection }) => {
-        const reading = rememberingAcceptedReply((content, reply) => classifyStoryContent(content, built.index, reply));
+        const reading = rememberingAcceptedReply((content, reply) =>
+          classifyStoryContent(content, built.index, reply, storyInQuestionLanguage));
         const request = storyCallRequest({
           story: input,
           site: "STORYTELLER",
@@ -585,7 +596,8 @@ export class StoryWriter {
         };
       },
       checkStory: async ({ round, candidate }) => {
-        const reading = rememberingAcceptedReply((content, reply) => classifyCheckerContent(content, reply));
+        const reading = rememberingAcceptedReply((content, reply) =>
+          classifyCheckerContent(content, reply, checkerInQuestionLanguage));
         const request = storyCallRequest({
           story: input,
           site: "CHECKER",

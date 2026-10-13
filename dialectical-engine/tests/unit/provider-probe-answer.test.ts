@@ -1,6 +1,6 @@
 /**
  * Probe answer fix (2026-10-12, practice debate 3): the health probe asks "Reply exactly: OK" and used to accept only
- * the two bytes `OK`. MiMo-V2.6-Pro answers at temperature 1.0 and thinks first, so a working answer such as "OK.",
+ * the two bytes `OK`. MiMo-V2.6-Pro answered at temperature 1.0 (its setting then) and thinks first, so a working answer such as "OK.",
  * "\n\nOK" or a finished thinking block before "OK" marked it ABSENT (PROVIDER_PROBE_FAILED, billed); with GLM busy at
  * the same moment the premium plan was refused (ASK_PLAN_TIER_MODEL_UNAVAILABLE). The probe now accepts those harmless
  * variants on both wires, still refuses a reply that is not that answer, and still demands the exact model id. Off
@@ -131,8 +131,9 @@ describe("the probe's answer room (a thinking model must be able to write OK)", 
   });
   it("practice debate 3's MiMo probe, as sent: 8,192 tokens of room, its reviewed sampling, no effort member; \"OK.\" is now HEALTHY", async () => {
     const { observation, sent } = await probe(MIMO, completion(MIMO.model, "OK."), previewProbeControls(MIMO));
+    // Its reviewed sampling: temperature 0.7 since the owner's reply-language ruling (2026-10-12; it was 1.0 in debate 3).
     expect(sent).toStrictEqual({
-      model: "XiaomiMiMo/MiMo-V2.6-Pro", max_tokens: 8192, temperature: 1.0, top_p: 0.95,
+      model: "XiaomiMiMo/MiMo-V2.6-Pro", max_tokens: 8192, temperature: 0.7, top_p: 0.95,
       messages: [{ role: "user", content: "DR-181 discovery health probe. Reply exactly: OK" }]
     });
     expect(observation.state).toBe("HEALTHY");
