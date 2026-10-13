@@ -66,3 +66,76 @@ describe('the website\'s model list: one reviewed value per stage of the switch-
   ['an unreviewed website list that matches the config',JSON.stringify([GLM,DEEPSEEK]),apiConfig({free_model_ids:[GLM,DEEPSEEK]}),false]
  ])('the stage check: %s',(_name,flag,config,expected)=>{expect(env.uiRosterMatchesApiConfig(flag,config)).toBe(expected);});
 });
+
+// Owner rulings 2026-10-13: the preview may run HOSTED, with NETOPIA's and Quaderno's sandboxes, only on its own configuration.
+describe('hosted preview environment', async () => {
+ const hosts = await import('../../packages/payments-netopia/src/hosts.js');
+ const egress = await import('../../deploy/' + 'preview-auth-dev/v1/egress-proxy.mjs');
+ const PREVIEW = JSON.stringify({ deployment: 'v3-preview', free_model_ids: ['zai-org/GLM-5.3-Flash'], requested_thinking_level: 'high', budget_socket: '/run/debateai-v3-preview/team-budget-v2.sock', scope_id: 'preview-team-v2-20261009' });
+ const TEAM = '["0b7c6f1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e"]';
+ const SOCKET = '/run/debateai-preview-turnstile/siteverify.sock';
+ const hosted = (): Record<string, string> => ({ ...configured(), DEBATEAI_DEPLOYMENT_MODE: 'hosted', PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW, PREVIEW_TEAM_USER_IDS_JSON: TEAM,
+  GEOIP_COUNTRY_DB_PATH: '/var/lib/debateai-geoip/dbip-country-lite.mmdb', TOR_EXIT_LIST_PATH: '/var/lib/debateai-geoip/tor-exit-list.txt', TURNSTILE_SOCKET_PATH: SOCKET });
+ const NETOPIA = { NETOPIA_API_BASE_URL: 'https://secure-sandbox.netopia-payments.com', NETOPIA_POS_SIGNATURE: 'ABCD-EFGH-IJKL-MNOP-QRST',
+  NETOPIA_API_KEY_PATH: '/etc/debateai-v3-preview/billing/netopia-api-key', NETOPIA_IPN_KEYS_PATH: '/etc/debateai-v3-preview/billing/netopia-ipn-keys.pem' };
+ const INVOICING = { QUADERNO_API_BASE_URL: 'https://dezbatere-test.sandbox-quadernoapp.com/api', QUADERNO_API_KEY_PATH: '/etc/debateai-v3-preview/billing/quaderno-api-key',
+  SMARTBILL_API_BASE_URL: 'https://smartbill.invalid', SMARTBILL_CREDENTIALS_PATH: '/etc/debateai-v3-preview/billing/smartbill-credentials', SMARTBILL_SERIES: 'DBAI',
+  OWNER_REPORT_EMAIL_PATH: '/etc/debateai-v3-preview/billing/owner-report-email' };
+ const narrow = (input: Record<string, string>) => env.narrowEnvironment('api', input, runtime, native, approved);
+ it.each([
+  ['hosted, billing off', {}],
+  ['hosted with NETOPIA\'s sandbox alone (the provider-only mode)', NETOPIA],
+  ['hosted with the whole billing group', { ...NETOPIA, ...INVOICING }],
+  ['hosted with NETOPIA\'s other sandbox base', { ...NETOPIA, ...INVOICING, NETOPIA_API_BASE_URL: 'https://secure.sandbox.netopia-payments.com' }]
+ ])('admits %s', (_name, patch) => {
+  const result = narrow({ ...hosted(), ...patch });
+  expect(result.deploymentMode).toBe('hosted');
+  expect(result.selectedRegisterVersion).toBe('12');
+  expect(Object.keys(result.environment).sort()).toEqual([...Object.keys({ ...hosted(), ...patch }), 'PATH'].sort());
+  // The proxy settings never reach the environment the API reads.
+  expect(Object.keys(result.environment).filter(key => /PROXY/i.test(key))).toEqual([]);
+ });
+ const drop = (key: string) => { const value = hosted(); delete value[key]; return value; };
+ it.each([
+  ['hosted without the preview configuration (the spending gates and the team)', (() => { const v = hosted(); delete v.PREVIEW_PROVIDER_TEST_CONFIG_JSON; delete v.PREVIEW_TEAM_USER_IDS_JSON; return v; })()],
+  ['hosted without the country database', drop('GEOIP_COUNTRY_DB_PATH')],
+  ['hosted with the country database elsewhere', { ...hosted(), GEOIP_COUNTRY_DB_PATH: '/tmp/dbip.mmdb' }],
+  ['hosted with the Tor list elsewhere', { ...hosted(), TOR_EXIT_LIST_PATH: '/var/lib/debateai-geoip/../tor.txt' }],
+  ['hosted without the Turnstile relay', drop('TURNSTILE_SOCKET_PATH')],
+  ['a mode in another spelling', { ...hosted(), DEBATEAI_DEPLOYMENT_MODE: 'Hosted' }],
+  ['NETOPIA\'s live base', { ...hosted(), ...NETOPIA, NETOPIA_API_BASE_URL: 'https://secure.netopia-payments.com/api' }],
+  ['NETOPIA\'s sandbox base with a trailing slash', { ...hosted(), ...NETOPIA, NETOPIA_API_BASE_URL: 'https://secure-sandbox.netopia-payments.com/' }],
+  ['three of NETOPIA\'s four settings', (() => { const v: Record<string, string> = { ...hosted(), ...NETOPIA }; delete v.NETOPIA_POS_SIGNATURE; return v; })()],
+  ['NETOPIA\'s key file elsewhere', { ...hosted(), ...NETOPIA, NETOPIA_API_KEY_PATH: '/etc/debateai/api/billing/netopia-api-key' }],
+  ['NETOPIA\'s public key file elsewhere', { ...hosted(), ...NETOPIA, NETOPIA_IPN_KEYS_PATH: '/etc/debateai-v3-preview/billing/other.pem' }],
+  ['the invoicing settings without NETOPIA\'s', { ...hosted(), ...INVOICING }],
+  ['five of the six invoicing settings', (() => { const v: Record<string, string> = { ...hosted(), ...NETOPIA, ...INVOICING }; delete v.SMARTBILL_SERIES; return v; })()],
+  ['Quaderno\'s live address', { ...hosted(), ...NETOPIA, ...INVOICING, QUADERNO_API_BASE_URL: 'https://dezbatere.quadernoapp.com/api' }],
+  ['a Quaderno sandbox address on two labels', { ...hosted(), ...NETOPIA, ...INVOICING, QUADERNO_API_BASE_URL: 'https://a.b.sandbox-quadernoapp.com/api' }],
+  ['a real SmartBill address', { ...hosted(), ...NETOPIA, ...INVOICING, SMARTBILL_API_BASE_URL: 'https://ws.smartbill.ro/SBORO/api' }],
+  ['the owner\'s address file elsewhere', { ...hosted(), ...NETOPIA, ...INVOICING, OWNER_REPORT_EMAIL_PATH: '/root/owner-email' }],
+  ['the moved billing clock (owner ruling 2026-10-13: still refused)', { ...hosted(), ...NETOPIA, ...INVOICING, BILLING_STAGE_CLOCK_OFFSET_DAYS: '31' }],
+  ['the moved billing clock in local mode', { ...configured(), BILLING_STAGE_CLOCK_OFFSET_DAYS: '31' }],
+  ['a billing setting in local mode', { ...configured(), ...NETOPIA }],
+  ['proxy settings in the environment file', { ...hosted(), HTTPS_PROXY: 'http://127.0.0.1:3180' }],
+  ['Node\'s proxy switch in the environment file', { ...hosted(), NODE_USE_ENV_PROXY: '1' }]
+ ])('refuses %s without emitting values', (_name, input) => expect(() => narrow(input)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/));
+ it('pins NETOPIA\'s sandbox bases to the payment package\'s own table, and the egress proxy to their hosts', () => {
+  const sandbox = hosts.NETOPIA_BASES.filter(entry => entry.environment === 'sandbox').map(entry => entry.base);
+  expect(env.PREVIEW_NETOPIA_SANDBOX_BASES).toEqual(sandbox);
+  expect(egress.PREVIEW_EGRESS_NETOPIA_HOSTS).toEqual(sandbox.map(base => new URL(base).hostname));
+  for (const base of env.PREVIEW_NETOPIA_SANDBOX_BASES) expect(hosts.netopiaEnvironmentOf(base)).toBe('sandbox');
+ });
+ it('points only the hosted API\'s https at the loopback egress proxy, and never through the process environment', () => {
+  const calls: unknown[] = [];
+  const setProxy = (value: unknown) => { calls.push(value); return () => undefined; };
+  const before = { ...process.env };
+  env.installHostedEgress('local', setProxy);
+  expect(calls).toEqual([]);
+  env.installHostedEgress('hosted', setProxy);
+  expect(calls).toEqual([{ HTTPS_PROXY: 'http://127.0.0.1:3180', NO_PROXY: 'localhost,127.0.0.1,[::1]' }]);
+  expect(egress.PREVIEW_EGRESS_PROXY_URL).toBe('http://127.0.0.1:3180');
+  expect(process.env).toEqual(before);
+  expect(() => env.installHostedEgress('staging', setProxy)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+});

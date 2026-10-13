@@ -1,5 +1,7 @@
+import { setGlobalProxyFromEnv } from 'node:http';
 import { refuse, withPrivateBytes } from './custody.mjs';
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY, PREVIEW_SOCKET } from './turnstile-custody.mjs';
+import { PREVIEW_EGRESS_PROXY_URL } from './egress-proxy.mjs';
 const STAFF=['STAFF_ACCESS_POLICY_VERSION','STAFF_WEBAUTHN_ORIGIN','STAFF_WEBAUTHN_RP_ID','STAFF_INDEPENDENT_ALERT_CONFIG_PATH','STAFF_ALERT_OPERATOR_MODULE_PATH','STAFF_ALERT_OPERATOR_MODULE_SHA256',
  'INTERNAL_ALLOWANCE_POLICY_VERSION','INTERNAL_ALLOWANCE_CURRENCY','INTERNAL_ALLOWANCE_MAXIMUM_GRANT_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_DAY_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_WEEK_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_LIFETIME_MS','INTERNAL_ALLOWANCE_FINISH_ALLOWANCE_BP','INTERNAL_ALLOWANCE_POLICY_SOURCE_REF'];
 /**
@@ -47,6 +49,66 @@ export function uiRosterMatchesApiConfig(uiFlag,apiConfigJson) {
   return rosterKeys===ROSTER_CONFIG_KEYS&&same(api.free_model_ids,ui.free)&&same(api.premium_model_ids,ui.premium);
  }catch{return false;}
 }
+/**
+ * The hosted preview (owner rulings 2026-10-13: hosted mode with NETOPIA's and Quaderno's sandboxes). The API's
+ * country files are the hosted kit's fixed refresh output (deploy/vps/systemd/debateai-geoip-refresh.service); the
+ * billing custody files sit at fixed paths in one API-owned 0700 folder (the IPN key file root-owned 0644, as in the
+ * kit); SmartBill stays the dummy `.invalid` address (it has no sandbox: every invoice is a real fiscal document).
+ */
+export const PREVIEW_HOSTED_FIXED_VALUES=Object.freeze({
+ GEOIP_COUNTRY_DB_PATH:'/var/lib/debateai-geoip/dbip-country-lite.mmdb',
+ TOR_EXIT_LIST_PATH:'/var/lib/debateai-geoip/tor-exit-list.txt',
+ NETOPIA_API_KEY_PATH:'/etc/debateai-v3-preview/billing/netopia-api-key',
+ NETOPIA_IPN_KEYS_PATH:'/etc/debateai-v3-preview/billing/netopia-ipn-keys.pem',
+ QUADERNO_API_KEY_PATH:'/etc/debateai-v3-preview/billing/quaderno-api-key',
+ SMARTBILL_CREDENTIALS_PATH:'/etc/debateai-v3-preview/billing/smartbill-credentials',
+ OWNER_REPORT_EMAIL_PATH:'/etc/debateai-v3-preview/billing/owner-report-email',
+ SMARTBILL_API_BASE_URL:'https://smartbill.invalid'
+});
+/** NETOPIA's two sandbox bases, exactly (packages/payments-netopia/src/hosts.ts; a unit test pins the two lists equal). */
+export const PREVIEW_NETOPIA_SANDBOX_BASES=Object.freeze(['https://secure-sandbox.netopia-payments.com','https://secure.sandbox.netopia-payments.com']);
+/** A Quaderno SANDBOX account's API address, the only Quaderno form the preview admits. */
+export const PREVIEW_QUADERNO_SANDBOX_BASE=/^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.sandbox-quadernoapp\.com\/api$/;
+const NETOPIA_KEYS=['NETOPIA_API_BASE_URL','NETOPIA_POS_SIGNATURE','NETOPIA_API_KEY_PATH','NETOPIA_IPN_KEYS_PATH'];
+const INVOICING_KEYS=['QUADERNO_API_KEY_PATH','QUADERNO_API_BASE_URL','SMARTBILL_CREDENTIALS_PATH','SMARTBILL_API_BASE_URL','SMARTBILL_SERIES','OWNER_REPORT_EMAIL_PATH'];
+/**
+ * Owner ruling 2026-10-13: moving the billing clock for renewal tests stays refused on the preview (the owner is still
+ * deciding). A host that ever ran with it must never go live (deploy/vps/README.md §14.8).
+ */
+const REFUSED_ON_PREVIEW=['BILLING_STAGE_CLOCK_OFFSET_DAYS'];
+/**
+ * The hosted API's extra rules: the country files and the Turnstile relay at their fixed values (the API refuses to
+ * start without them in hosted mode); NETOPIA's four settings all or none, and Quaderno's, SmartBill's and the owner's
+ * six all or none and only beside NETOPIA's (none: hosted, billing off; NETOPIA alone: the provider-only mode; all
+ * ten: billing on, once the register says so); and every value a sandbox form at its fixed path.
+ */
+function assertHostedApiValues(configured) {
+ const fixed=PREVIEW_HOSTED_FIXED_VALUES;
+ if(configured.GEOIP_COUNTRY_DB_PATH!==fixed.GEOIP_COUNTRY_DB_PATH||configured.TOR_EXIT_LIST_PATH!==fixed.TOR_EXIT_LIST_PATH
+  ||configured.TURNSTILE_SOCKET_PATH!==PREVIEW_SOCKET)refuse();
+ const present=keys=>keys.filter(key=>configured[key]!==undefined).length;
+ const netopia=present(NETOPIA_KEYS),invoicing=present(INVOICING_KEYS);
+ if(![0,NETOPIA_KEYS.length].includes(netopia)||![0,INVOICING_KEYS.length].includes(invoicing)||(invoicing>0&&netopia===0))refuse();
+ if(netopia>0&&(!PREVIEW_NETOPIA_SANDBOX_BASES.includes(configured.NETOPIA_API_BASE_URL)
+  ||configured.NETOPIA_API_KEY_PATH!==fixed.NETOPIA_API_KEY_PATH||configured.NETOPIA_IPN_KEYS_PATH!==fixed.NETOPIA_IPN_KEYS_PATH))refuse();
+ if(invoicing>0&&(!PREVIEW_QUADERNO_SANDBOX_BASE.test(configured.QUADERNO_API_BASE_URL)||configured.SMARTBILL_API_BASE_URL!==fixed.SMARTBILL_API_BASE_URL
+  ||['QUADERNO_API_KEY_PATH','SMARTBILL_CREDENTIALS_PATH','OWNER_REPORT_EMAIL_PATH'].some(key=>configured[key]!==fixed[key])))refuse();
+}
+/** No billing setting in local mode: billing exists only in hosted mode (apps/api/src/billing/connectors.ts billingModeOf). */
+const BILLING_ONLY_KEYS=[...NETOPIA_KEYS,...INVOICING_KEYS];
+/** What the hosted API's fetch does: https through the loopback egress proxy, loopback itself direct. */
+export const PREVIEW_HOSTED_PROXY_ENVIRONMENT=Object.freeze({HTTPS_PROXY:PREVIEW_EGRESS_PROXY_URL,NO_PROXY:'localhost,127.0.0.1,[::1]'});
+/**
+ * Hosted only, before the API's main is imported: every https request of the process's global fetch (NETOPIA's,
+ * Quaderno's) and of the https module goes through the egress proxy (egress-proxy.mjs), which lets only NETOPIA's and
+ * Quaderno's sandboxes through. Plain-http requests (the spending gates' Unix sockets) and loopback stay direct. The
+ * values are given to Node directly, never put into the process environment the API reads. Returns Node's restore.
+ */
+export function installHostedEgress(deploymentMode,setProxy=setGlobalProxyFromEnv) {
+ if(deploymentMode==='local')return ()=>{};
+ if(deploymentMode!=='hosted')refuse('PREVIEW_ENVIRONMENT_REFUSED');
+ return setProxy({...PREVIEW_HOSTED_PROXY_ENVIRONMENT});
+}
 const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY'];
 export function parseEnvironmentText(text) {
  try{
@@ -72,9 +134,12 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
     ||(configured.TURNSTILE_SITE_KEY!==undefined&&configured.TURNSTILE_SITE_KEY!==PREVIEW_SITE_KEY))refuse();
    return {environment:Object.freeze(environment),selectedRegisterVersion:null,deploymentMode:'local'};
   }
+  if(REFUSED_ON_PREVIEW.some(key=>configured[key]!==undefined))refuse();
   const normalized=service==='api'?runtime.parseApiEnvironment(configured):runtime.parseRunnerEnvironment(configured);
-  if(normalized.DEPLOYMENT_MODE!=='local'||String(normalized.REGISTER_VERSION)!==publication.registerVersion
-    ||configured.DEBATEAI_DEPLOYMENT_MODE!=='local')refuse();
+  // Local, or hosted (owner rulings 2026-10-13) only on the preview's own configuration (the spending gates and the team).
+  const mode=configured.DEBATEAI_DEPLOYMENT_MODE;
+  if(!['local','hosted'].includes(mode)||normalized.DEPLOYMENT_MODE!==mode||String(normalized.REGISTER_VERSION)!==publication.registerVersion
+    ||(mode==='hosted'&&normalized.PREVIEW_PROVIDER_TEST_CONFIG===undefined))refuse();
   if(service==='api'){
    if(configured.PUBLIC_APP_URL!==PREVIEW_ORIGIN||configured.API_HOST!=='127.0.0.1'||configured.API_PORT!==approved.apiPort
     ||configured.MAIL_SENDMAIL_PATH!==approved.mailExecutable||configured.MAIL_FROM!==approved.mailFrom
@@ -82,6 +147,8 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
    if(normalized.STAFF_ACCESS.policyVersion===2&&(normalized.STAFF_ACCESS.origin!==PREVIEW_ORIGIN||normalized.STAFF_ACCESS.rpId!=='v3-preview.dezbatere.ro'))refuse();
    // Social configuration is admitted by the final product's parser only when its whole pair is present.
    if((configured.SOCIAL_SOCKET_PATH===undefined)!==(configured.SOCIAL_PROVIDERS_JSON===undefined))refuse();
+   if(mode==='hosted')assertHostedApiValues(configured);
+   else if(BILLING_ONLY_KEYS.some(key=>configured[key]!==undefined))refuse();
   }
   return {environment:Object.freeze(environment),selectedRegisterVersion:String(normalized.REGISTER_VERSION),deploymentMode:normalized.DEPLOYMENT_MODE};
  }catch{refuse('PREVIEW_ENVIRONMENT_REFUSED');}
