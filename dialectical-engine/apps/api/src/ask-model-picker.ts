@@ -130,15 +130,24 @@ export function answerTokenCeilingsByRole(ceilings: CallTokenCeilings): Readonly
 
 /**
  * Debate shape (spec 2026-10-12 §3.3 step 8): the answer writer's call bound becomes max(sealed bound, the run's
- * answer length's writer bound), so the picker seats only writers whose window holds the longer answer. A receipt
- * without a shape keeps the sealed table (the same object).
+ * answer length's writer bound), so the picker seats only writers whose window holds the longer answer. The map's
+ * merge and choose calls are made by debaters (counted under POSITION, `expectedCallsByRoleFromBasis`) at the
+ * receipt's map step bounds (ruling X1), so POSITION's bound becomes max(sealed bound, merge bound, choose bound):
+ * a debater whose window cannot hold a merge would be refused by the gateway's window wall part-way through the
+ * debate. A receipt without a shape keeps the sealed table (the same object).
  */
 export function answerTokenCeilingsForBasis(
   ceilings: Readonly<Record<DebateRole, number>>,
   basis: Readonly<Record<string, unknown>>
 ): Readonly<Record<DebateRole, number>> {
   const shaped = admittedShapeOf(basis);
-  return shaped === null ? ceilings : Object.freeze({ ...ceilings, ANSWER_WRITER: Math.max(ceilings.ANSWER_WRITER, shaped.shape.writerBound) });
+  if (shaped === null) return ceilings;
+  const { writerBound, mapMergeBound, mapChooseBound } = shaped.shape;
+  return Object.freeze({
+    ...ceilings,
+    POSITION: Math.max(ceilings.POSITION, mapMergeBound, mapChooseBound),
+    ANSWER_WRITER: Math.max(ceilings.ANSWER_WRITER, writerBound)
+  });
 }
 
 /** S2: the sealed money terms the picker's limits are cut from — the API's `CostEnvelopeGuard` policy. */

@@ -85,7 +85,8 @@ export function decideSettingsForPlan<T extends AskSettings>(settings: T, plan: 
     ...settings,
     plan_tier: "free" as const,
     composition_budget_tier: gauges.compositionBudgetTier,
-    depth_params: Object.freeze({ depth: gauges.depth })
+    // Debate shape (spec 2026-10-12 §3.2): only the depth is Free's gauge; the shape settings pass on to the shape's own normalisation.
+    depth_params: Object.freeze({ ...settings.depth_params, depth: gauges.depth })
   });
 }
 
@@ -116,7 +117,8 @@ export function normaliseAskForPlan(ask: AskRequest, plan: BillingPlan): Readonl
       tier_source: FREE_GAUGE_SOURCE.tierSource,
       tier_provenance_ref: FREE_GAUGE_SOURCE.provenanceRef,
       composition_budget_tier: gauges.compositionBudgetTier,
-      depth_params: Object.freeze({ depth: gauges.depth })
+      // Debate shape (spec 2026-10-12 §3.2): only the depth is Free's gauge; the shape settings pass on to the shape's own normalisation.
+      depth_params: Object.freeze({ ...ask.depth_params, depth: gauges.depth })
     }),
     normalised: true
   });
@@ -157,11 +159,32 @@ export async function decideRoomSettings<T extends AskSettings>(
   ownerRef: string | null,
   billing: AskBilling | undefined
 ): Promise<T> {
-  if (billing === undefined || ownerRef === null) return settings;
+  return (await decideRoomSettingsAndPlan(settings, ownerRef, billing)).settings;
+}
+
+/**
+ * `decideRoomSettings` with the plan id `submit` would resolve (`resolveBillingAsk`'s `planId`): the entitlement's
+ * plan with billing on, null without billing, without an owner, or for internal funding. Debate shape (spec
+ * 2026-10-12 §3.1): the room read normalises and samples under the same plan key as the ask it advises on.
+ */
+export async function decideRoomSettingsAndPlan<T extends AskSettings>(
+  settings: T,
+  ownerRef: string | null,
+  billing: AskBilling | undefined
+): Promise<Readonly<{ settings: T; planId: PlanId | null }>> {
+  if (billing === undefined || ownerRef === null) return Object.freeze({ settings, planId: null });
   const basis = await billing.funding?.resolveAskFunding(ownerRef,billing.clock());
-  if (basis?.kind === "INTERNAL") return settings.plan_tier === "premium" ? settings : Object.freeze({...settings,plan_tier:"premium" as const});
+  if (basis?.kind === "INTERNAL") {
+    return Object.freeze({
+      settings: settings.plan_tier === "premium" ? settings : Object.freeze({...settings,plan_tier:"premium" as const}),
+      planId: null
+    });
+  }
   const entitlement = await billing.entitlements.current(ownerRef, billing.clock());
-  return decideSettingsForPlan(settings, planById(billing.plans, entitlement.planId));
+  return Object.freeze({
+    settings: decideSettingsForPlan(settings, planById(billing.plans, entitlement.planId)),
+    planId: entitlement.planId
+  });
 }
 
 export type CoarseFit = "AS_ASKED" | "FREE_ROSTER";

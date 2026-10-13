@@ -38,6 +38,7 @@ import {
   computeStructuralCeilingBasis,
   readAnswerRoleRotationPolicy,
   readCallTokenCeilings,
+  readDebateShapePolicy,
   readDeploymentRiskTier,
   readEngineVersion,
   readEnvelopeFormulaInputs,
@@ -129,6 +130,8 @@ export async function composePracticeAsk(input: Readonly<{
   });
   const deploymentRiskTier = await readDeploymentRiskTier(pool, version);
   const answerRoleRotation = await readAnswerRoleRotationPolicy(pool, version);
+  // Debate shape (spec 2026-10-12 §3.1): as main.ts reads it; the practice runner's composition refuses a present row.
+  const debateShapePolicy = await readDebateShapePolicy(pool, version);
   const runSettings: RunCreationSettings = {
     previewProviderTestConfig: previewConfig, previewTeamUserIds: [...input.teamUserIds],
     previewBudgetGate,
@@ -139,6 +142,7 @@ export async function composePracticeAsk(input: Readonly<{
     resolveDiscoveredPanel: resolveProviderPanel,
     modelPicker,
     ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
+    ...(debateShapePolicy === null ? {} : { debateShapePolicy }),
     resolveEnvelopeBasis: async (basis) => computeStructuralCeilingBasis({
       ...structuralInputs,
       panelSize: basis.panelSize,
@@ -151,7 +155,8 @@ export async function composePracticeAsk(input: Readonly<{
       synthesizerMaxRounds: envelopeFormulaInputs.synthesizerMaxRounds,
       evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
       maxDepth: envelopeFormulaInputs.maxDepth,
-      backupSequencesProvisioned: basis.backupSequencesProvisioned
+      backupSequencesProvisioned: basis.backupSequencesProvisioned,
+      ...(basis.shape === null ? {} : { shape: basis.shape })
     }),
     resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
       const resolved = resolveEffectiveRiskTier({

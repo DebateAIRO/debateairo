@@ -90,6 +90,7 @@ import {
   readProductRolePolicy,
   readPublicationCheckPolicy,
   readAnswerRoleRotationPolicy,
+  readDebateShapePolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -956,6 +957,8 @@ const legacyRunClaim=new PostgresLegacyRunClaimApplication(
 );
 // Role rotation (spec 2026-10-11): the optional row; ABSENT/OFF is today's engine, a malformed row refuses the boot.
 const answerRoleRotation = await boot.run("answer-role-rotation-policy", () => readAnswerRoleRotationPolicy(pool, environment.REGISTER_VERSION));
+// Debate shape (spec 2026-10-12 §3.1): the optional row; absent = today's shape byte for byte, a malformed row refuses the boot.
+const debateShapePolicy = await boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION));
 const application = new PostgresAskApplication(pool, dispatcher, {
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   ...(previewBudgetGate === undefined ? {} : { previewBudgetGate }),
@@ -978,6 +981,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   modelPicker,
   // Role rotation (spec 2026-10-11 Part 4): admission reads the counts only with the row ON.
   ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
+  // Debate shape (spec 2026-10-12 §3.1): admission sizes a shaped basis only with the row in force.
+  ...(debateShapePolicy === null ? {} : { debateShapePolicy }),
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
     panelSize: input.panelSize,
@@ -991,7 +996,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
     maxDepth: envelopeFormulaInputs.maxDepth,
     // A14/A20 (F17): DR-184-v5 only when the pinned assignment has a runner-up.
-    backupSequencesProvisioned: input.backupSequencesProvisioned
+    backupSequencesProvisioned: input.backupSequencesProvisioned,
+    // Debate shape (spec 2026-10-12 §3.6): the sizes admission resolved for this panel, or today's shape.
+    ...(input.shape === null ? {} : { shape: input.shape })
   }),
   resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
     const resolved = resolveEffectiveRiskTier({
@@ -1518,6 +1525,8 @@ const api = buildApi({
   // room answers FITS and the usage route 404.
   ...(askRoom === undefined ? {} : { askRoom }),
   ...(askBilling === undefined ? {} : { askBilling }),
+  // Debate shape: the room read normalises its query under the same row as submit.
+  ...(debateShapePolicy === null ? {} : { debateShapePolicy }),
   ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
   // P15, W7: scheduling an account erasure stops the owner's renewal at once (the reconciler's sweep repeats it, and
   // ends the plan once the erasure commits).

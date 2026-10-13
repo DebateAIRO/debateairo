@@ -63,7 +63,23 @@ describe("per-role call shares under the debate shape (spec 2026-10-12 §3.6)", 
     const ceilings = Object.freeze({ POSITION: 2048, SUPPORT_ATTACK: 2048, CROSS_EXCHANGE: 2048, JUDGE: 2048, REVIEWER: 2048,
       ANSWER_WRITER: 4096, ANSWER_CHECKER: 2048 });
     expect(answerTokenCeilingsForBasis(ceilings, legacy)).toBe(ceilings);
-    expect(answerTokenCeilingsForBasis(ceilings, shaped)).toEqual({ ...ceilings, ANSWER_WRITER: 16384 });
+    // Task 8 (note 4): the debaters also make the map's merge and choose calls, at the receipt's map step bounds.
+    expect(answerTokenCeilingsForBasis(ceilings, shaped)).toEqual({ ...ceilings, POSITION: 32_768, ANSWER_WRITER: 16384 });
     expect(answerTokenCeilingsForBasis({ ...ceilings, ANSWER_WRITER: 20_000 }, shaped).ANSWER_WRITER).toBe(20_000);
+  });
+  it("the debaters' window bound is the largest of the sealed one and the two map step bounds (Task 8, ruling X1)", () => {
+    const ceilings = Object.freeze({ POSITION: 2048, SUPPORT_ATTACK: 2048, CROSS_EXCHANGE: 2048, JUDGE: 2048, REVIEWER: 2048,
+      ANSWER_WRITER: 4096, ANSWER_CHECKER: 2048 });
+    const narrowMerge = resolveDebateShape({ policy: { ...POLICY, mapStepBounds: { merge: 16_384, choose: 8192 } }, plan: "free",
+      makers: 3, settings: { depthMode: "adaptive", scrutiny: "standard", answerLength: "detailed" } })!;
+    const basis = computeStructuralCeilingBasis({ ...TERMS, panelSize: 3, depth: 2, shape: narrowMerge });
+    expect(answerTokenCeilingsForBasis(ceilings, basis).POSITION).toBe(16_384);
+    const chooseLonger = resolveDebateShape({ policy: { ...POLICY, mapStepBounds: { merge: 8192, choose: 12_288 } }, plan: "free",
+      makers: 3, settings: { depthMode: "adaptive", scrutiny: "standard", answerLength: "detailed" } })!;
+    expect(answerTokenCeilingsForBasis(ceilings, computeStructuralCeilingBasis({ ...TERMS, panelSize: 3, depth: 2, shape: chooseLonger })).POSITION)
+      .toBe(12_288);
+    // A sealed bound above both stays; the other debate roles never take the map's bounds.
+    const wide = answerTokenCeilingsForBasis({ ...ceilings, POSITION: 40_000 }, basis);
+    expect(wide).toMatchObject({ POSITION: 40_000, SUPPORT_ATTACK: 2048, CROSS_EXCHANGE: 2048, JUDGE: 2048, REVIEWER: 2048 });
   });
 });
