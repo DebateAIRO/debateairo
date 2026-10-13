@@ -152,7 +152,8 @@ const EVALUATOR_SATISFIED = JSON.stringify({
  * It is removed before any class is read, as the database suite's double does.
  */
 const DIRECTIVE = new RegExp(
-  argumentLanguageDirective("\u0000").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\u0000", "[^.]+?"),
+  // Reply language (2026-10-12): a named language is followed by ", the language of the question"; the fallback is not.
+  argumentLanguageDirective("\u0000").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\u0000, the language of the question", "[^.]+?"),
   "g"
 );
 
