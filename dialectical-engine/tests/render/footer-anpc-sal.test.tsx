@@ -8,7 +8,7 @@ import { SiteFooter } from "../../apps/ui/components/SiteFooter.js";
 import type { SiteFooterBilling } from "../../apps/ui/lib/billing/footerBilling.js";
 import chromeEnglish from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
 
-const ANPC_SAL_URL = "https://anpc.ro/ce-este-sal/";
+const ANPC_SAL_URL = "https://reclamatiisal.anpc.ro/";
 const ANPC_SAL_SRC = "/consumer-protection/anpc-sal.png";
 const ANPC_SAL_TITLE = "ANPC – Soluționarea alternativă a litigiilor";
 const ANPC_SAL_ALT = "ANPC – Soluționarea alternativă a litigiilor. Detalii";

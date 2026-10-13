@@ -83,7 +83,7 @@ describe("P21 the site footer, extended for paid plans (R3-4; the card processor
 
   it("leaves the one-line footer to the seven legal links and ANPC's SAL badge (15b), and nothing about paying", () => {
     const line = markup(<SiteFooter variant="line" />).querySelector("footer.siteFooterLine")!;
-    expect(hrefs(line)).toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://anpc.ro/ce-este-sal/"]);
+    expect(hrefs(line)).toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://reclamatiisal.anpc.ro/"]);
   });
 
   it("takes billing's state from the one plans read, and the marks from the owner's files (none in the repository)", async () => {

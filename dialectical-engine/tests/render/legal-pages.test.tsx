@@ -610,7 +610,7 @@ describe("the footers (15a full, 15b one line)", () => {
       const footer = view.querySelector("footer.siteFooterLine");
       expect(footer).not.toBeNull();
       expect([...(footer?.querySelectorAll("a") ?? [])].map((link) => link.getAttribute("href")))
-        .toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://anpc.ro/ce-este-sal/"]);
+        .toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://reclamatiisal.anpc.ro/"]);
       const button = footer?.querySelector("button");
       expect(button?.textContent).toBe(chromeEnglish["chrome.footer.cookiePreferences"]);
       act(() => button?.click());
