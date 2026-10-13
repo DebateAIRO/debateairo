@@ -1,7 +1,10 @@
+import { projectedCallCeilingMicros, type ProviderTargetPrice } from "@debateai/budget";
+import { rootPositionRequestBytesBound } from "@debateai/judgement";
 import { exhaustive } from "@debateai/kernel";
 import {
-  mapErrorCodeOf, mapProviderPieces, mapRunAngleMap, mapRunBlindLists, mapRunSnowball,
-  type MapCallOutcome, type MapCallRequest, type MapCaller, type MapResult, type MapRunInput, type MapSeat, type MapStep
+  MAP_LIMITS, mapErrorCodeOf, mapProviderPieces, mapRunAngleMap, mapRunBlindLists, mapRunSnowball,
+  type MapCallOutcome, type MapCallRequest, type MapCaller, type MapChoiceRepository, type MapResult, type MapRunInput, type MapSeat,
+  type MapStep
 } from "@debateai/map";
 import type { CallBound, ProviderGateway } from "@debateai/providers";
 import type { DebateShapeOpening } from "@debateai/register";
@@ -27,6 +30,11 @@ export type MapStageDeps = Readonly<{
   laneStopped: (error: unknown) => boolean;
   abandon: (error: unknown) => boolean;
   serial: boolean;
+  /**
+   * Controller ruling T12-R0: root 0's worst-case call (`rootZeroKeepRoomMicros`), named on every map call so the money
+   * seam refuses a map call that would leave too little for it (a map spend stop). Absent or 0: no room is named.
+   */
+  keepRoomMicros?: number;
 }>;
 /**
  * `settled()` (Task 1 note): resolves once every call this caller SENT has finished, whatever its outcome. When an
@@ -49,6 +57,7 @@ export function mapStageBound(bound: CallBound, step: MapStep, longBounds: Reado
 const MAKER_SAT_OUT = "MAKER_SAT_OUT";
 
 export function createRunnerMapCaller(deps: MapStageDeps): RunnerMapCaller {
+  const keepRoom = deps.keepRoomMicros !== undefined && deps.keepRoomMicros > 0 ? { keepRoomMicros: deps.keepRoomMicros } : {};
   let spendStop: EnvelopeStopKind | null = null;
   let stopped = false;
   /** The first abandon this caller met (boxed: the error itself may be any value). Once set, nothing more is sent. */
@@ -80,7 +89,7 @@ export function createRunnerMapCaller(deps: MapStageDeps): RunnerMapCaller {
         runId: deps.runId, subjectItemId: deps.subjectItemId, callSiteKey: request.callSiteKey, role: "JUDGE", lane: "served",
         bound: mapStageBound(deps.judgeBound, request.step, deps.longBounds), contractHash: deps.mapContractHash,
         providerRef: member.providerRef, packet: pieces.framed.packet,
-        classifyContent: pieces.classifyContent, buildRepairPacket: pieces.buildRepairPacket
+        classifyContent: pieces.classifyContent, buildRepairPacket: pieces.buildRepairPacket, ...keepRoom
       }));
       return { kind: "OK", value: pieces.readAccepted(response.content) };
     } catch (error) {
@@ -141,4 +150,60 @@ export function mapConditionRecords(result: MapResult, runId: string, servedRoot
       reason: `${record.mark}:${record.step}`, liftPath: null, servedRootRule: null, affectedNodeIds: Object.freeze([servedRootNodeId])
     } satisfies ConditionMarkRecord);
   }));
+}
+
+/**
+ * Controller ruling T12-R0 — HOW MUCH MAP MATERIAL ROOT 0 CAN CARRY, in characters: its assigned answer (a chosen
+ * statement, or a filled answer built around one) and the JSON text of its map points (every point either side of a
+ * chosen answer, plus the quota fills, each a key point's claim with room for its JSON members). Task 13 frames root 0's
+ * `assigned_answer` and `map_points` within these, so the room the map keeps for root 0 is never below its real call.
+ */
+export const rootZeroMapMaterialChars = Object.freeze({
+  answer: 2 * MAP_LIMITS.claimMaxChars,
+  points: (2 * MAP_LIMITS.choosePointsPerSideMax + 3) * (MAP_LIMITS.claimMaxChars + 64) + 64
+});
+
+/** Room for the target's own `model` member, which `rootPositionRequestBytesBound` leaves empty. */
+const ROOT_ZERO_BODY_ALLOWANCES = Object.freeze({ modelIdBytes: 256 });
+
+/** The most bytes root 0's own request can carry for this question (a primary root, or a map-assigned one). */
+export function rootZeroRequestBytes(input: Readonly<{ questionLine: string; argumentLanguageName: string; completionTokenCeiling: number }>): number {
+  return rootPositionRequestBytesBound({ ...input, assignedMaterialChars: rootZeroMapMaterialChars })
+    + ROOT_ZERO_BODY_ALLOWANCES.modelIdBytes;
+}
+
+/**
+ * Root 0's worst-case call, in micro-units: the money seam's own projection (`projectedCallCeilingMicros`) of its largest
+ * request at its first attempt's completion ceiling, at the dearest price among the members that could write it. No
+ * price (local mode: no money ceiling) keeps no room.
+ */
+export function rootZeroKeepRoomMicros(input: Readonly<{ prices: readonly ProviderTargetPrice[]; requestBytes: number; completionTokenCeiling: number }>): number {
+  return input.prices.reduce((most, price) => Math.max(most,
+    projectedCallCeilingMicros(price, { requestBytes: input.requestBytes, completionTokenCeiling: input.completionTokenCeiling })), 0);
+}
+
+/**
+ * Debate shape (spec §3.3 step 1) — WHERE THE RUN'S MAP COMES FROM. A re-claimed run reuses its stored map and asks
+ * nothing; a spend stop the stored map met (`stoppedBy`) is restored, so the arguing stops after root 0 exactly as on the
+ * first claim (Task 12 fix round 1, Minor 2). Otherwise the map is asked and stored; when another copy of the run stored
+ * its map first (ALREADY_PRESENT), this copy argues the STORED map, never its own (Important 1), and keeps its own spend
+ * stop too: what it spent is spent. RUN_ERASED keeps this copy's map: nothing more of the run is stored.
+ */
+export async function resolveShapeMap(input: Readonly<{
+  store: Pick<MapChoiceRepository, "writeMapRun" | "readMapResultForRun">;
+  runId: string;
+  answerCount: () => number;
+  runMap: () => Promise<Readonly<{ result: MapResult; spendStop: EnvelopeStopKind | null }>>;
+  spendStopOfCode: (code: string) => EnvelopeStopKind | null;
+}>): Promise<Readonly<{ result: MapResult; spendStop: EnvelopeStopKind | null }>> {
+  const storedStop = (stored: MapResult): EnvelopeStopKind | null =>
+    stored.stoppedBy === null ? null : input.spendStopOfCode(stored.stoppedBy);
+  const stored = await input.store.readMapResultForRun(input.runId);
+  if (stored !== null) return Object.freeze({ result: stored, spendStop: storedStop(stored) });
+  const own = await input.runMap();
+  const written = await input.store.writeMapRun({ runId: input.runId, result: own.result, answerCount: input.answerCount() });
+  if (written !== "ALREADY_PRESENT") return own;
+  const winner = await input.store.readMapResultForRun(input.runId);
+  if (winner === null) return own;
+  return Object.freeze({ result: winner, spendStop: own.spendStop ?? storedStop(winner) });
 }

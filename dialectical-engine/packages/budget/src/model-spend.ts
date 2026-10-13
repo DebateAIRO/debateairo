@@ -130,6 +130,12 @@ export interface ProviderCostSeam {
   assertCallAllowed(projection: Readonly<{
     requestBytes: number;
     completionTokenCeiling: number;
+    /**
+     * Debate shape (controller ruling T12-R0): money the call must leave unspent under its ceiling — root 0's
+     * worst-case call, named by every map call. Added to the projection for the DECISION only (never counted in
+     * flight, never reserved, never charged). Absent: today's decision.
+     */
+    keepRoomMicros?: number;
   }>): Promise<void | ProviderCallAdmission>;
   /**
    * I4: charges what the vendor billed, and never refuses. `projection` is the
@@ -641,9 +647,12 @@ export class CostEnvelopeGuard {
           othersOfRunner = Number(inFlight.projectedMicrosAll() - own);
         }
         try {
+          const keepRoomMicros = projection.keepRoomMicros ?? 0;
+          if (!Number.isSafeInteger(keepRoomMicros) || keepRoomMicros < 0) throw new TypeError("COST_ENVELOPE_KEEP_ROOM_INVALID");
           const decision = decideRunCostEnvelope({
             spentMicros: await envelope.readSpentMicros(input.runId) + othersOfRun,
-            projectedMicros,
+            // T12-R0: a map call is admitted only if root 0's worst-case call still fits after it.
+            projectedMicros: projectedMicros + keepRoomMicros,
             ceilingMicros: envelope.ceilingMicros
           });
           if (decision.kind === "WOULD_CROSS") throw envelope.refusal(decision);

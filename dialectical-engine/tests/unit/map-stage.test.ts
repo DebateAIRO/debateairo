@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { replyLanguageExpectation, TypedDomainError } from "@debateai/kernel";
 import { mapAnglesSpec, mapPromptContractHash, type MapCallRequest } from "@debateai/map";
 import type { ProviderCallRequest, ProviderGateway } from "@debateai/providers";
-import { createRunnerMapCaller, mapConditionRecords, mapStageBound, mapStageSeats, type MapStageDeps } from "../../apps/runner/src/map-stage.js";
+import { createRunnerMapCaller, mapConditionRecords, mapStageBound, mapStageSeats, resolveShapeMap, type MapStageDeps } from "../../apps/runner/src/map-stage.js";
+import type { MapResult } from "@debateai/map";
 
 const BOUND = { maxAttempts: 3, tokenCeiling: 8_192, deadlineMs: 1_260_000 };
 const ANGLES = JSON.stringify({ angles: [
@@ -56,6 +57,16 @@ describe("the runner's map caller", () => {
     expect(await createRunnerMapCaller(deps(answering("not json"))).call(request())).toMatchObject({ kind: "FAILED" });
     expect(await createRunnerMapCaller(deps(answering(ANGLES), { sitsOut: () => true })).call(request()))
       .toEqual({ kind: "BUSY", code: "MAKER_SAT_OUT" });
+  });
+
+  it("names root 0's room on every map call when there is one, and never when there is none (T12-R0)", async () => {
+    const seen: ProviderCallRequest[] = [];
+    await createRunnerMapCaller(deps(answering(ANGLES, seen), { keepRoomMicros: 4_321 })).call(request());
+    await createRunnerMapCaller(deps(answering(ANGLES, seen), { keepRoomMicros: 0 })).call(request());
+    await createRunnerMapCaller(deps(answering(ANGLES, seen))).call(request());
+    expect(seen[0]).toMatchObject({ keepRoomMicros: 4_321 });
+    expect(seen[1]).not.toHaveProperty("keepRoomMicros");
+    expect(seen[2]).not.toHaveProperty("keepRoomMicros");
   });
 
   it("a lost claim is rethrown (the orchestrator then rethrows it: the run is abandoned)", async () => {
@@ -165,5 +176,62 @@ describe("the runner's map caller", () => {
     expect(records.map((record) => record.mark)).toEqual(["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK",
       "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED"]);
     expect(records.every((record) => record.affectedNodeIds.length === 1 && record.affectedNodeIds[0] === "node-0")).toBe(true);
+  });
+});
+
+/** Fix round 1: where the run's map comes from — the stored one, or a new one, and the stored one when another copy won. */
+describe("resolveShapeMap", () => {
+  const result = (stoppedBy: string | null, tag: string): MapResult => ({ arm: "C", kind: "MAP", angles: [], items: [], keyPoints: [],
+    mergedAnswers: [], framingChallenges: [tag], choice: null, marks: [], notes: [], calls: [], stoppedBy }) as MapResult;
+  const spendStopOfCode = (code: string) => code === "RUN_COST_ENVELOPE_MONEY_REACHED" ? "MONEY" as const
+    : code === "RUN_COST_ENVELOPE_EXHAUSTED" ? "ATTEMPTS" as const : null;
+  const storeOf = (stored: MapResult | null, onWrite: () => "INSERTED" | "ALREADY_PRESENT" | "RUN_ERASED", written: unknown[] = []) => {
+    let row = stored;
+    return { written, store: {
+      readMapResultForRun: async () => row,
+      writeMapRun: async (input: Readonly<{ runId: string; result: MapResult; answerCount: number }>) => {
+        written.push(input);
+        const outcome = onWrite();
+        if (outcome === "ALREADY_PRESENT") row = result(null, "winner");
+        return outcome;
+      }
+    } };
+  };
+
+  it("a re-claimed run reuses its stored map, asks nothing, and restores a money stop the map met (Minor 2)", async () => {
+    let asked = 0;
+    const { store, written } = storeOf(result("RUN_COST_ENVELOPE_MONEY_REACHED", "stored"), () => "INSERTED");
+    const resolved = await resolveShapeMap({ store, runId: "run-1", answerCount: () => 2, spendStopOfCode,
+      runMap: async () => { asked += 1; return { result: result(null, "new"), spendStop: null }; } });
+    expect(asked).toBe(0);
+    expect(written).toEqual([]);
+    expect(resolved.result.framingChallenges).toEqual(["stored"]);
+    expect(resolved.spendStop).toBe("MONEY");
+    // A lane stop is not a spend stop: nothing is restored.
+    const laneStopped = await resolveShapeMap({ store: storeOf(result("CALL_LANE_HELD_BACK", "stored"), () => "INSERTED").store,
+      runId: "run-1", answerCount: () => 2, spendStopOfCode, runMap: async () => ({ result: result(null, "new"), spendStop: null }) });
+    expect(laneStopped.spendStop).toBeNull();
+  });
+
+  it("a first claim asks the map, stores it with the run's answer count, and keeps its own stop", async () => {
+    const { store, written } = storeOf(null, () => "INSERTED");
+    const resolved = await resolveShapeMap({ store, runId: "run-1", answerCount: () => 3, spendStopOfCode,
+      runMap: async () => ({ result: result("RUN_COST_ENVELOPE_EXHAUSTED", "new"), spendStop: "ATTEMPTS" }) });
+    expect(resolved.result.framingChallenges).toEqual(["new"]);
+    expect(resolved.spendStop).toBe("ATTEMPTS");
+    expect(written).toEqual([{ runId: "run-1", result: result("RUN_COST_ENVELOPE_EXHAUSTED", "new"), answerCount: 3 }]);
+  });
+
+  it("a second writer that loses the race argues the STORED map, not its own (Important 1)", async () => {
+    const { store } = storeOf(null, () => "ALREADY_PRESENT");
+    const resolved = await resolveShapeMap({ store, runId: "run-1", answerCount: () => 2, spendStopOfCode,
+      runMap: async () => ({ result: result(null, "loser"), spendStop: null }) });
+    expect(resolved.result.framingChallenges).toEqual(["winner"]);
+    expect(resolved.spendStop).toBeNull();
+    // Its own map's money stop still stands: the money it spent is spent.
+    const stopped = await resolveShapeMap({ store: storeOf(null, () => "ALREADY_PRESENT").store, runId: "run-1", answerCount: () => 2,
+      spendStopOfCode, runMap: async () => ({ result: result("RUN_COST_ENVELOPE_MONEY_REACHED", "loser"), spendStop: "MONEY" }) });
+    expect(stopped.result.framingChallenges).toEqual(["winner"]);
+    expect(stopped.spendStop).toBe("MONEY");
   });
 });

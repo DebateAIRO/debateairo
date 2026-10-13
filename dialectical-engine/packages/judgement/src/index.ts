@@ -503,6 +503,36 @@ export function firstPositionCallProjections(input: Readonly<{
 }
 
 /**
+ * Debate shape (controller ruling T12-R0) — THE MOST BYTES ROOT 0'S OWN REQUEST CAN CARRY for this question, so the
+ * map can keep room for it. Root 0 is today's primary root (the map's fallback) or a map-assigned root whose answer and
+ * points are at most `assignedMaterialChars` characters each. The assigned material is made of U+0001, the character
+ * whose encoding grows most on the way (1 → 6 → 7 bytes, `firstPositionCallProjections`), so no real material of that
+ * length frames longer. Both claim-type variants of both contracts, the largest kept, measured as the gateway's
+ * `{model, max_tokens, messages}` body with an EMPTY model member: the caller adds its target's model id.
+ */
+export function rootPositionRequestBytesBound(input: Readonly<{
+  questionLine: string;
+  argumentLanguageName: string;
+  completionTokenCeiling: number;
+  assignedMaterialChars: Readonly<{ answer: number; points: number }>;
+}>): number {
+  const { answer, points } = input.assignedMaterialChars;
+  if (!Number.isSafeInteger(input.completionTokenCeiling) || input.completionTokenCeiling < 1
+    || !Number.isSafeInteger(answer) || answer < 1 || !Number.isSafeInteger(points) || points < 1) {
+    throw new TypeError("ROOT_POSITION_BOUND_INPUT_INVALID");
+  }
+  const legs: readonly JudgeLeg[] = [
+    Object.freeze({ kind: "primary-root" }),
+    Object.freeze({ kind: "assigned-root", assignedAnswer: "\u0001".repeat(answer), mapPoints: "\u0001".repeat(points) })
+  ];
+  return Math.max(...legs.flatMap((leg) => (["unknown", "resolved"] as const).map((claim) => Buffer.byteLength(JSON.stringify({
+    model: "",
+    max_tokens: input.completionTokenCeiling,
+    messages: framedJudgePrompt(leg, input.questionLine, input.argumentLanguageName, claim).packet.messages
+  }), "utf8"))));
+}
+
+/**
  * B9 (budget spec §2.10) — THE FIRST CALLS EACH PLAN CAN MAKE, one group per
  * plan. A run's makers are its plan's roster only (the API keeps each ask's
  * discovered panel to `PLAN_TIER_ROSTERS[planTier]`, apps/api/src/index.ts),

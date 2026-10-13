@@ -213,7 +213,10 @@ import {
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions } from "./shape-select.js";
-import { createRunnerMapCaller, mapStageSeats, runMapStage } from "./map-stage.js";
+import {
+  createRunnerMapCaller, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroRequestBytes, runMapStage
+} from "./map-stage.js";
+import { shapePositionCount } from "./shape-plan.js";
 import { shapeDistinctMakers, shapeSeatOrder } from "./shape-seats.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunInFlight } from "./run-in-flight.js";
@@ -6667,20 +6670,28 @@ export class WalkingSkeletonRunner {
     if (shapeRun !== null) rootSeats.splice(0, rootSeats.length, ...shapeSeatOrder(rootSeats));
     /**
      * Debate shape, Stage 1 (spec §1, §3.3 step 1, §3.5): the map, before root 0. A re-claimed run finds its stored map
-     * and asks nothing again. A stop during the map (money, attempts, lane) ends it with the code's fallbacks; the
-     * arguing then stops after root 0 and the answer is written (O6). A keep-alive refusal abandons the run, as today:
-     * the lane is stopped (a call still waiting is never sent), and the map calls already sent are awaited before the
-     * refusal is rethrown, so their receipts land and nothing of the map runs on after the run is abandoned (Task 1
-     * note). Never on today's run (`shapeRun === null`): no map, no call, no storage.
+     * and asks nothing again; a spend stop that map met is restored (`resolveShapeMap`). A copy of the run that loses the
+     * race to store its map argues the stored one. A stop during the map (money, attempts, lane) ends it with the code's
+     * fallbacks; the arguing then stops after root 0 and the answer is written (O6). Controller ruling T12-R0: every map
+     * call keeps room for root 0's worst-case call (`rootZeroKeepRoomMicros`), so a started debate can always pay its
+     * first position. A keep-alive refusal abandons the run, as today. Never on today's run (`shapeRun === null`): no
+     * map, no call, no storage.
      */
     let debateShapeMap: MapResult | null = null;
     let shapeMapResult: MapResult | null = null;
     let mapSpendStop: EnvelopeStopKind | null = null;
     if (shapeRun !== null) {
-      shapeMapResult = await this.#mapChoices.readMapResultForRun(run.runId);
-      if (shapeMapResult === null) {
+      const runMap = async (): Promise<Readonly<{ result: MapResult; spendStop: EnvelopeStopKind | null }>> => {
         /** PF-B40: map seats outside the claim-eligible list, wrapped once each. */
         const mapOnlyMembers = new Map<string, ConfiguredSeatMaker>();
+        // T12-R0: root 0's worst-case call, at the dearest member any root seat could write it with (hosted prices only).
+        const providerPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+        const rootZeroPrices = rootSeats.flatMap((seat) => membersOf(seat))
+          .flatMap((member) => { const price = providerPrices.get(member.providerRef); return price === undefined ? [] : [price]; });
+        const rootZeroCompletion = lengthRetryTokenCeiling(this.settings.judgeBound.tokenCeiling, 0);
+        const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, completionTokenCeiling: rootZeroCompletion,
+          requestBytes: rootZeroRequestBytes({ questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName,
+            completionTokenCeiling: rootZeroCompletion }) });
         const mapCaller = createRunnerMapCaller({
           runId: run.runId, subjectItemId: claimed.workItemId, mapContractHash: shapeRun.mapContractHash,
           judgeBound: this.settings.judgeBound,
@@ -6702,28 +6713,38 @@ export class WalkingSkeletonRunner {
           spendStopOf: expansionPhaseStop,
           laneStopped: (error) => callHeldBack(error) || (error instanceof TypedDomainError && error.code === CALL_LANE_STOPPED),
           abandon: keepAliveStop,
-          serial: !callsRunTogether
+          serial: !callsRunTogether,
+          keepRoomMicros
         });
         // Spec §2.3 (O6), the map's own guard: once the map has stopped, no queued map call starts.
         callLane?.guardStarts(() => !mapCaller.stopped());
         try {
-          shapeMapResult = await runMapStage({ opening: shapeRun.shape.opening, map: {
+          const result = await runMapStage({ opening: shapeRun.shape.opening, map: {
             questionLine: run.questionLine, languageName: run.argumentLanguageName, languageTag: run.argumentLanguageTag,
             seats: mapStageSeats(rootSeats, shapeRun.shape.mapAIs), caller: mapCaller, abandon: keepAliveStop, seed: run.runId,
             gapRoundsMax: shapeRun.shape.gapRounds, maxAnswers: shapeRun.shape.answers, pointsPerAnswer: shapeRun.shape.pointsPerAnswer
           } });
+          return Object.freeze({ result, spendStop: mapCaller.spendStop() });
         } catch (error) {
           callLane?.stop();
+          // Controller ruling T12-W: wait for the map calls already sent before the refusal leaves, so their MODEL_CALL
+          // and spend rows land inside this run's execution and nothing of the map runs on after it is abandoned. The
+          // wait is bounded: each of those calls ends by its own deadline (the gateway's per-attempt timeout), and the
+          // caller sends nothing more once it has seen the refusal.
           await mapCaller.settled();
           throw error;
         } finally {
           callLane?.guardStarts(null);
         }
-        mapSpendStop = mapCaller.spendStop();
+      };
+      const resolved = await resolveShapeMap({
+        store: this.#mapChoices, runId: run.runId, runMap,
         // Pre-flight PF-B31: never fewer than two positions (buildShapePlan refuses fewer; the receipt's answers is ≥ 2).
-        await this.#mapChoices.writeMapRun({ runId: run.runId, result: shapeMapResult,
-          answerCount: Math.max(2, Math.min(shapeRun.shape.answers, shapeDistinctMakers(rootSeats, seatSitsOut))) });
-      }
+        answerCount: () => shapePositionCount(shapeRun.shape.answers, shapeDistinctMakers(rootSeats, seatSitsOut)),
+        spendStopOfCode: (code) => expansionPhaseStop(new TypedDomainError(code, code))
+      });
+      shapeMapResult = resolved.result;
+      mapSpendStop = resolved.spendStop;
       if (shapeMapResult.kind === "MAP" && shapeMapResult.choice !== null) debateShapeMap = shapeMapResult;
     }
     /** True when every member of root `rootIndex`'s seat sits out the rest of the run (never without the book). */
@@ -10101,6 +10122,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
   "COST_ENVELOPE_DAY_INVALID",
   "COST_ENVELOPE_GUARD_INPUT_INVALID",
+  "COST_ENVELOPE_KEEP_ROOM_INVALID",
   "COST_ENVELOPE_PRICE_INVALID",
   "COST_ENVELOPE_PRICE_UNPRICED",
   "COST_ENVELOPE_PROJECTION_INVALID",
@@ -10235,6 +10257,8 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
   "MAP_GAP_ITEM_UNKNOWN",
+  "MAP_RECORD_INVALID",
+  "MAP_REPLY_UNREADABLE",
   "MAP_ROW_INVALID",
   "MEMORY_ASKER_SCOPE_MISMATCH",
   "MEMORY_DIFFERENCE_REQUIRED",

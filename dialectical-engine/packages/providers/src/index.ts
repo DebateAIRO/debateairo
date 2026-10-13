@@ -187,6 +187,14 @@ export interface ProviderCallRequest {
    */
   readonly costEnvelope?: ProviderCostEnvelopeSeam;
   /**
+   * Debate shape (controller ruling T12-R0, the owner's "always an answer" rule): money, in micro-units, this call
+   * must leave unspent under its phase's ceiling — root 0's worst-case call, named by every map call, so the map can
+   * never take the room a started debate needs for its first position. Handed to the money seam with the projection
+   * (`assertCallAllowed`), which refuses the call that would cut into it before it is sent. Absent: today's decision,
+   * byte for byte. Never sent.
+   */
+  readonly keepRoomMicros?: number;
+  /**
    * Model scorecard §2.2 (rulings R1, R7): the candidate's thinking level, in
    * the connection's own vocabulary. Absent or DEFAULT_ONLY puts nothing on the
    * wire. A level this connection did not declare is refused before the call is
@@ -1183,6 +1191,8 @@ export interface ProviderCostEnvelopeSeam {
     requestBytes: number;
     /** This attempt's `max_tokens`, which a length retry raises (W10/2). */
     completionTokenCeiling: number;
+    /** T12-R0: the request's `keepRoomMicros`, only when it names one: money the call must leave unspent. */
+    keepRoomMicros?: number;
   }>) => void | ProviderCallAdmission | Promise<void | ProviderCallAdmission>;
   /**
    * CHARGE what the vendor billed. Called for every attempt that produced a
@@ -1867,7 +1877,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
        */
       const costAdmission = await request.costEnvelope?.assertCallAllowed({
         requestBytes: Buffer.byteLength(body, "utf8"),
-        completionTokenCeiling: attemptTokenCeiling
+        completionTokenCeiling: attemptTokenCeiling,
+        // T12-R0: only a map call names a room; every other call's projection is today's two members.
+        ...(request.keepRoomMicros === undefined ? {} : { keepRoomMicros: request.keepRoomMicros })
       });
       attemptsMade = attempt;
       const inputHash = digest(JSON.stringify(responseFormat===undefined?attemptPacket:{...attemptPacket,response_format:responseFormat}));
