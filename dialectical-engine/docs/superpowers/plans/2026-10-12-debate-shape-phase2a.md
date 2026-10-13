@@ -168,6 +168,8 @@ The names fixed by INTERFACE §1 and §2 are kept. The deviations and additions 
 5. **Binding on P2b: the runner must stay inside `debateShapeSiteCounts`.**
    - Fixed mode is one exchange (a reply plus a defence) per chosen point per deeper round. This is a linear chain, not "every node of the previous round".
    - `MAP_UNAVAILABLE_TODAYS_OPENING` opens at most P positions (the first P seats) with at most K round-1 children each.
+   - In that fallback each position gets at most ONE cross-reply (P in all; target = the next position in plan order, since no `strongest_rival` exists without a map), never today's every-pair cross-exchange (controller ruling B1, final pre-P2b review).
+   - A position handed on to another maker (busy or sitting-out author) is handed on before that position's first call, or the re-ask stays inside the position site's own attempt allowance (ruling B1).
    - Map repairs (patch, full re-ask) are attempts inside the site's own allowance.
    - P2b adds an enumerator test of its plan builder against `debateShapeSiteCounts`.
 6. **The preview kit takes the row as an optional source key.** It goes on Project 1's `PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2` list, not on `PREVIEW_SOURCE_ROW_KEYS_V2`. Putting it in the required closure would switch the shape on at the preview's next publish, before the runner can run it. The release tool's `native-plan` flag is left out, because deploying the row is out of scope (spec §6).

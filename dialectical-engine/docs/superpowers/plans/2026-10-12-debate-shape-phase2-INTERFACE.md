@@ -98,3 +98,11 @@ New migration (next free number at build time) with:
 - Practice `debate` mode accepts `--shape-policy <file>` that adds a `debateShapePolicy` row to the THROWAWAY database's
   register only (like Project 1's concurrency override); the report adds map marks, chosen answers count, also-raised
   count, panel extensions, scrutiny extensions.
+
+## 7. Bindings P2b must keep (from P2a's money ceiling)
+
+- Fixed mode adds one exchange per chosen point per round (linear, not branching).
+- `MAP_UNAVAILABLE_TODAYS_OPENING` opens at most P positions with at most K round-1 children each and at most ONE cross-reply per position (target = next position in plan order) — never today's every-pair cross-exchange.
+- Map repairs stay inside each call's own attempt allowance; a reassigned map list may be re-asked once on another AI (counted twice in the ceiling).
+- A position handed on to another maker is handed on before its first call, or the re-ask stays inside the position site's own allowance.
+- A run's frozen sizes are read from its receipt (`envelope_basis.shape`, via the shared reader `parseCostEnvelopeBasis`/`debateShapeOfReceipt`), never recomputed.
