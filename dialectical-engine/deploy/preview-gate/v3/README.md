@@ -665,20 +665,34 @@ the daily split (owner's ruling, 2026-10-10 evening) is DeepInfra $10.00 and Ant
 
 ## Redeploy (2026-10-12): calls on their way together count once
 
-Only `preview_budget_authority.py` changed (the helper did not): failures of calls that were on
-their way at the same time now add 1 to the count of five that halts a gate with
-`provider_unreachable`, so one short network blip under 10 calls at once no longer halts it (owner
-ruling O8; spec 2026-10-12 parallel calls, section 3.4). That file's hash (`bridge_sha256`) is in
-both gates' GOs, so root writes a new GO for each gate, DeepInfra and Anthropic, exactly as in the
-existing GO step (here install step 4; README-anthropic.md install step 5), with the same values.
-Nothing else changes: no limit, no unit, no key, no `scope_id`. For each gate, as root:
+This change is in `preview_budget_authority.py`: failures of calls that were on their way at the
+same time now add 1 to the count of five that halts a gate with `provider_unreachable`, so one short
+network blip under 10 calls at once no longer halts it (owner ruling O8; spec 2026-10-12 parallel
+calls, section 3.4). A release that carries it may carry other gate changes too: the reply-language
+change (#154, 2026-10-12) changed `preview_budget_helper.py` (MiMo's `temperature` 0.7), so a
+release with both brings new versions of BOTH files, and new values for both hashes in each GO
+(`bridge_sha256`, `helper_sha256`).
+Root therefore always installs both files from the release and writes a new GO for each gate,
+DeepInfra and Anthropic, exactly as in the existing GO step (here install step 4;
+README-anthropic.md install step 5), with the same values and both new hashes. Nothing else
+changes: no limit, no unit, no key, no `scope_id`. For each gate, as root:
 1. `stop` (Daily operations, "Emergency off", level 1).
-2. Install the new gate files from the reviewed release (install step 1 of that gate's README) and
+2. Install both gate files from the reviewed release (install step 1 of that gate's README) and
    check their hashes as that step says.
-3. Write the GO again (the existing GO step): its `bridge_sha256` must match the new file.
+3. Write the GO again (the existing GO step): its `bridge_sha256` and `helper_sha256` must match the
+   two new files. `deploy/preview-release/v1/README.md` "Publishing the call-concurrency row", step 0,
+   checks both against the release and stops on any difference.
 4. Restart the gate's service (`debateai-preview-provider-budget.service`,
    `debateai-preview-anthropic-budget.service`) so the running gate loads the new code.
 5. `activate` (owner's yes); `status` must show `state` `active`.
+
+Restart the runner only after BOTH gates are `active`: the runner reads each gate's number of calls
+at once once, at start-up, from the gate's `/remaining`. A gate it cannot read then runs ONE call at
+a time until the runner's next restart, and the runner's journal shows
+`{"kind":"DEBATEAI_CALL_SCHEDULER","event":"GATE_CAPACITY_UNREAD","gate":"<gate>"}`. So whenever a
+gate is stopped, redeployed or restarted later, restart the runner after it is `active` again. The
+runner prints no line naming the call-concurrency setting; during the first debate after the
+restart, a gate's `status` showing `in_flight` above 1 is the proof that calls run together.
 
 ## Daily operations
 
