@@ -41,11 +41,15 @@ export type DebateShapePlan = Readonly<{
   opening: DebateShapeOpening;
 }>;
 export type DebateShapeLength = Readonly<{ words: number; writerBound: number }>;
+/** Controller ruling X1 (P2b ruling R-2): the max_tokens of the map's merge and choose calls, two long structured lists. */
+export type DebateShapeMapStepBounds = Readonly<{ merge: number; choose: number }>;
 export type DebateShapePolicy = Readonly<{
   kind: "DEBATE_SHAPE_POLICY";
   version: 1;
   plans: Readonly<Record<DebateShapePlanKey, DebateShapePlan>>;
   answerLength: Readonly<Record<AnswerLength, DebateShapeLength>>;
+  /** A row written without it reads the start values (32,768 each); every other member stays required. */
+  mapStepBounds: DebateShapeMapStepBounds;
 }>;
 
 /**
@@ -72,6 +76,9 @@ export type DebateShapeCeilingInput = Readonly<{
   opening: DebateShapeOpening;
   answerWords: number;
   writerBound: number;
+  /** X1: the map's merge and choose bounds, from the row's mapStepBounds (the runner asks max(judge bound, these)). */
+  mapMergeBound: number;
+  mapChooseBound: number;
 }>;
 
 const whole = (min: number, max: number) => z.number().int().min(min).max(max);
@@ -97,11 +104,19 @@ const planSchema = z.object({
   opening: z.enum(DEBATE_SHAPE_OPENINGS)
 }).strict();
 const lengthSchema = z.object({ words: whole(50, 5000), writerBound: whole(1024, 65536) }).strict();
+/**
+ * X1: each map step bound is at least the sealed judge bound's floor (8,192: a map call never asks for less than any
+ * other debate call) and at most 32,768 (the practice tool's R-1 room, every reviewed preview row's answer cap).
+ */
+const mapStepBoundsSchema = z.object({ merge: whole(8192, 32768), choose: whole(8192, 32768) }).strict();
+/** The start values of mapStepBounds, and what a row written without the member reads. */
+const mapStepBoundsStartValues = (): DebateShapeMapStepBounds => ({ merge: 32768, choose: 32768 });
 const policySchema = z.object({
   kind: z.literal("DEBATE_SHAPE_POLICY"),
   version: z.literal(1),
   plans: z.object({ free: planSchema, plus: planSchema, pro: planSchema, max: planSchema, premium: planSchema }).strict(),
-  answerLength: z.object({ short: lengthSchema, standard: lengthSchema, detailed: lengthSchema }).strict()
+  answerLength: z.object({ short: lengthSchema, standard: lengthSchema, detailed: lengthSchema }).strict(),
+  mapStepBounds: mapStepBoundsSchema.default(mapStepBoundsStartValues)
 }).strict().superRefine((policy, ctx) => {
   const { short, standard, detailed } = policy.answerLength;
   if (!(short.words < standard.words && standard.words < detailed.words)) {
@@ -204,7 +219,8 @@ export function debateShapePolicyStartValues(opening: DebateShapeOpening = "ANGL
       short: { words: 300, writerBound: 8192 },
       standard: { words: 700, writerBound: 12288 },
       detailed: { words: 1500, writerBound: 16384 }
-    }
+    },
+    mapStepBounds: mapStepBoundsStartValues()
   });
 }
 
@@ -290,7 +306,9 @@ export function resolveDebateShape(input: Readonly<{
     scrutinyWeakBelow: rules.scrutiny.scrutinyWeakBelow,
     opening: rules.opening,
     answerWords: length.words,
-    writerBound: length.writerBound
+    writerBound: length.writerBound,
+    mapMergeBound: input.policy.mapStepBounds.merge,
+    mapChooseBound: input.policy.mapStepBounds.choose
   });
 }
 

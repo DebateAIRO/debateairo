@@ -443,8 +443,9 @@ function malformedDebateShape(reason: string): TypedDomainError {
  * (`parseCostEnvelopeBasis`), never through a loose reader of this module's own. A receipt is shaped when it carries
  * a shape member OR names the shape formula, so a shape-formula receipt with its member missing is refused by the
  * parser, never priced as today's. A basis with neither is today's receipt (null). The parser's reason is kept.
+ * The ONE shared reader (PF7): the picker and the preview estimate (`preview-budget-estimate.ts`) both read through it.
  */
-function admittedShapeOf(basis: Readonly<Record<string, unknown>>): Readonly<{
+export function admittedShapeOf(basis: Readonly<Record<string, unknown>>): Readonly<{
   shape: DebateShapeCeilingInput;
   counts: DebateShapeSiteCounts;
 }> | null {

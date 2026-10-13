@@ -53,6 +53,7 @@ export function assertDebateShapeCeilingInput(shape: DebateShapeCeilingInput, pa
   if (!whole(shape.scrutinyRoundsPerPoint, 0) || !whole(shape.scrutinyPointsPerDebate, 0)
     || noScrutiny !== (shape.scrutinyPointsPerDebate === 0) || noScrutiny !== (shape.scrutiny === "standard")) refuse("scrutiny budget");
   if (!whole(shape.answerWords, 1) || !whole(shape.writerBound, 1)) refuse("answer length");
+  if (!whole(shape.mapMergeBound, 1) || !whole(shape.mapChooseBound, 1)) refuse("map step bounds");
   if (!DepthModeSchema.safeParse(shape.depthMode).success || !ScrutinySchema.safeParse(shape.scrutiny).success
     || !AnswerLengthSchema.safeParse(shape.answerLength).success
     || !(DEBATE_SHAPE_PLAN_KEYS as readonly string[]).includes(shape.plan)
@@ -64,6 +65,11 @@ const count = z.number().int().min(0);
 const share = (name: string) => {
   const error = `${name} must be a share from 0 to 1`;
   return z.number({ error }).min(0, { error }).max(1, { error });
+};
+/** A token bound that names itself when refused (X1: the map step bounds). */
+const tokens = (name: string) => {
+  const error = `${name} must be a whole number of tokens`;
+  return z.number({ error }).int({ error }).positive({ error });
 };
 /** The receipt's `shape` member: the run's frozen sizes (contract deviation 3) and the site counts it was billed for. */
 export const debateShapeReceiptSchema = z.object({
@@ -89,7 +95,10 @@ export const debateShapeReceiptSchema = z.object({
   map_sites: z.number().int().positive(),
   nodes: z.number().int().positive(),
   cross_nodes: z.number().int().positive(),
-  backup_sequences: z.union([z.literal(0), z.literal(1)])
+  backup_sequences: z.union([z.literal(0), z.literal(1)]),
+  // X1: appended last, so every earlier member of a shape receipt keeps its bytes.
+  map_merge_bound: tokens("map_merge_bound"),
+  map_choose_bound: tokens("map_choose_bound")
 }).strict();
 export type DebateShapeReceipt = z.infer<typeof debateShapeReceiptSchema>;
 
@@ -121,7 +130,9 @@ export function debateShapeReceipt(shape: DebateShapeCeilingInput, counts: Debat
     map_sites: counts.mapSites,
     nodes: counts.nodes,
     cross_nodes: counts.crossNodes,
-    backup_sequences: backupSequences
+    backup_sequences: backupSequences,
+    map_merge_bound: shape.mapMergeBound,
+    map_choose_bound: shape.mapChooseBound
   });
   const parsed = debateShapeReceiptSchema.safeParse(receipt);
   if (!parsed.success) {
@@ -151,7 +162,9 @@ export function debateShapeOfReceipt(receipt: DebateShapeReceipt): DebateShapeCe
     scrutinyWeakBelow: receipt.scrutiny_weak_below,
     opening: receipt.opening,
     answerWords: receipt.answer_words,
-    writerBound: receipt.writer_bound
+    writerBound: receipt.writer_bound,
+    mapMergeBound: receipt.map_merge_bound,
+    mapChooseBound: receipt.map_choose_bound
   });
 }
 

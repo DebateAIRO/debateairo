@@ -29,6 +29,8 @@ describe("debateShapePolicy: one optional row, absent means today's shape (spec 
     expect(START.plans.premium).toEqual(START.plans.pro);
     expect(START.answerLength).toEqual({ short: { words: 300, writerBound: 8192 }, standard: { words: 700, writerBound: 12288 },
       detailed: { words: 1500, writerBound: 16384 } });
+    // Controller ruling X1: the map's merge and choose steps answer at their own bound (P2b ruling R-2).
+    expect(START.mapStepBounds).toEqual({ merge: 32_768, choose: 32_768 });
     expect(Object.isFrozen(START.plans.max.scrutiny.exhaustive)).toBe(true);
     expect(DEBATE_SHAPE_PLAN_KEYS).toEqual(["free", "plus", "pro", "max", "premium"]);
     expect(DEBATE_SHAPE_OPENINGS).toEqual(["ANGLE_MAP", "BLIND_LISTS", "SNOWBALL"]);
@@ -49,6 +51,32 @@ describe("debateShapePolicy: one optional row, absent means today's shape (spec 
     ["another version", (v: any) => { v.version = 2; }, "version"],
     ["lengths that do not rise", (v: any) => { v.answerLength.short.words = 800; }, "answerLength.words"]
   ])("refuses %s, naming the path", (_name, mutate, path) => {
+    const value = plain();
+    mutate(value);
+    expect(() => parseDebateShapePolicy(value)).toThrow(`DEBATE_SHAPE_POLICY_INVALID:${path}`);
+  });
+  it("X1: a row without mapStepBounds reads the default; a written one is checked strictly (8,192..32,768 tokens each)", () => {
+    const without = plain();
+    delete without.mapStepBounds;
+    const parsed = parseDebateShapePolicy(without);
+    expect(parsed).toEqual(START);
+    expect(Object.isFrozen(parsed.mapStepBounds)).toBe(true);
+    const lower = parseDebateShapePolicy({ ...plain(), mapStepBounds: { merge: 8192, choose: 16_384 } });
+    expect(lower.mapStepBounds).toEqual({ merge: 8192, choose: 16_384 });
+    expect(resolveDebateShape({ policy: lower, plan: "pro", makers: 3, settings: SETTINGS }))
+      .toMatchObject({ mapMergeBound: 8192, mapChooseBound: 16_384 });
+    // The publishers' row writes the member (the default included), and it parses back to the same value.
+    const row = debateShapePolicyRow(parsed, "x1");
+    expect(JSON.parse(row.valueJsonText).mapStepBounds).toEqual({ merge: 32_768, choose: 32_768 });
+  });
+  it.each([
+    ["a merge bound under the judge bound floor", (v: any) => { v.mapStepBounds.merge = 8191; }, "mapStepBounds.merge"],
+    ["a choose bound above 32,768", (v: any) => { v.mapStepBounds.choose = 32_769; }, "mapStepBounds.choose"],
+    ["a fractional merge bound", (v: any) => { v.mapStepBounds.merge = 16_384.5; }, "mapStepBounds.merge"],
+    ["a missing choose bound", (v: any) => { delete v.mapStepBounds.choose; }, "mapStepBounds.choose"],
+    ["an unknown map step", (v: any) => { v.mapStepBounds.gap = 16_384; }, "mapStepBounds"],
+    ["a null member", (v: any) => { v.mapStepBounds = null; }, "mapStepBounds"]
+  ])("X1: refuses %s, naming the path", (_name, mutate, path) => {
     const value = plain();
     mutate(value);
     expect(() => parseDebateShapePolicy(value)).toThrow(`DEBATE_SHAPE_POLICY_INVALID:${path}`);
@@ -117,7 +145,7 @@ describe("debateShapePolicy: one optional row, absent means today's shape (spec 
       plan: "max", depthMode: "fixed", scrutiny: "exhaustive", answerLength: "detailed", mapAIs: 7, answers: 4, graders: 3,
       pointsPerAnswer: 4, deeperTopPoints: 2, gapRounds: 2, closeCallExtraGraders: 2, scrutinyRoundsPerPoint: 3,
       scrutinyPointsPerDebate: 15, scrutinyLeverageMin: 0.05, scrutinyWeakBelow: 0.5, opening: "ANGLE_MAP",
-      answerWords: 1500, writerBound: 16384 });
+      answerWords: 1500, writerBound: 16384, mapMergeBound: 32_768, mapChooseBound: 32_768 });
     expect(() => resolveDebateShape({ policy: START, plan: "free", makers: 3, settings: { ...SETTINGS, depthMode: "fixed" } }))
       .toThrow("DEBATE_SHAPE_SETTINGS_NOT_NORMALISED:depthMode");
     expect(() => resolveDebateShape({ policy: START, plan: "free", makers: 3, settings: { ...SETTINGS, scrutiny: "deep" } }))

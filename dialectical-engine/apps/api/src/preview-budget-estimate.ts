@@ -53,9 +53,11 @@ import {
   type PreviewProviderName,
   type PreviewProviderTestConfig
 } from "@debateai/providers";
-import { readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs, readSynthesisRoleControls } from "@debateai/register";
+import {
+  readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs, readSynthesisRoleControls, type DebateShapeCeilingInput
+} from "@debateai/register";
 import type { Pool, PoolClient } from "pg";
-import { expectedCallsByRoleFromBasis } from "./ask-model-picker.js";
+import { admittedShapeOf, expectedCallsByRoleFromBasis } from "./ask-model-picker.js";
 
 /**
  * The next midnight in Europe/Bucharest after `now` (DST-aware): the instant the gate's day, and so
@@ -219,7 +221,14 @@ export type PreviewUnfinishedRun = Readonly<{
  * length-retry ceiling; the story checker at its ceiling. The REALISTIC_WORST_CASE and STRICT_BOUND
  * modes price with it.
  */
-export type PreviewCallOutputTokens = Readonly<{ debate: number; storyteller: number; storytellerRetry: number; storyChecker: number }>;
+export type PreviewCallOutputTokens = Readonly<{
+  debate: number; storyteller: number; storytellerRetry: number; storyChecker: number;
+  /** Debate shape (spec 2026-10-12 §3.3 step 8): the answer writer's max_tokens when its run's answer length raises it. */
+  answerWriter?: number;
+  /** Debate shape (controller ruling X1): the map's merge and choose max_tokens when the run's map step bounds raise them. */
+  mapMerge?: number;
+  mapChoose?: number;
+}>;
 
 /** The register's four roles as model ids; the story pair is null when the register has no story. */
 export type PreviewRoleModels = Readonly<{
@@ -234,9 +243,12 @@ function roleModelList(roles: PreviewRoleModels): readonly string[] {
  * The kinds of call one debate makes, as the estimate prices them. UNBILLED_RETRY is owner ruling 5's
  * one retry of a call the gate proved unbilled: it counts against the gate's calls and costs nothing.
  * STORY_CHECKER_RETRY (story format robustness, 2026-10-12) is the story checker's one repair try, a
- * billed call like the storyteller's STORYTELLER_RETRY.
+ * billed call like the storyteller's STORYTELLER_RETRY. A debate-shape run (spec 2026-10-12) prices its answer
+ * writer's calls as ANSWER_WRITER (at its answer length's writer bound) and the map's one merge and one choose as
+ * MAP_MERGE / MAP_CHOOSE (at its map step bounds, controller ruling X1); each is a debate call when no bound raises it.
  */
-export type PreviewCallType = "DEBATE" | "STORYTELLER" | "STORYTELLER_RETRY" | "STORY_CHECKER" | "STORY_CHECKER_RETRY" | "PROBE" | "UNBILLED_RETRY";
+export type PreviewCallType = "DEBATE" | "ANSWER_WRITER" | "MAP_MERGE" | "MAP_CHOOSE" | "STORYTELLER" | "STORYTELLER_RETRY"
+  | "STORY_CHECKER" | "STORY_CHECKER_RETRY" | "PROBE" | "UNBILLED_RETRY";
 export type PreviewBilledCallType = Exclude<PreviewCallType, "UNBILLED_RETRY">;
 
 /**
@@ -300,13 +312,23 @@ const wholeNumber = (value: unknown): value is number => typeof value === "numbe
  */
 export function previewCallAverage(model: string, type: PreviewBilledCallType, measured: PreviewMeasuredCallUsage):
   Readonly<{ inputTokens: bigint; outputTokens: bigint; measured: boolean }> {
-  const bucket: PreviewMeasuredBucket | null = type === "DEBATE" ? "DEBATE" : type === "PROBE" ? null : "STORY";
+  const bucket = previewMeasuredBucketOf(type);
   const sample = bucket === null ? undefined : measured.find((entry) => entry.model === model && entry.bucket === bucket);
   if (sample === undefined || sample.calls < PREVIEW_CALIBRATION_MIN_SAMPLES) {
     return Object.freeze({ inputTokens: PREVIEW_ESTIMATE_DEFAULT_INPUT_TOKENS, outputTokens: PREVIEW_ESTIMATE_DEFAULT_OUTPUT_TOKENS, measured: false });
   }
   const calls = BigInt(sample.calls);
   return Object.freeze({ inputTokens: ceilDiv(sample.inputTokens, calls), outputTokens: ceilDiv(sample.outputTokens, calls), measured: true });
+}
+
+/** Where a call's measured usage is recorded: the debate's (the writer and the map are debate calls), the story's, or none. */
+function previewMeasuredBucketOf(type: PreviewBilledCallType): PreviewMeasuredBucket | null {
+  switch (type) {
+    case "DEBATE": case "ANSWER_WRITER": case "MAP_MERGE": case "MAP_CHOOSE": return "DEBATE";
+    case "STORYTELLER": case "STORYTELLER_RETRY": case "STORY_CHECKER": case "STORY_CHECKER_RETRY": return "STORY";
+    case "PROBE": return null;
+    default: return exhaustive(type);
+  }
 }
 
 /** The price of one call of `type` on `row`, in nano-USD (never asked for an unbilled retry). */
@@ -327,6 +349,8 @@ function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCall
   output: PreviewCallOutputTokens): PreviewCallPricer {
   const sent: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, number>> = {
     DEBATE: output.debate, STORYTELLER: output.storyteller, STORYTELLER_RETRY: output.storytellerRetry, STORY_CHECKER: output.storyChecker,
+    // Debate shape: the run's own writer and map step bounds when it has them (previewOutputTokensForBasis), else a debate call's.
+    ANSWER_WRITER: output.answerWriter ?? output.debate, MAP_MERGE: output.mapMerge ?? output.debate, MAP_CHOOSE: output.mapChoose ?? output.debate,
     // The checker's one repair try, at most its length-retry ceiling (a format repair asks for its ceiling, a length retry twice it).
     STORY_CHECKER_RETRY: lengthRetryTokenCeiling(output.storyChecker, 1)
   };
@@ -341,7 +365,8 @@ function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCall
     ? previewCallNanoUsd(row, PREVIEW_STRICT_PROBE_INPUT_TOKENS, PREVIEW_GLM_GENERATION_TOKEN_FLOOR)
     : previewCallNanoUsd(row, inputTokens[type], type === "STORYTELLER" || type === "STORYTELLER_RETRY" ? storyteller(row, type) : sent[type]);
 }
-const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens, STORY_CHECKER_RETRY: tokens });
+const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, ANSWER_WRITER: tokens, MAP_MERGE: tokens, MAP_CHOOSE: tokens,
+  STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens, STORY_CHECKER_RETRY: tokens });
 /**
  * STRICT_BOUND (6f62b6ba3): every call at its most, input at the largest body the gate accepts,
  * output at the max_tokens that call sends, clamped to the row; a health check at its fixed body and
@@ -361,7 +386,9 @@ export function realisticWorstCasePricer(output: PreviewCallOutputTokens, storyT
   const story = PREVIEW_STORY_REQUEST_BYTES[previewStoryTierOf(storyTier)];
   const storyteller = previewEstimateInputTokens(story.storyteller);
   const storyChecker = previewEstimateInputTokens(story.storyChecker);
-  return sentOutputPricer({ DEBATE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, STORYTELLER: storyteller, STORYTELLER_RETRY: storyteller,
+  return sentOutputPricer({ DEBATE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, ANSWER_WRITER: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
+    MAP_MERGE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, MAP_CHOOSE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
+    STORYTELLER: storyteller, STORYTELLER_RETRY: storyteller,
     STORY_CHECKER: storyChecker, STORY_CHECKER_RETRY: storyChecker }, output);
 }
 
@@ -504,20 +531,30 @@ function dearestPanelMemberPerGate(panelModels: readonly string[]): readonly Rea
   return Object.freeze([...dearest.values()].map((entry) => Object.freeze(entry)));
 }
 
-/** The three kinds of role a rotated debate places on a panel member (spec 2026-10-11, Part 5). */
-type PreviewRotatedRoleKind = "ANSWER" | "STORYTELLER" | "STORY_CHECKER";
+/**
+ * The kinds of call placed on one gate's dearest panel member: the roles a rotated debate places on a panel member
+ * (spec 2026-10-11, Part 5; ANSWER is the answer checker, ANSWER_WRITER the writer), and a shaped run's map merge and
+ * choose (controller ruling X1: any member may hold that seat).
+ */
+type PreviewRotatedRoleKind = "ANSWER" | "ANSWER_WRITER" | "MAP_MERGE" | "MAP_CHOOSE" | "STORYTELLER" | "STORY_CHECKER";
 
 /**
  * Spec 2026-10-11 Part 5: of one gate's panel models, the one whose call of this role kind costs the
- * most at `pricer` (DEBATE for the answer roles; STORYTELLER + STORYTELLER_RETRY for the storyteller;
- * STORY_CHECKER + STORY_CHECKER_RETRY for the story checker). The first in panel order wins a tie.
+ * most at `pricer` (DEBATE for the answer checker; ANSWER_WRITER for the writer, controller ruling PF5: a shaped run's
+ * writer may ask for more than a debate call, and without a shape it IS a debate call; MAP_MERGE / MAP_CHOOSE for the
+ * map's two long steps; STORYTELLER + STORYTELLER_RETRY for the storyteller; STORY_CHECKER + STORY_CHECKER_RETRY for
+ * the story checker). The first in panel order wins a tie.
  */
 function dearestByPricer(pricer: PreviewCallPricer, rowOf: (model: string) => PreviewModelRow) {
   const cost = (model: string, role: PreviewRotatedRoleKind): bigint => {
     const row = rowOf(model);
-    return role === "ANSWER" ? pricer(row, "DEBATE")
-      : role === "STORYTELLER" ? pricer(row, "STORYTELLER") + pricer(row, "STORYTELLER_RETRY")
-        : pricer(row, "STORY_CHECKER") + pricer(row, "STORY_CHECKER_RETRY");
+    switch (role) {
+      case "ANSWER": return pricer(row, "DEBATE");
+      case "ANSWER_WRITER": case "MAP_MERGE": case "MAP_CHOOSE": return pricer(row, role);
+      case "STORYTELLER": return pricer(row, "STORYTELLER") + pricer(row, "STORYTELLER_RETRY");
+      case "STORY_CHECKER": return pricer(row, "STORY_CHECKER") + pricer(row, "STORY_CHECKER_RETRY");
+      default: return exhaustive(role);
+    }
   };
   return (models: readonly string[], role: PreviewRotatedRoleKind): string =>
     models.reduce((best, model) => cost(model, role) > cost(best, role) ? model : best);
@@ -542,6 +579,12 @@ export type PreviewCallShares = Readonly<{ denominator: bigint; shares: readonly
  * `rotated` (spec 2026-10-11, Part 5): the four roles are panel members, so each role's calls go on
  * every gate that has a panel member, at that gate's `dearestFor` member, and no off-panel role ref
  * is health-checked; without it, today's split exactly.
+ * A debate-shape receipt (spec 2026-10-12, read only through the strict reader, PF7): the writer's sites are
+ * ANSWER_WRITER calls, and the map's one merge and one choose (controller ruling X1) are taken out of the panel's even
+ * share and charged, as MAP_MERGE / MAP_CHOOSE, one whole call each on every gate at its dearest panel member
+ * (`dearestFor` at that call's price, else the reviewers' dearest member): whichever member holds that seat, its gate
+ * is never under-charged. Every other map site (the angles, the lists, a list asked again, the gap rounds) stays an
+ * evenly shared debate call. Today's receipt: today's shares exactly.
  * Fractions are kept exact: every numerator is over the one `denominator`.
  */
 export function previewCallShares(input: Readonly<{
@@ -557,6 +600,7 @@ export function previewCallShares(input: Readonly<{
   debateCallCount?: PreviewDebateCallCount;
   /** Spec 2026-10-11 Part 5: a rotated debate; its four roles are panel members, priced per gate at `dearestFor`. */
   rotated?: boolean;
+  /** Required with `rotated`; also seats a shaped run's map merge and choose (X1) when given. */
   dearestFor?: (models: readonly string[], role: PreviewRotatedRoleKind) => string;
 }>): PreviewCallShares {
   const rotated = input.rotated === true;
@@ -586,10 +630,15 @@ export function previewCallShares(input: Readonly<{
   const add = (model: string, type: PreviewCallType, numerator: bigint): void => {
     if (numerator > 0n) shares.push(Object.freeze({ model, type, numerator }));
   };
-  const addDebate = (model: string, numerator: bigint): void => {
-    add(model, "DEBATE", numerator);
+  const addDebate = (model: string, numerator: bigint, type: PreviewCallType = "DEBATE"): void => {
+    add(model, type, numerator);
     add(model, "UNBILLED_RETRY", numerator);
   };
+  // Debate shape: the writer's sites are priced at the run's writer bound, and the map's merge and choose (one site
+  // each, X1) at its map step bounds; today's receipt keeps them all as DEBATE and has no map.
+  const shaped = previewShapeOf(input.basis) !== null;
+  const writerType: PreviewCallType = shaped ? "ANSWER_WRITER" : "DEBATE";
+  const mapLongSites = shaped ? 2n : 0n;
   if (input.storyOnly !== true) {
     if (sites === null) {
       for (const model of panelModels) addDebate(model, debate);
@@ -597,7 +646,7 @@ export function previewCallShares(input: Readonly<{
       // Every panel step but the reviews is shared evenly: each member states one position, authors its own
       // root's tree and its cross-exchanges, and judges every node another maker authored (apps/runner/src/
       // index.ts:5291-5326: the judge seats called per node are all the others, panelCallCap = members - 1).
-      for (const model of panelModels) addDebate(model, BigInt(sites.panel - sites.reviewer) * debate);
+      for (const model of panelModels) addDebate(model, (BigInt(sites.panel - sites.reviewer) - mapLongSites) * debate);
       // A node's ONE review goes to a different maker taken in turn round the debate's seeded circle
       // (selectDifferentMakerReviewer, apps/runner/src/index.ts), even per author over a long debate but
       // not per member in a short one, so one member can still take more than an even share. So each gate
@@ -608,14 +657,21 @@ export function previewCallShares(input: Readonly<{
       for (const { model, gateMembers } of dearestPanelMemberPerGate(panelModels)) {
         addDebate(model, BigInt(sites.reviewer) * debate * (gateMembers >= 2 ? members : members - 1n));
       }
+      if (shaped) {
+        // X1: one merge and one choose per run; any member may hold the seat, so every gate carries each whole call.
+        const seats = (type: "MAP_MERGE" | "MAP_CHOOSE"): readonly string[] => input.dearestFor === undefined
+          ? dearestPanelMemberPerGate(panelModels).map((entry) => entry.model) : perGate(type);
+        for (const type of ["MAP_MERGE", "MAP_CHOOSE"] as const) for (const model of seats(type)) addDebate(model, debate * members, type);
+      }
       if (rotated) {
-        // The careful side: every gate carries the writer's and checker's sites at its dearest member (spec Part 5).
-        for (const model of perGate("ANSWER")) {
-          addDebate(model, BigInt(sites.answerWriter) * debate * members);
-          addDebate(model, BigInt(sites.answerChecker) * debate * members);
+        // The careful side: every gate carries the writer's and checker's sites at its dearest member (spec Part 5); the
+        // writer's member at the writer's own price (PF5), which is a debate call's without a shape.
+        for (const models of panelGates.values()) {
+          addDebate(input.dearestFor!(models, "ANSWER_WRITER"), BigInt(sites.answerWriter) * debate * members, writerType);
+          addDebate(input.dearestFor!(models, "ANSWER"), BigInt(sites.answerChecker) * debate * members);
         }
       } else {
-        addDebate(input.roleModels.answerWriter, BigInt(sites.answerWriter) * debate * members);
+        addDebate(input.roleModels.answerWriter, BigInt(sites.answerWriter) * debate * members, writerType);
         addDebate(input.roleModels.answerChecker, BigInt(sites.answerChecker) * debate * members);
       }
     }
@@ -716,9 +772,9 @@ export function estimatePreviewGateNeeds(input: PreviewEstimateSettings & Readon
     const gate = previewGateKeyOf(reviewedRow(model).model)!;
     byGate.set(gate, [...(byGate.get(gate) ?? []), model]);
   }
-  const pricer = input.pricer ?? previewEstimatePricer({ measured: [], callOutputTokens: input.callOutputTokens });
-  return gateNeeds(byGate, previewCallShares(rotated ? { ...input, dearestFor: dearestByPricer(pricer, reviewedRow) } : input),
-    reviewedRow, pricer);
+  const pricer = input.pricer
+    ?? previewEstimatePricer({ measured: [], callOutputTokens: previewOutputTokensForBasis(input.callOutputTokens, input.basis) });
+  return gateNeeds(byGate, previewCallShares({ ...input, dearestFor: dearestByPricer(pricer, reviewedRow) }), reviewedRow, pricer);
 }
 
 /**
@@ -729,7 +785,7 @@ export function estimatePreviewGateNeeds(input: PreviewEstimateSettings & Readon
  * existed) is priced at the DeepInfra row whose average debate call is dearest, on the DeepInfra gate.
  */
 export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: PreviewEstimateSettings,
-  pricer: PreviewCallPricer = previewEstimatePricer({ measured: [], callOutputTokens: settings.callOutputTokens }),
+  pricer: PreviewCallPricer = previewEstimatePricer({ measured: [], callOutputTokens: previewOutputTokensForBasis(settings.callOutputTokens, run.basis) }),
   debateCallCount: PreviewDebateCallCount = previewDebateCallCount()): readonly PreviewGateNeed[] {
   const dearestRow = PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.reduce((best, row) => pricer(row, "DEBATE") > pricer(best, "DEBATE") ? row : best);
   const rowOf = (model: string): PreviewModelRow => previewModelRow(model) ?? dearestRow;
@@ -742,7 +798,7 @@ export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: 
   }
   const calls = previewCallShares({ ...settings, askProbeModelIds: [], basis: run.basis, panel: run.panel,
     roleModelOfRef: (ref) => previewModelRowForRef(ref)?.model ?? dearestRow.model, storyOnly: run.phase === "STORY", debateCallCount,
-    ...(rotated ? { rotated: true, dearestFor: dearestByPricer(pricer, rowOf) } : {}) });
+    dearestFor: dearestByPricer(pricer, rowOf), ...(rotated ? { rotated: true } : {}) });
   return gateNeeds(byGate, calls, rowOf, pricer);
 }
 
@@ -930,16 +986,18 @@ export async function assertPreviewBudgetAdmits(
     // the same pricing and count hold back every unfinished debate, so a new debate and a running
     // one are counted alike.
     const measured = previewModeReadsMeasuredUsage() ? await gate!.readMeasuredCallUsage?.() ?? [] : [];
-    const pricerFor = (storyTier: PreviewStoryTier | undefined) =>
-      previewEstimatePricer({ measured, callOutputTokens: gate!.callOutputTokens, storyTier: storyTier ?? PREVIEW_STORY_TIER_FALLBACK });
+    // Debate shape: each debate, new or unfinished, is priced at ITS OWN receipt's writer and map step bounds.
+    const pricerFor = (storyTier: PreviewStoryTier | undefined, basis: Readonly<Record<string, unknown>>) =>
+      previewEstimatePricer({ measured, callOutputTokens: previewOutputTokensForBasis(gate!.callOutputTokens, basis),
+        storyTier: storyTier ?? PREVIEW_STORY_TIER_FALLBACK });
     const debateCallCount = previewDebateCallCount();
-    needs = estimatePreviewGateNeeds({ basis: input.basis, panel: input.panel, ...gate!, pricer: pricerFor(input.storyTier), debateCallCount,
+    needs = estimatePreviewGateNeeds({ basis: input.basis, panel: input.panel, ...gate!, pricer: pricerFor(input.storyTier, input.basis), debateCallCount,
       ...(input.rotated === true ? { rotated: true } : {}) });
     const unfinished = await gate!.readUnfinishedRuns();
     if (unfinished.length > PREVIEW_UNFINISHED_RUNS_MAX) throw new TypeError("PREVIEW_UNFINISHED_RUNS_TOO_MANY");
     held = new Map();
     for (const run of unfinished) {
-      for (const hold of estimateUnfinishedRunHolds(run, gate!, pricerFor(run.storyTier), debateCallCount)) {
+      for (const hold of estimateUnfinishedRunHolds(run, gate!, pricerFor(run.storyTier, run.basis), debateCallCount)) {
         const sum = held.get(hold.gate) ?? { calls: 0, nanoUsd: 0n };
         held.set(hold.gate, { calls: sum.calls + hold.callsWithMargin, nanoUsd: sum.nanoUsd + hold.callsNanoUsd });
       }
@@ -1088,6 +1146,30 @@ export function previewCallOutputTokens(config: PreviewProviderTestConfig, ceili
     storytellerRetry: lengthRetryTokenCeiling(storyteller, 1),
     storyChecker: ceilings.story === null ? 0 : sent(ceilings.story.checker)
   });
+}
+
+/**
+ * Debate shape: the run's frozen sizes, read ONLY through the shared strict reader (`admittedShapeOf`, built on
+ * `parseCostEnvelopeBasis`; controller ruling PF7); null for today's receipt, a refusal for a malformed shaped one.
+ */
+function previewShapeOf(basis: Readonly<Record<string, unknown>>): DebateShapeCeilingInput | null {
+  return admittedShapeOf(basis)?.shape ?? null;
+}
+
+/** Debate shape: the run's answer-writer bound from its receipt (`shape.writer_bound`), or null for today's receipt. */
+export function previewShapeWriterBound(basis: Readonly<Record<string, unknown>>): number | null {
+  return previewShapeOf(basis)?.writerBound ?? null;
+}
+
+/**
+ * The output tokens one debate is priced at: the gate's, with the answer writer raised to the run's own writer bound
+ * and the map's merge and choose to its map step bounds (X1), never below a debate call's. Today's receipt: `output`.
+ */
+export function previewOutputTokensForBasis(output: PreviewCallOutputTokens, basis: Readonly<Record<string, unknown>>): PreviewCallOutputTokens {
+  const shape = previewShapeOf(basis);
+  if (shape === null) return output;
+  return Object.freeze({ ...output, answerWriter: Math.max(output.debate, shape.writerBound),
+    mapMerge: Math.max(output.debate, shape.mapMergeBound), mapChoose: Math.max(output.debate, shape.mapChooseBound) });
 }
 
 /** One read-only /remaining port per gate the config names: DeepInfra's always, Anthropic's when set. */

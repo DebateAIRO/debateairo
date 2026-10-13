@@ -94,7 +94,12 @@ describe("the strict receipt parser reads a debate shape receipt (spec 2026-10-1
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ["a scrutiny leverage share above 1", (b: any) => { b.shape.scrutiny_leverage_min = 1.5; }, "scrutiny_leverage_min must be a share from 0 to 1"],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ["a weak-below share written as null (a NaN on the wire)", (b: any) => { b.shape.scrutiny_weak_below = null; }, "scrutiny_weak_below must be a share from 0 to 1"]
+    ["a weak-below share written as null (a NaN on the wire)", (b: any) => { b.shape.scrutiny_weak_below = null; }, "scrutiny_weak_below must be a share from 0 to 1"],
+    // X1: the map step bounds are on every shape receipt, whole token counts.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ["a shape receipt without its merge bound", (b: any) => { delete b.shape.map_merge_bound; }, "map_merge_bound must be a whole number of tokens"],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ["a choose bound of 0", (b: any) => { b.shape.map_choose_bound = 0; }, "map_choose_bound must be a whole number of tokens"]
   ])("refuses %s", (_name, mutate, fired) => {
     const basis = shaped();
     mutate(basis);

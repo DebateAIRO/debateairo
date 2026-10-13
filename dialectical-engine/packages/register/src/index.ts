@@ -1219,6 +1219,7 @@ export {
   resolveDebateShape,
   type DebateShapeCeilingInput,
   type DebateShapeLength,
+  type DebateShapeMapStepBounds,
   type DebateShapeOpening,
   type DebateShapePlan,
   type DebateShapePlanKey,

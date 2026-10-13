@@ -130,6 +130,9 @@ describe("the structural ceiling learns the debate shape (spec 2026-10-12 §3.6)
     expect(code(() => basisOf(shape, 3, 1))).toBe("STRUCTURAL_CEILING_SHAPE_INVALID");
     expect(code(() => basisOf({ ...shape, closeCallExtraGraders: 2 }, 5, 1))).toBe("STRUCTURAL_CEILING_SHAPE_INVALID");
     expect(code(() => basisOf({ ...shape, scrutinyRoundsPerPoint: 2 }, 5, 1))).toBe("STRUCTURAL_CEILING_SHAPE_INVALID");
+    // X1: the map step bounds are whole token counts.
+    expect(code(() => basisOf({ ...shape, mapMergeBound: 0 }, 5, 1))).toBe("STRUCTURAL_CEILING_SHAPE_INVALID");
+    expect(code(() => basisOf({ ...shape, mapChooseBound: 1.5 }, 5, 1))).toBe("STRUCTURAL_CEILING_SHAPE_INVALID");
   });
 
   it("the shape receipt parses under its own strict schema and reads back as the sizes it was minted from", () => {
@@ -137,6 +140,9 @@ describe("the structural ceiling learns the debate shape (spec 2026-10-12 §3.6)
     const receipt = debateShapeReceiptSchema.parse(basisOf(shape, 5, 3, 1).shape);
     expect(receipt).toMatchObject({ backup_sequences: 1, map_sites: 15, nodes: 112, cross_nodes: 4 });
     expect(debateShapeOfReceipt(receipt)).toEqual(shape);
+    // X1: the map step bounds ride the receipt as its LAST two members, so every earlier member keeps its bytes.
+    expect(receipt).toMatchObject({ map_merge_bound: 32_768, map_choose_bound: 32_768 });
+    expect(Object.keys(basisOf(shape, 5, 3, 1).shape!).slice(-3)).toEqual(["backup_sequences", "map_merge_bound", "map_choose_bound"]);
     expect(debateShapeReceiptSchema.safeParse({ ...receipt, extra: 1 }).success).toBe(false);
   });
 
