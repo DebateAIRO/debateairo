@@ -427,7 +427,11 @@ export function previewDebateHarness(input: Readonly<{
     const asOf = "2026-10-11T19:30:00.000Z";
     const depth = admission.depth ?? 2;
     // A plain label, not a "should" question: the fixture composition map rates only the `unknown` claim type.
-    const question = admission.question ?? `preview-busy-model-${label}-${randomUUID()}`;
+    // Reply language (#154): the scripted replies are English, checked against the question's language. A UUID's hex
+    // letters made about 1 label in 6 read as Portuguese (lone "e", "a"), so the replies were refused at random; the
+    // label's fresh part is digits only, so the label always reads as no named language ("und", Latin script) and the
+    // English replies pass.
+    const question = admission.question ?? `preview-busy-model-${label}-${randomUUID().replace(/[a-f]/gu, (hex) => String(hex.charCodeAt(0) - 87))}`;
     const askerId = `asker:${question}:${randomUUID()}`;
     const panel = admission.panelRefs.map((ref) => panelMember(ref, asOf));
     const rotated = admission.pin ?? pickRotatedRoles({ panel, counts: {}, seed: roleRotationSeed({ as_of: asOf, question_line: question }) });
