@@ -35,7 +35,7 @@ const DBIP_URL = "https://db-ip.com";
  * (design 15a/15b/15c). The EU's ODR platform (SOL) closed on 20 July 2025, so it has no badge. The artwork and its words
  * are ANPC's own, in Romanian, so the alt text and the title stay Romanian in every locale, marked `lang="ro"`.
  */
-const ANPC_SAL_URL = "https://anpc.ro/ce-este-sal/";
+const ANPC_SAL_URL = "https://reclamatiisal.anpc.ro/";
 const ANPC_SAL_TITLE = "ANPC – Soluționarea alternativă a litigiilor";
 const ANPC_SAL_ALT = `${ANPC_SAL_TITLE}. Detalii`;
 const ANPC_SAL_SRC = "/consumer-protection/anpc-sal.png";
