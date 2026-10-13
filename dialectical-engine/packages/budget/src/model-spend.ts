@@ -42,6 +42,7 @@ import {
   providerUsageUnreported,
   readReportedUsage,
   runCostEnvelopeReached,
+  runCostEnvelopeRoomKept,
   sharedWallReached,
   storyCostEnvelopeReached,
   type CostEnvelopePhase,
@@ -649,13 +650,17 @@ export class CostEnvelopeGuard {
         try {
           const keepRoomMicros = projection.keepRoomMicros ?? 0;
           if (!Number.isSafeInteger(keepRoomMicros) || keepRoomMicros < 0) throw new TypeError("COST_ENVELOPE_KEEP_ROOM_INVALID");
-          const decision = decideRunCostEnvelope({
-            spentMicros: await envelope.readSpentMicros(input.runId) + othersOfRun,
-            // T12-R0: a map call is admitted only if root 0's worst-case call still fits after it.
-            projectedMicros: projectedMicros + keepRoomMicros,
-            ceilingMicros: envelope.ceilingMicros
-          });
+          const spentMicros = await envelope.readSpentMicros(input.runId) + othersOfRun;
+          const decision = decideRunCostEnvelope({ spentMicros, projectedMicros, ceilingMicros: envelope.ceilingMicros });
           if (decision.kind === "WOULD_CROSS") throw envelope.refusal(decision);
+          // T12-R0 / T12-R1: a call that fits but would leave less than the room it names (root 0's worst-case call,
+          // named only by the map's calls) is refused with its OWN code: the run's money is not spent, so only the map
+          // stops, never the arguing.
+          if (keepRoomMicros > 0) {
+            const withRoom = decideRunCostEnvelope({ spentMicros, projectedMicros: projectedMicros + keepRoomMicros,
+              ceilingMicros: envelope.ceilingMicros });
+            if (withRoom.kind === "WOULD_CROSS") throw runCostEnvelopeRoomKept(withRoom, keepRoomMicros);
+          }
           // B9: then the shared wall, for a walled BODY call on a guard that has one.
           if (walled && this.#sharedWall !== null) {
             await this.#assertSharedWall(this.#sharedWall, input.runId, projectedMicros, {

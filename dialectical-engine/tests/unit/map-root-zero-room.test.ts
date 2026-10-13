@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CostEnvelopeGuard, decideRunCostEnvelope, runCostEnvelopeReached, type ModelSpendStore } from "@debateai/budget";
+import { CostEnvelopeGuard, decideRunCostEnvelope, type ModelSpendStore } from "@debateai/budget";
 import { framedJudgePromptForTest, rootPositionRequestBytesBound } from "@debateai/judgement";
 import { TypedDomainError } from "@debateai/kernel";
 import { MAP_LIMITS, mapPromptContractHash } from "@debateai/map";
@@ -9,10 +9,13 @@ import {
   type ProviderCostEnvelopeSeam,
   type ProviderGateway
 } from "@debateai/providers";
+import { expansionPhaseStop } from "@debateai/runner";
 import {
   createRunnerMapCaller,
+  resolveShapeMap,
   rootZeroKeepRoomMicros,
   rootZeroMapMaterialChars,
+  rootZeroRoomRefs,
   runMapStage,
   type MapStageDeps
 } from "../../apps/runner/src/map-stage.js";
@@ -59,9 +62,18 @@ describe("the money seam keeps the room a call names (T12-R0)", () => {
   it("refuses a call whose projection plus the room would cross the BODY ceiling, and admits exact equality", async () => {
     const room = 1_000;
     expect(await decisionAt(BODY_CEILING - PROJECTED - room, room)).toBe("ADMITTED");
-    expect(await decisionAt(BODY_CEILING - PROJECTED - room + 1, room)).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+    // T12-R1: it would fit without the room, so the refusal is the room's own (only the map stops), never MONEY.
+    expect(await decisionAt(BODY_CEILING - PROJECTED - room + 1, room)).toBe("RUN_COST_ENVELOPE_ROOM_KEPT");
+    expect(await decisionAt(BODY_CEILING - PROJECTED, room)).toBe("RUN_COST_ENVELOPE_ROOM_KEPT");
+    // A call that would cross even without the room is the run's real money stop, room or not.
+    expect(await decisionAt(BODY_CEILING - PROJECTED + 1, room)).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
     // The same spend with no room named is today's decision: admitted.
     expect(await decisionAt(BODY_CEILING - PROJECTED - room + 1)).toBe("ADMITTED");
+  });
+
+  it("the room-only refusal is never a run-level spend stop; the real one is", () => {
+    expect(expansionPhaseStop(new TypedDomainError("RUN_COST_ENVELOPE_ROOM_KEPT", "x"))).toBeNull();
+    expect(expansionPhaseStop(new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "x"))).toBe("MONEY");
   });
 
   it("is today's decision exactly when no room is named, or a room of zero", async () => {
@@ -126,7 +138,24 @@ describe("root 0's worst-case call", () => {
     expect(rootZeroMapMaterialChars.points).toBeGreaterThanOrEqual(2 * MAP_LIMITS.choosePointsPerSideMax * MAP_LIMITS.claimMaxChars);
   });
 
-  it("is priced at the dearest root seat, never below one call's projection; no price (local) keeps no room", () => {
+  it("is priced at root 0's OWN seat (its main and backup, and the seat it is handed to on a sit-out), never another seat's (T12-R2)", () => {
+    const seat = (...refs: string[]) => ({ refs, out: false });
+    const seats = [seat("opener", "opener-backup"), seat("next"), seat("dear-third")];
+    const membersOf = (entry: { refs: string[] }) => entry.refs.map((providerRef) => ({ providerRef }));
+    // Without the sit-out book root 0 is never handed over: only its own seat.
+    expect(rootZeroRoomRefs({ seats, membersOf, canHandOver: false, sitsOut: () => false })).toEqual(["opener", "opener-backup"]);
+    // With it, the next seat that does not sit out may open instead; never a later, dearer one.
+    expect(rootZeroRoomRefs({ seats, membersOf, canHandOver: true, sitsOut: () => false })).toEqual(["opener", "opener-backup", "next"]);
+    expect(rootZeroRoomRefs({ seats, membersOf, canHandOver: true, sitsOut: (entry) => entry === seats[1] }))
+      .toEqual(["opener", "opener-backup", "dear-third"]);
+    // Priced: a dearer member of another seat never raises root 0's room.
+    const prices = new Map([["opener", PRICE], ["opener-backup", PRICE], ["next", PRICE],
+      ["dear-third", { inputMicrosPerMillionTokens: 50_000_000, outputMicrosPerMillionTokens: 50_000_000 }]]);
+    const priced = rootZeroRoomRefs({ seats, membersOf, canHandOver: true, sitsOut: () => false }).map((ref) => prices.get(ref)!);
+    expect(rootZeroKeepRoomMicros({ prices: priced, requestBytes: 1_000, completionTokenCeiling: 100 })).toBe(600);
+  });
+
+  it("is priced at the dearest member it is given, never below one call's projection; no price (local) keeps no room", () => {
     const cheap = { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 };
     const dear = { inputMicrosPerMillionTokens: 2_000_000, outputMicrosPerMillionTokens: 3_000_000 };
     // ceil(1000 / 2) x 2 + 100 x 3 = 1 300 for the dear seat; 600 for the cheap one.
@@ -136,14 +165,12 @@ describe("root 0's worst-case call", () => {
 });
 
 /**
- * The scripted run Task 15 extends to a whole debate: a money ceiling that leaves less than the map and one root-0 call.
- * Every call costs COST micro-units (charged at admission, so calls in flight count); the gateway refuses, as the seam
- * does, a call whose cost plus the room it names would cross the BODY ceiling. The map stops early with its code
- * fallbacks and sends nothing more, and root 0's call (the room) still fits.
+ * The scripted runs Task 15 extends to a whole debate. The calls go through the REAL money seam (`CostEnvelopeGuard`,
+ * BODY phase, the store summing what was charged): every call projects PROJECTED and is charged that at admission. The
+ * map names root 0's room on each call.
  */
-describe("a ceiling that leaves less than the map and one root-0 call", () => {
-  const COST = 1_000;
-  const ROOM = 2_500;
+describe("the map under a ceiling that leaves too little for it and root 0", () => {
+  const ROOM = 10_000;
   const ANGLES = JSON.stringify({ angles: [
     { angle_id: "opp", kind: "OPPOSITE_CASE", label: "The other side", focus: "The case against free buses." },
     { angle_id: "worry", kind: "ASKER_WORRY", label: "The worry", focus: "What the asker fears about the cost." },
@@ -155,24 +182,30 @@ describe("a ceiling that leaves less than the map and one root-0 call", () => {
     { claim: "More riders may crowd the buses at rush hour.", why_it_matters: "Service could get worse.", leans: "context" }],
   candidate_answers: ["Yes, for people on low incomes."] });
 
-  it("stops the map as a money stop, sends nothing more, and leaves root 0 its room", async () => {
-    // Room for the angles and one list, never a third call beside the room: 3 x COST + ROOM crosses by one.
-    const ceiling = 3 * COST + ROOM - 1;
-    let spent = 0;
-    const sent: string[] = [];
-    const metered: ProviderGateway = { call: async (call: ProviderCallRequest) => {
-      const decision = decideRunCostEnvelope({ spentMicros: spent, projectedMicros: COST + (call.keepRoomMicros ?? 0), ceilingMicros: ceiling });
-      if (decision.kind === "WOULD_CROSS") throw runCostEnvelopeReached(decision);
-      spent += COST;
-      sent.push(call.callSiteKey);
+  /** A gateway over the real seam: admitted calls are charged PROJECTED and answered; `sent` lists what left. */
+  const meteredFrom = (startSpent: number) => {
+    const state = { spent: startSpent, sent: [] as string[] };
+    const store: ModelSpendStore = {
+      recordSpend: async () => undefined, readRunSpentMicros: async () => state.spent, readRunStorySpentMicros: async () => 0,
+      readDaySpentMicros: async () => 0, admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
+    };
+    const guard = new CostEnvelopeGuard({ store, policy: POLICY, clock: () => new Date("2026-10-14T00:00:00.000Z") });
+    const gateway: ProviderGateway = { call: async (call: ProviderCallRequest) => {
+      await guard.providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" })
+        .assertCallAllowed({ ...PROJECTION, ...(call.keepRoomMicros === undefined ? {} : { keepRoomMicros: call.keepRoomMicros }) });
+      state.spent += PROJECTED;
+      state.sent.push(call.callSiteKey);
       return { content: call.callSiteKey === "MAP:angles" ? ANGLES : LIST } as never;
     } } as ProviderGateway;
+    return { state, gateway };
+  };
+  const mapUnder = async (gateway: ProviderGateway) => {
     const deps: MapStageDeps = {
       runId: "run-1", subjectItemId: "wi-1", mapContractHash: mapPromptContractHash(),
       judgeBound: { maxAttempts: 3, tokenCeiling: 8_192, deadlineMs: 60_000 }, longBounds: { merge: 32_768, choose: 32_768 },
-      memberOf: (aiRef) => ({ provider: metered, providerRef: aiRef }), sitsOut: () => false, satOutBy: () => false,
-      spendStopOf: (error) => error instanceof TypedDomainError && error.code === "RUN_COST_ENVELOPE_MONEY_REACHED" ? "MONEY" : null,
-      laneStopped: () => false, abandon: () => false, serial: true, keepRoomMicros: ROOM
+      memberOf: (aiRef) => ({ provider: gateway, providerRef: aiRef }), sitsOut: () => false, satOutBy: () => false,
+      spendStopOf: (error) => expansionPhaseStop(error), laneStopped: () => false, abandon: () => false, serial: true,
+      keepRoomMicros: ROOM, roomKept: (error) => error instanceof TypedDomainError && error.code === "RUN_COST_ENVELOPE_ROOM_KEPT"
     };
     const caller = createRunnerMapCaller(deps);
     const result = await runMapStage({ opening: "ANGLE_MAP", map: {
@@ -180,11 +213,62 @@ describe("a ceiling that leaves less than the map and one root-0 call", () => {
       seats: [{ aiRef: "a", maker: "ma" }, { aiRef: "b", maker: "mb" }, { aiRef: "c", maker: "mc" }],
       caller, seed: "run-1", gapRoundsMax: 1, maxAnswers: 3, pointsPerAnswer: 2
     } });
-    expect(sent).toEqual(["MAP:angles", "MAP:list:0"]);
+    return { caller, result };
+  };
+  const spendStopOfCode = (code: string) => expansionPhaseStop(new TypedDomainError(code, code));
+  const author = (callSiteKey: string): ProviderCallRequest => ({ runId: "run-1", subjectItemId: "wi-1", callSiteKey, role: "JUDGE",
+    lane: "served", bound: { maxAttempts: 3, tokenCeiling: 8_192, deadlineMs: 60_000 }, contractHash: "c", providerRef: "a",
+    packet: framedFixturePacket("q") });
+
+  it("(a) a refusal only because of the room stops the MAP, never the arguing: no spend stop, the next calls are still asked", async () => {
+    // The angles fit with the room; the first list fits only without it.
+    const { state, gateway } = meteredFrom(BODY_CEILING - PROJECTED - ROOM);
+    const { caller, result } = await mapUnder(gateway);
+    expect(state.sent).toEqual(["MAP:angles"]);
+    expect(result.stoppedBy).toBe("RUN_COST_ENVELOPE_ROOM_KEPT");
+    expect(result.marks.map((mark) => mark.mark)).toContain("MAP_UNAVAILABLE_TODAYS_OPENING");
+    expect(caller.spendStop()).toBeNull();
+    const resolved = await resolveShapeMap({ store: { readMapResultForRun: async () => null, writeMapRun: async () => "INSERTED" },
+      runId: "run-1", answerCount: () => 2, spendStopOfCode, runMap: async () => ({ result, spendStop: caller.spendStop() }) });
+    expect(resolved.spendStop).toBeNull();
+    // Root 0, then the next author call, are still asked; the seam alone decides them, as today.
+    await gateway.call(author("JUDGE"));
+    await gateway.call(author("JUDGE:root:secondary"));
+    expect(state.sent).toEqual(["MAP:angles", "JUDGE", "JUDGE:root:secondary"]);
+    // ...and refused only by the seam's own rule, once the run's money really is spent.
+    state.spent = BODY_CEILING - PROJECTED + 1;
+    await expect(gateway.call(author("JUDGE:root:2"))).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+  });
+
+  it("(b) a real money refusal during the map is the run's spend stop, as before", async () => {
+    // The angles fit with the room; then the run's spend reaches the ceiling (another call of the run was charged), so
+    // the first list would cross it even with no room at all.
+    const tight = meteredFrom(BODY_CEILING - PROJECTED - ROOM);
+    const jumping: ProviderGateway = { call: async (call) => {
+      const reply = await tight.gateway.call(call);
+      if (call.callSiteKey === "MAP:angles") tight.state.spent = BODY_CEILING;
+      return reply;
+    } };
+    const { caller, result } = await mapUnder(jumping);
+    expect(tight.state.sent).toEqual(["MAP:angles"]);
     expect(result.stoppedBy).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
     expect(caller.spendStop()).toBe("MONEY");
-    expect(result.marks.map((mark) => mark.mark)).toContain("MAP_UNAVAILABLE_TODAYS_OPENING");
-    // Root 0's worst-case call still fits under the BODY ceiling.
-    expect(decideRunCostEnvelope({ spentMicros: spent, projectedMicros: ROOM, ceilingMicros: ceiling }).kind).toBe("WITHIN");
+    const resolved = await resolveShapeMap({ store: { readMapResultForRun: async () => null, writeMapRun: async () => "INSERTED" },
+      runId: "run-1", answerCount: () => 2, spendStopOfCode, runMap: async () => ({ result, spendStop: caller.spendStop() }) });
+    expect(resolved.spendStop).toBe("MONEY");
+  });
+
+  it("(d) a re-claim of a map stopped by the room alone restores no stop; one stopped by money restores MONEY", async () => {
+    const stored = (stoppedBy: string) => ({ arm: "C", kind: "UNAVAILABLE", angles: [], items: [], keyPoints: [], mergedAnswers: [],
+      framingChallenges: [], choice: null, marks: [], notes: [], calls: [], stoppedBy }) as never;
+    const reclaim = (stoppedBy: string) => resolveShapeMap({
+      store: { readMapResultForRun: async () => stored(stoppedBy), writeMapRun: async () => "INSERTED" }, runId: "run-1",
+      answerCount: () => 2, spendStopOfCode, runMap: async () => { throw new Error("never asked"); } });
+    expect((await reclaim("RUN_COST_ENVELOPE_ROOM_KEPT")).spendStop).toBeNull();
+    expect((await reclaim("RUN_COST_ENVELOPE_MONEY_REACHED")).spendStop).toBe("MONEY");
+  });
+
+  it("keeps root 0 its room after a room-only stop", () => {
+    expect(decideRunCostEnvelope({ spentMicros: BODY_CEILING - ROOM, projectedMicros: ROOM, ceilingMicros: BODY_CEILING }).kind).toBe("WITHIN");
   });
 });

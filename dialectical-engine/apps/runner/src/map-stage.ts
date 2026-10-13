@@ -32,9 +32,15 @@ export type MapStageDeps = Readonly<{
   serial: boolean;
   /**
    * Controller ruling T12-R0: root 0's worst-case call (`rootZeroKeepRoomMicros`), named on every map call so the money
-   * seam refuses a map call that would leave too little for it (a map spend stop). Absent or 0: no room is named.
+   * seam refuses a map call that would leave too little for it. Absent or 0: no room is named.
    */
   keepRoomMicros?: number;
+  /**
+   * Ruling T12-R1: the seam's ROOM-ONLY refusal (RUN_COST_ENVELOPE_ROOM_KEPT: the call would have fitted without the
+   * room). It stops the map — STOPPED, nothing more sent — but is never a spend stop: `spendStop()` stays as it was,
+   * so the arguing is not stopped. Absent: no such refusal is told apart.
+   */
+  roomKept?: (error: unknown) => boolean;
 }>;
 /**
  * `settled()` (Task 1 note): resolves once every call this caller SENT has finished, whatever its outcome. When an
@@ -98,6 +104,7 @@ export function createRunnerMapCaller(deps: MapStageDeps): RunnerMapCaller {
         throw error;
       }
       if (deps.laneStopped(error)) { stopped = true; return { kind: "STOPPED", code: mapErrorCodeOf(error) }; }
+      if (deps.roomKept?.(error) === true) { stopped = true; return { kind: "STOPPED", code: mapErrorCodeOf(error) }; }
       const stop = deps.spendStopOf(error);
       if (stop !== null) { spendStop ??= stop; stopped = true; return { kind: "STOPPED", code: mapErrorCodeOf(error) }; }
       if (deps.satOutBy(error)) return { kind: "BUSY", code: MAKER_SAT_OUT };
@@ -166,6 +173,25 @@ export const rootZeroMapMaterialChars = Object.freeze({
 /** Room for the target's own `model` member, which `rootPositionRequestBytesBound` leaves empty. */
 const ROOT_ZERO_BODY_ALLOWANCES = Object.freeze({ modelIdBytes: 256 });
 
+/**
+ * Ruling T12-R2 — WHO CAN WRITE ROOT 0, so the room is priced at root 0's OWN seat: its planned member and its backup
+ * (`membersOf`: main and runner-up), and, only where the runner can hand root 0 to another seat (the sit-out book: root
+ * 0's member sits out, and the next seat that does not opens instead), that next seat's members too. Never another
+ * seat's dearer member. The cheaper-model try (B9) only ever moves root 0 to a CHEAPER maker, so it adds nobody.
+ */
+export function rootZeroRoomRefs<S>(input: Readonly<{
+  seats: readonly S[];
+  membersOf: (seat: S) => readonly Readonly<{ providerRef: string }>[];
+  canHandOver: boolean;
+  sitsOut: (seat: S) => boolean;
+}>): readonly string[] {
+  const [opener, ...rest] = input.seats;
+  if (opener === undefined) return Object.freeze([]);
+  const next = input.canHandOver ? rest.find((seat) => !input.sitsOut(seat)) : undefined;
+  return Object.freeze([...new Set([opener, ...(next === undefined ? [] : [next])]
+    .flatMap((seat) => input.membersOf(seat).map((member) => member.providerRef)))]);
+}
+
 /** The most bytes root 0's own request can carry for this question (a primary root, or a map-assigned one). */
 export function rootZeroRequestBytes(input: Readonly<{ questionLine: string; argumentLanguageName: string; completionTokenCeiling: number }>): number {
   return rootPositionRequestBytesBound({ ...input, assignedMaterialChars: rootZeroMapMaterialChars })
@@ -174,8 +200,12 @@ export function rootZeroRequestBytes(input: Readonly<{ questionLine: string; arg
 
 /**
  * Root 0's worst-case call, in micro-units: the money seam's own projection (`projectedCallCeilingMicros`) of its largest
- * request at its first attempt's completion ceiling, at the dearest price among the members that could write it. No
- * price (local mode: no money ceiling) keeps no room.
+ * request at its first attempt's completion ceiling, at the dearest price among the members that could write it
+ * (`rootZeroRoomRefs`). No price (local mode: no money ceiling) keeps no room.
+ *
+ * ONE CALL, ITS FIRST ATTEMPT — the same "one call" rule as the boot's RUN_CEILING_BELOW_ONE_CALL check
+ * (`firstPositionCallProjections`): the room covers root 0's first attempt only. Its retries and repairs, like every
+ * attempt of every call, are checked one by one by the money seam as today.
  */
 export function rootZeroKeepRoomMicros(input: Readonly<{ prices: readonly ProviderTargetPrice[]; requestBytes: number; completionTokenCeiling: number }>): number {
   return input.prices.reduce((most, price) => Math.max(most,

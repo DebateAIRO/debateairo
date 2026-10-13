@@ -39,6 +39,13 @@ export const COST_ENVELOPE_CURRENCY = "USD" as const;
 export const RUN_COST_ENVELOPE_MONEY_REACHED = "RUN_COST_ENVELOPE_MONEY_REACHED" as const;
 
 /**
+ * Debate shape (controller rulings T12-R0, T12-R1): the refusal of a call that names a room to keep (`keepRoomMicros`,
+ * only the map's calls) and would fit WITHOUT that room. The run's money is NOT spent: only the map stops (its code
+ * fallbacks finish it); the arguing goes on and every later call is decided as today. Never a run-level spend stop.
+ */
+export const RUN_COST_ENVELOPE_ROOM_KEPT = "RUN_COST_ENVELOPE_ROOM_KEPT" as const;
+
+/**
  * Engine money rule, Task M1 (spec 2026-09-26 §14.4.1) — WHICH PART OF A RUN A
  * CALL BELONGS TO. `SERVE` is an answer-writing call (the synthesizer and the
  * evaluator on the served lane); `BODY` is every other call a run makes while
@@ -424,6 +431,18 @@ export function chargeableUsage(
     ),
     completionTokens: side(parts.completionTokens, completionTokenCeiling)
   });
+}
+
+/** T12-R1: the room-only refusal (`RUN_COST_ENVELOPE_ROOM_KEPT`), with the decision that included the room. */
+export function runCostEnvelopeRoomKept(
+  decision: Extract<RunCostEnvelopeDecision, { kind: "WOULD_CROSS" }>,
+  keepRoomMicros: number
+): TypedDomainError {
+  return new TypedDomainError(
+    RUN_COST_ENVELOPE_ROOM_KEPT,
+    `The run has spent ${decision.spentMicros} of ${decision.ceilingMicros} ${COST_ENVELOPE_CURRENCY} micro-units`
+      + ` and the next call would leave less than the ${keepRoomMicros} it must keep`
+  );
 }
 
 /** The refusal `assertCallAllowed` raises; it is short-circuited by the gateway, never retried. */

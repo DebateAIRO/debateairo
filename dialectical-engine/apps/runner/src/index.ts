@@ -65,6 +65,7 @@ import {
   attemptCeilingForPhase,
   parseCostEnvelopeBasis,
   projectedCallCeilingMicros,
+  RUN_COST_ENVELOPE_ROOM_KEPT,
   sharedWallReached,
   type BudgetPressureDecision,
   type CostEnvelopePhase,
@@ -214,7 +215,7 @@ import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-s
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions } from "./shape-select.js";
 import {
-  createRunnerMapCaller, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroRequestBytes, runMapStage
+  createRunnerMapCaller, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroRequestBytes, rootZeroRoomRefs, runMapStage
 } from "./map-stage.js";
 import { shapePositionCount } from "./shape-plan.js";
 import { shapeDistinctMakers, shapeSeatOrder } from "./shape-seats.js";
@@ -6684,10 +6685,11 @@ export class WalkingSkeletonRunner {
       const runMap = async (): Promise<Readonly<{ result: MapResult; spendStop: EnvelopeStopKind | null }>> => {
         /** PF-B40: map seats outside the claim-eligible list, wrapped once each. */
         const mapOnlyMembers = new Map<string, ConfiguredSeatMaker>();
-        // T12-R0: root 0's worst-case call, at the dearest member any root seat could write it with (hosted prices only).
+        // T12-R0 / T12-R2: root 0's worst-case call, at the dearest member of root 0's OWN seat (and the seat it is
+        // handed to when its member sits out); hosted prices only. It covers root 0's first attempt (`rootZeroKeepRoomMicros`).
         const providerPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
-        const rootZeroPrices = rootSeats.flatMap((seat) => membersOf(seat))
-          .flatMap((member) => { const price = providerPrices.get(member.providerRef); return price === undefined ? [] : [price]; });
+        const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
+          .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
         const rootZeroCompletion = lengthRetryTokenCeiling(this.settings.judgeBound.tokenCeiling, 0);
         const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, completionTokenCeiling: rootZeroCompletion,
           requestBytes: rootZeroRequestBytes({ questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName,
@@ -6714,7 +6716,9 @@ export class WalkingSkeletonRunner {
           laneStopped: (error) => callHeldBack(error) || (error instanceof TypedDomainError && error.code === CALL_LANE_STOPPED),
           abandon: keepAliveStop,
           serial: !callsRunTogether,
-          keepRoomMicros
+          keepRoomMicros,
+          // T12-R1: a refusal only because of root 0's room stops the map, never the arguing.
+          roomKept: (error) => error instanceof TypedDomainError && error.code === RUN_COST_ENVELOPE_ROOM_KEPT
         });
         // Spec §2.3 (O6), the map's own guard: once the map has stopped, no queued map call starts.
         callLane?.guardStarts(() => !mapCaller.stopped());
@@ -10380,6 +10384,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
   "RUN_COST_ENVELOPE_MONEY_REACHED",
+  "RUN_COST_ENVELOPE_ROOM_KEPT",
   "RUN_COST_ENVELOPE_UNRESOLVED",
   "RUN_DEPTH_PARAMS_INVALID",
   "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
