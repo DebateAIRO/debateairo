@@ -347,6 +347,13 @@ const runnerSettings = (): WalkingSkeletonSettings => ({
   }))
 });
 
+/**
+ * Reply language (#154): the scripted replies are English, checked against the question's language. A UUID's hex
+ * letters made about 1 label in 6 read as Portuguese (lone "e", "a"), so the replies were refused at random; a
+ * label's fresh part is digits only, so the label always reads as no named language ("und", Latin script).
+ */
+const digitsOnlyId = (): string => randomUUID().replace(/[a-f]/gu, (hex) => String(hex.charCodeAt(0) - 87));
+
 async function createRun(
   questionLine: string,
   maxModelAttempts = 10,
@@ -517,13 +524,11 @@ async function startProviderDouble(
   // classes stay in the vocabulary so a fixture that still scripts one is
   // dispatched rather than silently served a judgement.
   type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "EVALUATOR" | "GENERAL";
-  // Reply language (#154): the directive has two forms, "<name>, the language of the question," and "English," (an
-  // English question, and the fallback for a question the detector cannot name, as most labels here). Both are
-  // removed: with only the first, an English directive's "fatalFlags" sent review calls to the PANEL answers.
   const ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN = new RegExp(
-    [argumentLanguageDirective("\u0000"), argumentLanguageDirective("")]
-      .map((directive) => directive.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\u0000", "[^.]+?"))
-      .join("|"),
+    argumentLanguageDirective("\u0000")
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      // Reply language (2026-10-12): a named language is followed by ", the language of the question"; the fallback is not.
+      .replace("\u0000, the language of the question", "[^.]+?"),
     "gu"
   );
   const classifyContent = (content: ProviderDoubleResponse): ResponseClass => {
@@ -693,7 +698,7 @@ async function executeResil01Scenario(input: {
     ? gateway
     : { call: (request) => { input.observe!(maker, request); return gateway.call(request); } };
   try {
-    const question = `${input.label}-${randomUUID()}`;
+    const question = `${input.label}-${digitsOnlyId()}`;
     const runId = input.envelopeBasis === undefined
       ? await createRun(question, 100, 2, input.depth ?? 1)
       : await createRun(question, 100, 2, input.depth ?? 1, `asker:${question}`, input.envelopeBasis);
@@ -914,7 +919,7 @@ describe("S-LANG argument language persistence", () => {
 
 describe("BUG-01 content-rejection retry accounting", () => {
   it("DR-184 C-2 crosses the real provider boundary after the in-run review key is exhausted", async () => {
-    const question = `dr184-c2-real-boundary-${randomUUID()}`;
+    const question = `dr184-c2-real-boundary-${digitsOnlyId()}`;
     const { runId, workItemId } = await createRunnerWork(question);
     const contractHash = "contract:dr184-c2-real-boundary";
     const nodeId = "node:dr184-c2-real-boundary";
@@ -965,7 +970,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
       });
     }
 
-    const ceilingQuestion = `dr184-c2-pinned-ceiling-${randomUUID()}`;
+    const ceilingQuestion = `dr184-c2-pinned-ceiling-${digitsOnlyId()}`;
     const ceilingRunId = await createRun(ceilingQuestion, 2);
     const ceilingWorkItemId = await new WorkItemRepository(database.pool).enqueue({
       runId: ceilingRunId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${ceilingQuestion}`
@@ -1002,7 +1007,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
   // model attempt, asked with a per-call bound of three against a provider that always
   // fails, must stop after the first attempt with the run's refusal - never spend two more.
   it("DL4-F3 re-checks the pinned run ceiling before every retry inside one gateway call", async () => {
-    const question = `dl4-f3-per-attempt-ceiling-${randomUUID()}`;
+    const question = `dl4-f3-per-attempt-ceiling-${digitsOnlyId()}`;
     const runId = await createRun(question, 1);
     const workItemId = await new WorkItemRepository(database.pool).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
@@ -1031,7 +1036,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
   });
 
   it("T11/T13 charges every rejected attempt while terminal execution counts only the accepted attempt", async () => {
-    const question = `bug01-accounting-${randomUUID()}`;
+    const question = `bug01-accounting-${digitsOnlyId()}`;
     const { runId, workItemId } = await createRunnerWork(question);
     const provider = await startProviderDouble(["rejected-one", "rejected-two", "accepted-three"]);
     try {
@@ -1076,7 +1081,7 @@ describe("BUG-01 content-rejection retry accounting", () => {
   });
 
   it("T12 exposes the last rejected artifact to the redelivery exhaustion check", async () => {
-    const question = `bug01-exhaustion-${randomUUID()}`;
+    const question = `bug01-exhaustion-${digitsOnlyId()}`;
     const { runId, workItemId } = await createRunnerWork(question);
     const provider = await startProviderDouble(["rejected-one", "rejected-two", "rejected-three"]);
     const ledger = new LedgerRepository(database.pool);
@@ -1156,7 +1161,7 @@ describe("LOAD-01 run projection ownership boundary", () => {
     const identity=testHttpIdentity(`resil01-${randomUUID()}`);
     await persistHttpIdentity(identity,"resil01");
     const askerId = `asker:historical:${randomUUID()}`;
-    const runId = await createRun(`resil01-holding-${randomUUID()}`, 10, 1, 1, askerId);
+    const runId = await createRun(`resil01-holding-${digitsOnlyId()}`, 10, 1, 1, askerId);
     await database.pool.query("SELECT core.append_run_ownership_event($1,$2)",[
       runId,identity.authenticated.ownerRef
     ]);
@@ -1321,7 +1326,7 @@ describe("LOAD-01 run projection ownership boundary", () => {
 
 describe("BUG-03 asker-scoped debates index", () => {
   it("lists open owner runs honestly and excludes foreign or already-served runs", async () => {
-    const servedQuestion = `bug03-served-${randomUUID()}`;
+    const servedQuestion = `bug03-served-${digitsOnlyId()}`;
     const ownerAskerId = `asker:${servedQuestion}`;
     const servedWork = await createRunnerWork(servedQuestion);
     const provider = await startProviderDouble([
@@ -1339,7 +1344,7 @@ describe("BUG-03 asker-scoped debates index", () => {
       const served = await runnerWithEndpoint(provider.endpoint).executeWorkItem(servedWork.workItemId);
       if (served.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
 
-      const runningRunId = await createRun(`bug03-running-${randomUUID()}`, 10, 1, 1, ownerAskerId);
+      const runningRunId = await createRun(`bug03-running-${digitsOnlyId()}`, 10, 1, 1, ownerAskerId);
       const runningWorkItemId = await new WorkItemRepository(database.pool).enqueue({
         runId: runningRunId,
         batteryRowId: "Q1",
@@ -1353,7 +1358,7 @@ describe("BUG-03 asker-scoped debates index", () => {
         [runningWorkItemId]
       );
 
-      const failedRunId = await createRun(`bug03-failed-${randomUUID()}`, 10, 1, 1, ownerAskerId);
+      const failedRunId = await createRun(`bug03-failed-${digitsOnlyId()}`, 10, 1, 1, ownerAskerId);
       const failedWork = new WorkItemRepository(database.pool);
       const failedWorkItemId = await failedWork.enqueue({
         runId: failedRunId,
@@ -1367,7 +1372,7 @@ describe("BUG-03 asker-scoped debates index", () => {
         reason: "TEST_LAYER:BUG03_TERMINAL_FAILURE"
       });
 
-      const foreignRunId = await createRun(`bug03-foreign-${randomUUID()}`, 10, 1, 1, `asker:foreign:${randomUUID()}`);
+      const foreignRunId = await createRun(`bug03-foreign-${digitsOnlyId()}`, 10, 1, 1, `asker:foreign:${randomUUID()}`);
       const index = await new ServeRepository(database.pool).readAnswerIndex(ownerAskerId, 10, 0);
 
       expect(index.total).toBe(3);
@@ -1399,7 +1404,7 @@ describe("BUG-03 asker-scoped debates index", () => {
     const servedFixtureCount = HOME_PAGE_SIZE + 1;
 
     for (let fixtureIndex = 0; fixtureIndex < servedFixtureCount; fixtureIndex += 1) {
-      const label = `bug04-served-${fixtureIndex}-${randomUUID()}`;
+      const label = `bug04-served-${fixtureIndex}-${digitsOnlyId()}`;
       const runId = await createRun(label, 10, 1, 1, ownerAskerId);
       const carriers = await database.pool.query<{ work_item_id: string; fact_bundle_id: string }>(
         `WITH work AS (
@@ -1433,7 +1438,7 @@ describe("BUG-03 asker-scoped debates index", () => {
       );
     }
 
-    const runningRunId = await createRun(`bug04-running-${randomUUID()}`, 10, 1, 1, ownerAskerId);
+    const runningRunId = await createRun(`bug04-running-${digitsOnlyId()}`, 10, 1, 1, ownerAskerId);
     const runningWorkItemId = await new WorkItemRepository(database.pool).enqueue({
       runId: runningRunId,
       batteryRowId: "Q1",
@@ -1914,7 +1919,7 @@ describe("L4-F9 / ADR-0017 §3(c) — a running debate keeps its claim", () => {
 
   it("renews only the claim it holds, and says when the job is already settled", async () => {
     const work = new WorkItemRepository(database.pool);
-    const { runId, workItemId } = await createRunnerWork(`l4f9-renew-${randomUUID()}`);
+    const { runId, workItemId } = await createRunnerWork(`l4f9-renew-${digitsOnlyId()}`);
     const workerId = "worker:l4f9";
     const claimed = await work.claimById({ workItemId, workerId, claimSeconds: 30 });
     if (claimed === null) throw new Error("TEST_EXPECTED_CLAIM");
@@ -1945,7 +1950,7 @@ describe("L4-F9 / ADR-0017 §3(c) — a running debate keeps its claim", () => {
   });
 
   it("makes a second dispatch stand down while the debate outlives its first claim", async () => {
-    const { workItemId } = await createRunnerWork(`l4f9-race-${randomUUID()}`);
+    const { workItemId } = await createRunnerWork(`l4f9-race-${digitsOnlyId()}`);
     const provider = await startProviderDouble(servedAnswer());
     const held = heldFirstCall(provider.endpoint);
     const settings = { ...runnerSettings(), claimMs: SHORT_CLAIM_MS };
@@ -1972,7 +1977,7 @@ describe("L4-F9 / ADR-0017 §3(c) — a running debate keeps its claim", () => {
   });
 
   it("makes no further model call once another copy holds the claim", async () => {
-    const { workItemId } = await createRunnerWork(`l4f9-lost-${randomUUID()}`);
+    const { workItemId } = await createRunnerWork(`l4f9-lost-${digitsOnlyId()}`);
     const provider = await startProviderDouble(servedAnswer());
     const held = heldFirstCall(provider.endpoint);
     try {
@@ -2154,7 +2159,7 @@ describe("FX-LG-02 / FX-LED-04 — append-only ordered ledger", () => {
 
 describe("S01 ledger hardening", () => {
   it("FX-LED-05 persists the input/contract/content hash triple on a raw artifact", async () => {
-    const runId = await createRun(`fx-led-05-${randomUUID()}`);
+    const runId = await createRun(`fx-led-05-${digitsOnlyId()}`);
     const artifactId = randomUUID();
     const supersedingArtifactId = randomUUID();
     await new LedgerRepository(database.pool).appendRawArtifact({
@@ -2299,7 +2304,7 @@ describe("apps/runner — legal command lifecycle", () => {
       evaluatorSatisfied()
     ]);
     try {
-      const question = `claim-primary-reselection-${randomUUID()}`;
+      const question = `claim-primary-reselection-${digitsOnlyId()}`;
       const secondaryMember = fixtureDiscoveredPanel(2)[1]!;
       const runId = await new RunRepository(database.pool).startRun({
         questionLine: question,
@@ -2900,7 +2905,7 @@ describe("apps/runner — legal command lifecycle", () => {
       reviewDouble("dispute", "Secondary review 4")
     ]);
     try {
-      const question = `resil01-class-h-${randomUUID()}`;
+      const question = `resil01-class-h-${digitsOnlyId()}`;
       const runId = await createRun(question, 40, 2, 1);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `resil01-class-h:${runId}`
@@ -3154,7 +3159,7 @@ describe("apps/runner — legal command lifecycle", () => {
       reviewDouble("agree", "Secondary review 4")
     ]);
     try {
-      const question = `t06-cannot-assess-class-h-${randomUUID()}`;
+      const question = `t06-cannot-assess-class-h-${digitsOnlyId()}`;
       const runId = await createRun(question, 40, 2, 1);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `t06-cannot-assess-class-h:${runId}`
@@ -5739,7 +5744,7 @@ describe("Engine money rule M2 — a stop while arguing never skips the answer (
     const seamB = stopOnBodyCall({ ordinal: 0, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
     const seamC = stopOnBodyCall({ ordinal: 1, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
     try {
-      const question = `m2-root-panel-partial-${randomUUID()}`;
+      const question = `m2-root-panel-partial-${digitsOnlyId()}`;
       const runId = await createRun(question, 90, 3, 1);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
@@ -6096,7 +6101,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     const seamB = moneySeam();
     const seamC = moneySeam({ refuseBody: 1 });
     try {
-      const question = `m3-price-order-${randomUUID()}`;
+      const question = `m3-price-order-${digitsOnlyId()}`;
       const runId = await createRun(question, 90, 3, 1);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
@@ -6180,7 +6185,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     const seamB = moneySeam();
     const seamC = moneySeam({ refuseBody: 1 });
     try {
-      const question = `m3-writer-avoids-checker-${randomUUID()}`;
+      const question = `m3-writer-avoids-checker-${digitsOnlyId()}`;
       const runId = await createRun(question, 90, 3, 1);
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
@@ -6740,7 +6745,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
   ] as const)("never lets %s to write the row change the answer", async (_name, code, sqlState) => {
     const logs: Record<string, unknown>[] = [];
     const repository = new ServeDisclosureRepository(database.pool);
-    const otherRunId = await createRun(`m3-row-other-run-${randomUUID()}`);
+    const otherRunId = await createRun(`m3-row-other-run-${digitsOnlyId()}`);
     const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
     const scenario = await executeResil01Scenario({
       label: `m3-row-failure-${code.toLowerCase()}`,
@@ -6850,7 +6855,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(await disclosureRowOf(unwrittenAnswerId)).toMatchObject({
       writerPlannedRef: astralRef, writerServedRef: astralRef, checkerSameAsWriter: true, serveStop: "NO_ARTIFACT"
     });
-    const otherRunId = await createRun(`m3-row-table-other-${randomUUID()}`);
+    const otherRunId = await createRun(`m3-row-table-other-${digitsOnlyId()}`);
     await expect(rawInsert({ runId: otherRunId })).rejects.toMatchObject({
       code: "23503", message: "SERVE_DISCLOSURE_RUN_MISMATCH"
     });
@@ -7624,7 +7629,7 @@ describe("T10/T11 · the served root and its label, through the production runne
    * SUPPORTED, however confident the judgement it produced.
    */
   it("T11 the mono-maker path serves CONTESTED with the LABEL-BASIS-INCOMPLETE disclosure", async () => {
-    const question = `t11-mono-maker-label-${randomUUID()}`;
+    const question = `t11-mono-maker-label-${digitsOnlyId()}`;
     const work = await createRunnerWork(question);
     // Fidelity 0.95 — the most confident judgement the double can give. If the
     // ladder consulted confidence instead of BASIS, this would print SUPPORTED.
@@ -7682,7 +7687,7 @@ describe("T10/T11 · the served root and its label, through the production runne
    * BEFORE any answer is written, on the same footing as J12's panel stop.
    */
   it("T11 stops loudly instead of labelling when the sealed verdict-label family is missing", async () => {
-    const question = `t11-unsealed-verdict-family-${randomUUID()}`;
+    const question = `t11-unsealed-verdict-family-${digitsOnlyId()}`;
     const work = await createRunnerWork(question);
     const provider = await startProviderDouble([...servedRunResponses("An unlabellable position.", 0.8)]);
     const { verdictLabelPolicy: _omitted, ...settingsWithoutVerdictLabelPolicy } = runnerSettings();
@@ -7717,7 +7722,7 @@ describe("T10/T11 · the served root and its label, through the production runne
    * resolvable, and the r1 filing only checked the former.
    */
   it("T9/J24 refuses an unconfigured sealed role ref before claiming, and names the role", async () => {
-    const question = `t09-role-ref-unconfigured-${randomUUID()}`;
+    const question = `t09-role-ref-unconfigured-${digitsOnlyId()}`;
     const work = await createRunnerWork(question);
     const provider = await startProviderDouble([...servedRunResponses("Never synthesized.", 0.8)]);
     const settings = runnerSettings();
@@ -7770,7 +7775,7 @@ describe("T10/T11 · the served root and its label, through the production runne
       evaluatorSatisfied()
     ]);
     try {
-      const question = `t09-role-absent-at-claim-${randomUUID()}`;
+      const question = `t09-role-absent-at-claim-${digitsOnlyId()}`;
       const panel = fixtureDiscoveredPanel(2);
       const primaryMember = panel[0]!;
       const secondaryMember = panel[1]!;
@@ -7886,7 +7891,7 @@ describe("T10/T11 · the served root and its label, through the production runne
   it.each(["HEALTHY", "ABSENT", "MISSING_PROBE"] as const)(
     "keeps a sealed synthesis provider outside the debate panel separate: %s",
     async (state) => {
-      const work = await createRunnerWork(`separate-synthesis-${state}-${randomUUID()}`);
+      const work = await createRunnerWork(`separate-synthesis-${state}-${digitsOnlyId()}`);
       const author = await startProviderDouble([judgementDouble("A single panel author's position", 0.4)]);
       const synthesis = await startProviderDouble([resil01Composition, evaluatorSatisfied()]);
       const roleRef = "provider:test-layer:secondary";
@@ -7951,7 +7956,7 @@ describe("T10/T11 · the served root and its label, through the production runne
     // wrong-producer case can be persisted without colliding with an existing
     // answer. codex r3 B2: run identity alone let exactly this artifact through
     // as both the candidate and the verdict reference.
-    const question = `t09-wrong-producer-${randomUUID()}`;
+    const question = `t09-wrong-producer-${digitsOnlyId()}`;
     // Activation-free, for the reason codex r4 B2 gave: with `createRun`'s full
     // battery, removing the guard under a mutant lets `persist` reach its
     // TERMINAL progress event and die on `core.reject_terminal_with_wait`
@@ -8086,7 +8091,7 @@ describe("T10/T11 · the served root and its label, through the production runne
    * the assertion here is the only thing that can go red.
    */
   it("T9/J29 refuses a REAL producer pair supplied for the WRONG ROLE", async () => {
-    const question = `t09-wrong-role-${randomUUID()}`;
+    const question = `t09-wrong-role-${digitsOnlyId()}`;
     // NO battery rows, deliberately (codex r4 B2 / D43). `createRun` seeds the
     // full battery, whose undrained activations make `core.reject_terminal_with_wait`
     // raise 23514 WAIT_DRAIN_REQUIRED the moment `persist` writes its TERMINAL
@@ -8238,7 +8243,7 @@ describe("T10/T11 · the served root and its label, through the production runne
     const absentPrimary = await startProviderDouble([]);
     const absentSecondary = await startProviderDouble([]);
     try {
-      const question = `t09-all-absent-at-claim-${randomUUID()}`;
+      const question = `t09-all-absent-at-claim-${digitsOnlyId()}`;
       const panel = fixtureDiscoveredPanel(2);
       const secondaryMember = panel[1]!;
       const runId = await new RunRepository(database.pool).startRun({
@@ -8313,7 +8318,7 @@ describe("T10/T11 · the served root and its label, through the production runne
    * same way T11's label family and J12's panel rows do.
    */
   it("T9 stops loudly instead of synthesizing when the sealed synthesis-role family is missing", async () => {
-    const question = `t09-unsealed-synthesis-family-${randomUUID()}`;
+    const question = `t09-unsealed-synthesis-family-${digitsOnlyId()}`;
     const work = await createRunnerWork(question);
     const provider = await startProviderDouble([...servedRunResponses("An unsynthesizable position.", 0.8)]);
     // T9 x board F33: the field is now REQUIRED on WalkingSkeletonSettings, so
@@ -8355,7 +8360,7 @@ describe("T10/T11 · the served root and its label, through the production runne
     ["synthesizerBound"],
     ["evaluatorBound"]
   ])("T9 refuses by NAME, not by TypeError, when the policy is present without its %s", async (bound) => {
-    const question = `t09-unresolved-${bound}-${randomUUID()}`;
+    const question = `t09-unresolved-${bound}-${digitsOnlyId()}`;
     const work = await createRunnerWork(question);
     const provider = await startProviderDouble([...servedRunResponses("An unsynthesizable position.", 0.8)]);
     const settings = runnerSettings();
@@ -8632,7 +8637,7 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
 
   /** FAILURE CASE 3, at the DDL — the database must be able to hold its own history. */
   it("B3-a the shipped CHECK admits the declared rule history without being lifted", async () => {
-    const legacy = await sealedBeforeMigration0055(`b3-check-${randomUUID()}`);
+    const legacy = await sealedBeforeMigration0055(`b3-check-${digitsOnlyId()}`);
     const latest = await database.pool.query<{ answer_version: number }>(
       "SELECT max(answer_version) AS answer_version FROM serve.answer WHERE answer_id=$1",
       [legacy.answerId]
@@ -8691,7 +8696,7 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
 
   /** FAILURE CASES 1 and 2 — projection and both public API routes. */
   it("B3-b a pre-0055 answer projects and parses through the public contract and both routes", async () => {
-    const legacy = await sealedBeforeMigration0055(`b3-read-${randomUUID()}`);
+    const legacy = await sealedBeforeMigration0055(`b3-read-${digitsOnlyId()}`);
     const projection = await new ServeRepository(database.pool)
       .readAnswerProjection(legacy.answerId, legacy.askerId);
 
@@ -8736,7 +8741,7 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
 
   /** FAILURE CASE 3 — DR-184 catch-up re-persists the preserved record. */
   it("B3-c catch-up carries the historical rule forward without relabelling it", async () => {
-    const legacy = await sealedBeforeMigration0055(`b3-catchup-${randomUUID()}`);
+    const legacy = await sealedBeforeMigration0055(`b3-catchup-${digitsOnlyId()}`);
     const serve = new ServeRepository(database.pool);
     const source = await serve.readReviewCatchUpSource(legacy.runId);
     expect(source.answerId).toBe(legacy.answerId);
@@ -8767,7 +8772,7 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
 
   /** The other half of the law: a FRESH selection may never record a retired rule. */
   it("B3-d refuses a retired rule on a fresh (non-superseding) answer", async () => {
-    const legacy = await sealedBeforeMigration0055(`b3-fresh-${randomUUID()}`);
+    const legacy = await sealedBeforeMigration0055(`b3-fresh-${digitsOnlyId()}`);
     const serve = new ServeRepository(database.pool);
     const source = await serve.readReviewCatchUpSource(legacy.runId);
 
@@ -8847,7 +8852,7 @@ describe("F-H-2 · liveness refresh with content encryption off", () => {
    * makes the run invisible and the returned count 0.
    */
   it("F-H-2 counts an unencrypted run as a candidate and records its QUERY event", async () => {
-    const question = `f-h-2-refresh-${randomUUID()}`;
+    const question = `f-h-2-refresh-${digitsOnlyId()}`;
     const runId = await createRun(question);
     const askedAt = new Date("2030-01-01T00:00:00.000Z");
 
@@ -8870,7 +8875,7 @@ describe("F-H-2 · liveness refresh with content encryption off", () => {
    * the refresh, a question being actively re-asked is archived anyway.
    */
   it("F-H-2 keeps a re-asked run out of a later retirement sweep", async () => {
-    const question = `f-h-2-not-retired-${randomUUID()}`;
+    const question = `f-h-2-not-retired-${digitsOnlyId()}`;
     const runId = await createRun(question);
     const liveness = new LivenessRepository(database.pool);
 
@@ -9475,7 +9480,7 @@ async function runB9ThreeMakers(input: Readonly<{
     return { call: (request) => { input.onCall?.(maker, request); seams[maker].observe(request); return inner.call(request); } };
   };
   try {
-    const question = `${input.label}-${randomUUID()}`;
+    const question = `${input.label}-${digitsOnlyId()}`;
     const runId = await createRun(question, 90, 3, 1);
     const workItemId = await new WorkItemRepository(database.pool).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
@@ -10146,7 +10151,7 @@ async function executeSeatScenario(input: {
     endpoint: doubles[route].endpoint, model: SEAT_ROUTES[route].model, maker: SEAT_ROUTES[route].maker, ...seamOf(route)
   }));
   try {
-    const question = `${input.label}-${randomUUID()}`;
+    const question = `${input.label}-${digitsOnlyId()}`;
     const runId = await createRun(question, 100, input.panelSize ?? 2, 1, `asker:${question}`, undefined, input.language ?? null);
     if (input.assignment !== undefined) await pinRoleAssignment(runId, input.assignment);
     if (input.rotation !== undefined) await insertRunRoleRotation(database.pool, { runId, ...input.rotation });

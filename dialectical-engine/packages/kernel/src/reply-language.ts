@@ -1,4 +1,4 @@
-import { detectArgumentLanguage, matrixClause } from "./argument-language.js";
+import { detectArgumentLanguage, foreignLatinLetterCount, matrixClause } from "./argument-language.js";
 
 /**
  * REPLY LANGUAGE (2026-10-12). Every structured step is told to write its natural-language fields in the question's
@@ -96,17 +96,6 @@ const REPLY_FUNCTION_WORDS: Readonly<Record<string, readonly string[]>> = Object
   vi: ["bị", "cho", "các", "có", "của", "cũng", "khi", "không", "là", "một", "như", "nhưng", "nên", "nếu", "này", "người", "những", "rất", "sẽ", "theo", "thì", "trong", "tại", "từ", "và", "vì", "với", "về", "đã", "đến", "để", "được", "hoặc", "hơn"]
 });
 
-/**
- * The letters beyond a-z each Latin-script language writes in its own lowercase words (a capitalised word is a name,
- * and names keep their own spelling: "Łódź" in an English reply is fine). English and Indonesian write none.
- */
-const LATIN_ALPHABET_EXTRAS: Readonly<Record<string, string>> = Object.freeze({
-  cs: "áčďéěíňóřšťúůýž", da: "åæéø", de: "äéöüß", en: "", es: "áéíñóúü", et: "äõöüšž", fi: "äåöšž",
-  fr: "àâæçéèêëîïôœùûüÿ", ga: "áéíóú", hr: "čćđšž", hu: "áéíóöőúüű", id: "", it: "àèéìíîòóù",
-  lt: "ąčęėįšųūž", lv: "āčēģīķļņšūž", mt: "àèìòùċġħż", nl: "áéèëíïóöúü", pl: "ąćęłńóśźż",
-  pt: "áâãàçéêíóôõú", ro: "ăâîșțşţ", sk: "áäčďéíĺľňóôŕšťúýž", sl: "čšž", sv: "åäéö", tr: "âçğıîöşüû",
-  vi: "àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ"
-});
 /** Letters outside the expected alphabet are clear evidence from this many on, and from 1 in 100 Latin letters. */
 const MIN_FOREIGN_LETTERS = 4;
 
@@ -216,10 +205,7 @@ function latinVerdict(tag: string, text: string): ReplyLanguageVerdict {
   const expected = REPLY_VOCABULARY.get(tag);
   if (expected === undefined) return "EXPECTED";
   const normalized = text.normalize("NFC");
-  const alphabet = LATIN_ALPHABET_EXTRAS[tag] ?? "";
-  const lowercaseWords = normalized.match(/(?<![\p{L}\p{M}\p{N}])\p{Ll}[\p{L}\p{M}]*(?![\p{L}\p{M}\p{N}])/gu) ?? [];
-  const foreign = lowercaseWords.reduce((n, word) => n + [...word].filter((letter) =>
-    /\p{Script=Latin}/u.test(letter) && !/[a-z]/u.test(letter) && !alphabet.includes(letter)).length, 0);
+  const foreign = foreignLatinLetterCount(normalized, tag);
   if (foreign >= MIN_FOREIGN_LETTERS && foreign * 100 >= count(normalized, /\p{Script=Latin}/gu)) return "OTHER";
   const words = latinWords(normalized);
   if (words.length < MIN_LATIN_WORDS) return "UNSURE";
