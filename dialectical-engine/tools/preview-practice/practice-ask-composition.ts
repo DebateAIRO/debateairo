@@ -35,6 +35,7 @@ import {
   type PreviewGateRemaining
 } from "@debateai/providers";
 import {
+  assertDebateShapeRunnerReady,
   computeStructuralCeilingBasis,
   readAnswerRoleRotationPolicy,
   readCallTokenCeilings,
@@ -132,6 +133,9 @@ export async function composePracticeAsk(input: Readonly<{
   const answerRoleRotation = await readAnswerRoleRotationPolicy(pool, version);
   // Debate shape (spec 2026-10-12 §3.1): as main.ts reads it; the practice runner's composition refuses a present row.
   const debateShapePolicy = await readDebateShapePolicy(pool, version);
+  // I2(a), Phase 2a: as apps/api/src/main.ts, the ask side refuses a present row too, so no shape receipt is minted
+  // for a runner that would argue it as today's shape. P2b removes it with the runner's guard.
+  assertDebateShapeRunnerReady(debateShapePolicy);
   const runSettings: RunCreationSettings = {
     previewProviderTestConfig: previewConfig, previewTeamUserIds: [...input.teamUserIds],
     previewBudgetGate,

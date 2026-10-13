@@ -91,6 +91,7 @@ import {
   readPublicationCheckPolicy,
   readAnswerRoleRotationPolicy,
   readDebateShapePolicy,
+  assertDebateShapeRunnerReady,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -959,6 +960,12 @@ const legacyRunClaim=new PostgresLegacyRunClaimApplication(
 const answerRoleRotation = await boot.run("answer-role-rotation-policy", () => readAnswerRoleRotationPolicy(pool, environment.REGISTER_VERSION));
 // Debate shape (spec 2026-10-12 §3.1): the optional row; absent = today's shape byte for byte, a malformed row refuses the boot.
 const debateShapePolicy = await boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION));
+/**
+ * I2(a), Phase 2a: the runner's guard, here too. A present row would make this API mint debate-shape receipts that a
+ * Phase-2a runner (booted on an older version) would claim and argue as today's shape, so the API refuses the version
+ * at boot (DEBATE_SHAPE_POLICY_RUNNER_PENDING), as the runner does. P2b removes it with the runner's guard.
+ */
+boot.runSync("debate-shape-policy", () => assertDebateShapeRunnerReady(debateShapePolicy));
 const application = new PostgresAskApplication(pool, dispatcher, {
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   ...(previewBudgetGate === undefined ? {} : { previewBudgetGate }),

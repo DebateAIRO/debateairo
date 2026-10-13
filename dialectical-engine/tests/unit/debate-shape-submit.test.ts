@@ -349,6 +349,22 @@ describe("the boot reads the optional row (note 8) and the practice runner refus
     expect(main).toContain("...(input.shape === null ? {} : { shape: input.shape })");
   });
 
+  it("I2(a): in Phase 2a the API boot and the practice ask refuse a present row right after reading it, before the ask application", () => {
+    const main = readFileSync(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+    const read = 'boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION))';
+    const guard = 'boot.runSync("debate-shape-policy", () => assertDebateShapeRunnerReady(debateShapePolicy));';
+    expect(main.split(guard)).toHaveLength(2);
+    expect(main.indexOf(read)).toBeLessThan(main.indexOf(guard));
+    expect(main.indexOf(guard)).toBeLessThan(main.indexOf("new PostgresAskApplication("));
+    const practice = readFileSync(new URL("../../tools/preview-practice/practice-ask-composition.ts", import.meta.url), "utf8");
+    const practiceRead = "const debateShapePolicy = await readDebateShapePolicy(pool, version);";
+    const practiceGuard = "assertDebateShapeRunnerReady(debateShapePolicy);";
+    expect(practice.split(practiceGuard)).toHaveLength(2);
+    expect(practice.indexOf(practiceRead)).toBeGreaterThan(-1);
+    expect(practice.indexOf(practiceRead)).toBeLessThan(practice.indexOf(practiceGuard));
+    expect(practice.indexOf(practiceGuard)).toBeLessThan(practice.indexOf("new PostgresAskApplication("));
+  });
+
   function rowPool(row: unknown) {
     const asked: unknown[][] = [];
     const pool = {

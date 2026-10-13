@@ -125,7 +125,7 @@ export async function composePracticeRunner(input: Readonly<{
   /**
    * Debate shape (spec 2026-10-12 §3.1; controller ruling PF10): the runner's Phase-2a guard, as apps/runner/src/main.ts
    * carries it. Absent = today's shape; a malformed row refuses (DEBATE_SHAPE_POLICY_INVALID), and in Phase 2a a valid
-   * one too (DEBATE_SHAPE_POLICY_RUNNER_PENDING), so practice never runs shape receipts as today's shape. P2d replaces it.
+   * one too (DEBATE_SHAPE_POLICY_RUNNER_PENDING), so practice never runs shape receipts as today's shape. P2b removes it.
    */
   assertDebateShapeRunnerReady(await readDebateShapePolicy(pool, environment.REGISTER_VERSION));
   const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);

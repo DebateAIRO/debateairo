@@ -233,6 +233,21 @@ export const RUNNER_COMPOSITION_SEGMENT_CAP = ENGINE_COMPOSITION_SEGMENT_CAP;
 export const RUNNER_FIXED_ORGANS_PER_COMPOSITION = ENGINE_FIXED_ORGANS_PER_COMPOSITION;
 export const RUNNER_MAX_RECOMPOSE = ENGINE_MAX_RECOMPOSE;
 
+/**
+ * I2(b), Phase 2a (P2a final review): the boot guard checks this runner's OWN register version, never the receipt of
+ * the run it claims. A run admitted by an API on a newer version (one sealing the debate shape row) carries a
+ * debate-shape receipt, and this runner would argue it as today's shape. So a claimed run whose receipt carries a
+ * shape is refused, terminally, right after the strict parse. P2b replaces this with the shaped run itself.
+ */
+export function refuseDebateShapeReceiptInPhase2a(envelopeBasis: ReturnType<typeof parseCostEnvelopeBasis>): void {
+  if (envelopeBasis.shape !== undefined) {
+    throw new TypedDomainError(
+      "RUN_ENVELOPE_BASIS_INVALID",
+      "This runner cannot run a debate-shape receipt yet (Phase 2a); a Phase 2b runner must claim this run"
+    );
+  }
+}
+
 const machineIdentifierSchema = z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9:._-]*$/u);
 
 /**
@@ -4956,6 +4971,8 @@ export class WalkingSkeletonRunner {
         "The frozen run cost envelope does not satisfy the sealed runner contract"
       );
     }
+    // I2(b), Phase 2a: a debate-shape receipt is never argued as today's shape. P2b replaces this line.
+    refuseDebateShapeReceiptInPhase2a(envelopeBasis);
     const expansionDepth = resolveExpansionDepth(run.depthParams);
     /**
      * Model scorecard A15 (spec §2.7) — the role assignment the picker pinned at
