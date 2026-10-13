@@ -1831,10 +1831,12 @@ export function askRefusalStatus(code: string): 401 | 403 | 422 | 429 {
  * to exhaust the day — ask once, read the ceiling, ask again and watch the
  * number climb. Same class as the support status-page leak DL1-F4.
  *
- * So the public body for this one refusal is the CODE. Every other ask refusal
- * keeps its message, because those describe the ASK the caller sent and
- * withholding them would only make a lawful refusal unactionable. The figures
- * stay on the error, and the boundary logs them for the operator.
+ * So the public body is the CODE alone for the refusals in the set below
+ * (ASK_REFUSALS_WITH_OPERATOR_FIGURES), whose messages carry operator-only
+ * figures. Every other ask refusal keeps its message, because those describe
+ * the ASK the caller sent and withholding them would only make a lawful refusal
+ * unactionable. The figures stay on the error, and the boundary logs them for
+ * the operator.
  */
 export function askRefusalPublicMessage(code: string, message: string): string {
   return ASK_REFUSALS_WITH_OPERATOR_FIGURES.has(code) ? code : message;

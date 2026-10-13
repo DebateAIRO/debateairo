@@ -14,12 +14,14 @@ import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import {
+  assertDebateShapeRunnerReady,
   assertHostedCostEnvelopesSealed,
   costEnvelopeBand,
   costEnvelopeCeilings,
   loadRunnerEnvironment,
   readBillingPlans,
   readCostEnvelopePolicy,
+  readDebateShapePolicy,
   readEngineVersion,
   readModelScorecard,
   readStoryPolicyFromRegister,
@@ -122,6 +124,12 @@ const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER
     return null;
   });
 const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
+/**
+ * Debate shape (spec 2026-10-12 §3.1): the optional register row. Absent = today's shape, byte for byte; a malformed
+ * row refuses this boot (DEBATE_SHAPE_POLICY_INVALID). Phase 2a: a valid row refuses it too
+ * (DEBATE_SHAPE_POLICY_RUNNER_PENDING), until Phase 2b teaches this runner the shape and replaces this line.
+ */
+assertDebateShapeRunnerReady(await readDebateShapePolicy(pool, environment.REGISTER_VERSION));
 /**
  * Codes and ids only: a story log line never carries story or debate text. The
  * detail goes FIRST, so no detail key can overwrite the line's kind or event.
