@@ -7,9 +7,9 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { DebateShapeSettings } from "@debateai/contract";
 import { createPool, migrate, type Pool } from "@debateai/db";
 import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
-import { previewDebateHarness } from "../support/preview-debate-harness.js";
+import { PANEL_REFS, previewDebateHarness } from "../support/preview-debate-harness.js";
 import { stubChatBody } from "../support/preview-gate-stubs.js";
-import { runShapeDebate, type ShapeScriptOptions } from "../support/debate-shape-harness.js";
+import { runShapeDebate, shapeForTest, type ShapeScriptOptions } from "../support/debate-shape-harness.js";
 import { copyDatabase } from "../support/saved-debate.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -56,5 +56,78 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
     const positions = await q(database.pool, `SELECT answer_id, root_index FROM core.map_position WHERE run_id=$1 ORDER BY root_index`, debate.runId);
     expect(positions.map((row) => row.root_index)).toEqual(Array.from({ length: shape.answers }, (_unused, index) => index));
+  }, 600_000);
+  it.each([
+    ["the angle planner fails", new Set(["ANGLES"] as const), "MAP_ANGLES_FALLBACK"],
+    ["the merge fails", new Set(["MERGE"] as const), "MAP_MERGE_FALLBACK"],
+    ["the choose fails", new Set(["CHOOSE"] as const), "MAP_CHOOSE_FALLBACK"],
+    ["the choose names one answer", new Set(["CHOOSE_ONE_ANSWER"] as const), "ANSWERS_FILLED"],
+    ["only one list arrives", new Set(["LISTS_BUT_ONE"] as const), "MAP_UNAVAILABLE_TODAYS_OPENING"]
+  ])("%s: the run still ends with an answer, and the mark rides it with its record", async (_label, fail, mark) => {
+    const { debate, result } = await argue(`fallback-${mark}`, "free", STANDARD, 1, { fail });
+    expect(result.kind).toBe("COMPLETED");
+    const rows = await q(database.pool, `SELECT mark, scope, call_site_key FROM serve.condition_mark WHERE answer_id=$1`, result.answerId);
+    expect(rows).toEqual(expect.arrayContaining([expect.objectContaining({ mark, scope: "answer", call_site_key: null })]));
+    if (mark === "MAP_UNAVAILABLE_TODAYS_OPENING") {
+      const roots = await q(database.pool, `SELECT count(*)::int AS n FROM core.node WHERE run_id=$1 AND parent_node_id IS NULL`, debate.runId);
+      expect(roots[0]!.n).toBeLessThanOrEqual(shapeForTest({ plan: "free", makers: PANEL_REFS.length, settings: STANDARD }).answers);
+    }
+  }, 600_000);
+
+  it("a money stop mid-map ends with an answer: root 0 is argued, the stop is disclosed, nothing else is asked", async () => {
+    const { result, calls } = await argue("money-stop", "free", STANDARD, 2, { stopAt: "MERGE" });
+    expect(result.kind).toBe("COMPLETED");
+    expect(calls.some((call) => call.call_site_key === "MAP:choose")).toBe(false);
+    expect(calls.filter((call) => call.call_site_key.startsWith("JUDGE:root:"))).toEqual([]);
+    const rows = await q(database.pool, `SELECT mark FROM serve.condition_mark WHERE answer_id=$1`, result.answerId);
+    expect(rows.map((row) => row.mark)).toEqual(expect.arrayContaining(["ENVELOPE_EXHAUSTED", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK"]));
+  }, 600_000);
+
+  it("a close call gains graders: PANEL-CLOSE-CALL-EXTENDED on the node, with more voices than J", async () => {
+    const { debate, result } = await argue("close-call", "free", STANDARD, 1, { panelSpread: true });
+    const records = await q(database.pool, `SELECT subject_ref FROM serve.condition_mark WHERE answer_id=$1 AND mark='PANEL-CLOSE-CALL-EXTENDED'`, result.answerId);
+    expect(records.length).toBeGreaterThan(0);
+    const shape = shapeForTest({ plan: "free", makers: PANEL_REFS.length, settings: STANDARD });
+    const voices = await q(database.pool, `SELECT (disagreement->'panel'->>'voiceCount')::int AS n FROM ledger.reduced_judgement WHERE node_id = $1::uuid`, records[0]!.subject_ref);
+    expect(voices[0]!.n).toBeGreaterThan(1 + shape.graders);
+    expect(debate.runId).toBeTruthy();
+  }, 600_000);
+
+  // Pre-flight PF-B32 (BLOCKER, law: always an answer): Task 11's unit row proves the fold; this is the runner-level row.
+  // One call at a time (no concurrency), so root 0's panel is the first one graded and its extension meets the stop.
+  // Controller ruling T14-P: the extension is an extra — its stop never marks root 0's complete J panel PANEL-PARTIAL.
+  it("a money stop on root 0's close-call extension still saves root 0 and the run answers", async () => {
+    const shape = shapeForTest({ plan: "free", makers: PANEL_REFS.length, settings: STANDARD });
+    const { debate, result } = await argue("close-call-stop", "free", STANDARD, 1,
+      { panelSpread: true, stopCloseCallAfter: shape.graders }, false);
+    expect(result.kind).toBe("COMPLETED");
+    const marks = await q(database.pool, `SELECT mark FROM serve.condition_mark WHERE answer_id=$1`, result.answerId);
+    expect(marks.map((row) => row.mark)).toContain("ENVELOPE_EXHAUSTED");
+    const rootZero = await q(database.pool, `SELECT root_node_id::text AS id FROM core.map_position WHERE run_id=$1 AND root_index=0`, debate.runId);
+    expect(rootZero).toHaveLength(1);
+    const stop = await q(database.pool, `SELECT disagreement->'panel'->>'spendStop' AS stop, disagreement->'marks' AS marks
+      FROM ledger.reduced_judgement WHERE node_id = $1::uuid`, rootZero[0]!.id);
+    expect(stop[0]!.stop).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+    expect(stop[0]!.marks).toEqual([]);
+  }, 600_000);
+
+  it("Premium deep scrutiny adds exchanges to the needy nodes and marks each one SCRUTINY-EXTENDED", async () => {
+    const deep = { depthMode: "adaptive", scrutiny: "deep", answerLength: "standard" } as const;
+    const { result, shape, calls } = await argue("scrutiny", "pro", deep, 1, { reviews: "dispute" });
+    const records = await q(database.pool, `SELECT subject_ref FROM serve.condition_mark WHERE answer_id=$1 AND mark='SCRUTINY-EXTENDED'`, result.answerId);
+    expect(records.length).toBeGreaterThan(0);
+    expect(records.length).toBeLessThanOrEqual(shape.scrutinyPointsPerDebate);
+    const scrutinyKeys = calls.filter((call) => call.outcome === "OK" && /^JUDGE:critic:root[0-9]+:r(2|3):/u.test(call.call_site_key));
+    expect(scrutinyKeys.length).toBeLessThanOrEqual(2 * shape.scrutinyRoundsPerPoint * shape.scrutinyPointsPerDebate);
+  }, 600_000);
+
+  it("the answer writer is asked for about N words under max(sealed, writerBound)", async () => {
+    const detailed = { depthMode: "adaptive", scrutiny: "standard", answerLength: "detailed" } as const;
+    const { gates, shape } = await argue("length", "free", detailed, 1);
+    const writer = gates.requests.find((request) => request.kind === "COMPOSE")!;
+    const frame = readFramedMaterial(wirePacket(stubChatBody(writer.provider, writer.body)));
+    expect(frame.contractId).toBe("serve.synthesizer.length.v1");
+    expect(frame.fields.at(-1)).toEqual({ name: "answer_length", content: `about ${String(shape.answerWords)} words` });
+    expect(Number(writer.body.max_tokens)).toBeGreaterThanOrEqual(shape.writerBound);
   }, 600_000);
 });

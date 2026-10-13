@@ -215,14 +215,15 @@ import {
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import {
-  shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeSelectChains
+  shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny, shapeSelectChains,
+  type ScrutinyCandidate
 } from "./shape-select.js";
 import {
-  createRunnerMapCaller, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroRequestBytes, rootZeroRoomRefs, runMapStage,
-  shapeRootMaterial
+  createRunnerMapCaller, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroRequestBytes,
+  rootZeroRoomRefs, runMapStage, shapeRootMaterial
 } from "./map-stage.js";
 import {
-  buildShapePlan, shapeLegCanRun, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
+  buildScrutinyLegs, buildShapePlan, shapeLegCanRun, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
   type ShapeLeg, type ShapePlan, type ShapePositionPlan
 } from "./shape-plan.js";
 import { shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeSeatOrder, shapeWriterSeat } from "./shape-seats.js";
@@ -6285,6 +6286,8 @@ export class WalkingSkeletonRunner {
         return { reducedMembers, dispersion, weighted, selection };
       };
       let reduced = reduceHeard(panel.judgements);
+      /** The base panel's own reduction (J graders), before any close-call extra: what its degradation marks read. */
+      const baseReduced = reduced;
 
       // Debate shape (spec §3.3 step 6; §6: the highest-voice rule is unchanged) — THE CLOSE-CALL EXTENSION. A
       // measured spread at or above the disagreement threshold calls up to E more graders, of makers neither the
@@ -6335,6 +6338,9 @@ export class WalkingSkeletonRunner {
           closeCallAdded = folded.added;
           closeCallStop = folded.spendStop;
           if (closeCallAdded > 0) reduced = reduceHeard(heard);
+          // Controller ruling T14-P: the extension's count is the extras that REDUCED (a heard extra the reduction
+          // could not use is not a voice on this node), never the extras merely heard.
+          closeCallAdded = reduced.reducedMembers.length - baseReduced.reducedMembers.length;
         }
       }
       // Pre-flight PF-B32: the stop that cut this panel short — the base panel's, else its extension's.
@@ -6346,7 +6352,11 @@ export class WalkingSkeletonRunner {
       const nonAuthorVoices = reducedMembers.length - 1;
       // A15d (controller carry 10): a paid voice the panel refused after the
       // call is lost exactly as a failed member is, and is disclosed with it.
-      const { marks, panelFailureReason } = panelDegradationOf(nonAuthorVoices, notes, panelStop);
+      // Controller ruling T14-P (debate shape): the degradation is the BASE panel's — an optional close-call extra that
+      // failed, or a stop its extension met, never marks a complete J panel PANEL-PARTIAL (the extension is an extra;
+      // what it added shows on its PANEL-CLOSE-CALL-EXTENDED record's count). Without an extension (every unshaped
+      // run) the base panel IS the panel: today's marks, byte for byte.
+      const { marks, panelFailureReason } = panelDegradationOf(baseReduced.reducedMembers.length - 1, panel.notes, spendStop);
 
       const candidateBand = this.settings.servePolicy?.candidateConfidenceBand ?? null;
       const steppedDownBand = candidateBand === null
@@ -6850,6 +6860,14 @@ export class WalkingSkeletonRunner {
       return Object.freeze({ promise, resolve });
     };
     /**
+     * Debate shape (spec §3.3 step 7) — THE NODES SCRUTINY CHOSE, each with the plan position it holds: set once by the
+     * scrutiny chain in `argueTogether`, and read after the arguing for their SCRUTINY-EXTENDED records. Nothing (`[]`)
+     * when no scrutiny slot is planned (today's run; a zero scrutiny budget), when scrutiny never ran (a stop, too few
+     * members, a failure), or once the arguing is over without it (first settle wins).
+     */
+    const scrutinyChosen = settable<readonly { readonly position: number; readonly nodeId: string }[]>();
+    if (shapePlan === null || shapePlan.scrutiny.count === 0) scrutinyChosen.resolve([]);
+    /**
      * An ordered recorder (ordered-recorder.ts) whose positions are each claimed once: committed, or given up by a
      * chain that has nothing (more) to write there (`skip`, harmless for a position already claimed), so no later
      * position ever waits on a chain that stopped, was dropped or failed. `skipBelow` gives up every unclaimed
@@ -7061,6 +7079,11 @@ export class WalkingSkeletonRunner {
        * runtime value the label ladder reads, never a zero it can compare.
        */
       readonly panelDispersion: number | null;
+      /**
+       * Debate shape (spec §3.3 step 7): the node's panel-selected base score (its reduced judgement's tau), read by
+       * scrutiny's "weak" need. Carried on every run; only a shaped run reads it.
+       */
+      readonly baseTau: number;
       /**
        * T5 / S3-1: every edge this node sources, carried to the node's ONE
        * review call so the reviewer measures them all on the visit it was
@@ -7362,6 +7385,7 @@ export class WalkingSkeletonRunner {
         restatementStatus: childJudged.restatementStatus,
         reversalPoint: childJudged.assessment.critic.summary,
         panelDispersion: childSelection.dispersion,
+        baseTau: childSelection.tau,
         authorIndex: input.authorIndex,
         maker: author.maker,
         member: authored.member
@@ -7903,8 +7927,12 @@ export class WalkingSkeletonRunner {
      * from here), then apply the ε branch freeze and the global δ stop. Returns
      * true when the debate should stop expanding.
      */
-    /** The last round boundary's propagation, kept for scrutiny (Task 14); null until a boundary is decided. */
-    let lastBoundary: { propagation: PropagationOutcome; rootNodeIds: readonly string[]; scoredNodeIds: ReadonlySet<string> } | null = null;
+    /**
+     * The last round boundary's propagation, read by scrutiny (spec §3.3 step 7: a node's root leverage); null until a
+     * boundary is decided (and on a run with no stopping policy, which decides none).
+     */
+    let lastBoundary: { completedRounds: number; propagation: PropagationOutcome; rootNodeIds: readonly string[];
+      scoredNodeIds: ReadonlySet<string> } | null = null;
     /** Adaptive (spec §3.3 step 5): set once the round-1 boundary chose the chains to keep. */
     let adaptiveChosen = false;
     /** True on a shaped run whose deeper rounds are adaptive: a deeper leg runs only under a chain the choice kept. */
@@ -8004,7 +8032,7 @@ export class WalkingSkeletonRunner {
         for (const index of subtreeIndices(branch.index)) frozenIndices.add(index);
       }
       for (const record of boundary.conditionMarkRecords) branchFrozenRecords.push(record);
-      lastBoundary = { propagation: boundary.propagation, rootNodeIds: rootScope.rootNodeIds, scoredNodeIds };
+      lastBoundary = { completedRounds, propagation: boundary.propagation, rootNodeIds: rootScope.rootNodeIds, scoredNodeIds };
       if (adaptiveShape && completedRounds === 1 && expansionDepth > 1) {
         const recorded = new Set(boundary.propagation.sensitivityRecords.map((record) => record.removedNodeId));
         keepAdaptiveChains((position) => {
@@ -8139,7 +8167,9 @@ export class WalkingSkeletonRunner {
         if (decision !== undefined) await decision;
         // Its parent's text: null when the parent never got one (dropped, halted, stopped, or itself never asked).
         const parentStatement = await statements[leg.parentIndex]!.promise;
-        if (parentStatement === null || stoppedByAdaptiveRule) return;
+        // Pre-flight PF-B48: the adaptive (δ) stop ends the PLANNED rounds only; a scrutiny leg (round > depth) still
+        // runs. A leg of today's plan always has round <= depth, so this is today's check.
+        if (parentStatement === null || (stoppedByAdaptiveRule && leg.round <= expansionDepth)) return;
         if (haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)
           || frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex)) return;
         // Spec §2.3 (O6): right before the reply's author call.
@@ -8388,11 +8418,58 @@ export class WalkingSkeletonRunner {
         const position = effectiveMakerCount + expansionPlan.length + exchangeIndex;
         chains.push(runChain((stage) => crossChain(exchangeIndex, stage), authorRank(position), releaseAt(position)));
       });
-      // Debate shape (spec §3.3 step 7): the scrutiny slots reserved after the plan are given up until scrutiny chooses
-      // its nodes (Task 14), so no later position, review batch or recorder waits on them.
-      if (shapePlan !== null) {
+      /**
+       * Spec §3.3 step 7 — SCRUTINY (Premium only: a zero budget plans no slot). Once every planned round is decided and
+       * reviewed, the needy nodes are chosen ONCE (`shapeRankScrutiny`) and get `roundsPerPoint` exchanges each, in the
+       * reserved slots, breadth-first (`buildScrutinyLegs`: at most `nodesPerDebate` nodes, 2·R·Q slots — never more
+       * than P2a priced); a slot no chosen node uses is given up. Never after a spend stop, too few members or a
+       * failure (`arguingStopped`); the adaptive (δ) stop judges the PLANNED rounds converged, not the needy nodes, so
+       * scrutiny still runs after it (pre-flight PF-B48, in `argueLeg`).
+       */
+      if (shapePlan !== null && shapeRun !== null && shapePlan.scrutiny.count > 0) {
+        const plannedEnd = shapePlan.scrutiny.start;
+        chains.push(runChain(async () => {
+          await everyBoundaryDecided;
+          await reviewRecorder.through(plannedEnd);
+          await Promise.all(reviewBatches.filter((_batch, index) => reviewBatchEnds[index]! <= plannedEnd).map((batch) => batch.done));
+          if (arguingStopped()) {
+            scrutinyChosen.resolve([]);
+            return;
+          }
+          const disputed = new Set(await this.#judgements.readDisputedNodeIds(run.runId));
+          const boundary = lastBoundary;
+          const recorded = new Set(boundary?.propagation.sensitivityRecords.map((record) => record.removedNodeId) ?? []);
+          const candidates = [...authoredNodes.entries()].flatMap(([position, node]): ScrutinyCandidate[] => {
+            // Pre-flight PF-B48: a node the stopping rule froze is never scrutinised (its legs would be skipped
+            // silently); a cross-reply answers another position and is not a point of its own.
+            if (position >= plannedEnd || shapeLegAt(position)?.kind === "CROSS" || frozenIndices.has(position)) return [];
+            // Root leverage: only for a node the last boundary scored AND measured (`resolveLeverage` refuses a node
+            // with no sensitivity record); none otherwise — the node can still be needy by spread or dispute.
+            const leverage = boundary === null || !boundary.scoredNodeIds.has(node.nodeId) || !recorded.has(node.nodeId) ? null
+              : resolveLeverage({ completedRounds: boundary.completedRounds, carryingNodeId: node.nodeId,
+                sensitivityRecords: boundary.propagation.sensitivityRecords, rootNodeIds: boundary.rootNodeIds }).leverage;
+            return [{ position, rootIndex: position < rootCount ? position : shapeLegAt(position)!.rootIndex,
+              dispersion: node.panelDispersion, disputed: disputed.has(node.nodeId), rootLeverage: leverage, baseTau: node.baseTau }];
+          });
+          const chosen = shapeRankScrutiny({
+            candidates,
+            // No sealed panel policy: a spread never makes a node needy (the panel itself refuses such a run first).
+            disagreementThreshold: panelPolicy?.disagreementThreshold ?? Number.POSITIVE_INFINITY,
+            leverageMin: shapeRun.shape.scrutinyLeverageMin,
+            weakBelow: shapeRun.shape.scrutinyWeakBelow,
+            pointsPerDebate: shapePlan.scrutiny.nodesPerDebate
+          });
+          for (const leg of buildScrutinyLegs({ plan: shapePlan, depth: expansionDepth, selected: chosen })) scrutinyLegs.set(leg.childIndex, leg);
+          scrutinyChosen.resolve(chosen.map((entry) => Object.freeze({ position: entry.position, nodeId: authoredNodes.get(entry.position)!.nodeId })));
+        }, [reviewBatchOf(plannedEnd - 1), 3, 1], () => scrutinyChosen.resolve([])));
         for (let slot = shapePlan.scrutiny.start; slot < totalPlannedNodes; slot += 1) {
-          chains.push(runChain(async () => undefined, authorRank(slot), releaseAt(slot)));
+          chains.push(runChain(async (stage) => {
+            await scrutinyChosen.promise;
+            const leg = scrutinyLegs.get(slot);
+            // A slot no chosen node uses is given up (the chain's release).
+            if (leg === undefined) return;
+            await argueLeg(leg, undefined, stage);
+          }, authorRank(slot), releaseAt(slot)));
         }
       }
       const allSettled = (async () => {
@@ -8579,6 +8656,8 @@ export class WalkingSkeletonRunner {
       }
       await reviewPendingAuthoredNodes();
     }
+    // Debate shape: the arguing is over — a scrutiny it never reached chose nothing (first settle wins).
+    scrutinyChosen.resolve([]);
     // Root 0's chain ran its panel or failed, and a failure was thrown just above.
     const selection = rootZeroPanel.selection;
     if (selection === null) {
@@ -8680,6 +8759,32 @@ export class WalkingSkeletonRunner {
     const servableMakerPositions = makerPositionServe.servableMakerPositions;
     const servedRootSelection = makerPositionServe.servedRootSelection;
     const servedRoot = makerPositionServe.servedRoot;
+    /**
+     * Debate shape (spec §3.3 steps 1, 6, 7) — THE SHAPE'S RECORDS ON THE ANSWER, each with its mark. Pre-flight PF-B47:
+     * `ServeRepository.persist` refuses a record that names no node, so every one names a node: a map record the served
+     * root (answer scope, `mapConditionRecords`), a close-call or scrutiny record the node it extended (node scope).
+     * Reasons are codes only (`<MARK>:<STEP>`, `<CODE>:<count>`), never text a person reads. Nothing on today's run.
+     */
+    const scrutinyRecords: ConditionMarkRecord[] = [];
+    for (const { position, nodeId } of await scrutinyChosen.promise) {
+      // Spec §3.3 step 7: one SCRUTINY-EXTENDED record per scrutinised node, naming the exchanges it got (saved ones).
+      const added = [...scrutinyLegs.values()].filter((leg) => leg.chain === position)
+        .flatMap((leg) => authoredNodes.get(leg.childIndex)?.nodeId ?? []);
+      if (added.length === 0) continue;
+      scrutinyRecords.push(Object.freeze({
+        mark: "SCRUTINY-EXTENDED" as const, scope: "node" as const, subjectRef: nodeId,
+        reason: `SCRUTINY_EXTENDED:${String(added.length)}`, liftPath: null, servedRootRule: null,
+        affectedNodeIds: Object.freeze([nodeId, ...added])
+      }));
+    }
+    // Controller ruling T14-P: the count is the extras that reduced (`runNodePanel`'s `closeCallAdded`).
+    const closeCallRecords: readonly ConditionMarkRecord[] = closeCallExtensions.map((entry) => Object.freeze({
+      mark: "PANEL-CLOSE-CALL-EXTENDED" as const, scope: "node" as const, subjectRef: entry.nodeId,
+      reason: `PANEL_CLOSE_CALL_EXTENDED:${String(entry.added)}`, liftPath: null, servedRootRule: null,
+      affectedNodeIds: Object.freeze([entry.nodeId])
+    }));
+    const mapRecords = shapeMapResult === null ? [] : mapConditionRecords(shapeMapResult, run.runId, servedRoot.nodeId);
+    const shapeRecords: readonly ConditionMarkRecord[] = Object.freeze([...mapRecords, ...closeCallRecords, ...scrutinyRecords]);
     // T11: the three-state label is derived HERE — from the propagated numbers
     // only, before composition and before any synthesis step, so the derivation
     // stays acyclic (confirm-item 3: the round-3 objection is a mark, never a
@@ -8874,7 +8979,9 @@ export class WalkingSkeletonRunner {
       ...(wayOfKnowingDowngrades.length > 0 ? ["WAY-OF-KNOWING-DOWNGRADED" as const] : []),
       // S2-2 / J13(b): same rule for the panel degradations — a mark recorded only on
       // the node's receipt is not disclosed to the reader of the answer.
-      ...new Set(panelDegradations.map((record) => record.mark))
+      ...new Set(panelDegradations.map((record) => record.mark)),
+      // Debate shape: the map's fallbacks and fills, and the two extensions — each mark with its record (below).
+      ...new Set(shapeRecords.map((record) => record.mark))
     ]);
     /**
      * RE-REVIEW 2(a) / ROUND 4: the maker-position disclosure is the serve
@@ -8954,6 +9061,8 @@ export class WalkingSkeletonRunner {
       // T7 / S3-2: one typed record per frozen branch, minted at the round
       // boundary that froze it and carried whole to the answer.
       ...branchFrozenRecords,
+      // Debate shape: one record per shape mark (map, close call, scrutiny); none on today's run.
+      ...shapeRecords,
       // Run resilience (fix (d), R-b): the members that sat out during the arguing join the claim-time revision in
       // the ONE record; with none, the reason is today's to the byte.
       ...((absentAtClaim.length === 0 && panelRevisedDuringRun === null) || effectiveMakerCount === 1 ? [] : [Object.freeze({
@@ -9440,8 +9549,10 @@ export class WalkingSkeletonRunner {
         // `JSON.stringify` of the whole request — the model-authored digest
         // summaries and the prior objection sat in the same compartment as the
         // engine's own `instructions`, with nothing saying which was which.
-        // D2 + A17: ONE builder for the live call and moment:replay, in the question's language.
-        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName);
+        // D2 + A17: ONE builder for the live call and moment:replay, in the question's language. Debate shape (spec §3.3
+        // step 8; Task 5 binding note): a shaped run's writer is asked for about the row's answer length — every writer
+        // call, first try and retries (each is a request through here); the checker's packet is never lengthed.
+        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, shapeRun === null ? null : shapeRun.shape.answerWords);
         const packet = framed.packet;
         /**
          * The draft as the engine reads it. Final review I-1: it is read INSIDE
@@ -9554,7 +9665,9 @@ export class WalkingSkeletonRunner {
             // `composerBound` — an organ T9 retired — which is how the longest
             // generation in the system ended up with a 60-second clock while the
             // judge, answering about ONE node, had 180.
-            bound: this.settings.synthesisRolePolicy.synthesizerBound,
+            // Debate shape (spec §3.3 step 8): max(the sealed bound, the row's writer bound) — never under the sealed one;
+            // the sealed bound itself, the same object, on today's run (`shapeWriterBound`).
+            bound: shapeWriterBound(this.settings.synthesisRolePolicy.synthesizerBound, shapeRun === null ? null : shapeRun.shape.writerBound),
             contractHash: this.settings.composerContractHash,
             providerRef: planned.providerRef,
             packet,

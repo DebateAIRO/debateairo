@@ -508,7 +508,12 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     // `captureMomentPacket` and `invokeMomentBuilder` in
     // acceptance/moment-tools.ts, and that builder is the only place the
     // projection is applied.
-    expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName)")).toBe(SYNTHESIS_CALL_SITES);
+    // Debate shape (Task 14): the WRITER's site passes the row's answer length as a fourth argument (null on today's
+    // run), so the count reads the shared head of both calls; the checker's call stays the two-argument one.
+    expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName")).toBe(SYNTHESIS_CALL_SITES);
+    expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName)")).toBe(1);
+    expect(occurrences(runner,
+      "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, shapeRun === null ? null : shapeRun.shape.answerWords)")).toBe(1);
     expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(1);
     // Debate shape (040ddb9fd): the answer-length variant adds ONE field after that one projection, nothing else.
     expect(runner).toContain("material: lengthed ? [...material, synthesizerAnswerLengthField(answerWords)] : material,");

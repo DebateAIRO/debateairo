@@ -1,4 +1,4 @@
-import type { CompositionBudgetTier, WayOfKnowing } from "@debateai/kernel";
+import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type WayOfKnowing } from "@debateai/kernel";
 import {
   withoutStoryNodeIds,
   type StoryCostFallback,
@@ -41,6 +41,12 @@ const STORY_REASON_BY_MARK: ReadonlyMap<string, string> = new Map([[
   "Adaptive stopping froze this branch: its leverage on the positions was below the sealed branch-freeze "
     + "threshold, so nothing was expanded beneath it"
 ]]);
+/**
+ * Debate shape (Task 14; Task 12 note): the eight shape marks say how the debate was run (the map's fallbacks and fills,
+ * a close call that gained graders, a point that got scrutiny), and their records carry codes only. The story is never
+ * handed them — neither the marks nor their reasons — so the story writer never reads a raw code. None on today's run.
+ */
+const STORY_OMITTED_MARKS: ReadonlySet<string> = new Set(DEBATE_SHAPE_MARKS);
 /** Free text with every node-id-shaped run replaced: the safety net under every field below. */
 const withoutNodeIds = withoutStoryNodeIds;
 
@@ -204,7 +210,7 @@ function inArrowOrder<T extends { readonly arrowId: string }>(arrows: readonly T
 export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteInput {
   const baseById = new Map(source.baseStrengths.map((row) => [row.nodeId, row.baseStrength] as const));
   const finalById = new Map(source.finalStrengths.map((row) => [row.nodeId, row.strength] as const));
-  const nodeScoped = source.conditionMarkRecords.filter((record) => record.scope === "node");
+  const nodeScoped = source.conditionMarkRecords.filter((record) => record.scope === "node" && !STORY_OMITTED_MARKS.has(record.mark));
   const excludedReasonOf = (nodeId: string): string | null => {
     const record = nodeScoped.find((candidate) =>
       (EXCLUDING_MARKS.has(candidate.mark) || SET_ASIDE_MARKS.has(candidate.mark))
@@ -238,7 +244,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
         disagreement: source.thresholds.disagreementThreshold
       },
       confidence_band: source.confidenceBand,
-      marks: source.answerMarks.map(withoutNodeIds)
+      marks: source.answerMarks.filter((mark) => !STORY_OMITTED_MARKS.has(mark)).map(withoutNodeIds)
     },
     servedStatement: Object.freeze(source.servedSegments.map((segment) => segment.text)),
     nodes: Object.freeze(source.authored.map((node) => Object.freeze({
