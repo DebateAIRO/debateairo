@@ -283,7 +283,14 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
     // Paid plans S1a: the seat's judge is built over the stamped provider, or over the
     // gateway the runner's cheaper-model-while-arguing factory wraps around it.
     expect(contents.get("apps/runner/src/run-seats.ts")).toMatch(/new Judge\(judgeGateway\)/);
-    expect([...contents].filter(([,body]) => /from "\.\/run-seats\.js"/.test(body)).map(([path]) => path))
+    // Only the leased runner imports run-seats' CODE. A type-only import (debate shape, 8b6bc71be: shape-select.ts
+    // takes the SeatMember type) is erased at build and reaches no seat book, Judge or gateway. Every reference to the
+    // module must be one of the import/export statements read here, so none escapes the classification.
+    const seatStatements = [...contents].flatMap(([path, body]) =>
+      [...body.matchAll(/^(?:import|export)\s[^;]*?from "\.\/run-seats\.js"/gmu)].map((match) => [path, match[0]] as const));
+    expect([...new Set(seatStatements.map(([path]) => path))].sort())
+      .toEqual([...contents].filter(([,body]) => /from "\.\/run-seats\.js"/.test(body)).map(([path]) => path).sort());
+    expect([...new Set(seatStatements.filter(([, statement]) => !/^(?:import|export)\s+type\s/u.test(statement)).map(([path]) => path))])
       .toEqual(["apps/runner/src/index.ts"]);
   });
 
