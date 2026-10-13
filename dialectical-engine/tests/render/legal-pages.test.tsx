@@ -578,8 +578,10 @@ describe("the model providers page lists the model families the product runs", (
       expect(entry.retentionKey).toBe("legal.providers.unconfirmed");
       expect(entry.locationKey).toBe("legal.providers.unconfirmed");
     }
+    // Every unchecked row says so; once every row the build shows is checked, none does.
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
-    expect(view.textContent).toContain("[not checked yet]");
+    const unchecked = PROVIDER_REGISTER.some(({ checkedOn }) => checkedOn === null);
+    expect(view.textContent.includes("[not checked yet]")).toBe(unchecked);
   });
 
   it("shows every register label in every locale's catalogue", () => {
