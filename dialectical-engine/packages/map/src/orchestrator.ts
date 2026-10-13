@@ -60,11 +60,26 @@ export type MapCallRequest<T> = Readonly<{
   spec: MapStepSpec<T>;
 }>;
 
-/** OK with the checked value; FAILED (after the caller's own repairs); BUSY (the AI sits out the rest of the map). */
+/**
+ * OK with the checked value; FAILED (after the caller's own repairs); BUSY (the AI sits out the rest of the map);
+ * STOPPED (a money, attempt or lane stop: the map asks nothing more and the code's fallbacks finish it).
+ */
 export type MapCallOutcome<T> =
   | Readonly<{ kind: "OK"; value: T }>
   | Readonly<{ kind: "FAILED"; code: string }>
-  | Readonly<{ kind: "BUSY"; code: string }>;
+  | Readonly<{ kind: "BUSY"; code: string }>
+  | Readonly<{ kind: "STOPPED"; code: string }>;
+
+/** The spec's list key; a list handed to another seat (spec §1.2) is asked under its own key, so each key is one task. */
+export function mapListCallSiteKey(listIndex: number, wave: 1 | 2): string {
+  return wave === 1 ? `MAP:list:${String(listIndex)}` : `MAP:list:${String(listIndex)}:2`;
+}
+
+/** The code a thrown caller error carries (a typed domain code), else MAP_CALLER_THREW. Never the error's message. */
+export function mapErrorCodeOf(error: unknown): string {
+  const code = typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined;
+  return typeof code === "string" && /^[A-Z][A-Z0-9_]{0,95}$/u.test(code) ? code : "MAP_CALLER_THREW";
+}
 
 /**
  * The only way the map reaches a model. Phase 1: the practice tool's preview gateway. Phase 2: the runner's gateway
@@ -91,6 +106,8 @@ export type MapRunInput = Readonly<{
   /** K: points per answer when the code chooses. */
   pointsPerAnswer: number;
   contracts?: MapPromptContractSet;
+  /** True for an error that ends the run (claim lost, time limit): rethrown, never a fallback. */
+  abandon?: (error: unknown) => boolean;
 }>;
 
 type MapListLike = Readonly<{
@@ -108,6 +125,7 @@ class MapRun {
   readonly marks: MapMarkRecord[] = [];
   readonly notes: MapNoteRecord[] = [];
   readonly ctx: MapSpecContext;
+  stoppedBy: string | null = null;
   #next = 0;
 
   constructor(readonly input: MapRunInput, readonly arm: MapArm) {
@@ -119,20 +137,28 @@ class MapRun {
 
   /**
    * Asks one call. Its plan position is taken synchronously, before the caller is reached, so calls running at the
-   * same time keep their plan order (spec §3.5). A throwing caller counts as FAILED; BUSY puts the seat out for good.
+   * same time keep their plan order (spec §3.5). A throwing caller counts as FAILED with the error's typed code, unless
+   * the caller's `abandon` claims it (rethrown); BUSY puts the seat out for good; STOPPED ends the map.
    */
   async mapAsk<T>(step: MapStep, callSiteKey: string, seat: MapSeat, shown: "BLIND" | readonly string[], spec: MapStepSpec<T>): Promise<T | null> {
+    // A stop ends the map: nothing new is asked; what already arrived is kept, and the code's fallbacks finish it.
+    if (this.stoppedBy !== null) return null;
     const order = this.#next;
     this.#next += 1;
     let outcome: MapCallOutcome<T>;
     try {
       outcome = await this.input.caller.call({ step, callSiteKey, seat, order, shown, spec });
-    } catch {
-      outcome = { kind: "FAILED", code: "MAP_CALLER_THREW" };
+    } catch (error) {
+      if (this.input.abandon?.(error) === true) throw error;
+      outcome = { kind: "FAILED", code: mapErrorCodeOf(error) };
     }
     this.calls.push(Object.freeze({ step, callSiteKey, aiRef: seat.aiRef, maker: seat.maker, order,
       shown: shown === "BLIND" ? "BLIND" : Object.freeze([...shown]), outcome: outcome.kind, code: outcome.kind === "OK" ? null : outcome.code }));
     if (outcome.kind === "BUSY") this.out.add(seat.aiRef);
+    if (outcome.kind === "STOPPED" && this.stoppedBy === null) {
+      this.stoppedBy = outcome.code;
+      this.mapNote("MAP_STOPPED", step, outcome.code);
+    }
     return outcome.kind === "OK" ? outcome.value : null;
   }
 
@@ -154,6 +180,7 @@ class MapRun {
     return Object.freeze({
       arm: this.arm,
       ...parts,
+      stoppedBy: this.stoppedBy,
       marks: Object.freeze([...this.marks]),
       notes: Object.freeze([...this.notes]),
       // Pushed as calls finish; returned in plan order, never finish order.
@@ -178,10 +205,10 @@ function mapDraftsOfList(assignment: MapListAssignment, reply: MapListLike, orig
 }
 
 /** The lists in parallel; every plan position is taken before the first await, and the results keep plan order. */
-function mapRunLists(run: MapRun, assignments: readonly MapListAssignment[]): Promise<readonly MapListOutcome[]> {
+function mapRunLists(run: MapRun, assignments: readonly MapListAssignment[], wave: 1 | 2): Promise<readonly MapListOutcome[]> {
   return Promise.all(assignments.map(async (assignment): Promise<MapListOutcome> => Object.freeze({
     assignment,
-    reply: await run.mapAsk("LIST", `MAP:list:${String(assignment.listIndex)}`, assignment.seat, "BLIND", mapListSpec(run.ctx, assignment.angle))
+    reply: await run.mapAsk("LIST", mapListCallSiteKey(assignment.listIndex, wave), assignment.seat, "BLIND", mapListSpec(run.ctx, assignment.angle))
   })));
 }
 
@@ -283,12 +310,13 @@ export async function mapRunAngleMap(input: MapRunInput): Promise<MapResult> {
   } else {
     angles = mapOrderAngles(planned);
   }
-  const first = await mapRunLists(run, mapListAssignments(angles, order, run.out));
+  const first = await mapRunLists(run, mapListAssignments(angles, order, run.out), 1);
   const failed = first.filter((entry) => entry.reply === null).map((entry) => entry.assignment);
   const finished = first.filter((entry) => entry.reply !== null).map((entry) => entry.assignment.seat);
-  const reassigned = mapReassignLists(failed, finished, run.out);
+  // A stop reassigns nothing: the lists already paid for are kept and the rest are dropped.
+  const reassigned = run.stoppedBy === null ? mapReassignLists(failed, finished, run.out) : [];
   for (const assignment of reassigned) run.mapNote("LIST_REASSIGNED", "LIST", mapListLabel(assignment.listIndex, assignment.angle));
-  const second = await mapRunLists(run, reassigned);
+  const second = await mapRunLists(run, reassigned, 2);
   const lists = [...mapArrived(first), ...mapArrived(second)];
   // One LIST_DROPPED per angle left with no list (ruling P8): past min(angles, seats), or failed with no seat to take it.
   for (const angle of mapDroppedAngles(angles, lists.map((entry) => entry.assignment))) {
@@ -302,7 +330,7 @@ export async function mapRunBlindLists(input: MapRunInput): Promise<MapResult> {
   const run = new MapRun(input, "B");
   if (mapTooFewMakers(input)) return run.mapUnavailable([], [], "fewer than two makers");
   const assignments = run.available.map((seat, index): MapListAssignment => Object.freeze({ listIndex: index, seat, angle: null }));
-  const done = await mapRunLists(run, assignments);
+  const done = await mapRunLists(run, assignments, 1);
   // An open list has no angle to hand on: a failed one is dropped.
   for (const entry of done) if (entry.reply === null) run.mapNote("LIST_DROPPED", "LIST", mapListLabel(entry.assignment.listIndex, null));
   return mapAfterLists(run, [], mapArrived(done));

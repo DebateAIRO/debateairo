@@ -48,7 +48,7 @@ export const MAP_MARKS = Object.freeze(["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBA
 export type MapMark = typeof MAP_MARKS[number];
 
 /** What happened along the way that is not a mark: kept for the practice record and the owners' reading. */
-export const MAP_NOTES = Object.freeze(["LIST_REASSIGNED", "LIST_DROPPED", "MERGE_ITEMS_KEPT", "GAP_SKIPPED", "GAP_STOPPED"] as const);
+export const MAP_NOTES = Object.freeze(["LIST_REASSIGNED", "LIST_DROPPED", "MERGE_ITEMS_KEPT", "GAP_SKIPPED", "GAP_STOPPED", "MAP_STOPPED"] as const);
 export type MapNote = typeof MAP_NOTES[number];
 
 export const MAP_STEPS = Object.freeze(["ANGLES", "LIST", "SNOWBALL", "MERGE", "GAP", "CHOOSE"] as const);
@@ -128,7 +128,7 @@ export type MapCallRecord = Readonly<{
   order: number;
   /** BLIND, or the ids of what the AI was shown. */
   shown: "BLIND" | readonly string[];
-  outcome: "OK" | "FAILED" | "BUSY";
+  outcome: "OK" | "FAILED" | "BUSY" | "STOPPED";
   code: string | null;
 }>;
 
@@ -145,4 +145,6 @@ export type MapResult = Readonly<{
   marks: readonly MapMarkRecord[];
   notes: readonly MapNoteRecord[];
   calls: readonly MapCallRecord[];
+  /** The code of the stop (money, attempts, lane) that ended the map early; null when it ran to its end. */
+  stoppedBy: string | null;
 }>;

@@ -138,7 +138,7 @@ describe("map arm C: the angle map", () => {
     const result = await mapRunAngleMap(input(scripted((request) =>
       request.step === "LIST" && request.seat.aiRef === "ai-2" ? "BUSY" : normal(request)).caller));
     expect(notes(result)).toEqual(["LIST_REASSIGNED", "GAP_STOPPED"]);
-    expect(result.calls.filter((call) => call.callSiteKey === "MAP:list:2").map((call) => `${call.aiRef}:${call.outcome}`))
+    expect(result.calls.filter((call) => call.callSiteKey.startsWith("MAP:list:2")).map((call) => `${call.aiRef}:${call.outcome}`))
       .toEqual(["ai-2:BUSY", "ai-0:OK"]);
     // Without the sit-out, ai-2 would be the chooser (see the first test).
     expect(steps(result).slice(-3)).toEqual(["MERGE:ai-1", "GAP:ai-4", "CHOOSE:ai-3"]);
@@ -235,8 +235,8 @@ describe("map arm C: the angle map", () => {
 
   it("a list that fails again after its reassignment is dropped with ONE note, not one per failure", async () => {
     const result = await mapRunAngleMap(input(scripted((request) =>
-      request.callSiteKey === "MAP:list:2" ? "FAIL" : normal(request)).caller, { seats: SEATS.slice(0, 4) }));
-    expect(result.calls.filter((call) => call.callSiteKey === "MAP:list:2").map((call) => `${call.aiRef}:${call.outcome}`))
+      request.callSiteKey.startsWith("MAP:list:2") ? "FAIL" : normal(request)).caller, { seats: SEATS.slice(0, 4) }));
+    expect(result.calls.filter((call) => call.callSiteKey.startsWith("MAP:list:2")).map((call) => `${call.aiRef}:${call.outcome}`))
       .toEqual(["ai-2:FAILED", "ai-0:FAILED"]);
     expect(notes(result)).toEqual(["LIST_REASSIGNED", "LIST_DROPPED", "GAP_STOPPED"]);
     expect(result.notes.find((note) => note.note === "LIST_DROPPED")!.detail).toBe("2:do");
