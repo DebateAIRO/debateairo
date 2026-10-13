@@ -1,3 +1,5 @@
+import type { SeatMember } from "./run-seats.js";
+
 /**
  * Debate shape — the two choices the propagated numbers make (pure code; no model is asked):
  *  · adaptive deeper rounds (spec §3.3 step 5): at the round-1 boundary, per position, the `deeperTopPoints` chosen
@@ -91,4 +93,18 @@ export function shapeCloseCallFold<J, N, S>(input: Readonly<{ heard: readonly J[
     added: extras.length,
     spendStop
   });
+}
+
+/**
+ * Task 11 fix round 1 (the owner's ruling: graders come from makers other than the author's; controller ruling T11-M)
+ * — on a SHAPED run a panel seat's member may answer only when its maker is the seat's own planned maker or not
+ * already taken at this node (the author's, a maker seated on another called seat, a maker already heard or called).
+ * So a seat's backup (its runner-up) never repeats a maker on the node; a seat with no such member fails as a seat
+ * whose members are all down. `rule === null` (today's run) hands back the SAME options object, untouched.
+ */
+export function shapeDistinctMakerOptions<O extends { readonly eligible: (member: SeatMember) => boolean }>(
+  options: O, rule: Readonly<{ ownMaker: string; taken: ReadonlySet<string> }> | null): O {
+  if (rule === null) return options;
+  const eligible = options.eligible;
+  return { ...options, eligible: (member: SeatMember) => eligible(member) && (member.maker === rule.ownMaker || !rule.taken.has(member.maker)) };
 }

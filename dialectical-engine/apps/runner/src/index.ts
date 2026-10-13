@@ -211,7 +211,7 @@ import {
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
-import { shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold } from "./shape-select.js";
+import { shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions } from "./shape-select.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
@@ -6124,6 +6124,10 @@ export class WalkingSkeletonRunner {
           };
         }
       });
+      // Task 11 fix round 1 (controller ruling T11-M): on a shaped run, the makers seated on this node's called seats —
+      // a seat's backup never repeats one of them, nor the author's (`shapeDistinctMakerOptions`). Unused today.
+      const calledMakers = plannedSeats.flatMap((entry, index) =>
+        calledSeats[index] === true && entry.planned !== null ? [entry.planned.maker] : []);
       const panelMembers = plannedSeats.flatMap(({ seat, panelOptions, planned }, seatPosition) => {
         if (planned === null) {
           return [{
@@ -6139,7 +6143,9 @@ export class WalkingSkeletonRunner {
           }];
         }
         if (calledSeats[seatPosition] !== true) return [];
-        return [memberFor(seat, panelOptions, planned)];
+        return [memberFor(seat, shapeDistinctMakerOptions(panelOptions, shapeShape === null
+          ? null
+          : { ownMaker: planned.maker, taken: new Set([input.authorMaker, ...calledMakers]) }), planned)];
       });
       const panel = await runJudgePanel({
         artifactProducerRef: input.authorProviderRef,
@@ -6188,10 +6194,10 @@ export class WalkingSkeletonRunner {
 
       // Task 11: today's reduction, statement for statement, as one local function — the close-call extension
       // re-reduces every voice heard through it.
-      const reduceHeard = (heard: typeof panel.judgements) => {
+      const reduceHeard = (voices: typeof panel.judgements) => {
         // Each member's assessment is reduced through the SAME ratified
         // composition as the author's, so the taus are commensurable.
-        const reducedMembers = heard.flatMap((entry) => {
+        const reducedMembers = voices.flatMap((entry) => {
           const reducedMember = reduceAssessment({
             claimType: input.claimType,
             assessment: entry.assessment,
@@ -6265,16 +6271,14 @@ export class WalkingSkeletonRunner {
       const firstDispersion = reduced.dispersion.kind === "MEASURED" ? reduced.dispersion.value : null;
       if (shapeShape !== null && spendStop === null
         && shapeCloseCallFires(firstDispersion, panelPolicy.disagreementThreshold, shapeShape.closeCallExtraGraders)) {
+        // Pre-flight PF-B34: every maker already CALLED at this node — the ones heard and the ones that failed — so no
+        // panel key (`PANEL:<node>:<providerRef>`, `panelKeyFor`) is ever asked twice.
+        const onPanelMakers = [...heard.map((entry) => entry.memberRole), ...calledMakers];
         const extraSeats = shapeCloseCallExtraSeats({
           seatMakers: plannedSeats.map((entry) => entry.planned?.maker ?? null),
           called: calledSeats,
           authorMaker: input.authorMaker,
-          // Pre-flight PF-B34: every maker already CALLED at this node — the ones heard and the ones that failed — so no
-          // panel key (`PANEL:<node>:<providerRef>`, `panelKeyFor`) is ever asked twice.
-          onPanelMakers: [
-            ...heard.map((entry) => entry.memberRole),
-            ...plannedSeats.flatMap((entry, index) => calledSeats[index] === true && entry.planned !== null ? [entry.planned.maker] : [])
-          ],
+          onPanelMakers,
           extra: shapeShape.closeCallExtraGraders,
           offset: seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: `${input.callSiteKey}:close-call` })
         });
@@ -6282,7 +6286,13 @@ export class WalkingSkeletonRunner {
           const extension = await runJudgePanel({
             artifactProducerRef: input.authorProviderRef,
             primary: { judgementRef: input.authorJudgementRef, assessment: input.authorAssessment, memberRole: input.authorMaker },
-            members: extraSeats.map((index) => memberFor(plannedSeats[index]!.seat, plannedSeats[index]!.panelOptions, plannedSeats[index]!.planned!)),
+            // Fix round 1 (owner ruling: graders from other makers): an extra seat's backup never repeats a maker already
+            // on this node — the author's, one heard or called, or another extra seat's.
+            members: extraSeats.map((index) => {
+              const extra = plannedSeats[index]!;
+              const taken = new Set([input.authorMaker, ...onPanelMakers, ...extraSeats.map((other) => plannedSeats[other]!.planned!.maker)]);
+              return memberFor(extra.seat, shapeDistinctMakerOptions(extra.panelOptions, { ownMaker: extra.planned!.maker, taken }), extra.planned!);
+            }),
             askTogether: callsRunTogether,
             // Pre-flight PF-B32 (law: always an answer): the SAME rule as the base panel — root 0's panel (AUTHOR_ONLY)
             // keeps what its extension heard and gets the stop back; every other panel lets it travel. Written "TRAVEL"

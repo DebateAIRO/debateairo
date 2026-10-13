@@ -201,10 +201,37 @@ describe("pre-flight PF-B35 / PF-B36: a shaped run's gate is never charged less 
       .reduce((sum, entry) => sum + entry.numerator, 0n);
     // The Anthropic gate (Haiku alone, g=1, J+E=3): every authored site, a third of the grading, the others' reviews.
     // The old even split charged it a quarter of the authored and grading sites together.
-    expect(debateOf([HAIKU])).toBe(authored * debate * members + judge * debate * members / 3n + reviewer * debate * (members - 1n));
+    // The grading share is rounded UP, as the code rounds it (never under-count).
+    expect(debateOf([HAIKU])).toBe(authored * debate * members + ceilDiv(judge * debate * members * 1n, 3n) + reviewer * debate * (members - 1n));
     // The DeepInfra gate (three members, min(1, 3/3) = 1): every authored, grading and review site; GLM also holds the
     // answer checker's sites (a role, not a panel share).
     expect(debateOf([GLM, MIMO, DEEPSEEK]) - BigInt(roles.ANSWER_CHECKER) * debate * members)
       .toBe((authored + judge + reviewer) * debate * members);
   });
+
+  it("PF-B35 with close-call extras (J=3, E=2 on six members): a one-member gate carries a fifth of the grading, rounded up", () => {
+    const plus = resolveDebateShape({ policy: debateShapePolicyStartValues(), plan: "plus", makers: 6,
+      settings: { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } })!;
+    expect(plus).toMatchObject({ graders: 3, closeCallExtraGraders: 2 });
+    const basis = computeStructuralCeilingBasis({ ...TERMS, panelSize: 6, depth: 2, shape: plus });
+    // Five DeepInfra members (one gate, g=5) and Haiku alone (g=1).
+    const panel = [GLM, MIMO, DEEPSEEK, GLM, MIMO, HAIKU].map((model_id, index) => ({ provider_ref: `preview:m${index}`, model_id }));
+    const { denominator, shares } = sharesOf(basis, panel);
+    const roles = expectedCallsByRoleFromBasis(basis);
+    const members = 6n;
+    const debate = denominator / members;
+    const authored = BigInt(roles.POSITION + roles.SUPPORT_ATTACK + roles.CROSS_EXCHANGE) - 2n;
+    const judge = BigInt(roles.JUDGE);
+    const reviewer = BigInt(roles.REVIEWER);
+    const debateOf = (models: readonly string[]) => shares.filter((entry) => models.includes(entry.model) && entry.type === "DEBATE")
+      .reduce((sum, entry) => sum + entry.numerator, 0n);
+    expect(debateOf([HAIKU])).toBe(authored * debate * members + ceilDiv(judge * debate * members * 1n, 5n) + reviewer * debate * (members - 1n));
+    // g=5 of J+E=5: every grading site.
+    expect(debateOf([GLM, MIMO, DEEPSEEK]) - BigInt(roles.ANSWER_CHECKER) * debate * members)
+      .toBe((authored + judge + reviewer) * debate * members);
+  });
 });
+/** Integer division rounded UP (the estimate's own rounding of a gate's grading share). */
+function ceilDiv(numerator: bigint, divisor: bigint): bigint {
+  return (numerator + divisor - 1n) / divisor;
+}
