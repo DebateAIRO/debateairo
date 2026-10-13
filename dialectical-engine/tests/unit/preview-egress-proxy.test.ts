@@ -21,7 +21,7 @@ const listen = async (server: net.Server, at: number | string = 0) => {
 async function upstream() {
   const received: Buffer[] = [];
   let connections = 0;
-  const server = net.createServer(socket => { connections++; socket.on('data', chunk => received.push(chunk)); socket.on('error', () => undefined); });
+  const server = net.createServer(socket => { connections++; socket.on('data', chunk => received.push(Buffer.from(chunk))); socket.on('error', () => undefined); });
   const port = await listen(server);
   return { port, bytes: () => Buffer.concat(received), connections: () => connections, sockets: server };
 }

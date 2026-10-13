@@ -262,7 +262,8 @@ describe('runner environment narrowing', () => {
   it('admits hosted with the preview configuration and refuses it without', () => {
     const result = env.narrowEnvironment('runner', { ...configured(), DEBATEAI_DEPLOYMENT_MODE: 'hosted' }, runtime, { registerVersion: '12' }, approved);
     expect(result.deploymentMode).toBe('hosted');
-    const { PREVIEW_PROVIDER_TEST_CONFIG_JSON: _config, PREVIEW_TEAM_USER_IDS_JSON: _team, ...bare } = { ...configured(), DEBATEAI_DEPLOYMENT_MODE: 'hosted' };
+    const bare: Record<string, string> = { ...configured(), DEBATEAI_DEPLOYMENT_MODE: 'hosted' };
+    delete bare.PREVIEW_PROVIDER_TEST_CONFIG_JSON; delete bare.PREVIEW_TEAM_USER_IDS_JSON;
     expect(() => env.narrowEnvironment('runner', bare, runtime, { registerVersion: '12' }, approved)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
     expect(() => env.narrowEnvironment('runner', { ...configured(), DEBATEAI_DEPLOYMENT_MODE: 'hosted', BILLING_STAGE_CLOCK_OFFSET_DAYS: '31' }, runtime, { registerVersion: '12' }, approved)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
   });

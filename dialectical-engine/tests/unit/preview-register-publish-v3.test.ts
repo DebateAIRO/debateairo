@@ -37,7 +37,7 @@ describe('publish kit v3: the hosted source', () => {
   it('is v2\'s source with the story money row added and only the three owner rows changed', async () => {
     const f = await fixture();
     for (const choice of [ON, OFF]) {
-      const rows = await buildPreviewSourceRowsV3(f.bootstrap, runtime, choice) as Row[];
+      const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, choice)] as Row[];
       expect(rows.map(row => row.rowKey).sort()).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V3].sort());
       expect(PREVIEW_SOURCE_ROW_KEYS_V3).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2, STORY_COST_ENVELOPE_POLICY_ROW_KEY].sort());
       const differing = rows.filter(row => JSON.stringify(row) !== JSON.stringify(f.v2.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey).sort();
@@ -47,7 +47,7 @@ describe('publish kit v3: the hosted source', () => {
 
   it('carries the owner\'s ceilings and room-read budget, keeps every other member, and switches billing on with the US withdrawal right', async () => {
     const f = await fixture();
-    const rows = await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON) as Row[];
+    const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[];
     const cost = value(rows, 'costEnvelopePolicy'), oldCost = value(f.v2, 'costEnvelopePolicy');
     expect(cost).toMatchObject({ per_run_ceiling_micros: 3_000_000, daily_ceiling_micros: 10_000_000, provisional: true });
     for (const member of ['admission_close_basis_points', 'finish_up_to_basis_points', 'waiting_line_per_person', 'serve_reserve_basis_points', 'serve_overrun_basis_points', 'currency', 'kind', 'minor_units_per_unit'])
@@ -60,13 +60,13 @@ describe('publish kit v3: the hosted source', () => {
     expect(billing).toEqual({ ...value(f.v2, 'billingPolicy'), enabled: true, withdrawal_countries: [...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value.withdrawal_countries, 'US'] });
     expect(rows.find(row => row.rowKey === 'billingPolicy')!.sourceRef).toContain('NETOPIA\'s sandbox');
     expect(value(rows, STORY_COST_ENVELOPE_POLICY_ROW_KEY)).toMatchObject({ kind: 'STORY_COST_ENVELOPE_POLICY', currency: 'USD', per_story_ceiling_micros: 50_000, per_story_overrun_basis_points: 2_000 });
-    expect(value(await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF) as Row[], 'billingPolicy')).toEqual(value(f.v2, 'billingPolicy'));
+    expect(value([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], 'billingPolicy')).toEqual(value(f.v2, 'billingPolicy'));
   });
 
   it('passes the checker, rotation and call-concurrency choices through to v2 (the hosted story rows follow the checker)', async () => {
     const f = await fixture();
     const policy = { perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50, deepinfra: 150 } };
-    const rows = await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON, { checker: 'deepseek', deepseekEnabledOnGate: true }, 'off', policy) as Row[];
+    const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON, { checker: 'deepseek', deepseekEnabledOnGate: true }, 'off', policy)] as Row[];
     expect(value(rows, 'storyCheckerRoleRef').providerRef).toBe('preview:deepseek-v4-1-flash');
     expect(value(rows, 'answerRoleRotationPolicy').enabled).toBe(false);
     expect(value(rows, 'callConcurrencyPolicy')).toMatchObject(policy);
@@ -94,9 +94,9 @@ describe('publish kit v3: the hosted source', () => {
   it('refuses a day that cannot hold one run plus its story (the API\'s own boot rule)', async () => {
     const f = await fixture();
     // 3.00 + the answer's 20% overrun is 3.60, plus the story's 0.06: a 3.65 day holds no full run.
-    const tight = await buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 3_650_000 }) as Row[];
+    const tight = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 3_650_000 })] as Row[];
     expect(refusal(() => compose(tight, f.v12))).toContain('STORY_DAILY_CEILING_INSUFFICIENT');
-    await expect(buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 3_660_000 }).then(rows => compose(rows as Row[], f.v12))).resolves.toBeTruthy();
+    await expect(buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 3_660_000 }).then(rows => compose([...rows] as Row[], f.v12))).resolves.toBeTruthy();
   });
 
   it('keeps v2\'s runtime gate', async () => {
@@ -109,7 +109,7 @@ describe('publish kit v3: composing from the current version', () => {
   it('from the live register 12 shape: the story money row is added and the three owner rows change, each shown with its old and new value', async () => {
     const f = await fixture();
     const before = structuredClone(f.v12);
-    const plan = compose(await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON) as Row[], f.v12);
+    const plan = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], f.v12);
     expect(plan.composer).toBe('preview-register-composer-v3');
     expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
     expect(plan.changedKeys).toEqual(OWNER_KEYS);
@@ -125,22 +125,22 @@ describe('publish kit v3: composing from the current version', () => {
 
   it('a first provider-only publication (billing off) changes only the ceilings and the room-read budget', async () => {
     const f = await fixture();
-    const plan = compose(await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF) as Row[], f.v12);
+    const plan = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], f.v12);
     expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
     expect(plan.changedKeys).toEqual(['admissionPolicy', 'costEnvelopePolicy']);
   });
 
   it('then billing on over that version changes the billing row alone; billing off again is a republish; v2 can no longer compose on it', async () => {
     const f = await fixture();
-    const first = compose(await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF) as Row[], f.v12);
+    const first = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], f.v12);
     const v13 = [...first.rows] as Row[];
-    const on = compose(await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON) as Row[], v13, '13');
+    const on = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], v13, '13');
     expect(on.addedKeys).toEqual([]);
     expect(on.changedKeys).toEqual(['billingPolicy']);
     const v14 = [...on.rows] as Row[];
-    const off = compose(await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF) as Row[], v14, '14');
+    const off = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], v14, '14');
     expect(off.changedKeys).toEqual(['billingPolicy']);
-    expect(value(off.rows as Row[], 'billingPolicy').enabled).toBe(false);
+    expect(value([...off.rows] as Row[], 'billingPolicy').enabled).toBe(false);
     // Kit v2 refuses a hosted base: once the preview is hosted, every later publication goes through v3.
     expect(() => composePreviewSnapshotV2({ sourceRows: f.v2 as any, baseRows: v14 as any, baseRegisterVersion: '14', baseSnapshotSha256: computeRegisterSnapshotSha256(v14 as any) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
     expect(() => composePreviewSnapshotV2({ sourceRows: f.v2 as any, baseRows: v13 as any, baseRegisterVersion: '13', baseSnapshotSha256: computeRegisterSnapshotSha256(v13 as any) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
@@ -148,11 +148,11 @@ describe('publish kit v3: composing from the current version', () => {
 
   it('the same inputs on the same base compose the same snapshot (publish recomposes what the owner approved)', async () => {
     const f = await fixture();
-    const a = compose(await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON) as Row[], f.v12);
-    const b = compose(await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON) as Row[], f.v12);
+    const a = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], f.v12);
+    const b = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], f.v12);
     expect(b.snapshotSha256).toBe(a.snapshotSha256);
     expect(b.deltaSha256).toBe(a.deltaSha256);
-    const other = compose(await buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 9_000_000 }) as Row[], f.v12);
+    const other = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 9_000_000 })] as Row[], f.v12);
     expect(other.deltaSha256).not.toBe(a.deltaSha256);
   });
 
@@ -166,7 +166,7 @@ describe('publish kit v3: composing from the current version', () => {
     ['a source with a base-owned row', (rows: Row[]) => [...rows, owned()[0]!], 'base-owned-row-in-source']
   ])('refuses %s', async (_name, tamper, rule) => {
     const f = await fixture();
-    const rows = tamper(await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON) as Row[]);
+    const rows = tamper([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[]);
     expect(() => compose(rows, f.v12)).toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
   });
 
@@ -181,7 +181,7 @@ describe('publish kit v3: composing from the current version', () => {
     ['the country policy while billing is on', (rows: Row[]) => rows.filter(row => row.rowKey !== 'countryPolicy'), 'BILLING_CONFIGURATION_INCOMPLETE']
   ])('the hosted boot questions refuse a version without %s', async (_name, tamper, code) => {
     const f = await fixture();
-    const rows = [...(await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON) as Row[]), ...owned()];
+    const rows: Row[] = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON), ...owned()];
     expect(() => assertHostedPreviewBootRows(rows as any)).not.toThrow();
     expect(refusal(() => assertHostedPreviewBootRows(tamper(rows) as any))).toContain(code);
   });
@@ -193,7 +193,7 @@ describe('publish kit v3: composing from the current version', () => {
     ['a base with a scorecard row', (rows: Row[]) => sorted([...rows, { rowKey: 'modelScorecard', valueJsonText: '{}', sourceRef: 'x' }]), 'support-or-scorecard-row']
   ])('refuses %s', async (_name, tamper, code) => {
     const f = await fixture();
-    const source = await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON) as Row[];
+    const source = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[];
     expect(refusal(() => compose(source, tamper(f.v12)))).toContain(code);
   });
 
