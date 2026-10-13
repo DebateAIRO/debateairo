@@ -1399,6 +1399,17 @@ below. The support model ref published in the support configuration row must equ
 `provider_ref` written here, or the chat has no model, every answer is DEGRADED, and the log
 carries `SUPPORT_RELAY_NOT_COMPOSED:` and the ref that could not be composed.
 
+**The support chat's model is Claude Haiku 5.5 (V, 2026-10-12)**, on Anthropic's own API. A
+target whose `base_url` is on `api.anthropic.com` is spoken over Anthropic's native Messages
+wire, the same one the debate path uses for Anthropic, never the OpenAI-compatible one: its
+`base_url` must be exactly `https://api.anthropic.com/v1` (anything else on that host refuses
+with `PROVIDER_ADAPTER_HOST_MISMATCH`), and its credential file holds the **bare API key** — no
+`Bearer` in front — because the key travels as `x-api-key`. A file written with a scheme word
+refuses at start-up with `PROVIDER_GATEWAY_CREDENTIAL_INVALID`, naming nothing of the value. In
+step 2 below, type the key itself at the prompt. The `api.env` entry reads
+`{"provider_ref":"vendor:anthropic","base_url":"https://api.anthropic.com/v1","model":"claude-haiku-5-5","authorization_file":"/etc/debateai/api/providers/anthropic.header"}`.
+Anthropic reports tokens and no money; the next paragraph says what that means for its spend row.
+
 **What the support chat cannot tell you yet.** Its spend row records the tokens a vendor
 reports, but most vendors report no money at all, so the `cost_usd` column stays empty and the
 deployment still needs sealed cost envelopes (V-28). A hosted deployment reads the `costEnvelopePolicy`
@@ -1426,7 +1437,7 @@ answer, or any part of either.
 can start without answering the question. A production unit that omits it refuses with
 `DEPLOYMENT_MODE_UNRESOLVED`; a typo refuses with `DEPLOYMENT_MODE_INVALID`.
 
-The paid-vendor probe spends `max_tokens: 8` per target per staleness window; the window is the `panelDiscoveryPolicy` register row's `probe_freshness_ms`, validated only as a positive integer. The development seed publishes `600000`. Hosted mode enforces no minimum, so the number an operator publishes is the whole control. The hosted publish command (`pnpm register:publish-hosted`) publishes the code-owned `panelDiscoveryPolicy` row with `probe_freshness_ms` set to `600000`, and its file has no member to change it; a different window needs a code change.
+The paid-vendor probe spends at most `max_tokens: 512` per target per staleness window (a model that thinks before it answers spends its thinking out of that room; a model that does not answers in a token or two); the window is the `panelDiscoveryPolicy` register row's `probe_freshness_ms`, validated only as a positive integer. The development seed publishes `600000`. Hosted mode enforces no minimum, so the number an operator publishes is the whole control. The hosted publish command (`pnpm register:publish-hosted`) publishes the code-owned `panelDiscoveryPolicy` row with `probe_freshness_ms` set to `600000`, and its file has no member to change it; a different window needs a code change.
 
 ### What the hosted mode refuses, in code
 
@@ -2507,9 +2518,10 @@ true:
 
 - NETOPIA's mark and the Visa and Mastercard marks (above), and the sentence on the checkout that payment happens on
   NETOPIA Payments' secure page;
-- the consumer-protection link the law asks for: ANPC's dispute resolution page (SAL), which the legal notice
-  (`/legal`) links today. The EU's online dispute platform (SOL) closed on 20 July 2025, so the site deliberately does
-  not link it. If NETOPIA asks for the ANPC links in the footer, that is a code change too;
+- the consumer-protection link the law asks for: ANPC's dispute resolution badge (SAL), which the footer of every page
+  shows and links to ANPC's page (`https://anpc.ro/ce-este-sal/`). Its artwork is in the repository at
+  `apps/ui/public/consumer-protection/anpc-sal.png`, so nothing needs copying. The EU's online dispute platform (SOL)
+  closed on 20 July 2025, so the site deliberately does not link it;
 - the Terms (prices, the monthly renewal, the 14-day withdrawal), the Privacy Policy naming NETOPIA Payments, and the
   cancellation rules, each reachable from every page;
 - the company details on the legal notice (above);

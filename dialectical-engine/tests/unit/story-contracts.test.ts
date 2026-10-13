@@ -15,6 +15,7 @@ import {
   storyContractHash,
   storyContractInArgumentLanguage
 } from "@debateai/story";
+import { STORYTELLER_V2_ANSWER_FORM } from "../../packages/story/src/contracts.js";
 
 /**
  * Verdict story, Task 2 — the two code-owned contracts (spec §5.2). The byte
@@ -27,12 +28,12 @@ const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta
 describe("verdict story — the storyteller and checker contracts", () => {
   it("puts the owners' pack in the instruction slot and code's form in the answer slot", () => {
     expect(buildStorytellerContract(PACK)).toEqual({
-      contractId: "story.storyteller.v2",
+      contractId: "story.storyteller.v3",
       instruction: assembleStorytellerInstruction(PACK),
       answerForm: STORYTELLER_ANSWER_FORM
     });
     expect(buildStoryCheckerContract(PACK)).toEqual({
-      contractId: "story.checker.v1",
+      contractId: "story.checker.v2",
       instruction: PACK.checker,
       answerForm: STORY_CHECKER_ANSWER_FORM
     });
@@ -70,7 +71,7 @@ describe("verdict story — the question's language (R1, dev's argument-language
         instruction: `${contract.instruction}\n\n${argumentLanguageDirective("Romanian")}`,
         answerForm: contract.answerForm
       });
-      expect(romanian.instruction).toContain("Write every natural-language field in Romanian.");
+      expect(romanian.instruction).toContain("Write every natural-language field in Romanian, the language of the question, even where the material quotes another language.");
       expect(Object.isFrozen(romanian)).toBe(true);
       // The door still accepts it: the directive holds no token reserved for the frame.
       const framed = buildFramedPrompt({ contract: romanian, material: [{ name: "question", content: JSON.stringify("Ne mut\u0103m?") }] });
@@ -196,4 +197,6 @@ describe("verdict story — the verdict basis the story explains", () => {
   });
 });
 
-it("preserves the installed concise storyteller answer form fingerprint",()=>{expect(createHash("sha256").update(STORYTELLER_ANSWER_FORM).digest("hex")).toBe("0e7ec7acc8a69057e6f23d1623cea3516925da8b72f310a06b33b859fa2d68e5");});
+it("preserves the installed concise storyteller answer form fingerprint",()=>{expect(createHash("sha256").update(STORYTELLER_V2_ANSWER_FORM).digest("hex")).toBe("0e7ec7acc8a69057e6f23d1623cea3516925da8b72f310a06b33b859fa2d68e5");});
+// Story format robustness (2026-10-12): v3 is v2 plus the quote sentence; v2 above stays as history.
+it("pins the current storyteller v3 answer form fingerprint",()=>{expect(createHash("sha256").update(STORYTELLER_ANSWER_FORM).digest("hex")).toBe("443f79f8470f9a4597a0371b3849b9612a0df33047946d8a30d6aa74348840b4");});

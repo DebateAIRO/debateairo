@@ -89,7 +89,8 @@ test("every locale translates the footer and navigation labels", () => {
   const added = Object.keys(chromeEnglish).filter((key) => key.startsWith("chrome.legal") || key.startsWith("chrome.footer."));
   // 13 -> 20: the paid-plans footer (P21, R3-4): pricing, cancel, withdraw, the card marks' group and names, DB-IP.
   // 20 -> 21: NETOPIA's mark beside the card marks (N25b, spec §2.18), its brand name untranslated.
-  assert.equal(added.length, 21);
+  // 21 -> 22: the CONSUMER PROTECTION head above ANPC's SAL badge (design 15a/15c).
+  assert.equal(added.length, 22);
   for (const locale of locales.filter((code) => code !== "en")) {
     const chrome = JSON.parse(source(`messages/${locale}/chrome.json`));
     for (const key of added) {
@@ -97,7 +98,7 @@ test("every locale translates the footer and navigation labels", () => {
       assert.notEqual(chrome[key].trim(), "", `${locale}/chrome:${key}`);
     }
     // The long labels are prose; a locale that left them English was not translated.
-    for (const key of ["chrome.legal.terms", "chrome.legal.privacy", "chrome.footer.cookiePreferences"]) {
+    for (const key of ["chrome.legal.terms", "chrome.legal.privacy", "chrome.footer.cookiePreferences", "chrome.footer.consumerProtection"]) {
       assert.notEqual(chrome[key], chromeEnglish[key], `${locale}/chrome:${key} is still English`);
     }
   }

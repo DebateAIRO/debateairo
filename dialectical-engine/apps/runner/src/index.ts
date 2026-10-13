@@ -36,6 +36,7 @@ import {
   measureDispersion,
   parseStructuredArtifact,
   reduceAssessment,
+  structuredParseRepair,
   runJudgePanel,
   selectReducedJudgement,
   type ClaimType,
@@ -101,8 +102,11 @@ import {
   ProviderContentUnacceptedError,
   lengthRetryTokenCeiling,
   providerTargetPrice,
+  rememberingAcceptedReply,
   type CallBound,
   type ContentClassification,
+  type ModelJsonRepair,
+  type ModelReplyFacts,
   type OpenAICompatibleGatewayOptions,
   type PromptPacket,
   type ProviderCallRequest,
@@ -156,6 +160,7 @@ import {
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import {
   argumentLanguageDirective,
+  replyLanguageCheck,
   SERVED_ROOT_SELECTION_RULE,
   TypedDomainError,
   exhaustive,
@@ -196,9 +201,19 @@ import {
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
+import {
+  createRunSitOutBook,
+  runPanelRevisedReason,
+  reviewEndsForMembersSatOut,
+  type RunResilienceSettings,
+  type RunSitOutBook,
+  type RunSitOutView
+} from "./run-sit-out.js";
 
 // Model scorecard A15/A16: the seat book and the seat caller live in their own module.
 export * from "./run-seats.js";
+// Run resilience (spec 2026-10-12, fix (d)): the per-run sit-out book lives in its own module.
+export * from "./run-sit-out.js";
 
 /**
  * T9 / J24 — the two sealed synthesis roles, named ONCE. Every check that has
@@ -656,10 +671,10 @@ export function buildSynthesisRolePrompt(
 }
 
 /** A17: the classification a live synthesis call applies, exported for replay. */
-export function classifySynthesisRoleContent(role: SynthesisRoleName, content: string): ContentClassification {
+export function classifySynthesisRoleContent(role: SynthesisRoleName, content: string, reply?: ModelReplyFacts): ContentClassification {
   return role === "SYNTHESIZER"
-    ? classifyStructuredContent(content, compositionSchema)
-    : classifyStructuredContent(content, evaluatorVerdictSchema);
+    ? classifyStructuredContent(content, compositionSchema, reply)
+    : classifyStructuredContent(content, evaluatorVerdictSchema, reply);
 }
 
 /**
@@ -984,6 +999,15 @@ export async function withCooldownRetry<T>(input: {
    * Absent (every legacy run), they count the errors' attempts exactly as before.
    */
   readonly siteAttemptsSpent?: () => Promise<number>;
+  /**
+   * Run resilience (spec 2026-10-12, fix (d); ruling R-a): a failure after which the cooldown hold and the final
+   * retry would only ask a member that now sits out the rest of the run — a call that ended in the vendor's gate-proven
+   * unbilled refusal (review amendment R-d: never the gate's own), an unavailable gate, or a member already sitting
+   * out, each seen through the run's sit-out book (`RunSitOutBook.haltsAtOnce`). Such a failure HALTS at
+   * once: no ten-minute hold, no final retry. Absent (hosted, local, every direct caller), every failure keeps
+   * today's path.
+   */
+  readonly haltsAtOnce?: (error: ProviderCallFailedError) => boolean;
 }): Promise<
   | { readonly kind: "AUTHORED"; readonly value: T }
   | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
@@ -1029,6 +1053,7 @@ export async function withCooldownRetry<T>(input: {
     return { kind: "AUTHORED", value: await input.attempt(input.baseMaxAttempts) };
   } catch (error) {
     if (!(error instanceof ProviderCallFailedError)) throw error;
+    if (input.haltsAtOnce?.(error) === true) return halted(error, error.attempts);
     if (input.finalRetryPermitted !== undefined && !(await input.finalRetryPermitted())) {
       return halted(error, error.attempts);
     }
@@ -2099,6 +2124,20 @@ export interface WalkingSkeletonSettings {
     roleRef: string;
     panel: readonly DiscoveredPanelMember[];
   }>) => boolean;
+  /**
+   * Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md; rulings R-a, R-b, R-c):
+   * the preview's facts about each provider ref — the gate its calls go through and the model it serves — and, by
+   * being set at all, the preview's run resilience:
+   *  · (b) the re-claim check reads each maker's own attempts (the counting gateway already does, per request);
+   *  · (d) a per-run sit-out book (`createRunSitOutBook`) wraps every claim-eligible maker's gateway: a model whose
+   *    call ends in gate-proven unbilled refusals, or every member behind a gate that is unavailable (fix (c)), sits
+   *    out the rest of the run, with no ten-minute hold (R-a); roots, panels, reviews, expansion, the answer roles and
+   *    the story leave it out and keep their existing disclosures (R-b);
+   *  · (a) the answer and story roles move on, with ROLE_UNAVAILABLE, from a member that sits out.
+   * Absent (hosted and local, R-c): every one of those paths is today's, byte for byte. main.ts sets it from
+   * `previewRunResilience` on the preview only.
+   */
+  readonly runResilience?: RunResilienceSettings;
   readonly scoringOperator?: ScoringOperatorRegisterInput;
   readonly runDeathPolicy?: RunDeathPolicy;
   readonly hiddenNodeScoreThreshold?: {
@@ -2154,7 +2193,7 @@ function hash(value: unknown): string {
  * refused before any strategy runs — the pre-fix refusal, re-asked as before.
  */
 type DecodedReply =
-  | { readonly decoded: true; readonly value: unknown }
+  | { readonly decoded: true; readonly value: unknown; readonly repair: ModelJsonRepair | null }
   | { readonly decoded: false; readonly message: string };
 
 /**
@@ -2185,19 +2224,27 @@ function topLevelObjectsOpened(content: string): number {
   return opened;
 }
 
-function decodeStructuredReply(content: string): DecodedReply {
+/**
+ * All-steps format robustness (2026-10-12): the judge path's strategies now end with the story's two late repairs
+ * (straight quotes inside a text escaped; only for a reply that finished normally, closing brackets), so `ending` —
+ * how the reply ended, as the gateway saw it — is passed through. Without it the ending is unknown and the last repair
+ * is not made. The decoded reply names the repair it needed (`jsonRepair` on the classification).
+ */
+function decodeStructuredReply(content: string, ending?: ModelReplyFacts): DecodedReply {
   try {
-    return { decoded: true, value: JSON.parse(content) };
+    return { decoded: true, value: JSON.parse(content), repair: null };
   } catch (error) {
     const refused: DecodedReply = { decoded: false, message: error instanceof Error ? error.message : String(error) };
     if (topLevelObjectsOpened(content) > 1) return refused;
-    const tolerant = parseStructuredArtifact(content, z.unknown());
-    return tolerant.kind === "PARSED" ? { decoded: true, value: tolerant.value } : refused;
+    const tolerant = parseStructuredArtifact(content, z.unknown(), ending);
+    return tolerant.kind === "PARSED"
+      ? { decoded: true, value: tolerant.value, repair: structuredParseRepair(tolerant.strategy) }
+      : refused;
   }
 }
 
-function parseContent<T>(content: string, schema: z.ZodType<T>, code: string): T {
-  const reply = decodeStructuredReply(content);
+function parseContent<T>(content: string, schema: z.ZodType<T>, code: string, ending?: ModelReplyFacts): T {
+  const reply = decodeStructuredReply(content, ending);
   if (!reply.decoded) throw new TypedDomainError(code, reply.message);
   try {
     return schema.parse(reply.value);
@@ -2206,13 +2253,15 @@ function parseContent<T>(content: string, schema: z.ZodType<T>, code: string): T
   }
 }
 
-function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>): ContentClassification {
-  const reply = decodeStructuredReply(content);
+function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>, ending?: ModelReplyFacts): ContentClassification {
+  const reply = decodeStructuredReply(content, ending);
   if (!reply.decoded) return { parseStatus: "PARSE_FAILED", parseError: reply.message };
   const parsed = schema.safeParse(reply.value);
-  return parsed.success
-    ? { parseStatus: "PARSED", parseError: null }
-    : { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message };
+  return !parsed.success
+    ? { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message }
+    : reply.repair === null
+      ? { parseStatus: "PARSED", parseError: null }
+      : { parseStatus: "PARSED", parseError: null, jsonRepair: reply.repair };
 }
 
 /**
@@ -2222,7 +2271,9 @@ function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>): Co
  * fenced block carrying the typed code and the schema path, and
  * `buildFramedRepairPrompt` refuses anything that is not a machine locator.
  */
-function buildSchemaRepairPacket(framed: FramedPrompt, rejected: {
+// Exported (all-steps format robustness, 2026-10-12) so the preview practice's formats lanes hand the gateway the same
+// repair packet the runner does (tools/preview-practice/practice-lanes.ts).
+export function buildSchemaRepairPacket(framed: FramedPrompt, rejected: {
   readonly parseStatus: string;
   readonly parseError: string;
 }): PromptPacket {
@@ -2275,7 +2326,17 @@ interface ComposedCitationContext {
    * the person's and the debaters' own words, so the prose may repeat them.
    */
   readonly exemptTokens: ReadonlySet<string>;
+  /**
+   * Reply language (2026-10-12): the person's question, whose language every
+   * segment's prose must be in (`replyLanguageCheck`). Without it the prose's
+   * language is not checked.
+   */
+  readonly questionLine?: string;
 }
+
+/** Reply language (2026-10-12): the answer's prose, and the checker's objection (the next round's material). */
+export const COMPOSED_PROSE = Object.freeze(["segments.*.text"] as const);
+export const EVALUATOR_PROSE = Object.freeze(["objection"] as const);
 
 /**
  * The writer's content classifier: the composition schema first (unchanged),
@@ -2283,10 +2344,10 @@ interface ComposedCitationContext {
  * question or a node's full statement already states is exempt from the prose
  * check (review round 2). Deterministic, and it never throws on model content.
  */
-export function classifyComposedContent(content: string, citation: ComposedCitationContext): ContentClassification {
-  const structured = classifyStructuredContent(content, compositionSchema);
+export function classifyComposedContent(content: string, citation: ComposedCitationContext, reply?: ModelReplyFacts): ContentClassification {
+  const structured = classifyStructuredContent(content, compositionSchema, reply);
   if (structured.parseStatus !== "PARSED") return structured;
-  const composed = parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
+  const composed = parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR", reply);
   const issues: ComposedCitationIssue[] = [];
   for (const [segmentIndex, segment] of composed.segments.entries()) {
     if (nodeIdsNamedInText(citation.digest, segment.text, citation.exemptTokens).length > 0) {
@@ -2298,9 +2359,12 @@ export function classifyComposedContent(content: string, citation: ComposedCitat
       }
     }
   }
-  return issues.length === 0
-    ? { parseStatus: "PARSED", parseError: null }
-    : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
+  if (issues.length > 0) return { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
+  // Reply language (2026-10-12): checked once the citations hold, so a refusal names one kind of fix.
+  const language = citation.questionLine === undefined ? [] : replyLanguageCheck(citation.questionLine, COMPOSED_PROSE)(composed);
+  return language.length === 0
+    ? structured
+    : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(language) };
 }
 
 /** The citation rejection a classifier error names first, or null for any other rejection. */
@@ -2323,7 +2387,8 @@ export function composedCitationRejectionOf(parseError: string): ComposedCitatio
  * to fix) in place of the generic `SCHEMA_FAILED`. Anything else is the shared
  * schema repair, unchanged.
  */
-function buildComposedRepairPacket(framed: FramedPrompt, rejected: {
+// Exported for the same reason as `buildSchemaRepairPacket`.
+export function buildComposedRepairPacket(framed: FramedPrompt, rejected: {
   readonly parseStatus: string;
   readonly parseError: string;
 }): PromptPacket {
@@ -2478,6 +2543,11 @@ function projectedServeCallMicros(
  * one that wrote the draft under check comes first (`preferNot`); the writer
  * itself is offered last, so it checks its own draft only when nothing else
  * fits — and the disclosure row says so.
+ *
+ * Run resilience (spec 2026-10-12, fix (a)): with the preview's sit-out book (`sitOut`), a maker that sits out the
+ * rest of the run is never offered, and when the planned maker moved because IT sits out (`avoidGate`: its gate), a
+ * maker behind another gate comes before one behind the same gate — after the checker's `preferNot` rule, before
+ * price. Without the book, or for a money refusal with nobody sitting out, the order is exactly today's.
  */
 export function servePhaseFallbackOrder(input: Readonly<{
   planned: string;
@@ -2485,12 +2555,16 @@ export function servePhaseFallbackOrder(input: Readonly<{
   prices: ProviderPriceMap;
   request: Pick<ProviderCallRequest, "packet" | "bound">;
   preferNot: string | null;
+  sitOut?: RunSitOutView;
+  avoidGate?: string | null;
 }>): readonly ServeRoleMaker[] {
   const seen = new Set<string>([input.planned]);
   const candidates: { readonly maker: ServeRoleMaker; readonly index: number; readonly micros: number | null }[] = [];
+  const avoidGate = input.avoidGate ?? null;
   for (const maker of input.claimEligible) {
     if (seen.has(maker.providerRef)) continue;
     seen.add(maker.providerRef);
+    if (input.sitOut?.sitsOut(maker.providerRef) === true) continue;
     const price = input.prices.get(maker.providerRef);
     candidates.push({
       maker,
@@ -2500,6 +2574,8 @@ export function servePhaseFallbackOrder(input: Readonly<{
   }
   const rank = (entry: typeof candidates[number]): readonly number[] => [
     input.preferNot !== null && entry.maker.providerRef === input.preferNot ? 1 : 0,
+    // Fix (a): 0 for every maker when no gate is avoided, so the order below is today's.
+    avoidGate !== null && input.sitOut?.gateOf(entry.maker.providerRef) === avoidGate ? 1 : 0,
     entry.micros === null ? 1 : 0,
     entry.micros ?? 0,
     entry.index
@@ -2518,6 +2594,12 @@ export interface ServeRoleCallOutcome<T> {
   readonly result: T;
   readonly servedBy: ServeRoleMaker;
   readonly fallback: boolean;
+  /**
+   * Run resilience (spec 2026-10-12, fix (a)): why a fallback served — "ROLE_UNAVAILABLE" when the call moved
+   * because the planned maker sits out the rest of the run, "MONEY" for the money fallback; null when the planned
+   * maker served. The disclosure row records the role's reason from it (migration 0114's per-role reasons).
+   */
+  readonly movedFor: "MONEY" | "ROLE_UNAVAILABLE" | null;
 }
 
 /**
@@ -2553,6 +2635,17 @@ export interface ServeRoleCallOutcome<T> {
  * `onFallbackFailure` before it ends the search. The answer-writer and the
  * checker hand it `fallbackContentRefusal`; the story hands nothing, so its
  * failures travel as they are. The planned maker's failure is never mapped.
+ *
+ * RUN RESILIENCE (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, fix (a); ruling R-c: the
+ * preview only). With the run's sit-out book (`sitOut`), a call also moves on from a maker that SITS OUT the rest of
+ * the run once its try failed — it was already sitting out (MAKER_SAT_OUT, nothing sent), its gate is unavailable
+ * (PROVIDER_GATE_UNAVAILABLE), or its call ended in gate-proven unbilled refusals (busy) — whatever code its failure
+ * reached this function under (a serve role's dead transport arrives as SYNTHESIS_TRANSPORT_DEATH). The book is the
+ * one judge of all three, so no failure code is read twice. Such a move is ROLE_UNAVAILABLE, never MONEY; makers
+ * that sit out are skipped (also one that starts sitting out while the search runs, as a gate halting mid-search
+ * does), and a maker behind another gate is tried first. Nobody left: the planned refusal travels, as it always
+ * has — on the answer roles a dead transport, which ends the answer components-only on the floor (Task M5), never
+ * CALL_BUDGET_EXHAUSTED (fix (b) gives each maker its own allowance). Without the book: today's search, unchanged.
  */
 export async function callServeRoleWithFallback<T>(input: Readonly<{
   planned: ServeRoleMaker;
@@ -2563,25 +2656,37 @@ export async function callServeRoleWithFallback<T>(input: Readonly<{
   call: (maker: ServeRoleMaker, request: ProviderCallRequest) => Promise<T>;
   refusedForMoney?: (error: unknown) => boolean;
   onFallbackFailure?: (error: unknown, request: ProviderCallRequest) => unknown;
+  sitOut?: RunSitOutView;
 }>): Promise<ServeRoleCallOutcome<T>> {
   const refusedForMoney = input.refusedForMoney ?? ((error: unknown) => envelopeStopKind(error) === "MONEY");
+  const satOut = (maker: ServeRoleMaker): boolean => input.sitOut?.sitsOut(maker.providerRef) === true;
   try {
-    return Object.freeze({ result: await input.call(input.planned, input.request), servedBy: input.planned, fallback: false });
+    return Object.freeze({
+      result: await input.call(input.planned, input.request), servedBy: input.planned, fallback: false, movedFor: null
+    });
   } catch (refusal) {
-    if (!refusedForMoney(refusal)) throw refusal;
+    // Fix (a): the book is read AFTER the try, so a maker the try itself just made sit out moves on too.
+    const unavailable = satOut(input.planned);
+    if (!unavailable && !refusedForMoney(refusal)) throw refusal;
+    const movedFor = unavailable ? "ROLE_UNAVAILABLE" as const : "MONEY" as const;
     for (const maker of servePhaseFallbackOrder({
       planned: input.planned.providerRef,
       claimEligible: input.claimEligible,
       prices: input.prices,
       request: input.request,
-      preferNot: input.preferNot
+      preferNot: input.preferNot,
+      ...(input.sitOut === undefined ? {} : {
+        sitOut: input.sitOut,
+        avoidGate: unavailable ? input.sitOut.gateOf(input.planned.providerRef) ?? null : null
+      })
     })) {
+      if (satOut(maker)) continue;
       const fallbackRequest = { ...input.request, providerRef: maker.providerRef };
       try {
         const result = await input.call(maker, fallbackRequest);
-        return Object.freeze({ result, servedBy: maker, fallback: true });
+        return Object.freeze({ result, servedBy: maker, fallback: true, movedFor });
       } catch (error) {
-        if (!refusedForMoney(error)) {
+        if (!refusedForMoney(error) && !satOut(maker)) {
           throw input.onFallbackFailure === undefined ? error : input.onFallbackFailure(error, fallbackRequest);
         }
       }
@@ -2642,9 +2747,12 @@ export function fallbackContentRefusal(
  */
 export function storyCostFallback(
   claimEligible: readonly ServeRoleMaker[],
-  prices: ProviderPriceMap
+  prices: ProviderPriceMap,
+  // Run resilience (spec 2026-10-12, fix (a)): the run's sit-out book, so a story role moves on from a member that
+  // sits out exactly as the answer roles do. Absent off the preview.
+  sitOut?: RunSitOutView
 ): StoryCostFallback {
-  return (input) => callServeRoleWithFallback({ ...input, claimEligible, prices });
+  return (input) => callServeRoleWithFallback({ ...input, claimEligible, prices, ...(sitOut === undefined ? {} : { sitOut }) });
 }
 
 /**
@@ -2992,7 +3100,10 @@ export function serveDisclosureBodyFacts(input: Readonly<{
 }>): Readonly<{ bodyStop: EnvelopeStopKind | null; pointsWithoutReview: number | null }> {
   return Object.freeze({
     bodyStop: input.runBodyBudgetStop,
-    pointsWithoutReview: input.decision.footing === "SPEND_STOPPED" ? input.decision.seededWithoutReview.length : null
+    // Run resilience (fix (d)): the arguing that ended for want of members leaves its unreviewed points too.
+    pointsWithoutReview: input.decision.footing === "SPEND_STOPPED" || input.decision.footing === "MEMBERS_SAT_OUT"
+      ? input.decision.seededWithoutReview.length
+      : null
   });
 }
 
@@ -3155,18 +3266,25 @@ export function logServeDisclosure(event: string, detail: Readonly<Record<string
   console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_SERVE_DISCLOSURE", event }));
 }
 
-export function parseComposerOutput(content: string): z.infer<typeof compositionSchema> {
-  return parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
+/** `reply`: how the accepted reply ended (`rememberingAcceptedReply`), so it is read exactly as its classifier read it. */
+export function parseComposerOutput(content: string, reply?: ModelReplyFacts): z.infer<typeof compositionSchema> {
+  return parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR", reply);
 }
 
-/** The evaluator's verdict as the engine reads it (the parser of the EVALUATOR call). */
-export function parseEvaluatorOutput(content: string): z.infer<typeof evaluatorVerdictSchema> {
-  return parseContent(content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
+/** The evaluator's verdict as the engine reads it (the parser of the EVALUATOR call); `reply` as for `parseComposerOutput`. */
+export function parseEvaluatorOutput(content: string, reply?: ModelReplyFacts): z.infer<typeof evaluatorVerdictSchema> {
+  return parseContent(content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR", reply);
 }
 
-/** The EVALUATOR call's content classifier: the same reading as `parseEvaluatorOutput`. */
-export function classifyEvaluatorContent(content: string): ContentClassification {
-  return classifyStructuredContent(content, evaluatorVerdictSchema);
+/**
+ * The EVALUATOR call's content classifier: the same reading as `parseEvaluatorOutput`. Reply language (2026-10-12):
+ * with the person's question, an objection must be in its language (`EVALUATOR_PROSE`).
+ */
+export function classifyEvaluatorContent(content: string, reply?: ModelReplyFacts, questionLine?: string): ContentClassification {
+  const structured = classifyStructuredContent(content, evaluatorVerdictSchema, reply);
+  if (structured.parseStatus !== "PARSED" || questionLine === undefined) return structured;
+  const language = replyLanguageCheck(questionLine, EVALUATOR_PROSE)(parseEvaluatorOutput(content, reply));
+  return language.length === 0 ? structured : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(language) };
 }
 
 export interface DebateExpansionLeg {
@@ -3553,6 +3671,13 @@ export interface MakerPositionDisclosureRoot {
  *
  * `monoMakerRecords` is REQUIRED (round 4, R-C): the marks and the records are
  * the two halves of one statement, and an optional half is how they diverge.
+ *
+ * Run resilience (spec 2026-10-12, fix (d); ruling R-b): on the preview a run can
+ * also reach one authored root because its other members SAT OUT (busy, or behind
+ * an unavailable gate) and too few were left to argue (`membersSatOut`, the
+ * answer's RUN_PANEL_REVISED reason). That is not money, so the same SINGLE-LINEAGE
+ * record names the members instead, with the lift the claim-time revision already
+ * uses; no new reader text. Absent, the rule above is unchanged.
  */
 export function buildMakerPositionDisclosure(input: Readonly<{
   effectiveMakerCount: number;
@@ -3561,6 +3686,7 @@ export function buildMakerPositionDisclosure(input: Readonly<{
   servedRoot: MakerPositionDisclosureRoot;
   monoMakerConditionMarks: readonly ConditionMarkRecord["mark"][];
   monoMakerRecords: readonly ConditionMarkRecord[];
+  membersSatOut?: string | null;
 }>): Readonly<{
   conditionMarks: readonly ConditionMarkRecord["mark"][];
   records: readonly ConditionMarkRecord[];
@@ -3574,6 +3700,20 @@ export function buildMakerPositionDisclosure(input: Readonly<{
   const unserved = input.authoredMakerPositions
     .filter((root) => root.nodeId !== input.servedRoot.nodeId);
   if (unserved.length === 0) {
+    if (input.runBodyBudgetStop === null && input.membersSatOut !== undefined && input.membersSatOut !== null) {
+      return Object.freeze({
+        conditionMarks: Object.freeze(["SINGLE-LINEAGE" as const]),
+        records: Object.freeze([Object.freeze({
+          mark: "SINGLE-LINEAGE" as const,
+          scope: "answer" as const,
+          subjectRef: input.servedRoot.nodeId,
+          reason: input.membersSatOut,
+          liftPath: "RESTORE_PINNED_PROVIDER_AND_RUN_AGAIN",
+          servedRootRule: null,
+          affectedNodeIds: Object.freeze([input.servedRoot.nodeId])
+        } satisfies ConditionMarkRecord)])
+      });
+    }
     if (input.runBodyBudgetStop === null) {
       throw new TypedDomainError(
         "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
@@ -3601,8 +3741,12 @@ export function buildMakerPositionDisclosure(input: Readonly<{
   });
 }
 
-/** The footing on which judged standing is projected for the served answer. */
-export type MakerPositionServeFooting = "MONO_MAKER" | "CROSS_REVIEWED" | "SPEND_STOPPED";
+/**
+ * The footing on which judged standing is projected for the served answer. MEMBERS_SAT_OUT (run resilience, spec
+ * 2026-10-12, fix (d)): the preview's arguing ended because too few members were left, so, as on SPEND_STOPPED, no
+ * review can be bought for what exists, and each node a review never reached stands on its own panel (R-A's rule).
+ */
+export type MakerPositionServeFooting = "MONO_MAKER" | "CROSS_REVIEWED" | "SPEND_STOPPED" | "MEMBERS_SAT_OUT";
 
 export interface MakerPositionServeDecision<T extends MakerPositionDisclosureRoot> {
   readonly footing: MakerPositionServeFooting;
@@ -3672,12 +3816,18 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
   monoMakerConditionMarks: readonly ConditionMarkRecord["mark"][];
   /** The mono-maker records name the served root, which is only known here. */
   monoMakerRecords: (servedRoot: T) => readonly ConditionMarkRecord[];
+  /**
+   * Run resilience (spec 2026-10-12, fix (d)): the answer's RUN_PANEL_REVISED reason when the preview's arguing
+   * ended because too few members were left to argue; absent or null on every other run (today's decision).
+   */
+  membersSatOut?: string | null;
 }>): MakerPositionServeDecision<T> {
+  const membersSatOut = input.membersSatOut ?? null;
   const footing: MakerPositionServeFooting = input.effectiveMakerCount <= 1
     ? "MONO_MAKER"
-    : input.runBodyBudgetStop === null ? "CROSS_REVIEWED" : "SPEND_STOPPED";
+    : input.runBodyBudgetStop !== null ? "SPEND_STOPPED" : membersSatOut === null ? "CROSS_REVIEWED" : "MEMBERS_SAT_OUT";
   const seededWithoutReview: readonly string[] = (() => {
-    if (footing !== "SPEND_STOPPED") return Object.freeze([]);
+    if (footing !== "SPEND_STOPPED" && footing !== "MEMBERS_SAT_OUT") return Object.freeze([]);
     const reviewed = new Set(input.reviewedNodeIds);
     const unjudged = new Set(input.unjudgedReviewNodeIds);
     return Object.freeze(input.materialisedNodeIds.filter((nodeId) => !reviewed.has(nodeId) && !unjudged.has(nodeId)));
@@ -3689,6 +3839,7 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
       case "CROSS_REVIEWED":
         return input.reviewedNodeIds;
       case "SPEND_STOPPED":
+      case "MEMBERS_SAT_OUT":
         return Object.freeze([...input.reviewedNodeIds, ...seededWithoutReview]);
       default: return exhaustive(footing);
     }
@@ -3714,7 +3865,8 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
     authoredMakerPositions: input.authoredMakerPositions,
     servedRoot,
     monoMakerConditionMarks: input.monoMakerConditionMarks,
-    monoMakerRecords: input.monoMakerRecords(servedRoot)
+    monoMakerRecords: input.monoMakerRecords(servedRoot),
+    ...(membersSatOut === null ? {} : { membersSatOut })
   });
   return Object.freeze({
     footing,
@@ -4565,6 +4717,12 @@ export class WalkingSkeletonRunner {
         hold,
         attempt: input.attempt,
         ...(siteAttemptsSpent === undefined ? {} : { siteAttemptsSpent }),
+        // Run resilience (spec 2026-10-12, ruling R-a): on the preview a busy member, an unavailable gate or a member
+        // that already sits out halts the site at once — no ten-minute hold for a model that will not be asked again.
+        // Finding 4 (review, 2026-10-12): the book judges it — a failure of the kind AND of a member that sat out through
+        // its own gateway — so a busy failure the book never saw keeps the hold. `sitOut` is built at claim, below,
+        // before any site is attempted; R-d: the gate's own unbilled refusals never sit a member out, so they hold.
+        ...(sitOut === null ? {} : { haltsAtOnce: sitOut.haltsAtOnce }),
         // A15d (controller carry 3, the ruling's preferred option): the site's
         // ONE final retry. A seat key past the sequence bound has spent it, so
         // the member answering here gets none when its partner's key has.
@@ -4714,6 +4872,25 @@ export class WalkingSkeletonRunner {
       }
       configuredMakers.push(configured!);
     }
+    /**
+     * Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, fix (d); rulings R-a,
+     * R-b) — THIS RUN'S SIT-OUT BOOK, on the preview only. Every claim-eligible maker's gateway (its judge's too) is
+     * wrapped here, before any per-run copy is taken (`bodyMakers`, the seat book, `synthesisMakers` and the story's
+     * makers all read these entries), so a member that sits out is refused before anything is sent wherever it was
+     * planned. Without `runResilience` (hosted and local) nothing is wrapped and every path below is today's.
+     */
+    const sitOut: RunSitOutBook | null = this.settings.runResilience === undefined
+      ? null
+      : createRunSitOutBook(this.settings.runResilience);
+    const sitOutMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {
+      if (sitOut === null) return maker;
+      const provider = sitOut.gateway(maker.providerRef, maker.provider);
+      return Object.freeze({ ...maker, provider, judge: new Judge(provider) });
+    };
+    configuredMakers.forEach((maker, index) => { configuredMakers[index] = sitOutMaker(maker); });
+    /** Fix (d): a seat sits out when every member it could call does; never without the book. */
+    const seatSitsOut = (seat: RunSeat): boolean => sitOut !== null
+      && membersOf(seat).every((member) => sitOut.sitsOut(member.providerRef));
     /**
      * B9 (budget spec §2.9) — CHEAPER MODELS WHILE ARGUING, under the new
      * settings. Each claim-eligible maker's judge is given a gateway for this
@@ -4933,7 +5110,9 @@ export class WalkingSkeletonRunner {
       ? synthesisRolePolicy.synthesizerRoleRef
       : synthesisRolePolicy.evaluatorRoleRef))) {
       if (panelRefs.has(roleRef)) continue;
-      const configured = configuredByProviderRef.get(roleRef);
+      // Run resilience (fix (d)): an out-of-panel role maker sits out on the same book as the panel.
+      const unwrapped = configuredByProviderRef.get(roleRef);
+      const configured = unwrapped === undefined ? undefined : sitOutMaker(unwrapped);
       if (configured === undefined || this.settings.claimTimeSynthesisRoleProbe === undefined) continue;
       // A15d (fix round 1, minor 4): a route the assignment also names was
       // probed above in this claim; its verdict stands, and no second probe row
@@ -5466,7 +5645,9 @@ export class WalkingSkeletonRunner {
       const notTheAuthor = (member: SeatIdentity): boolean => member.maker !== input.authorMaker;
       const panelCallCap = Math.max(effectiveMakerCount, envelopeBasis.panelSize) - 1;
       const panelKeyFor = (member: SeatMember): string => `${input.callSiteKey}:${member.providerRef}`;
-      const plannedSeats = seatBook.judge.map((seat) => {
+      // Run resilience (spec 2026-10-12, fix (d)): a member that sits out the rest of the run has no panel seat; it
+      // is disclosed once, on the answer (RUN_PANEL_REVISED), not as a failed seat on every node.
+      const plannedSeats = seatBook.judge.filter((seat) => !seatSitsOut(seat)).map((seat) => {
         // A16a (controller ruling on carry 1; fix round 1): a panel site a slot
         // answered on an earlier pass is PREFERRED for that slot again, and the
         // other member stays its backup (`ledgerSeatRule`).
@@ -5738,7 +5919,10 @@ export class WalkingSkeletonRunner {
       const exhausted = await this.#ledger.findExhaustedModelAttempt({
         runId: run.runId,
         workItemId: claimed.workItemId,
-        ...callSite
+        ...callSite,
+        // Run resilience (spec 2026-10-12, fix (b)): on the preview each maker's attempts are its own, as the
+        // counting gateway counts them (`attemptScope`), so the serve fallback's hops never end the work item here.
+        ...(this.settings.runResilience === undefined ? {} : { byActor: true })
       });
       if (exhausted !== null) {
         if (exhausted.outcome === "OK") continue;
@@ -5959,40 +6143,76 @@ export class WalkingSkeletonRunner {
       startedAt: judgementScheduledAt,
       finishedAt: new Date()
     });
-    const primarySeat = seatBook.position[0]!;
-    const primaryPlan = seatCallPlan(primarySeat, "JUDGE", positionRule(primarySeat));
-    const primaryAttempt = await cooldownAttempt({
-      callSiteKey: FIRST_POSITION_CALL_SITE_KEY,
-      parentNodeId: null,
-      plannedLegCount: 1,
-      failureScope: "MAKER_POSITION",
-      seatMember: primaryPlan.seatMember,
-      retrySeatMember: primaryPlan.retryMember,
-      attempt: (maxAttempts) => seatCaller.callSeat({
-        seat: primarySeat,
-        callSiteKey: "JUDGE",
-        ...primaryPlan.options,
-        call: (member, callSiteKey) => member.judge.judge({
-          runId: run.runId,
-          subjectItemId: claimed.workItemId,
-          callSiteKey,
-          // DL4-F4: the question travels as the question, in its own fenced
-          // field; the leg's directive is code's and rides the system message.
-          questionLine: run.questionLine,
-          argumentLanguageName: run.argumentLanguageName,
-          leg: { kind: "primary-root" },
-          providerRef: member.providerRef,
-          contractHash: this.settings.judgeContractHash,
-          bound: { ...this.settings.judgeBound, maxAttempts }
+    /**
+     * Run resilience (spec 2026-10-12, fix (d)) — WHICH SEAT WRITES EACH ROOT. Root i is position seat i, as always,
+     * unless root 0's own member sat out: then the next member that does not sit out opens, and the two seats trade
+     * roots, so the member that sat out holds the later root, which is dropped like any other root of a member that
+     * sits out (`rootSitsOut`). Without the sit-out book nothing ever trades and this is the seat book's own order.
+     */
+    const rootSeats: RunSeat[] = [...seatBook.position];
+    /** True when every member of root `rootIndex`'s seat sits out the rest of the run (never without the book). */
+    const rootSitsOut = (rootIndex: number): boolean => rootSeats[rootIndex] !== undefined && seatSitsOut(rootSeats[rootIndex]!);
+    /**
+     * Fix (d): the roots dropped because their member sat out (`satOutDuringRun`), instead of
+     * MAKER_POSITION_UNAVAILABLE: their subtrees and cross-exchanges are never planned, and the answer discloses the
+     * members through RUN_PANEL_REVISED. A root HALTED by a billed failure keeps today's refusal.
+     */
+    const satOutDuringRun = new Set<number>();
+    /**
+     * Fix (d): fewer than two members left to argue ends the arguing — a stop that is not money, so it never rides
+     * the answer as an envelope record — and the run goes on to its answer with what it has. Set once, never unset.
+     */
+    let membersSatOutStop = false;
+    const tooFewLeftToArgue = (): boolean => {
+      if (sitOut !== null && effectiveMakerCount > 1 && !membersSatOutStop) {
+        membersSatOutStop = rootSeats.filter((_seat, rootIndex) => !rootSitsOut(rootIndex)).length < 2;
+      }
+      return membersSatOutStop;
+    };
+    const openFirstPosition = async (primarySeat: RunSeat) => {
+      const primaryPlan = seatCallPlan(primarySeat, "JUDGE", positionRule(primarySeat));
+      const primaryAttempt = await cooldownAttempt({
+        callSiteKey: FIRST_POSITION_CALL_SITE_KEY,
+        parentNodeId: null,
+        plannedLegCount: 1,
+        failureScope: "MAKER_POSITION",
+        seatMember: primaryPlan.seatMember,
+        retrySeatMember: primaryPlan.retryMember,
+        attempt: (maxAttempts) => seatCaller.callSeat({
+          seat: primarySeat,
+          callSiteKey: "JUDGE",
+          ...primaryPlan.options,
+          call: (member, callSiteKey) => member.judge.judge({
+            runId: run.runId,
+            subjectItemId: claimed.workItemId,
+            callSiteKey,
+            // DL4-F4: the question travels as the question, in its own fenced
+            // field; the leg's directive is code's and rides the system message.
+            questionLine: run.questionLine,
+            argumentLanguageName: run.argumentLanguageName,
+            leg: { kind: "primary-root" },
+            providerRef: member.providerRef,
+            contractHash: this.settings.judgeContractHash,
+            bound: { ...this.settings.judgeBound, maxAttempts }
+          })
         })
-      })
-    }).catch((error: unknown) => {
-      // Task M2 (spec §14.4.1): the author's own first call is the one stop that
-      // leaves nothing to answer from. A ceiling that refuses it is below one
-      // call — a configuration fault, failed typed under its own code. Anything
-      // else, a vendor that reports no usage included, travels as it is.
-      throw firstCallCeilingFailure(error) ?? error;
-    });
+      }).catch((error: unknown) => {
+        // Task M2 (spec §14.4.1): the author's own first call is the one stop that
+        // leaves nothing to answer from. A ceiling that refuses it is below one
+        // call — a configuration fault, failed typed under its own code. Anything
+        // else, a vendor that reports no usage included, travels as it is.
+        throw firstCallCeilingFailure(error) ?? error;
+      });
+      return primaryAttempt;
+    };
+    let primaryAttempt = await openFirstPosition(rootSeats[0]!);
+    // Fix (d): root 0 cannot be dropped — nothing would exist to answer from — so when its member sat out, the next
+    // member that does not sit out opens instead (the two seats trade roots, above).
+    for (let next = 1; primaryAttempt.kind === "HALTED" && rootSitsOut(0) && next < rootSeats.length; next += 1) {
+      if (rootSitsOut(next)) continue;
+      [rootSeats[0], rootSeats[next]] = [rootSeats[next]!, rootSeats[0]!];
+      primaryAttempt = await openFirstPosition(rootSeats[0]!);
+    }
     if (primaryAttempt.kind === "HALTED") {
       throw new TypedDomainError(
         "MAKER_POSITION_UNAVAILABLE",
@@ -6353,12 +6573,20 @@ export class WalkingSkeletonRunner {
 
     // Task M2: a stop on the first root's panel has already ended the arguing;
     // authoring the secondary root would be one more call after it.
+    /** Fix (d): root `rootIndex` is dropped (`satOutDuringRun`) when its member sits out; false otherwise. */
+    const dropSatOutRoot = (rootIndex: number): boolean => {
+      if (!rootSitsOut(rootIndex)) return false;
+      satOutDuringRun.add(rootIndex);
+      return true;
+    };
     if (effectiveMakerCount > 1 && runBodyBudgetStop === null) {
       let secondary: Awaited<ReturnType<typeof authorPosition>> | null = null;
+      // Fix (d): a root whose member sits out is dropped without a call, and too few members left ends the arguing.
+      if (!tooFewLeftToArgue() && !dropSatOutRoot(1)) {
       try {
       secondary = await authorPosition({
         authorIndex: 1,
-        seat: seatBook.position[1]!,
+        seat: rootSeats[1]!,
         leg: { kind: "independent-root" },
         callSiteKey: "JUDGE:root:secondary",
         role: "secondary root author",
@@ -6376,25 +6604,30 @@ export class WalkingSkeletonRunner {
         // serve. Stopping here keeps it; throwing would discard it.
         runBodyBudgetStop = stop;
       }
+      }
       if (secondary !== null) {
-        if (secondary.kind === "HALTED") {
+        // Fix (d): halted because its member now sits out (busy, or its gate unavailable): dropped, not fatal.
+        if (secondary.kind === "HALTED" && !dropSatOutRoot(1)) {
           throw new TypedDomainError(
             "MAKER_POSITION_UNAVAILABLE",
             "The secondary maker position failed after the full cooldown and final-retry courtesy"
           );
         }
-        authoredNodes.set(1, secondary.value);
+        if (secondary.kind === "AUTHORED") authoredNodes.set(1, secondary.value);
       }
     }
 
     for (let makerIndex = 2; makerIndex < effectiveMakerCount; makerIndex += 1) {
       // RE-REVIEW C2(a): root 0 is minted, so the run has something to serve.
       if (runBodyBudgetStop !== null) break;
+      // Fix (d): too few members left ends the arguing; a root whose member sits out is dropped without a call.
+      if (tooFewLeftToArgue()) break;
+      if (dropSatOutRoot(makerIndex)) continue;
       let additionalRoot: Awaited<ReturnType<typeof authorPosition>>;
       try {
       additionalRoot = await authorPosition({
         authorIndex: makerIndex,
-        seat: seatBook.position[makerIndex]!,
+        seat: rootSeats[makerIndex]!,
         leg: { kind: "independent-root" },
         callSiteKey: `JUDGE:root:${makerIndex}`,
         role: "additional maker root author",
@@ -6412,6 +6645,8 @@ export class WalkingSkeletonRunner {
         break;
       }
       if (additionalRoot.kind === "HALTED") {
+        // Fix (d): halted because its member now sits out: dropped, not fatal. A billed failure keeps today's refusal.
+        if (dropSatOutRoot(makerIndex)) continue;
         throw new TypedDomainError(
           "MAKER_POSITION_UNAVAILABLE",
           `Maker position ${makerIndex} failed after the full cooldown and final-retry courtesy`
@@ -6430,8 +6665,13 @@ export class WalkingSkeletonRunner {
       // billed call. The guard lives HERE rather than at each of them, so a
       // fourth call site added tomorrow inherits it.
       if (runBodyBudgetStop !== null) return;
+      // Run resilience (spec 2026-10-12, fix (d)): too few members left to argue ends the reviews with the arguing.
+      if (tooFewLeftToArgue()) return;
+      // Fix (d): nodes whose reviewer sat out during their review, to be given another reviewer below.
+      let reviewerSatOut = false;
       for (const authoredNode of authoredNodes.values()) {
         if (reviewScheduledNodeIds.has(authoredNode.nodeId)) continue;
+        if (tooFewLeftToArgue()) return;
         reviewScheduledNodeIds.add(authoredNode.nodeId);
         const latestReviewerMaker = await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker);
         const reviewCallSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
@@ -6446,11 +6686,28 @@ export class WalkingSkeletonRunner {
         const reviewerSeats = seatBook.assigned
           ? rotateSeats(seatBook.reviewer, seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey: reviewCallSiteKey }))
           : seatBook.reviewer;
-        const reviewer = selectDifferentMakerReviewer(run.runId, authoredNode.maker, reviewerSeats.flatMap((seat) => {
+        // Fix (d): a seat whose members all sit out is never chosen to review.
+        const reviewerCandidates = reviewerSeats.flatMap((seat) => {
+          if (seatSitsOut(seat)) return [];
           const planned = seatCallPlan(seat, reviewCallSiteKey, differentMaker);
           const first = seatCaller.plan(seat, reviewCallSiteKey, planned.options);
           return first === null ? [] : [{ seat, maker: first.maker, plan: planned }];
-        }), latestReviewerMaker);
+        });
+        // Fix (d): every reviewer that could judge this node sits out — the same state as too few members left, so
+        // the arguing ends here and the node keeps its own panel's footing (`membersSatOutStop`), never a dead run.
+        // Finding 3 (review, 2026-10-12): only when a reviewer seat's member actually sat out; a node that never had a
+        // reviewer of another maker keeps today's DIFFERENT_MAKER_REVIEWER_UNAVAILABLE (selectDifferentMakerReviewer).
+        if (reviewEndsForMembersSatOut({
+          book: sitOut,
+          reviewerRefs: reviewerSeats.flatMap((seat) => membersOf(seat).map((member) => member.providerRef)),
+          candidateMakers: reviewerCandidates.map((candidate) => candidate.maker),
+          authorMaker: authoredNode.maker
+        })) {
+          reviewScheduledNodeIds.delete(authoredNode.nodeId);
+          membersSatOutStop = true;
+          return;
+        }
+        const reviewer = selectDifferentMakerReviewer(run.runId, authoredNode.maker, reviewerCandidates, latestReviewerMaker);
         try {
           const callSiteKey = reviewCallSiteKey;
           // B9: a review that has to move never moves onto the node's ACTUAL author.
@@ -6483,6 +6740,14 @@ export class WalkingSkeletonRunner {
             })
           });
           if (reviewAttempt.kind === "HALTED") {
+            // Fix (d): the reviewer itself now sits out (busy, or its gate unavailable): the node is not unjudgeable,
+            // its reviewer was; it is offered to another reviewer once this pass ends (the one that sat out is left
+            // out of the choice), unless too few members are left to argue.
+            if (seatSitsOut(reviewer.seat) && !tooFewLeftToArgue()) {
+              reviewScheduledNodeIds.delete(authoredNode.nodeId);
+              reviewerSatOut = true;
+              continue;
+            }
             hiddenReviewRecords.push({ nodeId: authoredNode.nodeId, record: reviewAttempt.record });
             continue;
           }
@@ -6525,6 +6790,8 @@ export class WalkingSkeletonRunner {
           );
         }
       }
+      // Fix (d): each pass that gives a node back marks one more member as sitting out, so this ends.
+      if (reviewerSatOut) await reviewPendingAuthoredNodes();
     };
     await reviewPendingAuthoredNodes();
 
@@ -6546,6 +6813,8 @@ export class WalkingSkeletonRunner {
     // root-major plan, so a change in it is not a boundary; round k completes at
     // the LAST leg carrying round k, when every root has finished round k.
     const globalRoundCompletions = deriveGlobalRoundCompletions(expansionPlan);
+    // Run resilience (spec 2026-10-12, fix (d)): a dropped root has no node, so nothing beneath it is ever planned.
+    const droppedSubtreeIndices = new Set([...satOutDuringRun].flatMap((rootIndex) => subtreeIndices(rootIndex)));
     const frozenIndices = new Set<number>();
     const branchFrozenRecords: ConditionMarkRecord[] = [];
     let previousRoundStrengths: readonly NodeStrengthRecord[] | null = null;
@@ -6625,6 +6894,8 @@ export class WalkingSkeletonRunner {
       // Expansion stops here and, since Task M2, the run carries what it has
       // on to its answer; the stop rides that answer as its envelope record.
       if (runBodyBudgetStop !== null) break;
+      // Fix (d): too few members left to argue ends the expansion as it ends the roots.
+      if (tooFewLeftToArgue()) break;
       if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
         await reviewPendingAuthoredNodes();
         activeExpansionRound = leg.round;
@@ -6633,9 +6904,11 @@ export class WalkingSkeletonRunner {
         // leg below would be authored — one more billed call — after the run
         // was told it cannot pay.
         if (runBodyBudgetStop !== null) break;
+        if (tooFewLeftToArgue()) break;
       }
       const skipped = haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)
-        || frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex);
+        || frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex)
+        || droppedSubtreeIndices.has(leg.parentIndex) || droppedSubtreeIndices.has(leg.childIndex);
       if (!skipped) {
       const parent = authoredNodes.get(leg.parentIndex);
       if (parent === undefined) {
@@ -6740,6 +7013,9 @@ export class WalkingSkeletonRunner {
     for (const exchange of buildCrossRootExchangePlan(effectiveMakerCount)) {
       // C1: same rule as the expansion loop above.
       if (runBodyBudgetStop !== null) break;
+      // Fix (d): too few members left ends the exchanges; a dropped root neither defends nor is attacked.
+      if (tooFewLeftToArgue()) break;
+      if (satOutDuringRun.has(exchange.authorRootIndex) || satOutDuringRun.has(exchange.targetRootIndex)) continue;
       const authorRoot = authoredNodes.get(exchange.authorRootIndex);
       const targetRoot = authoredNodes.get(exchange.targetRootIndex);
       if (authorRoot === undefined || targetRoot === undefined) {
@@ -6839,6 +7115,12 @@ export class WalkingSkeletonRunner {
      * projected on the single-maker footing (R-A): the review guard above
      * bought no review for the roots that exist, and none can be bought now.
      */
+    /**
+     * Run resilience (spec 2026-10-12, fix (d); ruling R-b): the claim-eligible members that sat out during the
+     * arguing, as the answer discloses them (`RUN_PANEL_REVISED:<ref>=PROVIDER_BUSY|PROVIDER_GATE_UNAVAILABLE`,
+     * merged into the CRITIQUE-UNAVAILABLE record below); null on every other run.
+     */
+    const panelRevisedDuringRun = runPanelRevisedReason(sitOut, configuredMakers.map((maker) => maker.providerRef));
     const makerPositionServe = decideMakerPositionServe({
       effectiveMakerCount,
       runBodyBudgetStop,
@@ -6853,7 +7135,9 @@ export class WalkingSkeletonRunner {
         ...unassessedReviewRecords.map(({ nodeId }) => nodeId)
       ],
       monoMakerConditionMarks,
-      monoMakerRecords
+      monoMakerRecords,
+      // Fix (d): the arguing that ended because too few members were left is not money, and says why.
+      ...(tooFewLeftToArgue() ? { membersSatOut: panelRevisedDuringRun } : {})
     });
     // Task M3 (spec §14.4.5): what the arguing left for the owner's disclosure
     // row, taken HERE, where the body ends and the serve decision reads the same
@@ -7054,7 +7338,7 @@ export class WalkingSkeletonRunner {
       return Object.freeze([...affected].filter((nodeId) => classHNodeIds.has(nodeId)));
     };
     const hiddenConditionMarks = Object.freeze([
-      ...(absentAtClaim.length > 0 ? ["CRITIQUE-UNAVAILABLE" as const] : []),
+      ...(absentAtClaim.length > 0 || panelRevisedDuringRun !== null ? ["CRITIQUE-UNAVAILABLE" as const] : []),
       ...(classHReviewRecords.length > 0 ? ["HIDDEN-UNJUDGEABLE" as const] : []),
       ...(classDReviewRecords.length > 0 ? ["DERIVED-STANDING-UNREVIEWED" as const] : []),
       ...(lowScoreRows.length > 0 ? ["HIDDEN-LOW-SCORE" as const] : []),
@@ -7115,6 +7399,12 @@ export class WalkingSkeletonRunner {
      */
     const writerPlannedByRound = new Map<number, string>();
     const checkerPlannedByRound = new Map<number, string>();
+    /**
+     * Run resilience (spec 2026-10-12, fix (a)): per round, the member a role moved to because its planned member sat
+     * out the rest of the run. The disclosure row names that role's fallback ROLE_UNAVAILABLE, never MONEY.
+     */
+    const writerUnavailableByRound = new Map<number, string>();
+    const checkerUnavailableByRound = new Map<number, string>();
     /** The member the checker's seat will ask first at `round` — the writer's `preferNot` (M3 review polish). */
     const plannedCheckerRef = (round: number): string => {
       if (seatBook.answerChecker === null) return synthesisRoles.evaluatorRoleRef;
@@ -7140,11 +7430,18 @@ export class WalkingSkeletonRunner {
       // T7 / S3-2: one typed record per frozen branch, minted at the round
       // boundary that froze it and carried whole to the answer.
       ...branchFrozenRecords,
-      ...(absentAtClaim.length === 0 || effectiveMakerCount === 1 ? [] : [Object.freeze({
+      // Run resilience (fix (d), R-b): the members that sat out during the arguing join the claim-time revision in
+      // the ONE record; with none, the reason is today's to the byte.
+      ...((absentAtClaim.length === 0 && panelRevisedDuringRun === null) || effectiveMakerCount === 1 ? [] : [Object.freeze({
         mark: "CRITIQUE-UNAVAILABLE" as const,
         scope: "answer" as const,
         subjectRef: servedRoot.nodeId,
-        reason: `CLAIM_PANEL_REVISED:${absentAtClaim.map(({ member, failureCode }) => `${member.provider_ref}=${failureCode}`).join(",")}`,
+        reason: [
+          ...(absentAtClaim.length === 0 ? [] : [
+            `CLAIM_PANEL_REVISED:${absentAtClaim.map(({ member, failureCode }) => `${member.provider_ref}=${failureCode}`).join(",")}`
+          ]),
+          ...(panelRevisedDuringRun === null ? [] : [panelRevisedDuringRun])
+        ].join("|"),
         liftPath: "RESTORE_PINNED_PROVIDER_AND_RUN_AGAIN",
         servedRootRule: null,
         affectedNodeIds: Object.freeze([servedRoot.nodeId])
@@ -7627,8 +7924,16 @@ export class WalkingSkeletonRunner {
          * reading refuses is that maker's content failure (`fallbackContentRefusal`).
          * For the planned maker nothing changes: the same codes end the run.
          */
+        // All-steps format robustness (2026-10-12): the writer's classifier, remembered, so its accepted draft is read
+        // again exactly as the classifier read it (the last tolerant repair depends on how the reply ended).
+        const writerReading = rememberingAcceptedReply((content, reply) => classifyComposedContent(content, {
+          digest: request.digest,
+          servedNodes,
+          exemptTokens: personIdTokens,
+          questionLine: run.questionLine
+        }, reply));
         const composedSegmentsOf = (content: string): readonly ComposedSegment[] => {
-          const parsed = parseComposerOutput(content);
+          const parsed = parseComposerOutput(content, writerReading.acceptedAs(content).reply);
           const segments = parsed.segments.map((segment) => {
             if (segment.segment_id === "memory:disclosure") {
               throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "The memory disclosure segment id is reserved for the typed renderer");
@@ -7674,6 +7979,8 @@ export class WalkingSkeletonRunner {
           planned,
           claimEligible: synthesisMakers,
           prices: servePrices,
+          // Run resilience (spec 2026-10-12, fix (a)): a writer that sits out hands the round on (ROLE_UNAVAILABLE).
+          ...(sitOut === null ? {} : { sitOut }),
           preferNot: plannedCheckerRef(request.round),
           call: async (maker, call) => {
             if (maker === planned) {
@@ -7724,15 +8031,12 @@ export class WalkingSkeletonRunner {
             providerRef: planned.providerRef,
             packet,
             // Task M4 review fix I-1: the schema, then the prose and the cited refs.
-            classifyContent: (content) => classifyComposedContent(content, {
-              digest: request.digest,
-              servedNodes,
-              exemptTokens: personIdTokens
-            }),
+            classifyContent: writerReading.classifyContent,
             buildRepairPacket: (rejected) => buildComposedRepairPacket(framed, rejected)
           }
         }));
         const { response, recordedKey: synthesizerCallSiteKey, servedRef: writerServedRef, composedSegments } = served.result;
+        if (served.movedFor === "ROLE_UNAVAILABLE") writerUnavailableByRound.set(request.round, writerServedRef);
         const renderedMemory = renderMemorySentence(factBundle.memoryDisclosure);
         validateMemorySentence(factBundle.memoryDisclosure, renderedMemory);
         const partitioned = partitionServedSegments(composedSegments, renderedMemory);
@@ -7792,8 +8096,10 @@ export class WalkingSkeletonRunner {
          * each maker makes, like the writer's draft, so a cheaper checker whose
          * verdict this reading refuses has left nothing to serve.
          */
+        // All-steps format robustness (2026-10-12): remembered as the writer's is.
+        const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine));
         const evaluatorVerdictOf = (content: string): EvaluatorVerdict => {
-          const parsed = parseEvaluatorOutput(content);
+          const parsed = parseEvaluatorOutput(content, checkerReading.acceptedAs(content).reply);
           return assertEvaluatorVerdict(Object.freeze({
             satisfied: parsed.satisfied,
             objection: parsed.objection,
@@ -7814,6 +8120,8 @@ export class WalkingSkeletonRunner {
           planned,
           claimEligible: synthesisMakers,
           prices: servePrices,
+          // Run resilience (fix (a)): a checker that sits out hands the round on (ROLE_UNAVAILABLE).
+          ...(sitOut === null ? {} : { sitOut }),
           preferNot: draftWriterByRound.get(request.round) ?? null,
           call: async (maker, call) => {
             if (maker === planned) {
@@ -7852,11 +8160,12 @@ export class WalkingSkeletonRunner {
             contractHash: this.settings.conformanceContractHash,
             providerRef: planned.providerRef,
             packet,
-            classifyContent: classifyEvaluatorContent,
+            classifyContent: checkerReading.classifyContent,
             buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
           }
         }));
         const { response, recordedKey: evaluatorCallSiteKey, servedRef: checkerServedRef, verdict } = served.result;
+        if (served.movedFor === "ROLE_UNAVAILABLE") checkerUnavailableByRound.set(request.round, checkerServedRef);
         conformanceRawArtifactRefs.push(response.rawArtifactRef);
         servedChecks.set(response.rawArtifactRef, checkerServedRef);
         return Object.freeze({
@@ -8195,7 +8504,16 @@ export class WalkingSkeletonRunner {
       serveStop: serveLoopStopOf(servePhaseFailure),
       digest: serveDisclosureDigestFacts(writerDigest),
       floor,
-      ...(rotationStandIns === null ? {} : { standIns: rotationStandIns })
+      ...(rotationStandIns === null ? {} : { standIns: rotationStandIns }),
+      // Run resilience (fix (a)): a role moved off a member that sat out stands in for it, as a sealed stand-in does
+      // (0114's per-role ROLE_UNAVAILABLE). Only when such a move served the answered round; otherwise the line above.
+      ...(answeredRound === undefined
+        || (!writerUnavailableByRound.has(answeredRound.round) && !checkerUnavailableByRound.has(answeredRound.round))
+        ? {}
+        : { standIns: {
+            writerRef: writerUnavailableByRound.get(answeredRound.round) ?? rotationStandIns?.writerRef ?? null,
+            checkerRef: checkerUnavailableByRound.get(answeredRound.round) ?? rotationStandIns?.checkerRef ?? null
+          } })
     }));
     await runnerStage(
       "ANSWER_MEMORY_OBSERVATION_FAILED",
@@ -8295,7 +8613,8 @@ export class WalkingSkeletonRunner {
               // Task M7 (spec §14.4.6): a story call refused for money is offered
               // to the SAME claim-eligible makers, cheapest first by this runner's
               // price map — the answer-writer's own fallback (Task M3).
-              costFallback: storyCostFallback(synthesisMakers, servePrices),
+              // Run resilience (fix (a)): and from a member that sits out, as the answer roles do (the third argument).
+              costFallback: storyCostFallback(synthesisMakers, servePrices, sitOut ?? undefined),
               // Part 4, P4-D (P3-N1; controller C3, 3 October 2026): on a pinned
               // assignment whose answer job has a SCORECARD seat, the story is
               // written and checked by this debate's OWN answer writer and checker
@@ -8784,6 +9103,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PROMPT_FRAME_MATERIAL_MALFORMED",
   "PROMPT_INSTRUCTION_RESERVED_TOKEN",
   "PROMPT_MATERIAL_FIELD_NAME_INVALID",
+  "PROMPT_PATCH_NOT_APPLICABLE",
   "PROMPT_REPAIR_NOT_A_LOCATOR",
   "PROPAGATION_MAGNITUDE_INVALID",
   "PROPAGATION_RECEIPT_INVALID",
@@ -9814,7 +10134,10 @@ export function createPostgresProviderGateway(
         runId: request.runId,
         workItemId: request.subjectItemId,
         contractHash: request.contractHash,
-        callSiteKey: request.callSiteKey
+        callSiteKey: request.callSiteKey,
+        // Run resilience (spec 2026-10-12, fix (b)): the preview's call policy asks for the step's allowance per
+        // maker; the incident's fourth fallback hop was refused here on rows three OTHER makers had written.
+        ...(request.attemptScope === "actor" ? { actorRef: request.providerRef } : {})
       });
       const remaining = remainingProviderAttempts(request.bound.maxAttempts, consumed);
       if (remaining <= 0) {

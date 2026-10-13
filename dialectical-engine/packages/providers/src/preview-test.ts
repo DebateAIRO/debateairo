@@ -5,11 +5,16 @@ import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel"
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
+import { createPreviewRemainingRpcPort, type PreviewRemainingPort } from "./preview-remaining.js";
 import {
   PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
   previewModelRow, previewModelRowForRef, previewNanoUsdText, previewRefsAreReviewedSet, previewReservationNanoUsd,
   previewRostersHonourMakerRule, type PreviewModelRow, type PreviewProviderName
 } from "./preview-models.js";
+import {
+  parsePreviewThinkingLevels, previewSlipFixLevel, previewThinkingLevelFor, previewThinkingLevelOnRequest, previewThinkingStepOf,
+  type PreviewThinkingLevels
+} from "./preview-thinking.js";
 
 export const PREVIEW_GLM_MODEL = "zai-org/GLM-5.3-Flash" as const;
 export const PREVIEW_GLM_PROVIDER_REF = "preview:fixture-a" as const;
@@ -20,7 +25,15 @@ export const PREVIEW_GLM_PROVIDER_REF = "preview:fixture-a" as const;
  */
 export const PREVIEW_GLM_PROVIDER_REFS = Object.freeze([PREVIEW_GLM_PROVIDER_REF, "preview:fixture-b"] as const);
 export const PREVIEW_GLM_BASE_URL = PREVIEW_DEEPINFRA_BASE_URL;
-export const PREVIEW_GLM_DEADLINE_MS = 600_000 as const;
+/**
+ * Every preview call's deadline (previewCallBound). Slow answer (owner ruling 2026-10-12): the GATE decides when a
+ * vendor call has taken too long (its CALL_DEADLINE_SECONDS, 1,200 s, and it answers within REPLY_TIMEOUT_SECONDS,
+ * that plus 30 s), so the app waits 30 s longer than the gate's reply: 1,260 s. It was 600 s, the gate's old deadline,
+ * and a MiMo story at 17 tokens a second ran past both.
+ */
+export const PREVIEW_GLM_DEADLINE_MS = 1_260_000 as const;
+/** The gate socket's own idle timeout: past the app's deadline, so the app's abort always ends a call first. */
+export const PREVIEW_GATE_IPC_TIMEOUT_MS = PREVIEW_GLM_DEADLINE_MS + 30_000;
 export const PREVIEW_GLM_GENERATION_TOKEN_FLOOR = 8192 as const;
 /** GLM's row bound; every row's own bound is PreviewModelRow.outputBound. */
 export const PREVIEW_GLM_OUTPUT_RESERVATION = 32_768 as const;
@@ -40,6 +53,9 @@ export const PREVIEW_GLM_TARGET = Object.freeze({
  * PR B: the six-key form may also carry `anthropic_budget_socket`, the Anthropic gate's socket (same
  * folder and pattern, never the DeepInfra socket). A roster naming an Anthropic model requires it.
  * `budget_socket` stays the DeepInfra gate's. Every gate is asked with the one `scope_id`.
+ *
+ * Spec 2026-10-12 §4.2: either form may also carry the optional `thinking_levels` table (the owner's levels per AI and
+ * per step, preview-thinking.ts). It is absent in today's configuration, and then every request is today's.
  */
 export interface PreviewProviderTestConfig {
   readonly deployment: "v3-preview";
@@ -49,6 +65,8 @@ export interface PreviewProviderTestConfig {
   readonly budget_socket: string;
   readonly scope_id: string;
   readonly anthropic_budget_socket?: string;
+  /** Spec 2026-10-12 §4.2: the owner's thinking-level table, keyed by reviewed model id; absent = every row's default. */
+  readonly thinking_levels?: PreviewThinkingLevels;
 }
 /** Each non-DeepInfra provider's optional socket key (a later provider adds its own key here). */
 export const PREVIEW_PROVIDER_SOCKET_KEYS: Readonly<Record<Exclude<PreviewProviderName, "deepinfra">, "anthropic_budget_socket">> =
@@ -74,10 +92,12 @@ export function parsePreviewProviderTestConfig(source: string | undefined): Prev
   let value: unknown; try { value = JSON.parse(source); } catch { return refused(); }
   if (typeof value !== "object" || value === null || Array.isArray(value)) return refused();
   const row = value as Record<string, unknown>;
-  const keys = Object.keys(row).sort().join(",");
+  // Spec 2026-10-12 §4.2: `thinking_levels` is an optional key on both forms, so the key checks look past it.
+  const own = Object.keys(row).filter(key => key !== "thinking_levels");
+  const keys = [...own].sort().join(",");
   const legacy = keys === LEGACY_CONFIG_KEYS.join(",");
-  const socketKeys = Object.keys(row).filter(key => OPTIONAL_SOCKET_KEYS.includes(key));
-  const baseKeys = Object.keys(row).filter(key => !OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(",");
+  const socketKeys = own.filter(key => OPTIONAL_SOCKET_KEYS.includes(key));
+  const baseKeys = own.filter(key => !OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(",");
   if ((!legacy && baseKeys !== CONFIG_KEYS.join(",")) || row.deployment !== "v3-preview" || row.requested_thinking_level !== "high"
     || typeof row.budget_socket !== "string" || !PREVIEW_SOCKET_PATTERN.test(row.budget_socket)
     || typeof row.scope_id !== "string" || !/^[a-z0-9][a-z0-9-]{0,95}$/u.test(row.scope_id)) return refused();
@@ -89,9 +109,11 @@ export function parsePreviewProviderTestConfig(source: string | undefined): Prev
   const free = reviewedRoster(row.free_model_ids);
   const premium = legacy ? free : reviewedRoster(row.premium_model_ids);
   if (!previewRostersHonourMakerRule(free, premium)) return refused();
+  // Spec 2026-10-12 §4.2: a bad table throws PREVIEW_THINKING_LEVELS_INVALID from the parser, unwrapped, so the boot error names it.
   const config: PreviewProviderTestConfig = Object.freeze({ deployment: "v3-preview", free_model_ids: free, premium_model_ids: premium,
     requested_thinking_level: "high", budget_socket: row.budget_socket, scope_id: row.scope_id,
-    ...Object.fromEntries(socketKeys.sort().map(key => [key, row[key] as string])) });
+    ...Object.fromEntries(socketKeys.sort().map(key => [key, row[key] as string])),
+    ...(row.thinking_levels === undefined ? {} : { thinking_levels: parsePreviewThinkingLevels(row.thinking_levels) }) });
   // A roster model whose provider has no gate socket here could never be called: refuse to boot.
   if ([...free, ...premium].some(id => previewProviderSocket(config, previewModelRow(id)!.provider) === undefined)) return refused();
   return config;
@@ -171,9 +193,9 @@ export function assertPreviewProviderTargets(config: PreviewTargetRosters | unde
     if (reviewed === undefined || target.model !== reviewed.model || target.maker !== reviewed.maker
       || target.baseUrl !== reviewed.baseUrl
       || (target.adapterKind ?? "openai-compatible-http") !== reviewed.adapterKind
-      || (reviewed.effort === null
+      || (reviewed.defaultEffort === "default"
         ? target.thinkingParameter !== undefined || target.thinkingLevels !== undefined
-        : target.thinkingParameter !== "reasoning_effort" || target.thinkingLevels?.length !== 1 || target.thinkingLevels[0] !== reviewed.effort)
+        : target.thinkingParameter !== "reasoning_effort" || target.thinkingLevels?.length !== 1 || target.thinkingLevels[0] !== reviewed.defaultEffort)
       || target.inputPriceMicrosPerMillionTokens !== reviewed.inputPriceMicrosPerMillion
       || target.outputPriceMicrosPerMillionTokens !== reviewed.outputPriceMicrosPerMillion
       || target.contextWindowTokens !== reviewed.contextWindowTokens
@@ -206,24 +228,31 @@ export function assertPreviewRoleGateSockets(config: PreviewTargetRosters, roleR
   }
 }
 /**
- * The probe's controls for one reviewed target: "high" only where the row has an effort switch,
- * and the generation floor, never above the row's bound. Throws for a target off the reviewed rows.
+ * The probe's controls for one reviewed target: the row's default level (spec 2026-10-12 §4.5: today's request) unless
+ * that is "default" (no member), and the generation floor, never above the row's bound. Throws for a target off the
+ * reviewed rows.
  */
-export function previewProbeControls(target: Readonly<{ model: string }>): Readonly<{ thinkingLevel?: "high"; tokenCeiling: number }> {
+export function previewProbeControls(target: Readonly<{ model: string }>): Readonly<{ thinkingLevel?: string; tokenCeiling: number }> {
   const reviewed = previewModelRow(target.model) ?? refused();
-  return Object.freeze({ ...(reviewed.effort === null ? {} : { thinkingLevel: reviewed.effort }),
+  return Object.freeze({ ...(reviewed.defaultEffort === "default" ? {} : { thinkingLevel: reviewed.defaultEffort }),
     tokenCeiling: Math.min(PREVIEW_GLM_GENERATION_TOKEN_FLOOR, reviewed.outputBound) });
 }
 /**
  * Contract A §2: on the preview only, a target's gateway never asks for more output than its
  * reviewed row allows (max_tokens is clamped to the row's bound, length retries included), so the
- * guarded fetch never meets a bound the gate refuses. Off the preview nothing is added.
+ * guarded fetch never meets a bound the gate refuses. Spec 2026-10-12 §4.4: and the gateway may set
+ * exactly the row's reviewed menu (less "default", which sends nothing), whatever single level the
+ * server's target file declares, so the owner's table needs no target-file change. Spread AFTER
+ * providerTargetGatewayControls, so this menu replaces the target file's. Off the preview nothing is added.
  */
 export function previewTargetGatewayControls(
   config: PreviewProviderTestConfig | undefined, target: Readonly<{ model: string }>
-): Readonly<{ maxOutputTokens?: number }> {
+): Readonly<{ maxOutputTokens?: number; thinking?: Readonly<{ parameter: "reasoning_effort"; levels: readonly string[] }> }> {
   if (config === undefined) return Object.freeze({});
-  return Object.freeze({ maxOutputTokens: (previewModelRow(target.model) ?? refused()).outputBound });
+  const reviewed = previewModelRow(target.model) ?? refused();
+  const levels = reviewed.efforts.filter(word => word !== "default");
+  return Object.freeze({ maxOutputTokens: reviewed.outputBound,
+    ...(levels.length === 0 ? {} : { thinking: Object.freeze({ parameter: "reasoning_effort" as const, levels: Object.freeze([...levels]) }) }) });
 }
 /**
  * The preview's token floor and deadline on a call bound. Preview retry fix, option B (spec 2026-10-11
@@ -239,14 +268,58 @@ export function previewRunnerPolicy<T extends { bounds: Readonly<Record<"JUDGE" 
   if (config === undefined) return policy;
   return { ...policy, bounds: { JUDGE: previewCallBound(policy.bounds.JUDGE, config), COMPOSER: previewCallBound(policy.bounds.COMPOSER, config), CONFORMANCE: previewCallBound(policy.bounds.CONFORMANCE, config) }, synthesisRolePolicy: { ...policy.synthesisRolePolicy, synthesizerBound: previewCallBound(policy.synthesisRolePolicy.synthesizerBound, config), evaluatorBound: previewCallBound(policy.synthesisRolePolicy.evaluatorBound, config) } };
 }
-/** Only the current native storyteller request may keep one safe locator repair. */
+/** A story call site on the story lane, by its own role: the storyteller (SYNTHESIZER) or the story checker (EVALUATOR). */
+function previewStorySite(request: ProviderCallRequest, site: "STORYTELLER" | "CHECKER"): boolean {
+  return request.lane === "story" && (site === "STORYTELLER"
+    ? request.role === "SYNTHESIZER" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey)
+    : request.role === "EVALUATOR" && /^STORY:CHECKER:[1-8]$/u.test(request.callSiteKey));
+}
+/**
+ * Only the current native storyteller and story checker requests may keep one safe locator repair (story format
+ * robustness, 2026-10-12: the checker too, so one format slip no longer costs the story its check).
+ */
 function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
-  if (request.lane !== "story" || request.role !== "SYNTHESIZER"
-    || !/^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey)
+  const site = previewStorySite(request, "STORYTELLER") ? "STORYTELLER" : previewStorySite(request, "CHECKER") ? "CHECKER" : null;
+  if (site === null || !Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 2
+    || typeof request.classifyContent !== "function" || typeof request.buildRepairPacket !== "function") return false;
+  try { return assertFramedPrompt(request.packet).contractId === (site === "STORYTELLER" ? "story.storyteller.v3" : "story.checker.v2"); }
+  catch { return false; }
+}
+/**
+ * All-steps format robustness (2026-10-12): every other structured step gets the story's one repair try on the preview.
+ * A debate step on the served lane (the author legs incl. critic and cross-root, panel and review: JUDGE; the answer
+ * writer: SYNTHESIZER; the answer checker: EVALUATOR) whose request carries its own content check and repair packet, with
+ * a framed prompt and a sealed lifetime bound of at least two, may send a second POST in the same call, and only after
+ * its reply was refused by that check (`retryOnlyAfterContentRejection`): the repair packet names the issues, exactly as
+ * hosted and local repair within the sealed bound. The counting gateway still reads the step's allowance per maker off
+ * the ledger (attemptScope "actor"), so the repair is billed and counted like any attempt and the sealed bound of three
+ * leaves the runner's final retry its room. A transport failure still ends the call after one POST, and an unbilled
+ * refusal still gets the one 60-second resend.
+ *
+ * Patch follow-up (owner design, 2026-10-12): that second POST is the SHORT follow-up whenever the refused reply decoded
+ * to an object refused at named members (the gateway decides; `planPatchFollowUp`), and a call whose second POST was a
+ * patch may send a third, the full re-ask, still within the sealed bound the counting gateway hands down as what is
+ * left (`remaining`), so it never meets a spent step. The story's sealed bound of two leaves the patch only.
+ */
+function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
+  if (request.lane !== "served" || (request.role !== "JUDGE" && request.role !== "SYNTHESIZER" && request.role !== "EVALUATOR")
     || !Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 2
     || typeof request.classifyContent !== "function" || typeof request.buildRepairPacket !== "function") return false;
-  try { return assertFramedPrompt(request.packet).contractId === "story.storyteller.v2"; }
+  try { assertFramedPrompt(request.packet); return true; }
   catch { return false; }
+}
+/**
+ * Story format robustness (2026-10-12), finding 1: the storyteller thinks before it writes, and on every reviewed row
+ * that thinking counts toward max_tokens (DeepInfra reports it as reasoning tokens inside the completion; Anthropic
+ * counts thinking as output). DeepSeek spent 11,317 of the sealed 12,000 thinking and its story was cut off. On the
+ * preview only, the storyteller's call asks for its row's story allowance (PreviewModelRow.storytellerTokenCeiling,
+ * never above the row's answer cap, which the gate already reserves for every call: previewReservationNanoUsd).
+ * Slow answer (owner ruling 2026-10-12): the whole cap on the fast rows (DeepSeek, Claude Haiku), 16,384 on the slower
+ * ones (MiMo, Qwen, GLM). A length retry still asks twice the allowance, held to the row's cap by the gateway. The
+ * sealed register row is untouched; every other call keeps previewCallBound.
+ */
+export function previewStorytellerTokenCeiling(reviewed: Readonly<{ storytellerTokenCeiling: number }>): number {
+  return reviewed.storytellerTokenCeiling;
 }
 /**
  * Owner ruling 5 (2026-10-10): how long the preview waits before its one retry of a call the gate
@@ -271,26 +344,74 @@ export function waitBeforePreviewUnbilledResend(
 export class PreviewUnbilledRefusal extends ProviderUnbilledRefusal {
   constructor(message = "Private preview call was not billed and did not reach an answer") { super(message); }
 }
+/**
+ * Run resilience, review amendment R-d (orchestrator, 2026-10-12): the unbilled refusal that says the MODEL is
+ * busy — the VENDOR refused the call and the gate proved it unbilled (PROVIDER_REFUSED_UNBILLED: a vendor 429/529,
+ * hold released), or, since gate v4, the gate refused it because that one model is cooling off after such refusals
+ * (MODEL_COOLING, `PreviewModelCooling` below). The gate's other unbilled refusals stay plain
+ * `PreviewUnbilledRefusal`s: its slots were full (CONCURRENCY_LIMIT_REACHED), the vendor was never reached
+ * (PROVIDER_NOT_REACHED), or the vendor answered with an error that bills nothing but is not "busy"
+ * (PROVIDER_ERROR_UNBILLED, review 2026-10-12: Anthropic's 400/404/413/500, which a resend of the same request would
+ * meet again); they are still REFUSED rows with the one 60-second resend, but they say nothing about the model being
+ * busy, so they never make it sit out (`providerCallEndedVendorRefusedUnbilled`, read by the runner's sit-out book).
+ */
+export class PreviewVendorRefusedUnbilled extends PreviewUnbilledRefusal {
+  constructor(message = "Private preview vendor refused the call unbilled") { super(message); }
+}
+/** The longest cool-off the gate ever names (preview_budget_authority.py COOL_OFF_MAX_SECONDS: 60 s doubling to 600 s). */
+const PREVIEW_MODEL_COOLING_MAX_SECONDS = 600;
+/**
+ * Gate v4 (2026-10-12): MODEL_COOLING. After two or more vendor-unbilled refusals in a row for ONE model, the gate
+ * lets that model cool off (60 seconds, doubling up to 600) and refuses its calls before reserving anything and
+ * without contacting the vendor; after the wait one trial call goes through, and an answer clears it. Other models
+ * are not affected. For the app this is the model being busy, exactly like the vendor's own unbilled refusal: a
+ * REFUSED row, the one 60-second resend (which lands about when the first wait ends, so it is often the trial), and
+ * the model sits out the rest of the run. Never a money stop. `retryAfterSeconds` is the gate's wait in whole
+ * seconds, kept only when it is a whole number from 1 to 600; it is informational (nothing waits on it).
+ */
+export class PreviewModelCooling extends PreviewVendorRefusedUnbilled {
+  readonly retryAfterSeconds: number | undefined;
+  constructor(retryAfterSeconds?: unknown) {
+    super("Private preview gate is letting this model cool off after it was busy");
+    this.retryAfterSeconds = Number.isSafeInteger(retryAfterSeconds) && Number(retryAfterSeconds) >= 1
+      && Number(retryAfterSeconds) <= PREVIEW_MODEL_COOLING_MAX_SECONDS ? Number(retryAfterSeconds) : undefined;
+  }
+}
+/**
+ * R-d: a call that ENDED in the vendor's gate-proven unbilled refusal — the gateway's PROVIDER_CALL_FAILED whose last
+ * attempt (on the preview, the one 60-second resend) was a `PreviewVendorRefusedUnbilled`. A bare refusal is not a
+ * call's end (the gateway records and wraps every one), so it is false; so is a call that ended in the gate's own
+ * refusal, even after a vendor refusal before it.
+ */
+export function providerCallEndedVendorRefusedUnbilled(error: unknown): boolean {
+  return error instanceof TypedDomainError && error.code === "PROVIDER_CALL_FAILED"
+    && (error as { cause?: unknown }).cause instanceof PreviewVendorRefusedUnbilled;
+}
 /** The refusal itself, or the gateway's PROVIDER_CALL_FAILED wrapping it as its cause. */
 function previewCallWasUnbilled(error: unknown): boolean {
   return error instanceof PreviewUnbilledRefusal || (typeof error === "object" && error !== null
     && (error as { cause?: unknown }).cause instanceof PreviewUnbilledRefusal);
 }
 /**
- * The preview's per-call policy for ONE target. A row with an effort switch runs every call at the
- * configured level ("high"); a row without one (MiMo, Qwen) never sends a level, and a request that asks
- * for one is refused before anything is sent.
+ * The preview's per-call policy for ONE target. Spec 2026-10-12 §4.4: the owner's `thinking_levels` table
+ * picks each call's level by its step (previewThinkingLevelFor), and a call's repair POSTs run at the AI's
+ * `slip_fix` level when the owner set one (`repairThinkingLevel`). With no table every call is today's: an
+ * effort row at its default ("high"), a row without a default level (MiMo, Qwen) sends none. The caller never
+ * picks: a request asking for another level, or carrying its own repair level, is refused before anything
+ * is sent (PROVIDER_THINKING_LEVEL_UNSUPPORTED).
  *
  * Preview retry fix, option B (spec 2026-10-11 §1.1, owner ruling R1): the request's lifetime bound
- * passes through (token floor and deadline applied, `maxAttempts` kept), and each call may send ONE
- * POST (`maxAttemptsThisCall`; the storyteller's repair call two). The counting gateway behind this
+ * passes through (token floor and deadline applied, `maxAttempts` kept; the storyteller's token ceiling is
+ * its row's bound), and each call may send ONE POST (`maxAttemptsThisCall`; the storyteller's and the story
+ * checker's repair calls two; every other structured step's two, the second only to repair a refused reply:
+ * `previewFormatRepairAllowed`, all-steps format robustness, 2026-10-12). The counting gateway behind this
  * wrapper reads the step's allowance off the ledger, where an unbilled refusal is a REFUSED row it
  * does not count.
  *
  * Owner ruling 5: a call the gate proves was never billed is sent ONCE more after
  * PREVIEW_UNBILLED_RETRY_COOLDOWN_MS. Only those refusals (R4: the gate's own concurrency refusal too);
- * never a second retry; never on the storyteller, whose two attempts already include one after any
- * failure. The start-of-debate estimate counts this retry. The runner's own cooldown and final retry
+ * never a second retry; never on the storyteller or the story checker, whose two attempts already include
+ * one after any failure. The start-of-debate estimate counts this retry. The runner's own cooldown and final retry
  * still follow a failure this wrapper passes up.
  */
 export function withPreviewProviderCallPolicy(
@@ -302,18 +423,35 @@ export function withPreviewProviderCallPolicy(
   return Object.freeze({ call(request: ProviderCallRequest) {
     // A row with no effort switch runs at the vendor default, so "DEFAULT_ONLY" asks for exactly that.
     const asksNoLevel = request.thinkingLevel === undefined
-      || (reviewed.effort === null && request.thinkingLevel === THINKING_LEVEL_DEFAULT_ONLY);
-    if (!asksNoLevel && (reviewed.effort === null || request.thinkingLevel !== config.requested_thinking_level)) {
-      throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", reviewed.effort === null
+      || (reviewed.defaultEffort === "default" && request.thinkingLevel === THINKING_LEVEL_DEFAULT_ONLY);
+    if (!asksNoLevel && (reviewed.defaultEffort === "default" || request.thinkingLevel !== config.requested_thinking_level)) {
+      throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", reviewed.defaultEffort === "default"
         ? "The private preview connection for this model has no thinking level"
-        : "The private preview connection is configured for high only");
+        : "The private preview chooses this model's thinking level itself");
     }
-    const bound = previewCallBound(request.bound, config);
+    // Spec 2026-10-12 §4.4: the repair level is the owner's slip_fix alone, never the caller's.
+    if (request.repairThinkingLevel !== undefined) {
+      throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", "The private preview chooses this model's thinking level itself");
+    }
+    const preview = previewCallBound(request.bound, config);
+    const bound = previewStorySite(request, "STORYTELLER")
+      ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) }) : preview;
     const storyRepair = previewStoryRepairAllowed(request);
-    // One explicit level replaces whatever the request carried: the configured level on an effort
-    // row; DEFAULT_ONLY on a row without one, which the gateway treats exactly as "no level".
-    const send = () => gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
-      bound, maxAttemptsThisCall: storyRepair ? 2 : 1 });
+    const formatRepair = !storyRepair && previewFormatRepairAllowed(request);
+    // Spec 2026-10-12 §4.4: one explicit level replaces whatever the request carried: the owner's table picks it per
+    // step (absent = the row's default = today's request: "high" on an effort row, DEFAULT_ONLY on a row without one,
+    // which the gateway treats exactly as "no level"). Decided once per call, so the unbilled resend below runs at it
+    // too. A call that may repair (the story's or the format repair) runs its repair POSTs at the AI's `slip_fix`
+    // level when the owner set one; absent, every POST runs at the call's level, as today.
+    // Run resilience (spec 2026-10-12, fix (b)): the step's allowance is this maker's own (`attemptScope`), so a
+    // fallback that moves a call to another maker never finds the step spent by the makers it moved away from.
+    const level = previewThinkingLevelOnRequest(previewThinkingLevelFor(config.thinking_levels, reviewed, previewThinkingStepOf(request)));
+    const slipFix = previewSlipFixLevel(config.thinking_levels, reviewed);
+    const repairLevel = slipFix === undefined || (!storyRepair && !formatRepair) ? undefined : previewThinkingLevelOnRequest(slipFix);
+    const send = () => gateway.call({ ...request, thinkingLevel: level,
+      ...(repairLevel === undefined ? {} : { repairThinkingLevel: repairLevel }),
+      bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1, attemptScope: "actor",
+      ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
     if (storyRepair) return send();
     return send().catch(async (error: unknown) => {
       if (!previewCallWasUnbilled(error)) throw error;
@@ -337,37 +475,79 @@ export type PreviewBudgetPorts = Readonly<Partial<Record<PreviewProviderName, Pr
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-/** Contract A §2: the DeepInfra (OpenAI) body the DeepInfra gate accepts for a row of its own. */
+/** Spec 2026-10-12 §4.5: a body's effort is on the row's menu; "default" only as an absent member, never a wire word. */
+function effortOnMenu(present: boolean, value: unknown, reviewed: PreviewModelRow): boolean {
+  return present
+    ? typeof value === "string" && value !== "default" && (reviewed.efforts as readonly string[]).includes(value)
+    : reviewed.efforts.includes("default");
+}
+/**
+ * Contract A §2: the DeepInfra (OpenAI) body the DeepInfra gate accepts for a row of its own. Reviewed sampling
+ * (2026-10-12): a row with `sampling` requires exactly those members with exactly those numbers (a row without one
+ * accepts none of them, as it accepts no other member), as the gate's DeepInfraProfile.body_valid does. Spec
+ * 2026-10-12 §4.5: `reasoning_effort`, when present, is a word on the row's menu; absent only where the menu holds
+ * "default".
+ */
 function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
   if (reviewed.provider !== "deepinfra") return false;
   const hasResponseFormat = Object.hasOwn(body, "response_format");
   const responseFormat = body.response_format;
   if (hasResponseFormat && (!reviewed.jsonObject || !isPlainObject(responseFormat)
     || Object.keys(responseFormat).length !== 1 || !Object.hasOwn(responseFormat, "type") || responseFormat.type !== "json_object")) return false;
-  const required = ["model", "max_tokens", "messages", ...(reviewed.effort === null ? [] : ["reasoning_effort"])];
+  const sampling = Object.entries(reviewed.sampling ?? {});
+  const hasEffort = Object.hasOwn(body, "reasoning_effort");
+  const required = ["model", "max_tokens", "messages", ...(hasEffort ? ["reasoning_effort"] : []),
+    ...sampling.map(([key]) => key)];
   return Object.keys(body).length === required.length + (hasResponseFormat ? 1 : 0)
     && required.every(key => Object.hasOwn(body, key))
-    && (reviewed.effort === null || body.reasoning_effort === reviewed.effort)
+    && effortOnMenu(hasEffort, body.reasoning_effort, reviewed)
+    && sampling.every(([key, value]) => typeof body[key] === "number" && body[key] === value)
     && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
     && Array.isArray(body.messages);
+}
+/** A text block of exactly `keys`, whose text is not only whitespace. */
+function isTextBlock(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+  return isPlainObject(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key))
+    && value.type === "text" && typeof value.text === "string" && value.text.trim().length > 0;
+}
+/**
+ * Prompt caching (owner approval 2026-10-12): the Anthropic `system` is either a text that is not only whitespace,
+ * or exactly the adapter's two text blocks (anthropicCacheableSystem): the first exactly {type, text, cache_control}
+ * with cache_control exactly {"type": "ephemeral"} (no ttl), the second exactly {type, text}. The gate's
+ * AnthropicProfile.system_valid is the same rule (tests/unit/fixtures/anthropic-cache-bodies.json).
+ */
+function anthropicSystemAccepted(system: unknown): boolean {
+  if (typeof system === "string") return system.trim().length > 0;
+  if (!Array.isArray(system) || system.length !== 2) return false;
+  const [first, second] = system as unknown[];
+  if (!isTextBlock(first, ["type", "text", "cache_control"]) || !isTextBlock(second, ["type", "text"])) return false;
+  const mark = first.cache_control;
+  return isPlainObject(mark) && Object.keys(mark).length === 1 && mark.type === "ephemeral";
+}
+/** An accepted Anthropic body asks for a cache write exactly when its system is the two-block form. */
+function anthropicBodyAsksCacheWrite(body: Record<string, unknown>): boolean {
+  return Array.isArray(body.system) && anthropicSystemAccepted(body.system);
 }
 /**
  * PR B, the wire contract's Anthropic body, exactly as the Anthropic gate checks it: `model`,
  * `max_tokens` (1..the row's bound), `messages` (each exactly {role, content: non-empty text},
  * roles alternating user/assistant, first and last a user turn, as the adapter builds them), an
- * optional non-empty `system` text, and `output_config` {"effort": "high"} exactly when the row
- * has an effort switch. Nothing else, anywhere.
+ * optional `system` (a non-empty text, or the two blocks carrying the one cache mark:
+ * anthropicSystemAccepted), and `output_config` exactly {"effort": <a word on the row's menu>} (spec 2026-10-12
+ * §4.5; absent only where the menu holds "default", which no Anthropic row does). Nothing else, anywhere.
  */
 function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
   if (reviewed.provider !== "anthropic") return false;
-  const required = ["model", "max_tokens", "messages", ...(reviewed.effort === null ? [] : ["output_config"])];
+  const hasEffort = Object.hasOwn(body, "output_config");
+  const required = ["model", "max_tokens", "messages", ...(hasEffort ? ["output_config"] : [])];
   const optional = Object.hasOwn(body, "system") ? 1 : 0;
   const messages = body.messages;
   const effort = body.output_config;
   return Object.keys(body).length === required.length + optional
     && required.every(key => Object.hasOwn(body, key))
-    && (optional === 0 || (typeof body.system === "string" && body.system.trim().length > 0))
-    && (reviewed.effort === null || (isPlainObject(effort) && Object.keys(effort).length === 1 && effort.effort === reviewed.effort))
+    && (optional === 0 || anthropicSystemAccepted(body.system))
+    && (hasEffort ? isPlainObject(effort) && Object.keys(effort).length === 1 && effortOnMenu(true, effort.effort, reviewed)
+      : effortOnMenu(false, undefined, reviewed))
     && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
     && Array.isArray(messages) && messages.length % 2 === 1
     && messages.every((message, index) => isPlainObject(message) && Object.keys(message).length === 2
@@ -385,8 +565,9 @@ function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
  * routes by the EXACT call URL to that provider's gate (DeepInfra chat completions to the DeepInfra
  * gate, Anthropic Messages to the Anthropic gate), so a call can only ever reach its own provider's
  * socket. It sends only a body that gate accepts for that body's reviewed row of THAT provider
- * (exact keys, the row's effort and JSON switches, 1 <= max_tokens <= the row's bound, at most
- * 256 KiB), never a key header, and reserves at that row's price.
+ * (exact keys, the row's effort and JSON switches and its reviewed sampling, 1 <= max_tokens <= the row's bound, at most
+ * 256 KiB), never a key header, and reserves at that row's price (an Anthropic body carrying the one cache
+ * mark: its input at the step's 5-minute cache-write price, 2026-10-12).
  */
 export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudgetPorts): typeof fetch {
   const byProvider: PreviewBudgetPorts = typeof (ports as PreviewBudgetPort).execute === "function"
@@ -408,8 +589,10 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
       throw new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate for this provider is not configured");
     }
     const body = init!.body as string;
-    // UTF-8 bytes + template allowance; the row's full output bound, including hidden reasoning.
-    const reserved = previewReservationNanoUsd(reviewed, Buffer.byteLength(body, "utf8"));
+    // UTF-8 bytes + template allowance; the row's full output bound, including hidden reasoning. A body carrying the
+    // cache mark reserves its whole input at the step's cache-write price, as the gate does.
+    const reserved = previewReservationNanoUsd(reviewed, Buffer.byteLength(body, "utf8"),
+      { cacheWrite: provider === "anthropic" && anthropicBodyAsksCacheWrite(decoded) });
     const result = await port.execute({ operationId: randomUUID(), requestBody: body,
       requestSha256: createHash("sha256").update(body).digest("hex"), reservedUsd: previewNanoUsdText(reserved) }, init!.signal ?? undefined);
     return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
@@ -432,9 +615,13 @@ const PREVIEW_DAILY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_DAILY_BUDGET_
  * 429/529 with no usage and a provably unbilled body) released its hold, so it is the same
  * transient failure as a busy gate: PROVIDER_CALL_FAILED (as PreviewUnbilledRefusal, which
  * withPreviewProviderCallPolicy sends once more after its cooldown), never a money stop. The gate
- * must list both codes as public refusals for them to arrive here.
+ * must list both codes as public refusals for them to arrive here. Gate v4 (2026-10-12) adds MODEL_COOLING: the
+ * gate refused one busy model's call before reserving or sending anything, which the app reads as the vendor's own
+ * unbilled refusal (`PreviewModelCooling`). Review 2026-10-12 adds PROVIDER_ERROR_UNBILLED: the vendor answered with an
+ * error that bills nothing but does not say it is busy (Anthropic's 400/404/413/500); the gate counts it toward its
+ * five-in-a-row streak, as before gate v4, and the app reads it as the plain `PreviewUnbilledRefusal`, never "busy".
  */
-const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED", "PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"]);
+const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED", "PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED", "PROVIDER_ERROR_UNBILLED", "MODEL_COOLING"]);
 function previewAuthorityRefusal(status: number | undefined, row: unknown): TypedDomainError {
   const code = status === 409 && typeof row === "object" && row !== null && !Array.isArray(row)
     ? (row as Record<string, unknown>).error : undefined;
@@ -444,14 +631,85 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
   if (typeof code === "string" && PREVIEW_TRANSIENT_REFUSALS.has(code)) {
     // Owner ruling R4 (2026-10-11): the gate's own concurrency refusal reserved and sent nothing, so it
     // is unbilled like the other two: a REFUSED row no count includes, and the one 60-second resend.
+    // R-d (2026-10-12): only the vendor's refusal says the model is busy; the gate's own two never do.
+    if (code === "PROVIDER_REFUSED_UNBILLED") return new PreviewVendorRefusedUnbilled();
+    // Gate v4: the gate's cool-off for one busy model is the same "this model is busy" as the vendor's refusal.
+    if (code === "MODEL_COOLING") return new PreviewModelCooling((row as Record<string, unknown>).retry_after);
+    if (code === "PROVIDER_ERROR_UNBILLED") return new PreviewUnbilledRefusal("Private preview vendor answered with an error that was not billed");
     return code === "CONCURRENCY_LIMIT_REACHED"
       ? new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight")
       : new PreviewUnbilledRefusal();
   }
+  // Gate v4: the gate says outright that it was already halted when the call arrived, before reserving anything.
+  if (code === "AUTHORITY_HALTED") return new PreviewGateUnavailable();
+  // Slow answer (2026-10-12): the call was sent and failed or ran out of time at the vendor; the gate booked its whole
+  // reservation and stays active. A billed transport failure, never money, never unbilled, never "unavailable".
+  if (code === PROVIDER_CHARGE_BOOKED_MAX) return new PreviewChargeBookedMax();
   return new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request");
 }
+/**
+ * Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md, fix (c)) — A HALTED GATE
+ * IS UNAVAILABLE, NOT MONEY. On 2026-10-11 the DeepInfra gate halted (its daily unbilled ceiling) and refused the next
+ * call PREVIEW_TEST_AUTHORITY_STOPPED, which `previewAuthorityRefusal` reads as the run's money ceiling; the preview
+ * has no run money seam (apps/runner/src/main.ts, costEnvelopePolicy is hosted only), so that was a misdiagnosis, and
+ * the serve fallback then walked every maker behind the same halted gate. A STOPPED refusal now asks the gate's
+ * read-only `/remaining` (preview-remaining.ts, on the same socket): a gate that is not active, or whose window is
+ * shut, is UNAVAILABLE. The code is never a spend stop, the call is never resent (it is not an unbilled refusal),
+ * and the gateway still records its FAILED row (counted against this maker only, fix (b)). Any other `/remaining`
+ * answer, or none, keeps today's mapping. Gate v4 (2026-10-12) made the "gate change, later": a gate that is already
+ * halted when a call arrives now says so itself (AUTHORITY_HALTED, found before anything is reserved), which is read
+ * as UNAVAILABLE straight away, without asking `/remaining`. STOPPED stays the gate's word for everything else (a halt
+ * after the call was reserved, or doubt about whether it was sent), and an older gate that only says STOPPED keeps
+ * the `/remaining` read above.
+ */
+export const PROVIDER_GATE_UNAVAILABLE = "PROVIDER_GATE_UNAVAILABLE" as const;
+/**
+ * Slow answer (owner ruling 2026-10-12): the gate's public refusal for a call it reserved and SENT whose vendor
+ * connection then failed or ran past the gate's deadline (1,200 s). The gate books the call's whole reservation as its
+ * charge (ledger state settled_reserved_max) and stays active. Before, it answered PREVIEW_TEST_AUTHORITY_STOPPED,
+ * which the app read as the run's money ceiling. It is the app's own sent-and-failed transport failure: the code is
+ * PROVIDER_CALL_FAILED (so the gateway records a billed FAILED attempt and the runner cools down and retries as after
+ * any transport failure), it is never a ProviderUnbilledRefusal (no REFUSED row, no 60-second resend), never a money
+ * code, never gate-unavailable, and no `/remaining` is read for it.
+ */
+export const PROVIDER_CHARGE_BOOKED_MAX = "PROVIDER_CHARGE_BOOKED_MAX" as const;
+export class PreviewChargeBookedMax extends TypedDomainError {
+  constructor() { super("PROVIDER_CALL_FAILED", "Private preview vendor call failed after it was sent; the gate booked its full reservation"); }
+}
+export class PreviewGateUnavailable extends TypedDomainError {
+  constructor() { super(PROVIDER_GATE_UNAVAILABLE, "Private preview gate is halted or its window is shut"); }
+}
+/** The refusal itself, or the gateway's PROVIDER_CALL_FAILED with it as its cause. */
+export function providerCallGateUnavailable(error: unknown): boolean {
+  const unavailable = (value: unknown): boolean => value instanceof TypedDomainError && value.code === PROVIDER_GATE_UNAVAILABLE;
+  return unavailable(error) || (typeof error === "object" && error !== null && unavailable((error as { cause?: unknown }).cause));
+}
+/** The one refusal that asks `/remaining`: a 409 whose body is exactly {"error": "PREVIEW_TEST_AUTHORITY_STOPPED", …}. */
+function previewAuthorityStopped(status: number | undefined, row: unknown): boolean {
+  return status === 409 && typeof row === "object" && row !== null && !Array.isArray(row)
+    && (row as Record<string, unknown>).error === "PREVIEW_TEST_AUTHORITY_STOPPED";
+}
+/**
+ * Run resilience (spec 2026-10-12, fix (d)): what the runner's per-run sit-out book needs to know of a reviewed ref
+ * on the preview — the gate its calls go through and the model it serves. Undefined off the preview, where the
+ * runner builds no book (hosted and local unchanged).
+ */
+export function previewRunResilience(config: PreviewProviderTestConfig | undefined): Readonly<{
+  gateOf: (providerRef: string) => string | undefined;
+  modelOf: (providerRef: string) => string | undefined;
+}> | undefined {
+  if (config === undefined) return undefined;
+  return Object.freeze({
+    gateOf: (providerRef: string) => previewModelRowForRef(providerRef)?.provider,
+    modelOf: (providerRef: string) => previewModelRowForRef(providerRef)?.model
+  });
+}
 /** Local IPC only: application principals never receive the provider credential or ledger write access. */
-export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig, socketPath: string = config.budget_socket): PreviewBudgetPort {
+export function createPreviewBudgetRpcPort(
+  config: PreviewProviderTestConfig, socketPath: string = config.budget_socket,
+  // Fix (c): the same gate's read-only `/remaining`, asked only after a STOPPED refusal.
+  remaining: PreviewRemainingPort = createPreviewRemainingRpcPort({ budget_socket: socketPath, scope_id: config.scope_id })
+): PreviewBudgetPort {
   return Object.freeze({ execute(input: PreviewBudgetExecution, signal?: AbortSignal) {
     return new Promise<Readonly<{ status: number; body: string }>>((resolve, reject) => {
       const data = JSON.stringify({ scope_id: config.scope_id, ...input });
@@ -472,7 +730,14 @@ export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig, so
           let result: unknown; try { result = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority response invalid")); return; }
           const row = result as Record<string, unknown>;
           if (response.statusCode !== 200 || typeof row !== "object" || row === null || !Number.isInteger(row.status) || typeof row.body !== "string") {
-            reject(previewAuthorityRefusal(response.statusCode, row)); return;
+            const refusal = previewAuthorityRefusal(response.statusCode, row);
+            if (!previewAuthorityStopped(response.statusCode, row)) { reject(refusal); return; }
+            // Fix (c): STOPPED asks whether the gate itself is halted; a failed read keeps today's mapping.
+            remaining.remaining(signal).then(
+              (gate) => reject(gate.state !== "active" || !gate.windowOpen ? new PreviewGateUnavailable() : refusal),
+              () => reject(refusal)
+            );
+            return;
           }
           resolve({ status: Number(row.status), body: row.body });
         });
@@ -481,7 +746,7 @@ export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig, so
       signal?.addEventListener("abort", canceled, { once: true });
       if (signal?.aborted) canceled();
       request.on("close", () => signal?.removeEventListener("abort", canceled));
-      request.setTimeout(PREVIEW_GLM_DEADLINE_MS + 30_000, () => request.destroy());
+      request.setTimeout(PREVIEW_GATE_IPC_TIMEOUT_MS, () => request.destroy());
       request.on("error", () => reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority unavailable")));
       request.end(data);
     });

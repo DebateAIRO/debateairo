@@ -1,14 +1,17 @@
 import { STORY_COST_ENVELOPE_REACHED } from "@debateai/budget";
 import { StoryLanguageTagSchema, type MakerLineage, type StoryBody } from "@debateai/contract";
 import type { Pool } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, replyLanguageCheck } from "@debateai/kernel";
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
+  rememberingAcceptedReply,
   schemaFailureLocator,
   type CallBound,
   type ContentClassification,
   type FramedMaterialField,
+  type ModelJsonRepair,
+  type ModelReplyFacts,
   type PromptContract,
   type ProviderCallRequest,
   type ProviderCallResult,
@@ -35,7 +38,14 @@ import {
 } from "./material.js";
 import type { StoryPack } from "./pack.js";
 import { StoryRepository, isPrivateContentErased, type StoryRecordInput } from "./repository.js";
-import { classifyCheckerContent, classifyStoryContent, parseCheckerVerdict, parseStoryBody } from "./validate.js";
+import {
+  STORY_BODY_PROSE,
+  STORY_CHECKER_PROSE,
+  classifyCheckerContent,
+  classifyStoryContent,
+  parseCheckerVerdict,
+  parseStoryBody
+} from "./validate.js";
 
 /**
  * THE VERDICT STORY WRITER (spec §3, §3.1). The runner calls it once, after the
@@ -250,7 +260,7 @@ function storyCallRequest(input: {
   readonly contract: PromptContract;
   readonly contractHash: string;
   readonly material: readonly FramedMaterialField[];
-  readonly classifyContent: (content: string) => ContentClassification;
+  readonly classifyContent: (content: string, reply?: ModelReplyFacts) => ContentClassification;
 }): ProviderCallRequest {
   const framed = buildFramedPrompt({ contract: input.contract, material: input.material });
   const request: ProviderCallRequest = {
@@ -427,6 +437,14 @@ export class StoryWriter {
     }
   }
 
+  /** Story format robustness (2026-10-12): an accepted reply that needed a repair, by code and ids only. */
+  #logRepair(site: StoryCallSite, round: number, repair: ModelJsonRepair | null, input: StoryWriteInput): void {
+    if (repair === null) return;
+    this.#log("STORY_REPLY_REPAIRED", () => ({
+      answerId: input.answerId, answerVersion: input.answerVersion, round, site, repair
+    }));
+  }
+
   async #store(record: StoryRecordInput, stepLease: StoryStepLease): Promise<void> {
     let stored: "INSERTED" | "ALREADY_PRESENT" | "RUN_ERASED";
     try {
@@ -515,7 +533,10 @@ export class StoryWriter {
      * run's cost fallback when the runner handed one over. Each try is one
      * provider call, so each takes its own short step lease. The ROLE rule
      * above is untouched: an absent role never reaches here, so a maker is only
-     * ever substituted for money.
+     * ever substituted for money — or, on the preview (run resilience, spec
+     * 2026-10-12 fix (a)), because the runner's fallback found the planned maker
+     * sitting out the rest of the run (the runner's own move rule, handed over
+     * inside `costFallback`; this writer is unchanged).
      */
     const callStoryRole = async (
       planned: StoryRoleMaker,
@@ -534,8 +555,13 @@ export class StoryWriter {
      * format repair try. Rounds, not repair packets; a gateway that reports no count reported none.
      */
     const repairedRounds = new Set<number>();
+    // Reply language (2026-10-12): each draft and each objection is checked against the question's language.
+    const storyInQuestionLanguage = replyLanguageCheck(input.questionLine, STORY_BODY_PROSE);
+    const checkerInQuestionLanguage = replyLanguageCheck(input.questionLine, STORY_CHECKER_PROSE);
     const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds }, {
       writeStory: async ({ round, priorObjection }) => {
+        const reading = rememberingAcceptedReply((content, reply) =>
+          classifyStoryContent(content, built.index, reply, storyInQuestionLanguage));
         const request = storyCallRequest({
           story: input,
           site: "STORYTELLER",
@@ -545,7 +571,7 @@ export class StoryWriter {
           contract: storytellerContract,
           contractHash: storytellerHash,
           material: toStoryPromptMaterial(built.material, priorObjection),
-          classifyContent: (content) => classifyStoryContent(content, built.index)
+          classifyContent: reading.classifyContent
         });
         // Task M7 (review ruling): a fallback storyteller is STRICTLY cheapest
         // first, the planned checker's maker included. Both calls spend ONE
@@ -557,7 +583,9 @@ export class StoryWriter {
         draftWriterByRound.set(round, servedBy.providerRef);
         // Short refs on purpose: the checker judges this body against the SAME
         // material the storyteller read. Real ids are restored only for storage.
-        const body: StoryBody = parseStoryBody(result.content, built.index);
+        const accepted = reading.acceptedAs(result.content);
+        const body: StoryBody = parseStoryBody(result.content, built.index, accepted.reply);
+        this.#logRepair("STORYTELLER", round, accepted.repair, input);
         if ((result.repairAttempts ?? 0) > 0) repairedRounds.add(round);
         return {
           artifactRef: result.rawArtifactRef,
@@ -568,6 +596,8 @@ export class StoryWriter {
         };
       },
       checkStory: async ({ round, candidate }) => {
+        const reading = rememberingAcceptedReply((content, reply) =>
+          classifyCheckerContent(content, reply, checkerInQuestionLanguage));
         const request = storyCallRequest({
           story: input,
           site: "CHECKER",
@@ -577,16 +607,19 @@ export class StoryWriter {
           contract: checkerContract,
           contractHash: checkerHash,
           material: toCheckerPromptMaterial(built.material, candidate),
-          classifyContent: (content) => classifyCheckerContent(content)
+          classifyContent: reading.classifyContent
         });
         // Task M7: the planned checker is always asked first; a fallback checker
         // prefers a maker other than the one that wrote this round's draft.
         const { result, servedBy } = await callStoryRole(checker, request, draftWriterByRound.get(round) ?? null);
+        const accepted = reading.acceptedAs(result.content);
+        const verdict = parseCheckerVerdict(result.content, accepted.reply);
+        this.#logRepair("CHECKER", round, accepted.repair, input);
         return {
           artifactRef: result.rawArtifactRef,
           callSiteKey: request.callSiteKey,
           lineage: lineageOf(result, servedBy.providerRef),
-          verdict: parseCheckerVerdict(result.content)
+          verdict
         };
       }
     });

@@ -466,7 +466,7 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
   const { quarter } = summary;
   const countryName = new Intl.DisplayNames(["en"], { type: "region" });
   const out: string[] = [
-    `DebateAI tax summary for ${quarter.label} (${longDate(quarter.from)} to ${longDate(new Date(quarter.to.getTime() - 86_400_000))}, UTC)`,
+    `Dialectical Engine tax summary for ${quarter.label} (${longDate(quarter.from)} to ${longDate(new Date(quarter.to.getTime() - 86_400_000))}, UTC)`,
     `From our own records: ${plural(summary.sales, "sale", "sales")} and ${plural(summary.refunds, "refund", "refunds")}.`
       + " Each amount is in the currency it was charged in; one block per country or state, tax scheme and currency.",
     ""

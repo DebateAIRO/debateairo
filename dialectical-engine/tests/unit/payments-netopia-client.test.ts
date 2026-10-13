@@ -23,12 +23,12 @@ const PAYER: Payer = Object.freeze({
   region: "Cluj", city: "Cluj-Napoca", postalCode: "400001", street: "Strada Exemplu 1"
 });
 const START: HostedPaymentStart = Object.freeze({
-  orderId: ORDER, amountMicros: 24_200_000, currency: "USD", description: "DebateAI Plus, one month", payer: PAYER,
+  orderId: ORDER, amountMicros: 24_200_000, currency: "USD", description: "Dialectical Engine Plus, one month", payer: PAYER,
   clientId: "ef".repeat(16), returnUrl: `https://debateai.test/checkout/return?charge=${ORDER}`,
   notifyUrl: "https://debateai.test/api/v1/billing/netopia/notify", language: "ro"
 });
 const CHARGE: SavedCardCharge = Object.freeze({
-  orderId: ORDER, amountMicros: 24_200_000, currency: "USD", description: "DebateAI Plus, one month", payer: PAYER,
+  orderId: ORDER, amountMicros: 24_200_000, currency: "USD", description: "Dialectical Engine Plus, one month", payer: PAYER,
   cardToken: createSecretToken(TOKEN_TEXT), payerIp: "203.0.113.7", returnUrl: START.returnUrl, notifyUrl: START.notifyUrl, language: "ro"
 });
 const STARTED = {

@@ -5,7 +5,7 @@ import { PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW } from "../../packages
 /** D, the register's code-owned publicationCheckPolicy deadline (60 000 ms). */
 const D = PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW.value.deadline_ms;
 
-const target = { providerRef: "development:hermes-glm-5.3-flash", baseUrl: "http://127.0.0.1:8794/v1", model: "z-ai/glm-5.3-flash", authorizationHeader: "Bearer test" };
+const target = { providerRef: "development:claude-haiku-5.5", baseUrl: "http://127.0.0.1:8794/v1", model: "claude-haiku-5-5", authorizationHeader: "Bearer test" };
 const packet = () => buildFramedPrompt({ contract: { contractId: "publication.test", instruction: "Judge the material.", answerForm: "JSON" }, material: [{ name: "question", content: "test" }] }).packet;
 const text = '{"verdict":"ALLOW","rules":[],"parts":[],"possibly_illegal":false}';
 const response = (finish_reason = "stop") => new Response(JSON.stringify({ choices: [{ message: { content: text }, finish_reason }] }), { status: 200 });

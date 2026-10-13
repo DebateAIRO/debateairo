@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Gizlilik",
-  "consent.settings.hint": "Bu tarayıcı yalnızca DebateAI’ın çalışması için gerekenleri tutar. Tam listeyi istediğiniz zaman burada görebilirsiniz.",
+  "consent.settings.hint": "Bu tarayıcı yalnızca Dialectical Engine’in çalışması için gerekenleri tutar. Tam listeyi istediğiniz zaman burada görebilirsiniz.",
   "consent.settings.button": "Neleri saklıyoruz",
   "consent.bar.label": "Çerez bildirimi",
   "consent.bar.eyebrow": "VERİLERİNİZ KAYIT ALTINDA",
   "consent.bar.title": "Yalnızca sistemin çalışması için gerekenleri saklarız.",
-  "consent.bar.body": "Dört çerez ve tarayıcınızın depolama alanında dört öğe; her biri DebateAI’ın çalışması için gerekli. İsteğe bağlı hiçbir şey yok, hiçbir şey başkalarıyla paylaşılmıyor.",
+  "consent.bar.body": "Dört çerez ve tarayıcınızın depolama alanında dört öğe; her biri Dialectical Engine’in çalışması için gerekli. İsteğe bağlı hiçbir şey yok, hiçbir şey başkalarıyla paylaşılmıyor.",
   "consent.bar.acknowledge": "Anladım",
   "consent.bar.whatWeStore": "Neleri saklıyoruz",
   "consent.link.cookiePolicy": "Çerez Politikası",

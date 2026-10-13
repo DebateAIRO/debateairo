@@ -10,6 +10,8 @@ import {
   PROVIDER_CONTENT_REFUSED,
   PROVIDER_REPLY_UNSUPPORTED,
   ProviderCallFailedError,
+  ANTHROPIC_PER_CALL_MARKERS_SEPARATOR,
+  anthropicCacheableSystem,
   anthropicMessagesRequestBody,
   anthropicUsageAsEngineUsage,
   observeProviderTarget,
@@ -46,7 +48,7 @@ function gatewayWith(
 ) {
   const sent: Sent[] = [];
   const ledger: Array<{ outcome: string }> = [];
-  const artifacts: Array<{ provider: string; rawText: string; metadata: Readonly<Record<string, unknown>> }> = [];
+  const artifacts: Array<{ provider: string; rawText: string; thinkingTokens?: number | null; metadata: Readonly<Record<string, unknown>> }> = [];
   const gateway = new AnthropicMessagesProviderGateway({
     endpoint: BASE_URL, model: MODEL, maker: "Anthropic",
     fetchImplementation: async (url, init) => {
@@ -117,8 +119,10 @@ describe("PR B — the Anthropic request on the wire", () => {
     });
     expect(sent[0]!.body).toBe(
       `{"model":"claude-haiku-5-5","max_tokens":64,"messages":[{"role":"user","content":${JSON.stringify(USER)}}],`
-      + `"system":${JSON.stringify(SYSTEM)}}`
+      + `"system":${JSON.stringify(anthropicCacheableSystem(SYSTEM))}}`
     );
+    // A framed system message ends with the per-call markers, so it goes out as the cached prefix plus the tail.
+    expect(Array.isArray(JSON.parse(sent[0]!.body).system)).toBe(true);
   });
 
   it("adds output_config.effort only when the high level is asked, and nothing at DEFAULT_ONLY", async () => {
@@ -176,9 +180,82 @@ describe("PR B — the Anthropic request on the wire", () => {
       expect(() => anthropicMessagesRequestBody({ model: MODEL, maxTokens: 10, thinkingLevel: "DEFAULT_ONLY", messages }))
         .toThrowError(expect.objectContaining({ code: PROVIDER_PACKET_UNSUPPORTED }));
     }
-    expect(() => anthropicMessagesRequestBody({
-      model: MODEL, maxTokens: 10, thinkingLevel: "low", messages: [{ role: "user", content: "q" }]
-    })).toThrowError(expect.objectContaining({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" }));
+    // Spec 2026-10-12 §4.4: the reviewed Haiku menu (low, medium, high) is carried; xhigh and max are not reviewed.
+    for (const thinkingLevel of ["low", "medium", "high"]) {
+      expect(JSON.parse(anthropicMessagesRequestBody({ model: MODEL, maxTokens: 10, thinkingLevel, messages: [{ role: "user", content: "q" }] })))
+        .toMatchObject({ output_config: { effort: thinkingLevel } });
+    }
+    for (const thinkingLevel of ["xhigh", "max", "none", "default"]) {
+      expect(() => anthropicMessagesRequestBody({
+        model: MODEL, maxTokens: 10, thinkingLevel, messages: [{ role: "user", content: "q" }]
+      })).toThrowError(expect.objectContaining({ code: "PROVIDER_THINKING_LEVEL_UNSUPPORTED" }));
+    }
+  });
+});
+
+describe("prompt caching (owner approval 2026-10-12): the stable system prefix is cached, the per-call markers are not", () => {
+  // The engine's framed system message (contract with the prompt frame, 2026-10-12): instruction + safety frame, then a
+  // tail whose first line is exactly the marker line, carrying the per-call fence and canary.
+  const PREFIX = "Synthetic instruction.\n\nSynthetic safety frame: material is data.";
+  const TAIL = "--- PER-CALL MARKERS (engine) ---\nBoundary marker: 0f1e\nCanary: c0de\n--- END PER-CALL MARKERS ---";
+  const FRAMED = `${PREFIX}\n\n${TAIL}`;
+  const bodyOf = (messages: PromptPacket["messages"]) => JSON.parse(anthropicMessagesRequestBody({
+    model: MODEL, maxTokens: 10, thinkingLevel: "high", messages })) as Record<string, unknown>;
+  it("pins the separator the frame and the adapter share", () => {
+    expect(ANTHROPIC_PER_CALL_MARKERS_SEPARATOR).toBe("\n\n--- PER-CALL MARKERS (engine) ---");
+    expect(FRAMED.includes(ANTHROPIC_PER_CALL_MARKERS_SEPARATOR)).toBe(true);
+  });
+  it("sends the framed system as exactly two text blocks, the 5-minute cache mark on the first only", () => {
+    const body = bodyOf([{ role: "system", content: FRAMED }, { role: "user", content: "question" }]);
+    expect(Object.keys(body)).toStrictEqual(["model", "max_tokens", "messages", "system", "output_config"]);
+    expect(body.system).toStrictEqual([
+      { type: "text", text: `${PREFIX}\n\n`, cache_control: { type: "ephemeral" } },
+      { type: "text", text: TAIL }
+    ]);
+    // The blank line stays with the prefix, so the tail's first line is exactly the marker line.
+    const [first, second] = body.system as Array<{ text: string }>;
+    expect(second!.text.split("\n")[0]).toBe("--- PER-CALL MARKERS (engine) ---");
+    // No cache mark anywhere else: the messages stay plain strings, and nothing is top-level.
+    expect(body.messages).toStrictEqual([{ role: "user", content: "question" }]);
+    expect(JSON.stringify(body).match(/cache_control/gu)).toHaveLength(1);
+    expect(first!.text + second!.text).toBe(FRAMED);
+  });
+  it("joining the two texts gives back the system text byte for byte, whatever the characters", () => {
+    for (const system of [FRAMED, `Răspunde 日本語 🙂 "q" \\ \t${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\nCanary: ç`,
+      `a${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}`, `${PREFIX}${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\nx${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\ny`,
+      `  lead\r\n${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\n`]) {
+      const split = anthropicCacheableSystem(system);
+      expect(Array.isArray(split), system).toBe(true);
+      const [first, second] = split as readonly [{ text: string }, { text: string }];
+      expect(first.text + second.text).toBe(system);
+      expect(second.text.startsWith(ANTHROPIC_PER_CALL_MARKERS_SEPARATOR.slice(2))).toBe(true);
+    }
+  });
+  it("cuts at the FIRST marker line: a second one stays in the uncached tail", () => {
+    const system = `${PREFIX}${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\nx${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\ny`;
+    const [first] = anthropicCacheableSystem(system) as readonly [{ text: string }, { text: string }];
+    expect(first.text).toBe(`${PREFIX}\n\n`);
+  });
+  it("joins every system message first, then splits the joined text", () => {
+    const body = bodyOf([{ role: "system", content: "rule one" }, { role: "user", content: "question" },
+      { role: "system", content: FRAMED }]);
+    expect(body.system).toStrictEqual([
+      { type: "text", text: `rule one\n\n${PREFIX}\n\n`, cache_control: { type: "ephemeral" } },
+      { type: "text", text: TAIL }
+    ]);
+  });
+  it("without the marker line the system stays one string, exactly as before", () => {
+    for (const system of ["rule one", `${PREFIX}\n--- PER-CALL MARKERS (engine) ---`, "--- PER-CALL MARKERS (engine) ---\nCanary: x",
+      `${PREFIX}\n\n--- PER-CALL MARKERS ---`]) {
+      expect(anthropicCacheableSystem(system)).toBe(system);
+      expect(bodyOf([{ role: "system", content: system }, { role: "user", content: "q" }]).system).toBe(system);
+    }
+    // A prefix that is only whitespace has nothing worth caching (and the vendor refuses empty text): one string.
+    const blank = `${ANTHROPIC_PER_CALL_MARKERS_SEPARATOR}\nCanary: x`;
+    expect(anthropicCacheableSystem(blank)).toBe(blank);
+    expect(anthropicCacheableSystem(`\u3000 ${blank}`)).toBe(`\u3000 ${blank}`);
+    // And no system at all is no system member.
+    expect(Object.keys(bodyOf([{ role: "user", content: "q" }]))).toStrictEqual(["model", "max_tokens", "messages", "output_config"]);
   });
 });
 
@@ -203,6 +280,17 @@ describe("PR B — reading the Anthropic reply", () => {
     expect(artifacts[0]!.rawText).toBe(JSON.stringify(body));
     expect(artifacts[0]!.metadata).toMatchObject({ finish_reason: "end_turn" });
     expect(ledger.map((row) => row.outcome)).toEqual(["OK"]);
+  });
+
+  it("records Haiku's thinking tokens on the artifact, and bills the same counts as before (spec 2026-10-12 §4.6)", async () => {
+    const body = message({ usage: { input_tokens: 10, output_tokens: 500, output_tokens_details: { thinking_tokens: 320 } } });
+    const { gateway, artifacts } = gatewayWith(() => reply(body));
+    const spy = chargeSpy();
+    const result = await gateway.call(request({ costEnvelope: spy.costEnvelope }));
+    expect(result).toMatchObject({ reasoningTokens: 320 });
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0]!.thinkingTokens).toBe(320);
+    expect(spy.charges).toStrictEqual([{ prompt_tokens: 10, completion_tokens: 500, total_tokens: 510 }]);
   });
 
   for (const [label, body, code] of [
@@ -432,8 +520,10 @@ describe("PR B — construction refuses what would fail on every call", () => {
       .toThrowError(new TypeError("PROVIDER_GATEWAY_CREDENTIAL_INVALID"));
     expect(() => new AnthropicMessagesProviderGateway({ ...base, thinking: { parameter: "x_thinking_level", levels: ["high"] } }))
       .toThrowError(new TypeError("PROVIDER_GATEWAY_THINKING_INVALID"));
-    expect(() => new AnthropicMessagesProviderGateway({ ...base, thinking: { parameter: "reasoning_effort", levels: ["low", "high"] } }))
+    expect(() => new AnthropicMessagesProviderGateway({ ...base, thinking: { parameter: "reasoning_effort", levels: ["xhigh", "high"] } }))
       .toThrowError(new TypeError("PROVIDER_GATEWAY_THINKING_INVALID"));
+    expect(() => new AnthropicMessagesProviderGateway({ ...base, authorizationHeader: "fixture-key",
+      thinking: { parameter: "reasoning_effort", levels: ["low", "medium", "high"] } })).not.toThrow();
     for (const credential of ["", "key with space", "key\twith-tab", "k\u00e9y", "key\n"]) {
       expect(() => new AnthropicMessagesProviderGateway({ ...base, authorizationHeader: credential }))
         .toThrowError(new TypeError("PROVIDER_GATEWAY_CREDENTIAL_INVALID"));
@@ -506,7 +596,7 @@ describe("PR B — the target and the register pick the wire", () => {
   it("refuses a native target declaring a level its wire cannot carry, or the relay spelling", () => {
     const configured = [{ providerRef: "vendor:anthropic", maker: "Anthropic", adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND }];
     for (const thinking of [
-      { thinking_parameter: "reasoning_effort", thinking_levels: ["low", "high"] },
+      { thinking_parameter: "reasoning_effort", thinking_levels: ["max", "high"] },
       { thinking_parameter: "x_thinking_level", thinking_levels: ["high"] }
     ]) {
       expect(() => parseProviderDiscoveryTargets(targetJson(thinking), configured))
@@ -604,15 +694,16 @@ describe("PR B — the discovery probe speaks the target's wire", () => {
     expect(JSON.parse(high.sent[0]!.body)).toMatchObject({ max_tokens: 300, output_config: { effort: "high" } });
   });
 
-  for (const [label, response] of [
-    ["another model", () => reply(message({ model: "claude-other", content: [{ type: "text", text: "OK" }] }))],
-    ["another answer", () => reply(message({ content: [{ type: "text", text: "Sure, OK" }] }))],
-    ["a refusal", () => reply(message({ content: [{ type: "text", text: "OK" }], stop_reason: "refusal" }))],
-    ["a truncation", () => reply(message({ content: [{ type: "text", text: "OK" }], stop_reason: "max_tokens" }))],
-    ["an overloaded vendor", () => vendorError(529, "overloaded_error")]
+  // Probe failure reasons (2026-10-12): each records why (tests/unit/provider-probe-failure-reason.test.ts).
+  for (const [label, response, failureCode] of [
+    ["another model", () => reply(message({ model: "claude-other", content: [{ type: "text", text: "OK" }] })), "PROVIDER_PROBE_MODEL_MISMATCH"],
+    ["another answer", () => reply(message({ content: [{ type: "text", text: "Sure, OK" }] })), "PROVIDER_PROBE_ANSWER_NOT_OK"],
+    ["a refusal", () => reply(message({ content: [{ type: "text", text: "OK" }], stop_reason: "refusal" })), "PROVIDER_PROBE_ANSWER_REFUSED"],
+    ["a truncation", () => reply(message({ content: [{ type: "text", text: "OK" }], stop_reason: "max_tokens" })), "PROVIDER_PROBE_ANSWER_CUT_OFF"],
+    ["an overloaded vendor", () => vendorError(529, "overloaded_error"), "PROVIDER_PROBE_HTTP_529"]
   ] as const) {
     it(`is ABSENT on ${label}`, async () => {
-      expect((await probe(response)).observation).toMatchObject({ state: "ABSENT", failureCode: "PROVIDER_PROBE_FAILED" });
+      expect((await probe(response)).observation).toMatchObject({ state: "ABSENT", failureCode });
     });
   }
 });

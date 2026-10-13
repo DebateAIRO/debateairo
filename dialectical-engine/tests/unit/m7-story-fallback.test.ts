@@ -467,7 +467,8 @@ describe("M7 · wired in the shipped runner, with Task M3's fallback reused", ()
   it("hands every run's story the run's own claim-eligible makers and the runner's price map", async () => {
     const runner = await readFile("apps/runner/src/index.ts", "utf8");
     const snapshot = runner.slice(runner.indexOf("input: buildStoryRunSnapshot({"), runner.indexOf('return { kind: "COMPLETED", answerId: persisted.answerId };'));
-    expect(snapshot).toContain("costFallback: storyCostFallback(synthesisMakers, servePrices)");
+    // Run resilience (spec 2026-10-12, fix (a)): plus the run's sit-out book, absent off the preview.
+    expect(snapshot).toContain("costFallback: storyCostFallback(synthesisMakers, servePrices, sitOut ?? undefined)");
     // The story's fallback IS the answer-writer's: one function, not a copy.
     const helper = runner.slice(runner.indexOf("export function storyCostFallback("));
     expect(helper.slice(0, helper.indexOf("\n}\n"))).toContain("callServeRoleWithFallback({");

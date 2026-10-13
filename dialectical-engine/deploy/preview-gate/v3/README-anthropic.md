@@ -33,9 +33,15 @@ they hide the Anthropic key folder (install step 3a, which comes BEFORE the Anth
 
 One reviewed model:
 
-| Model | Maker | Longest answer allowed (tokens) | Thinking | JSON mode |
+| Model | Maker | Longest answer allowed (tokens) | Thinking levels (first = the app's default) | JSON mode |
 |---|---|---|---|---|
-| `claude-haiku-5-5` | Anthropic | 32,768 | "high" | not allowed |
+| `claude-haiku-5-5` | Anthropic | 32,768 | "high", "medium", "low" | not allowed |
+
+Thinking levels (spec 2026-10-12): every request carries `output_config` `{"effort": <one of the
+three>}`; the gate refuses any other word ("xhigh" and "max" are not reviewed) and a request with
+no `output_config`. "high" is what the app sends when the owner has not chosen a level: exactly
+the request of before. The day ledger's `requested_effort` names the level the request carried. A
+menu change is a reviewed row change (new helper hash, GO rewrite, restart).
 
 Anthropic's list prices (per million tokens), read on 2026-10-10 from
 platform.claude.com/docs/en/about-claude/pricing. The price depends on how long the question is.
@@ -51,22 +57,33 @@ cache reads.
   the question, plus 2,048, counts as a token. If that count is 100,000 or less, the question
   cannot reach the upper step, so the call sets aside at the lower step's prices ($0.10 per
   million in, $0.50 out). Above 100,000 it sets aside at the upper step's ($0.50 in, $2.50 out).
-  The answer is counted at its longest allowed length (32,768 tokens). So the largest question the
-  gate accepts (256 KiB) sets aside at most (264,192 x $0.50 + 32,768 x $2.50) / 1,000,000 =
-  **$0.214016**, and an ordinary question (a few KB) about $0.017. No call may ever set aside more
-  than **$0.25**; a test checks it.
-- **Cache writes are never set aside for.** A 1-hour cache write over 100,000 tokens costs $1.00
-  per million, more than $0.50. The gate still does not set aside for it because a request through
-  the gate cannot ask for caching at all (caching marks are refused), so a cache write should never
-  happen. If Anthropic ever reports a call costing more than its set-aside amount (for example a
-  large cache write), that one call is charged in full and the gate halts with `charge_overrun`.
+  The answer is counted at its longest allowed length (32,768 tokens). So the largest question
+  without caching (256 KiB) sets aside at most (264,192 x $0.50 + 32,768 x $2.50) / 1,000,000 =
+  $0.214016, and an ordinary question (a few KB) about $0.017.
+- **Caching (owner's approval, 2026-10-12).** The app may ask Anthropic to keep the start of its
+  system text (the step's instructions and safety rules, the same on every call of that step) for
+  5 minutes, so the next call of that step reads it at a tenth of the price. It asks in exactly one
+  way: the system text sent as two text parts, the first marked `{"type": "ephemeral"}` (5 minutes,
+  never 1 hour), the second (the call's own random markers) unmarked. Any other caching mark, a
+  1-hour mark, a mark on a message, or a third part is refused before anything is set aside. A call
+  that asks for caching sets aside its whole question at the 5-minute cache-write price ($0.125 per
+  million, or $0.625 above 100,000), because the write can never be bigger than the question. So
+  the largest question the gate accepts, cached, sets aside at most
+  (264,192 x $0.625 + 32,768 x $2.50) / 1,000,000 = **$0.24704**, and an ordinary one about
+  $0.017. No call may ever set aside more than **$0.25**; a test checks it.
+- **Cache tokens are always charged at their own prices, never a halt by themselves.** Whatever
+  call reports cache writes or reads (asked for or not), the gate charges them at the table's prices.
+  A 1-hour cache write over 100,000 tokens costs $1.00 per million, more than the $0.625 set aside; no
+  request can ask for one, but if Anthropic ever reports a call costing more than its set-aside amount,
+  that one call is charged in full and the gate halts with `charge_overrun`, as before.
 - **What a call is charged** (after the call): Anthropic's real token counts, each kind at its
   own price, at the step the question length falls in. Exactly 100,000 tokens is still the lower
   step; 100,001 is the upper one. Anthropic does not report a cost, so this list-price charge is
   what the pot records.
-- The app never asks for caching, so cache writes should never appear. If Anthropic reports a
-  cache write without saying whether it was the 5-minute or the 1-hour kind, the gate charges all
-  of it at the dearer 1-hour price.
+- If Anthropic reports a cache write without saying whether it was the 5-minute or the 1-hour kind,
+  the gate charges it as the 5-minute kind on a call that asked for caching (the only kind a request
+  can ask for), and at the dearer 1-hour price on any other call. When it says, each part is charged
+  at its own price.
 - **Answers the gate cannot price stop the gate.** Any usage field it does not know, any web
   search or other server tool, a region other than "global", a service tier other than
   "standard", a code container, context editing, token counts outside the usage block, or any
@@ -85,8 +102,9 @@ cache reads.
 
 - **The gate refuses anything but a plain text question.** The request may carry only the model,
   the answer length, the messages (text only, the first one from the user), an optional system
-  text, and the thinking setting "high". Anything else (tools, streaming, caching marks,
-  temperature, a region or service tier, and so on) is refused before anything is set aside.
+  text (or the two parts that carry its one 5-minute caching mark, see "Caching" above), and a
+  thinking setting from the reviewed menu ("high", "medium" or "low"). Anything else (tools, streaming, any other caching mark, temperature, a
+  region or service tier, and so on) is refused before anything is set aside.
 - **Anything in Anthropic's answer the gate does not understand halts.** Usage fields it does not
   know, any use of Anthropic's server tools (web search and the like), a service tier other than
   "standard", a region other than "global", or a tool block in the answer: the cost is then
@@ -98,10 +116,50 @@ cache reads.
   widened after review). The answers: 429 or 529 (`rate_limit_error` or `overloaded_error`), 400
   (`invalid_request_error`), 404 (`not_found_error`), 413 (`request_too_large`) and 500
   (`api_error`), each with a body that is only Anthropic's error message (no usage, no answer
-  content, no model name anywhere). Such a call is released like DeepInfra's "too many requests":
-  nothing is charged, the day's record keeps it as a $0 `released_unbilled` entry with its HTTP
-  status, that call alone fails, and the app tries once more later. Five in a row halt with
-  `provider_unreachable`; the 20th on one day halts with `unbilled_release_ceiling`.
+  content, no model name anywhere). Every such call is released: nothing is charged, the day's
+  record keeps it as a $0 `released_unbilled` entry with its HTTP status, that call alone fails,
+  and the app tries once more later. There is no daily limit on them (`today_unbilled_releases` in
+  `status` shows the count; the halt watcher emails once a day when it reaches its threshold, see
+  "The daily unbilled email" below). What happens next depends on whether the answer means "busy"
+  (review of 2026-10-12):
+  - **Busy: 429 and 529** (`rate_limit_error`, `overloaded_error`). The same rules as DeepInfra's
+    "too many requests" (see README.md): the call fails with `PROVIDER_REFUSED_UNBILLED`, and it
+    never halts the gate. After 2 of them for Haiku with no normal answer from Haiku in between, the
+    gate refuses new Haiku calls for a while (`MODEL_COOLING`, with `retry_after` in seconds).
+    Nothing is set aside and Anthropic is not contacted. The first wait is 60 seconds; then ONE
+    call goes through as a trial. If the trial is refused the same way, the wait doubles: 120, 240,
+    480, then 600 seconds at most. A normal answer from Haiku ends the cool-off. The cool-off ends
+    by itself; nothing needs re-opening, and `activate` does not clear it (the wait runs on after a
+    re-open). These answers neither add to nor reset the count of five below.
+  - **Not busy: 400, 404, 413 and 500** (`invalid_request_error`, `not_found_error`,
+    `request_too_large`, `api_error`). The request itself was refused, or Anthropic had an inner
+    error: waiting would not help, so Haiku is never cooled off for them and the app does not make
+    it sit out the run. The call fails with `PROVIDER_ERROR_UNBILLED`. As before 2026-10-12, each
+    one adds to the count of five below.
+  Five in a row of "never reached Anthropic" (the connection failed before anything was sent) or
+  not-busy answers, with no normal answer in between, halt the gate with `provider_unreachable`,
+  and the halt watcher emails. A normal answer, or `activate`, resets that count.
+- **The daily unbilled email.** Once a day, the Anthropic halt watcher also warns about unbilled
+  refusals: when `status` shows `today_unbilled_releases` (calls Anthropic refused without billing
+  them, busy or not) at or above the threshold, the owner gets one email for that Bucharest day
+  with the count and the date. Nothing is halted; the email asks you to check Anthropic's billing
+  page that none of those calls was billed. The threshold is the `--unbilled-alert-at 100` flag in
+  `debateai-preview-anthropic-halt-watch.service` (1 to 100000; change it there, then
+  `systemctl daemon-reload`). The day is recorded before the email is queued, in
+  `/var/lib/debateai-preview-anthropic-halt-watch/announced-unbilled.json` (root-only, next to the
+  halt marker), so a failed email is not retried that day.
+- **A slow or cut-off answer is booked at its maximum, never a halt** (owner ruling of 2026-10-12,
+  "Book max cost, keep going"; the same code as the DeepInfra gate, see README.md "Slow or cut-off
+  answers"). The gate waits up to 20 minutes (1,200 seconds) for Anthropic's answer. If the
+  connection times out or breaks AFTER the call was sent, the gate charges that call exactly the
+  amount it set aside (the most it can cost: every byte of the question as a token at the dearest
+  price that question can have, plus the longest answer allowed), records it as
+  `settled_reserved_max`, counts it in today's spend, pot and call count, and keeps working. That
+  call alone fails with `PROVIDER_CHARGE_BOOKED_MAX`. `status` shows `today_booked_max` and
+  `today_booked_max_usd`, and the halt watcher emails the owner each time that number goes up
+  (recorded first in `/var/lib/debateai-preview-anthropic-halt-watch/announced-booked.json`). An
+  answer that does come back is judged exactly as before: Anthropic's own 504 timeout answer still
+  halts (next point).
 - **These still halt:** 401 (`authentication_error`) and 403 (`permission_error`), because the key
   is wrong or lacks a permission and root must look; 402 (`billing_error`); 504 (`timeout_error`),
   because the work may already have run; any error type that does not belong to its status; and
@@ -119,9 +177,9 @@ cache reads.
   addresses. Unlike DeepInfra, there is no address list to update: if Anthropic ever announces a
   new range, that is a reviewed change of the unit file and of `anthropic_addresses.py`.
 - **2 calls at the same time.** Before a debate starts, the app sets aside room for the calls that
-  may be running at once: calls in flight x the largest one-call hold, 2 x $0.214016 = $0.428032.
-  A fresh $2.00 pot then still has about $1.57 for the debates' own calls. A bigger pot allows more
-  calls in flight (each one needs $0.214016 of room).
+  may be running at once: calls in flight x the largest one-call hold, 2 x $0.24704 = $0.49408
+  (a cached full-size call; since caching, 2026-10-12). A fresh $2.00 pot then still has about $1.51
+  for the debates' own calls. A bigger pot allows more calls in flight (each one needs $0.24704 of room).
 - **The DeepInfra gate keeps its own copy of the code.** This gate's folder gets the new
   `preview_budget_helper.py` (the one that knows Anthropic). The DeepInfra gate's GO binds the
   hash of its own copy, so it keeps running unchanged. Updating the DeepInfra folder to this
@@ -274,7 +332,7 @@ own folder.
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
 
 When the gate is opened (`activate`), it checks once more that the calls in flight, each setting
-aside the largest worst case, fit in the pot: 2 x $0.214016 = $0.428032, inside $2.00.
+aside the largest worst case, fit in the pot: 2 x $0.24704 = $0.49408, inside $2.00.
 
 ```sh
 G=/opt/debateai-v3-preview/operator/anthropic-budget-v1
@@ -341,12 +399,17 @@ It sends "Reply exactly: OK" with an answer limit of 1,024 tokens and the thinki
 
 If it prints `"status": "refused"` instead of a result, the probe did not pass:
 - `PROBE_FENCE_REQUIRED`: the command was not copied whole. Nothing was read or spent.
-- `PROVIDER_REFUSED_UNBILLED`: Anthropic answered with one of its errors that bill nothing (for
-  example 400, a setting it does not accept). The gate stays open; `status` shows today's
-  `released_unbilled` entry with its `http_status`. Do not switch Haiku on: report it to the
-  reviewers (the row or the request shape needs a reviewed code change).
+- `PROVIDER_ERROR_UNBILLED`: Anthropic answered with one of its errors that bill nothing and do
+  not mean "busy" (for example 400, a setting it does not accept). The gate stays open; `status`
+  shows today's `released_unbilled` entry with its `http_status`. Do not switch Haiku on: report it
+  to the reviewers (the row or the request shape needs a reviewed code change).
+- `PROVIDER_REFUSED_UNBILLED`: Anthropic was busy (429 or 529). Nothing was charged. Probe again
+  later.
 - `PROVIDER_NOT_REACHED`: the connection failed before anything was sent. Check step 2's
   addresses, then probe again.
+- `AUTHORITY_HALTED`: the gate was already halted, so nothing was set aside and Anthropic was not
+  contacted. Re-open the gate first ("Daily operations"), then probe again. A probe is never
+  refused for a cool-off (`MODEL_COOLING`).
 
 How to read the one line it prints when the call went through:
 
@@ -415,7 +478,11 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
 ## Daily operations
 
 **How much did we spend today? Is the gate open?** This only reads. Look at `today_spend_usd`,
-`remaining_today_usd`, `state`, `reason`, `halts` and `window_open`.
+`remaining_today_usd`, `today_unbilled_releases` (refusals kept at $0; no limit), `today_booked_max`
+and `today_booked_max_usd` (calls whose connection timed out or broke after they were sent, each
+charged the most it could cost; already inside `today_spend_usd`; never a halt), `cooling`
+(Haiku's cool-off, if any; `activate` does not clear it), `unsent_streak`, `state`, `reason`,
+`halts` and `window_open`.
 
 ```sh
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1
@@ -425,7 +492,8 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
 1. Read `reason` and `halts` in `status` first.
 2. If a call was uncertain (`uncertain_charge`, `interrupted_call_uncertain`), look at the usage
    page of the preview workspace in the Anthropic Console for that time before re-opening. Its
-   full set-aside amount stays counted in that day's pot.
+   full set-aside amount stays counted in that day's pot. (A call that only timed out or lost its
+   connection after it was sent no longer halts: it is booked at its maximum and needs no re-open.)
 3. If the reason is `provider_error_or_model_identity`, the entry's `reply_model` in that day's
    record shows which model the answer named. For an answer the gate could not price, the entry's
    `accounting.invalid_reason` names the check it failed and `accounting.reply_shape` outlines the
@@ -438,10 +506,19 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
 ```
 
 **The halt watcher.** Every minute it asks this gate for `status` (read-only). Once per halt it
-queues one email to the owner with the reason code and this gate's own re-open command.
+queues one email to the owner with the reason code and this gate's own re-open command. It also
+emails once a day about many unbilled refusals, and once each time `today_booked_max` goes up (a
+call booked at its maximum; nothing to re-open).
+
+**Installing the slow-answer change (2026-10-12).** As in README.md "Slow answers (2026-10-12):
+installing this change", with this gate's own files and steps: copy the gate files, `gate_watch.py`
+and the unit `debateai-preview-anthropic-budget.service` (now `TimeoutStopSec=1300`) from the
+release, `systemctl daemon-reload`, write this gate's GO again (new hashes), restart
+`debateai-preview-anthropic-budget.service` when no debate is running (it may wait up to about 22
+minutes), then `activate` (owner's yes) and run the halt watcher once by hand.
 
 **Emergency off.** Level 1 is instant (no new paid call starts; re-open with `activate`). Level 2
-stops the service (up to about 11 minutes, while calls in flight finish).
+stops the service (up to about 22 minutes, while calls in flight finish; `TimeoutStopSec=1300`).
 
 ```sh
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py stop --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1

@@ -149,10 +149,6 @@ function codeForStatus(status: number): ContractErrorCode {
 }
 
 async function contractErrorForResponse(response: Response): Promise<ContractHttpError> {
-  const retryAfter = response.headers.get("retry-after")?.trim();
-  const parsedRetryAfter = retryAfter !== undefined && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
-  const retryAfterSeconds = parsedRetryAfter !== null && Number.isSafeInteger(parsedRetryAfter)
-    ? parsedRetryAfter : null;
   let serverCode: string | null = null;
   let serverMessage: string | null = null;
   let statement: PublicationRefusalStatement | null = null;
@@ -182,7 +178,30 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
   const detail = serverCode !== null && serverMessage !== null
     ? `${serverCode}: ${serverMessage}`
     : serverCode ?? serverMessage ?? `Contract request failed with ${response.status}`;
-  return new ContractHttpError(codeForStatus(response.status), response.status, detail, serverCode, statement, waiting, retryAfterSeconds);
+  return new ContractHttpError(
+    codeForStatus(response.status), response.status, detail, serverCode, statement, waiting,
+    retryAfterMs(response.headers.get("retry-after"))
+  );
+}
+
+/**
+ * `Retry-After` as milliseconds: delay-seconds or an HTTP date (RFC 9110 §10.2.3). Null when the header
+ * is absent or names no usable wait (zero, negative, fractional, a date already past, unreadable), so the
+ * caller keeps its own floor rather than reading a zero wait.
+ */
+function retryAfterMs(header: string | null): number | null {
+  if (header === null) return null;
+  const value = header.trim();
+  if (/^\d{1,9}$/u.test(value)) {
+    const seconds = Number(value);
+    return seconds > 0 ? seconds * 1_000 : null;
+  }
+  // An HTTP date opens with a day or month name; a signed or fractional number is not one.
+  if (!/^[A-Za-z]/u.test(value)) return null;
+  const at = Date.parse(value);
+  if (Number.isNaN(at)) return null;
+  const wait = at - Date.now();
+  return wait > 0 ? wait : null;
 }
 
 async function requestJson<T>(

@@ -10,7 +10,7 @@ const PROBE_MESSAGES = [{
 function probeBodyIsLiteral(body: string): boolean {
   const decoded = JSON.parse(body) as { messages: unknown; max_tokens: unknown };
   return isDeepStrictEqual(decoded.messages, PROBE_MESSAGES)
-    && decoded.max_tokens === 8
+    && decoded.max_tokens === 512
     && !body.includes("CONTENT RULE");
 }
 
@@ -32,7 +32,9 @@ async function captureProbe(): Promise<string[]> {
 
 describe("S01 R6 unframed health probes", () => {
   // Property: the real probe makes one call with one fixed user message,
-  // eight output tokens and no content rule. Any extra prompt material fails.
+  // 512 output tokens (eight until the probe answer fix of 2026-10-12, which a
+  // model that thinks first could spend before writing "OK") and no content
+  // rule. Any extra prompt material fails.
   it("R6-a — sends only the literal health probe", async () => {
     expect((await captureProbe()).map(probeBodyIsLiteral)).toEqual([true]);
   });
@@ -45,7 +47,7 @@ describe("S01 R6 unframed health probes", () => {
     const mutations = [
       { ...decoded, messages: [{ ...PROBE_MESSAGES[0], content: PROBE_MESSAGES[0]!.content + " Also answer the debate question." }] },
       { ...decoded, messages: [...PROBE_MESSAGES, { role: "user", content: "extra" }] },
-      { ...decoded, max_tokens: 9 },
+      { ...decoded, max_tokens: 513 },
       { ...decoded, extra: "CONTENT RULE" }
     ];
     expect(mutations.map((value) => probeBodyIsLiteral(JSON.stringify(value)))).toEqual([false, false, false, false]);

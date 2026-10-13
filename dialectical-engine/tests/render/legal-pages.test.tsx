@@ -173,7 +173,7 @@ describe("the legal notice states the company and seller details from one consta
     expect(factCell(view, "legal.notice.company.representative")?.textContent).toBe(COMPANY.representative);
     expect(factCell(view, "legal.notice.contact.phone")?.textContent).toBe(COMPANY.phone);
     expect(view.querySelector(".legalSection p")?.textContent).toBe(
-      `${COMPANY.tradingNames[0]} (also called ${COMPANY.tradingNames[1]}) is run by ${COMPANY.legalName}, a company registered in Romania.`
+      `${COMPANY.tradingNames[0]} is run by ${COMPANY.legalName}, a company registered in Romania.`
     );
     for (const address of Object.values(COMPANY.emails)) expect(view.textContent).toContain(address);
     // No catalogue in any locale may carry a company fact: filling COMPANY once must update all 35.
@@ -336,7 +336,7 @@ describe("the cookie policy describes the cookies the product really sets", () =
   const INV_STORAGE = ["debateai.consent", "debateai.mode", "debateai.languageOffer.dismissed", "debateai.support.conversation.v2", "debateai.phone-completion-draft.v1", "debateai.exportPending", "debateai.exportLinkOutcome"];
   const EN_KIND = ["Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Local storage", "Local storage", "Session storage", "Session storage", "Session storage", "Session storage", "Session storage"];
   const EN_LIFE = ["14 days", "14 days", "30 days", "1 year", "Up to 8 hours; 15-minute idle expiry", "Up to 8 hours; 15-minute idle expiry", "Up to 30 minutes", "Up to 30 minutes", "Up to 299 seconds", "Up to 299 seconds", "Up to 5 minutes", "Up to 5 minutes", "Up to 5 minutes", "Until you clear it", "Until you clear it", "Until you close the tab", "Until you close the tab", "15 minutes or until earlier clearing", "Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result", "Until tab close, sign-out, or a new link"];
-  const EN_RECIPIENT = [...Array(13).fill("DebateAI's server only"), ...Array(5).fill("stays in your browser"), "DebateAI's server only", "stays in your browser"];
+  const EN_RECIPIENT = [...Array(13).fill("Dialectical Engine's server only"), ...Array(5).fill("stays in your browser"), "Dialectical Engine's server only", "stays in your browser"];
   const english = legalEnglish as Record<string, string>;
   const INV_IDS = ["session", "csrf", "ageRefusal", "locale", "staff", "staff", "passwordReset", "passwordReset", "mfaRecovery", "mfaRecovery", "social", "social", "social", "consent", "mode", "languageOffer", "supportConversation", "phoneDraft", "exportPending", "exportLinkOutcome"];
 
@@ -443,7 +443,7 @@ describe("the cookie policy describes the cookies the product really sets", () =
     expect(typeof refuse).toBe("string");
     expect(typeof effect).toBe("string");
     expect(view.textContent).not.toMatch(/two choices/i);
-    // REV-S01 p1 SD-N1: help-chat text is posted to DebateAI's help (Assistant.tsx sendMessage), so the storage intro
+    // REV-S01 p1 SD-N1: help-chat text is posted to Dialectical Engine's help (Assistant.tsx sendMessage), so the storage intro
     // makes no claim that nothing in the browser's storage was ever sent.
     expect(english["legal.cookies.storageIntro"]).not.toMatch(/none of them is sent/i);
     expect(view.textContent).toContain(refuse);
@@ -488,6 +488,30 @@ describe("the model providers page lists the model families the product runs", (
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
     expect(headings).toEqual(["Anthropic", "DeepInfra", "Support chat model"]);
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
+  });
+
+  it("names Claude Haiku 5.5 as the support chat's model, with Anthropic's checked facts and no brackets", () => {
+    // Owner, 12 October 2026: the support chat runs on Claude Haiku 5.5 on Anthropic's API.
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
+    const support = [...view.querySelectorAll(".legalProviderEntry")].at(-1);
+    expect(support?.querySelector("h2")?.textContent).toBe("Support chat model");
+    const cells = Object.fromEntries([...(support?.querySelectorAll("tbody tr") ?? [])].map((row) => [
+      row.querySelector("th")?.textContent, row.querySelector("td")?.textContent?.trim()
+    ]));
+    expect(cells).toEqual({
+      "Models": "Claude Haiku 5.5",
+      "Company": "Anthropic Ireland, Limited",
+      "Home country": "Ireland",
+      "What it receives, and why": "What you type in the support chat — to answer you",
+      "Where it processes": legalEnglish["legal.providers.locationAnthropic"],
+      "How long it keeps data": legalEnglish["legal.providers.retentionAnthropic"],
+      "Zero data retention": "No",
+      "May it train on your data?": "No",
+      "Transfer basis": legalEnglish["legal.providers.sccBasis"],
+      "Contact": "privacy@anthropic.com",
+      "Last checked": "2026-10-10"
+    });
+    expect(support?.textContent).not.toMatch(/\[/u);
   });
 
   it("on the private preview's GLM build, lists DeepInfra just before the support chat's model, and no hosted cloud row", async () => {
@@ -576,7 +600,7 @@ describe("the US consumer health data page", () => {
 });
 
 describe("the footers (15a full, 15b one line)", () => {
-  it("the one-line footer carries the seven legal links and cookie preferences", () => {
+  it("the one-line footer carries the seven legal links, cookie preferences and ANPC's SAL badge", () => {
     const requests: Array<HTMLElement | null> = [];
     const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
     try {
@@ -584,7 +608,7 @@ describe("the footers (15a full, 15b one line)", () => {
       const footer = view.querySelector("footer.siteFooterLine");
       expect(footer).not.toBeNull();
       expect([...(footer?.querySelectorAll("a") ?? [])].map((link) => link.getAttribute("href")))
-        .toEqual(LEGAL_PAGES.map(({ href }) => href));
+        .toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://anpc.ro/ce-este-sal/"]);
       const button = footer?.querySelector("button");
       expect(button?.textContent).toBe(chromeEnglish["chrome.footer.cookiePreferences"]);
       act(() => button?.click());

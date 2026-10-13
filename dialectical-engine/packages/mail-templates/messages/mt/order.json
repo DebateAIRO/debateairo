@@ -1,5 +1,5 @@
 {
-  "order.planDescription": "Pjan ta’ kull xahar DebateAI {plan}",
-  "order.cardCheck": "Verifika tal-karta DebateAI",
-  "invoice.line": "Pjan DebateAI {plan}, minn {from} sa {to}"
+  "order.planDescription": "Pjan ta’ kull xahar Dialectical Engine {plan}",
+  "order.cardCheck": "Verifika tal-karta Dialectical Engine",
+  "invoice.line": "Pjan Dialectical Engine {plan}, minn {from} sa {to}"
 }

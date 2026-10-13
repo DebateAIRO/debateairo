@@ -46,6 +46,51 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
     expect(result.assessment.steelman.fidelity).toBe(0.8);
   });
 
+  it("keeps a good judge reply whose fatal flag is named in plain words, folding only the type", async () => {
+    // 2026-10-12 practice finding: one natural-language flag type used to refuse the whole billed reply.
+    const provider: ProviderGateway = {
+      call: async () => ({
+        rawArtifactRef: "artifact:natural-flag",
+        ledgerEntryRef: "ledger:natural-flag",
+        content: JSON.stringify({
+          statement: "A test-layer judgement.",
+          way_of_knowing: "REASONING",
+          locator: null,
+          restatement_text: "A test-layer judgement.",
+          restatement_status: "PASS",
+          value_laden: false,
+          steelman: { summary: "Strongest test-layer version.", fidelity: 0.8 },
+          critic: { summary: "Plausible test-layer counter.", counterargumentStrength: 0.2, basis: "PLAUSIBLE_COUNTER" },
+          evidence: { quality: 0.7, relevance: 0.9 },
+          context: { fit: 0.8, ambiguityFlags: [] },
+          fallacy: {
+            severity: 0.6,
+            fatalFlags: [{ type: "false dichotomy", severity: 0.6, description: "Only two options are offered." }]
+          }
+        }),
+        provider: "openai-compatible-http",
+        model: "fixture/model",
+        maker: "fixture",
+        modelVersion: "fixture-version"
+      })
+    };
+    const result = await new Judge(provider).judge({
+      runId: null,
+      subjectItemId: "node:natural-flag",
+      callSiteKey: "fixture:judge",
+      questionLine: "Test-layer question",
+      leg: { kind: "primary-root" },
+      providerRef: "provider:test",
+      contractHash: "contract:test",
+      bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 }
+    });
+    expect(result.assessment.steelman.fidelity).toBe(0.8);
+    expect(result.assessment.fallacy).toEqual({
+      severity: 0.6,
+      fatalFlags: [{ type: "false_dichotomy", severity: 0.6, description: "Only two options are offered." }]
+    });
+  });
+
   it("declares the complete strict artifact schema so a provider can return ruled judge JSON", async () => {
     const requiredSchemaFragments = [
       '"statement": non-empty string',

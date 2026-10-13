@@ -9,7 +9,7 @@ import settingsEnglish from "../../apps/ui/messages/en/settings.json" with { typ
 const G = "g".repeat(43);
 const CANCELLATION_REF = "55555555-5555-4555-8555-555555555555";
 const EXECUTE_AT = "2026-10-14T00:00:00.000Z";
-const REMOVE_WARNING = "Encrypted private content becomes permanently unreadable when its keys are destroyed. When the deletion runs, your public debates are removed from DebateAI and the keys to our copies are destroyed; downloaded, quoted, cached, indexed, or provider-retained copies may persist. Claimed legacy plaintext is reported as a retained residual, not as fully cleaned content.";
+const REMOVE_WARNING = "Encrypted private content becomes permanently unreadable when its keys are destroyed. When the deletion runs, your public debates are removed from Dialectical Engine and the keys to our copies are destroyed; downloaded, quoted, cached, indexed, or provider-retained copies may persist. Claimed legacy plaintext is reported as a retained residual, not as fully cleaned content.";
 
 let dom: JSDOM;
 let root: Root | null = null;

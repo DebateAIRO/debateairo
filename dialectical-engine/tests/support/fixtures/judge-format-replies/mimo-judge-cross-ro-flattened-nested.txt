@@ -1,0 +1,41 @@
+{
+  "statement": "Susțin poziția 'Da': pe liniile centrale ale unui oraș de mărime medie, gratuitatea este o măsură cu cost moderat și efecte concrete, atât timp cât este aplicată țintit, numai pe trunchiul central. Argumentul are trei straturi. Întâi, cererea de transport public are două pârghii: prețul și calitatea serviciului (frecvență, punctualitate, timp de călătorie). Eliminarea tarifului acționează instantaneu asupra pragului de intrare și atrage mai ales călătorii ocazionali, pe cei cu venituri mici, elevii, studenții și vârstnicii — exact segmentele pentru care costul biletului este factorul decisiv, nu frecvența. Pe traseele centrale acești călători sunt deja numeroși, deci efectul de creștere a numărului de pasageri se vede repede. Doi, prin mutarea unor călătorii scurte din mașina personală pe axele centrale, măsura reduce traficul auto în zona cu cea mai mare congestie, iar orașul de mărime medie are un centru suficient de compact încât autobuzul să fie competitiv ca timp față de mașină, mai ales când parcarea este limitată. Trei, costul este moderat și controlabil: renunțarea la încasări se aplică doar pe câteva trasee, nu pe întreaga rețea, iar încasările din titluri de călătorie pe acele trasee sunt oricum parțial acoperite de abonamente și subvenții; în plus, economiile vin din reducerea încasării numerarului, a validării, a controlului și a conflictelor la plată. Recunosc riscul: dacă gratuitatea este finanțată prin tăierea frecvenței, măsura se autodesființează. De aceea poziția corectă este 'gratuitate pe liniile centrale, cu frecvența menținută sau ușor crescută', nu 'gratuitate în loc de frecvență'.",
+  "way_of_knowing": "REASONING",
+  "locator": null,
+  "restatement_text": "Întrebarea dezbaterii este dacă un oraș de mărime medie ar trebui să facă gratuite liniile sale centrale de autobuz. Poziția proprie susține că da, deoarece gratuitatea pe liniile centrale crește numărul de călători și reduce traficul auto din centru, la un cost moderat. Poziția adversă susține că nu, deoarece o frecvență mai bună și autobuze punctuale atrag mai mulți călători decât un bilet gratuit.",
+  "restatement_status": "PASS",
+  "value_laden": true,
+  "claim_type": "comparative",
+  "steelman": "Poziția adversă, în forma ei cea mai puternică, spune că alegătorii de transport (cei care pot renunța la mașină) reacționează mai mult la timpul total de călătorie, la predictibilitate și la frecvență decât la tariful unei singure călătorii; pentru ei, un autobuz gratuit care vine rar și întârzie pierde în fața mașinii. În plus de aceasta, gratuitatea reduce veniturile din titluri de călătorie, iar acei bani puteau finanța exact frecvența și punctualitatea; în viziunea lor, politica corectă este să investești în serviciu întâi și abia apoi să intervii pe tarif.",
+  "fidelity": 0.9,
+  "critic": "Poziția adversă construiește o opoziție falsă între gratuitate și frecvență, deși într-un oraș de mărime medie cele două pot fi combinate: pierderea de încasări pe câteva trasee centrale este o fracțiune din bugetul de exploatare al rețelei, și poate fi acoperită prin eficientizarea colectării, prin redirecționarea subvențiilor existente sau prin mici tarife de parcare în centru. Mai mult, argumentul lor explică bine călătorii 'de alegere', dar îi neglijează pe cei cu constrângeri de buget, pentru care tariful este bariera imediată, iar frecvența este irelevantă dacă biletul nu se poate plăti. În al treilea rând, gratuitatea pe trunchiul central are un efect de rețea: simplifică îmbarcarea, scurtează timpul staționat în stații (fără plată și validare), deci îmbunătățește efectiv viteza comercială — frecvența percepută crește chiar și fără autobuze suplimentare. În fine, în absența unei taxe de congestie, tariful zero pe axele centrale este unul dintre puținele instrumente prin care un oraș mediu poate împinge explicit călătorii scurți din mașină în autobuz, iar beneficiul de decongestionare reduce la rândul lui timpii de mers ale autobuzelor, creând un cerc virtuos.",
+  "counterargumentStrength": 0.72,
+  "basis": "PLAUSIBLE_COUNTER",
+  "evidence": {
+    "quality": 0.42,
+    "relevance": 0.88
+  },
+  "context": {
+    "fit": 0.9,
+    "ambiguityFlags": [
+      "[REDACTED:long-run]șului_mediu_nu_sunt_precizate",
+      "[REDACTED:long-run]",
+      "nu_se_specifică_dacă_gratuitatea_ar_înlocui_sau_ar_completa_frecvența"
+    ]
+  },
+  "fallacy": {
+    "severity": 0.28,
+    "fatalFlags": [
+      {
+        "type": "false_dichotomy",
+        "severity": 0.35,
+        "description": "Poziția adversă tratează gratuitatea și frecvența ca alternative exclusive, deși alegerea reală este alocarea unui buget între efecte complementare și combinarea lor este posibilă."
+      },
+      {
+        "type": "hasty_generalization",
+        "severity": 0.22,
+        "description": "Argumentul propriu generalizează de la efectul observat pe traseele centrale la întreg traficul orașului, fără date despre comportamentul modal al călătorilor cu venituri diferite."
+      }
+    ]
+  }
+}

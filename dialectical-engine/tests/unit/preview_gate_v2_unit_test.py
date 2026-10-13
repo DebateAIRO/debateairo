@@ -272,6 +272,15 @@ class HaltWatchTests(unittest.TestCase):
         self.assertEqual((code, line['error']), (1, 'NOTICE_NOT_QUEUED'))
         self.assertTrue(self.state.exists())  # Recorded before queuing: never two emails for one halt.
 
+    def test_the_unbilled_state_file_is_a_sibling_and_never_the_halt_marker_itself(self):
+        self.assertEqual(gate_watch.unbilled_state_path(self.state), self.state.parent / 'announced-unbilled.json')
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = gate_watch.main(['--private', self.PRIVATE, '--state', str(self.state.parent / 'announced-unbilled.json')],
+                                   run=self.runner({'state': 'active'}))
+        self.assertEqual((code, json.loads(out.getvalue())), (1, {'status': 'refused', 'error': 'STATE_PATH_INVALID'}))
+        self.assertEqual(self.calls, [])
+
     def test_halt_watch_unit_is_root_without_network_and_never_sees_the_key(self):
         start = values(HALT_UNIT, 'ExecStart')[0].split()
         self.assertEqual(start[:3], ['/usr/bin/python3', '-I', OPERATOR + 'gate_watch.py'])
@@ -292,6 +301,229 @@ class HaltWatchTests(unittest.TestCase):
             '/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node '
             '/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --notice %i'])
         self.assertEqual(values(notice, 'OnFailure'), [])
+
+
+class UnbilledAlertTests(unittest.TestCase):
+    """2026-10-12 ruling: a high daily count of unbilled refusals (busy or rejected) ALERTS, never
+    halts. One email per gate per Bucharest day once status's today_unbilled_releases reaches the
+    threshold (default 100, --unbilled-alert-at)."""
+    PRIVATE = HaltWatchTests.PRIVATE
+    DAY = '2026-10-12'
+
+    def setUp(self):
+        folder = Path(tempfile.mkdtemp(prefix='gate-unbilled-watch-'))
+        self.addCleanup(shutil.rmtree, folder, True)
+        self.state = folder / 'announced-halt.json'
+        self.unbilled = folder / 'announced-unbilled.json'
+        self.calls = []
+
+    def runner(self, status, notice_code=0):
+        def run(argv, **kwargs):
+            self.calls.append(argv)
+            self.assertEqual(kwargs['env'], {})
+            if argv[0] == gate_watch.PYTHON:
+                return Completed(0, (json.dumps(status) + '\n').encode())
+            return Completed(notice_code)
+        return run
+
+    def status(self, count, today=DAY, **extra):
+        return {'state': 'active', 'reason': None, 'halted_at': None, 'today': today,
+                'today_unbilled_releases': count, 'today_spend_usd': '4.56', **extra}
+
+    def watch(self, status, *flags, notice_code=0):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = gate_watch.main(['--private', self.PRIVATE, '--state', str(self.state), *flags],
+                                   run=self.runner(status, notice_code))
+        return code, json.loads(out.getvalue())
+
+    def notices(self):
+        return [argv[-1] for argv in self.calls if argv[0] == gate_watch.SYSTEMCTL]
+
+    def test_one_email_when_the_count_reaches_the_threshold_then_none_again_that_day(self):
+        self.assertEqual(self.watch(self.status(99)), (0, {'status': 'ok', 'state': 'active'}))
+        self.assertEqual(self.notices(), [])
+        self.assertFalse(self.unbilled.exists())
+        code, line = self.watch(self.status(100))
+        self.assertEqual(code, 0)
+        self.assertEqual((line['status'], line['unbilled'], line['unbilled_notice']),
+                         ('ok', 'now', 'debateai-preview-notice@gate-unbilled-100_2026_10_12.service'))
+        self.assertEqual(self.notices(), ['debateai-preview-notice@gate-unbilled-100_2026_10_12.service'])
+        self.assertEqual(oct(os.stat(self.unbilled).st_mode & 0o777), '0o600')
+        self.assertEqual(json.loads(self.unbilled.read_text()), {'today': self.DAY})
+        self.assertFalse(self.state.exists())  # The halt marker is untouched: nothing halted.
+        code, line = self.watch(self.status(150))
+        self.assertEqual((code, line['unbilled']), (0, 'before'))
+        self.assertEqual(len(self.notices()), 1)
+        code, line = self.watch(self.status(100, today='2026-10-13'))
+        self.assertEqual((code, line['unbilled']), (0, 'now'))
+        self.assertEqual(self.notices()[-1], 'debateai-preview-notice@gate-unbilled-100_2026_10_13.service')
+        self.assertEqual(len(self.notices()), 2)
+        self.assertNotIn('4.56', json.dumps(self.calls))  # No amount ever reaches a unit name.
+
+    def test_the_threshold_flag_is_bounded(self):
+        code, line = self.watch(self.status(5), '--unbilled-alert-at', '5')
+        self.assertEqual((code, line['unbilled']), (0, 'now'))
+        self.assertEqual(self.notices(), ['debateai-preview-notice@gate-unbilled-5_2026_10_12.service'])
+        self.assertEqual(gate_watch.parse_args(['--private', 'p', '--state', 's']).unbilled_alert_at, 100)
+        for good in ('1', '100000'):
+            self.assertEqual(gate_watch.parse_args(['--private', 'p', '--state', 's', '--unbilled-alert-at', good]).unbilled_alert_at, int(good))
+        for bad in ('0', '-1', '100001', 'x', '1.5', ' 7', '१००'):
+            with self.subTest(bad=bad), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                gate_watch.parse_args(['--private', 'p', '--state', 's', '--unbilled-alert-at', bad])
+
+    def test_the_anthropic_gate_gets_its_own_kind_and_google_gets_none(self):
+        code, line = self.watch(self.status(100), '--notice', 'anthropic-halted')
+        self.assertEqual((code, line['unbilled']), (0, 'now'))
+        self.assertEqual(self.notices(), ['debateai-preview-notice@anthropic-unbilled-100_2026_10_12.service'])
+        self.unbilled.unlink()
+        self.calls.clear()
+        self.assertEqual(self.watch(self.status(5000), '--notice', 'google-halted'), (0, {'status': 'ok', 'state': 'active'}))
+        self.assertEqual(self.notices(), [])
+        self.assertFalse(self.unbilled.exists())
+
+    def test_a_halted_gate_still_gets_both_emails(self):
+        halted = self.status(120, state='halted', reason='uncertain_charge', halted_at='2026-10-12T09:00:00+00:00')
+        code, line = self.watch(halted)
+        self.assertEqual((code, line['status'], line['announced'], line['unbilled']), (0, 'halted', 'now', 'now'))
+        self.assertEqual(self.notices(), ['debateai-preview-notice@gate-halted-uncertain_charge.service',
+                                          'debateai-preview-notice@gate-unbilled-120_2026_10_12.service'])
+        self.assertTrue(self.state.exists() and self.unbilled.exists())
+
+    def test_a_missing_or_bad_count_or_day_is_skipped_quietly(self):
+        older = {'state': 'active', 'reason': None, 'halted_at': None, 'today': self.DAY}
+        bad = [older, {**older, 'today_unbilled_releases': None}]
+        for count in ('100', True, -1, 100.0, 1.5, None, [100], 10 ** 12):
+            bad.append(self.status(count))
+        for today in ('2026-13-01', '2026-02-31', '2026-10-12x', '2026-10-1', '2026_10_12', '२०२६-१०-१२', 20261012, None,
+                      '2026-10-12\n', ' 2026-10-12', '../2026-10-12'):
+            bad.append(self.status(500, today=today))
+        bad.append({k: v for k, v in self.status(500).items() if k != 'today'})
+        for status in bad:
+            with self.subTest(status=status):
+                self.assertEqual(self.watch(status), (0, {'status': 'ok', 'state': 'active'}))
+        self.assertEqual(self.notices(), [])
+        self.assertFalse(self.unbilled.exists())
+
+    def test_a_failed_notice_fails_the_watcher_with_the_day_recorded_and_is_not_retried(self):
+        code, line = self.watch(self.status(100), notice_code=1)
+        self.assertEqual((code, line), (1, {'status': 'refused', 'error': 'NOTICE_NOT_QUEUED'}))
+        self.assertEqual(json.loads(self.unbilled.read_text()), {'today': self.DAY})  # Recorded before queuing.
+        self.assertEqual(self.watch(self.status(130))[0], 0)  # Same day: not retried.
+        self.assertEqual(len(self.notices()), 1)
+
+    def test_when_the_halt_notice_fails_the_unbilled_one_is_still_queued(self):
+        halted = self.status(100, state='halted', reason='operator_stop', halted_at='t')
+        code, line = self.watch(halted, notice_code=1)
+        self.assertEqual((code, line['error']), (1, 'NOTICE_NOT_QUEUED'))
+        self.assertEqual(self.notices(), ['debateai-preview-notice@gate-halted-operator_stop.service',
+                                          'debateai-preview-notice@gate-unbilled-100_2026_10_12.service'])
+        self.assertTrue(self.state.exists() and self.unbilled.exists())
+
+    def test_an_unreadable_unbilled_marker_fails_the_watcher(self):
+        target = self.unbilled.parent / 'elsewhere.json'
+        target.write_text('{"today": "2026-10-12"}\n')
+        self.unbilled.symlink_to(target)  # Never read through a link (O_NOFOLLOW).
+        code, line = self.watch(self.status(100))
+        self.assertEqual((code, line['error']), (1, 'STATE_UNREADABLE'))
+        self.assertEqual(self.notices(), [])
+
+
+class BookedAlertTests(unittest.TestCase):
+    """Owner ruling 2026-10-12 ("Book max cost, keep going"): a call whose vendor connection failed or
+    timed out after it was sent is booked at its full reservation (settled_reserved_max) and the gate
+    stays active. The watcher emails once per new booking: whenever status's today_booked_max is above
+    the count it last announced for that Bucharest day. Never a halt notice."""
+    PRIVATE = HaltWatchTests.PRIVATE
+    DAY = '2026-10-12'
+
+    def setUp(self):
+        folder = Path(tempfile.mkdtemp(prefix='gate-booked-watch-'))
+        self.addCleanup(shutil.rmtree, folder, True)
+        self.state = folder / 'announced-halt.json'
+        self.booked = folder / 'announced-booked.json'
+        self.calls = []
+
+    def runner(self, status, notice_code=0):
+        def run(argv, **kwargs):
+            self.calls.append(argv)
+            self.assertEqual(kwargs['env'], {})
+            if argv[0] == gate_watch.PYTHON:
+                return Completed(0, (json.dumps(status) + '\n').encode())
+            return Completed(notice_code)
+        return run
+
+    def status(self, count, today=DAY, **extra):
+        return {'state': 'active', 'reason': None, 'halted_at': None, 'today': today, 'today_unbilled_releases': 0,
+                'today_booked_max': count, 'today_booked_max_usd': '0.1424', **extra}
+
+    def watch(self, status, *flags, notice_code=0):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = gate_watch.main(['--private', self.PRIVATE, '--state', str(self.state), *flags],
+                                   run=self.runner(status, notice_code))
+        return code, json.loads(out.getvalue())
+
+    def notices(self):
+        return [argv[-1] for argv in self.calls if argv[0] == gate_watch.SYSTEMCTL]
+
+    def test_one_email_per_new_booking_never_a_halt_notice(self):
+        self.assertEqual(self.watch(self.status(0)), (0, {'status': 'ok', 'state': 'active'}))
+        self.assertFalse(self.booked.exists())
+        code, line = self.watch(self.status(1))
+        self.assertEqual((code, line['status'], line['state'], line['booked'], line['booked_notice']),
+                         (0, 'ok', 'active', 'now', 'debateai-preview-notice@gate-booked-1_2026_10_12.service'))
+        self.assertEqual(oct(os.stat(self.booked).st_mode & 0o777), '0o600')
+        self.assertEqual(json.loads(self.booked.read_text()), {'today': self.DAY, 'count': 1})
+        self.assertFalse(self.state.exists())  # The halt marker is untouched: nothing halted.
+        self.assertEqual(self.watch(self.status(1))[1]['booked'], 'before')
+        self.watch(self.status(3))  # Two more since the last run: one email, with the day's count.
+        self.watch(self.status(3))
+        self.watch(self.status(1, today='2026-10-13'))
+        self.assertEqual(self.notices(), ['debateai-preview-notice@gate-booked-1_2026_10_12.service',
+                                          'debateai-preview-notice@gate-booked-3_2026_10_12.service',
+                                          'debateai-preview-notice@gate-booked-1_2026_10_13.service'])
+        self.assertNotIn('0.1424', json.dumps(self.calls))  # No amount ever reaches a unit name.
+        self.assertFalse(any('halted' in name for name in self.notices()))
+
+    def test_the_anthropic_gate_gets_its_own_kind_and_google_gets_none(self):
+        self.assertEqual(self.watch(self.status(2), '--notice', 'anthropic-halted')[1]['booked_notice'],
+                         'debateai-preview-notice@anthropic-booked-2_2026_10_12.service')
+        self.booked.unlink()
+        self.calls.clear()
+        self.assertEqual(self.watch(self.status(4), '--notice', 'google-halted'), (0, {'status': 'ok', 'state': 'active'}))
+        self.assertEqual(self.notices(), [])
+
+    def test_a_missing_or_bad_count_or_day_is_skipped_quietly(self):
+        bad = [{k: v for k, v in self.status(1).items() if k != 'today_booked_max'}]
+        for count in ('1', True, -1, 1.0, None, [1], 10 ** 12):
+            bad.append(self.status(count))
+        for today in ('2026-02-31', '2026-10-12\n', None, '../2026-10-12'):
+            bad.append(self.status(1, today=today))
+        for status in bad:
+            with self.subTest(status=status):
+                self.assertEqual(self.watch(status), (0, {'status': 'ok', 'state': 'active'}))
+        self.assertEqual(self.notices(), [])
+        self.assertFalse(self.booked.exists())
+
+    def test_a_failed_notice_fails_the_watcher_with_the_count_recorded_and_is_not_retried(self):
+        code, line = self.watch(self.status(1), notice_code=1)
+        self.assertEqual((code, line), (1, {'status': 'refused', 'error': 'NOTICE_NOT_QUEUED'}))
+        self.assertEqual(json.loads(self.booked.read_text()), {'today': self.DAY, 'count': 1})
+        self.assertEqual(self.watch(self.status(1))[0], 0)
+        self.assertEqual(len(self.notices()), 1)
+
+    def test_a_halted_gate_with_bookings_gets_both_emails_and_the_marker_files_stay_apart(self):
+        halted = self.status(1, state='halted', reason='charge_overrun', halted_at='2026-10-12T09:00:00+00:00')
+        code, line = self.watch(halted)
+        self.assertEqual((code, line['status'], line['announced'], line['booked']), (0, 'halted', 'now', 'now'))
+        self.assertEqual(self.notices(), ['debateai-preview-notice@gate-halted-charge_overrun.service',
+                                          'debateai-preview-notice@gate-booked-1_2026_10_12.service'])
+        self.assertEqual(gate_watch.booked_state_path(self.state), self.booked)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = gate_watch.main(['--private', self.PRIVATE, '--state', str(self.booked)], run=self.runner(halted))
+        self.assertEqual((code, json.loads(out.getvalue())), (1, {'status': 'refused', 'error': 'STATE_PATH_INVALID'}))
 
 
 class UnitFileTests(unittest.TestCase):

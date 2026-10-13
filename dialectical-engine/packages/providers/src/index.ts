@@ -2,7 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { z } from "zod";
 import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
-import { assertFramedPrompt } from "./prompt-frame.js";
+import { assertFramedPrompt, buildFramedPatchPrompt } from "./prompt-frame.js";
+import { PATCH_KEY_NOT_REQUESTED, mergePatchReply, planPatchFollowUp, type PatchFollowUpPlan } from "./patch-follow-up.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
 import {
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
@@ -17,8 +18,9 @@ import {
   isAnthropicThinkingControl,
   readAnthropicMessagesReply
 } from "./anthropic-messages.js";
-import { previewModelRowForEndpoint } from "./preview-models.js";
+import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
+import type { ModelJsonRepair, ModelReplyFacts } from "./model-json.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
 // not organ aliases. A debater's model may hold either role; the CALL is
@@ -50,8 +52,13 @@ export interface PromptPacket {
   }[];
 }
 
+/**
+ * `jsonRepair` (story format robustness, 2026-10-12): the one repair the tolerant decode
+ * (`decodeModelJson`) needed before the content passed its checks, so repairs can be counted.
+ * Absent for content that was strict JSON, and for every classifier that does not use the decode.
+ */
 export type ContentClassification =
-  | { readonly parseStatus: "PARSED"; readonly parseError: null }
+  | { readonly parseStatus: "PARSED"; readonly parseError: null; readonly jsonRepair?: ModelJsonRepair }
   | { readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly parseError: string };
 
 /**
@@ -133,7 +140,12 @@ export interface ProviderCallRequest {
   readonly providerRef: string;
   readonly packet: PromptPacket;
   readonly preferredResponseFormat?: "json_object";
-  readonly classifyContent?: (content: string) => ContentClassification;
+  /**
+   * `reply` (story format robustness, 2026-10-12): how this reply ended, so a classifier can refuse to
+   * repair an answer cut off at its token ceiling. Always passed by this gateway; a classifier that
+   * gets none must treat the ending as unknown.
+   */
+  readonly classifyContent?: (content: string, reply?: ModelReplyFacts) => ContentClassification;
   readonly buildRepairPacket?: (rejected: RejectedProviderContent) => PromptPacket;
   /**
    * L4-F8: re-evaluated before EVERY attempt, so a run-wide model-attempt ceiling checked once
@@ -152,6 +164,22 @@ export interface ProviderCallRequest {
    */
   readonly maxAttemptsThisCall?: number;
   /**
+   * All-steps format robustness (2026-10-12): true when the POSTs of THIS call after its first may be spent only on a
+   * reply this call's classifier refused (a repair packet, or a length retry): a transport failure (a timeout, a vendor
+   * error, the gate's refusal, billed or not) ends the call after its row, as a one-POST call would. Set only by the
+   * preview's call policy for a structured step's one repair try, so its one 60-second resend after an unbilled refusal
+   * stays the one resend. Absent: every failure may use the call's attempts, which is hosted and local byte for byte.
+   * Never sent.
+   */
+  readonly retryOnlyAfterContentRejection?: boolean;
+  /**
+   * Run resilience (spec 2026-10-12, fix (b)): whose attempts the step's allowance counts. "actor" — set only by
+   * the preview's call policy (`withPreviewProviderCallPolicy`) — counts the asking maker's own rows
+   * (`providerRef`), so each maker that a fallback moves a call to has its own allowance at the call site. Absent
+   * means the whole call site, which is hosted and local byte for byte. Never sent.
+   */
+  readonly attemptScope?: "actor";
+  /**
    * V-28: the money bound for THIS call. Per request and not per gateway,
    * because the price is the target's but the SPEND is the run's, and a gateway
    * is built once per target and then serves every run that reaches it.
@@ -165,6 +193,12 @@ export interface ProviderCallRequest {
    * sent (PROVIDER_THINKING_LEVEL_UNSUPPORTED) — never run at another level.
    */
   readonly thinkingLevel?: string;
+  /**
+   * Spec 2026-10-12 §4.4 (the owner's `slip_fix`): the thinking level of this call's REPAIR POSTs (the patch follow-up
+   * and the full re-ask), when it differs from `thinkingLevel`. Resolved, like `thinkingLevel`, before anything is
+   * sent; absent = every POST of the call runs at `thinkingLevel` (today's behaviour on every lane).
+   */
+  readonly repairThinkingLevel?: string;
   /**
    * Model scorecard §2.1 (ruling R5): the debate job this call does, in the
    * scorecard's seven-role vocabulary (`@debateai/kernel` DEBATE_ROLES).
@@ -235,6 +269,13 @@ export interface ProviderCallResult {
    * builds its own result and leaves it out means 0.
    */
   readonly repairAttempts?: number;
+  /**
+   * Patch follow-up (owner design, 2026-10-12): the form of the follow-up the accepted reply answered — "PATCH" when
+   * it was the short follow-up and `content` is the first reply with the patch merged in, "FULL" when it was the
+   * step's full re-ask. Absent when the accepted reply answered the original packet (or a gateway or double builds
+   * its own result).
+   */
+  readonly repairForm?: "PATCH" | "FULL";
 }
 
 export interface ProviderGateway {
@@ -1258,6 +1299,8 @@ const MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024;
  * oversized packet is a refused attempt — recorded, never sent, never retried.
  */
 const MAX_PROVIDER_REQUEST_PACKET_BYTES = 256 * 1024;
+/** Patch follow-up: room left in the packet cap for the body's other members around the messages. */
+const PATCH_PACKET_HEADROOM_BYTES = 4 * 1024;
 /** L4-F8: bounded exponential backoff between HTTP attempts — 250 ms x 2^n, capped at 4 s. */
 const PROVIDER_BACKOFF_BASE_MS = 250;
 const PROVIDER_BACKOFF_CAP_MS = 4_000;
@@ -1303,17 +1346,24 @@ export function estimateWindowTokens(messages: PromptPacket["messages"]): number
 /**
  * Model scorecard §2.3 — the thinking tokens the vendor reported, read
  * LENIENTLY off the RAW usage block: OpenAI's spelling
- * `completion_tokens_details.reasoning_tokens`, which the relays adopt. `null`
- * means not reported: never a guess and never a default zero, because a vendor
- * that says nothing has not said "none".
+ * `completion_tokens_details.reasoning_tokens` (DeepInfra, and the relays,
+ * which adopt it), else Anthropic's `output_tokens_details.thinking_tokens`
+ * (Haiku, spec 2026-10-12 §4.6). Thinking is already inside `output_tokens` /
+ * `completion_tokens`, so reading it changes no charge. `null` means not
+ * reported: never a guess and never a default zero, because a vendor that says
+ * nothing has not said "none".
  */
 export function reportedReasoningTokens(rawUsage: unknown): number | null {
   if (typeof rawUsage !== "object" || rawUsage === null || Array.isArray(rawUsage)) return null;
-  const details = (rawUsage as Readonly<Record<string, unknown>>).completion_tokens_details;
-  if (typeof details !== "object" || details === null || Array.isArray(details)) return null;
-  const value = (details as Readonly<Record<string, unknown>>).reasoning_tokens;
-  return typeof value === "number" && Number.isSafeInteger(value)
-    && value >= 0 && value <= MAX_USAGE_COUNTER ? value : null;
+  const usage = rawUsage as Readonly<Record<string, unknown>>;
+  const read = (details: unknown, key: string): number | null => {
+    if (typeof details !== "object" || details === null || Array.isArray(details)) return null;
+    const value = (details as Readonly<Record<string, unknown>>)[key];
+    return typeof value === "number" && Number.isSafeInteger(value)
+      && value >= 0 && value <= MAX_USAGE_COUNTER ? value : null;
+  };
+  return read(usage.completion_tokens_details, "reasoning_tokens")
+    ?? read(usage.output_tokens_details, "thinking_tokens");
 }
 
 /**
@@ -1608,10 +1658,39 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     this.#options = options;
   }
 
+  /**
+   * Patch follow-up: the short follow-up packet for a refused reply, or null when it cannot go out — the door or the
+   * builder refuses it (an answer that contains the boundary marker), the wire cannot say it, or it would not fit the
+   * packet cap or the declared window. Null means the step's full re-ask instead; nothing is sent or recorded here.
+   */
+  #patchPacket(
+    packet: PromptPacket, ownReply: string, plan: PatchFollowUpPlan, tokenCeiling: number, thinkingLevel: string,
+    fits: (packet: PromptPacket, tokenCeiling: number) => boolean
+  ): PromptPacket | null {
+    let patch: PromptPacket;
+    try {
+      patch = buildFramedPatchPrompt(packet, ownReply, plan.locator);
+      if (this.#anthropic) {
+        anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: tokenCeiling, thinkingLevel, messages: patch.messages });
+      }
+    } catch (error) {
+      if (error instanceof TypedDomainError) return null;
+      throw error;
+    }
+    return Buffer.byteLength(JSON.stringify(patch.messages), "utf8") + PATCH_PACKET_HEADROOM_BYTES <= MAX_PROVIDER_REQUEST_PACKET_BYTES
+      && fits(patch, tokenCeiling)
+      ? patch
+      : null;
+  }
+
   async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
     this.#options.assertNoOpenWriteTransaction();
     assertJsonObjectResponseCapability(this.#options);
     if(request.preferredResponseFormat!==undefined&&request.preferredResponseFormat!=="json_object") throw new TypedDomainError("PROVIDER_RESPONSE_FORMAT_INVALID","Unsupported preferred response format");
+    // JSON mode only where the row allows it (supportsJsonObjectResponse), for a story request that asks for it (the story
+    // writer and checker). The debate steps never ask: on 2026-10-12 GLM in JSON mode answered a judging call with "{}"
+    // and MiMo's quote slip became garbage, so that extension was withdrawn the same day. One value for the whole call,
+    // so the patch follow-up and the full re-ask carry the first POST's response_format.
     const responseFormat=request.lane==="story"&&request.preferredResponseFormat==="json_object"&&this.#options.supportsJsonObjectResponse===true?{type:"json_object"} as const:undefined;
     if (!Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 1) {
       throw new TypeError("CallBound.maxAttempts must be a positive integer");
@@ -1626,7 +1705,15 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * today; the field is also honoured when this gateway is called directly, without the counting
      * gateway in front.
      */
-    const callAttempts = Math.min(request.bound.maxAttempts, request.maxAttemptsThisCall ?? request.bound.maxAttempts);
+    /**
+     * Patch follow-up (owner design, 2026-10-12): a call whose SECOND POST was the short patch follow-up may send one
+     * more, for the full re-ask, still within `bound.maxAttempts` (on the preview the counting gateway's `remaining`,
+     * read off the ledger, so the counting gateway never meets a spent step for it). Hosted and local never set
+     * `maxAttemptsThisCall`, so for them this is the bound, as before.
+     */
+    let patchWasSecondPost = false;
+    const callAttempts = (): number => Math.min(request.bound.maxAttempts,
+      (request.maxAttemptsThisCall ?? request.bound.maxAttempts) + (patchWasSecondPost ? 1 : 0));
     /**
      * V-11 addendum, layer 1 — THE DOOR. Every hand-off in the engine passes
      * through this method, so holding the frame HERE is what makes "no call
@@ -1643,6 +1730,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * loop, like the frame refusal: nothing was sent, so nothing is ledgered.
      */
     const thinking = resolveThinkingLevel(request.thinkingLevel, this.#options.thinking, request.providerRef);
+    // Spec 2026-10-12 §4.4: the repair POSTs' level, decided and refused here too, before the first byte leaves.
+    const repairThinking = request.repairThinkingLevel === undefined
+      ? thinking : resolveThinkingLevel(request.repairThinkingLevel, this.#options.thinking, request.providerRef);
     assertProviderCallRecord(request);
     const callFacts = Object.freeze({
       modelRole: request.modelRole ?? null,
@@ -1674,13 +1764,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * accepted reply answered a repair packet.
      */
     let repairAttempts = 0;
-    let lastContentRejection: {
+    type ContentRefusalRecord = {
       attempts: number;
       parseStatus: ProviderContentRejectionStatus;
       parseError: string;
       rawArtifactRef: string;
       ledgerEntryRef: string;
-    } | null = null;
+    };
+    let lastContentRejection: ContentRefusalRecord | null = null;
 
     /**
      * Model scorecard §2.10: whether one attempt fits the declared window. The
@@ -1693,7 +1784,19 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       contextWindowTokens === undefined
         || estimateWindowTokens(packet.messages) + tokenCeiling <= contextWindowTokens;
 
-    for (let attempt = 1; attempt <= callAttempts; attempt += 1) {
+    /**
+     * Patch follow-up: the plan while `attemptPacket` is the patch packet (its reply is merged into the first reply
+     * before the step's classifier sees it); whether this call already sent one (one per call); and the first reply's
+     * refusal, which the full re-ask after a patch that did not do describes.
+     */
+    let patchPlan: PatchFollowUpPlan | null = null;
+    let patchTried = false;
+    let patchedRejection: RejectedProviderContent | null = null;
+    /** The first reply's refusal as recorded (its artifact and ledger row): the call's, while a patch was not merged. */
+    let patchedRefusal: ContentRefusalRecord | null = null;
+    let repairForm: "PATCH" | "FULL" | undefined;
+
+    for (let attempt = 1; attempt <= callAttempts(); attempt += 1) {
       const attemptTokenCeiling = Math.min(
         lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures),
         this.#options.maxOutputTokens ?? Number.MAX_SAFE_INTEGER
@@ -1710,6 +1813,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
        * rejection (or the usual PROVIDER_CALL_FAILED), never the window code.
        */
       if (attempt > 1 && !fitsContextWindow(attemptPacket, attemptTokenCeiling)) break;
+      // Spec 2026-10-12 §4.4: the original packet (and its length retries) runs at the call's level; an adopted repair
+      // packet (the patch follow-up or the full re-ask, `repairForm` set, reset by a length retry) at the repair level.
+      const attemptThinking = repairForm === undefined ? thinking : repairThinking;
       // L4-F8: back off first, then re-check the ceiling, so the decision to spend an attempt is
       // taken on the freshest state rather than on state read up to a backoff ago.
       if (attempt > 1) await sleep(providerBackoffMs(attempt));
@@ -1718,6 +1824,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // per-attempt bound a length retry raised (W10/2).
       // Model scorecard §2.2: with no level asked this is today's three-member
       // body byte for byte; with one, the target's own member carries it.
+      // Reviewed sampling (2026-10-12): a reviewed row with its own sampling (Qwen on
+      // DeepInfra) carries exactly those members after the level; every other target's
+      // body is unchanged (previewSamplingMembers is empty for it).
       // PR B: the Anthropic wire builds its own contract body; a packet it
       // cannot say is refused here, before anything is sent or recorded.
       let anthropicBody: string | undefined;
@@ -1726,7 +1835,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           anthropicBody = anthropicMessagesRequestBody({
             model: this.#options.model,
             maxTokens: attemptTokenCeiling,
-            thinkingLevel: thinking.sent,
+            thinkingLevel: attemptThinking.sent,
             messages: attemptPacket.messages
           });
         } catch (error) {
@@ -1740,7 +1849,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         : JSON.stringify({
         model: this.#options.model,
         max_tokens: attemptTokenCeiling,
-        ...thinking.wire,
+        ...attemptThinking.wire,
+        ...previewSamplingMembers(this.#options.endpoint, this.#options.model),
         messages: attemptPacket.messages,
         ...(responseFormat===undefined?{}:{response_format:responseFormat})
       });
@@ -1767,7 +1877,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       let ledgerRecorded = false;
       // Model scorecard §2.2: the level this attempt ran at, as far as it got. A
       // failure before any body arrived records the level that was sent.
-      let attemptThinkingLevel: string = thinking.sent;
+      let attemptThinkingLevel: string = attemptThinking.sent;
       // Pre-flight fix F13: set when the prompt could not be recorded, so the
       // catch below lets that failure leave unsent, unledgered and unretried.
       let promptRecordFailed = false;
@@ -1831,6 +1941,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         }
         // PR B: the Anthropic reply is read into the shape every line below
         // already reads; `rawText` (the artifact) keeps the vendor's own bytes.
+        // Spec 2026-10-12 §4.6: the reader keeps only the engine's three
+        // counters, so the vendor's own usage block is kept first, for the
+        // thinking-token read below (the charge keeps reading the reshaped one).
+        const vendorUsageBlock: unknown = typeof decoded === "object" && decoded !== null && !Array.isArray(decoded)
+          ? (decoded as Readonly<Record<string, unknown>>).usage
+          : undefined;
         const nativeReply = this.#anthropic ? readAnthropicMessagesReply(decoded) : null;
         if (nativeReply !== null) decoded = nativeReply.normalized;
         const candidate = z.object({ id: z.string(), model: modelIdSchema }).passthrough().safeParse(decoded);
@@ -1866,22 +1982,52 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         // tokens are read leniently off the RAW block, so the strict
         // four-counter parse above (and every test pinning it) is untouched.
         const echoedLevel = echoedThinkingLevel(decoded);
-        const thinkingLevelUsed = echoedLevel ?? thinking.sent;
-        const reasoningTokens = reportedReasoningTokens(rawUsage);
+        const thinkingLevelUsed = echoedLevel ?? attemptThinking.sent;
+        const reasoningTokens = reportedReasoningTokens(vendorUsageBlock);
         attemptThinkingLevel = thinkingLevelUsed;
         const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
+        const replyFacts: ModelReplyFacts = Object.freeze({ finishReason });
+        /**
+         * Patch follow-up: what this call hands back when the reply is accepted. The reply itself, except after a
+         * merged patch, where it is the first reply with the patch merged in (`mergePatchReply`) — the string the step's
+         * own classifier checked, so every caller that reads `content` again reads exactly what was accepted.
+         */
+        let acceptedContent = content;
+        /** Patch follow-up: this attempt was the patch and its reply could not be merged, so the first reply stands. */
+        let patchNotMerged = false;
         let classifiedContent: ContentClassification | {
           readonly parseStatus: "UNPARSED";
           readonly parseError: null;
         };
         try {
-          classifiedContent = content === null
-            ? { parseStatus: "UNPARSED", parseError: null }
-            : request.classifyContent?.(content) ?? {
-                parseStatus: contentParseStatus(content),
-                parseError: null
-              };
+          if (content !== null && patchPlan !== null && request.classifyContent !== undefined) {
+            const merged = mergePatchReply(patchPlan, content, replyFacts);
+            if (merged.ok) {
+              acceptedContent = merged.content;
+              classifiedContent = request.classifyContent(merged.content, replyFacts);
+            } else {
+              patchNotMerged = true;
+              classifiedContent = { parseStatus: merged.parseStatus, parseError: merged.parseError };
+              /**
+               * Owner ruling 2026-10-12: a reply with keys outside the request is most often the whole answer again.
+               * The step's own full check reads it as a whole answer, and it is accepted as it is when it passes —
+               * saving the full re-ask. When it does not, it stays refused as a patch (its record keeps
+               * PATCH_KEY_NOT_REQUESTED) and the first reply stands.
+               */
+              if (merged.parseError === PATCH_KEY_NOT_REQUESTED) {
+                const whole = request.classifyContent(content, replyFacts);
+                if (whole.parseStatus === "PARSED") classifiedContent = whole;
+              }
+            }
+          } else {
+            classifiedContent = content === null
+              ? { parseStatus: "UNPARSED", parseError: null }
+              : request.classifyContent?.(content, replyFacts) ?? {
+                  parseStatus: contentParseStatus(content),
+                  parseError: null
+                };
+          }
         } catch (error) {
           classifiedContent = {
             parseStatus: "SCHEMA_FAILED",
@@ -2012,13 +2158,13 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          *    another level) is CHANGED. A vendor never echoes, so there only a
          *    different echo is a change.
          */
-        if (thinking.sent !== THINKING_LEVEL_DEFAULT_ONLY
-          && (thinking.echoRequired
-            ? echoedLevel !== thinking.sent
-            : echoedLevel !== null && echoedLevel !== thinking.sent)) {
+        if (attemptThinking.sent !== THINKING_LEVEL_DEFAULT_ONLY
+          && (attemptThinking.echoRequired
+            ? echoedLevel !== attemptThinking.sent
+            : echoedLevel !== null && echoedLevel !== attemptThinking.sent)) {
           throw new TypedDomainError(
             PROVIDER_THINKING_LEVEL_CHANGED,
-            `${request.providerRef} was asked for thinking level ${thinking.sent} and did not report running at it`
+            `${request.providerRef} was asked for thinking level ${attemptThinking.sent} and did not report running at it`
           );
         }
         assertBoundedProviderResponse(decoded);
@@ -2100,13 +2246,21 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             finishedAt: new Date()
           });
           ledgerRecorded = true;
-          lastContentRejection = {
-            attempts: attempt,
-            parseStatus: contentRejection.parseStatus,
-            parseError: contentRejection.parseError,
-            rawArtifactRef,
-            ledgerEntryRef
-          };
+          /**
+           * Patch follow-up: a patch reply that could not be merged (PATCH_KEY_NOT_REQUESTED, PATCH_EMPTY,
+           * PATCH_NOT_AN_OBJECT) changed nothing — the first reply still stands — so if the call ends here, its refusal is
+           * that reply's. The steps read this code: the writer's citation codes end its round with no draft, never a
+           * FAILED run (Task M4 I-1). This attempt's own artifact and ledger row above keep the patch's own code.
+           */
+          lastContentRejection = patchNotMerged && patchedRefusal !== null
+            ? { ...patchedRefusal, attempts: attempt }
+            : {
+                attempts: attempt,
+                parseStatus: contentRejection.parseStatus,
+                parseError: contentRejection.parseError,
+                rawArtifactRef,
+                ledgerEntryRef
+              };
           if (contentRejection.parseStatus === PROVIDER_CONTENT_LENGTH_EXCEEDED) {
             // W10/2: a truncation is NOT repaired by asking again for the same
             // thing. Appending a correction is strictly counterproductive here
@@ -2115,23 +2269,56 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // ORIGINAL packet under a raised bound.
             lengthFailures += 1;
             attemptPacket = request.packet;
+            patchPlan = null;
+            repairForm = undefined;
             // Role rotation, Task 12: the original packet goes out again, so a repair adopted before
             // it no longer describes the reply that is finally accepted. Count afresh from here.
             repairAttempts = 0;
-          } else if (attempt < callAttempts && request.buildRepairPacket !== undefined) {
-            const repair = request.buildRepairPacket({
-              // `content` is the strict parse's, or the raw body when the cut
-              // landed before one existed. Either way it is what arrived.
-              rawText: content ?? rawText,
-              parseStatus: contentRejection.parseStatus,
-              parseError: contentRejection.parseError
-            });
-            // The repair path is the one that used to carry the model's own
-            // rejected output back into the instruction compartment. It goes
-            // through the same door as the first packet, with no exception.
-            assertFramedPrompt(repair);
-            attemptPacket = repair;
-            repairAttempts += 1;
+          } else if (request.buildRepairPacket !== undefined) {
+            const answeredPatch = patchPlan !== null;
+            patchPlan = null;
+            /**
+             * Patch follow-up (owner design, 2026-10-12), step (2): a reply to the ORIGINAL packet that decoded to an
+             * object and failed its check at named members gets the short follow-up first — the same packet object,
+             * then the model's own answer as its own turn, then only the failing machine paths (once per call). A
+             * reply that cannot be patched, and a patch that did not do, get the step's full re-ask (step 3), which
+             * describes the first reply's refusal.
+             */
+            const plan = !patchTried && attemptPacket === request.packet && content !== null && attempt < callAttempts()
+              ? planPatchFollowUp({ content, reply: replyFacts, parseStatus: contentRejection.parseStatus, parseError: contentRejection.parseError })
+              : null;
+            const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, repairThinking.sent, fitsContextWindow);
+            if (plan !== null && patch !== null) {
+              attemptPacket = patch;
+              patchPlan = plan;
+              patchTried = true;
+              if (attempt === 1) patchWasSecondPost = true;
+              patchedRejection = { rawText: content!, parseStatus: contentRejection.parseStatus, parseError: contentRejection.parseError };
+              patchedRefusal = {
+                attempts: attempt,
+                parseStatus: contentRejection.parseStatus,
+                parseError: contentRejection.parseError,
+                rawArtifactRef,
+                ledgerEntryRef
+              };
+              repairForm = "PATCH";
+              repairAttempts += 1;
+            } else if (attempt < callAttempts()) {
+              const repair = request.buildRepairPacket(answeredPatch && patchedRejection !== null ? patchedRejection : {
+                // `content` is the strict parse's, or the raw body when the cut
+                // landed before one existed. Either way it is what arrived.
+                rawText: content ?? rawText,
+                parseStatus: contentRejection.parseStatus,
+                parseError: contentRejection.parseError
+              });
+              // The repair path is the one that used to carry the model's own
+              // rejected output back into the instruction compartment. It goes
+              // through the same door as the first packet, with no exception.
+              assertFramedPrompt(repair);
+              attemptPacket = repair;
+              repairForm = "FULL";
+              repairAttempts += 1;
+            }
           }
           continue;
         }
@@ -2175,14 +2362,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         return {
           rawArtifactRef,
           ledgerEntryRef,
-          content: responseJson.choices[0]!.message.content,
+          // Patch follow-up: the merged answer after a patch; otherwise the reply, exactly as before.
+          content: acceptedContent ?? responseJson.choices[0]!.message.content,
           provider: this.#anthropic ? ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND : "openai-compatible-http",
           model: responseJson.model,
           maker: this.#options.maker,
           modelVersion: responseJson.model,
           thinkingLevel: thinkingLevelUsed,
           reasoningTokens,
-          repairAttempts
+          repairAttempts,
+          ...(repairAttempts > 0 && repairForm !== undefined ? { repairForm } : {})
         };
       } catch (error) {
         /**
@@ -2278,6 +2467,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          */
         if (error instanceof TypedDomainError
           && (error.code === PROVIDER_CONTENT_REFUSED || error.code === PROVIDER_REPLY_UNSUPPORTED)) break;
+        // All-steps format robustness (2026-10-12): a call whose later POSTs are for content repairs only ends here.
+        if (request.retryOnlyAfterContentRejection === true) break;
       }
       // L4-F2: an oversized packet is deterministic — resending it would burn the ceiling for
       // an identical refusal, so the loop stops on the attempt that refused it.
@@ -2338,20 +2529,32 @@ export { CONTENT_RULE_ID, CONTENT_RULE_TEXT, CONTENT_RULE_HEADING } from "./cont
 
 export {
   FRAMED_MATERIAL_FORMAT,
+  PATCH_REPLY_FORM_SENTENCE,
+  PER_CALL_MARKERS_HEADING,
   PROMPT_FRAME_VERSION,
+  TEXT_QUOTE_RULE_SENTENCE,
   appendFramedRejection,
   assertFramedPrompt,
+  buildFramedPatchPrompt,
   buildFramedPrompt,
   buildFramedRepairPrompt,
   promptContractFingerprintText,
   readPromptFrame,
   schemaFailureLocator,
+  splitCacheablePrefix,
   type FramedMaterialField,
   type FramedPrompt,
   type FramedRepairLocator,
   type PromptContract,
   type PromptFramePresence
 } from "./prompt-frame.js";
+
+// Patch follow-up (owner design, 2026-10-12): which refused replies get the short follow-up, and the merge.
+export {
+  mergePatchReply,
+  planPatchFollowUp,
+  schemaFailurePaths
+} from "./patch-follow-up.js";
 
 // V-11 addendum layer 5: tripwires — typed signals on the run, never gates.
 export {
@@ -2375,22 +2578,43 @@ export {
 } from "./provider-probe.js";
 
 export { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
+// Story format robustness (2026-10-12): the tolerant decode of a model's JSON answer.
+export {
+  decodeModelJson,
+  modelJsonFenceBody,
+  modelJsonLateRepair,
+  modelJsonObjectSpans,
+  rememberingAcceptedReply,
+  type ModelJsonDecoded,
+  type ModelJsonRepair,
+  type ModelReplyFacts
+} from "./model-json.js";
 export * from "./preview-test.js";
 
-// Multi-model preview, PR B: the native Anthropic Messages wire.
+// Multi-model preview, PR B: the native Anthropic Messages wire. The support chat
+// speaks it too (Claude Haiku 5.5), so the host, the headers and the key-shape
+// rule are exported from the one file that owns them.
 export {
+  ANTHROPIC_API_HOST,
   ANTHROPIC_API_VERSION,
   ANTHROPIC_EFFORT_LEVELS,
   ANTHROPIC_MESSAGES_BASE_URL,
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
   ANTHROPIC_MESSAGES_PATH,
+  ANTHROPIC_PER_CALL_MARKERS_SEPARATOR,
   PROVIDER_CONTENT_REFUSED,
   PROVIDER_PACKET_UNSUPPORTED,
   PROVIDER_REPLY_UNSUPPORTED,
+  anthropicCacheableSystem,
   anthropicMessagesRequestBody,
+  anthropicMessagesRequestHeaders,
   anthropicUsageAsEngineUsage,
+  assertAnthropicCredentialShape,
   readAnthropicMessagesReply,
-  type AnthropicMessagesReply
+  type AnthropicMessagesReply,
+  type AnthropicSystemBlocks
 } from "./anthropic-messages.js";
 export * from "./preview-models.js";
 export * from "./preview-remaining.js";
+// Spec 2026-10-12 §4.2–§4.4: the owner's thinking-level table, the step names and the level lookup.
+export * from "./preview-thinking.js";

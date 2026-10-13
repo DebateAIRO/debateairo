@@ -1,5 +1,5 @@
 {
-  "order.planDescription": "DebateAI {plan} aylık planı",
-  "order.cardCheck": "DebateAI kart doğrulaması",
-  "invoice.line": "DebateAI {plan} planı, {from} – {to}"
+  "order.planDescription": "Dialectical Engine {plan} aylık planı",
+  "order.cardCheck": "Dialectical Engine kart doğrulaması",
+  "invoice.line": "Dialectical Engine {plan} planı, {from} – {to}"
 }

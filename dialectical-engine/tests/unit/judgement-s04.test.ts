@@ -84,7 +84,7 @@ describe("FX-LG-16 / P12 — contract parsing and deterministic reduction", () =
     expect(parseJudgeAssessment(JSON.stringify({ steelman: {} }))).toMatchObject({ kind: "SCHEMA_FAILURE" });
   });
 
-  it("rejects a localized fatal flag type before reduction can silently miss its cap", () => {
+  it("folds a localized fatal flag type to its ASCII identifier before the schema check", () => {
     const localized = {
       ...assessment(),
       fallacy: {
@@ -96,7 +96,76 @@ describe("FX-LG-16 / P12 — contract parsing and deterministic reduction", () =
         }]
       }
     };
-    expect(parseJudgeAssessment(JSON.stringify(localized))).toMatchObject({ kind: "SCHEMA_FAILURE" });
+    expect(parseJudgeAssessment(JSON.stringify(localized))).toMatchObject({
+      kind: "PARSED",
+      assessment: { fallacy: { fatalFlags: [{ type: "NESUSTINUT", description: "Saltul nu are sprijin." }] } }
+    });
+  });
+
+  // 2026-10-12 practice finding: judge models name fatal flags in plain words, and one such type used to
+  // refuse the whole (billed, otherwise good) reply. The fold keeps the case as written.
+  const withFlagType = (type: string): JudgeAssessment => ({
+    ...assessment(),
+    fallacy: { severity: 0.6, fatalFlags: [{ type, severity: 0.6, description: "test-layer flag" }] }
+  });
+  const flagTypeAfterParse = (type: string): unknown => {
+    const parsed = parseJudgeAssessment(JSON.stringify(withFlagType(type)));
+    return parsed.kind === "PARSED" ? parsed.assessment.fallacy.fatalFlags[0]?.type : parsed.kind;
+  };
+
+  it("folds natural-language fatal flag types to the identifier shape the register caps use", () => {
+    expect(flagTypeAfterParse("false dichotomy")).toBe("false_dichotomy");
+    expect(flagTypeAfterParse("ad hominem (imputed motive)")).toBe("ad_hominem_imputed_motive");
+    expect(flagTypeAfterParse("unsupported certainty")).toBe("unsupported_certainty");
+    expect(flagTypeAfterParse("  false   dichotomy  ")).toBe("false_dichotomy");
+    expect(flagTypeAfterParse("Generalizare pripită")).toBe("Generalizare_pripita");
+    expect(flagTypeAfterParse("123 bad")).toBe("flag_123_bad");
+    expect(flagTypeAfterParse("a".repeat(63) + " tail")).toBe("a".repeat(63));
+  });
+
+  it("keeps an identifier-shaped fatal flag type exactly as written, case included", () => {
+    expect(flagTypeAfterParse("STRAW_MAN")).toBe("STRAW_MAN");
+    expect(flagTypeAfterParse("UNSUPPORTED-LEAP")).toBe("UNSUPPORTED-LEAP");
+    expect(flagTypeAfterParse("UNSUPPORTED")).toBe("UNSUPPORTED");
+  });
+
+  it("still refuses a fatal flag type with no identifier characters left", () => {
+    for (const type of ["", "   ", "!!!", "（）"]) {
+      expect(parseJudgeAssessment(JSON.stringify(withFlagType(type)))).toMatchObject({ kind: "SCHEMA_FAILURE" });
+    }
+  });
+
+  it("matches a folded fatal flag to its cap, driver and hole, and an exact cap name still fires", () => {
+    const parsed = parseJudgeAssessment(JSON.stringify(withFlagType("unsupported leap")));
+    if (parsed.kind !== "PARSED") throw new Error("expected the folded flag to parse");
+    const capped = (whenFatalType: string) => ({
+      ...compositionRow,
+      value: {
+        ...compositionRow.value,
+        entries: {
+          empirical: {
+            ...compositionRow.value.entries.empirical,
+            caps: [{ whenFatalType, to: 0.25, why: "test-layer folded cap", by: "test-layer:folded-cap-row" }]
+          }
+        }
+      }
+    });
+    const reduced = reduceAssessment({
+      claimType: "empirical", assessment: parsed.assessment,
+      compositionRow: capped("unsupported_leap"), reducerVersion: "test-layer:reducer-v1"
+    });
+    expect(reduced).toMatchObject({
+      kind: "REDUCED",
+      tau: 0.25,
+      caps: [{ toWhat: 0.25, byWhat: "test-layer:folded-cap-row" }],
+      drivers: [{ kind: "FATAL_FLAG", detail: "unsupported_leap" }],
+      holes: [{ kind: "FATAL_ASSESSMENT_HOLE", fatalType: "unsupported_leap" }]
+    });
+    const unfolded = reduceAssessment({
+      claimType: "empirical", assessment: parsed.assessment,
+      compositionRow: capped("unsupported leap"), reducerVersion: "test-layer:reducer-v1"
+    });
+    expect(unfolded).toMatchObject({ kind: "REDUCED", caps: [] });
   });
 
   it("preserves an ASCII hyphenated fatal flag and matches its register cap by exact type", () => {

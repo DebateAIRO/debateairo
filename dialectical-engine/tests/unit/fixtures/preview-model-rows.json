@@ -1,6 +1,6 @@
 {
-  "schema": "preview-model-rows-v1",
-  "about": "The reviewed DeepInfra model rows of the preview spending gate (contract A section 1). The gate (packages/providers/ops/preview_budget_helper.py) and the app (packages/providers/src) must both equal this file; a price change is a reviewed change to both sides and to this file. Prices are list prices in USD per million tokens. effort null means the request carries no reasoning_effort field. Per-call caps (owner ruling 2026-10-10), the same for every row: output_bound (the max_tokens ceiling and the reservation's output term) 32768 tokens, and a hard request body cap of 256 KiB (worst_case_request_bytes; story requests reach about 236 KiB at the high story size).",
+  "schema": "preview-model-rows-v2",
+  "about": "The reviewed DeepInfra model rows of the preview spending gate (contract A section 1). The gate (packages/providers/ops/preview_budget_helper.py) and the app (packages/providers/src) must both equal this file; a price change is a reviewed change to both sides and to this file. Prices are list prices in USD per million tokens. efforts is the reviewed thinking-level menu (spec 2026-10-12 section 4.1): a request's level must be on it, \"default\" meaning the request carries no reasoning_effort field (None in the gate's row) and any other word meaning reasoning_effort exactly that word; its first entry is the level the app sends by default (today's request). A menu change is a reviewed row change on both sides and in this file. sampling null means the request carries none of temperature, top_p and top_k; a sampling object means it carries exactly those keys with exactly those values (reviewed 2026-10-12: Qwen3.8-Flash degenerated into random multilingual tokens at DeepInfra's defaults, so it runs at its makers' thinking-mode settings; MiMo-V2.6-Pro broke its JSON with a straight closing quote, so it runs at DeepInfra's recommended temperature 1.0 and top_p 0.95; its JSON mode, tried the same day, was withdrawn because DeepInfra's JSON constraint turned that slip into garbage the engine's reader could otherwise repair). Per-call caps (owner ruling 2026-10-10), the same for every row: output_bound (the max_tokens ceiling and the reservation's output term) 32768 tokens, and a hard request body cap of 256 KiB (worst_case_request_bytes; story requests reach about 236 KiB at the high story size).",
   "provider": "deepinfra",
   "reservation": {
     "formula": "((request utf-8 bytes + overhead_bytes) * input price + output_bound * output price) / 1000000",
@@ -17,8 +17,9 @@
       "input_nano_usd_per_token": 150,
       "output_nano_usd_per_token": 500,
       "output_bound": 32768,
-      "effort": "high",
+      "efforts": ["high", "low"],
       "json_object": true,
+      "sampling": null,
       "worst_case_reservation_usd": "0.056012800"
     },
     {
@@ -29,8 +30,9 @@
       "input_nano_usd_per_token": 200,
       "output_nano_usd_per_token": 600,
       "output_bound": 32768,
-      "effort": "high",
+      "efforts": ["high", "low", "none"],
       "json_object": false,
+      "sampling": null,
       "worst_case_reservation_usd": "0.072499200"
     },
     {
@@ -41,8 +43,12 @@
       "input_nano_usd_per_token": 430,
       "output_nano_usd_per_token": 870,
       "output_bound": 32768,
-      "effort": null,
+      "efforts": ["default", "none"],
       "json_object": false,
+      "sampling": {
+        "temperature": 0.7,
+        "top_p": 0.95
+      },
       "worst_case_reservation_usd": "0.142110720"
     },
     {
@@ -53,8 +59,13 @@
       "input_nano_usd_per_token": 113,
       "output_nano_usd_per_token": 382,
       "output_bound": 32768,
-      "effort": null,
+      "efforts": ["default", "low", "medium", "none"],
       "json_object": false,
+      "sampling": {
+        "temperature": 0.6,
+        "top_p": 0.95,
+        "top_k": 20
+      },
       "worst_case_reservation_usd": "0.042371072"
     }
   ]

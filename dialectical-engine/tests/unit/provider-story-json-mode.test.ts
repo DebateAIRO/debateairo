@@ -43,8 +43,9 @@ describe("story JSON mode is an effective, target-specific wire control", () => 
   it("infers support only for the exact verified endpoint and model", () => {
     const target = { providerRef: "synthetic", maker: "Z.AI", baseUrl: ENDPOINT, model: MODEL };
     expect(providerTargetGatewayControls(target)).toEqual({ supportsJsonObjectResponse: true });
-    // Contract A §1: JSON mode is row-driven; the three other reviewed rows refuse it. The row's output
-    // cap is the preview's alone (previewTargetGatewayControls), never added to an ordinary target.
+    // Contract A §1: JSON mode is row-driven; the three other reviewed rows refuse it (MiMo's JSON mode, tried on
+    // 2026-10-12, was withdrawn the same day). The row's output cap is the preview's alone (previewTargetGatewayControls),
+    // never added to an ordinary target.
     for (const model of ["deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash"]) {
       expect(providerTargetGatewayControls({ ...target, model })).toEqual({});
     }
@@ -80,7 +81,9 @@ describe("story JSON mode is an effective, target-specific wire control", () => 
   it("leaves ordinary, unrequested, and unsupported calls byte-for-byte compatible", async () => {
     for (const variant of [
       { call: high, options: {} },
+      // The debate steps never get JSON mode (withdrawn 2026-10-12: GLM answered a judging call with "{}").
       { call: { ...high, lane: "served" as const, preferredResponseFormat: "json_object" as const }, options: {} },
+      { call: { ...high, lane: "evaluator" as const, preferredResponseFormat: "json_object" as const }, options: {} },
       { call: { ...high, preferredResponseFormat: "json_object" as const }, options: { supportsJsonObjectResponse: false } },
       { call: { ...high, preferredResponseFormat: "json_object" as const }, options: { endpoint: "http://synthetic/v1" } }
     ]) {

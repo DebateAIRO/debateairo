@@ -5,6 +5,16 @@
 # debateai-preview-notice@anthropic-halted-<reason>.service (--notice anthropic-halted), with
 # `systemctl start --no-block`: the email names the Anthropic gate's re-open command. It has its
 # own state file and its own notice unit, so two gates' halts are never one email.
+# Daily unbilled alert (2026-10-12: alert, never halt): once status's today_unbilled_releases
+# reaches --unbilled-alert-at (100 here; 1..100000), it queues ONE
+# debateai-preview-notice@anthropic-unbilled-<count>_<YYYY>_<MM>_<DD>.service per Bucharest day,
+# which says nothing was halted and to check Anthropic's billing page. The day is recorded first in
+# announced-unbilled.json next to the --state file (this unit's StateDirectory). Change the
+# threshold here, then `systemctl daemon-reload`.
+# Booked-at-maximum alert (owner ruling 2026-10-12: alert, never halt): each time status's
+# today_booked_max goes up (a call sent, then its connection timed out or broke, booked at its
+# full reservation), it queues debateai-preview-notice@anthropic-booked-<count>_<YYYY>_<MM>_<DD>.service;
+# the day and count are recorded first in announced-booked.json next to the --state file.
 # Root only because the gate's private folder is root-only; the key file is hidden from it, and it
 # has no network at all (systemctl talks to systemd over a local socket).
 [Unit]
@@ -15,7 +25,7 @@ OnFailure=debateai-preview-alert@%n.service
 Type=oneshot
 User=root
 Group=root
-ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/gate_watch.py --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 --state /var/lib/debateai-preview-anthropic-halt-watch/announced-halt.json --notice anthropic-halted
+ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/gate_watch.py --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 --state /var/lib/debateai-preview-anthropic-halt-watch/announced-halt.json --notice anthropic-halted --unbilled-alert-at 100
 StateDirectory=debateai-preview-anthropic-halt-watch
 StateDirectoryMode=0700
 # Short, so a stuck status run never holds the gate's shared lock long (the gate waits 10 s).

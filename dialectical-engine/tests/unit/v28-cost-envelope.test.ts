@@ -447,7 +447,7 @@ describe("V-28 amendment: hosted start-up refuses an admission row without the s
  * application may spend in a UTC day, across every run and every vendor". Two
  * paid surfaces are outside it today: the support chat, which is bounded by a
  * call cap and never in money, and the per-vendor discovery probe, which is a
- * real `max_tokens: 8` completion charged nowhere. The deferral is recorded
+ * real completion (at most `max_tokens: 512` since 2026-10-12; 8 before) charged nowhere. The deferral is recorded
  * honestly in the mission record; it was not in the code.
  *
  * These cases pin the CLAIM against the CODE, in both directions, so the
@@ -494,6 +494,7 @@ describe("C-I8 the daily ceiling claims only what it counts", () => {
         clock: () => new Date("2026-10-06T00:00:00.000Z"), ...(ceiling === undefined ? {} : { tokenCeiling: ceiling }) });
       expect(result.state).toBe("HEALTHY");
     }
-    expect(bodies.map(body => body.max_tokens)).toEqual([8, 32]);
+    // Probe answer fix (2026-10-12): 512 by default, so a model that thinks first can still write its "OK".
+    expect(bodies.map(body => body.max_tokens)).toEqual([512, 32]);
   });
 });

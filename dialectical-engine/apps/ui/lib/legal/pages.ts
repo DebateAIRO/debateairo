@@ -74,7 +74,7 @@ export type Company = Readonly<{
  */
 export const COMPANY: Company = Object.freeze({
   legalName: "DMS Merchandise Shop S.R.L.",
-  tradingNames: Object.freeze(["DebateAI", "Dialectical Engine"]),
+  tradingNames: Object.freeze(["Dialectical Engine"]),
   registeredOffice: "Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, județul Neamț, România",
   tradeRegisterNo: "J2022000426271",
   cui: "45935221",
@@ -140,7 +140,7 @@ export const LEGAL_COOKIES: readonly LegalInventoryItem[] = Object.freeze([
 
 /**
  * Browser-storage keys the UI writes: two in local storage and five in session storage. The
- * export link token is sent to the DebateAI server when redeemed; the link outcome stays in the
+ * export link token is sent to the Dialectical Engine server when redeemed; the link outcome stays in the
  * browser. The help-chat name is literal so this page does not pull in the support widget.
  */
 export const LEGAL_BROWSER_STORAGE: readonly LegalInventoryItem[] = Object.freeze([
@@ -265,26 +265,31 @@ export const MODEL_PROVIDERS: readonly ProviderRegisterEntry[] = Object.freeze([
 ]);
 
 /**
- * The support chat calls one model of its own (`apps/api/src/support/model.ts`), chosen when the
- * product is hosted; until then every fact about it is a placeholder.
+ * The support chat calls one model of its own (`apps/api/src/support/model.ts`): Claude Haiku 5.5
+ * on Anthropic's API (owner, 12 October 2026). Its facts are the ones checked against Anthropic's
+ * published terms on 10 October 2026 for the preview's Anthropic row (`ANTHROPIC_PREVIEW_PROVIDER`
+ * below; `docs/legal/2026-10-10-preview-provider-facts.md`): a customer in the EEA contracts with
+ * Anthropic Ireland, Limited; API inputs and outputs are deleted within 30 days unless flagged for
+ * misuse or the law requires more; zero data retention needs Anthropic's approval, which we do not
+ * have; no training on customer content; transfers under standard contractual clauses.
  */
 export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
   key: "support",
   provider: null,
   nameKey: "legal.providers.supportName",
-  models: "[…]",
+  models: "Claude Haiku 5.5",
   modelsKey: null,
-  entity: "[…]",
-  homeCountryKey: "legal.providers.unconfirmed",
+  entity: "Anthropic Ireland, Limited",
+  homeCountryKey: "legal.providers.ireland",
   purposes: Object.freeze<ProviderPurpose[]>(["support"]),
   purposesConfirmed: true,
-  locationKey: "legal.providers.unconfirmed",
-  retentionKey: "legal.providers.unconfirmed",
-  zeroRetention: "unconfirmed",
-  training: "unconfirmed",
-  basisKey: "legal.providers.unconfirmed",
-  contact: "[…]",
-  checkedOn: null
+  locationKey: "legal.providers.locationAnthropic",
+  retentionKey: "legal.providers.retentionAnthropic",
+  zeroRetention: "no",
+  training: "no",
+  basisKey: "legal.providers.sccBasis",
+  contact: "privacy@anthropic.com",
+  checkedOn: "2026-10-10"
 });
 
 /**

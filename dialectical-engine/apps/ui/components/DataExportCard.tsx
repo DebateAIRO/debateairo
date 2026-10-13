@@ -19,10 +19,10 @@ export function refusalMessage(failure: unknown, catalog: MessageCatalog, locale
     case "EXPORT_ACCOUNT_HELD": return t(catalog, "settings.export.held");
     case "EXPORT_IN_PROGRESS": return t(catalog, "settings.export.inProgress");
     case "EXPORT_RATE_LIMITED":
-      return failure.retryAfterSeconds === null
+      return failure.retryAfterMs === null
         ? t(catalog, "settings.export.unavailable")
         : t(catalog, "settings.export.rateLimited", {
-            time: formatDate(locale, new Date(Date.now() + failure.retryAfterSeconds * 1000).toISOString(),
+            time: formatDate(locale, new Date(Date.now() + failure.retryAfterMs).toISOString(),
               { dateStyle: "medium", timeStyle: "short" })
           });
     default: return t(catalog, "settings.export.unavailable");

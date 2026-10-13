@@ -1,11 +1,11 @@
 {
   "consent.settings.title": "Privatliv",
-  "consent.settings.hint": "Denne browser gemmer kun det, DebateAI har brug for for at virke. Se hele listen her når som helst.",
+  "consent.settings.hint": "Denne browser gemmer kun det, Dialectical Engine har brug for for at virke. Se hele listen her når som helst.",
   "consent.settings.button": "Det gemmer vi",
   "consent.bar.label": "Cookiemeddelelse",
   "consent.bar.eyebrow": "DINE DATA, FØRT TIL PROTOKOLS",
   "consent.bar.title": "Vi gemmer kun det, der holder dommerpanelet i gang.",
-  "consent.bar.body": "Fire cookies og fire elementer i din browsers lager, som hver især er nødvendige for, at DebateAI virker. Intet valgfrit, intet delt med andre.",
+  "consent.bar.body": "Fire cookies og fire elementer i din browsers lager, som hver især er nødvendige for, at Dialectical Engine virker. Intet valgfrit, intet delt med andre.",
   "consent.bar.acknowledge": "Forstået",
   "consent.bar.whatWeStore": "Det gemmer vi",
   "consent.link.cookiePolicy": "Cookiepolitik",

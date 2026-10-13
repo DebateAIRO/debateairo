@@ -138,6 +138,13 @@ class GateUnitTests(unittest.TestCase):
         # never DeepInfra's update command.
         self.assertEqual(values(CHECK_UNIT, 'OnFailure'), ['debateai-preview-notice@anthropic-addresses-mismatch.service'])
         self.assertEqual(options['--notice'], 'anthropic-halted')
+        # 2026-10-12: its own daily unbilled alert (anthropic-unbilled), at 100, beside its halt marker.
+        self.assertEqual(options['--unbilled-alert-at'], '100')
+        watcher = load(V2 / 'gate_watch.py', 'gate_watch_anthropic_unit')
+        args = watcher.parse_args(start[3:])
+        self.assertEqual((args.notice, args.unbilled_alert_at), ('anthropic-halted', 100))
+        self.assertEqual(watcher.UNBILLED_KINDS[args.notice], 'anthropic-unbilled')
+        self.assertEqual(str(watcher.unbilled_state_path(args.state)), '/var/lib/debateai-preview-anthropic-halt-watch/announced-unbilled.json')
         same = {'Description', 'ExecStart', 'StateDirectory', 'OnFailure'}
         self.assertEqual(without(CHECK_UNIT, same), without(DEEPINFRA_CHECK, same))
         for timer, v2 in ((HALT_TIMER, V2 / 'systemd/debateai-preview-gate-halt-watch.timer'),
@@ -201,11 +208,12 @@ class GateUnitTests(unittest.TestCase):
     def test_readme_names_the_same_paths_the_proposed_go_and_the_key_command(self):
         readme = README.read_text()
         for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"anthropic"', '"2.00"', '600', '$10.00', 'systemctl show -p InaccessiblePaths', '3a.',
-                     'claude-haiku-5-5', '0.214016', '0.428032', '160.79.104.0/23', 'getent ahostsv4 api.anthropic.com',
+                     'claude-haiku-5-5', '0.214016', '0.24704', '0.49408', '160.79.104.0/23', 'getent ahostsv4 api.anthropic.com',
                      'preview_key.py install anthropic', 'probe', '--model claude-haiku-5-5', 'model_echoed_exactly',
                      'completion_within_max_tokens', 'anthropic_budget_socket', '429', '529', UNIT.name, HALT_TIMER.name,
-                     CHECK_TIMER.name, TARGET_DROPIN.name):
+                     CHECK_TIMER.name, TARGET_DROPIN.name, 'MODEL_COOLING', 'AUTHORITY_HALTED'):
             self.assertIn(name, readme)
+        self.assertNotIn('the 20th on one day halts', readme)  # The daily unbilled ceiling is gone (2026-10-12).
         self.assertIn('README-anthropic.md', (V3 / 'README.md').read_text())
 
 
@@ -215,7 +223,8 @@ class GateUnitTests(unittest.TestCase):
         go = re.search(r"jq -n [^\n]*provider:\"anthropic\"[^\n]*", readme).group(0)
         for field in ('daily_budget_usd:"2.00"', 'max_paid_posts_per_day:600', 'max_concurrent_calls:2'):
             self.assertIn(field, go)
-        for stale in ('1.50', '"1.00"', '$3.50', '$4.00', '$5 team', '$5.00', '0.24704', '0.625 per million'):
+        # Prompt caching (2026-10-12) made $0.24704 (a cached full-size call) the worst case again: it is no longer stale.
+        for stale in ('1.50', '"1.00"', '$3.50', '$4.00', '$5 team', '$5.00', '0.625 per million', '0.428032'):
             self.assertNotIn(stale, readme)
         self.assertIn('DeepInfra $10.00 and Anthropic $2.00, $12.00 together', deepinfra)
         for stale in ('Anthropic $1.50', 'Anthropic $1.00', 'Anthropic (Claude Haiku) | $1.00'):

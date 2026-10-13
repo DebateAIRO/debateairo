@@ -39,7 +39,7 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewRunnerPolicy, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewRunnerPolicy, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -494,6 +494,11 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // estimate covers it. On the preview the rotated estimate prices only the panel's members; off the preview the
   // estimate prices the sealed roles as for any debate (no setting: always covered). Everywhere (Task 12) the runner
   // also requires the stand-in to be one of the debate's panel refs.
+  // Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md; ruling R-c): on the
+  // preview only, each maker's own attempt allowance at re-claim, a busy member or an unavailable gate sitting out
+  // the rest of the run, and the answer and story roles moving on from it (ROLE_UNAVAILABLE). Off the preview the
+  // setting is absent and the runner is today's.
+  ...(previewConfig === undefined ? {} : { runResilience: previewRunResilience(previewConfig)! }),
   ...(previewConfig === undefined ? {} : {
     answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ provider_ref: string; model_id: string }>[] }>) =>
       previewSealedRoleFallbackCovered(roleRef, panel)

@@ -36,18 +36,18 @@ export function renderPasswordResetMail(mail: PasswordResetMail, options: Readon
   if (mail.event === "PROOF") {
     if (!mail.token || !mail.cancelToken)
       throw new MailDeliveryError("PASSWORD_RESET_MAIL_INPUT_INVALID");
-    subject = "Reset your DebateAI password";
-    body = ["A password reset was requested for your DebateAI account.", "Open this link to choose a new password:", link("token", mail.token), "", `This link expires at ${mail.expiresAt.toISOString()}.`, "You must also enter a code from your current authenticator. The email link alone cannot reset your password.", "Your existing authenticator and unused recovery codes will be retained.", "", "If this was not you, open this link and confirm cancellation:", link("cancel", mail.cancelToken), "Cancelling does not change your password."];
+    subject = "Reset your Dialectical Engine password";
+    body = ["A password reset was requested for your Dialectical Engine account.", "Open this link to choose a new password:", link("token", mail.token), "", `This link expires at ${mail.expiresAt.toISOString()}.`, "You must also enter a code from your current authenticator. The email link alone cannot reset your password.", "Your existing authenticator and unused recovery codes will be retained.", "", "If this was not you, open this link and confirm cancellation:", link("cancel", mail.cancelToken), "Cancelling does not change your password."];
   }
   else {
-    const subjects = { COMPLETED: "Your DebateAI password was changed", CANCELLED: "DebateAI password reset cancelled", REFUSED: "DebateAI password reset stopped" };
+    const subjects = { COMPLETED: "Your Dialectical Engine password was changed", CANCELLED: "Dialectical Engine password reset cancelled", REFUSED: "Dialectical Engine password reset stopped" };
     const statements = { COMPLETED: "Your password was changed. All previous sessions were revoked. Your existing authenticator and unused recovery codes are unchanged. Sign in with your new password and the next code from your authenticator.", CANCELLED: "The password reset request was cancelled. Your password was not changed.", REFUSED: "The password reset request was stopped. Your password was not changed." };
       if (!Object.hasOwn(subjects, mail.event))
       throw new MailDeliveryError("PASSWORD_RESET_MAIL_INPUT_INVALID");
     subject = subjects[mail.event];
     body = [statements[mail.event]];
   }
-  return [`From: ${options.from}`, `To: ${mail.recipient}`, `Subject: ${subject}`, `Message-ID: <password-reset-${mail.messageId}@${origin.hostname}>`, "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "", "Hello,", "", ...body, "", "The DebateAI team", ""].join("\r\n");
+  return [`From: ${options.from}`, `To: ${mail.recipient}`, `Subject: ${subject}`, `Message-ID: <password-reset-${mail.messageId}@${origin.hostname}>`, "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "", "Hello,", "", ...body, "", "The Dialectical Engine team", ""].join("\r\n");
 }
 export class SendmailPasswordResetSender implements PasswordResetMailSender {
   constructor(private readonly options: Readonly<{

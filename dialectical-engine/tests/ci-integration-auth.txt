@@ -65,6 +65,8 @@ tests/integration/owner-one-key.test.ts
 # Spawns one tsx child under a 5 s commit deadline (kill-ceremony case): the only timing-bounded case on this list.
 tests/integration/owner-bootstrap-recovery.test.ts
 tests/integration/s9-dev-token-retirement-database.test.ts
+# The signed-in debate page's live stream (2026-10-11): one admission buys one open, session-checked stream.
+tests/integration/live-run-events.test.ts
 
 # Account erasure, migration lineage and preview upgrade preservation
 tests/integration/s10-t9-account-erasure-races.test.ts
