@@ -306,11 +306,15 @@ describe("production runner provider topology", () => {
 
     /**
      * Members the shipped entry point deliberately does NOT pass, each with the reason.
-     * Empty today: all optional members are composed. An entry here is a claim that
-     * absence is correct — state why; the pins below fail a stale or dishonest entry
-     * (one that is listed AND composed, or listed but no longer a member).
+     * An entry here is a claim that absence is correct — state why; the pins below fail
+     * a stale or dishonest entry (one that is listed AND composed, or listed but no
+     * longer a member).
      */
-    const INTENTIONALLY_ABSENT: Readonly<Record<string, string>> = {};
+    const INTENTIONALLY_ABSENT: Readonly<Record<string, string>> = {
+      // c5e0b2862 (debate shape, map stage).
+      mapChoices: "A storage seam only: absent, the runner stores and reads a shaped run's map with "
+        + "new MapChoiceRepository(pool) on its own pool, which is the production store; nothing composes it today."
+    };
 
     const unaccounted = optionalMembers
       .filter((member) => !composed.includes(member) && !(member in INTENTIONALLY_ABSENT));
@@ -321,5 +325,7 @@ describe("production runner provider topology", () => {
       expect(composed).not.toContain(member);
       expect(reason.trim().length).toBeGreaterThan(40);
     }
+    // The mapChoices claim is a fact of the runner: an absent seam falls back to the repository on the runner's pool.
+    expect(runnerSource).toContain("this.#mapChoices = settings.mapChoices?.store ?? new MapChoiceRepository(pool);");
   });
 });
