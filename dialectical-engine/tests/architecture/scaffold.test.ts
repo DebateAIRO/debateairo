@@ -35,7 +35,7 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
       { plan: { ...plan, recipeSha256: "0".repeat(64) }, migrateSource },
       { plan: { ...plan, manifest: { ...plan.manifest, order: [...plan.manifest.order].reverse() } }, migrateSource },
       { plan: { ...plan, sources: new Map([...plan.sources].map(([key, value]) => [key, key === name ? { ...value, sha256: "0".repeat(64) } : value])) }, migrateSource },
-      ...["if (appliedSet.has(name) || resolvedSet.has(name)) continue;", "INSERT INTO public.debateai_schema_migration (name, applied_at)", 'await client.query("ROLLBACK")', "client.release()"].map((fragment) => {
+      ...["if (appliedSet.has(name) || resolvedSet.has(name)) continue;", "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[compatEvidenceAfterChain,compat.logicalName]", 'await client.query("ROLLBACK")', "client.release()"].map((fragment) => {
         const at = migrateSource.indexOf(fragment, migrateSource.indexOf("export async function migrate("));
         expect(at).toBeGreaterThan(0);
         return { plan, migrateSource: migrateSource.slice(0, at) + "REMOVED_NATIVE_CONTROL" + migrateSource.slice(at + fragment.length) };

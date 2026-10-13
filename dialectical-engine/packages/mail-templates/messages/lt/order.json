@@ -1,5 +1,5 @@
 {
-  "order.planDescription": "DebateAI {plan} mėnesio planas",
-  "order.cardCheck": "DebateAI kortelės patikra",
-  "invoice.line": "DebateAI planas {plan}, {from}–{to}"
+  "order.planDescription": "Dialectical Engine {plan} mėnesio planas",
+  "order.cardCheck": "Dialectical Engine kortelės patikra",
+  "invoice.line": "Dialectical Engine planas {plan}, {from}–{to}"
 }

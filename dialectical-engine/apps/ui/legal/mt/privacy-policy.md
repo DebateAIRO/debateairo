@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.3 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions · Kontrollur: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
-**In short.** Niġbru dak li jeħtieġ kont u dak li tagħżel li tittajpja. Il-mistoqsijiet tiegħek jintbagħtu lill-fornituri tal-IA elenkati fir-Reġistru tagħna; ma jintużawx għat-taħriġ tal-mudelli. Id-dibattiti huma privati sakemm ma tippubblikahomx. It-tħassir tal-kont tiegħek jeqred iċ-ċwievet tad-data privata tiegħek; meta tiskedah, tagħżel jekk id-dibattiti ppubblikati tiegħek jitneħħewx ukoll jew jibqgħux pubbliċi taħt il-psewdonimu rtirat tiegħek. Tista’ tikkuntattjana fuq privacy@dezbatere.ro, u persuni msemmija f’dibattitu jistgħu jitolbu t-tneħħija mingħajr kont.
+**In short.** Niġbru dak li jeħtieġ kont u dak li tagħżel li tittajpja. Il-mistoqsijiet tiegħek jintbagħtu lill-fornituri tal-IA elenkati fir-Reġistru tagħna; ma jintużawx għat-taħriġ tal-mudelli. Il-fornitur tal-ospitar tagħna jaħżen il-kont tiegħek u d-dibattiti tiegħek f’Londra, fir-Renju Unit; it-taqsima 5 tispjega fejn oħra tmur id-data tiegħek. Id-dibattiti huma privati sakemm ma tippubblikahomx. It-tħassir tal-kont tiegħek jeqred iċ-ċwievet tad-data privata tiegħek; meta tiskedah, tagħżel jekk id-dibattiti ppubblikati tiegħek jitneħħewx ukoll jew jibqgħux pubbliċi taħt il-psewdonimu rtirat tiegħek. Tista’ tikkuntattjana fuq privacy@dezbatere.ro, u persuni msemmija f’dibattitu jistgħu jitolbu t-tneħħija mingħajr kont.
 
 ## 1. Min hu responsabbli għad-data tiegħek
 
@@ -95,6 +95,8 @@ Ma noħolqux profili dwarek, ma nużawx id-data tiegħek għar-reklamar, u ma nb
 
 **Riċevituri oħra.** Minbarra l-fornituri tal-IA, il-proċessuri li ġejjin jipproċessaw data f’isimna. Il-fornitur tal-ospitar tagħna, OVHcloud, jaħżen u jħaddem is-servizz fiċ-ċentru tad-data tiegħu f’Londra, fir-Renju Unit. Il-Kummissjoni Ewropea ddeċidiet li r-Renju Unit jipproteġi d-data personali b’mod adegwat (id-deċiżjoni ta’ adegwatezza tagħha tibqa’ fis-seħħ sa Diċembru 2031), għalhekk dan it-trasferiment ma jeħtieġ ebda salvagwardja oħra. Cloudflare twassal il-paġni tagħna, tittrasporta t-traffiku bejnek u s-servizz, u twettaq il-verifika kontra r-robots (it-taqsima 2); hija kumpanija Amerikana ċertifikata skont il-Qafas dwar il-Privatezza tad-Data bejn l-UE u l-Istati Uniti, u l-kuntratt tagħha magħna jżid il-klawżoli kuntrattwali standard tal-UE bħala salvagwardja ta’ riżerva. L-emails tal-kont jintbagħtu permezz ta’ Amazon Simple Email Service, skont il-kuntratt tagħna ma’ Amazon Web Services EMEA SARL fil-Lussemburgu; fejn Amazon tipproċessa dik id-data fl-Istati Uniti, it-trasferiment jiddependi fuq il-klawżoli kuntrattwali standard tal-UE fit-termini ta’ Amazon dwar l-ipproċessar tad-data. Il-pagamenti jsiru permezz tal-fornitur tagħna tal-ħlasijiet, NETOPIA Payments, ladarba jibdew il-pjanijiet bi ħlas. Kull wieħed jaġixxi fuq l-istruzzjonijiet dokumentati tagħna skont ftehim dwar l-ipproċessar tad-data bis-salvagwardji meħtieġa mill-Artikolu 28. Ma nippermettu lil ebda proċessur juża d-data tiegħek għall-finijiet tiegħu stess. Fejn fornitur jagħmel dan, ikun kontrollur għalih innifsu, u ma nibagħtulux id-data tiegħek.
 
+**Fejn hi d-data tiegħek.** Il-kont tiegħek u d-dibattiti tiegħek jinħażnu fir-Renju Unit, fuq is-servers tal-fornitur tal-ospitar tagħna f’Londra. Cloudflare tittrasporta t-traffiku permezz tan-netwerk tagħha stess, u Amazon tista’ tipproċessa l-emails tal-kont fl-Istati Uniti. Kull fornitur tal-IA jipproċessa t-test li jirċievi fil-pajjiżi li r-Reġistru jsemmi għalih, l-aktar fl-Istati Uniti.
+
 **Awtoritajiet pubbliċi.** Niżvelaw data personali lill-qrati, lir-regolaturi jew lill-awtoritajiet tal-infurzar tal-liġi fejn titlob dan il-liġi, u ngħarrfuk sakemm il-liġi ma żżommniex milli nagħmlu dan.
 
 ## 6. Pubblikazzjoni u viżibbiltà
@@ -148,12 +150,12 @@ Tista’ teżerċita kwalunkwe wieħed minn dawn mingħajr ħlas billi tikteb li
 
 | Dritt | Xi jfisser hawnhekk |
 | --- | --- |
-| **Aċċess** (Art. 15) | Kopja tad-data personali li nżommu dwarek, u din l-informazzjoni. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Aċċess** (Art. 15) | Kopja tad-data personali li nżommu dwarek, u din l-informazzjoni. Fl-Issettjar agħżel Esporta d-data: inħejju fajl ZIP b’fajls JSON u paġna waħda li tista’ tiftaħ fi kwalunkwe browser, u nibagħtulek b’email link biex tniżżel il-fajl li jaħdem għal 24 siegħa u biss waqt li tkun dħalt fil-kont tiegħek. |
 | **Rettifika** (Art. 16) | Ikkoreġi l-indirizz elettroniku jew l-indirizz elettroniku għall-irkupru tiegħek mill-issettjar. Il-psewdonimu tiegħek ma jistax jinbidel, għar-raġunijiet fit-Termini; tista’ tagħlaq il-kont u tiftaħ wieħed ġdid |
 | **Tħassir** (Art. 17) | Ħassar dibattitu privat fi kwalunkwe ħin mill-paġna tad-dibattitu. Agħlaq il-kont tiegħek mill-issettjar; it-taqsima 7 tispjega eżattament x’jagħmel dan. Itlobna nneħħu dibattitu ppubblikat li jkun fih id-data tiegħek kemm jekk inti l-awtur kif ukoll jekk le |
 | **Restrizzjoni** (Art. 18) | Itlobna nieqfu nipproċessaw data partikolari waqt li tiġi solvuta tilwima dwarha |
 | **Oġġezzjoni** (Art. 21) | Oġġezzjona għall-ipproċessar ibbażat fuq interessi leġittimi — l-ipproċessar tas-sigurtà u tal-awditjar fit-taqsima 4 — u nieqfu sakemm ma nkunux nistgħu nuru raġunijiet konvinċenti. Oġġezzjona għall-kummerċjalizzazzjoni fi kwalunkwe ħin, u nieqfu |
-| **Portabbiltà** (Art. 20) | Id-dibattiti u d-data tal-kont tiegħek f’format komuni li jista’ jinqara minn magna. \[Pending: same export as Access.\] Kontenut mhux personali li ħloqt, bħall-mistoqsijiet tiegħek, jingħatalek lura fuq talba meta jintemm il-kuntratt |
+| **Portabbiltà** (Art. 20) | Id-dibattiti u d-data tal-kont tiegħek f’format komuni li jista’ jinqara minn magna. Uża Esporta d-data fl-Issettjar: il-ZIP fih id-data tiegħek f’fajls JSON li jistgħu jinqraw minn magna u paġna waħda li tista’ tinqara faċilment; il-link mibgħut b’email jaħdem għal 24 siegħa u biss waqt li tkun dħalt fil-kont tiegħek. Kontenut mhux personali li ħloqt, bħall-mistoqsijiet tiegħek, jingħatalek lura fuq talba meta jintemm il-kuntratt |
 | **Irtirar tal-kunsens** (Art. 7(3)) | Irtira l-kunsens għall-kummerċjalizzazzjoni minn kwalunkwe messaġġ elettroniku jew mill-issettjar; irtira l-kunsens għal data sensittiva billi tagħlaq il-kont tiegħek mill-issettjar (tista’ wkoll tħalli barra din id-data jew tħassar dibattitu li jkun fiha). L-irtirar ma jaffettwax ipproċessar li jkun diġà sar |
 | **Ilment** | Lill-awtorità superviżorja Rumena, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, <anspdcp@dataprotection.ro>, jew lill-awtorità fil-pajjiż fejn tgħix. Nippreferu li l-ewwel tikkuntattja lilna |
 
@@ -174,7 +176,7 @@ Dialectical Engine hija għall-adulti. Tikkonferma li għandek 18-il sena jew ak
 ## 13. Cookies
 
 
-Dialectical Engine juża 18-il element, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn Dialectical Engine: 13-il cookie u 5 entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-**Politika dwar il-Cookies** fuq dezbatere.ro/cookies telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra.
+Dialectical Engine juża 20-il element, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn Dialectical Engine: 13-il cookie u 7 entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-**Politika dwar il-Cookies** fuq dezbatere.ro/cookies telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra.
 
 | Isem | Tip | Skop | Durata |
 |---|---|---|---|
@@ -196,6 +198,8 @@ Dialectical Engine juża 18-il element, ilkoll strettament meħtieġa għas-serv
 | `debateai.languageOffer.dismissed` | Ħażna tas-sessjoni | Jiftakar, għal din it-tab, li rrifjutajt l-offerta li jintwera dibattitu b’lingwa oħra. | Sakemm tagħlaq it-tab |
 | `debateai.support.conversation.v2` | Ħażna tas-sessjoni | Iżomm il-konversazzjoni tiegħek mal-chat tal-għajnuna fuq l-iskrin sakemm it-tab tibqa’ miftuħa. Titħassar meta xi ħadd jidħol jew joħroġ mill-kont f’din it-tab. | Sakemm tagħlaq it-tab |
 | `debateai.phone-completion-draft.v1` | Ħażna tas-sessjoni | Mistoqsija mhux lesta waqt il-pass tat-telefon; titħassar meta tinbidel is-sessjoni, toħroġ jew jinbidel is-sid | 15-il minuta jew sakemm jitħassar qabel |
+| `debateai.exportPending` | Ħażna tas-sessjoni | Iżomm il-link tal-esportazzjoni mibgħut bl-email f’din it-tab biex tidħol u terġa’ tipprova. | Sakemm tingħalaq it-tab, toħroġ, jinfetaħ link ġdid, jirnexxi l-ewwel tniżżil jew jirriżulta link invalidu jew kont ħażin |
+| `debateai.exportLinkOutcome` | Ħażna tas-sessjoni | Jiftakar liema messaġġ dwar il-link tat-tniżżil għandu jintwera f’din it-tab. | Sakemm tingħalaq it-tab, toħroġ jew jinfetaħ link ġdid |
 
 L-ebda parti oħra ma tiġbor, permezz ta’ Dialectical Engine, informazzjoni dwar l-attivitajiet tiegħek online matul iż-żmien u fuq diversi siti web.
 
@@ -229,7 +233,7 @@ L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-p
 
 ### B.4 L-Awstralja u ż-Żelanda l-Ġdida
 
-**L-Awstralja.** Dawk li jirċievu l-informazzjoni personali tiegħek barra l-Awstralja huma l-fornituri u l-proċessuri tal-IA elenkati fir-Reġistru, li jinsabu fl-Istati Uniti u fl-Unjoni Ewropea; nieħdu passi raġonevoli biex niżguraw li jittrattawha skont il-Prinċipji Awstraljani dwar il-Privatezza. **Deċiżjonijiet awtomatizzati:** mill-10 ta’ Diċembru 2026 din il-politika tidentifika t-tipi ta’ deċiżjonijiet li jittieħdu minn programmi tal-kompjuter u li jaffettwaw b’mod sinifikanti d-drittijiet jew l-interessi tiegħek — ma hemm ebda waħda; il-punteġġi u l-verdett jikkonċernaw argumenti, mhux lilek — u l-informazzjoni personali użata fihom. L-ilmenti jistgħu jsiru lill-**Uffiċċju tal-Kummissarju Awstraljan għall-Informazzjoni**. **Iż-Żelanda l-Ġdida.** L-uffiċjal tal-privatezza tagħna huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Fejn niġbru informazzjoni personali dwarek indirettament — għax utent ieħor inkludiha f’mistoqsija — din il-politika u t-taqsima 11 huma l-avviż li nagħtuk. Niżvelawha lill-fornituri tal-IA fir-Reġistru bħala l-aġenti tagħna, skont kuntratti li jitolbu salvagwardji komparabbli. L-ilmenti jistgħu jsiru lill-**Uffiċċju tal-Kummissarju għall-Privatezza**.
+**L-Awstralja.** Dawk li jirċievu l-informazzjoni personali tiegħek barra l-Awstralja huma l-proċessuri msemmija fit-taqsima 5, inkluż il-fornitur tal-ospitar tagħna f’Londra, fir-Renju Unit, u l-fornituri tal-IA elenkati fir-Reġistru. Jinsabu fir-Renju Unit, fl-Istati Uniti u fl-Unjoni Ewropea, u r-Reġistru jsemmi l-pajjiżi ta’ kull fornitur tal-IA; nieħdu passi raġonevoli biex niżguraw li jittrattawha skont il-Prinċipji Awstraljani dwar il-Privatezza. **Deċiżjonijiet awtomatizzati:** mill-10 ta’ Diċembru 2026 din il-politika tidentifika t-tipi ta’ deċiżjonijiet li jittieħdu minn programmi tal-kompjuter u li jaffettwaw b’mod sinifikanti d-drittijiet jew l-interessi tiegħek — ma hemm ebda waħda; il-punteġġi u l-verdett jikkonċernaw argumenti, mhux lilek — u l-informazzjoni personali użata fihom. L-ilmenti jistgħu jsiru lill-**Uffiċċju tal-Kummissarju Awstraljan għall-Informazzjoni**. **Iż-Żelanda l-Ġdida.** L-uffiċjal tal-privatezza tagħna huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Fejn niġbru informazzjoni personali dwarek indirettament — għax utent ieħor inkludiha f’mistoqsija — din il-politika u t-taqsima 11 huma l-avviż li nagħtuk. Niżvelawha lill-fornituri tal-IA fir-Reġistru bħala l-aġenti tagħna, skont kuntratti li jitolbu salvagwardji komparabbli. L-ilmenti jistgħu jsiru lill-**Uffiċċju tal-Kummissarju għall-Privatezza**.
 
 ### B.5 L-Iżvizzera
 

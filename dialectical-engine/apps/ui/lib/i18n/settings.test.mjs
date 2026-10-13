@@ -19,7 +19,9 @@ const ownedFiles = [
   "components/SettingsPageClient.tsx",
   "components/EmailSettings.tsx",
   "components/EvaluatorDevMenu.tsx",
-  "components/auth/SecurityActionResume.tsx"
+  "components/auth/SecurityActionResume.tsx",
+  "components/DataExportCard.tsx",
+  "components/ExportDownloadClient.tsx"
 ];
 const source = (path) => readFileSync(join(root, path), "utf8");
 const sources = new Map(ownedFiles.map((path) => [path, source(path)]));
@@ -27,7 +29,7 @@ const englishPath = join(root, "messages/en/settings.json");
 const visibleAttributes = new Set(["alt", "aria-label", "placeholder", "title"]);
 const allowedVisibleLiterals = new Set([
   "AI",
-  "DebateAI",
+  "Dialectical Engine",
   "data-ai-generated=\"true\"",
   "data-content-origin=\"automated\""
 ]);
@@ -123,7 +125,7 @@ test("protected product names stay out of translatable settings copy", () => {
   assert.ok(existsSync(englishPath), "messages/en/settings.json must exist");
   const english = JSON.parse(readFileSync(englishPath, "utf8"));
   const joined = Object.values(english).join("\n");
-  for (const protectedName of ["DebateAI", "Dialectical Engine", "vLLM"]) {
+  for (const protectedName of ["Dialectical Engine", "vLLM"]) {
     assert.equal(joined.includes(protectedName), false, `${protectedName} must be interpolated from source`);
   }
 });

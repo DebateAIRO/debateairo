@@ -111,7 +111,7 @@ function expectDeclarations(css: string, selector: string, declarations: string[
 const EYEBROW = "YOUR DATA, ON THE RECORD";
 const TITLE = "We store only what keeps the bench running.";
 const BODY =
-  "Four cookies and four items in your browser's storage, each needed for DebateAI to work. Nothing optional, nothing shared with anyone else.";
+  "Four cookies and four items in your browser's storage, each needed for Dialectical Engine to work. Nothing optional, nothing shared with anyone else.";
 const LABEL = "Cookie notice";
 /**
  * The three controls in DOM order. DONE.md default (2) and its step 3 fix the order

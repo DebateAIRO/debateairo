@@ -11,6 +11,8 @@ import { confirmationPhraseMatches } from '../AccountErasureControls';
 import type { LocaleCode } from '@/lib/i18n/locales';
 import { SecurityConfirmation } from './SecurityConfirmation';
 import { emailShape } from '@/lib/authFormValidation';
+import { refusalMessage } from '../DataExportCard';
+import { formatDate } from '@/lib/i18n/translate';
 export type SecurityResumeHandler = (authorization: StepUpAuthorizationRequest, initialProof: ConfirmedSecurityAction) => void | Promise<void>;
 /** Task12 consumes onResume for its profile/method/provider panels; proof remains one-use and exact. */
 export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, locale, client = contractClient, takeProof = takeSocialStepUp, onResume }: {
@@ -71,7 +73,7 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
     const { token, expires_at, ...authorization } = grant;
     const action = grant.action;
     const isRun = 'target_run_id' in grant;
-    const warning = action === 'PUBLISH' ? t(publicCatalog, "public.publication.publishWarning") : action === 'UNPUBLISH' ? t(publicCatalog, "public.publication.unpublishWarning") : action === 'DELETE_PRIVATE_DEBATE' ? t(publicCatalog, "public.publication.deleteExplanation") : action === 'DELETE_ACCOUNT' ? t(settingsCatalog, "settings.erasure.dataWarning") : t(catalog, "auth.security.providerProof");
+    const warning = action === 'PUBLISH' ? t(publicCatalog, "public.publication.publishWarning") : action === 'UNPUBLISH' ? t(publicCatalog, "public.publication.unpublishWarning") : action === 'DELETE_PRIVATE_DEBATE' ? t(publicCatalog, "public.publication.deleteExplanation") : action === 'DELETE_ACCOUNT' ? t(settingsCatalog, "settings.erasure.dataWarning") : action === 'EXPORT_DATA' ? t(settingsCatalog, "settings.export.title") : t(catalog, "auth.security.providerProof");
     const destructive = action === 'PUBLISH' || action === 'UNPUBLISH' || action === 'DELETE_PRIVATE_DEBATE';
     const allowed = destructive ? acknowledged : action === 'DELETE_ACCOUNT' ? confirmationPhraseMatches(phrase, t(settingsCatalog, "settings.erasure.confirmationPhrase"), locale) : action === 'CHANGE_EMAIL' ? emailShape(email) : true;
     async function confirm(result: ConfirmedSecurityAction) {
@@ -97,6 +99,12 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
                 if (active.current)
                     setCancellation(response.cancellation_ref);
                 message = t(settingsCatalog, "settings.erasure.scheduled");
+            }
+            else if (action === 'EXPORT_DATA') {
+                const response = await client.requestDataExport(result.step_up_grant.token, locale === 'en-US' || locale === 'en-GB' ? 'en' : locale);
+                message = response.status === 'NONE' ? t(settingsCatalog, "settings.export.statusUnavailable") : t(settingsCatalog, "settings.export.preparing", {
+                    time: formatDate(locale, response.requested_at, { dateStyle: 'medium', timeStyle: 'short' })
+                });
             }
             else if (action === 'CHANGE_EMAIL') {
                 await client.requestEmailChange(email.trim(), result.step_up_grant.token);
@@ -125,6 +133,8 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
                     setStatus(t(publicCatalog, failure instanceof ContractHttpError && failure.serverCode === 'DEBATE_MUST_BE_PRIVATE' ? 'public.publication.mustBePrivate' : failure instanceof ContractHttpError && failure.serverCode === 'LEGACY_CONTENT_RETAINED' ? 'public.publication.legacyRetained' : 'public.publication.deletionUnauthorized'));
                 else if (action === 'DELETE_ACCOUNT')
                     setStatus(t(settingsCatalog, failure instanceof ContractHttpError && failure.serverCode === 'ACCOUNT_NOTIFICATION_CHANNEL_REQUIRED' ? 'settings.erasure.notificationChannelRequired' : 'settings.erasure.notAuthorized'));
+                else if (action === 'EXPORT_DATA')
+                    setStatus(refusalMessage(failure, settingsCatalog, locale));
                 else if (action === 'CHANGE_EMAIL')
                     setStatus(failure instanceof ContractHttpError && failure.serverCode === 'EMAIL_INVALID' ? t(catalog, 'auth.emailUndeliverable') : t(settingsCatalog, 'settings.emailChange.failed'));
                 else

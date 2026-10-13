@@ -1,4 +1,4 @@
-# DebateAI — Szolgáltatási feltételek
+# Dialectical Engine — Szolgáltatási feltételek
 
 <!-- legal-chrome
 summaryTitle: Röviden
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
-**In short.** Önnek legalább 18 évesnek kell lennie. A DebateAI mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
+**In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
 ## 1. Kik vagyunk, és hogyan léphet velünk kapcsolatba
 
-A DebateAI üzemeltetője a Romániában bejegyzett **DMS Merchandise Shop S.R.L.** társaság.
+A Dialectical Engine üzemeltetője a Romániában bejegyzett **DMS Merchandise Shop S.R.L.** társaság.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ A DebateAI üzemeltetője a Romániában bejegyzett **DMS Merchandise Shop S.R.L
 
 Ezek az adatok folyamatosan elérhetők a webhelyen is: dezbatere.ro/legal. Mindig kapcsolatba léphet egy személlyel, nem csupán az asszisztensünkkel; ennek módját a 10. szakasz ismerteti.
 
-## 2. Hol kínáljuk a DebateAI szolgáltatást
+## 2. Hol kínáljuk a Dialectical Engine szolgáltatást
 
-A DebateAI szolgáltatást az alábbi országokban és régiókban élő személyeknek kínáljuk: Európai Unió (27 ország) és Európai Gazdasági Térség (Norvégia, Izland és Liechtenstein), Svájc, Moldova, Egyesült Államok (Tennessee állam kivételével), Kanada, Ausztrália, Új-Zéland, Szingapúr, Japán, Dél-Korea és Tajvan. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat.
+A Dialectical Engine szolgáltatást az alábbi országokban és régiókban élő személyeknek kínáljuk: Európai Unió (27 ország) és Európai Gazdasági Térség (Norvégia, Izland és Liechtenstein), Svájc, Moldova, Egyesült Államok (Tennessee állam kivételével), Kanada, Ausztrália, Új-Zéland, Szingapúr, Japán, Dél-Korea és Tajvan. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat.
 
 ## 3. E Feltételek elfogadása
 
@@ -58,21 +58,21 @@ A dezbatere.ro/privacy címen elérhető **Adatvédelmi szabályzatunk** ismerte
 
 Mielőtt Ön elektronikus úton szerződést köt velünk, a felület bemutatja az ehhez szükséges lépéseket, lehetővé teszi, hogy a beküldés előtt áttekintse és kijavítsa a megadott adatokat, valamint közli, hogy a szerződés milyen nyelveken köthető meg. E Feltételeket menthető és nyomtatható formában tesszük elérhetővé, fizetős csomag vásárlásakor az Ön által elfogadott változatot e-mailben elküldjük, és Ön bármikor másolatot kérhet. E Feltételek egyetlen rendelkezése sem korlátozza az Önt a román vagy uniós fogyasztóvédelmi jog, illetve a lakóhelye szerinti ország joga alapján megillető, szerződéssel nem korlátozható jogokat.
 
-## 4. Ki használhatja a DebateAI szolgáltatást
+## 4. Ki használhatja a Dialectical Engine szolgáltatást
 
-Fiók létrehozásához Önnek **legalább 18 évesnek** kell lennie, amit a regisztrációkor meg is erősít. A DebateAI nem gyermekeknek szól, és tudatosan nem nyújtjuk 18 év alatti személyeknek. Ha tudomásunkra jut, hogy egy fiók 18 év alatti személyhez tartozik, megszüntetjük azt. Egyes régiókban a megerősítésen túl további követelmények érvényesek; az A. melléklet ismerteti, hogy hol mi alkalmazandó.
+Fiók létrehozásához Önnek **legalább 18 évesnek** kell lennie, amit a regisztrációkor meg is erősít. A Dialectical Engine nem gyermekeknek szól, és tudatosan nem nyújtjuk 18 év alatti személyeknek. Ha tudomásunkra jut, hogy egy fiók 18 év alatti személyhez tartozik, megszüntetjük azt. Egyes régiókban a megerősítésen túl további követelmények érvényesek; az A. melléklet ismerteti, hogy hol mi alkalmazandó.
 
-Önnek rendelkeznie kell az e szerződés megkötéséhez szükséges cselekvőképességgel. Ha a DebateAI szolgáltatást valamely szervezet nevében használja, megerősíti, hogy jogosult a szervezetet kötelezni, és ebben az esetben az „Ön” kifejezés az adott szervezetet jelenti.
+Önnek rendelkeznie kell az e szerződés megkötéséhez szükséges cselekvőképességgel. Ha a Dialectical Engine szolgáltatást valamely szervezet nevében használja, megerősíti, hogy jogosult a szervezetet kötelezni, és ebben az esetben az „Ön” kifejezés az adott szervezetet jelenti.
 
 Bárki elolvashat egy közzétett vitát. Az olvasáshoz nem szükséges fiók, az azonban a szolgáltatás használatának minősül, ezért arra a 7., 15., 16. és 18. szakasz alkalmazandó.
 
-## 5. Mit tesz a DebateAI, és mit nem
+## 5. Mit tesz a Dialectical Engine, és mit nem
 
-Ön beküld egy kérdést vagy állítást. A DebateAI ezt több harmadik fél MI-modelljének továbbítja, amelyek érvelési gráfot építenek köré: állításokat, ellenérveket, kritikákat, bizonyítékokra való hivatkozásokat, pontszámokat, valamint egy megbízhatósági sávval ellátott végkövetkeztetést. Ön vitathat egyes állításokat, kérheti valamely kérdés további vizsgálatát, és eldöntheti, hogy közzéteszi-e az eredményt.
+Ön beküld egy kérdést vagy állítást. A Dialectical Engine ezt több harmadik fél MI-modelljének továbbítja, amelyek érvelési gráfot építenek köré: állításokat, ellenérveket, kritikákat, bizonyítékokra való hivatkozásokat, pontszámokat, valamint egy megbízhatósági sávval ellátott végkövetkeztetést. Ön vitathat egyes állításokat, kérheti valamely kérdés további vizsgálatát, és eldöntheti, hogy közzéteszi-e az eredményt.
 
 **A vitákban minden tartalmat MI hoz létre.** Az érveket, kritikákat, bizonyítékokra való hivatkozásokat, pontszámokat, végkövetkeztetéseket és a támogatási asszisztens válaszait gép hozza létre. Ezek tévesek, hiányosak, elavultak vagy magabiztosan pontatlanok lehetnek, és tükrözhetik a modellek torzításait. Megjelenítésük vagy közzétételük előtt azokat senki nem vizsgálja felül, és szerkesztői felelősségükért egyetlen megnevezett személy sem felel. A létrehozott tartalmat a termékben, a közzétett oldalakon és az exportált anyagokban MI által létrehozottként jelöljük meg.
 
-**A DebateAI nem nyújt tanácsadást.** Nem minősül jogi, orvosi, pénzügyi, adózási, pszichológiai, biztonsági vagy más szakmai tanácsadásnak, és a végkövetkeztetés nem ténymegállapítás. Ne alapozzon vitára olyan döntést, amely az Ön egészsége, biztonsága, pénzügyei, jogi helyzete vagy mások jólléte szempontjából jelentős, anélkül, hogy ellenőrizné az elsődleges forrásokat, és adott esetben szakképzett szakemberhez fordulna. A magas megbízhatósági sáv azt jelenti, hogy a modellek az általuk látott anyagok alapján a következtetést megalapozottnak találták; ez nem jelent garanciát annak igazságára.
+**A Dialectical Engine nem nyújt tanácsadást.** Nem minősül jogi, orvosi, pénzügyi, adózási, pszichológiai, biztonsági vagy más szakmai tanácsadásnak, és a végkövetkeztetés nem ténymegállapítás. Ne alapozzon vitára olyan döntést, amely az Ön egészsége, biztonsága, pénzügyei, jogi helyzete vagy mások jólléte szempontjából jelentős, anélkül, hogy ellenőrizné az elsődleges forrásokat, és adott esetben szakképzett szakemberhez fordulna. A magas megbízhatósági sáv azt jelenti, hogy a modellek az általuk látott anyagok alapján a következtetést megalapozottnak találták; ez nem jelent garanciát annak igazságára.
 
 **Amire kötelezettséget vállalunk.** A szolgáltatást kellő gondossággal és szakértelemmel, az általunk közzétett leírásnak megfelelően nyújtjuk. Amennyiben a jog garanciát biztosít arra, hogy a szolgáltatás megfelel a leírásának és rendeltetésszerű használatra alkalmas, e garancia alkalmazandó, és e Feltételek egyetlen rendelkezése sem szünteti meg. Azt nem ígérjük, hogy bármely konkrét kimenet pontos lesz: ez a létrehozott tartalom tulajdonsága, nem pedig annak mércéje, hogy a szolgáltatás működik-e.
 
@@ -92,19 +92,19 @@ Fiókját bármikor megszüntetheti a **Beállítások → Fiók** menüpontban.
 
 E szabályok az Ön által beküldött tartalmakra, a szolgáltatás használatának módjára és az Ön által közzétett tartalmakra vonatkoznak.
 
-**Ne küldjön be más személyekre vonatkozó személyes adatokat.** Azonosítható magánszemélyek helyett ügyekről, érvekről és közügyekről tegyen fel kérdéseket. Ne adjon meg neveket, elérhetőségi adatokat, azonosító számokat, képeket, egészségügyi, pénzügyi vagy más, valamely személy azonosítására alkalmas adatokat, és ne használja a DebateAI szolgáltatást arra, hogy egy személyről ügyiratot, profilt vagy dossziét állítson össze. A közszereplők nyilvános szerepükben végzett tevékenységére vonatkozó kérdések megengedettek; a magánszemélyt célzó kérdések nem. Ha mégis beküld ilyen adatokat, azokért Ön felel, és mi eltávolíthatjuk a tartalmat.
+**Ne küldjön be más személyekre vonatkozó személyes adatokat.** Azonosítható magánszemélyek helyett ügyekről, érvekről és közügyekről tegyen fel kérdéseket. Ne adjon meg neveket, elérhetőségi adatokat, azonosító számokat, képeket, egészségügyi, pénzügyi vagy más, valamely személy azonosítására alkalmas adatokat, és ne használja a Dialectical Engine szolgáltatást arra, hogy egy személyről ügyiratot, profilt vagy dossziét állítson össze. A közszereplők nyilvános szerepükben végzett tevékenységére vonatkozó kérdések megengedettek; a magánszemélyt célzó kérdések nem. Ha mégis beküld ilyen adatokat, azokért Ön felel, és mi eltávolíthatjuk a tartalmat.
 
 **Az Ön saját érzékeny adatai.** Az Ön által feltett kérdések érinthetik saját egészségét, meggyőződését, politikai nézeteit vagy más érzékeny ügyeit. Ehhez első vitája előtt, külön képernyőn járul hozzá. Ha Ön olyan helyen él, ahol az egészségügyi adatokra különös szabályok vonatkoznak, az A. melléklet külön tájékoztatóra irányíthatja.
 
 **Ne küldjön be és ne tegyen közzé jogellenes tartalmat**, ideértve a rágalmazó, erőszakra vagy gyűlöletre uszító, zaklató vagy fenyegető tartalmat, a hozzájárulás nélkül megosztott intim képfelvételt, a szellemi tulajdont vagy a titoktartást sértő tartalmat, az üzleti titkot felfedő tartalmat, a gyermekek szexuális bántalmazását ábrázoló anyagot, valamint a szankciókat vagy exportellenőrzési szabályokat sértő tartalmat.
 
-**Ne használja megtévesztésre a DebateAI szolgáltatást.** Ne tüntesse fel a létrehozott kimenetet ember által írtként, ha ez megtévesztő lenne, ne távolítsa el róla az MI által létrehozott tartalomra utaló jelölést, és ne használja látszólagos konszenzus, hamis bizonyíték vagy megszemélyesítés előállítására.
+**Ne használja megtévesztésre a Dialectical Engine szolgáltatást.** Ne tüntesse fel a létrehozott kimenetet ember által írtként, ha ez megtévesztő lenne, ne távolítsa el róla az MI által létrehozott tartalomra utaló jelölést, és ne használja látszólagos konszenzus, hamis bizonyíték vagy megszemélyesítés előállítására.
 
 **Ne támadja a szolgáltatást.** A közzétett viták szokásos keresőmotoros indexelése megengedett, de más automatizált hozzáféréshez, adatkinyeréshez, feltérképezéshez vagy tömeges kivonatoláshoz írásbeli engedélyünk szükséges; tilos a sebességkorlátok, a hitelesítés vagy a közzétételi vezérlők megkerülése; tilos a promptok vagy rendszerutasítások kinyerésének kísérlete; tilos a motort korlátai figyelmen kívül hagyására késztető promptinjektálás; írásbeli engedélyünk nélkül pedig tilos a feltérképezés és a terheléses tesztelés.
 
 **Ne értékesítse tovább és ne lássa el más márkajelzéssel** a szolgáltatást, továbbá írásbeli megállapodásunk nélkül ne használja versengő motor létrehozására, ideértve a kimenetek betanítási adatként való felhasználását.
 
-**Ne használja a DebateAI szolgáltatást valamely személy** egészségére, biztonságára, törvényes jogaira, foglalkoztatására, hitelképességére, lakhatására vagy bevándorlási jogállására vonatkozó döntésekhez. A szolgáltatást nem erre terveztük, és kimenetei nem szolgálnak biztonságos alapul ilyen döntésekhez.
+**Ne használja a Dialectical Engine szolgáltatást valamely személy** egészségére, biztonságára, törvényes jogaira, foglalkoztatására, hitelképességére, lakhatására vagy bevándorlási jogállására vonatkozó döntésekhez. A szolgáltatást nem erre terveztük, és kimenetei nem szolgálnak biztonságos alapul ilyen döntésekhez.
 
 **A közzététel helye szerinti helyi jog.** Ön felel azért, hogy minden általa közzétett tartalom megfeleljen a tartózkodási helye szerinti ország jogának. Bizonyos régiókban korlátozhatjuk egyes témák közzétételét.
 
@@ -132,15 +132,15 @@ A viták **alapértelmezés szerint bizalmasak**. Az Ön által létrehozott tar
 
 **Mit eredményez a közzététel.** A közzététel tudatos, külön megerősített művelet. Közzétételkor rögzített pillanatképet készítünk a vitáról, és azt fiók nélkül bárki számára olvashatóvá tesszük. A keresőmotorok indexelhetik. A pillanatkép megjeleníti az Ön **álnevét**, az Ön által megfogalmazott kérdést, az érvelési fát, a pontszámokat, a végkövetkeztetést és a megbízhatósági sávot, továbbá láthatóan jelzi, hogy a tartalmat MI hozta létre. Nem jeleníti meg az Ön e-mail-címét, munkamenet-nyilvántartásait vagy fiókelőzményeit.
 
-**A közzététel a gyakorlatban ténylegesen visszafordíthatatlan.** Amint egy vita nyilvánossá válik, mások elolvashatják, idézhetik, képernyőképet készíthetnek róla, archiválhatják és gyorsítótárba menthetik. A közzététel visszavonása eltávolítja a vitát a DebateAI felületéről és megsemmisíti a nálunk lévő példány kulcsát, de a máshol már meglévő példányokat nem érinti. Ne tegyen közzé semmit, amit nem szeretne tartósan az álnevéhez kapcsolva látni.
+**A közzététel a gyakorlatban ténylegesen visszafordíthatatlan.** Amint egy vita nyilvánossá válik, mások elolvashatják, idézhetik, képernyőképet készíthetnek róla, archiválhatják és gyorsítótárba menthetik. A közzététel visszavonása eltávolítja a vitát a Dialectical Engine felületéről és megsemmisíti a nálunk lévő példány kulcsát, de a máshol már meglévő példányokat nem érinti. Ne tegyen közzé semmit, amit nem szeretne tartósan az álnevéhez kapcsolva látni.
 
-**Közzétett viták a fiók megszüntetésekor.** Amikor ütemezi fiókja megszüntetését, Ön választja meg, mi történjen a közzétett vitáival. Ha bejelöli a **„Töröljék a nyilvános vitáimat is”** négyzetet, a megszüntetés végrehajtásakor mindegyiket eltávolítjuk a DebateAI-ról, és megsemmisítjük a másolatunkhoz tartozó kulcsot, ahogyan a közzététel visszavonásakor is, kivéve ha a jogszabály egy meghatározott elem megőrzését írja elő. Ha nem jelöli be a négyzetet, a viták nyilvánosak maradnak a visszavont álneve alatt. A mások által az eltávolítás előtt készített másolatok kívül esnek az ellenőrzésünkön. Ha egy eltávolítandó vitát továbbra is el szeretne érni, előbb töltse le.
+**Közzétett viták a fiók megszüntetésekor.** Amikor ütemezi fiókja megszüntetését, Ön választja meg, mi történjen a közzétett vitáival. Ha bejelöli a **„Töröljék a nyilvános vitáimat is”** négyzetet, a megszüntetés végrehajtásakor mindegyiket eltávolítjuk a Dialectical Engine-ről, és megsemmisítjük a másolatunkhoz tartozó kulcsot, ahogyan a közzététel visszavonásakor is, kivéve ha a jogszabály egy meghatározott elem megőrzését írja elő. Ha nem jelöli be a négyzetet, a viták nyilvánosak maradnak a visszavont álneve alatt. A mások által az eltávolítás előtt készített másolatok kívül esnek az ellenőrzésünkön. Ha egy eltávolítandó vitát továbbra is el szeretne érni, előbb töltse le.
 
 **A közzétett tartalmat mindig eltávolíthatjuk.** Eltávolíthatunk egy közzétett vitát, vagy korlátozhatjuk az ahhoz való hozzáférést, ha ezt jogszabály írja elő, bíróság vagy illetékes hatóság rendeli el, illetve ha a vita sérti e Feltételeket vagy jogellenes. E szakasz egyetlen rendelkezése sem akadályozza, hogy a 10. szakasz szerinti érvényes értesítés alapján intézkedjünk, és nem ígéri, hogy egy közzétett vita elérhető marad.
 
 **A közzétett tartalomra vonatkozó engedély.** A közzététellel Ön nem kizárólagos, az egész világra kiterjedő, jogdíjmentes engedélyt ad számunkra a pillanatkép tárhelyen tartására, tárolására, többszörözésére, megjelenítésére és nyilvánosan hozzáférhetővé tételére, valamint arra, hogy másoknak lehetővé tegyük annak olvasását és idézését, mindaddig, amíg az közzétett marad. Ez az engedély a nyilvános oldalak működtetését teszi lehetővé; nem jogosít fel bennünket arra, hogy az Ön tartalmát értékesítsük vagy más termékéhez engedélyezzük.
 
-**Ha egy vita Önről szól.** Ha egy, a DebateAI felületén közzétett vita Önre vonatkozó személyes adatot tartalmaz, rágalmazó vagy egyébként jogellenes, a 10. szakasz szerinti úton vagy a privacy@dezbatere.ro címen kérheti eltávolítását, függetlenül attól, hogy rendelkezik-e fiókkal. A kellően alátámasztott kérelmek alapján intézkedünk, és a kérelem benyújtásához nem követeljük meg a regisztrációt.
+**Ha egy vita Önről szól.** Ha egy, a Dialectical Engine felületén közzétett vita Önre vonatkozó személyes adatot tartalmaz, rágalmazó vagy egyébként jogellenes, a 10. szakasz szerinti úton vagy a privacy@dezbatere.ro címen kérheti eltávolítását, függetlenül attól, hogy rendelkezik-e fiókkal. A kellően alátámasztott kérelmek alapján intézkedünk, és a kérelem benyújtásához nem követeljük meg a regisztrációt.
 
 ## 10. Tartalom bejelentése, moderálás és panaszok
 
@@ -161,7 +161,7 @@ Minden bejelentést indokolatlan késedelem nélkül visszaigazolunk. A bejelent
 
 **Kapcsolatfelvétel egy személlyel.** Támogatási asszisztensünk egy MI-rendszer, és ezt fel is tünteti. Ön bármikor kérheti, hogy személlyel beszéljen, és minden támogatási beszélgetés felajánlja ezt a lehetőséget. Az Önnel való kommunikációban nem támaszkodunk kizárólag automatizált eszközökre.
 
-**Terrorista tartalom.** A terrorista tartalom jogellenes, és nem megengedett a DebateAI szolgáltatásban (7. szakasz). Az Európai Unió illetékes hatóságai az (EU) 2021/784 rendelet alapján eltávolítási végzéseket küldhetnek nekünk az 1. szakaszban megjelölt kapcsolattartó pontra. Ha ilyet kapunk, egy órán belül eltávolítjuk a tartalmat, vagy minden uniós országban hozzáférhetetlenné tesszük. Tájékoztatjuk a tartalmat közzétevő személyt arról, hogy azt eltávolítottuk, és kérésére arról is, miért és hogyan támadhatja meg a végzést, kivéve, ha a hatóság úgy dönt, hogy közbiztonsági okokból korlátozott ideig nem adható tájékoztatás. A rendelet előírásainak megfelelően az eltávolított tartalmat és a kapcsolódó adatokat hat hónapig megőrizzük, hogy az eltávolítás felülvizsgálható, és ha téves volt, visszavonható legyen. A tartalmat közzétevő személy megtámadhatja a végzést a végzést kibocsátó hatóság országának bíróságain, és igénybe veheti a panaszkezelési utunkat is. Egyetlen hatóság sem kötelezett bennünket konkrét intézkedések meghozatalára terrorista tartalommal szemben a rendelet alapján; ha ez megtörténik, itt ismertetjük ezeket az intézkedéseket, ideértve az esetleges automatizált eszközöket is.
+**Terrorista tartalom.** A terrorista tartalom jogellenes, és nem megengedett a Dialectical Engine szolgáltatásban (7. szakasz). Az Európai Unió illetékes hatóságai az (EU) 2021/784 rendelet alapján eltávolítási végzéseket küldhetnek nekünk az 1. szakaszban megjelölt kapcsolattartó pontra. Ha ilyet kapunk, egy órán belül eltávolítjuk a tartalmat, vagy minden uniós országban hozzáférhetetlenné tesszük. Tájékoztatjuk a tartalmat közzétevő személyt arról, hogy azt eltávolítottuk, és kérésére arról is, miért és hogyan támadhatja meg a végzést, kivéve, ha a hatóság úgy dönt, hogy közbiztonsági okokból korlátozott ideig nem adható tájékoztatás. A rendelet előírásainak megfelelően az eltávolított tartalmat és a kapcsolódó adatokat hat hónapig megőrizzük, hogy az eltávolítás felülvizsgálható, és ha téves volt, visszavonható legyen. A tartalmat közzétevő személy megtámadhatja a végzést a végzést kibocsátó hatóság országának bíróságain, és igénybe veheti a panaszkezelési utunkat is. Egyetlen hatóság sem kötelezett bennünket konkrét intézkedések meghozatalára terrorista tartalommal szemben a rendelet alapján; ha ez megtörténik, itt ismertetjük ezeket az intézkedéseket, ideértve az esetleges automatizált eszközöket is.
 
 **Az életet vagy biztonságot fenyegető súlyos kockázat.** Ha olyan információ jut tudomásunkra, amely valakinek az életét vagy biztonságát fenyegető bűncselekményre utal, értesítjük az illetékes hatóságokat.
 
@@ -183,7 +183,7 @@ A 8. szakasz (a már közzétett tartalom tekintetében), valamint a 15., 16. é
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-A DebateAI ingyenes csomagot kínál. Egy fizetős **Prémium** csomag lesz elérhető, amely hozzáférést biztosít a modellek teljes választékához, és lehetővé teszi, hogy Ön állítsa be a vita mérőit.
+A Dialectical Engine ingyenes csomagot kínál. Egy fizetős **Prémium** csomag lesz elérhető, amely hozzáférést biztosít a modellek teljes választékához, és lehetővé teszi, hogy Ön állítsa be a vita mérőit.
 
 **Fizetés előtt** közvetlenül a fizetési gomb felett megjelenítjük Önnek: a csomagot; az alkalmazandó adóval növelt teljes árat; a számlázási időszakot; azt, hogy a csomag lemondásig automatikusan megújul; az esetleges ingyenes próbaidőszak végét és az azt követően felszámítandó összeget; valamint a lemondás módját. A megújítási feltételeket külön jelölőnégyzet bejelölésével erősíti meg. A gomb felirata **Előfizetés és fizetés** (románul *Comandă cu obligație de plată*). Ugyanezeket az információkat, e Feltételeket és az elállási nyomtatványt tartalmazó visszaigazolást tartós adathordozón küldjük meg Önnek.
 
@@ -211,11 +211,11 @@ Ha Ön máshol él, az A. melléklet határozza meg a régiójában esetlegesen 
 
 ## 14. A szolgáltatás és e Feltételek módosítása
 
-**A szolgáltatás módosítása.** A DebateAI szolgáltatást folyamatosan fejlesztjük, és a szokásos fejlesztések, javítások és a modellválaszték módosításai előzetes értesítés nélkül történnek. Ha olyan változtatást hajtunk végre, amely túlmutat a szolgáltatás leírás szerinti működésének fenntartásán, azt kizárólag az alábbi okok valamelyikéből tesszük: jogi vagy szabályozási követelmény teljesítése; biztonsági vagy visszaélési probléma kezelése; mert egy modellszolgáltató módosítja, korlátozza vagy megszünteti valamely általunk igénybe vett modell vagy funkció biztosítását; az általunk nem ellenőrzött műszaki környezethez való alkalmazkodás; vagy valamely funkció Önnek többletköltséget nem okozó hozzáadása, fejlesztése vagy kivezetése.
+**A szolgáltatás módosítása.** A Dialectical Engine szolgáltatást folyamatosan fejlesztjük, és a szokásos fejlesztések, javítások és a modellválaszték módosításai előzetes értesítés nélkül történnek. Ha olyan változtatást hajtunk végre, amely túlmutat a szolgáltatás leírás szerinti működésének fenntartásán, azt kizárólag az alábbi okok valamelyikéből tesszük: jogi vagy szabályozási követelmény teljesítése; biztonsági vagy visszaélési probléma kezelése; mert egy modellszolgáltató módosítja, korlátozza vagy megszünteti valamely általunk igénybe vett modell vagy funkció biztosítását; az általunk nem ellenőrzött műszaki környezethez való alkalmazkodás; vagy valamely funkció Önnek többletköltséget nem okozó hozzáadása, fejlesztése vagy kivezetése.
 
 Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha a módosítás az Ön szolgáltatáshoz való hozzáférésére vagy annak használatára kisebbnél nagyobb hátrányos hatást gyakorol, Ön az értesítéstől vagy a módosítás hatálybalépésétől számított **30 napon** belül — a kettő közül a későbbi időpontig — díjmentesen megszüntetheti a szerződést, mi pedig visszatérítjük a fel nem használt időszakra előre kifizetett összeget.
 
-**E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a DebateAI szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
+**E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
 
 ## 15. Felelősség
 
@@ -231,15 +231,15 @@ Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha
 
 ## 16. Szellemi tulajdon
 
-Maga a szolgáltatás — a szoftver, a motor, a pontozási módszer, a felület, a DebateAI és a DebateAIRO név, valamint logóink — a mi vagy licencadóink tulajdonát képezi. E Feltételek engedélyt adnak Önnek a szolgáltatás használatára, tulajdonjogot azonban nem.
+Maga a szolgáltatás — a szoftver, a motor, a pontozási módszer, a felület, a Dialectical Engine és a DebateAIRO név, valamint logóink — a mi vagy licencadóink tulajdonát képezi. E Feltételek engedélyt adnak Önnek a szolgáltatás használatára, tulajdonjogot azonban nem.
 
-Ön a DebateAI megjelölésével és az eredeti oldalra mutató hivatkozással idézheti és hivatkozhatja a közzétett vitákat. Írásbeli megállapodásunk nélkül tilos a nyilvános korpusz tömeges másolása és rendszeres többszörözése, valamint a közzétett viták betanítási adatként való felhasználása.
+Ön a Dialectical Engine megjelölésével és az eredeti oldalra mutató hivatkozással idézheti és hivatkozhatja a közzétett vitákat. Írásbeli megállapodásunk nélkül tilos a nyilvános korpusz tömeges másolása és rendszeres többszörözése, valamint a közzétett viták betanítási adatként való felhasználása.
 
-A 8. szakasz szabályozza az Ön tartalmát és a létrehozott kimenetek jogállását. Ha úgy véli, hogy a DebateAI valamely tartalma sérti szellemi tulajdonát, használja a 10. szakasz szerinti bejelentési lehetőséget.
+A 8. szakasz szabályozza az Ön tartalmát és a létrehozott kimenetek jogállását. Ha úgy véli, hogy a Dialectical Engine valamely tartalma sérti szellemi tulajdonát, használja a 10. szakasz szerinti bejelentési lehetőséget.
 
 ## 17. Személyes adatok
 
-A személyes adatok kezelésének módját a dezbatere.ro/privacy címen elérhető **Adatvédelmi szabályzat** határozza meg. Ismerteti, milyen adatokat gyűjtünk, az egyes célok jogalapját, az adatok megőrzési idejét, az adatok címzettjeit, az érintett adattovábbításokat és az Ön jogai gyakorlásának módját. Három kérdés ide is tartozik. A 7. szakasz arra kéri Önt, hogy ne adja meg más személyek személyes adatait egy kérdésben; ha mégis megteszi, azért Ön felel, mi pedig eltávolíthatjuk a tartalmat. Ha egy DebateAI felületén közzétett vita Önre vonatkozó személyes adatot tartalmaz, fiók nélkül is kérheti annak eltávolítását (9. szakasz). Ezenkívül a szerződés bizonyítékaként nyilvántartjuk, hogy Ön elfogadta e Feltételeket — a változatot, az időpontot és a munkamenet technikai adatait —, amint azt az Adatvédelmi szabályzat ismerteti.
+A személyes adatok kezelésének módját a dezbatere.ro/privacy címen elérhető **Adatvédelmi szabályzat** határozza meg. Ismerteti, milyen adatokat gyűjtünk, az egyes célok jogalapját, az adatok megőrzési idejét, az adatok címzettjeit, az érintett adattovábbításokat és az Ön jogai gyakorlásának módját. Három kérdés ide is tartozik. A 7. szakasz arra kéri Önt, hogy ne adja meg más személyek személyes adatait egy kérdésben; ha mégis megteszi, azért Ön felel, mi pedig eltávolíthatjuk a tartalmat. Ha egy Dialectical Engine felületén közzétett vita Önre vonatkozó személyes adatot tartalmaz, fiók nélkül is kérheti annak eltávolítását (9. szakasz). Ezenkívül a szerződés bizonyítékaként nyilvántartjuk, hogy Ön elfogadta e Feltételeket — a változatot, az időpontot és a munkamenet technikai adatait —, amint azt az Adatvédelmi szabályzat ismerteti.
 
 ## 18. Irányadó jog és a jogviták elbírálásának helye
 
@@ -277,7 +277,7 @@ E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye sz
 
 ### A.2 Egyesült Államok
 
-**Tennessee.** A DebateAI szolgáltatást nem kínáljuk a Tennessee államban élő személyeknek.
+**Tennessee.** A Dialectical Engine szolgáltatást nem kínáljuk a Tennessee államban élő személyeknek.
 
 **Értesítések és eltávolítások.** A hozzájárulás nélkül megosztott intim képfelvételeket az abuse@dezbatere.ro címre küldött e-mailben, fiók nélkül be lehet jelenteni, és érvényes kérelem esetén 48 órán belül eltávolítjuk azokat. A szerzői jogi panaszokat a 10. szakaszban ismertetett bejelentési úton kell benyújtani.
 

@@ -5,7 +5,7 @@
   "legal.notice.title": "Juridisk information",
   "legal.notice.meta": "Vem som driver {product} och hur du når oss",
   "legal.notice.s01.title": "Vilka vi är",
-  "legal.notice.s01.body": "{product} (även kallad {alsoCalled}) drivs av {company}, ett bolag registrerat i Rumänien.",
+  "legal.notice.s01.body": "{product} drivs av {company}, ett bolag registrerat i Rumänien.",
   "legal.notice.s01.seller": "{company} är också säljare av de avgiftsbelagda abonnemangen: ditt avtal, dina betalningar och dina fakturor är med {company}.",
   "legal.notice.company.name": "Företagsnamn",
   "legal.notice.company.tradingNames": "Handelsnamn",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Kommer ihåg vilket gränssnittsspråk du har valt.",
   "legal.cookies.locale.life": "1 år",
   "legal.cookies.storageTitle": "Lagras i din webbläsare, inte i en cookie",
-  "legal.cookies.storageIntro": "Fyra poster sparas i webbläsarens lagring: två i lokal lagring, tills du rensar dem, och två i sessionslagring, tills du stänger fliken. Till skillnad från cookies skickas de inte med dina förfrågningar; hjälpchattens post innehåller en kopia av ett samtal du har haft med DebateAI:s hjälp, och dess meddelanden nådde DebateAI när du skickade dem.",
+  "legal.cookies.storageIntro": "Fyra poster sparas i webbläsarens lagring: två i lokal lagring, tills du rensar dem, och två i sessionslagring, tills du stänger fliken. Till skillnad från cookies skickas de inte med dina förfrågningar; hjälpchattens post innehåller en kopia av ett samtal du har haft med Dialectical Engine:s hjälp, och dess meddelanden nådde Dialectical Engine när du skickade dem.",
   "legal.cookies.consent.kind": "Lokal lagring",
   "legal.cookies.consent.purpose": "Kommer ihåg att du har sett meddelandet om kakor, så att det bara visas en gång.",
   "legal.cookies.consent.life": "Tills du rensar det",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Sessionslagring",
   "legal.cookies.supportConversation.purpose": "Håller ditt samtal med hjälpchatten på skärmen så länge fliken är öppen. Det raderas när någon loggar in eller ut i den här fliken.",
   "legal.cookies.supportConversation.life": "Tills du stänger fliken",
-  "legal.cookies.recipient.server": "Endast DebateAI:s server",
+  "legal.cookies.recipient.server": "Endast Dialectical Engine:s server",
   "legal.cookies.recipient.browser": "stannar i din webbläsare",
   "legal.cookies.refuse": "För att neka dem blockerar eller raderar du kakor och webbplatsdata för den här webbplatsen i webbläsarens inställningar.",
   "legal.cookies.refuseEffect": "Vad som då slutar fungera: inloggningen och att webbplatsen kommer ihåg ditt språk och dina visningsval.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Upp till 30 minuter",
   "legal.cookies.mfaRecovery.life": "Upp till 299 sekunder",
   "legal.cookies.social.life": "Upp till 5 minuter",
-  "legal.cookies.phoneDraft.life": "15 minuter eller tills tidigare radering"
+  "legal.cookies.phoneDraft.life": "15 minuter eller tills tidigare radering",
+  "legal.cookies.exportPending.purpose": "Sparar exportlänken från e-postmeddelandet i den här fliken för inloggning och nya försök.",
+  "legal.cookies.exportLinkOutcome.purpose": "Minns vilket meddelande om nedladdningslänken som ska visas i den här fliken.",
+  "legal.cookies.exportPending.life": "Tills fliken stängs, du loggar ut, en ny länk öppnas, den första nedladdningen lyckas eller länken bedöms ogiltig eller tillhör fel konto",
+  "legal.cookies.exportLinkOutcome.life": "Tills fliken stängs, du loggar ut eller en ny länk öppnas"
 }

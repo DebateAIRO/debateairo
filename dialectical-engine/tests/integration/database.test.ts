@@ -760,7 +760,9 @@ async function executeResil01Scenario(input: {
     return {
       runId, workItemId, result, error, answer, lifecycle: lifecycle.rows,
       snapshot: await new GraphRepository(database.pool).materialiseSnapshot(runId),
-      primaryCalls: primary.calls(), secondaryCalls: secondary.calls()
+      primaryCalls: primary.calls(), secondaryCalls: secondary.calls(),
+      // Every request body the planned maker received, a repair's included (codex r5 B1: only the wire shows them).
+      primaryBodies: primary.bodies()
     };
   } finally {
     await secondary.stop();
@@ -783,9 +785,15 @@ function recordingRunner(endpoint: string, settings = runnerSettings()): {
   readonly evaluatorCalls: readonly ProviderCallRequest[];
   /** W10/F3: the SYNTHESIZER half of the same boundary, recorded the same way. */
   readonly synthesizerCalls: readonly ProviderCallRequest[];
+  /**
+   * Patch follow-up (2026-10-12): each time the gateway called an EVALUATOR request's own repair builder (the full
+   * re-ask). The patch request is built inside the gateway, so it never appears here.
+   */
+  readonly evaluatorRepairBuilds: readonly Readonly<{ parseStatus: string; parseError: string }>[];
 } {
   const evaluatorCalls: ProviderCallRequest[] = [];
   const synthesizerCalls: ProviderCallRequest[] = [];
+  const evaluatorRepairBuilds: Readonly<{ parseStatus: string; parseError: string }>[] = [];
   const inner = createPostgresProviderGateway(database.pool, {
     endpoint, model: "test-layer/model", maker: "test-layer"
   });
@@ -793,13 +801,21 @@ function recordingRunner(endpoint: string, settings = runnerSettings()): {
     call: async (request) => {
       if (request.role === "EVALUATOR") evaluatorCalls.push(request);
       if (request.role === "SYNTHESIZER") synthesizerCalls.push(request);
-      return inner.call(request);
+      const build = request.buildRepairPacket;
+      return inner.call(request.role !== "EVALUATOR" || build === undefined ? request : {
+        ...request,
+        buildRepairPacket: (rejected) => {
+          evaluatorRepairBuilds.push(rejected);
+          return build(rejected);
+        }
+      });
     }
   };
   return {
     runner: new WalkingSkeletonRunner(database.pool, gateway, settings),
     evaluatorCalls,
-    synthesizerCalls
+    synthesizerCalls,
+    evaluatorRepairBuilds
   };
 }
 
@@ -4580,8 +4596,35 @@ describe("apps/runner — legal command lifecycle", () => {
    * comment cannot enter it, an alias cannot disguise it, and reformatting or
    * reordering the object literal cannot break it — only sending something else
    * can, which is the single thing that must fail.
+   *
+   * Patch follow-up (owner design, 2026-10-12): a refused first answer that CAN
+   * be patched now gets the short patch request as its second POST, built inside
+   * the gateway, and only a patch that did not do reaches the step's repair
+   * builder — so within the shipped bound of 3 the builder runs TWICE only when
+   * the first answer cannot be patched. Both orders happen in production, so
+   * both are driven: the first is the case this test was written for (the
+   * builder's second call, codex r6 B1); the second puts the patch request on
+   * the wire. (Until this split the one script was the second, and it no longer
+   * drove the builder twice.)
    */
-  it("SENDS the exported evaluator contract to the provider, observed at the gateway boundary", async () => {
+  it.each([
+    {
+      script: "an unpatchable first answer, so the repair builder runs twice",
+      questionLine: "evaluator-send-at-the-gateway",
+      // A member the contract does not have is an issue at the ROOT, which no
+      // patch can replace (`schemaFailurePaths`): this answer is re-asked in full.
+      firstAnswer: JSON.stringify({ satisfied: true, summary: "The answer is fair to every side." }),
+      repairBuilds: 2
+    },
+    {
+      script: "a patchable first answer, so the patch request goes out before the repair builder",
+      // Its own run: the work item's command key is the question line.
+      questionLine: "evaluator-send-at-the-gateway-patch",
+      // Two members missing, each one a patch can supply.
+      firstAnswer: JSON.stringify({ satisfied: true }),
+      repairBuilds: 1
+    }
+  ])("SENDS the exported evaluator contract to the provider, observed at the gateway boundary — $script", async ({ questionLine, firstAnswer, repairBuilds }) => {
     const provider = await startProviderDouble([
       JSON.stringify({ statement: "A looked-up answer.", way_of_knowing: "LOOKED_UP",
         locator: "https://example.invalid/test-layer", restatement_text: "A looked-up answer.", restatement_status: "PASS", value_laden: false,
@@ -4591,7 +4634,7 @@ describe("apps/runner — legal command lifecycle", () => {
         { segment_id: "segment:verdict", text: "A looked-up answer.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
         { segment_id: "segment:research", text: "Check another source.", node_refs: [], served_number_refs: [] }
       ] }),
-      JSON.stringify({ satisfied: true }),
+      firstAnswer,
       JSON.stringify({ satisfied: true }),
       evaluatorSatisfied()
     ]);
@@ -4609,6 +4652,8 @@ describe("apps/runner — legal command lifecycle", () => {
       // the evaluator spent `evaluatorBound.maxAttempts` (1) and the run died
       // on the first schema failure, so the second repair callback and the
       // third wire attempt this fixture exists to drive never happened.
+      // Patch follow-up (2026-10-12): the second callback now happens only
+      // after an unpatchable first answer — the first script above.
       const settings = {
         ...runnerSettings(),
         conformanceBound: { ...runnerSettings().conformanceBound, maxAttempts: 3 },
@@ -4617,12 +4662,12 @@ describe("apps/runner — legal command lifecycle", () => {
           evaluatorBound: { ...runnerSettings().synthesisRolePolicy.evaluatorBound, maxAttempts: 3 }
         }
       };
-      const { runner, evaluatorCalls } = recordingRunner(provider.endpoint, settings);
+      const { runner, evaluatorCalls, evaluatorRepairBuilds } = recordingRunner(provider.endpoint, settings);
       // NB: the question line feeds the code-first claim classifier
       // (packages/judgement/src/s04.ts). Words like "observed" resolve to
       // `empirical`, which this file's composition row does not ratify, so the
       // run would die at COMPOSITION_UNRESOLVED before reaching the evaluator.
-      const work = await createRunnerWork("evaluator-send-at-the-gateway");
+      const work = await createRunnerWork(questionLine);
       const result = await runner.executeWorkItem(work.workItemId);
       if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
 
@@ -4667,8 +4712,11 @@ describe("apps/runner — legal command lifecycle", () => {
       /**
        * THE COUNT IS THE VACUITY GUARD, and it is the only one (codex r6 B2).
        * Three attempts are expected because the sealed bound permits three and
-       * the fixture fails the schema twice; a run that stopped early cannot
-       * satisfy this, so the loop below cannot pass over an empty or short set.
+       * the fixture's first two answers fail the schema; a run that stopped
+       * early cannot satisfy this, so the loop below cannot pass over an empty
+       * or short set. The builder count beside it is not a shape pin either: it
+       * says which PATH each script reached (two full re-asks, or the patch
+       * request then one), never what a packet looks like.
        *
        * NOTHING HERE PINS REPAIR SHAPE. The previous version required the
        * second packet to carry exactly one more message than the first, which
@@ -4679,6 +4727,7 @@ describe("apps/runner — legal command lifecycle", () => {
        */
       expect(attempts).toHaveLength(3);
       expect(evaluatorCalls).toHaveLength(1);   // the wrapper saw ONE of the three
+      expect(evaluatorRepairBuilds).toHaveLength(repairBuilds);
 
       // THE INVARIANT, and the whole of it: every attempt LEADS with the
       // exported contract.
@@ -5222,9 +5271,11 @@ describe("apps/runner — legal command lifecycle", () => {
     } finally { await calibration.stop(); }
 
     // Review fix I-1: the writer's first draft names the node in its prose; the
-    // classifier refuses it and the provider's repair re-asks the same call.
+    // classifier refuses it and the provider's repair re-asks the same call —
+    // since the patch follow-up (owner design, 2026-10-12) with the short patch
+    // first, which the writer answers with only the refused member.
     const provider = await startProviderDouble([
-      judge, compositionCiting("n1", "A compact answer (n1)."), compositionCiting("n1"), evaluatorSatisfied()
+      judge, compositionCiting("n1", "A compact answer (n1)."), JSON.stringify({ "segments.0.text": "A compact answer." }), evaluatorSatisfied()
     ]);
     const settings = runnerSettings();
     const servePolicy = settings.servePolicy!;
@@ -5259,13 +5310,15 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(projection?.condition_marks).toContain("DIGEST-COMPRESSED");
       expect(projection?.band_ceiling).toMatchObject({ basis: { LOOKED_UP: 0, RAN: 0, REASONING: 1 } });
       // I-1: two writer attempts on the wire — the second is the repair turn,
-      // naming what to fix and where — and the served prose is the model's own
-      // clean words, never an edited copy of the first draft.
+      // naming what to fix and where (the patch: only that member) — and the
+      // served prose is the model's own clean words, never an edited copy of the
+      // first draft: the engine only puts the model's rewrite in its place.
       const writerAttempts = provider.bodies().map((body) => readFramedMaterial(wirePacket(body)))
         .filter((material) => material.contractId === SYNTHESIZER_PROMPT_CONTRACT.contractId);
       expect(writerAttempts).toHaveLength(2);
       expect(framedField(writerAttempts[1]!, "machine_rejection_code")).toBe("COMPOSED_TEXT_NAMES_A_NODE");
-      expect(framedField(writerAttempts[1]!, "machine_rejection_path")).toBe("segments.0.text");
+      expect(framedField(writerAttempts[1]!, "machine_rejection_paths")).toBe("segments.0.text");
+      expect(framedField(writerAttempts[1]!, "machine_reply_form")).toBe("PATCH");
       expect(projection?.composed_text.map((segment) => segment.text)).toContain("A compact answer.");
       expect(JSON.stringify(projection?.composed_text)).not.toContain("(n1)");
       expect(provider.calls()).toBe(4);
@@ -6319,8 +6372,18 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
    * does not carry, is refused by the writer's classifier and re-asked by the
    * provider's own repair on the SAME call. Before, the unknown ref ended the
    * run FAILED and the leaked id reached the person.
+   *
+   * Patch follow-up (owner design, 2026-10-12): a refused first draft now gets
+   * the short patch request as its second POST, and the full re-ask comes only
+   * after a patch that did not do. The script reaches the full re-ask so the
+   * unknown-node draft is the reply to a FULL re-ask, checked by the writer's
+   * classifier and named by its own code in the re-ask that follows it,
+   * whatever the patch step does with a whole answer. (Before this script the middle draft, citing
+   * node:nowhere, was the patch request's reply: refused as not-a-patch, so the
+   * unknown-node refusal was never exercised here.) The writer's sealed bound is
+   * 3; this fixture raises it to 4 so the clean draft can follow both re-asks.
    */
-  it("re-asks a draft that names a UUID in its prose, then one citing an unknown node, and serves the clean third draft (Task M4 I-1)", async () => {
+  it("re-asks a draft that names a UUID in its prose, then one citing an unknown node, and serves the clean draft after them (Task M4 I-1)", async () => {
     const debate = fullDebate("Primary M4 citation repair");
     const secondaryDebate = fullDebate("Secondary M4 citation repair");
     const scenario = await executeResil01Scenario({
@@ -6328,20 +6391,31 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       primary: [
         ...debate.judgements, ...debate.reviews,
         m4Composition("The judged position survives (00000000-0000-4000-8000-00000000abcd)."),
+        // The patch request's reply: a whole draft again, still naming the id, so it is refused however it is read.
+        m4Composition("The judged position survives, per 00000000-0000-4000-8000-00000000abcd."),
+        // The full re-ask's reply.
         m4Composition("The judged position survives.", ["node:nowhere"]),
         resil01Composition,
         evaluatorSatisfied()
       ],
       secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
-      settings: m4WriterAttempts(3)
+      settings: m4WriterAttempts(4)
     });
     expect(scenario.error).toBeNull();
     expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
     expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
     expect(JSON.stringify(scenario.answer?.composed_text)).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/u);
-    // One writer call, three attempts: the two refused drafts are on the ledger, the third served.
+    // One writer call, four attempts: the three refused drafts are on the ledger, the fourth served.
     expect((await serveLedger(scenario.runId)).filter((entry) => entry.call_site_key.startsWith("COMPOSER:"))
-      .map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED", "OK"]);
+      .map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED", "FAILED", "OK"]);
+    // Each draft refused for its own reason, read off the wire: every follow-up names why the draft before it was
+    // refused (the artifact keeps only CONTENT_SCHEMA_FAILED readable). The first POST is the plain ask; the patch
+    // request names the prose refusal; the re-ask after the unknown-node draft names that one. What the re-ask
+    // after the patch names is the patch step's business, not this test's.
+    expect(scenario.primaryBodies.map((body) => readFramedMaterial(wirePacket(body)))
+      .filter((material) => material.contractId === SYNTHESIZER_PROMPT_CONTRACT.contractId)
+      .map((material) => material.fields.find((field) => field.name === "machine_rejection_code")?.content ?? null))
+      .toEqual([null, "COMPOSED_TEXT_NAMES_A_NODE", expect.anything(), "COMPOSED_REF_NOT_IN_DIGEST"]);
     expect(await disclosureRowOf(answerIdOf(scenario)))
       .toMatchObject({ serveStop: null, writerServedRef: PRIMARY_REF });
   });
@@ -6376,7 +6450,9 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       primary: [
         ...debate.judgements, ...debate.reviews,
         m4Composition("The judged position survives (00000000-0000-4000-8000-00000000abcd)."),
-        m4Composition("The judged position survives, per 00000000-0000-4000-8000-00000000abcd.")
+        // The patch follow-up (owner design, 2026-10-12): the writer rewrites only the refused member, and the merged
+        // draft still names the id.
+        JSON.stringify({ "segments.0.text": "The judged position survives, per 00000000-0000-4000-8000-00000000abcd." })
       ],
       secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
       settings: m4WriterAttempts(2)
@@ -6402,6 +6478,8 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
         ...debate.judgements, ...debate.reviews,
         resil01Composition, evaluatorObjecting("Round one overstates the margin."),
         m4Composition("A rewrite citing 00000000-0000-4000-8000-00000000abcd."),
+        // Asked for the patch follow-up, the writer sends a whole draft again: it is not merged, so the first draft and
+        // its refusal stand, and the round still ends with no draft rather than a FAILED run.
         m4Composition("Another rewrite citing 00000000-0000-4000-8000-00000000abcd.")
       ],
       secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],

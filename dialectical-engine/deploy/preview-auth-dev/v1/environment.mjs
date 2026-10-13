@@ -26,21 +26,24 @@ const LEGACY_CONFIG_KEYS='budget_socket,deployment,free_model_ids,requested_thin
 const ROSTER_CONFIG_KEYS='budget_socket,deployment,free_model_ids,premium_model_ids,requested_thinking_level,scope_id';
 // PR B: the roster form may also name the Anthropic gate's socket (the API's parser checks its value).
 const OPTIONAL_SOCKET_KEYS=Object.freeze(['anthropic_budget_socket']);
+// Spec 2026-10-12 §4.2: the owner's thinking-level table is optional on both forms (the API's parser checks its contents).
+const OPTIONAL_TABLE_KEYS=Object.freeze(['thinking_levels']);
 /**
  * Whether the UI's public model list (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) offers exactly what the
  * API's preview configuration (PREVIEW_PROVIDER_TEST_CONFIG_JSON) allows: the legacy array only with the
  * legacy five-key config holding that one list; the two-list object only with the six-key config holding
  * the same free and premium lists, in the same order. A UI that offers a model the API refuses, or the
  * reverse, is a mismatch. The API config's own parser (packages/providers preview-test.ts) checks the rest.
+ * The optional thinking_levels table (spec 2026-10-12 §4.2) may ride on either form and is not compared here.
  */
 export function uiRosterMatchesApiConfig(uiFlag,apiConfigJson) {
  try{
   if(!isReviewedModelRosterFlag(uiFlag)||typeof apiConfigJson!=='string')return false;
   const ui=JSON.parse(uiFlag),api=JSON.parse(apiConfigJson);
   if(!api||typeof api!=='object'||Array.isArray(api))return false;
-  const keys=Object.keys(api).sort().join(','),same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const keys=Object.keys(api).filter(key=>!OPTIONAL_TABLE_KEYS.includes(key)).sort().join(','),same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   if(Array.isArray(ui))return keys===LEGACY_CONFIG_KEYS&&same(api.free_model_ids,ui);
-  const rosterKeys=Object.keys(api).filter(key=>!OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(',');
+  const rosterKeys=Object.keys(api).filter(key=>!OPTIONAL_SOCKET_KEYS.includes(key)&&!OPTIONAL_TABLE_KEYS.includes(key)).sort().join(',');
   return rosterKeys===ROSTER_CONFIG_KEYS&&same(api.free_model_ids,ui.free)&&same(api.premium_model_ids,ui.premium);
  }catch{return false;}
 }

@@ -212,7 +212,11 @@ export function vendorUsage(gate: PracticeGateName, vendorBody: string): Readonl
     return {
       inputTokens: input === null || !absentOrCount(row.cache_creation_input_tokens) || !absentOrCount(row.cache_read_input_tokens)
         ? null : input + cacheWrite + (cacheRead ?? 0),
-      outputTokens: count(row.output_tokens), reasoningTokens: null, cachedInputTokens: cacheRead
+      outputTokens: count(row.output_tokens),
+      // Spec 2026-10-12 §4.6: Haiku's thinking, which `output_tokens` already includes.
+      reasoningTokens: typeof row.output_tokens_details === "object" && row.output_tokens_details !== null
+        ? count((row.output_tokens_details as Record<string, unknown>).thinking_tokens) : null,
+      cachedInputTokens: cacheRead
     };
   }
   const details = row.completion_tokens_details;

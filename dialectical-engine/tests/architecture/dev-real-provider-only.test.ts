@@ -42,10 +42,14 @@ describe("development debate provider boundary", () => {
    * said Hermes GLM stays in the Support-only seam and OUT OF THE DEBATE ROSTER.
    * The owner has since put GLM into the debate — through `pi`, with the Z.AI key
    * kept inside pi — so what this row guards now is the SEPARATION: GLM debates
-   * only through the pi relay, the Support model stays Hermes, and the two never
-   * share a module, a roster slot or a credential path.
+   * only through the pi relay, the Support model has its own relay, and the two
+   * never share a module, a roster slot or a credential path.
+   *
+   * 2026-10-12 (V): the Support model is Claude Haiku 5.5, started by
+   * `startClaudeSupportRelay`; its ref is in no debate roster slot, and the
+   * Hermes support relay is no longer started by the stack.
    */
-  it("debates GLM only through the pi relay and keeps Hermes the Support-only seam", async () => {
+  it("debates GLM only through the pi relay and keeps Claude Haiku 5.5 the Support-only seam", async () => {
     const [panel, cliPanel, stack, piRelay] = await Promise.all([
       readFile("apps/runner/src/dev-provider-panel.ts", "utf8"),
       readFile("apps/runner/src/dev-cli-provider-panel.ts", "utf8"),
@@ -55,12 +59,14 @@ describe("development debate provider boundary", () => {
     expect(panel).toContain("development:pi-glm-cli");
     expect(cliPanel).toContain("startPiRelay");
     expect(panel).not.toContain("hermes-glm-5.3-flash");
-    expect(panel).not.toContain("startHermesSupportRelay");
-    expect(cliPanel).not.toContain("startHermesSupportRelay");
+    expect(panel).not.toContain("claude-haiku-5.5");
+    expect(panel).not.toContain("startClaudeSupportRelay");
+    expect(cliPanel).not.toContain("startClaudeSupportRelay");
     expect(cliPanel).not.toContain("hermes-relay");
     expect(piRelay).not.toContain("hermes-relay");
     expect(piRelay).not.toContain("auth.json");
-    expect(stack).toContain("startHermesSupportRelay");
+    expect(stack).toContain("startClaudeSupportRelay");
+    expect(stack).not.toContain("startHermesSupportRelay");
     expect(stack).toContain("supportModelTarget");
   });
 

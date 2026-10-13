@@ -5,7 +5,7 @@
   "legal.notice.title": "Impresszum",
   "legal.notice.meta": "Ki üzemelteti a {product} szolgáltatást, és hogyan érhet el minket",
   "legal.notice.s01.title": "Kik vagyunk",
-  "legal.notice.s01.body": "A {product} (más néven {alsoCalled}) üzemeltetője a Romániában bejegyzett {company} társaság.",
+  "legal.notice.s01.body": "A {product} üzemeltetője a Romániában bejegyzett {company} társaság.",
   "legal.notice.s01.seller": "A fizetős csomagok eladója is a(z) {company}: a szerződése, a fizetései és a számlái a(z) {company} céggel jönnek létre.",
   "legal.notice.company.name": "Cégnév",
   "legal.notice.company.tradingNames": "Kereskedelmi nevek",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Megjegyzi, milyen nyelvű felületet választott.",
   "legal.cookies.locale.life": "1 év",
   "legal.cookies.storageTitle": "A böngészőben tárolva, nem sütiben",
-  "legal.cookies.storageIntro": "A böngészője tárhelyén négy elemet őrzünk: kettőt a helyi tárhelyen, amíg Ön nem törli őket, és kettőt a munkamenet-tárhelyen, amíg be nem zárja a lapot. A sütikkel ellentétben ezeket nem csatolja a böngésző a kéréseihez; a súgócsevegés eleme egy olyan beszélgetés másolatát őrzi, amelyet a DebateAI súgójával folytatott, és amelynek üzenetei elküldésükkor jutottak el a DebateAI-hoz.",
+  "legal.cookies.storageIntro": "A böngészője tárhelyén négy elemet őrzünk: kettőt a helyi tárhelyen, amíg Ön nem törli őket, és kettőt a munkamenet-tárhelyen, amíg be nem zárja a lapot. A sütikkel ellentétben ezeket nem csatolja a böngésző a kéréseihez; a súgócsevegés eleme egy olyan beszélgetés másolatát őrzi, amelyet a Dialectical Engine súgójával folytatott, és amelynek üzenetei elküldésükkor jutottak el a Dialectical Engine-hez.",
   "legal.cookies.consent.kind": "Helyi tárhely",
   "legal.cookies.consent.purpose": "Megjegyzi, hogy Ön már látta a sütikről szóló értesítést, így az csak egyszer jelenik meg.",
   "legal.cookies.consent.life": "Amíg Ön nem törli",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Munkamenet-tárhely",
   "legal.cookies.supportConversation.purpose": "A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik.",
   "legal.cookies.supportConversation.life": "Amíg be nem zárja a lapot",
-  "legal.cookies.recipient.server": "Csak a DebateAI szerverének",
+  "legal.cookies.recipient.server": "Csak a Dialectical Engine szerverének",
   "legal.cookies.recipient.browser": "a böngészőjében marad",
   "legal.cookies.refuse": "Elutasításukhoz tiltsa le vagy törölje az oldal sütijeit és webhelyadatait a böngésző beállításaiban.",
   "legal.cookies.refuseEffect": "Ami ezután nem működik: a bejelentkezés, valamint a nyelv és a megjelenítési beállítások megjegyzése.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Legfeljebb 30 perc",
   "legal.cookies.mfaRecovery.life": "Legfeljebb 299 másodperc",
   "legal.cookies.social.life": "Legfeljebb 5 perc",
-  "legal.cookies.phoneDraft.life": "15 perc vagy a korábbi törlésig"
+  "legal.cookies.phoneDraft.life": "15 perc vagy a korábbi törlésig",
+  "legal.cookies.exportPending.purpose": "Ebben a lapon megőrzi az e-mailben kapott exporthivatkozást a bejelentkezéshez és az újrapróbálkozáshoz.",
+  "legal.cookies.exportLinkOutcome.purpose": "Megjegyzi, melyik letöltési hivatkozással kapcsolatos üzenetet kell megjeleníteni ezen a lapon.",
+  "legal.cookies.exportPending.life": "A lap bezárásáig, kijelentkezésig, új hivatkozásig, az első sikeres letöltésig vagy érvénytelen hivatkozásra vagy téves fiókra vonatkozó eredményig",
+  "legal.cookies.exportLinkOutcome.life": "A lap bezárásáig, kijelentkezésig vagy új hivatkozásig"
 }

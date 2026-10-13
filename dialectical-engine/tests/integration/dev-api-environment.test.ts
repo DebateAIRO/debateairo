@@ -33,9 +33,9 @@ import { parseRegisterVersionText } from "../../packages/register/src/index.js";
 
 const roots: string[] = [];
 const TEST_SUPPORT_MODEL_TARGET = JSON.stringify({
-  provider_ref: "development:hermes-glm-5.3-flash",
+  provider_ref: "development:claude-haiku-5.5",
   base_url: "http://127.0.0.1:8794/v1",
-  model: "z-ai/glm-5.3-flash",
+  model: "claude-haiku-5-5",
   authorization_header: "Bearer support-test"
 });
 
@@ -159,6 +159,7 @@ describe("DEV-09 private local API environment", () => {
     expect(environment.get("AUTHORIZATION_DATABASE_URL"))
       .not.toBe(environment.get("DATABASE_URL"));
     expect(environment.get("ERASURE_DATABASE_URL")).toContain("debateai_dev_erasure");
+    expect(environment.get("DATA_EXPORT_DATABASE_URL")).toContain("debateai_dev_data_export");
     expect(environment.get("HATCHET_TENANT_ID")).toBe("11111111-1111-4111-8111-111111111111");
     expect(environment.get("HATCHET_CLIENT_TOKEN")).toBe(testToken());
     expect(environment.get("PUBLIC_APP_URL")).toBe("https://localhost:3000");
@@ -190,9 +191,9 @@ describe("DEV-09 private local API environment", () => {
       }))
     );
     expect(JSON.parse(environment.get("SUPPORT_MODEL_TARGET_JSON")!)).toEqual({
-      provider_ref: "development:hermes-glm-5.3-flash",
+      provider_ref: "development:claude-haiku-5.5",
       base_url: "http://127.0.0.1:8794/v1",
-      model: "z-ai/glm-5.3-flash",
+      model: "claude-haiku-5-5",
       authorization_header: "Bearer support-test"
     });
     expect(environment.get("PROVIDER_PROBE_TIMEOUT_MS")).toBe("180000");

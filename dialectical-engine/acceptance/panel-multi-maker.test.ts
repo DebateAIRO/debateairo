@@ -126,7 +126,8 @@ function judgementBody(statement: string, scores: DoubleScores): string {
 const ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN = new RegExp(
   argumentLanguageDirective("\u0000")
     .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    .replace("\u0000", "[^.]+?"),
+    // Reply language (2026-10-12): a named language is followed by ", the language of the question"; the fallback is not.
+    .replace("\u0000, the language of the question", "[^.]+?"),
   "gu"
 );
 

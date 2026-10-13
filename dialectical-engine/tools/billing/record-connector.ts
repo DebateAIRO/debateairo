@@ -69,7 +69,7 @@ export function quadernoRecordingSale(transactionId: string): SaleRecord {
       name: "Test Person", email: "person@example.test", country: "DE", region: null, postalCode: "10115",
       city: "Berlin", street: null, taxId: null, locale: "de"
     },
-    lines: [{ description: "DebateAI Plus, October 2026", netMicros: 20_000_000, taxMicros: 3_800_000, taxRateBasisPoints: 1900 }],
+    lines: [{ description: "Dialectical Engine Plus, October 2026", netMicros: 20_000_000, taxMicros: 3_800_000, taxRateBasisPoints: 1900 }],
     taxCode: "saas",
     evidence: { billingCountry: "DE", ipAddress: "203.0.113.10", bankCountry: "DE" },
     // Spec §2.8 step 5: this recording is what asks Quaderno whether it accepts "netopia" (else the value is "other").
@@ -83,7 +83,7 @@ export function quadernoRecordingRefund(
   return {
     chargeId: RECORDING_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-05T10:00:00.000Z"), currency: "USD",
     refundTotalMicros: 11_900_000, original: { documentId: original.documentId, number: original.number },
-    description: "Teilerstattung DebateAI Plus",
+    description: "Teilerstattung Dialectical Engine Plus",
     processor: "netopia"
   };
 }
@@ -100,7 +100,7 @@ export function quadernoRecordingCompanySale(transactionId: string, vatCountry: 
       name: "Test Company Ltd", email: "person@example.test", country: vatCountry, region: null, postalCode: null,
       city: null, street: "1 Test Street", taxId: vatId, locale: "en"
     },
-    lines: [{ description: "DebateAI Plus, October 2026", netMicros: 20_000_000, taxMicros: 0, taxRateBasisPoints: 0 }],
+    lines: [{ description: "Dialectical Engine Plus, October 2026", netMicros: 20_000_000, taxMicros: 0, taxRateBasisPoints: 0 }],
     taxCode: "saas",
     evidence: { billingCountry: vatCountry, ipAddress: "203.0.113.10", bankCountry: vatCountry },
     processor: "netopia"
@@ -114,7 +114,7 @@ export function quadernoRecordingCompanyRefund(
   return {
     chargeId: RECORDING_COMPANY_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-05T10:00:00.000Z"), currency: "USD",
     refundTotalMicros: 10_000_000, original: { documentId: original.documentId, number: original.number },
-    description: "Partial refund, DebateAI Plus",
+    description: "Partial refund, Dialectical Engine Plus",
     processor: "netopia"
   };
 }
@@ -214,7 +214,7 @@ export function smartbillRecordingSale(chargeId: string, issuedOn: Date): SaleRe
       name: "Test Person", email: "person@example.test", country: "RO", region: "Cluj", postalCode: "400001",
       city: "Cluj-Napoca", street: "Str. Exemplu 1", taxId: null, locale: "ro"
     },
-    lines: [{ description: "DebateAI Plus, inregistrare de test", netMicros: 1_000_000, taxMicros: 210_000, taxRateBasisPoints: 2100 }],
+    lines: [{ description: "Dialectical Engine Plus, inregistrare de test", netMicros: 1_000_000, taxMicros: 210_000, taxRateBasisPoints: 2100 }],
     taxCode: "saas",
     evidence: { billingCountry: "RO", ipAddress: "203.0.113.10", bankCountry: "RO" },
     processor: "netopia"
@@ -228,7 +228,7 @@ export function smartbillRecordingRefund(
   return {
     chargeId, transactionId: "0", issuedOn, currency: "RON", refundTotalMicros,
     original: { documentId: original.externalRef, number: original.number },
-    description: "Rambursare DebateAI Plus",
+    description: "Rambursare Dialectical Engine Plus",
     processor: "netopia"
   };
 }

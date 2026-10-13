@@ -115,7 +115,7 @@ describe("P16b the summary", () => {
 
   it("reads in plain words, with registration, the where, the when, the dates and every list, and no personal data", () => {
     const text = renderTaxSummary(summary);
-    expect(text).toContain("DebateAI tax summary for 2026-Q4 (1 October 2026 to 31 December 2026, UTC)");
+    expect(text).toContain("Dialectical Engine tax summary for 2026-Q4 (1 October 2026 to 31 December 2026, UTC)");
     expect(text).toContain("4 sales and 1 refund");
     expect(text).toContain("Germany (EU_OSS)");
     expect(text).toContain("Net sales 50.00 USD, tax collected 9.50 USD");

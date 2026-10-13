@@ -245,7 +245,7 @@ function nativeHarness(contents: readonly string[], finishReasons: readonly stri
   const row = rowOf(model);
   const native = new OpenAICompatibleProviderGateway({
     endpoint: ENDPOINT, model, maker: row.maker,
-    ...(row.effort === null ? {} : { thinking: { parameter: "reasoning_effort", levels: ["high"] } }), fetchImplementation: fetcher,
+    ...(row.defaultEffort === "default" ? {} : { thinking: { parameter: "reasoning_effort", levels: [row.defaultEffort] } }), fetchImplementation: fetcher,
     assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined,
     persistRawArtifact: async (artifact) => { artifacts.push(artifact); return artifact.artifactId; },
     appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
@@ -287,7 +287,7 @@ describe("A — on the preview the storyteller asks for its row's own story allo
       ? { parseStatus: "PARSE_FAILED", parseError: "cut off at max_tokens" } : { parseStatus: "PARSED", parseError: null });
     await gateway.call({ ...cutIsRefused, costEnvelope: freeEnvelope });
     expect(executions.map((execution) => JSON.parse(execution.requestBody).max_tokens)).toEqual([16_384, 32_768]);
-    expect(JSON.parse(executions[0]!.requestBody)).toMatchObject({ model: MIMO, temperature: 1.0, top_p: 0.95 });
+    expect(JSON.parse(executions[0]!.requestBody)).toMatchObject({ model: MIMO, temperature: 0.7, top_p: 0.95 });
   });
 
   it("the start-of-debate estimate prices the storyteller at what is sent: each row's own story allowance", () => {

@@ -1,5 +1,5 @@
 {
-  "order.planDescription": "Μηνιαίο πρόγραμμα DebateAI {plan}",
-  "order.cardCheck": "Έλεγχος κάρτας DebateAI",
-  "invoice.line": "Πρόγραμμα DebateAI {plan}, {from} έως {to}"
+  "order.planDescription": "Μηνιαίο πρόγραμμα Dialectical Engine {plan}",
+  "order.cardCheck": "Έλεγχος κάρτας Dialectical Engine",
+  "invoice.line": "Πρόγραμμα Dialectical Engine {plan}, {from} έως {to}"
 }

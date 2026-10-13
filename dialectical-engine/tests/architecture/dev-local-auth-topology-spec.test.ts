@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { DEVELOPMENT_DATABASE_PRINCIPALS } from "../../apps/runner/src/dev-database-principals.js";
 
 const source = (relativePath: string): Promise<string> =>
   readFile(new URL(`../../${relativePath}`, import.meta.url), "utf8");
@@ -39,6 +40,16 @@ interface LocalAuthTopology {
 }
 
 describe("DEV-01 local-auth topology specification", () => {
+  it("binds every documented application login to the local provisioner roster", async () => {
+    const topology = JSON.parse(await source("docs/missions/2026-08-17-accounts-privacy-security/DEV-01-local-auth-topology.json")) as LocalAuthTopology;
+    const documented = topology.principals.filter(({ id }) => id.startsWith("debateai_dev_")
+      && id !== "debateai_dev_migrator" && id !== "debateai_dev_hatchet");
+    expect(documented.map(({ id, memberships, purpose }) => ({ id, memberships, environmentKey: purpose[0] })))
+      .toEqual(DEVELOPMENT_DATABASE_PRINCIPALS.map(({ roleName, capabilityRole, environmentKey }) => ({
+        id: roleName, memberships: [capabilityRole], environmentKey
+      })));
+  });
+
   it("defines an exact partially implemented topology without advertising a complete stack", async () => {
     const [raw, documentation, packageText] = await Promise.all([
       source("docs/missions/2026-08-17-accounts-privacy-security/DEV-01-local-auth-topology.json"),
@@ -166,6 +177,27 @@ describe("DEV-01 local-auth topology specification", () => {
         forbiddenMemberships: ["debateai_runtime", "debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "debateai_evaluator_worker", "debateai_evaluator_reader", "pg_*"],
         owns: [],
         purpose: ["EVALUATOR_DEV_MENU_DATABASE_URL"], serviceCredential: true
+      },
+      {
+        id: "debateai_dev_support_config_operator", login: true,
+        attributes: ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+        memberships: ["debateai_support_config_operator"],
+        forbiddenMemberships: ["debateai_runtime", "debateai_authorization_runtime", "debateai_erasure_runtime", "debateai_data_export_worker", "pg_*"],
+        owns: [], purpose: ["SUPPORT_CONFIG_OPERATOR_DATABASE_URL"], serviceCredential: true
+      },
+      {
+        id: "debateai_dev_support", login: true,
+        attributes: ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+        memberships: ["debateai_support"],
+        forbiddenMemberships: ["debateai_runtime", "debateai_authorization_runtime", "debateai_erasure_runtime", "debateai_data_export_worker", "pg_*"],
+        owns: [], purpose: ["SUPPORT_DATABASE_URL"], serviceCredential: true
+      },
+      {
+        id: "debateai_dev_data_export", login: true,
+        attributes: ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+        memberships: ["debateai_data_export_worker"],
+        forbiddenMemberships: ["debateai_runtime", "debateai_authorization_runtime", "debateai_erasure_runtime", "debateai_support", "pg_*"],
+        owns: [], purpose: ["DATA_EXPORT_DATABASE_URL"], serviceCredential: true
       },
       {
         id: "debateai_dev_hatchet", login: true,

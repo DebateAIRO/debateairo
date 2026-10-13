@@ -22,16 +22,17 @@ DEEPSEEK = 'deepseek-ai/DeepSeek-V4.1-Flash'
 MIMO = 'XiaomiMiMo/MiMo-V2.6-Pro'
 QWEN = 'Qwen/Qwen3.8-Flash'
 # The reviewed rows, written out independently of the gate (contract A section 1):
-# model -> (maker, input $/M, output $/M, output bound, effort, json_object). Output bound 32768 for
-# every row (owner ruling 2026-10-10).
-ROWS = {MODEL: ('Z.AI', '0.15', '0.50', 32768, 'high', True),
-        DEEPSEEK: ('DeepSeek', '0.20', '0.60', 32768, 'high', False),
-        MIMO: ('Xiaomi', '0.43', '0.87', 32768, None, False),
-        QWEN: ('Alibaba', '0.113', '0.382', 32768, None, False)}
+# model -> (maker, input $/M, output $/M, output bound, efforts, json_object). Output bound 32768 for
+# every row (owner ruling 2026-10-10). efforts is the reviewed thinking-level menu (spec 2026-10-12 section 4.1):
+# None is no reasoning_effort member, and the first entry is the level a default request carries.
+ROWS = {MODEL: ('Z.AI', '0.15', '0.50', 32768, ('high', 'low'), True),
+        DEEPSEEK: ('DeepSeek', '0.20', '0.60', 32768, ('high', 'low', 'none'), False),
+        MIMO: ('Xiaomi', '0.43', '0.87', 32768, (None, 'none'), False),
+        QWEN: ('Alibaba', '0.113', '0.382', 32768, (None, 'low', 'medium', 'none'), False)}
 # The reviewed sampling (2026-10-12), written out independently of the gate: model -> the exact keys and
 # values its request must carry. A row not listed carries none of them. MiMo's (owner approval 2026-10-12) are
-# DeepInfra's recommended temperature 1.0 and top_p 0.95, with no top_k.
-SAMPLING = {MIMO: {'temperature': 1.0, 'top_p': 0.95},
+# DeepInfra's recommended top_p 0.95 with the owner's temperature 0.7 (reply language, 2026-10-12), with no top_k.
+SAMPLING = {MIMO: {'temperature': 0.7, 'top_p': 0.95},
             QWEN: {'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}}
 HOST = 'synthetic-host'
 SCOPE = 'preview-team-synthetic'
@@ -90,11 +91,12 @@ def go_document(**changes):
 
 
 def body(**changes):
-    """A valid request for changes['model'] (GLM by default), with that row's effort and sampling rules."""
+    """A valid request for changes['model'] (GLM by default), at that row's default level, with its sampling rules."""
     model = changes.get('model', MODEL)
     value = {'model': model, 'max_tokens': 8192, 'messages': [{'role': 'user', 'content': 'Offline synthetic test'}]}
-    if ROWS.get(model, (None,) * 5)[4] == 'high' or model not in ROWS:
-        value['reasoning_effort'] = 'high'
+    default_effort = ROWS[model][4][0] if model in ROWS else 'high'
+    if default_effort is not None:
+        value['reasoning_effort'] = default_effort
     value.update(SAMPLING.get(model, {}))
     value.update(changes)
     return value

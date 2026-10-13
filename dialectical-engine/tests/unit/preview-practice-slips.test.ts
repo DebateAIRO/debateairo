@@ -104,8 +104,10 @@ describe("practice verdict: fixed slips are a warning (owner ruling 2026-10-12)"
     expect(practiceVerdict({ ...CLEAN, callsByModel: { m: calls(20, 2) } }).reasons).toEqual(["FORMAT_REPAIRED:m:2"]);
   });
 
-  it("the story's outcome stays as it was: anything but READY fails, READY_WITH_RESERVATION too", () => {
-    expect(practiceVerdict({ ...CLEAN, storyOutcome: "READY_WITH_RESERVATION" }).reasons).toEqual(["STORY_NOT_READY:READY_WITH_RESERVATION"]);
+  it("a story served with the checker's reservation is a warning; any other story that is not READY fails (owner ruling 2026-10-12)", () => {
+    expect(practiceVerdict({ ...CLEAN, storyOutcome: "READY_WITH_RESERVATION" })).toMatchObject({ verdict: "PASS_WITH_WARNINGS", reasons: ["STORY_RESERVED"] });
+    expect(practiceVerdict({ ...CLEAN, storyOutcome: "FAILED" })).toMatchObject({ verdict: "FAIL", reasons: ["STORY_NOT_READY:FAILED"] });
+    expect(practiceVerdict({ ...CLEAN, storyOutcome: "MISSING" })).toMatchObject({ verdict: "FAIL", reasons: ["STORY_NOT_READY:MISSING"] });
   });
 });
 
@@ -151,8 +153,18 @@ describe("practice formats: the second try is the app's own (same preview call p
     locator: null, restatement_text: "Should central buses be free?", restatement_status: "PASS", value_laden: true, claim_type: "normative",
     steelman: { summary: "Fares are a barrier.", fidelity: 0.8 }, critic: { summary: "Lost fares cut service.", counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" },
     evidence: { quality: 0.4, relevance: 0.8 }, context: { fit: 0.8, ambiguityFlags: [] }, fallacy: { severity: 0.1, fatalFlags: [] } });
-  const { value_laden: _left, ...withoutValueLaden } = JSON.parse(GOOD) as Record<string, unknown>;
-  const MISSING_FIELD = JSON.stringify(withoutValueLaden);
+  // Reply language (2026-10-12): the Romanian practice question is answered in Romanian, or the engine re-asks it.
+  const GOOD_RO = JSON.stringify({ ...JSON.parse(GOOD) as object,
+    statement: "Liniile centrale gratuite merită dacă bani noi le plătesc.",
+    restatement_text: "Ar trebui ca autobuzele centrale să fie gratuite?",
+    steelman: { summary: "Prețul biletului este o barieră.", fidelity: 0.8 },
+    critic: { summary: "Banii pierduți din bilete reduc serviciul.", counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" } });
+  const goodFor = (requestBody: string): string => requestBody.includes("Ar trebui un ") ? GOOD_RO : GOOD;
+  const withoutValueLaden = (good: string): string => {
+    const { value_laden: _left, ...rest } = JSON.parse(good) as Record<string, unknown>;
+    return JSON.stringify(rest);
+  };
+  const MISSING_FIELD = withoutValueLaden(GOOD);
 
   /** The patch follow-up's answer when it does its job: only the member it was asked for. */
   const PATCH = JSON.stringify({ value_laden: true });
@@ -170,8 +182,9 @@ describe("practice formats: the second try is the app's own (same preview call p
 
   /**
    * Every model answers well, except MiMo's first reply of its first `slips.remaining` jobs, which leaves out a
-   * required field. MiMo answers a patch follow-up with `patchAnswer`: the patch itself (the default), or its whole
-   * answer again (refused as a patch, so the call goes on to the full re-ask, which is answered well).
+   * required field. MiMo answers a patch follow-up with `patchAnswer`: the patch itself (the default), or a whole answer
+   * — accepted when it passes the step's check (owner ruling 2026-10-12), else refused as a patch, so the call goes on
+   * to the full re-ask, which is answered well.
    */
   function port(provider: "deepinfra" | "anthropic", slips: { remaining: number }, sent: string[],
     patchAnswer: string = PATCH, forms: string[] = []): PreviewBudgetPort {
@@ -183,9 +196,10 @@ describe("practice formats: the second try is the app's own (same preview call p
       id += 1;
       const form = requestForm(provider, input.requestBody);
       if (model === MIMO) forms.push(form);
-      let content = GOOD;
+      const good = goodFor(input.requestBody);
+      let content = good;
       if (model === MIMO && form === "PATCH") content = patchAnswer;
-      else if (model === MIMO && form === "ORIGINAL" && slips.remaining > 0) { slips.remaining -= 1; content = MISSING_FIELD; }
+      else if (model === MIMO && form === "ORIGINAL" && slips.remaining > 0) { slips.remaining -= 1; content = withoutValueLaden(good); }
       return { status: 200, body: stubVendorReply(provider, model, content, `slip-${String(id)}`) };
     } };
   }
@@ -223,8 +237,20 @@ describe("practice formats: the second try is the app's own (same preview call p
     expect(reportMarkdown(report)).toContain("1 fixed by the same call (by patch 1, by full re-ask 0, otherwise 0)");
   });
 
-  it("MiMo answers the patch follow-up with its whole answer again (refused as a patch), the full re-ask fixes it: REPAIRED by FULL, three tries", async () => {
+  it("owner ruling 2026-10-12: MiMo answers the patch follow-up with a whole answer that passes the check: accepted, REPAIRED by PATCH, two tries", async () => {
     const { result, report, forms } = await run(1, 1, GOOD);
+    const mimo = result.samples.find((sample) => sample.model === MIMO)!;
+    expect(mimo.status).toBe("REPAIRED");
+    expect(mimo.attempts.map((attempt) => [attempt.outcome, attempt.parseStatus, attempt.replyForm])).toEqual([
+      ["FAILED", "SCHEMA_FAILED", "ORIGINAL"], ["OK", "PARSED", "PATCH"]]);
+    expect(forms).toEqual(["ORIGINAL", "PATCH"]);
+    expect(mimo.repairKind).toBe("PATCH");
+    expect(mimo.issues).toEqual(["invalid_type@value_laden"]);
+    expect((report.slipsByModel as Record<string, unknown>)[MIMO]).toMatchObject({ repaired: 1, repairedByPatch: 1, repairedByFullAsk: 0 });
+  });
+
+  it("MiMo answers the patch follow-up with its whole answer again, still missing the field (refused as a patch), the full re-ask fixes it: REPAIRED by FULL, three tries", async () => {
+    const { result, report, forms } = await run(1, 1, MISSING_FIELD);
     const mimo = result.samples.find((sample) => sample.model === MIMO)!;
     expect(mimo.status).toBe("REPAIRED");
     expect(mimo.attempts.map((attempt) => [attempt.outcome, attempt.parseStatus, attempt.replyForm])).toEqual([
@@ -271,7 +297,7 @@ describe("practice formats: the second try is the app's own (same preview call p
     const busyAfterOne: PreviewBudgetPort = { async execute(input) {
       const model = String((JSON.parse(input.requestBody) as { model: unknown }).model);
       if (model === GLM && ++glmCalls > 1) throw new PreviewVendorRefusedUnbilled();
-      return { status: 200, body: stubVendorReply("deepinfra", model, GOOD, "x") };
+      return { status: 200, body: stubVendorReply("deepinfra", model, goodFor(input.requestBody), "x") };
     } };
     const ports = { deepinfra: observer.wrap("deepinfra", busyAfterOne), anthropic: observer.wrap("anthropic", port("anthropic", { remaining: 0 }, [])) };
     const result = await runPracticeFormats({ config, targets, ports, observer, lanes: ["JUDGE_POSITION"], samples: 4, gapMs: 0, pack, bounds,

@@ -1,4 +1,4 @@
-# DebateAI — Servicevoorwaarden
+# Dialectical Engine — Servicevoorwaarden
 
 <!-- legal-chrome
 summaryTitle: In het kort
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
-**In short.** U moet 18 jaar of ouder zijn. DebateAI stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Uw debatten zijn privé, tenzij u ze publiceert; als u ze publiceert, kan iedereen ze lezen. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
+**In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Uw debatten zijn privé, tenzij u ze publiceert; als u ze publiceert, kan iedereen ze lezen. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
 ## 1. Wie wij zijn en hoe u ons kunt bereiken
 
-DebateAI wordt geëxploiteerd door **DMS Merchandise Shop S.R.L.**, een in Roemenië geregistreerde vennootschap.
+Dialectical Engine wordt geëxploiteerd door **DMS Merchandise Shop S.R.L.**, een in Roemenië geregistreerde vennootschap.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ DebateAI wordt geëxploiteerd door **DMS Merchandise Shop S.R.L.**, een in Roeme
 
 Deze gegevens worden ook permanent op de site getoond op dezbatere.ro/legal. U kunt altijd een persoon bereiken, niet alleen onze assistent; hoofdstuk 10 legt uit hoe.
 
-## 2. Waar wij DebateAI aanbieden
+## 2. Waar wij Dialectical Engine aanbieden
 
-Wij bieden DebateAI aan personen die wonen in de Europese Unie (27 landen) en de Europese Economische Ruimte (Noorwegen, IJsland en Liechtenstein), Zwitserland, Moldavië, de Verenigde Staten (behalve Tennessee), Canada, Australië, Nieuw-Zeeland, Singapore, Japan, Zuid-Korea en Taiwan. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is.
+Wij bieden Dialectical Engine aan personen die wonen in de Europese Unie (27 landen) en de Europese Economische Ruimte (Noorwegen, IJsland en Liechtenstein), Zwitserland, Moldavië, de Verenigde Staten (behalve Tennessee), Canada, Australië, Nieuw-Zeeland, Singapore, Japan, Zuid-Korea en Taiwan. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is.
 
 ## 3. Aanvaarding van deze Voorwaarden
 
@@ -58,21 +58,21 @@ Ons **Privacybeleid** op dezbatere.ro/privacy legt uit hoe wij persoonsgegevens 
 
 Voordat u elektronisch een overeenkomst met ons sluit, toont de interface u welke stappen daarbij horen, kunt u de door u ingevoerde gegevens controleren en corrigeren voordat u ze indient, en wordt vermeld in welke talen de overeenkomst kan worden gesloten. Deze Voorwaarden zijn beschikbaar in een vorm die u kunt opslaan en afdrukken, wanneer u een betaald abonnement koopt, sturen wij u de door u aanvaarde versie per e-mail en u kunt te allen tijde een kopie opvragen. Niets in deze Voorwaarden beperkt rechten die u krachtens het Roemeense of EU-consumentenrecht, of het recht van het land waar u woont, hebt en die niet bij overeenkomst kunnen worden beperkt.
 
-## 4. Wie DebateAI mag gebruiken
+## 4. Wie Dialectical Engine mag gebruiken
 
-U moet **18 jaar of ouder** zijn om een account aan te maken en u bevestigt dit bij uw registratie. DebateAI is niet op kinderen gericht en wij bieden de dienst niet bewust aan personen jonger dan 18 jaar. Als wij vernemen dat een account toebehoort aan iemand jonger dan 18, sluiten wij het. Sommige regio's vereisen meer dan een bevestiging; Bijlage A vermeldt wat waar van toepassing is.
+U moet **18 jaar of ouder** zijn om een account aan te maken en u bevestigt dit bij uw registratie. Dialectical Engine is niet op kinderen gericht en wij bieden de dienst niet bewust aan personen jonger dan 18 jaar. Als wij vernemen dat een account toebehoort aan iemand jonger dan 18, sluiten wij het. Sommige regio's vereisen meer dan een bevestiging; Bijlage A vermeldt wat waar van toepassing is.
 
-U moet handelingsbekwaam zijn om deze overeenkomst aan te gaan. Als u DebateAI namens een organisatie gebruikt, bevestigt u dat u bevoegd bent die organisatie te binden, en betekent "u" vervolgens die organisatie.
+U moet handelingsbekwaam zijn om deze overeenkomst aan te gaan. Als u Dialectical Engine namens een organisatie gebruikt, bevestigt u dat u bevoegd bent die organisatie te binden, en betekent "u" vervolgens die organisatie.
 
 Iedereen mag een gepubliceerd debat lezen. Daarvoor is geen account nodig, maar het is wel gebruik van de dienst en de hoofdstukken 7, 15, 16 en 18 zijn daarop van toepassing.
 
-## 5. Wat DebateAI doet en wat het niet is
+## 5. Wat Dialectical Engine doet en wat het niet is
 
-U dient een vraag of stelling in. DebateAI stuurt deze naar verschillende AI-modellen van derden, die er een argumentengraaf omheen opbouwen: stellingen, tegenargumenten, kritieken, bewijsverwijzingen, scores en een oordeel met een zekerheidsband. U kunt afzonderlijke stellingen betwisten, vragen een punt nader te onderzoeken en beslissen of u het resultaat publiceert.
+U dient een vraag of stelling in. Dialectical Engine stuurt deze naar verschillende AI-modellen van derden, die er een argumentengraaf omheen opbouwen: stellingen, tegenargumenten, kritieken, bewijsverwijzingen, scores en een oordeel met een zekerheidsband. U kunt afzonderlijke stellingen betwisten, vragen een punt nader te onderzoeken en beslissen of u het resultaat publiceert.
 
 **Alles in een debat wordt door AI gegenereerd.** De argumenten, kritieken, bewijsverwijzingen, scores, oordelen en antwoorden van de ondersteuningsassistent worden door machines gegenereerd. Ze kunnen onjuist, onvolledig, verouderd of met stelligheid onjuist zijn en kunnen vooroordelen in de modellen weerspiegelen. Niemand beoordeelt ze voordat ze aan u worden getoond of gepubliceerd en geen bij naam genoemde persoon draagt er redactionele verantwoordelijkheid voor. Gegenereerde inhoud wordt in het product, op gepubliceerde pagina's en in exports als door AI gegenereerd aangeduid.
 
-**DebateAI is geen advies.** Het is geen juridisch, medisch, financieel, fiscaal, psychologisch, veiligheids- of ander professioneel advies en een oordeel is geen vaststelling van feiten. Gebruik een debat niet als grondslag voor een beslissing die van belang is voor uw gezondheid, veiligheid, geld, rechtspositie of het welzijn van anderen zonder primaire bronnen te controleren en, waar passend, een bevoegde professional te raadplegen. Een hoge zekerheidsband betekent dat de modellen de interpretatie op basis van het door hen beoordeelde materiaal als breed aanvaard beschouwden; dit garandeert niet dat zij juist is.
+**Dialectical Engine is geen advies.** Het is geen juridisch, medisch, financieel, fiscaal, psychologisch, veiligheids- of ander professioneel advies en een oordeel is geen vaststelling van feiten. Gebruik een debat niet als grondslag voor een beslissing die van belang is voor uw gezondheid, veiligheid, geld, rechtspositie of het welzijn van anderen zonder primaire bronnen te controleren en, waar passend, een bevoegde professional te raadplegen. Een hoge zekerheidsband betekent dat de modellen de interpretatie op basis van het door hen beoordeelde materiaal als breed aanvaard beschouwden; dit garandeert niet dat zij juist is.
 
 **Waartoe wij ons wel verbinden.** Wij zullen de dienst met redelijke zorg en vakbekwaamheid en overeenkomstig de door ons gepubliceerde beschrijving leveren. Wanneer de wet u garandeert dat de dienst aan zijn beschrijving beantwoordt en geschikt is voor zijn gebruikelijke doel, geldt die garantie en doet niets in deze Voorwaarden daaraan af. Wij beloven niet dat een bepaalde uitvoer juist is: dat is een eigenschap van de gegenereerde inhoud, niet van de vraag of de dienst werkt.
 
@@ -92,19 +92,19 @@ U kunt uw account te allen tijde sluiten via **Instellingen → Account**. De sl
 
 Deze regels gelden voor wat u indient, hoe u de dienst gebruikt en wat u publiceert.
 
-**Dien geen persoonsgegevens over andere personen in.** Vraag naar kwesties, argumenten en openbare onderwerpen in plaats van naar identificeerbare privépersonen. Neem geen namen, contactgegevens, identificatienummers, afbeeldingen, gezondheidsgegevens, financiële gegevens of andere gegevens op waarmee iemand kan worden geïdentificeerd, en gebruik DebateAI niet om een zaak, profiel of dossier over een persoon op te bouwen. Vragen over publieke personen die in hun openbare hoedanigheid handelen, zijn toegestaan; vragen die op een privépersoon zijn gericht niet. Als u dergelijke gegevens toch indient, bent u daarvoor verantwoordelijk en kunnen wij de inhoud verwijderen.
+**Dien geen persoonsgegevens over andere personen in.** Vraag naar kwesties, argumenten en openbare onderwerpen in plaats van naar identificeerbare privépersonen. Neem geen namen, contactgegevens, identificatienummers, afbeeldingen, gezondheidsgegevens, financiële gegevens of andere gegevens op waarmee iemand kan worden geïdentificeerd, en gebruik Dialectical Engine niet om een zaak, profiel of dossier over een persoon op te bouwen. Vragen over publieke personen die in hun openbare hoedanigheid handelen, zijn toegestaan; vragen die op een privépersoon zijn gericht niet. Als u dergelijke gegevens toch indient, bent u daarvoor verantwoordelijk en kunnen wij de inhoud verwijderen.
 
 **Uw eigen gevoelige informatie.** De vragen die u stelt, kunnen betrekking hebben op uw eigen gezondheid, overtuigingen, politiek of andere gevoelige aangelegenheden. U geeft daarvoor toestemming op een afzonderlijk scherm vóór uw eerste debat. Als u ergens woont waar specifieke regels voor gezondheidsgegevens gelden, kan Bijlage A naar een afzonderlijke kennisgeving verwijzen.
 
 **Dien geen onrechtmatige inhoud in en publiceer deze niet**, waaronder inhoud die lasterlijk is, aanzet tot geweld of haat, intimideert of bedreigt, uit intieme beelden bestaat die zonder toestemming zijn gedeeld, inbreuk maakt op intellectuele-eigendomsrechten of vertrouwelijkheid, bedrijfsgeheimen onthult, materiaal betreffende seksueel misbruik van kinderen vormt of sancties of exportcontroles schendt.
 
-**Gebruik DebateAI niet om te misleiden.** Presenteer gegenereerde uitvoer niet als door een mens geschreven wanneer dat misleidend zou zijn, verwijder niet het label dat aangeeft dat deze door AI is gegenereerd en gebruik deze niet om schijnbare consensus, vals bewijs of persoonsnabootsing te fabriceren.
+**Gebruik Dialectical Engine niet om te misleiden.** Presenteer gegenereerde uitvoer niet als door een mens geschreven wanneer dat misleidend zou zijn, verwijder niet het label dat aangeeft dat deze door AI is gegenereerd en gebruik deze niet om schijnbare consensus, vals bewijs of persoonsnabootsing te fabriceren.
 
 **Val de dienst niet aan.** Gewone indexering van gepubliceerde debatten door zoekmachines is toegestaan, maar voor andere geautomatiseerde toegang, scraping, crawling of bulkextractie is onze schriftelijke toestemming vereist; geen omzeiling van snelheidslimieten, authenticatie- of publicatiecontroles; geen pogingen om prompts of systeeminstructies te achterhalen; geen promptinjectie die erop is gericht de engine zijn beperkingen te laten negeren; geen verkennende tests of belastingtests zonder onze schriftelijke toestemming.
 
 **Verkoop de dienst niet door en breng hem niet onder een ander merk uit**, en gebruik hem niet om een concurrerende engine te bouwen, ook niet door uitvoer als trainingsgegevens te gebruiken, zonder onze schriftelijke toestemming.
 
-**Gebruik DebateAI niet voor beslissingen over iemands** gezondheid, veiligheid, wettelijke rechten, werk, krediet, huisvesting of immigratiestatus. Het is daarvoor niet ontwikkeld en de uitvoer vormt daarvoor geen veilige grondslag.
+**Gebruik Dialectical Engine niet voor beslissingen over iemands** gezondheid, veiligheid, wettelijke rechten, werk, krediet, huisvesting of immigratiestatus. Het is daarvoor niet ontwikkeld en de uitvoer vormt daarvoor geen veilige grondslag.
 
 **Lokaal recht waar u publiceert.** U bent ervoor verantwoordelijk dat alles wat u publiceert voldoet aan het recht van het land waar u zich bevindt. Wij kunnen de publicatie van bepaalde onderwerpen in bepaalde regio's beperken.
 
@@ -132,9 +132,9 @@ Debatten zijn **standaard privé**. Niets wat u maakt, is voor iemand anders zic
 
 **Wat publicatie doet.** Publicatie is een bewuste handeling die afzonderlijk wordt bevestigd. Wanneer u publiceert, maken wij een bevroren momentopname van het debat die iedereen zonder account kan lezen. Zoekmachines kunnen dit indexeren. De momentopname toont uw **pseudoniem**, uw vraag zoals u die hebt geschreven, de argumentboom, de scores, het oordeel en de zekerheidsband en draagt een zichtbaar label dat de inhoud door AI is gegenereerd. Uw e-mailadres, sessiegegevens en accountgeschiedenis worden niet getoond.
 
-**Publicatie is in de praktijk feitelijk onomkeerbaar.** Zodra een debat openbaar is, kunnen anderen het lezen, citeren, vastleggen in schermafbeeldingen, archiveren en in een cache opslaan. Door de publicatie in te trekken, wordt het uit DebateAI verwijderd en wordt de sleutel tot onze kopie vernietigd, maar kopieën die elders al bestaan, kunnen daardoor niet worden bereikt. Publiceer niets waarvan u niet wilt dat het permanent met uw pseudoniem in verband wordt gebracht.
+**Publicatie is in de praktijk feitelijk onomkeerbaar.** Zodra een debat openbaar is, kunnen anderen het lezen, citeren, vastleggen in schermafbeeldingen, archiveren en in een cache opslaan. Door de publicatie in te trekken, wordt het uit Dialectical Engine verwijderd en wordt de sleutel tot onze kopie vernietigd, maar kopieën die elders al bestaan, kunnen daardoor niet worden bereikt. Publiceer niets waarvan u niet wilt dat het permanent met uw pseudoniem in verband wordt gebracht.
 
-**Gepubliceerde debatten wanneer u uw account sluit.** Wanneer u de sluiting van uw account plant, kiest u wat er met uw gepubliceerde debatten gebeurt. Als u **„Ook mijn openbare debatten verwijderen”** aanvinkt, verwijderen wij ze bij de sluiting één voor één van DebateAI en vernietigen wij de sleutel van onze kopie, zoals bij het ongedaan maken van een publicatie, tenzij de wet ons verplicht een specifiek onderdeel te bewaren. Als u het vakje niet aanvinkt, blijven ze openbaar onder een uitgefaseerd pseudoniem. Kopieën die anderen vóór de verwijdering maakten, vallen buiten onze controle. Wilt u een verwijderd debat zelf blijven bewaren, download het dan eerst.
+**Gepubliceerde debatten wanneer u uw account sluit.** Wanneer u de sluiting van uw account plant, kiest u wat er met uw gepubliceerde debatten gebeurt. Als u **„Ook mijn openbare debatten verwijderen”** aanvinkt, verwijderen wij ze bij de sluiting één voor één van Dialectical Engine en vernietigen wij de sleutel van onze kopie, zoals bij het ongedaan maken van een publicatie, tenzij de wet ons verplicht een specifiek onderdeel te bewaren. Als u het vakje niet aanvinkt, blijven ze openbaar onder een uitgefaseerd pseudoniem. Kopieën die anderen vóór de verwijdering maakten, vallen buiten onze controle. Wilt u een verwijderd debat zelf blijven bewaren, download het dan eerst.
 
 **Wij kunnen gepubliceerde inhoud altijd verwijderen.** Wij kunnen een gepubliceerd debat verwijderen of de toegang daartoe beperken wanneer de wet dit vereist, wanneer een rechter of bevoegde autoriteit dit gelast, of wanneer het deze Voorwaarden schendt of illegaal is. Niets in dit hoofdstuk belet ons te handelen naar aanleiding van een geldige melding krachtens hoofdstuk 10 en niets daarin is een belofte dat een gepubliceerd debat beschikbaar zal blijven.
 
@@ -161,7 +161,7 @@ Wij bevestigen elke melding zonder onnodige vertraging. Wij behandelen meldingen
 
 **Contact opnemen met een persoon.** Onze ondersteuningsassistent is een AI-systeem en vermeldt dit. U kunt te allen tijde vragen met een persoon te spreken en elk ondersteuningsgesprek biedt die mogelijkheid. Wij vertrouwen niet uitsluitend op geautomatiseerde hulpmiddelen om met u te communiceren.
 
-**Terroristische inhoud.** Terroristische inhoud is illegaal en is niet toegestaan op DebateAI (hoofdstuk 7). Bevoegde autoriteiten in de Europese Unie kunnen ons verwijderingsbevelen sturen krachtens Verordening (EU) 2021/784, naar het contactpunt in hoofdstuk 1. Wanneer wij een bevel ontvangen, verwijderen wij de inhoud, of blokkeren wij de toegang daartoe in elk EU-land, binnen een uur. Wij laten de persoon die de inhoud heeft gepubliceerd weten dat zij is verwijderd en, als die persoon dat vraagt, waarom en hoe het bevel kan worden aangevochten, tenzij de autoriteit beslist dat de openbare veiligheid voor een beperkte periode geheimhouding vereist. Zoals de Verordening vereist, bewaren wij de verwijderde inhoud en de daarmee verband houdende gegevens zes maanden, zodat de verwijdering kan worden herzien en, als zij onjuist was, ongedaan kan worden gemaakt. De persoon die de inhoud heeft gepubliceerd, kan het bevel aanvechten bij de rechter van het land van de autoriteit die het heeft uitgevaardigd, en kan ook onze klachtenprocedure gebruiken. Geen autoriteit heeft ons verplicht specifieke maatregelen tegen terroristische inhoud te nemen krachtens de Verordening; doet een autoriteit dit wel, dan beschrijven wij die maatregelen hier, met inbegrip van eventuele geautomatiseerde hulpmiddelen.
+**Terroristische inhoud.** Terroristische inhoud is illegaal en is niet toegestaan op Dialectical Engine (hoofdstuk 7). Bevoegde autoriteiten in de Europese Unie kunnen ons verwijderingsbevelen sturen krachtens Verordening (EU) 2021/784, naar het contactpunt in hoofdstuk 1. Wanneer wij een bevel ontvangen, verwijderen wij de inhoud, of blokkeren wij de toegang daartoe in elk EU-land, binnen een uur. Wij laten de persoon die de inhoud heeft gepubliceerd weten dat zij is verwijderd en, als die persoon dat vraagt, waarom en hoe het bevel kan worden aangevochten, tenzij de autoriteit beslist dat de openbare veiligheid voor een beperkte periode geheimhouding vereist. Zoals de Verordening vereist, bewaren wij de verwijderde inhoud en de daarmee verband houdende gegevens zes maanden, zodat de verwijdering kan worden herzien en, als zij onjuist was, ongedaan kan worden gemaakt. De persoon die de inhoud heeft gepubliceerd, kan het bevel aanvechten bij de rechter van het land van de autoriteit die het heeft uitgevaardigd, en kan ook onze klachtenprocedure gebruiken. Geen autoriteit heeft ons verplicht specifieke maatregelen tegen terroristische inhoud te nemen krachtens de Verordening; doet een autoriteit dit wel, dan beschrijven wij die maatregelen hier, met inbegrip van eventuele geautomatiseerde hulpmiddelen.
 
 **Ernstig risico voor leven of veiligheid.** Als wij kennis krijgen van informatie die wijst op een strafbaar feit waarbij iemands leven of veiligheid wordt bedreigd, informeren wij de bevoegde autoriteiten.
 
@@ -183,7 +183,7 @@ De hoofdstukken 8 (voor reeds gepubliceerde inhoud), 15, 16 en 18 blijven na be�
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI biedt een gratis abonnement. Een betaald **Premium**-abonnement zal beschikbaar zijn, waarmee de volledige reeks modellen wordt ontsloten en u de debatmeters zelf kunt instellen.
+Dialectical Engine biedt een gratis abonnement. Een betaald **Premium**-abonnement zal beschikbaar zijn, waarmee de volledige reeks modellen wordt ontsloten en u de debatmeters zelf kunt instellen.
 
 **Voordat u betaalt**, tonen wij u direct boven de betaalknop: het abonnement; de totale prijs inclusief toepasselijke belastingen; de factureringsperiode; dat het abonnement automatisch wordt verlengd totdat het wordt opgezegd; de datum waarop een eventuele gratis proefperiode eindigt en welk bedrag daarna in rekening wordt gebracht; en hoe u kunt opzeggen. U bevestigt de verlengingsvoorwaarden door een afzonderlijk vakje aan te vinken. Op de knop staat **Abonneren en betalen** (in het Roemeens *Comandă cu obligație de plată*). Wij sturen u op een duurzame gegevensdrager een bevestiging met dezelfde informatie, deze Voorwaarden en het modelformulier voor herroeping.
 
@@ -211,11 +211,11 @@ Als u elders woont, vermeldt Bijlage A welk herroepingsrecht of welke bedenktijd
 
 ## 14. Wijzigingen in de dienst en deze Voorwaarden
 
-**In de dienst.** Wij ontwikkelen DebateAI voortdurend en brengen routinematige verbeteringen, oplossingen en wijzigingen in de reeks modellen zonder kennisgeving aan. Wanneer wij een wijziging aanbrengen die verder gaat dan de dienst te laten werken zoals beschreven, doen wij dat uitsluitend om een van deze redenen: om aan een wettelijke of regelgevende eis te voldoen; om op een beveiligings- of misbruikprobleem te reageren; omdat een modelaanbieder een model of functie waarvan wij afhankelijk zijn wijzigt, beperkt of niet langer aanbiedt; om ons aan te passen aan een technische omgeving waarover wij geen controle hebben; of om een functie zonder extra kosten voor u toe te voegen, te verbeteren of te beëindigen.
+**In de dienst.** Wij ontwikkelen Dialectical Engine voortdurend en brengen routinematige verbeteringen, oplossingen en wijzigingen in de reeks modellen zonder kennisgeving aan. Wanneer wij een wijziging aanbrengen die verder gaat dan de dienst te laten werken zoals beschreven, doen wij dat uitsluitend om een van deze redenen: om aan een wettelijke of regelgevende eis te voldoen; om op een beveiligings- of misbruikprobleem te reageren; omdat een modelaanbieder een model of functie waarvan wij afhankelijk zijn wijzigt, beperkt of niet langer aanbiedt; om ons aan te passen aan een technische omgeving waarover wij geen controle hebben; of om een functie zonder extra kosten voor u toe te voegen, te verbeteren of te beëindigen.
 
 Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wanneer. Als de wijziging meer dan een gering negatief effect heeft op uw toegang tot of gebruik van de dienst, kunt u binnen **30 dagen** nadat u hierover bent geïnformeerd of nadat de wijziging van kracht wordt, afhankelijk van welk moment later valt, de overeenkomst kosteloos beëindigen en betalen wij elk voorafbetaald bedrag voor de ongebruikte periode terug.
 
-**In deze Voorwaarden.** Wij kunnen deze Voorwaarden om dezelfde soorten redenen wijzigen. Voor wijzigingen die uw rechten niet verminderen, publiceren wij de nieuwe versie met een samenvatting van wat is gewijzigd en sturen wij u ten minste **30 dagen** vóór de ingangsdatum een e-mail; als u DebateAI na die datum blijft gebruiken, betekent dit dat u de wijziging aanvaardt, en u kunt uw account voordien sluiten. Voor wijzigingen die uw rechten verminderen — waaronder prijsverhogingen voor een bestaand abonnement, lagere limieten, verwijderde functies, nieuw gebruik van uw inhoud of wijzigingen in aansprakelijkheid, toepasselijk recht of geschillenbeslechting — vragen wij u bij uw volgende aanmelding uitdrukkelijk de nieuwe versie te aanvaarden en geldt de wijziging uitsluitend voor de toekomst. Wij maken een wijziging nooit met terugwerkende kracht en gebruiken dit hoofdstuk nooit om de kern van hetgeen waarvoor u hebt betaald tijdens de looptijd te wijzigen zonder u een uitweg te bieden. Eerdere versies blijven beschikbaar op dezbatere.ro/terms/versions.
+**In deze Voorwaarden.** Wij kunnen deze Voorwaarden om dezelfde soorten redenen wijzigen. Voor wijzigingen die uw rechten niet verminderen, publiceren wij de nieuwe versie met een samenvatting van wat is gewijzigd en sturen wij u ten minste **30 dagen** vóór de ingangsdatum een e-mail; als u Dialectical Engine na die datum blijft gebruiken, betekent dit dat u de wijziging aanvaardt, en u kunt uw account voordien sluiten. Voor wijzigingen die uw rechten verminderen — waaronder prijsverhogingen voor een bestaand abonnement, lagere limieten, verwijderde functies, nieuw gebruik van uw inhoud of wijzigingen in aansprakelijkheid, toepasselijk recht of geschillenbeslechting — vragen wij u bij uw volgende aanmelding uitdrukkelijk de nieuwe versie te aanvaarden en geldt de wijziging uitsluitend voor de toekomst. Wij maken een wijziging nooit met terugwerkende kracht en gebruiken dit hoofdstuk nooit om de kern van hetgeen waarvoor u hebt betaald tijdens de looptijd te wijzigen zonder u een uitweg te bieden. Eerdere versies blijven beschikbaar op dezbatere.ro/terms/versions.
 
 ## 15. Aansprakelijkheid
 
@@ -231,15 +231,15 @@ Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wann
 
 ## 16. Intellectuele eigendom
 
-De dienst zelf — de software, de engine, de scoringsmethode, de interface, de namen DebateAI en DebateAIRO en onze logo's — behoort ons of onze licentiegevers toe. Deze Voorwaarden geven u toestemming de dienst te gebruiken, geen eigendom ervan.
+De dienst zelf — de software, de engine, de scoringsmethode, de interface, de namen Dialectical Engine en DebateAIRO en onze logo's — behoort ons of onze licentiegevers toe. Deze Voorwaarden geven u toestemming de dienst te gebruiken, geen eigendom ervan.
 
-U mag gepubliceerde debatten citeren en ernaar linken met naamsvermelding van DebateAI en een link naar de oorspronkelijke pagina. Het zonder onze schriftelijke toestemming in bulk kopiëren, systematisch reproduceren van het openbare corpus en gebruiken van gepubliceerde debatten als trainingsgegevens is niet toegestaan.
+U mag gepubliceerde debatten citeren en ernaar linken met naamsvermelding van Dialectical Engine en een link naar de oorspronkelijke pagina. Het zonder onze schriftelijke toestemming in bulk kopiëren, systematisch reproduceren van het openbare corpus en gebruiken van gepubliceerde debatten als trainingsgegevens is niet toegestaan.
 
-Hoofdstuk 8 behandelt uw inhoud en de status van gegenereerde uitvoer. Als u meent dat iets op DebateAI inbreuk maakt op uw intellectuele eigendom, gebruikt u de meldingsprocedure van hoofdstuk 10.
+Hoofdstuk 8 behandelt uw inhoud en de status van gegenereerde uitvoer. Als u meent dat iets op Dialectical Engine inbreuk maakt op uw intellectuele eigendom, gebruikt u de meldingsprocedure van hoofdstuk 10.
 
 ## 17. Persoonsgegevens
 
-Hoe wij persoonsgegevens verwerken, staat in het **Privacybeleid** op dezbatere.ro/privacy. Het legt uit wat wij verzamelen, wat de rechtsgrond voor elk doel is, hoelang wij zaken bewaren, wie gegevens ontvangt, welke doorgiften plaatsvinden en hoe u uw rechten kunt uitoefenen. Drie punten horen ook hier thuis. Hoofdstuk 7 vraagt u geen persoonsgegevens van anderen in een vraag op te nemen; als u dit toch doet, bent u daarvoor verantwoordelijk en kunnen wij de inhoud verwijderen. Als een op DebateAI gepubliceerd debat persoonsgegevens over u bevat, kunt u ons zonder account vragen deze te verwijderen (hoofdstuk 9). En wij leggen uw aanvaarding van deze Voorwaarden — versie, tijdstip en technische sessiegegevens — vast als bewijs van de overeenkomst, zoals in het Privacybeleid wordt uitgelegd.
+Hoe wij persoonsgegevens verwerken, staat in het **Privacybeleid** op dezbatere.ro/privacy. Het legt uit wat wij verzamelen, wat de rechtsgrond voor elk doel is, hoelang wij zaken bewaren, wie gegevens ontvangt, welke doorgiften plaatsvinden en hoe u uw rechten kunt uitoefenen. Drie punten horen ook hier thuis. Hoofdstuk 7 vraagt u geen persoonsgegevens van anderen in een vraag op te nemen; als u dit toch doet, bent u daarvoor verantwoordelijk en kunnen wij de inhoud verwijderen. Als een op Dialectical Engine gepubliceerd debat persoonsgegevens over u bevat, kunt u ons zonder account vragen deze te verwijderen (hoofdstuk 9). En wij leggen uw aanvaarding van deze Voorwaarden — versie, tijdstip en technische sessiegegevens — vast als bewijs van de overeenkomst, zoals in het Privacybeleid wordt uitgelegd.
 
 ## 18. Toepasselijk recht en bevoegde rechter
 
@@ -277,7 +277,7 @@ De hoofdtekst van deze Voorwaarden is voor u geschreven. Daarnaast geldt: u kunt
 
 ### A.2 Verenigde Staten
 
-**Tennessee.** Aan personen die in Tennessee wonen, bieden wij DebateAI niet aan.
+**Tennessee.** Aan personen die in Tennessee wonen, bieden wij Dialectical Engine niet aan.
 
 **Kennisgevingen en verwijderingen.** Intieme beelden zonder toestemming kunnen zonder account worden gemeld per e-mail aan abuse@dezbatere.ro en worden binnen 48 uur na een geldig verzoek verwijderd. Auteursrechtklachten volgen de meldingsprocedure van hoofdstuk 10.
 

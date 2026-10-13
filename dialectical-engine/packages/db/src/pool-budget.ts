@@ -5,7 +5,7 @@
  * Pre-launch budget, 2026-10-10. The server allows 200 connections (3 kept for
  * the superuser) and Hatchet's role may take 50 of them. Owner rulings that day:
  * size for ONE API process — the server runs exactly one — and let the runner
- * run at most 8 debates at once. One API is 78 connections at most and the
+ * run at most 8 debates at once. One API is 79 connections at most and the
  * runner 20, which leaves room for Hatchet, the migrator, the operator's
  * commands and spare. A second API process needs PgBouncer or a higher limit
  * first. The plan, the per-pool audit and the arithmetic:
@@ -54,7 +54,11 @@ export const API_DATABASE_POOLS = Object.freeze({
   support: budget("api:support", 6, 5_000),
   // Every relay slot the register may allow (16, live, no restart) holds one
   // for the whole AI call, plus 2 for the queue's bookkeeping.
-  supportRelayLease: budget("api:support-relay-lease", 18, 5_000)
+  supportRelayLease: budget("api:support-relay-lease", 18, 5_000),
+  // The data export worker (mission data-export S01; opened only when DATA_EXPORT_STORE_PATH is set): one build at a
+  // time (single-flight timer) on one connection (V-43). Its 15 s lease renewal queues behind the snapshot read and
+  // waits the full 15 s, so a read of up to ~30 s keeps its lease.
+  dataExport: budget("api:data-export", 1, 15_000)
 });
 
 /** The support settings reader (API and the support commands): it gives up after 200 ms by design. */

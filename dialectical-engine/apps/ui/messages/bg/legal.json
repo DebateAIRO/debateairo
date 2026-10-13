@@ -5,7 +5,7 @@
   "legal.notice.title": "Информация за дружеството",
   "legal.notice.meta": "Кой управлява {product} и как да се свържете с нас",
   "legal.notice.s01.title": "Кои сме ние",
-  "legal.notice.s01.body": "{product} (известен още като {alsoCalled}) се управлява от {company}, дружество, регистрирано в Румъния.",
+  "legal.notice.s01.body": "{product} се управлява от {company}, дружество, регистрирано в Румъния.",
   "legal.notice.s01.seller": "{company} е и продавачът на платените планове: договорът, плащанията и фактурите ви са с {company}.",
   "legal.notice.company.name": "Наименование на дружеството",
   "legal.notice.company.tradingNames": "Търговски наименования",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Запомня избрания от Вас език на интерфейса.",
   "legal.cookies.locale.life": "1 година",
   "legal.cookies.storageTitle": "Съхранява се в браузъра Ви, а не в бисквитка",
-  "legal.cookies.storageIntro": "Четири елемента се пазят в хранилището на браузъра Ви: два в локалното хранилище, докато не ги изчистите, и два в хранилището на сесията, докато не затворите раздела. За разлика от бисквитките, те не се прикачват към заявките Ви; елементът на помощния чат пази копие на разговор, който сте водили с помощта на DebateAI, а съобщенията в него са стигнали до DebateAI, когато сте ги изпратили.",
+  "legal.cookies.storageIntro": "Четири елемента се пазят в хранилището на браузъра Ви: два в локалното хранилище, докато не ги изчистите, и два в хранилището на сесията, докато не затворите раздела. За разлика от бисквитките, те не се прикачват към заявките Ви; елементът на помощния чат пази копие на разговор, който сте водили с помощта на Dialectical Engine, а съобщенията в него са стигнали до Dialectical Engine, когато сте ги изпратили.",
   "legal.cookies.consent.kind": "Локално хранилище",
   "legal.cookies.consent.purpose": "Запомня, че сте видели известието за бисквитките, за да се показва само веднъж.",
   "legal.cookies.consent.life": "Докато не я изчистите",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Хранилище на сесията",
   "legal.cookies.supportConversation.purpose": "Пази разговора Ви с помощния чат на екрана, докато разделът е отворен. Изтрива се, когато някой влезе в профил или излезе от него в този раздел.",
   "legal.cookies.supportConversation.life": "Докато не затворите раздела",
-  "legal.cookies.recipient.server": "Само сървърът на DebateAI",
+  "legal.cookies.recipient.server": "Само сървърът на Dialectical Engine",
   "legal.cookies.recipient.browser": "остава в браузъра Ви",
   "legal.cookies.refuse": "За да ги откажете, блокирайте или изтрийте бисквитките и данните за този сайт в настройките на браузъра си.",
   "legal.cookies.refuseEffect": "Какво спира да работи тогава: влизането в профила и запомнянето на езика и настройките на показване.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "До 30 минути",
   "legal.cookies.mfaRecovery.life": "До 299 секунди",
   "legal.cookies.social.life": "До 5 минути",
-  "legal.cookies.phoneDraft.life": "15 минути или до по-ранно изтриване"
+  "legal.cookies.phoneDraft.life": "15 минути или до по-ранно изтриване",
+  "legal.cookies.exportPending.purpose": "Запазва изпратената по имейл връзка за експортиране в този раздел за вход и повторен опит.",
+  "legal.cookies.exportLinkOutcome.purpose": "Помни кое съобщение за връзката за изтегляне да се покаже в този раздел.",
+  "legal.cookies.exportPending.life": "До затваряне на раздела, излизане, нова връзка, първото успешно изтегляне или резултат за невалидна връзка или друг акаунт",
+  "legal.cookies.exportLinkOutcome.life": "До затваряне на раздела, излизане или нова връзка"
 }

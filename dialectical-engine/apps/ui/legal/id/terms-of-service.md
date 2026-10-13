@@ -1,4 +1,4 @@
-# DebateAI — Ketentuan Layanan
+# Dialectical Engine — Ketentuan Layanan
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
@@ -23,11 +23,11 @@ jumps:
 
 **Version 2.2 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
-**In short.** Anda harus berusia 18 tahun atau lebih. DebateAI menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Debat Anda bersifat privat kecuali Anda memublikasikannya; jika Anda memublikasikannya, siapa pun dapat membacanya. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
+**In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Debat Anda bersifat privat kecuali Anda memublikasikannya; jika Anda memublikasikannya, siapa pun dapat membacanya. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
 ## 1. Siapa kami dan cara menghubungi kami
 
-DebateAI dioperasikan oleh **DMS Merchandise Shop S.R.L.**, sebuah perusahaan yang terdaftar di Rumania.
+Dialectical Engine dioperasikan oleh **DMS Merchandise Shop S.R.L.**, sebuah perusahaan yang terdaftar di Rumania.
 
 |  |  |
 | --- | --- |
@@ -46,9 +46,9 @@ DebateAI dioperasikan oleh **DMS Merchandise Shop S.R.L.**, sebuah perusahaan ya
 
 Rincian ini juga ditampilkan secara permanen di situs pada dezbatere.ro/legal. Anda selalu dapat menghubungi seseorang, bukan hanya asisten kami; bagian 10 menjelaskan caranya.
 
-## 2. Tempat kami menawarkan DebateAI
+## 2. Tempat kami menawarkan Dialectical Engine
 
-Kami menawarkan DebateAI kepada orang yang tinggal di Uni Eropa (27 negara) dan Wilayah Ekonomi Eropa (Norwegia, Islandia, dan Liechtenstein), Swiss, Moldova, Amerika Serikat (kecuali Tennessee), Kanada, Australia, Selandia Baru, Singapura, Jepang, Korea Selatan, dan Taiwan. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani.
+Kami menawarkan Dialectical Engine kepada orang yang tinggal di Uni Eropa (27 negara) dan Wilayah Ekonomi Eropa (Norwegia, Islandia, dan Liechtenstein), Swiss, Moldova, Amerika Serikat (kecuali Tennessee), Kanada, Australia, Selandia Baru, Singapura, Jepang, Korea Selatan, dan Taiwan. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani.
 
 ## 3. Menerima Ketentuan ini
 
@@ -58,21 +58,21 @@ Anda menerima Ketentuan ini dengan mencentang kotak bertuliskan **"Saya telah me
 
 Sebelum Anda membuat kontrak apa pun dengan kami secara elektronik, antarmuka menunjukkan langkah-langkah yang diperlukan, memungkinkan Anda meninjau dan memperbaiki hal yang telah dimasukkan sebelum mengirimkannya, dan memberi tahu Anda bahasa yang dapat digunakan untuk membuat kontrak. Ketentuan ini tersedia dalam bentuk yang dapat Anda simpan dan cetak, saat Anda membeli paket berbayar, kami mengirimkan versi yang Anda terima melalui email, dan Anda dapat meminta salinannya kapan saja. Tidak ada hal dalam Ketentuan ini yang membatasi hak Anda berdasarkan hukum konsumen Rumania atau Uni Eropa, atau hukum negara tempat Anda tinggal, yang tidak dapat dibatasi melalui kontrak.
 
-## 4. Siapa yang boleh menggunakan DebateAI
+## 4. Siapa yang boleh menggunakan Dialectical Engine
 
-Anda harus **berusia 18 tahun atau lebih** untuk membuat akun, dan Anda mengonfirmasi hal ini saat mendaftar. DebateAI tidak ditujukan kepada anak-anak dan kami tidak secara sadar menyediakannya kepada siapa pun yang berusia di bawah 18 tahun. Jika kami mengetahui bahwa suatu akun dimiliki oleh seseorang yang berusia di bawah 18 tahun, kami menutupnya. Beberapa wilayah mewajibkan lebih dari sekadar konfirmasi; Lampiran A menjelaskan hal yang berlaku di masing-masing wilayah.
+Anda harus **berusia 18 tahun atau lebih** untuk membuat akun, dan Anda mengonfirmasi hal ini saat mendaftar. Dialectical Engine tidak ditujukan kepada anak-anak dan kami tidak secara sadar menyediakannya kepada siapa pun yang berusia di bawah 18 tahun. Jika kami mengetahui bahwa suatu akun dimiliki oleh seseorang yang berusia di bawah 18 tahun, kami menutupnya. Beberapa wilayah mewajibkan lebih dari sekadar konfirmasi; Lampiran A menjelaskan hal yang berlaku di masing-masing wilayah.
 
-Anda harus memiliki kecakapan hukum untuk membuat kontrak ini. Jika Anda menggunakan DebateAI atas nama suatu organisasi, Anda mengonfirmasi bahwa Anda berwenang untuk mengikat organisasi tersebut, dan "Anda" selanjutnya berarti organisasi tersebut.
+Anda harus memiliki kecakapan hukum untuk membuat kontrak ini. Jika Anda menggunakan Dialectical Engine atas nama suatu organisasi, Anda mengonfirmasi bahwa Anda berwenang untuk mengikat organisasi tersebut, dan "Anda" selanjutnya berarti organisasi tersebut.
 
 Siapa pun dapat membaca debat yang telah dipublikasikan. Membaca tidak memerlukan akun, tetapi merupakan penggunaan layanan, dan bagian 7, 15, 16, serta 18 berlaku atasnya.
 
-## 5. Hal yang dilakukan DebateAI, dan hal yang bukan merupakan fungsinya
+## 5. Hal yang dilakukan Dialectical Engine, dan hal yang bukan merupakan fungsinya
 
-Anda mengirimkan pertanyaan atau pernyataan. DebateAI meneruskannya kepada beberapa model AI pihak ketiga, yang menyusun grafik argumen di seputarnya: klaim, klaim tandingan, kritik, referensi bukti, skor, dan putusan dengan rentang keyakinan. Anda dapat menantang klaim tertentu, meminta suatu poin diselidiki lebih lanjut, dan memutuskan apakah hasilnya akan dipublikasikan.
+Anda mengirimkan pertanyaan atau pernyataan. Dialectical Engine meneruskannya kepada beberapa model AI pihak ketiga, yang menyusun grafik argumen di seputarnya: klaim, klaim tandingan, kritik, referensi bukti, skor, dan putusan dengan rentang keyakinan. Anda dapat menantang klaim tertentu, meminta suatu poin diselidiki lebih lanjut, dan memutuskan apakah hasilnya akan dipublikasikan.
 
 **Segala sesuatu dalam debat dihasilkan oleh AI.** Argumen, kritik, referensi bukti, skor, putusan, dan jawaban asisten dukungan dihasilkan oleh mesin. Semua itu mungkin salah, tidak lengkap, kedaluwarsa, atau disampaikan secara meyakinkan padahal keliru, serta mungkin mencerminkan bias dalam model. Tidak ada orang yang meninjaunya sebelum ditampilkan kepada Anda atau dipublikasikan, dan tidak ada orang tertentu yang memikul tanggung jawab editorial atasnya. Konten yang dihasilkan diberi label sebagai konten buatan AI dalam produk, pada halaman yang dipublikasikan, dan dalam ekspor.
 
-**DebateAI bukan nasihat.** DebateAI bukan nasihat hukum, medis, keuangan, perpajakan, psikologis, keselamatan, atau nasihat profesional lainnya, dan suatu putusan bukanlah penetapan fakta. Jangan menggunakan debat sebagai dasar keputusan yang penting bagi kesehatan, keselamatan, keuangan, kedudukan hukum Anda, atau kesejahteraan orang lain tanpa memeriksa sumber primer dan, bila sesuai, tenaga profesional yang berkualifikasi. Rentang keyakinan yang tinggi berarti model menilai penafsiran tersebut telah mapan berdasarkan materi yang dilihatnya; hal itu bukan jaminan bahwa penafsiran tersebut benar.
+**Dialectical Engine bukan nasihat.** Dialectical Engine bukan nasihat hukum, medis, keuangan, perpajakan, psikologis, keselamatan, atau nasihat profesional lainnya, dan suatu putusan bukanlah penetapan fakta. Jangan menggunakan debat sebagai dasar keputusan yang penting bagi kesehatan, keselamatan, keuangan, kedudukan hukum Anda, atau kesejahteraan orang lain tanpa memeriksa sumber primer dan, bila sesuai, tenaga profesional yang berkualifikasi. Rentang keyakinan yang tinggi berarti model menilai penafsiran tersebut telah mapan berdasarkan materi yang dilihatnya; hal itu bukan jaminan bahwa penafsiran tersebut benar.
 
 **Komitmen kami.** Kami akan menyediakan layanan dengan kehati-hatian dan keahlian yang wajar serta sesuai dengan uraian yang kami publikasikan. Jika hukum memberi Anda jaminan bahwa layanan sesuai dengan uraiannya dan layak untuk tujuan biasanya, jaminan tersebut berlaku dan tidak ada hal dalam Ketentuan ini yang menghapusnya. Kami tidak menjanjikan bahwa keluaran tertentu akan akurat: hal tersebut merupakan sifat konten yang dihasilkan, bukan tolok ukur apakah layanan berfungsi.
 
@@ -92,19 +92,19 @@ Anda dapat menutup akun kapan saja dari **Pengaturan → Akun**. Penutupan berla
 
 Aturan ini berlaku atas hal yang Anda kirimkan, cara Anda menggunakan layanan, dan hal yang Anda publikasikan.
 
-**Jangan mengirimkan data pribadi tentang orang lain.** Ajukan pertanyaan mengenai isu, argumen, dan persoalan publik, bukan mengenai individu privat yang dapat diidentifikasi. Jangan menyertakan nama, rincian kontak, nomor identifikasi, gambar, informasi kesehatan, keuangan, atau rincian lain yang mengidentifikasi seseorang, dan jangan menggunakan DebateAI untuk membangun perkara, profil, atau berkas mengenai seseorang. Pertanyaan mengenai tokoh publik yang bertindak dalam peran publiknya diperbolehkan; pertanyaan yang menyasar individu privat tidak diperbolehkan. Jika Anda tetap mengirimkan data tersebut, Anda bertanggung jawab atasnya, dan kami dapat menghapus konten tersebut.
+**Jangan mengirimkan data pribadi tentang orang lain.** Ajukan pertanyaan mengenai isu, argumen, dan persoalan publik, bukan mengenai individu privat yang dapat diidentifikasi. Jangan menyertakan nama, rincian kontak, nomor identifikasi, gambar, informasi kesehatan, keuangan, atau rincian lain yang mengidentifikasi seseorang, dan jangan menggunakan Dialectical Engine untuk membangun perkara, profil, atau berkas mengenai seseorang. Pertanyaan mengenai tokoh publik yang bertindak dalam peran publiknya diperbolehkan; pertanyaan yang menyasar individu privat tidak diperbolehkan. Jika Anda tetap mengirimkan data tersebut, Anda bertanggung jawab atasnya, dan kami dapat menghapus konten tersebut.
 
 **Informasi sensitif Anda sendiri.** Pertanyaan yang Anda ajukan mungkin menyangkut kesehatan, keyakinan, politik, atau hal sensitif lain tentang diri Anda. Anda menyetujui hal tersebut pada layar terpisah sebelum debat pertama Anda. Jika Anda tinggal di tempat yang memiliki aturan khusus mengenai data kesehatan, Lampiran A dapat mengarahkan Anda kepada pemberitahuan terpisah.
 
 **Jangan mengirimkan atau memublikasikan konten yang melanggar hukum**, termasuk konten yang mencemarkan nama baik, menghasut kekerasan atau kebencian, melecehkan atau mengancam, berupa gambar intim yang dibagikan tanpa persetujuan, melanggar hak kekayaan intelektual atau kerahasiaan, mengungkapkan rahasia dagang, merupakan materi pelecehan seksual terhadap anak, atau melanggar sanksi maupun pengendalian ekspor.
 
-**Jangan menggunakan DebateAI untuk menipu.** Jangan menyajikan keluaran yang dihasilkan sebagai tulisan manusia jika hal itu akan menyesatkan, menghapus label bahwa konten dihasilkan AI, atau menggunakannya untuk menciptakan kesan adanya konsensus, bukti palsu, atau penyamaran identitas.
+**Jangan menggunakan Dialectical Engine untuk menipu.** Jangan menyajikan keluaran yang dihasilkan sebagai tulisan manusia jika hal itu akan menyesatkan, menghapus label bahwa konten dihasilkan AI, atau menggunakannya untuk menciptakan kesan adanya konsensus, bukti palsu, atau penyamaran identitas.
 
 **Jangan menyerang layanan.** Pengindeksan biasa oleh mesin pencari atas debat yang dipublikasikan diperbolehkan, tetapi akses otomatis, pengambilan data, perayapan, atau ekstraksi massal lainnya memerlukan izin tertulis kami; dilarang mengakali batas laju, autentikasi, atau kendali publikasi; dilarang berupaya mengambil perintah atau instruksi sistem; dilarang melakukan injeksi perintah yang bertujuan membuat mesin mengabaikan batasannya; dilarang melakukan pengujian penetrasi atau beban tanpa izin tertulis kami.
 
 **Jangan menjual kembali atau mengganti merek** layanan, atau menggunakannya untuk membangun mesin pesaing, termasuk dengan menggunakan keluaran sebagai data pelatihan, tanpa persetujuan tertulis kami.
 
-**Jangan menggunakan DebateAI untuk mengambil keputusan mengenai** kesehatan, keselamatan, hak hukum, pekerjaan, kredit, perumahan, atau status imigrasi seseorang. DebateAI tidak dirancang untuk itu dan keluarannya bukan dasar yang aman untuk keputusan tersebut.
+**Jangan menggunakan Dialectical Engine untuk mengambil keputusan mengenai** kesehatan, keselamatan, hak hukum, pekerjaan, kredit, perumahan, atau status imigrasi seseorang. Dialectical Engine tidak dirancang untuk itu dan keluarannya bukan dasar yang aman untuk keputusan tersebut.
 
 **Hukum setempat di tempat Anda memublikasikan.** Anda bertanggung jawab untuk memastikan bahwa segala sesuatu yang Anda publikasikan mematuhi hukum negara tempat Anda berada. Kami dapat membatasi publikasi topik tertentu di wilayah tertentu.
 
@@ -132,9 +132,9 @@ Debat bersifat **privat secara bawaan**. Tidak ada hal yang Anda buat yang terli
 
 **Dampak publikasi.** Publikasi merupakan tindakan yang disengaja dan dikonfirmasi secara terpisah. Saat Anda memublikasikan, kami mengambil cuplikan tetap dari debat dan membuatnya dapat dibaca oleh siapa pun tanpa akun. Mesin pencari dapat mengindeksnya. Cuplikan tersebut menampilkan **nama samaran** Anda, pertanyaan sebagaimana Anda tulis, pohon argumen, skor, putusan, dan rentang keyakinan, serta memuat label yang terlihat bahwa konten dihasilkan AI. Cuplikan tersebut tidak menampilkan alamat email, catatan sesi, atau riwayat akun Anda.
 
-**Dalam praktiknya, publikasi tidak dapat dibatalkan sepenuhnya.** Setelah suatu debat tersedia untuk umum, orang lain dapat membaca, mengutip, mengambil tangkapan layar, mengarsipkan, dan menyimpannya dalam tembolok. Pembatalan publikasi menghapus debat dari DebateAI dan memusnahkan kunci salinan kami, tetapi tidak dapat menjangkau salinan yang telah berada di tempat lain. Jangan memublikasikan apa pun yang tidak ingin Anda kaitkan secara permanen dengan nama samaran Anda.
+**Dalam praktiknya, publikasi tidak dapat dibatalkan sepenuhnya.** Setelah suatu debat tersedia untuk umum, orang lain dapat membaca, mengutip, mengambil tangkapan layar, mengarsipkan, dan menyimpannya dalam tembolok. Pembatalan publikasi menghapus debat dari Dialectical Engine dan memusnahkan kunci salinan kami, tetapi tidak dapat menjangkau salinan yang telah berada di tempat lain. Jangan memublikasikan apa pun yang tidak ingin Anda kaitkan secara permanen dengan nama samaran Anda.
 
-**Debat yang dipublikasikan saat Anda menutup akun.** Saat Anda menjadwalkan penutupan akun, Anda memilih apa yang terjadi pada debat yang telah Anda publikasikan. Jika Anda mencentang **"Hapus juga debat publik saya"**, kami menghapus masing-masing dari DebateAI dan memusnahkan kunci salinan kami saat penutupan dijalankan, seperti ketika publikasi dibatalkan, kecuali jika hukum mewajibkan kami menyimpan item tertentu. Jika kotak dibiarkan tidak dicentang, debat tersebut tetap dapat diakses publik dengan nama samaran yang tidak lagi digunakan. Salinan yang dibuat orang lain sebelum penghapusan berada di luar kendali kami. Jika Anda ingin debat yang dihapus tetap tersedia bagi Anda, unduh terlebih dahulu.
+**Debat yang dipublikasikan saat Anda menutup akun.** Saat Anda menjadwalkan penutupan akun, Anda memilih apa yang terjadi pada debat yang telah Anda publikasikan. Jika Anda mencentang **"Hapus juga debat publik saya"**, kami menghapus masing-masing dari Dialectical Engine dan memusnahkan kunci salinan kami saat penutupan dijalankan, seperti ketika publikasi dibatalkan, kecuali jika hukum mewajibkan kami menyimpan item tertentu. Jika kotak dibiarkan tidak dicentang, debat tersebut tetap dapat diakses publik dengan nama samaran yang tidak lagi digunakan. Salinan yang dibuat orang lain sebelum penghapusan berada di luar kendali kami. Jika Anda ingin debat yang dihapus tetap tersedia bagi Anda, unduh terlebih dahulu.
 
 **Kami selalu dapat menurunkan konten yang dipublikasikan.** Kami dapat menghapus atau membatasi akses ke debat yang dipublikasikan jika diwajibkan hukum, diperintahkan oleh pengadilan atau otoritas berwenang, atau jika debat tersebut melanggar Ketentuan ini maupun hukum. Tidak ada hal dalam bagian ini yang menghalangi kami bertindak berdasarkan pemberitahuan yang sah menurut bagian 10, dan tidak ada hal di dalamnya yang menjanjikan bahwa debat yang dipublikasikan akan tetap tersedia.
 
@@ -161,7 +161,7 @@ Kami mengakui penerimaan setiap laporan tanpa penundaan yang tidak semestinya. K
 
 **Menghubungi manusia.** Asisten dukungan kami merupakan sistem AI dan menyatakan demikian. Anda dapat meminta berbicara dengan seseorang kapan saja, dan setiap percakapan dukungan menawarkan jalur tersebut. Kami tidak hanya mengandalkan alat otomatis untuk berkomunikasi dengan Anda.
 
-**Konten terorisme.** Konten terorisme melanggar hukum dan tidak diperbolehkan di DebateAI (bagian 7). Otoritas yang berwenang di Uni Eropa dapat mengirimkan perintah penghapusan kepada kami berdasarkan Peraturan (EU) No 2021/784 melalui titik kontak dalam bagian 1. Ketika kami menerima perintah tersebut, kami menghapus konten tersebut, atau memblokir aksesnya di setiap negara Uni Eropa, dalam waktu satu jam. Kami memberi tahu orang yang memublikasikannya bahwa konten tersebut telah dihapus dan, jika diminta, alasannya serta cara menantang perintah tersebut, kecuali otoritas tersebut memutuskan bahwa demi keamanan publik hal itu tidak boleh diungkapkan untuk jangka waktu terbatas. Sebagaimana diwajibkan Peraturan tersebut, kami menyimpan konten yang dihapus dan data terkait selama enam bulan, agar penghapusan tersebut dapat ditinjau dan, jika ternyata salah, dibatalkan. Orang yang memublikasikan konten tersebut dapat menantang perintah tersebut di pengadilan negara yang otoritasnya mengeluarkan perintah tersebut, dan juga dapat menggunakan jalur pengaduan kami. Belum ada otoritas yang mewajibkan kami mengambil langkah khusus terhadap konten terorisme berdasarkan Peraturan tersebut; jika ada yang mewajibkan, kami akan menjelaskan langkah tersebut di sini, termasuk alat otomatis apa pun.
+**Konten terorisme.** Konten terorisme melanggar hukum dan tidak diperbolehkan di Dialectical Engine (bagian 7). Otoritas yang berwenang di Uni Eropa dapat mengirimkan perintah penghapusan kepada kami berdasarkan Peraturan (EU) No 2021/784 melalui titik kontak dalam bagian 1. Ketika kami menerima perintah tersebut, kami menghapus konten tersebut, atau memblokir aksesnya di setiap negara Uni Eropa, dalam waktu satu jam. Kami memberi tahu orang yang memublikasikannya bahwa konten tersebut telah dihapus dan, jika diminta, alasannya serta cara menantang perintah tersebut, kecuali otoritas tersebut memutuskan bahwa demi keamanan publik hal itu tidak boleh diungkapkan untuk jangka waktu terbatas. Sebagaimana diwajibkan Peraturan tersebut, kami menyimpan konten yang dihapus dan data terkait selama enam bulan, agar penghapusan tersebut dapat ditinjau dan, jika ternyata salah, dibatalkan. Orang yang memublikasikan konten tersebut dapat menantang perintah tersebut di pengadilan negara yang otoritasnya mengeluarkan perintah tersebut, dan juga dapat menggunakan jalur pengaduan kami. Belum ada otoritas yang mewajibkan kami mengambil langkah khusus terhadap konten terorisme berdasarkan Peraturan tersebut; jika ada yang mewajibkan, kami akan menjelaskan langkah tersebut di sini, termasuk alat otomatis apa pun.
 
 **Risiko serius terhadap nyawa atau keselamatan.** Jika kami mengetahui informasi yang mengindikasikan tindak pidana yang melibatkan ancaman terhadap nyawa atau keselamatan seseorang, kami memberi tahu otoritas yang berwenang.
 
@@ -183,7 +183,7 @@ Bagian 8 (terkait konten yang telah dipublikasikan), 15, 16, dan 18 tetap berlak
 
 &#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
 
-DebateAI menawarkan paket gratis. Paket **Premium** berbayar akan tersedia, yang membuka seluruh daftar model dan memungkinkan Anda menetapkan sendiri indikator debat.
+Dialectical Engine menawarkan paket gratis. Paket **Premium** berbayar akan tersedia, yang membuka seluruh daftar model dan memungkinkan Anda menetapkan sendiri indikator debat.
 
 **Sebelum Anda membayar**, tepat di atas tombol pembayaran kami menampilkan: paket; harga total termasuk pajak yang berlaku; periode penagihan; bahwa paket diperpanjang secara otomatis hingga dibatalkan; tanggal berakhirnya uji coba gratis dan jumlah yang selanjutnya akan ditagihkan kepada Anda; serta cara membatalkan. Anda mengonfirmasi ketentuan perpanjangan dengan mencentang kotak terpisah. Tombol tersebut bertuliskan **Berlangganan dan bayar** (dalam bahasa Rumania, *Comandă cu obligație de plată*). Kami mengirimkan kepada Anda konfirmasi pada media tahan lama yang memuat informasi yang sama, Ketentuan ini, dan formulir penarikan diri.
 
@@ -211,11 +211,11 @@ Jika Anda tinggal di tempat lain, Lampiran A menyatakan hak penarikan diri atau 
 
 ## 14. Perubahan pada layanan dan Ketentuan ini
 
-**Pada layanan.** Kami terus mengembangkan DebateAI, dan peningkatan rutin, perbaikan, serta perubahan daftar model terjadi tanpa pemberitahuan. Jika kami membuat perubahan yang melampaui upaya mempertahankan fungsi layanan sebagaimana diuraikan, kami melakukannya hanya atas salah satu alasan berikut: mematuhi persyaratan hukum atau peraturan; menanggapi masalah keamanan atau penyalahgunaan; karena penyedia model mengubah, membatasi, atau menarik model maupun fitur yang kami andalkan; beradaptasi dengan lingkungan teknis yang tidak kami kendalikan; atau menambah, meningkatkan, maupun menghentikan fitur dengan cara yang tidak menambah biaya bagi Anda.
+**Pada layanan.** Kami terus mengembangkan Dialectical Engine, dan peningkatan rutin, perbaikan, serta perubahan daftar model terjadi tanpa pemberitahuan. Jika kami membuat perubahan yang melampaui upaya mempertahankan fungsi layanan sebagaimana diuraikan, kami melakukannya hanya atas salah satu alasan berikut: mematuhi persyaratan hukum atau peraturan; menanggapi masalah keamanan atau penyalahgunaan; karena penyedia model mengubah, membatasi, atau menarik model maupun fitur yang kami andalkan; beradaptasi dengan lingkungan teknis yang tidak kami kendalikan; atau menambah, meningkatkan, maupun menghentikan fitur dengan cara yang tidak menambah biaya bagi Anda.
 
 Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang berubah dan waktu perubahan. Jika perubahan tersebut menimbulkan dampak negatif yang lebih dari kecil terhadap akses ke atau penggunaan layanan oleh Anda, Anda dapat mengakhiri layanan tanpa biaya dalam waktu **30 hari** sejak menerima pemberitahuan, atau sejak perubahan berlaku, mana yang lebih akhir, dan kami mengembalikan setiap jumlah yang telah dibayar di muka untuk periode yang tidak digunakan.
 
-**Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan DebateAI setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
+**Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
 
 ## 15. Tanggung jawab
 
@@ -231,15 +231,15 @@ Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang
 
 ## 16. Kekayaan intelektual
 
-Layanan itu sendiri — perangkat lunak, mesin, metode penilaian, antarmuka, nama DebateAI dan DebateAIRO, serta logo kami — merupakan milik kami atau pemberi lisensi kami. Ketentuan ini memberi Anda izin untuk menggunakan layanan, bukan kepemilikan atasnya.
+Layanan itu sendiri — perangkat lunak, mesin, metode penilaian, antarmuka, nama Dialectical Engine dan DebateAIRO, serta logo kami — merupakan milik kami atau pemberi lisensi kami. Ketentuan ini memberi Anda izin untuk menggunakan layanan, bukan kepemilikan atasnya.
 
-Anda dapat mengutip dan menautkan debat yang dipublikasikan dengan atribusi kepada DebateAI dan tautan ke halaman aslinya. Penyalinan massal, reproduksi sistematis korpus publik, dan penggunaan debat yang dipublikasikan sebagai data pelatihan tidak diizinkan tanpa persetujuan tertulis kami.
+Anda dapat mengutip dan menautkan debat yang dipublikasikan dengan atribusi kepada Dialectical Engine dan tautan ke halaman aslinya. Penyalinan massal, reproduksi sistematis korpus publik, dan penggunaan debat yang dipublikasikan sebagai data pelatihan tidak diizinkan tanpa persetujuan tertulis kami.
 
-Bagian 8 mengatur konten Anda dan status keluaran yang dihasilkan. Jika Anda meyakini sesuatu di DebateAI melanggar kekayaan intelektual Anda, gunakan jalur pelaporan dalam bagian 10.
+Bagian 8 mengatur konten Anda dan status keluaran yang dihasilkan. Jika Anda meyakini sesuatu di Dialectical Engine melanggar kekayaan intelektual Anda, gunakan jalur pelaporan dalam bagian 10.
 
 ## 17. Data pribadi
 
-Cara kami menangani data pribadi ditetapkan dalam **Kebijakan Privasi** di dezbatere.ro/privacy. Kebijakan tersebut menjelaskan hal yang kami kumpulkan, dasar hukum untuk setiap tujuan, jangka waktu penyimpanan, pihak yang menerima data, transfer yang dilakukan, dan cara menggunakan hak Anda. Tiga poin juga perlu dinyatakan di sini. Bagian 7 meminta Anda agar tidak memasukkan data pribadi orang lain ke dalam pertanyaan; jika Anda tetap melakukannya, Anda bertanggung jawab atas hal tersebut, dan kami dapat menghapus kontennya. Jika debat yang dipublikasikan di DebateAI berisi data pribadi tentang Anda, Anda dapat meminta kami menghapusnya tanpa memiliki akun (bagian 9). Kami juga menyimpan catatan penerimaan Anda atas Ketentuan ini — versi, waktu, dan rincian teknis sesi — sebagai bukti kontrak, sebagaimana dijelaskan dalam Kebijakan Privasi.
+Cara kami menangani data pribadi ditetapkan dalam **Kebijakan Privasi** di dezbatere.ro/privacy. Kebijakan tersebut menjelaskan hal yang kami kumpulkan, dasar hukum untuk setiap tujuan, jangka waktu penyimpanan, pihak yang menerima data, transfer yang dilakukan, dan cara menggunakan hak Anda. Tiga poin juga perlu dinyatakan di sini. Bagian 7 meminta Anda agar tidak memasukkan data pribadi orang lain ke dalam pertanyaan; jika Anda tetap melakukannya, Anda bertanggung jawab atas hal tersebut, dan kami dapat menghapus kontennya. Jika debat yang dipublikasikan di Dialectical Engine berisi data pribadi tentang Anda, Anda dapat meminta kami menghapusnya tanpa memiliki akun (bagian 9). Kami juga menyimpan catatan penerimaan Anda atas Ketentuan ini — versi, waktu, dan rincian teknis sesi — sebagai bukti kontrak, sebagaimana dijelaskan dalam Kebijakan Privasi.
 
 ## 18. Hukum yang berlaku dan tempat sengketa diperiksa
 
@@ -277,7 +277,7 @@ Bagian utama Ketentuan ini ditulis untuk Anda. Selain itu: Anda dapat mengajukan
 
 ### A.2 Amerika Serikat
 
-**Tennessee.** Kami tidak menawarkan DebateAI kepada orang yang tinggal di Tennessee.
+**Tennessee.** Kami tidak menawarkan Dialectical Engine kepada orang yang tinggal di Tennessee.
 
 **Pemberitahuan dan penurunan konten.** Gambar intim tanpa persetujuan dapat dilaporkan melalui email ke abuse@dezbatere.ro, tanpa akun, dan dihapus dalam waktu 48 jam sejak permintaan yang sah. Pengaduan hak cipta diajukan melalui jalur pelaporan dalam bagian 10.
 

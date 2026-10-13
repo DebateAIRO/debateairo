@@ -87,6 +87,11 @@ To build `report.json` and `report.md` again from a folder's `openings.jsonl` (n
 acknowledgement needed), run `report --out` on that folder exactly as for formats: it reads `openings.jsonl` when the
 folder holds one.
 
+The owner's thinking levels (the settings' `thinking_levels` table, deploy/preview-auth-dev/v1/README.md) apply to
+openings as to every other call: arm T's positions run at the `opening` step's level, and so do all the map's calls
+(angles, lists, merge, gap, choose), since the map builds the opening; a repair inside a call runs at `slip_fix` when
+the owner set it.
+
 Before the real run, run it dry. `--dry` answers from a script: no socket, no settings, no acknowledgement, no
 connection to a gate at all, and nothing is spent. It goes through every arm of all 12 questions in a few seconds,
 with one repaired slip, one busy AI and the fallbacks, and ends PASS_WITH_WARNINGS (exit 10). Its report says "dry" in
@@ -139,8 +144,8 @@ The last line on the screen and the exit code say:
 | Exit | Verdict | Meaning |
 |---|---|---|
 | 0 | PASS | Everything worked. The upload may go ahead. |
-| 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes, or an AI's reply had the wrong format and a later try of the same call fixed it, by the short follow-up or the full re-ask (`FORMAT_REPAIRED:<model>:<how many>`, owner ruling 2026-10-12 "Fixed slips = warning"), or an AI was busy and sat out the rest after giving at least one accepted answer (`MODEL_BUSY_PARTLY:<model>:answered=<n>:skipped=<m>`, owner ruling 2026-10-12 "Keep GLM, it sits out"). Owner decides. |
-| 20 | FAIL | A call ended without an accepted reply after its tries because of its format (`FORMAT_FAILED`), or one AI's first tries had the wrong format too often (`SLIP_RATE:<model>:<slips>/<answered calls>`: more than 1 in 10 of its answered calls, one slip always allowed), a call failed, the debate did not finish, no answer or no story (anything but READY, so READY_WITH_RESERVATION too), or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
+| 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes, or an AI's reply had the wrong format and a later try of the same call fixed it, by the short follow-up or the full re-ask (`FORMAT_REPAIRED:<model>:<how many>`, owner ruling 2026-10-12 "Fixed slips = warning"), or an AI was busy and sat out the rest after giving at least one accepted answer (`MODEL_BUSY_PARTLY:<model>:answered=<n>:skipped=<m>`, owner ruling 2026-10-12 "Keep GLM, it sits out"), or the story was served with the story checker's reservation after its rounds ran out (`STORY_RESERVED`, owner ruling 2026-10-12). Owner decides. |
+| 20 | FAIL | A call ended without an accepted reply after its tries because of its format (`FORMAT_FAILED`), or one AI's first tries had the wrong format too often (`SLIP_RATE:<model>:<slips>/<answered calls>`: more than 1 in 10 of its answered calls, one slip always allowed), a call failed, the debate did not finish, no answer or no story (anything but READY or READY_WITH_RESERVATION), or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
 | 30 | NOT_PROVEN | It worked, but a model stayed busy (the AI company kept refusing its call as "too busy", not billed, or the model kept cooling off) and sat out before it gave a single accepted answer, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, or the operator pressed Ctrl-C once, so some model was not tested to the end. Run again later, or owner decides. |
 
 | 40 | HARNESS_ERROR | The practice could not run (a start check refused, or the tool broke). Nothing about the release is known. |
@@ -172,6 +177,10 @@ question again (the full re-ask), which may take a third try. The report says wh
 - In `failures`, a refused reply to the short follow-up (e.g. the AI sent its whole answer again: `PATCH_KEY_NOT_REQUESTED`)
   is listed too (debate: with `replyForm` `PATCH` and no re-check, since it holds only the parts asked for); formats
   shows each job's first wrong reply, the slip itself.
+- A reply written in another language than the question's (2026-10-12: MiMo answered 10 of 71 replies in Polish,
+  French, Spanish, Catalan, German, Portuguese or Chinese) is a slip like any other: its issues read
+  `TEXT_NOT_IN_QUESTION_LANGUAGE@<member>` (e.g. `TEXT_NOT_IN_QUESTION_LANGUAGE@reasons`), and the short follow-up
+  and the full re-ask carry that code, so the AI is asked for the same answer in the question's language.
 
 The prompt cache (information only): the start of each prompt now stays the same from call to call, so the AI
 companies can reuse it from their cache, cheaper and faster. `cacheByModel.<model>` (both modes) gives the calls each AI answered,
@@ -395,6 +404,7 @@ Optional flags:
   skipped; 0 skips at once),
   `--models a,b` (model ids from the preview's roster), `--lanes JUDGE_POSITION,PANEL,...` (default all nine:
   JUDGE_POSITION, JUDGE_ATTACK, JUDGE_CROSS, PANEL, REVIEW, SYNTHESIZER, EVALUATOR, STORYTELLER, STORY_CHECKER).
+  `--levels "<model>=<level>,...;..."` (the same jobs at several thinking levels, see S-6b).
 - openings: `--dry` (scripted answers, nothing spent), `--questions ro-euro,en-rent-caps,...` (only the fixed ids:
   ro-euro, ro-autobuze, ro-final-viata, ro-ciuperci, ro-strainatate, ro-hpv, en-nuclear, en-four-day-week,
   en-phones-school, en-retirement-age, en-social-media-age, en-rent-caps; default all twelve), `--arms T,A,B,C`
@@ -404,10 +414,69 @@ Optional flags:
   Any other flag is refused in openings (for example `--question`, `--models` or `--samples`), and `--settings` and
   the two `--gate-status-*` flags are refused with `--dry`, so a mistyped flag can never start the paid run.
 - report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/openings.jsonl when DIR holds one
-  (an openings run), else from DIR/samples.jsonl.
+  (an openings run), else from DIR/samples.jsonl. `report --side-by-side FILE --out DIR` writes only
+  DIR/side-by-side.html from a formats samples log (see S-6b).
 - debate: `--depth 1|2`, `--question ro|en`, `--transcript` (also write `transcript.json`: every prompt and every
   answer, see "The whole debate, word for word" above). The register is copied only through the register's own publication
   paths; an export holding a support-configuration version refuses (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
+
+### S-6b, Mac: thinking levels side by side (formats, `--levels`)
+
+`--levels` (formats mode only) asks the listed models every job once per listed thinking level (spec 2026-10-12
+§4.8). Its value is `<model>=<level>,<level>,...;<model>=...`:
+
+- each level must be on that model's reviewed menu (GLM: high, low; DeepSeek: high, low, none; MiMo: default, none;
+  Qwen: default, low, medium, none; Haiku: high, medium, low), and each model must be in this run (`--models`, or the
+  preview's roster without it). Anything else refuses before a gate is asked (`PRACTICE_LEVELS_INVALID`);
+- a level listed twice is run twice (`high#1`, `high#2`): the gap between those two runs shows how much the results
+  move by chance alone (the "chance band" line under the table in `report.md`);
+- the runs take turns per job (A, B, C, then B, C, A, ...), one after another, never at once, so a slow or busy hour
+  falls on every level alike. A busy model parks all its runs;
+- each run sends only its own level (the server's per-step levels are left out: a pure A/B). A model not listed runs
+  once, at the server's levels, as without `--levels`;
+- each sample in `samples.jsonl` also carries its run, level, thinking tokens, whether a reply stopped at max_tokens,
+  and its accepted answer (key-shaped strings blanked, at most 64 KiB). `report.json` gets a `levels` block and
+  `report.md` a "Thinking levels" table: per model and run, answered / jobs, first try, repaired, format failed (a reply
+  in the wrong format for good), call failed (the call itself failed or was refused, not billed), cut off, thinking
+  median and total, time median / p90, cost per job and total, and over bar (this run alone over the slip bar;
+  information only).
+
+To read the answers themselves, side by side: `node_modules/.bin/tsx tools/preview-practice/practice.ts report --side-by-side "$P/levels-step-b/samples.jsonl" --out "$P/levels-page"` writes `$P/levels-page/side-by-side.html` from a finished run's samples log, sending nothing and writing no report files. Open it in a browser. It shows the four chosen jobs only (PANEL, SYNTHESIZER, STORYTELLER, REVIEW); `--lanes PANEL,SYNTHESIZER` names other jobs, checked the same way as in formats mode. Each model has its own block, and each job a block per sample and question, with one labelled column per run: the accepted answer (or why there is none), then its status, thinking tokens, time, cost in US dollars, and "cut off" when a reply stopped at the length limit. Its header explains the labels: "high#2" is the same level run a second time, so you can see what changes by chance alone; "default" is the AI's own setting; "none" means thinking is switched off. The file holds the answers, so keep it in `$P` with the reports; it has no script, every value on it is escaped, and it is readable only by you.
+
+The tool does not count the testing day's budget itself: before a `--levels` run, read both gates' day spend (S-3)
+and keep the day's total under the owner's limits. The run can be stopped at any time with Ctrl-C (the report is
+still written).
+
+Step A (spec 2026-10-12 §6, a few cents): does each level really work? One job, one question, every level once. Same
+`D` and `P` as in S-5, fresh status files from S-3:
+
+```sh
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --lanes PANEL --samples 1 --levels "zai-org/GLM-5.3-Flash=high,low;deepseek-ai/DeepSeek-V4.1-Flash=high,low,none;Qwen/Qwen3.8-Flash=default,medium,low,none;XiaomiMiMo/MiMo-V2.6-Pro=default,none;claude-haiku-5-5=high,medium,low" --out "$P/levels-step-a"
+echo "exit: $?"
+```
+
+Step B (spec 2026-10-12 §6, the side-by-side run): all nine jobs, four samples of each job per run (the
+English and the Romanian practice question, each twice), today's level run twice. The planned runs:
+
+| AI | Level runs |
+|---|---|
+| GLM | high, high, low |
+| DeepSeek | high, high, low, none |
+| Qwen | default, default, medium, low, none |
+| MiMo | default, default, none |
+| Haiku | high, high, medium, low |
+
+Take out of the `--levels` value any level Step A showed refused or ignored, then (fresh status files from S-3 again):
+
+```sh
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --samples 4 --busy-wait-minutes 30 --levels "zai-org/GLM-5.3-Flash=high,high,low;deepseek-ai/DeepSeek-V4.1-Flash=high,high,low,none;Qwen/Qwen3.8-Flash=default,default,medium,low,none;XiaomiMiMo/MiMo-V2.6-Pro=default,default,none;claude-haiku-5-5=high,high,medium,low" --out "$P/levels-step-b"
+echo "exit: $?"
+```
+
+That is 19 runs of 36 jobs, about 680 jobs. The verdict stays per model, with all of that model's runs counted
+together (a slip fixed by the second try is a warning; a step failed for good, or more than 1 slip in 10 of the
+model's answered calls, fails). Each run's own bar is shown, for the comparison only, in the levels table's "over
+bar" column; its "answered / jobs" column shows the jobs a busy model skipped.
 
 ### S-7, stop and clean up
 
@@ -435,7 +504,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice.ts`: the command (the three modes, the start checks, the report).
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
   `main.ts` files compose them on the preview. `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
-- `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode. `practice-debate.ts`,
+- `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode; `practice-levels.ts`: its `--levels`
+  plan; `practice-side-by-side.ts`: the side-by-side page (`report --side-by-side`). `practice-debate.ts`,
   `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode; `practice-transcript.ts`: its
   `--transcript` file.
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
@@ -445,8 +515,14 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-openings.ts` (the openings run), `practice-openings-questions.ts` (the 12 fixed questions),
   `practice-openings-log.ts` (openings.jsonl and its report), `practice-openings-dry.ts` (`--dry`'s scripted gates).
   The map itself is the package `packages/map`. Tests: `tests/unit/map-*.test.ts`, `tests/unit/practice-openings*.test.ts`.
+- `check-thinking-levels.ts`: the offline check of a `thinking_levels` table before any API or runner restart
+  (deploy/preview-auth-dev/v1/README.md, "The optional `thinking_levels` table"; it sends nothing and needs no gate):
+  `node_modules/.bin/tsx tools/preview-practice/check-thinking-levels.ts --settings "$P/candidate-settings.env"`.
 - `gate-relay.py` and `test_gate_relay.py` (run: `python3 tools/preview-practice/test_gate_relay.py`).
-- Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-transcript.test.ts`,
+- Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-levels.test.ts`,
+  `tests/unit/preview-thinking-levels-check.test.ts`,
+  `tests/unit/preview-practice-side-by-side.test.ts`,
+  `tests/unit/preview-practice-transcript.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,
   `tests/integration/preview-practice-run.test.ts` (both modes against the scripted gate doubles in
   `tests/support/preview-gate-stubs.ts`; no vendor is contacted).

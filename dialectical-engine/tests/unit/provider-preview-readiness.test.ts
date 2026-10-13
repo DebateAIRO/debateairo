@@ -69,10 +69,11 @@ it("effective preview deadlines satisfy the real cooldown-aware lease guard and 
  const bound={maxAttempts:3,tokenCeiling:2048,deadlineMs:180000};
  const policy=feature("previewRunnerPolicy")({bounds:{JUDGE:bound,COMPOSER:bound,CONFORMANCE:bound},synthesisRolePolicy:{synthesizerBound:bound,evaluatorBound:bound}},config);
  // Preview retry fix, option B (spec 2026-10-11 §1.1): the sealed lifetime allowance is kept; one POST per call is maxAttemptsThisCall.
- expect(policy.bounds.JUDGE).toEqual({maxAttempts:3,tokenCeiling:8192,deadlineMs:600000});
+ expect(policy.bounds.JUDGE).toEqual({maxAttempts:3,tokenCeiling:8192,deadlineMs:1260000});
  expect(policy.synthesisRolePolicy.evaluatorBound).toEqual(policy.bounds.JUDGE);
- expect(()=>assertClaimCoversCall({claimMs:3600000,deadlineMs:policy.bounds.JUDGE.deadlineMs,marginMs:30000,cooldownMs:600000,maxCooldownHoldsPerRun:2})).not.toThrow();
- expect(()=>assertClaimCoversCall({claimMs:2000000,deadlineMs:policy.bounds.JUDGE.deadlineMs,marginMs:30000,cooldownMs:600000,maxCooldownHoldsPerRun:2})).toThrow(/CLAIM_BOUND_MISMATCH/);
+ // Slow-answer ruling 2026-10-12: the app waits 1,260 s for the gate, so a claim must cover 2 x (600 + 1,260) + 1,260 + 30 = 5,010 s; the old 3,600 s claim no longer does.
+ expect(()=>assertClaimCoversCall({claimMs:5100000,deadlineMs:policy.bounds.JUDGE.deadlineMs,marginMs:30000,cooldownMs:600000,maxCooldownHoldsPerRun:2})).not.toThrow();
+ expect(()=>assertClaimCoversCall({claimMs:3600000,deadlineMs:policy.bounds.JUDGE.deadlineMs,marginMs:30000,cooldownMs:600000,maxCooldownHoldsPerRun:2})).toThrow(/CLAIM_BOUND_MISMATCH/);
  let declared:any;declareHatchetWalkingSkeletonTask({client:{task:(options:any)=>{declared=options;return options;}} as any,runner:{} as any,failures:{} as any,workflowName:"fixture",engineRetries:0,previewExecutionTimeout:"3600s"});
  expect(declared.executionTimeout).toBe("3600s");expect(declared.retries).toBe(0);
 });

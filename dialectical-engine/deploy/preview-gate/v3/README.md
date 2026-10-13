@@ -31,12 +31,25 @@ What is new in v3:
 
 ### The four reviewed models
 
-| Model | Maker | Price the gate charges (per million tokens, in / out) | Longest answer allowed (tokens) | Thinking | JSON mode | Most one call can set aside |
+| Model | Maker | Price the gate charges (per million tokens, in / out) | Longest answer allowed (tokens) | Thinking levels (first = the app's default) | JSON mode | Most one call can set aside |
 |---|---|---|---|---|---|---|
-| `zai-org/GLM-5.3-Flash` | Z.AI | $0.15 / $0.50 | 32,768 | "high" | allowed | $0.0560 |
-| `deepseek-ai/DeepSeek-V4.1-Flash` | DeepSeek | $0.20 / $0.60 | 32,768 | "high" | not allowed | $0.0725 |
-| `XiaomiMiMo/MiMo-V2.6-Pro` | Xiaomi | $0.43 / $0.87 | 32,768 | none sent | not allowed | $0.1421 |
-| `Qwen/Qwen3.8-Flash` | Alibaba | $0.113 / $0.382 | 32,768 | none sent | not allowed | $0.0424 |
+| `zai-org/GLM-5.3-Flash` | Z.AI | $0.15 / $0.50 | 32,768 | "high", "low" | allowed | $0.0560 |
+| `deepseek-ai/DeepSeek-V4.1-Flash` | DeepSeek | $0.20 / $0.60 | 32,768 | "high", "low", "none" | not allowed | $0.0725 |
+| `XiaomiMiMo/MiMo-V2.6-Pro` | Xiaomi | $0.43 / $0.87 | 32,768 | default (none sent), "none" | not allowed | $0.1421 |
+| `Qwen/Qwen3.8-Flash` | Alibaba | $0.113 / $0.382 | 32,768 | default (none sent), "low", "medium", "none" | not allowed | $0.0424 |
+
+- Thinking levels (spec 2026-10-12): each model has a reviewed menu of thinking levels, only the
+  ones its maker documents. A request carries `reasoning_effort` with one word from its model's
+  menu, or no `reasoning_effort` at all where the menu says "default (none sent)" (the vendor's
+  own default). The gate refuses any other word, and a request with no `reasoning_effort` for GLM
+  or DeepSeek. "none" asks DeepInfra to switch thinking off. The first level is what the app sends
+  when the owner has not chosen one: exactly the request of before. The day ledger's
+  `requested_effort` names the level the request carried ("default" for none sent), and the
+  money set aside does not depend on it. That word, and the probe summary's `sent.effort`, changed
+  meaning at the gate update of 2026-10-12 14:06 UTC: in entries written before it, "none" means no
+  `reasoning_effort` was sent; from it on, "default" means none was sent and "none" means thinking
+  was switched off. A menu change is a reviewed row change (new helper hash,
+  GO rewrite, restart).
 
 - The prices are DeepInfra's list prices. GLM and DeepSeek are on promotion today (50% and 30%
   off), so the gate counts more than the real bill. That is the careful side. Qwen3.8-Flash (not

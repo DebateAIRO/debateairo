@@ -204,6 +204,7 @@ describe("N21 pnpm billing:check", () => {
       ok: false, text: "NETOPIA refused the API key (PAYMENT_CREDENTIALS_REFUSED:401): check that it is this system's key (a sandbox key works only on the sandbox)."
     });
     expect((await answerTo(() => json({ error: { code: "99", message: "general error" } })))?.ok).toBe(true);
+    expect((await answerTo(() => json({ error: { code: "99", message: "Invalid ntpID" }, payment: { amount: 0, status: 0 } })))?.ok).toBe(true);
     expect(await answerTo(() => new Response(null, { status: 302, headers: { location: "https://elsewhere.test/" } }))).toEqual({
       ok: false, text: "NETOPIA's address answered with a redirect (PAYMENT_CONFIGURATION_REFUSED:redirect): NETOPIA_API_BASE_URL must be one of its API addresses exactly."
     });

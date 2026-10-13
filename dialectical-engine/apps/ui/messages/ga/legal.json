@@ -5,7 +5,7 @@
   "legal.notice.title": "Fógra dlíthiúil",
   "legal.notice.meta": "Cé a oibríonn {product}, agus conas teagmháil a dhéanamh linn",
   "legal.notice.s01.title": "Cé sinne",
-  "legal.notice.s01.body": "Tá {product} (ar a dtugtar {alsoCalled} freisin) á oibriú ag {company}, cuideachta atá cláraithe sa Rómáin.",
+  "legal.notice.s01.body": "Tá {product} á oibriú ag {company}, cuideachta atá cláraithe sa Rómáin.",
   "legal.notice.s01.seller": "Is é {company} díoltóir na bpleananna íoctha freisin: is le {company} atá do chonradh, d’íocaíochtaí agus do shonraisc.",
   "legal.notice.company.name": "Ainm na cuideachta",
   "legal.notice.company.tradingNames": "Ainmneacha trádála",
@@ -91,7 +91,7 @@
   "legal.cookies.locale.purpose": "Meabhraíonn sé teanga an chomhéadain a roghnaigh tú.",
   "legal.cookies.locale.life": "1 bhliain",
   "legal.cookies.storageTitle": "Stóráilte i do bhrabhsálaí, ní i bhfianán",
-  "legal.cookies.storageIntro": "Coinnítear ceithre mhír i stóras do bhrabhsálaí: dhá cheann sa stóras áitiúil, go dtí go nglanann tú iad, agus dhá cheann sa stóras seisiúin, go dtí go ndúnann tú an cluaisín. Murab ionann agus fianáin, ní cheanglaítear iad le d'iarratais; coinníonn mír an chomhrá cabhrach cóip de chomhrá a bhí agat le cabhair DebateAI, agus shroich a teachtaireachtaí DebateAI nuair a sheol tú iad.",
+  "legal.cookies.storageIntro": "Coinnítear ceithre mhír i stóras do bhrabhsálaí: dhá cheann sa stóras áitiúil, go dtí go nglanann tú iad, agus dhá cheann sa stóras seisiúin, go dtí go ndúnann tú an cluaisín. Murab ionann agus fianáin, ní cheanglaítear iad le d'iarratais; coinníonn mír an chomhrá cabhrach cóip de chomhrá a bhí agat le cabhair Dialectical Engine, agus shroich a teachtaireachtaí Dialectical Engine nuair a sheol tú iad.",
   "legal.cookies.consent.kind": "Stóras áitiúil",
   "legal.cookies.consent.purpose": "Cuimhníonn sé go bhfaca tú an fógra fianán, ionas nach dtaispeántar é ach uair amháin.",
   "legal.cookies.consent.life": "Go dtí go nglanann tú é",
@@ -104,7 +104,7 @@
   "legal.cookies.supportConversation.kind": "Stóras seisiúin",
   "legal.cookies.supportConversation.purpose": "Coinníonn sé do chomhrá leis an gcabhair ar an scáileán fad a fhanann an cluaisín oscailte. Scriostar é nuair a shíníonn duine ar bith isteach nó amach sa chluaisín seo.",
   "legal.cookies.supportConversation.life": "Go dtí go ndúnann tú an cluaisín",
-  "legal.cookies.recipient.server": "Freastalaí DebateAI amháin",
+  "legal.cookies.recipient.server": "Freastalaí Dialectical Engine amháin",
   "legal.cookies.recipient.browser": "fanann sé i do bhrabhsálaí",
   "legal.cookies.refuse": "Chun iad a dhiúltú, cuir bac ar fhianáin agus ar shonraí suímh don suíomh seo, nó scrios iad, i socruithe do bhrabhsálaí.",
   "legal.cookies.refuseEffect": "Cad a stopann ag obair ansin: síniú isteach, agus cuimhneamh ar do theanga agus ar do roghanna taispeána.",
@@ -176,5 +176,9 @@
   "legal.cookies.passwordReset.life": "Suas le 30 nóiméad",
   "legal.cookies.mfaRecovery.life": "Suas le 299 soicind",
   "legal.cookies.social.life": "Suas le 5 nóiméad",
-  "legal.cookies.phoneDraft.life": "15 nóiméad nó go dtí glanadh níos luaithe"
+  "legal.cookies.phoneDraft.life": "15 nóiméad nó go dtí glanadh níos luaithe",
+  "legal.cookies.exportPending.purpose": "Coinníonn sé an nasc easpórtála a seoladh ar ríomhphost sa chluaisín seo chun síniú isteach agus triail eile a dhéanamh.",
+  "legal.cookies.exportLinkOutcome.purpose": "Cuimhníonn sé cén teachtaireacht faoin nasc íoslódála atá le taispeáint sa chluaisín seo.",
+  "legal.cookies.exportPending.life": "Go ndúnfar an cluaisín, go síneofar amach, go n-osclófar nasc nua, go n-éireoidh leis an gcéad íoslódáil nó go bhfaighfear toradh naisc neamhbhailí nó cuntais mhícheart",
+  "legal.cookies.exportLinkOutcome.life": "Go ndúnfar an cluaisín, go síneofar amach nó go n-osclófar nasc nua"
 }

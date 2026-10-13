@@ -50,7 +50,7 @@ const fixtureFile = JSON.parse(readFileSync(new URL("./fixtures/preview-model-ro
   schema: string; provider: string; reservation: Record<string, unknown>;
   rows: Array<{ model: string; maker: string; input_usd_per_m: string; output_usd_per_m: string; input_nano_usd_per_token: number;
     output_nano_usd_per_token: number; cache_write_5m_input_usd_per_m: string; cache_write_5m_input_nano_usd_per_token: number;
-    output_bound: number; effort: "high" | null; json_object: boolean; worst_case_reservation_usd: string;
+    output_bound: number; efforts: string[]; json_object: boolean; worst_case_reservation_usd: string;
     worst_case_uncached_reservation_usd: string }> };
 
 const configured = (providerRef: string) => { const row = previewModelRow(previewTargetJsonRow(providerRef).model)!;
@@ -76,7 +76,7 @@ describe("the Anthropic row equals its parity file and keeps the per-call cap", 
     expect(PREVIEW_REVIEWED_PROVIDER_REFS.at(-1)).toBe(HAIKU_REF);
   });
   it("field for field, the row the gate reserves at", () => {
-    expect(fixtureFile.schema).toBe("preview-model-rows-v1");
+    expect(fixtureFile.schema).toBe("preview-model-rows-v2");
     expect(fixtureFile.provider).toBe("anthropic");
     expect(fixtureFile.reservation).toEqual({ formula: expect.any(String), overhead_bytes: 2048, step_tokens: 100_000, step_rule: expect.any(String),
       cache_write_rule: expect.any(String), upper_input_usd_per_m: "0.50", upper_output_usd_per_m: "2.50",
@@ -84,7 +84,7 @@ describe("the Anthropic row equals its parity file and keeps the per-call cap", 
     expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.anthropic.map(row => ({ model: row.model, maker: row.maker, input_usd_per_m: row.inputUsdPerM,
       output_usd_per_m: row.outputUsdPerM, input_nano_usd_per_token: Number(row.inputNanoUsdPerToken),
       output_nano_usd_per_token: Number(row.outputNanoUsdPerToken), cache_write_5m_input_usd_per_m: row.cacheWriteInputUsdPerM,
-      cache_write_5m_input_nano_usd_per_token: Number(row.cacheWriteInputNanoUsdPerToken), output_bound: row.outputBound, effort: row.effort,
+      cache_write_5m_input_nano_usd_per_token: Number(row.cacheWriteInputNanoUsdPerToken), output_bound: row.outputBound, efforts: row.efforts,
       json_object: row.jsonObject, worst_case_reservation_usd: previewNanoUsdText(previewReservationNanoUsd(row, 256 * 1024, { cacheWrite: true })),
       worst_case_uncached_reservation_usd: previewNanoUsdText(previewReservationNanoUsd(row, 256 * 1024)) })))
       .toEqual(fixtureFile.rows);
@@ -265,6 +265,14 @@ describe("the guarded fetch routes by exact URL, each call only to its own provi
     expect(first!.reservedUsd).toBe(previewNanoUsdText(BigInt(Buffer.byteLength(small) + 2048) * 100n + 32_768n * 500n));
     expect(second!.reservedUsd).toBe(previewNanoUsdText(BigInt(Buffer.byteLength(large) + 2048) * 500n + 32_768n * 2_500n));
   });
+  it("accepts every level on the reviewed Haiku menu (spec 2026-10-12 §4.5)", async () => {
+    for (const effort of ["high", "medium", "low"]) {
+      const { executions, port } = recordingPorts();
+      const fetcher = createPreviewGuardedFetch({ anthropic: port("anthropic", () => haikuReply()) });
+      await fetcher(PREVIEW_ANTHROPIC_MESSAGES_URL, { method: "POST", body: JSON.stringify(anthropicBody({ output_config: { effort } })) });
+      expect(executions.anthropic, effort).toHaveLength(1);
+    }
+  });
   it.each([
     ["thinking", { thinking: { type: "adaptive" } }],
     ["tools", { tools: [] }],
@@ -289,7 +297,12 @@ describe("the guarded fetch routes by exact URL, each call only to its own provi
     ["max_tokens above the bound", { max_tokens: 32_769 }],
     ["fractional max_tokens", { max_tokens: 1.5 }],
     ["no output_config", { output_config: undefined }],
-    ["effort low", { output_config: { effort: "low" } }],
+    // Spec 2026-10-12 §4.5: only the reviewed Haiku menu (high, medium, low); "none" and "default" are never wire words here.
+    ["effort xhigh", { output_config: { effort: "xhigh" } }],
+    ["effort max", { output_config: { effort: "max" } }],
+    ["effort none", { output_config: { effort: "none" } }],
+    ["effort default", { output_config: { effort: "default" } }],
+    ["effort null", { output_config: { effort: null } }],
     ["output_config with a format", { output_config: { effort: "high", format: { type: "json_schema" } } }],
     ["a non-text system", { system: [{ type: "text", text: "x" }] }],
     ["one system block with the cache mark", { system: [{ type: "text", text: "x", cache_control: { type: "ephemeral" } }] }],

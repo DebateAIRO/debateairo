@@ -99,7 +99,7 @@ await writeFile(
   new URL("../generated/openapi.json", import.meta.url),
   `${JSON.stringify({
     openapi: "3.1.0",
-    info: { title: "DebateAI V3", version: "v1" },
+    info: { title: "Dialectical Engine V3", version: "v1" },
     components: { schemas: Object.fromEntries(Object.entries(endpointSchemas).map(([name, schema]) => [name, z.toJSONSchema(schema)])) },
     paths: contractInventory.routes.reduce<Record<string, Record<string, unknown>>>((paths, route) => {
       const separator = route.indexOf(" ");

@@ -491,8 +491,9 @@ describe("the preview's one format repair through the real counting gateway (all
   const fixedReply: Step = { answer: JSON.stringify({ outcome: "agree", reasons: ["Fares fund frequency."], edge_bearings: [0.8] }) };
   /**
    * Patch follow-up (owner design, 2026-10-12): the short follow-up's answer, only the member it was asked for. The
-   * reply above, refused at one member, now gets this follow-up first; a whole reply sent back to it is refused as a
-   * patch, and the full re-ask (a third POST, within the sealed bound of three) follows.
+   * reply above, refused at one member, now gets this follow-up first; a whole reply sent back to it is checked as a
+   * whole answer (owner ruling 2026-10-12): accepted when it passes, else refused as a patch (the scripts below send
+   * the same slip again), and the full re-ask (a third POST, within the sealed bound of three) follows.
    */
   const patchReply: Step = { answer: JSON.stringify({ edge_bearings: [0.8] }) };
 
@@ -569,7 +570,7 @@ describe("the preview's one format repair through the real counting gateway (all
   it("a patch refused as a patch, then the full re-ask: three counted POSTs in one call, never CALL_BUDGET_EXHAUSTED", async () => {
     const work = await createRunWork("format-patch-then-full");
     const waits: number[] = [];
-    const { port, sent } = await scriptedGate([missingField, fixedReply, fixedReply]);
+    const { port, sent } = await scriptedGate([missingField, missingField, fixedReply]);
     const reviewed = await review(previewGateway(port, waits), work);
     expect(reviewed.edgeMeasurements).toEqual([{ edgeId: "edge:all-steps", bearing: 0.8 }]);
     expect(sent).toHaveLength(3);
@@ -584,7 +585,7 @@ describe("the preview's one format repair through the real counting gateway (all
   it("a patch refused, then a billed timeout on the full re-ask: the review's final retry is sent and answered", async () => {
     const work = await createRunWork("format-patch-then-timeout");
     const waits: number[] = [];
-    const { port, sent } = await scriptedGate([missingField, fixedReply, timeout, fixedReply]);
+    const { port, sent } = await scriptedGate([missingField, missingField, timeout, fixedReply]);
     const gateway = previewGateway(port, waits);
     const { events, hold } = recordingHold(waits);
     const result = await withCooldownRetry({

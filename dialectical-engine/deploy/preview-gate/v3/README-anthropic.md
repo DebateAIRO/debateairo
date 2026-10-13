@@ -33,9 +33,15 @@ they hide the Anthropic key folder (install step 3a, which comes BEFORE the Anth
 
 One reviewed model:
 
-| Model | Maker | Longest answer allowed (tokens) | Thinking | JSON mode |
+| Model | Maker | Longest answer allowed (tokens) | Thinking levels (first = the app's default) | JSON mode |
 |---|---|---|---|---|
-| `claude-haiku-5-5` | Anthropic | 32,768 | "high" | not allowed |
+| `claude-haiku-5-5` | Anthropic | 32,768 | "high", "medium", "low" | not allowed |
+
+Thinking levels (spec 2026-10-12): every request carries `output_config` `{"effort": <one of the
+three>}`; the gate refuses any other word ("xhigh" and "max" are not reviewed) and a request with
+no `output_config`. "high" is what the app sends when the owner has not chosen a level: exactly
+the request of before. The day ledger's `requested_effort` names the level the request carried. A
+menu change is a reviewed row change (new helper hash, GO rewrite, restart).
 
 Anthropic's list prices (per million tokens), read on 2026-10-10 from
 platform.claude.com/docs/en/about-claude/pricing. The price depends on how long the question is.
@@ -96,8 +102,8 @@ cache reads.
 
 - **The gate refuses anything but a plain text question.** The request may carry only the model,
   the answer length, the messages (text only, the first one from the user), an optional system
-  text (or the two parts that carry its one 5-minute caching mark, see "Caching" above), and the
-  thinking setting "high". Anything else (tools, streaming, any other caching mark, temperature, a
+  text (or the two parts that carry its one 5-minute caching mark, see "Caching" above), and a
+  thinking setting from the reviewed menu ("high", "medium" or "low"). Anything else (tools, streaming, any other caching mark, temperature, a
   region or service tier, and so on) is refused before anything is set aside.
 - **Anything in Anthropic's answer the gate does not understand halts.** Usage fields it does not
   know, any use of Anthropic's server tools (web search and the like), a service tier other than
