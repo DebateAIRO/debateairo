@@ -131,9 +131,10 @@ describe("practice openings: the command line", () => {
     [["--question", "en-rent-caps"], "--question"], [["--models", HAIKU], "--models"], [["--lanes", "PANEL"], "--lanes"],
     [["--samples", "1"], "--samples"], [["--gap-ms", "0"], "--gap-ms"], [["--depth", "1"], "--depth"],
     [["--register-export", "/x/register.json"], "--register-export"], [["--sequential"], "--sequential"], [["--transcript"], "--transcript"],
-    // Dev's formats-only and report-only flags (#149), and Project 1's debate-only --call-concurrency (parallel calls).
+    // Dev's formats-only and report-only flags (#149), Project 1's debate-only --call-concurrency (parallel calls) and
+    // R15's debate-only --register-next.
     [["--levels", "x=high"], "--levels"], [["--side-by-side", "/x/samples.jsonl"], "--side-by-side"],
-    [["--call-concurrency", "12/3/default=50"], "--call-concurrency"]
+    [["--call-concurrency", "12/3/default=50"], "--call-concurrency"], [["--register-next"], "--register-next"]
   ] as const) {
     for (const dry of [true, false]) {
       it(`refuses ${label} in openings${dry ? " --dry" : ""}, before anything is written or sent`, async () => {

@@ -482,10 +482,11 @@ describe("the model providers page lists the model families the product runs", (
   });
 
   it("renders one register entry per provider, the support chat's model last", () => {
-    // This suite's build has no preview GLM flag, as the real site's has none: DeepInfra is not listed.
+    // This suite's build has no preview flag, as the real site's has none: it lists the five models the product runs
+    // (owner, 12 October 2026), Anthropic's Haiku and DeepInfra's four, not the hosted cloud rows.
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
-    expect(headings).toEqual([...MODEL_PROVIDERS.map(({ provider }) => provider), "Support chat model"]);
+    expect(headings).toEqual(["Anthropic", "DeepInfra", "Support chat model"]);
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
   });
 
@@ -577,8 +578,10 @@ describe("the model providers page lists the model families the product runs", (
       expect(entry.retentionKey).toBe("legal.providers.unconfirmed");
       expect(entry.locationKey).toBe("legal.providers.unconfirmed");
     }
+    // Every unchecked row says so; once every row the build shows is checked, none does.
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
-    expect(view.textContent).toContain("[not checked yet]");
+    const unchecked = PROVIDER_REGISTER.some(({ checkedOn }) => checkedOn === null);
+    expect(view.textContent.includes("[not checked yet]")).toBe(unchecked);
   });
 
   it("shows every register label in every locale's catalogue", () => {
@@ -607,7 +610,7 @@ describe("the footers (15a full, 15b one line)", () => {
       const footer = view.querySelector("footer.siteFooterLine");
       expect(footer).not.toBeNull();
       expect([...(footer?.querySelectorAll("a") ?? [])].map((link) => link.getAttribute("href")))
-        .toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://anpc.ro/ce-este-sal/"]);
+        .toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://reclamatiisal.anpc.ro/"]);
       const button = footer?.querySelector("button");
       expect(button?.textContent).toBe(chromeEnglish["chrome.footer.cookiePreferences"]);
       act(() => button?.click());

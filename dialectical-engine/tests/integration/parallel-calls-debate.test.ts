@@ -17,7 +17,7 @@ import { createHash } from "node:crypto";
 import { createPool, migrate, type Pool } from "@debateai/db";
 import { JudgementRepository } from "@debateai/judgement";
 import { TypedDomainError } from "@debateai/kernel";
-import { PREVIEW_PROVIDER_REF_MODELS, readPromptFrame } from "@debateai/providers";
+import { PREVIEW_PROVIDER_REF_MODELS, readPromptFrame, type PromptPacket } from "@debateai/providers";
 import {
   DEEPSEEK,
   FIVE_MAKER_REFS,
@@ -910,7 +910,7 @@ const digestOf = (text: string): string => createHash("sha256").update(text, "ut
 /** The call's own fence and canary, as the provider door reads them; null for a packet with no frame. */
 function framedTokensOf(chat: string): Readonly<{ fence: string; canary: string }> | null {
   try {
-    const frame = readPromptFrame(wirePacket(chat));
+    const frame = readPromptFrame(wirePacket(chat) as PromptPacket);
     return { fence: frame.fence, canary: frame.canary };
   } catch {
     return null;

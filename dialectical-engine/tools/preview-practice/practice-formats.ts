@@ -201,7 +201,7 @@ export function practiceAttemptsOf(sink: PracticeSink): readonly PracticeAttempt
     return Object.freeze({ callSiteKey: entry.callSiteKey, outcome: entry.outcome, parseStatus: artifact?.parseStatus ?? null,
       latencyMs: entry.finishedAt.getTime() - entry.startedAt.getTime(),
       jsonRepair: artifact === null || entry.outcome !== "OK" ? null
-        : practiceJsonRepairOf(replyContentOf(artifact.rawText), practiceFinishReasonOf(artifact.metadata)),
+        : practiceJsonRepairOf(replyContentOf(artifact.rawText), practiceFinishReasonOf(artifact.metadata), entry.callSiteKey),
       replyForm: sink.forms.get(entry.attemptId) ?? null });
   }));
 }

@@ -257,7 +257,7 @@ describe("the short follow-up on the preview's DeepInfra wire", () => {
 
 describe("the story checker's sealed bound of two: the patch only, then the call fails", () => {
   const checkerRequest = (): ProviderCallRequest => {
-    const framed = buildFramedPrompt({ contract: { contractId: "story.checker.v2", instruction: "Check the story.", answerForm: "Return one JSON object." },
+    const framed = buildFramedPrompt({ contract: { contractId: "story.checker.v3", instruction: "Check the story.", answerForm: "Return one JSON object." },
       material: [{ name: "story", content: "Synthetic story." }] });
     return { runId: "run:synthetic", subjectItemId: "story:synthetic", callSiteKey: "STORY:CHECKER:1", role: "EVALUATOR", lane: "story",
       preferredResponseFormat: "json_object", bound: { maxAttempts: 2, tokenCeiling: 8192, deadlineMs: 600_000 },

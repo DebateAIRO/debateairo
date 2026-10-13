@@ -126,15 +126,19 @@ export const judgeAssessmentSchema = z.object({
 export type JudgeAssessment = z.infer<typeof judgeAssessmentSchema>;
 
 /**
- * How a structured reply was read. All-steps format robustness (2026-10-12): after the judge's own three, the two late
+ * How a structured reply was read. All-steps format robustness (2026-10-12): after the judge's own three, the late
  * repairs the story's tolerant decode makes (`modelJsonLateRepair`): INNER_QUOTE (a straight double quote inside a text
- * that cannot end it, read as escaped) and, only for a reply that finished normally, CLOSING_BRACKETS.
+ * that cannot end it, read as escaped), STRAY_QUOTE (one stray straight quote before the final closing brackets,
+ * dropped; MiMo salvage, 2026-10-12) and, only for a reply that finished normally, CLOSING_BRACKETS. Then the shape
+ * repairs a step may ask for (`StructuredReadingOptions`).
  */
-export type StructuredParseStrategy = "RAW" | "ONE_FENCE" | "BRACE_BALANCED" | "INNER_QUOTE" | "CLOSING_BRACKETS" | "NESTED_FIELDS";
+export type StructuredParseStrategy = "RAW" | "ONE_FENCE" | "BRACE_BALANCED" | "INNER_QUOTE" | "STRAY_QUOTE" | "CLOSING_BRACKETS"
+  | "NESTED_FIELDS" | "RENAMED_MEMBER" | "UNASKED_KEYS" | "EMPTY_LIST";
 
 const STRUCTURED_PARSE_REPAIRS: Readonly<Record<StructuredParseStrategy, ModelJsonRepair | null>> = Object.freeze({
-  RAW: null, ONE_FENCE: "CODE_FENCE", BRACE_BALANCED: "OUTERMOST_OBJECT", INNER_QUOTE: "INNER_QUOTE", CLOSING_BRACKETS: "CLOSING_BRACKETS",
-  NESTED_FIELDS: "NESTED_FIELDS"
+  RAW: null, ONE_FENCE: "CODE_FENCE", BRACE_BALANCED: "OUTERMOST_OBJECT", INNER_QUOTE: "INNER_QUOTE", STRAY_QUOTE: "STRAY_QUOTE",
+  CLOSING_BRACKETS: "CLOSING_BRACKETS", NESTED_FIELDS: "NESTED_FIELDS", RENAMED_MEMBER: "RENAMED_MEMBER", UNASKED_KEYS: "UNASKED_KEYS",
+  EMPTY_LIST: "EMPTY_LIST"
 });
 
 /** The repair code a strategy is counted under (`ContentClassification.jsonRepair`); RAW needed none. */
@@ -176,9 +180,23 @@ function schemaFailureMessage(error: z.ZodError): string {
     : rendered;
 }
 
-/** How a step asks its reply to be read. `nestedFields`: the one shape repair (`nestedFieldsPlan`), the judge's author legs and panel only. */
+/**
+ * How a step asks its reply to be read: which SHAPE repairs it allows. Each is tried only after a decoded object failed
+ * the step's schema, each alone on the decoded object (one repair at most, in this order), and each is accepted only
+ * when the repaired object passes the full schema; otherwise the original refusal stands.
+ *  - `nestedFields`: NESTED_FIELDS (`nestedFieldsPlan`), the judge's author legs and panel;
+ *  - `renamedMembers`: RENAMED_MEMBER (`renameMisnamedMember`), the judge's author legs and panel;
+ *  - `unaskedKeys`: UNASKED_KEYS (`dropUnaskedKeys`), the judge's author legs, panel and review;
+ *  - `emptyLists`: EMPTY_LIST (`fillPinnedEmptyLists`), the review only.
+ * MiMo salvage (owner ruling 2026-10-12, "Salvage in code"): a reply that is right except for a harmless form slip is
+ * repaired in code instead of re-asked. None of these invents content, changes a value or reads a cut reply: a repair
+ * only moves, drops or fills what the schema itself fixes.
+ */
 export interface StructuredReadingOptions {
   readonly nestedFields?: boolean;
+  readonly renamedMembers?: boolean;
+  readonly unaskedKeys?: boolean;
+  readonly emptyLists?: boolean;
 }
 
 /**
@@ -245,15 +263,111 @@ function nestFlattenedMembers(decoded: unknown, plan: readonly NestedFieldsPlanE
   return repaired;
 }
 
+type RootShape = Readonly<Record<string, z.ZodType>>;
+
+/** The root members a schema asks for, or null when the schema is not an object (no shape repair then applies). */
+function rootShapeOf(schema: z.ZodType): RootShape | null {
+  return schema instanceof z.ZodObject ? schema.shape as RootShape : null;
+}
+
+function plainObject(decoded: unknown): Record<string, unknown> | null {
+  return typeof decoded === "object" && decoded !== null && !Array.isArray(decoded) ? decoded as Record<string, unknown> : null;
+}
+
+/** The members the schema requires (an optional member accepts undefined) that the decoded object lacks. */
+function missingRequiredMembers(source: Record<string, unknown>, shape: RootShape): readonly string[] {
+  return Object.keys(shape).filter((member) => !Object.hasOwn(source, member) && !shape[member]!.safeParse(undefined).success);
+}
+
+/**
+ * MiMo salvage (2026-10-12, debate 3 seq 178): MiMo-V2.6-Pro wrote its panel critic under `"critique"`, with exactly the
+ * critic's own fields. RENAMED_MEMBER: when exactly ONE required member is missing, that member's schema is an object
+ * (a scalar fits too many things to be recognised by its value), and exactly ONE key the schema never asked for holds a
+ * value that passes that member's own schema in full, the value moves to the member's name. Nothing else moves and the
+ * value is not changed. Null when that form is not there.
+ */
+function renameMisnamedMember(decoded: unknown, shape: RootShape): Record<string, unknown> | null {
+  const source = plainObject(decoded);
+  if (source === null) return null;
+  const missing = missingRequiredMembers(source, shape);
+  if (missing.length !== 1) return null;
+  const member = missing[0]!;
+  const memberSchema = shape[member]!;
+  if (!(memberSchema instanceof z.ZodObject)) return null;
+  const fitting = Object.keys(source).filter((key) => !Object.hasOwn(shape, key) && memberSchema.safeParse(source[key]).success);
+  if (fitting.length !== 1) return null;
+  const from = fitting[0]!;
+  const renamed: Record<string, unknown> = { ...source, [member]: source[from] };
+  delete renamed[from];
+  return renamed;
+}
+
+/**
+ * MiMo salvage (2026-10-12, debate 3 seq 239): beside a valid `"way_of_knowing"` MiMo-V2.6-Pro also wrote a
+ * `"way_of_kooking"` the schema never asked for. UNASKED_KEYS: the root keys the schema does not name are dropped
+ * (their names are the model's own text, so they are not copied into any message: DL4-F1); the caller accepts the
+ * result only if every asked member is then present and valid. Root keys only. A root key named like a field asked for
+ * INSIDE a member (a root `"fidelity"` beside `steelman.fidelity`) is never dropped: it may be a second, different value
+ * for something that is scored, and which one the model meant is not known. Null when there is no droppable key.
+ */
+function dropUnaskedKeys(decoded: unknown, shape: RootShape): Record<string, unknown> | null {
+  const source = plainObject(decoded);
+  if (source === null) return null;
+  const unasked = Object.keys(source).filter((key) => !Object.hasOwn(shape, key));
+  if (unasked.length === 0) return null;
+  const innerNames = new Set(Object.values(shape).flatMap((memberSchema) =>
+    memberSchema instanceof z.ZodObject ? Object.keys(memberSchema.shape as RootShape) : []));
+  if (unasked.some((key) => innerNames.has(key))) return null;
+  const kept: Record<string, unknown> = { ...source };
+  for (const key of unasked) delete kept[key];
+  return kept;
+}
+
+/** Whether a member's schema admits exactly one value, the empty list: a list pinned to at most 0 entries. */
+function pinnedEmptyList(memberSchema: z.ZodType): boolean {
+  if (!(memberSchema instanceof z.ZodArray) || !memberSchema.safeParse([]).success) return false;
+  const bag = (memberSchema as unknown as { _zod?: { bag?: { maximum?: unknown } } })._zod?.bag;
+  return bag?.maximum === 0;
+}
+
+/**
+ * MiMo salvage (2026-10-12, debate 3 seq 160): reviewing a node that sources no edges, MiMo-V2.6-Pro left out
+ * `edge_bearings`, which the prompt said "has exactly 0 entries" and the schema pins to length 0: the one value it
+ * admits is []. EMPTY_LIST: every missing required member must be such a pinned-empty list, and each is filled with [].
+ * A list that may hold an entry is never filled: what it would hold is not known. Null when that form is not there.
+ */
+function fillPinnedEmptyLists(decoded: unknown, shape: RootShape): Record<string, unknown> | null {
+  const source = plainObject(decoded);
+  if (source === null) return null;
+  const missing = missingRequiredMembers(source, shape);
+  if (missing.length === 0 || !missing.every((member) => pinnedEmptyList(shape[member]!))) return null;
+  const filled: Record<string, unknown> = { ...source };
+  for (const member of missing) filled[member] = [];
+  return filled;
+}
+
+type ShapeRepair = readonly [allowed: boolean | undefined, repair: StructuredParseStrategy, build: () => Record<string, unknown> | null];
+
 function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, schema: z.ZodType<T>, options?: StructuredReadingOptions): ParseStructuredArtifactResult<T> {
   const parsed = schema.safeParse(decoded);
   if (parsed.success) return Object.freeze({ kind: "PARSED", strategy, value: parsed.data });
   const refused: ParseStructuredArtifactResult<T> = Object.freeze({ kind: "SCHEMA_FAILURE", message: schemaFailureMessage(parsed.error) });
-  if (options?.nestedFields !== true) return refused;
-  const nested = nestFlattenedMembers(decoded, nestedFieldsPlan(schema));
-  if (nested === null) return refused;
-  const repaired = schema.safeParse(nested);
-  return repaired.success ? Object.freeze({ kind: "PARSED", strategy: "NESTED_FIELDS", value: repaired.data }) : refused;
+  const shape = rootShapeOf(schema);
+  if (options === undefined || shape === null) return refused;
+  const repairs: readonly ShapeRepair[] = [
+    [options.nestedFields, "NESTED_FIELDS", () => nestFlattenedMembers(decoded, nestedFieldsPlan(schema))],
+    [options.renamedMembers, "RENAMED_MEMBER", () => renameMisnamedMember(decoded, shape)],
+    [options.unaskedKeys, "UNASKED_KEYS", () => dropUnaskedKeys(decoded, shape)],
+    [options.emptyLists, "EMPTY_LIST", () => fillPinnedEmptyLists(decoded, shape)]
+  ];
+  for (const [allowed, repair, build] of repairs) {
+    if (allowed !== true) continue;
+    const candidate = build();
+    if (candidate === null) continue;
+    const repaired = schema.safeParse(candidate);
+    if (repaired.success) return Object.freeze({ kind: "PARSED", strategy: repair, value: repaired.data });
+  }
+  return refused;
 }
 
 /**
@@ -274,7 +388,8 @@ function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, sc
  * Judge nested fields (2026-10-12): with `options.nestedFields` (the judge's author legs and panel), an object that decoded but
  * failed the schema is tried once more with its flattened members nested (`nestFlattenedMembers`, the plan read off
  * the schema by `nestedFieldsPlan`); it is accepted only if the result passes the full schema, as NESTED_FIELDS, and
- * otherwise the original refusal stands. The step re-reads its accepted content with the same options, so every
+ * otherwise the original refusal stands. MiMo salvage (2026-10-12) adds RENAMED_MEMBER, UNASKED_KEYS and EMPTY_LIST the
+ * same way (`StructuredReadingOptions`). The step re-reads its accepted content with the same options, so every
  * reader gets the repaired object.
  */
 export function parseStructuredArtifact<T>(

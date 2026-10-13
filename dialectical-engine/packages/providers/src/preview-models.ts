@@ -97,6 +97,14 @@ export type PreviewModelRow = Readonly<{
    */
   storytellerTokenCeiling: number;
   /**
+   * The max_tokens the preview's story checker asks for at least (previewStoryCheckerTokenCeiling): the generation
+   * floor (8,192) unless the row says more; its length retry asks twice it, held to `outputBound`. Story wording
+   * (practice debate 2, 2026-10-12): at 8,192 MiMo's thinking stopped at exactly 4,916 reasoning tokens on both of its
+   * story checks, and on the second its unfinished thinking ran on in the answer after the JSON verdict until
+   * max_tokens; at 16,384 (its length retry) it finished. App only, like `storytellerTokenCeiling`.
+   */
+  storyCheckerTokenCeiling: number;
+  /**
    * Spec 2026-10-12 §4.1: the reviewed thinking-level menu, only levels the model's maker documents (GLM has no
    * "medium": an unknown word runs its maximum). The first entry is `defaultEffort`. The gate holds the same menu.
    */
@@ -145,7 +153,8 @@ const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 
 type RowInput = Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;
-  outputBound: number; storytellerTokenCeiling: number; efforts: readonly PreviewEffort[]; jsonObject: boolean; contextWindowTokens?: number;
+  outputBound: number; storytellerTokenCeiling: number; storyCheckerTokenCeiling?: number; efforts: readonly PreviewEffort[];
+  jsonObject: boolean; contextWindowTokens?: number;
   upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string; cacheWriteInputUsdPerM?: string }>;
   sampling?: PreviewSampling;
   cacheWriteInputUsdPerM?: string;
@@ -178,6 +187,12 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
     || input.storytellerTokenCeiling < PREVIEW_STORY_TOKENS_FLOOR) {
     throw new TypeError("PREVIEW_MODEL_ROW_STORYTELLER_CEILING_INVALID");
   }
+  // The story checker's allowance obeys the same bounds; a row that names none keeps the generation floor.
+  const storyCheckerTokenCeiling = input.storyCheckerTokenCeiling ?? PREVIEW_STORY_TOKENS_FLOOR;
+  if (!Number.isSafeInteger(storyCheckerTokenCeiling) || storyCheckerTokenCeiling > input.outputBound
+    || storyCheckerTokenCeiling < PREVIEW_STORY_TOKENS_FLOOR) {
+    throw new TypeError("PREVIEW_MODEL_ROW_STORY_CHECKER_CEILING_INVALID");
+  }
   // Only the Anthropic wire (and its gate) can carry a cache mark; a row that caches has the price on every step.
   if (cacheWriteInputUsdPerM !== undefined ? provider !== "anthropic" || (upperStep !== undefined && upperStep.cacheWriteInputUsdPerM === undefined)
     : upperStep?.cacheWriteInputUsdPerM !== undefined) {
@@ -201,6 +216,7 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
       inputNanoUsdPerToken: nano(upperStep.inputUsdPerM), outputNanoUsdPerToken: nano(upperStep.outputUsdPerM),
       ...(upperStep.cacheWriteInputUsdPerM === undefined ? {} : { cacheWriteInputNanoUsdPerToken: nano(upperStep.cacheWriteInputUsdPerM) }) }) }),
     ...(cacheWriteInputUsdPerM === undefined ? {} : { cacheWriteInputUsdPerM, cacheWriteInputNanoUsdPerToken: nano(cacheWriteInputUsdPerM) }),
+    storyCheckerTokenCeiling,
     contextWindowTokens: input.contextWindowTokens ?? PROVIDER_CONNECTIONS[provider].contextWindowTokens,
     inputNanoUsdPerToken,
     outputNanoUsdPerToken,
@@ -231,7 +247,9 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
     // reply with 11 issues), while without JSON mode the engine's reader (INNER_QUOTE) repairs that exact slip with no call.
     // Thinking levels (spec 2026-10-12 §2): Xiaomi documents thinking on or off only, no levels.
     row("deepinfra", { model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["default", "none"], jsonObject: false,
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS,
+      // Story wording (practice debate 2, 2026-10-12): room for its thinking as the story checker (see the field).
+      storyCheckerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["default", "none"], jsonObject: false,
       sampling: { temperature: 0.7, top_p: 0.95 } }),
     // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
     // Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid mid-answer into

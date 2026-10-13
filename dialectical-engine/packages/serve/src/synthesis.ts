@@ -919,16 +919,59 @@ export interface SynthesisLoopControls {
  * This is not MORE than the minimum payload — it is part of the minimum. A party
  * judged on agreement with the label needs to know it is judged on it.
  */
-export const SYNTHESIZER_INSTRUCTIONS =
+export const SYNTHESIZER_V2_INSTRUCTIONS =
   "Write the served statement from the digest below. Every load-bearing claim must trace to a "
   + "digest node. Do not overstate the evidence, and state the losing positions fairly. Your "
   + "statement must agree with the supplied code label, and must claim no more confidence than "
   + "that label carries.";
 
-export const EVALUATOR_INSTRUCTIONS =
+/**
+ * PRACTICE DEBATE 3 (2026-10-12) — THE ANSWER WRITER'S INSTRUCTION, v3 (owner
+ * approved 2026-10-12, "Approve as written"; the text below is that wording
+ * verbatim). The v1/v2 instruction above asked for "the served statement from
+ * the digest", traced "to a digest node" and bound to "the supplied code
+ * label": the writer did as told and printed the served strength and the
+ * engine's words, and the answer-text check (`synthesisWordingIndex`) refused
+ * DeepSeek's answer four times running in that debate. The owner's rule: an
+ * answer a person reads never shows a score, a threshold, a point number, a
+ * citation marker or the engine's mechanics. This instruction says so to the
+ * writer, and the code check stays exactly as strict.
+ *
+ * What its words name in the material (`toSynthesisPromptMaterial`, field
+ * names unchanged): "the material" is the fenced block — the `digest` and the
+ * `code_label` (and on a retry the checker's objection); "a point" is one of
+ * the digest's nodes, whose id or short ref `node_refs` copies; "the label in
+ * the material" is `code_label.verdictLabel`.
+ *
+ * The v1/v2 text stays above, byte for byte, as sealed history: register
+ * versions sealed before v3 carry its fingerprint.
+ */
+export const SYNTHESIZER_INSTRUCTIONS =
+  "Write the answer the person will read, from the material below. Every claim the answer rests on "
+  + "must come from a point in the material; list those points in node_refs, never in the text. Do not "
+  + "overstate the evidence, and describe the options that lost fairly. The answer must agree with the "
+  + "label in the material and must not sound more certain than that label allows. Write for the person "
+  + "who asked: never print a score, strength, margin, threshold or any other number taken from the "
+  + "material; never name the material, its fields, labels, marks or point ids; never describe how the "
+  + "debate, its judges or its checkers work. A figure that the question or an argument itself states "
+  + "may be repeated.";
+
+/** Shipped history: the checker's instruction of `serve.evaluator.v1`, byte for byte. */
+export const EVALUATOR_V1_INSTRUCTIONS =
   "Judge the candidate statement against the digest and the code label. Check fairness to the "
   + "losing positions, agreement between the statement and the code label, and overstatement. "
   + "Return an objection whenever you are not satisfied.";
+
+/**
+ * The checker's instruction of `serve.evaluator.v2` (owner approved
+ * 2026-10-12, verbatim): the same duties as v1, plus the reader's rule the
+ * writer is now bound by, so the checker grades what the writer was told.
+ */
+export const EVALUATOR_INSTRUCTIONS =
+  "Judge the candidate answer against the material and its label. Check that it is fair to the "
+  + "options that lost, agrees with the label, does not overstate, and speaks to the person: no score "
+  + "or other number taken from the material, no field names, labels, marks or point ids, and no "
+  + "description of how the debate was run. Return an objection whenever you are not satisfied.";
 
 /**
  * The synthesizer's recorded request. The key set IS the fresh-context
@@ -1195,6 +1238,15 @@ export function buildEvaluatorRequest(input: {
  * Nothing leaves the REQUEST object: `assertFreshContextRequest` inspects the
  * request, the audit record keeps full provenance, and the frozen key sets above
  * are untouched. V's rule is RECORDED and WITHHELD, never forgotten.
+ *
+ * PRACTICE DEBATE 2 (2026-10-12), PROBLEM 7 — THE NUMBERS TRAVEL ROUNDED. Every
+ * strength the writer and its checker read (each digest node's `finalStrength`,
+ * the code label's `servedStrength` and `margin`) is shown at four decimals, the
+ * way the compact and spine rungs and the story's material already show them
+ * (`digestStrength`). The served answer of that debate printed
+ * "0.9600034199999999" because the material handed the float over unrounded.
+ * Rounding changes only what is SHOWN: the request keeps the exact values, and
+ * the answer text may print none of them anyway (`synthesisWordingIndex`).
  */
 export function toSynthesisPromptMaterial(
   request: SynthesizerRequest | EvaluatorRequest
@@ -1206,11 +1258,11 @@ export function toSynthesisPromptMaterial(
     // the digest name the same node the same way, and no real id reaches the
     // model beside a digest of refs. The runner maps a cited ref back.
     servedNodeId: digestNodeRefOf(request.digest, request.codeLabel.servedNodeId) ?? request.codeLabel.servedNodeId,
-    servedStrength: request.codeLabel.servedStrength,
-    margin: request.codeLabel.margin
+    servedStrength: digestStrength(request.codeLabel.servedStrength),
+    margin: request.codeLabel.margin === null ? null : digestStrength(request.codeLabel.margin)
   };
   const fields = [
-    { name: "digest", content: JSON.stringify(request.digest) },
+    { name: "digest", content: JSON.stringify(shownDigest(request.digest)) },
     { name: "code_label", content: JSON.stringify(codeLabel) }
   ];
   if (request.role === "EVALUATOR") {
@@ -1219,6 +1271,217 @@ export function toSynthesisPromptMaterial(
     fields.push({ name: "prior_objection", content: request.priorObjection });
   }
   return Object.freeze(fields);
+}
+
+/**
+ * The digest as the models are shown it: every node's strength at four
+ * decimals, every other byte as built. The key order is the digest's own (a
+ * spread keeps it), so the shown JSON differs from the built one only in the
+ * digits of each strength, and never grows: a rounded number prints no longer
+ * than the number it rounds.
+ */
+function shownDigest(digest: SynthesisDigest): SynthesisDigest {
+  return Object.freeze({
+    ...digest,
+    nodes: Object.freeze(digest.nodes.map((node) => Object.freeze({
+      ...node,
+      finalStrength: node.finalStrength === null ? null : digestStrength(node.finalStrength)
+    })))
+  });
+}
+
+/* ------------------------------- problem 7: no score or code in the answer */
+
+/**
+ * PRACTICE DEBATE 2 (2026-10-12), PROBLEM 7 — THE ANSWER'S WORDS, CHECKED IN CODE.
+ * The served answer printed the served strength ("0.9600034199999999") and the
+ * engine's own words. The owner's rule: an answer a person reads never shows a
+ * score, a threshold, or the engine's mechanics. Nothing checked that; the
+ * checker model read the draft and was satisfied.
+ *
+ * This is the story's rule (`packages/story/src/material.ts`, `storyScoreTexts`
+ * and `STORY_ENGINE_TOKENS`; `validate.ts`, STORY_TEXT_SCORE_VALUE and
+ * STORY_TEXT_ENGINE_TOKEN) applied to the answer writer's material, and like the
+ * story's it is language-independent: it reads digits and code-shaped tokens,
+ * never a word list, so it holds in every language the question can be in.
+ *
+ *  · `scoreTexts` — every strength the material shows, and the exact value the
+ *    request holds, as a text might print it: two decimals rounded half up, the
+ *    value as the material prints it, and the exact value, each with "." and
+ *    with ",". A form the person's question or a debater's full statement also
+ *    states as a figure is theirs, and is not held ("0,96 lei" in the question).
+ *  · `engineTokens` — every code-shaped key and value the material carries
+ *    (`finalStrength`, `code_label`, `REASONING`, `UNSERVED-MAKER-POSITION`, the
+ *    verdict label), the answer form's own identifiers (`node_refs`,
+ *    `served_number_refs`, `segment_id`) and the served-number slot, less any
+ *    the question or a statement uses itself as a whole token. A plain
+ *    lowercase word is never a code token: it would refuse ordinary text.
+ *
+ * Internal node names (a short ref, a UUID) are `nodeIdsNamedInText`'s, as before.
+ */
+export interface SynthesisWordingIndex {
+  readonly scoreTexts: ReadonlySet<string>;
+  readonly engineTokens: ReadonlySet<string>;
+}
+
+/**
+ * The one served-number slot the runner serves. The v2 answer form named it in
+ * its own words; v3 asks for no slot at all (`served_number_refs` is always []),
+ * and the slot stays an engine token: an answer text that names it is refused.
+ */
+export const SYNTHESIZER_SERVED_NUMBER_SLOT = "number:final-strength" as const;
+
+/** The answer form's identifiers that are code, not words (each named in `SYNTHESIZER_ANSWER_FORM` or, the slot, in v2's). */
+const SYNTHESIZER_FORM_TOKENS = Object.freeze([
+  "segment_id", "node_refs", "served_number_refs", SYNTHESIZER_SERVED_NUMBER_SLOT
+]);
+
+/**
+ * What a code token looks like: an all-capitals code with at least two letters
+ * (CONTESTED, LOOKED_UP, UNSERVED-MAKER-POSITION), a lowercase key with an
+ * underscore (code_label), or a camelCase key (finalStrength). A lowercase word
+ * on its own ("margin", "digest") is never one: refusing it would refuse
+ * ordinary text in any language that uses the word.
+ */
+const SYNTHESIS_ENGINE_TOKEN_SHAPE =
+  /^(?:[A-Z][A-Z0-9]+(?:[_-][A-Z0-9]+)*|[a-z][a-z0-9]*(?:_[a-z0-9]+)+|[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+)$/u;
+
+/**
+ * A strength as a text might print it (the story's `storyScoreForms`): two
+ * decimals rounded half up the way a person rounds, the value as the material
+ * shows it (four decimals), and the exact value; each with a point and with a
+ * comma. A value with no decimal separator in any of those (0, 1) has no form:
+ * a bare digit is never a score text.
+ */
+function synthesisScoreForms(value: number): readonly string[] {
+  const magnitude = Math.abs(value);
+  const printed = new Set([
+    (Math.round(magnitude * 100 + 1e-7) / 100).toFixed(2),
+    String(digestStrength(magnitude)),
+    String(magnitude)
+  ]);
+  return [...printed]
+    .filter((form) => /^[0-9]+\.[0-9]+$/u.test(form))
+    .flatMap((form) => [form, form.replace(".", ",")]);
+}
+
+/**
+ * Every decimal a text states as a figure of its own (the story's
+ * `storyStatedFigures`): digits, one "." or ",", digits, with no digit or
+ * further separator on either side and no percent sign after it; read with the
+ * comma as a point.
+ */
+function synthesisStatedFigures(texts: readonly string[]): ReadonlySet<string> {
+  const figures = new Set<string>();
+  const decimal = /(?<![\p{Nd}.,])\p{Nd}+[.,]\p{Nd}+(?![\p{Nd}]|[.,]\p{Nd})(?![\p{Zs}]?%)/gu;
+  for (const text of texts) {
+    for (const match of text.matchAll(decimal)) figures.add(match[0].replace(",", "."));
+  }
+  return figures;
+}
+
+/** Every non-integer number, object key and string value in a JSON value. */
+function walkMaterial(
+  value: unknown,
+  visit: { readonly number: (value: number) => void; readonly token: (text: string) => void }
+): void {
+  if (typeof value === "number") {
+    if (Number.isFinite(value) && !Number.isInteger(value)) visit.number(value);
+  } else if (typeof value === "string") {
+    visit.token(value);
+  } else if (Array.isArray(value)) {
+    for (const entry of value) walkMaterial(entry, visit);
+  } else if (value !== null && typeof value === "object") {
+    for (const [key, entry] of Object.entries(value)) {
+      visit.token(key);
+      walkMaterial(entry, visit);
+    }
+  }
+}
+
+/** A whole, case-sensitive token: no letter, digit or underscore right before or after it. */
+function wholeTokenPattern(tokens: readonly string[]): RegExp | null {
+  if (tokens.length === 0) return null;
+  const alternatives = [...tokens]
+    .sort((left, right) => right.length - left.length || (left < right ? -1 : left > right ? 1 : 0))
+    .map((token) => token.replace(/[.*+?^${}()|[\]\\/]/gu, "\\$&"));
+  return new RegExp(`(?<![\\p{L}\\p{N}_])(?:${alternatives.join("|")})(?![\\p{L}\\p{N}_])`, "u");
+}
+
+/**
+ * The wording index for one synthesis request: built from the material the
+ * models are shown (`toSynthesisPromptMaterial`) and the exact values the
+ * request holds. `personTexts` are the person's question and every node's FULL
+ * statement — the same texts `idShapedTokensIn` reads — whose own figures and
+ * tokens the answer may repeat.
+ */
+export function synthesisWordingIndex(input: {
+  readonly request: SynthesizerRequest | EvaluatorRequest;
+  readonly personTexts: readonly string[];
+}): SynthesisWordingIndex {
+  const stated = synthesisStatedFigures(input.personTexts);
+  const own = input.personTexts.join("\n");
+  const numbers: number[] = [];
+  const tokens = new Set<string>(SYNTHESIZER_FORM_TOKENS);
+  const visit = {
+    number: (value: number): void => { numbers.push(value); },
+    token: (text: string): void => { if (SYNTHESIS_ENGINE_TOKEN_SHAPE.test(text)) tokens.add(text); }
+  };
+  for (const field of toSynthesisPromptMaterial(input.request)) {
+    if (field.name !== "digest" && field.name !== "code_label") continue;
+    visit.token(field.name);
+    walkMaterial(JSON.parse(field.content) as unknown, visit);
+  }
+  // The exact values too: the material shows them rounded, but a model that read
+  // an older prompt, or the request's audit record, could print them whole.
+  numbers.push(input.request.codeLabel.servedStrength);
+  if (input.request.codeLabel.margin !== null) numbers.push(input.request.codeLabel.margin);
+  for (const node of input.request.digest.nodes) {
+    if (node.finalStrength !== null) numbers.push(node.finalStrength);
+  }
+  const scoreTexts = new Set<string>();
+  for (const value of numbers) {
+    if (!Number.isFinite(value) || Number.isInteger(value)) continue;
+    for (const form of synthesisScoreForms(value)) {
+      if (!stated.has(form.replace(",", "."))) scoreTexts.add(form);
+    }
+  }
+  const engineTokens = new Set([...tokens].filter((token) => {
+    const pattern = wholeTokenPattern([token]);
+    return pattern === null || !pattern.test(own);
+  }));
+  return Object.freeze({ scoreTexts, engineTokens });
+}
+
+/** The answer-text refusals `synthesisWordingRefusalsIn` names, each the code the writer's repair turn carries. */
+export const SYNTHESIS_WORDING_REFUSALS = Object.freeze([
+  "COMPOSED_TEXT_PRINTS_A_SCORE",
+  "COMPOSED_TEXT_USES_ENGINE_CODE"
+] as const);
+export type SynthesisWordingRefusal = typeof SYNTHESIS_WORDING_REFUSALS[number];
+
+/**
+ * What one answer text does wrong, in the order the codes are listed: it prints
+ * a score the material shows (a whole token: no digit right before or after it,
+ * and no percent sign after it, so "10,96 lei" and "96%" are left alone, as in
+ * the story), or it uses a code token. Deterministic and never throws.
+ */
+export function synthesisWordingRefusalsIn(
+  text: string,
+  index: SynthesisWordingIndex
+): readonly SynthesisWordingRefusal[] {
+  const refusals: SynthesisWordingRefusal[] = [];
+  if (index.scoreTexts.size > 0) {
+    const alternatives = [...index.scoreTexts]
+      .sort((left, right) => right.length - left.length || (left < right ? -1 : left > right ? 1 : 0))
+      .map((form) => form.replace(".", "\\."));
+    if (new RegExp(`(?<!\\p{Nd})(?:${alternatives.join("|")})(?!\\p{Nd})(?![\\p{Zs}]?%)`, "u").test(text)) {
+      refusals.push("COMPOSED_TEXT_PRINTS_A_SCORE");
+    }
+  }
+  const engine = wholeTokenPattern([...index.engineTokens]);
+  if (engine !== null && engine.test(text)) refusals.push("COMPOSED_TEXT_USES_ENGINE_CODE");
+  return Object.freeze(refusals);
 }
 
 /* -------------------------------------------------------------------- loop */
@@ -1534,11 +1797,12 @@ export async function runSynthesisLoop<TCandidate>(
  * The SYNTHESIZER's contract ids. The answer form is code's half of the prompt
  * and is sealed by hash in the register row `composerContractHash`: once a form
  * has shipped, changing it is a NEW contract id, never an edit (the storyteller
- * v1 -> v2 precedent in `packages/story/src/contracts.ts`). v1 stays below as
- * shipped history, byte for byte; v2 is what the runner sends.
+ * v1 -> v2 precedent in `packages/story/src/contracts.ts`). v1 and v2 stay below
+ * as shipped history, byte for byte; v3 is what the runner sends.
  */
 export const SYNTHESIZER_V1_CONTRACT_ID = "serve.synthesizer.v1" as const;
-export const SYNTHESIZER_CONTRACT_ID = "serve.synthesizer.v2" as const;
+export const SYNTHESIZER_V2_CONTRACT_ID = "serve.synthesizer.v2" as const;
+export const SYNTHESIZER_CONTRACT_ID = "serve.synthesizer.v3" as const;
 
 /**
  * Shipped v1 history. Moved verbatim out of `apps/runner/src/index.ts`, where
@@ -1554,14 +1818,16 @@ export const SYNTHESIZER_V1_ANSWER_FORM =
   + "plan that would lift it.";
 
 /**
- * Current form (v2): v1's full contract plus the served-number reference
+ * Shipped v2 history: v1's full contract plus the served-number reference
  * format. On 2026-10-05 a real answer was refused because its
  * served_number_refs held values and prose instead of slot ids: v1 never named
  * the one slot the runner serves (`numberRef: "number:final-strength"` in
  * `apps/runner/src/index.ts`) nor the identifier grammar the runner's parser
- * enforces (`machineIdentifierSchema`). Both are stated here exactly.
+ * enforces (`machineIdentifierSchema`). Its fingerprint is the
+ * `composerContractHash` of every register version sealed from 2026-10-09 until
+ * v3 (the preview's versions 10 and 11 among them).
  */
-export const SYNTHESIZER_ANSWER_FORM = `${SYNTHESIZER_V1_ANSWER_FORM} `
+export const SYNTHESIZER_V2_ANSWER_FORM = `${SYNTHESIZER_V1_ANSWER_FORM} `
   + "segment_id and every node_refs or served_number_refs entry must be an ASCII identifier matching "
   + "^[A-Za-z0-9][A-Za-z0-9:._-]*$; copy digest node ids exactly and never translate identifiers. "
   + "served_number_refs identifies typed served-number slots, not the numeric values themselves. "
@@ -1569,6 +1835,41 @@ export const SYNTHESIZER_ANSWER_FORM = `${SYNTHESIZER_V1_ANSWER_FORM} `
   + "Include that exact ref when the segment asserts that served number. If a segment asserts no served number, use []. "
   + "Never invent a slot from other digest statistics or code_label.margin, and never put numeric values, "
   + "percentages, expressions, or citation labels in served_number_refs.";
+
+/**
+ * Current form (v3, owner-approved content, 2026-10-12). PRACTICE DEBATE 3:
+ * v2 told the writer to "include that exact ref when the segment asserts that
+ * served number" (so it asserted the number in the text) and v1's two-segment
+ * rule asked for "a hypothesis" and "the research plan" (so the model opened
+ * its segments with "Hypothesis:" and "Research plan:"). v3 keeps the JSON shape
+ * the runner parses (`compositionSchema`), the two-segment rule for an answer
+ * that rests on reasoning alone (serve reads it as the provisional answer and
+ * what would settle it, `HYPOTHESIS_WITH_RESEARCH_PLAN`) and v2's identifier
+ * grammar, and asks for no served number at all: `served_number_refs` is
+ * always []. No rule beyond the owner's content is added.
+ */
+export const SYNTHESIZER_ANSWER_FORM =
+  "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. "
+  + "node_refs lists the ids of the points whose facts the segment states, copied exactly. Add no facts. "
+  + "When the points a segment relies on rest on reasoning alone, with nothing measured or looked up behind them, "
+  + "return two segments in order: the first gives the provisional answer and says plainly that it is not yet "
+  + "settled; the second says what evidence would settle it. Never start a segment with a heading or a label. "
+  + "segment_id and every node_refs entry must be an ASCII identifier matching ^[A-Za-z0-9][A-Za-z0-9:._-]*$; "
+  + "copy ids exactly and never translate identifiers. served_number_refs is always [].";
+
+/** Shipped history, as sent: v1's contract (the v1/v2 instruction and the v1 form). */
+export const SYNTHESIZER_V1_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_V1_CONTRACT_ID,
+  instruction: SYNTHESIZER_V2_INSTRUCTIONS,
+  answerForm: SYNTHESIZER_V1_ANSWER_FORM
+});
+
+/** Shipped history, as sent: v2's contract (the same instruction as v1, the v2 form). */
+export const SYNTHESIZER_V2_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_V2_CONTRACT_ID,
+  instruction: SYNTHESIZER_V2_INSTRUCTIONS,
+  answerForm: SYNTHESIZER_V2_ANSWER_FORM
+});
 
 export const SYNTHESIZER_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: SYNTHESIZER_CONTRACT_ID,

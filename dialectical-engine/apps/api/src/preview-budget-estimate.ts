@@ -48,6 +48,7 @@ import {
   previewModelRowForRef,
   previewProviderSocket,
   previewStorytellerTokenCeiling,
+  previewStoryCheckerTokenCeiling,
   type PreviewGateRemaining,
   type PreviewModelRow,
   type PreviewProviderName,
@@ -364,9 +365,18 @@ function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCall
     const own = previewStorytellerTokenCeiling(row);
     return Math.min(sent[type], type === "STORYTELLER" ? own : lengthRetryTokenCeiling(own, 1));
   };
+  // Story wording (2026-10-12): the story checker asks for the larger of what `output` says and its row's own checker
+  // allowance (previewStoryCheckerTokenCeiling), and its repair try at most twice that, as the gateway sends them (the
+  // clamp in previewCallNanoUsd holds the retry to the row's bound). None, when the register has no story.
+  const storyChecker = (row: PreviewModelRow, type: "STORY_CHECKER" | "STORY_CHECKER_RETRY"): number => {
+    if (sent[type] === 0) return 0;
+    const own = previewStoryCheckerTokenCeiling(row);
+    return Math.max(sent[type], type === "STORY_CHECKER" ? own : lengthRetryTokenCeiling(own, 1));
+  };
   return (row, type) => type === "PROBE"
     ? previewCallNanoUsd(row, PREVIEW_STRICT_PROBE_INPUT_TOKENS, PREVIEW_GLM_GENERATION_TOKEN_FLOOR)
-    : previewCallNanoUsd(row, inputTokens[type], type === "STORYTELLER" || type === "STORYTELLER_RETRY" ? storyteller(row, type) : sent[type]);
+    : previewCallNanoUsd(row, inputTokens[type], type === "STORYTELLER" || type === "STORYTELLER_RETRY" ? storyteller(row, type)
+      : type === "STORY_CHECKER" || type === "STORY_CHECKER_RETRY" ? storyChecker(row, type) : sent[type]);
 }
 const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, ANSWER_WRITER: tokens, MAP_MERGE: tokens, MAP_CHOOSE: tokens,
   STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens, STORY_CHECKER_RETRY: tokens });

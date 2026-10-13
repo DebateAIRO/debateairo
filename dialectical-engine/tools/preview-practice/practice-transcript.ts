@@ -257,7 +257,7 @@ export function buildTranscriptAttempts(input: Readonly<{
         errorCode: artifact?.parseErrorCode ?? null,
         errorDetail: artifact?.parseErrorDetail ?? null,
         issues: issueListFromParseError(artifact?.parseErrorDetail ?? null),
-        jsonRepair: entry.outcome === "OK" && content !== null ? practiceJsonRepairOf(content, finishReason) : null,
+        jsonRepair: entry.outcome === "OK" && content !== null ? practiceJsonRepairOf(content, finishReason, entry.callSiteKey) : null,
         finishReason
       }),
       replyForm,

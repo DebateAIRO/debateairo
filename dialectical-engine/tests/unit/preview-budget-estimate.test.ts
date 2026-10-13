@@ -1215,10 +1215,14 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
     // 16,384: 2 rounds x 16,384 x $0.87/M x 1.15 = $0.0327844 less on those DeepInfra columns. Free's dearest storyteller
     // is DeepSeek (still 32,768) and Anthropic's is Haiku (still 32,768): unchanged. Before: premium 3.73 / 4.77 / 6.83,
     // all five 4.44 / 5.74 / 8.32.
+    // Story wording (practice debate 2, 2026-10-12): MiMo, the rotated story checker on premium and all five, asks for
+    // 16,384 (its repair 32,768) instead of 8,192 (16,384): 2 rounds x 24,576 x $0.87/M x 1.15 = $0.0491789 more on those
+    // DeepInfra columns. Free's checker is not MiMo and Anthropic's is Haiku (still 8,192): unchanged; calls unchanged.
+    // Before: premium 3.7 / 4.73 / 6.8, all five 4.41 / 5.7 / 8.29.
     expect(table).toEqual([
-      [[2.08, 106], [3.7, 338], [4.41, 465], [1.2, 177]],
-      [[2.33, 161], [4.73, 522], [5.7, 695], [1.47, 260]],
-      [[2.81, 272], [6.8, 890], [8.29, 1155], [1.99, 426]]
+      [[2.08, 106], [3.75, 338], [4.46, 465], [1.2, 177]],
+      [[2.33, 161], [4.78, 522], [5.75, 695], [1.47, 260]],
+      [[2.81, 272], [6.85, 890], [8.34, 1155], [1.99, 426]]
     ]);
     for (const [free, premium, fiveDeepinfra, fiveAnthropic] of table) {
       for (const [dollars, calls] of [free!, premium!, fiveDeepinfra!]) { expect(dollars).toBeLessThanOrEqual(10); expect(calls).toBeLessThanOrEqual(2000); }

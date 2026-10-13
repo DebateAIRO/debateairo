@@ -614,17 +614,23 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     }
   );
 
-  it("states the code-label obligation to the party judged on it (F-W9-1)", () => {
-    // The evaluator is instructed to check "agreement between the statement and
-    // the code label" and overstatement. Before this ticket the SYNTHESIZER
-    // received `codeLabel` and was never told what to do with it — a rule
-    // enforced against a party that was never told it was bound by it. The
-    // property is that the obligation is STATED, so these assertions are about
-    // the two duties, never about a sentence someone may legitimately reword.
-    expect(SYNTHESIZER_INSTRUCTIONS).toMatch(/agree\w*\b[^.]*\bcode label|code label[^.]*\bagree/iu);
-    expect(SYNTHESIZER_INSTRUCTIONS).toMatch(/confidence/iu);
-    // ...and the duties the evaluator already grades stay stated as well.
-    expect(SYNTHESIZER_INSTRUCTIONS).toMatch(/digest node/iu);
-    expect(SYNTHESIZER_INSTRUCTIONS).toMatch(/losing positions/iu);
+  it("states the label obligation to the party judged on it (F-W9-1)", () => {
+    // The evaluator is instructed to check agreement with the label and
+    // overstatement. Before F-W9-1 the SYNTHESIZER received `codeLabel` and was
+    // never told what to do with it — a rule enforced against a party that was
+    // never told it was bound by it. The property is that the obligation is
+    // STATED, so these assertions are about the duties, never about a sentence
+    // someone may legitimately reword. serve.synthesizer.v3 (owner-approved
+    // wording, practice debate 3, 2026-10-12) states them in the reader's words:
+    // "the label in the material" is `code_label.verdictLabel`, "a point" a
+    // digest node, "the options that lost" the losing positions.
+    expect(SYNTHESIZER_INSTRUCTIONS).toMatch(/agree\w*\b[^.]*\blabel|label[^.]*\bagree/iu);
+    expect(SYNTHESIZER_INSTRUCTIONS).toMatch(/certain/iu);
+    // ...and the duties the evaluator grades stay stated as well, for both roles.
+    expect(SYNTHESIZER_INSTRUCTIONS).toMatch(/point in the material/iu);
+    expect(SYNTHESIZER_INSTRUCTIONS).toMatch(/options that lost fairly/iu);
+    expect(EVALUATOR_INSTRUCTIONS).toMatch(/fair to the options that lost/iu);
+    expect(EVALUATOR_INSTRUCTIONS).toMatch(/agrees with the label/iu);
+    expect(EVALUATOR_INSTRUCTIONS).toMatch(/does not overstate/iu);
   });
 });

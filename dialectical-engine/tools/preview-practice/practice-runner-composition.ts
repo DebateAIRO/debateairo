@@ -64,6 +64,7 @@ import {
 } from "@debateai/providers";
 import { StoryWriter, loadStoryPack, resolveStoryPackDir, type StoryPack } from "@debateai/story";
 import {
+  assertRegisterPromptContractHashes,
   buildProviderPriceMap,
   createPostgresProviderGateway,
   logBodyCostFallback,
@@ -129,6 +130,8 @@ export async function composePracticeRunner(input: Readonly<{
    */
   assertDebateShapeRunnerReady(await readDebateShapePolicy(pool, environment.REGISTER_VERSION));
   const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);
+  // As main.ts: a register that does not carry this code's prompt fingerprints refuses the start.
+  assertRegisterPromptContractHashes(policy.hashes, environment.REGISTER_VERSION);
   const storyLog = input.storyLog ?? (() => undefined);
   const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
     .catch((error: unknown) => {

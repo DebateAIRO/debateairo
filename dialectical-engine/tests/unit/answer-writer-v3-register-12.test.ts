@@ -1,0 +1,200 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { canonicalRegisterJson, computeRegisterSnapshotSha256, loadBootstrapRegister, parseCanonicalRegisterJson } from "@debateai/register";
+import { assertRegisterPromptContractHashes, codePromptContractHashes } from "@debateai/runner";
+import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
+import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
+import { buildPreviewSourceRowsV2, composePreviewSnapshotV2 } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
+import {
+  composePracticeNextRegisterVersion,
+  PRACTICE_REGISTER_EXPORT_SCHEMA,
+  type PracticeRegisterExport
+} from "../../tools/preview-practice/practice-register-import.js";
+
+/**
+ * PRACTICE DEBATE 3 (2026-10-12) — the answer writer's serve.synthesizer.v3 and the answer checker's
+ * serve.evaluator.v2 (owner-approved wording) reach the register as a NEW version, never by editing one.
+ *
+ * The preview runs register version 11, whose `composerContractHash` is v2's 340e11a6…8b70 and whose
+ * `conformanceContractHash` is evaluator v1's f205421c…9dcc (measured on the practice export of
+ * 2026-10-12). The runner records every answer-writer and answer-checker call under the REGISTER's
+ * fingerprint, so this file pins three things:
+ *  1. the register 12 the preview publish kit composes on a version-11-shaped base changes exactly those
+ *     two rows, to the v3/v2 seals (and the development register carries the same seals);
+ *  2. the runner refuses to start on a register that does not carry the fingerprints this code sends;
+ *  3. the practice can compose that same version 12 itself (`--register-next`), before any upload.
+ */
+const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+const canonical = (value: unknown) => parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value))) as string;
+type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
+
+const V3_COMPOSER = "4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f";
+const V2_CONFORMANCE = "660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f";
+/** What the live register version 11 carries (sealed history; never edited). */
+const LIVE_11 = Object.freeze({
+  judge: "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365",
+  composer: "340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70",
+  conformance: "f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc"
+});
+
+const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
+  operatorSha256: "c".repeat(64), observedAt: "2026-10-11T10:42:25.561Z" };
+const DEEPSEEK = { checker: "deepseek", deepseekEnabledOnGate: true } as const;
+const owned = (): Row[] => [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW]
+  .map((row) => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
+const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(b.rowKey, "en"));
+
+/**
+ * A version-11-shaped base: what the kit publishes from this code (DeepSeek checker, rotation on), with the two
+ * synthesis fingerprints at the values version 11 holds. `extra` replaces further rows.
+ */
+async function live11Base(extra: Readonly<Record<string, string>> = {}): Promise<Row[]> {
+  const source = await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, DEEPSEEK) as unknown as Row[];
+  const replaced: Record<string, string> = {
+    composerContractHash: canonical(LIVE_11.composer), conformanceContractHash: canonical(LIVE_11.conformance), ...extra
+  };
+  return sorted([...source.map((row) => replaced[row.rowKey] === undefined ? row : { ...row, valueJsonText: replaced[row.rowKey]! }), ...owned()]);
+}
+
+function exportOf(base: readonly Row[]): PracticeRegisterExport {
+  return Object.freeze({
+    schema: PRACTICE_REGISTER_EXPORT_SCHEMA,
+    versions: Object.freeze([Object.freeze({ register_version: "11", row_count: base.length, sealed: true, base_register_version: "10",
+      publication_id: null, request_sha256: null, snapshot_sha256: computeRegisterSnapshotSha256(base as never), publication_kind: "GENERAL",
+      recorded_at: null })]),
+    rows: Object.freeze(base.map((row) => Object.freeze({ register_version: "11", row_key: row.rowKey, value_json: row.valueJsonText,
+      source_ref: row.sourceRef })))
+  });
+}
+
+describe("register 12: the new prompt seals reach the register as a new version", () => {
+  it("the code's prompt fingerprints are the v3/v2 seals, and the judge's is unchanged from version 11", () => {
+    expect(codePromptContractHashes()).toEqual({ judge: LIVE_11.judge, composer: V3_COMPOSER, conformance: V2_CONFORMANCE });
+  });
+
+  it("the development register's builder seals the same values the code sends", async () => {
+    const rows = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((row) => [row.rowKey, row.value]));
+    expect(rows.composerContractHash).toBe(V3_COMPOSER);
+    expect(rows.conformanceContractHash).toBe(V2_CONFORMANCE);
+    expect(rows.judgeContractHash).toBe(LIVE_11.judge);
+  });
+
+  it("the preview publish kit, on a version-11-shaped base, changes exactly the two synthesis fingerprints", async () => {
+    const base = await live11Base();
+    const source = await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, DEEPSEEK);
+    const plan = composePreviewSnapshotV2({ sourceRows: source, baseRows: base as never, baseRegisterVersion: "11",
+      baseSnapshotSha256: computeRegisterSnapshotSha256(base as never) });
+    expect(plan.addedKeys).toEqual([]);
+    expect(plan.changedKeys).toEqual(["composerContractHash", "conformanceContractHash"]);
+    const entry = (key: string) => plan.delta.find((row) => row.rowKey === key)!;
+    expect([entry("composerContractHash").oldValueJsonText, entry("composerContractHash").newValueJsonText])
+      .toEqual([`"${LIVE_11.composer}"`, `"${V3_COMPOSER}"`]);
+    expect([entry("conformanceContractHash").oldValueJsonText, entry("conformanceContractHash").newValueJsonText])
+      .toEqual([`"${LIVE_11.conformance}"`, `"${V2_CONFORMANCE}"`]);
+    // The base is not edited: version 11 keeps its values; the new rows are a new snapshot.
+    expect(base.find((row) => row.rowKey === "composerContractHash")!.valueJsonText).toBe(`"${LIVE_11.composer}"`);
+    expect(plan.snapshotSha256).not.toBe(computeRegisterSnapshotSha256(base as never));
+  });
+});
+
+describe("the runner refuses a register that does not carry the code's prompt fingerprints", () => {
+  it("accepts the code's own fingerprints", () => {
+    expect(() => assertRegisterPromptContractHashes(codePromptContractHashes(), 12)).not.toThrow();
+  });
+
+  it("refuses version 11's fingerprints, naming both synthesis rows and both values", () => {
+    let caught: unknown = null;
+    try { assertRegisterPromptContractHashes(LIVE_11, "11"); } catch (error) { caught = error; }
+    expect(caught).toMatchObject({ code: "REGISTER_PROMPT_CONTRACT_HASH_MISMATCH" });
+    const message = (caught as Error).message;
+    expect(message).toContain("Register version 11");
+    expect(message).toContain(`composerContractHash is ${LIVE_11.composer}, the code's is ${V3_COMPOSER}`);
+    expect(message).toContain(`conformanceContractHash is ${LIVE_11.conformance}, the code's is ${V2_CONFORMANCE}`);
+    expect(message).not.toContain("judgeContractHash");
+  });
+
+  it("refuses a single differing row, the judge's included", () => {
+    for (const key of ["judge", "composer", "conformance"] as const) {
+      expect(() => assertRegisterPromptContractHashes({ ...codePromptContractHashes(), [key]: "0".repeat(64) }, 12))
+        .toThrowError(expect.objectContaining({ code: "REGISTER_PROMPT_CONTRACT_HASH_MISMATCH" }));
+    }
+  });
+
+  it("is called by the runner's boot and by the practice composition, right after the register policy is read", () => {
+    const read = (relative: string) => readFileSync(new URL(`../../${relative}`, import.meta.url), "utf8");
+    for (const [file, policyLine, indent] of [
+      ["apps/runner/src/main.ts", "const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);", ""],
+      ["tools/preview-practice/practice-runner-composition.ts", "  const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);", "  "]
+    ] as const) {
+      const source = read(file);
+      const at = source.indexOf(policyLine);
+      expect(at, file).toBeGreaterThanOrEqual(0);
+      const guard = source.indexOf(`${indent}assertRegisterPromptContractHashes(policy.hashes, environment.REGISTER_VERSION);`, at);
+      expect(guard, file).toBeGreaterThan(at);
+      // Nothing that uses the policy runs between the read and the guard: only comment lines stand there.
+      const between = source.slice(at + policyLine.length, guard).split("\n").map((line) => line.trim()).filter((line) => line !== "");
+      expect(between.every((line) => line.startsWith("//")), file).toBe(true);
+    }
+  });
+});
+
+describe("the practice can practise register 12 before it is published (--register-next)", () => {
+  it("composes the kit's own version 12 on the exported version 11, with its checker, rotation and runtime", async () => {
+    const base = await live11Base();
+    const next = await composePracticeNextRegisterVersion(exportOf(base));
+    const source = await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, DEEPSEEK);
+    const kit = composePreviewSnapshotV2({ sourceRows: source, baseRows: base as never, baseRegisterVersion: "11",
+      baseSnapshotSha256: computeRegisterSnapshotSha256(base as never) });
+    expect(next).toMatchObject({ baseRegisterVersion: "11", checker: "deepseek", roleRotation: "on",
+      addedKeys: [], changedKeys: ["composerContractHash", "conformanceContractHash"] });
+    // Byte for byte what the server's plan composes from the same inputs.
+    expect(next.rows).toEqual(kit.rows);
+    expect(next.snapshotSha256).toBe(kit.snapshotSha256);
+    expect(next.deltaSha256).toBe(kit.deltaSha256);
+    expect(next.deltaSha256).toBe(sha(JSON.stringify(kit.delta)));
+    const value = (key: string) => JSON.parse(next.rows.find((row) => row.rowKey === key)!.valueJsonText);
+    expect([value("composerContractHash"), value("conformanceContractHash")]).toEqual([V3_COMPOSER, V2_CONFORMANCE]);
+    expect(value("evaluatorRoleRef").providerRef).toBe("preview:deepseek-v4-1-flash");
+    expect(value("answerRoleRotationPolicy").enabled).toBe(true);
+  });
+
+  it("keeps a GLM checker and a switched-off rotation when the base has them", async () => {
+    const base = await live11Base({
+      evaluatorRoleRef: canonical({ kind: "EVALUATOR_ROLE_REF", providerRef: "preview:fixture-b", provisional: true }),
+      answerRoleRotationPolicy: canonical({ kind: "ANSWER_ROLE_ROTATION_POLICY", rule: "LEAST_SHARE_SEEDED_TIE_V1", enabled: false })
+    });
+    const next = await composePracticeNextRegisterVersion(exportOf(base));
+    expect([next.checker, next.roleRotation]).toEqual(["glm", "off"]);
+    const value = (key: string) => JSON.parse(next.rows.find((row) => row.rowKey === key)!.valueJsonText);
+    expect(value("evaluatorRoleRef").providerRef).toBe("preview:fixture-b");
+    expect(value("answerRoleRotationPolicy").enabled).toBe(false);
+  });
+
+  it("refuses when the code changes no row, or when the base cannot be read back", async () => {
+    const unchanged = await live11Base({ composerContractHash: canonical(V3_COMPOSER), conformanceContractHash: canonical(V2_CONFORMANCE) });
+    await expect(composePracticeNextRegisterVersion(exportOf(unchanged)))
+      .rejects.toMatchObject({ code: "PRACTICE_REGISTER_NEXT_UNSUPPORTED" });
+    const strangeChecker = await live11Base({
+      evaluatorRoleRef: canonical({ kind: "EVALUATOR_ROLE_REF", providerRef: "preview:mimo-v2-6-pro", provisional: true })
+    });
+    await expect(composePracticeNextRegisterVersion(exportOf(strangeChecker)))
+      .rejects.toMatchObject({ code: "PRACTICE_REGISTER_NEXT_UNSUPPORTED" });
+    const base = await live11Base();
+    const unmeasured = base.map((row) => row.rowKey === "nodeRuntimeVersion" ? { ...row, sourceRef: "historical node measurement" } : row);
+    await expect(composePracticeNextRegisterVersion(exportOf(unmeasured)))
+      .rejects.toMatchObject({ code: "PRACTICE_REGISTER_NEXT_UNSUPPORTED" });
+  });
+
+  it("the practice debate publishes the next version on top and runs on it, the settings file staying the live one", () => {
+    const source = readFileSync(new URL("../../tools/preview-practice/practice-debate.ts", import.meta.url), "utf8");
+    expect(source).toContain("await importPracticeRegister(pool, input.register, input.registerNext ?? null)");
+    expect(source).toContain("String(input.settings.runner.REGISTER_VERSION) !== liveVersion");
+    expect(source).toContain("String(nextVersion) !== receipt.registerVersion");
+    expect(source).toContain("REGISTER_VERSION: nextVersion");
+    expect(source).toContain("composePracticeRunner({ pool, environment: settings.runner,");
+    const cli = readFileSync(new URL("../../tools/preview-practice/practice.ts", import.meta.url), "utf8");
+    expect(cli).toContain("\"--register-next\"");
+    expect(cli).toContain("await composePracticeNextRegisterVersion(register)");
+  });
+});

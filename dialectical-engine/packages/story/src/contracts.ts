@@ -13,14 +13,18 @@ import { assembleStorytellerInstruction, type StoryPack } from "./pack.js";
  * changing the hard limits, and storyteller v3 and checker v2 (story format
  * robustness, 2026-10-12) add how to quote, and for the checker that the
  * criteria are always required, after real preview replies broke the JSON with
- * a straight quote or left the criteria out.
+ * a straight quote or left the criteria out. Checker v3 (R15 practice debate, 2026-10-13) raises the
+ * objection's limit from 2000 to 4000 characters: since the story wording of 2026-10-12 the checker lists
+ * every problem in one objection, one short sentence each, and a real verdict of 2,739 characters was refused
+ * for its length alone. v2 stays below as history.
  */
 
 export const STORYTELLER_V1_CONTRACT_ID = "story.storyteller.v1" as const;
 export const STORYTELLER_V2_CONTRACT_ID = "story.storyteller.v2" as const;
 export const STORYTELLER_CONTRACT_ID = "story.storyteller.v3" as const;
 export const STORY_CHECKER_V1_CONTRACT_ID = "story.checker.v1" as const;
-export const STORY_CHECKER_CONTRACT_ID = "story.checker.v2" as const;
+export const STORY_CHECKER_V2_CONTRACT_ID = "story.checker.v2" as const;
+export const STORY_CHECKER_CONTRACT_ID = "story.checker.v3" as const;
 
 /**
  * Both current forms end with this sentence. A straight double quote inside a JSON text ends that text; a
@@ -77,9 +81,28 @@ export const STORY_CHECKER_V1_ANSWER_FORM = `Return only one JSON object with ex
 }
 When satisfied is true, every criterion must be true. When satisfied is false, objection must be a non-empty string. In the objection, refer to points by their ids, such as P7.`;
 
-/** Current form: v1 plus the criteria rule two real verdicts broke, and how to quote. */
-export const STORY_CHECKER_ANSWER_FORM = `${STORY_CHECKER_V1_ANSWER_FORM}
-The criteria object is always required, with all eight booleans, whether satisfied is true or false. ${STORY_QUOTE_SENTENCE}`;
+/** The criteria rule two real verdicts broke (checker v2 onward). */
+const STORY_CHECKER_CRITERIA_SENTENCE = "The criteria object is always required, with all eight booleans, whether satisfied is true or false.";
+
+/** Shipped v2 history: v1 plus the criteria rule two real verdicts broke, and how to quote. */
+export const STORY_CHECKER_V2_ANSWER_FORM = `${STORY_CHECKER_V1_ANSWER_FORM}
+${STORY_CHECKER_CRITERIA_SENTENCE} ${STORY_QUOTE_SENTENCE}`;
+
+/** The objection's limit in v1 and v2, and since v3 (`StoryCheckerVerdictSchema` in `validate.ts` mirrors it). */
+const STORY_CHECKER_V1_OBJECTION_LIMIT = "\"objection\": null | non-empty string of at most 2000 characters,";
+// R15 into dev (2026-10-13): a frozen limits object, as STORY_PACK_LIMITS and @debateai/contract's STORY_BODY_LIMITS,
+// because the source-purity law (tools/orphan-audit, J10(b)) refuses an exported bare number. The value and every
+// byte of the checker v3 form it is written into are unchanged.
+export const STORY_CHECKER_LIMITS = Object.freeze({ maxObjectionChars: 4000 });
+
+/**
+ * Current form: v2 byte for byte except the objection's limit, 4000 characters instead of 2000 (R15 practice
+ * debate, 2026-10-13: the checker now lists every problem, one short sentence each, and 2000 did not hold them).
+ */
+export const STORY_CHECKER_ANSWER_FORM = STORY_CHECKER_V2_ANSWER_FORM.replace(
+  STORY_CHECKER_V1_OBJECTION_LIMIT,
+  `"objection": null | non-empty string of at most ${STORY_CHECKER_LIMITS.maxObjectionChars} characters,`
+);
 
 export function buildStorytellerContract(pack: StoryPack): PromptContract {
   return Object.freeze({

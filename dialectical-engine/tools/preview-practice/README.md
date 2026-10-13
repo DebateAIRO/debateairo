@@ -448,6 +448,14 @@ Optional flags:
   formats, openings and report refuse it), `--transcript` (also write `transcript.json`: every prompt and every answer, see "The whole
   debate, word for word" above). The register is copied only through the register's own publication
   paths; an export holding a support-configuration version refuses (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
+  `--register-next` practises a release that needs a NEW register version (new sealed prompts) before it is uploaded:
+  the export is imported as always, then this checkout's next version is composed on its newest version by the
+  preview publish kit itself (`buildPreviewSourceRowsV2` and `composePreviewSnapshotV2`, with the newest version's own
+  checker choice, rotation switch and measured runtime), published on top in the throwaway database, and the debate
+  runs on it. The settings file stays the live one (its `REGISTER_VERSION` must still be the export's newest version).
+  The progress line and `report.json` (`register.codeNext`) name every row the next version changes: on the server,
+  the publish proposal must show the same rows (plus `nodeRuntimeVersion`'s source reference, which the server
+  measures again). A checkout that changes no row refuses (`PRACTICE_REGISTER_NEXT_UNSUPPORTED`).
 
 ### S-6b, Mac: thinking levels side by side (formats, `--levels`)
 

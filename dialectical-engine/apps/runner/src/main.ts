@@ -51,7 +51,7 @@ import {
   resolveStoryPackDir,
   type StoryPack
 } from "@debateai/story";
-import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logBodyCostFallback, logServeDisclosure, plansUnresolvedPersonAllowance, WalkingSkeletonRunner } from "./index.js";
+import { assertRegisterPromptContractHashes, buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logBodyCostFallback, logServeDisclosure, plansUnresolvedPersonAllowance, WalkingSkeletonRunner } from "./index.js";
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
@@ -106,6 +106,10 @@ if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   ));
 }
 const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);
+// Practice debate 3 (2026-10-12): every judge, answer-writer and answer-checker call is recorded under the register's
+// prompt fingerprint, so a register that does not carry the fingerprint of a prompt this code sends refuses the start
+// (REGISTER_PROMPT_CONTRACT_HASH_MISMATCH) instead of logging the new prompt under the old fingerprint.
+assertRegisterPromptContractHashes(policy.hashes, environment.REGISTER_VERSION);
 /**
  * VERDICT STORY (spec 2026-09-26 §9): the story's register rows are OPTIONAL.
  * A register that never sealed them — every version before this feature,

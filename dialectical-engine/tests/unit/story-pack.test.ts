@@ -334,6 +334,64 @@ function built(result: StoryMaterialResult): Extract<StoryMaterialResult, { kind
   return result;
 }
 
+/**
+ * Story wording (practice debate 2, 2026-10-12). What our own pack taught or left open, pinned so it cannot come back:
+ * the storyteller copied "when it was double-checked" from the instruction itself; read an author's objection as the
+ * position's own admission and cited one point's words to its neighbour; named the third-placed option as the close
+ * rival; and the checker found one problem per round, so two rounds rarely reached a clean story.
+ */
+describe("verdict story — the shipped pack's wording fixes (story wording, 2026-10-12)", () => {
+  const pack = loadStoryPack(SHIPPED_DIR);
+
+  it("teaches no sentence about the checking: the old model phrases are gone, the finding-first rule is there", () => {
+    expect(pack.common).not.toContain("A point challenged when it was double-checked");
+    expect(pack.common).not.toContain("a point was challenged when it was double-checked");
+    expect(pack.common).not.toContain("a second model's double-check");
+    expect(pack.common).toContain("This holds for whole sentences, not only for words.");
+    expect(pack.common).toContain("no text speaks of the material");
+    expect(pack.common).toContain("its claims have no sources behind them");
+    // The reviewer's note is held to the same rule.
+    expect(pack.common).toContain("never of what the debate weighed or how it worked");
+  });
+
+  it("says who wrote each objection and what it argues against, and how to cite it", () => {
+    for (const text of [pack.common, pack.checker]) {
+      expect(text).toContain("objection_to");
+      expect(text).toMatch(/never a concession or (an )?admission/u);
+    }
+    expect(pack.common).toContain("two notes the point's own author wrote while writing it");
+    expect(pack.common).toContain("list in node_refs the point whose record holds it, never a neighbour with similar words");
+    expect(pack.checker).toContain("words taken from one point and cited to another are not");
+  });
+
+  it("names the option that made a close call close: the runner-up, place 2; the others within the tie margin finished behind it", () => {
+    for (const text of [pack.common, pack.checker]) {
+      expect(text).toContain("within_tie_margin");
+      expect(text).toContain("place");
+    }
+    expect(pack.common).toContain("the one that made it close is the position at runner_up_id, in place 2");
+    expect(pack.checker).toContain("the option the story names as the closest is the runner-up");
+    // The hinges are not all on our side: the storyteller is told to read which way each pushes.
+    expect(pack.common).toContain("A hinge can argue for our answer or for a rival");
+  });
+
+  it("asks the checker for every problem at once, and the storyteller to fix them all in one draft", () => {
+    expect(pack.checker).not.toContain("in a few sentences at most");
+    expect(pack.checker).toContain("list every problem you find in this one objection, most important first");
+    expect(pack.common).toContain("fix every problem it rightly points to, all in this draft");
+  });
+
+  it("tells the checker its reply is the one JSON object, with nothing after it", () => {
+    expect(pack.checker).toContain("once it is written, stop, and add nothing after it");
+  });
+
+  it("explains every key the material carries", () => {
+    for (const key of ["place", "within_tie_margin", "objection_to", "runner_up_id"]) {
+      expect([key, new RegExp(`(?<![\\p{L}_])${key}(?![\\p{L}_])`, "u").test(pack.common)]).toEqual([key, true]);
+    }
+  });
+});
+
 describe("verdict story — the assembled instruction's layout", () => {
   it("renders common text, the choosing rule, then each shape in pack order", () => {
     const pack = loadStoryPack(writePack());

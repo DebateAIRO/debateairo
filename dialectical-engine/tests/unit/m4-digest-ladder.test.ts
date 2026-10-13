@@ -868,7 +868,10 @@ describe("M4 · the answer's prose never names an internal id (review fix I-1)",
     const schema = classifyComposedContent(JSON.stringify({ segments: [] }), citation);
     expect(schema.parseStatus).toBe("SCHEMA_FAILED");
     expect(composedCitationRejectionOf(schema.parseError ?? "")).toBeNull();
-    expect(COMPOSED_CITATION_REJECTIONS).toEqual(["COMPOSED_TEXT_NAMES_A_NODE", "COMPOSED_REF_NOT_IN_DIGEST"]);
+    // Problem 7 (2026-10-12) added the two wording refusals; tests/unit/p7-answer-wording.test.ts pins them.
+    expect(COMPOSED_CITATION_REJECTIONS).toEqual([
+      "COMPOSED_TEXT_NAMES_A_NODE", "COMPOSED_REF_NOT_IN_DIGEST", "COMPOSED_TEXT_PRINTS_A_SCORE", "COMPOSED_TEXT_USES_ENGINE_CODE"
+    ]);
   });
 });
 
