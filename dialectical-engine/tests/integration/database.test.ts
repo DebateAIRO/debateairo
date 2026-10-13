@@ -517,10 +517,13 @@ async function startProviderDouble(
   // classes stay in the vocabulary so a fixture that still scripts one is
   // dispatched rather than silently served a judgement.
   type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "EVALUATOR" | "GENERAL";
+  // Reply language (#154): the directive has two forms, "<name>, the language of the question," and "English," (an
+  // English question, and the fallback for a question the detector cannot name, as most labels here). Both are
+  // removed: with only the first, an English directive's "fatalFlags" sent review calls to the PANEL answers.
   const ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN = new RegExp(
-    argumentLanguageDirective("\u0000")
-      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-      .replace("\u0000", "[^.]+?"),
+    [argumentLanguageDirective("\u0000"), argumentLanguageDirective("")]
+      .map((directive) => directive.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\u0000", "[^.]+?"))
+      .join("|"),
     "gu"
   );
   const classifyContent = (content: ProviderDoubleResponse): ResponseClass => {
