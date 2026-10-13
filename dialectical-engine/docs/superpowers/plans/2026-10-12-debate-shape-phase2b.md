@@ -119,6 +119,8 @@ NOTEs are "Implementer note (pre-flight PF-Bn)" lines in their task.
 - PF-B55 → Task 17: `test:ci-gate` dropped; targeted runs one at a time.
 - PF-B56 → Task 17 + Owner steps 1: README locations; no double edit of the key count; the PF-B13 owner step (note).
 
+- 2026-10-14 (controller ruling T7-PRIV, commits 4ca79b191 + 0677d3717): every id in a readable column is code-minted. The map package renames angles `g1..gN` (plan order, fallback angles too) and chosen answers `a1..aN` (choice order, filled answers too; `filled-N` is gone); merged key points/answers keep the code-minted `kp01`/`an01`. 0116's CHECKs are `^g[1-7]$` (angle_id) and `^a[1-4]$` (answer_id); `map_position`'s root key is `FOREIGN KEY (run_id, root_node_id) REFERENCES core.node(run_id, node_id)`. Task 7's text below shows the pre-ruling CHECKs; the code is the source of truth. Tasks 8, 12–15 use the code ids (never an AI-written id in a readable column, a log line or a mark record).
+
 ## Global Constraints
 
 - **Row absent = today, byte for byte.** A run whose `parseCostEnvelopeBasis(run.envelopeBasis).shape` is `undefined`
