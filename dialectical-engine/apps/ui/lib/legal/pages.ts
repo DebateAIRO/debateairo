@@ -359,6 +359,8 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   models: "Claude Haiku 5.5",
   entity: "Anthropic Ireland, Limited",
   homeCountryKey: "legal.providers.ireland",
+  // One of the five launch models (owner, 12 October 2026): role rotation gives it every debate job.
+  purposesConfirmed: true,
   locationKey: "legal.providers.locationAnthropic",
   retentionKey: "legal.providers.retentionAnthropic",
   zeroRetention: "no",
