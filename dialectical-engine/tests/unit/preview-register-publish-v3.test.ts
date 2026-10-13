@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, PREVIEW_SOURCE_ROW_KEYS_V2 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
@@ -206,5 +208,23 @@ describe('publish kit v3: composing from the current version', () => {
     const v2 = composePreviewSnapshotV2({ sourceRows: f.v2 as any, baseRows: f.v12 as any, baseRegisterVersion: '12', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v12 as any) });
     const pool = { query: async () => { throw new Error('no database call expected'); } } as any;
     await expect(publishPreviewRegisterV3(pool, { publicationId: '11111111-1111-4111-8111-111111111111', sourceRef: 'x', snapshot: v2 as any, approval: { baseRegisterVersion: '12', baseSnapshotSha256: v2.baseSnapshotSha256, snapshotSha256: v2.snapshotSha256, deltaSha256: v2.deltaSha256 } })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+  });
+});
+
+describe('the native operator chooses the kit by the plan', () => {
+  const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
+  const body = text.slice(text.indexOf('export async function runNativeOperator('));
+  it('loads kit v3 only for a plan with the owner\'s hosted inputs, and hands them to the builder', () => {
+    expect(body).toContain("const hosted=Object.hasOwn(plan,'hostedBilling');");
+    expect(body).toContain("tsImport(hosted?'./publish-register-v3.ts':'./publish-register-v2.ts',import.meta.url)");
+    expect(body.split('publisher.buildPreviewSourceRowsV3(')).toHaveLength(2);
+    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null\)/);
+    expect(body).toContain('const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);');
+  });
+  it('publishes with kit v3 only after the pending-forward-step check, like kit v2', () => {
+    const preCheck = body.indexOf("if(plan.operation==='publish')await verify.refusePendingForwardSteps(pool);");
+    expect(preCheck).toBeGreaterThan(-1);
+    expect(body.indexOf('publisher.publishPreviewRegisterV3(')).toBeGreaterThan(preCheck);
+    expect(body.indexOf('publisher.publishPreviewRegisterV2(')).toBeGreaterThan(preCheck);
   });
 });

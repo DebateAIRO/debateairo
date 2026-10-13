@@ -18,10 +18,12 @@
 //   release-artifacts.mjs native-plan --operation apply-and-plan|plan|publish|verify --from <existing native plan>
 //       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
 //       [--publication <publish output>] [--checker glm|deepseek --deepseek-enabled-on-gate yes] --out <file>
-//       [--role-rotation on|off] [--call-concurrency '<JSON object>']
-//       (--checker, --role-rotation and --call-concurrency only with --operation plan; publish carries the plan's choices;
+//       [--role-rotation on|off] [--call-concurrency '<JSON object>'] [--hosted-billing '<JSON object>']
+//       (--checker, --role-rotation, --call-concurrency and --hosted-billing only with --operation plan; publish carries the plan's choices;
 //        defaults glm, on and the base's call-concurrency row kept as it is (or none); --role-rotation off publishes the rotation row disabled: the preview's rollback;
-//        --call-concurrency '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}' publishes that row)
+//        --call-concurrency '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}' publishes that row;
+//        --hosted-billing '{"billing":"off","perRunCeilingMicros":…,"dailyCeilingMicros":…,"askRoomReads":{"limit":…,"windowMs":…,"capacity":…}}'
+//        composes a HOSTED version with kit v3 (the owner's values); verify and apply-and-plan carry it from --from)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
@@ -89,7 +91,7 @@ const COMMANDS = Object.freeze({
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency'] }
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--hosted-billing'] }
 });
 
 export class Refusal extends Error {
@@ -357,7 +359,9 @@ const sameList = (a, b) => Array.isArray(a) && a.length === b.length && a.every(
  */
 export function proposalApproval(proposal, plan) {
   const bad = () => refuse('PROPOSAL_REFUSED');
-  if (!sameKeySet(proposal, PROPOSAL_KEYS) || proposal.schema !== 'preview-auth-dev-snapshot-proposal-v2' || proposal.composer !== 'preview-register-composer-v2') bad();
+  // A plan with the owner's hosted-billing inputs was composed by kit v3; every other plan by kit v2 (native-operator.mjs).
+  const composer = Object.hasOwn(plan, 'hostedBilling') ? 'preview-register-composer-v3' : 'preview-register-composer-v2';
+  if (!sameKeySet(proposal, PROPOSAL_KEYS) || proposal.schema !== 'preview-auth-dev-snapshot-proposal-v2' || proposal.composer !== composer) bad();
   if (proposal.sourceRevision !== plan.sourceRevision || proposal.sourceTree !== plan.sourceTree || proposal.operatorManifestSha256 !== plan.operatorManifestSha256
     || proposal.baseRegisterVersion !== plan.selectedBaseRegisterVersion || proposal.baseSnapshotSha256 !== plan.selectedBaseSnapshotSha256) refuse('PROPOSAL_MISMATCH');
   if (!GIT40.test(proposal.sourceRevision) || !GIT40.test(proposal.sourceTree) || ![proposal.baseSnapshotSha256, proposal.snapshotSha256, proposal.deltaSha256].every(value => HEX64.test(value ?? ''))
@@ -426,6 +430,12 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (concurrencyText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--call-concurrency']);
   let concurrencyValue;
   if (concurrencyText !== undefined) try { concurrencyValue = strictJson(Buffer.from(concurrencyText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--call-concurrency']); }
+  // The hosted preview (owner rulings 2026-10-13): the owner's billing switch, ceilings and room-read budget, as one JSON
+  // object, for a new `plan` only (native-operator.mjs validateHostedBillingChoice below; publish-register-v3.ts checks it again).
+  const hostedText = options['--hosted-billing'];
+  if (hostedText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--hosted-billing']);
+  let hostedValue;
+  if (hostedText !== undefined) try { hostedValue = strictJson(Buffer.from(hostedText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--hosted-billing']); }
   await assertOutputFree(options['--out'], { layout });
   // Lazy: native-operator.mjs loads tsx and pg, which exist only in an installed release root.
   const nativeOperator = () => import('../../preview-auth-dev/v1/native-operator.mjs');
@@ -434,6 +444,11 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (concurrencyText !== undefined) {
     const check = deps.validateCallConcurrencyChoice ?? (await nativeOperator()).validateCallConcurrencyChoice;
     try { concurrencyChoice = check(concurrencyValue); } catch { refuse('ARGUMENTS_REFUSED', ['--call-concurrency']); }
+  }
+  let hostedChoice;
+  if (hostedText !== undefined) {
+    const check = deps.validateHostedBillingChoice ?? (await nativeOperator()).validateHostedBillingChoice;
+    try { hostedChoice = check(hostedValue); } catch { refuse('ARGUMENTS_REFUSED', ['--hosted-billing']); }
   }
   const from = await readJson(options['--from'], { layout, flag: '--from', maxBytes: MAX_PLAN_BYTES, artifact: false });
   try { validateNativePlan(from.value); } catch { refuse('FROM_PLAN_INVALID'); }
@@ -448,6 +463,8 @@ async function nativePlanCommand(options, { layout, deps }) {
     // Publish kit v2 composes from the CURRENT published version: the publication the live verify
     // plan (and so every pinned launch plan) runs on. Derived, never typed.
     if (from.value.operation !== 'verify') refuse('FROM_PLAN_INVALID');
+    // A live version composed by kit v3 (hosted) can only be the base of another v3 plan: kit v2 refuses billing on.
+    if (Object.hasOwn(from.value, 'hostedBilling') && hostedChoice === undefined) refuse('HOSTED_BILLING_REQUIRED');
     const live = from.value.approval?.publication;
     try { validatePublication(live); } catch { refuse('NATIVE_APPROVAL_REQUIRED'); }
     selectedBaseRegisterVersion = live.registerVersion;
@@ -488,13 +505,17 @@ async function nativePlanCommand(options, { layout, deps }) {
   // The same for the call-concurrency policy: present only when the plan's operator gave one.
   const callConcurrency = operation === 'plan' ? concurrencyChoice
     : operation === 'publish' ? from.value.callConcurrency : undefined;
+  // The hosted inputs: a new plan's own; every other operation carries the --from plan's, so publish recomposes the
+  // approved snapshot and verify and apply-and-plan compose from a hosted base with kit v3.
+  const hostedBilling = operation === 'plan' ? hostedChoice : from.value.hostedBilling;
   const plan = {
     schema: from.value.schema, operation, sourceRoot: source.value.sourceRoot, sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree,
     sourceManifest: { path: source.path, sha256: source.sha256 }, operatorManifestSha256: operatorDigest,
     selectedBaseRegisterVersion, selectedBaseSnapshotSha256, publicationId, approval,
     ...(checkerChoice === undefined ? {} : { checkerChoice }),
     ...(rotationChoice === undefined ? {} : { roleRotation: rotationChoice }),
-    ...(callConcurrency === undefined ? {} : { callConcurrency })
+    ...(callConcurrency === undefined ? {} : { callConcurrency }),
+    ...(hostedBilling === undefined ? {} : { hostedBilling })
   };
   try { validateNativePlan(plan); } catch { refuse('NATIVE_PLAN_INVALID'); }
   await (deps.verifySourceManifest ?? verifySourceManifest)(source.value, sourceBinding(source));
