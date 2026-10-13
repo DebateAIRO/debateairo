@@ -236,6 +236,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // It opens no lease and reads no content.
       "apps/runner/src/call-lane-gateway.ts",
       "apps/runner/src/index.ts",
+      // Debate shape (0116, c5e0b2862): the map stage's caller sends each map call through the member gateway the
+      // runner hands it (lane, sit-out book, keep-alive, the run-required leased gateway), naming the run. It opens
+      // no lease and reads no content of its own; the map's storage goes through packages/map/src/repository.ts above.
+      "apps/runner/src/map-stage.ts",
       // L4-F9 repair: the keep-alive hands each runner call, unchanged, to the
       // gateway it wraps (the run-required, leased gateway), or refuses it before
       // anything is sent. It opens no lease and reads no content of its own.
@@ -255,6 +259,12 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
     ]);
     expect(contents.get("apps/runner/src/index.ts")).toMatch(/withRunContentLease/);
     expect(contents.get("apps/runner/src/index.ts")).toMatch(/PROVIDER_RUN_REQUIRED/);
+    // The map stage: every call names the run, it touches no cipher or lease itself, and only the leased runner uses it.
+    expect(contents.get("apps/runner/src/map-stage.ts")).toMatch(/member\.provider\.call\(\{\s*runId: deps\.runId,/);
+    expect(contents.get("apps/runner/src/map-stage.ts")).not.toMatch(privatePrimitive);
+    expect(contents.get("apps/runner/src/map-stage.ts")).not.toMatch(/withRunContentLease|ContentCipher|@debateai\/db/);
+    expect([...contents].filter(([,body]) => /from "\.\/map-stage\.js"/.test(body)).map(([path]) => path))
+      .toEqual(["apps/runner/src/index.ts"]);
     expect(contents.get("packages/story/src/writer.ts")).toMatch(/runId: input\.story\.runId,/);
     expect(contents.get("packages/story/src/writer.ts")).toMatch(/lane: "story",/);
     expect(contents.get("packages/providers/src/preview-test.ts")).toMatch(/gateway\.call\(\{\s*\.\.\.request,/);
