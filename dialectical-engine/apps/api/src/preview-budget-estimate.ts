@@ -334,7 +334,10 @@ function previewMeasuredBucketOf(type: PreviewBilledCallType): PreviewMeasuredBu
 /** The price of one call of `type` on `row`, in nano-USD (never asked for an unbilled retry). */
 export type PreviewCallPricer = (row: PreviewModelRow, type: PreviewBilledCallType) => bigint;
 
-/** CALIBRATED_ESTIMATE: the average call of that kind by that model (previewCallAverage) at the row's list price today. */
+/**
+ * CALIBRATED_ESTIMATE: the average call of that kind by that model (previewCallAverage) at the row's list price today.
+ * The calibrated average ignores a shaped run's writer and map step bounds; switching to it under-prices those calls.
+ */
 export function calibratedEstimatePricer(measured: PreviewMeasuredCallUsage): PreviewCallPricer {
   return (row, type) => {
     const average = previewCallAverage(row.model, type, measured);
@@ -400,6 +403,7 @@ export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" 
  * a whole debate in the $10.00 day, so a started debate is not cut off for money.
  * To switch (back to CALIBRATED_ESTIMATE, to STRICT_BOUND, or to a mode added beside these), change
  * this one constant; previewEstimatePricer and previewDebateCallCount follow it, nothing else reads it.
+ * The calibrated average ignores a shaped run's writer and map step bounds; switching to it under-prices those calls.
  */
 export const PREVIEW_ESTIMATE_PRICING_MODE: PreviewPricingMode = "REALISTIC_WORST_CASE";
 /** THE ONE PRICING SWITCH: the pricer for `mode` (default: the active mode above). */
@@ -503,7 +507,9 @@ function debateSitesByRole(basis: Readonly<Record<string, unknown>>):
   let byRole: ReturnType<typeof expectedCallsByRoleFromBasis>;
   try {
     byRole = expectedCallsByRoleFromBasis(basis);
-  } catch {
+  } catch (error) {
+    // I1: a debate-shape receipt is never priced as today's (never-under-count): its split must read.
+    if (previewShapeOf(basis) !== null) throw error;
     return null;
   }
   const total = Object.values(byRole).reduce((sum, calls) => sum + calls, 0);
@@ -600,11 +606,17 @@ export function previewCallShares(input: Readonly<{
   debateCallCount?: PreviewDebateCallCount;
   /** Spec 2026-10-11 Part 5: a rotated debate; its four roles are panel members, priced per gate at `dearestFor`. */
   rotated?: boolean;
-  /** Required with `rotated`; also seats a shaped run's map merge and choose (X1) when given. */
+  /**
+   * Required with `rotated` or a debate-shape receipt (M2: a shaped run's map merge and choose, X1, are seated at each
+   * gate's dearest member at THEIR price, never at a debate call's).
+   */
   dearestFor?: (models: readonly string[], role: PreviewRotatedRoleKind) => string;
 }>): PreviewCallShares {
   const rotated = input.rotated === true;
-  if (rotated && input.dearestFor === undefined) throw new TypeError("PREVIEW_ROTATION_PRICER_MISSING");
+  // Debate shape: the writer's sites are priced at the run's writer bound, and the map's merge and choose (one site
+  // each, X1) at its map step bounds; today's receipt keeps them all as DEBATE and has no map.
+  const shaped = previewShapeOf(input.basis) !== null;
+  if ((rotated || shaped) && input.dearestFor === undefined) throw new TypeError("PREVIEW_ROTATION_PRICER_MISSING");
   const askProbeModelIds = input.askProbeModelIds ?? [];
   const expected = previewExpectedCalls({ ...input, roleProviderRefs: rotated ? [] : input.roleProviderRefs,
     askProbeTargets: askProbeModelIds.length });
@@ -634,9 +646,6 @@ export function previewCallShares(input: Readonly<{
     add(model, type, numerator);
     add(model, "UNBILLED_RETRY", numerator);
   };
-  // Debate shape: the writer's sites are priced at the run's writer bound, and the map's merge and choose (one site
-  // each, X1) at its map step bounds; today's receipt keeps them all as DEBATE and has no map.
-  const shaped = previewShapeOf(input.basis) !== null;
   const writerType: PreviewCallType = shaped ? "ANSWER_WRITER" : "DEBATE";
   const mapLongSites = shaped ? 2n : 0n;
   if (input.storyOnly !== true) {
@@ -659,9 +668,7 @@ export function previewCallShares(input: Readonly<{
       }
       if (shaped) {
         // X1: one merge and one choose per run; any member may hold the seat, so every gate carries each whole call.
-        const seats = (type: "MAP_MERGE" | "MAP_CHOOSE"): readonly string[] => input.dearestFor === undefined
-          ? dearestPanelMemberPerGate(panelModels).map((entry) => entry.model) : perGate(type);
-        for (const type of ["MAP_MERGE", "MAP_CHOOSE"] as const) for (const model of seats(type)) addDebate(model, debate * members, type);
+        for (const type of ["MAP_MERGE", "MAP_CHOOSE"] as const) for (const model of perGate(type)) addDebate(model, debate * members, type);
       }
       if (rotated) {
         // The careful side: every gate carries the writer's and checker's sites at its dearest member (spec Part 5); the

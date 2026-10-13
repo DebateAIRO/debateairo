@@ -233,6 +233,19 @@ const costEnvelopeBasisSchema = z.object({
    * disclosed, and nothing here recomputes them from panel size and depth. A
    * receipt with a self-consistent serve leg and a wrong author count parses.
    */
+  /**
+   * I1 (P2a final review): the leg is one site per synthesis role per round, and the two roles share ONE sealed loop
+   * bound (`SERVE_LEG.sites` refuses unequal bounds), so every receipt this parser can accept was minted even. An odd
+   * count cannot split between the answer writer and the checker, and a reader that cannot split it must never fall
+   * back to pricing the run as something else.
+   */
+  if (basis.serve_leg.synthesis_loop_sites % 2 !== 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["serve_leg", "synthesis_loop_sites"],
+      message: `synthesis-loop sites ${basis.serve_leg.synthesis_loop_sites} are odd: the writer and the checker share them evenly`
+    });
+  }
   const billed = SERVE_LEG.billed(basis.serve_leg);
   if (basis.call_sites.serve !== billed) {
     ctx.addIssue({

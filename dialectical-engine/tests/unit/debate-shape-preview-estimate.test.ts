@@ -21,8 +21,10 @@ const shaped = computeStructuralCeilingBasis({ ...TERMS, panelSize: 2, depth: 1,
 const legacy = computeStructuralCeilingBasis({ ...TERMS, panelSize: 2, depth: 1 });
 const PANEL = Object.freeze([{ provider_ref: "preview:fixture-a", model_id: GLM }, { provider_ref: "preview:mimo", model_id: MIMO }]);
 const ROLES = Object.freeze({ answerWriter: GLM, answerChecker: GLM, storyteller: GLM, storyChecker: GLM });
+// M2: a shaped receipt needs `dearestFor`; MiMo is the dearer of the DeepInfra gate's members here.
 const sharesOf = (basis: Readonly<Record<string, unknown>>, panel: readonly PreviewPanelMember[] = PANEL) => previewCallShares({ basis, panel,
-  roleModels: ROLES, roleProviderRefs: [], storyRounds: 0, maxCooldownHoldsPerRun: 2 });
+  roleModels: ROLES, roleProviderRefs: [], storyRounds: 0, maxCooldownHoldsPerRun: 2,
+  dearestFor: (models) => models.includes(MIMO) ? MIMO : models[0]! });
 
 describe("the preview prices the answer writer at the run's answer length (spec 2026-10-12 §3.3 step 8)", () => {
   it("an ANSWER_WRITER call is a debate call unless the run's writer bound is larger", () => {
@@ -46,6 +48,13 @@ describe("the preview prices the answer writer at the run's answer length (spec 
     expect(() => previewOutputTokensForBasis(OUTPUT, { ...shaped, shape: { ...(shaped.shape as Readonly<Record<string, unknown>>), writer_bound: "16384" } }))
       .toThrow(/malformed debate shape/u);
   });
+  it("I1: a shaped receipt whose sites do not split into roles is refused, never priced as today's shape", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const odd: any = JSON.parse(JSON.stringify(shaped));
+    odd.serve_leg.synthesis_loop_sites = 7; odd.call_sites.serve = 7; odd.serve_reserve_attempts = 7 * odd.per_site_attempts.organ;
+    expect(() => estimatePreviewGateNeeds({ roleModels: ROLES, roleProviderRefs: [], storyRounds: 0, callOutputTokens: OUTPUT,
+      maxCooldownHoldsPerRun: 2, basis: odd, panel: PANEL })).toThrow(/synthesis-loop sites 7 are odd/u);
+  });
   it("today's debate keeps today's shares; a shaped one puts the writer's sites on ANSWER_WRITER", () => {
     expect(sharesOf(legacy).shares.some((share) => share.type === "ANSWER_WRITER")).toBe(false);
     const writer = sharesOf(shaped).shares.filter((share) => share.type === "ANSWER_WRITER");
@@ -56,6 +65,12 @@ describe("the preview prices the answer writer at the run's answer length (spec 
 });
 
 describe("X1: the map's merge and choose are priced at the run's map step bounds; every other map site at the debate bound", () => {
+  it("M2: a shaped receipt without a seat chooser is refused (its map seats are never chosen at a debate call's price); today's needs none", () => {
+    expect(() => previewCallShares({ basis: shaped, panel: PANEL, roleModels: ROLES, roleProviderRefs: [], storyRounds: 0,
+      maxCooldownHoldsPerRun: 2 })).toThrow("PREVIEW_ROTATION_PRICER_MISSING");
+    expect(previewCallShares({ basis: legacy, panel: PANEL, roleModels: ROLES, roleProviderRefs: [], storyRounds: 0,
+      maxCooldownHoldsPerRun: 2 })).toEqual(sharesOf(legacy));
+  });
   it("a MAP_MERGE or MAP_CHOOSE call is a debate call unless the run's bound is larger", () => {
     const row = previewModelRow(GLM)!;
     for (const type of ["MAP_MERGE", "MAP_CHOOSE"] as const) {

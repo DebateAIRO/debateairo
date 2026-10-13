@@ -78,8 +78,9 @@ export function settingsClassKey(settings: RunSettingsClass): string {
 /**
  * A waiting run's stored shape settings, read the CAREFUL way (contract deviation 8): a value this code does not know
  * reads as the dearest one, so one odd row can never stop the whole waiting line (the reason migration 0085's trigger
- * exists for the depth cast); the dearest class has few samples, so it is estimated at the run's maximum. No settings
- * (a run asked without the row) is null. A shaped run with no plan on its receipt (one maker) takes `fallbackPlan`.
+ * exists for the depth cast); the dearest class is the careful side (with fewer than the sample size of its own runs it
+ * is estimated at the run's maximum). No settings (a run asked without the row) is null. A shaped run with no plan on
+ * its receipt (one maker) takes `fallbackPlan`.
  */
 export function waitingShapeClassOf(raw: unknown, fallbackPlan: DebateShapePlanKey): RunShapeClass | null {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -207,6 +208,9 @@ function countedTokens(text: string): number {
  * recency is its last RUN or STORY charge. The class is read from the columns the
  * run already stores (budget spec §2.5 "The plan reads each from the columns");
  * its model count is the stored panel's length, the ask side's roster length.
+ * Debate shape (M1): a shaped class samples only runs whose RECEIPT carries that plan's shape, so a one-maker run (the
+ * four settings stored, no shape minted) never joins it; a one-maker shaped ask then samples nothing and is estimated
+ * at the run's maximum, the careful side. An unshaped class still samples only runs with no settings and no shape.
  */
 export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
   constructor(private readonly pool: Pool) {}
@@ -238,7 +242,7 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
            AND COALESCE(run.depth_params->>'depthMode', '') = $7
            AND COALESCE(run.depth_params->>'scrutiny', '') = $8
            AND COALESCE(run.depth_params->>'answerLength', '') = $9
-           AND (run.envelope_basis->'shape' IS NULL OR run.envelope_basis->'shape'->>'plan' = $10)
+           AND COALESCE(run.envelope_basis->'shape'->>'plan', '') = $10
            AND EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = run.run_id)
            AND NOT EXISTS (
              SELECT 1 FROM core.work_item AS work

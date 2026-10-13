@@ -258,7 +258,8 @@ const FREE_SHAPE_DEPTH_CEILING = 2;
  * The plan's normalisation (spec §3.2). With the row: fixed -> adaptive where the plan does not allow it, a scrutiny
  * the plan has no budget for -> standard, Free's depth capped at its ceiling (ruling S6), and every key written in one
  * order. Without it: `{ depth }` exactly (the same object for a depth-only ask), so nothing a client sends can change
- * today's stored bytes and the depth is untouched. With billing on, Free's sealed fixed gauge already equals the ceiling.
+ * today's stored bytes and the depth is untouched. With billing on, billing's Free gauge sets the depth first; this
+ * ceiling can only lower it.
  */
 export function normaliseDepthParamsForShape(depthParams: DepthParams, policy: DebateShapePolicy | null, plan: DebateShapePlanKey): DepthParams {
   if (policy === null) return Object.keys(depthParams).length === 1 ? depthParams : Object.freeze({ depth: depthParams.depth });

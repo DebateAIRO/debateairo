@@ -155,7 +155,11 @@ describe("B2 the recent-runs sample (budget spec §2.5)", () => {
     const today = await run({ compositionBudgetTier: "medium", makers: 3 });
     const pro = await run({ compositionBudgetTier: "medium", makers: 3, depthParams: shapedParams, envelopeBasis: receipt("pro") });
     const max = await run({ compositionBudgetTier: "medium", makers: 3, depthParams: shapedParams, envelopeBasis: receipt("max") });
-    for (const runId of [today, pro, max]) {
+    // M1: a one-maker run asked with the row stores the four settings but mints no shape (M < 2); its models still
+    // make it a three-model class, and it must never join a shaped class's sample.
+    const sharedMaker = fixtureDiscoveredPanel(3).map((member) => Object.freeze({ ...member, maker: "maker:shared" }));
+    const oneMaker = await run({ compositionBudgetTier: "medium", panel: sharedMaker, depthParams: shapedParams });
+    for (const runId of [today, pro, max, oneMaker]) {
       await job(runId, "DONE");
       await spend({ runId, recordedAt: new Date(now.getTime() - HOUR) });
     }
@@ -168,5 +172,10 @@ describe("B2 the recent-runs sample (budget spec §2.5)", () => {
       .resolves.toEqual([pro]);
     await expect(read({ ...base, shape: { plan: "pro", depthMode: "fixed", scrutiny: "standard", answerLength: "standard" } }))
       .resolves.toEqual([]);
+    // M1: no plan's shaped class samples the shapeless one-maker run, whatever its plan.
+    for (const plan of ["free", "plus", "pro", "max", "premium"] as const) {
+      const sample = await read({ ...base, shape: { plan, depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } });
+      expect(sample).not.toContain(oneMaker);
+    }
   });
 });

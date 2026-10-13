@@ -54,12 +54,31 @@ describe("the strict receipt parser reads a debate shape receipt (spec 2026-10-1
       }
     }
   });
+  it("I1: refuses an odd synthesis-site count on today's receipt too, and keeps today's even one", () => {
+    for (const backup of [0, 1] as const) {
+      const basis = legacy(backup);
+      expect(basis.serve_leg.synthesis_loop_sites % 2).toBe(0);
+      expect(refusal(basis)).toBeNull();
+      basis.serve_leg.synthesis_loop_sites = 7; basis.call_sites.serve = 7; basis.serve_reserve_attempts = 7 * basis.per_site_attempts.organ;
+      const refused = refusal(basis);
+      expect(refused?.code).toBe("RUN_COST_ENVELOPE_UNRESOLVED");
+      expect(refused?.message).toContain("synthesis-loop sites 7 are odd");
+    }
+  });
   it.each([
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ["a shape receipt under the v4 name", (b: any) => { b.formula_version = "DR-184-v4"; }, "DR-184-v4 and its shape member disagree"],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ["a v4 receipt carrying a shape member", (b: any) => { b.formula_version = "DR-184-v4"; b.call_sites = legacy().call_sites; b.max_model_attempts = legacy().max_model_attempts; },
       "DR-184-v4 and its shape member disagree"],
+    // I3 (final review): the other direction — the shape formula's name with its member gone.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ["a shape-formula receipt with no shape member", (b: any) => { delete b.shape; }, "DR-185-shape-v1 and its shape member disagree"],
+    // I1 (final review): the answer writer and checker split the synthesis sites evenly, so an odd count cannot be a receipt.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ["an odd synthesis-site count", (b: any) => {
+      b.serve_leg.synthesis_loop_sites = 7; b.call_sites.serve = 7; b.serve_reserve_attempts = 7 * b.per_site_attempts.organ;
+    }, "synthesis-loop sites 7 are odd"],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ["an author leg that is not map sites plus nodes", (b: any) => { b.call_sites.author += 1; }, "are not map plus nodes"],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
