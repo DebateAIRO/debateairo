@@ -76,10 +76,27 @@ export function shapePositionsForTodaysOpening(input: Readonly<{ answers: number
   })));
 }
 
+/**
+ * How many positions a shaped run argues (pre-flight PF-B31): the receipt's P, lowered to the distinct makers left after
+ * a sit-out, never below two — `buildShapePlan` refuses fewer, and a refusal would leave the run without an answer. A
+ * missing position is handed over or dropped afterwards (Task 13), never planned away here.
+ */
+export function shapePositionCount(answers: number, makersLeft: number): number {
+  if (!Number.isSafeInteger(answers) || answers < 2 || !Number.isSafeInteger(makersLeft) || makersLeft < 0) {
+    throw new TypeError("SHAPE_POSITION_COUNT_INVALID");
+  }
+  return Math.max(2, Math.min(answers, makersLeft));
+}
+
 export function buildShapePlan(input: Readonly<{ positions: readonly ShapePositionPlan[]; depth: number;
   scrutiny: Readonly<{ roundsPerPoint: number; pointsPerDebate: number }> }>): ShapePlan {
   const rootCount = input.positions.length;
   if (rootCount < 2 || !Number.isSafeInteger(input.depth) || input.depth < 1) throw new TypeError("SHAPE_PLAN_INPUT_INVALID");
+  // A cross-reply answers ANOTHER position of this plan: a rival out of range or the position itself is refused.
+  input.positions.forEach((position, rootIndex) => {
+    const rival = position.rivalIndex;
+    if (!Number.isSafeInteger(rival) || rival < 0 || rival >= rootCount || rival === rootIndex) throw new TypeError("SHAPE_PLAN_RIVAL_INVALID");
+  });
   const legs: ShapeLeg[] = [];
   const children = new Map<number, number>();
   const ordinal = (parent: number): number => { const next = (children.get(parent) ?? 0) + 1; children.set(parent, next); return next; };
@@ -93,13 +110,12 @@ export function buildShapePlan(input: Readonly<{ positions: readonly ShapePositi
   };
   input.positions.forEach((position, rootIndex) => {
     for (const point of position.points) {
-      push({ kind: "POINT", round: 1, rootIndex, parentIndex: rootIndex, polarity: point.polarity, chain: null,
+      // A POINT's chain is itself: `next` is the plan position `push` is about to give it.
+      push({ kind: "POINT", round: 1, rootIndex, parentIndex: rootIndex, polarity: point.polarity, chain: next,
         consideration: point.consideration, keyPointId: point.keyPointId, targetRootIndex: null },
       (childIndex) => legKey(point.polarity, rootIndex, 1, childIndex));
     }
   });
-  // A POINT's chain is itself: set after the push (its position is only known then).
-  for (const [index, leg] of legs.entries()) legs[index] = Object.freeze({ ...leg, chain: leg.childIndex });
   input.positions.forEach((position, rootIndex) => {
     push({ kind: "CROSS", round: 1, rootIndex, parentIndex: rootIndex, polarity: "attack", chain: null, consideration: null,
       keyPointId: null, targetRootIndex: position.rivalIndex },
@@ -156,18 +172,29 @@ export function buildScrutinyLegs(input: Readonly<{ plan: ShapePlan; depth: numb
 
 /**
  * How many nodes the plan can make at most — what P2a's `debateShapeSiteCounts(shape, depth).nodes` priced — COUNTED
- * FROM THE PLAN'S OWN LEGS, never re-derived from a formula (pre-flight PF-B29): the roots, every round-1 leg, the
- * deeper legs of every chain (fixed) or of the first `deeperTopPoints` chains of each position (adaptive: the most chains
- * `shapeSelectChains` keeps, and every chain has as many deeper legs as any other), and the scrutiny slots. A plan with a
- * leg deeper than `depth` is refused: the ceiling was never minted for it.
+ * FROM THE PLAN'S OWN LEGS, never re-derived from a formula (pre-flight PF-B29): the roots, every leg
+ * `shapeRunnableLegs` keeps (all of them in fixed mode; adaptive drops only the deeper legs of the chains past the first
+ * `deeperTopPoints` of each position — the most chains `shapeSelectChains` keeps, and every chain has as many deeper
+ * legs as any other), and the scrutiny slots. A plan with a leg deeper than `depth` is refused: the ceiling was never
+ * minted for it.
  */
 export function shapeRunnableNodeCount(plan: ShapePlan, depth: number, depthMode: "fixed" | "adaptive", deeperTopPoints: number): number {
+  return plan.rootCount + shapeRunnableLegs(plan, depth, depthMode, deeperTopPoints).length + plan.scrutiny.count;
+}
+
+/**
+ * The plan's legs that can run: EVERY leg except the deeper legs of a chain adaptive mode drops (a chain past the first
+ * `deeperTopPoints` of its position). A leg the rule does not recognise — a deeper leg with no chain — is counted, never
+ * silently skipped (never under-count).
+ */
+export function shapeRunnableLegs(plan: ShapePlan, depth: number, depthMode: "fixed" | "adaptive", deeperTopPoints: number): readonly ShapeLeg[] {
   if (plan.legs.some((leg) => leg.round > depth)) throw new TypeError("SHAPE_PLAN_DEEPER_THAN_PRICED");
-  const kept = new Set<number>();
-  for (let rootIndex = 0; rootIndex < plan.rootCount; rootIndex += 1) {
-    const chains = plan.legs.filter((leg) => leg.kind === "POINT" && leg.rootIndex === rootIndex).map((leg) => leg.childIndex);
-    for (const chain of depthMode === "fixed" ? chains : chains.slice(0, deeperTopPoints)) kept.add(chain);
+  const dropped = new Set<number>();
+  if (depthMode === "adaptive") {
+    for (let rootIndex = 0; rootIndex < plan.rootCount; rootIndex += 1) {
+      const chains = plan.legs.filter((leg) => leg.kind === "POINT" && leg.rootIndex === rootIndex).map((leg) => leg.childIndex);
+      for (const chain of chains.slice(deeperTopPoints)) dropped.add(chain);
+    }
   }
-  const runnable = plan.legs.filter((leg) => leg.round === 1 || (leg.chain !== null && kept.has(leg.chain)));
-  return plan.rootCount + runnable.length + plan.scrutiny.count;
+  return Object.freeze(plan.legs.filter((leg) => leg.kind === "POINT" || leg.chain === null || !dropped.has(leg.chain)));
 }

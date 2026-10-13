@@ -6,8 +6,8 @@ import {
 } from "@debateai/register";
 import { deriveGlobalRoundCompletions, selectPreventableBranches } from "../../apps/runner/src/index.js";
 import {
-  buildScrutinyLegs, buildShapePlan, shapePositionsForTodaysOpening, shapePositionsFromMap, shapeRoundOnePoints,
-  shapeRunnableNodeCount
+  buildScrutinyLegs, buildShapePlan, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap, shapeRoundOnePoints,
+  shapeRunnableLegs, shapeRunnableNodeCount, type ShapeLeg, type ShapePlan
 } from "../../apps/runner/src/shape-plan.js";
 import { shapeHandOverRoot, shapeSeatOrder, shapeWriterSeat } from "../../apps/runner/src/shape-seats.js";
 
@@ -20,6 +20,28 @@ const CHOICE = { alsoRaised: [], answers: [
   { answerId: "a2", statement: "No.", forKeyPointIds: ["k3"], againstKeyPointIds: ["k1"], strongestRival: "gone", filled: false },
   { answerId: "a3", statement: "Only at night.", forKeyPointIds: [], againstKeyPointIds: ["k2"], strongestRival: "a1", filled: true }] };
 const KEY_POINTS = ["k1", "k2", "k3", "k4"].map(kp);
+type Sites = Readonly<{ positionNodes: number; pointNodes: number; crossNodes: number; deeperNodes: number; scrutinyNodes: number }>;
+const SITES = ["positionNodes", "pointNodes", "crossNodes", "deeperNodes", "scrutinyNodes"] as const;
+/** The plan's runnable nodes, site by site, counted from its legs (review fix 1: never only the total). */
+const sitesOf = (plan: ShapePlan, runnable: readonly ShapeLeg[]): Sites => {
+  const kinds = (...wanted: readonly ShapeLeg["kind"][]) => runnable.filter((leg) => wanted.includes(leg.kind)).length;
+  return { positionNodes: plan.rootCount, pointNodes: kinds("POINT"), crossNodes: kinds("CROSS"), deeperNodes: kinds("REPLY", "DEFENCE"),
+    scrutinyNodes: plan.scrutiny.count };
+};
+/** Every site within its priced allowance (equal when `exact`); the sites add up to the whole runnable count. */
+const expectWithinSites = (plan: ShapePlan, runnable: readonly ShapeLeg[], priced: Sites & Readonly<{ nodes: number }>, exact: boolean, at: string): void => {
+  const sites = sitesOf(plan, runnable);
+  for (const site of SITES) {
+    if (exact) expect(sites[site], `${at} ${site}`).toBe(priced[site]);
+    else expect(sites[site], `${at} ${site}`).toBeLessThanOrEqual(priced[site]);
+  }
+  expect(SITES.reduce((sum, site) => sum + sites[site], 0), `${at} every leg in a site`).toBe(plan.rootCount + runnable.length + plan.scrutiny.count);
+};
+/** No two legs under one parent share a sibling ordinal (plan and scrutiny legs together). */
+const expectOrdinalsUnique = (legs: readonly ShapeLeg[], at: string): void => {
+  const slots = legs.map((leg) => `${String(leg.parentIndex)}/${String(leg.siblingOrdinal)}`);
+  expect(new Set(slots).size, `${at} sibling ordinals`).toBe(slots.length);
+};
 
 describe("round-1 points (spec §3.3 step 3)", () => {
   it("takes against first, then for, at least one of each when both exist", () => {
@@ -102,15 +124,18 @@ describe("the breadth-first plan (spec §3.3 steps 3–5, INTERFACE §3 round or
       for (const depth of [1, 2, 3]) {
         const shape = { answers: 3, pointsPerAnswer: 3, deeperTopPoints: 2, depthMode, scrutinyRoundsPerPoint: 2, scrutinyPointsPerDebate: 6,
           mapAIs: 4, gapRounds: 2, graders: 3, closeCallExtraGraders: 1 } as unknown as DebateShapeCeilingInput;
-        const priced = debateShapeSiteCounts(shape, depth).nodes;
+        const counts = debateShapeSiteCounts(shape, depth);
+        const priced = counts.nodes;
         const full = buildShapePlan({ positions: fullPoints, depth, scrutiny: { roundsPerPoint: 2, pointsPerDebate: 6 } });
         expect(shapeRunnableNodeCount(full, depth, depthMode, 2), `${depthMode} d${String(depth)}`).toBe(priced);
+        expectWithinSites(full, shapeRunnableLegs(full, depth, depthMode, 2), counts, true, `${depthMode} d${String(depth)}`);
         // Pre-flight PF-B29: the plan's own legs, counted raw, never a formula. In fixed mode every leg runs, so the plan
         // holds exactly what P2a priced; and no leg is deeper than the depth the ceiling was minted for.
         if (depthMode === "fixed") expect(full.rootCount + full.legs.length + full.scrutiny.count, `fixed d${String(depth)} raw`).toBe(priced);
         for (const leg of full.legs) expect(leg.round).toBeLessThanOrEqual(depth);
         const fewer = buildShapePlan({ positions, depth, scrutiny: { roundsPerPoint: 2, pointsPerDebate: 6 } });
         expect(shapeRunnableNodeCount(fewer, depth, depthMode, 2)).toBeLessThanOrEqual(priced);
+        expectWithinSites(fewer, shapeRunnableLegs(fewer, depth, depthMode, 2), counts, false, `fewer ${depthMode} d${String(depth)}`);
       }
     }
   });
@@ -136,16 +161,47 @@ describe("seats", () => {
 });
 
 describe("fewer than two positions (pre-flight PF-B31)", () => {
+  it("shapePositionCount: max(2, min(P, makers left)), refusing a P below two or a broken count", () => {
+    expect([0, 1, 2, 3, 4, 9].map((makersLeft) => shapePositionCount(3, makersLeft))).toEqual([2, 2, 2, 3, 3, 3]);
+    expect(shapePositionCount(2, 1)).toBe(2);
+    for (const [answers, makersLeft] of [[1, 3], [2.5, 3], [3, -1], [3, Number.NaN]] as const) {
+      expect(() => shapePositionCount(answers, makersLeft), `${String(answers)}/${String(makersLeft)}`).toThrow("SHAPE_POSITION_COUNT_INVALID");
+    }
+  });
+
   it("the plan refuses one position; the callers' floor of two always builds", () => {
     const one = shapePositionsForTodaysOpening({ answers: 1, pointsPerAnswer: 3 });
     expect(() => buildShapePlan({ positions: one, depth: 2, scrutiny: { roundsPerPoint: 0, pointsPerDebate: 0 } })).toThrow("SHAPE_PLAN_INPUT_INVALID");
-    // Tasks 12/13: positions = max(2, min(P, distinct makers left)) — a sit-out leaving one maker still plans two.
+    // Tasks 12/13 size positions with shapePositionCount — a sit-out leaving one maker (or none) still plans two.
     for (const makersLeft of [0, 1, 2]) {
-      const count = Math.max(2, Math.min(3, makersLeft));
-      const plan = buildShapePlan({ positions: shapePositionsForTodaysOpening({ answers: count, pointsPerAnswer: 3 }), depth: 2,
-        scrutiny: { roundsPerPoint: 0, pointsPerDebate: 0 } });
+      const plan = buildShapePlan({ positions: shapePositionsForTodaysOpening({ answers: shapePositionCount(3, makersLeft), pointsPerAnswer: 3 }),
+        depth: 2, scrutiny: { roundsPerPoint: 0, pointsPerDebate: 0 } });
       expect(plan.rootCount).toBe(2);
     }
+  });
+});
+
+describe("the strongest rival (review fix 5)", () => {
+  it("the plan refuses a rival that is out of range, not whole, or the position itself", () => {
+    const positions = shapePositionsForTodaysOpening({ answers: 3, pointsPerAnswer: 1 });
+    for (const rivalIndex of [-1, 3, 1.5, 0, Number.NaN]) {
+      const broken = positions.map((position, index) => (index === 0 ? { ...position, rivalIndex } : position));
+      expect(() => buildShapePlan({ positions: broken, depth: 1, scrutiny: { roundsPerPoint: 0, pointsPerDebate: 0 } }), String(rivalIndex))
+        .toThrow("SHAPE_PLAN_RIVAL_INVALID");
+    }
+    expect(buildShapePlan({ positions, depth: 1, scrutiny: { roundsPerPoint: 0, pointsPerDebate: 0 } }).rootCount).toBe(3);
+  });
+});
+
+describe("dropped chains (review fix 2)", () => {
+  it("counts every leg except the deeper legs of the chains adaptive drops, a chainless deeper leg included", () => {
+    const plan = buildShapePlan({ positions: shapePositionsForTodaysOpening({ answers: 2, pointsPerAnswer: 3 }), depth: 2,
+      scrutiny: { roundsPerPoint: 0, pointsPerDebate: 0 } });
+    // 2 roots, 6 points, 2 crosses, 12 deeper legs; adaptive X=1 keeps one chain per root (4 deeper legs).
+    expect(shapeRunnableNodeCount(plan, 2, "adaptive", 1)).toBe(2 + 6 + 2 + 4);
+    const last = plan.legs[plan.legs.length - 1]!;
+    const chainless = { ...plan, legs: [...plan.legs, { ...last, kind: "REPLY" as const, chain: null, childIndex: last.childIndex + 1 }] };
+    expect(shapeRunnableNodeCount(chainless, 2, "adaptive", 1)).toBe(2 + 6 + 2 + 4 + 1);
   });
 });
 
@@ -189,7 +245,8 @@ describe("the enumerator: no plan the runner can build runs more nodes than P2a 
               const params = normaliseDepthParamsForShape({ depth: asked, depthMode, scrutiny, answerLength: "standard" }, policy, planKey);
               const shape = resolveDebateShape({ policy, plan: planKey, makers, settings: debateShapeSettingsOf(params) })!;
               const depth = params.depth;
-              const priced = debateShapeSiteCounts(shape, depth).nodes;
+              const counts = debateShapeSiteCounts(shape, depth);
+              const priced = counts.nodes;
               const P = shape.answers;
               const K = shape.pointsPerAnswer;
               const budget = { roundsPerPoint: shape.scrutinyRoundsPerPoint, pointsPerDebate: shape.scrutinyPointsPerDebate };
@@ -213,6 +270,10 @@ describe("the enumerator: no plan the runner can build runs more nodes than P2a 
                   expect(keys.every((key) => KEY_0069.test(key)), at).toBe(true);
                   const runnable = shapeRunnableNodeCount(plan, depth, shape.depthMode, shape.deeperTopPoints);
                   expect(runnable, at).toBeLessThanOrEqual(priced);
+                  const runnableLegs = shapeRunnableLegs(plan, depth, shape.depthMode, shape.deeperTopPoints);
+                  expect(plan.rootCount + runnableLegs.length + plan.scrutiny.count, at).toBe(runnable);
+                  const exact = positionsLeft === P && opening !== "mapSpread" && (shape.depthMode === "fixed" || shape.deeperTopPoints <= K);
+                  expectWithinSites(plan, runnableLegs, counts, exact, at);
                   // Every reserved scrutiny slot is a node the ceiling priced; more selected nodes than Q never add a leg.
                   const selected = [...Array.from({ length: plan.rootCount }, (_unused, index) => ({ position: index, rootIndex: index })),
                     ...plan.legs.map((leg) => ({ position: leg.childIndex, rootIndex: leg.rootIndex }))].slice(0, budget.pointsPerDebate + 2);
@@ -224,6 +285,7 @@ describe("the enumerator: no plan the runner can build runs more nodes than P2a 
                     expect(leg.callSiteKey, at).toMatch(KEY_0069);
                   }
                   expect(new Set([...keys, ...scrutinyLegs.map((leg) => leg.callSiteKey)]).size, at).toBe(keys.length + scrutinyLegs.length);
+                  expectOrdinalsUnique([...plan.legs, ...scrutinyLegs], at);
                   if (positionsLeft === P && opening !== "mapSpread") {
                     // Every answer has K points: the plan holds exactly what was priced (fixed: raw legs; adaptive: X ≤ K).
                     equalWalked += 1;
