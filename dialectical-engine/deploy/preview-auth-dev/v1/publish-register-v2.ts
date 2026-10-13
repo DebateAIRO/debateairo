@@ -32,6 +32,7 @@
 // the source carry that row (an optional key, PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2). Left out (the default), the
 // source has no such row: a base without it stays without it (one call at a time per debate, as before), and a base
 // that holds it keeps it unchanged (controller ruling R19: the composer carries it from the base, like a base-owned row).
+// Debate shape (spec 2026-10-12 §3.1): likewise optional; the source carries a debateShapePolicy row only when the operator hands one.
 // The delta now carries the old and new canonical values, so the owner reviews values, not hashes;
 // deltaSha256 binds that exact document and the approval binds deltaSha256.
 import { createHash } from 'node:crypto';
@@ -41,6 +42,7 @@ import {
   parseRegisterVersionText, buildConfiguredProviderSetSealedRow, buildConfiguredProviderSetDeploymentRow,
   PASSWORD_RESET_POLICY_REGISTER_ROW, BACKUP_EMAIL_POLICY_REGISTER_ROW, MFA_RECOVERY_POLICY_REGISTER_ROW,
   answerRoleRotationPolicyRow, callConcurrencyPolicyRow, callConcurrencyPolicyFromValue, CALL_CONCURRENCY_POLICY_ROW_KEY,
+  DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyRow, parseDebateShapePolicy, type DebateShapePolicy,
   type BootstrapRegister, type CallConcurrencyPolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
@@ -86,7 +88,7 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
  * never in PREVIEW_SOURCE_ROW_KEYS_V2's exact closure. A base row with such a key that the source leaves out is
  * carried from the base unchanged (R19: a plan that does not name the value keeps the current one); it is never dropped.
  */
-export const PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 = Object.freeze([CALL_CONCURRENCY_POLICY_ROW_KEY] as const);
+export const PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 = Object.freeze([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY] as const);
 
 /** The answer writer: GLM (fixture-a), always. Story roles follow the writer and checker (story-policy.ts). */
 export const PREVIEW_SYNTHESIZER_ROLE_REF = 'preview:fixture-a' as const;
@@ -133,13 +135,15 @@ const sourceKeysReviewed = (keys:readonly string[]) => {
  * v1's source build (same runtime gate, same provider panel), closed by the reviewed key list instead of a count.
  * `checker` is the reviewed checker choice (default GLM) and `roleRotation` the operator's rotation switch
  * (default 'on'); `callConcurrency` the operator's optional parallel-calls policy (default null: no row, one call at
- * a time). All three are checked before anything else is built (the policy by the register's own parser,
- * CALL_CONCURRENCY_POLICY_INVALID).
+ * a time); `debateShape` the operator's optional debate shape policy (default null: no row, today's shape). All are
+ * checked before anything else is built (each policy by the register's own parser, CALL_CONCURRENCY_POLICY_INVALID
+ * or DEBATE_SHAPE_POLICY_INVALID).
  */
-export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
+export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
   const evaluatorRoleRef=previewCheckerRoleRef(checker);
   const rotationEnabled=previewRoleRotationEnabled(roleRotation);
   const concurrencyRows=callConcurrency===null?[]:[callConcurrencyPolicyRow(callConcurrency,'docs/superpowers/specs/2026-10-12-parallel-calls-design.md; owner 2026-10-12')];
+  const shapeRows=debateShape===null?[]:[debateShapePolicyRow(debateShape,'docs/superpowers/specs/2026-10-12-debate-shape-design.md; owner 2026-10-12')];
   if(runtime.nodeVersion!=='v26.8.2'||runtime.pnpmVersion!=='11.20.0'||!/^([0-9a-f]{40})$/.test(runtime.sourceRevision)
     ||!/^([0-9a-f]{40})$/.test(runtime.sourceTree)||!/^([0-9a-f]{64})$/.test(runtime.operatorSha256)
     ||!Number.isFinite(Date.parse(runtime.observedAt))||bootstrap.values.pnpmVersion!==runtime.pnpmVersion||bootstrap.values.postgresMajorVersion!=='18')fail();
@@ -159,7 +163,9 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
     // operator published with roleRotation 'off' (the row stays, disabled: behaviour is then today's).
     answerRoleRotationPolicyRow(rotationEnabled,'docs/superpowers/specs/2026-10-11-role-rotation-design.md; owner 2026-10-10'),
     // Parallel calls (spec 2026-10-12 §3.1): only when the operator supplied a policy.
-    ...concurrencyRows];
+    ...concurrencyRows,
+    // Debate shape (spec 2026-10-12 §3.1): only when the operator supplied a policy.
+    ...shapeRows];
   if(!sourceKeysReviewed(rows.map(row=>row.rowKey)))fail('source-key-list');
   return Object.freeze(rows.map(row=>Object.freeze(row)));
 }
@@ -229,7 +235,10 @@ export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly Reg
   // An optional row the source leaves out keeps the base's value (R19), checked by its own parser, never in the delta.
   const optional=PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 as readonly string[];
   const carried=base.filter(row=>optional.includes(row.rowKey)&&!sourceMap.has(row.rowKey));
-  for(const row of carried)if(row.rowKey===CALL_CONCURRENCY_POLICY_ROW_KEY)callConcurrencyPolicyFromValue(JSON.parse(row.valueJsonText));
+  for(const row of carried){
+    if(row.rowKey===CALL_CONCURRENCY_POLICY_ROW_KEY)callConcurrencyPolicyFromValue(JSON.parse(row.valueJsonText));
+    if(row.rowKey===DEBATE_SHAPE_POLICY_ROW_KEY)parseDebateShapePolicy(JSON.parse(row.valueJsonText));
+  }
   // Any other base row the source no longer builds is never dropped silently.
   if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)&&!optional.includes(row.rowKey)))fail('base-row-dropped');
   assertProviderRows(sourceMap,'source');

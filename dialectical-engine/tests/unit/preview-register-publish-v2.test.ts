@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows, composePreviewSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import {
@@ -318,7 +318,7 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     const absent = await build(), given = await build(policy);
     expect(absent.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(await build(null)).toEqual(absent);
-    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY]);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY]);
     expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(given.filter(row => row.rowKey !== CALL_CONCURRENCY_POLICY_ROW_KEY)).toEqual(absent);
     expect(JSON.parse(given.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)!.valueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
@@ -385,6 +385,38 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     expect(JSON.parse(entry.newValueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
     // A plan without the key hands null: the source, and so the delta, is today's.
     expect(compose(await build(null), f.v9).deltaSha256).toBe(compose(f.source, f.v9).deltaSha256);
+  });
+});
+
+describe('publish kit v2: the optional debateShapePolicy row (absent by default, spec 2026-10-12 §3.1)', () => {
+  const policy = debateShapePolicyStartValues();
+  const build = async (debateShape?: unknown) =>
+    [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, undefined, undefined, null, debateShape as any)] as Row[];
+
+  it('adds exactly one row when supplied and nothing by default; it is optional, never in the reviewed closure', async () => {
+    const absent = await build(), given = await build(policy);
+    expect(absent.map(row => row.rowKey)).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
+    expect(await build(null)).toEqual(absent);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY]);
+    expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
+    expect(given.filter(row => row.rowKey !== DEBATE_SHAPE_POLICY_ROW_KEY)).toEqual(absent);
+    expect(JSON.parse(given.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)!.valueJsonText)).toEqual(JSON.parse(JSON.stringify(policy)));
+  });
+  it('refuses a policy the register parser refuses, before building any row', async () => {
+    const bad = JSON.parse(JSON.stringify(policy));
+    bad.plans.free.mapAIs = 10;
+    await expect(build(bad)).rejects.toThrow('DEBATE_SHAPE_POLICY_INVALID:plans.free.mapAIs');
+  });
+  it('R19: a plan without a value keeps the base version\'s row unchanged; a broken base row is refused, never carried', async () => {
+    const f = await fixture();
+    const published = compose(await build(policy), f.v9);
+    expect(published.addedKeys).toEqual([ROTATION_KEY, DEBATE_SHAPE_POLICY_ROW_KEY].sort((a, b) => a.localeCompare(b, 'en')));
+    const base = [...published.rows] as Row[];
+    const kept = compose(f.source, base, '10');
+    expect(kept.rows.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)).toEqual(base.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY));
+    expect(kept.delta).toEqual([]);
+    const broken = base.map(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"DEBATE_SHAPE_POLICY"', '"X"') } : row);
+    expect(() => compose(f.source, broken, '10')).toThrow('DEBATE_SHAPE_POLICY_INVALID:kind');
   });
 });
 

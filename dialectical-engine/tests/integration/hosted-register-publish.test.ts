@@ -31,12 +31,15 @@ import {
   assertAskRoomAdmissionSealed,
   assertHostedSupportAdmissionSealed,
   callConcurrencyPolicyRow,
+  debateShapePolicyRow,
+  debateShapePolicyStartValues,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
   readAdmissionPolicy,
   readAnswerRoleRotationPolicy,
   readAuthPolicy,
   readCallConcurrencyPolicy,
+  readDebateShapePolicy,
   readBillingPlans,
   readBillingPolicy,
   readCostEnvelopePolicy,
@@ -55,6 +58,7 @@ import {
 import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
 import {
   HOSTED_REGISTER_FILE_FORMAT,
+  HostedRegisterBootCheckFailedError,
   createPostgresHostedRegisterOperations,
   hostedRegisterRefusalCode,
   parseHostedRegisterFile,
@@ -543,6 +547,49 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     const before = await versionCount();
     const code = await planOf({ ...hostedFile(), callConcurrencyPolicy: member }).then(() => "NO_REFUSAL", hostedRegisterRefusalCode);
     expect(code).toBe("HOSTED_REGISTER_CALL_CONCURRENCY_INVALID");
+    expect(await versionCount()).toBe(before);
+  }, 120_000);
+
+  // Debate shape (spec 2026-10-12 §3.1): the optional debateShapePolicy member becomes one additive row. Controller
+  // ruling PF4: in Phase 2a the boot check also asks the runner's own guard, so a version that seals the row is sealed
+  // (it can never be withdrawn) and then refused as not boot-ready: DEBATE_SHAPE_POLICY_RUNNER_PENDING. P2b removes it.
+  it("seals debateShapePolicy as the row the publishers build (refused as not boot-ready in Phase 2a), and a file without the member seals none", async () => {
+    const operations = createPostgresHostedRegisterOperations(database.pool);
+    const absent = await publishHostedRegister({ plan: await planOf(hostedFile()), operations });
+    expect(absent.outcome).toBe("CREATED");
+    await expect(readDebateShapePolicy(database.pool, registerVersionToSafeLegacyNumber(absent.registerVersion))).resolves.toBeNull();
+
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(debateShapePolicyStartValues())) as Record<string, unknown>;
+    const before = await versionCount();
+    const failure = await publishHostedRegister({ plan: await planOf({ ...hostedFile(), debateShapePolicy: member }), operations })
+      .then(() => null, (error: unknown) => error);
+    expect(failure).toBeInstanceOf(HostedRegisterBootCheckFailedError);
+    expect(failure).toMatchObject({ code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:DEBATE_SHAPE_POLICY_RUNNER_PENDING" });
+    // The error carries the sealed version's result (the CLI prints it as HOSTED_REGISTER_NOT_BOOT_READY).
+    const given = (failure as HostedRegisterBootCheckFailedError).result;
+    expect(given.outcome).toBe("CREATED");
+    expect(await versionCount()).toBe(before + 1);
+    const expected = debateShapePolicyRow(debateShapePolicyStartValues(), "task-14b integration: first hosted register");
+    const sealed = await database.pool.query<{ value_json: unknown; source_ref: string }>(
+      "SELECT value_json,source_ref FROM register.register_row WHERE register_version=$1 AND row_key='debateShapePolicy'",
+      [given.registerVersion]
+    );
+    expect(sealed.rows).toEqual([{ value_json: JSON.parse(expected.valueJsonText), source_ref: expected.sourceRef }]);
+    await expect(readDebateShapePolicy(database.pool, registerVersionToSafeLegacyNumber(given.registerVersion)))
+      .resolves.toEqual(debateShapePolicyStartValues());
+  }, 120_000);
+
+  it.each([
+    ["a size above its bound", (m: any) => { m.plans.free.mapAIs = 10; }],
+    ["a member carrying the row's kind", (m: any) => { m.kind = "DEBATE_SHAPE_POLICY"; }],
+    ["a member present as JSON null", () => null]
+  ])("refuses a debateShapePolicy member with %s before anything is sealed", async (_name, change) => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(debateShapePolicyStartValues()));
+    const changed = change(member);
+    const before = await versionCount();
+    const code = await planOf({ ...hostedFile(), debateShapePolicy: changed === null ? null : member })
+      .then(() => "NO_REFUSAL", hostedRegisterRefusalCode);
+    expect(code).toBe("HOSTED_REGISTER_DEBATE_SHAPE_INVALID");
     expect(await versionCount()).toBe(before);
   }, 120_000);
 });

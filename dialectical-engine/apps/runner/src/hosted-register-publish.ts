@@ -34,7 +34,9 @@
  *    file's sourceRef; left out, no such row is sealed and the engine keeps its fixed roles. Likewise optional,
  *    the `callConcurrencyPolicy` (spec 2026-10-12, parallel calls): `{ "perDebate", "perModelPerDebate",
  *    "perModelPerRunner" }`, sealed as the ADDITIVE `callConcurrencyPolicy` row under the file's sourceRef;
- *    left out, no such row is sealed and the runner makes one call at a time per debate.
+ *    left out, no such row is sealed and the runner makes one call at a time per debate. Likewise optional, the
+ *    `debateShapePolicy` (spec 2026-10-12, debate shape): the policy without its kind, sealed as the ADDITIVE
+ *    `debateShapePolicy` row under the file's sourceRef; left out, no such row is sealed and the engine keeps today's shape.
  *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
  *    own `--scorecard` file: the owners' approved document, sealed as it is,
  *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
@@ -93,6 +95,7 @@ import {
   BILLING_POLICY_ROW_KEY,
   CALL_CONCURRENCY_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
+  DEBATE_SHAPE_POLICY_ROW_KEY,
   COST_ENVELOPE_POLICY_ROW_KEY,
   COUNTRY_POLICY_ROW_KEY,
   MODEL_SCORECARD_MAX_BYTES,
@@ -111,6 +114,9 @@ import {
   buildConfiguredProviderSetDeploymentRow,
   callConcurrencyPolicyFromValue,
   callConcurrencyPolicyRow,
+  assertDebateShapeRunnerReady,
+  debateShapePolicyRow,
+  parseDebateShapePolicy,
   callTokenCeilingsFromValues,
   computeRegisterSnapshotSha256,
   composeStaffPolicyRegisterPublicationRows,
@@ -131,6 +137,7 @@ import {
   readAdmissionPolicy,
   readAnswerRoleRotationPolicy,
   readCallConcurrencyPolicy,
+  readDebateShapePolicy,
   readAuthPolicy,
   readBillingPlans,
   readBillingPolicy,
@@ -210,7 +217,9 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // Role rotation (spec 2026-10-11): OPTIONAL. Left out, no row is sealed and the engine keeps its fixed roles.
   "answerRoleRotation",
   // Parallel calls (spec 2026-10-12): OPTIONAL. Left out, no row is sealed and the runner makes one call at a time per debate.
-  "callConcurrencyPolicy"
+  "callConcurrencyPolicy",
+  // Debate shape (spec 2026-10-12): OPTIONAL. Left out, no row is sealed and the engine keeps today's shape.
+  "debateShapePolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -404,6 +413,8 @@ export type HostedRegisterFile = Readonly<{
   answerRoleRotation?: unknown;
   /** Optional (spec 2026-10-12): the policy without its `kind`; absent = no callConcurrencyPolicy row. */
   callConcurrencyPolicy?: unknown;
+  /** Optional (spec 2026-10-12): the debate shape policy without its kind; absent = no debateShapePolicy row. */
+  debateShapePolicy?: unknown;
 }>;
 
 /**
@@ -465,7 +476,8 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     ...(Object.hasOwn(record, "askRoomReads") ? { askRoomReads: record.askRoomReads } : {}),
     ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {}),
     ...(Object.hasOwn(record, "answerRoleRotation") ? { answerRoleRotation: record.answerRoleRotation } : {}),
-    ...(Object.hasOwn(record, "callConcurrencyPolicy") ? { callConcurrencyPolicy: record.callConcurrencyPolicy } : {})
+    ...(Object.hasOwn(record, "callConcurrencyPolicy") ? { callConcurrencyPolicy: record.callConcurrencyPolicy } : {}),
+    ...(Object.hasOwn(record, "debateShapePolicy") ? { debateShapePolicy: record.debateShapePolicy } : {})
   });
 }
 
@@ -790,6 +802,23 @@ function callConcurrencyRowOf(member: unknown, sourceRef: string): ReturnType<ty
 }
 
 /**
+ * The debateShapePolicy row for the file's optional member (spec 2026-10-12 §3.1). The member is the policy without
+ * its `kind` (the row adds it); a member that is not an object, carries `kind`, or that the register's own parser
+ * refuses is refused with the file's own code (never the parser's message), so a malformed member can never seal a
+ * malformed row.
+ */
+function debateShapeRowOf(member: unknown, sourceRef: string): ReturnType<typeof debateShapePolicyRow> {
+  if (typeof member !== "object" || member === null || Array.isArray(member) || Object.hasOwn(member, "kind")) {
+    return refuse("HOSTED_REGISTER_DEBATE_SHAPE_INVALID");
+  }
+  try {
+    return debateShapePolicyRow(parseDebateShapePolicy({ kind: "DEBATE_SHAPE_POLICY", ...member }), sourceRef);
+  } catch {
+    return refuse("HOSTED_REGISTER_DEBATE_SHAPE_INVALID");
+  }
+}
+
+/**
  * Everything decided before a connection exists. A refusal here has published
  * nothing and opened nothing; a plan that returns is exactly what would be sealed.
  */
@@ -825,6 +854,9 @@ export async function planHostedRegisterPublication(
   // (one call at a time per debate, as before).
   const callConcurrencyRow = file.callConcurrencyPolicy === undefined ? null
     : callConcurrencyRowOf(file.callConcurrencyPolicy, file.sourceRef);
+  // Debate shape (spec 2026-10-12): the same, for the optional debateShapePolicy member. Absent = no row (today's shape).
+  const debateShapeRow = file.debateShapePolicy === undefined ? null
+    : debateShapeRowOf(file.debateShapePolicy, file.sourceRef);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -962,11 +994,21 @@ export async function planHostedRegisterPublication(
     valueJsonText: callConcurrencyRow.valueJsonText,
     sourceRef: callConcurrencyRow.sourceRef
   })];
+  // Debate shape (spec 2026-10-12) is ADDITIVE too, for the same reason.
+  if (debateShapeRow !== null && codeOwnedRows.some((row) => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const debateShapeRows: readonly RegisterPublicationRow[] = debateShapeRow === null ? [] : [Object.freeze({
+    rowKey: debateShapeRow.rowKey,
+    valueJsonText: debateShapeRow.valueJsonText,
+    sourceRef: debateShapeRow.sourceRef
+  })];
   const rows = Object.freeze([
     ...codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row),
     ...scorecardRows,
     ...roleRotationRows,
-    ...callConcurrencyRows
+    ...callConcurrencyRows,
+    ...debateShapeRows
   ]);
   const keys = new Set(rows.map((row) => row.rowKey));
   if (keys.size !== rows.length || ALGORITHM_REGISTER_ROW_KEYS.some((key) => !keys.has(key))) {
@@ -1302,6 +1344,10 @@ export async function verifyHostedRegisterBootReadiness(
   await readAnswerRoleRotationPolicy(pool, version);
   // Parallel calls (spec 2026-10-12): optional (ABSENT = one call at a time), but a malformed row would refuse the runner's boot.
   await readCallConcurrencyPolicy(pool, version);
+  // Debate shape (spec 2026-10-12): optional (ABSENT = today's shape); a malformed row refuses both boots. Controller
+  // ruling PF4: this also asks the runner's own Phase-2a guard (apps/runner/src/main.ts), so a version the runner would
+  // refuse to start on (DEBATE_SHAPE_POLICY_RUNNER_PENDING) is never reported ready. Phase 2b removes the guard here too.
+  assertDebateShapeRunnerReady(await readDebateShapePolicy(pool, version));
   // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
   // sealed one the API would refuse at start-up is refused here, by its reason.
   const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());
