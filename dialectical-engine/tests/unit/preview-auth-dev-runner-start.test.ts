@@ -57,6 +57,19 @@ describe('runner startup event (afterRunnerReady)', () => {
     expect(receipt.parseRunnerRuntimeEvent(`PREVIEW_RUNNER_STARTED ${JSON.stringify(started.event)}`)).toEqual(started.event);
   });
 
+  it('carries the hosted mode into the event (owner rulings 2026-10-13), and refuses a mode that changes during main', async () => {
+    const main = fakeMain(ready);
+    const started = await receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => ({ ...selection, DEBATEAI_DEPLOYMENT_MODE: 'hosted' }), subscribeReady: main.subscribeReady, importMain: main.importMain, emit: () => undefined });
+    expect(started.event.deploymentMode).toBe('hosted');
+    expect(receipt.validateRunnerRuntimeEvent(started.event)).toEqual(started.event);
+    main.stop(); await started.running;
+    let mode = 'local';
+    const flipping = fakeMain(ready);
+    await expect(receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => ({ ...selection, DEBATEAI_DEPLOYMENT_MODE: mode }), subscribeReady: flipping.subscribeReady, importMain: async () => { mode = 'hosted'; await flipping.importMain(); }, emit: () => undefined })).rejects.toThrow('PREVIEW_RUNTIME_SELECTION_REFUSED');
+    flipping.stop();
+    expect(() => receipt.validateRunnerRuntimeEvent({ ...started.event, deploymentMode: 'staging' })).toThrow();
+  });
+
   it('hands a failure after readiness to the caller through `running`', async () => {
     const main = fakeMain(ready, { failAfter: true });
     const started = await receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => selection, subscribeReady: main.subscribeReady, importMain: main.importMain, emit: () => undefined });
@@ -115,7 +128,8 @@ describe('runner startup event (afterRunnerReady)', () => {
   it.each([
     ['binding', { binding: { ...binding, apiMainSha256: hash } }],
     ['identity', { identity: { ...identity, uid: 0 } }],
-    ['selection', { readSelection: () => ({ ...selection, DEBATEAI_DEPLOYMENT_MODE: 'hosted' }) }],
+    // Hosted is a lawful mode since owner rulings 2026-10-13; any other word is not.
+    ['selection', { readSelection: () => ({ ...selection, DEBATEAI_DEPLOYMENT_MODE: 'staging' }) }],
     ['publication', { publication: { ...publication, publicationKind: 'OTHER' } }]
   ])('refuses a malformed %s before main is imported', async (_name, patch) => {
     let imported = 0;
@@ -241,8 +255,16 @@ describe('runner environment narrowing', () => {
     expect(result.selectedRegisterVersion).toBe('12');
     expect(Object.keys(result.environment).sort()).toEqual([...Object.keys(configured()), 'PATH'].sort());
   });
-  it.each([{ NODE_EXTRA_CA_CERTS: '/etc/ca.crt' }, { NODE_OPTIONS: '--require x' }, { REGISTER_VERSION: '11' }, { DEBATEAI_DEPLOYMENT_MODE: 'hosted' }, { NODE_ENV: 'development' }, { PREVIEW_TEAM_USER_IDS_JSON: '["not-a-uuid"]' }, { TURNSTILE_SOCKET_PATH: '/run/x.sock' }])('refuses %j without emitting values', patch => {
+  it.each([{ NODE_EXTRA_CA_CERTS: '/etc/ca.crt' }, { NODE_OPTIONS: '--require x' }, { REGISTER_VERSION: '11' }, { DEBATEAI_DEPLOYMENT_MODE: 'staging' }, { NODE_ENV: 'development' }, { PREVIEW_TEAM_USER_IDS_JSON: '["not-a-uuid"]' }, { TURNSTILE_SOCKET_PATH: '/run/x.sock' }, { HTTPS_PROXY: 'http://127.0.0.1:3180' }])('refuses %j without emitting values', patch => {
     expect(() => env.narrowEnvironment('runner', { ...configured(), ...patch }, runtime, { registerVersion: '12' }, approved)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+  });
+  // Owner rulings 2026-10-13: the runner runs hosted beside a hosted API, only on the preview's own configuration.
+  it('admits hosted with the preview configuration and refuses it without', () => {
+    const result = env.narrowEnvironment('runner', { ...configured(), DEBATEAI_DEPLOYMENT_MODE: 'hosted' }, runtime, { registerVersion: '12' }, approved);
+    expect(result.deploymentMode).toBe('hosted');
+    const { PREVIEW_PROVIDER_TEST_CONFIG_JSON: _config, PREVIEW_TEAM_USER_IDS_JSON: _team, ...bare } = { ...configured(), DEBATEAI_DEPLOYMENT_MODE: 'hosted' };
+    expect(() => env.narrowEnvironment('runner', bare, runtime, { registerVersion: '12' }, approved)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+    expect(() => env.narrowEnvironment('runner', { ...configured(), DEBATEAI_DEPLOYMENT_MODE: 'hosted', BILLING_STAGE_CLOCK_OFFSET_DAYS: '31' }, runtime, { registerVersion: '12' }, approved)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
   });
 });
 
