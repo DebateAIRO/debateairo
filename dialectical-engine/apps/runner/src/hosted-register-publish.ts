@@ -31,7 +31,10 @@
  *    checked by the register's own parser); without the member the seeder's code-owned row is
  *    sealed as it is. Likewise optional, the `answerRoleRotation` (spec 2026-10-11, role rotation):
  *    `{ "enabled": true | false }`, sealed as the ADDITIVE `answerRoleRotationPolicy` row under the
- *    file's sourceRef; left out, no such row is sealed and the engine keeps its fixed roles.
+ *    file's sourceRef; left out, no such row is sealed and the engine keeps its fixed roles. Likewise optional,
+ *    the `callConcurrencyPolicy` (spec 2026-10-12, parallel calls): `{ "perDebate", "perModelPerDebate",
+ *    "perModelPerRunner" }`, sealed as the ADDITIVE `callConcurrencyPolicy` row under the file's sourceRef;
+ *    left out, no such row is sealed and the runner makes one call at a time per debate.
  *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
  *    own `--scorecard` file: the owners' approved document, sealed as it is,
  *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
@@ -88,6 +91,7 @@ import {
   ANSWER_ROLE_ROTATION_POLICY_ROW_KEY,
   BILLING_PLANS_ROW_KEY,
   BILLING_POLICY_ROW_KEY,
+  CALL_CONCURRENCY_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
   COST_ENVELOPE_POLICY_ROW_KEY,
   COUNTRY_POLICY_ROW_KEY,
@@ -105,6 +109,8 @@ import {
   billingPlansFromValue,
   billingPolicyFromValue,
   buildConfiguredProviderSetDeploymentRow,
+  callConcurrencyPolicyFromValue,
+  callConcurrencyPolicyRow,
   callTokenCeilingsFromValues,
   computeRegisterSnapshotSha256,
   composeStaffPolicyRegisterPublicationRows,
@@ -124,6 +130,7 @@ import {
   publicationCheckPolicyFromValue,
   readAdmissionPolicy,
   readAnswerRoleRotationPolicy,
+  readCallConcurrencyPolicy,
   readAuthPolicy,
   readBillingPlans,
   readBillingPolicy,
@@ -201,7 +208,9 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // hate-speech S02 (owner, 2026-10-04): OPTIONAL. Left out, the code-owned publicationCheckPolicy row is sealed as it is.
   "publicationCheckPolicy",
   // Role rotation (spec 2026-10-11): OPTIONAL. Left out, no row is sealed and the engine keeps its fixed roles.
-  "answerRoleRotation"
+  "answerRoleRotation",
+  // Parallel calls (spec 2026-10-12): OPTIONAL. Left out, no row is sealed and the runner makes one call at a time per debate.
+  "callConcurrencyPolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -393,6 +402,8 @@ export type HostedRegisterFile = Readonly<{
   publicationCheckPolicy?: unknown;
   /** Optional (spec 2026-10-11): `{ "enabled": boolean }`; absent = no answerRoleRotationPolicy row. */
   answerRoleRotation?: unknown;
+  /** Optional (spec 2026-10-12): the policy without its `kind`; absent = no callConcurrencyPolicy row. */
+  callConcurrencyPolicy?: unknown;
 }>;
 
 /**
@@ -453,7 +464,8 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {}),
     ...(Object.hasOwn(record, "askRoomReads") ? { askRoomReads: record.askRoomReads } : {}),
     ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {}),
-    ...(Object.hasOwn(record, "answerRoleRotation") ? { answerRoleRotation: record.answerRoleRotation } : {})
+    ...(Object.hasOwn(record, "answerRoleRotation") ? { answerRoleRotation: record.answerRoleRotation } : {}),
+    ...(Object.hasOwn(record, "callConcurrencyPolicy") ? { callConcurrencyPolicy: record.callConcurrencyPolicy } : {})
   });
 }
 
@@ -761,6 +773,23 @@ function roleRotationRowOf(member: unknown, sourceRef: string): ReturnType<typeo
 }
 
 /**
+ * The callConcurrencyPolicy row for the file's optional member (spec 2026-10-12). The member is the policy without
+ * its `kind` (the row adds it); a member that is not an object, carries `kind`, or that the register's own parser
+ * refuses (bounds, the required runner `default`, an unknown field) is refused with the file's own code, so a
+ * malformed member can never seal a malformed row.
+ */
+function callConcurrencyRowOf(member: unknown, sourceRef: string): ReturnType<typeof callConcurrencyPolicyRow> {
+  if (typeof member !== "object" || member === null || Array.isArray(member) || Object.hasOwn(member, "kind")) {
+    return refuse("HOSTED_REGISTER_CALL_CONCURRENCY_INVALID");
+  }
+  try {
+    return callConcurrencyPolicyRow(callConcurrencyPolicyFromValue({ kind: "CALL_CONCURRENCY_POLICY", ...member }), sourceRef);
+  } catch {
+    return refuse("HOSTED_REGISTER_CALL_CONCURRENCY_INVALID");
+  }
+}
+
+/**
  * Everything decided before a connection exists. A refusal here has published
  * nothing and opened nothing; a plan that returns is exactly what would be sealed.
  */
@@ -792,6 +821,10 @@ export async function planHostedRegisterPublication(
   // checked here, before anything is sealed. Absent = no row (the fixed roles, as before).
   const roleRotationRow = file.answerRoleRotation === undefined ? null
     : roleRotationRowOf(file.answerRoleRotation, file.sourceRef);
+  // Parallel calls (spec 2026-10-12): the same, for the optional callConcurrencyPolicy member. Absent = no row
+  // (one call at a time per debate, as before).
+  const callConcurrencyRow = file.callConcurrencyPolicy === undefined ? null
+    : callConcurrencyRowOf(file.callConcurrencyPolicy, file.sourceRef);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -920,10 +953,20 @@ export async function planHostedRegisterPublication(
     valueJsonText: roleRotationRow.valueJsonText,
     sourceRef: roleRotationRow.sourceRef
   })];
+  // Parallel calls (spec 2026-10-12) is ADDITIVE too, for the same reason.
+  if (callConcurrencyRow !== null && codeOwnedRows.some((row) => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const callConcurrencyRows: readonly RegisterPublicationRow[] = callConcurrencyRow === null ? [] : [Object.freeze({
+    rowKey: callConcurrencyRow.rowKey,
+    valueJsonText: callConcurrencyRow.valueJsonText,
+    sourceRef: callConcurrencyRow.sourceRef
+  })];
   const rows = Object.freeze([
     ...codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row),
     ...scorecardRows,
-    ...roleRotationRows
+    ...roleRotationRows,
+    ...callConcurrencyRows
   ]);
   const keys = new Set(rows.map((row) => row.rowKey));
   if (keys.size !== rows.length || ALGORITHM_REGISTER_ROW_KEYS.some((key) => !keys.has(key))) {
@@ -1257,6 +1300,8 @@ export async function verifyHostedRegisterBootReadiness(
   await readPublicationCheckPolicy(pool, version);
   // Role rotation (spec 2026-10-11): optional (ABSENT keeps the fixed roles), but a malformed row would refuse the API's boot.
   await readAnswerRoleRotationPolicy(pool, version);
+  // Parallel calls (spec 2026-10-12): optional (ABSENT = one call at a time), but a malformed row would refuse the runner's boot.
+  await readCallConcurrencyPolicy(pool, version);
   // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
   // sealed one the API would refuse at start-up is refused here, by its reason.
   const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());

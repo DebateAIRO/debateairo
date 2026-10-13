@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256 } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows, composePreviewSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import {
   buildPreviewSourceRowsV2, composePreviewSnapshotV2, assertBaseIsCurrent, publishPreviewRegisterV2, previewDeltaSha256V2, previewCheckerRoleRef,
-  PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS, BASE_NOT_CURRENT, PreviewRegisterBaseNotCurrentError,
+  PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS, BASE_NOT_CURRENT, PreviewRegisterBaseNotCurrentError,
   PREVIEW_SYNTHESIZER_ROLE_REF, PREVIEW_EVALUATOR_ROLE_REF, PREVIEW_DEEPSEEK_CHECKER_ROLE_REF
 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
 
@@ -307,6 +307,84 @@ describe('publish kit v2: the role rotation switch (on by default; off is a repu
     ['upper case', 'OFF'], ['a boolean false', false], ['a boolean true', true], ['null', null], ['another word', 'disabled'], ['an object', { roleRotation: 'off' }]
   ])('refuses %s, by its own rule, before building any row', async (_name, choice) => {
     await expect(build(choice)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: role-rotation-choice');
+  });
+});
+
+describe('publish kit v2: the optional callConcurrencyPolicy row (absent by default)', () => {
+  const policy = { perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50, deepinfra: 150, anthropic: 50 } };
+  const build = async (callConcurrency?: unknown) => [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, undefined, undefined, callConcurrency as any)] as Row[];
+
+  it('adds exactly one row when supplied and nothing by default; the reviewed key list is unchanged', async () => {
+    const absent = await build(), given = await build(policy);
+    expect(absent.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
+    expect(await build(null)).toEqual(absent);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY]);
+    expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
+    expect(given.filter(row => row.rowKey !== CALL_CONCURRENCY_POLICY_ROW_KEY)).toEqual(absent);
+    expect(JSON.parse(given.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)!.valueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
+  });
+
+  it('refuses a policy the register parser refuses, before building any row', async () => {
+    await expect(build({ ...policy, perDebate: 65 })).rejects.toThrow('CALL_CONCURRENCY_POLICY_INVALID');
+    await expect(build({ ...policy, perModelPerRunner: { deepinfra: 150 } })).rejects.toThrow('CALL_CONCURRENCY_POLICY_INVALID');
+  });
+
+  it('composes with or without the row: a base without it and a plan without it give no row, as before', async () => {
+    const f = await fixture();
+    const given = compose(await build(policy), f.v9);
+    expect(given.addedKeys).toEqual([ROTATION_KEY, CALL_CONCURRENCY_POLICY_ROW_KEY].sort((a, b) => a.localeCompare(b, 'en')));
+    const absent = compose(f.source, f.v9);
+    expect(absent.rows.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
+    expect(absent.delta.map(entry => entry.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
+  });
+
+  it('R19: a plan without a value keeps the base version\'s row unchanged (no delta entry, never base-row-dropped)', async () => {
+    const f = await fixture();
+    const published = compose(await build(policy), f.v9);
+    const base = [...published.rows] as Row[];
+    const sealed = base.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)!;
+    const kept = compose(f.source, base, '10');
+    // The very base row, value and source reference byte for byte.
+    expect(kept.rows.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)).toEqual(sealed);
+    expect(kept.delta.map(entry => entry.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
+    // Nothing else changed either: the source on its own result is an empty delta and the same snapshot.
+    expect(kept.delta).toEqual([]);
+    expect(kept.snapshotSha256).toBe(published.snapshotSha256);
+    // A base row that does not parse is refused, never carried.
+    const broken = base.map(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY ? { ...row, valueJsonText: canonical({ ...JSON.parse(row.valueJsonText), perDebate: 65 }) } : row);
+    expect(() => compose(f.source, broken, '10')).toThrow('CALL_CONCURRENCY_POLICY_INVALID');
+  });
+
+  it('R19: a plan with a new value replaces the base version\'s row (changed in the delta); the off switch is a value', async () => {
+    const f = await fixture();
+    const base = [...compose(await build(policy), f.v9).rows] as Row[];
+    const off = { perDebate: 1, perModelPerDebate: 1, perModelPerRunner: { default: 1000 } };
+    const next = compose(await build(off), base, '10');
+    expect(next.changedKeys).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY]);
+    const entry = next.delta.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)!;
+    expect(JSON.parse(entry.oldValueJsonText!)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
+    expect(JSON.parse(entry.newValueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...off });
+    // The same value again is no change at all.
+    expect(compose(await build(policy), base, '10').delta).toEqual([]);
+  });
+
+  it('the native operator hands the plan\'s policy to the builder as its fifth argument, so the row is in the reviewed delta', async () => {
+    const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
+    const calls = text.split('publisher.buildPreviewSourceRowsV2(');
+    expect(calls).toHaveLength(2); // the operator's one builder call
+    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null\);/);
+    // What it hands over is the plan's value exactly as the plan check accepted it.
+    const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+    const plan = operator.validateNativePlan({ schema: 'preview-auth-dev-native-plan-v1', operation: 'plan', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api',
+      sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), sourceManifest: {}, operatorManifestSha256: 'c'.repeat(64), selectedBaseRegisterVersion: '9', selectedBaseSnapshotSha256: 'd'.repeat(64),
+      publicationId: id, approval: null, callConcurrency: JSON.parse(JSON.stringify(policy)) });
+    const f = await fixture();
+    const snapshot = compose(await build(plan.callConcurrency ?? null), f.v9);
+    const entry = snapshot.delta.find((row: any) => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY) as any;
+    expect(entry.change).toBe('added');
+    expect(JSON.parse(entry.newValueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
+    // A plan without the key hands null: the source, and so the delta, is today's.
+    expect(compose(await build(null), f.v9).deltaSha256).toBe(compose(f.source, f.v9).deltaSha256);
   });
 });
 

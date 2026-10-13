@@ -14,6 +14,7 @@
  *    With --levels (spec 2026-10-12 §4.8, practice-levels.ts) the listed models do every job once per listed
  *    thinking level, the runs taking turns, and the report gets a levels table.
  *  - debate:  one whole practice debate (depth 1 by default, 2 allowed) through the real ask path and the real runner.
+ *             --call-concurrency sets how many AI calls go at once for this practice only (practice-parallel.ts).
  *             With --transcript it also writes <out>/transcript.json: every prompt and every reply, decrypted
  *             (practice-transcript.ts).
  *  - openings: the debate-shape comparison (spec 2026-10-12 §2): today's opening (T) and three map openings (A snowball,
@@ -65,6 +66,7 @@ import {
   type OpeningsQuestion
 } from "./practice-openings-questions.js";
 import { openingsQuestionRotations, runPracticeOpenings } from "./practice-openings.js";
+import { parsePracticeCallConcurrency } from "./practice-parallel.js";
 import { parsePracticeRegisterExport, PracticeRegisterError } from "./practice-register-import.js";
 import {
   abortedReport,
@@ -106,7 +108,7 @@ type Args = Readonly<{ mode: "formats" | "debate" | "openings" | "report"; flags
 
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels",
-  "--side-by-side", "--questions", "--arms"]);
+  "--side-by-side", "--questions", "--arms", "--call-concurrency"]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry"]);
 
 /**
@@ -335,6 +337,12 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
   try {
     const args = parsePracticeArgs(argv);
     mode = args.mode;
+    // Parallel AI calls: the debate's runner only; checked before anything is read or sent.
+    const callConcurrencyText = args.flags.get("--call-concurrency");
+    if (callConcurrencyText !== undefined && args.mode !== "debate") {
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--call-concurrency (debate mode only)");
+    }
+    const callConcurrency = callConcurrencyText === undefined ? undefined : parsePracticeCallConcurrency(callConcurrencyText);
     if (args.switches.has("--transcript") && args.mode !== "debate") {
       throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--transcript (debate mode only)");
     }
@@ -546,6 +554,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       settings, sockets, register: register!,
       budgetPorts, observer, depth: wholeNumber(args, "--depth", 1, 1, 2),
       questionId: args.flags.get("--question") ?? "ro",
+      ...(callConcurrency === undefined ? {} : { callConcurrency }),
       ...(options.wait === undefined ? {} : { wait: options.wait }),
       ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
       progress: log,

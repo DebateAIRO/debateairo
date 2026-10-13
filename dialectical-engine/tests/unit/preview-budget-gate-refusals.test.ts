@@ -12,7 +12,7 @@ import { createServer, type Server, type ServerResponse } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isRunLevelSpendStop } from "@debateai/kernel";
 import {
   buildFramedPrompt,
@@ -27,13 +27,16 @@ import {
   PROVIDER_COST_ENVELOPE_REFUSAL_CODES,
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
+  createPreviewBusyCoordinator,
   PreviewChargeBookedMax,
   PreviewGateUnavailable,
+  PreviewGateUnsent,
   PreviewModelCooling,
   PreviewUnbilledRefusal,
   PreviewVendorRefusedUnbilled,
   providerCallEndedVendorRefusedUnbilled,
   providerCallGateUnavailable,
+  providerCallGateUnsent,
   ProviderUnbilledRefusal,
   type PreviewBudgetPort,
   type PreviewGateRemaining,
@@ -156,6 +159,44 @@ describe("the preview spending gate's 409 refusal body", () => {
     expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
   });
 
+  it.each(["PROVIDER_NOT_REACHED", "PROVIDER_ERROR_UNBILLED"])(
+    "parallel calls §3.4: %s is PreviewGateUnsent, still an unbilled refusal and never the model being busy",
+    async (code) => {
+      const { port } = await gate({ status: 409, body: JSON.stringify({ error: code }) });
+      const refusal: unknown = await port.execute(execution).then(() => null, (error: unknown) => error);
+      expect(refusal).toBeInstanceOf(PreviewGateUnsent);
+      expect(refusal).toBeInstanceOf(PreviewUnbilledRefusal);
+      expect(refusal).toBeInstanceOf(ProviderUnbilledRefusal);
+      expect(refusal).not.toBeInstanceOf(PreviewVendorRefusedUnbilled);
+      expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+      expect(providerCallGateUnsent(refusal)).toBe(true);
+      expect(providerCallEndedVendorRefusedUnbilled(refusal)).toBe(false);
+    }
+  );
+
+  it.each([
+    ["CONCURRENCY_LIMIT_REACHED", { error: "CONCURRENCY_LIMIT_REACHED" }],
+    ["PROVIDER_REFUSED_UNBILLED", { error: "PROVIDER_REFUSED_UNBILLED" }],
+    ["MODEL_COOLING", { error: "MODEL_COOLING", retry_after: 60 }]
+  ] as const)("parallel calls §3.4: %s is not gate-unsent", async (_code, body) => {
+    const { port } = await gate({ status: 409, body: JSON.stringify(body) });
+    const refusal: unknown = await port.execute(execution).then(() => null, (error: unknown) => error);
+    expect(refusal).toBeInstanceOf(PreviewUnbilledRefusal);
+    expect(refusal).not.toBeInstanceOf(PreviewGateUnsent);
+    expect(providerCallGateUnsent(refusal)).toBe(false);
+  });
+
+  it("providerCallGateUnsent reads only PreviewGateUnsent, bare or as a PROVIDER_CALL_FAILED's cause", () => {
+    const wrapped = (cause: unknown) => Object.assign(new PreviewUnbilledRefusal("wrapper"), { cause });
+    expect(providerCallGateUnsent(new PreviewGateUnsent())).toBe(true);
+    expect(providerCallGateUnsent(wrapped(new PreviewGateUnsent()))).toBe(true);
+    expect(providerCallGateUnsent(wrapped(new PreviewVendorRefusedUnbilled()))).toBe(false);
+    expect(providerCallGateUnsent(wrapped(new PreviewModelCooling(60)))).toBe(false);
+    expect(providerCallGateUnsent(new PreviewUnbilledRefusal())).toBe(false);
+    expect(providerCallGateUnsent({ code: "PROVIDER_CALL_FAILED", cause: new PreviewGateUnsent() })).toBe(false);
+    expect(providerCallGateUnsent(undefined)).toBe(false);
+  });
+
   it("through the native gateway, CONCURRENCY_LIMIT_REACHED leaves as PROVIDER_CALL_FAILED, the money refusal as itself", async () => {
     const MODEL = "zai-org/GLM-5.3-Flash";
     const REF = "preview:fixture-a";
@@ -191,6 +232,8 @@ describe("the preview spending gate's 409 refusal body", () => {
     // Review amendment R-d (2026-10-12): only the vendor's unbilled refusal ends a call as "the model is busy".
     expect(providerCallEndedVendorRefusedUnbilled(busy)).toBe(false);
     expect(busy).toMatchObject({ cause: expect.any(PreviewUnbilledRefusal) });
+    // Parallel calls §3.4: the gate's own slot refusal says nothing about reaching the vendor.
+    expect(providerCallGateUnsent(busy)).toBe(false);
     // Review 2026-10-12: PROVIDER_ERROR_UNBILLED (a vendor error that bills nothing but is not "busy", e.g.
     // Anthropic's 400/404/413/500) is the plain unbilled refusal, as before gate v4: the model never sits out for it.
     for (const [unsent, vendorBusy] of [["PROVIDER_NOT_REACHED", false], ["PROVIDER_REFUSED_UNBILLED", true],
@@ -200,6 +243,8 @@ describe("the preview spending gate's 409 refusal body", () => {
       expect(isRunLevelSpendStop(refusal)).toBe(false);
       expect(providerCallEndedVendorRefusedUnbilled(refusal), unsent).toBe(vendorBusy);
       expect((refusal as { cause: unknown }).cause instanceof PreviewVendorRefusedUnbilled, unsent).toBe(vendorBusy);
+      // Parallel calls §3.4: the two "could not get an answer out of the vendor" refusals are named gate-unsent.
+      expect(providerCallGateUnsent(refusal), unsent).toBe(!vendorBusy);
     }
     // Owner ruling 5: each unbilled refusal is sent once more after the cooldown, and only once.
     expect(slept).toEqual([COOLDOWN_MS, COOLDOWN_MS, COOLDOWN_MS, COOLDOWN_MS]);
@@ -229,7 +274,8 @@ describe("the preview spending gate's 409 refusal body", () => {
       } };
       return { sent, port };
     };
-    const gatewayFor = (port: PreviewBudgetPort, slept: number[], ledger: ProviderLedgerInput[] = []) => {
+    const gatewayFor = (port: PreviewBudgetPort, slept: number[], ledger: ProviderLedgerInput[] = [],
+      options: Readonly<{ busy?: ReturnType<typeof createPreviewBusyCoordinator>; sleep?: (milliseconds: number) => Promise<void>; onGateUnsent?: (gate: string) => void }> = {}) => {
       const thinking = { thinking_parameter: "reasoning_effort", thinking_levels: ["high"] };
       const target = parseProviderDiscoveryTargets(JSON.stringify([{
         provider_ref: REF, base_url: "https://api.deepinfra.com/v1/openai", model: MODEL,
@@ -242,7 +288,9 @@ describe("the preview spending gate's 409 refusal body", () => {
         persistRawArtifact: async (artifact) => artifact.artifactId,
         appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },
         assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
-      }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); } });
+      }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); await options.sleep?.(milliseconds); },
+        ...(options.busy === undefined ? {} : { busy: options.busy }),
+        ...(options.onGateUnsent === undefined ? {} : { onGateUnsent: options.onGateUnsent }) });
     };
     const site = "fixture:judge";
     const contract = "contract:test";
@@ -276,6 +324,133 @@ describe("the preview spending gate's 409 refusal body", () => {
       await expect(gatewayFor(failed.port, other).call(request)).rejects.toMatchObject({ code: "PROVIDER_CALL_FAILED" });
       expect(failed.sent).toHaveLength(1);
       expect(other).toEqual([]);
+    });
+
+    /**
+     * Parallel calls §3.3 (owner ruling O4): three calls of one model in flight, all refused busy by the vendor. With a
+     * busy coordinator exactly ONE of them (the probe) waits and resends; the other two wait for its outcome.
+     */
+    const deferred = () => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((done) => { resolve = done; });
+      return { promise, resolve };
+    };
+    /** A port answering execution N with `script(N)`: a thrown Error, a gate reply, or a reply held until `hold` resolves. */
+    const sequenced = (script: (index: number) => Error | string | Promise<string>) => {
+      const sent: string[] = [];
+      const port: PreviewBudgetPort = { execute: async (input) => {
+        sent.push(input.requestBody);
+        const next = await script(sent.length);
+        if (next instanceof Error) throw next;
+        return JSON.parse(next) as { status: number; body: string };
+      } };
+      return { sent, port };
+    };
+    const threeCalls = (gateway: ReturnType<typeof gatewayFor>) => ["a", "b", "c"].map((suffix) =>
+      gateway.call({ ...request, callSiteKey: `${site}:${suffix}`, subjectItemId: `node:${suffix}` })
+        .then(() => "ANSWERED", (error: unknown) => error));
+
+    it("busy coordinator: three calls refused busy → ONE probe resend; probe answered → the other two resend once each", async () => {
+      const slept: number[] = [];
+      const cooled = deferred();
+      const probeHeld = deferred();
+      const { sent, port } = sequenced((index) => index <= 3 ? new PreviewVendorRefusedUnbilled()
+        : index === 4 ? probeHeld.promise.then(() => answer) : answer);
+      const gateway = gatewayFor(port, slept, [], { busy: createPreviewBusyCoordinator(), sleep: () => cooled.promise });
+      const results = threeCalls(gateway);
+      await vi.waitFor(() => { expect(sent).toHaveLength(3); expect(slept).toEqual([COOLDOWN_MS]); });
+      // Only the probe waits the cooldown; the other two are parked on the coordinator, not sleeping.
+      cooled.resolve();
+      await vi.waitFor(() => { expect(sent).toHaveLength(4); });
+      await new Promise((done) => setTimeout(done, 20));
+      // Exactly one resend POST before the probe's outcome.
+      expect(sent).toHaveLength(4);
+      probeHeld.resolve();
+      await expect(Promise.all(results)).resolves.toEqual(["ANSWERED", "ANSWERED", "ANSWERED"]);
+      expect(sent).toHaveLength(6);
+      expect(slept).toEqual([COOLDOWN_MS]);
+    });
+
+    it("busy coordinator: the probe refused busy again → the other two end now with their own busy refusal, no second POST", async () => {
+      const slept: number[] = [];
+      const ledger: ProviderLedgerInput[] = [];
+      const { sent, port } = sequenced(() => new PreviewVendorRefusedUnbilled());
+      const gateway = gatewayFor(port, slept, ledger, { busy: createPreviewBusyCoordinator() });
+      const results = await Promise.all(threeCalls(gateway));
+      for (const refusal of results) {
+        expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: expect.any(PreviewVendorRefusedUnbilled) });
+        expect(providerCallEndedVendorRefusedUnbilled(refusal)).toBe(true);
+      }
+      expect(sent).toHaveLength(4);
+      expect(slept).toEqual([COOLDOWN_MS]);
+      expect(ledger.map((entry) => entry.outcome)).toEqual(["REFUSED", "REFUSED", "REFUSED", "REFUSED"]);
+    });
+
+    it("busy coordinator: the probe ends another way → the other two still get their one resend", async () => {
+      const slept: number[] = [];
+      const { sent, port } = sequenced((index) => index <= 3 ? new PreviewVendorRefusedUnbilled()
+        : index === 4 ? new Error("connection reset") : answer);
+      const gateway = gatewayFor(port, slept, [], { busy: createPreviewBusyCoordinator() });
+      const results = await Promise.all(threeCalls(gateway));
+      expect(results.filter((result) => result === "ANSWERED")).toHaveLength(2);
+      expect(results.filter((result) => result !== "ANSWERED")).toEqual([expect.objectContaining({ code: "PROVIDER_CALL_FAILED" })]);
+      expect(sent).toHaveLength(6);
+      expect(slept).toEqual([COOLDOWN_MS]);
+    });
+
+    it("busy coordinator: a probe whose wait throws still releases the waiters (no hang), who resend once", async () => {
+      const slept: number[] = [];
+      const { sent, port } = sequenced((index) => index <= 3 ? new PreviewVendorRefusedUnbilled() : answer);
+      const gateway = gatewayFor(port, slept, [], { busy: createPreviewBusyCoordinator(),
+        sleep: () => Promise.reject(new Error("aborted while waiting")) });
+      const results = await Promise.all(threeCalls(gateway));
+      expect(results.filter((result) => result === "ANSWERED")).toHaveLength(2);
+      expect(results.filter((result) => result !== "ANSWERED")).toEqual([expect.objectContaining({ message: "aborted while waiting" })]);
+      expect(sent).toHaveLength(5);
+    });
+
+    it("busy coordinator: the probe waits the gate's longer cool-off; the gate's own refusals keep today's path", async () => {
+      const slept: number[] = [];
+      const cooling = sequenced((index) => index === 1 ? new PreviewModelCooling(120) : answer);
+      await expect(gatewayFor(cooling.port, slept, [], { busy: createPreviewBusyCoordinator() }).call(request)).resolves.toBeDefined();
+      expect(slept).toEqual([120_000]);
+      const unsent: number[] = [];
+      const busy = createPreviewBusyCoordinator();
+      const gateUnsent = sequenced((index) => index <= 2 ? new PreviewGateUnsent() : answer);
+      await expect(gatewayFor(gateUnsent.port, unsent, [], { busy }).call(request)).rejects.toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+      expect(unsent).toEqual([COOLDOWN_MS]);
+      expect(gateUnsent.sent).toHaveLength(2);
+      // A gate-unsent refusal never opens the model: the next call is admitted and its busy refusal is a fresh probe.
+      await expect(busy.refusedBusy(MODEL, undefined)).resolves.toBe("PROBE");
+    });
+
+    /**
+     * Spec §3.4 (final review, minor 6): the gate is marked unhealthy on the FIRST PreviewGateUnsent, before the
+     * policy's 60 s resend wait — not only when the call finally fails at the lane — so the gate admits one call in
+     * flight during that minute. Never for the gate's own slots refusal or a busy model.
+     */
+    it("onGateUnsent: told of the gate on the first gate-unsent refusal, before the resend wait; never for other refusals", async () => {
+      const events: string[] = [];
+      const record = (milliseconds: number) => { events.push(`sleep:${String(milliseconds)}`); return Promise.resolve(); };
+      const onGateUnsent = (gate: string) => { events.push(`unsent:${gate}`); };
+      const unsent = sequenced((index) => index === 1 ? new PreviewGateUnsent() : answer);
+      await expect(gatewayFor(unsent.port, [], [], { sleep: record, onGateUnsent }).call(request)).resolves.toBeDefined();
+      expect(events).toEqual(["unsent:deepinfra", `sleep:${String(COOLDOWN_MS)}`]);
+      events.length = 0;
+      const slots = sequenced((index) => index === 1 ? new PreviewUnbilledRefusal() : answer);
+      await expect(gatewayFor(slots.port, [], [], { sleep: record, onGateUnsent }).call(request)).resolves.toBeDefined();
+      const busyModel = sequenced((index) => index === 1 ? new PreviewVendorRefusedUnbilled() : answer);
+      await expect(gatewayFor(busyModel.port, [], [], { sleep: record, onGateUnsent }).call(request)).resolves.toBeDefined();
+      expect(events).toEqual([`sleep:${String(COOLDOWN_MS)}`, `sleep:${String(COOLDOWN_MS)}`]);
+    });
+
+    it("onGateUnsent that throws never changes the call: it still waits and resends once", async () => {
+      const slept: number[] = [];
+      const unsent = sequenced((index) => index === 1 ? new PreviewGateUnsent() : answer);
+      await expect(gatewayFor(unsent.port, slept, [], { onGateUnsent: () => { throw new Error("test-layer hook"); } }).call(request))
+        .resolves.toBeDefined();
+      expect(slept).toEqual([COOLDOWN_MS]);
+      expect(unsent.sent).toHaveLength(2);
     });
 
     it("an unbilled attempt is recorded REFUSED, a billed failure FAILED; the thrown error keeps FAILED", async () => {

@@ -22,7 +22,9 @@ import {
   readCostEnvelopePolicy,
   readEngineVersion,
   readModelScorecard,
-  readStoryPolicyFromRegister
+  readStoryPolicyFromRegister,
+  effectiveCallConcurrency,
+  readCallConcurrencyPolicy
 } from "@debateai/register";
 import {
   CostEnvelopeGuard,
@@ -39,7 +41,7 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewRunnerPolicy, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunnerPolicy, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -48,6 +50,9 @@ import {
   type StoryPack
 } from "@debateai/story";
 import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logBodyCostFallback, logServeDisclosure, plansUnresolvedPersonAllowance, WalkingSkeletonRunner } from "./index.js";
+import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
+import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, targetCallSubjects } from "./call-lane-gateway.js";
+import { createRunInFlight } from "./run-in-flight.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -76,6 +81,9 @@ configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
 // READS this store, so no write ever chooses between the two.
 const kek = loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH);
 const pool = createPool(environment.DATABASE_URL, RUNNER_DATABASE_POOLS.runtime);
+// Parallel AI calls (spec 2026-10-12 §3.6): claim renewals only, on their own two connections, so a burst of a
+// debate's writes on the pool above never keeps a renewal waiting and never costs a debate its claim.
+const keepAlivePool = createPool(environment.DATABASE_URL, RUNNER_DATABASE_POOLS.keepAlive);
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   const users = new FileUserDekStore(environment.USER_DEK_STORE_PATH!, kek);
   configureContentEncryption(pool, new ContentCipher(
@@ -203,6 +211,14 @@ const costEnvelopePolicy = environment.DEPLOYMENT_MODE === "hosted"
   : null;
 const modelSpendStore = new PostgresModelSpendStore(pool);
 /**
+ * Parallel AI calls (spec 2026-10-12 §3.5; ruling R15) — the calls in flight, TWO counters, never one shared: the
+ * counting gateway's (each call's attempt, for the run-wide attempt ceiling) and the money guard's (each call's
+ * projected micros, for the run's envelope and the shared wall). One shared counter would count a paid call's attempt
+ * twice against the ceiling (run-in-flight.ts).
+ */
+const gatewayInFlight = createRunInFlight();
+const moneyInFlight = createRunInFlight();
+/**
  * B9 (budget spec §2.9, paid-plans spec §2.4.1–2.4.2) — THE SHARED WALL WHILE
  * ARGUING, in two independent halves, built whenever hosted.
  *
@@ -275,7 +291,8 @@ const costEnvelopeGuard = costEnvelopePolicy === null
       // when the day cannot hold one full run plus its story.
       policy: costEnvelopeGuardPolicy(costEnvelopePolicy, storyPolicy),
       ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }),
-      ...(fundingAllowance === undefined ? {} : {fundingAdmission:fundingAllowance})
+      ...(fundingAllowance === undefined ? {} : {fundingAdmission:fundingAllowance}),
+      inFlight: moneyInFlight
     });
 /**
  * B9 (budget spec §2.10) — A LIMIT BELOW ONE CALL REFUSES THIS BOOT
@@ -310,6 +327,21 @@ if (costEnvelopePolicy !== null && envelopeBand !== null) {
     })
   });
 }
+/**
+ * Parallel AI calls (spec 2026-10-12 §3.2-§3.4) — THE RUNNER'S CALL SCHEDULER. One for this process: every debate opens
+ * a lane in it, and every model call waits there for a slot under the register's `callConcurrencyPolicy` row (absent:
+ * one call at a time per debate, today's order). On the preview each gate's own slots are read once here, from its
+ * `/remaining`, so the runner never sends a gate more calls at once than it holds: the rest wait their turn instead of
+ * being refused. A gate that cannot be read gets one slot and one content-free line.
+ */
+const runnerCallScheduler = createCallScheduler({
+  policy: effectiveCallConcurrency(await readCallConcurrencyPolicy(pool, environment.REGISTER_VERSION))
+});
+if (previewConfig !== undefined) {
+  await applyPreviewGateCapacities({ scheduler: runnerCallScheduler, gates: previewGateRemainingReaders(previewConfig) });
+}
+/** Spec §3.3 (owner ruling O4): ONE busy coordinator for every preview call of this runner, so one call probes a busy model. */
+const previewBusy = createPreviewBusyCoordinator();
 const providerTopology = createRunnerProviderTopology(providerTargets, (target) => {
   const price = providerTargetPrice(target);
   if (costEnvelopeGuard !== undefined && price === null) {
@@ -326,6 +358,8 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
     ...previewTargetGatewayControls(previewConfig, target),
     ...(target.authorizationHeader === undefined
       ? {} : { authorizationHeader: target.authorizationHeader }),
+    // Spec §3.5: this process's calls in flight count toward each run's attempt ceiling.
+    inFlight: gatewayInFlight,
     ...(costEnvelopeGuard === undefined || price === null ? {} : {
       // The run is not known until a work item is claimed, so the seam is built
       // per call from the run the gateway was handed. Hosted requires the vendor
@@ -346,7 +380,11 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
       })
     })
   });
-  return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig, target);
+  // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.
+  return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig, target, {
+    busy: previewBusy,
+    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); }
+  });
 });
 const runRepository = new RunRepository(pool);
 // V-20: taken on the DECLARED targets, because the three optional keys describe
@@ -499,6 +537,13 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // the rest of the run, and the answer and story roles moving on from it (ROLE_UNAVAILABLE). Off the preview the
   // setting is absent and the runner is today's.
   ...(previewConfig === undefined ? {} : { runResilience: previewRunResilience(previewConfig)! }),
+  // Parallel AI calls (spec 2026-10-12 §3.2, §3.6): every debate's calls through its lane of the one scheduler above,
+  // each provider ref's model, vendor and (preview) gate, and the claim renewals on their own pool.
+  callScheduler: runnerCallScheduler,
+  callSubjects: previewConfig === undefined ? targetCallSubjects(providerTargets) : previewCallSubjects(previewConfig),
+  // Ruling R31 (preview only): a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
+  ...(previewConfig === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),
+  renewals: new WorkItemRepository(keepAlivePool),
   ...(previewConfig === undefined ? {} : {
     answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ provider_ref: string; model_id: string }>[] }>) =>
       previewSealedRoleFallbackCovered(roleRef, panel)

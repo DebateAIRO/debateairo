@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Pool } from "pg";
@@ -201,6 +202,10 @@ import {
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
+import type { RunInFlight } from "./run-in-flight.js";
+import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
+import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
+import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
 import {
   createRunSitOutBook,
   runPanelRevisedReason,
@@ -413,13 +418,36 @@ export type ReviewFailureOutcome =
  *
  * L4-F9 repair: a debate that must stop (its claim taken, or its time limit
  * reached) is not one unavailable review; the stop leaves as it arrived.
+ *
+ * Parallel calls (Task 10, fix round 1): neither is a review the debate's
+ * STOPPED lane refused unsent (CALL_LANE_STOPPED). Another chain failed and
+ * stopped the lane; the refusal leaves as it arrived, so the runner throws that
+ * real failure instead of this node's review (`throwBodyFailure` sets the
+ * refusal aside).
+ *
+ * Parallel calls (Task 12): nor is a review the lane HELD BACK at dispatch
+ * because the arguing had stopped while it waited (CALL_LANE_HELD_BACK). It
+ * leaves as it arrived, and the chain that asked for it simply ends there
+ * (`runChain`): a review never asked, never a failure.
  */
 const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
   "CALL_BUDGET_EXHAUSTED",
   "PRODUCER_GRADING_FORBIDDEN",
   "RUNNER_CLAIM_LOST",
-  "RUNNER_TIME_LIMIT_REACHED"
+  "RUNNER_TIME_LIMIT_REACHED",
+  CALL_LANE_STOPPED,
+  CALL_LANE_HELD_BACK
 ]);
+
+/** Parallel calls (Task 12): a call the debate's lane held back at dispatch — never sent (spec §2.3, O6). */
+function callHeldBack(error: unknown): boolean {
+  return error instanceof TypedDomainError && error.code === CALL_LANE_HELD_BACK;
+}
+
+/** L4-F9: the keep-alive's refusal — the debate must make no further model call (its claim taken, or its time up). */
+function keepAliveStop(error: unknown): boolean {
+  return error instanceof TypedDomainError && (error.code === "RUNNER_CLAIM_LOST" || error.code === "RUNNER_TIME_LIMIT_REACHED");
+}
 
 export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
   const stop = expansionPhaseStop(error);
@@ -434,9 +462,13 @@ export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
  * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — WHAT A NODE'S PANEL DOES WITH A
  * STOP RAISED BY ONE OF ITS MEMBERS.
  *
- * A run-level spend stop is never noted as a member failure (C2(b)): the panel
- * asks no further member. Since the M2 polish that includes the attempt ceiling,
- * which used to be noted as a PROVIDER_ERROR member failure.
+ * A run-level spend stop is never noted as a member failure (C2(b)). Since the
+ * M2 polish that includes the attempt ceiling, which used to be noted as a
+ * PROVIDER_ERROR member failure. On today's serial path (the debate's lane
+ * admits one call) the panel asks its members one at a time and asks no
+ * further member after the stop; when the debate's calls run together
+ * (`askTogether`, ruling R32) every member was already asked at once, and the
+ * first stop in member order is the panel's stop once every member settled.
  *
  *  · "TRAVEL" — every node but the first root: the panel rethrows the stop, and
  *    the phase catch that authored the node records it (the node is not
@@ -954,8 +986,94 @@ export interface HoldProgressEvent {
 
 export interface HoldRecorder {
   countCooldownHolds(runId: string): Promise<number>;
+  /**
+   * Parallel AI calls (spec 2026-10-12 §2.3): takes one of the run's cooldown
+   * holds, or refuses (false) when the run already holds `cap`. Present, it
+   * replaces `withCooldownRetry`'s "count, then compare", which two sites
+   * failing together would both pass. `reservingHoldRecorder` supplies it.
+   */
+  reserveHold?(runId: string, cap: number): Promise<boolean>;
   record(event: HoldProgressEvent): Promise<void>;
   wait(cooldownMs: number): Promise<void>;
+}
+
+/**
+ * Parallel AI calls (spec 2026-10-12 §2.3) — THE RUN-WIDE HOLD CAP UNDER
+ * CONCURRENT FAILURES. Wraps a recorder with an in-memory reservation per run:
+ * `reserveHold` counts its hold as reserved synchronously, BEFORE it reads the
+ * run's recorded holds, and admits it iff recorded + reserved <= cap, where
+ * reserved is the count it saw when it reserved (itself included). Refused, it
+ * releases at once; admitted, it stays reserved until the hold's COOLDOWN_HOLD
+ * record has committed (or failed), when the database count takes over.
+ *
+ * The reserved count is the one taken at reservation, not one read after the
+ * count returns: a hold that commits and releases while this one's count is
+ * being read may be missing from that count, and would then be in neither
+ * number. Taken at reservation, the later of two reservations always sees the
+ * earlier (reserved, or by then recorded — at worst counted twice, which only
+ * refuses). One runner process owns a claimed debate, so the count is exact.
+ */
+export function reservingHoldRecorder(recorder: HoldRecorder): HoldRecorder {
+  const reserved = new Map<string, number>();
+  const release = (runId: string): void => {
+    const held = reserved.get(runId) ?? 0;
+    if (held <= 1) reserved.delete(runId);
+    else reserved.set(runId, held - 1);
+  };
+  return Object.freeze({
+    countCooldownHolds: (runId: string) => recorder.countCooldownHolds(runId),
+    reserveHold: async (runId: string, cap: number): Promise<boolean> => {
+      const held = (reserved.get(runId) ?? 0) + 1;
+      reserved.set(runId, held);
+      let recorded: number;
+      try {
+        recorded = await recorder.countCooldownHolds(runId);
+      } catch (error) {
+        release(runId);
+        throw error;
+      }
+      if (recorded + held <= cap) return true;
+      release(runId);
+      return false;
+    },
+    record: async (event: HoldProgressEvent): Promise<void> => {
+      if (event.kind !== "node.retrying" || event.state !== "COOLDOWN_HOLD") return recorder.record(event);
+      try {
+        await recorder.record(event);
+      } finally {
+        release(event.runId);
+      }
+    },
+    wait: (cooldownMs: number) => recorder.wait(cooldownMs)
+  });
+}
+
+/**
+ * Parallel AI calls (spec 2026-10-12 §2.1) — A REPLY'S PARENT, SAVED LATER. A support/attack reply and a
+ * cross-exchange start their author call once the parent's AUTHOR call has returned (they need only its text), so the
+ * parent's node — whose id its save mints — may not exist yet when the reply's call fails. `saved` is that id once
+ * the parent is saved, or null when it never is (the reply is then dropped unsaved). Every record that names the
+ * parent waits for it (`laterParentHold`), so it names the node the serial run's record names.
+ */
+interface LaterParentNode {
+  readonly saved: Promise<string | null>;
+}
+
+/**
+ * Parallel AI calls, ruling R26b — THE CHAIN STEP A MODEL CALL BELONGS TO: its place in today's serial order (the
+ * runner's `ChainRank`), so a member that sits out can be placed where today's loop would first have seen it.
+ */
+const chainStageScope = new AsyncLocalStorage<{ readonly rank: readonly number[] }>();
+
+/** The hold recorder of one site whose parent is saved later: each record waits for the parent's id and names it. */
+function laterParentHold(recorder: HoldRecorder, parent: LaterParentNode): HoldRecorder {
+  const reserve = recorder.reserveHold;
+  return Object.freeze({
+    countCooldownHolds: (runId: string) => recorder.countCooldownHolds(runId),
+    ...(reserve === undefined ? {} : { reserveHold: (runId: string, cap: number) => reserve.call(recorder, runId, cap) }),
+    record: async (event: HoldProgressEvent): Promise<void> => recorder.record({ ...event, parentNodeId: await parent.saved }),
+    wait: (cooldownMs: number) => recorder.wait(cooldownMs)
+  });
 }
 
 export interface HaltedExpansionRecord {
@@ -1060,12 +1178,23 @@ export async function withCooldownRetry<T>(input: {
     // DR-186(8): review gets every ruled provider attempt plus the final
     // attempt, but never holds the in-run loading page open.
     if (input.failureScope === "REVIEW") return finalAttempt(error);
-    const holds = await input.hold.countCooldownHolds(input.runId);
-    // DR-184/C-1: the run-wide cap bounds waiting only. It must never eat the
-    // final attempt that the structural ceiling provisions at every site.
-    if (holds >= input.policy.maxCooldownHoldsPerRun) return finalAttempt(error);
-    const holdUntil = new Date(Date.now() + input.policy.cooldownMs).toISOString();
-    const heldAttempts = await spent(error.attempts);
+    let holdUntil: string;
+    let heldAttempts: number;
+    if (input.hold.reserveHold !== undefined) {
+      // Parallel AI calls (spec 2026-10-12 §2.3): the reservation is taken
+      // last, so nothing that can fail lies between it and the COOLDOWN_HOLD
+      // record that releases it. Refused, the site keeps its final attempt.
+      heldAttempts = await spent(error.attempts);
+      if (!(await input.hold.reserveHold(input.runId, input.policy.maxCooldownHoldsPerRun))) return finalAttempt(error);
+      holdUntil = new Date(Date.now() + input.policy.cooldownMs).toISOString();
+    } else {
+      const holds = await input.hold.countCooldownHolds(input.runId);
+      // DR-184/C-1: the run-wide cap bounds waiting only. It must never eat the
+      // final attempt that the structural ceiling provisions at every site.
+      if (holds >= input.policy.maxCooldownHoldsPerRun) return finalAttempt(error);
+      holdUntil = new Date(Date.now() + input.policy.cooldownMs).toISOString();
+      heldAttempts = await spent(error.attempts);
+    }
     await input.hold.record({
       kind: "node.retrying",
       state: "COOLDOWN_HOLD",
@@ -2138,6 +2267,31 @@ export interface WalkingSkeletonSettings {
    * `previewRunResilience` on the preview only.
    */
   readonly runResilience?: RunResilienceSettings;
+  /**
+   * Parallel AI calls (spec docs/superpowers/specs/2026-10-12-parallel-calls-design.md §3.2): the runner's one call
+   * scheduler. Each claimed debate opens a lane in it, and every claim-eligible maker's gateway (its judge's too) goes
+   * through that lane, outside the sit-out book, so body, serve and story calls all wait for a slot under the register's
+   * limits (absent row: one call at a time per debate). The lane closes when `execute` ends, after the story. Absent:
+   * nothing is wrapped, today's runner (and, like an absent row, today's one-call-after-another debate: Task 10).
+   */
+  readonly callScheduler?: CallScheduler;
+  /**
+   * The model, vendor and preview gate each provider ref's calls use (`previewCallSubjects` on the preview,
+   * `targetCallSubjects` elsewhere). Read only with `callScheduler`; absent, each ref is its own model behind no gate.
+   */
+  readonly callSubjects?: CallSubjectResolver;
+  /**
+   * Ruling R31 (preview only): awaited by every lane call BEFORE it asks for a slot (`laneGateway`'s `beforeSlot`).
+   * main.ts sets it to the runner-wide busy coordinator's `admit(subject.model)`, so a call to a busy model waits
+   * holding no debate, model or gate slot. Read only with `callScheduler`; absent (hosted and local), nothing waits
+   * before the slot.
+   */
+  readonly callBeforeSlot?: (subject: CallSubject) => Promise<void>;
+  /**
+   * Spec §3.6: where the claim renewals of a running debate go — a repository on the runner's own small keep-alive
+   * pool, so a burst of a debate's writes never keeps a renewal waiting for a connection. Absent: the runner's pool.
+   */
+  readonly renewals?: Pick<WorkItemRepository, "renewClaim">;
   readonly scoringOperator?: ScoringOperatorRegisterInput;
   readonly runDeathPolicy?: RunDeathPolicy;
   readonly hiddenNodeScoreThreshold?: {
@@ -4573,9 +4727,42 @@ export class WalkingSkeletonRunner {
     const keepAlive = startRunKeepAlive({
       claimDeadline: claimed.claimDeadline,
       renewEveryMs: this.settings.claimMs / 3,
-      renew: (heldUntil) => this.#work.renewClaim({ ...claimInput, workItemId: claimed.workItemId, heldUntil }),
+      renew: (heldUntil) => (this.settings.renewals ?? this.#work).renewClaim({ ...claimInput, workItemId: claimed.workItemId, heldUntil }),
       ...(task === undefined ? {} : { task })
     });
+    /**
+     * Parallel AI calls (spec 2026-10-12 §3.2): this debate's lane of the runner's call scheduler, opened once the
+     * debate is claimed and closed in the `finally` below, after the story: a call still waiting then is refused
+     * (CALL_LANE_STOPPED) and never sent. Without a scheduler there is no lane and nothing is wrapped.
+     */
+    const callScheduler = this.settings.callScheduler;
+    const callLane = callScheduler === undefined ? undefined : callScheduler.openLane(claimedRunId);
+    /**
+     * WHETHER THIS DEBATE'S CALLS RUN TOGETHER: only when its lane admits more than one call at a time (the register's
+     * `callConcurrencyPolicy` row, set above one per debate). With the row absent — or no scheduler at all — the debate
+     * runs today's engine call for call: the opening positions one after another, then today's review pass, and every judge panel asks its members one at a time (ruling R32). So hosted
+     * and local behave byte for byte as today (global constraints), the same calls meet the same ceilings, and a stop
+     * lands exactly where it lands today (ruling R2: the serial run's saved content is the reference).
+     */
+    const callsRunTogether = callLane !== undefined && callLane.callsAtOnce > 1;
+    const callSubjects = this.settings.callSubjects;
+    /**
+     * Spec §2.3 (Task 12): told of every failed call of this debate's lane BEFORE its slot frees (`laneGateway`'s
+     * `onFailed`); set only while the arguing runs together (`argueTogether`), never on today's serial engine.
+     */
+    let laneCallFailed: ((error: unknown) => void) | null = null;
+    /** A maker's gateway through this debate's lane; the gateway itself without a scheduler. */
+    const throughCallLane = (providerRef: string, provider: ProviderGateway): ProviderGateway =>
+      callScheduler === undefined || callLane === undefined ? provider : laneGateway({
+        lane: callLane,
+        scheduler: callScheduler,
+        subject: callSubjects === undefined
+          ? Object.freeze({ model: providerRef, vendor: "default", gate: null })
+          : callSubjects.subjectOf(providerRef),
+        provider,
+        onFailed: (error) => { laneCallFailed?.(error); },
+        ...(this.settings.callBeforeSlot === undefined ? {} : { beforeSlot: this.settings.callBeforeSlot })
+      });
     try {
     return await runKeepAliveScope.run(keepAlive, async () => {
     /**
@@ -4623,9 +4810,15 @@ export class WalkingSkeletonRunner {
       readonly outcome: "TIMED_OUT" | "FAILED";
       readonly ledgerEntryRef: string;
     }>();
+    // Parallel AI calls (spec 2026-10-12 §2.3): one reservation book per run,
+    // so sites failing together cannot pass the run's hold cap.
+    const runHoldRecorder = this.settings.holdRecorder === undefined
+      ? undefined
+      : reservingHoldRecorder(this.settings.holdRecorder);
     const cooldownAttempt = async <T>(input: {
       readonly callSiteKey: string;
-      readonly parentNodeId: string | null;
+      /** Parallel AI calls (§2.1): a reply's parent may be saved later (`LaterParentNode`); its records wait for it. */
+      readonly parentNodeId: string | null | LaterParentNode;
       readonly plannedLegCount: number;
       readonly failureScope: "MAKER_POSITION" | "EXPANSION" | "REVIEW";
       readonly attempt: (maxAttempts: number) => Promise<T>;
@@ -4655,10 +4848,13 @@ export class WalkingSkeletonRunner {
       if (policy === undefined) {
         return { kind: "AUTHORED", value: await input.attempt(this.settings.judgeBound.maxAttempts) };
       }
-      const hold = this.settings.holdRecorder;
+      const hold = runHoldRecorder;
       if (hold === undefined) {
         throw new TypedDomainError("RUN_HOLD_RECORDER_UNRESOLVED", "runDeathPolicy requires a production hold recorder");
       }
+      // A parent saved later is named once it is saved: by every hold record (`laterParentHold`) and by the halt.
+      const laterParent = typeof input.parentNodeId === "object" && input.parentNodeId !== null ? input.parentNodeId : null;
+      const knownParentNodeId = laterParent === null ? input.parentNodeId as string | null : null;
       /**
        * A16a (controller ruling on concern 2): an assigned site's TRUE attempts —
        * both of its seat keys, off the ledger — for its hold and halt records. A
@@ -4680,9 +4876,10 @@ export class WalkingSkeletonRunner {
       const preflight = preflightHaltedSites.get(siteKey)
         ?? (input.seatMember === null ? spentSiteHalts.get(siteKey) : undefined);
       if (preflight !== undefined) {
+        const preflightParentNodeId = laterParent === null ? knownParentNodeId : await laterParent.saved;
         const record = Object.freeze({
           callSiteKey: siteKey,
-          parentNodeId: input.parentNodeId,
+          parentNodeId: preflightParentNodeId,
           plannedLegCount: input.plannedLegCount,
           terminalTransportOutcome: preflight.outcome,
           lastLedgerEntryRef: preflight.ledgerEntryRef
@@ -4694,7 +4891,7 @@ export class WalkingSkeletonRunner {
             : input.failureScope === "REVIEW" ? "REVIEW_HALTED" : "MAKER_POSITION_HALTED",
           runId: run.runId,
           callSiteKey: siteKey,
-          parentNodeId: input.parentNodeId,
+          parentNodeId: preflightParentNodeId,
           holdMs: policy.cooldownMs,
           holdUntil: null,
           attemptsSpent: siteAttemptsSpent === undefined
@@ -4706,15 +4903,15 @@ export class WalkingSkeletonRunner {
         return { kind: "HALTED", record };
       }
       const seatMember = input.seatMember;
-      return withCooldownRetry({
+      const retried = withCooldownRetry({
         runId: run.runId,
         callSiteKey: siteKey,
-        parentNodeId: input.parentNodeId,
+        parentNodeId: knownParentNodeId,
         plannedLegCount: input.plannedLegCount,
         baseMaxAttempts: this.settings.judgeBound.maxAttempts,
         failureScope: input.failureScope,
         policy,
-        hold,
+        hold: laterParent === null ? hold : laterParentHold(hold, laterParent),
         attempt: input.attempt,
         ...(siteAttemptsSpent === undefined ? {} : { siteAttemptsSpent }),
         // Run resilience (spec 2026-10-12, ruling R-a): on the preview a busy member, an unavailable gate or a member
@@ -4744,6 +4941,11 @@ export class WalkingSkeletonRunner {
           }
         })
       });
+      if (laterParent === null) return retried;
+      const outcome = await retried;
+      return outcome.kind === "HALTED"
+        ? { kind: "HALTED", record: Object.freeze({ ...outcome.record, parentNodeId: await laterParent.saved }) }
+        : outcome;
     };
     let envelopeBasis: ReturnType<typeof parseCostEnvelopeBasis>;
     try {
@@ -4882,9 +5084,33 @@ export class WalkingSkeletonRunner {
     const sitOut: RunSitOutBook | null = this.settings.runResilience === undefined
       ? null
       : createRunSitOutBook(this.settings.runResilience);
+    /**
+     * Parallel AI calls (spec 2026-10-12 §3.2): the same loop puts every maker's gateway through this debate's call
+     * lane, OUTSIDE the sit-out book: a call that waited for a slot meets the sit-out check only when it may start. So
+     * every per-run copy below (body makers, the legacy seat book, the synthesis and story makers) uses the lane.
+     * Without either, the maker is returned as it is: today's run.
+     */
+    /**
+     * Ruling R26b: told after every failed call of a member gateway (with the book only); it places the moment too few
+     * members are left to argue in today's order (`tooFewRank`). Set once the root seats exist.
+     */
+    let afterFailedCall: (() => void) | null = null;
+    const observedFailures = (provider: ProviderGateway): ProviderGateway => Object.freeze({
+      call: async (request: ProviderCallRequest): Promise<ProviderCallResult> => {
+        try {
+          return await provider.call(request);
+        } catch (error) {
+          // A call the lane held back was never sent: it cannot have made a member sit out (Task 12).
+          if (!callHeldBack(error)) afterFailedCall?.();
+          throw error;
+        }
+      }
+    });
     const sitOutMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {
-      if (sitOut === null) return maker;
-      const provider = sitOut.gateway(maker.providerRef, maker.provider);
+      const sittingOut = sitOut === null ? maker.provider : sitOut.gateway(maker.providerRef, maker.provider);
+      const laned = throughCallLane(maker.providerRef, sittingOut);
+      const provider = sitOut === null ? laned : observedFailures(laned);
+      if (provider === maker.provider) return maker;
       return Object.freeze({ ...maker, provider, judge: new Judge(provider) });
     };
     configuredMakers.forEach((maker, index) => { configuredMakers[index] = sitOutMaker(maker); });
@@ -5012,8 +5238,16 @@ export class WalkingSkeletonRunner {
           ? Object.freeze({ state: "HEALTHY" as const })
           : Object.freeze({ state: "ABSENT" as const, failureCode }));
       }
+      // Parallel AI calls (spec 2026-10-12 §3.2): an assigned seat's member calls through this debate's lane too. The
+      // assigned book reads the configured makers, not the sit-out copies, as before; without a scheduler, as they are.
+      const assignedConfigured: ReadonlyMap<string, ConfiguredSeatMaker> = callLane === undefined
+        ? configuredByProviderRef
+        : new Map([...configuredByProviderRef].map(([ref, maker]) => {
+          const provider = throughCallLane(ref, maker.provider);
+          return [ref, Object.freeze({ ...maker, provider, judge: new Judge(provider) })] as const;
+        }));
       assignedSeats = buildAssignedRunSeatBook({
-        assignment: roleAssignment, configured: configuredByProviderRef, routeHealth,
+        assignment: roleAssignment, configured: assignedConfigured, routeHealth,
         // B9c x S1a: an assigned seat's judge goes through the cheaper-model gateway too.
         ...(this.settings.bodyCostFallback === true ? { judgeGatewayFor: bodyGatewayFor } : {})
       });
@@ -5539,6 +5773,11 @@ export class WalkingSkeletonRunner {
      * so the FX-HR-H6 producer bulkhead is exercised by the code that owns it
      * and leaves a recorded note, rather than being pre-filtered away here.
      *
+     * Ruling R32: the members are asked one at a time — today's panel, byte
+     * for byte — unless this debate's calls run together (`callsRunTogether`:
+     * its lane admits more than one call), when every member is asked at once
+     * and the answers are read in member order.
+     *
      * S4-1: this is node-local and is NOT the cross-maker review call — the
      * review leg (edge measurement) stays exactly where it was.
      *
@@ -5734,6 +5973,9 @@ export class WalkingSkeletonRunner {
           memberRole: input.authorMaker
         },
         members: panelMembers,
+        // Ruling R32: one member at a time on today's serial path; all at once
+        // only when this debate's lane admits more than one call.
+        askTogether: callsRunTogether,
         // Task M2: only the first root's panel keeps the voices it heard when a
         // spend stop cuts it short; every other panel lets the stop travel.
         onRunLevelSpendStop: input.onSpendStop === "AUTHOR_ONLY" ? "RETURN_HEARD" : "RETHROW",
@@ -5748,9 +5990,10 @@ export class WalkingSkeletonRunner {
       /**
        * Task M2 — THE FIRST ROOT'S PANEL, CUT SHORT BY A SPEND STOP.
        *
-       * The panel ended where it stood and returned what it had gathered: the
-       * author, every member voice already heard (and paid for), and every
-       * note. They go through the SAME reduction as any panel whose remaining
+       * The panel returned what it had gathered: the author, every member
+       * voice already heard (and paid for), and every note — asked one at a
+       * time, it ended where the stop stood; asked together (ruling R32), every
+       * voice that came back around the stop is kept. They go through the SAME reduction as any panel whose remaining
        * members could not speak, so the disclosure is the existing one:
        *
        *  · one or more member voices heard -> selection over the author and
@@ -6169,6 +6412,144 @@ export class WalkingSkeletonRunner {
       }
       return membersSatOutStop;
     };
+    /**
+     * Ruling R26b — WHERE IN TODAY'S ORDER TOO FEW MEMBERS WERE FIRST LEFT: the rank of the chain step whose failed call
+     * made the deciding member sit out (or whose reviewer choice found every reviewer sitting out); `[]` — before
+     * everything — for a call made outside the chains. Read only by a round boundary's decision (`argueTogether`).
+     */
+    let tooFewRank: readonly number[] | null = null;
+    const noteTooFew = (rank: readonly number[]): void => { tooFewRank ??= rank; };
+    afterFailedCall = () => {
+      if (tooFewRank !== null || effectiveMakerCount <= 1) return;
+      if (rootSeats.filter((_seat, rootIndex) => !rootSitsOut(rootIndex)).length < 2) noteTooFew(chainStageScope.getStore()?.rank ?? []);
+    };
+    /**
+     * Parallel AI calls (spec 2026-10-12 §2.1) — THE PLAN, KNOWN BEFORE ROOT 0. Both plans are pure functions of the
+     * depth and the maker count, so every node's PLAN POSITION is fixed before any call: root i → i, expansion leg
+     * j → M + j (its `childIndex`), cross-exchange k → M + E + k. Nodes are saved, and reviews recorded, in that
+     * order — today's serial order — whatever order the calls finish in.
+     *
+     * PRO-01 × PANEL-01: each independently authored root owns its own B3-B breadth-first pro/con tree, with real
+     * per-node maker lineage.
+     */
+    const expansionPlan = effectiveMakerCount > 1
+      ? buildMultiMakerExpansionPlan(expansionDepth, effectiveMakerCount)
+      : [];
+    const crossExchangePlan = buildCrossRootExchangePlan(effectiveMakerCount);
+    const totalPlannedNodes = effectiveMakerCount + expansionPlan.length + crossExchangePlan.length;
+    // T7 / S3-2 + S5-1 · ruling J15(a) — adaptive stopping, evaluated at the
+    // DERIVED global round boundary. `leg.round` resets at every root in this
+    // root-major plan, so a change in it is not a boundary; round k completes at
+    // the LAST leg carrying round k, when every root has finished round k.
+    const globalRoundCompletions = deriveGlobalRoundCompletions(expansionPlan);
+    /** A promise and the function that settles it, for a result another chain waits on (first settle wins). */
+    const settable = <T>() => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((settle) => { resolve = settle; });
+      return Object.freeze({ promise, resolve });
+    };
+    /**
+     * An ordered recorder (ordered-recorder.ts) whose positions are each claimed once: committed, or given up by a
+     * chain that has nothing (more) to write there (`skip`, harmless for a position already claimed), so no later
+     * position ever waits on a chain that stopped, was dropped or failed. `skipBelow` gives up every unclaimed
+     * earlier position — for the serial phases, where none of them can be claimed any more.
+     */
+    const positionRecorder = (size: number) => {
+      const recorder: OrderedRecorder = createOrderedRecorder(size);
+      const claimed = new Set<number>();
+      /** Each position's turn, over: its write has settled, or it was given up. */
+      const settled = Array.from({ length: size }, () => settable<void>());
+      const skip = (position: number): void => {
+        if (claimed.has(position)) return;
+        claimed.add(position);
+        recorder.skip(position);
+        settled[position]!.resolve();
+      };
+      return Object.freeze({
+        /** Ordered-recorder rule: the write may START inside this call; everything it reads is set up before. */
+        commit: <T>(position: number, write: () => Promise<T>): Promise<T> => {
+          claimed.add(position);
+          const written = recorder.commit(position, write);
+          written.then(() => settled[position]!.resolve(), () => settled[position]!.resolve());
+          return written;
+        },
+        skip,
+        skipBelow: (end: number): void => {
+          for (let position = 0; position < end; position += 1) skip(position);
+        },
+        /** Resolves once every position below `end` has been written or given up. */
+        through: async (end: number): Promise<void> => {
+          await Promise.all(settled.slice(0, end).map((turn) => turn.promise));
+        },
+        /** Resolves once every position has been written or given up. */
+        done: (): Promise<void> => recorder.done()
+      });
+    };
+    type PositionRecorder = ReturnType<typeof positionRecorder>;
+    /** Nodes, in plan order. */
+    const nodeRecorder = positionRecorder(totalPlannedNodes);
+    /** Each node's reviewer choice, in review order (spec §2.2: the reviewer turn never depends on who finished first). */
+    const reviewChoices = positionRecorder(totalPlannedNodes);
+    /** Each node's review, recorded in review order. */
+    const reviewRecorder = positionRecorder(totalPlannedNodes);
+    /**
+     * Spec §2.3 — A FAILURE THAT ENDS THE DEBATE, WITH CALLS IN FLIGHT. The chain that meets it records it with its
+     * place in today's serial order (`rank`) and stops the lane: no new call starts, and a call still waiting for a
+     * slot is refused unsent (CALL_LANE_STOPPED). Every other chain is awaited, so the calls already sent land their
+     * receipts; then the first failure in today's order is thrown, as today.
+     */
+    let bodyFailed = false;
+    /**
+     * A chain's RANK is its place in today's serial order, compared item by item: `[batch, phase, …]` — the review
+     * batch whose stretch of plan positions holds it (`reviewBatchOf`), then 0 for an author call and its panel and
+     * save, 1 for a review, 2 for a re-offered review (then the pass and the place in it), 3 for the batch's round
+     * boundary decision; then the plan position.
+     */
+    type ChainRank = readonly number[];
+    const compareRanks = (left: ChainRank, right: ChainRank): number => {
+      for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+        const difference = (left[index] ?? -1) - (right[index] ?? -1);
+        if (difference !== 0) return difference;
+      }
+      return 0;
+    };
+    const bodyFailures: { readonly rank: ChainRank; readonly error: unknown }[] = [];
+    /**
+     * Ruling R26 — WHERE IN TODAY'S ORDER EACH SPEND STOP WAS RAISED: the rank of the chain step that set
+     * `runBodyBudgetStop`. A round boundary's decision (no model call) runs exactly where today's loop still reaches it:
+     * when no stop was raised before that boundary's own review pass (`spendStoppedFrom`).
+     */
+    const spendStopRanks: ChainRank[] = [];
+    const noteSpendStop = (rank: ChainRank): void => { spendStopRanks.push(rank); };
+    /** Spec §2.3 (O6): no chain starts an AUTHOR or a REVIEW call once this is true. */
+    const arguingStopped = (): boolean => bodyFailed || runBodyBudgetStop !== null || tooFewLeftToArgue();
+    /**
+     * Spec §2.3 — THE KEEP-ALIVE STOP (claim lost, time limit) met by a chain: settled with that refusal, once. The
+     * arguing (`argueTogether`) then ends at once, without awaiting the calls in flight.
+     */
+    const keepAliveStopped = settable<unknown>();
+    /**
+     * Runs one chain to its end. The returned promise never rejects: a failure is kept (above), and `release` then
+     * gives up whatever recorder positions the chain did not commit. `stage.rank` moves on as the chain does.
+     * Task 12: a call the lane HELD BACK (the arguing had stopped while it waited) ends the chain as a stop does — its
+     * positions given up, never a failure; a keep-alive refusal is a failure, and is also told to `keepAliveStopped`.
+     */
+    const runChain = (body: (stage: { rank: ChainRank }) => Promise<void>, rank: ChainRank, release: () => void): Promise<void> => {
+      const stage = { rank };
+      return chainStageScope.run(stage, () => body(stage)).catch((error: unknown) => {
+        if (callHeldBack(error)) return;
+        bodyFailed = true;
+        bodyFailures.push(Object.freeze({ rank: stage.rank, error }));
+        callLane?.stop();
+        if (keepAliveStop(error)) keepAliveStopped.resolve(error);
+      }).finally(release);
+    };
+    /** Once every chain has settled: the first failure in today's order. A call the stopped lane refused is never the cause. */
+    const throwBodyFailure = (): void => {
+      const causes = bodyFailures.filter(({ error }) => !(error instanceof TypedDomainError && error.code === CALL_LANE_STOPPED));
+      const first = [...(causes.length > 0 ? causes : bodyFailures)].sort((left, right) => compareRanks(left.rank, right.rank))[0];
+      if (first !== undefined) throw first.error;
+    };
     const openFirstPosition = async (primarySeat: RunSeat) => {
       const primaryPlan = seatCallPlan(primarySeat, "JUDGE", positionRule(primarySeat));
       const primaryAttempt = await cooldownAttempt({
@@ -6236,74 +6617,6 @@ export class WalkingSkeletonRunner {
     if (reduced.kind !== "REDUCED") {
       throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${reduced.claimType}`);
     }
-    const selection = await runNodePanel({
-      authorMaker: rootAuthor.maker,
-      authorProviderRef: rootAuthor.providerRef,
-      authorJudgementRef: judged.provenanceRef,
-      authorAssessment: judged.assessment,
-      authorTau: reduced.tau,
-      claimType: judged.normalizedClaim.claimType,
-      statement: judged.statement,
-      callSiteKey: "PANEL:root",
-      questionLine: run.questionLine,
-      onSpendStop: "AUTHOR_ONLY"
-    });
-    // Task M2 (spec §14.4.1): a stop on the first root's panel no longer escapes
-    // the work item. Root 0 rests on the voices its panel heard before the stop
-    // (PANEL-PARTIAL), or on its author's own judgement when none was heard
-    // (single voice), and the stop ends the arguing here: the run goes straight
-    // on to its answer.
-    if (selection.spendStop !== null) runBodyBudgetStop = selection.spendStop;
-    const nodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
-      const created = await writer.addNode({
-        runId: run.runId,
-        statementText: judged.statement,
-        claimType: judged.normalizedClaim.claimType,
-        parentNodeId: null,
-        childKind: null,
-        siblingOrdinal: 0,
-        generationStatus: "complete",
-        pathStatus: "active",
-        explorationDecision: "continue",
-        provenanceRef: judged.provenanceRef,
-        wayOfKnowing: judged.wayOfKnowing,
-        locator: judged.locator,
-        valueLaden: judged.valueLaden
-      });
-      await writer.addStrangerRestatement({
-        nodeId: created,
-        text: judged.restatementText,
-        checkStatus: judged.restatementStatus
-      });
-      return created;
-    });
-    for (const mark of selection.marks) {
-      panelDegradations.push(Object.freeze({
-        subjectRef: nodeId,
-        mark,
-        reason: selection.panelFailureReason ?? "Every non-author panel member failed"
-      }));
-    }
-    const reducedJudgementId = await this.#judgements.recordReduced({
-      runId: run.runId,
-      nodeId,
-      rawArtifactRef: judged.provenanceRef,
-      tau: selection.tau,
-      numberKind: this.settings.judgementNumberKind,
-      producer: this.settings.judgementProducer,
-      wayOfKnowing: judged.wayOfKnowing,
-      uncertaintyLadderPosition: reduced.uncertaintyLadderPosition,
-      uncertaintyDrivers: reduced.drivers,
-      scoreCaps: reduced.caps,
-      holes: reduced.holes,
-      branchIdentifier: reduced.branch,
-      reducerVersion: reduced.reducerVersion,
-      judgeWeightVersion: judgementPolicy.judgeWeightVersion,
-      selectedJudgementRef: selection.selectedJudgementRef,
-      dispersion: selection.dispersion,
-      panelContractHashes: selection.panelContractHashes,
-      disagreement: selection.disagreement
-    });
 
     interface AuthoredDebateNode {
       readonly nodeId: string;
@@ -6337,28 +6650,16 @@ export class WalkingSkeletonRunner {
         readonly polarity: "support" | "attack";
       }[];
     }
-    const authoredNodes = new Map<number, AuthoredDebateNode>([[0, Object.freeze({
-      nodeId,
-      sourcedEdges: Object.freeze([]),
-      statement: judged.statement,
-      provenanceRef: judged.provenanceRef,
-      reducedJudgementId,
-      wayOfKnowing: judged.wayOfKnowing,
-      locator: judged.locator,
-      restatementStatus: judged.restatementStatus,
-      reversalPoint: judged.assessment.critic.summary,
-      panelDispersion: selection.dispersion,
-      authorIndex: 0,
-      maker: rootAuthor.maker,
-      member: primaryMaker
-    })]]);
+    /**
+     * Every node saved so far, keyed by its PLAN POSITION (root i → i, expansion leg j → M + j, cross-exchange k →
+     * M + E + k). Nodes are saved through the node recorder, in plan order, so this map's insertion order — the order
+     * reviews are taken in — is today's serial order whatever order the calls finished in.
+     */
+    const authoredNodes = new Map<number, AuthoredDebateNode>();
     const haltedExpansionRecords: HaltedExpansionRecord[] = [];
     // S2-3 / J5: way-of-knowing downgrades are bound to the node the graph
     // minted, never to the work item the judge was called with (codex T4-r1 B2).
     const wayOfKnowingDowngrades: WayOfKnowingDowngradeRecord[] = [];
-    if (judged.wayOfKnowingDowngrade !== null) {
-      wayOfKnowingDowngrades.push(bindWayOfKnowingDowngrade(judged.wayOfKnowingDowngrade, nodeId));
-    }
     const hiddenReviewRecords: Array<{
       readonly nodeId: string;
       readonly record: HaltedExpansionRecord;
@@ -6377,7 +6678,8 @@ export class WalkingSkeletonRunner {
       readonly outcome: "cannot-assess";
     }> = [];
 
-    const authorPosition = async (input: {
+    /** One authoring leg: the seat that writes it, what it is asked, and where its node goes. */
+    interface AuthorPositionInput {
       readonly authorIndex: number;
       /** A15: the seat that writes this node — POSITION, SUPPORT_ATTACK or a cross-exchange seat. */
       readonly seat: RunSeat;
@@ -6402,23 +6704,61 @@ export class WalkingSkeletonRunner {
         readonly targetStatement: string;
         readonly polarity: "support" | "attack";
       }[];
-    }): Promise<
-      | { readonly kind: "AUTHORED"; readonly value: AuthoredDebateNode }
+    }
+    /**
+     * What one leg's author call is given (spec §2.1): a reply or a cross-exchange is asked before its parent is saved,
+     * so its parent may be a `LaterParentNode` — named in its hold and halt records once saved.
+     */
+    type AuthorCallInput = Omit<AuthorPositionInput, "parentNodeId"> & {
+      readonly parentNodeId: string | null | LaterParentNode;
+    };
+    /** What a node's save needs from its leg: where the node goes in the graph. */
+    type SaveInput = Pick<AuthorPositionInput,
+      "authorIndex" | "parentNodeId" | "childKind" | "siblingOrdinal" | "explorationDecision" | "edges">;
+    /** What one leg's author call and panel produced, before anything of it is saved. */
+    interface AuthoredPosition {
+      readonly judged: typeof judged;
+      readonly reduced: Extract<ReturnType<typeof reduceAssessment>, { readonly kind: "REDUCED" }>;
+      readonly selection: Awaited<ReturnType<typeof runNodePanel>>;
+      /** B9: the model that actually wrote the node (a moved call's cheaper maker). */
+      readonly author: Readonly<{ maker: string; providerRef: string }>;
+      /** A15: the member that ANSWERED — main or runner-up. */
+      readonly member: SeatMember;
+    }
+
+    /**
+     * Parallel AI calls (spec 2026-10-12 §2.1) — ONE LEG'S AUTHOR CALL AND ITS PANEL, NOTHING SAVED: the first half of
+     * what `authorPosition` used to do in one go. Legs run together this way while their nodes are saved in plan order
+     * (`saveAuthored`, through the node recorder). Its one database write is the leg's JUDGEMENT_SCHEDULED receipt,
+     * started BESIDE the author call rather than awaited before it, so chains started together reach the call lane in
+     * the order they were started; a receipt's place in the ledger follows the clock (O7). A receipt that cannot be
+     * written still fails the leg, once its call has settled.
+     */
+    const authorAndPanel = async (
+      input: AuthorCallInput,
+      /** Spec §2.1: told the node's statement once its author call returned, before its panel — replies start from it. */
+      authoredStatement?: (statement: string) => void
+    ): Promise<
+      | { readonly kind: "AUTHORED"; readonly value: AuthoredPosition }
       | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
     > => {
-        await this.#ledger.append({
-          runId: run.runId,
-          attemptId: runnerAttemptId,
-          actionKind: "JUDGEMENT_SCHEDULED",
-          subjectItemId: claimed.workItemId,
-          stanceAtAction: "UNASSIGNED",
-          outcome: "OK",
-          actorRef: this.settings.workerId,
-          inputHash: hash({ leg: input.leg, questionLine: run.questionLine, workItemId: claimed.workItemId }),
-          contractHash: this.settings.judgeContractHash,
-          startedAt: new Date(),
-          finishedAt: new Date()
-        });
+      const scheduled = this.#ledger.append({
+        runId: run.runId,
+        attemptId: runnerAttemptId,
+        actionKind: "JUDGEMENT_SCHEDULED",
+        subjectItemId: claimed.workItemId,
+        stanceAtAction: "UNASSIGNED",
+        outcome: "OK",
+        actorRef: this.settings.workerId,
+        inputHash: hash({ leg: input.leg, questionLine: run.questionLine, workItemId: claimed.workItemId }),
+        contractHash: this.settings.judgeContractHash,
+        startedAt: new Date(),
+        finishedAt: new Date()
+      });
+      // Read once the call has settled (below); never left without a handler meanwhile.
+      scheduled.catch(() => undefined);
+      // One call at a time (today's engine): the receipt is written before the call, as it always was.
+      if (!callsRunTogether) await scheduled;
       const childPlan = seatCallPlan(
         input.seat,
         input.callSiteKey,
@@ -6447,218 +6787,340 @@ export class WalkingSkeletonRunner {
             bound: { ...this.settings.judgeBound, maxAttempts }
           })
         })
+      }).catch(async (error: unknown) => {
+        // The receipt was written first today; its own failure is the earlier one.
+        await scheduled;
+        throw error;
       });
+      await scheduled;
       if (childAttempt.kind === "HALTED") return childAttempt;
       const childJudged = childAttempt.value.value;
       // A15: the member that ANSWERED — main or runner-up — is the node's maker
       // lineage, the panel's author (controller carry 8) and the reviewer rule's
-      // author.
+      // author. Cross-exchange chains read `positionAnswerers` for their writer.
       const selectedMaker = childAttempt.value.member;
       if (input.seat.role === "POSITION") positionAnswerers.set(input.seat.seatIndex, selectedMaker);
       // B9: the author is the model that actually wrote this node (a moved call's cheaper maker).
       const author = actualAuthor(input.callSiteKey, selectedMaker);
       const childReduced = reduceAssessment({
-          claimType: childJudged.normalizedClaim.claimType,
-          assessment: childJudged.assessment,
-          compositionRow,
-          reducerVersion: judgementPolicy.reducerVersion
-        });
-        if (childReduced.kind !== "REDUCED") {
-          throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${childReduced.claimType}`);
-        }
-        const childSelection = await runNodePanel({
-          authorMaker: author.maker,
-          authorProviderRef: author.providerRef,
-          authorJudgementRef: childJudged.provenanceRef,
-          authorAssessment: childJudged.assessment,
-          authorTau: childReduced.tau,
-          claimType: childJudged.normalizedClaim.claimType,
-          statement: childJudged.statement,
-          callSiteKey: `PANEL:${input.callSiteKey}`,
-          // The PANEL assesses a node against THE DEBATE'S QUESTION. It used to
-          // receive the leg's concatenated instruction string, so a parent's
-          // statement rode into the panel prompt as well (DL4-F4).
-          questionLine: run.questionLine,
-          // A stop here travels to the phase catch that authored this node.
-          onSpendStop: "TRAVEL"
-        });
-        const { created: childNodeId, minted: childSourcedEdges } = await this.#graph.withGraphWrite(run.runId, async (writer) => {
-          const created = await writer.addNode({
-            runId: run.runId,
-            statementText: childJudged.statement,
-            claimType: childJudged.normalizedClaim.claimType,
-            parentNodeId: input.parentNodeId,
-            childKind: input.childKind,
-            siblingOrdinal: input.siblingOrdinal,
-            generationStatus: "complete",
-            pathStatus: "active",
-            explorationDecision: input.explorationDecision,
-            provenanceRef: childJudged.provenanceRef,
-            wayOfKnowing: childJudged.wayOfKnowing,
-            locator: childJudged.locator,
-            valueLaden: childJudged.valueLaden
-          });
-          await writer.addStrangerRestatement({
-            nodeId: created,
-            text: childJudged.restatementText,
-            checkStatus: childJudged.restatementStatus
-          });
-          const minted: { readonly edgeId: string; readonly targetStatement: string; readonly polarity: "support" | "attack" }[] = [];
-          for (const edge of input.edges) {
-            const edgeId = await writer.addEdge({
-              runId: run.runId,
-              sourceNodeId: created,
-              targetKind: "NODE",
-              targetNodeId: edge.targetNodeId,
-              targetEdgeId: null,
-              targetEdgePolarity: null,
-              polarity: edge.polarity,
-              kind: edge.polarity === "attack" ? "rebutting" : null,
-              strength: null,
-              magnitudeStatus: "UNKNOWN",
-              // T5 / S3-1: the stamp names the role that will measure this edge.
-              strengthSource: "REVIEWER",
-              provenanceRef: childJudged.provenanceRef
-            });
-            minted.push({ edgeId, targetStatement: edge.targetStatement, polarity: edge.polarity });
-          }
-          return { created, minted: Object.freeze(minted) };
-        });
-        if (childJudged.wayOfKnowingDowngrade !== null) {
-          wayOfKnowingDowngrades.push(bindWayOfKnowingDowngrade(childJudged.wayOfKnowingDowngrade, childNodeId));
-        }
-        for (const mark of childSelection.marks) {
-          panelDegradations.push(Object.freeze({
-            subjectRef: childNodeId,
-            mark,
-            reason: childSelection.panelFailureReason ?? "Every non-author panel member failed"
-          }));
-        }
-        const childReducedJudgementId = await this.#judgements.recordReduced({
-          runId: run.runId,
-          nodeId: childNodeId,
-          rawArtifactRef: childJudged.provenanceRef,
-          tau: childSelection.tau,
-          numberKind: this.settings.judgementNumberKind,
-          producer: this.settings.judgementProducer,
-          wayOfKnowing: childJudged.wayOfKnowing,
-          uncertaintyLadderPosition: childReduced.uncertaintyLadderPosition,
-          uncertaintyDrivers: childReduced.drivers,
-          scoreCaps: childReduced.caps,
-          holes: childReduced.holes,
-          branchIdentifier: childReduced.branch,
-          reducerVersion: childReduced.reducerVersion,
-          judgeWeightVersion: judgementPolicy.judgeWeightVersion,
-          selectedJudgementRef: childSelection.selectedJudgementRef,
-          dispersion: childSelection.dispersion,
-          panelContractHashes: childSelection.panelContractHashes,
-          disagreement: childSelection.disagreement
-        });
+        claimType: childJudged.normalizedClaim.claimType,
+        assessment: childJudged.assessment,
+        compositionRow,
+        reducerVersion: judgementPolicy.reducerVersion
+      });
+      if (childReduced.kind !== "REDUCED") {
+        throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${childReduced.claimType}`);
+      }
+      authoredStatement?.(childJudged.statement);
+      // Spec §2.3: once the author call was sent, its panel always runs — it finishes a paid step.
+      const childSelection = await runNodePanel({
+        authorMaker: author.maker,
+        authorProviderRef: author.providerRef,
+        authorJudgementRef: childJudged.provenanceRef,
+        authorAssessment: childJudged.assessment,
+        authorTau: childReduced.tau,
+        claimType: childJudged.normalizedClaim.claimType,
+        statement: childJudged.statement,
+        callSiteKey: `PANEL:${input.callSiteKey}`,
+        // The PANEL assesses a node against THE DEBATE'S QUESTION. It used to
+        // receive the leg's concatenated instruction string, so a parent's
+        // statement rode into the panel prompt as well (DL4-F4).
+        questionLine: run.questionLine,
+        // A stop here travels to the phase catch that authored this node.
+        onSpendStop: "TRAVEL"
+      });
       return { kind: "AUTHORED", value: Object.freeze({
-          nodeId: childNodeId,
-          sourcedEdges: childSourcedEdges,
-          statement: childJudged.statement,
-          provenanceRef: childJudged.provenanceRef,
-          reducedJudgementId: childReducedJudgementId,
-          wayOfKnowing: childJudged.wayOfKnowing,
-          locator: childJudged.locator,
-          restatementStatus: childJudged.restatementStatus,
-          reversalPoint: childJudged.assessment.critic.summary,
-          panelDispersion: childSelection.dispersion,
-          authorIndex: input.authorIndex,
-          maker: author.maker,
-          member: selectedMaker
-        }) };
+        judged: childJudged, reduced: childReduced, selection: childSelection, author, member: selectedMaker
+      }) };
     };
 
-    // Task M2: a stop on the first root's panel has already ended the arguing;
-    // authoring the secondary root would be one more call after it.
+    /**
+     * Parallel AI calls (spec 2026-10-12 §2.1) — SAVING ONE NODE IN ITS PLAN POSITION, the second half of what
+     * `authorPosition` used to do: the node, its restatement and its edges (one graph write), its way-of-knowing and
+     * panel-degradation records, its reduced judgement, and its place in `authoredNodes`. Only the node recorder
+     * calls it, so nodes are saved in today's serial order whatever order their calls finished in.
+     */
+    const saveAuthored = async (position: number, input: SaveInput, authored: AuthoredPosition): Promise<AuthoredDebateNode> => {
+      const { judged: childJudged, reduced: childReduced, selection: childSelection, author } = authored;
+      const { created: childNodeId, minted: childSourcedEdges } = await this.#graph.withGraphWrite(run.runId, async (writer) => {
+        const created = await writer.addNode({
+          runId: run.runId,
+          statementText: childJudged.statement,
+          claimType: childJudged.normalizedClaim.claimType,
+          parentNodeId: input.parentNodeId,
+          childKind: input.childKind,
+          siblingOrdinal: input.siblingOrdinal,
+          generationStatus: "complete",
+          pathStatus: "active",
+          explorationDecision: input.explorationDecision,
+          provenanceRef: childJudged.provenanceRef,
+          wayOfKnowing: childJudged.wayOfKnowing,
+          locator: childJudged.locator,
+          valueLaden: childJudged.valueLaden
+        });
+        await writer.addStrangerRestatement({
+          nodeId: created,
+          text: childJudged.restatementText,
+          checkStatus: childJudged.restatementStatus
+        });
+        const minted: { readonly edgeId: string; readonly targetStatement: string; readonly polarity: "support" | "attack" }[] = [];
+        for (const edge of input.edges) {
+          const edgeId = await writer.addEdge({
+            runId: run.runId,
+            sourceNodeId: created,
+            targetKind: "NODE",
+            targetNodeId: edge.targetNodeId,
+            targetEdgeId: null,
+            targetEdgePolarity: null,
+            polarity: edge.polarity,
+            kind: edge.polarity === "attack" ? "rebutting" : null,
+            strength: null,
+            magnitudeStatus: "UNKNOWN",
+            // T5 / S3-1: the stamp names the role that will measure this edge.
+            strengthSource: "REVIEWER",
+            provenanceRef: childJudged.provenanceRef
+          });
+          minted.push({ edgeId, targetStatement: edge.targetStatement, polarity: edge.polarity });
+        }
+        return { created, minted: Object.freeze(minted) };
+      });
+      if (childJudged.wayOfKnowingDowngrade !== null) {
+        wayOfKnowingDowngrades.push(bindWayOfKnowingDowngrade(childJudged.wayOfKnowingDowngrade, childNodeId));
+      }
+      // S2-2 / J13(b): one record per node whose panel degraded, bound to the node the graph minted.
+      for (const mark of childSelection.marks) {
+        panelDegradations.push(Object.freeze({
+          subjectRef: childNodeId,
+          mark,
+          reason: childSelection.panelFailureReason ?? "Every non-author panel member failed"
+        }));
+      }
+      const childReducedJudgementId = await this.#judgements.recordReduced({
+        runId: run.runId,
+        nodeId: childNodeId,
+        rawArtifactRef: childJudged.provenanceRef,
+        tau: childSelection.tau,
+        numberKind: this.settings.judgementNumberKind,
+        producer: this.settings.judgementProducer,
+        wayOfKnowing: childJudged.wayOfKnowing,
+        uncertaintyLadderPosition: childReduced.uncertaintyLadderPosition,
+        uncertaintyDrivers: childReduced.drivers,
+        scoreCaps: childReduced.caps,
+        holes: childReduced.holes,
+        branchIdentifier: childReduced.branch,
+        reducerVersion: childReduced.reducerVersion,
+        judgeWeightVersion: judgementPolicy.judgeWeightVersion,
+        selectedJudgementRef: childSelection.selectedJudgementRef,
+        dispersion: childSelection.dispersion,
+        panelContractHashes: childSelection.panelContractHashes,
+        disagreement: childSelection.disagreement
+      });
+      const node: AuthoredDebateNode = Object.freeze({
+        nodeId: childNodeId,
+        sourcedEdges: childSourcedEdges,
+        statement: childJudged.statement,
+        provenanceRef: childJudged.provenanceRef,
+        reducedJudgementId: childReducedJudgementId,
+        wayOfKnowing: childJudged.wayOfKnowing,
+        locator: childJudged.locator,
+        restatementStatus: childJudged.restatementStatus,
+        reversalPoint: childJudged.assessment.critic.summary,
+        panelDispersion: childSelection.dispersion,
+        authorIndex: input.authorIndex,
+        maker: author.maker,
+        member: authored.member
+      });
+      authoredNodes.set(position, node);
+      return node;
+    };
+
+    /**
+     * The serial phases (expansion legs and cross-exchanges; Task 11 makes them chains too): a leg, then its node
+     * saved in its plan position. Serially, every earlier position is already saved or never will be, so they are
+     * given up first and the save never waits.
+     */
+    const authorPosition = async (input: AuthorPositionInput, position: number): Promise<
+      | { readonly kind: "AUTHORED"; readonly value: AuthoredDebateNode }
+      | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
+    > => {
+      const authored = await authorAndPanel(input);
+      if (authored.kind === "HALTED") return authored;
+      nodeRecorder.skipBelow(position);
+      return { kind: "AUTHORED", value: await nodeRecorder.commit(position, () => saveAuthored(position, input, authored.value)) };
+    };
+
     /** Fix (d): root `rootIndex` is dropped (`satOutDuringRun`) when its member sits out; false otherwise. */
     const dropSatOutRoot = (rootIndex: number): boolean => {
       if (!rootSitsOut(rootIndex)) return false;
       satOutDuringRun.add(rootIndex);
       return true;
     };
-    if (effectiveMakerCount > 1 && runBodyBudgetStop === null) {
-      let secondary: Awaited<ReturnType<typeof authorPosition>> | null = null;
-      // Fix (d): a root whose member sits out is dropped without a call, and too few members left ends the arguing.
-      if (!tooFewLeftToArgue() && !dropSatOutRoot(1)) {
-      try {
-      secondary = await authorPosition({
-        authorIndex: 1,
-        seat: rootSeats[1]!,
-        leg: { kind: "independent-root" },
-        callSiteKey: "JUDGE:root:secondary",
-        role: "secondary root author",
-        parentNodeId: null,
-        childKind: null,
-        siblingOrdinal: 0,
-        plannedLegCount: 1,
-        explorationDecision: "continue",
-        edges: []
-      });
-      } catch (error) {
-        const stop = expansionPhaseStop(error);
-        if (stop === null) throw error;
-        // Root 0 is already minted and panelled, so the run HAS something to
-        // serve. Stopping here keeps it; throwing would discard it.
-        runBodyBudgetStop = stop;
-      }
-      }
-      if (secondary !== null) {
-        // Fix (d): halted because its member now sits out (busy, or its gate unavailable): dropped, not fatal.
-        if (secondary.kind === "HALTED" && !dropSatOutRoot(1)) {
-          throw new TypedDomainError(
-            "MAKER_POSITION_UNAVAILABLE",
-            "The secondary maker position failed after the full cooldown and final-retry courtesy"
-          );
-        }
-        if (secondary.kind === "AUTHORED") authoredNodes.set(1, secondary.value);
-      }
-    }
-
-    for (let makerIndex = 2; makerIndex < effectiveMakerCount; makerIndex += 1) {
-      // RE-REVIEW C2(a): root 0 is minted, so the run has something to serve.
-      if (runBodyBudgetStop !== null) break;
-      // Fix (d): too few members left ends the arguing; a root whose member sits out is dropped without a call.
-      if (tooFewLeftToArgue()) break;
-      if (dropSatOutRoot(makerIndex)) continue;
-      let additionalRoot: Awaited<ReturnType<typeof authorPosition>>;
-      try {
-      additionalRoot = await authorPosition({
-        authorIndex: makerIndex,
-        seat: rootSeats[makerIndex]!,
-        leg: { kind: "independent-root" },
-        callSiteKey: `JUDGE:root:${makerIndex}`,
-        role: "additional maker root author",
-        parentNodeId: null,
-        childKind: null,
-        siblingOrdinal: 0,
-        plannedLegCount: 1,
-        explorationDecision: "continue",
-        edges: []
-      });
-      } catch (error) {
-        const stop = expansionPhaseStop(error);
-        if (stop === null) throw error;
-        runBodyBudgetStop = stop;
-        break;
-      }
-      if (additionalRoot.kind === "HALTED") {
-        // Fix (d): halted because its member now sits out: dropped, not fatal. A billed failure keeps today's refusal.
-        if (dropSatOutRoot(makerIndex)) continue;
-        throw new TypedDomainError(
-          "MAKER_POSITION_UNAVAILABLE",
-          `Maker position ${makerIndex} failed after the full cooldown and final-retry courtesy`
-        );
-      }
-      authoredNodes.set(makerIndex, additionalRoot.value);
-    }
 
     // DR-184/C-10: reviews are interleaved at round boundaries. Coverage is
     // invariant; reviewer assignment may change because rotation observes the
     // latest landed review, and that behaviour change is deliberately declared.
     const reviewScheduledNodeIds = new Set<string>();
+    /** The reviewer seat chosen for one node, with the member it calls first. */
+    interface ReviewerChoice {
+      readonly seat: RunSeat;
+      readonly maker: string;
+      readonly plan: ReturnType<typeof seatCallPlan>;
+    }
+    /**
+     * Today's reviewer choice for ONE node, given the latest reviewer of its author's maker. "MEMBERS_SAT_OUT" ends
+     * the arguing (`membersSatOutStop`); a node no maker but its author's could review throws, as always.
+     */
+    const chooseReviewer = (authoredNode: AuthoredDebateNode, latestReviewerMaker: string | null):
+      | { readonly kind: "MEMBERS_SAT_OUT" }
+      | { readonly kind: "REVIEW"; readonly reviewer: ReviewerChoice } => {
+      const reviewCallSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
+      // A15 (R5): reviewers come from the REVIEWER seats, and a seat may review
+      // only through a member of a different maker than the author — checked
+      // per member, so whichever member answers is held to the same rule.
+      const differentMaker = (member: SeatIdentity): boolean => member.maker !== authoredNode.maker;
+      // Final review I2 (REVIEWER): on an assigned run the maker rotation below
+      // starts at a SITE-PURE offset (`seatRotationOffset`), so no listed reviewer
+      // seat can sit idle for a whole run — two seats of one maker, or a third
+      // behind two that alternate. The legacy (unassigned) book keeps today's order.
+      const reviewerSeats = seatBook.assigned
+        ? rotateSeats(seatBook.reviewer, seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey: reviewCallSiteKey }))
+        : seatBook.reviewer;
+      // Fix (d): a seat whose members all sit out is never chosen to review.
+      const reviewerCandidates = reviewerSeats.flatMap((seat) => {
+        if (seatSitsOut(seat)) return [];
+        const planned = seatCallPlan(seat, reviewCallSiteKey, differentMaker);
+        const first = seatCaller.plan(seat, reviewCallSiteKey, planned.options);
+        return first === null ? [] : [{ seat, maker: first.maker, plan: planned }];
+      });
+      // Fix (d): every reviewer that could judge this node sits out — the same state as too few members left, so
+      // the arguing ends here and the node keeps its own panel's footing (`membersSatOutStop`), never a dead run.
+      // Finding 3 (review, 2026-10-12): only when a reviewer seat's member actually sat out; a node that never had a
+      // reviewer of another maker keeps today's DIFFERENT_MAKER_REVIEWER_UNAVAILABLE (selectDifferentMakerReviewer).
+      if (reviewEndsForMembersSatOut({
+        book: sitOut,
+        reviewerRefs: reviewerSeats.flatMap((seat) => membersOf(seat).map((member) => member.providerRef)),
+        candidateMakers: reviewerCandidates.map((candidate) => candidate.maker),
+        authorMaker: authoredNode.maker
+      })) {
+        membersSatOutStop = true;
+        return { kind: "MEMBERS_SAT_OUT" };
+      }
+      return {
+        kind: "REVIEW",
+        reviewer: selectDifferentMakerReviewer(run.runId, authoredNode.maker, reviewerCandidates, latestReviewerMaker)
+      };
+    };
+    /** How one node's review call ended (nothing recorded yet): `recordReviewOutcome` records it in review order. */
+    type ReviewCallOutcome =
+      | { readonly kind: "REVIEWED"; readonly review: Awaited<ReturnType<Judge["review"]>>; readonly callSiteKey: string }
+      | { readonly kind: "HIDDEN"; readonly record: HaltedExpansionRecord }
+      /** Fix (d): the reviewer itself sat out during the call; the node is offered to another reviewer after this pass. */
+      | { readonly kind: "GIVEN_BACK" }
+      /** C1: a spend refusal stopped the reviewing (`runBodyBudgetStop`). */
+      | { readonly kind: "STOPPED" };
+    /** One node's review call, through the reviewer chosen for it. Nothing is written here but the call's own receipts. */
+    const callReview = async (authoredNode: AuthoredDebateNode, reviewer: ReviewerChoice): Promise<ReviewCallOutcome> => {
+      const callSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
+      try {
+        // B9: a review that has to move never moves onto the node's ACTUAL author.
+        reviewAuthorMakers.set(callSiteKey, authoredNode.maker);
+        const reviewAttempt = await cooldownAttempt({
+          callSiteKey,
+          parentNodeId: authoredNode.nodeId,
+          plannedLegCount: 1,
+          failureScope: "REVIEW",
+          seatMember: reviewer.plan.seatMember,
+          retrySeatMember: reviewer.plan.retryMember,
+          attempt: (maxAttempts) => seatCaller.callSeat({
+            seat: reviewer.seat,
+            callSiteKey,
+            ...reviewer.plan.options,
+            call: (member, memberCallSiteKey) => member.judge.review({
+              runId: run.runId,
+              subjectItemId: claimed.workItemId,
+              callSiteKey: memberCallSiteKey,
+              questionLine: run.questionLine,
+              argumentLanguageName: run.argumentLanguageName,
+              statement: authoredNode.statement,
+              authorMaker: authoredNode.maker,
+              providerRef: member.providerRef,
+              contractHash: this.settings.judgeContractHash,
+              bound: { ...this.settings.judgeBound, maxAttempts },
+              // S3-1: this ONE call measures every edge the node sources.
+              edges: authoredNode.sourcedEdges
+            })
+          })
+        });
+        if (reviewAttempt.kind === "HALTED") {
+          // Fix (d): the reviewer itself now sits out (busy, or its gate unavailable): the node is not unjudgeable,
+          // its reviewer was; it is offered to another reviewer once this pass ends (the one that sat out is left
+          // out of the choice), unless too few members are left to argue.
+          if (seatSitsOut(reviewer.seat) && !tooFewLeftToArgue()) return { kind: "GIVEN_BACK" };
+          return { kind: "HIDDEN", record: reviewAttempt.record };
+        }
+        // A15: the key the ledger holds for this review, seat marker included.
+        return { kind: "REVIEWED", review: reviewAttempt.value.value, callSiteKey: reviewAttempt.value.callSiteKey };
+      } catch (error) {
+        const outcome = reviewFailureOutcome(error);
+        if (outcome.kind === "RETHROW") throw error;
+        // C1: a spend refusal stops REVIEWING, it does not fail the run. The
+        // nodes already reviewed keep their reviews; the rest stay unreviewed
+        // and are disclosed as such, exactly as they are when a reviewer's
+        // transport dies.
+        if (outcome.kind === "BUDGET_STOP") {
+          runBodyBudgetStop = outcome.stop;
+          return { kind: "STOPPED" };
+        }
+        throw new TypedDomainError(
+          "NODE_REVIEW_UNAVAILABLE",
+          `No valid cross-maker review was recorded for node ${authoredNode.nodeId}`
+        );
+      }
+    };
+    /** Records one node's landed review (or its hidden one); called in review order. */
+    const recordReviewOutcome = async (
+      authoredNode: AuthoredDebateNode,
+      outcome: Extract<ReviewCallOutcome, { readonly kind: "REVIEWED" | "HIDDEN" }>
+    ): Promise<void> => {
+      if (outcome.kind === "HIDDEN") {
+        hiddenReviewRecords.push({ nodeId: authoredNode.nodeId, record: outcome.record });
+        return;
+      }
+      const review = outcome.review;
+      try {
+        // T5 / S3-1 + codex r2 B1: the review and the magnitudes it already
+        // returned are ONE fact, committed in ONE transaction. Writing the
+        // review alone is irreversible and would remove this node from every
+        // future work set, stranding the bearing beyond any repair.
+        await recordReviewWithMeasurements(this.pool, {
+          runId: run.runId,
+          nodeId: authoredNode.nodeId,
+          authorRawArtifactRef: authoredNode.provenanceRef,
+          reviewRawArtifactRef: review.provenanceRef,
+          outcome: review.outcome,
+          reasons: review.reasons,
+          measurements: review.edgeMeasurements
+        });
+      } catch (error) {
+        // As the review call's own catch: our refusals leave as they arrived; anything else is this node's review lost.
+        if (reviewFailureOutcome(error).kind === "RETHROW") throw error;
+        throw new TypedDomainError(
+          "NODE_REVIEW_UNAVAILABLE",
+          `No valid cross-maker review was recorded for node ${authoredNode.nodeId}`
+        );
+      }
+      // T6/J14: recorded only AFTER the review commits, so the disclosure
+      // can never name an outcome the ledger does not hold.
+      if (review.outcome === "cannot-assess") {
+        unassessedReviewRecords.push({
+          nodeId: authoredNode.nodeId, callSiteKey: outcome.callSiteKey, outcome: review.outcome
+        });
+      }
+    };
+    /**
+     * The serial review pass (the expansion and cross-exchange phases; Task 11 makes them chains): every saved node
+     * not yet reviewed, in review order, the reviewer turn read off the ledger per node, exactly as before.
+     */
     const reviewPendingAuthoredNodes = async (): Promise<void> => {
       if (effectiveMakerCount <= 1) return;
       // RE-REVIEW I5: three call sites are unconditional, and each review is a
@@ -6674,132 +7136,266 @@ export class WalkingSkeletonRunner {
         if (tooFewLeftToArgue()) return;
         reviewScheduledNodeIds.add(authoredNode.nodeId);
         const latestReviewerMaker = await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker);
-        const reviewCallSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
-        // A15 (R5): reviewers come from the REVIEWER seats, and a seat may review
-        // only through a member of a different maker than the author — checked
-        // per member, so whichever member answers is held to the same rule.
-        const differentMaker = (member: SeatIdentity): boolean => member.maker !== authoredNode.maker;
-        // Final review I2 (REVIEWER): on an assigned run the maker rotation below
-        // starts at a SITE-PURE offset (`seatRotationOffset`), so no listed reviewer
-        // seat can sit idle for a whole run — two seats of one maker, or a third
-        // behind two that alternate. The legacy (unassigned) book keeps today's order.
-        const reviewerSeats = seatBook.assigned
-          ? rotateSeats(seatBook.reviewer, seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey: reviewCallSiteKey }))
-          : seatBook.reviewer;
-        // Fix (d): a seat whose members all sit out is never chosen to review.
-        const reviewerCandidates = reviewerSeats.flatMap((seat) => {
-          if (seatSitsOut(seat)) return [];
-          const planned = seatCallPlan(seat, reviewCallSiteKey, differentMaker);
-          const first = seatCaller.plan(seat, reviewCallSiteKey, planned.options);
-          return first === null ? [] : [{ seat, maker: first.maker, plan: planned }];
-        });
-        // Fix (d): every reviewer that could judge this node sits out — the same state as too few members left, so
-        // the arguing ends here and the node keeps its own panel's footing (`membersSatOutStop`), never a dead run.
-        // Finding 3 (review, 2026-10-12): only when a reviewer seat's member actually sat out; a node that never had a
-        // reviewer of another maker keeps today's DIFFERENT_MAKER_REVIEWER_UNAVAILABLE (selectDifferentMakerReviewer).
-        if (reviewEndsForMembersSatOut({
-          book: sitOut,
-          reviewerRefs: reviewerSeats.flatMap((seat) => membersOf(seat).map((member) => member.providerRef)),
-          candidateMakers: reviewerCandidates.map((candidate) => candidate.maker),
-          authorMaker: authoredNode.maker
-        })) {
+        const chosen = chooseReviewer(authoredNode, latestReviewerMaker);
+        if (chosen.kind === "MEMBERS_SAT_OUT") {
           reviewScheduledNodeIds.delete(authoredNode.nodeId);
-          membersSatOutStop = true;
           return;
         }
-        const reviewer = selectDifferentMakerReviewer(run.runId, authoredNode.maker, reviewerCandidates, latestReviewerMaker);
-        try {
-          const callSiteKey = reviewCallSiteKey;
-          // B9: a review that has to move never moves onto the node's ACTUAL author.
-          reviewAuthorMakers.set(callSiteKey, authoredNode.maker);
-          const reviewAttempt = await cooldownAttempt({
-            callSiteKey,
-            parentNodeId: authoredNode.nodeId,
-            plannedLegCount: 1,
-            failureScope: "REVIEW",
-            seatMember: reviewer.plan.seatMember,
-            retrySeatMember: reviewer.plan.retryMember,
-            attempt: (maxAttempts) => seatCaller.callSeat({
-              seat: reviewer.seat,
-              callSiteKey,
-              ...reviewer.plan.options,
-              call: (member, memberCallSiteKey) => member.judge.review({
-                runId: run.runId,
-                subjectItemId: claimed.workItemId,
-                callSiteKey: memberCallSiteKey,
-                questionLine: run.questionLine,
-                argumentLanguageName: run.argumentLanguageName,
-                statement: authoredNode.statement,
-                authorMaker: authoredNode.maker,
-                providerRef: member.providerRef,
-                contractHash: this.settings.judgeContractHash,
-                bound: { ...this.settings.judgeBound, maxAttempts },
-                // S3-1: this ONE call measures every edge the node sources.
-                edges: authoredNode.sourcedEdges
-              })
-            })
-          });
-          if (reviewAttempt.kind === "HALTED") {
-            // Fix (d): the reviewer itself now sits out (busy, or its gate unavailable): the node is not unjudgeable,
-            // its reviewer was; it is offered to another reviewer once this pass ends (the one that sat out is left
-            // out of the choice), unless too few members are left to argue.
-            if (seatSitsOut(reviewer.seat) && !tooFewLeftToArgue()) {
-              reviewScheduledNodeIds.delete(authoredNode.nodeId);
-              reviewerSatOut = true;
-              continue;
-            }
-            hiddenReviewRecords.push({ nodeId: authoredNode.nodeId, record: reviewAttempt.record });
-            continue;
-          }
-          const review = reviewAttempt.value.value;
-          // T5 / S3-1 + codex r2 B1: the review and the magnitudes it already
-          // returned are ONE fact, committed in ONE transaction. Writing the
-          // review alone is irreversible and would remove this node from every
-          // future work set, stranding the bearing beyond any repair.
-          await recordReviewWithMeasurements(this.pool, {
-            runId: run.runId,
-            nodeId: authoredNode.nodeId,
-            authorRawArtifactRef: authoredNode.provenanceRef,
-            reviewRawArtifactRef: review.provenanceRef,
-            outcome: review.outcome,
-            reasons: review.reasons,
-            measurements: review.edgeMeasurements
-          });
-          // T6/J14: recorded only AFTER the review commits, so the disclosure
-          // can never name an outcome the ledger does not hold.
-          if (review.outcome === "cannot-assess") {
-            unassessedReviewRecords.push({
-              // A15: the key the ledger holds for this review, seat marker included.
-              nodeId: authoredNode.nodeId, callSiteKey: reviewAttempt.value.callSiteKey, outcome: review.outcome
-            });
-          }
-        } catch (error) {
-          const outcome = reviewFailureOutcome(error);
-          if (outcome.kind === "RETHROW") throw error;
-          // C1: a spend refusal stops REVIEWING, it does not fail the run. The
-          // nodes already reviewed keep their reviews; the rest stay unreviewed
-          // and are disclosed as such, exactly as they are when a reviewer's
-          // transport dies.
-          if (outcome.kind === "BUDGET_STOP") {
-            runBodyBudgetStop = outcome.stop;
-            return;
-          }
-          throw new TypedDomainError(
-            "NODE_REVIEW_UNAVAILABLE",
-            `No valid cross-maker review was recorded for node ${authoredNode.nodeId}`
-          );
+        const outcome = await callReview(authoredNode, chosen.reviewer);
+        if (outcome.kind === "STOPPED") return;
+        if (outcome.kind === "GIVEN_BACK") {
+          reviewScheduledNodeIds.delete(authoredNode.nodeId);
+          reviewerSatOut = true;
+          continue;
         }
+        await recordReviewOutcome(authoredNode, outcome);
       }
       // Fix (d): each pass that gives a node back marks one more member as sitting out, so this ends.
       if (reviewerSatOut) await reviewPendingAuthoredNodes();
     };
-    await reviewPendingAuthoredNodes();
 
-    // PRO-01 × PANEL-01: each independently authored root owns its own B3-B
-    // breadth-first pro/con tree, with real per-node maker lineage.
-    const expansionPlan = effectiveMakerCount > 1
-      ? buildMultiMakerExpansionPlan(expansionDepth, effectiveMakerCount)
-      : [];
+    /**
+     * Parallel AI calls (spec 2026-10-12 §2.2) — THE REVIEWER TURN IN CHAINS, BATCH BY BATCH. Today's engine reviews in
+     * BATCHES (`reviewPendingAuthoredNodes`): the roots; in the expansion, at each change of round and at each global
+     * round boundary; after the expansion; after the cross-exchanges. Nodes are saved in plan order, so each batch is
+     * one stretch of plan positions, and `reviewBatchEnds` are their ends (exclusive). A chain's reviewer is chosen in
+     * REVIEW ORDER (the choice recorder), with today's rule, from the latest reviewer of the author's maker: read off
+     * the ledger the first time the batch meets that maker — once every earlier batch's reviews, re-offers included,
+     * are recorded: the ledger today's batch reads — then advanced here at each choice. So it never depends on which
+     * review landed first, it is today's turn whenever the batch's reviews land as chosen, and each batch starts again
+     * from the ledger.
+     */
+    const reviewBatchEnds: readonly number[] = (() => {
+      const ends = [effectiveMakerCount];
+      let round = expansionPlan[0]?.round ?? null;
+      expansionPlan.forEach((leg, legIndex) => {
+        if (round !== null && leg.round !== round) {
+          ends.push(effectiveMakerCount + legIndex);
+          round = leg.round;
+        }
+        if (globalRoundCompletions.has(legIndex)) ends.push(effectiveMakerCount + legIndex + 1);
+      });
+      ends.push(effectiveMakerCount + expansionPlan.length, totalPlannedNodes);
+      // Never decreasing, so the distinct ends are in order (an empty batch has no positions to place).
+      return Object.freeze([...new Set(ends)]);
+    })();
+    /** The review batch a plan position belongs to. */
+    const reviewBatchOf = (position: number): number => reviewBatchEnds.findIndex((end) => position < end);
+    /** A chain's rank (`ChainRank`) while it authors, panels and saves the node at `position`, and while it reviews it. */
+    const authorRank = (position: number): ChainRank => [reviewBatchOf(position), 0, position];
+    const reviewRank = (position: number): ChainRank => [reviewBatchOf(position), 1, position];
+    /** One review batch: its turn book, and what it waits for. */
+    interface ReviewBatch {
+      /** The latest reviewer per author maker: read off the ledger the first time the batch meets a maker, then advanced. */
+      readonly latest: Map<string, string | null>;
+      /** Every earlier batch is over: its reviews recorded and its given-back nodes offered again. */
+      readonly ready: Promise<void>;
+      /** Fix (d): the nodes whose reviewer sat out during the call, in review order, offered again after the batch. */
+      readonly givenBack: AuthoredDebateNode[];
+    }
+    /** Where one node's review chain stands: its position, its pass's two recorders, its batch. */
+    interface ReviewSlot {
+      readonly position: number;
+      readonly choices: PositionRecorder;
+      readonly reviews: PositionRecorder;
+      readonly batch: ReviewBatch;
+      /** The review's place in today's order (`ChainRank`). */
+      readonly rank: ChainRank;
+    }
+    /** One node's review chain: the ordered choice, the call (spec §2.3: never started once the arguing stopped), the ordered record. */
+    const reviewInChain = async (slot: ReviewSlot, authoredNode: AuthoredDebateNode): Promise<void> => {
+      if (effectiveMakerCount <= 1) return;
+      const reviewer = await slot.choices.commit(slot.position, async (): Promise<ReviewerChoice | null> => {
+        await slot.batch.ready;
+        if (arguingStopped()) return null;
+        const latest = slot.batch.latest;
+        if (!latest.has(authoredNode.maker)) {
+          latest.set(authoredNode.maker, await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker));
+        }
+        const chosen = chooseReviewer(authoredNode, latest.get(authoredNode.maker) ?? null);
+        if (chosen.kind === "MEMBERS_SAT_OUT") {
+          noteTooFew(slot.rank);
+          return null;
+        }
+        latest.set(authoredNode.maker, chosen.reviewer.maker);
+        reviewScheduledNodeIds.add(authoredNode.nodeId);
+        return chosen.reviewer;
+      });
+      if (reviewer === null) return;
+      if (arguingStopped()) {
+        reviewScheduledNodeIds.delete(authoredNode.nodeId);
+        return;
+      }
+      const outcome = await callReview(authoredNode, reviewer);
+      if (outcome.kind === "STOPPED") noteSpendStop(slot.rank);
+      await slot.reviews.commit(slot.position, async () => {
+        // Spec §2.3: once a failure ends the debate, nothing more is recorded.
+        if (outcome.kind === "STOPPED" || bodyFailed) return;
+        if (outcome.kind === "GIVEN_BACK") {
+          reviewScheduledNodeIds.delete(authoredNode.nodeId);
+          slot.batch.givenBack.push(authoredNode);
+          return;
+        }
+        await recordReviewOutcome(authoredNode, outcome);
+      });
+    };
+    /**
+     * Fix (d), kept: the nodes a batch gave back are offered again — together, each to a reviewer chosen in review
+     * order — once that batch is over; each pass that gives one back marks one more member as sitting out, so this
+     * ends. Each pass is a batch of its own, read off the ledger again, as today's recursion reads it. `rank` places a
+     * failure here after everything the batch itself did; it is thrown once every chain has settled.
+     */
+    const reviewGivenBack = async (givenBack: readonly AuthoredDebateNode[], rank: ChainRank): Promise<void> => {
+      let pending = givenBack;
+      for (let pass = 1; pending.length > 0 && !arguingStopped(); pass += 1) {
+        const choices = positionRecorder(pending.length);
+        const reviews = positionRecorder(pending.length);
+        const batch: ReviewBatch = Object.freeze({
+          latest: new Map<string, string | null>(), ready: Promise.resolve(), givenBack: [] as AuthoredDebateNode[]
+        });
+        await Promise.allSettled(pending.map((authoredNode, position) => runChain(
+          () => reviewInChain({ position, choices, reviews, batch, rank: [...rank, pass, position] }, authoredNode),
+          [...rank, pass, position],
+          () => { choices.skip(position); reviews.skip(position); }
+        )));
+        pending = batch.givenBack;
+      }
+    };
+
+    /**
+     * Parallel AI calls (spec 2026-10-12 §2.1) — WHAT A CHAIN WAITS FOR FROM ANOTHER. Per plan position: its statement
+     * once its author call returned (a reply starts from its parent's, a cross-exchange from both roots'), and its
+     * node once saved (a reply's hold and halt records name it). Null: it never will be — the position was dropped,
+     * halted, stopped or never asked. A chain's `release` settles both, so nothing waits on a chain that ended.
+     */
+    const statements = Array.from({ length: totalPlannedNodes }, () => settable<string | null>());
+    const savedNodes = Array.from({ length: totalPlannedNodes }, () => settable<AuthoredDebateNode | null>());
+    /** A reply's parent at `position`, saved later: its node id once saved, or null if it never is. */
+    const laterParentAt = (position: number): LaterParentNode =>
+      Object.freeze({ saved: savedNodes[position]!.promise.then((node) => node?.nodeId ?? null) });
+    /** The review batches, set up when the arguing runs together (`argueTogether`); a node's review slot is in one. */
+    let reviewBatches: readonly { readonly batch: ReviewBatch; readonly done: Promise<void> }[] = [];
+    const reviewSlot = (position: number): ReviewSlot => Object.freeze({
+      position, choices: reviewChoices, reviews: reviewRecorder, batch: reviewBatches[reviewBatchOf(position)]!.batch,
+      rank: reviewRank(position)
+    });
+    /** A chain gives up whatever it did not commit at its position, so no later position waits on it. */
+    const releaseAt = (position: number) => (): void => {
+      nodeRecorder.skip(position);
+      reviewChoices.skip(position);
+      reviewRecorder.skip(position);
+      statements[position]!.resolve(null);
+      savedNodes[position]!.resolve(null);
+    };
+
+    /**
+     * Parallel AI calls (spec 2026-10-12 §2.1, part 1 of 3) — THE OPENING POSITIONS RUN TOGETHER.
+     *
+     * Root 0's author call ran alone and first, above (with today's seat swap). Now — when the debate's calls run
+     * together (`callsRunTogether`, in `argueTogether` below; otherwise the same chains run one after another, as
+     * today) — all at once, each as its own chain: root 0's panel; and for every other root its author call, then its
+     * panel. Each chain then saves its node in its plan position (the node recorder: root i is saved after roots
+     * 0..i−1 are saved or skipped), and from there reviews it (the reviewer chosen in review order, recorded in review
+     * order). Today's per-root rules hold on each root's OWN result: a root whose member sits out is dropped without a
+     * call (fix (d)); a spend refusal stops the arguing and keeps what exists (C1); a root halted by a billed failure
+     * ends the debate (MAKER_POSITION_UNAVAILABLE) — the lane is stopped, every other chain is awaited, then the error
+     * is thrown.
+     *
+     * Spec §2.3 (O6): a chain starts no author call and no review call once the arguing has stopped (a spend stop,
+     * too few members left, or a failure that ends the debate) and gives up its positions; the panel of a node whose
+     * author call was already sent always runs, as the serial leg that was underway always finished its panel.
+     */
+    const ROOT_SAVE: Omit<SaveInput, "authorIndex"> = Object.freeze({
+      parentNodeId: null, childKind: null, siblingOrdinal: 0, explorationDecision: "continue", edges: Object.freeze([])
+    });
+    const rootCallSiteKey = (rootIndex: number): string =>
+      rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
+    /** Root 0's panel result: its selection rule is recorded on the propagation receipt (below). */
+    const rootZeroPanel: { selection: Awaited<ReturnType<typeof runNodePanel>> | null } = { selection: null };
+    const rootZeroChain = async (stage: { rank: ChainRank }): Promise<void> => {
+      const selection = await runNodePanel({
+        authorMaker: rootAuthor.maker,
+        authorProviderRef: rootAuthor.providerRef,
+        authorJudgementRef: judged.provenanceRef,
+        authorAssessment: judged.assessment,
+        authorTau: reduced.tau,
+        claimType: judged.normalizedClaim.claimType,
+        statement: judged.statement,
+        callSiteKey: "PANEL:root",
+        questionLine: run.questionLine,
+        onSpendStop: "AUTHOR_ONLY"
+      });
+      // Task M2 (spec §14.4.1): a stop on the first root's panel no longer escapes
+      // the work item. Root 0 rests on the voices its panel heard before the stop
+      // (PANEL-PARTIAL), or on its author's own judgement when none was heard
+      // (single voice), and the stop ends the arguing: no chain starts another
+      // author or review call, and the run goes on to its answer.
+      if (selection.spendStop !== null) runBodyBudgetStop = selection.spendStop;
+      if (selection.spendStop !== null) noteSpendStop(stage.rank);
+      rootZeroPanel.selection = selection;
+      // Spec §2.3: once a failure ends the debate, nothing more is saved (its turn still passes, so no later save waits).
+      const authoredRoot = await nodeRecorder.commit(0, async () => bodyFailed ? null : saveAuthored(0, { ...ROOT_SAVE, authorIndex: 0 }, {
+        judged, reduced, selection, author: rootAuthor, member: primaryMaker
+      }));
+      savedNodes[0]!.resolve(authoredRoot);
+      if (authoredRoot === null || !callsRunTogether) return;
+      stage.rank = reviewRank(0);
+      await reviewInChain(reviewSlot(0), authoredRoot);
+    };
+    const rootChain = async (rootIndex: number, stage: { rank: ChainRank }): Promise<void> => {
+      // Spec §2.3 (O6): right before the author call. Fix (d): too few members left ends the arguing, and a root
+      // whose member sits out is dropped without a call.
+      if (arguingStopped()) return;
+      if (dropSatOutRoot(rootIndex)) return;
+      const input: AuthorPositionInput = {
+        authorIndex: rootIndex,
+        seat: rootSeats[rootIndex]!,
+        leg: { kind: "independent-root" },
+        callSiteKey: rootCallSiteKey(rootIndex),
+        role: rootIndex === 1 ? "secondary root author" : "additional maker root author",
+        ...ROOT_SAVE,
+        plannedLegCount: 1
+      };
+      let authoredRoot: Awaited<ReturnType<typeof authorAndPanel>>;
+      try {
+        // Spec §2.1: the root's statement is told as soon as its author call returned — its replies start from it.
+        authoredRoot = await authorAndPanel(input, (statement) => statements[rootIndex]!.resolve(statement));
+      } catch (error) {
+        const stop = expansionPhaseStop(error);
+        if (stop === null) throw error;
+        // Root 0 is authored, so the run HAS something to serve. Stopping here
+        // keeps it; throwing would discard it.
+        runBodyBudgetStop = stop;
+        noteSpendStop(stage.rank);
+        return;
+      }
+      if (authoredRoot.kind === "HALTED") {
+        // Fix (d): halted because its member now sits out (busy, or its gate unavailable): dropped, not fatal.
+        if (dropSatOutRoot(rootIndex)) return;
+        throw new TypedDomainError(
+          "MAKER_POSITION_UNAVAILABLE",
+          rootIndex === 1
+            ? "The secondary maker position failed after the full cooldown and final-retry courtesy"
+            : `Maker position ${String(rootIndex)} failed after the full cooldown and final-retry courtesy`
+        );
+      }
+      const authoredValue = authoredRoot.value;
+      const saved = await nodeRecorder.commit(rootIndex, async () => bodyFailed ? null : saveAuthored(rootIndex, input, authoredValue));
+      savedNodes[rootIndex]!.resolve(saved);
+      if (saved === null || !callsRunTogether) return;
+      stage.rank = reviewRank(rootIndex);
+      await reviewInChain(reviewSlot(rootIndex), saved);
+    };
+    if (!callsRunTogether) {
+      // Today's engine, call for call: root 0's panel and save, each further root in order (the same chain, run
+      // alone), then today's review pass over the roots.
+      for (let rootIndex = 0; rootIndex < effectiveMakerCount; rootIndex += 1) {
+        await runChain(rootIndex === 0 ? rootZeroChain : (stage) => rootChain(rootIndex, stage), [0, 0, rootIndex], releaseAt(rootIndex));
+        throwBodyFailure();
+      }
+      await reviewPendingAuthoredNodes();
+    }
+
     const haltedIndices = new Set<number>();
     const subtreeIndices = (rootIndex: number): readonly number[] => {
       const indices = new Set([rootIndex]);
@@ -6808,12 +7404,8 @@ export class WalkingSkeletonRunner {
       }
       return Object.freeze([...indices]);
     };
-    // T7 / S3-2 + S5-1 · ruling J15(a) — adaptive stopping, evaluated at the
-    // DERIVED global round boundary. `leg.round` resets at every root in this
-    // root-major plan, so a change in it is not a boundary; round k completes at
-    // the LAST leg carrying round k, when every root has finished round k.
-    const globalRoundCompletions = deriveGlobalRoundCompletions(expansionPlan);
     // Run resilience (spec 2026-10-12, fix (d)): a dropped root has no node, so nothing beneath it is ever planned.
+    // (Today's engine; when the arguing runs together, a reply reads its dropped parent's missing statement instead.)
     const droppedSubtreeIndices = new Set([...satOutDuringRun].flatMap((rootIndex) => subtreeIndices(rootIndex)));
     const frozenIndices = new Set<number>();
     const branchFrozenRecords: ConditionMarkRecord[] = [];
@@ -6887,89 +7479,7 @@ export class WalkingSkeletonRunner {
       for (const record of boundary.conditionMarkRecords) branchFrozenRecords.push(record);
       return boundary.continuation.kind === "STOP";
     };
-    let activeExpansionRound = expansionPlan[0]?.round ?? null;
     let stoppedByAdaptiveRule = false;
-    for (const [legIndex, leg] of expansionPlan.entries()) {
-      // C1: an earlier leg, or a review between rounds, reached a spend bound.
-      // Expansion stops here and, since Task M2, the run carries what it has
-      // on to its answer; the stop rides that answer as its envelope record.
-      if (runBodyBudgetStop !== null) break;
-      // Fix (d): too few members left to argue ends the expansion as it ends the roots.
-      if (tooFewLeftToArgue()) break;
-      if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
-        await reviewPendingAuthoredNodes();
-        activeExpansionRound = leg.round;
-        // RE-REVIEW I5: the review above can itself reach the bound, and the
-        // loop-top check has already run for this iteration. Without this the
-        // leg below would be authored — one more billed call — after the run
-        // was told it cannot pay.
-        if (runBodyBudgetStop !== null) break;
-        if (tooFewLeftToArgue()) break;
-      }
-      const skipped = haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)
-        || frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex)
-        || droppedSubtreeIndices.has(leg.parentIndex) || droppedSubtreeIndices.has(leg.childIndex);
-      if (!skipped) {
-      const parent = authoredNodes.get(leg.parentIndex);
-      if (parent === undefined) {
-        throw new TypedDomainError("DEBATE_EXPANSION_PARENT_MISSING", `Node index ${leg.parentIndex}`);
-      }
-      const role = leg.polarity === "support" ? "defender" : "critic";
-      const plannedSubtreeIndices = subtreeIndices(leg.childIndex);
-      let authored: Awaited<ReturnType<typeof authorPosition>>;
-      try {
-      authored = await authorPosition({
-        authorIndex: leg.authorIndex,
-        // A15 (R5): the legs come from the SUPPORT_ATTACK seats, rotating as
-        // today — `(rootIndex + round) % seatCount`, which on the legacy book
-        // (one seat per debater) is exactly `leg.authorIndex`.
-        seat: seatBook.supportAttack[(leg.rootIndex + leg.round) % seatBook.supportAttack.length]!,
-        // DL4-F4, the leg that carried the injection: `parent.statement` is the
-        // PREVIOUS model's output. It is material, it gets its own fenced
-        // field, and the directive it used to be glued to is code's.
-        leg: {
-          kind: leg.polarity === "support" ? "support" : "attack",
-          positionUnderDebate: parent.statement
-        },
-        callSiteKey: `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
-        role,
-        parentNodeId: parent.nodeId,
-        childKind: leg.polarity === "support" ? "support" : "defeater",
-        siblingOrdinal: leg.polarity === "support" ? 1 : 2,
-        plannedLegCount: plannedSubtreeIndices.length,
-        explorationDecision: leg.polarity === "support" ? "deepen" : "challenge",
-        edges: [{ targetNodeId: parent.nodeId, targetStatement: parent.statement, polarity: leg.polarity }]
-      });
-      } catch (error) {
-        // C1: a spend refusal is not an expansion failure, and nothing is
-        // recorded as halted: no transport failed. The refusal may have come on
-        // the leg's own author call (money and the attempt ceiling refuse before
-        // sending) or on its panel, after the author call was made and billed
-        // (a usage stop always comes after its call). Either way no node is
-        // minted for the leg, and the branch simply stops being expanded.
-        const stop = expansionPhaseStop(error);
-        if (stop === null) throw error;
-        runBodyBudgetStop = stop;
-        break;
-      }
-      if (authored.kind === "HALTED") {
-        const indices = plannedSubtreeIndices;
-        indices.forEach((index) => haltedIndices.add(index));
-        haltedExpansionRecords.push({ ...authored.record, plannedLegCount: indices.length });
-      } else {
-        authoredNodes.set(leg.childIndex, authored.value);
-      }
-      }
-      // J15(a): every root has now finished this round, so the boundary is real.
-      const completedRound = globalRoundCompletions.get(legIndex);
-      if (completedRound !== undefined) {
-        await reviewPendingAuthoredNodes();
-        stoppedByAdaptiveRule = await closeGlobalRound(completedRound, legIndex);
-        if (stoppedByAdaptiveRule) break;
-      }
-    }
-    await reviewPendingAuthoredNodes();
-
     // DR-154(2) generalized proposal: each maker authors one ordered response
     // per other maker root. Each real response node defends its own root and
     // attacks its named target; both S07 edges carry UNKNOWN magnitude until
@@ -7010,57 +7520,405 @@ export class WalkingSkeletonRunner {
         pinned: null
       });
     };
-    for (const exchange of buildCrossRootExchangePlan(effectiveMakerCount)) {
-      // C1: same rule as the expansion loop above.
-      if (runBodyBudgetStop !== null) break;
-      // Fix (d): too few members left ends the exchanges; a dropped root neither defends nor is attacked.
-      if (tooFewLeftToArgue()) break;
-      if (satOutDuringRun.has(exchange.authorRootIndex) || satOutDuringRun.has(exchange.targetRootIndex)) continue;
-      const authorRoot = authoredNodes.get(exchange.authorRootIndex);
-      const targetRoot = authoredNodes.get(exchange.targetRootIndex);
-      if (authorRoot === undefined || targetRoot === undefined) {
-        throw new TypedDomainError("DEBATE_ROOT_MISSING", "A cross-root exchange requires both authored roots");
+    /**
+     * Parallel AI calls (spec 2026-10-12 §2.1, parts 1 and 2 of 3) — THE ARGUING RUNS TOGETHER, when the debate's calls
+     * do (`callsRunTogether`). Root 0's author call ran alone and first, above. Now, all at once, each as its own chain:
+     *  - root 0's panel, and every other root's author call, then its panel (part 1, above);
+     *  - every support/attack reply: its author call starts once its PARENT's author call returned (it needs only the
+     *    parent's text), then its panel;
+     *  - every cross-exchange: its author call starts once both roots' author calls returned, then its panel.
+     * Depth >= 2: a reply AFTER a global round boundary in the plan first waits for that boundary's freeze/stop decision
+     * (`closeGlobalRound`), which waits for every node up to the boundary to be saved or given up and for their reviews
+     * (re-offers included), and then reads what the decision froze or stopped. Replies before the boundary run freely,
+     * as today they ran before the decision; so it sees, and prevents, exactly what it does in the serial run.
+     * Every node is saved in its plan position (the node recorder) and reviewed from there (the review batches); a
+     * cross-exchange, after the last boundary's decision, which in today's order it follows.
+     *
+     * Today's rules hold on each chain's own result: a reply under a halted, frozen or dropped branch, or after the
+     * adaptive stop, is never asked; a halted reply halts its branch (recorded in plan order); a spend refusal stops the
+     * arguing and keeps what exists; a reply whose parent was never minted (that parent's panel stop travelled) is paid
+     * and dropped, as today's rule drops a stopped leg. Spec §2.3 (O6): no chain starts an author or a review call once
+     * the arguing has stopped; once every chain has settled, the first failure in today's order is thrown.
+     */
+    const argueTogether = async (): Promise<void> => {
+      // The review batches: each is over once every earlier one is, its own reviews are recorded, and the nodes it
+      // gave back were offered again.
+      let earlierBatches: Promise<void> = Promise.resolve();
+      reviewBatches = Object.freeze(reviewBatchEnds.map((end, batchIndex) => {
+        const batch: ReviewBatch = Object.freeze({
+          latest: new Map<string, string | null>(), ready: earlierBatches, givenBack: [] as AuthoredDebateNode[]
+        });
+        earlierBatches = runChain(async () => {
+          await batch.ready;
+          await reviewRecorder.through(end);
+          await reviewGivenBack(batch.givenBack, [batchIndex, 2]);
+        }, [batchIndex, 2], () => undefined);
+        return Object.freeze({ batch, done: earlierBatches });
+      }));
+      /** Ruling R26: every spend stop raised so far comes at or after `rank` in today's order. */
+      const spendStoppedFrom = (rank: ChainRank): boolean =>
+        spendStopRanks.length > 0 && spendStopRanks.every((stopRank) => compareRanks(stopRank, rank) >= 0);
+      // The global round boundaries, one decision after another.
+      const boundaryDecisions: (readonly [number, Promise<void>])[] = [];
+      let earlierDecisions: Promise<void> = Promise.resolve();
+      for (const [boundaryLegIndex, completedRound] of globalRoundCompletions) {
+        const boundaryEnd = effectiveMakerCount + boundaryLegIndex + 1;
+        const batchIndex = reviewBatchOf(boundaryEnd - 1);
+        const after = earlierDecisions;
+        earlierDecisions = runChain(async () => {
+          await after;
+          // Every node up to the boundary saved or given up, and reviewed: its review batch ends at the boundary.
+          await nodeRecorder.through(boundaryEnd);
+          await reviewBatches[batchIndex]!.done;
+          // Today's loop never reached this boundary: a failure, the adaptive rule's stop at an earlier boundary, or a
+          // stop it saw BEFORE the boundary. Ruling R26: a spend stop raised by this boundary's own review pass (or by
+          // a step today's order puts after the boundary, a cross-exchange) still lets today's loop decide the round —
+          // pure code and one PROPAGATION row — so the chains decide it too. R26b: today's loop asks "too few members
+          // left?" last before the boundary's last reply, so too few left by that reply or anything after it in
+          // today's order lets the round be decided too.
+          if (stoppedByAdaptiveRule || bodyFailed) return;
+          if (tooFewLeftToArgue() && !(tooFewRank !== null && compareRanks(tooFewRank, [batchIndex, 0, boundaryEnd - 1]) >= 0)) return;
+          if (runBodyBudgetStop !== null && !spendStoppedFrom([batchIndex, 1])) return;
+          stoppedByAdaptiveRule = await closeGlobalRound(completedRound, boundaryLegIndex);
+        }, [batchIndex, 3], () => undefined);
+        boundaryDecisions.push([boundaryLegIndex, earlierDecisions] as const);
       }
-      let authored: Awaited<ReturnType<typeof authorPosition>>;
-      try {
-      authored = await authorPosition({
-        authorIndex: exchange.authorIndex,
-        seat: crossExchangeSeatFor(exchange),
-        leg: {
-          kind: "cross-root",
-          ownPosition: authorRoot.statement,
-          otherMakersPosition: targetRoot.statement
-        },
-        callSiteKey: `JUDGE:cross-root:${exchange.authorRootIndex}->${exchange.targetRootIndex}`,
-        role: "cross-root response",
-        parentNodeId: authorRoot.nodeId,
-        childKind: "support",
-        // Root expansion occupies ordinals 1/2. Preserve M=2's historical
-        // ordinal 3 while allocating one deterministic slot per other root.
-        siblingOrdinal: 3 + (exchange.targetRootIndex < exchange.authorRootIndex
-          ? exchange.targetRootIndex
-          : exchange.targetRootIndex - 1),
-        plannedLegCount: 1,
-        explorationDecision: "challenge",
-        edges: [
-          { targetNodeId: authorRoot.nodeId, targetStatement: authorRoot.statement, polarity: "support" },
-          { targetNodeId: targetRoot.nodeId, targetStatement: targetRoot.statement, polarity: "attack" }
-        ]
+      const everyBoundaryDecided = earlierDecisions;
+      /** The decision a reply waits for: the last boundary before it in the plan (which waits for the ones before). */
+      const decisionBefore = (legIndex: number): Promise<void> | undefined =>
+        boundaryDecisions.filter(([boundaryLegIndex]) => boundaryLegIndex < legIndex).pop()?.[1];
+
+      const legChain = async (legIndex: number, stage: { rank: ChainRank }): Promise<void> => {
+        const leg = expansionPlan[legIndex]!;
+        const position = leg.childIndex;
+        const decision = decisionBefore(legIndex);
+        if (decision !== undefined) await decision;
+        // Its parent's text: null when the parent never got one (dropped, halted, stopped, or itself never asked).
+        const parentStatement = await statements[leg.parentIndex]!.promise;
+        if (parentStatement === null || stoppedByAdaptiveRule) return;
+        if (haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)
+          || frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex)) return;
+        // Spec §2.3 (O6): right before the reply's author call.
+        if (arguingStopped()) return;
+        const role = leg.polarity === "support" ? "defender" : "critic";
+        const plannedSubtreeIndices = subtreeIndices(leg.childIndex);
+        const call = {
+          authorIndex: leg.authorIndex,
+          // A15 (R5): the legs come from the SUPPORT_ATTACK seats, rotating as today.
+          seat: seatBook.supportAttack[(leg.rootIndex + leg.round) % seatBook.supportAttack.length]!,
+          // DL4-F4: the parent's statement is material, in its own fenced field.
+          leg: { kind: leg.polarity === "support" ? "support" as const : "attack" as const, positionUnderDebate: parentStatement },
+          callSiteKey: `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
+          role,
+          childKind: leg.polarity === "support" ? "support" as const : "defeater" as const,
+          siblingOrdinal: leg.polarity === "support" ? 1 : 2,
+          plannedLegCount: plannedSubtreeIndices.length,
+          explorationDecision: leg.polarity === "support" ? "deepen" as const : "challenge" as const
+        };
+        let authored: Awaited<ReturnType<typeof authorAndPanel>>;
+        try {
+          authored = await authorAndPanel({ ...call, parentNodeId: laterParentAt(leg.parentIndex), edges: [] },
+            (statement) => statements[position]!.resolve(statement));
+        } catch (error) {
+          // C1, as today: a spend refusal on the author call or its panel stops the arguing; no node is minted.
+          const stop = expansionPhaseStop(error);
+          if (stop === null) throw error;
+          runBodyBudgetStop = stop;
+          noteSpendStop(stage.rank);
+          return;
+        }
+        if (authored.kind === "HALTED") {
+          // As today: nothing beneath a halted reply is asked, and its halt is recorded in plan order.
+          plannedSubtreeIndices.forEach((index) => haltedIndices.add(index));
+          statements[position]!.resolve(null);
+          const halted = { ...authored.record, plannedLegCount: plannedSubtreeIndices.length };
+          await nodeRecorder.commit(position, async () => {
+            if (!bodyFailed) haltedExpansionRecords.push(halted);
+          });
+          return;
+        }
+        const authoredValue = authored.value;
+        const saved = await nodeRecorder.commit(position, async () => {
+          // Saved after its parent (plan order). Spec §2.3: nothing is saved after a failure, and a reply whose parent
+          // was never minted has nothing to attach to: paid, and dropped.
+          const parent = authoredNodes.get(leg.parentIndex);
+          if (bodyFailed || parent === undefined) return null;
+          return saveAuthored(position, {
+            ...call,
+            parentNodeId: parent.nodeId,
+            edges: [{ targetNodeId: parent.nodeId, targetStatement: parent.statement, polarity: leg.polarity }]
+          }, authoredValue);
+        });
+        savedNodes[position]!.resolve(saved);
+        if (saved === null) return;
+        stage.rank = reviewRank(position);
+        await reviewInChain(reviewSlot(position), saved);
+      };
+
+      const crossChain = async (exchangeIndex: number, stage: { rank: ChainRank }): Promise<void> => {
+        const exchange = crossExchangePlan[exchangeIndex]!;
+        const position = effectiveMakerCount + expansionPlan.length + exchangeIndex;
+        const [ownPosition, otherMakersPosition] = await Promise.all([
+          statements[exchange.authorRootIndex]!.promise, statements[exchange.targetRootIndex]!.promise
+        ]);
+        // As today: a dropped root neither defends nor is attacked (fix (d)), and a root never written has no exchange.
+        if (ownPosition === null || otherMakersPosition === null) return;
+        // Spec §2.3 (O6): right before the exchange's author call.
+        if (arguingStopped()) return;
+        const call = {
+          authorIndex: exchange.authorIndex,
+          seat: crossExchangeSeatFor(exchange),
+          leg: { kind: "cross-root" as const, ownPosition, otherMakersPosition },
+          callSiteKey: `JUDGE:cross-root:${exchange.authorRootIndex}->${exchange.targetRootIndex}`,
+          role: "cross-root response",
+          childKind: "support" as const,
+          siblingOrdinal: 3 + (exchange.targetRootIndex < exchange.authorRootIndex
+            ? exchange.targetRootIndex
+            : exchange.targetRootIndex - 1),
+          plannedLegCount: 1,
+          explorationDecision: "challenge" as const
+        };
+        let authored: Awaited<ReturnType<typeof authorAndPanel>>;
+        try {
+          authored = await authorAndPanel({ ...call, parentNodeId: laterParentAt(exchange.authorRootIndex), edges: [] });
+        } catch (error) {
+          const stop = expansionPhaseStop(error);
+          if (stop === null) throw error;
+          runBodyBudgetStop = stop;
+          noteSpendStop(stage.rank);
+          return;
+        }
+        // In today's order every cross-exchange comes after the expansion and its last round decision.
+        await everyBoundaryDecided;
+        if (authored.kind === "HALTED") {
+          const halted = authored.record;
+          await nodeRecorder.commit(position, async () => {
+            if (!bodyFailed) haltedExpansionRecords.push(halted);
+          });
+          return;
+        }
+        const authoredValue = authored.value;
+        const saved = await nodeRecorder.commit(position, async () => {
+          const authorRoot = authoredNodes.get(exchange.authorRootIndex);
+          const targetRoot = authoredNodes.get(exchange.targetRootIndex);
+          if (bodyFailed || authorRoot === undefined || targetRoot === undefined) return null;
+          return saveAuthored(position, {
+            ...call,
+            parentNodeId: authorRoot.nodeId,
+            edges: [
+              { targetNodeId: authorRoot.nodeId, targetStatement: authorRoot.statement, polarity: "support" },
+              { targetNodeId: targetRoot.nodeId, targetStatement: targetRoot.statement, polarity: "attack" }
+            ]
+          }, authoredValue);
+        });
+        savedNodes[position]!.resolve(saved);
+        if (saved === null) return;
+        stage.rank = reviewRank(position);
+        await reviewInChain(reviewSlot(position), saved);
+      };
+
+      // Root 0's author call has returned: its replies and exchanges may start from its statement now.
+      statements[0]!.resolve(judged.statement);
+      const chains = [runChain(rootZeroChain, authorRank(0), releaseAt(0))];
+      for (let rootIndex = 1; rootIndex < effectiveMakerCount; rootIndex += 1) {
+        chains.push(runChain((stage) => rootChain(rootIndex, stage), authorRank(rootIndex), releaseAt(rootIndex)));
+      }
+      expansionPlan.forEach((leg, legIndex) => {
+        chains.push(runChain((stage) => legChain(legIndex, stage), authorRank(leg.childIndex), releaseAt(leg.childIndex)));
       });
-      } catch (error) {
-        const stop = expansionPhaseStop(error);
-        if (stop === null) throw error;
-        runBodyBudgetStop = stop;
-        break;
+      crossExchangePlan.forEach((_exchange, exchangeIndex) => {
+        const position = effectiveMakerCount + expansionPlan.length + exchangeIndex;
+        chains.push(runChain((stage) => crossChain(exchangeIndex, stage), authorRank(position), releaseAt(position)));
+      });
+      const allSettled = (async () => {
+        await Promise.allSettled(chains);
+        await Promise.allSettled([everyBoundaryDecided, earlierBatches]);
+        await nodeRecorder.done();
+        await reviewChoices.done();
+        await reviewRecorder.done();
+      })();
+      // Spec §2.3 — the keep-alive stop: the debate ends NOW, with today's code, and the calls in flight are never
+      // awaited (their receipts still land; the lane was stopped, so nothing new is sent, and nothing more is saved:
+      // the body has failed). Every promise left behind is handled, so none can reject unhandled. Any other way, every
+      // chain is awaited and the first failure in today's order is thrown, as before.
+      const keepAliveRefusal = await Promise.race([allSettled.then(() => null), keepAliveStopped.promise]);
+      if (keepAliveRefusal !== null) {
+        for (const abandoned of [allSettled, ...chains, everyBoundaryDecided, earlierBatches]) abandoned.catch(() => undefined);
+        throw keepAliveRefusal;
       }
-      if (authored.kind === "HALTED") {
-        haltedExpansionRecords.push(authored.record);
-      } else {
-        const nextIndex = Math.max(...authoredNodes.keys()) + 1;
-        authoredNodes.set(nextIndex, authored.value);
+      throwBodyFailure();
+    };
+    if (callsRunTogether) {
+      /**
+       * Spec §2.3 (O6; Task 10 review carry, ruled) — NO AUTHOR OR REVIEW CALL STARTS ONCE THE ARGUING HAS STOPPED, not
+       * even one already waiting in the lane: the lane asks this guard at the moment it would start a call, and holds a
+       * refused one back (CALL_LANE_HELD_BACK: never sent; its chain ends as a stopped chain ends). Panel calls always
+       * start — the panel of a node whose author call was sent finishes that paid step. A spend refusal is known to the
+       * guard from the moment it leaves the lane, before its slot frees (`laneCallFailed`): with the cheaper-model
+       * setting off (B9) every such refusal stops the arguing once its chain hears it, so nothing waiting behind it
+       * slips out first; with the setting on, a refusal may instead move to a cheaper maker, so only the recorded stop
+       * counts. Only here: today's serial engine (one call at a time) never has a guard.
+       *
+       * Ruling R30 (Task 12 fix round 1) — A KEEP-ALIVE REFUSAL ENDS THE ARGUING WHICHEVER CALL MET IT. The keep-alive
+       * sits below the lane, so every refusal it makes passes this hook — a panel member's too, which the panel would
+       * otherwise take as one failed member while other nodes' author calls land, run their panels and save, with
+       * another copy maybe running the same debate (L4-F9). So, whatever the cheaper-model setting: the body is failed
+       * (nothing more is saved), the lane stopped (nothing more is sent) and the arguing ends at once (`keepAliveStopped`).
+       */
+      let spendRefusalSeen = false;
+      const spendRefusalsCount = this.settings.bodyCostFallback !== true;
+      laneCallFailed = (error) => {
+        if (keepAliveStop(error)) {
+          bodyFailed = true;
+          callLane?.stop();
+          keepAliveStopped.resolve(error);
+          return;
+        }
+        if (spendRefusalsCount && expansionPhaseStop(error) !== null) spendRefusalSeen = true;
+      };
+      callLane?.guardStarts((ticket: CallTicket) =>
+        (ticket.priority !== "AUTHOR" && ticket.priority !== "REVIEW") || !(spendRefusalSeen || arguingStopped()));
+      try {
+        await argueTogether();
+      } finally {
+        // The answer's own calls follow: they are never held back.
+        callLane?.guardStarts(null);
+        laneCallFailed = null;
       }
+    } else {
+      let activeExpansionRound = expansionPlan[0]?.round ?? null;
+      for (const [legIndex, leg] of expansionPlan.entries()) {
+        // C1: an earlier leg, or a review between rounds, reached a spend bound.
+        // Expansion stops here and, since Task M2, the run carries what it has
+        // on to its answer; the stop rides that answer as its envelope record.
+        if (runBodyBudgetStop !== null) break;
+        // Fix (d): too few members left to argue ends the expansion as it ends the roots.
+        if (tooFewLeftToArgue()) break;
+        if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
+          await reviewPendingAuthoredNodes();
+          activeExpansionRound = leg.round;
+          // RE-REVIEW I5: the review above can itself reach the bound, and the
+          // loop-top check has already run for this iteration. Without this the
+          // leg below would be authored — one more billed call — after the run
+          // was told it cannot pay.
+          if (runBodyBudgetStop !== null) break;
+          if (tooFewLeftToArgue()) break;
+        }
+        const skipped = haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)
+          || frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex)
+          || droppedSubtreeIndices.has(leg.parentIndex) || droppedSubtreeIndices.has(leg.childIndex);
+        if (!skipped) {
+        const parent = authoredNodes.get(leg.parentIndex);
+        if (parent === undefined) {
+          throw new TypedDomainError("DEBATE_EXPANSION_PARENT_MISSING", `Node index ${leg.parentIndex}`);
+        }
+        const role = leg.polarity === "support" ? "defender" : "critic";
+        const plannedSubtreeIndices = subtreeIndices(leg.childIndex);
+        let authored: Awaited<ReturnType<typeof authorPosition>>;
+        try {
+        authored = await authorPosition({
+          authorIndex: leg.authorIndex,
+          // A15 (R5): the legs come from the SUPPORT_ATTACK seats, rotating as
+          // today — `(rootIndex + round) % seatCount`, which on the legacy book
+          // (one seat per debater) is exactly `leg.authorIndex`.
+          seat: seatBook.supportAttack[(leg.rootIndex + leg.round) % seatBook.supportAttack.length]!,
+          // DL4-F4, the leg that carried the injection: `parent.statement` is the
+          // PREVIOUS model's output. It is material, it gets its own fenced
+          // field, and the directive it used to be glued to is code's.
+          leg: {
+            kind: leg.polarity === "support" ? "support" : "attack",
+            positionUnderDebate: parent.statement
+          },
+          callSiteKey: `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
+          role,
+          parentNodeId: parent.nodeId,
+          childKind: leg.polarity === "support" ? "support" : "defeater",
+          siblingOrdinal: leg.polarity === "support" ? 1 : 2,
+          plannedLegCount: plannedSubtreeIndices.length,
+          explorationDecision: leg.polarity === "support" ? "deepen" : "challenge",
+          edges: [{ targetNodeId: parent.nodeId, targetStatement: parent.statement, polarity: leg.polarity }]
+        }, leg.childIndex);
+        } catch (error) {
+          // C1: a spend refusal is not an expansion failure, and nothing is
+          // recorded as halted: no transport failed. The refusal may have come on
+          // the leg's own author call (money and the attempt ceiling refuse before
+          // sending) or on its panel, after the author call was made and billed
+          // (a usage stop always comes after its call). Either way no node is
+          // minted for the leg, and the branch simply stops being expanded.
+          const stop = expansionPhaseStop(error);
+          if (stop === null) throw error;
+          runBodyBudgetStop = stop;
+          break;
+        }
+        // A saved leg is already in `authoredNodes`, at its plan position (`leg.childIndex`).
+        if (authored.kind === "HALTED") {
+          const indices = plannedSubtreeIndices;
+          indices.forEach((index) => haltedIndices.add(index));
+          haltedExpansionRecords.push({ ...authored.record, plannedLegCount: indices.length });
+        }
+        }
+        // J15(a): every root has now finished this round, so the boundary is real.
+        const completedRound = globalRoundCompletions.get(legIndex);
+        if (completedRound !== undefined) {
+          await reviewPendingAuthoredNodes();
+          stoppedByAdaptiveRule = await closeGlobalRound(completedRound, legIndex);
+          if (stoppedByAdaptiveRule) break;
+        }
+      }
+      await reviewPendingAuthoredNodes();
+      for (const [exchangeIndex, exchange] of crossExchangePlan.entries()) {
+        // C1: same rule as the expansion loop above.
+        if (runBodyBudgetStop !== null) break;
+        // Fix (d): too few members left ends the exchanges; a dropped root neither defends nor is attacked.
+        if (tooFewLeftToArgue()) break;
+        if (satOutDuringRun.has(exchange.authorRootIndex) || satOutDuringRun.has(exchange.targetRootIndex)) continue;
+        const authorRoot = authoredNodes.get(exchange.authorRootIndex);
+        const targetRoot = authoredNodes.get(exchange.targetRootIndex);
+        if (authorRoot === undefined || targetRoot === undefined) {
+          throw new TypedDomainError("DEBATE_ROOT_MISSING", "A cross-root exchange requires both authored roots");
+        }
+        let authored: Awaited<ReturnType<typeof authorPosition>>;
+        try {
+        authored = await authorPosition({
+          authorIndex: exchange.authorIndex,
+          seat: crossExchangeSeatFor(exchange),
+          leg: {
+            kind: "cross-root",
+            ownPosition: authorRoot.statement,
+            otherMakersPosition: targetRoot.statement
+          },
+          callSiteKey: `JUDGE:cross-root:${exchange.authorRootIndex}->${exchange.targetRootIndex}`,
+          role: "cross-root response",
+          parentNodeId: authorRoot.nodeId,
+          childKind: "support",
+          // Root expansion occupies ordinals 1/2. Preserve M=2's historical
+          // ordinal 3 while allocating one deterministic slot per other root.
+          siblingOrdinal: 3 + (exchange.targetRootIndex < exchange.authorRootIndex
+            ? exchange.targetRootIndex
+            : exchange.targetRootIndex - 1),
+          plannedLegCount: 1,
+          explorationDecision: "challenge",
+          edges: [
+            { targetNodeId: authorRoot.nodeId, targetStatement: authorRoot.statement, polarity: "support" },
+            { targetNodeId: targetRoot.nodeId, targetStatement: targetRoot.statement, polarity: "attack" }
+          ]
+        }, effectiveMakerCount + expansionPlan.length + exchangeIndex);
+        } catch (error) {
+          const stop = expansionPhaseStop(error);
+          if (stop === null) throw error;
+          runBodyBudgetStop = stop;
+          break;
+        }
+        // A saved exchange is already in `authoredNodes`, at its plan position (after every expansion leg's).
+        if (authored.kind === "HALTED") haltedExpansionRecords.push(authored.record);
+      }
+      await reviewPendingAuthoredNodes();
     }
-    await reviewPendingAuthoredNodes();
+    // Root 0's chain ran its panel or failed, and a failure was thrown just above.
+    const selection = rootZeroPanel.selection;
+    if (selection === null) {
+      throw new TypedDomainError("MAKER_POSITION_UNAVAILABLE", "The primary maker position's panel did not finish");
+    }
 
     const authoredNodeList = [...authoredNodes.entries()]
       .sort(([left], [right]) => left - right)
@@ -8696,6 +9554,7 @@ export class WalkingSkeletonRunner {
     return executed;
     });
     } finally {
+      callLane?.close();
       keepAlive.stop();
     }
   }
@@ -8862,6 +9721,8 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "BUDGET_SKIP_AFFECTED_NODES_REQUIRED",
   "CALIBRATION_STRATEGY_INVALID",
   "CALL_BUDGET_EXHAUSTED",
+  "CALL_LANE_HELD_BACK",
+  "CALL_LANE_STOPPED",
   "CALL_SITE_SEAT_ALREADY_MARKED",
   "CALL_SITE_SEAT_MARKER_REQUIRED",
   "CATCH_UP_ANSWER_NOT_FOUND",
@@ -10004,6 +10865,13 @@ export function plansUnresolvedPersonAllowance(): PersonAllowanceSource {
   });
 }
 
+/**
+ * Parallel AI calls (spec 2026-10-12 §3.5): a money seam that may count its
+ * call's projection in flight (`CostEnvelopeGuard.providerSeam`), and releases
+ * it when the gateway's call has settled.
+ */
+type InFlightReleasingSeam = ProviderCostEnvelopeSeam & { readonly releaseInFlight?: () => void };
+
 export function createPostgresProviderGateway(
   pool: Pool,
   options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction" | "persistCallPrompt">
@@ -10025,18 +10893,27 @@ export function createPostgresProviderGateway(
         runId: string,
         phase: CostEnvelopePhase,
         sharedWall: SharedWallApplication
-      ) => ProviderCostEnvelopeSeam;
+      ) => InFlightReleasingSeam;
       /**
        * Verdict story (spec §8): the STORY's own money bound, built per call
        * from the leased run exactly as the run's is. A story call on a metered
        * gateway (one with `buildCostEnvelopeSeam`) that has no story seam is
        * refused, so a story can never spend unbounded where the debate cannot.
        */
-      readonly buildStoryCostEnvelopeSeam?: (runId: string) => ProviderCostEnvelopeSeam;
+      readonly buildStoryCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /**
+       * Parallel AI calls (spec 2026-10-12 §3.5): this process's calls in
+       * flight, for the run-wide attempt ceiling. A call bounded by that ceiling
+       * counts itself before the ceiling is first asked and is released once it
+       * settles, so its ledger rows are written by then; both ceiling checks add
+       * the run's OTHER calls in flight. Absent = today's checks, byte for byte.
+       * Never the money seam's counter (run-in-flight.ts).
+       */
+      readonly inFlight?: RunInFlight;
     }
 ): ProviderGateway {
   const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
-  const { buildStoryCostEnvelopeSeam, ...httpOptions } = gatewayOptions;
+  const { buildStoryCostEnvelopeSeam, inFlight, ...httpOptions } = gatewayOptions;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
   const http = new OpenAICompatibleProviderGateway({
@@ -10127,8 +11004,19 @@ export function createPostgresProviderGateway(
       // is bounded by its sealed call bound (the per-site count below), and the
       // rounds by `storyLoopMaxRounds`; the RUN's ceiling is never consulted,
       // so a debate that used every attempt still gets its story.
-      if (!authenticatedEvaluatorScope && !storyScope) {
-        await budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase);
+      const runCeilingBinds = !authenticatedEvaluatorScope && !storyScope;
+      // Parallel AI calls (spec 2026-10-12 §3.5): a call the run's ceiling binds
+      // counts itself in flight FIRST, synchronously, and every ceiling check
+      // then adds the run's OTHER calls in flight, counted before the ledger is
+      // read. Released in the finally below, once every row of the call is written.
+      const releaseCall = runCeilingBinds && inFlight !== undefined ? inFlight.begin(leasedRunId, 0n) : undefined;
+      const otherAttemptsInFlight = (): Readonly<{ inFlightAttempts: number }> => ({
+        inFlightAttempts: releaseCall === undefined ? 0 : inFlight!.attempts(leasedRunId) - 1
+      });
+      let costEnvelope: InFlightReleasingSeam | undefined;
+      try {
+      if (runCeilingBinds) {
+        await budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase, otherAttemptsInFlight());
       }
       const consumed = await ledger.countModelAttempts({
         runId: request.runId,
@@ -10144,6 +11032,27 @@ export function createPostgresProviderGateway(
         throw new TypedDomainError("CALL_BUDGET_EXHAUSTED", request.subjectItemId);
       }
       try {
+        /**
+         * V-28: the money envelope binds EVERY call, the authenticated evaluator
+         * scope included. That scope is exempt from the ATTEMPT ceiling because
+         * its attempts are billed to the evaluator rather than to the run
+         * (`ledger_entry_is_authenticated_scope`), but its calls are made against
+         * the same paid vendor with the same money, so exempting them from the
+         * money ceiling would leave a hole the size of the evaluator leg. The run
+         * id is the leased one, for the same reason as the attempt hook below.
+         *
+         * Verdict story: a story call is bound by the STORY's seam instead —
+         * its own ceiling, summed over STORY charges only.
+         *
+         * Task M1: the run's seam is built for the call's phase, so an
+         * answer-writing call is compared with the answer's ceiling.
+         *
+         * Parallel AI calls: built here, so the finally below can release what
+         * it still counts in flight once the call has settled.
+         */
+        costEnvelope = storyScope
+          ? buildStoryCostEnvelopeSeam?.(leasedRunId)
+          : buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request));
         return await http.call({
           // Preview retry fix, option B (spec 2026-10-11 §1.1): the spread forwards the preview's
           // `maxAttemptsThisCall` (one POST per call), and `remaining` stays the step's billed allowance,
@@ -10154,31 +11063,10 @@ export function createPostgresProviderGateway(
           // retry loop (B26c's hook, wired here), not only once per call; the refusal is the
           // run's own RUN_COST_ENVELOPE_EXHAUSTED and no ledger row is written for it. The
           // run id is the leased one the S06 seam bound above, not a re-read of the request.
-          ...(authenticatedEvaluatorScope || storyScope ? {} : {
-            assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase)
-          }),
-          /**
-           * V-28: the money envelope binds EVERY call, the authenticated evaluator
-           * scope included. That scope is exempt from the ATTEMPT ceiling because
-           * its attempts are billed to the evaluator rather than to the run
-           * (`ledger_entry_is_authenticated_scope`), but its calls are made against
-           * the same paid vendor with the same money, so exempting them from the
-           * money ceiling would leave a hole the size of the evaluator leg. The run
-           * id is the leased one, for the same reason as the attempt hook above.
-           *
-           * Verdict story: a story call is bound by the STORY's seam instead —
-           * its own ceiling, summed over STORY charges only.
-           *
-           * Task M1: the run's seam is built for the call's phase, so an
-           * answer-writing call is compared with the answer's ceiling.
-           */
-          ...(storyScope
-            ? (buildStoryCostEnvelopeSeam === undefined ? {} : {
-              costEnvelope: buildStoryCostEnvelopeSeam(leasedRunId)
-            })
-            : (buildCostEnvelopeSeam === undefined ? {} : {
-              costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase, providerCallSharedWall(request))
-            }))
+          ...(runCeilingBinds ? {
+            assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase, otherAttemptsInFlight())
+          } : {}),
+          ...(costEnvelope === undefined ? {} : { costEnvelope })
         });
       } catch (error) {
         capture?.emit(captureFailureEnvelope({
@@ -10189,6 +11077,10 @@ export function createPostgresProviderGateway(
           source: "first_party"
         }));
         throw error;
+      }
+      } finally {
+        costEnvelope?.releaseInFlight?.();
+        releaseCall?.();
       }
       });
       };

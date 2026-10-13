@@ -197,6 +197,35 @@ describe("C2(b) — a run-level spend stop is never a panel member failure", () 
     expect(reached).toEqual(["panel-1"]);
   });
 
+  it("asked together (parallel calls, askTogether), still rethrows the stop as itself, never as a note", async () => {
+    const reached: string[] = [];
+    await expect(runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary: { judgementRef: "j0", assessment: {} as never, memberRole: "primary" },
+      askTogether: true,
+      members: [
+        {
+          memberRole: "panel-1", actorRef: "actor:one", contractHash: "c1",
+          judge: async () => {
+            reached.push("panel-1");
+            throw new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "spent");
+          }
+        },
+        {
+          memberRole: "panel-2", actorRef: "actor:two", contractHash: "c2",
+          judge: async () => { reached.push("panel-2"); return { judgementRef: "j2", assessment: {} as never }; }
+        }
+      ]
+    })).rejects.toThrowError(
+      expect.objectContaining({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" })
+    );
+
+    // Parallel calls (spec 2026-10-12 §2.3, owner ruling O6): the members are
+    // asked together, so the second member was already asked when the stop
+    // arrived; the stop still leaves the panel as itself, never as a note.
+    expect(reached).toEqual(["panel-1", "panel-2"]);
+  });
+
   it("still records an ordinary member failure as a note", async () => {
     const panel = await runJudgePanel({
       artifactProducerRef: "actor:author",

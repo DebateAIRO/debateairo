@@ -151,6 +151,14 @@ export type DebatePageRunEventConsumerInput = {
 
 /** The single event-consumption seam used by the live stream and render tests. */
 export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsumerInput): (event: RunEvent) => void {
+  // Parallel calls: several steps can fail and retry at the same time, and the page has ONE
+  // error banner. These are the steps whose failure is on it and that have not retried yet;
+  // a retry clears the banner only once none is left, never for another step's retry.
+  const failedNodes = new Set<string>();
+  const nodeOf = (event: RunEvent): string => {
+    const node = event.subject_ref ?? event.payload.node_ref;
+    return typeof node === "string" ? node : "";
+  };
   return (event) => {
     const next = applyRunEvent(input.readLive(), event);
     input.writeLive(next);
@@ -169,10 +177,13 @@ export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsum
         raw: next.compositionText
       }));
     } else if (event.event_type === "node.failed") {
+      failedNodes.add(nodeOf(event));
       input.writeError(t(input.catalog ?? debateChromeEnglish, "debateChrome.error.claimGenerationFailed"));
     } else if (event.event_type === "node.retrying") {
-      input.writeError(null);
+      if (failedNodes.delete(nodeOf(event)) && failedNodes.size === 0) input.writeError(null);
     } else if (event.event_type === "run.terminal") {
+      // The run's own final sentence owns the banner now: no late retry may clear it.
+      failedNodes.clear();
       if (next.terminalFailure !== null) {
         input.updateDebate((current) => current === null
           ? current

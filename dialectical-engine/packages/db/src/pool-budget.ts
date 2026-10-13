@@ -6,8 +6,8 @@
  * the superuser) and Hatchet's role may take 50 of them. Owner rulings that day:
  * size for ONE API process — the server runs exactly one — and let the runner
  * run at most 8 debates at once. One API is 79 connections at most and the
- * runner 20, which leaves room for Hatchet, the migrator, the operator's
- * commands and spare. A second API process needs PgBouncer or a higher limit
+ * runner 34 (20 until parallel AI calls, 2026-10-12), which leaves room for
+ * Hatchet, the migrator, the operator's commands and 21 spare. A second API process needs PgBouncer or a higher limit
  * first. The plan, the per-pool audit and the arithmetic:
  * docs/operations/2026-10-10-database-connection-budget.md; the guard that keeps
  * main.ts and these numbers in step: tests/architecture/database-connection-budget.test.ts.
@@ -66,12 +66,19 @@ export const SUPPORT_CONTROL_PLANE_POOL = budget("support:control", 2, 200);
 
 /**
  * Debates one runner process runs at once. Each holds its content lease for
- * the whole debate and takes a second connection for spend and memory reads,
- * so the runner's pool is twice this plus 4 for the claim, the start-up
- * reconciliation and the story writer. Further debates wait in Hatchet's queue.
+ * the whole debate and takes a second connection for spend and memory reads;
+ * since a debate's AI calls run at the same time (spec
+ * docs/superpowers/specs/2026-10-12-parallel-calls-design.md §3.6) their ledger
+ * and spend writes overlap, so a third. The runner's pool is three times this
+ * plus 8 for the claim, the start-up reconciliation, the story writer and
+ * bursts. Claim renewal has its own pool of 2 (`keepAlive`), so a burst of a
+ * debate's writes never costs a debate its claim. Further debates wait in
+ * Hatchet's queue.
  */
 export const RUNNER_CAPACITY = Object.freeze({ concurrentRuns: 8 });
 
 export const RUNNER_DATABASE_POOLS = Object.freeze({
-  runtime: budget("runner:runtime", RUNNER_CAPACITY.concurrentRuns * 2 + 4, 5_000)
+  runtime: budget("runner:runtime", RUNNER_CAPACITY.concurrentRuns * 3 + 8, 5_000),
+  // Only the running debates' claim renewals (apps/runner/src/run-keep-alive.ts).
+  keepAlive: budget("runner:keep-alive", 2, 5_000)
 });

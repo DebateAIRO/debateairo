@@ -1173,6 +1173,16 @@ export {
   type AnswerRoleRotationPolicyState
 } from "./answer-role-rotation-policy.js";
 export {
+  CALL_CONCURRENCY_LIMITS,
+  CALL_CONCURRENCY_POLICY_ROW_KEY,
+  callConcurrencyPolicyFromValue,
+  callConcurrencyPolicyRow,
+  effectiveCallConcurrency,
+  readCallConcurrencyPolicy,
+  type CallConcurrencyPolicy,
+  type CallConcurrencyPolicyState
+} from "./call-concurrency-policy.js";
+export {
   MFA_POLICY_REGISTER_ROW,
   MFA_POLICY_DEPLOYMENT_REGISTER_ROW,
   MFA_POLICY_ROW_KEY,

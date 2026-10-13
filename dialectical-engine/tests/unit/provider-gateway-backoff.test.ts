@@ -133,7 +133,9 @@ describe("L4-F8 — per-attempt ceiling hook", () => {
 describe("DL4-F3 — the runner's gateway factory supplies the per-attempt hook", () => {
   // Task M1: the hook also names the call's phase, the one the money seam below
   // is built for, so a BODY call and a SERVE call see their own share.
-  const HOOK = "assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase)";
+  // Parallel calls (Task 8): and the run's other calls in flight
+  // (tests/unit/run-in-flight.test.ts drives the arithmetic).
+  const HOOK = "assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase, otherAttemptsInFlight())";
 
   function factoryBody(source: string): string {
     const start = source.indexOf("export function createPostgresProviderGateway");
@@ -201,8 +203,11 @@ describe("DL4-F3 — the runner's gateway factory supplies the per-attempt hook"
  */
 describe("V-28 — the runner's gateway factory supplies the money seam", () => {
   // Task M1: built for the call's phase, the SAME phase the attempt hook above
-  // is asked with.
-  const SEAM = "costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase, providerCallSharedWall(request))";
+  // is asked with. Parallel calls (Task 8): built just before the call it is
+  // handed to, so the gateway can release what it counts in flight once the
+  // call has settled.
+  const SEAM = "buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request))";
+  const HANDED = "...(costEnvelope === undefined ? {} : { costEnvelope })";
 
   function factoryBody(source: string): string {
     const start = source.indexOf("export function createPostgresProviderGateway");
@@ -219,6 +224,8 @@ describe("V-28 — the runner's gateway factory supplies the money seam", () => 
     expect(body).toContain("const { buildCostEnvelopeSeam, ...gatewayOptions } = options;");
     expect(body).toContain(SEAM);
     expect(body.split(SEAM)).toHaveLength(2);
+    expect(body.split(HANDED)).toHaveLength(2);
+    expect(body).toContain("costEnvelope?.releaseInFlight?.();");
     // Never a re-read of the request's own run id — the lease is the binding.
     expect(body).not.toContain("buildCostEnvelopeSeam(request.runId");
   });

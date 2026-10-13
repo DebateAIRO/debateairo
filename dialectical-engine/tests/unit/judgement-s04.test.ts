@@ -18,6 +18,7 @@ import {
   selectReducedJudgement,
   type JudgeAssessment
 } from "@debateai/judgement";
+import { TypedDomainError } from "@debateai/kernel";
 import { CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY } from "@debateai/register";
 
 const assessment = (counterargumentStrength = 0.2): JudgeAssessment => ({
@@ -413,6 +414,287 @@ const EXPECTED_PANEL_NOTE_REASONS = [
   // the fixed fallback, and the pre-existing self-grading constant
   "UNCLASSIFIED_MEMBER_ERROR", "FX-HR-H6"
 ] as const;
+
+/**
+ * Parallel calls, Task 5 (spec 2026-10-12 §2.2/§2.3, owner ruling O6) — a panel
+ * asked with `askTogether` (the runner passes it only when the debate's lane
+ * admits more than one call) asks its members TOGETHER and reads their results
+ * in MEMBER order, so the panel's outcome is the same whatever order the
+ * answers arrive in.
+ */
+describe("Parallel calls · a judge panel asks its members together, results read in member order", () => {
+  type Answer = { judgementRef: string; assessment: JudgeAssessment };
+  /** A promise the test settles by hand, so the finish order is the test's choice. */
+  const deferred = () => {
+    let resolve!: (value: Answer) => void;
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<Answer>((onResolve, onReject) => { resolve = onResolve; reject = onReject; });
+    return { promise, resolve, reject };
+  };
+  const flush = async () => { for (let round = 0; round < 10; round += 1) await Promise.resolve(); };
+  const stop = (code: string) => new TypedDomainError(code, "test-layer: run-level stop");
+  const primary = { judgementRef: "judgement:author", assessment: assessment(), memberRole: "author" };
+
+  it("(a) keeps author, m1, m2, m3 when the members answer in reverse order", async () => {
+    const seats = [deferred(), deferred(), deferred()];
+    const pending = runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary,
+      askTogether: true,
+      members: seats.map((seat, index) => ({
+        memberRole: `m${index + 1}`, actorRef: `actor:m${index + 1}`, contractHash: `contract:m${index + 1}`,
+        judge: () => seat.promise
+      }))
+    });
+    for (const index of [2, 1, 0]) {
+      seats[index]!.resolve({ judgementRef: `judgement:m${index + 1}`, assessment: assessment() });
+      await flush();
+    }
+    const result = await pending;
+    expect(result.judgements.map((entry) => entry.memberRole)).toEqual(["author", "m1", "m2", "m3"]);
+    expect(result.judgements.map((entry) => entry.judgementRef))
+      .toEqual(["judgement:author", "judgement:m1", "judgement:m2", "judgement:m3"]);
+    expect(result.judgements.map((entry) => entry.contractHash)).toEqual([null, "contract:m1", "contract:m2", "contract:m3"]);
+    expect(result.notes).toEqual([]);
+  });
+
+  it("(b) starts every member's call, in member order, before any of them answers", async () => {
+    const events: string[] = [];
+    const seats = [deferred(), deferred(), deferred()];
+    const pending = runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary,
+      askTogether: true,
+      members: seats.map((seat, index) => ({
+        memberRole: `m${index + 1}`, actorRef: `actor:m${index + 1}`, contractHash: `contract:m${index + 1}`,
+        judge: () => { events.push(`start m${index + 1}`); return seat.promise; }
+      }))
+    });
+    // Synchronously, before a single answer exists, every call is already out.
+    expect(events).toEqual(["start m1", "start m2", "start m3"]);
+    seats.forEach((seat, index) => seat.resolve({ judgementRef: `judgement:m${index + 1}`, assessment: assessment() }));
+    await pending;
+    expect(events).toEqual(["start m1", "start m2", "start m3"]);
+  });
+
+  it("(c) RETURN_HEARD keeps every member that answered around a stop, with the stop as stoppedBy", async () => {
+    const m2Stop = stop("RUN_COST_ENVELOPE_MONEY_REACHED");
+    const m3Stop = stop("RUN_COST_ENVELOPE_EXHAUSTED");
+    const seats = [deferred(), deferred(), deferred(), deferred(), deferred()];
+    const asked: string[] = [];
+    const pending = runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary,
+      askTogether: true,
+      members: seats.map((seat, index) => ({
+        memberRole: `m${index + 1}`, actorRef: `actor:m${index + 1}`, contractHash: `contract:m${index + 1}`,
+        judge: () => { asked.push(`m${index + 1}`); return seat.promise; }
+      })),
+      onRunLevelSpendStop: "RETURN_HEARD"
+    });
+    // The later stop (m3) lands first; the first stop IN MEMBER ORDER (m2) still names the panel's stop.
+    seats[2]!.reject(m3Stop);
+    await flush();
+    seats[4]!.reject(new PanelMemberFailure("TIMEOUT", "test-layer timeout"));
+    await flush();
+    seats[3]!.resolve({ judgementRef: "judgement:m4", assessment: assessment() });
+    await flush();
+    seats[1]!.reject(m2Stop);
+    await flush();
+    seats[0]!.resolve({ judgementRef: "judgement:m1", assessment: assessment() });
+    const result = await pending;
+    expect(asked).toEqual(["m1", "m2", "m3", "m4", "m5"]);
+    expect(result.judgements.map((entry) => entry.memberRole)).toEqual(["author", "m1", "m4"]);
+    expect(result.stoppedBy).toBe(m2Stop);
+    // A stop is the run's, never a member's note; the ordinary failure after it is kept.
+    expect(result.notes).toEqual([
+      { memberRole: "m5", contractHash: "contract:m5", kind: "MEMBER_FAILED", failureKind: "TIMEOUT", reason: "TIMEOUT" }
+    ]);
+  });
+
+  it("(c') RETURN_HEARD with the brief's shape: m2 stops, m1 and m3 answer", async () => {
+    const m2Stop = stop("RUN_COST_ENVELOPE_MONEY_REACHED");
+    const result = await runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary,
+      askTogether: true,
+      members: [
+        { memberRole: "m1", actorRef: "actor:m1", contractHash: "contract:m1", judge: async () => ({ judgementRef: "judgement:m1", assessment: assessment() }) },
+        { memberRole: "m2", actorRef: "actor:m2", contractHash: "contract:m2", judge: async () => { throw m2Stop; } },
+        { memberRole: "m3", actorRef: "actor:m3", contractHash: "contract:m3", judge: async () => ({ judgementRef: "judgement:m3", assessment: assessment() }) }
+      ],
+      onRunLevelSpendStop: "RETURN_HEARD"
+    });
+    expect(result.judgements.map((entry) => entry.judgementRef)).toEqual(["judgement:author", "judgement:m1", "judgement:m3"]);
+    expect(result.stoppedBy).toBe(m2Stop);
+    expect(result.notes).toEqual([]);
+  });
+
+  it("(d) RETHROW throws the first stop in member order, only after every member has settled", async () => {
+    const m3Stop = stop("RUN_COST_ENVELOPE_EXHAUSTED");
+    const settled: string[] = [];
+    const seats = [deferred(), deferred(), deferred()];
+    const pending = runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary,
+      askTogether: true,
+      members: seats.map((seat, index) => ({
+        memberRole: `m${index + 1}`, actorRef: `actor:m${index + 1}`, contractHash: `contract:m${index + 1}`,
+        judge: () => seat.promise.finally(() => { settled.push(`m${index + 1}`); })
+      }))
+    }).then(() => ({ kind: "RETURNED" as const, settled: [...settled] }), (error: unknown) => ({ kind: "THREW" as const, error, settled: [...settled] }));
+    seats[2]!.reject(m3Stop);
+    await flush();
+    seats[0]!.reject(new PanelMemberFailure("TIMEOUT", "test-layer timeout"));
+    await flush();
+    let outcomeBeforeLastSeat: unknown = "PENDING";
+    void pending.then((outcome) => { outcomeBeforeLastSeat = outcome; });
+    await flush();
+    expect(outcomeBeforeLastSeat).toBe("PENDING");
+    seats[1]!.resolve({ judgementRef: "judgement:m2", assessment: assessment() });
+    const outcome = await pending;
+    expect(outcome.kind).toBe("THREW");
+    expect(outcome.kind === "THREW" ? outcome.error : null).toBe(m3Stop);
+    expect([...outcome.settled].sort()).toEqual(["m1", "m2", "m3"]);
+  });
+
+  it("(e) the author's maker on another route is a PRODUCER_GRADING_FORBIDDEN note in its place, never called", async () => {
+    let authorMakerCalls = 0;
+    const result = await runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary,
+      askTogether: true,
+      members: [
+        { memberRole: "m1", actorRef: "actor:m1", contractHash: "contract:m1", judge: async () => { throw new PanelMemberFailure("TIMEOUT", "slow"); } },
+        {
+          memberRole: "author", actorRef: "actor:author-second-route", contractHash: "contract:self",
+          judge: async () => { authorMakerCalls += 1; return { judgementRef: "never", assessment: assessment() }; }
+        },
+        { memberRole: "m3", actorRef: "actor:m3", contractHash: "contract:m3", judge: async () => { throw new PanelMemberFailure("PARSE_FAILURE", "bad"); } }
+      ]
+    });
+    expect(authorMakerCalls).toBe(0);
+    expect(result.judgements.map((entry) => entry.judgementRef)).toEqual(["judgement:author"]);
+    expect(result.notes.map((note) => [note.memberRole, note.kind])).toEqual([
+      ["m1", "MEMBER_FAILED"], ["author", "PRODUCER_GRADING_FORBIDDEN"], ["m3", "MEMBER_FAILED"]
+    ]);
+  });
+
+  it("notes a judge that throws synchronously as that member's failure and still asks the rest", async () => {
+    const asked: string[] = [];
+    const result = await runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary,
+      askTogether: true,
+      members: [
+        { memberRole: "m1", actorRef: "actor:m1", contractHash: "contract:m1", judge: () => { asked.push("m1"); throw new Error("test-layer: sync"); } },
+        { memberRole: "m2", actorRef: "actor:m2", contractHash: "contract:m2", judge: async () => { asked.push("m2"); return { judgementRef: "judgement:m2", assessment: assessment() }; } }
+      ]
+    });
+    expect(asked).toEqual(["m1", "m2"]);
+    expect(result.judgements.map((entry) => entry.judgementRef)).toEqual(["judgement:author", "judgement:m2"]);
+    expect(result.notes).toEqual([
+      { memberRole: "m1", contractHash: "contract:m1", kind: "MEMBER_FAILED", failureKind: "PROVIDER_ERROR", reason: "UNCLASSIFIED_MEMBER_ERROR" }
+    ]);
+  });
+
+  it("refuses an answer from the author's maker after the call in its member place, and keeps the others", async () => {
+    const seats = [deferred(), deferred(), deferred()];
+    const pending = runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary,
+      askTogether: true,
+      members: [
+        { memberRole: "m1", actorRef: "actor:m1", contractHash: "contract:m1", judge: () => seats[0]!.promise },
+        {
+          memberRole: "m2", actorRef: "actor:m2", contractHash: "contract:m2",
+          judge: () => seats[1]!.promise.then((answer) => ({ ...answer, actorRef: "actor:backup", memberRole: "author" }))
+        },
+        { memberRole: "m3", actorRef: "actor:m3", contractHash: "contract:m3", judge: () => seats[2]!.promise.then(() => { throw new PanelMemberFailure("TIMEOUT", "slow"); }) }
+      ]
+    });
+    for (const index of [2, 1, 0]) {
+      seats[index]!.resolve({ judgementRef: `judgement:m${index + 1}`, assessment: assessment() });
+      await flush();
+    }
+    const result = await pending;
+    expect(result.judgements.map((entry) => entry.memberRole)).toEqual(["author", "m1"]);
+    expect(result.notes.map((note) => [note.memberRole, note.kind])).toEqual([
+      ["m2", "PRODUCER_GRADING_REFUSED_AFTER_CALL"], ["m3", "MEMBER_FAILED"]
+    ]);
+  });
+});
+
+/**
+ * Ruling R32 (final review, Important 1) — WITHOUT `askTogether` (the serial
+ * path: the register's call-concurrency row absent, as hosted and local run
+ * today) the panel is today's loop: one member at a time, each awaited before
+ * the next is asked, and nobody is asked after a run-level spend stop — every
+ * further member would be another billed call for a run told it cannot pay.
+ */
+describe("Ruling R32 · without askTogether the panel asks one member at a time, and nobody after a stop", () => {
+  type Answer = { judgementRef: string; assessment: JudgeAssessment };
+  const primary = { judgementRef: "judgement:author", assessment: assessment(), memberRole: "author" };
+  const flush = async () => { for (let round = 0; round < 10; round += 1) await Promise.resolve(); };
+
+  it("asks the next member only once the one before it has answered", async () => {
+    const events: string[] = [];
+    let answerFirst!: (value: Answer) => void;
+    const pending = runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary,
+      members: [
+        { memberRole: "m1", actorRef: "actor:m1", contractHash: "contract:m1", judge: () => { events.push("start m1"); return new Promise<Answer>((resolve) => { answerFirst = resolve; }); } },
+        { memberRole: "m2", actorRef: "actor:m2", contractHash: "contract:m2", judge: async () => { events.push("start m2"); return { judgementRef: "judgement:m2", assessment: assessment() }; } }
+      ]
+    });
+    await flush();
+    expect(events).toEqual(["start m1"]);
+    answerFirst({ judgementRef: "judgement:m1", assessment: assessment() });
+    const result = await pending;
+    expect(events).toEqual(["start m1", "start m2"]);
+    expect(result.judgements.map((entry) => entry.judgementRef)).toEqual(["judgement:author", "judgement:m1", "judgement:m2"]);
+  });
+
+  it("asks nobody after a run-level spend stop, under both rules", async () => {
+    for (const rule of ["RETHROW", "RETURN_HEARD"] as const) {
+      const asked: string[] = [];
+      const stopped = new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "test-layer: spent");
+      const outcome = await runJudgePanel({
+        artifactProducerRef: "actor:author",
+        primary,
+        members: [
+          { memberRole: "m1", actorRef: "actor:m1", contractHash: "contract:m1", judge: async () => { asked.push("m1"); return { judgementRef: "judgement:m1", assessment: assessment() }; } },
+          { memberRole: "m2", actorRef: "actor:m2", contractHash: "contract:m2", judge: async () => { asked.push("m2"); throw stopped; } },
+          { memberRole: "m3", actorRef: "actor:m3", contractHash: "contract:m3", judge: async () => { asked.push("m3"); return { judgementRef: "judgement:m3", assessment: assessment() }; } }
+        ],
+        onRunLevelSpendStop: rule
+      }).then((result) => result, (error: unknown) => error);
+      expect(asked, rule).toEqual(["m1", "m2"]);
+      if (rule === "RETHROW") {
+        expect(outcome, rule).toBe(stopped);
+      } else {
+        const result = outcome as Awaited<ReturnType<typeof runJudgePanel>>;
+        expect(result.stoppedBy, rule).toBe(stopped);
+        expect(result.judgements.map((entry) => entry.judgementRef), rule).toEqual(["judgement:author", "judgement:m1"]);
+      }
+    }
+  });
+
+  it("is the same with askTogether false spelled out", async () => {
+    const asked: string[] = [];
+    await expect(runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary,
+      askTogether: false,
+      members: [
+        { memberRole: "m1", actorRef: "actor:m1", contractHash: "contract:m1", judge: async () => { asked.push("m1"); throw new TypedDomainError("RUN_COST_ENVELOPE_EXHAUSTED", "test-layer: attempts"); } },
+        { memberRole: "m2", actorRef: "actor:m2", contractHash: "contract:m2", judge: async () => { asked.push("m2"); return { judgementRef: "judgement:m2", assessment: assessment() }; } }
+      ]
+    })).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_EXHAUSTED" });
+    expect(asked).toEqual(["m1"]);
+  });
+});
 
 describe("F-DIAG-S04-PANEL-NOTE — the panel note never carries a raw caught message", () => {
   // Synthetic only (D18): no value here is, or resembles, a real credential.

@@ -8,8 +8,10 @@ import {
 import {
   projectJudgedStanding,
   remainingProviderAttempts,
+  reservingHoldRecorder,
   withCooldownRetry,
-  type HoldProgressEvent
+  type HoldProgressEvent,
+  type HoldRecorder
 } from "@debateai/runner";
 import { assertRequiredConditionMarkRecords, type ConditionMarkRecord } from "@debateai/serve";
 import { CONDITION_MARKS } from "@debateai/kernel";
@@ -49,13 +51,20 @@ describe("RESIL-01 / DR-174 lifecycle mutation ledger", () => {
     expect(source).toContain('export const FIRST_POSITION_CALL_SITE_KEY = "JUDGE" as const;');
     // V-28 (task 11) changed the DECLARATION, not the routing: the secondary
     // root is authored inside a try/catch that turns a spend refusal into a
-    // clean stop instead of discarding an already-minted root 0, so `secondary`
-    // is a `let` assigned in the try rather than a `const`. What this row is
-    // about — that the secondary root goes through `authorPosition`, and so
-    // through the cooldown seam, under that call-site key with a null parent —
-    // is unchanged and is still pinned, declaration included.
-    expect(source).toMatch(/let secondary: Awaited<ReturnType<typeof authorPosition>> \| null = null;/);
-    expect(source).toMatch(/secondary = await authorPosition\(\{[\s\S]*?callSiteKey: "JUDGE:root:secondary",[\s\S]*?parentNodeId: null/);
+    // clean stop instead of discarding an already-minted root 0. Parallel calls
+    // (Task 10, 2026-10-12) changed it again: every root after the first is one
+    // chain (`rootChain`), all started together, so the secondary root is root
+    // index 1 of that chain rather than a statement of its own. What this row is
+    // about — that the secondary root goes through the leg's author call
+    // (`authorAndPanel`), and so through the cooldown seam, under that call-site
+    // key with a null parent — is unchanged and is still pinned. Task 11: the
+    // chain is told the root's statement as soon as its author call returned
+    // (its replies start from it), and the roots' chains are started together
+    // with the replies' and cross-exchanges' (`chains`).
+    expect(source).toMatch(/const rootCallSiteKey = \(rootIndex: number\): string =>\s*rootIndex === 1 \? "JUDGE:root:secondary" : `JUDGE:root:\$\{String\(rootIndex\)\}`;/);
+    expect(source).toMatch(/const ROOT_SAVE: Omit<SaveInput, "authorIndex"> = Object\.freeze\(\{\s*parentNodeId: null,/);
+    expect(source).toMatch(/const input: AuthorPositionInput = \{[\s\S]*?callSiteKey: rootCallSiteKey\(rootIndex\),[\s\S]*?\.\.\.ROOT_SAVE,[\s\S]*?authoredRoot = await authorAndPanel\(input, \(statement\) => statements\[rootIndex\]!\.resolve\(statement\)\);/);
+    expect(source).toMatch(/for \(let rootIndex = 1; rootIndex < effectiveMakerCount; rootIndex \+= 1\) \{\s*chains\.push\(runChain\(\(stage\) => rootChain\(rootIndex, stage\)/);
     expect(source).toMatch(/const childAttempt = await cooldownAttempt\(\{[\s\S]*?failureScope: input\.parentNodeId === null \? "MAKER_POSITION" : "EXPANSION"/);
     expect(source).toContain("maxAttempts: this.settings.judgeBound.maxAttempts + (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0)");
   });
@@ -126,6 +135,180 @@ describe("RESIL-01 / DR-174 lifecycle mutation ledger", () => {
     expect(hold.events.every((event) => event.callSiteKey === "JUDGE:same-key")).toBe(true);
   });
 });
+
+/**
+ * Parallel AI calls (spec 2026-10-12 §2.3), Task 8 — THE RUN-WIDE HOLD CAP UNDER CONCURRENT FAILURES. Today the cap
+ * reads the run's recorded holds and then holds: two sites failing together both read the same count and both hold.
+ * The runner's recorder now reserves a hold in memory before it reads the count, and releases the reservation once
+ * the hold's COOLDOWN_HOLD record has committed (or on refusal), so concurrent failures cannot pass the cap.
+ */
+describe("Parallel calls · the hold cap counts holds being started in this process", () => {
+  const cooldownSite = (hold: HoldRecorder, callSiteKey: string, attempt = vi.fn(async (): Promise<string> => {
+    throw transportFailure();
+  })) => withCooldownRetry({
+    runId: "run:test",
+    callSiteKey,
+    parentNodeId: "node:parent",
+    plannedLegCount: 1,
+    baseMaxAttempts: 3,
+    failureScope: "EXPANSION",
+    policy,
+    hold,
+    attempt
+  });
+
+  /** A recorder whose count answers only when told, so two failures can read it at the same time. */
+  function gatedRecorder(recorded: number) {
+    const events: HoldProgressEvent[] = [];
+    let open: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => { open = resolve; });
+    const base = {
+      countCooldownHolds: vi.fn(async () => { await gate; return recorded + events.filter((event) => event.state === "COOLDOWN_HOLD").length; }),
+      record: vi.fn(async (event: HoldProgressEvent) => { events.push(event); }),
+      wait: vi.fn(async () => undefined)
+    };
+    return { base, events, open: () => open() };
+  }
+
+  it("uses the recorder's reservation instead of reading and comparing the count", async () => {
+    const hold = {
+      ...recorder(0),
+      reserveHold: vi.fn(async () => false)
+    };
+    const attempt = vi.fn(async (): Promise<string> => { throw transportFailure(); });
+    await expect(cooldownSite(hold, "JUDGE:reserved", attempt)).resolves.toMatchObject({ kind: "HALTED" });
+    expect(hold.reserveHold).toHaveBeenCalledWith("run:test", 2);
+    expect(hold.countCooldownHolds).not.toHaveBeenCalled();
+    expect(hold.wait).not.toHaveBeenCalled();
+    // The refused hold still keeps the site's final attempt.
+    expect(attempt.mock.calls).toEqual([[3], [4]]);
+  });
+
+  it("holds when the reservation admits it, exactly as the count did", async () => {
+    const hold = { ...recorder(0), reserveHold: vi.fn(async () => true) };
+    const attempt = vi.fn()
+      .mockRejectedValueOnce(transportFailure())
+      .mockResolvedValueOnce("authored");
+    await expect(cooldownSite(hold, "JUDGE:admitted", attempt)).resolves.toEqual({ kind: "AUTHORED", value: "authored" });
+    expect(hold.wait).toHaveBeenCalledOnce();
+    expect(hold.events.map((event) => event.state)).toEqual(["COOLDOWN_HOLD", "COOLDOWN_RETRY"]);
+  });
+
+  it("lets only one of two sites failing together take the run's last hold", async () => {
+    const gated = gatedRecorder(1);
+    const hold = reservingHoldRecorder(gated.base);
+    const first = cooldownSite(hold, "JUDGE:site-a");
+    const second = cooldownSite(hold, "JUDGE:site-b");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    gated.open();
+    await Promise.all([first, second]);
+    expect(gated.events.filter((event) => event.state === "COOLDOWN_HOLD")).toHaveLength(1);
+    expect(gated.base.wait).toHaveBeenCalledOnce();
+  });
+
+  it("without the reservation, the same two failures would both have held (the race it closes)", async () => {
+    const gated = gatedRecorder(1);
+    const first = cooldownSite(gated.base, "JUDGE:site-a");
+    const second = cooldownSite(gated.base, "JUDGE:site-b");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    gated.open();
+    await Promise.all([first, second]);
+    expect(gated.events.filter((event) => event.state === "COOLDOWN_HOLD")).toHaveLength(2);
+  });
+
+  it("admits iff recorded + reserved <= cap, and releases on refusal", async () => {
+    const hold = reservingHoldRecorder({ ...recorder(1) });
+    await expect(hold.reserveHold!("run:test", 2)).resolves.toBe(true);
+    // The first reservation is live until its COOLDOWN_HOLD record commits: a second one would be the third hold.
+    await expect(hold.reserveHold!("run:test", 2)).resolves.toBe(false);
+    await expect(hold.reserveHold!("run:test", 2)).resolves.toBe(false);
+    // Another run is never counted.
+    await expect(hold.reserveHold!("run:other", 2)).resolves.toBe(true);
+  });
+
+  it("releases a reservation once its hold's record has committed, so the database count takes over", async () => {
+    let recorded = 0;
+    const base = {
+      countCooldownHolds: vi.fn(async () => recorded),
+      record: vi.fn(async (event: HoldProgressEvent) => { if (event.state === "COOLDOWN_HOLD") recorded += 1; }),
+      wait: vi.fn(async () => undefined)
+    };
+    const hold = reservingHoldRecorder(base);
+    await expect(hold.reserveHold!("run:test", 2)).resolves.toBe(true);
+    await hold.record({ ...holdEvent(), state: "COOLDOWN_HOLD" });
+    // recorded 1 + this reservation 1 <= 2.
+    await expect(hold.reserveHold!("run:test", 2)).resolves.toBe(true);
+    await hold.record({ ...holdEvent(), state: "COOLDOWN_HOLD" });
+    await expect(hold.reserveHold!("run:test", 2)).resolves.toBe(false);
+  });
+
+  it("releases a reservation whose record fails, and one whose count fails", async () => {
+    let failRecord = true;
+    let failCount = false;
+    const base = {
+      countCooldownHolds: vi.fn(async () => { if (failCount) throw new Error("count down"); return 0; }),
+      record: vi.fn(async () => { if (failRecord) throw new Error("record down"); }),
+      wait: vi.fn(async () => undefined)
+    };
+    const hold = reservingHoldRecorder(base);
+    await expect(hold.reserveHold!("run:test", 1)).resolves.toBe(true);
+    await expect(hold.record({ ...holdEvent(), state: "COOLDOWN_HOLD" })).rejects.toThrow("record down");
+    failRecord = false;
+    failCount = true;
+    await expect(hold.reserveHold!("run:test", 1)).rejects.toThrow("count down");
+    failCount = false;
+    // Neither failure left a reservation behind: cap 1 with 0 recorded admits one.
+    await expect(hold.reserveHold!("run:test", 1)).resolves.toBe(true);
+  });
+
+  it("counts a reservation that commits and releases while another one is still reading the count", async () => {
+    // The race the brief's "reserved read after the await" would miss: site A's hold commits and releases between
+    // site B's count read (which did not see A's row) and B's decision. B must still see A.
+    let recorded = 0;
+    let releaseRead: (count: number) => void = () => undefined;
+    let reads = 0;
+    const base = {
+      countCooldownHolds: vi.fn(async () => {
+        reads += 1;
+        if (reads === 2) return new Promise<number>((resolve) => { releaseRead = resolve; });
+        return recorded;
+      }),
+      record: vi.fn(async (event: HoldProgressEvent) => { if (event.state === "COOLDOWN_HOLD") recorded += 1; }),
+      wait: vi.fn(async () => undefined)
+    };
+    const hold = reservingHoldRecorder(base);
+    await expect(hold.reserveHold!("run:test", 1)).resolves.toBe(true);
+    const second = hold.reserveHold!("run:test", 1);
+    await hold.record({ ...holdEvent(), state: "COOLDOWN_HOLD" });
+    releaseRead(0);
+    await expect(second).resolves.toBe(false);
+  });
+
+  it("passes every other record and the wait straight through", async () => {
+    const base = recorder(0);
+    const hold = reservingHoldRecorder(base);
+    await hold.record({ ...holdEvent(), state: "COOLDOWN_RETRY" });
+    await hold.wait(5);
+    await expect(hold.countCooldownHolds("run:test")).resolves.toBe(0);
+    expect(base.events.map((event) => event.state)).toEqual(["COOLDOWN_RETRY"]);
+    expect(base.wait).toHaveBeenCalledWith(5);
+  });
+});
+
+function holdEvent(): HoldProgressEvent {
+  return {
+    kind: "node.retrying",
+    state: "COOLDOWN_HOLD",
+    runId: "run:test",
+    callSiteKey: "JUDGE:test",
+    parentNodeId: null,
+    holdMs: 600_000,
+    holdUntil: null,
+    attemptsSpent: 3,
+    transportOutcome: "FAILED",
+    plannedLegCount: 1
+  };
+}
 
 const fullSnapshot: EvaluationSnapshot = {
   nodes: [

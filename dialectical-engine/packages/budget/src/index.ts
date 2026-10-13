@@ -59,6 +59,7 @@ export {
   costEnvelopeGuardPolicy,
   mostOneRunMaySpendMicros,
   type CostEnvelopeGuardInput,
+  type InFlightSpend,
   type ModelSpendEntry,
   type ModelSpendSource,
   type ModelSpendStore,
@@ -583,21 +584,35 @@ export class BudgetRepository {
    * Task M1: asked with the call's phase. A BODY call is refused at the pinned
    * ceiling less the answer's reserve, a SERVE call at the whole ceiling
    * (`attemptCeilingForPhase`); the code is the same for both.
+   *
+   * Parallel AI calls (spec 2026-10-12 §3.5): `inFlightAttempts` is how many
+   * OTHER calls of this run are in flight in this process — sent, or about to
+   * be, with no ledger row yet. The call is allowed iff
+   * `consumed + inFlightAttempts < ceiling`. The caller counts them BEFORE this
+   * reads the ledger, so a call that settles in between is seen in one place or
+   * the other (or both: the conservative side). Absent means 0: today's rule.
    */
-  async assertModelAttemptAllowed(runId: string, phase: CostEnvelopePhase): Promise<void> {
+  async assertModelAttemptAllowed(
+    runId: string,
+    phase: CostEnvelopePhase,
+    options?: Readonly<{ inFlightAttempts?: number }>
+  ): Promise<void> {
     if (!isCostEnvelopePhase(phase)) throw new TypeError("MODEL_SPEND_PHASE_INVALID");
+    const inFlight = options?.inFlightAttempts ?? 0;
+    if (!Number.isSafeInteger(inFlight) || inFlight < 0) throw new TypeError("MODEL_ATTEMPT_IN_FLIGHT_INVALID");
     const basis = await this.readPinnedBasis(runId);
     const ceiling = attemptCeilingForPhase(basis, phase);
     const consumed = await this.countRunModelAttempts(runId);
-    if (consumed >= ceiling) {
+    if (consumed + inFlight >= ceiling) {
       // Engine money rule, Task M2 polish: the counts ride the refusal, as the
       // money refusal's "spent X of Y" does, so a ceiling set below one call can
       // be told from a re-claim that inherited an earlier claim's attempts.
       throw new TypedDomainError(
         "RUN_COST_ENVELOPE_EXHAUSTED",
         `Run ${runId} exhausted the ${phase} share of its pinned computed structural ceiling:`
-          + ` the next call would be attempt ${consumed + 1} of a ${phase} ceiling of ${ceiling}`
+          + ` the next call would be attempt ${consumed + inFlight + 1} of a ${phase} ceiling of ${ceiling}`
           + ` (the whole ceiling is ${basis.maxModelAttempts})`
+          + (inFlight === 0 ? "" : `, with ${inFlight} other call${inFlight === 1 ? "" : "s"} in flight`)
       );
     }
   }

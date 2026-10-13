@@ -7,7 +7,8 @@
 // targets, exactly as on the preview, and the sealed v11 writer ref preview:fixture-a is GLM).
 // The providers are composed as apps/runner/src/main.ts composes them on the preview: the six reviewed targets, the
 // topology's first target as primary, each gateway = withPreviewProviderCallPolicy(createPostgresProviderGateway(…
-// over createPreviewGuardedFetch …)), both claim probes through observeClaimTimeTarget. The two gates are real RPC
+// over createPreviewGuardedFetch …), …, { busy })) with ONE busy coordinator, the attempt counter and the call scheduler
+// (tests/support/preview-debate-harness.ts), both claim probes through observeClaimTimeTarget. The two gates are real RPC
 // ports (createPreviewBudgetRpcPort) over unix-socket stubs that answer vendor-shaped replies by the request's
 // contract, so the 409 mapping, the body checks and the Anthropic wire are the shipped ones. Only the 60-second
 // waits are injected. Integration suites are skipped by the CI gate: run this file by hand before merging.
@@ -32,140 +33,31 @@
 // Both expect the run to be served all the same. They were written red first, against 8b3201d75.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
-import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery";
-import { RunRepository, insertRunRoleRotation, migrate, type DiscoveredPanelMember } from "@debateai/db";
+import { migrate } from "@debateai/db";
 import { LedgerRepository } from "@debateai/ledger";
-import {
-  assertPreviewProviderTargets,
-  assertPreviewRoleTargets,
-  createPreviewBudgetRpcPort,
-  createPreviewGuardedFetch,
-  observeClaimTimeTarget,
-  observeProviderTarget,
-  parsePreviewProviderTestConfig,
-  parseProviderDiscoveryTargets,
-  PREVIEW_GLM_DEADLINE_MS,
-  PreviewModelCooling,
-  previewModelRow,
-  previewProbeControls,
-  previewRunnerPolicy,
-  previewRunResilience,
-  previewSealedRoleFallbackCovered,
-  previewTargetGatewayControls,
-  previewTargetJsonRow,
-  providerTargetGatewayControls,
-  PREVIEW_PROVIDER_REF_MODELS,
-  PREVIEW_REVIEWED_PROVIDER_REFS,
-  withPreviewProviderCallPolicy,
-  type PreviewProviderTestConfig,
-  type ProviderDiscoveryTarget
-} from "@debateai/providers";
-import {
-  CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
-  buildStoryRegisterRows,
-  computeStructuralCeilingBasis,
-  readStoryPolicy
-} from "@debateai/register";
-import { createPostgresProviderGateway, WalkingSkeletonRunner, type WalkingSkeletonSettings } from "@debateai/runner";
-import {
-  pickRotatedRoles,
-  ROLE_ROTATION_RULE,
-  roleRotationSeed,
-  rotationPinFields,
-  type RotatedRoles,
-  type RotationPick
-} from "@debateai/scorecard";
+import { PreviewModelCooling, PREVIEW_PROVIDER_REF_MODELS } from "@debateai/providers";
 import { ServeRepository } from "@debateai/serve";
+import { StoryRepository } from "@debateai/story";
+import type { RotatedRoles } from "@debateai/scorecard";
+import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
+import { GATE_ANSWERS_REACHING_VENDOR, STUB_COOL_OFF_RETRY_AFTER_SECONDS } from "../support/preview-gate-stubs.js";
 import {
-  StoryRepository,
-  StoryWriter,
-  loadStoryPack,
-  resolveStoryPackDir
-} from "@debateai/story";
-import { DEVELOPMENT_ORGAN_COST_BOUNDS, DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
-import { createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
-import {
-  GATE_ANSWERS_REACHING_VENDOR,
-  startPreviewGateStubs,
-  STUB_COOL_OFF_RETRY_AFTER_SECONDS,
-  type GateDebateScripts,
-  type GateOverride,
-  type GateRequest
-} from "../support/preview-gate-stubs.js";
+  DEEPSEEK,
+  FIVE_MAKER_REFS,
+  GLM,
+  HAIKU,
+  INCIDENT_PIN,
+  MIMO,
+  PANEL_REFS,
+  POLICY,
+  QWEN,
+  RUN_RESILIENCE,
+  SEALED_WRITER_REF,
+  UNBILLED_RESEND_MS,
+  previewDebateHarness,
+  rotationPick
+} from "../support/preview-debate-harness.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-
-const GLM = "zai-org/GLM-5.3-Flash";
-const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
-const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
-const QWEN = "Qwen/Qwen3.8-Flash";
-const HAIKU = "claude-haiku-5-5";
-/** Owner ruling 5 / R4: the one wait before the one resend of a gate-proven unbilled refusal. */
-const UNBILLED_RESEND_MS = 60_000;
-/** The frozen panel the ask admitted with GLM busy (spec §3): the four makers that answered, in register order. */
-const PANEL_REFS = Object.freeze([
-  "preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro", "preview:qwen-3-8-flash", "preview:claude-haiku-5-5"
-]);
-const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
-  deployment: "v3-preview", free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU],
-  requested_thinking_level: "high", budget_socket: "/run/debateai-v3-preview/provider-budget.sock",
-  anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget.sock", scope_id: "preview-busy-model-run"
-}))! as PreviewProviderTestConfig;
-/** The register's configured provider for a reviewed ref (its row's maker and adapter kind). */
-const configured = (providerRef: string) => {
-  const row = previewModelRow(previewTargetJsonRow(providerRef).model)!;
-  return { providerRef, maker: row.maker, adapterKind: row.adapterKind };
-};
-/** All SIX reviewed targets, GLM's two refs included: GLM is configured, only the run's panel leaves it out. */
-const TARGETS = parseProviderDiscoveryTargets(
-  JSON.stringify(PREVIEW_REVIEWED_PROVIDER_REFS.map(previewTargetJsonRow)), PREVIEW_REVIEWED_PROVIDER_REFS.map(configured)
-);
-/** The sealed organ bounds, seen through the preview's runner policy exactly as main.ts reads them. */
-const POLICY = previewRunnerPolicy({
-  bounds: DEVELOPMENT_ORGAN_COST_BOUNDS.organs,
-  synthesisRolePolicy: {
-    synthesizerBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.COMPOSER,
-    evaluatorBound: DEVELOPMENT_ORGAN_COST_BOUNDS.organs.CONFORMANCE
-  }
-}, PREVIEW);
-/** Register v11's sealed answer roles: GLM writes, DeepSeek checks (deploy/preview-auth-dev/v1/publish-register-v2.ts). */
-const SEALED_WRITER_REF = "preview:fixture-a";
-const SEALED_CHECKER_REF = "preview:deepseek-v4-1-flash";
-/** The v11 story rows: the storyteller follows the sealed writer, the story checker the sealed checker. */
-const STORY_POLICY = readStoryPolicy(buildStoryRegisterRows({
-  synthesizerRoleRef: SEALED_WRITER_REF, evaluatorRoleRef: SEALED_CHECKER_REF,
-  sourceRef: "test-layer:preview-busy-model", hosted: false
-}), 11)!;
-/** The sealed envelope-formula terms the ask path sizes a run with (as tests/integration/preview-busy-model-ask.test.ts). */
-const CEILING_TERMS = Object.freeze({ judgeMaxAttempts: 3, organMaxAttempts: 3, maxRecompose: 1, maxCooldownHoldsPerRun: 2,
-  finalRetryAttempts: 1, branchingFactor: 2, compositionSegmentCap: 4, fixedOrgansPerComposition: 6, reviewerCallsPerNode: 1,
-  synthesizerMaxRounds: 3, evaluatorMaxRounds: 3, maxDepth: 5 });
-/** Run b53b9a9e's panel (spec 2026-10-12 "Incident"): all five makers, in register order, GLM by its writer ref. */
-const FIVE_MAKER_REFS = Object.freeze([SEALED_WRITER_REF, ...PANEL_REFS]);
-const rotationPick = (providerRef: string): RotationPick => Object.freeze({
-  providerRef, modelId: PREVIEW_PROVIDER_REF_MODELS[providerRef]!, maker: configured(providerRef).maker
-});
-/**
- * The incident's rotation pin, written by hand (spec 2026-10-12 "Incident"): GLM writes and tells the story, DeepSeek
- * checks the answer, Haiku checks the story. The runner seats the debaters in `eligibleModelIds` order, opener first
- * (apps/runner/src/run-seats.ts pinnedPositionOrder; apps/runner/src/index.ts:5047-5049), so GLM is the last root
- * (root index 4, key JUDGE:root:4), as in the incident: roots 0-3 were written before GLM's own root was asked.
- */
-const INCIDENT_PIN: RotatedRoles = Object.freeze({
-  rule: ROLE_ROTATION_RULE,
-  answerWriter: rotationPick(SEALED_WRITER_REF), answerChecker: rotationPick(SEALED_CHECKER_REF),
-  storyteller: rotationPick(SEALED_WRITER_REF), storyChecker: rotationPick("preview:claude-haiku-5-5"),
-  opener: rotationPick(SEALED_CHECKER_REF),
-  eligibleModelIds: Object.freeze([DEEPSEEK, MIMO, QWEN, HAIKU, GLM])
-});
-/**
- * Spec 2026-10-12 fixes (a)-(d): the runner's one new preview setting, which gate serves a ref and which model it is
- * (so a busy model sits out on all of its refs, and a halted gate takes every member behind it). The same helper
- * apps/runner/src/main.ts composes it with on the preview (`previewRunResilience`); both answer undefined for a ref
- * the preview does not know. (The red run on 8b3201d75 built it inline: that runner had no such field and ignored it.)
- */
-const RUN_RESILIENCE = previewRunResilience(PREVIEW)!;
-const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
-const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:preview-busy-model-run" });
 
 let database: TestDatabase;
 const stubClosers: (() => Promise<void>)[] = [];
@@ -179,236 +71,22 @@ afterEach(async () => {
 });
 afterAll(async () => database?.stop());
 
-/* ------------------------------------------------------------------ the gates */
-
 /**
- * Both preview gates over real unix sockets (tests/support/preview-gate-stubs.ts, shared with the preview practice
- * tool's integration test), speaking the gate's RPC protocol, routed by URL as the gate routes them: `POST /complete`
- * (one model call) and `POST /remaining` (the read-only day figures, contract A §5). Every /complete request is
- * recorded in arrival order with how it was answered; every /remaining read is recorded apart. Without `debate`
- * scripts a GLM request is answered as a billed vendor 500 (and fails the test by the record). A probe takes the next
- * step of its model's script (OK once spent); with `debate` scripts (GateDebateScripts: absent, the first describe's
- * rule stands) a scripted model refuses every other request unbilled, and the DeepInfra gate halts at its ceiling
- * (409 PREVIEW_TEST_AUTHORITY_STOPPED, /remaining "halted"); the Anthropic gate never halts. Every other request is
- * answered by its contract. The story double tells one path per position the storyteller was handed (its own
- * `positions` field, packages/story/src/material.ts), so a debate that lost a root mid-run (T1, T2) is told with as
- * many paths as it has positions (validate.ts STORY_POSITION_COVERAGE).
+ * The runner composed as apps/runner/src/main.ts composes it on the preview, over the two gates' doubles
+ * (tests/support/preview-debate-harness.ts, shared with tests/integration/parallel-calls-debate.test.ts): the busy
+ * coordinator, the attempt counter and the call scheduler included, the scheduler here with the register's
+ * `callConcurrencyPolicy` row ABSENT (one call at a time per debate), as on every register that never published it.
  */
-async function startGates(
-  probeScripts: Readonly<Record<string, readonly ("OK" | "UNBILLED")[]>>, debate?: GateDebateScripts,
-  override?: (request: GateRequest) => GateOverride | null
-) {
-  const stubs = await startPreviewGateStubs({
-    storyDefaultShape: PACK.defaultShape, probeScripts,
-    ...(debate === undefined ? { refuseModels: [GLM] } : { debate }),
-    ...(override === undefined ? {} : { override })
-  });
-  stubClosers.push(stubs.close);
-  // The /remaining reads arrive on the same socket as /complete, as on the preview (createPreviewRemainingRpcPort).
-  const deepinfra = createPreviewBudgetRpcPort(PREVIEW, stubs.sockets.deepinfra);
-  const anthropic = createPreviewBudgetRpcPort(PREVIEW, stubs.sockets.anthropic);
-  return {
-    requests: stubs.requests, remainingReads: stubs.remainingReads, halt: stubs.halt, cooling: stubs.cooling,
-    deepinfraPort: deepinfra, guardedFetch: createPreviewGuardedFetch({ deepinfra, anthropic })
-  };
-}
-
-/* ------------------------------------------------------------------ the runner, composed as main.ts */
-
-/** Test-layer serving vocabulary (story-end-to-end.test.ts's), with one provider family per maker of the six refs. */
-function fixtureSettings(): Omit<WalkingSkeletonSettings, "providerRef" | "maker" | "synthesisRolePolicy"> {
-  const families = new Map<string, string[]>();
-  for (const target of TARGETS) families.set(target.maker, [...(families.get(target.maker) ?? []), target.providerRef]);
-  return {
-    workerId: "runner:preview-busy-model", claimMarginMs: 60_000,
-    // assertClaimCoversCall: two holds of (cooldown + the preview's 600 s deadline), one more deadline, the margin.
-    claimMs: 2 * (DEVELOPMENT_RUN_DEATH_POLICY.cooldown_ms + PREVIEW_GLM_DEADLINE_MS) + PREVIEW_GLM_DEADLINE_MS + 60_000,
-    judgeBound: POLICY.bounds.JUDGE, composerBound: POLICY.bounds.COMPOSER, conformanceBound: POLICY.bounds.CONFORMANCE,
-    judgeContractHash: "contract:judge:busy-model", composerContractHash: "contract:composer:busy-model",
-    conformanceContractHash: "contract:conformance:busy-model", propagationContractHash: "contract:propagation:busy-model",
-    serveContractHash: "contract:serve:busy-model", maxRecompose: 1, factBundleVersion: 1,
-    judgementNumberKind: "base-probability", judgementProducer: "judgement:busy-model",
-    propagationNumberKind: "propagated-probability", propagationProducer: "propagation:busy-model",
-    compositionRow: {
-      rowKey: CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY, registerVersion: 1, sourceRef: "test-layer:S04",
-      value: { kind: "CLAIM_TYPE_COMPOSITION_MAP", entries: { unknown: {
-        branch: "EVIDENCE_AWARE", clarityDecayPerAmbiguity: 0.1, terms: [{ metric: "steelman_fidelity", coefficient: 1 }],
-        caps: [], uncertaintyLadder: [{ atMost: 1, label: "TEST_LAYER" }]
-      } } }
-    },
-    servePolicy: {
-      compositionBudgets: {
-        low: { tier: "low", bound: 10_000, registerRowKey: "compositionBundleBudget.low", registerVersion: 1, sourceRef: "test-layer:DR-078" },
-        medium: { tier: "medium", bound: 20_000, registerRowKey: "compositionBundleBudget.medium", registerVersion: 1, sourceRef: "test-layer:DR-078" },
-        high: { tier: "high", bound: 30_000, registerRowKey: "compositionBundleBudget.high", registerVersion: 1, sourceRef: "test-layer:DR-078" }
-      },
-      candidateConfidenceBand: "TEST_TOP_BAND",
-      bandCeiling: { rowKey: "wayOfKnowingCeiling", registerVersion: 1, sourceRef: "test-layer:DR-086", value: {
-        bandOrder: ["TEST_CAPPED_BAND", "TEST_TOP_BAND"],
-        ceilingLabels: ["TEST_DEFAULT_CEILING", "TEST_LOOKED_UP_CEILING", "TEST_EMPTY_BASIS_FLOOR"],
-        defaultCeiling: { label: "TEST_DEFAULT_CEILING", ceilingBand: "TEST_TOP_BAND", liftPath: "test-layer:retain-band" },
-        cuts: [{ minimumShares: { LOOKED_UP: 0.5 }, label: "TEST_LOOKED_UP_CEILING", ceilingBand: "TEST_CAPPED_BAND",
-          liftPath: "test-layer:improve-way-of-knowing" }],
-        emptyBasisFloor: { label: "TEST_EMPTY_BASIS_FLOOR", ceilingBand: "TEST_CAPPED_BAND",
-          liftPath: "test-layer:gather-any-verified-evidence-to-lift" }
-      } }
-    },
-    judgementPolicy: {
-      selectionRule: { kind: "MAXIMIZE_WEIGHTED_TAU", rowKey: "test-layer:selection-rule", registerVersion: 1, sourceRef: "test-layer:DR-077" },
-      earnedWeight: 1, judgeWeightVersion: "test-layer:weight-v1", reducerVersion: "test-layer:reducer-v1"
-    },
-    panelPolicy: {
-      registerVersion: 1, dispersionScale: 1, repeatedFamilyMultiplier: 0.5, disagreementThreshold: 0.25,
-      oneStepDown: { TEST_CAPPED_BAND: "TEST_CAPPED_BAND", TEST_TOP_BAND: "TEST_CAPPED_BAND" },
-      providerFamilies: [...families].map(([maker, providerRefs]) => ({ familyRef: `test-layer:family:${maker}`, providerRefs })),
-      unmappedReason: "PROVIDER_FAMILY_UNMAPPED",
-      sourceRefs: { dispersionScale: "test-layer:J1", repeatedFamilyMultiplier: "test-layer:J1", disagreementThreshold: "test-layer:J1",
-        downgradeBands: "test-layer:J1", providerFamilyMap: "test-layer:J1" }
-    },
-    // δ and ε of 0: no branch freezes and the run never stops early, so depth 2 is expanded in full.
-    stoppingPolicy: { registerVersion: 1, delta: 0, epsilon: 0,
-      sourceRefs: { globalStopDelta: "test-layer:T7", branchFreezeEpsilon: "test-layer:T7" } },
-    verdictLabelPolicy: {
-      registerVersion: 1, gamma: 0.05, highCut: 0.7, lowCut: 0.35, disagreementThreshold: 0.25,
-      sourceRefs: { verdictMarginGamma: "test-layer:goal-v4:80-96", verdictHighCut: "test-layer:goal-v4:80-96",
-        verdictLowCut: "test-layer:goal-v4:80-96", disagreementThreshold: "test-layer:J1",
-        disagreementQuantity: "test-layer:goal-v4:80-96" }
-    },
-    scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
-    runDeathPolicy: { cooldownMs: DEVELOPMENT_RUN_DEATH_POLICY.cooldown_ms, finalRetryAttempts: DEVELOPMENT_RUN_DEATH_POLICY.final_retry_attempts,
-      maxCooldownHoldsPerRun: DEVELOPMENT_RUN_DEATH_POLICY.max_cooldown_holds_per_run },
-    resolveTerminalActivations: async ({ waitingRows }) => waitingRows.map((batteryRowId) => ({
-      batteryRowId, state: "INACTIVE" as const,
-      predicateInputs: { kind: "PRESENT" as const, values: { fixture: "BUSY-MODEL", predicateResult: false, terminalEvaluation: true } },
-      skipEvidence: { kind: "PRESENT" as const, evidenceType: "TEST_LAYER_TERMINAL_PREDICATE_RESULT", result: "FALSE_AT_COMPLETION" }
-    }))
-  };
-}
-
-/**
- * The claim probe of one target. `resend` is main.ts's observeClaimTarget (spec §2: one 60-second resend after a
- * gate-proven unbilled refusal, the claim keeps the last observation); `single` is the composition before the fix
- * (observeProviderTarget: one probe, no resend), kept as the control below.
- */
-type ClaimComposition = "resend" | "single";
-
-/**
- * apps/runner/src/main.ts's preview runner, over these gates; the waits are recorded, never slept. `resilience` is the
- * run-resilience setting (RUN_RESILIENCE): only the second describe passes it, so the first describe's runner stays
- * 8b3201d75's composition exactly.
- */
-function previewRunner(gates: Awaited<ReturnType<typeof startGates>>, claim: ClaimComposition, resilience?: typeof RUN_RESILIENCE) {
-  const probeSleeps: number[] = [];
-  const callSleeps: number[] = [];
-  const holdWaits: number[] = [];
-  const topology = createRunnerProviderTopology(TARGETS, (target) => withPreviewProviderCallPolicy(
-    createPostgresProviderGateway(database.pool, {
-      fetchImplementation: gates.guardedFetch, endpoint: target.baseUrl, model: target.model, maker: target.maker,
-      ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(PREVIEW, target)
-    }),
-    PREVIEW, target, { sleep: async (milliseconds) => { callSleeps.push(milliseconds); } }
-  ));
-  const story = new StoryWriter({
-    pool: database.pool, pack: PACK, policy: STORY_POLICY, hosted: false, log: () => undefined,
-    resolveProvider: (roleRef) => {
-      const member = [topology.primary, ...(topology.critique === undefined ? [] : [topology.critique]), ...topology.additionalMakers]
-        .find((candidate) => candidate.providerRef === roleRef);
-      return member === undefined ? null : { provider: member.provider, providerRef: member.providerRef };
-    }
-  });
-  const observe = (target: ProviderDiscoveryTarget) => claim === "resend"
-    ? observeClaimTimeTarget({
-      preview: true, sleep: async (milliseconds) => { probeSleeps.push(milliseconds); }, target,
-      timeoutMs: PREVIEW_GLM_DEADLINE_MS, ...previewProbeControls(target), fetchImplementation: gates.guardedFetch,
-      clock: () => new Date()
-    })
-    : observeProviderTarget({
-      target, timeoutMs: PREVIEW_GLM_DEADLINE_MS, ...previewProbeControls(target), fetchImplementation: gates.guardedFetch,
-      clock: () => new Date()
-    });
-  const probe = async (providerRef: string) => {
-    const target = TARGETS.find((candidate) => candidate.providerRef === providerRef);
-    if (target === undefined) return { state: "ABSENT" as const, modelId: null, failureCode: "CLAIM_GATEWAY_UNRESOLVED" };
-    const observation = await observe(target);
-    return { state: observation.state, modelId: observation.modelId, failureCode: observation.failureCode };
-  };
-  const synthesisRolePolicy = {
-    registerVersion: 11, synthesizerRoleRef: SEALED_WRITER_REF, evaluatorRoleRef: SEALED_CHECKER_REF,
-    evaluatorLoopMaxRounds: 3, identicalRoleRefs: false,
-    synthesizerBound: POLICY.synthesisRolePolicy.synthesizerBound, evaluatorBound: POLICY.synthesisRolePolicy.evaluatorBound,
-    sourceRefs: { synthesizerRoleRef: "test-layer:v11", evaluatorRoleRef: "test-layer:v11", evaluatorLoopMaxRounds: "test-layer:v11" }
-  };
-  // main.ts's boot checks: the six reviewed targets, and every role the register names is one of them.
-  assertPreviewProviderTargets(PREVIEW, TARGETS);
-  assertPreviewRoleTargets(PREVIEW, TARGETS, [SEALED_WRITER_REF, SEALED_CHECKER_REF, STORY_POLICY.storytellerRoleRef, STORY_POLICY.storyCheckerRoleRef]);
-  const runner = new WalkingSkeletonRunner(database.pool, topology.primary.provider, {
-    ...fixtureSettings(),
-    providerRef: topology.primary.providerRef, maker: topology.primary.maker,
-    ...(topology.critique === undefined ? {} : { critique: topology.critique }),
-    additionalMakers: topology.additionalMakers,
-    synthesisRolePolicy,
-    story,
-    claimTimeProbe: (member) => probe(member.provider_ref),
-    claimTimeSynthesisRoleProbe: probe,
-    answerRoleFallbackCovered: ({ roleRef, panel }) => previewSealedRoleFallbackCovered(roleRef, panel),
-    ...(resilience === undefined ? {} : { runResilience: resilience }),
-    holdRecorder: {
-      countCooldownHolds: async () => holdWaits.length,
-      record: async () => undefined,
-      wait: async (cooldownMs) => { holdWaits.push(cooldownMs); }
-    }
-  });
-  return { runner, topology, probeSleeps, callSleeps, holdWaits };
-}
-
-/* ------------------------------------------------------------------ the run, as admission writes it */
-
-const panelMember = (providerRef: string, asOf: string): DiscoveredPanelMember => Object.freeze({
-  provider_ref: providerRef, maker: configured(providerRef).maker, model_id: PREVIEW_PROVIDER_REF_MODELS[providerRef]!,
-  probe_evidence_ref: randomUUID(), probed_at: asOf
-});
-
-/**
- * A depth-2 run on `panelRefs` (default: the four-member panel), with the rotation pin admission writes (counts empty:
- * the first rotated debate), or with `pin` written by hand (the incident's, INCIDENT_PIN).
- */
-async function admittedRun(label: string, admission: Readonly<{ panelRefs: readonly string[]; pin?: RotatedRoles }> = { panelRefs: PANEL_REFS }):
-  Promise<{ runId: string; workItemId: string; askerId: string; rotated: RotatedRoles }> {
-  const asOf = "2026-10-11T19:30:00.000Z";
-  // A plain label, not a "should" question: the fixture composition map rates only the `unknown` claim type.
-  const question = `preview-busy-model-${label}-${randomUUID()}`;
-  const askerId = `asker:${question}`;
-  const panel = admission.panelRefs.map((ref) => panelMember(ref, asOf));
-  const rotated = admission.pin ?? pickRotatedRoles({ panel, counts: {}, seed: roleRotationSeed({ as_of: asOf, question_line: question }) });
-  if (rotated === null) throw new Error("test: four makers always rotate");
-  const runId = await new RunRepository(database.pool).startRun({
-    questionLine: question, principal: { kind: "legacy", legacyAskerId: askerId }, sessionId: `session:${question}`,
-    callerScope: "ASKER", asOf: new Date(asOf), askerRiskTier: "casual", effectiveRiskTier: "casual", tierSource: "ASKER",
-    tierProvenanceRef: `asker-declaration:${question}`, compositionBudgetTier: "high",
-    depthParams: { depth: 2 }, discoveredPanel: panel, strangerSampleRate: 1,
-    envelopeBasis: computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize: panel.length, depth: 2 }),
-    registerVersion: 1, batteryVersion: "s00", batteryRows
-  });
-  await insertRunRoleRotation(database.pool, { runId, ...rotationPinFields(rotated) });
-  const workItemId = await new WorkItemRepository(database.pool).enqueue({
-    runId, batteryRowId: "Q1", nodeSet: [], commandKey: `preview-busy-model-run:${runId}`
-  });
-  return { runId, workItemId, askerId, rotated };
-}
-
-async function modelCalls(runId: string) {
-  return (await database.pool.query<{ call_site_key: string; actor_ref: string; outcome: string }>(
-    `SELECT call_site_key, actor_ref, outcome FROM ledger.ledger_entry
-      WHERE run_id=$1 AND action_kind='MODEL_CALL' ORDER BY sequence`, [runId]
-  )).rows;
-}
+const {
+  startGates, fixtureSettings, previewRunner, admittedRun, modelCalls, completedRun, disclosureOf, bodyFactsOf, servedAnswer
+} = previewDebateHarness({ pool: () => database.pool, stubClosers });
 
 describe("a preview debate admitted without busy GLM runs to an answer and a story (spec 2026-10-11 busy model)", () => {
   it("four makers, depth 2: the pinned writer's [409, OK] claim probe keeps it, and GLM is never sent a byte", async () => {
     const debate = await admittedRun("run");
     const writerModel = debate.rotated.answerWriter.modelId;
     const gates = await startGates({ [writerModel]: ["UNBILLED", "OK"] });
-    const composed = previewRunner(gates, "resend");
+    const composed = await previewRunner(gates, "resend");
     const startedAt = new Date();
     const result = await composed.runner.executeWorkItem(debate.workItemId);
     if (result.kind !== "COMPLETED") throw new Error(`expected a completed run, got ${result.kind}`);
@@ -472,7 +150,7 @@ describe("a preview debate admitted without busy GLM runs to an answer and a sto
     // Without this, a scenario whose writer never met the refusal would pass the test above for the wrong reason.
     const debate = await admittedRun("control");
     const gates = await startGates({ [debate.rotated.answerWriter.modelId]: ["UNBILLED", "OK"] });
-    const composed = previewRunner(gates, "single");
+    const composed = await previewRunner(gates, "single");
     await expect(composed.runner.executeWorkItem(debate.workItemId)).rejects.toMatchObject({
       code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM",
       message: expect.stringContaining(`pinned SYNTHESIZER role ref ${debate.rotated.answerWriter.providerRef} was absent at claim (PROVIDER_PROBE_UNBILLED_REFUSAL)`)
@@ -493,68 +171,6 @@ const GLM_ROOT_KEY = "JUDGE:root:4";
 /** GLM's entry in the run-time panel disclosure (spec (d) "Disclosure"), inside the RUN_PANEL_REVISED list. */
 const GLM_SAT_OUT = /RUN_PANEL_REVISED:(?:[^,;\s]+,)*preview:fixture-a=PROVIDER_BUSY(?:[,;\s]|$)/u;
 
-/**
- * Runs the work item to its end. A run that does not complete fails the test with what the run left behind: the
- * error, the work item's terminal reason, every model call that did not answer OK, the waits and the gates' answers.
- * That message is the red evidence on 8b3201d75.
- */
-async function completedRun(
-  composed: ReturnType<typeof previewRunner>, debate: Awaited<ReturnType<typeof admittedRun>>,
-  gates: Awaited<ReturnType<typeof startGates>>
-): Promise<{ kind: "COMPLETED"; answerId: string }> {
-  let failure: string;
-  try {
-    const result = await composed.runner.executeWorkItem(debate.workItemId);
-    if (result.kind === "COMPLETED") return result;
-    failure = `result ${JSON.stringify(result)}`;
-  } catch (error) {
-    failure = `error ${String((error as { code?: unknown }).code)}: ${error instanceof Error ? error.message : String(error)}`;
-  }
-  const workItem = (await database.pool.query<{ state: string; terminal_reason: string | null }>(
-    `SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1`, [debate.workItemId])).rows[0];
-  const notOk = (await modelCalls(debate.runId)).filter((call) => call.outcome !== "OK")
-    .map((call) => `${call.call_site_key} ${call.actor_ref} ${call.outcome}`);
-  const answers = new Map<string, number>();
-  for (const request of gates.requests) {
-    const key = `${request.provider} ${request.model} ${request.kind} ${request.answer}`;
-    answers.set(key, (answers.get(key) ?? 0) + 1);
-  }
-  throw new Error([
-    `expected a completed run; got ${failure}`,
-    `work item ${workItem?.state ?? "?"} terminal_reason=${String(workItem?.terminal_reason)}`,
-    `model calls not OK (${String(notOk.length)}): ${notOk.join(" | ")}`,
-    `holdWaits=${JSON.stringify(composed.holdWaits)} callSleeps=${JSON.stringify(composed.callSleeps)}`,
-    `deepinfra halt=${JSON.stringify(gates.halt)} remaining reads=${JSON.stringify(gates.remainingReads)}`,
-    `gate answers: ${[...answers].map(([key, count]) => `${key} x${String(count)}`).join(" | ")}`
-  ].join("\n"));
-}
-
-/** The answer's owner-side disclosure row (migrations 0076 and 0114): who wrote and checked it, and why it moved. */
-async function disclosureOf(answerId: string) {
-  return (await database.pool.query<{
-    fallback_reason: string | null; writer_fallback_reason: string | null; checker_fallback_reason: string | null;
-  }>(`SELECT fallback_reason, writer_fallback_reason, checker_fallback_reason FROM serve.serve_disclosure
-       WHERE answer_id=$1 ORDER BY answer_version DESC LIMIT 1`, [answerId])).rows[0];
-}
-
-/** The owner-side row's body facts (migration 0076): the spend stop that ended the arguing, and the points it left unreviewed. */
-async function bodyFactsOf(answerId: string) {
-  return (await database.pool.query<{ body_stop: string | null; points_without_review: number | null }>(
-    `SELECT body_stop, points_without_review FROM serve.serve_disclosure WHERE answer_id=$1 ORDER BY answer_version DESC LIMIT 1`,
-    [answerId])).rows[0];
-}
-
-/** The served answer and its story, read as the asker reads them; with the work item's settled state. */
-async function servedAnswer(debate: Awaited<ReturnType<typeof admittedRun>>, answerId: string) {
-  const answer = await new ServeRepository(database.pool).readAnswerProjection(answerId, debate.askerId);
-  const story = await new StoryRepository(database.pool).readForAnswer({
-    answerId, answerVersion: null, ownership: { legacyAskerId: debate.askerId }
-  });
-  const workItem = (await database.pool.query<{ state: string; terminal_reason: string | null }>(
-    `SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1`, [debate.workItemId])).rows[0];
-  return { answer, story, workItem };
-}
-
 describe("a preview debate survives a busy model and a halted gate (spec 2026-10-12 run resilience, T1 and T2)", () => {
   it("T1, the incident replay: GLM and Qwen busy, the DeepInfra gate halts at its 4th unbilled release, and the answer is still served", async () => {
     // N = 4, from the run's call order (apps/runner/src/index.ts). Root 0 is the opener DeepSeek's (`JUDGE`,
@@ -570,7 +186,7 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
     // CALL_BUDGET_EXHAUSTED before it reaches Haiku (spec "Incident" step 3): the control below.
     const debate = await admittedRun("incident", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
     const gates = await startGates({}, { unbilled: [GLM, QWEN], deepInfraHaltAt: 4 });
-    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const composed = await previewRunner(gates, "resend", { resilience: RUN_RESILIENCE });
     const result = await completedRun(composed, debate, gates);
 
     // The scenario really replayed the incident: the DeepInfra gate reached its ceiling and halted.
@@ -653,7 +269,7 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
     // dropped), no writer or storyteller call. Only GLM is scripted to refuse, so the one 60-second wait is GLM's.
     const debate = await admittedRun("busy-glm", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
     const gates = await startGates({}, { unbilled: [GLM] });
-    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const composed = await previewRunner(gates, "resend", { resilience: RUN_RESILIENCE });
     const result = await completedRun(composed, debate, gates);
 
     // Exactly one GLM call after claim: two POSTs, both refused unbilled; then none. The gate never halted.
@@ -696,7 +312,7 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
     // reaches the vendor again, and any that reached the gate would be answered MODEL_COOLING.
     const debate = await admittedRun("cooling-glm", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
     const gates = await startGates({}, { unbilled: [GLM], coolOffAfter: 2 });
-    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const composed = await previewRunner(gates, "resend", { resilience: RUN_RESILIENCE });
     const result = await completedRun(composed, debate, gates);
 
     // Two GLM requests reached the vendor after claim (the call and its resend), both refused unbilled; the gate then
@@ -748,7 +364,7 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
     // AUTHORITY_HALTED, which the app reads as an unavailable gate at once (no /remaining read, no resend).
     const debate = await admittedRun("incident-halted", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
     const gates = await startGates({}, { unbilled: [GLM, QWEN], deepInfraHaltAt: 4, deepInfraHaltedAnswer: "AUTHORITY_HALTED" });
-    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const composed = await previewRunner(gates, "resend", { resilience: RUN_RESILIENCE });
     const result = await completedRun(composed, debate, gates);
 
     expect(gates.halt.unbilledReleases).toBe(4);
@@ -791,7 +407,7 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
     const pin: RotatedRoles = Object.freeze({ ...INCIDENT_PIN, eligibleModelIds: Object.freeze([DEEPSEEK, MIMO, GLM, QWEN, HAIKU]) });
     const debate = await admittedRun("gap", { panelRefs: FIVE_MAKER_REFS, pin });
     const gates = await startGates({}, { unbilled: [GLM] });
-    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const composed = await previewRunner(gates, "resend", { resilience: RUN_RESILIENCE });
     const result = await completedRun(composed, debate, gates);
 
     const { answer, story, workItem } = await servedAnswer(debate, result.answerId);
@@ -833,7 +449,7 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
     });
     const debate = await admittedRun("opener", { panelRefs: FIVE_MAKER_REFS, pin });
     const gates = await startGates({}, { unbilled: [GLM] });
-    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const composed = await previewRunner(gates, "resend", { resilience: RUN_RESILIENCE });
     const result = await completedRun(composed, debate, gates);
 
     // GLM's one call is root 0 itself (POST + its one resend); no ten-minute hold before DeepSeek opens.
@@ -873,7 +489,7 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
         refused += 1;
         return { gateRefuses: code };
       });
-      const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+      const composed = await previewRunner(gates, "resend", { resilience: RUN_RESILIENCE });
       const result = await completedRun(composed, debate, gates);
 
       expect(gates.requests.filter((request) => request.model === GLM && request.kind === "JUDGE").slice(0, 3)
@@ -903,7 +519,7 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
   it("nobody sat out: the CRITIQUE-UNAVAILABLE reason is the claim-time revision alone, byte for byte", async () => {
     const debate = await admittedRun("claim-only", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
     const gates = await startGates({ [MIMO]: ["UNBILLED", "UNBILLED"] }, { unbilled: [] });
-    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const composed = await previewRunner(gates, "resend", { resilience: RUN_RESILIENCE });
     const result = await completedRun(composed, debate, gates);
     const { answer } = await servedAnswer(debate, result.answerId);
     const critique = answer!.condition_mark_records.filter((record) => record.mark === "CRITIQUE-UNAVAILABLE");
@@ -914,7 +530,7 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
   it("a claim-time revision and a member that sat out: one record, CLAIM_PANEL_REVISED|RUN_PANEL_REVISED", async () => {
     const debate = await admittedRun("claim-and-run", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
     const gates = await startGates({ [MIMO]: ["UNBILLED", "UNBILLED"] }, { unbilled: [GLM] });
-    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const composed = await previewRunner(gates, "resend", { resilience: RUN_RESILIENCE });
     const result = await completedRun(composed, debate, gates);
     const { answer } = await servedAnswer(debate, result.answerId);
     const critique = answer!.condition_mark_records.filter((record) => record.mark === "CRITIQUE-UNAVAILABLE");
@@ -949,7 +565,7 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
       runId: debate.runId, workItemId: debate.workItemId, contractHash: fixtureSettings().judgeContractHash, maxAttempts: allowance
     })).toMatchObject({ callSiteKey: "JUDGE:root:2", outcome: "FAILED" });
     const gates = await startGates({}, { unbilled: [] });
-    const composed = previewRunner(gates, "resend", RUN_RESILIENCE);
+    const composed = await previewRunner(gates, "resend", { resilience: RUN_RESILIENCE });
     const result = await completedRun(composed, debate, gates);
     const calls = await modelCalls(debate.runId);
     expect(calls.filter((call) => call.call_site_key === "JUDGE:root:2" && call.outcome === "OK").map((call) => call.actor_ref))

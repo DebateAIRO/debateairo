@@ -283,8 +283,11 @@ The smallest pot that passes with all four switched on is $1.43.
 - **Five in a row that never reached DeepInfra halt the gate** with `provider_unreachable`. "Never
   reached" means the connection failed before anything was sent. A "too many requests" answer in
   between neither adds to that count nor resets it. (For Anthropic, its not-busy error answers, 400,
-  404, 413 and 500, do add to that count, as before 2026-10-12: README-anthropic.md.) A normal answer, or `activate`, resets it. Such
-  a failed connection leaves no entry: nothing was sent, so there is nothing DeepInfra could bill.
+  404, 413 and 500, do add to that count, as before 2026-10-12: README-anthropic.md.) A normal answer, or `activate`, resets it.
+  Such a failed connection leaves no entry: nothing was sent, so there is nothing DeepInfra could bill.
+  Calls that were on their way at the same time count once (since 2026-10-12): one short network
+  blip that fails 10 calls at once adds 1 to the count, not 10. Calls sent one after another still
+  add 1 each.
 - **What the app sees when a call is refused, in plain words.**
   - `PROVIDER_REFUSED_UNBILLED`: DeepInfra's "too many requests" answer. Nothing was charged.
   - `PROVIDER_ERROR_UNBILLED`: only from the Anthropic gate: Anthropic answered with an error that
@@ -659,6 +662,23 @@ restart them, and check with `systemctl show -p InaccessiblePaths <unit>` that e
 `/etc/debateai-v3-preview/provider-anthropic-go-v1.json`. The exact commands are in
 README-anthropic.md, step 3a. The near-term setup is DeepInfra and Anthropic only (Google later);
 the daily split (owner's ruling, 2026-10-10 evening) is DeepInfra $10.00 and Anthropic $2.00, $12.00 together.
+
+## Redeploy (2026-10-12): calls on their way together count once
+
+Only `preview_budget_authority.py` changed (the helper did not): failures of calls that were on
+their way at the same time now add 1 to the count of five that halts a gate with
+`provider_unreachable`, so one short network blip under 10 calls at once no longer halts it (owner
+ruling O8; spec 2026-10-12 parallel calls, section 3.4). That file's hash (`bridge_sha256`) is in
+both gates' GOs, so root writes a new GO for each gate, DeepInfra and Anthropic, exactly as in the
+existing GO step (here install step 4; README-anthropic.md install step 5), with the same values.
+Nothing else changes: no limit, no unit, no key, no `scope_id`. For each gate, as root:
+1. `stop` (Daily operations, "Emergency off", level 1).
+2. Install the new gate files from the reviewed release (install step 1 of that gate's README) and
+   check their hashes as that step says.
+3. Write the GO again (the existing GO step): its `bridge_sha256` must match the new file.
+4. Restart the gate's service (`debateai-preview-provider-budget.service`,
+   `debateai-preview-anthropic-budget.service`) so the running gate loads the new code.
+5. `activate` (owner's yes); `status` must show `state` `active`.
 
 ## Daily operations
 
