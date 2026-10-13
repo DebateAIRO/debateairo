@@ -10,6 +10,8 @@
 // packages/providers/ops/preview_budget_authority.py): with `debate.coolOffAfter` a model cools off after that many
 // unbilled refusals in a row (409 MODEL_COOLING with retry_after, never contacting the vendor), and with
 // `debate.deepInfraHaltedAnswer: "AUTHORITY_HALTED"` the halted DeepInfra gate says so itself instead of STOPPED.
+// The contract's valid reply is written in the language the request's directive names (stubReplyLanguage): since the
+// reply-language check (2026-10-12) a reply in another language than the question's is refused and re-asked.
 import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -93,24 +95,83 @@ export type GateOverride = Readonly<{ content: string }> | Readonly<{ unbilled: 
 
 /* ------------------------------------------------------------------ the doubles' answers */
 
-export const stubJudgement = (statement: string): string => JSON.stringify({
+/**
+ * The language of the contract's valid reply. Every step's instruction ends with the argument-language directive, and
+ * since the reply-language check (2026-10-12, packages/kernel/src/reply-language.ts) a reply that is not in the
+ * question's language is refused as TEXT_NOT_IN_QUESTION_LANGUAGE and re-asked, so the stand-in writes the language
+ * the directive names, as a model that follows it: Romanian when told Romanian (the practice debate's default
+ * question), else English (the practice's English question, and the busy-model run's label question, which is told
+ * "the same language as the question").
+ */
+export type StubLanguage = "en" | "ro";
+const ROMANIAN_DIRECTIVE = argumentLanguageDirective("Romanian");
+export function stubReplyLanguage(chat: string): StubLanguage {
+  return wirePacket(chat).messages.some((message) => typeof message.content === "string" && message.content.includes(ROMANIAN_DIRECTIVE))
+    ? "ro" : "en";
+}
+
+/** The stand-in's prose, the same sentences in each language it writes. */
+const STUB_PROSE = Object.freeze({
+  en: Object.freeze({
+    point: (served: number) => `Practice debate point ${String(served)}.`,
+    counter: "Plausible counter.",
+    panelAssessment: "Panel member assessment.",
+    panelCounter: "Panel member counter.",
+    review: (served: number) => `Review ${String(served)} agrees.`,
+    verdict: "Congestion pricing on central roads is worth trying.",
+    research: "Check an independent source.",
+    story: Object.freeze({
+      headline: "The positions were argued, and they held up.",
+      summary: "You asked a question; the answers were weighed against their strongest objections.",
+      confidence: "Fairly sure, until a sourced objection turns up.",
+      line: "This position held up.",
+      change: "A stronger, sourced objection would change the answer.",
+      reason: "The first position held up against its strongest objection.",
+      sections: Object.freeze(["What you are deciding", "The verdict", "What would change it"]),
+      paragraph: (title: string) => `${title}, in the debate's own terms.`
+    })
+  }),
+  ro: Object.freeze({
+    point: (served: number) => `Argumentul ${String(served)} din dezbaterea de exercițiu.`,
+    counter: "Un contraargument plauzibil.",
+    panelAssessment: "Evaluarea unui membru al juriului.",
+    panelCounter: "Contraargumentul unui membru al juriului.",
+    review: (served: number) => `Recenzia ${String(served)} este de acord.`,
+    verdict: "Taxa de congestie pe drumurile centrale merită încercată.",
+    research: "Verificați o sursă independentă.",
+    story: Object.freeze({
+      headline: "Pozițiile au fost argumentate și au rezistat.",
+      summary: "Ați pus o întrebare, iar răspunsurile au fost cântărite față de cele mai puternice obiecții ale lor.",
+      confidence: "Destul de sigur, până când apare o obiecție cu sursă.",
+      line: "Această poziție a rezistat.",
+      change: "O obiecție mai puternică și cu sursă ar schimba răspunsul.",
+      reason: "Prima poziție a rezistat în fața celei mai puternice obiecții a sa.",
+      sections: Object.freeze(["Ce decideți", "Verdictul", "Ce l-ar schimba"]),
+      paragraph: (title: string) => `${title}, în termenii dezbaterii.`
+    })
+  })
+});
+
+export const stubJudgement = (statement: string, language: StubLanguage = "en"): string => JSON.stringify({
   statement, way_of_knowing: "REASONING", locator: null, restatement_text: statement, restatement_status: "PASS",
   value_laden: false, claim_type: "unknown",
   steelman: { summary: statement, fidelity: 0.72 },
-  critic: { summary: "Plausible counter.", counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
+  critic: { summary: STUB_PROSE[language].counter, counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" },
   evidence: { quality: 0.72, relevance: 0.72 }, context: { fit: 0.72, ambiguityFlags: [] },
   fallacy: { severity: 0.28, fatalFlags: [] }
 });
 /** A panel member's assessment at fidelity 0 (tau 0): it never displaces an author's voice (tests/integration/database.test.ts). */
-export const STUB_PANEL_ASSESSMENT = JSON.stringify({
-  steelman: { summary: "Panel member assessment.", fidelity: 0 },
-  critic: { summary: "Panel member counter.", counterargumentStrength: 1, basis: "PLAUSIBLE_COUNTER" },
+export const stubPanelAssessment = (language: StubLanguage = "en"): string => JSON.stringify({
+  steelman: { summary: STUB_PROSE[language].panelAssessment, fidelity: 0 },
+  critic: { summary: STUB_PROSE[language].panelCounter, counterargumentStrength: 1, basis: "PLAUSIBLE_COUNTER" },
   evidence: { quality: 0, relevance: 0 }, context: { fit: 0, ambiguityFlags: [] }, fallacy: { severity: 1, fatalFlags: [] }
 });
-export const STUB_COMPOSITION = JSON.stringify({ segments: [
-  { segment_id: "segment:verdict", text: "Congestion pricing on central roads is worth trying.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
-  { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
+export const STUB_PANEL_ASSESSMENT = stubPanelAssessment();
+export const stubComposition = (language: StubLanguage = "en"): string => JSON.stringify({ segments: [
+  { segment_id: "segment:verdict", text: STUB_PROSE[language].verdict, node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+  { segment_id: "segment:research", text: STUB_PROSE[language].research, node_refs: [], served_number_refs: [] }
 ] });
+export const STUB_COMPOSITION = stubComposition();
 export const STUB_EVALUATOR_SATISFIED = JSON.stringify({ satisfied: true, objection: null, criteria: {
   fairness_to_losers: true, statement_label_agreement: true, no_overstatement: true, restatement: true, citation_tracing: true
 } });
@@ -119,24 +180,28 @@ export const STUB_STORY_CHECKER_SATISFIED = JSON.stringify({ satisfied: true, ob
   citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
 } });
 
-/** A story with one path per position the storyteller was handed (its `positions` material, refs P1..Pn). */
+/**
+ * A story with one path per position the storyteller was handed (its `positions` material, refs P1..Pn), in the
+ * language the request's directive names.
+ */
 export function stubStoryFor(chat: string, defaultShape: string): string {
   const fields = readFramedMaterial(wirePacket(chat)).fields;
   const positions = JSON.parse(fields.find((field) => field.name === "positions")?.content ?? "[]") as { id: string }[];
   const refs = positions.length === 0 ? ["P1"] : positions.map((position) => position.id);
+  const prose = STUB_PROSE[stubReplyLanguage(chat)].story;
   const paragraph = (text: string) => ({ text, node_refs: [refs[0]!] });
   return JSON.stringify({
     shape_id: defaultShape,
     short: {
-      headline: "The positions were argued, and they held up.",
-      summary: "You asked a question; the answers were weighed against their strongest objections.",
-      confidence: "Fairly sure, until a sourced objection turns up.",
-      paths: refs.map((ref) => ({ position_ref: ref, fate: "HELD_UP", line: "This position held up.", node_refs: [ref] })),
-      change: paragraph("A stronger, sourced objection would change the answer.")
+      headline: prose.headline,
+      summary: prose.summary,
+      confidence: prose.confidence,
+      paths: refs.map((ref) => ({ position_ref: ref, fate: "HELD_UP", line: prose.line, node_refs: [ref] })),
+      change: paragraph(prose.change)
     },
-    why: { reasons: [paragraph("The first position held up against its strongest objection.")] },
-    long: { sections: ["What you are deciding", "The verdict", "What would change it"].map((title) => ({
-      title, paragraphs: [paragraph(`${title}, in the debate's own terms.`)]
+    why: { reasons: [paragraph(prose.reason)] },
+    long: { sections: prose.sections.map((title) => ({
+      title, paragraphs: [paragraph(prose.paragraph(title))]
     })) },
     reviewer_note: null
   });
@@ -261,15 +326,16 @@ export async function startPreviewGateStubs(input: Readonly<{
   };
   const answerFor = (kind: GateRequestKind | "UNKNOWN", chat: string): string | null => {
     served += 1;
+    const language = kind === "UNKNOWN" || kind === "PROBE" ? "en" : stubReplyLanguage(chat);
     switch (kind) {
       case "PROBE": return "OK";
       case "STORYTELLER": return stubStoryFor(chat, input.storyDefaultShape);
       case "STORY_CHECKER": return STUB_STORY_CHECKER_SATISFIED;
-      case "PANEL": return STUB_PANEL_ASSESSMENT;
-      case "REVIEW": return withRequestDerivedBearings(reviewArtifact("agree", [`Review ${String(served)} agrees.`]), chat);
-      case "JUDGE": return stubJudgement(`Practice debate point ${String(served)}.`);
+      case "PANEL": return stubPanelAssessment(language);
+      case "REVIEW": return withRequestDerivedBearings(reviewArtifact("agree", [STUB_PROSE[language].review(served)]), chat);
+      case "JUDGE": return stubJudgement(STUB_PROSE[language].point(served), language);
       case "EVALUATOR": return STUB_EVALUATOR_SATISFIED;
-      case "COMPOSE": return STUB_COMPOSITION;
+      case "COMPOSE": return stubComposition(language);
       default: return null;
     }
   };
