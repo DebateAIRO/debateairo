@@ -721,6 +721,9 @@ importers:
 
   packages/map:
     dependencies:
+      '@debateai/db':
+        specifier: workspace:*
+        version: link:../db
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../kernel

@@ -1,0 +1,308 @@
+import { z } from "zod";
+import {
+  CONTENT_JSON_SENTINEL,
+  assertPrivateContentLive,
+  decryptLeasedContentForRun,
+  encryptAttestedLeasedContentForRun,
+  prepareLeasedContentEncryptionForRun,
+  withRunContentLease,
+  withWriteTransaction,
+  type AttestedContentEnvelope,
+  type CryptoEnvelope,
+  type Pool
+} from "@debateai/db";
+import { TypedDomainError, exhaustive } from "@debateai/kernel";
+import { mapRankKeyPoints } from "./items.js";
+import { MAP_LEANS, MAP_LIMITS, MAP_MARKS, type MapItem, type MapItemOrigin, type MapMark, type MapResult } from "./types.js";
+
+/**
+ * Debate shape (spec §3.4): the map's storage. Items, the run's choice and the roots that argued each answer, in the
+ * three append-only tables of migration 0116. Debate text is sealed per row (carriers core.map_item / core.map_choice)
+ * on an encrypted run and kept in the clear on a legacy run, exactly as the story's repository does.
+ *
+ * Every readable column holds a code (ruling T7-PRIV): the repository refuses, typed and before anything is sealed or
+ * stored, any id that is not code-minted. Its refusals name a field and a position only, never a value: no AI-written
+ * id, claim or reason reaches an error message.
+ */
+export type MapChoiceAnswerRecord = Readonly<{ answerId: string; statement: string; rootIndex: number;
+  rootNodeId: string | null; maker: string | null; filled: boolean }>;
+export type MapAlsoRaisedRecord = Readonly<{ keyPointId: string; claim: string; makers: readonly string[] }>;
+export type MapChoiceRecord = Readonly<{ opening: "MAP" | "TODAYS_OPENING"; answers: readonly MapChoiceAnswerRecord[];
+  alsoRaised: readonly MapAlsoRaisedRecord[]; marks: readonly MapMark[] }>;
+export type MapWriteOutcome = "INSERTED" | "ALREADY_PRESENT" | "RUN_ERASED";
+
+const SENTINEL = JSON.stringify(CONTENT_JSON_SENTINEL);
+
+// 0116's code shapes, held here too so a breach is refused typed (and value-free) before any seal.
+const ITEM_ID = /^[a-z]{2}[0-9]{2,4}$/u;
+const ANGLE_ID = /^g[1-7]$/u;
+const ANSWER_ID = /^a[1-4]$/u;
+const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+/** 0069's core.jsonb_is_code_token: one token of 1..256 characters from a closed set (no whitespace). */
+const CODE_TOKEN = /^[[\]A-Za-z0-9_.:@/+>=#-]{1,256}$/u;
+
+const itemContent = z.union([z.object({ claim: z.string(), why: z.string() }).strict(), z.object({ answer: z.string() }).strict()]);
+/** The run's map without its items (they are rows of core.map_item) and without its call records (they are ledger rows). */
+const choiceContent = z.object({
+  answers: z.array(z.object({ answerId: z.string(), statement: z.string(), rootIndex: z.number().int().min(0), filled: z.boolean() }).strict()),
+  alsoRaised: z.array(z.object({ keyPointId: z.string(), claim: z.string(), makers: z.array(z.string()) }).strict()),
+  result: z.unknown()
+}).strict();
+type ChoiceContent = z.infer<typeof choiceContent>;
+
+type ItemRow = Readonly<{ item_id: string; ai_ref: string; maker: string; origin: MapItemOrigin; angle_id: string | null;
+  angle_kind: MapItem["angleKind"]; kind: "POINT" | "ANSWER"; leans: string | null; list_index: number; content: unknown;
+  content_ciphertext: CryptoEnvelope | null }>;
+
+function pgError(error: unknown): { code: unknown; message: unknown } | null {
+  return typeof error === "object" && error !== null ? error as { code: unknown; message: unknown } : null;
+}
+
+/** Erasure is benign for the map: the run's content is gone, so there is nothing to store or show. */
+function isPrivateContentErased(error: unknown): boolean {
+  if (error instanceof TypedDomainError) return error.code === "PRIVATE_CONTENT_ERASED";
+  const row = pgError(error);
+  return row !== null && row.code === "55000" && row.message === "PRIVATE_CONTENT_ERASED";
+}
+
+/** 0116's attestation guard fires before 0040's barrier: on a run erased as 0040 erases, it answers this first. */
+function isAttestationSecretUnresolved(error: unknown): boolean {
+  const row = pgError(error);
+  return row !== null && row.code === "55000" && row.message === "CONTENT_ATTESTATION_SECRET_UNRESOLVED";
+}
+
+const recordInvalid = (field: string): TypedDomainError => new TypedDomainError("MAP_RECORD_INVALID", `MAP_RECORD_INVALID: ${field}`);
+const rowInvalid = (detail: string): TypedDomainError => new TypedDomainError("MAP_ROW_INVALID", `MAP_ROW_INVALID: ${detail}`);
+
+function stepOf(origin: MapItemOrigin): "LIST" | "SNOWBALL" | "GAP" {
+  switch (origin) {
+    case "BLIND":
+      return "LIST";
+    case "SHOWN":
+      return "SNOWBALL";
+    case "GAP":
+      return "GAP";
+    default:
+      return exhaustive(origin);
+  }
+}
+
+/** The first readable field of the map that is not code-shaped, as `field` or `items[i].field`; null when all are. */
+function mapRecordBreach(result: MapResult, answerCount: number): string | null {
+  if (!Number.isSafeInteger(answerCount) || answerCount < 0 || answerCount > MAP_LIMITS.chooseAnswersMax) return "answerCount";
+  for (const [index, item] of result.items.entries()) {
+    if (!ITEM_ID.test(item.itemId)) return `items[${String(index)}].itemId`;
+    if (!CODE_TOKEN.test(item.seat.aiRef)) return `items[${String(index)}].seat.aiRef`;
+    if (!CODE_TOKEN.test(item.seat.maker)) return `items[${String(index)}].seat.maker`;
+    if (item.angleId !== null && !ANGLE_ID.test(item.angleId)) return `items[${String(index)}].angleId`;
+    if (!Number.isSafeInteger(item.listIndex) || item.listIndex < 0) return `items[${String(index)}].listIndex`;
+  }
+  if (new Set(result.items.map((item) => item.itemId)).size !== result.items.length) return "items.itemId";
+  for (const [index, answer] of (result.choice?.answers ?? []).entries()) {
+    if (!ANSWER_ID.test(answer.answerId)) return `choice.answers[${String(index)}].answerId`;
+  }
+  return null;
+}
+
+export class MapChoiceRepository {
+  constructor(private readonly pool: Pool) {}
+
+  /**
+   * The map's items and its choice, once per run (a re-run of the same run finds them: ALREADY_PRESENT). Pre-flight
+   * PF-B28a: every seal is made first (one prepared run cipher, inside the run's content lease), then ONE write
+   * transaction inserts the choice FIRST and then the items, so a crash leaves neither, and a second writer of the same
+   * run (a re-claim) finds the choice and writes no item: the stored items always belong to the stored choice.
+   */
+  async writeMapRun(input: Readonly<{ runId: string; result: MapResult; answerCount: number }>): Promise<MapWriteOutcome> {
+    const { runId, result } = input;
+    const breach = mapRecordBreach(result, input.answerCount);
+    if (breach !== null) throw recordInvalid(breach);
+    const answers = (result.choice?.answers ?? []).slice(0, input.answerCount)
+      .map((answer, rootIndex) => Object.freeze({ answerId: answer.answerId, statement: answer.statement, rootIndex, filled: answer.filled }));
+    const byId = new Map(result.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
+    const alsoRaised = mapRankKeyPoints((result.choice?.alsoRaised ?? []).flatMap((id) => byId.get(id) ?? []))
+      .map((keyPoint) => Object.freeze({ keyPointId: keyPoint.keyPointId, claim: keyPoint.claim, makers: [...keyPoint.makers] }));
+    const { items: _items, calls: _calls, ...rest } = result;
+    const content: ChoiceContent = choiceContent.parse({ answers, alsoRaised, result: rest });
+    const opening = result.kind === "MAP" ? "MAP" : "TODAYS_OPENING";
+    const marks = result.marks.map((record) => record.mark);
+    const items = [...result.items].sort((a, b) => a.itemId.localeCompare(b.itemId))
+      .map((item) => ({ item, value: item.kind === "POINT" ? { claim: item.claim, why: item.whyItMatters } : { answer: item.answer } }));
+    try {
+      return await withRunContentLease(this.pool, [runId], async () => {
+        const present = await this.pool.query(`SELECT 1 FROM core.map_choice WHERE run_id = $1`, [runId]);
+        if (present.rowCount === 1) return "ALREADY_PRESENT" as const;
+        // Every seal before the transaction opens: nothing is sealed while a write transaction is open.
+        const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+        let sealedChoice: AttestedContentEnvelope | null;
+        let sealedItems: (AttestedContentEnvelope | null)[];
+        try {
+          sealedItems = items.map(({ item, value }) => encryptAttestedLeasedContentForRun(leased, "core.map_item", item.itemId, value));
+          sealedChoice = encryptAttestedLeasedContentForRun(leased, "core.map_choice", runId, content);
+          await leased.assertLive();
+        } finally {
+          await leased.close();
+        }
+        return await withWriteTransaction(this.pool, async (client) => {
+          const inserted = await client.query(
+            `INSERT INTO core.map_choice (run_id, opening, marks, content, content_ciphertext, content_attestation)
+             VALUES ($1,$2,$3::jsonb,$4::jsonb,$5::jsonb,$6) ON CONFLICT (run_id) DO NOTHING`,
+            [runId, opening, JSON.stringify(marks), sealedChoice === null ? JSON.stringify(content) : SENTINEL,
+              sealedChoice === null ? null : JSON.stringify(sealedChoice.envelope), sealedChoice?.attestation ?? null]
+          );
+          // Another writer's choice committed first: its items are already there, so this one writes none.
+          if (inserted.rowCount !== 1) return "ALREADY_PRESENT" as const;
+          for (const [index, { item, value }] of items.entries()) {
+            const sealed = sealedItems[index] ?? null;
+            // No ON CONFLICT: this transaction owns the run's choice row, so a duplicate item would be a real defect.
+            await client.query(
+              `INSERT INTO core.map_item (run_id, item_id, step, ai_ref, maker, origin, angle_id, angle_kind, kind, leans, list_index, position,
+                 content, content_ciphertext, content_attestation)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15)`,
+              [runId, item.itemId, stepOf(item.origin), item.seat.aiRef, item.seat.maker,
+                item.origin, item.angleId, item.angleKind, item.kind, item.kind === "POINT" ? item.leans : null, item.listIndex,
+                // The item's number in its id, which mapAssignItemIds derives from plan order.
+                Number(item.itemId.slice(2)),
+                sealed === null ? JSON.stringify(value) : SENTINEL, sealed === null ? null : JSON.stringify(sealed.envelope), sealed?.attestation ?? null]
+            );
+          }
+          return "INSERTED" as const;
+        });
+      });
+    } catch (error) {
+      if (await this.#erased(error, runId)) return "RUN_ERASED";
+      throw error;
+    }
+  }
+
+  /** Which root argued a chosen answer, once that root is saved (ids and codes only: not a content carrier). */
+  async writeMapPosition(input: Readonly<{ runId: string; answerId: string; rootIndex: number; rootNodeId: string; maker: string }>): Promise<MapWriteOutcome> {
+    if (!ANSWER_ID.test(input.answerId)) throw recordInvalid("answerId");
+    if (!Number.isSafeInteger(input.rootIndex) || input.rootIndex < 0) throw recordInvalid("rootIndex");
+    if (!UUID_TEXT.test(input.rootNodeId)) throw recordInvalid("rootNodeId");
+    if (!CODE_TOKEN.test(input.maker)) throw recordInvalid("maker");
+    try {
+      const inserted = await this.pool.query(
+        `INSERT INTO core.map_position (run_id, answer_id, root_index, root_node_id, maker) VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (run_id, answer_id) DO NOTHING`,
+        [input.runId, input.answerId, input.rootIndex, input.rootNodeId, input.maker]
+      );
+      return inserted.rowCount === 1 ? "INSERTED" : "ALREADY_PRESENT";
+    } catch (error) {
+      if (await this.#erased(error, input.runId)) return "RUN_ERASED";
+      throw error;
+    }
+  }
+
+  async readMapChoiceForRun(runId: string): Promise<MapChoiceRecord | null> {
+    const read = await this.#readChoice(runId);
+    if (read === null) return null;
+    const positions = await this.pool.query<{ answer_id: string; root_node_id: string; maker: string }>(
+      `SELECT answer_id, root_node_id::text AS root_node_id, maker FROM core.map_position WHERE run_id = $1`, [runId]);
+    const byAnswer = new Map(positions.rows.map((row) => [row.answer_id, row] as const));
+    return Object.freeze({
+      opening: read.opening,
+      marks: Object.freeze(read.marks),
+      answers: Object.freeze(read.content.answers.map((answer) => Object.freeze({ ...answer,
+        rootNodeId: byAnswer.get(answer.answerId)?.root_node_id ?? null, maker: byAnswer.get(answer.answerId)?.maker ?? null }))),
+      alsoRaised: Object.freeze(read.content.alsoRaised.map((entry) => Object.freeze({ ...entry, makers: Object.freeze([...entry.makers]) })))
+    });
+  }
+
+  /** The run's items, ordered by item id; an erased run (or one with no map) has none. */
+  async readMapItemsForRun(runId: string): Promise<readonly MapItem[]> {
+    try {
+      return await withRunContentLease(this.pool, [runId], async () => {
+        const rows = await this.pool.query<ItemRow>(
+          `SELECT item_id, ai_ref, maker, origin, angle_id, angle_kind, kind, leans, list_index, content, content_ciphertext
+             FROM core.map_item WHERE run_id = $1 ORDER BY item_id`, [runId]);
+        if (rows.rows.length === 0) return Object.freeze([]);
+        const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+        try {
+          const items = rows.rows.map((row) => itemOf(row,
+            itemContent.safeParse(decryptLeasedContentForRun<unknown>(leased, "core.map_item", row.item_id, row.content_ciphertext, row.content))));
+          await leased.assertLive();
+          return Object.freeze(items);
+        } finally {
+          await leased.close();
+        }
+      });
+    } catch (error) {
+      if (isPrivateContentErased(error)) return Object.freeze([]);
+      throw error;
+    }
+  }
+
+  /** The whole map, as the orchestrator returned it (minus its call records): a re-claimed run reuses it, calling nothing. */
+  async readMapResultForRun(runId: string): Promise<MapResult | null> {
+    const read = await this.#readChoice(runId);
+    if (read === null) return null;
+    const items = await this.readMapItemsForRun(runId);
+    return Object.freeze({ ...(read.content.result as Omit<MapResult, "items" | "calls">), items, calls: Object.freeze([]) }) as MapResult;
+  }
+
+  async #readChoice(runId: string): Promise<{ opening: "MAP" | "TODAYS_OPENING"; marks: MapMark[]; content: ChoiceContent } | null> {
+    try {
+      return await withRunContentLease(this.pool, [runId], async () => {
+        const row = (await this.pool.query<{ opening: "MAP" | "TODAYS_OPENING"; marks: unknown; content: unknown; content_ciphertext: CryptoEnvelope | null }>(
+          `SELECT opening, marks, content, content_ciphertext FROM core.map_choice WHERE run_id = $1`, [runId])).rows[0];
+        if (row === undefined) return null;
+        const marks = z.array(z.enum(MAP_MARKS)).safeParse(row.marks);
+        if (!marks.success) throw rowInvalid("core.map_choice marks");
+        const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+        try {
+          const content = choiceContent.safeParse(
+            decryptLeasedContentForRun<unknown>(leased, "core.map_choice", runId, row.content_ciphertext, row.content));
+          if (!content.success) throw rowInvalid("core.map_choice content");
+          await leased.assertLive();
+          return { opening: row.opening, marks: marks.data, content: content.data };
+        } finally {
+          await leased.close();
+        }
+      });
+    } catch (error) {
+      if (isPrivateContentErased(error)) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * RUN_ERASED for 0040's barrier (or the lease's own check), and for 0116's attestation guard's missing secret ONLY
+   * when the run's content is in fact no longer live: on a live run a missing secret is a defect, and stays loud.
+   */
+  async #erased(error: unknown, runId: string): Promise<boolean> {
+    if (isPrivateContentErased(error)) return true;
+    if (!isAttestationSecretUnresolved(error)) return false;
+    try {
+      await assertPrivateContentLive(this.pool, runId);
+      return false;
+    } catch (check) {
+      return isPrivateContentErased(check);
+    }
+  }
+}
+
+const LEAN = z.enum(MAP_LEANS);
+
+function itemOf(row: ItemRow, parsed: ReturnType<typeof itemContent.safeParse>): MapItem {
+  if (!parsed.success) throw rowInvalid(`core.map_item ${row.item_id}`);
+  const value = parsed.data;
+  const base = { itemId: row.item_id, seat: Object.freeze({ aiRef: row.ai_ref, maker: row.maker }), origin: row.origin,
+    angleId: row.angle_id, angleKind: row.angle_kind, listIndex: row.list_index };
+  if (row.kind === "POINT" && "claim" in value) {
+    const leans = LEAN.safeParse(row.leans);
+    if (!leans.success) throw rowInvalid(`core.map_item ${row.item_id}`);
+    return Object.freeze({ ...base, kind: "POINT" as const, claim: value.claim, whyItMatters: value.why, leans: leans.data });
+  }
+  if (row.kind === "ANSWER" && "answer" in value) {
+    return Object.freeze({ ...base, kind: "ANSWER" as const, answer: value.answer });
+  }
+  throw rowInvalid(`core.map_item ${row.item_id}`);
+}
+
+export function readMapChoiceForRun(pool: Pool, runId: string): Promise<MapChoiceRecord | null> {
+  return new MapChoiceRepository(pool).readMapChoiceForRun(runId);
+}
+export function readMapItemsForRun(pool: Pool, runId: string): Promise<readonly MapItem[]> {
+  return new MapChoiceRepository(pool).readMapItemsForRun(runId);
+}

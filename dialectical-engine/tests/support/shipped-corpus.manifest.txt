@@ -946,6 +946,7 @@ packages/map/src/opposite-templates.ts
 packages/map/src/orchestrator.ts
 packages/map/src/prompts.ts
 packages/map/src/replies.ts
+packages/map/src/repository.ts
 packages/map/src/roles.ts
 packages/map/src/specs.ts
 packages/map/src/text.ts

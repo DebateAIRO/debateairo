@@ -28,12 +28,12 @@ describe("map package: the shared vocabulary (spec 2026-10-12 §1)", () => {
     expect([...MAP_STEPS]).toEqual(["ANGLES", "LIST", "SNOWBALL", "MERGE", "GAP", "CHOOSE"]);
   });
 
-  it("is a declared dependency-edge row that depends on kernel and providers only", async () => {
+  it("is a declared dependency-edge row that depends on kernel, providers and db only", async () => {
     // The audit checks only the rows it declares, so a missing row could not fail the violation filter alone: the
     // row count (36 -> 37) and the package's own manifest read pin that the row exists and what it names.
     const manifest = await auditEdgeManifest("map", "packages/map");
     expect(manifest.violations).toEqual([]);
-    expect([...manifest.dependencies].sort()).toEqual(["kernel", "providers"]);
+    expect([...manifest.dependencies].sort()).toEqual(["db", "kernel", "providers"]);
     const report = await auditArchitecture();
     expect(report.edgeRowsChecked).toBe(37);
     expect(report.violations.filter((violation) => violation.startsWith("map "))).toEqual([]);

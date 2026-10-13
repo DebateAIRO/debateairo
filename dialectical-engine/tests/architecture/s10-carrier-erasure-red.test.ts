@@ -203,6 +203,8 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "packages/judgement/src/index.ts",
       "packages/ledger/src/index.ts",
       "packages/liveness/src/index.ts",
+      // Debate shape (0116): the map repository seals and reads core.map_item / core.map_choice inside withRunContentLease.
+      "packages/map/src/repository.ts",
       "packages/memory/src/index.ts",
       "packages/serve/src/index.ts",
       "packages/settlement/src/index.ts",
