@@ -24,6 +24,10 @@ import {
   type CanonicalJsonAst,
   type RegisterPublicationRow
 } from "./register-publication.js";
+import {
+  DEBATE_SHAPE_FORMULA_VERSION, assertDebateShapeCeilingInput, debateShapeReceipt, debateShapeSiteCounts
+} from "./debate-shape-ceiling.js";
+import type { DebateShapeCeilingInput } from "./debate-shape-policy.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
 export {
@@ -201,6 +205,12 @@ export interface StructuralCeilingInput {
    * only `undefined` counts as absent (`null` is refused like any other value).
    */
   readonly backupSequencesProvisioned?: 0 | 1;
+  /**
+   * Debate shape (spec 2026-10-12 §3.6) — the sizes the admitted panel runs under the register's optional
+   * `debateShapePolicy` row (`resolveDebateShape`), passed only when the row is in force and the panel has two or more
+   * makers. Absent: the receipt is DR-184-v4/v5 byte for byte.
+   */
+  readonly shape?: DebateShapeCeilingInput;
 }
 
 /**
@@ -209,7 +219,7 @@ export interface StructuralCeilingInput {
  * pass, so an omitted term reached the arithmetic as `undefined` and minted a
  * `NaN` ceiling in silence. A missing term is now as loud as an invalid one.
  */
-const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned">[] = Object.freeze([
+const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned" | "shape">[] = Object.freeze([
   "panelSize", "depth", "judgeMaxAttempts", "organMaxAttempts", "maxRecompose",
   "maxCooldownHoldsPerRun", "finalRetryAttempts", "branchingFactor",
   "compositionSegmentCap", "fixedOrgansPerComposition",
@@ -406,6 +416,10 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
       `Requested depth ${input.depth} exceeds the sealed maximum depth ${input.maxDepth}`
     );
   }
+  // Debate shape (spec 2026-10-12 §3.6): checked before any leg is counted, so an incoherent shape never mints a ceiling.
+  if (input.shape !== undefined) assertDebateShapeCeilingInput(input.shape, input.panelSize);
+  const shaped = input.shape === undefined ? null
+    : Object.freeze({ shape: input.shape, counts: debateShapeSiteCounts(input.shape, input.depth) });
   const nodesPerRoot = input.panelSize === 1
     ? 1
     : (input.branchingFactor ** (input.depth + 1) - 1) / (input.branchingFactor - 1);
@@ -427,10 +441,17 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   const crossExchangeSiteAttempts = input.judgeMaxAttempts + input.finalRetryAttempts;
   const panelMemberAttempts = input.judgeMaxAttempts + backupJudgeSequence;
   const serveSiteAttempts = input.organMaxAttempts + backupOrganSequence;
-  const authorSites = materializedNodes;
-  const crossExchangeAuthorSites = crossExchangeNodes;
-  const panelSites = input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
-  const reviewerSites = input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;
+  // Debate shape (spec 2026-10-12 §3.6): the map's sites are author sites at the cooldown allowance; every node has its
+  // graders, its close-call extras (counted on EVERY node, so the ceiling never under-counts) and its reviews; the P
+  // cross-replies are the cross-exchange author sites (no runner-up), as today's M(M-1).
+  const authorSites = shaped === null ? materializedNodes : shaped.counts.mapSites + shaped.counts.nodes;
+  const crossExchangeAuthorSites = shaped === null ? crossExchangeNodes : shaped.counts.crossNodes;
+  const panelSites = shaped !== null
+    ? (shaped.shape.graders + shaped.shape.closeCallExtraGraders) * shaped.counts.nodes
+    : input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
+  const reviewerSites = shaped !== null
+    ? input.reviewerCallsPerNode * shaped.counts.nodes
+    : input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;
   // THE RETIRED COMPOSITION TOPOLOGY — declared, checked, and BILLED NOWHERE.
   // The sealed row still carries `fixedOrgansPerComposition`, `maxRecompose`
   // and `compositionSegmentCap`, and `apps/api/src/main.ts` still passes all
@@ -512,8 +533,10 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     serve_reserve_attempts: serveSites * serveSiteAttempts,
     hold_cap: input.maxCooldownHoldsPerRun,
     final_retry_attempts: input.finalRetryAttempts,
-    formula_version: backupSequences === 1 ? "DR-184-v5" : "DR-184-v4",
-    bounds_source_ref: "engine-exports+register"
+    formula_version: shaped !== null ? DEBATE_SHAPE_FORMULA_VERSION : backupSequences === 1 ? "DR-184-v5" : "DR-184-v4",
+    bounds_source_ref: "engine-exports+register",
+    // Debate shape: the run's frozen sizes, LAST and only when shaped, so a receipt minted without them keeps its bytes.
+    ...(shaped === null ? {} : { shape: debateShapeReceipt(shaped.shape, shaped.counts, backupSequences) })
   });
 }
 
@@ -1202,6 +1225,17 @@ export {
   type DebateShapePolicy,
   type DebateShapeScrutinyBudget
 } from "./debate-shape-policy.js";
+export {
+  DEBATE_SHAPE_FORMULA_VERSION,
+  assertDebateShapeCeilingInput,
+  debateShapeOfReceipt,
+  debateShapeReceipt,
+  debateShapeReceiptSchema,
+  debateShapeSiteCounts,
+  structuralBasisProvisionsBackup,
+  type DebateShapeReceipt,
+  type DebateShapeSiteCounts
+} from "./debate-shape-ceiling.js";
 export {
   MFA_POLICY_REGISTER_ROW,
   MFA_POLICY_DEPLOYMENT_REGISTER_ROW,
