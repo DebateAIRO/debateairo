@@ -150,7 +150,8 @@ describe("preview storyteller v3 safe repair allowance", () => {
     ["old storyteller v1 contract", () => storyRequest("story.storyteller.v1")],
     ["previous storyteller v2 contract", () => storyRequest("story.storyteller.v2")],
     ["checker contract", () => storyRequest("story.checker.v1")],
-    ["current checker contract on the storyteller's site", () => storyRequest("story.checker.v2")],
+    ["previous checker v2 contract", () => storyRequest("story.checker.v2")],
+    ["current checker contract on the storyteller's site", () => storyRequest("story.checker.v3")],
     ["unknown storyteller version", () => storyRequest("story.storyteller.v4")],
     ...[undefined, null, "classifier"].map(classifyContent => [
       `noncallable classifier ${String(classifyContent)}`,

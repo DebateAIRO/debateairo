@@ -9,6 +9,7 @@ import {
   previewModelRow,
   previewTargetGatewayControls,
   readPromptFrame,
+  rememberingAcceptedReply,
   schemaFailureLocator,
   withPreviewProviderCallPolicy,
   type ContentClassification,
@@ -37,14 +38,16 @@ import {
   STORYTELLER_V2_ANSWER_FORM,
   STORYTELLER_V2_CONTRACT_ID,
   STORY_CHECKER_V1_ANSWER_FORM,
-  STORY_CHECKER_V1_CONTRACT_ID
+  STORY_CHECKER_V1_CONTRACT_ID,
+  STORY_CHECKER_V2_ANSWER_FORM,
+  STORY_CHECKER_V2_CONTRACT_ID
 } from "../../packages/story/src/contracts.js";
 import {
   previewCallOutputTokens,
   previewCallShares,
   strictUpperBoundPricer
 } from "../../apps/api/src/preview-budget-estimate.js";
-import { practiceStoryPolicy, practiceStorySnapshot } from "../../tools/preview-practice/practice-lanes.js";
+import { practiceJsonRepairOf, practiceStoryPolicy, practiceStorySnapshot } from "../../tools/preview-practice/practice-lanes.js";
 import { practiceQuestion } from "../../tools/preview-practice/practice-questions.js";
 
 /**
@@ -173,12 +176,19 @@ describe("B — the storyteller's reply is decoded tolerantly, then checked in f
 describe("C — the checker's answer form says criteria are always required and how to quote", () => {
   it("is a new contract, v2, that keeps v1's form byte for byte and adds the two sentences", () => {
     expect(STORY_CHECKER_V1_CONTRACT_ID).toBe("story.checker.v1");
-    expect(STORY_CHECKER_CONTRACT_ID).toBe("story.checker.v2");
-    expect(STORY_CHECKER_ANSWER_FORM.startsWith(`${STORY_CHECKER_V1_ANSWER_FORM}\n`)).toBe(true);
+    expect(STORY_CHECKER_V2_CONTRACT_ID).toBe("story.checker.v2");
+    expect(STORY_CHECKER_V2_ANSWER_FORM.startsWith(`${STORY_CHECKER_V1_ANSWER_FORM}\n`)).toBe(true);
+    expect(STORY_CHECKER_V2_ANSWER_FORM).toContain("The criteria object is always required, with all eight booleans, whether satisfied is true or false.");
+    expect(STORY_CHECKER_V2_ANSWER_FORM).toContain("No text contains a straight double quote (\"): to quote words, use typographic quotes such as „ ” or « », or escape the straight quote as \\\".");
+  });
+
+  // Checker v3 (R15 practice debate, 2026-10-13): v2's two sentences kept, the objection's limit raised to 4000.
+  it("the current checker v3 keeps v2's sentences and states the 4000-character objection limit", () => {
+    expect(STORY_CHECKER_CONTRACT_ID).toBe("story.checker.v3");
+    expect(STORY_CHECKER_ANSWER_FORM).toBe(STORY_CHECKER_V2_ANSWER_FORM.replace("at most 2000 characters", "at most 4000 characters"));
     expect(STORY_CHECKER_ANSWER_FORM).toContain("The criteria object is always required, with all eight booleans, whether satisfied is true or false.");
-    expect(STORY_CHECKER_ANSWER_FORM).toContain("No text contains a straight double quote (\"): to quote words, use typographic quotes such as „ ” or « », or escape the straight quote as \\\".");
     const contract = buildStoryCheckerContract(PACK);
-    expect(contract.contractId).toBe("story.checker.v2");
+    expect(contract.contractId).toBe("story.checker.v3");
     expect(contract.answerForm).toBe(STORY_CHECKER_ANSWER_FORM);
   });
 
@@ -217,7 +227,7 @@ function storyCall(site: "STORYTELLER" | "CHECKER", contractId: string, classify
     buildRepairPacket: (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))
   };
 }
-const checkerCall = (contractId = "story.checker.v2") => storyCall("CHECKER", contractId, (content, reply) => classifyCheckerContent(content, reply));
+const checkerCall = (contractId: string = STORY_CHECKER_CONTRACT_ID) => storyCall("CHECKER", contractId, (content, reply) => classifyCheckerContent(content, reply));
 const storytellerCall = () => storyCall("STORYTELLER", "story.storyteller.v3", () => ({ parseStatus: "PARSED", parseError: null }));
 
 const RESULT: ProviderCallResult = {
@@ -312,6 +322,8 @@ describe("D — on the preview the story checker gets the storyteller's one form
   it("permits two POSTs in the current checker's call; an old checker contract keeps one", async () => {
     expect((await forwarded(checkerCall())).maxAttemptsThisCall).toBe(2);
     expect((await forwarded(checkerCall("story.checker.v1"))).maxAttemptsThisCall).toBe(1);
+    // Checker v3 (2026-10-13) is the current contract; v2 is now an old one too.
+    expect((await forwarded(checkerCall("story.checker.v2"))).maxAttemptsThisCall).toBe(1);
     expect((await forwarded({ ...checkerCall(), callSiteKey: "STORY:CHECKER:9" })).maxAttemptsThisCall).toBe(1);
     expect((await forwarded({ ...checkerCall(), role: "SYNTHESIZER" })).maxAttemptsThisCall).toBe(1);
     expect((await forwarded({ ...checkerCall(), bound: { maxAttempts: 1, tokenCeiling: 2048, deadlineMs: 1 } })).maxAttemptsThisCall).toBe(1);
@@ -337,7 +349,7 @@ describe("D — on the preview the story checker gets the storyteller's one form
     expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "OK"]);
     const messages = JSON.parse(executions[1]!.requestBody).messages as { role: string; content: string }[];
     const repaired = readPromptFrame({ messages: messages as never });
-    expect(repaired.contractId).toBe("story.checker.v2");
+    expect(repaired.contractId).toBe("story.checker.v3");
     expect(repaired.fields.slice(-3)).toEqual([
       { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
       { name: "machine_rejection_paths", content: "criteria" },
@@ -394,6 +406,165 @@ describe("D — the start-of-debate estimate counts the checker's repair as a bi
     const sent = previewCallOutputTokens(CONFIG, { debate: [2048], story: { storyteller: 12_000, checker: 2048 } });
     const strict = strictUpperBoundPricer(sent);
     expect(strict(rowOf(DEEPSEEK), "STORY_CHECKER_RETRY")).toBe(264_192n * 200n + 16_384n * 600n);
+  });
+});
+
+describe("E — story wording (practice debate 2, 2026-10-12): MiMo's story checker gets room to finish its thinking", () => {
+  // At 8,192 MiMo's thinking stopped at exactly 4,916 reasoning tokens on both of its checks; on the second, its
+  // unfinished thinking ran on in the answer after the JSON verdict until max_tokens (finish "length").
+  const verdictThenThinking = `${VERDICT}\n\nHmm, wait. Let me reconsider before finalizing. The objection above is wrong.`;
+
+  it("MiMo's checker asks for 16,384; every other row's checker keeps previewCallBound's 8,192", async () => {
+    expect(rowOf(MIMO).storyCheckerTokenCeiling).toBe(16_384);
+    expect((await forwarded(checkerCall(), MIMO)).bound).toEqual({ maxAttempts: 2, tokenCeiling: 16_384, deadlineMs: 1_260_000 });
+    for (const model of [DEEPSEEK, GLM, QWEN, HAIKU]) {
+      expect(rowOf(model).storyCheckerTokenCeiling, model).toBe(8192);
+      expect((await forwarded(checkerCall(), model)).bound.tokenCeiling, model).toBe(8192);
+    }
+  });
+
+  it("never lowers what previewCallBound gives the checker", async () => {
+    const larger = { ...checkerCall(), bound: { maxAttempts: 2, tokenCeiling: 20_000, deadlineMs: 180_000 } };
+    expect((await forwarded(larger, MIMO)).bound.tokenCeiling).toBe(20_000);
+  });
+
+  it("sends 16,384 on the wire, and after a verdict cut off at max_tokens its length retry twice that, held to the row's cap", async () => {
+    const { gateway, executions } = nativeHarness([verdictThenThinking, VERDICT], ["length", "stop"], MIMO);
+    const result = await gateway.call({ ...checkerCall(), costEnvelope: freeEnvelope });
+    expect(executions.map((execution) => JSON.parse(execution.requestBody).max_tokens)).toEqual([16_384, 32_768]);
+    expect(result.content).toBe(VERDICT);
+  });
+
+  it("still never salvages the first JSON of a reply cut off at max_tokens: its own text may overturn it", () => {
+    expect(classifyCheckerContent(verdictThenThinking, { finishReason: "length" }).parseStatus).not.toBe("PARSED");
+  });
+
+  it("the start-of-debate estimate prices MiMo's checker at what is sent, and every other row's as before", () => {
+    const sent = previewCallOutputTokens(CONFIG, { debate: [2048], story: { storyteller: 12_000, checker: 2048 } });
+    expect(sent.storyChecker).toBe(8192);
+    const strict = strictUpperBoundPricer(sent);
+    const mimo = rowOf(MIMO);
+    expect(strict(mimo, "STORY_CHECKER") - strict(mimo, "DEBATE")).toBe(8192n * mimo.outputNanoUsdPerToken);
+    expect(strict(mimo, "STORY_CHECKER_RETRY")).toBe(strict(mimo, "DEBATE") + (32_768n - 8192n) * mimo.outputNanoUsdPerToken);
+    const deepseek = rowOf(DEEPSEEK);
+    expect(strict(deepseek, "STORY_CHECKER")).toBe(strict(deepseek, "DEBATE"));
+    // None, when the register has no story.
+    const none = strictUpperBoundPricer(previewCallOutputTokens(CONFIG, { debate: [2048], story: null }));
+    expect(none(mimo, "STORY_CHECKER")).toBe(none(mimo, "DEBATE") - 8192n * mimo.outputNanoUsdPerToken);
+  });
+});
+
+/**
+ * R15 practice debate (2026-10-12, 19:13–20:12 UTC): the debate's only failure. MiMo-V2.6-Pro's story checker, round 2:
+ *  · seq 644 (finish "stop", 12,923 output tokens): its whole check written out as prose, then the verdict in a ```json
+ *    fence at the very end, with straight quotes closing „…" quotations inside the objection: PARSE_FAILED;
+ *  · seq 646 (the full re-ask): a valid verdict whose objection is 2,739 characters, over checker v2's 2,000 (the story
+ *    wording of 2026-10-12 asks for every problem, one short sentence each): SCHEMA_FAILED too_big@objection.
+ * The fixtures are those two real replies, whole (our own practice text, no secret). 644's verdict also left out the
+ * criteria object, so the trailing-object read (taken only when the object passes the full schema) does not accept 644
+ * itself: it stays PARSE_FAILED, the call's full re-ask follows, and that re-ask (646) is now accepted. The same reply
+ * with the criteria the form asks for is accepted on the first POST.
+ */
+describe("F — R15: the story checker's reasoning-then-verdict reply and its long objection", () => {
+  const R15_644 = fixture("mimo-checker-r15-644-reasoning-then-fenced-verdict.txt");
+  const R15_646 = fixture("mimo-checker-r15-646-long-objection.txt");
+  const objectionOf = (text: string): string => (JSON.parse(text) as { objection: string }).objection;
+  const VERDICT_END = "\"\n}\n```";
+  /** 644 as the checker form asks for it: the same prose and verdict, with the criteria object the model left out. */
+  const R15_644_WHOLE = `${R15_644.slice(0, -VERDICT_END.length)}",\n  "criteria": ${JSON.stringify(CRITERIA)}\n}\n\`\`\``;
+
+  it("646: the real 2,739-character objection was refused only for its length, and fits checker v3's 4000", () => {
+    expect(objectionOf(R15_646)).toHaveLength(2739);
+    expect(STORY_CHECKER_V2_ANSWER_FORM).toContain("at most 2000 characters");
+    expect(STORY_CHECKER_ANSWER_FORM).toContain("at most 4000 characters");
+    expect(classifyCheckerContent(R15_646, STOP)).toEqual({ parseStatus: "PARSED", parseError: null });
+    const verdict = parseCheckerVerdict(R15_646, STOP);
+    expect(verdict.satisfied).toBe(false);
+    expect(verdict.objection).toHaveLength(2739);
+    expect(verdict.criteria.reviewer_note_separate).toBe(true);
+    // Still a limit: one character past 4000 is refused at its path, as 2,739 was at 2000.
+    const tooLong = JSON.stringify({ ...JSON.parse(R15_646), objection: "x".repeat(4001) });
+    const refused = classifyCheckerContent(tooLong, STOP);
+    expect(refused.parseStatus).toBe("SCHEMA_FAILED");
+    expect(schemaFailureLocator(refused as Exclude<ContentClassification, { parseStatus: "PARSED" }>)).toEqual({ code: "SCHEMA_FAILED", path: "objection" });
+  });
+
+  it("644: the real reply, whose trailing verdict left out the criteria, stays the PARSE_FAILED it was", () => {
+    expect(R15_644.endsWith(VERDICT_END)).toBe(true);
+    const classified = classifyCheckerContent(R15_644, STOP);
+    expect(classified.parseStatus).toBe("PARSE_FAILED");
+    expect(classified.parseError).toContain("is not valid JSON");
+  });
+
+  it("644 with the criteria the form asks for: the verdict that ends the reply is read (TRAILING_OBJECT)", () => {
+    expect(classifyCheckerContent(R15_644_WHOLE, STOP)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "TRAILING_OBJECT" });
+    const verdict = parseCheckerVerdict(R15_644_WHOLE, STOP);
+    expect(verdict).toMatchObject({ satisfied: false, criteria: CRITERIA });
+    // The straight quotes closing „…" inside the objection are kept as text.
+    expect(verdict.objection).toContain("„the material holds no data\" (the pilots paragraph and the reviewer note)");
+    expect(verdict.objection!.startsWith("1) The third reason in why cites P23")).toBe(true);
+    expect(verdict.objection!.endsWith("make it a caveat, not a reason.")).toBe(true);
+  });
+
+  it("is NOT read when the call was cut off at max_tokens, or when how it ended is unknown", () => {
+    expect(classifyCheckerContent(R15_644_WHOLE, LENGTH).parseStatus).toBe("PARSE_FAILED");
+    expect(classifyCheckerContent(R15_644_WHOLE).parseStatus).toBe("PARSE_FAILED");
+    expect(() => parseCheckerVerdict(R15_644_WHOLE)).toThrow(expect.objectContaining({ code: "STORY_CHECKER_CONTENT_INVALID" }));
+  });
+
+  it("a trailing verdict that fails the checker's schema stays PARSE_FAILED: never a new schema refusal", () => {
+    const overLimit = R15_644_WHOLE.replace("\"objection\": \"1) ", `"objection": "${"x".repeat(4001)} 1) `);
+    const satisfiedWithUnmet = R15_644_WHOLE.replace("\"satisfied\": false", "\"satisfied\": true");
+    for (const text of [R15_644, overLimit, satisfiedWithUnmet]) {
+      const classified = classifyCheckerContent(text, STOP);
+      expect(classified.parseStatus).toBe("PARSE_FAILED");
+      expect(classified.parseError).toContain("is not valid JSON");
+    }
+  });
+
+  it.each([
+    ["the verdict followed by more prose", () => `${R15_644_WHOLE}\n\nWait, on reflection that objection is wrong. Let me redo the check.`],
+    // A second verdict that strict JSON cannot read either (a strict one is already taken by OUTERMOST_OBJECT, as before).
+    ["two verdicts at the end", () => R15_644_WHOLE.replace(/\n```$/u, `\n{"satisfied": false, "objection": "the „summary" is wrong", "criteria": ${JSON.stringify(CRITERIA)}}\n\`\`\``)],
+    // A draft that strict JSON cannot read (a straight quote closes „…"), so only the trailing-object read could reach
+    // the final verdict past it: the brace in the prose refuses it.
+    ["an earlier draft verdict in the prose", () => R15_644_WHOLE.replace("These are the problems I need to raise.", "First draft: {\"satisfied\": false, \"objection\": \"the „summary\" is wrong\"}")]
+  ])("refuses %s", (_name, make) => {
+    const text = make();
+    expect(text).not.toBe(R15_644_WHOLE);
+    expect(classifyCheckerContent(text, STOP).parseStatus).toBe("PARSE_FAILED");
+  });
+
+  it("through the preview gateway, as the story writer reads it: the whole 644 is accepted on the first POST", async () => {
+    const reading = rememberingAcceptedReply((content, reply) => classifyCheckerContent(content, reply));
+    const { gateway, executions, artifacts, ledger } = nativeHarness([R15_644_WHOLE], ["stop"], MIMO);
+    const result = await gateway.call({ ...checkerCall(), classifyContent: reading.classifyContent, costEnvelope: freeEnvelope });
+    expect(executions).toHaveLength(1);
+    expect(artifacts.map((artifact) => artifact.parseStatus)).toEqual(["PARSED"]);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["OK"]);
+    expect(result.content).toBe(R15_644_WHOLE);
+    expect(result.repairForm).toBeUndefined();
+    const accepted = reading.acceptedAs(result.content);
+    expect(accepted.repair).toBe("TRAILING_OBJECT");
+    expect(parseCheckerVerdict(result.content, accepted.reply)).toMatchObject({ satisfied: false, criteria: CRITERIA });
+    // The practice report names the repair as information, never as a slip; only on the story sites.
+    expect(practiceJsonRepairOf(R15_644_WHOLE, "stop", "STORY:CHECKER:2")).toBe("TRAILING_OBJECT");
+    expect(practiceJsonRepairOf(R15_644_WHOLE, "length", "STORY:CHECKER:2")).toBeNull();
+    expect(practiceJsonRepairOf(R15_644_WHOLE, "stop", "SERVE:SYNTHESIZER:1")).toBeNull();
+  });
+
+  it("through the preview gateway, the real R15 sequence: 644 refused, then the real 646 full re-ask accepted under checker v3", async () => {
+    const reading = rememberingAcceptedReply((content, reply) => classifyCheckerContent(content, reply));
+    const { gateway, executions, artifacts, ledger } = nativeHarness([R15_644, R15_646], ["stop", "stop"], MIMO);
+    const result = await gateway.call({ ...checkerCall(), classifyContent: reading.classifyContent, costEnvelope: freeEnvelope });
+    expect(executions).toHaveLength(2);
+    expect(artifacts.map((artifact) => artifact.parseStatus)).toEqual(["PARSE_FAILED", "PARSED"]);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "OK"]);
+    expect(result.repairForm).toBe("FULL");
+    expect(result.content).toBe(R15_646);
+    const accepted = reading.acceptedAs(result.content);
+    expect(accepted.repair).toBeNull();
+    expect(parseCheckerVerdict(result.content, accepted.reply).objection).toHaveLength(2739);
   });
 });
 

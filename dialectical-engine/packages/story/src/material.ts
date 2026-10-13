@@ -86,10 +86,22 @@ export interface StoryNodeEnrichment {
  */
 export interface StoryMaterialPosition {
   readonly id: string;
+  /**
+   * Where it finished, 1 for the winner (practice debate 2, 2026-10-12): the
+   * storyteller named the third-placed option as the "close rival" of a close
+   * call. The order of the list said it, but no field did.
+   */
+  readonly place: number;
   readonly claim: string;
   readonly author?: string;
   readonly final?: number;
   readonly won: boolean;
+  /**
+   * Present, and true, on a losing position that finished within the tie margin
+   * of the winner (the label rule's own comparison, at or below `gamma`), so
+   * "which option made it close" is a field, never an inference.
+   */
+  readonly within_tie_margin?: true;
 }
 
 export interface StoryMaterialPoint {
@@ -104,6 +116,16 @@ export interface StoryMaterialPoint {
   readonly set_aside?: string;
   readonly best_case?: string;
   readonly objection?: string;
+  /**
+   * The point or position `objection` argues AGAINST (practice debate 2,
+   * 2026-10-12). The objection is the critic summary the point's OWN author
+   * wrote while writing it, about the point or position it was asked to argue
+   * with: a position's is about itself; a point's is about the point it attacks,
+   * or, when it attacks none, the one it supports. Read as "the case against
+   * this point", it made a story call the counter raised against a position
+   * "its own admission", and cite the wrong point for it.
+   */
+  readonly objection_to?: string;
   readonly review?: "agree" | "dispute" | "cannot-assess";
   readonly review_reasons?: readonly string[];
   readonly author?: string;
@@ -170,10 +192,12 @@ export interface StoryMaterial {
 type StoryKeyList<T> = { readonly [K in keyof Required<T>]: true };
 const STORY_POINT_KEYS: StoryKeyList<StoryMaterialPoint> = {
   id: true, position: true, supports: true, attacks: true, claim: true, known_by: true, base: true, final: true,
-  set_aside: true, best_case: true, objection: true, review: true, review_reasons: true, author: true,
+  set_aside: true, best_case: true, objection: true, objection_to: true, review: true, review_reasons: true, author: true,
   judge_spread: true, leverage: true
 };
-const STORY_POSITION_KEYS: StoryKeyList<StoryMaterialPosition> = { id: true, claim: true, author: true, final: true, won: true };
+const STORY_POSITION_KEYS: StoryKeyList<StoryMaterialPosition> = {
+  id: true, place: true, claim: true, author: true, final: true, won: true, within_tie_margin: true
+};
 const STORY_VERDICT_KEYS: StoryKeyList<StoryMaterialVerdict> = {
   label: true, rule_in_words: true, rung: true, trigger: true, winner_id: true, winner_final: true, runner_up_id: true,
   runner_up_final: true, margin: true, disagreement: true, thresholds: true, confidence_band: true, marks: true,
@@ -379,8 +403,26 @@ function storyNumberWords(value: number | null): string {
   return value === null ? "not measured" : String(storyNumber(value));
 }
 
+/**
+ * The references the rule's sentence names (practice debate 2, 2026-10-12): the
+ * winner, the runner-up, and any other losing position that also finished
+ * within the tie margin. A score alone ("the runner-up (0.9301)") left the
+ * storyteller to work out which option made a close call close, and it named
+ * the wrong one.
+ */
+interface StoryRuleRefs {
+  readonly winner: string | null;
+  readonly runnerUp: string | null;
+  readonly alsoWithinTieMargin: readonly string[];
+}
+
+/** " P2" when the reference is known, else nothing: the sentence reads the same either way. */
+function storyNamed(ref: string | null): string {
+  return ref === null ? "" : ` ${ref}`;
+}
+
 /** The rung and trigger `deriveVerdictLabel` recorded, in plain words. */
-function storyRuleInWords(basis: StoryVerdictBasis, positionsArgued: number): string {
+function storyRuleInWords(basis: StoryVerdictBasis, positionsArgued: number, refs: StoryRuleRefs): string {
   const winner = storyNumberWords(basis.winner_strength);
   const low = storyNumberWords(basis.thresholds.low_cut);
   const high = storyNumberWords(basis.thresholds.high_cut);
@@ -402,8 +444,8 @@ function storyRuleInWords(basis: StoryVerdictBasis, positionsArgued: number): st
     sentences.push(`The label is UNSUPPORTED because the strongest position finished at ${winner}, below the low cut of ${low}.`);
   } else if (basis.trigger === "MARGIN_WITHIN_GAMMA") {
     sentences.push(
-      `The label is CONTESTED because the strongest position (${winner}) led the runner-up `
-        + `(${storyNumberWords(basis.runner_up_strength)}) by only ${storyNumberWords(basis.margin)}, `
+      `The label is CONTESTED because the strongest position${storyNamed(refs.winner)} (${winner}) led the runner-up`
+        + `${storyNamed(refs.runnerUp)} (${storyNumberWords(basis.runner_up_strength)}) by only ${storyNumberWords(basis.margin)}, `
         + `within the tie margin of ${storyNumberWords(basis.thresholds.gamma)}.`
     );
   } else if (basis.trigger === "DISAGREEMENT_AT_THRESHOLD") {
@@ -424,6 +466,13 @@ function storyRuleInWords(basis: StoryVerdictBasis, positionsArgued: number): st
     );
   } else {
     sentences.push(`The label is ${basis.label}; the rule that decided is recorded as ${basis.trigger}.`);
+  }
+  if (refs.alsoWithinTieMargin.length > 0) {
+    const others = refs.alsoWithinTieMargin.join(", ");
+    sentences.push(
+      `${others} also finished within the tie margin of the strongest position, behind the runner-up`
+        + `${storyNamed(refs.runnerUp)}, which finished closest.`
+    );
   }
   return sentences.join(" ");
 }
@@ -601,14 +650,26 @@ export function buildStoryMaterial(input: {
   }
 
   const basis = snapshot.verdictBasis;
+  // A losing position within the tie margin of the winner, by the label rule's own comparison (margin <= gamma).
+  const withinTieMargin = new Set(positionNodes
+    .filter((node) => node.nodeId !== basis.winner_node_id && node.finalStrength !== null
+      && Number.isFinite(node.finalStrength) && basis.winner_strength - node.finalStrength <= basis.thresholds.gamma)
+    .map((node) => node.nodeId));
+  const runnerUpRef = basis.runner_up_node_id === null ? null : refOf.get(basis.runner_up_node_id) ?? null;
   const verdict: StoryMaterialVerdict = Object.freeze({
     label: basis.label,
-    rule_in_words: storyRuleInWords(basis, positionNodes.length),
+    rule_in_words: storyRuleInWords(basis, positionNodes.length, {
+      winner: refOf.get(basis.winner_node_id) ?? null,
+      runnerUp: runnerUpRef,
+      alsoWithinTieMargin: positionNodes
+        .filter((node) => withinTieMargin.has(node.nodeId) && node.nodeId !== basis.runner_up_node_id)
+        .map((node) => ref(node.nodeId))
+    }),
     rung: basis.rung,
     trigger: basis.trigger,
     winner_id: refOf.get(basis.winner_node_id) ?? null,
     winner_final: storyNumber(basis.winner_strength),
-    runner_up_id: basis.runner_up_node_id === null ? null : refOf.get(basis.runner_up_node_id) ?? null,
+    runner_up_id: runnerUpRef,
     runner_up_final: basis.runner_up_strength === null ? null : storyNumber(basis.runner_up_strength),
     margin: basis.margin === null ? null : storyNumber(basis.margin),
     disagreement: basis.disagreement === null ? null : storyNumber(basis.disagreement),
@@ -627,12 +688,14 @@ export function buildStoryMaterial(input: {
     const visible = new Set(nodesInRefOrder
       .filter((node) => !step.keepOnlySpine || spine.has(node.nodeId))
       .map((node) => node.nodeId));
-    const positions = positionNodes.map((node): StoryMaterialPosition => Object.freeze({
+    const positions = positionNodes.map((node, index): StoryMaterialPosition => Object.freeze({
       id: ref(node.nodeId),
+      place: index + 1,
       claim: storyClip(node.claim, step.claimChars),
       ...(node.authorModel === null ? {} : { author: node.authorModel }),
       ...(node.finalStrength === null ? {} : { final: storyNumber(node.finalStrength) }),
-      won: node.nodeId === basis.winner_node_id
+      won: node.nodeId === basis.winner_node_id,
+      ...(withinTieMargin.has(node.nodeId) ? { within_tie_margin: true as const } : {})
     }));
     const points = nodesInRefOrder.filter((node) => visible.has(node.nodeId)).map((node): StoryMaterialPoint => {
       const judgeDropped = step.dropJudgeOutsideKept && !keptLeverage.has(node.nodeId) && !positionIds.has(node.nodeId);
@@ -648,6 +711,9 @@ export function buildStoryMaterial(input: {
       const link = links.get(node.nodeId);
       const supports = (link?.supports ?? []).filter((target) => visible.has(target)).map(ref);
       const attacks = (link?.attacks ?? []).filter((target) => visible.has(target)).map(ref);
+      // What the author's objection argues against: the position itself, else the point it attacks, else the one it
+      // supports (the leg it was written for: an attack or a cross-root reply attacks; a support leg only supports).
+      const objectionTo = positionIds.has(node.nodeId) ? ref(node.nodeId) : attacks[0] ?? supports[0] ?? null;
       const nodeLeverage = leverage.get(node.nodeId);
       return Object.freeze({
         id: ref(node.nodeId),
@@ -661,6 +727,7 @@ export function buildStoryMaterial(input: {
         ...(node.excludedReason === null ? {} : { set_aside: node.excludedReason }),
         ...(bestCase === null ? {} : { best_case: storyClip(bestCase, judgeChars) }),
         ...(objection === null ? {} : { objection: storyClip(objection, judgeChars) }),
+        ...(objection === null || objectionTo === null ? {} : { objection_to: objectionTo }),
         ...(reviewOutcome === null ? {} : { review: reviewOutcome }),
         ...(reviewReasons.length === 0 ? {} : { review_reasons: Object.freeze(reviewReasons.map((reason) => storyClip(reason, judgeChars))) }),
         ...(node.authorModel === null ? {} : { author: node.authorModel }),

@@ -52,6 +52,10 @@ import {
  * historical replay drift — as it already did for `serveContractHash`, a
  * whole-module digest that has moved since S01. A fresh ceremony database
  * seeds normally. Re-opening a standing one is the open ceremony-path item.
+ *
+ * 2026-10-12: serve.synthesizer.v3 and serve.evaluator.v2 (practice debate 3)
+ * moved `composerContractHash` and `conformanceContractHash` the same way, with
+ * the same consequence for a standing ceremony database.
  */
 export const ACCEPTANCE_REGISTER_VERSION = 4 as const;
 /**

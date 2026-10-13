@@ -27,6 +27,7 @@ import {
   practiceFinishReasonOf,
   practiceJsonRepairOf,
   practiceReplyFormOf,
+  practiceReviewEdgeCountOf,
   recheckReply,
   replyContentOf
 } from "./practice-lanes.js";
@@ -35,6 +36,7 @@ import { practiceQuestion } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
 import {
   importPracticeRegister,
+  type PracticeNextRegisterVersion,
   type PracticeRegisterExport,
   type PracticeRegisterImportReceipt
 } from "./practice-register-import.js";
@@ -204,12 +206,22 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
    * (ledger.call_prompt, written by the runner's gateway just before it sent the attempt, decrypted with the run's key).
    * Null when the attempt has no recorded prompt (refused before it was sent).
    */
-  const replyFormOf = async (attemptId: string | null): Promise<PracticeReplyForm | null> => {
+  const promptMessagesOf = async (attemptId: string | null): Promise<Parameters<typeof practiceReplyFormOf>[0] | null> => {
     if (attemptId === null) return null;
     const prompt = await readCallPrompt(pool, attemptId);
     if (prompt === null) return null;
     const messages = JSON.parse(prompt.promptText) as unknown;
-    return Array.isArray(messages) ? practiceReplyFormOf(messages as Parameters<typeof practiceReplyFormOf>[0]) : null;
+    return Array.isArray(messages) ? messages as Parameters<typeof practiceReplyFormOf>[0] : null;
+  };
+  const replyFormOf = async (attemptId: string | null): Promise<PracticeReplyForm | null> => {
+    const messages = await promptMessagesOf(attemptId);
+    return messages === null ? null : practiceReplyFormOf(messages);
+  };
+  /** MiMo salvage (2026-10-12): a review's edge count, from its own prompt, so the recheck knows when [] is the answer. */
+  const reviewEdgeCountOf = async (attemptId: string | null, callSiteKey: string): Promise<number | null> => {
+    if (callFamilyOf(callSiteKey) !== "REVIEW") return null;
+    const messages = await promptMessagesOf(attemptId);
+    return messages === null ? null : practiceReviewEdgeCountOf(messages);
   };
   for (const entry of entries) {
     const model = modelOfRef(entry.actor_ref);
@@ -242,7 +254,7 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     call.tries.push(Object.freeze({ outcome: entry.outcome, parseStatus: artifact === undefined ? null : parseStatus, replyForm }));
     if (entry.outcome === "OK" && artifact !== undefined) {
       const stored = await readContent(entry.raw_artifact_ref!, artifact);
-      const repair = practiceJsonRepairOf(replyContentOf(stored.rawText), practiceFinishReasonOf(artifact.metadata_json));
+      const repair = practiceJsonRepairOf(replyContentOf(stored.rawText), practiceFinishReasonOf(artifact.metadata_json), entry.call_site_key);
       if (repair !== null) jsonRepairs.push(Object.freeze({ model, repair }));
     }
     if (formatFailed && artifact !== undefined) {
@@ -251,7 +263,7 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
       failures.push(Object.freeze({
         sequence: Number(entry.sequence), model, providerRef: entry.actor_ref, callSiteKey: entry.call_site_key, parseStatus,
         issues: issueListFromParseError(stored.parseErrorDetail),
-        recheckIssues: replyForm === "PATCH" ? [] : recheckReply(entry.call_site_key, content).issues,
+        recheckIssues: replyForm === "PATCH" ? [] : recheckReply(entry.call_site_key, content, await reviewEdgeCountOf(entry.attempt_id, entry.call_site_key)).issues,
         replyForm, latencyMs, replyText: reportableReplyText(content), fixedBySameCall: false
       }));
     }
@@ -294,6 +306,11 @@ export async function runPracticeDebate(input: Readonly<{
   settings: PracticeSettings;
   sockets: PracticeSockets;
   register: PracticeRegisterExport;
+  /**
+   * `--register-next`: the code's next register version, composed on the export's newest version
+   * (`composePracticeNextRegisterVersion`); the practice publishes it on top and runs on it. Null: the live version.
+   */
+  registerNext?: PracticeNextRegisterVersion | null;
   /** The watched gate ports. */
   budgetPorts: PreviewBudgetPorts;
   observer: PracticeGateObserver;
@@ -320,19 +337,33 @@ export async function runPracticeDebate(input: Readonly<{
     const pool = database.pool;
     progress("practice database started; migrating");
     await migrate(pool);
-    const receipt = await importPracticeRegister(pool, input.register);
-    // Exactly the exported versions, no other: each version from 1 to one above the last, asked by its own number.
-    const exported = new Set(input.register.versions.map((version) => version.register_version));
+    const receipt = await importPracticeRegister(pool, input.register, input.registerNext ?? null);
+    // Exactly the exported versions (and the code's next one, with --register-next), no other: each version from 1 to
+    // one above the last, asked by its own number.
+    const exported = new Set([...input.register.versions.map((version) => version.register_version),
+      ...(receipt.codeNext === undefined ? [] : [receipt.registerVersion])]);
     for (let version = 1n; version <= BigInt(receipt.registerVersion) + 1n; version += 1n) {
       const found = (await pool.query("SELECT 1 FROM register.register_version WHERE register_version=$1", [String(version)])).rows.length === 1;
       if (found !== exported.has(String(version))) {
         throw Object.assign(new Error("PRACTICE_REGISTER_NOT_EXACT"), { code: "PRACTICE_REGISTER_NOT_EXACT" });
       }
     }
-    if (String(input.settings.runner.REGISTER_VERSION) !== receipt.registerVersion) {
+    // The settings file is the live runner's: its REGISTER_VERSION is the export's newest version, always.
+    const liveVersion = input.register.versions[input.register.versions.length - 1]!.register_version;
+    if (String(input.settings.runner.REGISTER_VERSION) !== liveVersion) {
       throw Object.assign(new Error("PRACTICE_REGISTER_VERSION_MISMATCH"), { code: "PRACTICE_REGISTER_VERSION_MISMATCH" });
     }
-    progress(`register imported up to version ${receipt.registerVersion}`);
+    // With --register-next the runner and the ask path read the code's next version instead (the live one plus one,
+    // which the import proved it allocated), as the server will once REGISTER_VERSION is repinned to it.
+    const nextVersion = input.settings.runner.REGISTER_VERSION + 1;
+    if (receipt.codeNext !== undefined && String(nextVersion) !== receipt.registerVersion) {
+      throw Object.assign(new Error("PRACTICE_REGISTER_VERSION_MISMATCH"), { code: "PRACTICE_REGISTER_VERSION_MISMATCH" });
+    }
+    const settings: PracticeSettings = receipt.codeNext === undefined ? input.settings
+      : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion }) });
+    progress(receipt.codeNext === undefined ? `register imported up to version ${receipt.registerVersion}`
+      : `register imported up to live version ${liveVersion}; practising on this code's next version ${receipt.registerVersion}`
+        + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
     // Content encryption ON, as on the live preview, with a key that lives only in this process.
     const users = new PracticeUserDekStore();
     configureContentEncryption(pool, new ContentCipher(new MemoryRunContentKeyStore(users, async (ownerRef) => {
@@ -360,10 +391,10 @@ export async function runPracticeDebate(input: Readonly<{
     const dispatched: { runId: string; workItemId: string }[] = [];
     const ask = await composePracticeAsk({
       pool, provisionPool: database.extraPool(), serverAdmissionPool: database.extraPool(), legacyAdmissionPool: database.extraPool(),
-      settings: input.settings, sockets: input.sockets, budgetPorts: input.budgetPorts, teamUserIds: [userId],
+      settings, sockets: input.sockets, budgetPorts: input.budgetPorts, teamUserIds: [userId],
       dispatcher: { dispatch: async (job) => { dispatched.push({ ...job }); } }, log: progress
     });
-    const runner = await composePracticeRunner({ pool, environment: input.settings.runner, budgetPorts: input.budgetPorts,
+    const runner = await composePracticeRunner({ pool, environment: settings.runner, budgetPorts: input.budgetPorts,
       remaining: remainingPorts, keepAlivePool: database.extraPool(),
       ...(input.callConcurrency === undefined ? {} : { callConcurrency: input.callConcurrency }),
       ...(input.wait === undefined ? {} : { wait: input.wait }), ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });

@@ -956,6 +956,23 @@ the runner accepts. Its fingerprint is the code-owned row `composerContractHash`
 - Versions already sealed keep the v1 fingerprint; nothing is edited. **Rolling back** the code means pinning the
   register version the older code was running on again.
 
+### Upgrading to the answer writer v3 and answer checker v2 release (serve.synthesizer.v3, serve.evaluator.v2)
+
+This release supersedes `serve.synthesizer.v2` with `serve.synthesizer.v3` and `serve.evaluator.v1` with
+`serve.evaluator.v2` (owner-approved wording, 2026-10-12): the answer writer and its checker are told that the
+answer is for the person who asked, with no score, number, field name or engine mechanics in it. Both fingerprints
+move: `composerContractHash` and `conformanceContractHash`. No migration, no new environment key.
+
+- **Publish a new hosted register version first**, exactly as for v2 above (`pnpm register:publish-hosted`, pin it
+  in both `EnvironmentFile`s, restart both units in one step with `unfinished` at 0).
+- **New in this release: the runner refuses to start on a register that does not carry the fingerprints of the
+  prompts it sends.** It stops at boot with `REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`, naming the row and both
+  values (`assertRegisterPromptContractHashes`, `apps/runner/src/index.ts`), instead of recording the new prompts
+  under the old fingerprints. So a runner restarted on this code with `REGISTER_VERSION` still pinned to an older
+  version does not start: publish and pin, then start.
+- **Rolling back** the code means pinning the register version the older code was running on again (the older code
+  has no such check, and on the new version it would record its v2 prompts under the v3 fingerprints).
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,

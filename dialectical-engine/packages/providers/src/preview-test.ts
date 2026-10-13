@@ -277,13 +277,14 @@ function previewStorySite(request: ProviderCallRequest, site: "STORYTELLER" | "C
 }
 /**
  * Only the current native storyteller and story checker requests may keep one safe locator repair (story format
- * robustness, 2026-10-12: the checker too, so one format slip no longer costs the story its check).
+ * robustness, 2026-10-12: the checker too, so one format slip no longer costs the story its check). The current
+ * checker is v3 since 2026-10-13 (the objection's limit raised to 4000 characters).
  */
 function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
   const site = previewStorySite(request, "STORYTELLER") ? "STORYTELLER" : previewStorySite(request, "CHECKER") ? "CHECKER" : null;
   if (site === null || !Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 2
     || typeof request.classifyContent !== "function" || typeof request.buildRepairPacket !== "function") return false;
-  try { return assertFramedPrompt(request.packet).contractId === (site === "STORYTELLER" ? "story.storyteller.v3" : "story.checker.v2"); }
+  try { return assertFramedPrompt(request.packet).contractId === (site === "STORYTELLER" ? "story.storyteller.v3" : "story.checker.v3"); }
   catch { return false; }
 }
 /**
@@ -321,6 +322,14 @@ function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
  */
 export function previewStorytellerTokenCeiling(reviewed: Readonly<{ storytellerTokenCeiling: number }>): number {
   return reviewed.storytellerTokenCeiling;
+}
+/**
+ * Story wording (practice debate 2, 2026-10-12): the least max_tokens the preview's story checker asks for on its row
+ * (PreviewModelRow.storyCheckerTokenCeiling: the generation floor, 16,384 on MiMo, whose thinking otherwise ran out
+ * and spilled into its answer). The checker asks for the larger of this and previewCallBound's ceiling, never less.
+ */
+export function previewStoryCheckerTokenCeiling(reviewed: Readonly<{ storyCheckerTokenCeiling: number }>): number {
+  return reviewed.storyCheckerTokenCeiling;
 }
 /**
  * Owner ruling 5 (2026-10-10): how long the preview waits before its one retry of a call the gate
@@ -477,7 +486,10 @@ export function withPreviewProviderCallPolicy(
     }
     const preview = previewCallBound(request.bound, config);
     const bound = previewStorySite(request, "STORYTELLER")
-      ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) }) : preview;
+      ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) })
+      : previewStorySite(request, "CHECKER")
+        ? Object.freeze({ ...preview, tokenCeiling: Math.max(preview.tokenCeiling, previewStoryCheckerTokenCeiling(reviewed)) })
+        : preview;
     const storyRepair = previewStoryRepairAllowed(request);
     const formatRepair = !storyRepair && previewFormatRepairAllowed(request);
     // Spec 2026-10-12 §4.4: one explicit level replaces whatever the request carried: the owner's table picks it per

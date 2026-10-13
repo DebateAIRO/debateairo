@@ -47,7 +47,7 @@ import { parsePracticeLevels, type PracticeLevelPlan } from "./practice-levels.j
 import { practiceInterruptGate, takeOverSignals } from "./practice-interrupt.js";
 import { PRACTICE_LANES, type PracticeLane } from "./practice-lanes.js";
 import { parsePracticeCallConcurrency } from "./practice-parallel.js";
-import { parsePracticeRegisterExport, PracticeRegisterError } from "./practice-register-import.js";
+import { composePracticeNextRegisterVersion, parsePracticeRegisterExport, PracticeRegisterError } from "./practice-register-import.js";
 import {
   abortedReport,
   assertOutsideRepository,
@@ -89,7 +89,7 @@ type Args = Readonly<{ mode: "formats" | "debate" | "report"; flags: ReadonlyMap
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels",
   "--side-by-side", "--call-concurrency"]);
-const SWITCHES = new Set<string>(["--sequential", "--transcript"]);
+const SWITCHES = new Set<string>(["--sequential", "--transcript", "--register-next"]);
 
 export function parsePracticeArgs(argv: readonly string[]): Args {
   const [mode, ...rest] = argv;
@@ -279,6 +279,10 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       }
       return parsePracticeRegisterExport(text);
     })() : null;
+    // --register-next: the code's next register version, composed before anything is spent (a refusal costs nothing).
+    if (args.switches.has("--register-next") && mode !== "debate") throw new PracticeRefusal("PRACTICE_FLAG_UNKNOWN", "--register-next (debate only)");
+    const registerNext = register !== null && args.switches.has("--register-next")
+      ? await composePracticeNextRegisterVersion(register) : null;
     // The brake counts connection failures in a row, from root's streak at the start (practice-gate-observer.ts).
     observer = new PracticeGateObserver({ unsentStreakAtStart });
     options.onObserver?.(observer, stop);
@@ -381,7 +385,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       return finish(practiceReportFromLog(readPracticeSampleLog(directory)));
     }
     const result = await runPracticeDebate({
-      settings, sockets, register: register!,
+      settings, sockets, register: register!, registerNext,
       budgetPorts, observer, depth: wholeNumber(args, "--depth", 1, 1, 2),
       questionId: args.flags.get("--question") ?? "ro",
       ...(callConcurrency === undefined ? {} : { callConcurrency }),

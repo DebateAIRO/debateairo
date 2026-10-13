@@ -2586,6 +2586,7 @@ export {
   modelJsonObjectSpans,
   rememberingAcceptedReply,
   type ModelJsonDecoded,
+  type ModelJsonDecodeOptions,
   type ModelJsonRepair,
   type ModelReplyFacts
 } from "./model-json.js";

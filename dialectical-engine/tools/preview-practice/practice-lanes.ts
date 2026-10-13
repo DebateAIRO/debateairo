@@ -21,6 +21,8 @@ import {
   judgeAssessmentSchema,
   nodeReviewArtifactSchema,
   parseStructuredArtifact,
+  REVIEW_ARTIFACT_READING,
+  structuredParseRepair,
   type JudgeLeg
 } from "@debateai/judgement";
 import {
@@ -55,6 +57,7 @@ import {
   buildSynthesizerRequest,
   idShapedTokensIn,
   synthesisCallSiteKey,
+  synthesisWordingIndex,
   type DigestSourceNode,
   type SynthesisDigest
 } from "@debateai/serve";
@@ -146,9 +149,70 @@ export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
  * strict JSON. The judge's own reading takes the FIRST of several objects where this takes the last, so for such a reply
  * the code may differ; the counts are shown in the report, never a reason for a verdict.
  */
-export function practiceJsonRepairOf(content: string, finishReason: unknown): string | null {
-  const decoded = decodeModelJson(content, { finishReason: typeof finishReason === "string" ? finishReason : null });
+export function practiceJsonRepairOf(content: string, finishReason: unknown, callSiteKey?: string): string | null {
+  const ending: ModelReplyFacts = { finishReason: typeof finishReason === "string" ? finishReason : null };
+  // MiMo salvage (2026-10-12): the judge-family steps also make SHAPE repairs (NESTED_FIELDS, RENAMED_MEMBER,
+  // UNASKED_KEYS, EMPTY_LIST) that the schema-blind decode cannot see, so with its call-site key a judge, panel or
+  // review reply is read by the step's own reader and counted under the repair that reader needed.
+  // An ACCEPTED review with no `edge_bearings` was accepted only by EMPTY_LIST, which needs a node with no edges: 0.
+  const structured = callSiteKey === undefined ? null : structuredReadingOf(callSiteKey, content, ending, { whenMissing: 0 });
+  if (structured !== null) return structured.kind === "PARSED" ? structuredParseRepair(structured.strategy) : null;
+  // R15 practice debate (2026-10-13): the two story sites also read a reply that ends with its one object after prose
+  // (TRAILING_OBJECT), and only when that object passed their full checks; this reply WAS accepted, so the object the
+  // decode finds there is the one the site took, and the repair is named.
+  const decoded = decodeModelJson(content, ending, callSiteKey?.startsWith("STORY:") === true ? { trailingObjectAccepted: () => true } : undefined);
   return decoded.ok ? decoded.repair : null;
+}
+
+/** What a review's format check knows about its edge count (`reviewEdgeCountOf`). */
+type ReviewEdgeKnowledge = Readonly<{ known?: number | null; whenMissing: number | null }>;
+
+/**
+ * The review's edge count for its format check: `known` (read from the call's own prompt) when there is one; else the
+ * stored reply's own `edge_bearings` length (so a length mismatch is then not re-detected); else, when the list is
+ * missing, `whenMissing`. Null: not known, and a missing list is then not read as [].
+ */
+function reviewEdgeCountOf(content: string, edges: ReviewEdgeKnowledge): number | null {
+  if (typeof edges.known === "number") return edges.known;
+  const decoded = decodeModelJson(content);
+  const bearings = decoded.ok && typeof decoded.value === "object" && decoded.value !== null
+    ? (decoded.value as { edge_bearings?: unknown }).edge_bearings
+    : undefined;
+  return Array.isArray(bearings) ? bearings.length : edges.whenMissing;
+}
+
+/**
+ * A judge-family reply read exactly as its step reads it (schema and reading options), or null for any other step.
+ * A review whose edge count is not known is read without EMPTY_LIST and with a list of one entry asked for, so a
+ * missing `edge_bearings` stays a refusal there.
+ */
+function structuredReadingOf(callSiteKey: string, content: string, ending: ModelReplyFacts | undefined, edgeKnowledge: ReviewEdgeKnowledge) {
+  switch (callFamilyOf(callSiteKey)) {
+    case "JUDGE": return parseStructuredArtifact(content, judgeArtifactSchema, ending, JUDGE_ARTIFACT_READING);
+    case "PANEL": return parseStructuredArtifact(content, judgeAssessmentSchema, ending, JUDGE_ARTIFACT_READING);
+    case "REVIEW": {
+      const edges = reviewEdgeCountOf(content, edgeKnowledge);
+      return edges === null
+        ? parseStructuredArtifact(content, nodeReviewArtifactSchema(1), ending, { ...REVIEW_ARTIFACT_READING, emptyLists: false })
+        : parseStructuredArtifact(content, nodeReviewArtifactSchema(edges), ending, REVIEW_ARTIFACT_READING);
+    }
+    default: return null;
+  }
+}
+
+/**
+ * The review's edge count from the call's own recorded prompt: the `edges_sourced_by_this_node` material field the
+ * review packet carries (a JSON list). Null when the prompt holds no such field or it cannot be read.
+ */
+export function practiceReviewEdgeCountOf(messages: PromptPacket["messages"]): number | null {
+  try {
+    const field = readPromptFrame({ messages }).fields.find((candidate) => candidate.name === "edges_sourced_by_this_node");
+    if (field === undefined) return null;
+    const edges = JSON.parse(field.content) as unknown;
+    return Array.isArray(edges) ? edges.length : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -192,21 +256,19 @@ function fromStructured(result: ReturnType<typeof parseStructuredArtifact>): rea
 /**
  * Re-runs the job's own format check on a stored reply. The story's storyteller check needs the run's material
  * index (which refs exist), which is not stored: the reply is checked against the story's schema only. The review
- * check's length rule needs the number of edges: the reply's own `edge_bearings` length is used, so only a length
- * mismatch is not re-detected (the stored detail still names it).
+ * check's length rule needs the number of edges: `reviewEdgeCount` (read from the call's own prompt,
+ * `practiceReviewEdgeCountOf`) when the caller has it, else the reply's own `edge_bearings` length, so only a length
+ * mismatch is not re-detected (the stored detail still names it); a reply with no list and no known count is not read
+ * as [] (MiMo salvage EMPTY_LIST needs a node with no edges).
  */
-export function recheckReply(callSiteKey: string, content: string): Readonly<{ family: PracticeCallFamily; issues: readonly string[] }> {
+export function recheckReply(callSiteKey: string, content: string, reviewEdgeCount?: number | null): Readonly<{ family: PracticeCallFamily; issues: readonly string[] }> {
   const family = callFamilyOf(callSiteKey);
   switch (family) {
-    case "JUDGE": return { family, issues: fromStructured(parseStructuredArtifact(content, judgeArtifactSchema, undefined, JUDGE_ARTIFACT_READING)) };
-    case "PANEL": return { family, issues: fromStructured(parseStructuredArtifact(content, judgeAssessmentSchema, undefined, JUDGE_ARTIFACT_READING)) };
+    case "JUDGE":
+    case "PANEL":
     case "REVIEW": {
-      let edges = 0;
-      try {
-        const bearings = (JSON.parse(content) as { edge_bearings?: unknown }).edge_bearings;
-        if (Array.isArray(bearings)) edges = bearings.length;
-      } catch { /* the parser below reports it */ }
-      return { family, issues: fromStructured(parseStructuredArtifact(content, nodeReviewArtifactSchema(edges))) };
+      const read = structuredReadingOf(callSiteKey, content, undefined, { known: reviewEdgeCount ?? null, whenMissing: null });
+      return { family, issues: read === null ? Object.freeze(["UNMAPPED"]) : fromStructured(read) };
     }
     case "SYNTHESIZER": return { family, issues: fromClassification(classifySynthesisRoleContent("SYNTHESIZER", content)) };
     case "EVALUATOR": return { family, issues: fromClassification(classifyEvaluatorContent(content)) };
@@ -574,10 +636,12 @@ export async function runPracticeLane(context: PracticeLaneContext): Promise<Pra
       const request = buildSynthesizerRequest({ controls, round: 1, digest, codeLabel, prior: null });
       const framed = buildSynthesisRolePrompt(request, q.languageName);
       // As the runner's writerReading: the accepted draft is read again exactly as its classifier read it.
+      const personTexts = [q.questionLine, ...graph.authored.map((node) => node.statement)];
       const reading = rememberingAcceptedReply((content, reply) => classifyComposedContent(content, {
         digest: request.digest,
         servedNodes,
-        exemptTokens: idShapedTokensIn([q.questionLine, ...graph.authored.map((node) => node.statement)]),
+        exemptTokens: idShapedTokensIn(personTexts),
+        wording: synthesisWordingIndex({ request, personTexts }),
         questionLine: q.questionLine
       }, reply));
       const response = await context.gateway.call({

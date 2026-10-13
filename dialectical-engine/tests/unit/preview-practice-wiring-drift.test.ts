@@ -306,8 +306,10 @@ describe("preview practice lanes: the jobs see the runner's context", () => {
     // Reply language (2026-10-12): both check the objection against the question's language.
     expect(RUNNER).toContain("const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine));");
     expect(LANES).toContain("const reading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, q.questionLine));");
-    expect(RUNNER).toMatch(/exemptTokens: personIdTokens,\s*questionLine: run\.questionLine\s*\}, reply\)\);/u);
-    expect(LANES).toMatch(/questionLine: q\.questionLine\s*\}, reply\)\);/u);
+    // R15 into dev (2026-10-13): the writer's classifier also carries Problem 7's wording index (no scores or engine
+    // codes in the prose), so both pins now hold the wording member before the question line.
+    expect(RUNNER).toMatch(/exemptTokens: personIdTokens,\s*wording: writerWording,\s*questionLine: run\.questionLine\s*\}, reply\)\);/u);
+    expect(LANES).toMatch(/wording: synthesisWordingIndex\(\{ request, personTexts \}\),\s*questionLine: q\.questionLine\s*\}, reply\)\);/u);
   });
 
   it("the story snapshot comes from the runner's own builder, and the story must give each position its own path", () => {
