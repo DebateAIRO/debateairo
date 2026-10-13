@@ -1,5 +1,7 @@
+import type { Pool } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
-import type { DebateShapePolicy } from "@debateai/register";
+import { mapPromptContractHash } from "@debateai/map";
+import { readDebateShapePolicy, readMapContractHash, type DebateShapePolicy } from "@debateai/register";
 
 /** What a runner needs to argue the debate shape, resolved once at boot. */
 export type DebateShapeRunnerSettings = Readonly<{ mapContractHash: string }>;
@@ -21,4 +23,19 @@ export function resolveDebateShapeRunnerSettings(input: Readonly<{
     throw new TypedDomainError("MAP_CONTRACT_HASH_MISMATCH", "The register's mapContractHash is not this runner's map contracts");
   }
   return Object.freeze({ mapContractHash: input.mapContractHash });
+}
+
+/**
+ * The one boot read (apps/runner/src/main.ts, the practice runner, the hosted readiness check): the debateShapePolicy
+ * row first, and the mapContractHash row ONLY when that row is present. No shape row = today's boot, byte for byte:
+ * the map hash row is never read, so even a malformed one cannot refuse a runner that does not argue the shape.
+ */
+export async function readDebateShapeRunnerSettings(
+  pool: Pick<Pool, "query">,
+  registerVersion: number,
+  codeMapContractHash: string = mapPromptContractHash()
+): Promise<DebateShapeRunnerSettings | null> {
+  const policy = await readDebateShapePolicy(pool, registerVersion);
+  if (policy === null) return null;
+  return resolveDebateShapeRunnerSettings({ policy, mapContractHash: await readMapContractHash(pool, registerVersion), codeMapContractHash });
 }

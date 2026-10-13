@@ -8,7 +8,7 @@ import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/pro
 import {
   BUNDLED_MODEL_SCORECARD_SOURCE_REF,
   DEBATE_SHAPE_FORMULA_VERSION,
-  debateShapeLargestBounds,
+  debateShapeWriterCeiling,
   debateShapeSiteCounts,
   readBundledModelScorecard,
   readEngineVersion,
@@ -269,9 +269,7 @@ export function askModelPickerSettings(input: Readonly<{
   // the row's largest writer bound, and Free's writer has no fallback. Only this check reads it: `answerTokenCeilings`
   // (the settings the picker seats with) keep the sealed bounds; a run's own writer bound comes from its receipt.
   const freeAnswerCeilings = Object.freeze({
-    ANSWER_WRITER: input.debateShapePolicy === undefined || input.debateShapePolicy === null
-      ? answerTokenCeilings.ANSWER_WRITER
-      : Math.max(answerTokenCeilings.ANSWER_WRITER, debateShapeLargestBounds(input.debateShapePolicy).writer),
+    ANSWER_WRITER: debateShapeWriterCeiling(answerTokenCeilings.ANSWER_WRITER, input.debateShapePolicy ?? null),
     ANSWER_CHECKER: answerTokenCeilings.ANSWER_CHECKER
   });
   // Paid plans P4-E (Part 3b re-review M-4; ruling C4): the backstop of the publish-time

@@ -193,6 +193,15 @@ export function debateShapeLargestBounds(policy: DebateShapePolicy): Readonly<{ 
   return Object.freeze({ writer: policy.answerLength.detailed.writerBound, map: Math.max(policy.mapStepBounds.merge, policy.mapStepBounds.choose) });
 }
 
+/**
+ * The answer writer's ceiling the Free answer-job eligibility check asks (pre-flight PF-B22), at the API boot and at
+ * the hosted publish alike: the sealed writer bound with no row in force, else the larger of it and the row's largest
+ * writer bound (a Free `detailed` answer asks that much, and Free's writer has no fallback).
+ */
+export function debateShapeWriterCeiling(sealedWriterBound: number, policyInForce: DebateShapePolicy | null): number {
+  return policyInForce === null ? sealedWriterBound : Math.max(sealedWriterBound, debateShapeLargestBounds(policyInForce).writer);
+}
+
 /** The canonical AST: every number a DECIMAL node (integers and the six-decimal shares alike). */
 function shapeAst(value: unknown): CanonicalJsonAst {
   if (value === null || typeof value === "boolean" || typeof value === "string") return value;

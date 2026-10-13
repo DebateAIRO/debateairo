@@ -20,9 +20,7 @@ import {
   loadRunnerEnvironment,
   readBillingPlans,
   readCostEnvelopePolicy,
-  readDebateShapePolicy,
   readEngineVersion,
-  readMapContractHash,
   readModelScorecard,
   readStoryPolicyFromRegister,
   effectiveCallConcurrency,
@@ -38,7 +36,6 @@ import {
 } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
-import { mapPromptContractHash } from "@debateai/map";
 import { firstCallPlanModels } from "@debateai/scorecard";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
@@ -56,7 +53,7 @@ import { assertRegisterPromptContractHashes, buildProviderPriceMap, createPostgr
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
-import { resolveDebateShapeRunnerSettings } from "./debate-shape-boot.js";
+import { readDebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -132,14 +129,10 @@ const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER
 const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
 /**
  * Debate shape (spec 2026-10-12 §3.1, §4): the optional row (absent = today's shape, byte for byte; malformed = boot
- * refused, DEBATE_SHAPE_POLICY_INVALID) and, with it, the sealed map contracts (DEBATE_SHAPE_MAP_HASH_UNSEALED /
+ * refused, DEBATE_SHAPE_POLICY_INVALID) and, only with it, the sealed map contracts (DEBATE_SHAPE_MAP_HASH_UNSEALED /
  * MAP_CONTRACT_HASH_MISMATCH). A run's sizes are read from its own receipt, never from this row.
  */
-const debateShape = resolveDebateShapeRunnerSettings({
-  policy: await readDebateShapePolicy(pool, environment.REGISTER_VERSION),
-  mapContractHash: await readMapContractHash(pool, environment.REGISTER_VERSION),
-  codeMapContractHash: mapPromptContractHash()
-});
+const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);
 /**
  * Codes and ids only: a story log line never carries story or debate text. The
  * detail goes FIRST, so no detail key can overwrite the line's kind or event.

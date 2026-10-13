@@ -3,18 +3,56 @@ import { describe, expect, it } from "vitest";
 import { mapPromptContractHash } from "@debateai/map";
 import {
   debateShapeInForce, debateShapeLargestBounds, debateShapePolicyRow, debateShapePolicyStartValues, parseDebateShapePolicy,
-  parseMapContractHash
+  debateShapeWriterCeiling, parseMapContractHash
 } from "@debateai/register";
-import { resolveDebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
+import type { Pool } from "pg";
+import { readDebateShapeRunnerSettings, resolveDebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
 import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
 
 const code = mapPromptContractHash();
 const policy = debateShapePolicyStartValues();
 
+/** A register with at most the two rows, answering by row key and recording every read (version, key). */
+function registerPool(rows: Readonly<{ debateShapePolicy?: unknown; mapContractHash?: unknown }>) {
+  const asked: unknown[][] = [];
+  const pool = {
+    query: async (_sql: string, values: unknown[]) => {
+      asked.push(values);
+      const key = values[1] as "debateShapePolicy" | "mapContractHash";
+      return { rows: Object.hasOwn(rows, key) ? [{ value_json: rows[key] }] : [] };
+    }
+  } as unknown as Pool;
+  return { pool, asked };
+}
+
 describe("the runner's boot with the debate shape", () => {
-  it("no row: today's runner, whatever the map hash row says", () => {
+  it("no row: today's runner, whatever the map hash row says", async () => {
     expect(resolveDebateShapeRunnerSettings({ policy: null, mapContractHash: null, codeMapContractHash: code })).toBeNull();
     expect(resolveDebateShapeRunnerSettings({ policy: null, mapContractHash: "0".repeat(64), codeMapContractHash: code })).toBeNull();
+    // The boot read: without the shape row the map hash row is never read, so absent, matching, mismatching and even a
+    // malformed hash row all boot today's runner (fix round 1: no shape row = today's boot).
+    for (const hash of [undefined, code, "f".repeat(64), "not-a-hash", 7, null]) {
+      const register = registerPool(hash === undefined ? {} : { mapContractHash: hash });
+      await expect(readDebateShapeRunnerSettings(register.pool, 7)).resolves.toBeNull();
+      expect(register.asked).toEqual([[7, "debateShapePolicy"]]);
+    }
+  });
+
+  it("with the row, the boot read asks the map hash too and resolves it like the runner", async () => {
+    const row = JSON.parse(JSON.stringify(policy));
+    const sealed = registerPool({ debateShapePolicy: row, mapContractHash: code });
+    await expect(readDebateShapeRunnerSettings(sealed.pool, 7)).resolves.toEqual({ mapContractHash: code });
+    expect(sealed.asked).toEqual([[7, "debateShapePolicy"], [7, "mapContractHash"]]);
+    await expect(readDebateShapeRunnerSettings(registerPool({ debateShapePolicy: row }).pool, 7))
+      .rejects.toMatchObject({ code: "DEBATE_SHAPE_MAP_HASH_UNSEALED" });
+    await expect(readDebateShapeRunnerSettings(registerPool({ debateShapePolicy: row, mapContractHash: "f".repeat(64) }).pool, 7))
+      .rejects.toMatchObject({ code: "MAP_CONTRACT_HASH_MISMATCH" });
+    await expect(readDebateShapeRunnerSettings(registerPool({ debateShapePolicy: row, mapContractHash: "not-a-hash" }).pool, 7))
+      .rejects.toThrow("MAP_CONTRACT_HASH_INVALID");
+    await expect(readDebateShapeRunnerSettings(registerPool({ debateShapePolicy: { kind: "DEBATE_SHAPE_POLICY" } }).pool, 7))
+      .rejects.toThrow(/^DEBATE_SHAPE_POLICY_INVALID:/u);
+    const off = registerPool({ debateShapePolicy: { ...row, enabled: false }, mapContractHash: code });
+    await expect(readDebateShapeRunnerSettings(off.pool, 7)).resolves.toEqual({ mapContractHash: code });
   });
 
   it("a row needs the sealed map hash, equal to the code's", () => {
@@ -36,8 +74,8 @@ describe("the runner's boot with the debate shape", () => {
   it("main.ts and the practice runner read both rows and no longer carry the Phase 2a guard", () => {
     for (const file of ["apps/runner/src/main.ts", "tools/preview-practice/practice-runner-composition.ts"]) {
       const text = readFileSync(new URL(`../../${file}`, import.meta.url), "utf8");
-      expect(text, file).toContain("readDebateShapePolicy(pool, environment.REGISTER_VERSION)");
-      expect(text, file).toContain("readMapContractHash(pool, environment.REGISTER_VERSION)");
+      expect(text, file).toContain("await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION)");
+      expect(text, file).not.toContain("resolveDebateShapeRunnerSettings(");
       expect(text, file).not.toContain("assertDebateShapeRunnerReady");
     }
   });
@@ -55,8 +93,8 @@ describe("the runner's boot with the debate shape", () => {
       }
     }
     const hosted = readFileSync(new URL("../../apps/runner/src/hosted-register-publish.ts", import.meta.url), "utf8");
-    expect(hosted).toContain("resolveDebateShapeRunnerSettings({");
-    expect(hosted).toContain("readMapContractHash(pool, version)");
+    expect(hosted).toContain("await readDebateShapeRunnerSettings(pool, version);");
+    expect(hosted).not.toContain("resolveDebateShapeRunnerSettings(");
   });
 
   it("a disabled row is no row for the ask side, and still a row for the runner (the preview's rollback)", () => {
@@ -77,5 +115,10 @@ describe("the runner's boot with the debate shape", () => {
       writer: policy.answerLength.detailed.writerBound,
       map: Math.max(policy.mapStepBounds.merge, policy.mapStepBounds.choose)
     });
+    // The Free answer-writer ceiling both boot checks ask: the sealed bound without a row in force, else the larger.
+    const writer = policy.answerLength.detailed.writerBound;
+    expect(debateShapeWriterCeiling(4096, null)).toBe(4096);
+    expect(debateShapeWriterCeiling(4096, policy)).toBe(writer);
+    expect(debateShapeWriterCeiling(writer + 1, policy)).toBe(writer + 1);
   });
 });

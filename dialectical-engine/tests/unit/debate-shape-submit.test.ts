@@ -392,5 +392,10 @@ describe("the boot reads the optional row (note 8) and the practice runner resol
     const absent = rowPool(undefined);
     await expect(compose(absent.pool)).rejects.toThrow("PRACTICE_TEST_NEXT_READ");
     expect(absent.asked[0]).toEqual([7, "debateShapePolicy"]);
+    // No row: the map hash row is never read (fix round 1), so even a malformed one passes on.
+    expect(absent.asked).not.toContainEqual([7, "mapContractHash"]);
+    const malformedHash = rowPool(undefined, "not-a-hash");
+    await expect(compose(malformedHash.pool)).rejects.toThrow("PRACTICE_TEST_NEXT_READ");
+    expect(malformedHash.asked).not.toContainEqual([7, "mapContractHash"]);
   });
 });

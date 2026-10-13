@@ -1211,6 +1211,7 @@ export {
   DEBATE_SHAPE_POLICY_ROW_KEY,
   debateShapeInForce,
   debateShapeLargestBounds,
+  debateShapeWriterCeiling,
   debateShapePlanKeyOf,
   debateShapePolicyRow,
   debateShapePolicyStartValues,

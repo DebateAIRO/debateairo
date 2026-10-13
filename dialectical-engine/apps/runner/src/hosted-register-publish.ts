@@ -74,7 +74,6 @@ import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import { custodyAccepts } from "@debateai/crypto";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
-import { mapPromptContractHash } from "@debateai/map";
 import {
   firstCallPlanModels, freeAnswerJobsFollowPaidSiteRule, freeCapsFollowPaidSiteRule, planCapsFollowPaidSiteRule,
   SCORECARD_FREE_ANSWER_UNSCORED, SCORECARD_FREE_CAPS_INVALID, SCORECARD_PLAN_CAPS_INVALID, type PickerSettings,
@@ -116,10 +115,10 @@ import {
   callConcurrencyPolicyFromValue,
   callConcurrencyPolicyRow,
   debateShapeInForce,
-  debateShapeLargestBounds,
   debateShapePolicyRow,
+  debateShapeWriterCeiling,
   parseDebateShapePolicy,
-  readMapContractHash,
+  type DebateShapePolicy,
   callTokenCeilingsFromValues,
   computeRegisterSnapshotSha256,
   composeStaffPolicyRegisterPublicationRows,
@@ -140,7 +139,6 @@ import {
   readAdmissionPolicy,
   readAnswerRoleRotationPolicy,
   readCallConcurrencyPolicy,
-  readDebateShapePolicy,
   readAuthPolicy,
   readBillingPlans,
   readBillingPolicy,
@@ -179,7 +177,7 @@ import {
 } from "./dev-deployment-register.js";
 import type { DevelopmentConfiguredProvider } from "./dev-provider-panel.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
-import { resolveDebateShapeRunnerSettings } from "./debate-shape-boot.js";
+import { readDebateShapeRunnerSettings } from "./debate-shape-boot.js";
 
 /** The operator file's declared shape. A new shape is a new format string, never a silent change. */
 export const HOSTED_REGISTER_FILE_FORMAT = "debateai.hosted-register.v1" as const;
@@ -809,14 +807,17 @@ function callConcurrencyRowOf(member: unknown, sourceRef: string): ReturnType<ty
  * The debateShapePolicy row for the file's optional member (spec 2026-10-12 §3.1). The member is the policy without
  * its `kind` (the row adds it); a member that is not an object, carries `kind`, or that the register's own parser
  * refuses is refused with the file's own code (never the parser's message), so a malformed member can never seal a
- * malformed row.
+ * malformed row. Returns the parsed policy beside the row (fix round 1), so the plan reads the member once.
  */
-function debateShapeRowOf(member: unknown, sourceRef: string): ReturnType<typeof debateShapePolicyRow> {
+function debateShapeRowOf(member: unknown, sourceRef: string): Readonly<{
+  row: ReturnType<typeof debateShapePolicyRow>; policy: DebateShapePolicy;
+}> {
   if (typeof member !== "object" || member === null || Array.isArray(member) || Object.hasOwn(member, "kind")) {
     return refuse("HOSTED_REGISTER_DEBATE_SHAPE_INVALID");
   }
   try {
-    return debateShapePolicyRow(parseDebateShapePolicy({ kind: "DEBATE_SHAPE_POLICY", ...member }), sourceRef);
+    const policy = parseDebateShapePolicy({ kind: "DEBATE_SHAPE_POLICY", ...member });
+    return Object.freeze({ row: debateShapePolicyRow(policy, sourceRef), policy });
   } catch {
     return refuse("HOSTED_REGISTER_DEBATE_SHAPE_INVALID");
   }
@@ -859,12 +860,12 @@ export async function planHostedRegisterPublication(
   const callConcurrencyRow = file.callConcurrencyPolicy === undefined ? null
     : callConcurrencyRowOf(file.callConcurrencyPolicy, file.sourceRef);
   // Debate shape (spec 2026-10-12): the same, for the optional debateShapePolicy member. Absent = no row (today's shape).
-  const debateShapeRow = file.debateShapePolicy === undefined ? null
+  const debateShape = file.debateShapePolicy === undefined ? null
     : debateShapeRowOf(file.debateShapePolicy, file.sourceRef);
+  const debateShapeRow = debateShape === null ? null : debateShape.row;
   // Debate shape (P2b Task 6, pre-flight PF-B21): the member in force (absent, or `enabled: false`, = none), for the
-  // Free answer-job check below. debateShapeRowOf above already refused a malformed member, so this parse cannot refuse.
-  const debateShapeInForcePolicy = file.debateShapePolicy === undefined ? null
-    : debateShapeInForce(parseDebateShapePolicy({ kind: "DEBATE_SHAPE_POLICY", ...(file.debateShapePolicy as Record<string, unknown>) }));
+  // Free answer-job check below.
+  const debateShapeInForcePolicy = debateShapeInForce(debateShape === null ? null : debateShape.policy);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -1110,9 +1111,7 @@ export async function planHostedRegisterPublication(
       // Debate shape (P2b Task 6, pre-flight PF-B22): with the member in force a Free `detailed` answer asks the writer
       // for up to the member's largest writer bound, and Free's writer has no fallback.
       answerTokenCeilingByRole: {
-        ANSWER_WRITER: debateShapeInForcePolicy === null
-          ? ceilings.synthesizer
-          : Math.max(ceilings.synthesizer, debateShapeLargestBounds(debateShapeInForcePolicy).writer),
+        ANSWER_WRITER: debateShapeWriterCeiling(ceilings.synthesizer, debateShapeInForcePolicy),
         ANSWER_CHECKER: ceilings.evaluator
       }
     })) {
@@ -1364,15 +1363,11 @@ export async function verifyHostedRegisterBootReadiness(
   await readAnswerRoleRotationPolicy(pool, version);
   // Parallel calls (spec 2026-10-12): optional (ABSENT = one call at a time), but a malformed row would refuse the runner's boot.
   await readCallConcurrencyPolicy(pool, version);
-  // Debate shape (spec 2026-10-12 §3.1, §4): optional (ABSENT = today's shape); a malformed row refuses both boots.
-  // The runner's own boot resolution (apps/runner/src/main.ts), so a version the runner would refuse
-  // (DEBATE_SHAPE_MAP_HASH_UNSEALED / MAP_CONTRACT_HASH_MISMATCH) is never reported ready. The row is read raw, as the
-  // runner reads it: a disabled row (enabled: false) still needs its sealed map hash.
-  resolveDebateShapeRunnerSettings({
-    policy: await readDebateShapePolicy(pool, version),
-    mapContractHash: await readMapContractHash(pool, version),
-    codeMapContractHash: mapPromptContractHash()
-  });
+  // Debate shape (spec 2026-10-12 §3.1, §4): optional (ABSENT = today's shape, and the map hash row is then never
+  // read); a malformed row refuses both boots. The runner's own boot read (apps/runner/src/main.ts), so a version the
+  // runner would refuse (DEBATE_SHAPE_MAP_HASH_UNSEALED / MAP_CONTRACT_HASH_MISMATCH) is never reported ready. The row
+  // is read raw, as the runner reads it: a disabled row (enabled: false) still needs its sealed map hash.
+  await readDebateShapeRunnerSettings(pool, version);
   // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
   // sealed one the API would refuse at start-up is refused here, by its reason.
   const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());
