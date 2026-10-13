@@ -42,3 +42,53 @@ export function shapeRankScrutiny(input: Readonly<{ candidates: readonly Scrutin
     .slice(0, budget)
     .map((entry) => entry.node));
 }
+
+/** Spec §3.3 step 6: a close call (measured spread ≥ the disagreement threshold) gains up to E graders. */
+export function shapeCloseCallFires(dispersion: number | null, threshold: number, extra: number): boolean {
+  return extra > 0 && dispersion !== null && dispersion >= threshold;
+}
+
+/**
+ * The extra seats: not called yet, with a maker that is neither the author's nor already on the panel, at most one
+ * per maker, in rotation from `offset`. Appended AFTER the panel's members, so the repeated-family discount never
+ * re-weights a voice already heard: under the unchanged highest-voice rule an extra can only raise the selected score
+ * or widen the spread (spec §6).
+ */
+export function shapeCloseCallExtraSeats(input: Readonly<{ seatMakers: readonly (string | null)[]; called: readonly boolean[];
+  authorMaker: string; onPanelMakers: readonly string[]; extra: number; offset: number }>): readonly number[] {
+  const count = input.seatMakers.length;
+  const taken = new Set([input.authorMaker, ...input.onPanelMakers]);
+  const chosen: number[] = [];
+  for (let step = 0; step < count && chosen.length < input.extra; step += 1) {
+    const index = (input.offset + step) % count;
+    const maker = input.seatMakers[index];
+    if (maker === null || maker === undefined || input.called[index] === true || taken.has(maker)) continue;
+    taken.add(maker);
+    chosen.push(index);
+  }
+  return Object.freeze(chosen);
+}
+
+/**
+ * Pre-flight PF-B32 (law: always an answer) — the extension's outcome, folded EXACTLY as the base panel's. The
+ * extension's author is judgements[0], as in the base run: kept once; its other voices come AFTER every voice already
+ * heard. A run-level spend stop it handed back (root 0's panel asks `RETURN_HEARD`, as its base panel does) is kept
+ * with the voices it heard when `stopOf` (the runner's `panelSpendStop(·, input.onSpendStop)`) classifies it, and
+ * rethrown otherwise, as the base panel rethrows an unclassified one. Generic, so this file never imports ./index.js.
+ */
+export function shapeCloseCallFold<J, N, S>(input: Readonly<{ heard: readonly J[]; notes: readonly N[];
+  extension: Readonly<{ judgements: readonly J[]; notes: readonly N[]; stoppedBy?: unknown }>;
+  stopOf: (error: unknown) => S | null }>): Readonly<{ heard: readonly J[]; notes: readonly N[]; added: number; spendStop: S | null }> {
+  let spendStop: S | null = null;
+  if (Object.hasOwn(input.extension, "stoppedBy")) {
+    spendStop = input.stopOf(input.extension.stoppedBy);
+    if (spendStop === null) throw input.extension.stoppedBy;
+  }
+  const extras = input.extension.judgements.slice(1);
+  return Object.freeze({
+    heard: Object.freeze([...input.heard, ...extras]),
+    notes: Object.freeze([...input.notes, ...input.extension.notes]),
+    added: extras.length,
+    spendStop
+  });
+}

@@ -3,9 +3,10 @@ import { previewModelRow, type PreviewGateRemaining } from "@debateai/providers"
 import { computeStructuralCeilingBasis, debateShapePolicyStartValues, resolveDebateShape } from "@debateai/register";
 import {
   assertPreviewBudgetAdmits, estimatePreviewGateNeeds, PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, PreviewDailyLimitRefusal,
-  previewCallNanoUsd, previewCallShares, previewOutputTokensForBasis, previewShapeWriterBound, realisticWorstCasePricer,
+  previewCallNanoUsd, previewCallShares, previewOutputTokensForBasis, previewShapedGradingShare, previewShapeWriterBound, realisticWorstCasePricer,
   type PreviewBudgetGateSettings, type PreviewCallOutputTokens, type PreviewCallPricer, type PreviewPanelMember, type PreviewUnfinishedRun
 } from "../../apps/api/src/preview-budget-estimate.js";
+import { expectedCallsByRoleFromBasis } from "../../apps/api/src/ask-model-picker.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
 const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
@@ -163,5 +164,47 @@ describe("PF6: admission prices a new and an unfinished debate, each with ITS OW
     const { held, needs } = await figures(gate([run]), legacy);
     expect(needs).toBe(shapeBlind(legacy));
     expect(withinMargin(held - shapeBlind(shaped))).toBe(true);
+  });
+});
+
+describe("pre-flight PF-B35 / PF-B36: a shaped run's gate is never charged less than its own members can make", () => {
+  it("PF-B35: a gate of g members carries min(1, g / (J + E)) of the grading sites, whatever the panel size", () => {
+    const share = (gateMembers: number, graders: number, closeCallExtraGraders: number) =>
+      previewShapedGradingShare({ gateMembers, graders, closeCallExtraGraders });
+    // J=1, E=0 on a 4-maker panel: one member can grade every node. The old bound min(1, g·(J+E)/(M−1)) gave 1/3.
+    expect(share(1, 1, 0)).toEqual({ numerator: 1n, denominator: 1n });
+    // The Plus start values on 4 makers (J=3, E=0): a one-member gate grades at most a third.
+    expect(share(1, 3, 0)).toEqual({ numerator: 1n, denominator: 3n });
+    expect(share(3, 3, 0)).toEqual({ numerator: 3n, denominator: 3n });
+    // The premium start values with makers to spare (J=3, E=2) and the free ones (J=2, E=2).
+    expect(share(1, 3, 2)).toEqual({ numerator: 1n, denominator: 5n });
+    expect(share(3, 3, 2)).toEqual({ numerator: 3n, denominator: 5n });
+    expect(share(6, 3, 2)).toEqual({ numerator: 5n, denominator: 5n });
+    expect(share(1, 2, 2)).toEqual({ numerator: 1n, denominator: 4n });
+    expect(share(2, 2, 2)).toEqual({ numerator: 2n, denominator: 4n });
+  });
+
+  it("PF-B36: every gate carries the authored sites in full; each gate's total is what its own members can make", () => {
+    const plus = resolveDebateShape({ policy: debateShapePolicyStartValues(), plan: "plus", makers: 4,
+      settings: { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } })!;
+    expect(plus).toMatchObject({ answers: 3, graders: 3, closeCallExtraGraders: 0 });
+    const basis = computeStructuralCeilingBasis({ ...TERMS, panelSize: 4, depth: 2, shape: plus });
+    const panel = [GLM, MIMO, DEEPSEEK, HAIKU].map((model_id, index) => ({ provider_ref: `preview:m${index}`, model_id }));
+    const { denominator, shares } = sharesOf(basis, panel);
+    const roles = expectedCallsByRoleFromBasis(basis);
+    const members = 4n;
+    const debate = denominator / members; // PER_STEP (the active mode): one call per site
+    const authored = BigInt(roles.POSITION + roles.SUPPORT_ATTACK + roles.CROSS_EXCHANGE) - 2n; // merge and choose priced apart
+    const judge = BigInt(roles.JUDGE);
+    const reviewer = BigInt(roles.REVIEWER);
+    const debateOf = (models: readonly string[]) => shares.filter((entry) => models.includes(entry.model) && entry.type === "DEBATE")
+      .reduce((sum, entry) => sum + entry.numerator, 0n);
+    // The Anthropic gate (Haiku alone, g=1, J+E=3): every authored site, a third of the grading, the others' reviews.
+    // The old even split charged it a quarter of the authored and grading sites together.
+    expect(debateOf([HAIKU])).toBe(authored * debate * members + judge * debate * members / 3n + reviewer * debate * (members - 1n));
+    // The DeepInfra gate (three members, min(1, 3/3) = 1): every authored, grading and review site; GLM also holds the
+    // answer checker's sites (a role, not a panel share).
+    expect(debateOf([GLM, MIMO, DEEPSEEK]) - BigInt(roles.ANSWER_CHECKER) * debate * members)
+      .toBe((authored + judge + reviewer) * debate * members);
   });
 });

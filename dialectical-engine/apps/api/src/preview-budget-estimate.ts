@@ -513,7 +513,7 @@ export function previewExpectedCalls(input: Readonly<{
 
 /** The basis's one-call-per-site split: the panel's calls and the answer writer's and checker's; null without a split. */
 function debateSitesByRole(basis: Readonly<Record<string, unknown>>):
-  Readonly<{ panel: number; reviewer: number; answerWriter: number; answerChecker: number; total: number }> | null {
+  Readonly<{ panel: number; reviewer: number; authored: number; judge: number; answerWriter: number; answerChecker: number; total: number }> | null {
   let byRole: ReturnType<typeof expectedCallsByRoleFromBasis>;
   try {
     byRole = expectedCallsByRoleFromBasis(basis);
@@ -525,7 +525,28 @@ function debateSitesByRole(basis: Readonly<Record<string, unknown>>):
   const total = Object.values(byRole).reduce((sum, calls) => sum + calls, 0);
   if (total < 1) return null;
   return Object.freeze({ panel: total - byRole.ANSWER_WRITER - byRole.ANSWER_CHECKER, reviewer: byRole.REVIEWER,
+    // The two parts of the non-review panel sites (panel − reviewer = authored + judge). On a shaped receipt POSITION
+    // holds every map site too (answers + map sites) and JUDGE is (J + E) × nodes.
+    authored: byRole.POSITION + byRole.SUPPORT_ATTACK + byRole.CROSS_EXCHANGE, judge: byRole.JUDGE,
     answerWriter: byRole.ANSWER_WRITER, answerChecker: byRole.ANSWER_CHECKER, total });
+}
+
+/**
+ * Pre-flight PF-B35 (never under-count): the share of a shaped run's grading sites one GATE can make. A gate with g
+ * panel members carries min(1, g / (J + E)), J the receipt's graders and E its close-call extras.
+ * Proof: the receipt prices (J+E)·N grading sites over N nodes; each member grades a node at most once (no panel key is
+ * asked twice), so a gate whose g members can sit in at most min(g, J+E) of a node's J+E seats makes at most
+ * N·min(g, J+E) grading calls, a share of min(1, g/(J+E)); seat rotation by a per-site hash can put them on every node,
+ * so this is the true worst case for every row value the parser allows (graders 1..5, extras 0..4, so J+E ≥ 1).
+ * It assumes each route holds at most one judge seat per node.
+ */
+export function previewShapedGradingShare(input: Readonly<{ gateMembers: number; graders: number; closeCallExtraGraders: number }>):
+  Readonly<{ numerator: bigint; denominator: bigint }> {
+  const seats = input.graders + input.closeCallExtraGraders;
+  if (!Number.isSafeInteger(input.gateMembers) || input.gateMembers < 1 || !Number.isSafeInteger(seats) || seats < 1) {
+    throw new TypeError("PREVIEW_SHAPED_GRADING_SHARE_INVALID");
+  }
+  return Object.freeze({ numerator: BigInt(Math.min(input.gateMembers, seats)), denominator: BigInt(seats) });
 }
 
 /**
@@ -662,10 +683,24 @@ export function previewCallShares(input: Readonly<{
     if (sites === null) {
       for (const model of panelModels) addDebate(model, debate);
     } else {
-      // Every panel step but the reviews is shared evenly: each member states one position, authors its own
-      // root's tree and its cross-exchanges, and judges every node another maker authored (apps/runner/src/
-      // index.ts:5291-5326: the judge seats called per node are all the others, panelCallCap = members - 1).
-      for (const model of panelModels) addDebate(model, (BigInt(sites.panel - sites.reviewer) - mapLongSites) * debate);
+      if (shaped) {
+        // Debate shape (pre-flight PF-B35, PF-B36; the owner's never-under-count rule): A answers, J graders and E
+        // close-call extras can be fewer than the M members, and the writer and judge seats rotate, so one member can
+        // author or grade far more than 1/M. Each gate, at its dearest panel member: the authored sites (positions,
+        // points, replies, cross-replies, every map site but the merge and the choose, priced below) IN FULL, the review
+        // leg's rule; and min(1, g / (J + E)) of the grading sites (`previewShapedGradingShare`), rounded up.
+        const shape = previewShapeOf(input.basis)!;
+        for (const { model, gateMembers } of dearestPanelMemberPerGate(panelModels)) {
+          addDebate(model, (BigInt(sites.authored) - mapLongSites) * debate * members);
+          const grading = previewShapedGradingShare({ gateMembers, graders: shape.graders, closeCallExtraGraders: shape.closeCallExtraGraders });
+          addDebate(model, (BigInt(sites.judge) * debate * members * grading.numerator + grading.denominator - 1n) / grading.denominator);
+        }
+      } else {
+        // Every panel step but the reviews is shared evenly: each member states one position, authors its own
+        // root's tree and its cross-exchanges, and judges every node another maker authored (apps/runner/src/
+        // index.ts:5291-5326: the judge seats called per node are all the others, panelCallCap = members - 1).
+        for (const model of panelModels) addDebate(model, (BigInt(sites.panel - sites.reviewer) - mapLongSites) * debate);
+      }
       // A node's ONE review goes to a different maker taken in turn round the debate's seeded circle
       // (selectDifferentMakerReviewer, apps/runner/src/index.ts), even per author over a long debate but
       // not per member in a short one, so one member can still take more than an even share. So each gate

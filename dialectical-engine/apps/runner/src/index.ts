@@ -211,6 +211,7 @@ import {
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold } from "./shape-select.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
@@ -5108,6 +5109,11 @@ export class WalkingSkeletonRunner {
     }
     // I2(b), Phase 2a: a debate-shape receipt is never argued as today's shape. P2b replaces this line.
     refuseDebateShapeReceiptInPhase2a(envelopeBasis);
+    /**
+     * Debate shape (P2b): the receipt's frozen sizes, or null — today's run. Until Task 13 lifts the per-run refusal
+     * above, it is null in every run that reaches the code below; Task 12 wraps it into the run's shape context.
+     */
+    const shapeShape = envelopeBasis.shape ?? null;
     const expansionDepth = resolveExpansionDepth(run.depthParams);
     /**
      * Model scorecard A15 (spec §2.7) — the role assignment the picker pinned at
@@ -5916,6 +5922,10 @@ export class WalkingSkeletonRunner {
     // graph minted — the same discipline `bindWayOfKnowingDowngrade` follows. Declared
     // here because BOTH judgement producers (root and child) append to it.
     const panelDegradations: PanelDegradationRecord[] = [];
+    // Debate shape (spec §3.3 step 6): one entry per node whose panel the close-call extension widened, bound to the
+    // node it extended (root 0's included: `saveAuthored` saves it too). Task 14 turns them into
+    // PANEL-CLOSE-CALL-EXTENDED records; always empty on today's run.
+    const closeCallExtensions: { readonly nodeId: string; readonly added: number }[] = [];
 
     /**
      * S2-2 / T3 — the judge panel for ONE authored node.
@@ -5975,6 +5985,8 @@ export class WalkingSkeletonRunner {
        * can return one.
        */
       readonly spendStop: EnvelopeStopKind | null;
+      /** Debate shape (spec §3.3 step 6): the members the close-call extension called and heard (0: none; always 0 today). */
+      readonly closeCallAdded: number;
     }> => {
       const judgeContractHash = this.settings.judgeContractHash;
       const authorOnlySelection = (): {
@@ -6008,7 +6020,8 @@ export class WalkingSkeletonRunner {
           disagreement: createUnmeasuredDisagreement(),
           marks: Object.freeze([]),
           panelFailureReason: null,
-          spendStop: null
+          spendStop: null,
+          closeCallAdded: 0
         });
       }
       if (panelPolicy === undefined) {
@@ -6034,7 +6047,11 @@ export class WalkingSkeletonRunner {
       // pays for a call the panel would refuse, and a seat whose main shares the
       // author's maker is answered by its runner-up instead of being lost.
       const notTheAuthor = (member: SeatIdentity): boolean => member.maker !== input.authorMaker;
-      const panelCallCap = Math.max(effectiveMakerCount, envelopeBasis.panelSize) - 1;
+      // Debate shape (spec §3.3 step 6): a shaped run asks J graders per node (never more than the makers who are not
+      // the author); today's run keeps today's cap.
+      const panelCallCap = shapeShape === null
+        ? Math.max(effectiveMakerCount, envelopeBasis.panelSize) - 1
+        : Math.min(shapeShape.graders, effectiveMakerCount - 1);
       const panelKeyFor = (member: SeatMember): string => `${input.callSiteKey}:${member.providerRef}`;
       // Run resilience (spec 2026-10-12, fix (d)): a member that sits out the rest of the run has no panel seat; it
       // is disclosed once, on the answer (RUN_PANEL_REVISED), not as a failed seat on every node.
@@ -6068,6 +6085,45 @@ export class WalkingSkeletonRunner {
         panelCallCap,
         seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: input.callSiteKey })
       );
+      type PlannedPanelSeat = (typeof plannedSeats)[number];
+      // One called seat's panel member — the base panel's and, on a shaped run, the close-call extension's.
+      const memberFor = (
+        seat: PlannedPanelSeat["seat"],
+        panelOptions: PlannedPanelSeat["panelOptions"],
+        planned: NonNullable<PlannedPanelSeat["planned"]>
+      ) => ({
+        memberRole: planned.maker,
+        actorRef: planned.providerRef,
+        contractHash: judgeContractHash,
+        judge: async () => {
+          const answered = await seatCaller.callSeat({
+            seat,
+            callSiteKey: input.callSiteKey,
+            ...panelOptions,
+            keyFor: panelKeyFor,
+            call: (member, callSiteKey) => member.judge.assess({
+              runId: run.runId,
+              subjectItemId: claimed.workItemId,
+              callSiteKey,
+              questionLine: input.questionLine,
+              argumentLanguageName: run.argumentLanguageName,
+              statement: input.statement,
+              authorMaker: input.authorMaker,
+              providerRef: member.providerRef,
+              contractHash: judgeContractHash,
+              bound: this.settings.judgeBound
+            })
+          });
+          // A15c (controller carry 7): the member that ANSWERED, route and
+          // maker together — never one without the other.
+          return {
+            judgementRef: answered.value.judgementRef,
+            assessment: answered.value.assessment,
+            actorRef: answered.member.providerRef,
+            memberRole: answered.member.maker
+          };
+        }
+      });
       const panelMembers = plannedSeats.flatMap(({ seat, panelOptions, planned }, seatPosition) => {
         if (planned === null) {
           return [{
@@ -6083,39 +6139,7 @@ export class WalkingSkeletonRunner {
           }];
         }
         if (calledSeats[seatPosition] !== true) return [];
-        return [{
-          memberRole: planned.maker,
-          actorRef: planned.providerRef,
-          contractHash: judgeContractHash,
-          judge: async () => {
-            const answered = await seatCaller.callSeat({
-              seat,
-              callSiteKey: input.callSiteKey,
-              ...panelOptions,
-              keyFor: panelKeyFor,
-              call: (member, callSiteKey) => member.judge.assess({
-                runId: run.runId,
-                subjectItemId: claimed.workItemId,
-                callSiteKey,
-                questionLine: input.questionLine,
-                argumentLanguageName: run.argumentLanguageName,
-                statement: input.statement,
-                authorMaker: input.authorMaker,
-                providerRef: member.providerRef,
-                contractHash: judgeContractHash,
-                bound: this.settings.judgeBound
-              })
-            });
-            // A15c (controller carry 7): the member that ANSWERED, route and
-            // maker together — never one without the other.
-            return {
-              judgementRef: answered.value.judgementRef,
-              assessment: answered.value.assessment,
-              actorRef: answered.member.providerRef,
-              memberRole: answered.member.maker
-            };
-          }
-        }];
+        return [memberFor(seat, panelOptions, planned)];
       });
       const panel = await runJudgePanel({
         artifactProducerRef: input.authorProviderRef,
@@ -6162,74 +6186,131 @@ export class WalkingSkeletonRunner {
         : null;
       if (Object.hasOwn(panel, "stoppedBy") && spendStop === null) throw panel.stoppedBy;
 
-      // Each member's assessment is reduced through the SAME ratified
-      // composition as the author's, so the taus are commensurable.
-      const reducedMembers = panel.judgements.flatMap((entry) => {
-        const reducedMember = reduceAssessment({
-          claimType: input.claimType,
-          assessment: entry.assessment,
-          compositionRow,
-          reducerVersion: judgementPolicy.reducerVersion
+      // Task 11: today's reduction, statement for statement, as one local function — the close-call extension
+      // re-reduces every voice heard through it.
+      const reduceHeard = (heard: typeof panel.judgements) => {
+        // Each member's assessment is reduced through the SAME ratified
+        // composition as the author's, so the taus are commensurable.
+        const reducedMembers = heard.flatMap((entry) => {
+          const reducedMember = reduceAssessment({
+            claimType: input.claimType,
+            assessment: entry.assessment,
+            compositionRow,
+            reducerVersion: judgementPolicy.reducerVersion
+          });
+          return reducedMember.kind === "REDUCED"
+            ? [{ ...entry, tau: reducedMember.tau }]
+            : [];
         });
-        return reducedMember.kind === "REDUCED"
-          ? [{ ...entry, tau: reducedMember.tau }]
-          : [];
-      });
-      if (reducedMembers.length === 0) {
-        throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no reducible judgement");
-      }
-
-      const dispersion = measureDispersion(
-        reducedMembers.map((entry) => ({ judgementRef: entry.judgementRef, tau: entry.tau })),
-        {
-          scale: panelPolicy.dispersionScale,
-          rowKey: "dispersionScale",
-          registerVersion: panelPolicy.registerVersion,
-          sourceRef: panelPolicy.sourceRefs.dispersionScale ?? panelPolicy.unmappedReason
+        if (reducedMembers.length === 0) {
+          throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no reducible judgement");
         }
-      );
 
-      // A15 (R5; controller carry 7 — lands with E8): the discount keys on the
-      // ROUTE THAT ANSWERED — `actorRef` on each panel entry — never on a maker
-      // name looked up in a list, which could not tell two seats of one maker,
-      // or a backup from another family, apart.
-      const familyOf = (actorRef: string): JudgeFamily => {
-        const entry = panelPolicy.providerFamilies.find((family) => family.providerRefs.includes(actorRef));
-        return entry === undefined
-          ? { kind: "UNKNOWN", reason: panelPolicy.unmappedReason }
-          : { kind: "KNOWN", familyRef: entry.familyRef };
+        const dispersion = measureDispersion(
+          reducedMembers.map((entry) => ({ judgementRef: entry.judgementRef, tau: entry.tau })),
+          {
+            scale: panelPolicy.dispersionScale,
+            rowKey: "dispersionScale",
+            registerVersion: panelPolicy.registerVersion,
+            sourceRef: panelPolicy.sourceRefs.dispersionScale ?? panelPolicy.unmappedReason
+          }
+        );
+
+        // A15 (R5; controller carry 7 — lands with E8): the discount keys on the
+        // ROUTE THAT ANSWERED — `actorRef` on each panel entry — never on a maker
+        // name looked up in a list, which could not tell two seats of one maker,
+        // or a backup from another family, apart.
+        const familyOf = (actorRef: string): JudgeFamily => {
+          const entry = panelPolicy.providerFamilies.find((family) => family.providerRefs.includes(actorRef));
+          return entry === undefined
+            ? { kind: "UNKNOWN", reason: panelPolicy.unmappedReason }
+            : { kind: "KNOWN", familyRef: entry.familyRef };
+        };
+        const weighted = applyCorrelatedErrorDiscount(
+          reducedMembers.map((entry) => ({
+            memberRole: entry.memberRole,
+            earnedWeight: judgementPolicy.earnedWeight,
+            family: familyOf(entry.actorRef)
+          })),
+          {
+            repeatedFamilyMultiplier: panelPolicy.repeatedFamilyMultiplier,
+            rowKey: "repeatedFamilyMultiplier",
+            registerVersion: panelPolicy.registerVersion,
+            sourceRef: panelPolicy.sourceRefs.repeatedFamilyMultiplier ?? panelPolicy.unmappedReason
+          }
+        );
+        const selection = selectReducedJudgement(
+          reducedMembers.map((entry, index) => ({
+            judgementRef: entry.judgementRef,
+            tau: entry.tau,
+            effectiveWeight: weighted[index]!.effectiveWeight
+          })),
+          judgementPolicy.selectionRule
+        );
+        if (selection.kind !== "SELECTED") {
+          throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no selectable judgement");
+        }
+        return { reducedMembers, dispersion, weighted, selection };
       };
-      const weighted = applyCorrelatedErrorDiscount(
-        reducedMembers.map((entry) => ({
-          memberRole: entry.memberRole,
-          earnedWeight: judgementPolicy.earnedWeight,
-          family: familyOf(entry.actorRef)
-        })),
-        {
-          repeatedFamilyMultiplier: panelPolicy.repeatedFamilyMultiplier,
-          rowKey: "repeatedFamilyMultiplier",
-          registerVersion: panelPolicy.registerVersion,
-          sourceRef: panelPolicy.sourceRefs.repeatedFamilyMultiplier ?? panelPolicy.unmappedReason
+      let reduced = reduceHeard(panel.judgements);
+
+      // Debate shape (spec §3.3 step 6; §6: the highest-voice rule is unchanged) — THE CLOSE-CALL EXTENSION. A
+      // measured spread at or above the disagreement threshold calls up to E more graders, of makers neither the
+      // author's nor already called at this node; their voices come AFTER every voice heard and the node is reduced
+      // again. Never on today's run (`shapeShape === null`).
+      let heard = panel.judgements;
+      let notes = panel.notes;
+      let closeCallAdded = 0;
+      let closeCallStop: EnvelopeStopKind | null = null;
+      const firstDispersion = reduced.dispersion.kind === "MEASURED" ? reduced.dispersion.value : null;
+      if (shapeShape !== null && spendStop === null
+        && shapeCloseCallFires(firstDispersion, panelPolicy.disagreementThreshold, shapeShape.closeCallExtraGraders)) {
+        const extraSeats = shapeCloseCallExtraSeats({
+          seatMakers: plannedSeats.map((entry) => entry.planned?.maker ?? null),
+          called: calledSeats,
+          authorMaker: input.authorMaker,
+          // Pre-flight PF-B34: every maker already CALLED at this node — the ones heard and the ones that failed — so no
+          // panel key (`PANEL:<node>:<providerRef>`, `panelKeyFor`) is ever asked twice.
+          onPanelMakers: [
+            ...heard.map((entry) => entry.memberRole),
+            ...plannedSeats.flatMap((entry, index) => calledSeats[index] === true && entry.planned !== null ? [entry.planned.maker] : [])
+          ],
+          extra: shapeShape.closeCallExtraGraders,
+          offset: seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: `${input.callSiteKey}:close-call` })
+        });
+        if (extraSeats.length > 0) {
+          const extension = await runJudgePanel({
+            artifactProducerRef: input.authorProviderRef,
+            primary: { judgementRef: input.authorJudgementRef, assessment: input.authorAssessment, memberRole: input.authorMaker },
+            members: extraSeats.map((index) => memberFor(plannedSeats[index]!.seat, plannedSeats[index]!.panelOptions, plannedSeats[index]!.planned!)),
+            askTogether: callsRunTogether,
+            // Pre-flight PF-B32 (law: always an answer): the SAME rule as the base panel — root 0's panel (AUTHOR_ONLY)
+            // keeps what its extension heard and gets the stop back; every other panel lets it travel. Written "TRAVEL"
+            // first on purpose: tests/architecture/v28-serve-decision-wiring.test.ts pins the base panel's own mapping
+            // text exactly ONCE in this file (PANEL_STOP_MAPPING).
+            onRunLevelSpendStop: input.onSpendStop === "TRAVEL" ? "RETHROW" : "RETURN_HEARD",
+            leaveOutMoneyRefusedSeats: this.settings.bodyCostFallback === true
+          });
+          // The author is judgements[0] of both runs: kept once. The extras come AFTER every voice already heard. A stop
+          // the extension handed back is classified by the base panel's own rule, or rethrown (shapeCloseCallFold).
+          const folded = shapeCloseCallFold({ heard, notes, extension, stopOf: (error) => panelSpendStop(error, input.onSpendStop) });
+          heard = folded.heard;
+          notes = folded.notes;
+          closeCallAdded = folded.added;
+          closeCallStop = folded.spendStop;
+          if (closeCallAdded > 0) reduced = reduceHeard(heard);
         }
-      );
-      const selection = selectReducedJudgement(
-        reducedMembers.map((entry, index) => ({
-          judgementRef: entry.judgementRef,
-          tau: entry.tau,
-          effectiveWeight: weighted[index]!.effectiveWeight
-        })),
-        judgementPolicy.selectionRule
-      );
-      if (selection.kind !== "SELECTED") {
-        throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no selectable judgement");
       }
+      // Pre-flight PF-B32: the stop that cut this panel short — the base panel's, else its extension's.
+      const panelStop = spendStop ?? closeCallStop;
+      const { reducedMembers, dispersion, weighted, selection } = reduced;
 
       // confirm-item 5. The author is always judgement[0]; every other entry is
       // a non-author voice that actually parsed.
       const nonAuthorVoices = reducedMembers.length - 1;
       // A15d (controller carry 10): a paid voice the panel refused after the
       // call is lost exactly as a failed member is, and is disclosed with it.
-      const { marks, panelFailureReason } = panelDegradationOf(nonAuthorVoices, panel.notes, spendStop);
+      const { marks, panelFailureReason } = panelDegradationOf(nonAuthorVoices, notes, panelStop);
 
       const candidateBand = this.settings.servePolicy?.candidateConfidenceBand ?? null;
       const steppedDownBand = candidateBand === null
@@ -6276,12 +6357,13 @@ export class WalkingSkeletonRunner {
             }))),
             // A15d (controller carry 15): a refusal after the call keeps the
             // maker that answered; every other note keeps its stored shape.
-            notes: panelNoteRecords(panel.notes),
+            notes: panelNoteRecords(notes),
             // Task M2: present only on a panel a spend stop cut short.
-            ...(spendStop === null ? {} : { spendStop: ENVELOPE_STOP_REASONS[spendStop] })
+            ...(panelStop === null ? {} : { spendStop: ENVELOPE_STOP_REASONS[panelStop] })
           })
         }),
-        spendStop
+        spendStop: panelStop,
+        closeCallAdded
       });
     };
 
@@ -7046,6 +7128,9 @@ export class WalkingSkeletonRunner {
           mark,
           reason: childSelection.panelFailureReason ?? "Every non-author panel member failed"
         }));
+      }
+      if (childSelection.closeCallAdded > 0) {
+        closeCallExtensions.push(Object.freeze({ nodeId: childNodeId, added: childSelection.closeCallAdded }));
       }
       const childReducedJudgementId = await this.#judgements.recordReduced({
         runId: run.runId,
