@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CostEnvelopeGuard, decideRunCostEnvelope, projectedCallCeilingMicros, type ModelSpendStore } from "@debateai/budget";
-import { framedJudgePromptForTest, rootPositionRequestBytesBound } from "@debateai/judgement";
-import { TypedDomainError } from "@debateai/kernel";
+import { framedJudgePromptForTest, rootPositionRepairRequestBytesBound, rootPositionRequestBytesBound } from "@debateai/judgement";
+import { TypedDomainError, questionLanguageForBounds } from "@debateai/kernel";
 import { MAP_LIMITS, mapPromptContractHash } from "@debateai/map";
 import {
   buildFramedRepairPrompt,
@@ -223,6 +223,44 @@ describe("root 0's worst-case call", () => {
     // The room of the first attempt alone (before T12-R3) would leave the length retry refused for money: no answer.
     const firstOnly = BODY_CEILING - projectedCallCeilingMicros(PRICE, attempts.first);
     expect(await decide(firstOnly + projectedCallCeilingMicros(PRICE, attempts.first), attempts.retries[0]!)).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+  });
+
+  it("PF-L38 / L-B64: a locked root 0's room frames the lock at the bound lock (first, retry and repair); no lock is today's room", () => {
+    const RO = { code: "ro", name: "Romanian" };
+    const input = { questionLine: QUESTION, argumentLanguageName: "Romanian", completionTokenCeiling: CEILING };
+    const material = { assignedMaterialChars: rootZeroMapMaterialChars };
+    for (const [measure, bodyBound] of [[rootZeroRequestBytes, rootPositionRequestBytesBound],
+      [rootZeroRepairRequestBytes, rootPositionRepairRequestBytesBound]] as const) {
+      const today = measure(input);
+      expect(today).toBe(bodyBound({ ...input, ...material }) + 256);
+      expect(measure({ ...input, questionLanguage: null })).toBe(today);
+      const locked = measure({ ...input, questionLanguage: RO });
+      expect(locked).toBeGreaterThan(today);
+      // Framed at the bound lock (the longest tag, a 64-byte name), so never below the run's own lock's framing.
+      expect(locked).toBe(bodyBound({ ...input, ...material, questionLanguage: questionLanguageForBounds() }) + 256);
+      expect(locked).toBeGreaterThanOrEqual(bodyBound({ ...input, ...material, questionLanguage: RO }) + 256);
+    }
+    // Real locked root 0 requests — today's primary root and an assigned root at the map's limits (U+0001, the character
+    // that grows most), under real locks up to a 64-byte name — never frame above the locked room's first attempt.
+    const lockedFirst = rootZeroRequestBytes({ ...input, questionLanguage: RO }) - 256;
+    const assigned = { kind: "assigned-root" as const, assignedAnswer: "\u0001".repeat(rootZeroMapMaterialChars.answer),
+      mapPoints: "\u0001".repeat(rootZeroMapMaterialChars.points) };
+    for (const lock of [RO, { code: "az-Cyrl", name: "Azerbaijani (Cyrillic script)" }, { code: "sr-Cyrl", name: "\u0416".repeat(32) }]) {
+      for (const leg of [{ kind: "primary-root" as const }, assigned]) {
+        for (const claim of ["unknown", "resolved"] as const) {
+          expect(bodyBytes(framedJudgePromptForTest(leg, QUESTION, "Romanian", claim, lock).packet)).toBeLessThanOrEqual(lockedFirst);
+        }
+      }
+    }
+    // The room's attempts forward the lock to every bound (T12-R3: the first, the length retry and the repair).
+    const attempts = rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "Romanian", tokenCeiling: CEILING, questionLanguage: RO });
+    expect(attempts.first.requestBytes).toBe(rootZeroRequestBytes({ ...input, completionTokenCeiling: lengthRetryTokenCeiling(CEILING, 0), questionLanguage: RO }));
+    expect(attempts.retries.map((retry) => retry.requestBytes)).toEqual([
+      rootZeroRequestBytes({ ...input, completionTokenCeiling: lengthRetryTokenCeiling(CEILING, 1), questionLanguage: RO }),
+      rootZeroRepairRequestBytes({ ...input, completionTokenCeiling: CEILING, questionLanguage: RO })
+    ]);
+    expect(rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "Romanian", tokenCeiling: CEILING, questionLanguage: null }))
+      .toEqual(rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "Romanian", tokenCeiling: CEILING }));
   });
 });
 

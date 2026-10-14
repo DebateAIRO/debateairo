@@ -516,7 +516,11 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
       "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, shapeRun === null ? null : shapeRun.shape.answerWords)")).toBe(1);
     expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(1);
     // Debate shape (040ddb9fd): the answer-length variant adds ONE field after that one projection, nothing else.
-    expect(runner).toContain("material: lengthed ? [...material, synthesizerAnswerLengthField(answerWords)] : material,");
+    // Question language (P2L Task 13, PF-L40): a shaped run's lock adds ONE code-owned field after those, last; the
+    // wrapper returns the same array without a lock, so today's material is that one projection still.
+    expect(runner).toContain(
+      "material: withQuestionLanguageField(lengthed ? [...material, synthesizerAnswerLengthField(answerWords)] : material, questionLanguage),"
+    );
     // ...and there is exactly ONE projection, so the allow-list cannot be forked
     // into a second copy that quietly readmits a field.
     expect(occurrences(readFileSync(SYNTHESIS_SRC, "utf8"), "export function toSynthesisPromptMaterial")).toBe(1);

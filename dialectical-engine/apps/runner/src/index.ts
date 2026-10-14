@@ -174,7 +174,10 @@ import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from 
 import { MapChoiceRepository, type MapResult } from "@debateai/map";
 import {
   argumentLanguageDirective,
-  replyLanguageCheck,
+  questionLanguageSentence,
+  replyLanguageCheckFor,
+  withQuestionLanguageField,
+  type QuestionLanguage,
   SERVED_ROOT_SELECTION_RULE,
   TypedDomainError,
   exhaustive,
@@ -734,13 +737,21 @@ export function assertRegisterPromptContractHashes(
   );
 }
 
+/**
+ * The contract with its language sentence, added at call time (never sealed: the synthesizer and evaluator fingerprints
+ * exclude it). Without a lock, today's directive byte for byte; with a shaped run's lock (question-language spec
+ * 2026-10-13 L6), THE one named sentence.
+ */
 function promptContractInArgumentLanguage(
   contract: PromptContract,
-  argumentLanguageName: string
+  argumentLanguageName: string,
+  questionLanguage: QuestionLanguage | null = null
 ): PromptContract {
   return Object.freeze({
     ...contract,
-    instruction: `${contract.instruction} ${argumentLanguageDirective(argumentLanguageName)}`
+    instruction: questionLanguage === null
+      ? `${contract.instruction} ${argumentLanguageDirective(argumentLanguageName)}`
+      : `${contract.instruction} ${questionLanguageSentence(questionLanguage)}`
   });
 }
 
@@ -788,12 +799,16 @@ export const evaluatorVerdictSchema = z.object({
  * export). `randomBytes` exists for the byte-equality test; production never
  * passes it. Paid plans S1a: it writes in the question's language (dev's
  * argument-language rule, D2), so the replayed prompt is the live one.
+ * Question language (spec 2026-10-13 L6): with a shaped run's lock, the named
+ * sentence replaces the directive and the `question_language` field rides LAST
+ * (after `answer_length`); without one (null), the packet is today's, byte for byte.
  */
 export function buildSynthesisRolePrompt(
   request: SynthesizerRequest | EvaluatorRequest,
   argumentLanguageName: string,
   randomBytes?: (size: number) => Buffer,
-  answerWords: number | null = null
+  answerWords: number | null = null,
+  questionLanguage: QuestionLanguage | null = null
 ): FramedPrompt {
   // Debate shape (spec §3.3 step 8): only a writer call with an answer length takes the length variant; without one
   // (every run without a shape, and every checker call) the packet is today's, byte for byte.
@@ -805,9 +820,12 @@ export function buildSynthesisRolePrompt(
       request.role === "SYNTHESIZER"
         ? (lengthed ? SYNTHESIZER_LENGTH_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT)
         : EVALUATOR_PROMPT_CONTRACT,
-      argumentLanguageName
+      argumentLanguageName,
+      questionLanguage
     ),
-    material: lengthed ? [...material, synthesizerAnswerLengthField(answerWords)] : material,
+    // The language field wraps the ONE projection (and the length field after it): it rides LAST; with no lock
+    // `withQuestionLanguageField` returns the same array, today's bytes.
+    material: withQuestionLanguageField(lengthed ? [...material, synthesizerAnswerLengthField(answerWords)] : material, questionLanguage),
     ...(randomBytes === undefined ? {} : { randomBytes })
   });
 }
@@ -2641,6 +2659,11 @@ interface ComposedCitationContext {
    * language is not checked.
    */
   readonly questionLine?: string;
+  /**
+   * Question language (spec 2026-10-13 L6): a shaped run's lock. With it, the prose is checked against the lock
+   * (`replyLanguageCheckFor`), never a re-guess of the question; absent, today's check.
+   */
+  readonly questionLanguage?: QuestionLanguage;
 }
 
 /** Reply language (2026-10-12): the answer's prose, and the checker's objection (the next round's material). */
@@ -2675,7 +2698,7 @@ export function classifyComposedContent(content: string, citation: ComposedCitat
   }
   if (issues.length > 0) return { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
   // Reply language (2026-10-12): checked once the citations hold, so a refusal names one kind of fix.
-  const language = citation.questionLine === undefined ? [] : replyLanguageCheck(citation.questionLine, COMPOSED_PROSE)(composed);
+  const language = citation.questionLine === undefined ? [] : replyLanguageCheckFor(citation.questionLine, citation.questionLanguage, COMPOSED_PROSE)(composed);
   return language.length === 0
     ? structured
     : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(language) };
@@ -3592,12 +3615,15 @@ export function parseEvaluatorOutput(content: string, reply?: ModelReplyFacts): 
 
 /**
  * The EVALUATOR call's content classifier: the same reading as `parseEvaluatorOutput`. Reply language (2026-10-12):
- * with the person's question, an objection must be in its language (`EVALUATOR_PROSE`).
+ * with the person's question, an objection must be in its language (`EVALUATOR_PROSE`); with a shaped run's lock
+ * (question-language spec 2026-10-13 L6), in the locked language.
  */
-export function classifyEvaluatorContent(content: string, reply?: ModelReplyFacts, questionLine?: string): ContentClassification {
+export function classifyEvaluatorContent(
+  content: string, reply?: ModelReplyFacts, questionLine?: string, questionLanguage: QuestionLanguage | null = null
+): ContentClassification {
   const structured = classifyStructuredContent(content, evaluatorVerdictSchema, reply);
   if (structured.parseStatus !== "PARSED" || questionLine === undefined) return structured;
-  const language = replyLanguageCheck(questionLine, EVALUATOR_PROSE)(parseEvaluatorOutput(content, reply));
+  const language = replyLanguageCheckFor(questionLine, questionLanguage, EVALUATOR_PROSE)(parseEvaluatorOutput(content, reply));
   return language.length === 0 ? structured : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(language) };
 }
 

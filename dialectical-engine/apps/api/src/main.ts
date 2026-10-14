@@ -661,7 +661,10 @@ await boot.run("run-ceiling-covers-one-call", async () => {
   const firstCalls = firstPositionCallProjections({
     targets: declaredProviderTargets,
     judgeTokenCeiling: await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION),
-    questionMaxBytes: askQuestionMaxBytes()
+    questionMaxBytes: askQuestionMaxBytes(),
+    // Pre-flight PF-L38: with the debate-shape row in force a run may be shaped, and its first call carries the locked
+    // language (the named sentence and the question_language field): priced at the longest lock too. Row absent: today's.
+    questionLanguageLocked: debateShapeInForcePolicy !== null
   });
   assertRunCeilingCoversOneCall({
     bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,

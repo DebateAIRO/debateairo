@@ -15,7 +15,7 @@ import {
   readPromptFrame
 } from "@debateai/providers";
 import { EVALUATOR_PROMPT_CONTRACT, buildSynthesisRolePrompt } from "@debateai/runner";
-import { canonicalPromptFingerprint, type MomentBuilder } from "@debateai/scorecard";
+import { canonicalPromptFingerprint, momentIdFor, type MomentBuilder } from "@debateai/scorecard";
 import {
   SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
   buildSynthesisDigest,
@@ -114,6 +114,33 @@ describe("A18 · the same prompt, rebuilt from recorded material, for every deba
     const rebuilt = await captureMomentPacket(inputs);
     expect(readPromptFrame(rebuilt).fence).not.toBe(readPromptFrame(recorded).fence);
     expect(canonicalPromptFingerprint(rebuilt.messages)).toBe(canonicalPromptFingerprint(recorded.messages));
+  });
+
+  it.each(CASES)("PF-L39: %s at %s with a lock replays through its trailing question_language field; without one it keeps its id",
+    async (role, key, builder) => {
+      const RO = { code: "ro", name: "Romanian" };
+      const locked = parseMomentBuilder({ family: builder.family, inputs: { ...(builder.inputs as object), questionLanguage: RO } });
+      const recorded = await captureMomentPacket(locked);
+      expect(readPromptFrame(recorded).fields.at(-1)).toEqual({ name: "question_language", content: '{"code":"ro","name":"Romanian"}' });
+      const inputs = builderFromRecordedPacket(role, key, recorded);
+      expect(inputs).toEqual(locked);
+      const rebuilt = await captureMomentPacket(inputs);
+      expect(canonicalPromptFingerprint(rebuilt.messages)).toBe(canonicalPromptFingerprint(recorded.messages));
+      // An unlocked moment reads back with no lock member, so its id is the one it had before P2L.
+      const unlocked = builderFromRecordedPacket(role, key, await captureMomentPacket(parseMomentBuilder(builder)));
+      expect(Object.hasOwn(unlocked.inputs, "questionLanguage")).toBe(false);
+      expect(momentIdFor({ role, contractHash: "h", builder: unlocked })).toBe(momentIdFor({ role, contractHash: "h", builder }));
+    });
+
+  it("PF-L39/PF-L40: a lengthed writer moment with a lock reads answer_length before the trailing language field", async () => {
+    const RO = { code: "ro", name: "Romanian" };
+    const locked = parseMomentBuilder({ family: "SYNTHESIS_WRITER",
+      inputs: { round: 1, digest: digest(), codeLabel: CODE_LABEL, priorObjection: null, answerWords: 300, questionLanguage: RO } });
+    const recorded = await captureMomentPacket(locked);
+    expect(readPromptFrame(recorded).fields.slice(-2).map((field) => field.name)).toEqual(["answer_length", "question_language"]);
+    const inputs = builderFromRecordedPacket("ANSWER_WRITER", "COMPOSER:SYNTHESIZER:INITIAL:1", recorded);
+    expect(inputs).toEqual(locked);
+    expect(canonicalPromptFingerprint((await captureMomentPacket(inputs)).messages)).toBe(canonicalPromptFingerprint(recorded.messages));
   });
 
   it("refuses a repair packet, a leg under the wrong role and a contract the role never uses", async () => {

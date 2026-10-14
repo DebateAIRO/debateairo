@@ -1,6 +1,6 @@
 import { projectedCallCeilingMicros, type ProviderTargetPrice } from "@debateai/budget";
 import { rootPositionRepairRequestBytesBound, rootPositionRequestBytesBound } from "@debateai/judgement";
-import { exhaustive, TypedDomainError } from "@debateai/kernel";
+import { exhaustive, questionLanguageForBounds, TypedDomainError, type QuestionLanguage } from "@debateai/kernel";
 import {
   MAP_LIMITS, mapErrorCodeOf, mapProviderPieces, mapRunAngleMap, mapRunBlindLists, mapRunSnowball,
   type MapCallOutcome, type MapCallRequest, type MapCaller, type MapChoiceRepository, type MapResult, type MapRunInput, type MapSeat,
@@ -230,15 +230,32 @@ export function rootZeroRoomRefs<S>(input: Readonly<{
     .flatMap((seat) => input.membersOf(seat).map((member) => member.providerRef)))]);
 }
 
+/** What sizes one of root 0's requests: the question, the language, the completion bound and the run's lock (or none). */
+type RootZeroRequestInput = Readonly<{
+  questionLine: string; argumentLanguageName: string; completionTokenCeiling: number; questionLanguage?: QuestionLanguage | null;
+}>;
+
+/**
+ * Pre-flight PF-L38 and ruling L-B64 — THE LOCK ROOT 0'S ROOM IS FRAMED WITH. A locked root 0 carries the named sentence
+ * and the `question_language` field, so its room frames them; it frames them at the bound lock
+ * (`questionLanguageForBounds`: the longest tag and a 64-byte name, which no lock the kernel makes or reads back frames
+ * longer than), so the room stays a ceiling whatever lock reaches root 0's call. No lock: today's framing, today's room.
+ */
+function rootZeroRoomLock(questionLanguage: QuestionLanguage | null | undefined): QuestionLanguage | null {
+  return questionLanguage === null || questionLanguage === undefined ? null : questionLanguageForBounds();
+}
+
 /** The most bytes root 0's own request can carry for this question (a primary root, or a map-assigned one). */
-export function rootZeroRequestBytes(input: Readonly<{ questionLine: string; argumentLanguageName: string; completionTokenCeiling: number }>): number {
-  return rootPositionRequestBytesBound({ ...input, assignedMaterialChars: rootZeroMapMaterialChars })
+export function rootZeroRequestBytes(input: RootZeroRequestInput): number {
+  return rootPositionRequestBytesBound({ ...input, assignedMaterialChars: rootZeroMapMaterialChars,
+    questionLanguage: rootZeroRoomLock(input.questionLanguage) })
     + ROOT_ZERO_BODY_ALLOWANCES.modelIdBytes;
 }
 
 /** Ruling T12-R3: the most bytes root 0's FORMAT REPAIR (the judge's full re-ask) can carry for this question. */
-export function rootZeroRepairRequestBytes(input: Readonly<{ questionLine: string; argumentLanguageName: string; completionTokenCeiling: number }>): number {
-  return rootPositionRepairRequestBytesBound({ ...input, assignedMaterialChars: rootZeroMapMaterialChars })
+export function rootZeroRepairRequestBytes(input: RootZeroRequestInput): number {
+  return rootPositionRepairRequestBytesBound({ ...input, assignedMaterialChars: rootZeroMapMaterialChars,
+    questionLanguage: rootZeroRoomLock(input.questionLanguage) })
     + ROOT_ZERO_BODY_ALLOWANCES.modelIdBytes;
 }
 
@@ -250,11 +267,14 @@ export type RootZeroAttempt = Readonly<{ requestBytes: number; completionTokenCe
  * retry, whichever is dearer: a length retry (the first packet again at `lengthRetryTokenCeiling(tc, 1)`, as the gateway
  * re-sends it after a cut reply) or a format repair (the full re-ask at the first attempt's bound, as the gateway sends it
  * after a reply that failed its check). The backup answering after a billed failure of the main is the first packet at
- * the first bound, under both. Each is sized the conservative way the first attempt is (`rootPositionRequestBytesBound`).
+ * the first bound, under both. Each is sized the conservative way the first attempt is (`rootPositionRequestBytesBound`),
+ * and each frames the run's lock when it has one (PF-L38: `rootZeroRoomLock`).
  */
-export function rootZeroRoomAttempts(input: Readonly<{ questionLine: string; argumentLanguageName: string; tokenCeiling: number }>):
+export function rootZeroRoomAttempts(input: Readonly<{ questionLine: string; argumentLanguageName: string; tokenCeiling: number;
+  questionLanguage?: QuestionLanguage | null }>):
   Readonly<{ first: RootZeroAttempt; retries: readonly RootZeroAttempt[] }> {
-  const question = { questionLine: input.questionLine, argumentLanguageName: input.argumentLanguageName };
+  const question = { questionLine: input.questionLine, argumentLanguageName: input.argumentLanguageName,
+    questionLanguage: input.questionLanguage ?? null };
   const firstBound = lengthRetryTokenCeiling(input.tokenCeiling, 0);
   const lengthRetryBound = lengthRetryTokenCeiling(input.tokenCeiling, 1);
   return Object.freeze({
