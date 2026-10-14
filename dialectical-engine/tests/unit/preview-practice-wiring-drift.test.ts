@@ -248,6 +248,29 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     expect(objectAfter(PRACTICE_ASK, "const runSettings: RunCreationSettings = {").has("billing")).toBe(false);
   });
 
+  it("hosted and local alike: the debate shape and the question language are wired as the two main.ts files wire them", () => {
+    // The merge of #165 into the debate-shape branch: the hosted compositions read the shape row (and its map hash) and
+    // price the first call with the locked language exactly as main.ts does, in both modes.
+    const runnerMain = flat(RUNNER_MAIN);
+    const practiceRunner = flat(PRACTICE_RUNNER);
+    const shapeRead = "const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);";
+    expect(runnerMain).toContain(shapeRead);
+    expect(practiceRunner).toContain(shapeRead);
+    expect(runnerMain).toContain("questionLanguageLocked: debateShape !== null");
+    expect(practiceRunner).toContain("questionLanguageLocked: input.debateShape !== null");
+    expect(practiceRunner).toContain("storyPolicy, debateShape, log:");
+    // Read before the money wiring, never only in one mode.
+    expect(practiceRunner.indexOf(shapeRead)).toBeLessThan(practiceRunner.indexOf("const money = await composePracticeRunnerMoney("));
+    const apiMain = flat(API_MAIN);
+    const practiceAsk = flat(PRACTICE_ASK);
+    for (const source of [apiMain, practiceAsk]) {
+      expect(source).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");
+      expect(source).toContain("const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);");
+      expect(source).toContain("const questionLanguage = debateShapeInForcePolicy === null ? undefined : await");
+      expect(source).toContain("route: questionLanguageRouteFor({");
+    }
+  });
+
   it("control: the reader sees a key that is missing", () => {
     const shipped = objectKeys("{ a: 1, ...(x ? {} : { b: 2, c: { d: 3 } }), e: f(g, { h: 1 }), m(n: string) { return { o: n }; }, i }");
     expect([...shipped].sort()).toEqual(["a", "b", "c", "e", "i", "m"]);
