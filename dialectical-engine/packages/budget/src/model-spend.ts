@@ -60,7 +60,66 @@ import { decideSharedWall } from "./room.js";
  * A STORY charge names its run and counts toward the DAY, but never toward the
  * run's own envelope: the story can never cost the verdict (spec §8).
  */
-export type ModelSpendSource = "RUN" | "SUPPORT" | "STORY";
+export type ModelSpendSource =
+  | "RUN"
+  | "SUPPORT"
+  | "STORY"
+  /** the fast language check before a debate: a run-less site cost (0117), written only by ledger.record_language_check_spend */
+  | "LANGUAGE_CHECK";
+
+/**
+ * Question language, P2L Task 19 (migration 0117): the ONE writer of a LANGUAGE_CHECK row, a SECURITY DEFINER
+ * function the API's runtime role may execute (pre-flight PF-L58, option (a)). Its signature, as `to_regprocedure`
+ * reads it: the hosted API's boot probe asks only whether it exists, and keeps the fast check off until it does.
+ */
+export const LANGUAGE_CHECK_SPEND_WRITER = "ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)" as const;
+
+/** One fast language check's site cost, as the writer takes it: no run, no phase, no attempt. */
+export type LanguageCheckSpendEntry = Readonly<{
+  spendId: string;
+  /** `language-check:<provider>:<model>`: codes only, never question text. */
+  providerRef: string;
+  /** The UTC day, `YYYY-MM-DD`, as `costEnvelopeDay` names it. */
+  chargedOn: string;
+  chargeMicros: number;
+  inputTokens: number;
+  outputTokens: number;
+}>;
+
+/** The boot probe: does the one writer exist on this database (0117 applied)? Read-only. */
+export async function languageCheckSpendWriterPresent(pool: Pick<Pool, "query">): Promise<boolean> {
+  const result = await pool.query<{ present: unknown }>("SELECT to_regprocedure($1) IS NOT NULL AS present", [LANGUAGE_CHECK_SPEND_WRITER]);
+  return result.rows[0]?.present === true;
+}
+
+/** One language check's site cost, through the one writer (0117). The database's CHECKs refuse a negative count. */
+export async function recordLanguageCheckSpend(pool: Pick<Pool, "query">, entry: LanguageCheckSpendEntry): Promise<void> {
+  await pool.query("SELECT ledger.record_language_check_spend($1::uuid,$2::text,$3::date,$4::bigint,$5::bigint,$6::bigint)",
+    [entry.spendId, entry.providerRef, entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
+}
+
+const wholeCount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+
+/**
+ * What one fast language check cost, in USD micro-units: (input x input price + output x output price) / 1,000,000,
+ * rounded UP once, exactly (BigInt), so it never under-counts. `price` is per million tokens; the caller hands in the
+ * price it must never undercut (the hosted route: the larger of the row's and the provider table's, at the cache-write
+ * rate when the frame is cacheable). A projected record (no usage named, an abort after sending) is priced the same way.
+ */
+export function languageCheckChargeMicros(
+  usage: Readonly<{ inputTokens: number; outputTokens: number }>,
+  price: Readonly<{ input: number; output: number }>
+): number {
+  if (!wholeCount(usage?.inputTokens) || !wholeCount(usage?.outputTokens) || !wholeCount(price?.input) || !wholeCount(price?.output)) {
+    throw new TypedDomainError("MODEL_SPEND_LANGUAGE_CHECK_CHARGE_INVALID", "MODEL_SPEND_LANGUAGE_CHECK_CHARGE_INVALID");
+  }
+  const total = BigInt(usage.inputTokens) * BigInt(price.input) + BigInt(usage.outputTokens) * BigInt(price.output);
+  const micros = (total + 999_999n) / 1_000_000n;
+  if (micros > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new TypedDomainError("MODEL_SPEND_LANGUAGE_CHECK_CHARGE_INVALID", "MODEL_SPEND_LANGUAGE_CHECK_CHARGE_INVALID");
+  }
+  return Number(micros);
+}
 
 export interface ModelSpendEntry {
   readonly spendId: string;
@@ -911,6 +970,14 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   }
 
   async recordSpend(entry: ModelSpendEntry): Promise<void> {
+    // P2L Task 19, pre-flight PF-L58 option (a): a language check's site cost has ONE writer, the 0117 function
+    // (recordLanguageCheckSpend). This direct INSERT refuses the source before any query.
+    if (entry.spendSource === "LANGUAGE_CHECK") {
+      throw new TypedDomainError(
+        "MODEL_SPEND_LANGUAGE_CHECK_FUNCTION_ONLY",
+        "A language check's site cost is written only by ledger.record_language_check_spend"
+      );
+    }
     if ((entry.spendSource === "RUN" || entry.spendSource === "STORY") && entry.runId === null) {
       throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run or story charge must name its run");
     }

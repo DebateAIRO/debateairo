@@ -158,7 +158,7 @@ describe("the question-language decider (question-language spec 2026-10-13)", ()
       .decide({ ask: askOf("Should cities price congestion?", { site_language: "ro" }), ownerScope: "owner:a", fastCheckAllowed: true });
     expect(unstated).toMatchObject({ language: { code: "en" }, source: "LOCAL_ELD", localReason: "NO_FAST_CHECK" });
 
-    for (const reason of ["LOCAL_MODE", "NO_GATE", "HOSTED_BEFORE_SPEND_RECORD", "POLICY_OFF"] as const) {
+    for (const reason of ["LOCAL_MODE", "NO_GATE", "HOSTED_BEFORE_SPEND_RECORD", "NO_HOSTED_KEY", "POLICY_OFF"] as const) {
       const stated = await new QuestionLanguageDecider({ eld: eldSaying(UNSURE_RO), fastCheck: null, key: newQuestionLanguageReferenceKey(),
         clock: () => NOW, maxQuestionBytes: 8192, fastCheckOffReason: reason })
         .decide({ ask: askOf(MIX_Q, { site_language: "ro" }), ownerScope: "legacy:x", fastCheckAllowed: false });

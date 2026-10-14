@@ -1,7 +1,7 @@
 import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
 import { readModelScorecard, readEngineVersion } from "@debateai/register";
 import { previewProviderSocket } from "@debateai/providers";
-import { readQuestionLanguagePolicy } from "@debateai/register";
+import { questionLanguagePolicyStartValues, readQuestionLanguagePolicy } from "@debateai/register";
 import { composeQuestionLanguage, hostedQuestionLanguageRoute, questionLanguageRouteFor } from "./question-language/boot.js";
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
 import { readPreviewBudgetGateSettings } from "./preview-budget-estimate.js";
@@ -112,7 +112,9 @@ import {
   RecentRunsCostEstimator,
   assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
-  mostOneRunMaySpendMicros
+  languageCheckSpendWriterPresent,
+  mostOneRunMaySpendMicros,
+  recordLanguageCheckSpend
 } from "@debateai/budget";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { firstCallPlanModels } from "@debateai/scorecard";
@@ -191,7 +193,7 @@ import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
 import { projectSupportDraftReport,type SupportDraftReport } from "./support/response-policy.js";
 import {
-  createSupportModelAdapter,parseSupportModelTargetJson,type SupportModelPort
+  createSupportModelAdapter,parseSupportModelTargetJson,supportAnthropicMessagesKey,type SupportModelPort
 } from "./support/model.js";
 import {
   SupportModelReservationLedger,createReservedSupportModelPort
@@ -634,25 +636,57 @@ const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTo
 const debateShapePolicy = await boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION));
 // The row in force for the ask side (amendment 2026-10-13, the preview's rollback): `enabled: false` is no row here.
 const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
+// V-30(1): the support chat's model is configuration, on the SAME mode decision
+// the debate targets take above. Hosted refuses a relay target here exactly as
+// it refuses one there; local keeps today's relay path. Parsed HERE, above the
+// question-language step, whose hosted fast check borrows this target's key
+// (P2L Task 19, pre-flight PF-L36); the support chat below receives this same target.
+const supportModelTarget = boot.runSync("support-model-target", () =>
+  (environment.SUPPORT_MODEL_TARGET_JSON === undefined
+    ? undefined
+    : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON,{
+      mode: environment.DEPLOYMENT_MODE,nodeEnv: environment.NODE_ENV
+    })));
 // Question language (spec 2026-10-13): only with the debate shape row in force (row absent, or `enabled: false`: no
 // row read, no eld load, today's boot). The row is optional (absent = start values); a malformed row, an owner text
 // carrying a frame token, or an unreviewed preview model refuses the boot. The fast check is a site cost: nothing
 // charges the person for it.
-const questionLanguage = debateShapeInForcePolicy === null ? undefined : await boot.run("question-language", async () => composeQuestionLanguage({
-  policy: await readQuestionLanguagePolicy(pool, environment.REGISTER_VERSION),
-  // Ruling L-ROUTE: a configured preview is PREVIEW (the guarded fetch with the Anthropic gate socket) or NONE, never
-  // HOSTED; without a preview the hosted side builds no transport until Task 19 (boot.ts hostedQuestionLanguageRoute).
-  route: questionLanguageRouteFor({
-    previewConfigured: previewConfig !== undefined,
-    previewFetch,
-    anthropicSocket: previewConfig === undefined ? undefined : previewProviderSocket(previewConfig, "anthropic"),
-    hosted: () => hostedQuestionLanguageRoute(environment.DEPLOYMENT_MODE)
-  }),
-  clock: () => new Date(),
-  maxQuestionBytes: askQuestionMaxBytes(),
-  // CR-5: one key for every API process of this deployment, derived from the blind-index key loaded above.
-  referenceKey: questionLanguageReferenceKeyFrom(blindIndexKey)
-}));
+const questionLanguage = debateShapeInForcePolicy === null ? undefined : await boot.run("question-language", async () => {
+  const policy = await readQuestionLanguagePolicy(pool, environment.REGISTER_VERSION);
+  // Task 19: with no preview configured the hosted side decides, awaited before the composition. It probes for 0117's
+  // one writer (absent = the fast check stays off, HOSTED_BEFORE_SPEND_RECORD: never spend unrecorded) and reads the
+  // support target's Anthropic key once, through the same custody loader the support chat uses. Each check is then one
+  // run-less site cost in the day's pot, never the person's; a failed record is one code-only line.
+  const hostedRoute = previewConfig !== undefined ? undefined : await hostedQuestionLanguageRoute({
+    mode: environment.DEPLOYMENT_MODE,
+    fastCheck: (policy ?? questionLanguagePolicyStartValues()).fastCheck,
+    readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readCustodyAuthorizationHeader),
+    spend: {
+      writerPresent: () => languageCheckSpendWriterPresent(pool),
+      record: (entry) => recordLanguageCheckSpend(pool, entry)
+    },
+    clock: () => new Date(),
+    report: (line) => console.error(JSON.stringify(line))
+  });
+  return composeQuestionLanguage({
+    policy,
+    // Ruling L-ROUTE: a configured preview is PREVIEW (the guarded fetch with the Anthropic gate socket) or NONE, never
+    // HOSTED (no onUsage there: the gate settles preview money); without a preview the hosted route above stands.
+    route: questionLanguageRouteFor({
+      previewConfigured: previewConfig !== undefined,
+      previewFetch,
+      anthropicSocket: previewConfig === undefined ? undefined : previewProviderSocket(previewConfig, "anthropic"),
+      hosted: () => {
+        if (hostedRoute === undefined) throw new TypeError("QUESTION_LANGUAGE_HOSTED_ROUTE_ON_PREVIEW");
+        return hostedRoute;
+      }
+    }),
+    clock: () => new Date(),
+    maxQuestionBytes: askQuestionMaxBytes(),
+    // CR-5: one key for every API process of this deployment, derived from the blind-index key loaded above.
+    referenceKey: questionLanguageReferenceKeyFrom(blindIndexKey)
+  });
+});
 const modelPicker = await composeAskModelPicker({
   boot,
   pool,
@@ -1212,15 +1246,8 @@ const supportRelayQueue = new SupportRelayQueue({
   reportCleanupFailure: reportSupportDiagnostic
 });
 const supportDegraded = new SupportDegradedState();
-// V-30(1): the support chat's model is configuration, on the SAME mode decision
-// the debate targets take above. Hosted refuses a relay target here exactly as
-// it refuses one there; local keeps today's relay path.
-const supportModelTarget = boot.runSync("support-model-target", () =>
-  (environment.SUPPORT_MODEL_TARGET_JSON === undefined
-    ? undefined
-    : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON,{
-      mode: environment.DEPLOYMENT_MODE,nodeEnv: environment.NODE_ENV
-    })));
+// V-30(1): the support chat's model target is parsed above, before the question-language step (P2L Task 19,
+// pre-flight PF-L36); the support chat receives that same target here.
 const supportModels = new Map<string,SupportModelPort>(supportModelTarget === undefined ? [] : [[
   supportModelTarget.providerRef,
   // V-9(2): a declared credential FILE is resolved here, through the same

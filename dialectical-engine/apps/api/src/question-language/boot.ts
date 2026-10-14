@@ -1,6 +1,10 @@
+import { randomUUID } from "node:crypto";
+import { costEnvelopeDay, languageCheckChargeMicros, type LanguageCheckSpendEntry } from "@debateai/budget";
 import { TypedDomainError } from "@debateai/kernel";
-import { ANTHROPIC_MESSAGES_BASE_URL, ANTHROPIC_MESSAGES_PATH, PREVIEW_ANTHROPIC_MESSAGES_URL, previewModelRow } from "@debateai/providers";
-import { questionLanguagePolicyStartValues, type DeploymentMode, type QuestionLanguagePolicy } from "@debateai/register";
+import { ANTHROPIC_MESSAGES_BASE_URL, ANTHROPIC_MESSAGES_PATH, PREVIEW_ANTHROPIC_MESSAGES_URL, previewModelRow, type PreviewModelRow } from "@debateai/providers";
+import {
+  questionLanguagePolicyStartValues, type DeploymentMode, type QuestionLanguageFastCheck, type QuestionLanguagePolicy
+} from "@debateai/register";
 import { QuestionLanguageDecider, type QuestionLanguageChoiceNeeded, type QuestionLanguageFastCheckOffReason, type QuestionLanguageLock } from "./decider.js";
 import { loadEldReader } from "./eld.js";
 import { ELD_TUNING } from "./eld-tuning.js";
@@ -15,8 +19,9 @@ import { anthropicFastCheckTransport, type FastCheckUsage } from "./transport.js
  *   deployment                         route    transport                                         who pays
  *   preview + Anthropic gate socket    PREVIEW  the guarded fetch, no key, no spend record        the gate's daily pot
  *   preview, no Anthropic gate socket  NONE     none (reason NO_GATE)                             nothing is called
- *   hosted, before Task 19             NONE     none (reason HOSTED_BEFORE_SPEND_RECORD)          nothing is called
- *   hosted, Task 19 (spend record)     HOSTED   the support target's key, the exact Anthropic URL the run-less spend record
+ *   hosted, 0117's writer absent       NONE     none (reason HOSTED_BEFORE_SPEND_RECORD)          nothing is called
+ *   hosted, no Anthropic support key   NONE     none (reason NO_HOSTED_KEY)                       nothing is called
+ *   hosted, 0117 + the support key     HOSTED   the support target's key, the exact Anthropic URL the run-less spend record
  *   local mode                         NONE     none (reason LOCAL_MODE)                          nothing is called
  *   the row's fastCheck: null          (any)    none (reason POLICY_OFF)                          nothing is called
  *
@@ -26,7 +31,7 @@ import { anthropicFastCheckTransport, type FastCheckUsage } from "./transport.js
 export type QuestionLanguagePaidRoute =
   | Readonly<{ kind: "PREVIEW"; fetch: typeof fetch }>
   | Readonly<{ kind: "HOSTED"; credential: string; recordSpend: (usage: FastCheckUsage) => Promise<void> }>
-  | Readonly<{ kind: "NONE"; reason: Exclude<QuestionLanguageFastCheckOffReason, "POLICY_OFF"> }>;
+  | Readonly<{ kind: "NONE"; reason: QuestionLanguageFastCheckOffReason }>;
 
 /** The message is the code (pre-flight PF-L13: a test's toThrow("…") reads the message); it carries no owner text. */
 const refusal = (code: string): TypedDomainError => new TypedDomainError(code, code);
@@ -61,19 +66,86 @@ export function questionLanguageRouteFor(input: Readonly<{ previewConfigured: bo
   return input.hosted();
 }
 
+/** The reviewed provider table's Haiku row: the floor of every hosted language-check price (Task 4 note, Task 19). */
+const HAIKU_PRICE_ROW_MODEL = "claude-haiku-5-5";
+
+/** USD micro-units per million tokens, from a nano-USD-per-token price (USD/M x 1000 nano = USD/M x 1e6 micros). */
+const microsPerMillion = (nanoPerToken: bigint): number => Number(nanoPerToken * 1000n);
+
 /**
- * The route with no preview configuration. Local mode has no paid AI. Hosted builds no transport until Task 19's
- * run-less spend record exists (global constraints, Money).
- * Task 19: hosted returns { kind: "HOSTED", credential, recordSpend } only when ALL hold: the support model target
- * (apps/api/src/support/model.ts parseSupportModelTargetJson, parsed ABOVE the question-language boot step, pre-flight
- * PF-L36) is an Anthropic Messages target with a custody-read credential, and
- * `ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)` exists (to_regprocedure). No key is read
- * from anywhere else.
+ * The per-million price a hosted language check is recorded at (the money law: never under-count). Input: the larger
+ * of the row's input price at the 5-minute cache-write rate (1.25x, rounded up) and the provider table's cache-write
+ * input price; output: the larger of the row's and the table's. The frame is always cacheable (the fast check's system
+ * goes as the two-block form with the one cache mark, transport.ts), so the cache-write rate always applies. The table
+ * is the reviewed Anthropic rows (preview-models.ts): Haiku's row, and the configured model's own row when it has one;
+ * at more than the row's upper-step threshold of input tokens, each row's upper step.
  */
-export function hostedQuestionLanguageRoute(mode: DeploymentMode): QuestionLanguagePaidRoute {
-  return mode === "hosted"
-    ? Object.freeze({ kind: "NONE", reason: "HOSTED_BEFORE_SPEND_RECORD" })
-    : Object.freeze({ kind: "NONE", reason: "LOCAL_MODE" });
+export function hostedLanguageCheckPrice(rowPrice: Readonly<{ input: number; output: number }>, model: string,
+  inputTokens: number): Readonly<{ input: number; output: number }> {
+  const haiku = previewModelRow(HAIKU_PRICE_ROW_MODEL);
+  if (haiku === undefined || haiku.provider !== "anthropic") throw refusal("QUESTION_LANGUAGE_PRICE_TABLE_UNAVAILABLE");
+  const own = previewModelRow(model);
+  const rows: PreviewModelRow[] = [haiku, ...(own !== undefined && own.provider === "anthropic" && own !== haiku ? [own] : [])];
+  let input = Math.ceil((rowPrice.input * 5) / 4);
+  let output = rowPrice.output;
+  for (const row of rows) {
+    const step = row.upperStep !== undefined && inputTokens > row.upperStep.aboveChargedInputTokens ? row.upperStep : row;
+    const cacheWrite = step.cacheWriteInputNanoUsdPerToken;
+    const tableInput = cacheWrite === undefined ? Math.ceil((microsPerMillion(step.inputNanoUsdPerToken) * 5) / 4) : microsPerMillion(cacheWrite);
+    input = Math.max(input, tableInput);
+    output = Math.max(output, microsPerMillion(step.outputNanoUsdPerToken));
+  }
+  return Object.freeze({ input, output });
+}
+
+/** The one line a failed record writes: the event and a code, never question, reply or database text. */
+export type QuestionLanguageSpendReport = Readonly<{ event: "api.question_language.spend_unrecorded"; code: string }>;
+const CODE_SHAPED = /^[A-Z0-9_]{1,64}$/u;
+function spendFailureCode(error: unknown): string {
+  const code = typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined;
+  return typeof code === "string" && CODE_SHAPED.test(code) ? code : "QUESTION_LANGUAGE_SPEND_RECORD_FAILED";
+}
+
+/**
+ * The route with no preview configuration (P2L Task 19). Local mode has no paid AI. Hosted turns the fast check on only
+ * when BOTH hold, else NONE with the reason:
+ *  · `ledger.record_language_check_spend` exists (`spend.writerPresent`, the 0117 probe): without it the API keeps the
+ *    check off (HOSTED_BEFORE_SPEND_RECORD) — never spend unrecorded;
+ *  · the support model target (apps/api/src/support/model.ts, parsed ABOVE the question-language boot step, pre-flight
+ *    PF-L36) is an Anthropic Messages target whose key `readCredential` reads through the custody loader (else
+ *    NO_HOSTED_KEY). No key is read from anywhere else, and none before the writer is known to exist.
+ * `recordSpend` writes each check as ONE run-less site cost through the writer: `language-check:<provider>:<model>`,
+ * the UTC day, the tokens the transport names (a projected record at the projected maximum) priced at
+ * `hostedLanguageCheckPrice`. A failed record is reported by code only and never fails the ask: the call already
+ * happened (the support chat's rule for unreported cost). It counts in the provider's daily site pot, never a person's.
+ */
+export async function hostedQuestionLanguageRoute(input: Readonly<{
+  mode: DeploymentMode;
+  fastCheck: QuestionLanguageFastCheck | null;
+  readCredential: () => string | undefined;
+  spend: Readonly<{ writerPresent: () => Promise<boolean>; record: (entry: LanguageCheckSpendEntry) => Promise<void> }>;
+  clock: () => Date;
+  report: (line: QuestionLanguageSpendReport) => void;
+  newSpendId?: () => string;
+}>): Promise<QuestionLanguagePaidRoute> {
+  if (input.mode !== "hosted") return Object.freeze({ kind: "NONE", reason: "LOCAL_MODE" });
+  const fastCheck = input.fastCheck;
+  if (fastCheck === null) return Object.freeze({ kind: "NONE", reason: "POLICY_OFF" });
+  if (!(await input.spend.writerPresent())) return Object.freeze({ kind: "NONE", reason: "HOSTED_BEFORE_SPEND_RECORD" });
+  const credential = input.readCredential();
+  if (credential === undefined) return Object.freeze({ kind: "NONE", reason: "NO_HOSTED_KEY" });
+  const providerRef = `language-check:${fastCheck.provider}:${fastCheck.model}`;
+  const newSpendId = input.newSpendId ?? randomUUID;
+  const recordSpend = async (usage: FastCheckUsage): Promise<void> => {
+    try {
+      const price = hostedLanguageCheckPrice(fastCheck.priceMicrosUsdPerMillionTokens, fastCheck.model, usage.inputTokens);
+      await input.spend.record(Object.freeze({ spendId: newSpendId(), providerRef, chargedOn: costEnvelopeDay(input.clock()),
+        chargeMicros: languageCheckChargeMicros(usage, price), inputTokens: usage.inputTokens, outputTokens: usage.outputTokens }));
+    } catch (error) {
+      input.report(Object.freeze({ event: "api.question_language.spend_unrecorded", code: spendFailureCode(error) }));
+    }
+  };
+  return Object.freeze({ kind: "HOSTED", credential, recordSpend });
 }
 
 /**

@@ -2,7 +2,9 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   CostEnvelopeGuard,
+  PostgresModelSpendStore,
   costEnvelopeDay,
+  languageCheckChargeMicros,
   costEnvelopeGuardPolicy,
   DEFAULT_RESERVATION_TTL_MS,
   type ModelSpendEntry,
@@ -527,5 +529,45 @@ describe("C-I2 the reservation covers the wait for a first charge", () => {
     // names the margin it really leaves rather than a comfortable one.
     expect(stated).toMatch(/max_cooldown_holds_per_run/u);
     expect(stated).toMatch(/SIXTY SECONDS/u);
+  });
+});
+
+/**
+ * Question language, P2L Task 19 (migration 0117): the fast language check is a run-less SITE cost. Its charge is the
+ * vendor's (or the projected maximum) token counts at the price handed in, rounded UP once; its one writer is the
+ * database function (pre-flight PF-L58, option (a)), so the store's direct INSERT refuses the source before any query.
+ */
+describe("P2L Task 19 — the language check's charge and its one writer", () => {
+  it("prices the counts at the given per-million prices, rounded up once (never under-counts)", () => {
+    expect(languageCheckChargeMicros({ inputTokens: 310, outputTokens: 28 }, { input: 100000, output: 500000 }))
+      .toBe(Math.ceil((310 * 100000 + 28 * 500000) / 1_000_000));
+    expect(languageCheckChargeMicros({ inputTokens: 310, outputTokens: 28 }, { input: 100000, output: 500000 })).toBe(45);
+    // A fraction of a micro-unit is a whole one: 1 token at 1 micro-USD per million is 1, not 0.
+    expect(languageCheckChargeMicros({ inputTokens: 1, outputTokens: 0 }, { input: 1, output: 1 })).toBe(1);
+    expect(languageCheckChargeMicros({ inputTokens: 0, outputTokens: 0 }, { input: 100000, output: 500000 })).toBe(0);
+    // Exact in integers far past 2^53 / 1e6 products (BigInt inside): 4,096 output tokens at the row's price cap.
+    expect(languageCheckChargeMicros({ inputTokens: 300_000, outputTokens: 4096 }, { input: 100_000_000, output: 100_000_000 }))
+      .toBe(30_409_600);
+  });
+
+  it("refuses counts or prices that are not whole non-negative numbers", () => {
+    for (const [usage, price] of [
+      [{ inputTokens: -1, outputTokens: 0 }, { input: 1, output: 1 }],
+      [{ inputTokens: 1.5, outputTokens: 0 }, { input: 1, output: 1 }],
+      [{ inputTokens: 1, outputTokens: Number.NaN }, { input: 1, output: 1 }],
+      [{ inputTokens: 1, outputTokens: 1 }, { input: -1, output: 1 }],
+      [{ inputTokens: 1, outputTokens: 1 }, { input: 1, output: 0.5 }]
+    ] as const) {
+      expect(() => languageCheckChargeMicros(usage, price)).toThrow("MODEL_SPEND_LANGUAGE_CHECK_CHARGE_INVALID");
+    }
+  });
+
+  it("recordSpend refuses a LANGUAGE_CHECK row before any query: the database function is its one writer", async () => {
+    const queries: unknown[] = [];
+    const store = new PostgresModelSpendStore({ query: async (...args: unknown[]) => { queries.push(args); return { rows: [] }; } } as never);
+    await expect(store.recordSpend({ spendId: "00000000-0000-4000-8000-000000000001", spendSource: "LANGUAGE_CHECK", runId: null,
+      providerRef: "language-check:anthropic:claude-haiku-5-5", chargedOn: "2026-10-13", chargeMicros: 45, inputTokens: 310, outputTokens: 28 }))
+      .rejects.toMatchObject({ code: "MODEL_SPEND_LANGUAGE_CHECK_FUNCTION_ONLY" });
+    expect(queries).toEqual([]);
   });
 });

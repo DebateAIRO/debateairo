@@ -10,12 +10,12 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth and the debate shape's map (0116, below) the sixth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the debate shape's map (0116, below) the sixth and the language check's site cost (0117, below) the seventh. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0116: 0116,
-   `debate-shape-map-forward0116.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0116 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0117: 0117,
+   `language-check-spend-forward0117.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0117 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -100,6 +100,25 @@ functions' definitions and ACLs). Known limit: `maker` keeps 0069's code-token r
 space needs a later step before it joins a provider set. If `origin/dev` takes 0116 first, renumber this step at merge
 time (its manifest, loader name and `previous` follow), as C1's recipe above says.
 
+## The language check's site cost (0117)
+
+The seventh chain step, after the debate shape map's 0116 (the question-language spec 2026-10-13, kept outside this
+repository; plan `docs/superpowers/plans/2026-10-13-debate-shape-phase2-language.md` Task 19): `0117_language_check_spend.sql`,
+`language-check-spend-forward0117.json`, `packages/db/src/migration-forward0117.ts` (`loadForward0117`, appended last
+to `STEPS`, `MIGRATION_FORWARD0117_*` refusals). The fast language check runs before a debate exists, so its cost is a
+SITE cost in the day's pot (`ledger.model_spend` summed by day), never a run's and never a person's. The step widens
+0074's `model_spend_spend_source_check` by exactly `LANGUAGE_CHECK`, adds `model_spend_language_check_is_runless` (no
+run, no phase) and one writer, `ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)`: SECURITY
+DEFINER, `search_path = pg_catalog`, owned by `debateai_staff_security_owner` (the role 0093 and 0107 gave column
+INSERT on `ledger.model_spend` for their spend writers), EXECUTE revoked from PUBLIC and granted to `debateai_runtime`
+alone. It is the ONLY writer of such a row (pre-flight PF-L58, option (a)): `PostgresModelSpendStore.recordSpend`
+refuses the source (`MODEL_SPEND_LANGUAGE_CHECK_FUNCTION_ONLY`), and the hosted API probes the function at boot and
+keeps the fast check off until it exists (`HOSTED_BEFORE_SPEND_RECORD`). No billing relation or function, so
+`verify-effective-capabilities-111.sql` stays the verifier in force; no `replayVerifierSql`: its checks are its
+postcondition digest (the writer's owner, rights, settings, definition and ACL, and the two CHECKs by name and
+definition). If `origin/dev` takes 0117 first, renumber this step at merge time (its manifest, loader name and
+`previous` follow), as C1's recipe above says.
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -108,8 +127,9 @@ own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again 
 COMMIT — so a step's promises (for example the batch's "no runtime may
 publish staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
 changes something an earlier step's verifier pins must change that verifier through its own reviewed step design; it
-cannot silently pass. The effective-capability verifier of the last applied step (after 0116: 0111's, which the batch,
-Part C's step, role rotation, the data export and the debate shape map keep) still runs at the end of every `migrate()`.
+cannot silently pass. The effective-capability verifier of the last applied step (after 0117: 0111's, which the batch,
+Part C's step, role rotation, the data export, the debate shape map and the language check's site cost keep) still runs
+at the end of every `migrate()`.
 
 ## Merge order: check the preview first
 

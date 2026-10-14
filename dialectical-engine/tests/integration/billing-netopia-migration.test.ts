@@ -23,9 +23,11 @@ const PART_C_MIGRATION = "0113_billing_price_currencies.sql";
 const ROLE_ROTATION_MIGRATION = "0114_role_rotation.sql";
 /** data-export S01 (V-41): the export's step, chained after role rotation's. */
 const EXPORT_MIGRATION = "0115_data_export.sql";
-/** The debate shape's map (spec 2026-10-12 §3.4), chained after the export's; migrate() applies it last. */
+/** The debate shape's map (spec 2026-10-12 §3.4), chained after the export's. */
 const MAP_MIGRATION = "0116_debate_shape_map.sql";
-const CHAIN = [NETOPIA_MIGRATION, AUTH_DB_BATCH, PART_C_MIGRATION, ROLE_ROTATION_MIGRATION, EXPORT_MIGRATION, MAP_MIGRATION] as const;
+/** The language check's site cost (question-language spec 2026-10-13), chained after the map's; migrate() applies it last. */
+const LANGUAGE_CHECK_MIGRATION = "0117_language_check_spend.sql";
+const CHAIN = [NETOPIA_MIGRATION, AUTH_DB_BATCH, PART_C_MIGRATION, ROLE_ROTATION_MIGRATION, EXPORT_MIGRATION, MAP_MIGRATION, LANGUAGE_CHECK_MIGRATION] as const;
 const DEV_110 = "0110_account_erasure_public_debates.sql";
 const SUPERSEDING_VERIFIER = "lineage/verify-effective-capabilities-111.sql";
 const SEALED_VERIFIER = "lineage/verify-effective-capabilities.sql";
@@ -500,7 +502,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
     expect(after.ledger.filter((row) => !(CHAIN as readonly string[]).includes(row.name))).toEqual(before.ledger);
     expect(after.forward108).toEqual(before.forward108);
     expect(after.forward110).toEqual(before.forward110);
-    expect(after.steps).toHaveLength(6);
+    expect(after.steps).toHaveLength(7);
     expect(after.steps[0]).toMatchObject({
       source_name: NETOPIA_MIGRATION, base_recipe_sha256: plan.recipeSha256,
       previous_manifest_sha256: plan.forward110.manifestSha256, forward_manifest_sha256: step!.manifestSha256,
@@ -670,17 +672,19 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       const counts = (await older.pool.query("SELECT name, count(*)::int n FROM public.debateai_schema_migration WHERE name = ANY($1) GROUP BY name ORDER BY name",
         [[DEV_110, ...CHAIN]])).rows;
       expect(counts).toEqual([{ name: DEV_110, n: 1 }, { name: NETOPIA_MIGRATION, n: 1 }, { name: AUTH_DB_BATCH, n: 1 }, { name: PART_C_MIGRATION, n: 1 },
-        { name: ROLE_ROTATION_MIGRATION, n: 1 }, { name: EXPORT_MIGRATION, n: 1 }, { name: MAP_MIGRATION, n: 1 }]);
+        { name: ROLE_ROTATION_MIGRATION, n: 1 }, { name: EXPORT_MIGRATION, n: 1 }, { name: MAP_MIGRATION, n: 1 },
+        { name: LANGUAGE_CHECK_MIGRATION, n: 1 }]);
       const receipt110 = (await older.pool.query("SELECT source_name, chain_manifest_sha256 FROM public.debateai_schema_migration_forward110")).rows;
       expect(receipt110).toEqual([{ source_name: DEV_110, chain_manifest_sha256: plan.forward108.manifestSha256 }]);
       const receipts = await receiptOf(older.pool);
-      expect(receipts).toHaveLength(6);
+      expect(receipts).toHaveLength(7);
       expect(receipts[0]).toMatchObject({ source_name: NETOPIA_MIGRATION, previous_manifest_sha256: plan.forward110.manifestSha256 });
       expect(receipts[1]).toMatchObject({ source_name: AUTH_DB_BATCH, previous_manifest_sha256: plan.forwardChain[0]!.manifestSha256 });
       expect(receipts[2]).toMatchObject({ source_name: PART_C_MIGRATION, previous_manifest_sha256: plan.forwardChain[1]!.manifestSha256 });
       expect(receipts[3]).toMatchObject({ source_name: ROLE_ROTATION_MIGRATION, previous_manifest_sha256: plan.forwardChain[2]!.manifestSha256 });
       expect(receipts[4]).toMatchObject({ source_name: EXPORT_MIGRATION, previous_manifest_sha256: plan.forwardChain[3]!.manifestSha256 });
       expect(receipts[5]).toMatchObject({ source_name: MAP_MIGRATION, previous_manifest_sha256: plan.forwardChain[4]!.manifestSha256 });
+      expect(receipts[6]).toMatchObject({ source_name: LANGUAGE_CHECK_MIGRATION, previous_manifest_sha256: plan.forwardChain[5]!.manifestSha256 });
       const before = (await older.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
       await migrate(older.pool);
       expect((await older.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows).toEqual(before);

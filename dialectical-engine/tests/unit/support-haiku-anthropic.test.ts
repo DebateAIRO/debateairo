@@ -10,7 +10,8 @@ import {
   SUPPORT_RELAY_MODEL,
   SUPPORT_RELAY_PROVIDER_REF,
   createSupportModelAdapter,
-  parseSupportModelTargetJson
+  parseSupportModelTargetJson,
+  supportAnthropicMessagesKey
 } from "../../apps/api/src/support/model.js";
 import { buildSupportAnswerPrompt } from "../../apps/api/src/support/prompt.js";
 import { createPublicationJudgeTransport } from "../../apps/api/src/publication-check/judge-transport.js";
@@ -239,5 +240,24 @@ describe("support chat on Claude Haiku 5.5 — the local relay pin", () => {
     expect(() => parseSupportModelTargetJson(JSON.stringify({
       ...relay, provider_ref: "development:hermes-glm-5.3-flash", model: "z-ai/glm-5.3-flash"
     }), LOCAL)).toThrow("SUPPORT_MODEL_PATH_NOT_RATIFIED");
+  });
+});
+
+describe("support chat on Claude Haiku 5.5 — the key the hosted language check borrows (P2L Task 19)", () => {
+  it("reads the Anthropic target's key through the same custody loader, and no key for any other target", () => {
+    const hosted = parseSupportModelTargetJson(anthropicTarget({ authorization_file: credentialFile(`${BARE_FIXTURE}\n`) }), HOSTED);
+    expect(supportAnthropicMessagesKey(hosted, readCustodyAuthorizationHeader)).toBe(BARE_FIXTURE);
+    expect(supportAnthropicMessagesKey(undefined, readCustodyAuthorizationHeader)).toBeUndefined();
+    const relay = parseSupportModelTargetJson(JSON.stringify({ provider_ref: SUPPORT_RELAY_PROVIDER_REF, base_url: "http://127.0.0.1:8794/v1",
+      model: SUPPORT_RELAY_MODEL, authorization_header: "Bearer support-only" }), LOCAL);
+    expect(supportAnthropicMessagesKey(relay, () => { throw new Error("never read"); })).toBeUndefined();
+    const vendor = parseSupportModelTargetJson(JSON.stringify({ provider_ref: "vendor:acme", base_url: "https://api.acme.example/v1",
+      model: "m", authorization_file: "/etc/debateai/api/providers/acme.header" }), HOSTED);
+    expect(supportAnthropicMessagesKey(vendor, () => { throw new Error("never read"); })).toBeUndefined();
+  });
+
+  it("refuses a key file written for the other wire, as the support adapter does, naming nothing of the value", () => {
+    const target = parseSupportModelTargetJson(anthropicTarget({ authorization_file: credentialFile(`Bearer ${BARE_FIXTURE}\n`) }), HOSTED);
+    expect(() => supportAnthropicMessagesKey(target, readCustodyAuthorizationHeader)).toThrow(new TypeError("PROVIDER_GATEWAY_CREDENTIAL_INVALID"));
   });
 });

@@ -377,7 +377,8 @@
         "billing.read_internal_grant_commitments",
         "billing.reserve_internal_provider_call",
         "billing.settle_internal_provider_call",
-        "billing.read_internal_run_state"
+        "billing.read_internal_run_state",
+        "ledger.record_language_check_spend"
       ]
     },
     {
@@ -2224,6 +2225,13 @@
         "EXECUTE ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean),billing.read_internal_grant_commitments(uuid,uuid,uuid,uuid)",
         "EXECUTE ON FUNCTION billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text),billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint)",
         "EXECUTE ON FUNCTION billing.read_internal_run_state(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0117_language_check_spend.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)"
       ]
     }
   ],
