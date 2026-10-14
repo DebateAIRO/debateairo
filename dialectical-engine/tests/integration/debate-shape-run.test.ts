@@ -31,6 +31,8 @@ import { runShapeDebate, scriptedShapeAnswers, shapeForTest, type ShapeDebateOpt
 import { copyDatabase, dropDatabase, savedDebate, type SavedDebate } from "../support/saved-debate.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
+import { rootZeroKeepRoomMicros, rootZeroRoomAttempts } from "../../apps/runner/src/map-stage.js";
+import { questionLanguageFromRun } from "@debateai/kernel";
 
 let database: TestDatabase;
 /** A connection to the cluster's maintenance database, for making and dropping the per-run copies. */
@@ -96,6 +98,21 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
     const positions = await q(database.pool, `SELECT answer_id, root_index FROM core.map_position WHERE run_id=$1 ORDER BY root_index`, debate.runId);
     expect(positions.map((row) => row.root_index)).toEqual(Array.from({ length: shape.answers }, (_unused, index) => index));
+  }, 600_000);
+
+  // P2L Task 17 (pre-flight PF-L52): a shaped run's every call — map, judge legs, panel, review, writer, checker and
+  // story — carries the run's locked language (the named sentence and the question_language field, last), never today's
+  // fallback directive; the locked Romanian replies are accepted, not refused. The language is set on startRun directly.
+  it("question language: every captured prompt of a shape run carries the locked sentence and field, never the fallback form", async () => {
+    const run = await runShapeDebate(harness, { label: "question-language", language: { tag: "ro", name: "Romanian" }, question: "Ar trebui sa renuntam la leu?" });
+    const { prompts } = run;
+    expect(prompts.length).toBeGreaterThan(0);
+    for (const prompt of prompts) {
+      expect(prompt.system).toContain("in Romanian, the language this debate was set to");
+      expect(prompt.system).not.toContain("the same language as the question");
+      expect(prompt.fields.at(-1)?.name).toBe("question_language");
+    }
+    expect(run.result.kind).toBe("COMPLETED");   // the locked Romanian replies are accepted, not refused (PF-L52)
   }, 600_000);
 
   // Amendment 2026-10-13 (final review note 6): the independent check of P2a's ceiling — what the run really made,
@@ -430,6 +447,30 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     }, 600_000);
 
     /**
+     * P2L Task 17, pre-flight PF-L38 (BLOCKER): root 0's room is sized in the runner from the run's LOCK — decided by its
+     * shape receipt, the same lock its judge inputs carry — framed at the bound lock. With hosted prices, a shaped run
+     * stored as ro/Romanian keeps a larger room than the same run stored as "und" (no lock, today's room).
+     */
+    it("root 0's room frames the run's lock: a locked shaped run keeps a larger room than the same run read as und (PF-L38)", async () => {
+      const question = "debate-shape-hosted-lock-1234567890";
+      const roomOf = async (label: string, language: Readonly<{ tag: string; name: string }>) => {
+        const probe = hostedMoney(1_000_000_000, () => CHEAP);
+        const run = await argue(label, "free", STANDARD, 1, {}, false, { money: probe.money, question, language });
+        expect(run.result.kind).toBe("COMPLETED");
+        const rooms = [...new Set(probe.seamLog.filter((entry) => entry.phase === "BODY" && entry.room > 0).map((entry) => entry.room))];
+        expect(rooms).toHaveLength(1);
+        const expected = rootZeroKeepRoomMicros({ prices: [CHEAP], ...rootZeroRoomAttempts({
+          questionLine: question, argumentLanguageName: language.name, tokenCeiling: POLICY.bounds.JUDGE.tokenCeiling,
+          questionLanguage: questionLanguageFromRun(language.tag, language.name) }) });
+        expect(rooms[0]).toBe(expected);
+        return rooms[0]!;
+      };
+      const locked = await roomOf("hosted-lock-ro", { tag: "ro", name: "Romanian" });
+      const unlocked = await roomOf("hosted-lock-und", { tag: "und", name: "the same language as the question" });
+      expect(locked).toBeGreaterThan(unlocked);
+    }, 600_000);
+
+    /**
      * Final review I-3 (Review Focus #1, "a lost claim during the map abandons"): the run loses its claim while the map's
      * lists are being asked (the keep-alive refuses, as `keepAliveStop` reads a lost claim or the time limit). The run is
      * abandoned exactly as today — it rejects; nothing is argued, no map is stored, no answer is written — and the map
@@ -596,7 +637,10 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     for (const writer of writers) {
       const frame = materialOf(writer);
       expect(frame.contractId).toBe("serve.synthesizer.length.v1");
-      expect(frame.fields.at(-1)).toEqual({ name: "answer_length", content: `about ${String(shape.answerWords)} words` });
+      // Pre-flight PF-L40 (P2L Task 17): the run is locked (the harness's English), so the language field rides LAST and
+      // the length field just before it.
+      expect(frame.fields.at(-2)).toEqual({ name: "answer_length", content: `about ${String(shape.answerWords)} words` });
+      expect(frame.fields.at(-1)?.name).toBe("question_language");
       // Final review M-5: exactly max(sealed, writerBound), as the title says — never only "at least the writer bound".
       expect(Number(writer.body.max_tokens)).toBe(Math.max(POLICY.bounds.COMPOSER.tokenCeiling, shape.writerBound));
     }

@@ -509,11 +509,12 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     // acceptance/moment-tools.ts, and that builder is the only place the
     // projection is applied.
     // Debate shape (Task 14): the WRITER's site passes the row's answer length as a fourth argument (null on today's
-    // run), so the count reads the shared head of both calls; the checker's call stays the two-argument one.
+    // run), so the count reads the shared head of both calls. Question language (P2L Task 17): both pass the run's lock
+    // as the fifth (null on a run without a shape: today's packet); the checker's packet is never lengthed (null).
     expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName")).toBe(SYNTHESIS_CALL_SITES);
-    expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName)")).toBe(1);
+    expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, null, shapeLanguage)")).toBe(1);
     expect(occurrences(runner,
-      "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, shapeRun === null ? null : shapeRun.shape.answerWords)")).toBe(1);
+      "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, shapeRun === null ? null : shapeRun.shape.answerWords,\n          shapeLanguage)")).toBe(1);
     expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(1);
     // Debate shape (040ddb9fd): the answer-length variant adds ONE field after that one projection, nothing else.
     // Question language (P2L Task 13, PF-L40): a shaped run's lock adds ONE code-owned field after those, last; the

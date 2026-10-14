@@ -1107,7 +1107,10 @@ export async function planHostedRegisterPublication(
     const firstCalls = firstPositionCallProjections({
       targets,
       judgeTokenCeiling: judgeTokenCeilingFromValue(sealed("acceptanceOrganCostBounds")?.value),
-      questionMaxBytes: askQuestionMaxBytes()
+      questionMaxBytes: askQuestionMaxBytes(),
+      // Ruling L-B9R (P2L Task 17): the runner's boot prices the longest lock whenever the version carries ANY
+      // debateShapePolicy row (enabled false too), so the plan asks the same.
+      questionLanguageLocked: debateShape !== null
     });
     assertRunCeilingCoversOneCall({
       bodyCeilingMicros: costEnvelopeCeilings(costEnvelope).bodyMicros,

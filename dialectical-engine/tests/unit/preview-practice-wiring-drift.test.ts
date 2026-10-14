@@ -304,11 +304,13 @@ describe("preview practice lanes: the jobs see the runner's context", () => {
     expect(RUNNER).toMatch(/const writerReading = rememberingAcceptedReply\(\(content, reply\) => classifyComposedContent\(content, \{/u);
     expect(LANES).toMatch(/const reading = rememberingAcceptedReply\(\(content, reply\) => classifyComposedContent\(content, \{/u);
     // Reply language (2026-10-12): both check the objection against the question's language.
-    expect(RUNNER).toContain("const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine));");
+    // Question language (P2L Task 17): the runner's reading also carries a shaped run's lock (null on today's run).
+    expect(RUNNER).toContain("const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine, shapeLanguage));");
     expect(LANES).toContain("const reading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, q.questionLine));");
     // R15 into dev (2026-10-13): the writer's classifier also carries Problem 7's wording index (no scores or engine
     // codes in the prose), so both pins now hold the wording member before the question line.
-    expect(RUNNER).toMatch(/exemptTokens: personIdTokens,\s*wording: writerWording,\s*questionLine: run\.questionLine\s*\}, reply\)\);/u);
+    // Question language (P2L Task 17): and, after the question line, a shaped run's lock (absent on today's run).
+    expect(RUNNER).toMatch(/exemptTokens: personIdTokens,\s*wording: writerWording,\s*questionLine: run\.questionLine,\s*\.\.\.shapeLanguageInput\s*\}, reply\)\);/u);
     expect(LANES).toMatch(/wording: synthesisWordingIndex\(\{ request, personTexts \}\),\s*questionLine: q\.questionLine\s*\}, reply\)\);/u);
   });
 

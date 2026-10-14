@@ -828,6 +828,28 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
     expect(await planCode(freeRosterFile({ input: 1_000_000, output: 4_000_000 }, true))).toBe("NO_REFUSAL");
   });
 
+  /**
+   * Ruling L-B9R (P2L Task 17): with ANY debateShapePolicy member (enabled false too: the runner reads the raw row and
+   * finishes the shaped runs admitted before the switch), a run may carry the locked language, so the first call is
+   * priced at the longest lock too. The dearest input price a version WITHOUT the member lets through is refused with it.
+   */
+  it("prices the longest lock whenever a debateShapePolicy member is present, enabled false included (L-B9R)", async () => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(debateShapePolicyStartValues())) as Record<string, unknown>;
+    const output = 4_000_000;
+    const withoutRow = (input: number) => planCode(freeRosterFile({ input, output }, true));
+    let fits = 1_000_000;
+    let refused = 50_000_000;
+    expect(await withoutRow(fits)).toBe("NO_REFUSAL");
+    expect(await withoutRow(refused)).toBe("RUN_CEILING_BELOW_ONE_CALL");
+    while (refused - fits > 1) {
+      const middle = Math.floor((fits + refused) / 2);
+      if (await withoutRow(middle) === "NO_REFUSAL") fits = middle; else refused = middle;
+    }
+    for (const shape of [member, { ...member, enabled: false }]) {
+      expect(await planCode({ ...freeRosterFile({ input: fits, output }, true), debateShapePolicy: shape })).toBe("RUN_CEILING_BELOW_ONE_CALL");
+    }
+  });
+
   it("has nothing to ask while no plan's whole roster is configured, as at boot", async () => {
     const file = validFile();
     Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {

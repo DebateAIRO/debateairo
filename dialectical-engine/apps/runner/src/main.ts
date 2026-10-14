@@ -324,7 +324,11 @@ if (costEnvelopePolicy !== null && envelopeBand !== null) {
   const firstCalls = firstPositionCallProjections({
     targets: declaredProviderTargets,
     judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,
-    questionMaxBytes: askQuestionMaxBytes()
+    questionMaxBytes: askQuestionMaxBytes(),
+    // Ruling L-B9R (P2L Task 17): with ANY debateShapePolicy row (read raw above, enabled false too: this runner still
+    // finishes the shaped runs admitted before the switch), a run's first call may carry the locked language, so it is
+    // priced at the longest lock too. No row: today's price.
+    questionLanguageLocked: debateShape !== null
   });
   assertRunCeilingCoversOneCall({
     bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,

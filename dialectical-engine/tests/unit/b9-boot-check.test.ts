@@ -236,6 +236,10 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
     expect(main).toContain("judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,");
     expect(main).toContain("questionMaxBytes: askQuestionMaxBytes()");
     expect(main).toContain("rosters: PLAN_TIER_ROSTERS");
+    // Ruling L-B9R (P2L Task 17): the runner prices the longest lock whenever ANY debateShapePolicy row is present
+    // (`debateShape`, read raw before this check: enabled false too); no row, today's price.
+    expect(main).toContain("questionLanguageLocked: debateShape !== null");
+    expect(main.indexOf("questionLanguageLocked: debateShape !== null")).toBeGreaterThan(main.indexOf("const debateShape = await readDebateShapeRunnerSettings("));
   });
 
   it("the API, after its provider targets are read, over the policy row its boot already read, one group per plan", async () => {

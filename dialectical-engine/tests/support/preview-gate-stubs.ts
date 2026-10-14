@@ -16,7 +16,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { argumentLanguageDirective } from "@debateai/kernel";
+import { argumentLanguageDirective, questionLanguageSentence } from "@debateai/kernel";
 import { MAP_CONTRACT_IDS } from "@debateai/map";
 import { STORY_CHECKER_CONTRACT_ID, STORYTELLER_CONTRACT_ID } from "@debateai/story";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
@@ -110,9 +110,14 @@ export type GateOverride = Readonly<{ content: string }> | Readonly<{ unbilled: 
  * "the same language as the question").
  */
 export type StubLanguage = "en" | "ro";
-const ROMANIAN_DIRECTIVE = argumentLanguageDirective("Romanian");
+/**
+ * Romanian, in both forms a request can name it: today's directive, and (question-language spec 2026-10-13, P2L Task 17,
+ * pre-flight PF-L52) the locked sentence a shaped run's calls carry instead.
+ */
+const ROMANIAN_DIRECTIVES = Object.freeze([argumentLanguageDirective("Romanian"), questionLanguageSentence({ code: "ro", name: "Romanian" })]);
 export function stubReplyLanguage(chat: string): StubLanguage {
-  return wirePacket(chat).messages.some((message) => typeof message.content === "string" && message.content.includes(ROMANIAN_DIRECTIVE))
+  return wirePacket(chat).messages.some((message) => typeof message.content === "string"
+    && ROMANIAN_DIRECTIVES.some((directive) => message.content.includes(directive)))
     ? "ro" : "en";
 }
 
@@ -217,12 +222,23 @@ export function stubStoryFor(chat: string, defaultShape: string): string {
 
 /**
  * The argument-language directive names the machine keys below, so it is removed before routing (as database.test.ts).
- * Both of its forms (#154): another language is named "<name>, the language of the question,", English only "English,"
- * (an English question, and the fallback for a question the detector cannot name, as these tests' labels are). With
- * only the first form an English directive stayed in, its "fatalFlags" sent every review and checker call to PANEL.
+ * Both of its forms (#154): another language is named "<name>, the language of the question,", English only "English,
+ * the language of the question," (an English question, and the fallback for a question the detector cannot name, as
+ * these tests' labels are). With only the first form an English directive stayed in, its "fatalFlags" sent every review
+ * and checker call to PANEL. Question language (spec 2026-10-13, P2L Task 17, pre-flight PF-L51): a shaped run's calls
+ * carry the locked sentence instead, which names "fatalFlags[].type" too — the third alternative removes it WHOLE (both
+ * of its sentences), built from the kernel's own sentence exactly as the first two are, never from a fragment.
  */
-const LANGUAGE_DIRECTIVE = new RegExp([argumentLanguageDirective("\u0000"), argumentLanguageDirective("")]
+// The kernel frames only a lock it would accept (Task 13 review, Minor 2: never "\u0000" as a name), so the sentence is
+// built with a plain placeholder name, then that one name is marked as the first two forms' is.
+const LOCKED_NAME_PLACEHOLDER = "Placeholderish";
+const LANGUAGE_DIRECTIVE = new RegExp([argumentLanguageDirective("\u0000"), argumentLanguageDirective(""),
+  questionLanguageSentence({ code: "en", name: LOCKED_NAME_PLACEHOLDER }).replace(LOCKED_NAME_PLACEHOLDER, "\u0000")]
   .map((directive) => directive.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\u0000", "[^.]+?")).join("|"), "gu");
+/** The one stripping `classifyGateRequest` applies, under a name a test can call (P2L Task 17, PF-L51). */
+export function stripLanguageDirectiveForTest(text: string): string {
+  return text.replace(LANGUAGE_DIRECTIVE, "");
+}
 const PROBE_QUESTION = "Reply exactly: OK";
 
 /**
@@ -248,7 +264,7 @@ export function classifyGateRequest(chat: string): GateRequestKind | "UNKNOWN" {
   if (contractId === STORY_CHECKER_CONTRACT_ID) return "STORY_CHECKER";
   // Debate shape (plan Task 15): the map's six contracts, by their ids. The new judge contracts stay "JUDGE" below.
   if ((Object.values(MAP_CONTRACT_IDS) as string[]).includes(contractId)) return "MAP";
-  const instruction = (messages[0]?.content ?? "").replace(LANGUAGE_DIRECTIVE, "");
+  const instruction = stripLanguageDirectiveForTest(messages[0]?.content ?? "");
   // The panel's assessment is the judge's schema WITHOUT restatement_text (tests/unit/t03-judge-panel.test.ts).
   if (instruction.includes("fatalFlags") && !instruction.includes("restatement_text")) return "PANEL";
   if (instruction.includes("edge_bearings")) return "REVIEW";

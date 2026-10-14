@@ -174,6 +174,7 @@ import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from 
 import { MapChoiceRepository, type MapResult } from "@debateai/map";
 import {
   argumentLanguageDirective,
+  questionLanguageFromRun,
   questionLanguageSentence,
   replyLanguageCheckFor,
   withQuestionLanguageField,
@@ -5710,6 +5711,17 @@ export class WalkingSkeletonRunner {
       ? Object.freeze({ shape: shapeShape, settings: shapeSettings, mapContractHash: this.settings.debateShape.mapContractHash })
       : null;
     /**
+     * Question language (spec 2026-10-13 L6; P2L Task 17) — THE RUN'S LOCK, decided by its SHAPE RECEIPT: a shaped run
+     * reads its stored tag and name back as a lock (`questionLanguageFromRun`; null for "und" or a stored fallback name);
+     * a run without a shape is never locked, whatever tag it stored, so every one of its calls keeps today's directive,
+     * fields and reply check byte for byte. Computed before the map stage, whose root-0 room frames it (PF-L38). Every
+     * call of a shaped run carries it: the judge legs, root 0's room, the review, the panel, the writer and its
+     * reading, the checker and its reading, the map (which reads the same stored pair itself) and the story.
+     */
+    const shapeLanguage: QuestionLanguage | null = shapeRun === null ? null
+      : questionLanguageFromRun(run.argumentLanguageTag, run.argumentLanguageName);
+    const shapeLanguageInput = shapeLanguage === null ? {} : { questionLanguage: shapeLanguage };
+    /**
      * A15 (R5) and controller ruling A14 (carry 1): debaters come from distinct
      * makers. On an assigned run a POSITION member may answer only when no OTHER
      * POSITION seat holds its maker — read off the CLAIMED book, never off who
@@ -6165,6 +6177,7 @@ export class WalkingSkeletonRunner {
               callSiteKey,
               questionLine: input.questionLine,
               argumentLanguageName: run.argumentLanguageName,
+              ...shapeLanguageInput,
               statement: input.statement,
               authorMaker: input.authorMaker,
               providerRef: member.providerRef,
@@ -6746,7 +6759,7 @@ export class WalkingSkeletonRunner {
         const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
           .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
         const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
-          questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName,
+          questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
           tokenCeiling: this.settings.judgeBound.tokenCeiling }) });
         const mapCaller = createRunnerMapCaller({
           runId: run.runId, subjectItemId: claimed.workItemId, mapContractHash: shapeRun.mapContractHash,
@@ -7044,6 +7057,7 @@ export class WalkingSkeletonRunner {
             // field; the leg's directive is code's and rides the system message.
             questionLine: run.questionLine,
             argumentLanguageName: run.argumentLanguageName,
+            ...shapeLanguageInput,
             leg,
             providerRef: member.providerRef,
             contractHash: this.settings.judgeContractHash,
@@ -7274,6 +7288,7 @@ export class WalkingSkeletonRunner {
             callSiteKey,
             questionLine: run.questionLine,
             argumentLanguageName: run.argumentLanguageName,
+            ...shapeLanguageInput,
             leg: input.leg,
             providerRef: member.providerRef,
             contractHash: this.settings.judgeContractHash,
@@ -7556,6 +7571,7 @@ export class WalkingSkeletonRunner {
               callSiteKey: memberCallSiteKey,
               questionLine: run.questionLine,
               argumentLanguageName: run.argumentLanguageName,
+              ...shapeLanguageInput,
               statement: authoredNode.statement,
               authorMaker: authoredNode.maker,
               providerRef: member.providerRef,
@@ -9607,7 +9623,8 @@ export class WalkingSkeletonRunner {
         // D2 + A17: ONE builder for the live call and moment:replay, in the question's language. Debate shape (spec §3.3
         // step 8; Task 5 binding note): a shaped run's writer is asked for about the row's answer length — every writer
         // call, first try and retries (each is a request through here); the checker's packet is never lengthed.
-        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, shapeRun === null ? null : shapeRun.shape.answerWords);
+        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, shapeRun === null ? null : shapeRun.shape.answerWords,
+          shapeLanguage);
         const packet = framed.packet;
         /**
          * The draft as the engine reads it. Final review I-1: it is read INSIDE
@@ -9624,7 +9641,9 @@ export class WalkingSkeletonRunner {
           servedNodes,
           exemptTokens: personIdTokens,
           wording: writerWording,
-          questionLine: run.questionLine
+          // P2L Task 17: the question AND the lock — the reading drops the lock when the question is absent.
+          questionLine: run.questionLine,
+          ...shapeLanguageInput
         }, reply));
         const composedSegmentsOf = (content: string): readonly ComposedSegment[] => {
           const parsed = parseComposerOutput(content, writerReading.acceptedAs(content).reply);
@@ -9784,7 +9803,7 @@ export class WalkingSkeletonRunner {
         const checkerOptions = synthesisSeatOptions("EVALUATOR", checkerSeat, checkerSiteKey);
         const planned: ServeRoleMaker = seatCaller.plan(checkerSeat, checkerSiteKey, checkerOptions) ?? checkerSeat.main;
         checkerPlannedByRound.set(request.round, planned.providerRef);
-        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName);
+        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, null, shapeLanguage);
         const packet = framed.packet;
         /**
          * The verdict as the engine reads it, its coherence included (the loop
@@ -9793,7 +9812,7 @@ export class WalkingSkeletonRunner {
          * verdict this reading refuses has left nothing to serve.
          */
         // All-steps format robustness (2026-10-12): remembered as the writer's is.
-        const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine));
+        const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine, shapeLanguage));
         const evaluatorVerdictOf = (content: string): EvaluatorVerdict => {
           const parsed = parseEvaluatorOutput(content, checkerReading.acceptedAs(content).reply);
           return assertEvaluatorVerdict(Object.freeze({
@@ -10268,6 +10287,8 @@ export class WalkingSkeletonRunner {
               // The same language the debate's own prompts were told to write in
               // (argumentLanguageDirective), and the tag the story is stored with.
               argumentLanguage: { tag: run.argumentLanguageTag, name: run.argumentLanguageName },
+              // P2L Task 17: the story writes in the lock only when the run's shape receipt locked it.
+              languageLocked: shapeLanguage !== null,
               compositionBudgetTier: run.compositionBudgetTier,
               verdict: { label: verdictLabel.label, rung: verdictLabel.rung, trigger: verdictLabel.trigger },
               servedRootNodeId: servedRoot.nodeId,
