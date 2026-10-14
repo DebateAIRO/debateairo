@@ -141,6 +141,11 @@ The pre-flight scan (`.superpowers/sdd/2026-10-13-debate-shape-phase2-language/p
 - PF-L63 → Owner steps 2: "v2/v3 kit".
 - PF-L64 → Self-review table gains L8, mix, consent, money and kit rows; implementer note on sealed values.
 
+**Task 18 interplay with P2c (P2c pre-flight corrections, 2026-10-14):**
+- P2c PF-C32 → Task 18 Step 4 also runs `tests/render/debate-shape-new-controls.test.tsx` and `tests/unit/debate-shape-new-ask-wire.test.ts`.
+- P2c PF-C41, PF-C36 → Task 18 Step 0: `grep -L … || true` (skip when it prints nothing); packets in the git-ignored `.superpowers/sdd/2026-10-13-debate-shape-phase2-language/translations`; P2c's merge script used with its removal and replace lists emptied (it is no longer add-only).
+- P2L ledger notes for Task 18 → the `submit()` loop allows four `createDebate` calls plus the consent retry (the CR-5 test makes four); USE sends `proposed_question` as given and the first try's `topic.trim()` as `original_question_line`; after a stale refusal the page never resends a `check_ref` and re-checks once with the person's wording and no choice; a second offer in the same press is answered with KEEP_MINE and its new `check_ref`, never a second pop-up; branch on `serverCode`; the offer comes before plan and allowance refusals (D1 order); known trade-off: after a stale USE_REWRITE the REPEAT_OFFER lock keeps the person's wording.
+
 ## Global Constraints
 
 **Row absent = today, byte for byte**
@@ -4196,9 +4201,9 @@ export function useQuestionLanguageChoice(input: Readonly<{ catalog: MessageCata
   Readonly<{ ensureChoice(offer: QuestionLanguageOffer): Promise<QuestionLanguageAnswer>; dialog: React.ReactNode }>;
 ```
 
-- [ ] **Step 0 (only if needed):** run `grep -L '"newDebate.languageCheck.body"' apps/ui/messages/*/newDebate.json`. If it lists ANY file, some locale lacks the keys and this step runs for exactly the listed locales (pre-flight PF-L57: checking only `en` misses the case where P2c Task 8 added the English keys but Task 10 never translated them, and catalogue parity then goes red).
+- [ ] **Step 0 (only if needed):** run `grep -L '"newDebate.languageCheck.body"' apps/ui/messages/*/newDebate.json || true` (`grep -L` exits 1 when it lists nothing, which is the normal case once P2c Task 10 has run; the `|| true` keeps a `set -e` shell going; P2c pre-flight PF-C41). If it prints nothing, skip the rest of Step 0. If it lists ANY file, some locale lacks the keys and this step runs for exactly the listed locales (pre-flight PF-L57: checking only `en` misses the case where P2c Task 8 added the English keys but Task 10 never translated them, and catalogue parity then goes red).
   - `en` and `ro`, if listed: add the six keys as in the table (Romanian given as is, never translated).
-  - Every other listed locale: translate with P2c Task 10's process, cut down to these six keys (`docs/superpowers/plans/2026-10-12-debate-shape-phase2c.md`, Task 10, ~3950–4040): the same six Haiku workers by language group, effort `xhigh`, foreground; the worker prompt's key list is these six keys (and its counts become 6 per locale); each group gets only its listed locales; packets inside `$(git rev-parse --absolute-git-dir)/p2l-translations`, never committed; the same merge script, which adds the six keys and touches nothing else. Rules for these keys:
+  - Every other listed locale: translate with P2c Task 10's process, cut down to these six keys (`docs/superpowers/plans/2026-10-12-debate-shape-phase2c.md`, the section "## Task 10: All 35 locales"; find it by its heading): the same six Haiku workers by language group, effort `xhigh`, foreground; the worker prompt's key list is these six keys (and its counts become 6 per locale); each group gets only its listed locales; packets in `"$(git rev-parse --show-toplevel)/.superpowers/sdd/2026-10-13-debate-shape-phase2-language/translations"` (git-ignored, never committed; P2c pre-flight PF-C36). P2c's merge script does more than add keys: it also removes the retired keys and replaces the reworded `debateChrome.condition.mapMergeFallback` (P2c pre-flight PF-C41, PF-C33). Use it with its removal list and its replace list emptied, so that here it only adds the six keys. Rules for these keys:
     - keep `{languages}` and `{language}` untranslated;
     - the sentence must read naturally with a language name, or a list of names, filled in;
     - use the catalogue's own register.
@@ -4395,16 +4400,18 @@ The render test's mocks resolve `{ id: "run-1" }`, as the consent test's do.
 - Guard it once: `const pageLocale: LocaleCode = isLocale(locale) ? locale : "en";` (`isLocale`, `apps/ui/lib/i18n/locales.ts` ~79), and use `pageLocale` for `catalogLocale(...)` and `useQuestionLanguageChoice`.
 - Create `const languageChoice = useQuestionLanguageChoice({ catalog, locale: pageLocale });` next to `useSensitiveDataConsent`.
 - Render `{languageChoice.dialog}` beside `{consent.dialog}{crisis.dialog}`.
-- In `submit()`, replace the single `createDebate(topic.trim(), config, token)` call (and its consent retry) with a loop of at most three tries:
+- In `submit()`, replace the single `createDebate(topic.trim(), config, token)` call (and its consent retry) with a loop of at most FOUR `createDebate` calls per press of "Start debate", plus today's one consent retry (P2L ledger note for Task 18: the CR-5 test below makes four calls: the first ask, the answer to the offer, the re-check after a stale refusal, and the KEEP_MINE answer to a second offer; "three tries" would stop before the last one):
   - the site language is `catalogLocale(pageLocale)` (en-US/en-GB → en);
   - every call passes it;
   - on `QuestionLanguageChoiceNeededError`, `await languageChoice.ensureChoice(error.offer)`:
     - `"EDIT"`: focus the question textarea and return (the debate is not created; the next submit checks again);
-    - `"USE"`: call again with the offer's `proposed_question` and `{ check_ref, choice: "USE_REWRITE", original_question_line: topic.trim() }`;
+    - `"USE"`: call again with the offer's `proposed_question` exactly as the server sent it (not trimmed or edited) and `{ check_ref, choice: "USE_REWRITE", original_question_line: topic.trim() }`, where `topic.trim()` is the same string the first try sent;
     - `"KEEP"`: call again with `topic.trim()` and `{ check_ref, choice: "KEEP_MINE" }`;
-  - on `isQuestionLanguageCheckStale(error)` after a choice: call once more with no choice (the server checks again; a second offer for the same question within 15 minutes is answered by the server with its fallback lock, `REPEAT_OFFER`, ruling CR-5);
+  - on `isQuestionLanguageCheckStale(error)` after a choice: never resend that `check_ref`; call once more with the person's own wording (`topic.trim()`) and no choice (the server checks again; a second offer for the same question within 15 minutes is answered by the server with its fallback lock, `REPEAT_OFFER`, ruling CR-5). Known trade-off: after a stale `USE_REWRITE`, the `REPEAT_OFFER` lock keeps the person's wording, not the rewrite;
+  - branch on the error's `serverCode` (via `isQuestionLanguageCheckStale`), never on `.code`: the client's `.code` for every 409 is `"SERVER_FAILURE"`;
   - ruling CR-5, page side: the pop-up shows at most ONCE per press of "Start debate". If a second offer still arrives in the same submit (an API process that did not see the first offer), the page does not show it: it answers that offer with `{ check_ref: <the new reference>, choice: "KEEP_MINE" }` and the person's own wording;
-  - the existing consent refusal branch stays as it is, inside the loop.
+  - the existing consent refusal branch stays as it is, inside the loop;
+  - order (D1): the server makes its language offer before any plan or allowance refusal (the decider runs first in `submit`, after the session and team checks). So the pop-up can come first and a plan or allowance refusal only on the answering call; the loop hands every error that is not an offer, a stale-check 409 or the consent refusal to today's handling, unchanged.
 - Keep `buildNewDebateAskConfig` and the config object untouched: `tests/render/ux01-new-debate-form.test.tsx` pins its keys.
 
 `apps/ui/lib/v3/requestFailure.ts` (~131–136; pre-flight PF-L29): map a 409 whose `serverCode` is `QUESTION_LANGUAGE_CHECK_INVALID`, `QUESTION_LANGUAGE_CHECK_EXPIRED` or `QUESTION_LANGUAGE_CHOICE_MISMATCH` to the page's plain "check again" handling (the loop above), never to a raw code in text; branch on `serverCode`, since the client's own `.code` for any 409 is `"SERVER_FAILURE"` (PF-L24).
@@ -4419,6 +4426,8 @@ Run, one after another:
 - `pnpm exec vitest run tests/render/ux01-new-debate-form.test.tsx`
 - `pnpm exec vitest run tests/render/tier01-new-plan-tier.test.tsx`
 - `pnpm exec vitest run tests/render/new-debate-no-phone-step.test.tsx`
+- `pnpm exec vitest run tests/render/debate-shape-new-controls.test.tsx` (P2c Task 8's /new controls; this task edits the same `submit()`; P2c pre-flight PF-C32)
+- `pnpm exec vitest run tests/unit/debate-shape-new-ask-wire.test.ts` (P2c Task 8's wire test; this task adds `createDebate`'s fifth argument; P2c pre-flight PF-C32)
 
 Then run the catalogue check from the UI folder, the form P2c uses (pre-flight PF-L55: the test reads `join(process.cwd(), "messages")` and imports TypeScript, so it fails from the engine folder): `cd apps/ui && node --import tsx --test lib/i18n/catalog.test.mjs` (the same form for `catalogNamespaces.test.mjs` if this task touched it).
 
