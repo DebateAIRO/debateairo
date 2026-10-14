@@ -27,6 +27,10 @@ import { ServeRepository } from "@debateai/serve";
 import type { Pool, PoolClient, QueryResult } from "pg";
 import type { AskBilling } from "../../apps/api/src/ask-billing.js";
 import type { AskRoomPort, AskRoomReader, RoomDecision, RoomQuestion } from "../../apps/api/src/ask-room.js";
+import {
+  buildDevelopmentAlgorithmRegisterRows, buildDevelopmentDeploymentRegisterRows, buildDevelopmentRunnerRegisterRows
+} from "../../apps/runner/src/dev-deployment-register.js";
+import type { DevelopmentProviderPanel } from "../../apps/runner/src/dev-provider-panel.js";
 import { composePracticeRunner } from "../../tools/preview-practice/practice-runner-composition.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
@@ -364,17 +368,59 @@ describe("the boot reads the optional row (note 8) and the practice runner resol
     expect(practice.indexOf(inForce)).toBeLessThan(practice.indexOf("new PostgresAskApplication("));
   });
 
-  function rowPool(row: unknown, mapHash?: unknown) {
+  /**
+   * The practice mirrors apps/runner/src/main.ts's boot order (the wiring-drift rule): the sealed envelopes, then the
+   * development runner policy and its prompt fingerprints, THEN the shape. So the scripted pool first answers the
+   * policy step with the code's own development register rows (the dev builders, round-tripped through JSON as the
+   * database hands them back), then answers only the two shape keys; any read after the shape step throws
+   * PRACTICE_TEST_NEXT_READ ("passed on"). The two shape keys are the test's to script, never the builders'.
+   */
+  const SHAPE_KEYS = new Set(["debateShapePolicy", "mapContractHash"]);
+  async function policyRegister() {
+    const providerPanel = {
+      configuredProviders: [
+        { providerRef: "practice-maker-a", adapterKind: "openai-compatible-http", maker: "maker-a" },
+        { providerRef: "practice-maker-b", adapterKind: "openai-compatible-http", maker: "maker-b" }
+      ],
+      requiredDistinctMakers: 2
+    } as unknown as DevelopmentProviderPanel;
+    const rows = [
+      ...buildDevelopmentDeploymentRegisterRows(providerPanel),
+      ...buildDevelopmentAlgorithmRegisterRows(providerPanel),
+      ...await buildDevelopmentRunnerRegisterRows()
+    ].filter(({ rowKey }) => !SHAPE_KEYS.has(rowKey));
+    return new Map(rows.map((row) => [row.rowKey, {
+      row_key: row.rowKey, value_json: JSON.parse(JSON.stringify(row.value)) as unknown, source_ref: row.sourceRef
+    }]));
+  }
+  async function rowPool(row: unknown, mapHash?: unknown) {
+    const register = await policyRegister();
     const asked: unknown[][] = [];
+    let shapeStep = false;
     const pool = {
       query: vi.fn(async (_sql: string, values: unknown[]) => {
         asked.push(values);
-        if (values[1] === "debateShapePolicy") return { rows: row === undefined ? [] : [{ value_json: row }] };
-        if (values[1] === "mapContractHash") return { rows: mapHash === undefined ? [] : [{ value_json: mapHash }] };
-        throw new Error("PRACTICE_TEST_NEXT_READ");
+        if (values[1] === "debateShapePolicy") {
+          shapeStep = true;
+          return { rows: row === undefined ? [] : [{ value_json: row }] };
+        }
+        if (values[1] === "mapContractHash") {
+          shapeStep = true;
+          return { rows: mapHash === undefined ? [] : [{ value_json: mapHash }] };
+        }
+        if (shapeStep) throw new Error("PRACTICE_TEST_NEXT_READ");
+        const keys = Array.isArray(values[1]) ? values[1] as unknown[] : [values[1]];
+        return { rows: keys.flatMap((key) => register.get(String(key)) ?? []) };
       })
     } as unknown as Pool;
-    return { pool, asked };
+    /** The reads from the shape step on; every read before it is the policy step's and names no shape key. */
+    const shapeReads = () => {
+      const first = asked.findIndex((values) => SHAPE_KEYS.has(String(values[1])));
+      expect(first).toBeGreaterThan(0);
+      expect(asked.slice(0, first).flat(2).filter((key) => SHAPE_KEYS.has(String(key)))).toEqual([]);
+      return asked.slice(first);
+    };
+    return { pool, asked, shapeReads };
   }
   const compose = (pool: Pool) => composePracticeRunner({
     pool, keepAlivePool: pool, budgetPorts: {} as never, remaining: {} as never,
@@ -382,19 +428,21 @@ describe("the boot reads the optional row (note 8) and the practice runner resol
   });
 
   it("a valid row without its map hash refuses the practice runner after the two reads; with the code's hash it passes on; a malformed one refuses; no row passes on", async () => {
-    const unsealed = rowPool(JSON.parse(JSON.stringify(POLICY)));
+    const unsealed = await rowPool(JSON.parse(JSON.stringify(POLICY)));
     await expect(compose(unsealed.pool)).rejects.toMatchObject({ code: "DEBATE_SHAPE_MAP_HASH_UNSEALED" });
-    expect(unsealed.asked).toEqual([[7, "debateShapePolicy"], [7, "mapContractHash"]]);
-    const sealed = rowPool(JSON.parse(JSON.stringify(POLICY)), mapPromptContractHash());
+    expect(unsealed.shapeReads()).toEqual([[7, "debateShapePolicy"], [7, "mapContractHash"]]);
+    const sealed = await rowPool(JSON.parse(JSON.stringify(POLICY)), mapPromptContractHash());
     await expect(compose(sealed.pool)).rejects.toThrow("PRACTICE_TEST_NEXT_READ");
-    expect(sealed.asked.slice(0, 2)).toEqual([[7, "debateShapePolicy"], [7, "mapContractHash"]]);
-    await expect(compose(rowPool({ kind: "DEBATE_SHAPE_POLICY" }).pool)).rejects.toThrow(/^DEBATE_SHAPE_POLICY_INVALID:/u);
-    const absent = rowPool(undefined);
+    expect(sealed.shapeReads().slice(0, 2)).toEqual([[7, "debateShapePolicy"], [7, "mapContractHash"]]);
+    const malformed = await rowPool({ kind: "DEBATE_SHAPE_POLICY" });
+    await expect(compose(malformed.pool)).rejects.toThrow(/^DEBATE_SHAPE_POLICY_INVALID:/u);
+    expect(malformed.shapeReads()[0]).toEqual([7, "debateShapePolicy"]);
+    const absent = await rowPool(undefined);
     await expect(compose(absent.pool)).rejects.toThrow("PRACTICE_TEST_NEXT_READ");
-    expect(absent.asked[0]).toEqual([7, "debateShapePolicy"]);
+    expect(absent.shapeReads()[0]).toEqual([7, "debateShapePolicy"]);
     // No row: the map hash row is never read (fix round 1), so even a malformed one passes on.
     expect(absent.asked).not.toContainEqual([7, "mapContractHash"]);
-    const malformedHash = rowPool(undefined, "not-a-hash");
+    const malformedHash = await rowPool(undefined, "not-a-hash");
     await expect(compose(malformedHash.pool)).rejects.toThrow("PRACTICE_TEST_NEXT_READ");
     expect(malformedHash.asked).not.toContainEqual([7, "mapContractHash"]);
   });
