@@ -115,7 +115,7 @@
   "public.story.fate.setAside": "Set aside",
   "public.story.pathsListName": "Positions the debate explored",
   "public.alsoRaised.title": "Also raised, not debated",
-  "public.alsoRaised.empty": "Every point that came up was debated.",
+  "public.alsoRaised.empty": "No other points came up.",
   "public.positionTitle": "The case for {answer}, argued by {ai}",
   "public.story.hide": "Hide",
   "public.story.show": "Show",

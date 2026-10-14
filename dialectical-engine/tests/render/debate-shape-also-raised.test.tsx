@@ -85,7 +85,7 @@ const VIEW: DebateMapView = {
 const QUESTION_WORDS: Record<string, string> = {
   ...publicEnglish,
   "public.alsoRaised.title": "RO Also raised",
-  "public.alsoRaised.empty": "RO Every point was debated.",
+  "public.alsoRaised.empty": "RO No other points came up.",
   "public.positionTitle": "RO Pentru {answer}, susținut de {ai}"
 };
 const PUBLIC_BASE = {
@@ -186,7 +186,7 @@ describe("debate shape P2c — the public overview's also-raised list", () => {
 
   it("says every point was debated when nothing was left over", async () => {
     const container = await mount(overview({ positions: [], also_raised: [] }));
-    expect(container.querySelector(".alsoRaisedEmpty")?.textContent).toBe("RO Every point was debated.");
+    expect(container.querySelector(".alsoRaisedEmpty")?.textContent).toBe("RO No other points came up.");
     expect(container.querySelector(".alsoRaisedItem")).toBeNull();
   });
 
