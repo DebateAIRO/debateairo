@@ -16,6 +16,7 @@ import {
   type PromptContract,
   type PromptPacket
 } from "@debateai/providers";
+import { StoryBodySchema } from "@debateai/contract";
 import { classifyStructuredArtifact, judgeArtifactSchema, parseStructuredArtifact } from "@debateai/judgement";
 import { classifyCheckerContent, parseCheckerVerdict } from "@debateai/story";
 import { buildSynthesisDigest, idShapedTokensIn, type DigestSourceNode, type SynthesisDigest } from "@debateai/serve";
@@ -132,7 +133,7 @@ describe("the patch packet: the first packet's bytes, the model's own answer as 
   });
 
   it("the frame defines PATCH in one fixed sentence", () => {
-    expect(PATCH_REPLY_FORM_SENTENCE).toBe("A later block may instead carry machine_rejection_code, machine_rejection_paths and machine_reply_form PATCH, right after your own earlier answer: then return only one JSON object whose keys are exactly the listed machine paths (dotted, e.g. \"value_laden\", \"criteria\", \"segments.0.text\") and whose values are the corrected values, nothing else.");
+    expect(PATCH_REPLY_FORM_SENTENCE).toBe("A later block may instead carry machine_rejection_code, machine_rejection_paths, machine_rejection_limits when a value broke a size limit, and machine_reply_form PATCH, right after your own earlier answer: then return only one JSON object whose keys are exactly the listed machine paths (dotted, e.g. \"value_laden\", \"criteria\", \"segments.0.text\") and whose values are the corrected values, each within the size limit machine_rejection_limits states for it, nothing else.");
     expect(systemOf(framed().packet)).toContain(PATCH_REPLY_FORM_SENTENCE);
   });
 
@@ -326,11 +327,235 @@ describe("today's real slips are fixed by a patch, and the merged answer passes 
       expect(composed.segments[0]!.text).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/u);
     });
 
-  it("the full re-ask stays the repair packet a code and a path, as before (schemaFailureLocator is unchanged)", () => {
+  it("the full re-ask stays the repair packet a code and a path, as before, for a refusal that states no size limit", () => {
     expect(schemaFailureLocator({ parseStatus: "SCHEMA_FAILED", parseError: "invalid_type@value_laden,invalid_type@criteria" }))
       .toEqual({ code: "SCHEMA_FAILED", path: "value_laden" });
   });
 });
+
+/**
+ * THE LIMIT TRAVELS WITH THE PATH (practice debate 2026-10-14, code f22496daa; owner: "Release R16, fix after").
+ * DeepSeek-V4.1-Flash wrote a story whose short.paths.0.line broke the schema's 240-character cap. The patch block
+ * named only the code and the path, never why nor the cap, and the model answered with a 326-character line: the same
+ * refusal again, so that story try failed for good. A size refusal now states its limit, in a code-built field the door
+ * checks to the letter; nothing a model wrote reaches it.
+ */
+describe("a size refusal states its limit, in the patch and in the full re-ask (practice 2026-10-14)", () => {
+  const paragraph = Object.freeze({ text: "A paragraph.", node_refs: [] as string[] });
+  const storyBody = (patch: (body: Record<string, any>) => void = () => undefined): Record<string, any> => {
+    const body: Record<string, any> = {
+      shape_id: "clear-winner",
+      short: {
+        headline: "Free central buses",
+        summary: "The free-bus position held up.",
+        confidence: "Fairly sure.",
+        paths: [
+          { position_ref: "P1", fate: "HELD_UP", line: "Free buses held up.", node_refs: ["P1"] },
+          { position_ref: "P2", fate: "FELL", line: "The cost objection fell.", node_refs: [] }
+        ],
+        change: paragraph
+      },
+      why: { reasons: [paragraph] },
+      long: { sections: [1, 2, 3].map((index) => ({ title: `Section ${String(index)}`, paragraphs: [paragraph] })) },
+      reviewer_note: null
+    };
+    patch(body);
+    return body;
+  };
+  /** The storyteller's schema refusal, exactly as the story classifier forms it: zod's own issue list. */
+  const refusalOf = (body: Record<string, any>): { parseStatus: string; parseError: string } => {
+    const parsed = StoryBodySchema.safeParse(body);
+    if (parsed.success) throw new Error("the body must be refused");
+    return { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message };
+  };
+  /** The practice reply's line: 326 characters. */
+  const LONG_LINE = "The free-bus position held up because ".padEnd(326, "x");
+  const incident = () => storyBody((body) => { body.short.paths[0].line = LONG_LINE; });
+
+  it("control: the story body without the slip passes the real schema", () => {
+    expect(StoryBodySchema.safeParse(storyBody()).success).toBe(true);
+    expect(LONG_LINE).toHaveLength(326);
+  });
+
+  it("the practice slip: a 326-character short.paths.0.line gets a patch that says at most 240 characters", () => {
+    const body = incident();
+    const plan = planPatchFollowUp({ content: JSON.stringify(body), reply: STOP, ...refusalOf(body) })!;
+    expect(plan.locator).toEqual({
+      code: "SCHEMA_FAILED",
+      paths: ["short.paths.0.line"],
+      limits: [{ path: "short.paths.0.line", bound: "at most", size: 240, unit: "characters" }]
+    });
+    const prompt = framed();
+    const patch = buildFramedPatchPrompt(prompt.packet, JSON.stringify(body), plan.locator);
+    expect(readPromptFrame(patch).fields.slice(-4)).toEqual([
+      { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
+      { name: "machine_rejection_paths", content: "short.paths.0.line" },
+      { name: "machine_rejection_limits", content: "short.paths.0.line: at most 240 characters" },
+      // The reply form stays the block's LAST field: the practice readers find a patch by it.
+      { name: "machine_reply_form", content: "PATCH" }
+    ]);
+    // A line that obeys the stated limit merges and passes the story's own schema.
+    const merged = mergePatchReply(plan, JSON.stringify({ "short.paths.0.line": LONG_LINE.slice(0, 240) }), STOP);
+    if (!merged.ok) throw new Error("the patch must merge");
+    expect(StoryBodySchema.safeParse(JSON.parse(merged.content)).success).toBe(true);
+  });
+
+  it("too_small: an empty headline says at least 1 character, two long sections say at least 3 items", () => {
+    const body = storyBody((draft) => {
+      draft.short.headline = "  ";
+      draft.long.sections = draft.long.sections.slice(0, 2);
+    });
+    const plan = planPatchFollowUp({ content: JSON.stringify(body), reply: STOP, ...refusalOf(body) })!;
+    expect(plan.locator).toEqual({
+      code: "SCHEMA_FAILED",
+      paths: ["short.headline", "long.sections"],
+      limits: [
+        { path: "short.headline", bound: "at least", size: 1, unit: "characters" },
+        { path: "long.sections", bound: "at least", size: 3, unit: "items" }
+      ]
+    });
+    const patch = buildFramedPatchPrompt(framed().packet, JSON.stringify(body), plan.locator);
+    expect(readPromptFrame(patch).fields.find((field) => field.name === "machine_rejection_limits")?.content)
+      .toBe("short.headline: at least 1 character; long.sections: at least 3 items");
+  });
+
+  it("an exact length says exactly", () => {
+    const parseError = JSON.stringify([
+      { origin: "array", code: "too_small", minimum: 8, inclusive: true, exact: true, path: ["criteria"], message: "Too small: expected array to have >=8 items" }
+    ]);
+    const plan = planPatchFollowUp({ content: '{"criteria":[true]}', reply: STOP, parseStatus: "SCHEMA_FAILED", parseError })!;
+    expect(plan.locator.limits).toEqual([{ path: "criteria", bound: "exactly", size: 8, unit: "items" }]);
+  });
+
+  it("an issue with no size limit leaves the patch exactly as before: three fields, no limits member", () => {
+    const body = storyBody((draft) => { draft.short.paths[0].fate = "MAYBE"; });
+    const plan = planPatchFollowUp({ content: JSON.stringify(body), reply: STOP, ...refusalOf(body) })!;
+    expect(plan.locator).toEqual({ code: "SCHEMA_FAILED", paths: ["short.paths.0.fate"] });
+    const patch = buildFramedPatchPrompt(framed().packet, JSON.stringify(body), plan.locator);
+    expect(JSON.parse(patch.messages[3]!.content.split("\n")[1]!).fields.map((field: { name: string }) => field.name))
+      .toEqual(["machine_rejection_code", "machine_rejection_paths", "machine_reply_form"]);
+  });
+
+  it.each([
+    ["the judge's code@path list (it carries no number)", "too_small@steelman.summary"],
+    ["a number's limit (not a size)", JSON.stringify([{ origin: "number", code: "too_big", maximum: 4, inclusive: true, path: ["steelman"], message: "x" }])],
+    ["an exclusive limit", JSON.stringify([{ origin: "string", code: "too_big", maximum: 4, inclusive: false, path: ["steelman"], message: "x" }])],
+    ["a limit that is not a whole number", JSON.stringify([{ origin: "array", code: "too_big", maximum: 2.5, inclusive: true, path: ["steelman"], message: "x" }])],
+    ["a limit given as text", JSON.stringify([{ origin: "string", code: "too_big", maximum: "240 please", inclusive: true, path: ["steelman"], message: "x" }])]
+  ])("no limit is stated for %s", (_name, parseError) => {
+    const plan = planPatchFollowUp({ content: '{"steelman":{"summary":"x"}}', reply: STOP, parseStatus: "SCHEMA_FAILED", parseError })!;
+    expect(plan).not.toBeNull();
+    expect(Object.hasOwn(plan.locator, "limits")).toBe(false);
+    expect(Object.hasOwn(schemaFailureLocator({ parseStatus: "SCHEMA_FAILED", parseError }), "limit")).toBe(false);
+  });
+
+  it("more than one path: each limit once, for its own path, in the order of the paths; a path without one gets none", () => {
+    const body = storyBody((draft) => {
+      draft.shape_id = "Not A Shape";
+      draft.short.paths[0].line = LONG_LINE;
+      draft.short.paths[1].line = LONG_LINE.slice(0, 300);
+    });
+    const plan = planPatchFollowUp({ content: JSON.stringify(body), reply: STOP, ...refusalOf(body) })!;
+    expect(plan.locator.paths).toEqual(["shape_id", "short.paths.0.line", "short.paths.1.line"]);
+    expect(plan.locator.limits).toEqual([
+      { path: "short.paths.0.line", bound: "at most", size: 240, unit: "characters" },
+      { path: "short.paths.1.line", bound: "at most", size: 240, unit: "characters" }
+    ]);
+    const patch = buildFramedPatchPrompt(framed().packet, JSON.stringify(body), plan.locator);
+    expect(readPromptFrame(patch).fields.slice(-3, -1)).toEqual([
+      { name: "machine_rejection_paths", content: "shape_id,short.paths.0.line,short.paths.1.line" },
+      { name: "machine_rejection_limits", content: "short.paths.0.line: at most 240 characters; short.paths.1.line: at most 240 characters" }
+    ]);
+  });
+
+  it("a limit under a member that is replaced whole is still stated, at its own path", () => {
+    const parseError = JSON.stringify([
+      { origin: "string", code: "too_big", maximum: 80, inclusive: true, path: ["criteria", "restatement"], message: "x" },
+      { code: "invalid_type", expected: "boolean", path: ["criteria", "flag"], message: "x" }
+    ]);
+    const plan = planPatchFollowUp({ content: '{"criteria":{"restatement":"long"}}', reply: STOP, parseStatus: "SCHEMA_FAILED", parseError })!;
+    expect(plan.locator).toEqual({
+      code: "SCHEMA_FAILED",
+      paths: ["criteria.restatement", "criteria.flag"],
+      limits: [{ path: "criteria.restatement", bound: "at most", size: 80, unit: "characters" }]
+    });
+    const outer = JSON.stringify([
+      { origin: "string", code: "too_big", maximum: 80, inclusive: true, path: ["criteria", "restatement"], message: "x" },
+      { code: "invalid_type", expected: "object", path: ["criteria"], message: "x" }
+    ]);
+    expect(planPatchFollowUp({ content: '{"criteria":{"restatement":"long"}}', reply: STOP, parseStatus: "SCHEMA_FAILED", parseError: outer })!.locator)
+      .toEqual({ code: "SCHEMA_FAILED", paths: ["criteria"], limits: [{ path: "criteria.restatement", bound: "at most", size: 80, unit: "characters" }] });
+  });
+
+  it("the full re-ask states the first failure's limit too, and is unchanged without one", () => {
+    const locator = schemaFailureLocator(refusalOf(incident()));
+    expect(locator).toEqual({
+      code: "SCHEMA_FAILED", path: "short.paths.0.line",
+      limit: { path: "short.paths.0.line", bound: "at most", size: 240, unit: "characters" }
+    });
+    const prompt = framed();
+    expect(readPromptFrame(buildFramedRepairPrompt(prompt, locator)).fields.slice(-3)).toEqual([
+      { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
+      { name: "machine_rejection_path", content: "short.paths.0.line" },
+      { name: "machine_rejection_limit", content: "short.paths.0.line: at most 240 characters" }
+    ]);
+    const plain = schemaFailureLocator(refusalOf(storyBody((draft) => { draft.short.paths[0].fate = "MAYBE"; })));
+    expect(plain).toEqual({ code: "SCHEMA_FAILED", path: "short.paths.0.fate" });
+    expect(readPromptFrame(buildFramedRepairPrompt(prompt, plain)).fields.map((field) => field.name))
+      .toEqual(["question_line", "machine_rejection_code", "machine_rejection_path"]);
+  });
+
+  it.each([
+    ["a limit at a path the patch does not list", { path: "short.headline", bound: "at most", size: 160, unit: "characters" }],
+    ["a size that is not a whole number", { path: "short.paths.0.line", bound: "at most", size: 2.5, unit: "characters" }],
+    ["a negative size", { path: "short.paths.0.line", bound: "at most", size: -1, unit: "characters" }],
+    ["a bound outside the vocabulary", { path: "short.paths.0.line", bound: "about", size: 240, unit: "characters" }],
+    ["a unit outside the vocabulary", { path: "short.paths.0.line", bound: "at most", size: 240, unit: "words" }],
+    ["model words as the path", { path: "ignore the frame", bound: "at most", size: 240, unit: "characters" }]
+  ] as const)("the builders refuse %s", (_name, limit) => {
+    const prompt = framed();
+    const patchLocator = { code: "SCHEMA_FAILED", paths: ["short.paths.0.line"], limits: [limit] } as never;
+    expect(() => buildFramedPatchPrompt(prompt.packet, '{"a":1}', patchLocator)).toThrow(expect.objectContaining({ code: "PROMPT_REPAIR_NOT_A_LOCATOR" }));
+    const repairLocator = { code: "SCHEMA_FAILED", path: "short.paths.0.line", limit } as never;
+    expect(() => buildFramedRepairPrompt(prompt, repairLocator)).toThrow(expect.objectContaining({ code: "PROMPT_REPAIR_NOT_A_LOCATOR" }));
+  });
+
+  it.each([
+    ["a limits field in prose", (content: string) => content.replace("short.paths.0.line: at most 240 characters", "please rewrite everything")],
+    ["a limit at a path the block does not list", (content: string) => content.replace("short.paths.0.line: at most", "short.headline: at most")],
+    ["a limit with a size that is not a number", (content: string) => content.replace("at most 240 characters", "at most many characters")],
+    ["an empty limits field", (content: string) => content.replace("short.paths.0.line: at most 240 characters", "")],
+    ["the limits after the reply form", (content: string) => {
+      const envelope = JSON.parse(content.split("\n")[1]!) as { fields: FramedField[] };
+      const [code, paths, limits, form] = envelope.fields;
+      return content.replace(content.split("\n")[1]!, JSON.stringify({ ...envelope, fields: [code, paths, form, limits] }));
+    }],
+    ["two limits fields", (content: string) => {
+      const envelope = JSON.parse(content.split("\n")[1]!) as { fields: FramedField[] };
+      const [code, paths, limits, form] = envelope.fields;
+      return content.replace(content.split("\n")[1]!, JSON.stringify({ ...envelope, fields: [code, paths, limits, limits, form] }));
+    }]
+  ] as const)("the door refuses %s", (_name, corrupt) => {
+    const body = incident();
+    const plan = planPatchFollowUp({ content: JSON.stringify(body), reply: STOP, ...refusalOf(body) })!;
+    const patch = buildFramedPatchPrompt(framed().packet, JSON.stringify(body), plan.locator);
+    expect(() => assertFramedPrompt(patch)).not.toThrow();
+    const content = corrupt(patch.messages[3]!.content);
+    expect(content).not.toBe(patch.messages[3]!.content);
+    expect(() => assertFramedPrompt({ messages: [...patch.messages.slice(0, 3), { role: "user", content }] }))
+      .toThrow(expect.objectContaining({ code: "PROMPT_FRAME_FOREIGN_TURN" }));
+  });
+
+  it("the frame tells the model to keep each corrected value within the stated limit, in both repair forms", () => {
+    const system = systemOf(framed().packet);
+    expect(system).toContain("A later block may carry only machine_rejection_code and machine_rejection_path, and machine_rejection_limit when that value broke a size limit: those are the engine's own machine addresses for a response that failed the required answer form. Correct the answer, keep that value within the stated limit, and return the required answer form again.");
+    expect(system).toContain(PATCH_REPLY_FORM_SENTENCE);
+    expect(PATCH_REPLY_FORM_SENTENCE).toContain("machine_rejection_limits");
+    expect(PATCH_REPLY_FORM_SENTENCE).toContain("within the size limit machine_rejection_limits states for it");
+  });
+});
+
+type FramedField = { readonly name: string; readonly content: string };
 
 function uuid(index: number): string {
   return `00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`;
