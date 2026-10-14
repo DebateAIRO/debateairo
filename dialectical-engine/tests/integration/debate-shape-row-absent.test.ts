@@ -21,7 +21,7 @@
 // What this does NOT prove: nothing here runs the pre-P2a code. The proof that nothing moved against TODAY'S code is the
 // existing suites, unchanged and green (plan Task 16 Step 2), and the unit proofs that today's judge and writer prompts
 // are byte-identical (Tasks 4, 5). The comparison here is between runners of this branch.
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { evaluateAskAdmission, type RunCreationSettings } from "@debateai/api";
 import { PLAN_TIER_ROSTERS, type AskRequest } from "@debateai/contract";
@@ -29,7 +29,8 @@ import { createPool, migrate, type Pool } from "@debateai/db";
 import { mapPromptContractHash } from "@debateai/map";
 import { readPromptFrame, type PromptPacket } from "@debateai/providers";
 import {
-  computeStructuralCeilingBasis, debateShapeInForce, debateShapePolicyRow, debateShapePolicyStartValues, readDebateShapePolicy
+  computeStructuralCeilingBasis, debateShapeInForce, debateShapePolicyRow, debateShapePolicyStartValues, parseRegisterVersionText,
+  readDebateShapePolicy, registerVersionToSafeLegacyNumber, type RegisterPublicationRow, type RegisterVersionText
 } from "@debateai/register";
 import { ServeRepository } from "@debateai/serve";
 import { normaliseAskForDebateShape } from "../../apps/api/src/debate-shape-ask.js";
@@ -40,6 +41,7 @@ import {
 } from "../support/preview-debate-harness.js";
 import type { GateOverride, GateRequest } from "../support/preview-gate-stubs.js";
 import { scriptedAnswers } from "../support/scripted-answers.js";
+import { importHistoricalRegisterFixture, publishRegisterFixture, registerFixtureRow } from "../support/registerFixtures.js";
 import { copyDatabase, dropDatabase, savedDebate, type SavedDebate } from "../support/saved-debate.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -53,52 +55,50 @@ const databaseUrl = (name: string): string => database.connectionString.replace(
 const CODE_MAP_HASH = mapPromptContractHash();
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
 
-/** The register versions this file seals (far above anything the migrations write), by the variant they boot. */
-const REGISTER = Object.freeze({
-  ABSENT: 9_101, HASH_MATCH: 9_102, HASH_MISMATCH: 9_103, HASH_MALFORMED: 9_104, DISABLED: 9_105, ENABLED: 9_106
-});
-type Variant = Exclude<keyof typeof REGISTER, "ENABLED">;
+/** The register versions this file publishes, by the variant they boot (assigned by the publication, in `beforeAll`). */
+type RegisterVariant = "ABSENT" | "HASH_MATCH" | "HASH_MISMATCH" | "HASH_MALFORMED" | "DISABLED" | "ENABLED";
+let REGISTER: Readonly<Record<RegisterVariant, number>>;
+type Variant = Exclude<RegisterVariant, "ENABLED">;
 const VARIANTS: readonly Variant[] = ["ABSENT", "HASH_MATCH", "HASH_MISMATCH", "HASH_MALFORMED", "DISABLED"];
 
 const POLICY = debateShapePolicyStartValues();
 const shapeRow = (enabled: boolean) => debateShapePolicyRow(enabled ? POLICY : { ...POLICY, enabled: false }, "test-layer:task-16");
-const hashRow = (value: string) => ({ rowKey: "mapContractHash", valueJsonText: JSON.stringify(value), sourceRef: "test-layer:task-16" });
+const hashRow = (value: string) => registerFixtureRow("mapContractHash", value, "test-layer:task-16");
 /** A row of no family the shape reads: a version needs at least one row (register_version.row_count > 0). */
-const MARKER = Object.freeze({ rowKey: "task16RowAbsentMarker", valueJsonText: "true", sourceRef: "test-layer:task-16" });
+const MARKER = registerFixtureRow("task16RowAbsentMarker", true, "test-layer:task-16");
 
 /**
- * Seals one register version with exactly `rows`, as the integration suites write fixture history: in one transaction
- * with the publication triggers off (`session_replication_role = replica`; the test connects as a superuser).
+ * Publishes one register version holding exactly `rows` through the register's own publication port (the sanctioned
+ * fixture writer; no direct register DML, tests/architecture/register-support-publication.test.ts), on top of `base`,
+ * and returns the version the publication sealed.
  */
-async function sealRegisterVersion(pool: Pool, version: number,
-  rows: readonly Readonly<{ rowKey: string; valueJsonText: string; sourceRef: string }>[]): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query("SET LOCAL session_replication_role = replica");
-    await client.query("INSERT INTO register.register_version(register_version,row_count,sealed) VALUES($1,$2,true)", [version, rows.length]);
-    for (const row of rows) {
-      await client.query("INSERT INTO register.register_row(register_version,row_key,value_json,source_ref) VALUES($1,$2,$3::jsonb,$4)",
-        [version, row.rowKey, row.valueJsonText, row.sourceRef]);
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
-  }
+async function publishRegisterVersion(pool: Pool, base: RegisterVersionText,
+  rows: readonly RegisterPublicationRow[]): Promise<RegisterVersionText> {
+  const receipt = await publishRegisterFixture(pool, {
+    publicationId: randomUUID(), baseRegisterVersion: base, rows: Object.freeze([...rows]), sourceRef: "test-layer:task-16"
+  });
+  return receipt.registerVersion;
 }
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  await sealRegisterVersion(database.pool, REGISTER.ABSENT, [MARKER]);
-  await sealRegisterVersion(database.pool, REGISTER.HASH_MATCH, [hashRow(CODE_MAP_HASH)]);
-  await sealRegisterVersion(database.pool, REGISTER.HASH_MISMATCH, [hashRow("f".repeat(64))]);
-  await sealRegisterVersion(database.pool, REGISTER.HASH_MALFORMED, [hashRow("not-a-hash")]);
-  await sealRegisterVersion(database.pool, REGISTER.DISABLED, [shapeRow(false), hashRow(CODE_MAP_HASH)]);
-  await sealRegisterVersion(database.pool, REGISTER.ENABLED, [shapeRow(true), hashRow(CODE_MAP_HASH)]);
+  // The migrations seal no version: today's register (ABSENT) is imported as historical version 1, the only way the
+  // port writes a version without a base; every other variant is published on top of the one before it.
+  await importHistoricalRegisterFixture(database.pool, 1, [MARKER]);
+  let base = parseRegisterVersionText("1");
+  const versions: Partial<Record<RegisterVariant, number>> = { ABSENT: registerVersionToSafeLegacyNumber(base) };
+  for (const [variant, rows] of [
+    ["HASH_MATCH", [hashRow(CODE_MAP_HASH)]],
+    ["HASH_MISMATCH", [hashRow("f".repeat(64))]],
+    ["HASH_MALFORMED", [hashRow("not-a-hash")]],
+    ["DISABLED", [shapeRow(false), hashRow(CODE_MAP_HASH)]],
+    ["ENABLED", [shapeRow(true), hashRow(CODE_MAP_HASH)]]
+  ] as const) {
+    base = await publishRegisterVersion(database.pool, base, rows);
+    versions[variant] = registerVersionToSafeLegacyNumber(base);
+  }
+  REGISTER = Object.freeze(versions as Record<RegisterVariant, number>);
   admin = createPool(databaseUrl("postgres"), { max: 1 });
   // The shared pool's idle sessions close after node-postgres's ten idle seconds; then the migrated database is copied.
   await copyDatabase(admin, "debateai_s00", MIGRATED_COPY);
