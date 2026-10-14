@@ -1,6 +1,7 @@
-import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type WayOfKnowing } from "@debateai/kernel";
+import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type WayOfKnowing } from "@debateai/kernel";
 import {
   withoutStoryNodeIds,
+  type StoryAnswersNoteKind,
   type StoryCostFallback,
   type StoryRoleMaker,
   type StoryRoleResolver,
@@ -136,6 +137,17 @@ export interface StorySnapshotSource {
    * register's refs.
    */
   readonly roleMakers?: StoryRunRoleMakers | undefined;
+  /**
+   * Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's points that were raised but
+   * not debated (`storyAlsoRaisedFrom`). Undefined when the run had no map choice, so the
+   * story's material stays exactly today's.
+   */
+  readonly alsoRaised?: readonly { readonly claim: string; readonly raisedBy: number }[] | undefined;
+  /**
+   * Debate shape P2c, owner ruling C-STORY: why not every answer argued was picked the usual way
+   * (`storyAnswersNoteFrom`). Undefined on today's run and on a map that chose everything itself.
+   */
+  readonly answersNote?: StoryAnswersNoteKind | undefined;
 }
 
 /**
@@ -212,6 +224,52 @@ function inArrowOrder<T extends { readonly arrowId: string }>(arrows: readonly T
     .map(({ arrow }) => arrow);
 }
 
+/** The members of P2b's `MapResult` (@debateai/map) this module reads; structural, so the runner keeps one import. */
+export type StoryMapSource = Readonly<{
+  keyPoints: readonly Readonly<{ keyPointId: string; claim: string; makers: readonly string[] }>[];
+  choice: Readonly<{ alsoRaised: readonly string[] }> | null;
+}>;
+
+/**
+ * Debate shape P2c: the map choice's "also raised, not debated" points, in the choice's
+ * order (most-raised first), each with how many different makers raised it. A claim is
+ * cleared of node ids like every free text here. No map, or a map that chose nothing:
+ * undefined.
+ */
+export function storyAlsoRaisedFrom(
+  map: StoryMapSource | null
+): readonly { readonly claim: string; readonly raisedBy: number }[] | undefined {
+  if (map === null || map.choice === null) return undefined;
+  const byId = new Map(map.keyPoints.map((point) => [point.keyPointId, point] as const));
+  return Object.freeze(map.choice.alsoRaised.flatMap((keyPointId) => {
+    const point = byId.get(keyPointId);
+    if (point === undefined) return [];
+    return [Object.freeze({ claim: withoutNodeIds(point.claim), raisedBy: Math.max(1, new Set(point.makers).size) })];
+  }));
+}
+
+/** The members of P2b's `MapResult` the answers note reads; structural, like `StoryMapSource`. */
+export type StoryMapOutcome = Readonly<{
+  kind: "MAP" | "UNAVAILABLE";
+  marks: readonly Readonly<{ mark: string }>[];
+}>;
+
+/**
+ * Debate shape P2c, owner ruling C-STORY: the plain sentence, if any, the story owes the person about how the answers
+ * argued came about. Read from the map's whole result and its marks (the runner's `shapeMapResult`, never
+ * `debateShapeMap`, which is null exactly when the map fell back). The map unavailable, or today's opening argued
+ * because the map gave fewer than two positions (`arguedTodaysOpening`; no mark records that case), is MAP_UNAVAILABLE;
+ * an answer or a point the code filled in is ANSWERS_FILLED. The map's other fallbacks change how the map was made, not
+ * which answers were argued: no note. No map (today's run): undefined, so the story's material stays today's.
+ */
+export function storyAnswersNoteFrom(map: StoryMapOutcome | null, arguedTodaysOpening: boolean): StoryAnswersNoteKind | undefined {
+  if (map === null) return undefined;
+  const marked = (mark: DebateShapeMark): boolean => map.marks.some((record) => record.mark === mark);
+  if (arguedTodaysOpening || map.kind === "UNAVAILABLE" || marked("MAP_UNAVAILABLE_TODAYS_OPENING")) return "MAP_UNAVAILABLE";
+  if (marked("ANSWERS_FILLED") || marked("CHOOSE_QUOTA_FILLED")) return "ANSWERS_FILLED";
+  return undefined;
+}
+
 export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteInput {
   const baseById = new Map(source.baseStrengths.map((row) => [row.nodeId, row.baseStrength] as const));
   const finalById = new Map(source.finalStrengths.map((row) => [row.nodeId, row.strength] as const));
@@ -281,6 +339,10 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     stepLease: source.stepLease,
     costFallback: source.costFallback,
     ...(source.roleMakers === undefined ? {} : { roleMakers: source.roleMakers }),
+    ...(source.alsoRaised === undefined
+      ? {}
+      : { alsoRaised: Object.freeze(source.alsoRaised.map((item) => Object.freeze({ claim: item.claim, raisedBy: item.raisedBy }))) }),
+    ...(source.answersNote === undefined ? {} : { answersNote: source.answersNote }),
     ...(source.languageLocked === true ? { languageLocked: true as const } : {})
   });
 }

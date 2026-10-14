@@ -217,7 +217,7 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import {
   shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny, shapeSelectChains,
   type ScrutinyCandidate
@@ -10326,6 +10326,13 @@ export class WalkingSkeletonRunner {
               servedSegments: floor === null ? finalSegments : [{ text: servedRootJudgement.statement }],
               authored: authoredNodeList,
               positionNodeIds: makerPositionNodeIds,
+              // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's unchosen points, for the story's "also
+              // raised, not debated" paragraph, only when the map's own answers were argued; undefined otherwise.
+              alsoRaised: storyAlsoRaisedFrom(shapeMapPositions !== null && shapeMapPositions.length >= 2 ? debateShapeMap : null),
+              // Owner ruling C-STORY: one plain sentence when the answers came from a map fallback, read from the map's
+              // whole result (debateShapeMap is null on a fallback); undefined on today's run.
+              answersNote: storyAnswersNoteFrom(shapeMapResult,
+                shapeRun !== null && (shapeMapPositions === null || shapeMapPositions.length < 2)),
               baseStrengths: materialised.nodes,
               finalStrengths: propagation.strengths,
               // The WHOLE graph's arrows, in the engine's fixed order, so every
