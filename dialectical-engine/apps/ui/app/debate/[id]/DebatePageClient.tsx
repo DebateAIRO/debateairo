@@ -26,6 +26,7 @@ import {
   ContractHttpError,
   type Answer,
   type AnswerFloor,
+  type DebateMapView,
   type ExecutionLedgerDigest,
   type Inspection,
   type InvestigationGap,
@@ -96,6 +97,9 @@ import type { LocaleCode } from "@/lib/i18n/locales";
 import { questionLocale as questionLocaleOf } from "@/lib/i18n/questionLocale";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { Toast } from "@/components/Toast";
+import { AlsoRaisedList } from "@/components/AlsoRaisedList";
+import { PositionTitlesContext, type PositionTitles } from "@/components/PositionTitle";
+import { positionTitlesFrom } from "@/lib/v3/mapView";
 import {
   PublicationControl,type PrivateDeletionStatus
 } from "@/components/PublicationControl";
@@ -599,7 +603,9 @@ export default function DebatePageClient({
   storyLocale,
   storyCatalog,
   initialFloor = null,
-  publicFloor = null
+  publicFloor = null,
+  initialMapView = null,
+  publicMapView = null
 }: {
   id: string;
   initialDebate: DebateDetail | null;
@@ -671,11 +677,19 @@ export default function DebatePageClient({
    * snapshot's own points. The public page reads nothing else.
    */
   publicFloor?: ResolvedFloor | null;
+  /**
+   * Debate shape P2c (spec 2026-10-12 §3.3 step 8): the owner's map view, from the server's
+   * read beside the answer. The page's own refreshes read it again with the answer.
+   */
+  initialMapView?: DebateMapView | null;
+  /** Public mode: the snapshot's map view. The public page reads nothing else. */
+  publicMapView?: DebateMapView | null;
 }) {
   const { catalog: chromeCatalog, locale } = useChromeI18n();
   const [debate, setDebate] = useState<DebateDetail | null>(initialDebate);
   const [answer, setAnswer] = useState<Answer | null>(initialAnswer);
   const [floor, setFloor] = useState<AnswerFloor | null>(initialFloor);
+  const [mapView, setMapView] = useState<DebateMapView | null>(initialMapView);
   const [live, setLive] = useState<LiveRunState>(createLiveRunState);
   const [ledgerDigest, setLedgerDigest] = useState<ExecutionLedgerDigest | null>(null);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
@@ -761,6 +775,12 @@ export default function DebatePageClient({
           && previous.answer_version === bundle.answer.answer_version;
         const floorRead = bundle.floorRead;
         setFloor((current) => (floorRead.failed && sameAnswer ? current : floorRead.floor));
+        // Debate shape P2c: the map view is read with the answer too. A failed read, or a bundle
+        // without one, keeps the view the page shows for this same answer version.
+        const mapViewRead = bundle.mapViewRead;
+        setMapView((current) => (mapViewRead === undefined || mapViewRead.failed
+          ? (sameAnswer ? current : null)
+          : mapViewRead.mapView));
         answerRef.current = bundle.answer;
         setAnswer(bundle.answer);
         setDebate(bundle.detail);
@@ -1025,6 +1045,19 @@ export default function DebatePageClient({
       : toStoryView(answer, story, id, storyLocale, reportSupportedForLocale, resolvedFloor)),
     [publicMode, answer, story, storyLocaleReady, id, storyLocale, resolvedFloor]
   );
+  // Debate shape P2c (ruling S2): "The case for {answer}, argued by {ai}" for each opening
+  // position, in the question's language (`storyCatalog`), as the story strip speaks it. Like
+  // the strip, the owner's titles wait until that language's catalogue has arrived
+  // (`storyLocaleReady`), so a "starting" render never shows them in the interface's words.
+  const shownMapView = publicMode ? publicMapView : (storyLocaleReady ? mapView : null);
+  const positionTitles = useMemo<PositionTitles>(() => ({
+    locale: storyLocale,
+    byNodeId: positionTitlesFrom(
+      shownMapView,
+      publicMode ? [...(publicNodesById?.values() ?? [])] : answer?.nodes ?? [],
+      storyCatalog
+    )
+  }), [shownMapView, publicMode, publicNodesById, answer, storyCatalog, storyLocale]);
 
   const showInspection = useCallback(async () => {
     if (answerRef.current === null) return;
@@ -1449,6 +1482,7 @@ export default function DebatePageClient({
   const scoringConfidenceText = formatScoringConfidenceCopy(debateChromeCatalog);
   const scoringInsightsExpandable = scoringState.status === "loaded" && scoringByNodeId.size > 0;
   return (
+    <PositionTitlesContext.Provider value={positionTitles}>
     <div
       className="debateView"
       data-public-mode={publicMode ? "true" : "false"}
@@ -1602,6 +1636,9 @@ export default function DebatePageClient({
 
       {/* ---- verdict story strip (owner only; spec 2026-09-26 §10) ---- */}
       {storyView === null ? null : <StoryPanel view={storyView} catalog={storyCatalog} locale={storyLocale} />}
+
+      {/* ---- also raised, not debated (owner; the public page shows it in its overview) ---- */}
+      {publicMode ? null : <AlsoRaisedList view={storyLocaleReady ? mapView : null} catalog={storyCatalog} locale={storyLocale} />}
 
       <ScoringErrorBoundary catalog={miscCatalog}>
         {scoringInsightsExpandable ? (
@@ -1984,6 +2021,7 @@ export default function DebatePageClient({
         </div>
       )}
     </div>
+    </PositionTitlesContext.Provider>
   );
 }
 

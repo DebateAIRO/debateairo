@@ -1,6 +1,7 @@
 "use client";
 
 import type { Answer, ExecutionLedgerDigest, Inspection, InvestigationGap } from "@debateai/contract";
+import { DEBATE_SHAPE_MARKS } from "@debateai/kernel";
 import type { LiveRunState } from "@/lib/v3/liveEvents";
 import type { AnswerExport } from "@/lib/v3/answerExport";
 import { unrepresentedEdges } from "@/lib/v3/adapter";
@@ -31,6 +32,13 @@ import composeEnglish from "@/messages/en/compose.json";
  * S14 reading surface re-housed inside V2's own drawer design; it renders
  * only values the contract actually served, and typed absence otherwise.
  */
+
+/**
+ * Debate shape P2c (ruling C-DRAWER): the eight shape marks show only their words here. Their
+ * records' scope, subject (a run id, `<run>:<n>`, or a node id), reason code (`MAP_MERGE_FALLBACK:MERGE`,
+ * `SCRUTINY_EXTENDED:3`) and lift path are engine internals, and their chips carry no raw mark as a tooltip.
+ */
+const SHAPE_MARKS: ReadonlySet<string> = new Set<string>(DEBATE_SHAPE_MARKS);
 
 function labeledNumberLine(
   catalog: MessageCatalog,
@@ -236,7 +244,7 @@ export function AnswerHonestyDrawer({
             ) : (
               <div className="roleChips">
                 {answer.condition_marks.map((mark) => (
-                  <span key={mark} className="roleChip" title={mark}>
+                  <span key={mark} className="roleChip" title={SHAPE_MARKS.has(mark) ? undefined : mark}>
                     {markLabelFromRecords(mark, answer.condition_mark_records, debateChromeCatalog)}
                   </span>
                 ))}
@@ -247,6 +255,16 @@ export function AnswerHonestyDrawer({
                 {answer.condition_mark_records.map((record) => {
                   // S1b: the runner's two BACKUP-MODEL-USED records in the page's language; every
                   // other record exactly as the engine wrote it.
+                  if (SHAPE_MARKS.has(record.mark)) {
+                    // Debate shape P2c (ruling C-DRAWER): the label only. No scope, run or node id, reason code or lift path.
+                    return (
+                      <li key={`${record.mark}:${record.subject_ref}`} className="drawerFindingItem">
+                        <div className="drawerFindingMeta">
+                          <span>{conditionRecordLabel(record, debateChromeCatalog)}</span>
+                        </div>
+                      </li>
+                    );
+                  }
                   const backupKeys = backupRecordKeysFor(record);
                   return (
                     <li key={`${record.mark}:${record.subject_ref}`} className="drawerFindingItem">

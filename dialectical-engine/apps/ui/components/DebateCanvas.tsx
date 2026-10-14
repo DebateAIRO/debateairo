@@ -14,6 +14,7 @@ import {
   type PlacedClaim
 } from "@/lib/debatePresentation";
 import { ModelMetaLine } from "@/components/ModelPresentation";
+import { PositionTitle } from "@/components/PositionTitle";
 import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
 import {
   formatIndependencePill,
@@ -502,6 +503,7 @@ function CanvasCard({
                 />
               ) : null}
             </div>
+            <PositionTitle nodeId={node.id} />
             <div className="nodeScoreRow">
               <ScoringErrorBoundary catalog={miscCatalog}>
                 {scoring ? (

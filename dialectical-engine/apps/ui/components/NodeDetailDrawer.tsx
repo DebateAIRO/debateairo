@@ -24,6 +24,7 @@ import {
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import type { Answer } from "@debateai/contract";
+import { DEBATE_SHAPE_MARKS } from "@debateai/kernel";
 import type { ContractNode } from "@/lib/v3/adapter";
 import { v3NodeHonestyRows, wayOfKnowingLabel } from "@/lib/v3/adapter";
 import { abstentionKindLabel, markLabelFromRecords } from "@/lib/v3/labels";
@@ -43,6 +44,9 @@ function isSetAsidePath(node: DebateNode): boolean {
     stoppingStatus === "abandoned"
   );
 }
+
+/** Debate shape P2c (rulings C-TONE, C-DRAWER): the eight shape marks are information, not a dispute. */
+const SHAPE_MARKS: ReadonlySet<string> = new Set<string>(DEBATE_SHAPE_MARKS);
 
 const DECISION_KIND_LABEL_KEYS: Record<string, string> = {
   continue: "debateDrawers.node.decisionContinue",
@@ -479,13 +483,16 @@ function NodeHonestyDetails({
       {v3.condition_marks.length > 0 ? (
         <div className="drawerConditionPills">
           {v3.condition_marks.map((mark) => {
-            const tone = mark === "UNFALSIFIED-AFTER-ROTATION"
-              ? "agree"
-              : mark === "UNDER-EXPLORED"
-                ? "gold"
-                : "dispute";
+            const shape = SHAPE_MARKS.has(mark);
+            const tone = shape
+              ? "neutral"
+              : mark === "UNFALSIFIED-AFTER-ROTATION"
+                ? "agree"
+                : mark === "UNDER-EXPLORED"
+                  ? "gold"
+                  : "dispute";
             return (
-              <span key={mark} className={`drawerConditionPill ${tone}`} data-condition-pill data-mark={tone} title={mark}>
+              <span key={mark} className={`drawerConditionPill ${tone}`} data-condition-pill data-mark={tone} title={shape ? undefined : mark}>
                 {markLabelFromRecords(mark, conditionRecords, debateChromeCatalog)}
               </span>
             );

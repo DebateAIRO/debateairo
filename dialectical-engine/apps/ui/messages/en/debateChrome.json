@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Some judges could not assess this point",
   "debateChrome.condition.panelDegradedSingleVoice": "Only the author's own assessment survived",
   "debateChrome.condition.mapAnglesFallback": "The question was explored from a standard set of angles",
-  "debateChrome.condition.mapMergeFallback": "Similar points were grouped together by a simple rule",
+  "debateChrome.condition.mapMergeFallback": "Points that said the same thing were combined",
   "debateChrome.condition.mapChooseFallback": "The answers to debate were picked by a simple rule",
   "debateChrome.condition.mapUnavailable": "Each AI started with its own answer",
   "debateChrome.condition.answersFilled": "A second answer was added so two answers could be compared",

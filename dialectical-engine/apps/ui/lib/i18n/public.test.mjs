@@ -28,7 +28,11 @@ const sourcePaths = [
   // The PDF download route's refusals (Task 15): short plain lines, `public.report.error.*`.
   "lib/report/reportRoute.ts",
   // The floor answer (Task M6): "Our best answer:" and the thin-basis line, `public.story.floor*`.
-  "lib/v3/floorAnswer.ts"
+  "lib/v3/floorAnswer.ts",
+  // Debate shape P2c: "Also raised, not debated" and the position titles, `public.alsoRaised.*` and
+  // `public.positionTitle`, in the QUESTION's `public` catalogue.
+  "components/AlsoRaisedList.tsx",
+  "lib/v3/mapView.ts"
 ];
 const sources = new Map(sourcePaths.map((path) => [path, readFileSync(join(root, path), "utf8")]));
 const catalogPath = join(root, "messages/en/public.json");

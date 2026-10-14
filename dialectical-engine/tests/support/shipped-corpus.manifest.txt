@@ -432,6 +432,7 @@ apps/ui/components/AccountMenu.tsx
 apps/ui/components/AgeConfirmationFlow.tsx
 apps/ui/components/AgeRefusal.tsx
 apps/ui/components/AiNotice.tsx
+apps/ui/components/AlsoRaisedList.tsx
 apps/ui/components/AnswerHonestyDrawer.tsx
 apps/ui/components/ArgumentFocusView.tsx
 apps/ui/components/AuthGate.tsx
@@ -468,6 +469,7 @@ apps/ui/components/NodeDetailDrawer.tsx
 apps/ui/components/OwnerPossessionPanel.tsx
 apps/ui/components/PasswordResetFlow.tsx
 apps/ui/components/PhoneProfileCard.tsx
+apps/ui/components/PositionTitle.tsx
 apps/ui/components/PublicAnswerDisclosure.tsx
 apps/ui/components/PublicDebateOverview.tsx
 apps/ui/components/PublicHonestyDrawer.tsx
