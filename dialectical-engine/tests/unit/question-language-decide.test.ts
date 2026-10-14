@@ -7,7 +7,7 @@ import {
 } from "../../apps/api/src/question-language/decide.js";
 import { ELD_CONFUSED_SITES, ELD_TUNING } from "../../apps/api/src/question-language/eld-tuning.js";
 import type { EldReading } from "../../apps/api/src/question-language/eld.js";
-import type { FastCheckReading } from "../../apps/api/src/question-language/fast-check.js";
+import { readQuestionLanguageReply, type FastCheckReading } from "../../apps/api/src/question-language/fast-check.js";
 
 const L = (code: string, name: string) => ({ code, name });
 const RO = L("ro", "Romanian"), EN = L("en", "English"), ID = L("id", "Indonesian"), CA = L("ca", "Catalan"), HR = L("hr", "Croatian");
@@ -191,20 +191,45 @@ describe("the question-language decision table (question-language spec 2026-10-1
     expect(decideBeforeFast(SITE, sure(SITE.code), "q", signedOut)).toEqual({ kind: "LOCK", language: SITE, source: "ELD_SITE" });
   });
 
-  it("CR-5: a second offer for the same person and question within 15 minutes is the fallback lock, never a second pop-up", () => {
+  it("CR-5 + ruling L-REPEAT: a second offer for the same person and question within 15 minutes locks the fast AI's main language, never a second pop-up", () => {
     expect(REPEAT_OFFER_WINDOW.ms).toBe(15 * MINUTE);
     const offer = decideAfterFast(RO, unsure, mix(REWRITE), MIX_Q, MAX);
     expect(offer.kind).toBe("OFFER");
-    expect(withoutRepeatOffer(offer, RO, unsure, MIX_Q, null, NOW)).toBe(offer);
-    expect(withoutRepeatOffer(offer, RO, unsure, MIX_Q, NOW - 14 * MINUTE, NOW)).toEqual({ kind: "LOCK", language: RO, source: "REPEAT_OFFER" });
-    expect(withoutRepeatOffer(offer, RO, sure("en"), MIX_Q, NOW - MINUTE, NOW)).toEqual({ kind: "LOCK", language: EN, source: "REPEAT_OFFER" });
-    expect(withoutRepeatOffer(offer, RO, unsure, MIX_Q, NOW - 15 * MINUTE, NOW)).toBe(offer);
-    expect(withoutRepeatOffer(offer, RO, unsure, MIX_Q, NOW - 30 * MINUTE, NOW)).toBe(offer);
+    expect(withoutRepeatOffer(offer, null, NOW)).toBe(offer);
+    expect(withoutRepeatOffer(offer, NOW - 14 * MINUTE, NOW)).toEqual({ kind: "LOCK", language: RO, source: "REPEAT_OFFER" });
+    expect(withoutRepeatOffer(offer, NOW - 15 * MINUTE, NOW)).toBe(offer);
+    expect(withoutRepeatOffer(offer, NOW - 30 * MINUTE, NOW)).toBe(offer);
+    // A mostly-English question on the ro site: the fast AI's main language (en) is locked, as "Keep my wording" would,
+    // not eld's reading and not the site language.
+    const EN_MIX_Q = "Should Romania adopt the euro now, sau ar trebui să aștepte creșterea salariilor?";
+    const mostlyEnglish = decideAfterFast(RO, unsure,
+      { kind: "MIX", main: EN, seen: [EN, RO], proposed: "Should Romania adopt the euro now, or should it wait until wages grow?" }, EN_MIX_Q, MAX);
+    expect(mostlyEnglish.kind).toBe("OFFER");
+    expect(withoutRepeatOffer(mostlyEnglish, NOW - MINUTE, NOW)).toEqual({ kind: "LOCK", language: EN, source: "REPEAT_OFFER" });
     // A remembered offer from "the future" (a clock step back) is still a repeat: never two pop-ups.
-    expect(withoutRepeatOffer(offer, RO, unsure, MIX_Q, NOW + MINUTE, NOW)).toEqual({ kind: "LOCK", language: RO, source: "REPEAT_OFFER" });
+    expect(withoutRepeatOffer(offer, NOW + MINUTE, NOW)).toEqual({ kind: "LOCK", language: RO, source: "REPEAT_OFFER" });
     // A lock is never touched.
     const lock = decideAfterFast(RO, unsure, { kind: "ONE", main: EN }, MIX_Q, MAX);
-    expect(withoutRepeatOffer(lock, RO, unsure, MIX_Q, NOW - MINUTE, NOW)).toBe(lock);
+    expect(withoutRepeatOffer(lock, NOW - MINUTE, NOW)).toBe(lock);
+  });
+
+  it("Tasks 5 and 7 together: the fast check's reader output feeds the table", () => {
+    const reply = (main: string, seen: readonly string[], isMix: boolean, proposed: string | null): string =>
+      JSON.stringify({ main_language: main, languages_seen: seen, is_real_mix: isMix, proposed_question: proposed });
+    const decide = (text: string, eld: EldReading = unsure) => decideAfterFast(RO, eld, readQuestionLanguageReply(text, MIX_Q), MIX_Q, MAX);
+    // One language.
+    expect(decide(reply("en", ["en"], false, null))).toEqual({ kind: "LOCK", language: EN, source: "FAST" });
+    // A real mix with a usable rewrite: the offer.
+    expect(decide(reply("ro", ["ro", "en"], true, REWRITE))).toEqual({ kind: "OFFER", main: RO, seen: [RO, EN], proposed: REWRITE });
+    // A real mix whose rewrite the reader discards: main locked, the reader's code recorded.
+    const unchanged = decide(reply("ro", ["ro", "en"], true, MIX_Q));
+    expect(unchanged).toEqual({ kind: "LOCK", language: RO, source: "FAST_MIX_NO_OFFER", rewriteRefusal: "REWRITE_UNUSABLE:UNCHANGED" });
+    expect(decisionRecordCode(unchanged)).toBe("FAST_MIX_NO_OFFER:REWRITE_UNUSABLE:UNCHANGED");
+    expect(decide(reply("ro", ["ro", "en"], true, "Should Romania adopt the euro or wait until wages catch up with the rest of Europe?")))
+      .toEqual({ kind: "LOCK", language: RO, source: "FAST_MIX_NO_OFFER", rewriteRefusal: "REWRITE_UNUSABLE:OTHER_LANGUAGE" });
+    // A DOWN reply: the fallback (the site with eld unsure, eld's confident top otherwise).
+    expect(decide("not json at all")).toEqual({ kind: "LOCK", language: RO, source: "FALLBACK_SITE" });
+    expect(decide(reply("unknown", [], false, null), sure("en"))).toEqual({ kind: "LOCK", language: EN, source: "FALLBACK_ELD" });
   });
 
   it("every outcome carries a code for the decision record, never question text", () => {
@@ -220,7 +245,7 @@ describe("the question-language decision table (question-language spec 2026-10-1
       [decideAfterFast(RO, sure("en"), { kind: "DOWN", reason: "TRANSPORT" }, secretQuestion, MAX), "FALLBACK_ELD"],
       [fallbackLock(RO, unsure, secretQuestion, true), "LOCAL_SITE"],
       [fallbackLock(RO, sure("en"), secretQuestion, true), "LOCAL_ELD"],
-      [withoutRepeatOffer(decideAfterFast(RO, unsure, secretMix, secretQuestion, MAX), RO, unsure, secretQuestion, NOW, NOW), "REPEAT_OFFER"]
+      [withoutRepeatOffer(decideAfterFast(RO, unsure, secretMix, secretQuestion, MAX), NOW, NOW), "REPEAT_OFFER"]
     ];
     const before = decideBeforeFast(SITE, sure(SITE.code), secretQuestion, ON);
     expect(before.kind).toBe("LOCK");

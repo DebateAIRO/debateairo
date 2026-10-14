@@ -31,8 +31,9 @@ export type LockSource = "ELD_SITE" | "FAST" | "FAST_MIX_NO_OFFER" | "FALLBACK_E
 /** Why a real mix was locked with no offer: the reader's code (ruling L-REWRITE), or this table's own second check. */
 export type MixNoOfferCode = FastCheckRewriteRefusal | "MIX_ONE_LANGUAGE_SEEN";
 
+export type LanguageLock = Readonly<{ kind: "LOCK"; language: QuestionLanguage; source: LockSource; rewriteRefusal?: MixNoOfferCode }>;
 export type LanguageDecision =
-  | Readonly<{ kind: "LOCK"; language: QuestionLanguage; source: LockSource; rewriteRefusal?: MixNoOfferCode }>
+  | LanguageLock
   | Readonly<{ kind: "OFFER"; main: QuestionLanguage; seen: readonly QuestionLanguage[]; proposed: string }>;
 
 /** Before the fast call: a final lock, or "ask the fast AI". */
@@ -42,7 +43,8 @@ export type BeforeFastDecision = LanguageDecision | Readonly<{ kind: "ASK_FAST" 
  * Ruling CR-2: the sites where eld may be confidently wrong about a near neighbour, so the fast AI always checks even
  * when eld names the site language: the three eld lacks (ga, id, mt), Croatian (Serbian and Bosnian in Latin script
  * read as Croatian), and every site Task 3 measured with a confident cross-locale confusion (ELD_CONFUSED_SITES).
- * Each extra check costs about $0.00005. The fallback (fast AI down) still uses eld: never block.
+ * Each extra check costs about $0.00013 (the framed system message is about 5.2 KB, ~1,300 input tokens). The fallback
+ * (fast AI down) still uses eld: never block.
  */
 export const FAST_CHECK_ALWAYS_SITES: readonly string[] = Object.freeze(
   [...new Set([...SITE_LANGUAGES_ELD_LACKS, "hr", ...ELD_CONFUSED_SITES])].sort());
@@ -55,8 +57,8 @@ const OFFER_LANGUAGES = Object.freeze({ max: 6 });
 
 const UTF8 = new TextEncoder();
 
-const lock = (language: QuestionLanguage, source: LockSource): LanguageDecision => Object.freeze({ kind: "LOCK", language, source });
-const noOffer = (main: QuestionLanguage, rewriteRefusal: MixNoOfferCode): LanguageDecision =>
+const lock = (language: QuestionLanguage, source: LockSource): LanguageLock => Object.freeze({ kind: "LOCK", language, source });
+const noOffer = (main: QuestionLanguage, rewriteRefusal: MixNoOfferCode): LanguageLock =>
   Object.freeze({ kind: "LOCK", language: main, source: "FAST_MIX_NO_OFFER", rewriteRefusal });
 const primary = (code: string): string => code.split("-")[0]!.toLowerCase();
 
@@ -85,7 +87,7 @@ function eldLanguage(site: QuestionLanguage, eld: EldReading, questionLine: stri
 }
 
 /** Fast AI down (local = false) or no fast AI at all (local = true): eld's top when confident, else the site language. */
-export function fallbackLock(site: QuestionLanguage, eld: EldReading, questionLine: string, local: boolean): LanguageDecision {
+export function fallbackLock(site: QuestionLanguage, eld: EldReading, questionLine: string, local: boolean): LanguageLock {
   const fromEld = eldLanguage(site, eld, questionLine);
   return fromEld === null ? lock(site, local ? "LOCAL_SITE" : "FALLBACK_SITE") : lock(fromEld, local ? "LOCAL_ELD" : "FALLBACK_ELD");
 }
@@ -135,20 +137,21 @@ export function decideAfterFast(
 
 /**
  * CR-5: the same person and the same question were offered a rewrite less than 15 minutes ago (the caller remembers
- * when, by a hash of the person and the question, never the text): never a second pop-up. The offer becomes the
- * fallback lock (eld's confident top, else the site language) with source REPEAT_OFFER. A remembered time later than
- * `nowMs` (the clock stepped back) still counts as a repeat. A lock passes through untouched.
+ * when, by a hash of the person and the question, never the text): never a second pop-up. Controller ruling L-REPEAT:
+ * the offer becomes a lock of the fast AI's main language, exactly as "Keep my wording" would (the fast AI's reading
+ * is in hand and is the best one), with source REPEAT_OFFER. A remembered time later than `nowMs` (the clock stepped
+ * back) still counts as a repeat. A lock passes through untouched.
  */
-export function withoutRepeatOffer(
-  decision: LanguageDecision, site: QuestionLanguage, eld: EldReading, questionLine: string,
-  lastOfferAtMs: number | null, nowMs: number
-): LanguageDecision {
+export function withoutRepeatOffer(decision: LanguageDecision, lastOfferAtMs: number | null, nowMs: number): LanguageDecision {
   if (decision.kind !== "OFFER" || lastOfferAtMs === null || nowMs >= lastOfferAtMs + REPEAT_OFFER_WINDOW.ms) return decision;
-  const fallback = fallbackLock(site, eld, questionLine, false);
-  return fallback.kind === "LOCK" ? lock(fallback.language, "REPEAT_OFFER") : lock(site, "REPEAT_OFFER");
+  return lock(decision.main, "REPEAT_OFFER");
 }
 
-/** The decision record's outcome code: codes only, never question or rewrite text. */
+/**
+ * The decision record's outcome code: codes only, never question or rewrite text. LOCAL_* covers every "no fast call"
+ * reason alike (local mode, no gate, hosted before Task 19's spend record, a signed-out person): Task 10 records which
+ * reason beside it.
+ */
 export function decisionRecordCode(decision: LanguageDecision): string {
   if (decision.kind === "OFFER") return "OFFER";
   return decision.rewriteRefusal === undefined ? decision.source : `${decision.source}:${decision.rewriteRefusal}`;
