@@ -65,10 +65,18 @@ vi.mock("next/link", () => ({
 }));
 
 import DebatePageClient from "../../apps/ui/app/debate/[id]/DebatePageClient.js";
+import { PublicDebatePageClient } from "../../apps/ui/app/public/debate/[id]/PublicDebatePageClient.js";
 import { PublicDebateOverview } from "../../apps/ui/components/PublicDebateOverview.js";
 import { debateDetailFromAnswer } from "../../apps/ui/lib/v3/adapter.js";
 import { STORY_FIXTURE_ANSWER, STORY_FIXTURE_DEBATE_ID, storyFixture } from "../../apps/ui/lib/v3/storyFixture.js";
 import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
+import timeEnglish from "../../apps/ui/messages/en/time.json" with { type: "json" };
+import chromeEnglish from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
+import debateChromeEnglish from "../../apps/ui/messages/en/debateChrome.json" with { type: "json" };
+import debateDrawersEnglish from "../../apps/ui/messages/en/debateDrawers.json" with { type: "json" };
+import miscEnglish from "../../apps/ui/messages/en/misc.json" with { type: "json" };
+import composeEnglish from "../../apps/ui/messages/en/compose.json" with { type: "json" };
+import homeEnglish from "../../apps/ui/messages/en/home.json" with { type: "json" };
 
 class ResizeObserverStub {
   observe() {}
@@ -143,6 +151,46 @@ function owner(initialMapView: DebateMapView | null): ReactElement {
   );
 }
 
+/**
+ * Review M-4: the published page. The snapshot's own nodes (the owner's, as a publication carries them: public lineage,
+ * no review) and its map view; the page has no owner answer, so titles can come only from `publicMapView` and the
+ * public nodes.
+ */
+function publicPage(): ReactElement {
+  const nodes = STORY_FIXTURE_ANSWER.nodes.map((node) => ({
+    ...node, disagreement: null, review: null,
+    maker_lineage: node.maker_lineage === null ? null : { maker: node.maker_lineage.maker, model_id: node.maker_lineage.model_id }
+  }));
+  const debate = PublicDebateSchema.parse({
+    ...PUBLIC_BASE,
+    answer: { ...PUBLIC_BASE.answer, nodes, edges: STORY_FIXTURE_ANSWER.edges, tree_included: true },
+    map_view: VIEW
+  });
+  return (
+    <PublicDebatePageClient debate={debate} locale="en" storyLocale="ro" storyCatalog={QUESTION_WORDS}
+      publicCatalog={publicEnglish} timeCatalog={timeEnglish} debateChromeCatalog={debateChromeEnglish}
+      debateDrawersCatalog={debateDrawersEnglish} miscCatalog={miscEnglish} composeCatalog={composeEnglish}
+      homeCatalog={homeEnglish} />
+  );
+}
+
+/** Open one of the page's reading views by its button (the published page lands on the overview). */
+async function openView(container: HTMLElement, label: string): Promise<void> {
+  const button = [...container.querySelectorAll<HTMLButtonElement>(
+    `[role="group"][aria-label="${chromeEnglish["chrome.view"]}"] > button`
+  )].find((candidate) => candidate.textContent === label);
+  expect(button, label).not.toBeUndefined();
+  await act(async () => button!.click());
+  await flush();
+}
+
+/** Who raised a point, how many did, or a position's number: none of it may reach the list. */
+const WHO_OR_HOW_MANY = ["OpenAI", "Anthropic", "xAI", "Google", "raised by", "raised_by", "P1", "P2"];
+function expectNoWhoOrHowMany(text: string): void {
+  for (const forbidden of WHO_OR_HOW_MANY) expect(text, forbidden).not.toContain(forbidden);
+  expect(text, "a count").not.toMatch(/[0-9]/u);
+}
+
 function titlesIn(container: HTMLElement): string[] {
   return [...new Set([...container.querySelectorAll(".positionTitle")].map((title) => title.textContent ?? ""))];
 }
@@ -179,9 +227,17 @@ describe("debate shape P2c — the public overview's also-raised list", () => {
     expect(section?.getAttribute("lang")).toBe("ro");
     expect(section?.querySelector(".alsoRaisedTitle")?.textContent).toBe("RO Also raised");
     expect([...section!.querySelectorAll(".alsoRaisedItem")].map((item) => item.textContent)).toEqual(VIEW.also_raised);
-    for (const forbidden of ["OpenAI", "Anthropic", "xAI", "raised by", "raised_by", "P1"]) {
-      expect(section!.textContent).not.toContain(forbidden);
-    }
+    // Review M-4: the section holds its title and the claims and nothing else, so a count, a maker or a number the
+    // component added would show here. The fixture's claims themselves name no one and hold no number.
+    expect(section!.textContent).toBe(["RO Also raised", ...VIEW.also_raised].join(""));
+    expectNoWhoOrHowMany(section!.textContent ?? "");
+  });
+
+  it("the who-or-how-many check fails on text that says who or how many (its control)", () => {
+    expect(() => expectNoWhoOrHowMany("Chiria poate crește, raised by OpenAI.")).toThrow();
+    expect(() => expectNoWhoOrHowMany("Chiria poate crește (3)")).toThrow();
+    expect(() => expectNoWhoOrHowMany("P1: Chiria poate crește")).toThrow();
+    expect(() => expectNoWhoOrHowMany(["RO Also raised", ...VIEW.also_raised].join(""))).not.toThrow();
   });
 
   it("says every point was debated when nothing was left over", async () => {
@@ -193,6 +249,18 @@ describe("debate shape P2c — the public overview's also-raised list", () => {
   it("shows nothing for a snapshot without a map", async () => {
     const container = await mount(overview(undefined));
     expect(container.querySelector(".alsoRaised")).toBeNull();
+  });
+});
+
+describe("debate shape P2c — the published debate page", () => {
+  it("titles each position from the snapshot's map view and nodes, in the question's language", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = await mount(publicPage());
+    for (const view of [chromeEnglish["chrome.thread"], chromeEnglish["chrome.tree"]]) {
+      await openView(container, view);
+      expect(titlesIn(container).sort(), view).toEqual([...TITLES].sort());
+      for (const title of container.querySelectorAll(".positionTitle")) expect(title.getAttribute("lang"), view).toBe("ro");
+    }
   });
 });
 

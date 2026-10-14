@@ -19,6 +19,7 @@ import {
 } from "../../packages/crypto/src/index.js";
 import type { PostgresPublicationRepository } from "@debateai/db";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
+import { RepositoryAnswerMapViewApplication, type MapViewReader, type MapViewSource } from "../../apps/api/src/map-views.js";
 import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
 import {
   createPublicationContentCheck,
@@ -103,7 +104,7 @@ function publishedTexts(answer: Answer): string[] {
 }
 
 /** Memory fakes in the `publicationHarness` shape (s8-publication.test.ts), counting every side effect. */
-function publicationFakes(options: { preflight?: boolean; story?: PublicStoryShort; mapView?: DebateMapView } = {}) {
+function publicationFakes(options: { preflight?: boolean; story?: PublicStoryShort; mapView?: DebateMapView; mapViews?: MapViewReader } = {}) {
   const counts = { prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 };
   const stored: { publicationRef: string; runId: string; contentCiphertext: CryptoEnvelope }[] = [];
   const repository = {
@@ -130,7 +131,7 @@ function publicationFakes(options: { preflight?: boolean; story?: PublicStorySho
   }) as PublicationCipher["create"];
   const application = new PostgresPublicationApplication(repository, cipher, () => new Date("2026-09-29T12:00:00.000Z"),
     repository, options.story === undefined ? undefined : { readStoryShort: async () => options.story! },
-    options.mapView === undefined ? undefined : { readMapView: async () => options.mapView! });
+    options.mapViews ?? (options.mapView === undefined ? undefined : { readMapView: async () => options.mapView! }));
   /** The snapshot that was encrypted and handed to the repository, decrypted back. */
   const decryptStored = async (): Promise<PublicDebate> => {
     const last = stored.at(-1)!;
@@ -395,6 +396,31 @@ describe("hate-speech S02 publish path", () => {
       });
       expect(todayResult?.state).toBe("PUBLISHED");
       expect("map_view" in await today.decryptStored()).toBe(false);
+    });
+
+    // Review M-4: the real map view reader, over a run with no map choice, and (ruling C-TWO) over a map whose single
+    // answer left the debate arguing today's opening. Neither snapshot carries a view, so the published page never
+    // says "No other points came up" for a debate that had no map.
+    it("a real no-map run, and a map with fewer than two argued answers, publish no map view", async () => {
+      const owned = { owns: async () => true, ownedRunOfAnswer: async () => RUN_ID };
+      const reader = (record: MapViewSource | null) => new RepositoryAnswerMapViewApplication({
+        readMapOpeningForRun: async () => (record === null ? null : "MAP" as const),
+        readMapChoiceForRun: async () => record
+      }, owned);
+      const oneAnswer: MapViewSource = { answers: [{ statement: "Only one.", rootNodeId: null }], alsoRaised: [{ claim: "Left over.", makers: ["A"] }] };
+      for (const record of [null, oneAnswer]) {
+        const reads: string[] = [];
+        const app = reader(record);
+        const fakes = publicationFakes({ mapViews: { readMapView: async (input) => { reads.push(input.runId); return app.readMapView(input); } } });
+        const result = await fakes.application.publish({
+          runId: RUN_ID, answer: servedAnswer(), authenticated, grantToken: GRANT_TOKEN, source: SOURCE,
+          contentCheck: contentCheck(createPartJudgeStub({})).check
+        });
+        expect(result?.state).toBe("PUBLISHED");
+        // The real reader was asked, for this run, and answered no view.
+        expect(reads).toEqual([RUN_ID]);
+        expect("map_view" in await fakes.decryptStored(), JSON.stringify(record)).toBe(false);
+      }
     });
   });
 

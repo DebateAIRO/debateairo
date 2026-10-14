@@ -123,8 +123,14 @@ describe("phone-completion draft with Answer length and the two depth modes", ()
   it("accepts a submitted ask with or without the three choices, and refuses an unknown one", () => {
     storeRecord({ ...form }, { ...submitted, config: legacyConfig, query: legacyQuery });
     expect(phoneCompletionDraftForOwner(OWNER)).not.toBeNull();
-    storeRecord({ ...form }, { ...submitted, config: { ...submitted.config, scrutiny: "infinite" } });
-    expect(phoneCompletionDraftForOwner(OWNER)).toBeNull();
+    // Review M-4: the unknown value sits in BOTH the ask and the room query, so the two still agree and only the
+    // schemas can refuse it — never the config-versus-query comparison.
+    for (const unknown of [{ scrutiny: "infinite" }, { depth_mode: "manual" }, { answer_length: "epic" }]) {
+      const config = { ...submitted.config, ...unknown };
+      const query = { ...submitted.query, ...unknown };
+      storeRecord({ ...form }, { ...submitted, config, query } as unknown as SubmittedPhoneDraft);
+      expect(phoneCompletionDraftForOwner(OWNER), JSON.stringify(unknown)).toBeNull();
+    }
   });
 
   it("compares the room query's three choices with the ask's, as it compares the depth", () => {

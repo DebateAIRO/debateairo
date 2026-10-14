@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { StoryBody, StoryVerdictBasis } from "@debateai/contract";
 import {
@@ -91,6 +92,18 @@ const ALSO_RAISED: readonly StorySnapshotAlsoRaised[] = [
   { claim: "Cycle lanes are a cheaper alternative.", raisedBy: 2 }
 ];
 
+/**
+ * `toStoryPromptMaterial(build({}).material, null)` for this file's snapshot, measured at the P2c base 96f826d91 by
+ * running this very case against that commit's packages/story/src (P2c fix wave, review M-4). Re-measure only for a
+ * deliberate change to today's story material, never to make a P2c change pass.
+ */
+const P2C_BASE_NO_MAP_MATERIAL = Object.freeze({
+  sha256: "55ade9a5ea321faf98a9d53f4d4d95ab83388a32cde0a92eda2647b141769d3d",
+  promptBytes: 1972,
+  materialBytes: 1507,
+  compressionStep: 0
+});
+
 type Built = Extract<StoryMaterialResult, { kind: "OK" }>;
 
 function built(result: StoryMaterialResult): Built {
@@ -143,6 +156,20 @@ describe("debate shape P2c — also raised, not debated, in the story material",
     expect(toStoryPromptMaterial(empty.material, null).map((entry) => entry.name)).toEqual(CORE_FIELDS);
     expect(JSON.stringify(toStoryPromptMaterial(empty.material, null)))
       .toBe(JSON.stringify(toStoryPromptMaterial(plain.material, null)));
+  });
+
+  // P2c fix wave (review M-4): a FIXED baseline, measured at the P2c base 96f826d91 (before any also-raised or answers
+  // note code existed) with this file's own snapshot. The comparison above runs the new code on both sides; this pin
+  // catches any change to an existing field's bytes for a run without a map.
+  it("keeps a no-map run's story material at the bytes it had before P2c (fixed baseline from 96f826d91)", () => {
+    const plain = built(build({}));
+    const prompt = JSON.stringify(toStoryPromptMaterial(plain.material, null));
+    expect({
+      sha256: createHash("sha256").update(prompt).digest("hex"),
+      promptBytes: Buffer.byteLength(prompt),
+      materialBytes: plain.material.bytes,
+      compressionStep: plain.compressionStep
+    }).toEqual(P2C_BASE_NO_MAP_MATERIAL);
   });
 
   it("sends also_raised after omitted, most-raised first, with only each claim and never a count (C-ORDER)", () => {
@@ -204,6 +231,8 @@ describe("debate shape P2c — also raised, not debated, in the story material",
     const longNodes = snapshot().nodes.map((entry) => ({ ...entry, claim: text(entry.nodeId, 600) }));
     const longRaised = Array.from({ length: 12 }, (_, index) => ({ claim: text(`raised ${String(index)}`, 300), raisedBy: 1 }));
     const seenSteps = new Set<number>();
+    /** Per ladder step: the longest also-raised claim seen there (review M-4: every step must check a real item). */
+    const longestAt = new Map<number, number>();
     let budget = 10_000_000;
     for (let guard = 0; guard < 400; guard += 1) {
       const result = build({ nodes: longNodes, alsoRaised: longRaised }, budget);
@@ -211,13 +240,20 @@ describe("debate shape P2c — also raised, not debated, in the story material",
       seenSteps.add(result.compressionStep);
       const limit = Math.min(240, STEP_CLAIM_CHARS[result.compressionStep] ?? 240);
       for (const item of result.material.alsoRaised ?? []) {
-        expect(Array.from(item.claim).length).toBeLessThanOrEqual(limit);
+        const length = Array.from(item.claim).length;
+        expect(length).toBeLessThanOrEqual(limit);
+        longestAt.set(result.compressionStep, Math.max(longestAt.get(result.compressionStep) ?? 0, length));
       }
       expect(result.material.bytes).toBeLessThanOrEqual(budget);
       budget = result.material.bytes - 1;
     }
     expect(seenSteps.has(0)).toBe(true);
     expect(seenSteps.has(5)).toBe(true);
+    // Every step the loop reached carried also-raised points, cut to exactly that step's limit: the cut is checked at
+    // each step, never passed vacuously by a step where no point fitted.
+    for (const step of seenSteps) {
+      expect(longestAt.get(step), `step ${String(step)}`).toBe(Math.min(240, STEP_CLAIM_CHARS[step] ?? 240));
+    }
   });
 
   it("refuses the field's own name in a story, as every underscore key of the material", () => {
