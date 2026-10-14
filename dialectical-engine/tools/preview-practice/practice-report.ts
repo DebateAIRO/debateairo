@@ -406,6 +406,8 @@ export function debateReport(input: Readonly<{
     wallSeconds: Math.round((input.finishedAt.getTime() - input.startedAt.getTime()) / 1000),
     time: Object.freeze({ admissionSeconds: Math.round(r.seconds.admission), debateSeconds: Math.round(r.seconds.debate) }),
     register: r.register,
+    // Hosted mode only: the room or the daily guard, billing (register / practice), the ceilings, the settings set aside.
+    ...(r.deployment === undefined ? {} : { deployment: r.deployment }),
     ask: Object.freeze({ questionId: r.questionId, depth: r.depth, planTier: "premium" }),
     // Debate shape: only when the debate ran with a debate-shape row; absent otherwise, so today's report keeps its keys.
     ...(r.shape === undefined ? {} : { shape: r.shape }),
@@ -459,6 +461,16 @@ export function reportMarkdown(report: PracticeReport): string {
     `Exit code ${String(report.exitCode)}. Started ${String(report.startedAt)}, finished ${String(report.finishedAt)}.`, ""];
   if (report.reasons.length > 0) {
     lines.push("Why:", "", ...report.reasons.map((reason) => `- ${reason}`), "");
+  }
+  const deployment = report.deployment as PracticeDebateResult["deployment"] | undefined;
+  if (deployment !== undefined) {
+    const dollars = (micros: number | null | undefined) => micros === null || micros === undefined ? "none" : `$${(micros / 1_000_000).toFixed(2)}`;
+    lines.push("Hosted mode:", "",
+      `- the ask went through ${deployment.room ? "the room (the site's day, the waiting line)" : "the daily guard"}`,
+      `- billing: ${deployment.billingInRegister} in the register, kept off in the practice (no plan wall, no charge scope)`,
+      `- ceilings: per debate ${dollars(deployment.ceilings?.perRunCeilingMicros)}, per day ${dollars(deployment.ceilings?.dailyCeilingMicros)}`
+        + ` (this practice's own spend only), per story ${dollars(deployment.ceilings?.perStoryCeilingMicros)}`,
+      `- server-only settings set aside unread: ${deployment.setAsideSettings.length === 0 ? "none" : deployment.setAsideSettings.join(", ")}`, "");
   }
   const totals = report.totals as Record<string, unknown> | undefined;
   if (totals !== undefined) lines.push("Totals:", "", ...Object.entries(totals).map(([key, value]) => `- ${key}: ${String(value)}`), "");

@@ -110,8 +110,12 @@ const PRACTICE_RUNNER = read("tools/preview-practice/practice-runner-composition
 const API_MAIN = read("apps/api/src/main.ts");
 const PRACTICE_ASK = read("tools/preview-practice/practice-ask-composition.ts");
 
-/** Settings only a hosted (money-metered, billing) deployment passes; the preview is local mode. */
-const HOSTED_ONLY_ASK_KEYS = new Set(["room", "waitingLine", "assertDailyCostEnvelope", "billing"]);
+/**
+ * The one setting the practice never passes: `billing` (hosted with billing on). The practice composes the hosted ask
+ * too since 2026-10-14 (the room, its waiting line, or the daily guard), but keeps billing off: its throwaway person
+ * has bought no plan (practice-ask-composition.ts says why).
+ */
+const HOSTED_ONLY_ASK_KEYS = new Set(["billing"]);
 
 describe("the practice runs the shipped composition (drift guard)", () => {
   it("hands WalkingSkeletonRunner exactly the settings apps/runner/src/main.ts hands it", () => {
@@ -177,12 +181,102 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     expect(code).not.toMatch(/^\s*runResilience: previewRunResilience\(previewConfig\)!,/mu);
   });
 
+  /** Without comments, every run of white space one space: a statement reads the same however it is wrapped. */
+  const flat = (source: string) => withoutComments(source).replace(/\s+/gu, " ");
+
+  it("hosted (2026-10-14): the runner's money wiring is main.ts's, statement for statement", () => {
+    const shipped = flat(RUNNER_MAIN);
+    const practice = flat(PRACTICE_RUNNER);
+    for (const statement of [
+      "assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);",
+      "const costEnvelopePolicy = environment.DEPLOYMENT_MODE === \"hosted\" ? await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION) : null;",
+      "const moneyInFlight = createRunInFlight();",
+      "const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);",
+      "const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION);",
+      "const selectedFunding = await allowances.readPolicy();",
+      "if (selectedFunding !== null && (environment.DEPLOYMENT_MODE !== \"hosted\" || envelopeBand === null || billingPlans === null)) throw new TypedDomainError(\"INTERNAL_FUNDING_UNAVAILABLE\",",
+      "finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints, persons: billingPlans === null ? plansUnresolvedPersonAllowance() : fundingAllowance ?? new BillingPersonAllowanceSource({ entitlements: new EntitlementRepository(pool).readOnlyPort(), plans: billingPlans, closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints }), owners: modelSpendStore",
+      "store: modelSpendStore, policy: costEnvelopeGuardPolicy(costEnvelopePolicy, storyPolicy), ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }), ...(fundingAllowance === undefined ? {} : {fundingAdmission:fundingAllowance}), inFlight: moneyInFlight",
+      "if (costEnvelopePolicy !== null && envelopeBand !== null) { const firstCalls = firstPositionCallProjections({ targets: declaredProviderTargets,",
+      "bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,",
+      "if (costEnvelopeGuard !== undefined && price === null) { throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`); }",
+      "buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => costEnvelopeGuard.providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),",
+      "...(storyCeilingMicros === null ? {} : { buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({ runId, price, requireReportedUsage: true }) })",
+      "hosted: environment.DEPLOYMENT_MODE === \"hosted\",",
+      "providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),",
+      "bodyCostFallback: envelopeBand !== null,"
+    ]) {
+      expect(shipped, statement).toContain(statement);
+      expect(practice, statement).toContain(statement);
+    }
+    // The local-only refusal is gone; local mode builds no guard (composePracticeRunnerMoney returns null there).
+    expect(practice).not.toContain("PRACTICE_REQUIRES_LOCAL_MODE");
+    expect(practice).toContain("if (environment.DEPLOYMENT_MODE !== \"hosted\") return null;");
+  });
+
+  it("hosted (2026-10-14): the ask's money stages are main.ts's, and the room gets main.ts's options but the funding", () => {
+    const shipped = flat(API_MAIN);
+    const practice = flat(PRACTICE_ASK);
+    for (const statement of [
+      "assertHostedSupportAdmissionSealed(environment.DEPLOYMENT_MODE, admissionPolicy);",
+      "return Object.freeze({ runPolicy, guardPolicy: costEnvelopeGuardPolicy(runPolicy, storyPolicy) });",
+      "new CostEnvelopeGuard({ store: new PostgresModelSpendStore(pool), policy: costEnvelopeRows.guardPolicy })",
+      "policy: await readBillingPolicy(pool, environment.REGISTER_VERSION), plans: await readBillingPlans(pool, environment.REGISTER_VERSION), envelope: costEnvelopeRows.runPolicy",
+      "const band = costEnvelopeBand(costEnvelopeRows.runPolicy);",
+      "const stranded = await new RunWaitRepository(pool).countWaiting();",
+      "assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });",
+      "maximumMicros: mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy)",
+      "dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros, closeBasisPoints: band.closeBasisPoints, waitingLinePerPerson: band.waitingLinePerPerson",
+      "perRunCeilingMicros: costEnvelopeRows?.guardPolicy.perRunCeilingMicros ?? null,",
+      "moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,",
+      "...(askRoom !== undefined ? { room: askRoom, waitingLine: askRoom } : costEnvelopeGuard === undefined ? {} : { assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun() }),",
+      "bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,",
+      "ownRosterOnly: billingEnabled ? [\"free\"] : []"
+    ]) {
+      expect(shipped, statement).toContain(statement);
+      expect(practice, statement).toContain(statement);
+    }
+    const shippedRoom = objectAfter(API_MAIN, "const room = new AskRoom({");
+    const practiceRoom = objectAfter(PRACTICE_ASK, "const room = new AskRoom({");
+    expect(shippedRoom.has("funding")).toBe(true);
+    expect([...practiceRoom].sort()).toEqual([...shippedRoom].filter((key) => key !== "funding").sort());
+    // Billing kept off: the room has no person allowance, no entitlements and no plans; the ask has no `billing`.
+    expect(practice).toContain("const billingPlans = null;");
+    expect(practice).toContain("const entitlements = null;");
+    expect(practice).toContain("const personAllowance = NO_PERSON_ALLOWANCE;");
+    expect(practice).toContain("billingEnabled: false,");
+    expect(objectAfter(PRACTICE_ASK, "const runSettings: RunCreationSettings = {").has("billing")).toBe(false);
+  });
+
+  it("hosted and local alike: the debate shape and the question language are wired as the two main.ts files wire them", () => {
+    // The merge of #165 into the debate-shape branch: the hosted compositions read the shape row (and its map hash) and
+    // price the first call with the locked language exactly as main.ts does, in both modes.
+    const runnerMain = flat(RUNNER_MAIN);
+    const practiceRunner = flat(PRACTICE_RUNNER);
+    const shapeRead = "const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);";
+    expect(runnerMain).toContain(shapeRead);
+    expect(practiceRunner).toContain(shapeRead);
+    expect(runnerMain).toContain("questionLanguageLocked: debateShape !== null");
+    expect(practiceRunner).toContain("questionLanguageLocked: input.debateShape !== null");
+    expect(practiceRunner).toContain("storyPolicy, debateShape, log:");
+    // Read before the money wiring, never only in one mode.
+    expect(practiceRunner.indexOf(shapeRead)).toBeLessThan(practiceRunner.indexOf("const money = await composePracticeRunnerMoney("));
+    const apiMain = flat(API_MAIN);
+    const practiceAsk = flat(PRACTICE_ASK);
+    for (const source of [apiMain, practiceAsk]) {
+      expect(source).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");
+      expect(source).toContain("const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);");
+      expect(source).toContain("const questionLanguage = debateShapeInForcePolicy === null ? undefined : await");
+      expect(source).toContain("route: questionLanguageRouteFor({");
+    }
+  });
+
   it("control: the reader sees a key that is missing", () => {
     const shipped = objectKeys("{ a: 1, ...(x ? {} : { b: 2, c: { d: 3 } }), e: f(g, { h: 1 }), m(n: string) { return { o: n }; }, i }");
     expect([...shipped].sort()).toEqual(["a", "b", "c", "e", "i", "m"]);
     // And on the real files: the practice without one of its settings no longer matches main.ts.
     const anchor = "new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {";
-    const trimmed = objectAfter(PRACTICE_RUNNER.replace("bodyCostFallback: false,", ""), anchor);
+    const trimmed = objectAfter(PRACTICE_RUNNER.replace("bodyCostFallback: envelopeBand !== null,", ""), anchor);
     expect(trimmed.has("bodyCostFallback")).toBe(false);
     expect(objectAfter(RUNNER_MAIN, anchor).has("bodyCostFallback")).toBe(true);
     expect(objectAfter(API_MAIN, "new PostgresAskApplication(pool, dispatcher, {").has("resolveRisk")).toBe(true);

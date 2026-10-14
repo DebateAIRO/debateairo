@@ -49,6 +49,102 @@ Four modes:
 Run **formats** first, then **debate**. Both must PASS. **openings** is separate: run it when the owners want the
 comparison, never as a release check.
 
+The practice works for both kinds of preview: the local-mode preview of today and the hosted preview with
+NETOPIA's sandbox (`deploy/preview-release/v1/README.md`, "Hosted preview with NETOPIA sandbox billing"). The
+practice reads which one it is from the exported settings; "Practising the hosted preview" below says what changes.
+
+## Practising the hosted preview
+
+Once the preview runs in hosted mode (runbook H6 onwards), the exported settings say
+`DEBATEAI_DEPLOYMENT_MODE=hosted` and the live register is a version made by publish kit v3. The practice then
+rehearses what the hosted server runs on the debate path:
+
+- **the runner, as the hosted runner is composed**: each debate is held to the register's per-debate ceiling
+  (`costEnvelopePolicy`), the story to its own ceiling (`storyCostEnvelopePolicy`), every AI call is priced from the
+  settings' target prices, and a call refused for money moves to a cheaper AI as on the server;
+- **the ask, as the hosted API takes it**: the room (the site's day and the waiting line) or, without the band, the
+  daily guard; the hosted start-up checks of the register (the support and room budgets, billing readiness) refuse
+  here when the hosted API would refuse to start on that version;
+- **the hosted rules for the AI targets**: an `https` address and a price for every target.
+
+What stays off the Mac, on purpose:
+
+- **Billing is kept off in the practice**, whatever the register says. With billing on, a person's debate is held to
+  the plan that person bought with NETOPIA's sandbox cards; the practice's throwaway person has bought nothing (a
+  purchase needs NETOPIA, Quaderno and the server's key files, which the practice never touches), so it would run as an
+  unpaid Free account and measure a made-up person instead of the release. The practice therefore asks the way the
+  server asks with billing off (runbook H6): no plan wall, no charge on the person, no server-chosen plan. The register's
+  billing row is still checked the way the hosted API checks it at start. Billing's own flows (checkout, NETOPIA's
+  notify message, invoices, emails) are tested on the server with the sandbox cards (runbook H7, H8).
+- **No NETOPIA, Quaderno or SmartBill call, no email, no key file.** The practice starts no billing route, no country
+  gate and no mail; its ask goes straight to the ask application.
+- **The country files and the billing settings** (`GEOIP_COUNTRY_DB_PATH`, `TOR_EXIT_LIST_PATH`, `NETOPIA_*`,
+  `QUADERNO_*`, `SMARTBILL_*`, `OWNER_REPORT_EMAIL_PATH`) are server paths and sandbox addresses. S-2 does not copy
+  them. If a settings file carries them anyway, the practice sets them aside unread and prints their names (never a
+  value): `settings: server-only settings set aside unread (never opened, never sent): ...`. In a local-mode settings
+  file they are refused, as before.
+- **The site's day** is counted in the practice's own throwaway database, so it holds only this practice's spend. The
+  real shared limit is still the two gates' daily pots.
+
+What the practice prints and reports in hosted mode: `settings: hosted mode (...)` at the start; after the ask,
+`hosted mode: the ask went through the room ...; billing is <on|off> in the register and kept off in the practice`;
+`deployment` in report.json and a "Hosted mode" block in report.md (room or daily guard, billing in the register and
+in the practice, the per-debate, per-day and per-story ceilings, the settings set aside). An ask the room would put in
+line is reported as not admitted (`ADMISSION_REFUSED:ASK_WAITING_IN_LINE:<limit>`): the practice starts no waker.
+
+One thing the practice shows that the server's start does not: a per-debate ceiling too low for even one call fails
+the practice debate (`RUN_CEILING_BELOW_FIRST_CALL`), while the hosted start-up check for it
+(`RUN_CEILING_BELOW_ONE_CALL`) cannot fire on the preview: it prices the plans' own models, none of which is a preview
+model, and the preview has no scorecard in force. On the server such a version would start, then fail every debate.
+
+What changes in the steps:
+
+| Step | Hosted preview |
+|---|---|
+| S-0 | unchanged |
+| S-1 | unchanged: the same read-only export; the newest version is the kit-v3 one the preview runs |
+| S-2 | unchanged commands; `cut -d= -f1` shows `DEBATEAI_DEPLOYMENT_MODE` among the keys and the file says `hosted` (check with `grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' /root/practice/settings.env`, which must print 1) |
+| S-3, S-5, S-7 | unchanged |
+| S-4 | unchanged (the relay knows nothing of the mode) |
+| S-6 | the same commands. A release that needs a new register version: add `--register-next --hosted-billing '<the same JSON the plan will get>'` (and the plan's `--checker`, `--role-rotation`, `--call-concurrency` choices as below) |
+
+### `--register-next` on the hosted preview (publish kit v3)
+
+On the server, a register version for the hosted preview is planned with `native-plan --operation plan
+--hosted-billing '<JSON>'` (kit v3); a hosted preview's plan without it is refused there (`HOSTED_BILLING_REQUIRED`). The
+practice takes the same inputs, checked by the release tool's own rules, and composes the next version with kit v3's
+own code (`buildPreviewSourceRowsV3`, `composePreviewSnapshotV3`):
+
+- `--hosted-billing '<JSON>'`: exactly the plan's value, for example
+  `'{"billing":"off","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'`
+  (use the owner's values; H7's is the same with `"billing":"on"`). It selects kit v3 and runs the practice in hosted
+  mode, also on a local-mode settings file: that is how to practise the switch itself (runbook H6) before it happens.
+- `--checker glm|deepseek` (deepseek only with `--deepseek-enabled-on-gate yes`), `--role-rotation on|off`,
+  `--register-call-concurrency '<JSON>'`: the plan's `--checker`/`--deepseek-enabled-on-gate`, `--role-rotation` and
+  `--call-concurrency`, same values. The practice's own `--call-concurrency A/B/...` is something else: it sets this
+  practice's calls at once and is never written to a register.
+- `--shape-policy FILE` with `--register-next --hosted-billing '<JSON>'`: the debate-shape row goes into kit v3's next
+  version, as the plan's `--debate-shape '<the same policy as JSON>'` puts it there; give the plan the same policy. The
+  new debate shape and the question language then run in hosted mode exactly as in local mode (the runner reads the
+  row and its map fingerprint, the ask locks the question's language).
+- With kit v3 the choices follow the PLAN's defaults, not the newest version's: the answer checker GLM, rotation on,
+  the call-concurrency row carried unchanged. Give the practice exactly the flags you will give the plan; where a
+  default moves a row away from what the preview runs now, the practice says so (`register-next: the newest version's
+  answer checker is DeepSeek; without --checker deepseek ...`), and the server's proposal will show the same change.
+- The changed rows it prints (and `register.codeNext` in report.json, with `composer:
+  "preview-register-composer-v3"`, the hosted inputs and those notes) are the server proposal's `addedKeys` and
+  `changedKeys`, except `nodeRuntimeVersion`, whose source reference the server measures again (so its hashes differ).
+  For example, the first hosted version on register 12 with billing off adds `storyCostEnvelopePolicy` and changes
+  `admissionPolicy` and `costEnvelopePolicy`; billing on over it changes `billingPolicy` alone.
+- Without `--hosted-billing` the practice uses kit v2 exactly as before (the newest version's own checker and
+  rotation), and refuses on a hosted preview (`PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED`).
+
+```sh
+HB='{"billing":"off","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --register-next --hosted-billing "$HB" --out "$P/debate-report"
+echo "exit: $?"
+```
+
 ## The result
 
 Each run writes `report.json` (everything, including the text of every reply that failed its format check, with
@@ -247,8 +343,11 @@ With the row, `report.json` gains a `shape` block, and `report.md` a "Debate sha
 block holds:
 
 - `source`: FLAG for `--shape-policy`, REGISTER for a register that already holds the row;
-- `registerVersion`: the throwaway version the debate ran on;
-- `row`: ADDED or REPLACED;
+- `registerVersion`: the throwaway version the debate ran on. `report.json`'s `register` block names the same version;
+  when the practice published its own version on top (`--shape-policy` without `--register-next`), that block keeps the
+  export's newest version as `importedRegisterVersion`;
+- `row`: ADDED or REPLACED; with `--register-next`, UNCHANGED when the export already held this very row (same value,
+  same source);
 - `asked`: the three settings as given;
 - `storedDepthParams`: what the ask path stored for the run;
 - `sizes`: the sizes frozen on the run's money receipt (plan, map AIs, answers, graders, close-call extra graders,
@@ -342,6 +441,9 @@ With the new shape on, the site fixes the language of each question before the d
 The verdict:
 
 - FAIL: a question locked to the wrong language, or the mixed question not offered a rewrite.
+- FAIL: a rewrite offered on a question whose "Offer the rewrite" is "no" (`LANGUAGE_UNEXPECTED_OFFER`), even when
+  the language is right. For example `lang-ro-borrowed`: borrowed words such as "startup" or "AI" never make a
+  question mixed, so the site must not show the pop-up for it.
 - NOT_PROVEN: the fast AI did not answer, so the language came from a fallback. Run it again later.
 - PASS otherwise. Then the owners read each rewrite in `report.md`, where it stands beside the question, and decide
   whether it keeps the meaning.
@@ -372,8 +474,9 @@ echo "exit: $?"
 
 Debate mode, with a debate-shape row, also asks with a site language:
 
-- `--site-language <code>`: one of the site's 35 languages. Left out, it is the question's own language as the old
-  guesser reads it, if the site has that language; else English.
+- `--site-language <code>`: one of the site's 35 languages. Left out, a language case asked by its id (for example
+  `--question lang-sr-latn`) is asked on its own site from the table above, as the language mode asks it. Any other
+  question is asked on its own language as the old guesser reads it, if the site has that language; else English.
 - `--language-choice use|keep`: how the pop-up is answered when the ask offers a rewrite. The default is `keep`: the
   person keeps their own wording. With `use`, the debate argues the rewritten question, while `transcript.json` still
   names the case's own question.
@@ -402,7 +505,8 @@ echo "exit: $?"
   prints the count it found. The gate itself halts at five. There is no daily cap: "too busy" refusals never stop a
   start. It also refuses unless each gate's own read-only "what is left today" answer says active and open.
 - The settings file may hold only non-secret settings from an allow-list; a database address, a team list or
-  anything key-shaped refuses.
+  anything key-shaped refuses. A hosted settings file may also carry the hosted API's country-file and billing
+  settings: they are set aside unread (see "Practising the hosted preview").
 - A busy model (formats mode): when the AI company refuses a model's call as "too busy" and refuses its one resend
   too (not billed), or the model is cooling off after such refusals (the gate refuses that model for a while, without
   contacting the AI company), only that model pauses. It waits out its cool-off (as long as the gate says when it
@@ -484,6 +588,8 @@ echo "exit: $?"
 - the whole-debate comparison (S-8): eight depth-1 debates over at least five days, after day 1's language mode and
   `lang-ro-en-mix` debate, about $1.9 to $4.3 in all with
   day 1's formats; a pair run again adds about $0.45 to $1, so allow up to about $6 for reruns.
+- hosted preview: the same calls and cost; the debate is also held to the register's per-debate ceiling (the owner's
+  value, suggested $3) and its story to the story ceiling ($0.05), as on the server.
 
 ## Operator steps
 
@@ -542,13 +648,10 @@ install -o ubuntu -g ubuntu -m 0600 /root/practice/register-export.json /root/pr
 
 ### S-4, server, root: install and start the relay
 
-Once per server: a group for the relay's sockets, with the ssh user in it (the ssh user must log in again afterwards
-for the group to apply).
-
-```sh
-getent group debateai-practice || groupadd --system debateai-practice
-gpasswd -a ubuntu debateai-practice
-```
+The relay's two sockets belong to the group `ubuntu` (the ssh user's own group), mode `0660`, so the ssh user's
+forward can open them; the relay runs with `ubuntu` as a supplementary group so it can give them that group. (Earlier
+versions of this step named a group `debateai-practice`; it does not exist on the server, and the relay refuses an
+unknown group, `GATE_RELAY_UNKNOWN_GROUP`. Nothing has to be created once per server.)
 
 Each time: install the relay (the digest printed must be `356f35eaf28764a3e17c2af5e2ec25360405c775331323177aac4e12ab409ce0`, the one printed on the Mac in S-0), then start it
 as the runner account, sandboxed: no network but unix sockets, read-only system, no new privileges, ends by itself
@@ -559,14 +662,14 @@ call in flight finish for up to 1,500 s: a model call may take up to the gate's 
 install -d -o root -g root -m 0755 /usr/local/lib/debateai-practice
 install -o root -g root -m 0644 /home/ubuntu/gate-relay.py /usr/local/lib/debateai-practice/gate-relay.py
 sha256sum /usr/local/lib/debateai-practice/gate-relay.py
-systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=debateai-practice -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30600 -p TimeoutStopSec=1560 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group debateai-practice --mode 0660 --max-connections 20 --lifetime-seconds 28800 --drain-seconds 1500 --idle-timeout-seconds 1500
+systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=ubuntu -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30600 -p TimeoutStopSec=1560 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group ubuntu --mode 0660 --max-connections 20 --lifetime-seconds 28800 --drain-seconds 1500 --idle-timeout-seconds 1500
 systemctl status debateai-preview-practice-relay --no-pager
 journalctl -u debateai-preview-practice-relay -o cat --no-pager
 ls -l /run/debateai-practice
 ```
 
 The journal must show one `"event": "start"` line and the folder two sockets, `srw-rw----` with group
-`debateai-practice`. A refusal prints one plain word (for example `GATE_RELAY_GATE_MISSING:anthropic`) and the unit
+`ubuntu`. A refusal prints one plain word (for example `GATE_RELAY_GATE_MISSING:anthropic`) and the unit
 ends.
 
 ### S-5, Mac: forward the two sockets
@@ -662,9 +765,13 @@ Optional flags:
   runs on it. The settings file stays the live one (its `REGISTER_VERSION` must still be the export's newest version).
   The progress line and `report.json` (`register.codeNext`) name every row the next version changes: on the server,
   the publish proposal must show the same rows (plus `nodeRuntimeVersion`'s source reference, which the server
-  measures again). A checkout that changes no row refuses (`PRACTICE_REGISTER_NEXT_UNSUPPORTED`).
-  With `--shape-policy`, the debate-shape row goes into that next version too (no other version is made), so
-  `register.codeNext` also names `debateShapePolicy`, which the release's own publish leaves out.
+  measures again). A checkout that changes no row refuses (`PRACTICE_REGISTER_NEXT_UNSUPPORTED`). On the hosted
+  preview, or to practise the switch to it, add `--hosted-billing '<JSON>'` (publish kit v3; see "`--register-next` on
+  the hosted preview" above); `--checker`, `--deepseek-enabled-on-gate`, `--role-rotation` and
+  `--register-call-concurrency` give the plan's other choices (with kit v2 they replace the newest version's).
+  With `--shape-policy`, the debate-shape row goes into that next version too, with kit v2 or kit v3 alike (no other
+  version is made), so `register.codeNext` also names `debateShapePolicy`, which the release's own publish leaves out
+  unless the plan is given the same policy (`--debate-shape '<JSON>'`).
   `--site-language <code>`, `--language-choice use|keep` (default `keep`; see "The question language"; debate only, with
   a debate-shape row).
 - language: `--dry` (scripted answers, nothing spent); `--register-export` (the fast AI's settings from its
@@ -773,7 +880,17 @@ cp -Rp "$P/compare" "$HOME/debate-shape-s8-compare-$(date +%Y-%m-%d)"
 
 1. Day 1: run S-3, then S-6's formats. It must PASS. For exit 10 the owner decides, as in the table above.
 2. Then the language mode (above): first `--dry`, then the real run. It must PASS. A FAIL stops everything: nothing is
-   uploaded. NOT_PROVEN: run it again later the same day.
+   uploaded. NOT_PROVEN: run it again later the same day, into a NEW `--out` folder. The first run's folder already
+   holds its `language.jsonl`, so the mode refuses it (`PRACTICE_OUT_ALREADY_HOLDS_LANGUAGE`, nothing spent). For the
+   second try, for example:
+
+   ```sh
+   scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+   PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts language --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/language-report-2"
+   echo "exit: $?"
+   ```
+
+   A third try goes into `"$P/language-report-3"`, and so on.
 3. Then, the same day, one full practice debate on `lang-ro-en-mix` in the new shape (the command at the end of "The
    question language"). It must PASS, and its "Question language" paragraph must say the offer was made and the
    rewrite used. It costs about $0.30 and takes 1 to 2 hours, like one new-shape debate.
@@ -885,7 +1002,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 
 - `practice.ts`: the command (the four modes, the start checks, the report).
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
-  `main.ts` files compose them on the preview. `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
+  `main.ts` files compose them on the preview, in local or hosted mode (hosted: the money wiring, with billing kept off
+  in the ask). `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
 - `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode; `practice-levels.ts`: its `--levels`
   plan; `practice-side-by-side.ts`: the side-by-side page (`report --side-by-side`). `practice-debate.ts`,
   `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode; `practice-transcript.ts`: its
@@ -907,7 +1025,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   (deploy/preview-auth-dev/v1/README.md, "The optional `thinking_levels` table"; it sends nothing and needs no gate):
   `node_modules/.bin/tsx tools/preview-practice/check-thinking-levels.ts --settings "$P/candidate-settings.env"`.
 - `gate-relay.py` and `test_gate_relay.py` (run: `python3 tools/preview-practice/test_gate_relay.py`).
-- Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-levels.test.ts`,
+- Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-hosted.test.ts` (hosted settings and the
+  kit-v3 `--register-next`), `tests/unit/preview-practice-levels.test.ts`,
   `tests/unit/preview-thinking-levels-check.test.ts`,
   `tests/unit/preview-practice-shape.test.ts`,
   `tests/unit/preview-practice-language.test.ts`,

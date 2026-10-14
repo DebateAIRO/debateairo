@@ -35,8 +35,8 @@ import {
 } from "./practice-lanes.js";
 import {
   practiceDebateLanguageBlock,
+  practiceDebateSiteLanguage,
   practiceLanguageResubmission,
-  practiceSiteLanguageFor,
   readPracticeMapLanguage,
   type PracticeDebateLanguage,
   type PracticeDebateLanguageBlock,
@@ -63,6 +63,7 @@ import {
   type PracticeShapeBlock,
   type PracticeShapeFacts,
   type PracticeShapeOverride,
+  type PracticeShapeRowChange,
   type PracticeShapeSource
 } from "./practice-shape.js";
 import { startPracticeDatabase, type PracticeDatabase } from "./practice-throwaway-db.js";
@@ -182,6 +183,20 @@ export type PracticeDebateResult = Readonly<{
   shape?: PracticeShapeBlock;
   /** Question language: the lock, its source, the offer and the planner's naming (operator-only); absent without a debate-shape row. */
   language?: PracticeDebateLanguageBlock;
+  /**
+   * Hosted mode only (absent in local mode): the ask went through the room or the daily guard, billing as the register
+   * says it and as the practice ran it (always off), the ceilings the run was held to (micro-dollars), and the names
+   * of the server-only settings set aside unread.
+   */
+  deployment?: Readonly<{
+    mode: "hosted";
+    room: boolean;
+    billingInRegister: "on" | "off";
+    billingInPractice: "off";
+    ceilings: Readonly<{ perRunCeilingMicros: number; dailyCeilingMicros: number; perStoryCeilingMicros: number | null; band: boolean;
+      billingPlansSealed: boolean }> | null;
+    setAsideSettings: readonly string[];
+  }>;
 }>;
 
 const ROSTER_ORDER = Object.freeze(["MAP", "JUDGE", "PANEL", "REVIEW", "SYNTHESIZER", "EVALUATOR", "STORYTELLER", "STORY_CHECKER", "UNMAPPED"]);
@@ -399,8 +414,15 @@ export async function runPracticeDebate(input: Readonly<{
     // read the row exactly as the live services would. The export file is only read; the live register is never reached.
     const shapeVersion: PracticeShapeVersion | null = input.shape === undefined || input.shape.policy === null
       || receipt.codeNext !== undefined ? null : await publishPracticeShapeVersion(pool, input.register, receipt, input.shape.policy);
-    const settings: PracticeSettings = receipt.codeNext === undefined && shapeVersion === null ? input.settings
-      : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion }) });
+    // A next version composed by publish kit v3 is a hosted one: the server runs it in hosted mode (runbook H6 step 5
+    // switches both units to hosted with it), so the practice runs it in hosted mode too, whatever the settings said.
+    // The practice's own debate-shape version (no --register-next) keeps the settings' mode.
+    const settings: PracticeSettings = receipt.codeNext !== undefined
+      ? Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion,
+        ...(receipt.codeNext.composer === undefined ? {} : { DEPLOYMENT_MODE: "hosted" as const }) }) })
+      : shapeVersion === null ? input.settings
+        : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion }) });
+    const hosted = settings.runner.DEPLOYMENT_MODE === "hosted";
     progress(receipt.codeNext === undefined ? `register imported up to version ${receipt.registerVersion}`
       : `register imported up to live version ${liveVersion}; practising on this code's next version ${receipt.registerVersion}`
         + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
@@ -410,10 +432,16 @@ export async function runPracticeDebate(input: Readonly<{
     }
     // The version both compositions read: the live one, the code's next one, or the practice's own.
     const registerVersion = String(settings.runner.REGISTER_VERSION);
-    // FLAG only: what the debate-shape row did in that version (with --register-next, as the code's next version's delta).
-    const shapeRowChange: "ADDED" | "REPLACED" | null = shapeVersion !== null ? shapeVersion.row
+    // report.json's register block names that same version (final review M-2): on the practice's own version the
+    // import's receipt names the export's newest, which is kept beside it under its own name. Else the receipt as it is.
+    const reportedRegister: PracticeRegisterImportReceipt = shapeVersion === null ? receipt
+      : Object.freeze({ ...receipt, registerVersion: shapeVersion.registerVersion, importedRegisterVersion: receipt.registerVersion });
+    // FLAG only: what the debate-shape row did in that version (with --register-next, as the code's next version's delta:
+    // a row whose bytes, value and source ref, equal the export's is in neither list, UNCHANGED; final review M-3).
+    const shapeRowChange: PracticeShapeRowChange | null = shapeVersion !== null ? shapeVersion.row
       : input.shape === undefined || input.shape.policy === null || receipt.codeNext === undefined ? null
-        : receipt.codeNext.addedKeys.includes(DEBATE_SHAPE_POLICY_ROW_KEY) ? "ADDED" : "REPLACED";
+        : receipt.codeNext.addedKeys.includes(DEBATE_SHAPE_POLICY_ROW_KEY) ? "ADDED"
+          : receipt.codeNext.changedKeys.includes(DEBATE_SHAPE_POLICY_ROW_KEY) ? "REPLACED" : "UNCHANGED";
     // The row the debate runs on, read as the ask path and the runner read it (absent: today's shape, byte for byte).
     // A row switched off (P2b's `enabled: false`, the preview's rollback) is no row, as the API reads it.
     const readRow = await readDebateShapePolicy(pool, settings.runner.REGISTER_VERSION);
@@ -468,7 +496,9 @@ export async function runPracticeDebate(input: Readonly<{
       pool, provisionPool: database.extraPool(), serverAdmissionPool: database.extraPool(), legacyAdmissionPool: database.extraPool(),
       settings, sockets: input.sockets, budgetPorts: input.budgetPorts, teamUserIds: [userId],
       dispatcher: { dispatch: async (job) => { dispatched.push({ ...job }); } }, log: progress,
-      onQuestionLanguage: (outcome) => { languageOutcomes.push(outcome); }
+      onQuestionLanguage: (outcome) => { languageOutcomes.push(outcome); },
+      // Hosted only: the room's own decision pool (main.ts: API_DATABASE_POOLS.roomDecision).
+      ...(hosted ? { roomDecisionPool: database.extraPool() } : {})
     });
     const runner = await composePracticeRunner({ pool, environment: settings.runner, budgetPorts: input.budgetPorts,
       remaining: remainingPorts, keepAlivePool: database.extraPool(),
@@ -476,7 +506,7 @@ export async function runPracticeDebate(input: Readonly<{
       ...(input.wait === undefined ? {} : { wait: input.wait }), ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
     const question = practiceDebateQuestion(input.questionId);
     // The site language goes with the question only when the ask reads it (a debate-shape row); else the ask is today's.
-    const siteLanguage = shapeRow === null ? null : input.language?.siteLanguage ?? practiceSiteLanguageFor(question.questionLine);
+    const siteLanguage = shapeRow === null ? null : practiceDebateSiteLanguage(question, input.language?.siteLanguage);
     const request = {
       question_line: question.questionLine, ...(siteLanguage === null ? {} : { site_language: siteLanguage }),
       risk_tier: "casual", tier_source: "ASKER",
@@ -490,8 +520,9 @@ export async function runPracticeDebate(input: Readonly<{
     let refusalCode: string | null = null;
     let languageChoice: "USE_REWRITE" | "KEEP_MINE" | null = null;
     try {
+      let accepted: Awaited<ReturnType<typeof ask.application.submit>>;
       try {
-        await ask.application.submit(request, session, { kind: "server", userId, ownerRef });
+        accepted = await ask.application.submit(request, session, { kind: "server", userId, ownerRef });
       } catch (error) {
         if (!(error instanceof QuestionLanguageChoiceNeeded)) throw error;
         // The site's one-language pop-up (P2L): answered as the operator asked (--language-choice, default keep:
@@ -500,10 +531,22 @@ export async function runPracticeDebate(input: Readonly<{
         const choice = input.language?.choice ?? "keep";
         languageChoice = choice === "use" ? "USE_REWRITE" : "KEEP_MINE";
         progress(`the ask answered with a one-language offer; answering ${languageChoice} as the site's pop-up would`);
-        await ask.application.submit(practiceLanguageResubmission(request, error.offer, choice), session, { kind: "server", userId, ownerRef });
+        accepted = await ask.application.submit(practiceLanguageResubmission(request, error.offer, choice), session,
+          { kind: "server", userId, ownerRef });
       }
+      // Hosted with the band: the room may put the ask in line instead of starting it. The practice starts no waker,
+      // so a waiting ask is reported as not admitted, naming the limit it waits for.
+      if (accepted.status === "WAITING") refusalCode = `ASK_WAITING_IN_LINE:${accepted.waiting_scope ?? "UNKNOWN"}`;
     } catch (error) {
       refusalCode = codeOf(error);
+    }
+    const deployment: PracticeDebateResult["deployment"] = ask.hosted === null ? undefined : Object.freeze({
+      mode: "hosted" as const, room: ask.hosted.room, billingInRegister: ask.hosted.billingInRegister,
+      billingInPractice: ask.hosted.billingInPractice, ceilings: runner.money, setAsideSettings: input.settings.setAsideKeys
+    });
+    if (deployment !== undefined) {
+      progress(`hosted mode: the ask went through ${deployment.room ? "the room (the site's day, the waiting line)" : "the daily guard"};`
+        + ` billing is ${deployment.billingInRegister} in the register and kept off in the practice (no plan wall, no charge scope)`);
     }
     const admissionSeconds = (performance.now() - admissionStarted) / 1000;
     const job = dispatched[0];
@@ -518,7 +561,7 @@ export async function runPracticeDebate(input: Readonly<{
       remaining.deepinfra.after = await readRemaining(remainingPorts.deepinfra);
       remaining.anthropic.after = await readRemaining(remainingPorts.anthropic);
       return Object.freeze({
-        register: receipt, questionId: question.id, depth: input.depth,
+        register: reportedRegister, questionId: question.id, depth: input.depth,
         admission: { admitted: false, refusalCode: refusalCode ?? "NOT_DISPATCHED", panel: [], satOut: [], rotation: null },
         run: { runId: null, workItemOutcome: null, failureCode: null, answer: null, story: null },
         byModelAndSite: [], probes, failures: [], formatFailures: 0, callsByModel: {}, repairKindsByModel: {}, answersByModel: {}, jsonRepairs: [],
@@ -526,7 +569,8 @@ export async function runPracticeDebate(input: Readonly<{
         remaining, seconds: { admission: admissionSeconds, debate: 0 }, parallel: runner.callStats.summary(),
         ...(shapeSource === null ? {} : { shape: shapeBlockOf(shapeSource, null) }),
         ...(siteLanguage === null ? {} : { language: practiceDebateLanguageBlock({ siteLanguage, outcomes: languageOutcomes, choice: languageChoice,
-          planner: null, storedLanguage: null }) })
+          planner: null, storedLanguage: null }) }),
+        ...(deployment === undefined ? {} : { deployment })
       });
     }
     const runRow = (await pool.query<{ discovered_panel: unknown }>("SELECT discovered_panel FROM core.run WHERE run_id=$1", [job.runId])).rows[0];
@@ -633,7 +677,7 @@ export async function runPracticeDebate(input: Readonly<{
     remaining.deepinfra.after = await readRemaining(remainingPorts.deepinfra);
     remaining.anthropic.after = await readRemaining(remainingPorts.anthropic);
     return Object.freeze({
-      register: receipt, questionId: question.id, depth: input.depth,
+      register: reportedRegister, questionId: question.id, depth: input.depth,
       admission: Object.freeze({
         admitted: true, refusalCode: null,
         panel: panelFacts,
@@ -646,7 +690,8 @@ export async function runPracticeDebate(input: Readonly<{
       parallel: runner.callStats.summary(),
       ...(transcript === undefined ? {} : { transcript }),
       ...(shape === undefined ? {} : { shape }),
-      ...(language === undefined ? {} : { language })
+      ...(language === undefined ? {} : { language }),
+      ...(deployment === undefined ? {} : { deployment })
     });
   } finally {
     remaining.deepinfra.after ??= await readRemaining(remainingPorts.deepinfra);

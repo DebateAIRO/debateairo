@@ -14,6 +14,7 @@ import {
   type RegisterPublicationRow
 } from "@debateai/register";
 import { buildPreviewSourceRowsV2 } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
+import { buildPreviewSourceRowsV3, composePreviewSnapshotV3 } from "../../deploy/preview-auth-dev/v1/publish-register-v3.js";
 import { buildDevelopmentRunnerRegisterRows, DEVELOPMENT_RUNNER_SOURCE_REF } from "../../apps/runner/src/dev-deployment-register.js";
 import { INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW, STAFF_ACCESS_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
 import { parsePracticeArgs } from "../../tools/preview-practice/practice.js";
@@ -29,7 +30,9 @@ import {
 import { practiceVerdict, type PracticeVerdictInput } from "../../tools/preview-practice/practice-verdict.js";
 import { reportMarkdown, type PracticeReport } from "../../tools/preview-practice/practice-report.js";
 import {
+  composePracticeHostedNextRegisterVersion,
   composePracticeNextRegisterVersion,
+  parsePracticeNextRegisterInputs,
   parsePracticeRegisterExport,
   PRACTICE_CODE_HASH_ROW_KEYS,
   PRACTICE_REGISTER_EXPORT_SCHEMA,
@@ -200,11 +203,50 @@ describe("practice debate shape: the throwaway register version", () => {
       rows: base.map((entry) => ({ register_version: "11", row_key: entry.rowKey, value_json: entry.valueJsonText, source_ref: entry.sourceRef }))
     }));
     await expect(composePracticeNextRegisterVersion(document)).rejects.toMatchObject({ code: "PRACTICE_REGISTER_NEXT_UNSUPPORTED" });
-    const next = await composePracticeNextRegisterVersion(document, undefined, debateShapePolicyStartValues());
+    const next = await composePracticeNextRegisterVersion(document, undefined, { debateShape: debateShapePolicyStartValues() });
     expect([next.addedKeys, next.changedKeys]).toEqual([[DEBATE_SHAPE_POLICY_ROW_KEY], []]);
     expect(next.rows).toHaveLength(base.length + 1);
     expect(JSON.parse(next.rows.find((entry) => entry.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)!.valueJsonText))
       .toEqual(JSON.parse(debateShapePolicyRow(debateShapePolicyStartValues(), PRACTICE_SHAPE_SOURCE_REF).valueJsonText));
+  });
+
+  it("--register-next --hosted-billing with --shape-policy: kit v3's next version carries the row, as the plan's --debate-shape (D-REGNEXT, hosted)", async () => {
+    // The merge of #165 (practice hosted mode): the policy reaches kit v3's own source build as its debateShape, byte for
+    // byte what the server's native-plan --hosted-billing --debate-shape composes from the same inputs.
+    const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
+      operatorSha256: "c".repeat(64), observedAt: "2026-10-11T10:42:25.561Z" };
+    const owned = [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW]
+      .map((entry) => ({ rowKey: entry.rowKey, valueJsonText: canonicalRegisterJson(entry.valueAst), sourceRef: entry.sourceRef }));
+    const base = [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime), ...owned]
+      .sort((a, b) => a.rowKey.localeCompare(b.rowKey, "en"));
+    const document = parsePracticeRegisterExport(JSON.stringify({ schema: PRACTICE_REGISTER_EXPORT_SCHEMA,
+      versions: [{ register_version: "12", row_count: base.length, base_register_version: "11", publication_id: null, request_sha256: null,
+        snapshot_sha256: null, publication_kind: "GENERAL", recorded_at: null }],
+      rows: base.map((entry) => ({ register_version: "12", row_key: entry.rowKey, value_json: entry.valueJsonText, source_ref: entry.sourceRef }))
+    }));
+    const hosted = { billing: "off", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
+      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } } as const;
+    const policy = debateShapePolicyStartValues();
+    const without = await composePracticeHostedNextRegisterVersion(document, hosted);
+    expect(without.addedKeys).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
+    const next = await composePracticeHostedNextRegisterVersion(document, hosted, { debateShape: policy });
+    expect(next.addedKeys).toEqual([...without.addedKeys, DEBATE_SHAPE_POLICY_ROW_KEY].sort());
+    expect(next.changedKeys).toEqual(without.changedKeys);
+    expect(JSON.parse(next.rows.find((entry) => entry.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)!.valueJsonText))
+      .toEqual(JSON.parse(debateShapePolicyRow(policy, PRACTICE_SHAPE_SOURCE_REF).valueJsonText));
+    const server = composePreviewSnapshotV3({
+      sourceRows: await buildPreviewSourceRowsV3(await loadBootstrapRegister(), runtime, hosted, { checker: "glm" }, "on", null, policy),
+      baseRows: base, baseRegisterVersion: "12", baseSnapshotSha256: next.baseSnapshotSha256
+    });
+    expect([next.snapshotSha256, next.deltaSha256]).toEqual([server.snapshotSha256, server.deltaSha256]);
+  });
+
+  it("--shape-policy's policy rides on the --register-next inputs as a choice, and never picks the kit", async () => {
+    const policy = debateShapePolicyStartValues();
+    expect(await parsePracticeNextRegisterInputs({ debateShape: policy })).toEqual({ kit: "v2", hostedBilling: null, choices: { debateShape: policy } });
+    expect(await parsePracticeNextRegisterInputs({ debateShape: null })).toEqual({ kit: "v2", hostedBilling: null, choices: {} });
+    const cli = readFileSync(new URL("../../tools/preview-practice/practice.ts", import.meta.url), "utf8");
+    expect(cli).toContain("callConcurrency: args.flags.get(\"--register-call-concurrency\"), debateShape: nextShape");
   });
 });
 
@@ -308,6 +350,8 @@ describe("practice debate shape: what the run did", () => {
     // Pre-flight PF-D19 (T14-P): the close call called for extra graders; one that then failed still leaves the mark.
     expect(markdown).toContain("- points whose close call called for extra graders: 3; points scrutinised further: 2");
     expect(practiceShapeLines(blockOf({ ...FACTS, sizes: null })).join("\n")).toContain("- the new shape was not exercised: NO_SHAPE_ON_RECEIPT");
+    // Final review M-3: --register-next on an export that already held the very row.
+    expect(practiceShapeLines({ ...blockOf(FACTS), row: "UNCHANGED" }).join("\n")).toContain("version 6, row unchanged):");
     expect(practiceShapeLines(blockOf({ ...FACTS, choice: { opening: "MAP", answers: 1, alsoRaised: 4 } })).join("\n"))
       .toContain("- the new shape was not exercised: MAP_ANSWERS_NOT_ARGUED");
   });

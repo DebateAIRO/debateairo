@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { migrate } from "@debateai/db";
 import {
+  DEBATE_SHAPE_POLICY_ROW_KEY,
   canonicalRegisterJson,
   createPostgresRegisterPublicationPort,
   loadBootstrapRegister,
@@ -671,6 +672,67 @@ describe("preview practice: debate mode", () => {
     expect(existsSync(join(out, "transcript.json"))).toBe(false);
   }, 600_000);
 
+  it("hosted (2026-10-14): a hosted settings export with the server-only billing settings, --register-next --hosted-billing (billing on): kit v3's next version, the hosted runner and room, billing kept off: PASS (exit 0)", async () => {
+    const { stubs, env, common, quiet, out } = await scenario();
+    // The hosted preview's export: hosted mode, plus the api.env lines runbook H6/H7 adds (set aside unread).
+    const hostedSettings = join(folder, `hosted-settings-${randomUUID()}.env`);
+    await writeFile(hostedSettings, settingsText().replace("DEBATEAI_DEPLOYMENT_MODE=local", "DEBATEAI_DEPLOYMENT_MODE=hosted")
+      + ["GEOIP_COUNTRY_DB_PATH=/var/lib/debateai-geoip/dbip-country-lite.mmdb", "TOR_EXIT_LIST_PATH=/var/lib/debateai-geoip/tor-exit-list.txt",
+        "NETOPIA_API_BASE_URL=https://secure-sandbox.netopia-payments.com", "NETOPIA_API_KEY_PATH=/etc/debateai-v3-preview/billing/netopia-api-key",
+        "NETOPIA_IPN_KEYS_PATH=/etc/debateai-v3-preview/billing/netopia-ipn-keys.pem", ""].join("\n"));
+    const logged: string[] = [];
+    const hostedBilling = JSON.stringify({ billing: "on", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
+      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } });
+    const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
+    const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--depth", "1", "--register-next",
+      "--hosted-billing", hostedBilling], env, { ...quiet, log: (line) => logged.push(line) });
+    const report = outcome.report as unknown as {
+      verdict: string; reasons: string[]; admission: { admitted: boolean; panel: { modelId: string }[] };
+      run: { workItemOutcome: string; answer: { served: boolean }; story: { outcome: string } };
+      register: { registerVersion: string; steps: { path: string }[]; codeNext: { composer: string; addedKeys: string[]; changedKeys: string[] } };
+      deployment: { mode: string; room: boolean; billingInRegister: string; billingInPractice: string; setAsideSettings: string[];
+        ceilings: { perRunCeilingMicros: number; dailyCeilingMicros: number; perStoryCeilingMicros: number | null; band: boolean } };
+    };
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(report.register.registerVersion).toBe("6");
+    expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION", "CODE_NEXT_VERSION"]);
+    expect(report.register.codeNext).toMatchObject({ composer: "preview-register-composer-v3", addedKeys: expect.arrayContaining(["storyCostEnvelopePolicy"]) });
+    expect(report.register.codeNext.changedKeys).toEqual(expect.arrayContaining(["admissionPolicy", "billingPolicy", "costEnvelopePolicy"]));
+    expect(report.deployment).toEqual({ mode: "hosted", room: true, billingInRegister: "on", billingInPractice: "off",
+      setAsideSettings: ["GEOIP_COUNTRY_DB_PATH", "TOR_EXIT_LIST_PATH", "NETOPIA_API_BASE_URL", "NETOPIA_API_KEY_PATH", "NETOPIA_IPN_KEYS_PATH"],
+      ceilings: { perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000, perStoryCeilingMicros: 50_000, band: true, billingPlansSealed: true } });
+    expect(report.admission.admitted).toBe(true);
+    expect(report.admission.panel.map((member) => member.modelId).sort()).toEqual([...FIVE].sort());
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    // The log names what was set aside (names only) and how billing ran; no set-aside value is printed or written.
+    expect(logged).toContain("settings: server-only settings set aside unread (never opened, never sent): GEOIP_COUNTRY_DB_PATH, TOR_EXIT_LIST_PATH, NETOPIA_API_BASE_URL, NETOPIA_API_KEY_PATH, NETOPIA_IPN_KEYS_PATH");
+    expect(logged.some((line) => line.startsWith("hosted mode: the ask went through the room"))).toBe(true);
+    const written = readFileSync(join(out, "report.json"), "utf8") + readFileSync(join(out, "report.md"), "utf8") + logged.join("\n");
+    for (const secretPath of ["/etc/debateai-v3-preview/billing", "netopia-payments.com", "dbip-country-lite"]) expect(written).not.toContain(secretPath);
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain("- billing: on in the register, kept off in the practice");
+  }, 600_000);
+
+  // The hosted money rules are live in the practice, not decoration: a per-debate ceiling of one micro-dollar. The
+  // boot's own RUN_CEILING_BELOW_ONE_CALL cannot fire on the preview (it prices the plan rosters' models, none of which
+  // is a preview model, and no scorecard is in force there: firstCallPlanModels, assertRunCeilingCoversOneCall), so on
+  // the server such a version would start and fail its first debate; the practice shows exactly that, before upload.
+  it("hosted (2026-10-14), control: a per-debate ceiling below one call: the hosted runner's envelope refuses the first call (RUN_CEILING_BELOW_FIRST_CALL): FAIL (exit 20)", async () => {
+    const { stubs, env, common, quiet } = await scenario();
+    const hostedSettings = join(folder, `hosted-settings-${randomUUID()}.env`);
+    await writeFile(hostedSettings, settingsText().replace("DEBATEAI_DEPLOYMENT_MODE=local", "DEBATEAI_DEPLOYMENT_MODE=hosted"));
+    const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
+    const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--register-next", "--hosted-billing",
+      JSON.stringify({ billing: "off", perRunCeilingMicros: 1, dailyCeilingMicros: 10_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } })],
+    env, quiet);
+    expect(outcome.exitCode).toBe(20);
+    expect(outcome.report).toMatchObject({ verdict: "FAIL", admission: { admitted: true },
+      run: { workItemOutcome: "THREW", failureCode: "RUN_CEILING_BELOW_FIRST_CALL" } });
+    // Only the health probes went out: the envelope refused the first debate call before it was sent.
+    expect(stubs.requests.filter((request) => request.kind !== "PROBE")).toEqual([]);
+  }, 600_000);
+
   it("--transcript: transcript.json holds every model call of the ledger in order, with the prompts the gates received and the replies they gave, decrypted", async () => {
     const { stubs, env, common, quiet, out } = await scenario(mimoFirstPanelSlips({ patch: "PATCH" }));
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1", "--transcript"], env, quiet);
@@ -788,7 +850,9 @@ describe("preview practice: debate mode", () => {
 describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 ยง5)", () => {
   const SHAPE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/shape-policy-start.json", import.meta.url));
   type ShapeReport = {
-    verdict: string; reasons: string[]; ask: unknown; register: { steps: { path: string }[] };
+    verdict: string; reasons: string[]; ask: unknown;
+    register: { registerVersion: string; importedRegisterVersion?: string; steps: { path: string }[];
+      codeNext?: { baseRegisterVersion: string; addedKeys: string[]; changedKeys: string[] } };
     run: { runId: string; workItemOutcome: string; answer: { served: boolean }; story: { outcome: string } };
     byModelAndSite: { model: string; site: string }[];
     shape?: { source: string; registerVersion: string; row: string | null; storedDepthParams: unknown; sizes: Record<string, unknown> | null;
@@ -818,6 +882,8 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 ย
     // The export is only read; the import itself is today's; the practice's own version is one above it.
     expect(exportDigest()).toBe(before);
     expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION"]);
+    // Final review M-2: the register block names the version the debate ran on, the imported newest under its own name.
+    expect(report.register).toMatchObject({ registerVersion: "6", importedRegisterVersion: "5" });
     expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
     // Both compositions read the row: the ask path stored the four settings, admission froze the sizes, the runner ran the map.
     expect(report.shape).toMatchObject({
@@ -851,6 +917,111 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 ย
     expect(transcript.attempts.some((attempt) => attempt.family === "MAP")).toBe(true);
     expect(transcript.structure.map?.choice?.alsoRaised.length ?? 0).toBeGreaterThan(0);
     expect(transcript.structure.map?.items.length ?? 0).toBeGreaterThan(0);
+  }, 900_000);
+
+  it("--register-next --shape-policy (the path every branch debate takes, ruling D-BOTHNEXT): the code's next version carries the row, nothing more is published: PASS (exit 0)", async () => {
+    // Final review M-1: the export is one the publish kit itself would publish from this code, so the code's next
+    // version is the live one plus the debate-shape row the kit's own source build adds (controller ruling D-REGNEXT).
+    const before = exportDigest();
+    const logs: string[] = [];
+    const { stubs, env, common, quiet, out } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--register-next", "--depth", "1",
+      "--shape-policy", SHAPE_POLICY_START, "--transcript"], env, { ...quiet, log: (line: string) => { logs.push(line); } });
+    const report = outcome.report as unknown as ShapeReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(exportDigest()).toBe(before);
+    // The import brought in 4 and 5, then the code's next version (6) with the row ADDED; nothing was published on top.
+    expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION", "CODE_NEXT_VERSION"]);
+    expect(report.register).toMatchObject({ registerVersion: "6", codeNext: { baseRegisterVersion: "5", addedKeys: [DEBATE_SHAPE_POLICY_ROW_KEY] } });
+    expect(report.register.codeNext!.changedKeys).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
+    expect("importedRegisterVersion" in report.register).toBe(false);
+    expect(logs.some((line) => line.includes("practising on this code's next version 6"))).toBe(true);
+    expect(logs.some((line) => line.includes("in this throwaway copy as version"))).toBe(false);
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
+    // A real shape block, read from the database: both compositions read the row in the code's next version.
+    expect(report.shape).toMatchObject({
+      source: "FLAG", registerVersion: "6", row: "ADDED", opening: "ANGLE_MAP", chosenAnswers: 2, notExercised: null,
+      storedDepthParams: { depth: 1, depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" },
+      sizes: { plan: "premium", mapAIs: 5, graders: 3, opening: "ANGLE_MAP" }
+    });
+    expect(report.shape!.mapCallsByStep).toMatchObject({ angles: 1, merge: 1, choose: 1 });
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: false, lock: { code: "ro", source: "FAST" }, storedLanguage: "ro" });
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as { run: { registerVersion: string } };
+    expect(transcript.run.registerVersion).toBe("6");
+  }, 900_000);
+
+  it("hosted: --register-next --hosted-billing --shape-policy (the merge of #165): kit v3's next version carries the row, the hosted runner and ask run the new shape and lock the language: PASS (exit 0)", async () => {
+    // Controller ruling D-REGNEXT in hosted mode: the policy reaches kit v3's own source build (as the plan's
+    // --debate-shape), and both hosted compositions read the row, its map hash and the question-language decider as the
+    // two main.ts files do.
+    const before = exportDigest();
+    const { stubs, env, common, quiet } = await scenario();
+    const hostedSettings = join(folder, `hosted-settings-${randomUUID()}.env`);
+    await writeFile(hostedSettings, settingsText().replace("DEBATEAI_DEPLOYMENT_MODE=local", "DEBATEAI_DEPLOYMENT_MODE=hosted"));
+    const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
+    const hostedBilling = JSON.stringify({ billing: "off", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
+      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } });
+    const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--register-next", "--hosted-billing",
+      hostedBilling, "--depth", "1", "--shape-policy", SHAPE_POLICY_START], env, quiet);
+    const report = outcome.report as unknown as ShapeReport & {
+      register: { codeNext: { composer?: string } }; deployment?: { mode: string; room: boolean; billingInPractice: string } };
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(exportDigest()).toBe(before);
+    expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION", "CODE_NEXT_VERSION"]);
+    expect(report.register).toMatchObject({ registerVersion: "6", codeNext: { composer: "preview-register-composer-v3" } });
+    expect(report.register.codeNext!.addedKeys).toEqual(expect.arrayContaining([DEBATE_SHAPE_POLICY_ROW_KEY, "storyCostEnvelopePolicy"]));
+    expect(report.deployment).toMatchObject({ mode: "hosted", room: true, billingInPractice: "off" });
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
+    expect(report.shape).toMatchObject({ source: "FLAG", registerVersion: "6", row: "ADDED", opening: "ANGLE_MAP", notExercised: null,
+      sizes: { plan: "premium", mapAIs: 5, opening: "ANGLE_MAP" } });
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: false, lock: { code: "ro", source: "FAST" }, storedLanguage: "ro" });
+  }, 900_000);
+
+  // Final review M-5: the one-language offer and its answer, through the real decider and the ask's own resubmission
+  // (the signed check reference, the owner's scope). The fast check reads lang-ro-en-mix as a real mix with a usable
+  // rewrite (the dry script's reading); every other request is the doubles' own.
+  const MIX_CASE = PRACTICE_LANGUAGE_CASES.find((entry) => entry.id === "lang-ro-en-mix")!;
+  const MIX_REWRITE = PRACTICE_LANGUAGE_DRY_REWRITES["lang-ro-en-mix"]!;
+  const questionLineOf = (request: GateRequest): string | undefined =>
+    readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body))).fields.find((field) => field.name === "question_line")?.content;
+  const mixScript = (request: GateRequest): GateOverride | null =>
+    request.kind === "QUESTION_LANGUAGE" ? { content: practiceLanguageDryReading(questionLineOf(request) ?? "") } : null;
+  const offerDebate = async (choice: readonly string[]) => {
+    const { stubs, env, common, quiet, out } = await scenario(mixScript);
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--register-next", "--depth", "1",
+      "--question", "lang-ro-en-mix", ...choice, "--shape-policy", SHAPE_POLICY_START, "--transcript"], env, quiet);
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as { run: { question: { id: string; text: string } } };
+    const angles = stubs.requests.filter((request) => request.kind === "MAP" && questionLineOf(request) !== undefined);
+    return { outcome, report: outcome.report as unknown as ShapeReport, stubs, transcript, mapQuestions: new Set(angles.map(questionLineOf)) };
+  };
+
+  it("lang-ro-en-mix with --language-choice use: the offer is made, the ask is sent again with the server's rewrite, and the debate argues it: PASS (exit 0)", async () => {
+    const { outcome, report, stubs, transcript, mapQuestions } = await offerDebate(["--site-language", "ro", "--language-choice", "use"]);
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
+    // The lock came from the person's choice on the server's signed offer; the rewrite was used and stored as Romanian.
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: true, choice: "USE_REWRITE", rewriteUsed: true,
+      lock: { code: "ro", source: "CHOICE", recordCode: "CHOICE", fast: { outcome: "MIX", main: "ro" } }, storedLanguage: "ro" });
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true } });
+    // The map planned the rewrite, never the mixed wording; the transcript still names the case's own question.
+    expect([...mapQuestions]).toEqual([MIX_REWRITE]);
+    expect(transcript.run.question).toEqual({ id: "lang-ro-en-mix", text: MIX_CASE.questionLine });
+  }, 900_000);
+
+  it("lang-ro-en-mix with the default answer (keep), asked on the case's own site: the offer is made and the person's wording is kept: PASS (exit 0)", async () => {
+    const { outcome, report, mapQuestions } = await offerDebate([]);
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: true, choice: "KEEP_MINE", rewriteUsed: false,
+      lock: { code: "ro", source: "CHOICE", recordCode: "CHOICE" }, storedLanguage: "ro" });
+    expect([...mapQuestions]).toEqual([MIX_CASE.questionLine]);
   }, 900_000);
 
   it("no --shape-policy and a register without the row: today's shape, nothing new in the report, no map call", async () => {

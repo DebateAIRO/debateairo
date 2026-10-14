@@ -7405,10 +7405,13 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
     // T9/J23: the prompt now names the DIGEST nodes a segment cites, because
     // the citable set follows the digest. The fragment tracks the stable
     // clause so the test keeps proving that the contract is DECLARED.
+    // Answer writer v3 (serve.synthesizer.v3, register 12): the clause now asks
+    // for the provisional answer, said to be not yet settled, then what evidence
+    // would settle it; v1's "hypothesis" and "research plan" words are history.
     "rest on reasoning alone",
-    "at least two segments",
-    "first segment states the provisional answer as a hypothesis",
-    "second segment states the research plan"
+    "return two segments in order",
+    "the first gives the provisional answer and says plainly that it is not yet settled",
+    "the second says what evidence would settle it"
   ] as const;
 
   async function startContractAwareProviderDouble(): Promise<{

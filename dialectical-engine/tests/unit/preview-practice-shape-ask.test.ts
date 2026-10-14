@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, type DebateShapePolicy } from "@debateai/register";
 import { runPracticeDebate } from "../../tools/preview-practice/practice-debate.js";
 import { OPENINGS_QUESTIONS } from "../../tools/preview-practice/practice-openings-questions.js";
+import { PRACTICE_LANGUAGE_CASES } from "../../tools/preview-practice/practice-questions.js";
 import { parsePracticeRegisterExport, type PracticeRegisterImportReceipt } from "../../tools/preview-practice/practice-register-import.js";
 import type { PracticeSettings, PracticeSockets } from "../../tools/preview-practice/practice-settings.js";
 
@@ -60,13 +61,15 @@ vi.mock("../../tools/preview-practice/practice-ask-composition.js", () => ({
   composePracticeAsk: vi.fn(async (input: { settings: PracticeSettings }) => {
     seen.askVersions.push(input.settings.runner.REGISTER_VERSION);
     // Admits nothing: the debate ends as an ask that was not dispatched, after the request was handed over.
-    return { application: { submit: async (request: Record<string, unknown>) => { seen.requests.push(request); } } };
+    // Local mode, as the real composition returns it (hosted: null); submit answers QUEUED as the real ask does.
+    return { application: { submit: async (request: Record<string, unknown>) => { seen.requests.push(request); return { status: "QUEUED" }; } },
+      hosted: null };
   })
 }));
 vi.mock("../../tools/preview-practice/practice-runner-composition.js", () => ({
   composePracticeRunner: vi.fn(async (input: { environment: { REGISTER_VERSION: number } }) => {
     seen.runnerVersions.push(input.environment.REGISTER_VERSION);
-    return { runner: {}, callStats: { summary: () => ({}) } };
+    return { runner: {}, callStats: { summary: () => ({}) }, money: null };
   })
 }));
 
@@ -86,8 +89,8 @@ const SETTINGS = { runner: { REGISTER_VERSION: 5 }, previewConfig: { premium_mod
 const SOCKETS = { deepinfra: "/nowhere/deepinfra.sock", anthropic: "/nowhere/anthropic.sock" } as PracticeSockets;
 const ASK = Object.freeze({ depthMode: "fixed", scrutiny: "deep", answerLength: "short" } as const);
 const LIVE: PracticeRegisterImportReceipt = Object.freeze({ registerVersion: "5", steps: [] });
-const codeNext = (addedKeys: readonly string[]): PracticeRegisterImportReceipt => Object.freeze({ registerVersion: "6", steps: [],
-  codeNext: { baseRegisterVersion: "5", addedKeys, changedKeys: [], deltaSha256: "b".repeat(64) } });
+const codeNext = (addedKeys: readonly string[], changedKeys: readonly string[] = []): PracticeRegisterImportReceipt => Object.freeze({
+  registerVersion: "6", steps: [], codeNext: { baseRegisterVersion: "5", addedKeys, changedKeys, deltaSha256: "b".repeat(64) } });
 
 function debate(extra: Readonly<Record<string, unknown>>) {
   return runPracticeDebate({ settings: SETTINGS, sockets: SOCKETS, register: REGISTER, budgetPorts: {} as never, observer: {} as never,
@@ -116,20 +119,60 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     expect(seen.requests[0]!.question_line).toBe(OPENINGS_QUESTIONS.find((question) => question.id === "ro-euro")!.questionLine);
     expect(result.questionId).toBe("ro-euro");
     expect(result.admission).toMatchObject({ admitted: false, refusalCode: "NOT_DISPATCHED" });
+    // Final review M-2: report.json's register block names the version the debate ran on (as shape.registerVersion and
+    // the transcript do), with the imported newest (live) version kept under its own name.
+    expect(result.register).toEqual({ registerVersion: "6", importedRegisterVersion: "5", steps: [] });
+    expect(result.shape?.registerVersion).toBe("6");
   });
 
   it("--shape-policy with --register-next: nothing more is published; the code's next version (6), which carries the row, is read", async () => {
     seen.receipt = codeNext([DEBATE_SHAPE_POLICY_ROW_KEY]);
     seen.versions.add("6");
     seen.rows.set(6, debateShapePolicyStartValues());
-    await debate({ registerNext: {} as never, shape: { policy: debateShapePolicyStartValues(), ask: ASK } });
+    const result = await debate({ registerNext: {} as never, shape: { policy: debateShapePolicyStartValues(), ask: ASK } });
     expect(seen.published).toEqual([]);
     expect([seen.readVersions, seen.askVersions, seen.runnerVersions]).toEqual([[6], [6], [6]]);
     expect(seen.requests[0]!.depth_params).toEqual({ depth: 1, depthMode: "fixed", scrutiny: "deep", answerLength: "short" });
+    // The import's receipt already names the code's next version: it is reported as it is (M-2).
+    expect(result.register).toBe(seen.receipt);
+    expect(result.shape?.registerVersion).toBe("6");
+  });
+
+  it("--shape-policy with --register-next: shape.row says what the code's next version did to the row: ADDED, REPLACED or UNCHANGED (final review M-3)", async () => {
+    const rowOf = async (receipt: PracticeRegisterImportReceipt) => {
+      seen.receipt = receipt;
+      seen.versions.add("6");
+      seen.rows.set(6, debateShapePolicyStartValues());
+      return (await debate({ registerNext: {} as never, shape: { policy: debateShapePolicyStartValues(), ask: {} } })).shape?.row;
+    };
+    expect(await rowOf(codeNext([DEBATE_SHAPE_POLICY_ROW_KEY]))).toBe("ADDED");
+    expect(await rowOf(codeNext(["judgeContractHash"], [DEBATE_SHAPE_POLICY_ROW_KEY]))).toBe("REPLACED");
+    // The export already held a row with the same bytes (value and source ref): the key is in neither list.
+    expect(await rowOf(codeNext(["judgeContractHash"]))).toBe("UNCHANGED");
+    expect(seen.published).toEqual([]);
+  });
+
+  it("a language case asked by id is asked on the case's own site, unless --site-language says otherwise (final review M-6)", async () => {
+    const sites: unknown[] = [];
+    for (const language of [undefined, { siteLanguage: null, choice: "keep" }, { siteLanguage: "en", choice: "keep" }]) {
+      seen.requests.length = 0;
+      await debate({ questionId: "lang-sr-latn", shape: { policy: debateShapePolicyStartValues(), ask: {} },
+        ...(language === undefined ? {} : { language }) });
+      expect(seen.requests[0]!.question_line).toBe(PRACTICE_LANGUAGE_CASES.find((entry) => entry.id === "lang-sr-latn")!.questionLine);
+      sites.push(seen.requests[0]!.site_language);
+    }
+    // lang-sr-latn is asked on the Romanian site (the case table), as language mode asks it.
+    expect(sites).toEqual(["ro", "ro", "en"]);
+    // Any other question keeps the question's own language as its default site.
+    seen.requests.length = 0;
+    await debate({ questionId: "en-nuclear", shape: { policy: debateShapePolicyStartValues(), ask: {} } });
+    expect(seen.requests[0]!.site_language).toBe("en");
   });
 
   it("no shape: today's debate (the live version, depth only, nothing published)", async () => {
-    await debate({});
+    const result = await debate({});
+    // Row absent: report.json's register block stays today's receipt, byte for byte (M-2).
+    expect(result.register).toBe(LIVE);
     expect(seen.published).toEqual([]);
     expect([seen.askVersions, seen.runnerVersions]).toEqual([[5], [5]]);
     expect(seen.requests[0]!.depth_params).toEqual({ depth: 1 });
