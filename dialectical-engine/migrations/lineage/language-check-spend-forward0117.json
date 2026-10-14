@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0117_language_check_spend.sql",
-    "sha256": "a0b19c184261245a14ee5ced037075655e2336d25372370ff2bb4696564e4130"
+    "sha256": "a2c7bc26cb28cbc2fc8d0f03347961b86140929cafa3e76dbecd6ba6f9f56177"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

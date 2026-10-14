@@ -13,7 +13,9 @@ const SIGNATURE = String.raw`ledger\.record_language_check_spend\(uuid,text,date
 describe("0117: the language check's run-less site cost", () => {
   it("widens the source CHECK by exactly LANGUAGE_CHECK and keeps a run-less row phase-less", () => {
     expect(sql).toMatch(/CHECK \(spend_source IN \('RUN', 'SUPPORT', 'STORY', 'LANGUAGE_CHECK'\)\)/u);
-    expect(sql).toMatch(/spend_source <> 'LANGUAGE_CHECK' OR \(run_id IS NULL AND spend_phase IS NULL\)/u);
+    // Fix round 2: run-, phase- AND attempt-less; both CHECKs in ONE ALTER TABLE (one scan of the ledger).
+    expect(sql).toMatch(/spend_source <> 'LANGUAGE_CHECK' OR \(run_id IS NULL AND spend_phase IS NULL AND attempt_id IS NULL\)/u);
+    expect(sql.match(/ALTER TABLE ledger\.model_spend\b/gu)).toHaveLength(1);
   });
   it("writes only through one SECURITY DEFINER function, granted to the runtime role alone", () => {
     // Deviation from the brief's `CREATE FUNCTION` (Task 19 report): the repository's replay-safety law
@@ -21,10 +23,12 @@ describe("0117: the language check's run-less site cost", () => {
     // The brief's intent — this step defines a NEW function and replaces none — is pinned instead: exactly one function
     // is created, it is this one, and no earlier migration names it.
     expect([...sql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([a-z_.]+)\(/gu)].map(([, name]) => name))
-      .toEqual(["ledger.record_language_check_spend"]);
+      .toEqual(["ledger.record_language_check_spend", "ledger.refuse_language_check_spend_outside_writer"]);
     expect(sql).toMatch(/CREATE OR REPLACE FUNCTION ledger\.record_language_check_spend\(/u);
     for (const earlier of readdirSync(MIGRATIONS).filter((name) => /^\d{4}_.+\.sql$/u.test(name) && name < "0117_")) {
-      expect(readFileSync(new URL(earlier, MIGRATIONS), "utf8"), earlier).not.toContain("record_language_check_spend");
+      const text = readFileSync(new URL(earlier, MIGRATIONS), "utf8");
+      expect(text, earlier).not.toContain("record_language_check_spend");
+      expect(text, earlier).not.toContain("refuse_language_check_spend_outside_writer");
     }
     expect(sql).toMatch(/SECURITY DEFINER/u);
     expect(sql).toMatch(/SET search_path = pg_catalog/u);
@@ -33,8 +37,24 @@ describe("0117: the language check's run-less site cost", () => {
   });
   it("is replay-safe in the repository's form: each CHECK dropped IF EXISTS before it is added", () => {
     for (const name of ["model_spend_spend_source_check", "model_spend_language_check_is_runless"]) {
-      expect(sql).toMatch(new RegExp(String.raw`DROP CONSTRAINT IF EXISTS ${name},\s+ADD CONSTRAINT ${name} CHECK`, "u"));
+      expect(sql).toMatch(new RegExp(String.raw`DROP CONSTRAINT IF EXISTS ${name},\s+ADD CONSTRAINT ${name}\s+CHECK`, "u"));
     }
+    expect(sql).toContain("DROP TRIGGER IF EXISTS language_check_spend_writer_only ON ledger.model_spend;");
+  });
+  it("fix round 2: the writer refuses a day outside UTC today +-1 and a provider reference off the code shape", () => {
+    expect(sql).toMatch(/LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog/u);
+    expect(sql).toContain("p_charged_on IS NULL OR p_charged_on < v_today - 1 OR p_charged_on > v_today + 1");
+    expect(sql).toContain("p_provider_ref !~ '^language-check:[a-z0-9-]+:[A-Za-z0-9._/-]{1,128}$'");
+    expect(sql).toContain("v_today date := (pg_catalog.clock_timestamp() AT TIME ZONE 'UTC')::date;");
+    expect(sql).toMatch(/RAISE EXCEPTION 'LANGUAGE_CHECK_SPEND_INVALID' USING ERRCODE = 'check_violation';/u);
+  });
+  it("fix round 2: option (a) holds in the database — a LANGUAGE_CHECK INSERT by anyone but the writer's owner is refused", () => {
+    expect(sql).toMatch(/CREATE TRIGGER language_check_spend_writer_only BEFORE INSERT ON ledger\.model_spend\s+FOR EACH ROW WHEN \(NEW\.spend_source = 'LANGUAGE_CHECK'\) EXECUTE FUNCTION ledger\.refuse_language_check_spend_outside_writer\(\);/u);
+    const guard = sql.slice(sql.indexOf("CREATE OR REPLACE FUNCTION ledger.refuse_language_check_spend_outside_writer"));
+    // SECURITY INVOKER: current_user is the inserting role (the owner only inside the definer writer).
+    expect(guard.slice(0, guard.indexOf("$$;"))).not.toMatch(/SECURITY DEFINER/u);
+    expect(guard).toContain("RAISE EXCEPTION 'LANGUAGE_CHECK_SPEND_WRITER_ONLY' USING ERRCODE = 'insufficient_privilege';");
+    expect(sql).toContain("REVOKE ALL ON FUNCTION ledger.refuse_language_check_spend_outside_writer() FROM PUBLIC;");
   });
   it("is owned like 0093's spend writers (debateai_staff_security_owner), and no other role may execute it", () => {
     // The definer runs with its OWNER's rights: the NOLOGIN role 0093/0107 gave column INSERT on ledger.model_spend, never

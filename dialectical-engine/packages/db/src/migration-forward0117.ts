@@ -7,15 +7,17 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * The fast language check's site cost (question-language spec 2026-10-13, plan 2026-10-13-debate-shape-phase2-language
  * Task 19) as the chain step after the debate shape's map 0116 (migrations/lineage/README.md). It adds no billing
  * relation and no billing function, so the effective verifier 0116 keeps in force (0111's) stays in force and is named
- * as its own. Its checks are its postcondition (the one writer's definition, owner, rights and ACL, and the two CHECKs
- * on ledger.model_spend), compared on every later migrate(); it has no supplemental verifier, so no replayVerifierSql.
+ * as its own. Its checks are its postcondition (the writer and its INSERT guard: definitions, owners, rights and ACLs;
+ * the guard's trigger; the two CHECKs on ledger.model_spend), compared on every later migrate(); it has no supplemental
+ * verifier, so no replayVerifierSql.
  */
 const NAME='0117_language_check_spend.sql';
 const VERSION='language-check-spend-forward0117-v1';
 const MANIFEST_PATH='lineage/language-check-spend-forward0117.json';
 const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0117 adds no billing relation or function, so it names the verifier in force (0111's, which 0112 to 0116 keep)
 const PREVIOUS='0116_debate_shape_map.sql';
-const FUNCTIONS=['ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)'] as const;
+const FUNCTIONS=['ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)','ledger.refuse_language_check_spend_outside_writer()'] as const;
+const TRIGGERS=['language_check_spend_writer_only'] as const;
 const CONSTRAINTS=['model_spend_language_check_is_runless','model_spend_spend_source_check'] as const;
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0117_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
@@ -23,8 +25,9 @@ const exactKeys=(value:unknown,keys:readonly string[]):value is Record<string,un
 const digest=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
 
 /**
- * 0117's writer (owner, SECURITY DEFINER, its search_path, volatility, definition digest and ACL) and the two CHECKs it
- * puts on ledger.model_spend (the widened source list and the run-less LANGUAGE_CHECK row), by name and definition.
+ * 0117's writer and its INSERT guard (owner, SECURITY DEFINER or not, search_path, volatility, definition digest and
+ * ACL), the guard's trigger on ledger.model_spend (name, enabled state, definition), and the two CHECKs it puts there
+ * (the widened source list and the run-, phase- and attempt-less LANGUAGE_CHECK row), by name and definition.
  */
 async function postconditionEvidence(client:PoolClient):Promise<string>{
  const functions=(await client.query(`
@@ -37,7 +40,11 @@ async function postconditionEvidence(client:PoolClient):Promise<string>{
   SELECT k.conname,pg_get_constraintdef(k.oid) definition FROM pg_constraint k
   WHERE k.conrelid='ledger.model_spend'::regclass AND k.conname=ANY($1::text[]) ORDER BY k.conname`,[CONSTRAINTS])).rows;
  if(constraints.length!==CONSTRAINTS.length)return fail('POSTCONDITION_OBJECTS');
- return sha(JSON.stringify({functions,constraints}));
+ const triggers=(await client.query(`
+  SELECT t.tgname,t.tgenabled::text enabled,pg_get_triggerdef(t.oid) definition FROM pg_trigger t
+  WHERE t.tgrelid='ledger.model_spend'::regclass AND NOT t.tgisinternal AND t.tgname=ANY($1::text[]) ORDER BY t.tgname`,[TRIGGERS])).rows;
+ if(triggers.length!==TRIGGERS.length)return fail('POSTCONDITION_OBJECTS');
+ return sha(JSON.stringify({functions,constraints,triggers}));
 }
 
 export async function loadForward0117(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{

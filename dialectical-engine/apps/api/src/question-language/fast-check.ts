@@ -58,8 +58,18 @@ export function framedQuestionLanguageCheck(instruction: string, questionLine: s
   }).packet;
 }
 
+/** The transport codes that mean "not sent on purpose" (Task 19 fix round 2), read as their own DOWN reasons. */
+export const QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES = Object.freeze({
+  dayPot: "QUESTION_LANGUAGE_FAST_CHECK_SKIPPED_DAY_POT",
+  spendRecordDown: "QUESTION_LANGUAGE_FAST_CHECK_SPEND_RECORD_DOWN"
+} as const);
+
 export type FastCheckReading =
-  | Readonly<{ kind: "DOWN"; reason: "TIMEOUT" | "TRANSPORT" | "UNREADABLE" | "UNKNOWN_LANGUAGE" }>
+  /**
+   * SKIPPED_DAY_POT / SPEND_RECORD_DOWN (Task 19 fix round 2, hosted only): nothing was sent — today's site pot is at
+   * its ceiling (ruling L-POT), or the spend record is down (the breaker); the decider records the code beside the lock.
+   */
+  | Readonly<{ kind: "DOWN"; reason: "TIMEOUT" | "TRANSPORT" | "UNREADABLE" | "UNKNOWN_LANGUAGE" | "SKIPPED_DAY_POT" | "SPEND_RECORD_DOWN" }>
   | Readonly<{ kind: "ONE"; main: QuestionLanguage }>
   | Readonly<{ kind: "MIX"; main: QuestionLanguage; seen: readonly QuestionLanguage[]; proposed: string }>
   /**
@@ -193,8 +203,11 @@ export function createFastCheck(deps: Readonly<{ transport: FastCheckTransport; 
         const packet = framedQuestionLanguageCheck(deps.instruction, questionLine, site);
         const text = await Promise.race([deps.transport({ packet, signal }), abandoned]);
         return typeof text === "string" ? readQuestionLanguageReply(text, questionLine) : down("UNREADABLE");
-      } catch {
-        return signal.aborted ? down("TIMEOUT") : down("TRANSPORT");
+      } catch (error) {
+        if (signal.aborted) return down("TIMEOUT");
+        const code = error instanceof TypedDomainError ? error.code : null;
+        return code === QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES.dayPot ? down("SKIPPED_DAY_POT")
+          : code === QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES.spendRecordDown ? down("SPEND_RECORD_DOWN") : down("TRANSPORT");
       } finally {
         clearTimeout(timer);
       }

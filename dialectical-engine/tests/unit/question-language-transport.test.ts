@@ -63,6 +63,24 @@ describe("the fast check's transport", () => {
     expect(usage).toEqual([]);
   });
 
+  it("Task 19 fix round 2: beforeSend's skip code is thrown before anything is sent or recorded; a failing gate never sends", async () => {
+    let sent = 0;
+    const counting = (async () => { sent += 1; return new Response(message('{"main_language":"en"}'), { status: 200 }); }) as typeof fetch;
+    const usage: FastCheckUsage[] = [];
+    const skipping = anthropicFastCheckTransport({ fetch: counting, url: HOSTED_URL, credential: "sk-ant-test", settings,
+      onUsage: (u) => { usage.push(u); }, beforeSend: async () => "QUESTION_LANGUAGE_FAST_CHECK_SKIPPED_DAY_POT" });
+    await expect(skipping({ packet, signal: AbortSignal.timeout(5000) })).rejects.toMatchObject({ code: "QUESTION_LANGUAGE_FAST_CHECK_SKIPPED_DAY_POT" });
+    const failing = anthropicFastCheckTransport({ fetch: counting, url: HOSTED_URL, credential: "sk-ant-test", settings,
+      onUsage: (u) => { usage.push(u); }, beforeSend: async () => { throw new Error("db down"); } });
+    await expect(failing({ packet, signal: AbortSignal.timeout(5000) })).rejects.toMatchObject({ code: "QUESTION_LANGUAGE_FAST_CHECK_GATE_FAILED" });
+    expect(sent).toBe(0);
+    expect(usage).toEqual([]);
+    const open = anthropicFastCheckTransport({ fetch: counting, url: HOSTED_URL, credential: "sk-ant-test", settings,
+      onUsage: (u) => { usage.push(u); }, beforeSend: async () => null });
+    expect(await open({ packet, signal: AbortSignal.timeout(5000) })).toBe('{"main_language":"en"}');
+    expect(sent).toBe(1);
+  });
+
   it("CR-6: on the preview no key header is ever sent, and a failure carries no question text", async () => {
     const guarded = createPreviewGuardedFetch({ anthropic: { execute: async () => ({ status: 500, body: "{}" }) } });
     const transport = anthropicFastCheckTransport({ fetch: guarded, url: PREVIEW_ANTHROPIC_MESSAGES_URL, credential: undefined, settings });

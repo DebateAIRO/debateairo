@@ -8,7 +8,7 @@ import {
 import { QuestionLanguageDecider, type QuestionLanguageChoiceNeeded, type QuestionLanguageFastCheckOffReason, type QuestionLanguageLock } from "./decider.js";
 import { loadEldReader } from "./eld.js";
 import { ELD_TUNING } from "./eld-tuning.js";
-import { assertQuestionLanguageInstructionFrameable, createFastCheck, type FastCheck } from "./fast-check.js";
+import { QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES, assertQuestionLanguageInstructionFrameable, createFastCheck, type FastCheck } from "./fast-check.js";
 import type { QuestionLanguageReferenceKey } from "./reference.js";
 import { anthropicFastCheckTransport, type FastCheckUsage } from "./transport.js";
 
@@ -30,7 +30,9 @@ import { anthropicFastCheckTransport, type FastCheckUsage } from "./transport.js
  */
 export type QuestionLanguagePaidRoute =
   | Readonly<{ kind: "PREVIEW"; fetch: typeof fetch }>
-  | Readonly<{ kind: "HOSTED"; credential: string; recordSpend: (usage: FastCheckUsage) => Promise<void> }>
+  | Readonly<{ kind: "HOSTED"; credential: string; recordSpend: (usage: FastCheckUsage) => Promise<void>;
+    /** Asked before each send: null = send; a skip code (breaker down, site pot full) = do not send (fix round 2). */
+    beforeSend: () => Promise<string | null> }>
   | Readonly<{ kind: "NONE"; reason: QuestionLanguageFastCheckOffReason }>;
 
 /** The message is the code (pre-flight PF-L13: a test's toThrow("…") reads the message); it carries no owner text. */
@@ -99,8 +101,19 @@ export function hostedLanguageCheckPrice(rowPrice: Readonly<{ input: number; out
   });
 }
 
-/** The one line a failed record writes: the event and a code, never question, reply or database text. */
-export type QuestionLanguageSpendReport = Readonly<{ event: "api.question_language.spend_unrecorded"; code: string }>;
+/**
+ * The lines the hosted spend record writes: each failed record (`spend_unrecorded`), and once, when the breaker latches
+ * (`spend_record_down`). The event and a code only, never question, reply or database text.
+ */
+export type QuestionLanguageSpendReport = Readonly<{
+  event: "api.question_language.spend_unrecorded" | "api.question_language.spend_record_down"; code: string }>;
+/**
+ * The breaker (Task 19 fix round 2, "never spend unrecorded"): a refusal every later record would meet too — no right
+ * (42501), no function (42883), a CHECK or the writer's own refusal (23514) — latches at once; any other failure after
+ * this many in a row. Latched, nothing more is sent until a restart re-probes.
+ */
+const SPEND_RECORD_LATCHING_CODES: ReadonlySet<string> = new Set(["42501", "42883", "23514"]);
+const SPEND_RECORD_FAILURES_IN_A_ROW = 3;
 const CODE_SHAPED = /^[A-Z0-9_]{1,64}$/u;
 function spendFailureCode(error: unknown): string {
   const code = typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined;
@@ -121,12 +134,19 @@ function spendFailureCode(error: unknown): string {
  * the UTC day, the tokens the transport names (a projected record at the projected maximum) priced at
  * `hostedLanguageCheckPrice`. A failed record is reported by code only and never fails the ask: the call already
  * happened (the support chat's rule for unreported cost). It counts in the provider's daily site pot, never a person's.
+ * Fix round 2: `beforeSend` keeps the check from being sent when the spend record is down (the breaker above latched)
+ * or today's site pot is at or above its day ceiling (ruling L-POT); either is the fallback lock, never a block.
  */
 export async function hostedQuestionLanguageRoute(input: Readonly<{
   mode: DeploymentMode;
   fastCheck: QuestionLanguageFastCheck | null;
   readCredential: () => string | undefined;
   spend: Readonly<{ writerPresent: () => Promise<boolean>; record: (entry: LanguageCheckSpendEntry) => Promise<void> }>;
+  /**
+   * Ruling L-POT: today's site pot and the day ceiling the ask admission uses. At or above it, a check is skipped (no
+   * call, no spend; the fallback lock). Hosted without it refuses the boot (QUESTION_LANGUAGE_DAY_POT_UNAVAILABLE).
+   */
+  dayPot: Readonly<{ ceilingMicros: number; spentMicros: (day: string) => Promise<number> }> | null;
   clock: () => Date;
   report: (line: QuestionLanguageSpendReport) => void;
   newSpendId?: () => string;
@@ -136,21 +156,44 @@ export async function hostedQuestionLanguageRoute(input: Readonly<{
   if (fastCheck === null) return Object.freeze({ kind: "NONE", reason: "POLICY_OFF" });
   // Fix round 1: a model off the reviewed price table refuses the boot (typed), before the database or the key.
   pricedFastCheckRow(fastCheck.model);
+  const dayPot = input.dayPot;
+  if (dayPot === null || !Number.isSafeInteger(dayPot.ceilingMicros) || dayPot.ceilingMicros < 0) {
+    throw refusal("QUESTION_LANGUAGE_DAY_POT_UNAVAILABLE");
+  }
   if (!(await input.spend.writerPresent())) return Object.freeze({ kind: "NONE", reason: "HOSTED_BEFORE_SPEND_RECORD" });
   const credential = input.readCredential();
   if (credential === undefined) return Object.freeze({ kind: "NONE", reason: "NO_HOSTED_KEY" });
   const providerRef = `language-check:${fastCheck.provider}:${fastCheck.model}`;
   const newSpendId = input.newSpendId ?? randomUUID;
+  let recordDown = false;
+  let failuresInARow = 0;
   const recordSpend = async (usage: FastCheckUsage): Promise<void> => {
     try {
       const price = hostedLanguageCheckPrice(fastCheck.priceMicrosUsdPerMillionTokens, fastCheck.model, usage.inputTokens);
       await input.spend.record(Object.freeze({ spendId: newSpendId(), providerRef, chargedOn: costEnvelopeDay(input.clock()),
         chargeMicros: languageCheckChargeMicros(usage, price), inputTokens: usage.inputTokens, outputTokens: usage.outputTokens }));
+      failuresInARow = 0;
     } catch (error) {
-      input.report(Object.freeze({ event: "api.question_language.spend_unrecorded", code: spendFailureCode(error) }));
+      const code = spendFailureCode(error);
+      input.report(Object.freeze({ event: "api.question_language.spend_unrecorded", code }));
+      failuresInARow += 1;
+      if (!recordDown && (SPEND_RECORD_LATCHING_CODES.has(code) || failuresInARow >= SPEND_RECORD_FAILURES_IN_A_ROW)) {
+        recordDown = true;
+        input.report(Object.freeze({ event: "api.question_language.spend_record_down", code }));
+      }
     }
   };
-  return Object.freeze({ kind: "HOSTED", credential, recordSpend });
+  const beforeSend = async (): Promise<string | null> => {
+    if (recordDown) return QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES.spendRecordDown;
+    try {
+      const spent = await dayPot.spentMicros(costEnvelopeDay(input.clock()));
+      return Number.isFinite(spent) && spent < dayPot.ceilingMicros ? null : QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES.dayPot;
+    } catch {
+      // A pot that cannot be read is treated as full: never spend past what cannot be checked.
+      return QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES.dayPot;
+    }
+  };
+  return Object.freeze({ kind: "HOSTED", credential, recordSpend, beforeSend });
 }
 
 /**
@@ -176,7 +219,7 @@ export async function composeQuestionLanguage(input: Readonly<{ policy: Question
     const transport = route.kind === "PREVIEW"
       ? anthropicFastCheckTransport({ fetch: route.fetch, url: PREVIEW_ANTHROPIC_MESSAGES_URL, credential: undefined, settings: policy.fastCheck })
       : anthropicFastCheckTransport({ fetch, url: `${ANTHROPIC_MESSAGES_BASE_URL}${ANTHROPIC_MESSAGES_PATH}`,
-        credential: route.credential, settings: policy.fastCheck, onUsage: route.recordSpend });
+        credential: route.credential, settings: policy.fastCheck, onUsage: route.recordSpend, beforeSend: route.beforeSend });
     fastCheck = createFastCheck({ transport, instruction: policy.instruction, timeoutMs: policy.fastCheck.timeoutMs });
   }
   const eld = await loadEldReader(ELD_TUNING.database);

@@ -108,15 +108,19 @@ repository; plan `docs/superpowers/plans/2026-10-13-debate-shape-phase2-language
 to `STEPS`, `MIGRATION_FORWARD0117_*` refusals). The fast language check runs before a debate exists, so its cost is a
 SITE cost in the day's pot (`ledger.model_spend` summed by day), never a run's and never a person's. The step widens
 0074's `model_spend_spend_source_check` by exactly `LANGUAGE_CHECK`, adds `model_spend_language_check_is_runless` (no
-run, no phase) and one writer, `ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)`: SECURITY
+run, no phase, no attempt; both in one ALTER TABLE) and one writer, `ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)`: SECURITY
 DEFINER, `search_path = pg_catalog`, owned by `debateai_staff_security_owner` (the role 0093 and 0107 gave column
 INSERT on `ledger.model_spend` for their spend writers), EXECUTE revoked from PUBLIC and granted to `debateai_runtime`
-alone. It is the ONLY writer of such a row (pre-flight PF-L58, option (a)): `PostgresModelSpendStore.recordSpend`
-refuses the source (`MODEL_SPEND_LANGUAGE_CHECK_FUNCTION_ONLY`), and the hosted API probes the function at boot and
-keeps the fast check off until it exists (`HOSTED_BEFORE_SPEND_RECORD`). No billing relation or function, so
+alone; it refuses (23514) a day outside UTC today ±1 and a provider reference off
+`^language-check:[a-z0-9-]+:[A-Za-z0-9._/-]{1,128}$`. It is the ONLY writer of such a row (pre-flight PF-L58, option
+(a)), in the database too: the BEFORE INSERT trigger `language_check_spend_writer_only` (WHEN the source is
+`LANGUAGE_CHECK`, function `ledger.refuse_language_check_spend_outside_writer()`) refuses (42501) any role but the
+writer's owner. `PostgresModelSpendStore.recordSpend` refuses the source too (`MODEL_SPEND_LANGUAGE_CHECK_FUNCTION_ONLY`),
+and the hosted API probes at boot that the function exists and its role may EXECUTE it, keeping the fast check off
+until both hold (`HOSTED_BEFORE_SPEND_RECORD`). No billing relation or function, so
 `verify-effective-capabilities-111.sql` stays the verifier in force; no `replayVerifierSql`: its checks are its
-postcondition digest (the writer's owner, rights, settings, definition and ACL, and the two CHECKs by name and
-definition). If `origin/dev` takes 0117 first, renumber this step at merge time (its manifest, loader name and
+postcondition digest (the writer's and the guard's owners, rights, settings, definitions and ACLs, the guard's trigger,
+and the two CHECKs by name and definition). If `origin/dev` takes 0117 first, renumber this step at merge time (its manifest, loader name and
 `previous` follow), as C1's recipe above says.
 
 ## Replay: every applied step keeps its own checks

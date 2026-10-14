@@ -647,6 +647,18 @@ const supportModelTarget = boot.runSync("support-model-target", () =>
     : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON,{
       mode: environment.DEPLOYMENT_MODE,nodeEnv: environment.NODE_ENV
     })));
+// Task 19 fix round 2 (Minor 6): the support target's key file is read ONCE at boot, through the same custody loader,
+// by whichever reader comes first (the hosted question-language route, else the support adapter); the other gets the
+// same value. Both readers are at boot, so the adapter sees exactly what it read before. Cleared once the support
+// adapter is built, so this process keeps no copy beyond the adapter's own.
+const supportCredentialReads = new Map<string,string>();
+const readSupportCredentialOnce = (path: string): string => {
+  const known = supportCredentialReads.get(path);
+  if (known !== undefined) return known;
+  const value = readCustodyAuthorizationHeader(path);
+  supportCredentialReads.set(path, value);
+  return value;
+};
 // Question language (spec 2026-10-13): only with the debate shape row in force (row absent, or `enabled: false`: no
 // row read, no eld load, today's boot). The row is optional (absent = start values); a malformed row, an owner text
 // carrying a frame token, or an unreviewed preview model refuses the boot. The fast check is a site cost: nothing
@@ -660,10 +672,15 @@ const questionLanguage = debateShapeInForcePolicy === null ? undefined : await b
   const hostedRoute = previewConfig !== undefined ? undefined : await hostedQuestionLanguageRoute({
     mode: environment.DEPLOYMENT_MODE,
     fastCheck: (policy ?? questionLanguagePolicyStartValues()).fastCheck,
-    readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readCustodyAuthorizationHeader),
+    readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
     spend: {
       writerPresent: () => languageCheckSpendWriterPresent(pool),
       record: (entry) => recordLanguageCheckSpend(pool, entry)
+    },
+    // Ruling L-POT: the day ceiling the ask admission uses (costEnvelopeGuardPolicy), against the day's whole site pot.
+    dayPot: costEnvelopeRows === undefined ? null : {
+      ceilingMicros: costEnvelopeRows.guardPolicy.dailyCeilingMicros,
+      spentMicros: (day) => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
     },
     clock: () => new Date(),
     report: (line) => console.error(JSON.stringify(line))
@@ -1253,11 +1270,13 @@ const supportModels = new Map<string,SupportModelPort>(supportModelTarget === un
   // V-9(2): a declared credential FILE is resolved here, through the same
   // custody-checked loader the debate targets use — one seam, one contract.
   createSupportModelAdapter(supportModelTarget,{
-    readAuthorizationHeader: readCustodyAuthorizationHeader,
+    readAuthorizationHeader: readSupportCredentialOnce,
     timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS,
     reportDiagnostic: reportSupportDiagnostic
   })
 ] as const]);
+// Fix round 2 (Minor 6): the adapter holds its key now; the boot's one-read memo keeps no copy past this line.
+supportCredentialReads.clear();
 // hate-speech S02 (D-S02-12, D-S02-21): the publish check's judge is the support
 // chat's configured target, called through its own per-call adapter; absent,
 // every publish answers UNAVAILABLE `JUDGE_NOT_CONFIGURED`. SIGUSR2 toggles the

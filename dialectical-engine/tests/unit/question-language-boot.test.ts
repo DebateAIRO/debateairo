@@ -44,17 +44,25 @@ afterEach(() => {
 
 /** The hosted route's seams, counted: the writer probe, the key read, the records written and the codes reported. */
 function hostedDeps(over: Readonly<{ mode?: "hosted" | "local"; fastCheck?: typeof start.fastCheck; writerPresent?: boolean;
-  key?: string | undefined; recordFails?: Error }>) {
-  const state = { probes: 0, keyReads: 0, records: [] as LanguageCheckSpendEntry[], reports: [] as unknown[], ids: [] as string[] };
+  key?: string | undefined; recordFails?: Error; recordFailures?: (Error | undefined)[];
+  dayPot?: { ceilingMicros: number; spentMicros: (day: string) => Promise<number> } | null }>) {
+  const state = { probes: 0, keyReads: 0, records: [] as LanguageCheckSpendEntry[], reports: [] as unknown[], ids: [] as string[],
+    potReads: [] as string[] };
   let n = 0;
+  let call = 0;
   const input = {
     mode: over.mode ?? "hosted",
     fastCheck: "fastCheck" in over ? over.fastCheck! : start.fastCheck,
     readCredential: () => { state.keyReads += 1; return "key" in over ? over.key : "sk-ant-test-key"; },
     spend: {
       writerPresent: async () => { state.probes += 1; return over.writerPresent ?? true; },
-      record: async (entry: LanguageCheckSpendEntry) => { if (over.recordFails !== undefined) throw over.recordFails; state.records.push(entry); }
+      record: async (entry: LanguageCheckSpendEntry) => {
+        const failure = over.recordFailures !== undefined ? over.recordFailures[call++] : over.recordFails;
+        if (failure !== undefined) throw failure;
+        state.records.push(entry);
+      }
     },
+    dayPot: "dayPot" in over ? over.dayPot! : { ceilingMicros: 5_000_000, spentMicros: async (day: string) => { state.potReads.push(day); return 0; } },
     clock: () => new Date("2026-10-13T23:59:59.000Z"),
     newSpendId: () => { const id = `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`; state.ids.push(id); return id; },
     report: (line: unknown) => { state.reports.push(line); }
@@ -144,13 +152,86 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
     const route = await hostedQuestionLanguageRoute(deps.input);
     if (route.kind !== "HOSTED") throw new Error("unreachable");
     await expect(route.recordSpend({ inputTokens: 310, outputTokens: 28, projected: false })).resolves.toBeUndefined();
-    expect(deps.reports).toEqual([{ event: "api.question_language.spend_unrecorded", code: "23514" }]);
+    // 23514 is a refusal every later record would meet too: the breaker latches at once (fix round 2), reported once.
+    expect(deps.reports).toEqual([{ event: "api.question_language.spend_unrecorded", code: "23514" },
+      { event: "api.question_language.spend_record_down", code: "23514" }]);
     const plain = hostedDeps({ recordFails: new Error("question text here") });
     const second = await hostedQuestionLanguageRoute(plain.input);
     if (second.kind !== "HOSTED") throw new Error("unreachable");
     await second.recordSpend({ inputTokens: 1, outputTokens: 1, projected: true });
     expect(plain.reports).toEqual([{ event: "api.question_language.spend_unrecorded", code: "QUESTION_LANGUAGE_SPEND_RECORD_FAILED" }]);
     expect(JSON.stringify([...deps.reports, ...plain.reports])).not.toMatch(/România|question text/u);
+  });
+
+  it("fix round 2 (breaker): after a 42501/42883/23514 record failure, or 3 failures in a row, the route stops sending until restart", async () => {
+    for (const code of ["42501", "42883", "23514"]) {
+      const deps = hostedDeps({ recordFails: Object.assign(new Error("x"), { code }) });
+      const route = await hostedQuestionLanguageRoute(deps.input);
+      if (route.kind !== "HOSTED") throw new Error("unreachable");
+      expect(await route.beforeSend()).toBeNull();
+      await route.recordSpend({ inputTokens: 1, outputTokens: 1, projected: false });
+      expect(await route.beforeSend()).toBe("QUESTION_LANGUAGE_FAST_CHECK_SPEND_RECORD_DOWN");
+      await route.recordSpend({ inputTokens: 1, outputTokens: 1, projected: true });
+      // Reported once (the down line), every failure still logged as unrecorded.
+      expect(deps.reports.filter((line) => (line as { event: string }).event === "api.question_language.spend_record_down"))
+        .toEqual([{ event: "api.question_language.spend_record_down", code }]);
+    }
+    // Any other failure: three in a row latch; a success in between resets the count.
+    const other = Object.assign(new Error("x"), { code: "57014" });
+    const deps = hostedDeps({ recordFailures: [other, other, undefined, other, other, other] });
+    const route = await hostedQuestionLanguageRoute(deps.input);
+    if (route.kind !== "HOSTED") throw new Error("unreachable");
+    for (let i = 0; i < 5; i += 1) {
+      await route.recordSpend({ inputTokens: 1, outputTokens: 1, projected: false });
+      expect(await route.beforeSend()).toBeNull();
+    }
+    await route.recordSpend({ inputTokens: 1, outputTokens: 1, projected: false });
+    expect(await route.beforeSend()).toBe("QUESTION_LANGUAGE_FAST_CHECK_SPEND_RECORD_DOWN");
+    expect(deps.reports.at(-1)).toEqual({ event: "api.question_language.spend_record_down", code: "57014" });
+  });
+
+  it("fix round 2 (breaker), end to end: the first failed record is logged, the next ask never reaches fetch and locks the fallback", async () => {
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ id: "msg_1", type: "message", role: "assistant", model: "claude-haiku-5-5",
+      content: [{ type: "text", text: '{"main_language":"ro"}' }], stop_reason: "end_turn", usage: { input_tokens: 1300, output_tokens: 20 } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const deps = hostedDeps({ recordFails: Object.assign(new Error("permission denied"), { code: "42501" }) });
+    const decider = await compose(null, await hostedQuestionLanguageRoute(deps.input));
+    await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:a", fastCheckAllowed: true });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(deps.reports).toEqual([{ event: "api.question_language.spend_unrecorded", code: "42501" },
+      { event: "api.question_language.spend_record_down", code: "42501" }]);
+    const second = await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:b", fastCheckAllowed: true });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(["FALLBACK_SITE", "FALLBACK_ELD"]).toContain(second.source);
+    expect(second.recordCode).toBe(`${second.source}:FAST_CHECK_SPEND_RECORD_DOWN`);
+    expect(second.trace.fast).toMatchObject({ outcome: "DOWN", reason: "SPEND_RECORD_DOWN" });
+  });
+
+  it("ruling L-POT: with today's site pot at or above its day ceiling the fast check is skipped (no call, no spend), never a block", async () => {
+    const fetchSpy = vi.fn(async () => new Response("{}", { status: 500 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    for (const [spent, sends] of [[4_999_999, true], [5_000_000, false], [7_000_000, false]] as const) {
+      fetchSpy.mockClear();
+      const deps = hostedDeps({ dayPot: { ceilingMicros: 5_000_000, spentMicros: async (day) => { deps.potReads.push(day); return spent; } } });
+      const decider = await compose(null, await hostedQuestionLanguageRoute(deps.input));
+      const lock = await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:a", fastCheckAllowed: true });
+      expect(deps.potReads).toEqual(["2026-10-13"]);
+      expect(fetchSpy).toHaveBeenCalledTimes(sends ? 1 : 0);
+      expect(deps.records).toEqual([]);
+      if (!sends) {
+        expect(lock.recordCode).toBe(`${lock.source}:FAST_CHECK_SKIPPED_DAY_POT`);
+        expect(lock.trace.fast).toMatchObject({ outcome: "DOWN", reason: "SKIPPED_DAY_POT" });
+      }
+    }
+    // A pot that cannot be read is treated as full: skipped, never spent past.
+    fetchSpy.mockClear();
+    const unreadable = hostedDeps({ dayPot: { ceilingMicros: 5_000_000, spentMicros: async () => { throw new Error("db down"); } } });
+    const decider = await compose(null, await hostedQuestionLanguageRoute(unreadable.input));
+    const lock = await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:a", fastCheckAllowed: true });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(lock.recordCode).toBe(`${lock.source}:FAST_CHECK_SKIPPED_DAY_POT`);
+    // Hosted without a day ceiling to check against refuses the boot.
+    await expect(hostedQuestionLanguageRoute(hostedDeps({ dayPot: null }).input)).rejects.toMatchObject({ code: "QUESTION_LANGUAGE_DAY_POT_UNAVAILABLE" });
   });
 
   it("never under-counts: the larger of the row's and the provider table's price, input at the cache-write rate", () => {
@@ -254,7 +335,7 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
     const recorded = recordingFetch();
     vi.stubGlobal("fetch", recorded.fetch);
     const recordSpend = vi.fn(async () => undefined);
-    const decider = await compose(null, { kind: "HOSTED", credential: "sk-ant-test-key", recordSpend });
+    const decider = await compose(null, { kind: "HOSTED", credential: "sk-ant-test-key", recordSpend, beforeSend: async () => null });
     const lock = await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:a", fastCheckAllowed: true });
     expect(["FALLBACK_SITE", "FALLBACK_ELD", "ELD_SITE"]).toContain(lock.source);
     expect(recorded.calls.length).toBe(1);
@@ -263,7 +344,7 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
     // A refused request (HTTP 500) costs nothing: the transport records no spend for it.
     expect(recordSpend).not.toHaveBeenCalled();
     // A key of the wrong shape refuses the boot (the transport's own construction check).
-    await expect(compose(null, { kind: "HOSTED", credential: "Bearer sk-ant-test-key", recordSpend })).rejects.toThrow();
+    await expect(compose(null, { kind: "HOSTED", credential: "Bearer sk-ant-test-key", recordSpend, beforeSend: async () => null })).rejects.toThrow();
   });
 
   it("onDecided receives each lock (the practice report's hook)", async () => {

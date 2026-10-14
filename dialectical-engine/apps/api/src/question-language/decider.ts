@@ -171,7 +171,13 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
     const nowMs = this.#deps.clock().getTime();
     const decision = withoutRepeatOffer(decideAfterFast(site, reading, fast, questionLine, this.#deps.maxQuestionBytes),
       this.#lastOfferAt(offerKey, nowMs), nowMs);
-    if (decision.kind === "LOCK") return this.#lock(site, decision, trace, null);
+    if (decision.kind === "LOCK") {
+      // Task 19 fix round 2: a check skipped on purpose (the site pot at its ceiling, or the spend record down) says so
+      // beside the lock's own code, so the record tells a skip from a vendor failure.
+      const skipped = fast.kind !== "DOWN" ? null : fast.reason === "SKIPPED_DAY_POT" ? "FAST_CHECK_SKIPPED_DAY_POT"
+        : fast.reason === "SPEND_RECORD_DOWN" ? "FAST_CHECK_SPEND_RECORD_DOWN" : null;
+      return this.#lock(site, decision, trace, null, skipped);
+    }
 
     const checkRef = signQuestionLanguageReference(this.#deps.key, { ownerScope: input.ownerScope, site: site.code, questionLine,
       proposed: decision.proposed, main: decision.main.code, now: new Date(nowMs) });
@@ -233,9 +239,10 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
   }
 
   #lock(site: QuestionLanguage, decision: Extract<LanguageDecision, { kind: "LOCK" }>, trace: QuestionLanguageTrace,
-    localReason: QuestionLanguageLocalReason | null): QuestionLanguageLock {
+    localReason: QuestionLanguageLocalReason | null, skipped: string | null = null): QuestionLanguageLock {
+    const recordCode = skipped === null ? decisionRecordCode(decision) : `${decisionRecordCode(decision)}:${skipped}`;
     return this.#done(Object.freeze({ language: decision.language, source: decision.source, siteLanguage: site.code, rewriteAccepted: false,
-      originalQuestionLine: null, trace, recordCode: decisionRecordCode(decision), localReason }));
+      originalQuestionLine: null, trace, recordCode, localReason }));
   }
 
   /** CR-5: drops entries older than the window (oldest first), then answers when this key was last offered. */

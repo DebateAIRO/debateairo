@@ -77,6 +77,12 @@ async function readBoundedReply(response: Response): Promise<string> {
 export function anthropicFastCheckTransport(deps: Readonly<{
   fetch: typeof fetch; url: string; credential: string | undefined; settings: QuestionLanguageFastCheck;
   onUsage?: (usage: FastCheckUsage) => Promise<void> | void;
+  /**
+   * Fix round 2 (hosted only): asked before anything is sent. A code means "do not send": the call throws that code
+   * (the fast check reads it as DOWN, the person gets the fallback lock) and nothing is sent or recorded. Null: send.
+   * A gate that throws is a refusal too (QUESTION_LANGUAGE_FAST_CHECK_GATE_FAILED): never send what cannot be checked.
+   */
+  beforeSend?: () => Promise<string | null>;
 }>): FastCheckTransport {
   if (deps.credential !== undefined) {
     assertAnthropicCredentialShape(deps.credential);
@@ -103,6 +109,15 @@ export function anthropicFastCheckTransport(deps: Readonly<{
     });
     // Aborted before anything left the app: nothing was sent, so nothing is recorded.
     if (signal.aborted) throw failure("QUESTION_LANGUAGE_FAST_CHECK_ABORTED");
+    if (deps.beforeSend !== undefined) {
+      let skip: string | null;
+      try {
+        skip = await deps.beforeSend();
+      } catch {
+        skip = "QUESTION_LANGUAGE_FAST_CHECK_GATE_FAILED";
+      }
+      if (skip !== null) throw failure(skip);
+    }
     let response: Response;
     try {
       response = await deps.fetch(deps.url, { method: "POST", headers: anthropicMessagesRequestHeaders(deps.credential), body, signal });
