@@ -318,3 +318,41 @@ describe("practice debate shape: what the run did", () => {
     expect(reportMarkdown(report)).not.toContain("Debate shape");
   });
 });
+
+describe("README: the debate commands are real commands of this tool", () => {
+  const readme = readFileSync(new URL("../../tools/preview-practice/README.md", import.meta.url), "utf8");
+  const commands = readme.split("\n").filter((line) => line.includes("tools/preview-practice/practice.ts debate "));
+  const argvOf = (line: string): string[] => line.slice(line.indexOf("practice.ts ") + "practice.ts ".length).trim().split(/\s+/u)
+    .map((word) => word.replace(/^"(.*)"$/u, "$1"));
+  const readFromEngine = (path: string): string => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+
+  it("names the pass bar, the new shape and the comparison", () => {
+    expect(commands.length).toBeGreaterThanOrEqual(4);
+    expect(commands.filter((line) => line.includes("--shape-policy tools/preview-practice/shape-policy-start.json")).length).toBeGreaterThanOrEqual(2);
+    expect(commands.filter((line) => line.includes("--question \"$Q\""))).toHaveLength(2);
+    // Controller ruling D-BOTHNEXT (pre-flight PF-D2): the new-shape command and both S-8 arms run on this code's next version.
+    expect(commands.filter((line) => line.includes(" --register-next ")).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("every one parses with flags the tool reads, fixed questions and a valid policy file", () => {
+    for (const line of commands) {
+      const args = parsePracticeArgs(argvOf(line));
+      expect(args.mode).toBe("debate");
+      const asked = args.flags.get("--question") ?? "ro";
+      for (const id of asked === "$Q" ? [...PRACTICE_COMPARISON_QUESTION_IDS] : [asked]) expect(practiceDebateQuestion(id).id).toBe(id);
+      expect(() => practiceShapeOverrideFromArgs(args.mode, args.flags, readFromEngine)).not.toThrow();
+      // Controller ruling D-BOTHNEXT (pre-flight PF-D2): until the owners republish the register with this code's prompt
+      // fingerprints, every new-shape and comparison debate needs --register-next. S-6's own debate line keeps none.
+      if (asked === "$Q" || args.flags.has("--shape-policy")) expect(args.switches.has("--register-next")).toBe(true);
+      if (asked === "$Q") {
+        expect(args.flags.get("--depth")).toBe("1");
+        expect(args.switches.has("--transcript")).toBe(true);
+        expect(args.flags.get("--out")).toMatch(/^\$P\/compare\/\$Q\/(today|shape)$/u);
+      }
+    }
+  });
+
+  it("leaves the judging to the owners, outside the repository", () => {
+    expect(readme).toContain("results are judged by the owners' private method, outside this repository");
+  });
+});
