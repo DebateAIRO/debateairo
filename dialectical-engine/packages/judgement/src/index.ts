@@ -1078,7 +1078,7 @@ export class JudgementRepository {
   }
 
   /**
-   * Reclaim resume (spec 2026-10-14, migration 0118): every read of the run's reviews and judgements here counts only
+   * Reclaim resume (spec 2026-10-14, migration 0119): every read of the run's reviews and judgements here counts only
    * the nodes of the live copy. A copy that took the run over sets the dead copy's nodes aside (generation_status
    * 'stale') and writes its own, so a stale node's review or judgement is the dead copy's and must not steer this one.
    */

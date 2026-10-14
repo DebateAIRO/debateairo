@@ -1,4 +1,4 @@
--- 0118 · A debate taken over after a crash (spec docs/superpowers/specs/2026-10-14-reclaim-resume-design.md, "The
+-- 0119 · A debate taken over after a crash (spec docs/superpowers/specs/2026-10-14-reclaim-resume-design.md, "The
 -- database change"). The copy that takes a run over replays the dead copy's recorded answers and writes its own tree;
 -- the dead copy's rows are SET ASIDE, never deleted: their nodes are marked generation_status = 'stale' (a value
 -- 0002's node_generation_status_closed already allows, and that every reader of the debate skips).

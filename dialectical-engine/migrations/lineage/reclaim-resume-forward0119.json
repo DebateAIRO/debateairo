@@ -1,5 +1,5 @@
 {
-  "version": "reclaim-resume-forward0118-v1",
+  "version": "reclaim-resume-forward0119-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0117_language_check_spend.sql",
@@ -7,8 +7,8 @@
     "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
   },
   "migration": {
-    "name": "0118_reclaim_resume.sql",
-    "sha256": "060f765b575010f6b938f49f2d389a05020a4b13c24efd81ccd0ab0db9ed774c"
+    "name": "0119_reclaim_resume.sql",
+    "sha256": "0a958fd4a602879742e39fd23ca435b9e0c30f18d67bf30e71d153113dc4b7a6"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

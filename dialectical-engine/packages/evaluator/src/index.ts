@@ -2160,7 +2160,7 @@ export class EvaluatorHarvestRepository {
           ORDER BY entry.raw_artifact_ref,entry.attempt_id,entry.call_site_key,
             authenticated_evaluator_scope
         `, [runId,artifactRefs]);
-    // Reclaim resume (migration 0118): a copy that took the run over set the dead copy's nodes aside ('stale') and
+    // Reclaim resume (migration 0119): a copy that took the run over set the dead copy's nodes aside ('stale') and
     // wrote its own from the same recorded answers, so a stale node, its review, its judgement and its strength are
     // a duplicate of the live copy's and are not read. The raw artifacts above stay: UNION already folds a stale node
     // and its live copy (same provenance) into one artifact, and each artifact is a call that was made.

@@ -3246,7 +3246,7 @@ export class ServeRepository {
          AND NOT evaluator.ledger_entry_is_authenticated_scope(ledger_entry_id)
        ORDER BY sequence`, [runId]
     ), this.pool.query<{ node_id: string }>(
-      // Reclaim resume (migration 0118): a node a later copy set aside ('stale') is not one of the run's current nodes.
+      // Reclaim resume (migration 0119): a node a later copy set aside ('stale') is not one of the run's current nodes.
       `SELECT node_id::text FROM core.node WHERE run_id=$1 AND generation_status <> 'stale' ORDER BY created_at_seq`, [runId]
     ), this.pool.query<{ node_set: unknown; state: string; claim_deadline: Date | null }>(
       `SELECT node_set, state, claim_deadline FROM core.work_item WHERE run_id=$1`, [runId]
@@ -3376,7 +3376,7 @@ export class ServeRepository {
       .find((node) => node.node_id === nodeId) ?? null;
   }
 
-  /** Reclaim resume (migration 0118): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */
+  /** Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */
   private async readEdgesForRun(runId: string): Promise<Edge[]> {
     const result = await this.pool.query<{
       edge_id: string;
@@ -3417,7 +3417,7 @@ export class ServeRepository {
     }));
   }
 
-  /** Reclaim resume (migration 0118): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */
+  /** Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */
   private async readNodesForRun(runId: string, answerId?: string, answerVersion?: number): Promise<Node[]> {
     return withRunContentLease(this.pool,[runId],async () => {
     const result = await this.pool.query<{

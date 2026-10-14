@@ -19,7 +19,7 @@ const MAP = "0116_debate_shape_map.sql";
 /** The language check's site cost, chained after the map (question-language spec 2026-10-13). */
 const LANGUAGE_CHECK = "0117_language_check_spend.sql";
 /** The reclaim resume, chained after the language check (spec 2026-10-14-reclaim-resume-design). */
-const RECLAIM = "0118_reclaim_resume.sql";
+const RECLAIM = "0119_reclaim_resume.sql";
 const ROTATE = "identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)";
 const rows = async (db: TestDatabase, table: string) => (await db.pool.query(`SELECT * FROM ${table} ORDER BY 1`)).rows;
 const ledger = (db: TestDatabase) => rows(db, "public.debateai_schema_migration");
@@ -31,7 +31,7 @@ describe("data export forward115", () => {
   beforeAll(async () => { db = await startTestDatabase(); await migrate(db.pool); }, 180_000);
   afterAll(async () => { await db?.stop(); });
 
-  it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the map 0116, the language check 0117 and the reclaim resume 0118 with linked receipts", async () => {
+  it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the map 0116, the language check 0117 and the reclaim resume 0119 with linked receipts", async () => {
     const plan = await loadMigrationPlan();
     expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAP, LANGUAGE_CHECK, RECLAIM]);
     const names = (await ledger(db)).map(row => row.name).filter(name => name.startsWith("011"));

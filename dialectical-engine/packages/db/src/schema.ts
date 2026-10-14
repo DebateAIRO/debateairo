@@ -418,7 +418,7 @@ export const mapPosition = core.table("map_position", {
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
 });
 
-// Reclaim resume (0118): an answer's root moved from a root a later copy set aside ('stale') to that copy's own root.
+// Reclaim resume (0119): an answer's root moved from a root a later copy set aside ('stale') to that copy's own root.
 // Append-only, ids and codes only; the root in force is the last move's (packages/map's readMapChoiceForRun).
 export const mapPositionRepoint = core.table("map_position_repoint", {
   runId: uuid("run_id").notNull(),

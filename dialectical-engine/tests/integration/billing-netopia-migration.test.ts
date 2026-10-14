@@ -28,7 +28,7 @@ const MAP_MIGRATION = "0116_debate_shape_map.sql";
 /** The language check's site cost (question-language spec 2026-10-13), chained after the map's. */
 const LANGUAGE_CHECK_MIGRATION = "0117_language_check_spend.sql";
 /** The reclaim resume (spec 2026-10-14-reclaim-resume-design), chained after the language check's; migrate() applies it last. */
-const RECLAIM_MIGRATION = "0118_reclaim_resume.sql";
+const RECLAIM_MIGRATION = "0119_reclaim_resume.sql";
 const CHAIN = [NETOPIA_MIGRATION, AUTH_DB_BATCH, PART_C_MIGRATION, ROLE_ROTATION_MIGRATION, EXPORT_MIGRATION, MAP_MIGRATION, LANGUAGE_CHECK_MIGRATION, RECLAIM_MIGRATION] as const;
 const DEV_110 = "0110_account_erasure_public_debates.sql";
 const SUPERSEDING_VERIFIER = "lineage/verify-effective-capabilities-111.sql";

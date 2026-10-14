@@ -67,21 +67,21 @@ The new copy runs the debate from the start, exactly as a first copy would. Two 
      move to this copy's root is recorded in `core.map_position_repoint`, and the map's reader
      (`readMapChoiceForRun`, behind the debate page and the publication copy) serves the root in force.
 
-## The database change (chain step 0118)
+## The database change (chain step 0119)
 
 - `debateai_runtime` may `UPDATE (generation_status) ON core.node`; a trigger lets an update change ONLY
   `generation_status`, and only to `stale` from another value (never back), and never once the run has a
   `serve.answer` (NODE_RETIRE_AFTER_ANSWER: a served debate keeps its tree whoever asks). It replaces 0000's blanket
   `reject_mutation` on `core.node`; DELETE stays refused, and an erased encrypted run refuses the mark
-  (`PRIVATE_CONTENT_ERASED`). The chain refuses to start a runner while 0118 is pending, so no runner without the grant
+  (`PRIVATE_CONTENT_ERASED`). The chain refuses to start a runner while 0119 is pending, so no runner without the grant
   ever reaches the set-aside.
 - `core.map_position` itself cannot be changed: 0116's chain step digests its ACL and triggers on every later
   `migrate()`, so a grant or trigger there would read as drift. The move is a NEW append-only table,
   `core.map_position_repoint` (run, answer, from root, to root, maker; ids and codes only): a trigger allows a move only
   from the root in force, only when that root is stale, and only to a live node of the same run; 0040's erasure
   barrier refuses a move on an erased run.
-- Chain step files: `migrations/0118_reclaim_resume.sql`, `migrations/lineage/reclaim-resume-forward0118.json`,
-  `packages/db/src/migration-forward0118.ts`, appended last to `STEPS`.
+- Chain step files: `migrations/0119_reclaim_resume.sql`, `migrations/lineage/reclaim-resume-forward0119.json`,
+  `packages/db/src/migration-forward0119.ts`, appended last to `STEPS`.
 
 ## What does not change
 

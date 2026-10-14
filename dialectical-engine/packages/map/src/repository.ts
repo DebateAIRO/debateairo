@@ -32,7 +32,7 @@ export type MapAlsoRaisedRecord = Readonly<{ keyPointId: string; claim: string; 
 export type MapChoiceRecord = Readonly<{ opening: "MAP" | "TODAYS_OPENING"; answers: readonly MapChoiceAnswerRecord[];
   alsoRaised: readonly MapAlsoRaisedRecord[]; marks: readonly MapMark[] }>;
 /**
- * REPOINTED (writeMapPosition only, migration 0118): the answer's position already named a root that a copy which took
+ * REPOINTED (writeMapPosition only, migration 0119): the answer's position already named a root that a copy which took
  * the run over has set aside ('stale'), and now names the given root. A caller treats it as INSERTED.
  */
 export type MapWriteOutcome = "INSERTED" | "ALREADY_PRESENT" | "REPOINTED" | "RUN_ERASED";
@@ -40,7 +40,7 @@ export type MapWriteOutcome = "INSERTED" | "ALREADY_PRESENT" | "REPOINTED" | "RU
 const SENTINEL = JSON.stringify(CONTENT_JSON_SENTINEL);
 
 /**
- * Each position's root IN FORCE (migration 0118): the last re-point's root (the move no later move of the answer starts
+ * Each position's root IN FORCE (migration 0119): the last re-point's root (the move no later move of the answer starts
  * from), else the position's own; its maker likewise; and whether that root has been set aside ('stale'). Ids and codes
  * only. `$1` is the run; a caller may append `AND position.answer_id = $2`.
  */
@@ -213,8 +213,8 @@ export class MapChoiceRepository {
   /**
    * Which root argued a chosen answer, once that root is saved (ids and codes only: not a content carrier). A re-claimed
    * run finds the first pass's row (ALREADY_PRESENT). When that row's root in force has been set aside (reclaim resume,
-   * migration 0118: the copy that took the run over marked the dead copy's nodes 'stale' and saved its own), the
-   * answer's root moves to the given one: one append-only row of core.map_position_repoint (0118's trigger checks that
+   * migration 0119: the copy that took the run over marked the dead copy's nodes 'stale' and saved its own), the
+   * answer's root moves to the given one: one append-only row of core.map_position_repoint (0119's trigger checks that
    * the move starts from the root in force, which is stale, and ends on a live node of the run) — REPOINTED. The
    * position's root_index stays the first pass's. An erased run answers RUN_ERASED (0040's barrier on either table).
    */

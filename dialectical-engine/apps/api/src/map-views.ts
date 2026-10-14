@@ -120,7 +120,7 @@ function claimKey(claim: string): string {
  * order, and only the claims travel.
  * After a re-claim, `core.map_position` keeps the first pass's `root_node_id` (it is written
  * with ON CONFLICT DO NOTHING), but a copy that took the run over after a crash set that root
- * aside and moved the answer to its own root (migration 0118's `core.map_position_repoint`);
+ * aside and moved the answer to its own root (migration 0119's `core.map_position_repoint`);
  * `readMapChoiceForRun` carries the root in force, so the title shows. If the recorded node is
  * still not in the answer the position is dropped here: its title just does not show
  * (pre-flight PF-C19).

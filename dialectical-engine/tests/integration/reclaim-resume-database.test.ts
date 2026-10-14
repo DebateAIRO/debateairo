@@ -19,7 +19,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 
 /**
  * Reclaim resume, the database layer (spec docs/superpowers/specs/2026-10-14-reclaim-resume-design.md, "The database
- * change"; migration 0118). A copy that takes a run over after a crash sets the dead copy's nodes aside
+ * change"; migration 0119). A copy that takes a run over after a crash sets the dead copy's nodes aside
  * (generation_status 'stale') instead of deleting them, and moves each map answer's root from a stale root to its own.
  * Pinned here on real PostgreSQL: what the runtime role may and may not do to core.node and to the map's re-point
  * table, GraphRepository.retireNodes, MapChoiceRepository.writeMapPosition's REPOINTED, and that every reader of the
@@ -138,7 +138,7 @@ const statuses = async (runId: string): Promise<Record<string, string>> => Objec
   node_id: string; generation_status: string;
 }>(`SELECT node_id::text, generation_status FROM core.node WHERE run_id=$1`, [runId])).rows.map((row) => [row.node_id, row.generation_status]));
 
-describe("0118: the runtime role may set a node aside, and nothing else", () => {
+describe("0119: the runtime role may set a node aside, and nothing else", () => {
   async function oneNode(runId: string): Promise<string> {
     return new GraphRepository(database.pool).withGraphWrite(runId, (writer) => writer.addNode({
       runId, claimType: "unknown", generationStatus: "complete", pathStatus: "active", explorationDecision: "continue",
@@ -342,7 +342,7 @@ describe("every reader of the debate ignores a stale copy that shares its author
   });
 });
 
-// The map's re-point (0118's core.map_position_repoint): a minimal two-answer map, as
+// The map's re-point (0119's core.map_position_repoint): a minimal two-answer map, as
 // tests/integration/map-choice-repository.test.ts writes one.
 const seat = (n: number) => ({ aiRef: `preview:ref-${String(n)}`, maker: `maker-${String(n)}` });
 const MAP_RESULT = Object.freeze({
@@ -367,7 +367,7 @@ const MAP_RESULT = Object.freeze({
   notes: [], calls: []
 }) as MapResult;
 
-describe("0118: an answer's map root moves only from a stale root to a live node of the same run", () => {
+describe("0119: an answer's map root moves only from a stale root to a live node of the same run", () => {
   async function mappedRun(encrypted = false): Promise<{ runId: string; dead: Copy; live: Copy; repository: MapChoiceRepository }> {
     const runId = encrypted ? await encryptedRun() : await legacyRun();
     const authors = { root: await artifact(runId, "house-a"), child: await artifact(runId, "house-a") };

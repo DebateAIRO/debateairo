@@ -566,10 +566,10 @@ export class GraphRepository {
   }
 
   /**
-   * Reclaim resume (spec 2026-10-14, migration 0118): sets aside every node of the run that is not already set aside
+   * Reclaim resume (spec 2026-10-14, migration 0119): sets aside every node of the run that is not already set aside
    * and is not one of `keepNodeIds` (generation_status 'stale'), under the run's graph-write lock, and answers how many
    * it set aside. A copy that takes a run over calls it with no ids before it writes anything (the dead copy's nodes),
-   * and with its own saved ids before scoring (a dying copy that was still writing). 0118's trigger lets the runtime
+   * and with its own saved ids before scoring (a dying copy that was still writing). 0119's trigger lets the runtime
    * change nothing but that one column, one way: a stale node never comes back, and its readers skip it. It is the one
    * write that changes rows another copy saved, so it is FENCED on the claim (`RetireClaimFence`): a copy that lost
    * the work item gets RUNNER_CLAIM_LOST and changes nothing.

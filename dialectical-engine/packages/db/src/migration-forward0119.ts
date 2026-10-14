@@ -12,20 +12,20 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * 0117 keeps in force (0111's) stays in force and is named as its own. Its checks are its postcondition (below),
  * compared on every later migrate(); it has no supplemental verifier, so no replayVerifierSql.
  */
-const NAME='0118_reclaim_resume.sql';
-const VERSION='reclaim-resume-forward0118-v1';
-const MANIFEST_PATH='lineage/reclaim-resume-forward0118.json';
-const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0118 adds no billing relation or function, so it names the verifier in force (0111's, which 0112 to 0117 keep)
+const NAME='0119_reclaim_resume.sql';
+const VERSION='reclaim-resume-forward0119-v1';
+const MANIFEST_PATH='lineage/reclaim-resume-forward0119.json';
+const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0119 adds no billing relation or function, so it names the verifier in force (0111's, which 0112 to 0117 keep)
 const PREVIOUS='0117_language_check_spend.sql';
 const FUNCTIONS=['core.enforce_map_position_repoint()','core.reject_node_mutation_except_retire()'] as const;
 const NODE_TRIGGERS=['reject_mutation','reject_mutation_except_retire'] as const;
-const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0118_${detail}`);};
+const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0119_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 const exactKeys=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
 const digest=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
 
 /**
- * 0118's two trigger functions (owner, SECURITY DEFINER or not, search_path, volatility, definition digest and ACL);
+ * 0119's two trigger functions (owner, SECURITY DEFINER or not, search_path, volatility, definition digest and ACL);
  * core.node's guard triggers by name (0000's reject_mutation must stay ABSENT, reject_mutation_except_retire present:
  * name, enabled state, definition) and the runtime's column grants on core.node (UPDATE on generation_status only) and
  * its table grants there (no DELETE); and core.map_position_repoint whole (owner, ACL, columns, constraints, indexes,
@@ -63,7 +63,7 @@ async function postconditionEvidence(client:PoolClient):Promise<string>{
  return sha(JSON.stringify({functions,nodeTriggers,nodeRights,tables}));
 }
 
-export async function loadForward0118(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
+export async function loadForward0119(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
  const directory=new URL('../../../migrations/',import.meta.url);
  const bytes=await readFile(new URL(MANIFEST_PATH,directory));const raw:unknown=JSON.parse(bytes.toString('utf8'));
  if(!exactKeys(raw,['version','baseRecipeSha256','previous','migration','verifier'])||raw.version!==VERSION||raw.baseRecipeSha256!==anchor.baseRecipeSha256

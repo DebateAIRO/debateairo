@@ -52,7 +52,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
     // The auth DB batch (0112) follows 0111, Part C's 0113 follows it, role rotation's 0114 follows 0113, the data
     // export's 0115 follows 0114 (V-41), the debate shape's map (0116) follows 0115, the language check's site cost
-    // (0117) follows 0116, and the reclaim resume (0118) follows 0117 (migrations/lineage/README.md).
+    // (0117) follows 0116, and the reclaim resume (0119) follows 0117 (migrations/lineage/README.md).
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
@@ -61,7 +61,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0115_data_export.sql",
       "0116_debate_shape_map.sql",
       "0117_language_check_spend.sql",
-      "0118_reclaim_resume.sql"
+      "0119_reclaim_resume.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -110,7 +110,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0115_data_export.sql",
       "0116_debate_shape_map.sql",
       "0117_language_check_spend.sql",
-      "0118_reclaim_resume.sql"
+      "0119_reclaim_resume.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -153,7 +153,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0115_data_export.sql",
       "0116_debate_shape_map.sql",
       "0117_language_check_spend.sql",
-      "0118_reclaim_resume.sql"
+      "0119_reclaim_resume.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -192,7 +192,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0115_data_export.sql",
       "0116_debate_shape_map.sql",
       "0117_language_check_spend.sql",
-      "0118_reclaim_resume.sql"
+      "0119_reclaim_resume.sql"
     ]);
     expect(exportStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0116.json")).toString("utf8"));
@@ -231,7 +231,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0115_data_export.sql",
       "0116_debate_shape_map.sql",
       "0117_language_check_spend.sql",
-      "0118_reclaim_resume.sql"
+      "0119_reclaim_resume.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0117.json")).toString("utf8"));
@@ -259,7 +259,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(step!.replayVerifierSql).toBeUndefined();
   });
 
-  it("chains the reclaim resume 0118 after 0117: the recipe, 0117's manifest and the effective verifier 0117 keeps (0111's)", async () => {
+  it("chains the reclaim resume 0119 after 0117: the recipe, 0117's manifest and the effective verifier 0117 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
     const [netopia, , , , , , languageStep, step] = plan.forwardChain;
     expect(plan.forwardChain.map((entry) => entry.name)).toEqual([
@@ -270,25 +270,25 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0115_data_export.sql",
       "0116_debate_shape_map.sql",
       "0117_language_check_spend.sql",
-      "0118_reclaim_resume.sql"
+      "0119_reclaim_resume.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
-    const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0118.json")).toString("utf8"));
+    const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));
     expect(manifest).toEqual({
-      version: "reclaim-resume-forward0118-v1",
+      version: "reclaim-resume-forward0119-v1",
       baseRecipeSha256: plan.recipeSha256,
       previous: {
         name: "0117_language_check_spend.sql",
         manifestSha256: sha256(await bytesOf("lineage/language-check-spend-forward0117.json")),
         verifierSha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql"))
       },
-      migration: { name: "0118_reclaim_resume.sql", sha256: sha256(await bytesOf("0118_reclaim_resume.sql")) },
+      migration: { name: "0119_reclaim_resume.sql", sha256: sha256(await bytesOf("0119_reclaim_resume.sql")) },
       verifier: {
         path: "lineage/verify-effective-capabilities-111.sql",
         sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql"))
       }
     });
-    expect(step!.manifestSha256).toBe(sha256(await bytesOf("lineage/reclaim-resume-forward0118.json")));
+    expect(step!.manifestSha256).toBe(sha256(await bytesOf("lineage/reclaim-resume-forward0119.json")));
     expect(step!.previousName).toBe(languageStep!.name);
     expect(step!.previousManifestSha256).toBe(languageStep!.manifestSha256);
     expect(step!.previousVerifierSha256).toBe(languageStep!.verifierSha256);
@@ -374,19 +374,19 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(readme.replace(/\s+/gu, " ")).toContain("the debate shape's map (0116, below) the sixth, the language check's site cost (0117, below) the seventh");
   });
 
-  it("documents the reclaim resume 0118 as the step after 0117, with its manifest, its loader and the verifier it keeps", async () => {
+  it("documents the reclaim resume 0119 as the step after 0117, with its manifest, its loader and the verifier it keeps", async () => {
     const readme = (await bytesOf("lineage/README.md")).toString("utf8");
-    const section = readme.slice(readme.indexOf("## The reclaim resume (0118)"));
-    expect(section.startsWith("## The reclaim resume (0118)")).toBe(true);
-    for (const needle of ["0117", "0118_reclaim_resume.sql", "reclaim-resume-forward0118.json",
-      "verify-effective-capabilities-111.sql", "packages/db/src/migration-forward0118.ts", "replayVerifierSql",
+    const section = readme.slice(readme.indexOf("## The reclaim resume (0119)"));
+    expect(section.startsWith("## The reclaim resume (0119)")).toBe(true);
+    for (const needle of ["0117", "0119_reclaim_resume.sql", "reclaim-resume-forward0119.json",
+      "verify-effective-capabilities-111.sql", "packages/db/src/migration-forward0119.ts", "replayVerifierSql",
       "core.map_position_repoint", "core.reject_node_mutation_except_retire()", "reject_mutation_except_retire",
-      "generation_status", "MIGRATION_FORWARD0118_", "`STEPS`", "renumber"
+      "generation_status", "MIGRATION_FORWARD0119_", "`STEPS`", "renumber"
     ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
-    expect(readme.replace(/\s+/gu, " ")).toContain("the debate shape's map (0116, below) the sixth, the language check's site cost (0117, below) the seventh and the reclaim resume (0118, below) the eighth");
+    expect(readme.replace(/\s+/gu, " ")).toContain("the debate shape's map (0116, below) the sixth, the language check's site cost (0117, below) the seventh and the reclaim resume (0119, below) the eighth");
   });
 
-  it("refuses a changed 0111, 0113, 0114, 0116, 0117 or 0118, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
+  it("refuses a changed 0111, 0113, 0114, 0116, 0117 or 0119, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
     const root = await mkdtemp(join(tmpdir(), "forward-chain-111-"));
     try {
       await mkdir(join(root, "packages/db/src"), { recursive: true });
@@ -474,19 +474,19 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       // The same refusal when 0116's own manifest changes under 0117 (its bytes are what 0117 is bound to): 0116's own
       // loader reads its manifest by content, so a trailing line break leaves 0116 valid and refuses 0117 alone.
       await refusal("lineage/debate-shape-map-forward0116.json", (text) => `${text}\n`, "MIGRATION_FORWARD0117_MANIFEST");
-      // The reclaim resume 0118 changed by one character, and its manifest bound to 0116 instead of 0117.
-      await refusal("0118_reclaim_resume.sql", (text) => text.replace("NODE_RETIRE_ONE_WAY", "NODE_RETIRE_ONE_WAy"),
-        "MIGRATION_FORWARD0118_SOURCE_DIGEST");
+      // The reclaim resume 0119 changed by one character, and its manifest bound to 0116 instead of 0117.
+      await refusal("0119_reclaim_resume.sql", (text) => text.replace("NODE_RETIRE_ONE_WAY", "NODE_RETIRE_ONE_WAy"),
+        "MIGRATION_FORWARD0119_SOURCE_DIGEST");
       const mapDigest = sha256(await bytesOf("lineage/debate-shape-map-forward0116.json"));
-      await refusal("lineage/reclaim-resume-forward0118.json", (text) => {
+      await refusal("lineage/reclaim-resume-forward0119.json", (text) => {
         const manifest = JSON.parse(text);
         manifest.previous.name = "0116_debate_shape_map.sql";
         manifest.previous.manifestSha256 = mapDigest;
         return `${JSON.stringify(manifest, null, 2)}\n`;
-      }, "MIGRATION_FORWARD0118_MANIFEST");
-      // The same refusal when 0117's own manifest changes under 0118 (its bytes are what 0118 is bound to): 0117's own
-      // loader reads its manifest by content, so a trailing line break leaves 0117 valid and refuses 0118 alone.
-      await refusal("lineage/language-check-spend-forward0117.json", (text) => `${text}\n`, "MIGRATION_FORWARD0118_MANIFEST");
+      }, "MIGRATION_FORWARD0119_MANIFEST");
+      // The same refusal when 0117's own manifest changes under 0119 (its bytes are what 0119 is bound to): 0117's own
+      // loader reads its manifest by content, so a trailing line break leaves 0117 valid and refuses 0119 alone.
+      await refusal("lineage/language-check-spend-forward0117.json", (text) => `${text}\n`, "MIGRATION_FORWARD0119_MANIFEST");
       const extra = join(root, "migrations/0199_unbound_step.sql");
       await writeFile(extra, "SELECT 1;\n");
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_LINEAGE_REFUSED SOURCE_INVENTORY") });
