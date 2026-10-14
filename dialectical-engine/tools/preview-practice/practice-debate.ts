@@ -160,7 +160,7 @@ export type PracticeDebateResult = Readonly<{
   transcript?: Readonly<{ path: string | null; attempts: number; bytes: number; blanked: Readonly<Record<string, number>>; error: string | null }>;
 }>;
 
-const ROSTER_ORDER = Object.freeze(["JUDGE", "PANEL", "REVIEW", "SYNTHESIZER", "EVALUATOR", "STORYTELLER", "STORY_CHECKER", "UNMAPPED"]);
+const ROSTER_ORDER = Object.freeze(["MAP", "JUDGE", "PANEL", "REVIEW", "SYNTHESIZER", "EVALUATOR", "STORYTELLER", "STORY_CHECKER", "UNMAPPED"]);
 
 function modelOfRef(providerRef: string): string {
   return PREVIEW_PROVIDER_REF_MODELS[providerRef] ?? `unreviewed:${providerRef}`;

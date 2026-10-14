@@ -17,6 +17,7 @@ import { buildPreviewSourceRowsV2 } from "../../deploy/preview-auth-dev/v1/publi
 import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
 import { INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW, STAFF_ACCESS_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
 import { parsePracticeArgs } from "../../tools/preview-practice/practice.js";
+import { callFamilyOf, practiceMapStepOf, recheckReply } from "../../tools/preview-practice/practice-lanes.js";
 import { OPENINGS_QUESTIONS } from "../../tools/preview-practice/practice-openings-questions.js";
 import { PRACTICE_COMPARISON_QUESTION_IDS, practiceDebateQuestion } from "../../tools/preview-practice/practice-questions.js";
 import { practiceShapeOverrideFromArgs } from "../../tools/preview-practice/practice-shape.js";
@@ -195,5 +196,32 @@ describe("practice debate shape: the throwaway register version", () => {
     expect(next.rows).toHaveLength(base.length + 1);
     expect(JSON.parse(next.rows.find((entry) => entry.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)!.valueJsonText))
       .toEqual(JSON.parse(debateShapePolicyRow(debateShapePolicyStartValues(), PRACTICE_SHAPE_SOURCE_REF).valueJsonText));
+  });
+});
+
+describe("practice: map calls in the practice's own accounting", () => {
+  it("names the map family and step from the call-site key (spec §3.4: MAP:angles, MAP:list:<i>, MAP:list:<i>:2, MAP:merge, MAP:gap:<k>, MAP:choose)", () => {
+    for (const key of ["MAP:angles", "MAP:list:0", "MAP:list:3", "MAP:list:3:2", "MAP:merge", "MAP:gap:1", "MAP:choose"]) {
+      expect(callFamilyOf(key)).toBe("MAP");
+    }
+    // A failed list handed to another seat has its own key MAP:list:<i>:2 (P2b Task 1) and still counts as a list.
+    expect(["MAP:angles", "MAP:list:3", "MAP:list:3:2", "MAP:merge", "MAP:gap:2", "MAP:choose"].map(practiceMapStepOf))
+      .toEqual(["angles", "list", "list", "merge", "gap", "choose"]);
+    expect(practiceMapStepOf("MAP:other")).toBeNull();
+    expect(practiceMapStepOf("JUDGE:attack:root0")).toBeNull();
+    expect(callFamilyOf("JUDGE:review:abc")).toBe("REVIEW");
+  });
+
+  it("re-checks a map reply by its step's own schema", () => {
+    const point = (n: number) => ({ claim: `Point ${String(n)}`, why_it_matters: "It can change the answer.", leans: "context" });
+    expect(recheckReply("MAP:list:0", JSON.stringify({ points: [1, 2, 3].map(point), candidate_answers: ["Yes."] })))
+      .toEqual({ family: "MAP", issues: [] });
+    // A snowball reply (no minimum) under the same list key is accepted too.
+    expect(recheckReply("MAP:list:1", JSON.stringify({ points: [], candidate_answers: [] })).issues).toEqual([]);
+    expect(recheckReply("MAP:angles", JSON.stringify({ angles: [] })).issues.length).toBeGreaterThan(0);
+    expect(recheckReply("MAP:choose", JSON.stringify({ answers: [] })).issues.length).toBeGreaterThan(0);
+    expect(recheckReply("MAP:merge", "not json").issues.length).toBeGreaterThan(0);
+    expect(recheckReply("MAP:other", "{}")).toEqual({ family: "MAP", issues: ["UNMAPPED"] });
+    expect(recheckReply("SOMETHING:ELSE", "{}")).toEqual({ family: "UNMAPPED", issues: ["UNMAPPED"] });
   });
 });

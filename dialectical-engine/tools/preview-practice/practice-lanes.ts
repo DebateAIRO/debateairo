@@ -26,6 +26,15 @@ import {
   type JudgeLeg
 } from "@debateai/judgement";
 import {
+  mapAnglesReplySchema,
+  mapChooseReplySchema,
+  mapClassifyReply,
+  mapGapReplySchema,
+  mapListReplySchema,
+  mapMergeReplySchema,
+  mapSnowballReplySchema
+} from "@debateai/map";
+import {
   decodeModelJson,
   promptContractFingerprintText,
   rememberingAcceptedReply,
@@ -129,10 +138,11 @@ export function replyContentOf(rawText: string): string {
   return rawText;
 }
 
-export type PracticeCallFamily = "JUDGE" | "PANEL" | "REVIEW" | "SYNTHESIZER" | "EVALUATOR" | "STORYTELLER" | "STORY_CHECKER" | "UNMAPPED";
+export type PracticeCallFamily = "MAP" | "JUDGE" | "PANEL" | "REVIEW" | "SYNTHESIZER" | "EVALUATOR" | "STORYTELLER" | "STORY_CHECKER" | "UNMAPPED";
 
 /** Which job a debate call was, from its call-site key (apps/runner/src/index.ts and packages/story naming). */
 export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
+  if (callSiteKey.startsWith("MAP:")) return "MAP";
   if (callSiteKey.startsWith("STORY:STORYTELLER:")) return "STORYTELLER";
   if (callSiteKey.startsWith("STORY:CHECKER:")) return "STORY_CHECKER";
   if (callSiteKey.startsWith("COMPOSER:SYNTHESIZER:")) return "SYNTHESIZER";
@@ -141,6 +151,45 @@ export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
   if (callSiteKey.startsWith("JUDGE:review:")) return "REVIEW";
   if (callSiteKey === "JUDGE" || callSiteKey.startsWith("JUDGE:")) return "JUDGE";
   return "UNMAPPED";
+}
+
+/** The map's steps as their call-site keys name them (spec 2026-10-12 §3.4). */
+export const PRACTICE_MAP_STEPS = Object.freeze(["angles", "list", "merge", "gap", "choose"] as const);
+export type PracticeMapStep = typeof PRACTICE_MAP_STEPS[number];
+
+/**
+ * `MAP:angles` → angles, `MAP:list:<i>` → list, `MAP:gap:<k>` → gap, …; null for any other key. Only the second
+ * segment is read, so a reassigned list (`MAP:list:<i>:2`, P2b Task 1) is a list too.
+ */
+export function practiceMapStepOf(callSiteKey: string): PracticeMapStep | null {
+  const [family, step] = callSiteKey.split(":");
+  if (family !== "MAP" || step === undefined) return null;
+  return (PRACTICE_MAP_STEPS as readonly string[]).includes(step) ? step as PracticeMapStep : null;
+}
+
+/**
+ * The schemas a map step's reply may have. The list key carries both the list and (in a snowball opening) the
+ * snowball reply, so either is accepted. The steps' own content checks need the run's ids and are not re-run here:
+ * the schema re-check is the diagnosis, the call-time check is the verdict.
+ */
+const MAP_RECHECK_SCHEMAS: Readonly<Record<PracticeMapStep, readonly Parameters<typeof mapClassifyReply>[2][]>> = Object.freeze({
+  angles: [mapAnglesReplySchema],
+  list: [mapListReplySchema, mapSnowballReplySchema],
+  merge: [mapMergeReplySchema],
+  gap: [mapGapReplySchema],
+  choose: [mapChooseReplySchema]
+});
+
+function recheckMapReply(callSiteKey: string, content: string): readonly string[] {
+  const step = practiceMapStepOf(callSiteKey);
+  if (step === null) return Object.freeze(["UNMAPPED"]);
+  let first: readonly string[] | null = null;
+  for (const schema of MAP_RECHECK_SCHEMAS[step]) {
+    const issues = fromClassification(mapClassifyReply(content, undefined, schema, () => []).classification);
+    if (issues.length === 0) return issues;
+    first ??= issues;
+  }
+  return first ?? Object.freeze(["UNMAPPED"]);
 }
 
 /**
@@ -280,6 +329,7 @@ export function recheckReply(callSiteKey: string, content: string, reviewEdgeCou
       }
       return { family, issues: fromZod(StoryBodySchema.safeParse(parsed)) };
     }
+    case "MAP": return { family, issues: recheckMapReply(callSiteKey, content) };
     default: return { family, issues: Object.freeze(["UNMAPPED"]) };
   }
 }
