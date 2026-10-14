@@ -61,13 +61,15 @@ vi.mock("../../tools/preview-practice/practice-ask-composition.js", () => ({
   composePracticeAsk: vi.fn(async (input: { settings: PracticeSettings }) => {
     seen.askVersions.push(input.settings.runner.REGISTER_VERSION);
     // Admits nothing: the debate ends as an ask that was not dispatched, after the request was handed over.
-    return { application: { submit: async (request: Record<string, unknown>) => { seen.requests.push(request); } } };
+    // Local mode, as the real composition returns it (hosted: null); submit answers QUEUED as the real ask does.
+    return { application: { submit: async (request: Record<string, unknown>) => { seen.requests.push(request); return { status: "QUEUED" }; } },
+      hosted: null };
   })
 }));
 vi.mock("../../tools/preview-practice/practice-runner-composition.js", () => ({
   composePracticeRunner: vi.fn(async (input: { environment: { REGISTER_VERSION: number } }) => {
     seen.runnerVersions.push(input.environment.REGISTER_VERSION);
-    return { runner: {}, callStats: { summary: () => ({}) } };
+    return { runner: {}, callStats: { summary: () => ({}) }, money: null };
   })
 }));
 
