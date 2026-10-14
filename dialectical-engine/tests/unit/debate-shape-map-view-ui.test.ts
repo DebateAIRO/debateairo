@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ContractHttpError, type Answer, type DebateMapView } from "@debateai/contract";
 import { positionAiName, positionTitlesFrom, readAnswerMapView, type PositionTitleNode } from "../../apps/ui/lib/v3/mapView.js";
 import { getDebateBundle } from "../../apps/ui/lib/api.js";
 import { PREVIEW_MODEL_MAKERS } from "../../apps/ui/lib/previewPlanRoster.js";
+import { modelFamilyName, modelMeta } from "../../apps/ui/lib/models.js";
 import { STORY_FIXTURE_ANSWER } from "../../apps/ui/lib/v3/storyFixture.js";
 
 /** Debate shape P2c: the owner page reads the map view beside the answer, and titles each position with it. */
@@ -112,5 +114,26 @@ describe("debate shape P2c — positionTitlesFrom", () => {
     expect(positionTitlesFrom(view("  Move now?! "), nodes, ENGLISH_TITLE).get("n-yes")).toBe("The case for Move now, argued by GPT");
     expect(positionTitlesFrom(view("现在搬。"), nodes, ENGLISH_TITLE).get("n-yes")).toBe("The case for 现在搬, argued by GPT");
     expect(positionTitlesFrom(view(" ?! "), nodes, ENGLISH_TITLE).size).toBe(0);
+  });
+});
+
+// P2c fix wave (Task 11 follow-up): the four family names live in lib/models.ts alone; the titles ask it, so a family
+// renamed there renames its titles too.
+describe("debate shape P2c — one copy of the family names", () => {
+  it("modelFamilyName gives the plain family name modelMeta gives, with no catalogue, and nothing for a local or unknown model", () => {
+    for (const id of ["claude-sonnet-4", "gpt-5", "openai/o3-mini", "gemini-2.5-pro", "grok-4.5-high-loop"]) {
+      expect(modelFamilyName(id), id).toBe(modelMeta(id).name);
+    }
+    expect(modelFamilyName("qwen3-32b")).toBeNull();
+    expect(modelFamilyName("claude-local-test")).toBeNull();
+    expect(modelFamilyName("acme-lab/acme-7b-chat")).toBeNull();
+  });
+
+  it("mapView.ts keeps no copy of the names and asks lib/models.ts", () => {
+    // The code, without its comments (a comment may quote a name as an example).
+    const source = readFileSync(new URL("../../apps/ui/lib/v3/mapView.ts", import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//gu, "").replace(/^\s*\/\/.*$/gmu, "");
+    expect(source).toMatch(/modelFamilyName\(/u);
+    for (const name of ['"Claude"', '"GPT"', '"Gemini"', '"Grok"']) expect(source, name).not.toContain(name);
   });
 });

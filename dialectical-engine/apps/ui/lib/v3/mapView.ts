@@ -1,5 +1,5 @@
 import { ContractHttpError, type Answer, type ContractClient, type DebateMapView } from "@debateai/contract";
-import { modelKey } from "../models.js";
+import { modelFamilyName } from "../models.js";
 import { PREVIEW_MODEL_MAKERS } from "../previewPlanRoster.js";
 import { t, type MessageCatalog } from "../i18n/translate.js";
 
@@ -29,15 +29,6 @@ export type PositionTitleLineage = Readonly<{ maker: string; model_id: string }>
 /** The two members of an answer's (owner) or a snapshot's (public) node a title needs. */
 export type PositionTitleNode = Readonly<{ node_id: string; maker_lineage: PositionTitleLineage | null }>;
 
-/**
- * The model families named by a plain family name in every language, by their `modelKey`: the
- * names `modelMeta` gives them. Read here by key, so no catalogue is involved (`modelMeta` reads
- * the interface's compose words, which a title in the question's language must not use).
- */
-const PLAIN_FAMILY_NAMES: ReadonlyMap<string, string> = new Map([
-  ["claude", "Claude"], ["gpt", "GPT"], ["gemini", "Gemini"], ["grok", "Grok"]
-]);
-
 /** A recorded maker that reads as a display name: no id, path or code characters. */
 const PLAIN_MAKER_NAME = /^[\p{L}\p{N}][\p{L}\p{N} .&'-]{0,39}$/u;
 
@@ -55,8 +46,10 @@ const ANSWER_CLOSE = /[\s.!?。！？؟]+$/u;
  */
 export function positionAiName(lineage: PositionTitleLineage): string | null {
   const modelId = lineage.model_id;
-  const family = PLAIN_FAMILY_NAMES.get(modelKey(modelId));
-  if (family !== undefined && !modelId.toLowerCase().includes("local")) return family;
+  // lib/models.ts's own family names, read with no catalogue (`modelMeta` reads the interface's compose words, which a
+  // title in the question's language must not use).
+  const family = modelFamilyName(modelId);
+  if (family !== null) return family;
   const previewMaker = Object.hasOwn(PREVIEW_MODEL_MAKERS, modelId) ? PREVIEW_MODEL_MAKERS[modelId] : undefined;
   if (previewMaker !== undefined) return previewMaker;
   const maker = lineage.maker.trim();
