@@ -183,7 +183,14 @@ export type PracticeNextRegisterVersion = Readonly<{
 }>;
 
 export type PracticeRegisterImportReceipt = Readonly<{
+  /**
+   * The version the debate ran on. As the import returns it: the export's newest version, or the code's next one
+   * (`--register-next`). In a debate's report, after `--shape-policy` published the practice's own version on top, that
+   * version (final review M-2), and the imported newest version moves to `importedRegisterVersion`.
+   */
   registerVersion: string;
+  /** Only when the practice's own debate-shape version was published on top: the newest version the import brought in. */
+  importedRegisterVersion?: string;
   steps: readonly PracticeRegisterImportStep[];
   /** Present when the practice runs on the code's next version (`--register-next`): what that version changed. */
   codeNext?: Readonly<{ baseRegisterVersion: string; addedKeys: readonly string[]; changedKeys: readonly string[]; deltaSha256: string }>;

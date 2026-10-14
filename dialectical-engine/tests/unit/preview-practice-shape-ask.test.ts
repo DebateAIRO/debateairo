@@ -116,20 +116,29 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     expect(seen.requests[0]!.question_line).toBe(OPENINGS_QUESTIONS.find((question) => question.id === "ro-euro")!.questionLine);
     expect(result.questionId).toBe("ro-euro");
     expect(result.admission).toMatchObject({ admitted: false, refusalCode: "NOT_DISPATCHED" });
+    // Final review M-2: report.json's register block names the version the debate ran on (as shape.registerVersion and
+    // the transcript do), with the imported newest (live) version kept under its own name.
+    expect(result.register).toEqual({ registerVersion: "6", importedRegisterVersion: "5", steps: [] });
+    expect(result.shape?.registerVersion).toBe("6");
   });
 
   it("--shape-policy with --register-next: nothing more is published; the code's next version (6), which carries the row, is read", async () => {
     seen.receipt = codeNext([DEBATE_SHAPE_POLICY_ROW_KEY]);
     seen.versions.add("6");
     seen.rows.set(6, debateShapePolicyStartValues());
-    await debate({ registerNext: {} as never, shape: { policy: debateShapePolicyStartValues(), ask: ASK } });
+    const result = await debate({ registerNext: {} as never, shape: { policy: debateShapePolicyStartValues(), ask: ASK } });
     expect(seen.published).toEqual([]);
     expect([seen.readVersions, seen.askVersions, seen.runnerVersions]).toEqual([[6], [6], [6]]);
     expect(seen.requests[0]!.depth_params).toEqual({ depth: 1, depthMode: "fixed", scrutiny: "deep", answerLength: "short" });
+    // The import's receipt already names the code's next version: it is reported as it is (M-2).
+    expect(result.register).toBe(seen.receipt);
+    expect(result.shape?.registerVersion).toBe("6");
   });
 
   it("no shape: today's debate (the live version, depth only, nothing published)", async () => {
-    await debate({});
+    const result = await debate({});
+    // Row absent: report.json's register block stays today's receipt, byte for byte (M-2).
+    expect(result.register).toBe(LIVE);
     expect(seen.published).toEqual([]);
     expect([seen.askVersions, seen.runnerVersions]).toEqual([[5], [5]]);
     expect(seen.requests[0]!.depth_params).toEqual({ depth: 1 });

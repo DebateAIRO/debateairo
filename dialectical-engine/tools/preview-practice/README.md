@@ -247,7 +247,9 @@ With the row, `report.json` gains a `shape` block, and `report.md` a "Debate sha
 block holds:
 
 - `source`: FLAG for `--shape-policy`, REGISTER for a register that already holds the row;
-- `registerVersion`: the throwaway version the debate ran on;
+- `registerVersion`: the throwaway version the debate ran on. `report.json`'s `register` block names the same version;
+  when the practice published its own version on top (`--shape-policy` without `--register-next`), that block keeps the
+  export's newest version as `importedRegisterVersion`;
 - `row`: ADDED or REPLACED;
 - `asked`: the three settings as given;
 - `storedDepthParams`: what the ask path stored for the run;

@@ -410,6 +410,10 @@ export async function runPracticeDebate(input: Readonly<{
     }
     // The version both compositions read: the live one, the code's next one, or the practice's own.
     const registerVersion = String(settings.runner.REGISTER_VERSION);
+    // report.json's register block names that same version (final review M-2): on the practice's own version the
+    // import's receipt names the export's newest, which is kept beside it under its own name. Else the receipt as it is.
+    const reportedRegister: PracticeRegisterImportReceipt = shapeVersion === null ? receipt
+      : Object.freeze({ ...receipt, registerVersion: shapeVersion.registerVersion, importedRegisterVersion: receipt.registerVersion });
     // FLAG only: what the debate-shape row did in that version (with --register-next, as the code's next version's delta).
     const shapeRowChange: "ADDED" | "REPLACED" | null = shapeVersion !== null ? shapeVersion.row
       : input.shape === undefined || input.shape.policy === null || receipt.codeNext === undefined ? null
@@ -518,7 +522,7 @@ export async function runPracticeDebate(input: Readonly<{
       remaining.deepinfra.after = await readRemaining(remainingPorts.deepinfra);
       remaining.anthropic.after = await readRemaining(remainingPorts.anthropic);
       return Object.freeze({
-        register: receipt, questionId: question.id, depth: input.depth,
+        register: reportedRegister, questionId: question.id, depth: input.depth,
         admission: { admitted: false, refusalCode: refusalCode ?? "NOT_DISPATCHED", panel: [], satOut: [], rotation: null },
         run: { runId: null, workItemOutcome: null, failureCode: null, answer: null, story: null },
         byModelAndSite: [], probes, failures: [], formatFailures: 0, callsByModel: {}, repairKindsByModel: {}, answersByModel: {}, jsonRepairs: [],
@@ -633,7 +637,7 @@ export async function runPracticeDebate(input: Readonly<{
     remaining.deepinfra.after = await readRemaining(remainingPorts.deepinfra);
     remaining.anthropic.after = await readRemaining(remainingPorts.anthropic);
     return Object.freeze({
-      register: receipt, questionId: question.id, depth: input.depth,
+      register: reportedRegister, questionId: question.id, depth: input.depth,
       admission: Object.freeze({
         admitted: true, refusalCode: null,
         panel: panelFacts,
