@@ -6,7 +6,7 @@ import type { EldDatabaseSize, EldReading, EldSegmentReading } from "./eld.js";
  * more than 20% digits are left out: 1,518 of 17,862), and eld settles only on its plain-word reading (eld.ts `read`:
  * the plain words of every clause, read together; names, brands and codes never decide). Confident = isReliable() AND
  * at least `minLetters` plain letters. Chosen by chooseEldTuning: no Romanian/English confusion, no
- * Romanian-without-diacritics sentence read as anything else, at most 0.05% of sentences readable as another of our
+ * Romanian-without-diacritics sentence read as anything else, at most one sentence in two thousand readable as another of our
  * languages, then the most questions settled with no fast call.
  *
  * size    minLetters sentences settlesOwnSite wrongLockable wrongLockableRoEn roPlainSettles roPlainWrong
