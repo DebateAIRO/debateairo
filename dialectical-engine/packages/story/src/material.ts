@@ -316,7 +316,7 @@ const STORY_TOP_LEVERAGE = 10;
 /** Ladder steps 6 and 7 spare this many highest-leverage points (positions are not ranked). */
 const STORY_KEPT_LEVERAGE = 20;
 /** Debate shape P2c: at most this many also-raised points reach the material, most-raised first. */
-export const STORY_ALSO_RAISED_MAX = 12;
+const STORY_ALSO_RAISED_MAX = 12;
 /** An also-raised claim is cut to this many characters, or to the ladder step's claim cut when that is shorter. */
 const STORY_ALSO_RAISED_CLAIM_CHARS = 240;
 

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StoryBody, StoryVerdictBasis } from "@debateai/contract";
 import {
-  STORY_ALSO_RAISED_MAX,
   STORY_ANSWERS_NOTE_ANSWERS_FILLED,
   STORY_ANSWERS_NOTE_MAP_UNAVAILABLE,
   STORY_ENGINE_TOKENS,
@@ -165,8 +164,7 @@ describe("debate shape P2c — also raised, not debated, in the story material",
     expect(checker.indexOf("also_raised")).toBeLessThan(checker.indexOf("candidate_story"));
   });
 
-  it(`keeps at most ${String(STORY_ALSO_RAISED_MAX)} points, drops blank claims and counts a bad count as one`, () => {
-    expect(STORY_ALSO_RAISED_MAX).toBe(12);
+  it("keeps at most 12 points, drops blank claims and counts a bad count as one", () => {
     const many = Array.from({ length: 20 }, (_, index) => ({ claim: `Point number ${String(index)}.`, raisedBy: 1 }));
     const result = built(build({ alsoRaised: [{ claim: "   ", raisedBy: 5 }, { claim: "Odd count.", raisedBy: Number.NaN }, ...many] }));
     const items = fieldOf(result, "also_raised") as StoryMaterialAlsoRaised[];

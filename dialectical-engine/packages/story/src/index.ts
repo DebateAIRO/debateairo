@@ -33,7 +33,6 @@ export {
   type StoryMaterialIndex
 } from "./validate.js";
 export {
-  STORY_ALSO_RAISED_MAX,
   STORY_ANSWERS_NOTE_ANSWERS_FILLED,
   STORY_ANSWERS_NOTE_MAP_UNAVAILABLE,
   STORY_ENGINE_TOKENS,
