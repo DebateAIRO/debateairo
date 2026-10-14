@@ -4681,7 +4681,12 @@ export class PostgresAskApplication implements AskApplication {
           if (error instanceof TypedDomainError) markAskRefusal(error);
           throw error;
         });
-    let shapePlan: DebateShapePlanKey = debateShapePlanKeyOf(null, requestedAsk.plan_tier);
+    // An unknown tier (a direct caller; the route's schema admits only free and premium) is refused by today's typed
+    // check further on — `#submitWithRoom`'s first line, or `evaluateAskAdmission` after the daily guard — so until
+    // then it is keyed as Free, the narrowest plan, instead of `debateShapePlanKeyOf` throwing a raw TypeError first.
+    // With billing on, the key is re-derived below from the plan the server resolved.
+    let shapePlan: DebateShapePlanKey = Object.hasOwn(PLAN_TIER_ROSTERS, requestedAsk.plan_tier as string)
+      ? debateShapePlanKeyOf(null, requestedAsk.plan_tier) : "free";
     let ask: AskRequest = normaliseAskForDebateShape(requestedAsk, shapePolicy, shapePlan);
     let plannedAsk: AskRequest = ask;
     let applied: AskApplied | null = null;
