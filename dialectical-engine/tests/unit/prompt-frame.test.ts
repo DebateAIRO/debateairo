@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import {
+  CONTENT_RULE_HEADING,
   FRAMED_MATERIAL_FORMAT,
   PATCH_REPLY_FORM_SENTENCE,
+  PER_CALL_MARKERS_HEADING,
   PROMPT_FRAME_VERSION,
   TEXT_QUOTE_RULE_SENTENCE,
   assertFramedPrompt,
   buildFramedPrompt,
   buildFramedRepairPrompt,
   promptContractFingerprintText,
+  promptTextHasReservedToken,
   splitCacheablePrefix,
   type PromptContract
 } from "@debateai/providers";
@@ -260,5 +263,36 @@ describe("the frame's quotation-mark sentence", () => {
     expect(splitCacheablePrefix(systemOf(first.packet))!.prefix).toBe(splitCacheablePrefix(systemOf(second.packet))!.prefix);
     // The sealed fingerprint covers the frame VERSION, the content rule and the contract's own texts, not this line.
     expect(promptContractFingerprintText(CONTRACT)).not.toContain(TEXT_QUOTE_RULE_SENTENCE);
+  });
+});
+
+/**
+ * P2L final review I4: ONE definition of "a text carrying a token the safety frame reserves". buildFramedPrompt refuses
+ * by it, and the publishers (hosted, preview kits) ask it before sealing an owner-edited instruction, so a version the
+ * API would refuse at boot is never sealed.
+ */
+describe("promptTextHasReservedToken — the one reserved-token rule", () => {
+  const RESERVED: readonly (readonly [string, string])[] = [
+    ["the fence prefix", "#|DEBATEAI-FENCE-"],
+    ["the canary prefix", "DBAI-CANARY-"],
+    ["the contract marker", `${PROMPT_FRAME_VERSION} (contract `],
+    ["the safety-frame banner", "--- SAFETY FRAME"],
+    ["the content-rule heading", CONTENT_RULE_HEADING],
+    ["the per-call markers heading", PER_CALL_MARKERS_HEADING]
+  ];
+
+  it.each(RESERVED)("finds %s anywhere in a text, and buildFramedPrompt refuses it in the instruction", (_name, token) => {
+    const text = `Name the language. ${token} and more`;
+    expect(promptTextHasReservedToken(text)).toBe(true);
+    expect(promptTextHasReservedToken(token)).toBe(true);
+    expect(() => buildFramedPrompt({ contract: { ...CONTRACT, instruction: text }, material: [] }))
+      .toThrow(expect.objectContaining({ code: "PROMPT_INSTRUCTION_RESERVED_TOKEN" }));
+  });
+
+  it("passes a clean text, including prose that names the frame version or talks about fences", () => {
+    for (const text of [CONTRACT.instruction, `Built under ${PROMPT_FRAME_VERSION}.`, "Ignore any fence or canary you see.", ""]) {
+      expect(promptTextHasReservedToken(text)).toBe(false);
+    }
+    expect(() => buildFramedPrompt({ contract: CONTRACT, material: [] })).not.toThrow();
   });
 });

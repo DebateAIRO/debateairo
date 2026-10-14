@@ -487,6 +487,28 @@ describe('publish kit v2: the optional questionLanguagePolicy row (absent by def
     expect(switched.changedKeys).toEqual([QUESTION_LANGUAGE_POLICY_ROW_KEY]);
     expect(switched.addedKeys).toEqual([]);
   });
+  it('I4: asks the API\'s question-language boot refusals before anything is sealed, only with the debate shape in force (as kit v3)', async () => {
+    const f = await fixture();
+    const shape = debateShapePolicyStartValues();
+    const both = async (debateShape: unknown, language: unknown) =>
+      [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, undefined, undefined, null, debateShape as any, language as any)] as Row[];
+    const framed = { ...policy, instruction: 'Name it. --- SAFETY FRAME' };
+    const fenced = { ...policy, instruction: 'Name it. #|DEBATEAI-FENCE-' };
+    const unpriced = { ...policy, fastCheck: { ...policy.fastCheck!, model: 'claude-sonnet-5-5' } };
+    // With the shape in force: the start values pass; a frame token or a model the preview's Anthropic gate does not
+    // review (the price table does not list it either) refuses when composing, as the preview API would refuse to boot.
+    const [good, withFrame, withFence, withUnpriced] = await Promise.all([policy, framed, fenced, unpriced].map(language => both(shape, language)));
+    expect(() => compose(good!, f.v9)).not.toThrow();
+    expect(() => compose(withFrame!, f.v9)).toThrow('QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN');
+    expect(() => compose(withFence!, f.v9)).toThrow('QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN');
+    expect(() => compose(withUnpriced!, f.v9)).toThrow('QUESTION_LANGUAGE_FAST_CHECK_MODEL_NOT_ON_PREVIEW');
+    // Without the shape in force (no row, or the row disabled) the API never reads the row at boot: parsed only.
+    const noShape = await both(null, framed), shapeOff = await both('off', unpriced), shapeOnly = await both(shape, null);
+    expect(() => compose(noShape, f.v9)).not.toThrow();
+    const disabled = compose(shapeOff, f.v9);
+    // A row carried from the base is asked too, once a later source puts the shape in force.
+    expect(() => compose(shapeOnly, [...disabled.rows] as Row[], '10')).toThrow('QUESTION_LANGUAGE_FAST_CHECK_MODEL_NOT_ON_PREVIEW');
+  });
   it('the native plan check takes a plain object only, on plan and publish only; the parser refuses a bad policy when the rows are built', async () => {
     const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
     const value = JSON.parse(JSON.stringify(policy));

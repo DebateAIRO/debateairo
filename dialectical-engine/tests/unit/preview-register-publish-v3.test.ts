@@ -318,6 +318,17 @@ describe('publish kit v3: the optional questionLanguagePolicy row (ruling L-KIT,
     await expect(composed(null, framed)).resolves.toBeDefined();
     await expect(composed('off', offPreview)).resolves.toBeDefined();
   });
+
+  it('I4: refuses every reserved frame token (the providers\' one rule) and a model the price table does not list, before sealing', async () => {
+    const f = await fixture();
+    const composed = async (language: unknown) => compose(await v3(shape, language), f.v12);
+    for (const token of ['#|DEBATEAI-FENCE-', 'DBAI-CANARY-', 'debateai.prompt-frame.v2 (contract ', '--- SAFETY FRAME', 'CONTENT RULE debateai.content-rule.v1', '--- PER-CALL MARKERS (engine) ---']) {
+      await expect(composed({ ...policy, instruction: `Name it. ${token}x` })).rejects.toThrow('QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN');
+    }
+    // claude-sonnet-5-5 is on no reviewed row: the preview gate does not review it and no price exists for it.
+    await expect(composed({ ...policy, fastCheck: { ...policy.fastCheck!, model: 'claude-sonnet-5-5' } })).rejects.toThrow('QUESTION_LANGUAGE_FAST_CHECK_MODEL_NOT_ON_PREVIEW');
+    await expect(composed({ ...policy, fastCheck: null, instruction: 'Name the language.' })).resolves.toBeDefined();
+  });
 });
 
 describe('the native operator chooses the kit by the plan', () => {

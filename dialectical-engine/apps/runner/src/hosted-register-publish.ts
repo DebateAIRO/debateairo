@@ -88,6 +88,8 @@ import {
   assertDeploymentProviderTargets,
   assertPricedProviderTargets,
   parseProviderDiscoveryTargets,
+  previewModelRow,
+  promptTextHasReservedToken,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import {
@@ -125,6 +127,10 @@ import {
   QUESTION_LANGUAGE_POLICY_ROW_KEY,
   parseQuestionLanguagePolicy,
   questionLanguagePolicyRow,
+  questionLanguagePolicyStartValues,
+  readDebateShapePolicy,
+  readQuestionLanguagePolicy,
+  type QuestionLanguagePolicy,
   callTokenCeilingsFromValues,
   computeRegisterSnapshotSha256,
   composeStaffPolicyRegisterPublicationRows,
@@ -835,19 +841,52 @@ function debateShapeRowOf(member: unknown, sourceRef: string): Readonly<{
 }
 
 /**
+ * P2L final review I4: what the hosted API's question-language boot step (apps/api/src/question-language/boot.ts, run
+ * with the debate shape in force and no preview configured) refuses of a parsed policy, asked here without the API:
+ *  · an owner instruction carrying a token the safety frame reserves (QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN) —
+ *    the providers' one rule, promptTextHasReservedToken, the same buildFramedPrompt refuses by;
+ *  · a fast check whose model is not an Anthropic row of the reviewed provider price table
+ *    (QUESTION_LANGUAGE_FAST_CHECK_MODEL_UNPRICED, boot.ts pricedFastCheckRow: the same table, the same condition).
+ * The fast check switched off (`fastCheck: null`) is never priced, so its model is never asked.
+ */
+function hostedQuestionLanguageBootable(policy: QuestionLanguagePolicy): boolean {
+  if (promptTextHasReservedToken(policy.instruction)) return false;
+  return policy.fastCheck === null || previewModelRow(policy.fastCheck.model)?.provider === "anthropic";
+}
+
+/**
  * The questionLanguagePolicy row for the file's optional member (question-language spec 2026-10-13), exactly as
  * debateShapeRowOf: the member is the policy without its `kind`; a member that is not an object, carries `kind`, or
  * that the register's own parser refuses is refused with the file's own code, so a malformed member never seals.
+ * I4: so is a member the hosted API would refuse at boot (hostedQuestionLanguageBootable): a sealed version cannot be
+ * edited, so it is refused here, before anything is sealed, whether or not this file puts the debate shape in force.
  */
 function questionLanguageRowOf(member: unknown, sourceRef: string): ReturnType<typeof questionLanguagePolicyRow> {
   if (typeof member !== "object" || member === null || Array.isArray(member) || Object.hasOwn(member, "kind")) {
     return refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
   }
+  let policy: QuestionLanguagePolicy;
+  let row: ReturnType<typeof questionLanguagePolicyRow>;
   try {
-    return questionLanguagePolicyRow(parseQuestionLanguagePolicy({ kind: "QUESTION_LANGUAGE_POLICY", ...member }), sourceRef);
+    policy = parseQuestionLanguagePolicy({ kind: "QUESTION_LANGUAGE_POLICY", ...member });
+    row = questionLanguagePolicyRow(policy, sourceRef);
   } catch {
     return refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
   }
+  return hostedQuestionLanguageBootable(policy) ? row : refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+}
+
+/**
+ * I4, the readiness half: the API's question-language boot step over the SEALED version, exactly when the API asks it
+ * (the debate shape row in force; absent or `enabled: false` = the row is never read, as at boot). The row absent =
+ * the start values. A malformed row refuses with the register's own code (as at boot); a row the hosted API would
+ * refuse (hostedQuestionLanguageBootable) with HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID, so a version sealed before
+ * the publisher refused it is never reported ready.
+ */
+export async function assertHostedQuestionLanguageBootReady(pool: Pick<Pool, "query">, version: number): Promise<void> {
+  if (debateShapeInForce(await readDebateShapePolicy(pool, version)) === null) return;
+  const policy = (await readQuestionLanguagePolicy(pool, version)) ?? questionLanguagePolicyStartValues();
+  if (!hostedQuestionLanguageBootable(policy)) refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
 }
 
 /**
@@ -1411,6 +1450,8 @@ export async function verifyHostedRegisterBootReadiness(
   // runner would refuse (DEBATE_SHAPE_MAP_HASH_UNSEALED / MAP_CONTRACT_HASH_MISMATCH) is never reported ready. The row
   // is read raw, as the runner reads it: a disabled row (enabled: false) still needs its sealed map hash.
   await readDebateShapeRunnerSettings(pool, version);
+  // Question language (P2L final review I4): main.ts's question-language step, with the shape in force only.
+  await assertHostedQuestionLanguageBootReady(pool, version);
   // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
   // sealed one the API would refuse at start-up is refused here, by its reason.
   const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());

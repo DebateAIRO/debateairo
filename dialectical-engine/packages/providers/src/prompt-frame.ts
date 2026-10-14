@@ -232,6 +232,20 @@ export function promptContractFingerprintText(contract: PromptContract): string 
 }
 
 /**
+ * True when `text` carries a token the safety frame reserves: the fence prefix, the canary prefix, the contract marker,
+ * the safety-frame banner, the content-rule heading or the per-call markers heading (REVIEW ITEM 9, FW-B; see
+ * buildFramedPrompt below for why each is reserved). The ONE definition (P2L final review I4): buildFramedPrompt refuses
+ * an instruction or answer form by it, and every publisher of an owner-edited instruction asks it before sealing, so
+ * a version the API would refuse at boot is never sealed. Prefix and whole-token checks only: prose that merely talks
+ * about fences or names the frame version is the owners' to write.
+ */
+export function promptTextHasReservedToken(text: string): boolean {
+  return text.includes(FENCE_PREFIX) || text.includes(CANARY_PREFIX)
+    || text.includes(CONTRACT_ID_MARKER) || text.includes(SAFETY_FRAME_BANNER)
+    || text.includes(CONTENT_RULE_HEADING) || text.includes(PER_CALL_MARKERS_HEADING);
+}
+
+/**
  * Build the ONE packet shape any hand-off may send. `randomBytes` exists for the
  * tests that must drive a collision; production never passes it.
  */
@@ -265,9 +279,7 @@ export function buildFramedPrompt(input: {
    * that names the frame version is still the owners' to write.
    */
   for (const [slot, text] of [["instruction", contract.instruction], ["answerForm", contract.answerForm]] as const) {
-    if (text.includes(FENCE_PREFIX) || text.includes(CANARY_PREFIX)
-      || text.includes(CONTRACT_ID_MARKER) || text.includes(SAFETY_FRAME_BANNER)
-      || text.includes(CONTENT_RULE_HEADING) || text.includes(PER_CALL_MARKERS_HEADING)) {
+    if (promptTextHasReservedToken(text)) {
       throw new TypedDomainError(
         "PROMPT_INSTRUCTION_RESERVED_TOKEN",
         `The ${slot} of ${contract.contractId} contains a token reserved for the safety frame`

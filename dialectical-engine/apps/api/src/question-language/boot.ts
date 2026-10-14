@@ -1,14 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { costEnvelopeDay, languageCheckChargeMicros, type LanguageCheckSpendEntry } from "@debateai/budget";
 import { TypedDomainError } from "@debateai/kernel";
-import { ANTHROPIC_MESSAGES_BASE_URL, ANTHROPIC_MESSAGES_PATH, PREVIEW_ANTHROPIC_MESSAGES_URL, previewModelRow, type PreviewModelRow } from "@debateai/providers";
+import {
+  ANTHROPIC_MESSAGES_BASE_URL, ANTHROPIC_MESSAGES_PATH, PREVIEW_ANTHROPIC_MESSAGES_URL, previewModelRow, promptTextHasReservedToken, type PreviewModelRow
+} from "@debateai/providers";
 import {
   questionLanguagePolicyStartValues, type DeploymentMode, type QuestionLanguageFastCheck, type QuestionLanguagePolicy
 } from "@debateai/register";
 import { QuestionLanguageDecider, type QuestionLanguageChoiceNeeded, type QuestionLanguageFastCheckOffReason, type QuestionLanguageLock } from "./decider.js";
 import { loadEldReader } from "./eld.js";
 import { ELD_TUNING } from "./eld-tuning.js";
-import { QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES, assertQuestionLanguageInstructionFrameable, createFastCheck, type FastCheck } from "./fast-check.js";
+import { QUESTION_LANGUAGE_FAST_CHECK_SKIP_CODES, createFastCheck, type FastCheck } from "./fast-check.js";
 import type { QuestionLanguageReferenceKey } from "./reference.js";
 import { anthropicFastCheckTransport, type FastCheckUsage } from "./transport.js";
 
@@ -40,10 +42,12 @@ const refusal = (code: string): TypedDomainError => new TypedDomainError(code, c
 
 /**
  * Boot: an owner instruction carrying a frame token, or (on the preview) a model the Anthropic gate does not review
- * or an effort off its reviewed menu, refuses the boot once, by name, never at every ask.
+ * or an effort off its reviewed menu, refuses the boot once, by name, never at every ask. The frame-token rule is the
+ * providers' one definition (promptTextHasReservedToken, P2L final review I4), the same the hosted publisher and the
+ * preview kits ask before sealing; on the hosted route an unpriced model is refused by hostedQuestionLanguageRoute.
  */
 export function assertQuestionLanguagePolicyBootable(policy: QuestionLanguagePolicy, route: QuestionLanguagePaidRoute): void {
-  assertQuestionLanguageInstructionFrameable(policy.instruction);
+  if (promptTextHasReservedToken(policy.instruction)) throw refusal("QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN");
   if (policy.fastCheck === null || route.kind !== "PREVIEW") return;
   const reviewed = previewModelRow(policy.fastCheck.model);
   if (reviewed === undefined || reviewed.provider !== policy.fastCheck.provider

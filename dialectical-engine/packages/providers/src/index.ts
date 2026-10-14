@@ -2551,6 +2551,7 @@ export {
   buildFramedPrompt,
   buildFramedRepairPrompt,
   promptContractFingerprintText,
+  promptTextHasReservedToken,
   readPromptFrame,
   schemaFailureLocator,
   splitCacheablePrefix,

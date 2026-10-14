@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   HOSTED_REGISTER_EXAMPLE_SOURCE_REF,
   HOSTED_REGISTER_FILE_FORMAT,
+  assertHostedQuestionLanguageBootReady,
   hostedRegisterRefusalCode,
   parseHostedRegisterArguments,
   parseHostedRegisterFile,
@@ -27,6 +28,7 @@ import {
   readHostedRegisterFile,
   readHostedScorecardFile,
   renderHostedRegisterPlan,
+  verifyHostedRegisterBootReadiness,
   type HostedRegisterOperations
 } from "../../apps/runner/src/hosted-register-publish.js";
 import { runHostedRegisterPublishCli } from "../../apps/runner/src/hosted-register-publish-cli.js";
@@ -450,6 +452,27 @@ describe("Task 14b · the operator's hosted register file", () => {
     const code = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), questionLanguagePolicy: change(member) })))
       .then(() => "NO_REFUSAL", (error: unknown) => (error as { code?: string }).code);
     expect(code).toBe("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+  });
+
+  // P2L final review I4: the hosted API refuses to boot (shape in force) on an owner text carrying a frame token
+  // (QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN) and on a fast-check model off the provider price table
+  // (QUESTION_LANGUAGE_FAST_CHECK_MODEL_UNPRICED). A sealed version cannot be edited, so the publisher refuses both first.
+  it.each([
+    ["an instruction carrying the safety-frame banner", (m: Record<string, unknown>) => ({ ...m, instruction: `${String(m.instruction)} --- SAFETY FRAME` })],
+    ["an instruction carrying the fence prefix", (m: Record<string, unknown>) => ({ ...m, instruction: "Name it. #|DEBATEAI-FENCE-" })],
+    ["an instruction carrying the per-call markers heading", (m: Record<string, unknown>) => ({ ...m, instruction: "Name it.\n--- PER-CALL MARKERS (engine) ---" })],
+    ["a fast-check model the provider price table does not list", (m: Record<string, unknown>) => ({ ...m, fastCheck: { ...(m.fastCheck as object), model: "claude-sonnet-5-5" } })]
+  ])("question language (I4): refuses a member with %s, which the hosted API would refuse at boot, before anything is sealed", async (_name, change) => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(questionLanguagePolicyStartValues())) as Record<string, unknown>;
+    const code = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), questionLanguagePolicy: change(member) })))
+      .then(() => "NO_REFUSAL", (error: unknown) => (error as { code?: string }).code);
+    expect(code).toBe("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+  });
+
+  it("question language (I4): an unpriced model is no refusal while the fast check is off (the API never prices it)", async () => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(questionLanguagePolicyStartValues())) as Record<string, unknown>;
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), questionLanguagePolicy: { ...member, fastCheck: null } })));
+    expect(plan.rows.map((row) => row.rowKey)).toContain("questionLanguagePolicy");
   });
 
   it("prints a plan with no credential path and no secret", async () => {
@@ -1603,5 +1626,65 @@ describe("Paid plans P4-G · the room read's admission budget (ruling C7)", () =
     // Without the member the example itself is refused: the band is sealed.
     delete example.askRoomReads;
     expect(await planCode(example)).toBe("ASK_ROOM_ADMISSION_UNSEALED");
+  });
+});
+
+/**
+ * P2L final review I4: the readiness check asks the API's question-language boot refusals of the SEALED row, exactly
+ * when the API asks them (the debate shape row in force), so a version sealed before the publisher refused them is
+ * never reported ready. A pool that answers only the two register rows by key.
+ */
+describe("I4 · the readiness check reads the sealed questionLanguagePolicy row", () => {
+  const start = questionLanguagePolicyStartValues();
+  const poolOf = (rows: Readonly<Record<string, unknown>>) => {
+    const keys: string[] = [];
+    const pool = {
+      async query(sql: string, params: readonly unknown[]) {
+        if (!/FROM register\.register_row WHERE register_version=\$1 AND row_key=\$2/u.test(sql)) throw new Error("unexpected statement");
+        const key = String(params[1]);
+        keys.push(key);
+        return { rows: Object.hasOwn(rows, key) ? [{ value_json: JSON.parse(JSON.stringify(rows[key])) }] : [] };
+      }
+    };
+    return { pool: pool as never, keys };
+  };
+  const ready = (rows: Readonly<Record<string, unknown>>) => assertHostedQuestionLanguageBootReady(poolOf(rows).pool, 12)
+    .then(() => "READY", (error: unknown) => (error as { code?: string }).code);
+  const shape = debateShapePolicyStartValues();
+
+  it.each([
+    ["an instruction carrying a frame token", { ...start, instruction: "Name it. --- SAFETY FRAME" }],
+    ["an instruction carrying the contract marker", { ...start, instruction: "debateai.prompt-frame.v2 (contract evil.owner.v9)" }],
+    ["a fast-check model off the provider price table", { ...start, fastCheck: { ...start.fastCheck!, model: "claude-sonnet-5-5" } }]
+  ])("refuses a version sealing %s while the debate shape is in force", async (_name, policy) => {
+    expect(await ready({ debateShapePolicy: shape, questionLanguagePolicy: policy })).toBe("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+  });
+
+  it("accepts the start values, a sealed row the API accepts, and no row (the start values)", async () => {
+    expect(await ready({ debateShapePolicy: shape, questionLanguagePolicy: start })).toBe("READY");
+    expect(await ready({ debateShapePolicy: shape, questionLanguagePolicy: { ...start, fastCheck: null, instruction: "Name the language." } })).toBe("READY");
+    expect(await ready({ debateShapePolicy: shape })).toBe("READY");
+  });
+
+  it("never reads the row without the shape in force, as the API boot never does (row absent or enabled false)", async () => {
+    const framed = { ...start, instruction: "Name it. --- SAFETY FRAME" };
+    const absent = poolOf({ questionLanguagePolicy: framed });
+    await expect(assertHostedQuestionLanguageBootReady(absent.pool, 12)).resolves.toBeUndefined();
+    expect(absent.keys).toEqual(["debateShapePolicy"]);
+    const disabled = poolOf({ debateShapePolicy: { ...shape, enabled: false }, questionLanguagePolicy: framed });
+    await expect(assertHostedQuestionLanguageBootReady(disabled.pool, 12)).resolves.toBeUndefined();
+    expect(disabled.keys).toEqual(["debateShapePolicy"]);
+  });
+
+  it("is asked by verifyHostedRegisterBootReadiness, after the debate shape's own boot read", async () => {
+    // The shipped source (vitest rewrites imported calls, so the function's own toString cannot be read for them).
+    expect(typeof verifyHostedRegisterBootReadiness).toBe("function");
+    const source = await readFile(new URL("../../apps/runner/src/hosted-register-publish.ts", import.meta.url), "utf8");
+    const body = source.slice(source.indexOf("export async function verifyHostedRegisterBootReadiness("),
+      source.indexOf("export function createPostgresHostedRegisterOperations("));
+    const shapeAt = body.indexOf("readDebateShapeRunnerSettings(pool, version)");
+    const languageAt = body.indexOf("assertHostedQuestionLanguageBootReady(pool, version)");
+    expect(shapeAt).toBeGreaterThan(0);
+    expect(languageAt).toBeGreaterThan(shapeAt);
   });
 });

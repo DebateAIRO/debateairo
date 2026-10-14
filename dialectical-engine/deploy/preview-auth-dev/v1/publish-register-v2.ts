@@ -43,11 +43,12 @@ import {
   parseRegisterVersionText, buildConfiguredProviderSetSealedRow, buildConfiguredProviderSetDeploymentRow,
   PASSWORD_RESET_POLICY_REGISTER_ROW, BACKUP_EMAIL_POLICY_REGISTER_ROW, MFA_RECOVERY_POLICY_REGISTER_ROW,
   answerRoleRotationPolicyRow, callConcurrencyPolicyRow, callConcurrencyPolicyFromValue, CALL_CONCURRENCY_POLICY_ROW_KEY,
-  DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyRow, debateShapePolicyStartValues, parseDebateShapePolicy, type DebateShapePolicy,
+  DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyRow, debateShapePolicyStartValues, parseDebateShapePolicy, debateShapeInForce, type DebateShapePolicy,
   QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyRow, parseQuestionLanguagePolicy, type QuestionLanguagePolicy,
   type BootstrapRegister, type CallConcurrencyPolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
+import { assertQuestionLanguagePolicyBootable } from '../../../apps/api/src/question-language/boot.js';
 import { parseProviderDiscoveryTargets } from '@debateai/providers';
 import { PREVIEW_GLM_PROVIDER_REFS, assertPreviewProviderTargets } from '../../../packages/providers/src/preview-test.js';
 import { PREVIEW_MODEL_ROWS, PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef, previewRefsAreReviewedSet, previewTargetJsonRow } from '../../../packages/providers/src/preview-models.js';
@@ -233,6 +234,21 @@ export type SnapshotDeltaV2 = Readonly<{
 /** One canonical serialisation of the delta, shared by the composer and the release tool. */
 export const previewDeltaSha256V2 = (delta:readonly SnapshotDeltaV2[]) => hash(JSON.stringify(delta));
 
+/**
+ * P2L final review I4 (as kit v3, ruling L-KIT): the API's question-language boot step (main.ts "question-language")
+ * asked of the composed rows (source and carried alike) before anything is sealed, only when they hold the debate
+ * shape in force (no shape row, or `enabled: false`: the API never reads the row at boot, so it is parsed only). The
+ * preview route is the one the preview API takes (L-ROUTE: never hosted): an owner text carrying a frame token (the
+ * providers' one rule) or a fast-check model the preview's Anthropic gate does not review refuses by the API's own code.
+ */
+function assertQuestionLanguageBootableV2(rows:readonly RegisterPublicationRow[]):void {
+  const map=new Map(rows.map(row=>[row.rowKey,row]));
+  const language=map.get(QUESTION_LANGUAGE_POLICY_ROW_KEY),shape=map.get(DEBATE_SHAPE_POLICY_ROW_KEY);
+  if(language===undefined||shape===undefined||debateShapeInForce(parseDebateShapePolicy(JSON.parse(shape.valueJsonText)))===null)return;
+  assertQuestionLanguagePolicyBootable(parseQuestionLanguagePolicy(JSON.parse(language.valueJsonText)),
+    {kind:'PREVIEW',fetch:(async()=>fail('question-language-boot-check-never-calls')) as typeof fetch});
+}
+
 export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly RegisterPublicationRow[];baseRows:readonly RegisterPublicationRow[];baseRegisterVersion:string;baseSnapshotSha256:string}>) {
   const source=canonicalRows(input.sourceRows),base=canonicalRows(input.baseRows);
   const baseRegisterVersion=parseRegisterVersionText(input.baseRegisterVersion);
@@ -260,6 +276,7 @@ export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly Reg
   staffAccessPolicyFromValue(JSON.parse(staff.valueJsonText),staff.sourceRef);
   internalAllowancePolicyFromValue(JSON.parse(internal.valueJsonText),internal.sourceRef);
   const rows=canonicalRows([...source,...owned.map(key=>baseMap.get(key)!),...carried]);
+  assertQuestionLanguageBootableV2(rows);
   const delta:SnapshotDeltaV2[]=[];
   for(const row of source){
     const old=baseMap.get(row.rowKey);
