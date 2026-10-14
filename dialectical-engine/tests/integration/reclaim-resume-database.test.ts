@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
-import { GraphRepository } from "@debateai/graph";
+import { GraphRepository, type RetireClaimFence } from "@debateai/graph";
 import { JudgementRepository } from "@debateai/judgement";
 import { LedgerRepository } from "@debateai/ledger";
 import { MapChoiceRepository, type MapResult } from "@debateai/map";
 import { ServeRepository } from "@debateai/serve";
 import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
+import { persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun,
   createLegacyStoryRun,
@@ -45,6 +46,24 @@ const legacyRun = (): Promise<string> => createLegacyStoryRun(database.pool, `re
 function encryptedRun(): Promise<string> {
   if (owner === undefined) throw new Error("RECLAIM_TEST_OWNER_UNPROVISIONED");
   return createEncryptedStoryRun(database.pool, owner, `reclaim resume ${marker()}`);
+}
+
+const CLAIM_MS = 600_000;
+const claims = new Map<string, RetireClaimFence>();
+/**
+ * A work item of the run, CLAIMED by a test worker for ten minutes — the claim a copy holds while it argues, and the
+ * fence `retireNodes` checks (the same one for every call on the run, as one copy's would be).
+ */
+async function heldClaim(runId: string): Promise<RetireClaimFence> {
+  const known = claims.get(runId);
+  if (known !== undefined) return known;
+  const row = (await database.pool.query<{ work_item_id: string; claim_deadline: Date }>(
+    `INSERT INTO core.work_item (run_id, battery_row_id, node_set, command_key, state, claimed_by, claim_deadline, created_at_seq)
+     VALUES ($1,'Q1','[]'::jsonb,$2,'CLAIMED','runner:reclaim-test',clock_timestamp() + make_interval(secs => $3),ledger.allocate_sequence())
+     RETURNING work_item_id::text, claim_deadline`, [runId, `reclaim-test:${randomUUID()}`, CLAIM_MS / 1_000])).rows[0]!;
+  const fence = Object.freeze({ workItemId: row.work_item_id, workerId: "runner:reclaim-test", heldUntil: row.claim_deadline, claimMs: CLAIM_MS });
+  claims.set(runId, fence);
+  return fence;
 }
 
 /** `sql` as debateai_runtime (the role the runner's pool logs in as), in its own transaction. */
@@ -210,14 +229,61 @@ describe("GraphRepository.retireNodes", () => {
     const live = await saveCopy(runId, authors, "live");
     const otherCopy = await saveCopy(other, { root: await artifact(other, "house-a"), child: await artifact(other, "house-a") }, "other");
     const graph = new GraphRepository(database.pool);
-    expect(await graph.retireNodes(runId, [live.root, live.child])).toBe(2);
+    expect(await graph.retireNodes(runId, [live.root, live.child], await heldClaim(runId))).toBe(2);
     expect(await statuses(runId)).toEqual({ [dead.root]: "stale", [dead.child]: "stale", [live.root]: "complete", [live.child]: "complete" });
-    expect(await graph.retireNodes(runId, [live.root, live.child])).toBe(0);
-    expect(await graph.retireNodes(runId, [live.root])).toBe(1);
+    expect(await graph.retireNodes(runId, [live.root, live.child], await heldClaim(runId))).toBe(0);
+    expect(await graph.retireNodes(runId, [live.root], await heldClaim(runId))).toBe(1);
     expect(await statuses(runId)).toEqual({ [dead.root]: "stale", [dead.child]: "stale", [live.root]: "complete", [live.child]: "stale" });
-    expect(await graph.retireNodes(runId, [])).toBe(1);
+    expect(await graph.retireNodes(runId, [], await heldClaim(runId))).toBe(1);
     expect(Object.values(await statuses(runId))).toEqual(["stale", "stale", "stale", "stale"]);
     expect(await statuses(other)).toEqual({ [otherCopy.root]: "complete", [otherCopy.child]: "complete" });
+  });
+
+  it("is fenced on the copy's claim: a lapsed claim, another copy's claim or a settled item sets nothing aside (RUNNER_CLAIM_LOST)", async () => {
+    const graph = new GraphRepository(database.pool);
+    const lostClaim = async (fence: RetireClaimFence, runId: string): Promise<void> => {
+      await expect(graph.retireNodes(runId, [], fence)).rejects.toMatchObject({ code: "RUNNER_CLAIM_LOST" });
+      expect(Object.values(await statuses(runId)).every((status) => status === "complete")).toBe(true);
+    };
+    // Lapsed: the deadline this copy set has passed.
+    const lapsedRun = await legacyRun();
+    await saveCopy(lapsedRun, { root: await artifact(lapsedRun, "house-a"), child: await artifact(lapsedRun, "house-a") }, "dead");
+    const lapsed = await heldClaim(lapsedRun);
+    await database.pool.query(`UPDATE core.work_item SET claim_deadline = clock_timestamp() - interval '1 second' WHERE work_item_id=$1`, [lapsed.workItemId]);
+    await lostClaim(lapsed, lapsedRun);
+    // Taken: the claim lapsed and another copy (the same worker id, as a same-process retry) claimed the item since.
+    const takenRun = await legacyRun();
+    await saveCopy(takenRun, { root: await artifact(takenRun, "house-a"), child: await artifact(takenRun, "house-a") }, "dead");
+    const mine = await heldClaim(takenRun);
+    await database.pool.query(`UPDATE core.work_item SET claim_deadline = $2::timestamptz + make_interval(secs => $3) + interval '1 second' WHERE work_item_id=$1`,
+      [mine.workItemId, mine.heldUntil, CLAIM_MS / 1_000]);
+    await lostClaim(mine, takenRun);
+    // ...while this copy's own renewal (a later deadline, within one claim of the one it set) keeps the fence.
+    await database.pool.query(`UPDATE core.work_item SET claim_deadline = $2::timestamptz + interval '1 minute' WHERE work_item_id=$1`, [mine.workItemId, mine.heldUntil]);
+    expect(await graph.retireNodes(takenRun, [], mine)).toBe(2);
+    // Settled: the item is DONE.
+    const doneRun = await legacyRun();
+    await saveCopy(doneRun, { root: await artifact(doneRun, "house-a"), child: await artifact(doneRun, "house-a") }, "dead");
+    const done = await heldClaim(doneRun);
+    await database.pool.query(`UPDATE core.work_item SET state='DONE', claimed_by=NULL, claim_deadline=NULL WHERE work_item_id=$1`, [done.workItemId]);
+    await lostClaim(done, doneRun);
+    // Another worker.
+    const otherRun = await legacyRun();
+    await saveCopy(otherRun, { root: await artifact(otherRun, "house-a"), child: await artifact(otherRun, "house-a") }, "dead");
+    await lostClaim({ ...await heldClaim(otherRun), workerId: "runner:another" }, otherRun);
+  });
+
+  it("never sets a node aside once the run has served an answer, whoever asks (NODE_RETIRE_AFTER_ANSWER)", async () => {
+    const runId = await legacyRun();
+    const copy = await saveCopy(runId, { root: await artifact(runId, "house-a"), child: await artifact(runId, "house-a") }, "served");
+    await persistTerminalRun({ pool: database.pool, runId, fixtureKey: `reclaim-${marker()}`,
+      factBundle: { facts: ["reclaim-served-fact"], residualObjections: [], badges: [], conditionMarks: ["DEFECT"],
+        reversalPoint: "reclaim-served-reversal", buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null } });
+    await expect(asRuntime(`UPDATE core.node SET generation_status='stale' WHERE node_id=$1`, [copy.root]))
+      .rejects.toThrow(/NODE_RETIRE_AFTER_ANSWER/u);
+    await expect(database.pool.query(`UPDATE core.node SET generation_status='stale' WHERE node_id=$1`, [copy.root]))
+      .rejects.toThrow(/NODE_RETIRE_AFTER_ANSWER/u);
+    expect(await statuses(runId)).toEqual({ [copy.root]: "complete", [copy.child]: "complete" });
   });
 });
 
@@ -239,7 +305,7 @@ describe("every reader of the debate ignores a stale copy that shares its author
       reviewRawArtifactRef: await artifact(runId, "house-c"), outcome: "dispute", reasons: ["dead dispute"] });
     await recordNodeReviewAlone(database.pool, { runId, nodeId: dead.child, authorRawArtifactRef: authors.child,
       reviewRawArtifactRef: await artifact(runId, "house-c"), outcome: "dispute", reasons: ["dead dispute"] });
-    expect(await new GraphRepository(database.pool).retireNodes(runId, [live.root, live.child])).toBe(2);
+    expect(await new GraphRepository(database.pool).retireNodes(runId, [live.root, live.child], await heldClaim(runId))).toBe(2);
     return { runId, live, dead, reviewers: { live: "house-b", dead: "house-c" } };
   }
 
@@ -322,7 +388,7 @@ describe("0118: an answer's map root moves only from a stale root to a live node
     const { runId, dead, live, repository } = await mappedRun();
     expect(await repository.writeMapPosition({ runId, answerId: "a1", rootIndex: 0, rootNodeId: live.root, maker: "maker-1" })).toBe("ALREADY_PRESENT");
     expect(await positionOf(repository, runId)).toMatchObject({ rootNodeId: dead.root, maker: "maker-0" });
-    await new GraphRepository(database.pool).retireNodes(runId, [live.root, live.child]);
+    await new GraphRepository(database.pool).retireNodes(runId, [live.root, live.child], await heldClaim(runId));
     expect(await repository.writeMapPosition({ runId, answerId: "a1", rootIndex: 0, rootNodeId: live.root, maker: "maker-1" })).toBe("REPOINTED");
     expect(await positionOf(repository, runId)).toMatchObject({ rootNodeId: live.root, maker: "maker-1" });
     expect(await repository.writeMapPosition({ runId, answerId: "a1", rootIndex: 0, rootNodeId: live.root, maker: "maker-1" })).toBe("ALREADY_PRESENT");
@@ -331,7 +397,7 @@ describe("0118: an answer's map root moves only from a stale root to a live node
       .toEqual([{ root: dead.root, maker: "maker-0" }]);
     // A second take-over moves it again, from the root now in force.
     const third = await saveCopy(runId, { root: await artifact(runId, "house-a"), child: await artifact(runId, "house-a") }, "third");
-    await new GraphRepository(database.pool).retireNodes(runId, [third.root, third.child]);
+    await new GraphRepository(database.pool).retireNodes(runId, [third.root, third.child], await heldClaim(runId));
     expect(await repository.writeMapPosition({ runId, answerId: "a1", rootIndex: 0, rootNodeId: third.root, maker: "maker-0" })).toBe("REPOINTED");
     expect(await positionOf(repository, runId)).toMatchObject({ rootNodeId: third.root, maker: "maker-0" });
   });
@@ -340,7 +406,7 @@ describe("0118: an answer's map root moves only from a stale root to a live node
     const { runId, dead, live } = await mappedRun();
     await expect(repoint(runId, dead.root, live.root))
       .rejects.toMatchObject({ code: "55000", message: "MAP_POSITION_REPOINT_ROOT_LIVE: only a stale root is moved away from" });
-    await new GraphRepository(database.pool).retireNodes(runId, [live.root, live.child]);
+    await new GraphRepository(database.pool).retireNodes(runId, [live.root, live.child], await heldClaim(runId));
     await expect(repoint(runId, dead.root, dead.child))
       .rejects.toMatchObject({ code: "55000", message: "MAP_POSITION_REPOINT_TARGET_STALE: a root moves to a live node of the same run" });
     await expect(repoint(runId, dead.child, live.root))
@@ -358,7 +424,7 @@ describe("0118: an answer's map root moves only from a stale root to a live node
 
   it("the re-point table is append-only for every role: UPDATE, DELETE and TRUNCATE refused", async () => {
     const { runId, live } = await mappedRun();
-    await new GraphRepository(database.pool).retireNodes(runId, [live.root, live.child]);
+    await new GraphRepository(database.pool).retireNodes(runId, [live.root, live.child], await heldClaim(runId));
     expect(await new MapChoiceRepository(database.pool).writeMapPosition({ runId, answerId: "a1", rootIndex: 0, rootNodeId: live.root, maker: "maker-1" })).toBe("REPOINTED");
     await expect(asRuntime(`UPDATE core.map_position_repoint SET maker='maker-0' WHERE run_id=$1`, [runId])).rejects.toMatchObject({ code: "42501" });
     await expect(database.pool.query(`UPDATE core.map_position_repoint SET maker = maker WHERE run_id=$1`, [runId]))
@@ -374,12 +440,12 @@ describe("0118: an answer's map root moves only from a stale root to a live node
 
   it("an encrypted run re-points; once it is erased, writeMapPosition answers RUN_ERASED and nothing moves", async () => {
     const { runId, dead, live, repository } = await mappedRun(true);
-    await new GraphRepository(database.pool).retireNodes(runId, [live.root, live.child]);
+    await new GraphRepository(database.pool).retireNodes(runId, [live.root, live.child], await heldClaim(runId));
     expect(await repository.writeMapPosition({ runId, answerId: "a1", rootIndex: 0, rootNodeId: live.root, maker: "maker-1" })).toBe("REPOINTED");
     expect(await positionOf(repository, runId)).toMatchObject({ rootNodeId: live.root });
 
     const erased = await mappedRun(true);
-    await new GraphRepository(database.pool).retireNodes(erased.runId, [erased.live.root, erased.live.child]);
+    await new GraphRepository(database.pool).retireNodes(erased.runId, [erased.live.root, erased.live.child], await heldClaim(erased.runId));
     if (owner === undefined) throw new Error("RECLAIM_TEST_OWNER_UNPROVISIONED");
     await database.pool.query(
       `INSERT INTO serve.private_run_key_cleanup_intent (request_ref,user_id,run_id,requested_at,cleanup_publication_refs)

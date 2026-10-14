@@ -145,6 +145,8 @@ interface Outcome {
   readonly nodesWhenLost: number;
   /** Calls the first copy had sent and not yet seen answered when it was lost (their results may be lost with it). */
   readonly inFlightWhenLost: number;
+  /** The second copy's answered review calls whose site names a node set aside (the earliest copy's id for that node). */
+  readonly reviewsAtEarlierSites: number;
 }
 
 /** Runs one debate to its answer in a copy of the seed; `lose` loses its first copy partway and lets a second finish. */
@@ -197,6 +199,10 @@ async function argueInCopy(seedName: string, copy: string, seed: AdmittedRun, va
       `SELECT call_site_key AS key, sequence::text FROM ledger.ledger_entry
         WHERE run_id=$1 AND action_kind='MODEL_CALL' AND outcome='OK' ORDER BY sequence`, [seed.runId]);
     const { nameIds } = await idNames(pool, seed.runId);
+    const staleNodeIds = new Set((await pool.query<{ node_id: string }>(
+      `SELECT node_id::text FROM core.node WHERE run_id=$1 AND generation_status='stale'`, [seed.runId])).rows.map((row) => row.node_id));
+    const reviewsAtEarlierSites = calls.rows.filter((row) => lose && Number(row.sequence) > lostAtSequence
+      && [...row.key.matchAll(UUID)].some(([id]) => row.key.startsWith("JUDGE:review:") && staleNodeIds.has(id.toLowerCase()))).length;
     const choice = await new MapChoiceRepository(pool).readMapChoiceForRun(seed.runId);
     const staleIds = new Set((await pool.query<{ node_id: string }>(
       `SELECT node_id::text FROM core.node WHERE run_id=$1 AND generation_status='stale'`, [seed.runId])).rows.map((row) => row.node_id));
@@ -209,7 +215,8 @@ async function argueInCopy(seedName: string, copy: string, seed: AdmittedRun, va
         [seed.runId])).rows[0]!.n,
       okCalls: calls.rows.map((row) => ({ key: nameIds(row.key), copy: lose && Number(row.sequence) > lostAtSequence ? 2 : 1 })),
       nodesWhenLost,
-      inFlightWhenLost
+      inFlightWhenLost,
+      reviewsAtEarlierSites
     };
   } finally {
     await pool.end();
@@ -246,7 +253,7 @@ async function referenceAndResumed(variant: Variant): Promise<{ reference: Outco
  * aside, and a call the first copy got answered is asked again only when its result was lost with that copy (it was
  * still in flight).
  */
-function expectResumed(reference: Outcome, resumed: Outcome): void {
+function expectResumed(reference: Outcome, resumed: Outcome, serial: boolean): void {
   expect(resumed.nodesWhenLost).toBeGreaterThan(0);
   expect(reference.staleNodes).toBe(0);
   expect(resumed.staleNodes).toBe(resumed.nodesWhenLost);
@@ -254,6 +261,8 @@ function expectResumed(reference: Outcome, resumed: Outcome): void {
   const firstCopy = new Set(resumed.okCalls.filter((call) => call.copy === 1).map((call) => call.key));
   const askedAgain = resumed.okCalls.filter((call) => call.copy === 2 && firstCopy.has(call.key)).map((call) => call.key);
   expect(askedAgain.length).toBeLessThanOrEqual(resumed.inFlightWhenLost);
+  // One call at a time: the call in flight when the copy was lost was answered and recorded too, so nothing at all.
+  if (serial) expect(askedAgain).toEqual([]);
   // Nothing the reference never asked, and every site the reference answered was answered once across both copies,
   // apart from the in-flight ones.
   expect(new Set(resumed.okCalls.map((call) => call.key))).toEqual(new Set(reference.okCalls.map((call) => call.key)));
@@ -265,7 +274,7 @@ it("one call at a time: a run lost at its first review (every opening position s
     label: "serial_first_review", depth: 1, answers: (question) => scriptedAnswers(question),
     loseAt: (request, seen) => request.kind === "REVIEW" && seen === 0
   });
-  expectResumed(reference, resumed);
+  expectResumed(reference, resumed, true);
 }, 900_000);
 
 it("one call at a time: a run lost mid-arguing (replies saved, some reviewed) resumes and argues to the same answer", async () => {
@@ -273,7 +282,10 @@ it("one call at a time: a run lost mid-arguing (replies saved, some reviewed) re
     label: "serial_mid_arguing", depth: 2, answers: (question) => scriptedAnswers(question),
     loseAt: (request, seen) => request.kind === "REVIEW" && seen === 6
   });
-  expectResumed(reference, resumed);
+  expectResumed(reference, resumed, true);
+  // Nodes the first copy saved but never got reviewed are reviewed by this copy at the first copy's own site.
+  expect(resumed.reviewsAtEarlierSites).toBeGreaterThan(0);
+  expect(reference.reviewsAtEarlierSites).toBe(0);
 }, 900_000);
 
 it("calls together: a run lost mid-arguing resumes and argues to the same answer", async () => {
@@ -282,7 +294,7 @@ it("calls together: a run lost mid-arguing resumes and argues to the same answer
     answers: (question) => scriptedAnswers(question),
     loseAt: (request, seen) => request.kind === "REVIEW" && seen === 6
   });
-  expectResumed(reference, resumed);
+  expectResumed(reference, resumed, false);
 }, 900_000);
 
 it("a shaped run lost after its positions were saved resumes on its stored map and argues to the same answer", async () => {
@@ -292,7 +304,7 @@ it("a shaped run lost after its positions were saved resumes on its stored map a
     answers: (question) => scriptedShapeAnswers(question),
     loseAt: (request, seen) => request.kind === "REVIEW" && seen === 2
   });
-  expectResumed(reference, resumed);
+  expectResumed(reference, resumed, true);
   // The map's reader (the debate page, the publication copy) serves each argued answer's LIVE root, the reference's.
   expect(reference.mapRoots.length).toBeGreaterThan(1);
   expect(resumed.mapRoots.filter((entry) => entry.stale)).toEqual([]);

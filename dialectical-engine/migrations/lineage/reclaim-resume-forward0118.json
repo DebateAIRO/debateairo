@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0118_reclaim_resume.sql",
-    "sha256": "bd22902b4b1f3b3b7f496b03f9f8defa58ef5d866e492faf8b4d59351540ad08"
+    "sha256": "060f765b575010f6b938f49f2d389a05020a4b13c24efd81ccd0ab0db9ed774c"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

@@ -109,9 +109,10 @@ describe("the content a recorded call handed back", () => {
   });
 });
 
-const artifact = (content: string) => Object.freeze({
+/** A recorded reply; `attempt` is its place in its gateway call (`raw_artifact.metadata_json.attempt`). */
+const artifact = (content: string, attempt = 1) => Object.freeze({
   rawText: openAiReply(content), provider: "openai-compatible-http", modelId: "vendor/model-1", maker: "vendor",
-  modelVersion: "vendor/model-1", thinkingTokens: null
+  modelVersion: "vendor/model-1", thinkingTokens: null, attempt
 });
 let sequence = 0;
 const attempt = (input: Partial<RecordedAttempt> & Pick<RecordedAttempt, "callSiteKey" | "outcome" | "promptFingerprint">): RecordedAttempt => {
@@ -134,17 +135,44 @@ describe("recorded attempts grouped into answered calls", () => {
       .toEqual([["JUDGE:root:secondary", ["b"]], ["JUDGE", ["a", "a2"]]]);
   });
 
-  it("a call answers a request for one of its original packets; a repaired answer names the reply it repaired", () => {
+  it("a call answers a request for its original packet only; a repaired answer names the last reply to that packet", () => {
+    // One gateway call: the original refused, the patch lost in transport (no reply), the patch answered.
     const [call] = recordedCalls([
-      attempt({ callSiteKey: "JUDGE", outcome: "FAILED", promptFingerprint: "orig" }),
-      attempt({ callSiteKey: "JUDGE", outcome: "FAILED", promptFingerprint: "orig" }),
-      attempt({ callSiteKey: "JUDGE", outcome: "OK", promptFingerprint: "patch", artifact: artifact("{}") })
+      attempt({ callSiteKey: "JUDGE", outcome: "FAILED", promptFingerprint: "orig", artifact: artifact("{}", 1) }),
+      attempt({ callSiteKey: "JUDGE", outcome: "TIMED_OUT", promptFingerprint: "patch" }),
+      attempt({ callSiteKey: "JUDGE", outcome: "OK", promptFingerprint: "patch", artifact: artifact("{}", 3) })
     ]);
     const replay = replayOf(call!, "orig");
     expect(replay?.answered?.promptFingerprint).toBe("orig");
-    expect(replay?.repairAttempts).toBe(1);
-    expect(replayOf(call!, "patch")?.answered).toBeNull();
+    expect(replay?.repairAttempts).toBe(2);
+    expect(replayOf(call!, "patch")).toBeNull();
     expect(replayOf(call!, "another prompt")).toBeNull();
+  });
+
+  it("an earlier gateway call at the site that failed in full and asked something else is never the answered call", () => {
+    // Prompt A failed in full (a call of its own); later prompt B was answered at its first attempt.
+    const [call] = recordedCalls([
+      attempt({ callSiteKey: "JUDGE:defender:root0:r1:p0", outcome: "FAILED", promptFingerprint: "A", artifact: artifact("{}", 1) }),
+      attempt({ callSiteKey: "JUDGE:defender:root0:r1:p0", outcome: "FAILED", promptFingerprint: "A", artifact: artifact("{}", 2) }),
+      attempt({ callSiteKey: "JUDGE:defender:root0:r1:p0", outcome: "OK", promptFingerprint: "B", artifact: artifact("{}", 1) })
+    ]);
+    expect(replayOf(call!, "A")).toBeNull();
+    expect(replayOf(call!, "B")).toMatchObject({ answered: null, repairAttempts: 0 });
+  });
+
+  it("a length retry re-sends the original packet: the answer is its own, nothing repaired", () => {
+    const [call] = recordedCalls([
+      attempt({ callSiteKey: "JUDGE", outcome: "FAILED", promptFingerprint: "orig", artifact: artifact("{}", 1) }),
+      attempt({ callSiteKey: "JUDGE", outcome: "OK", promptFingerprint: "orig", artifact: artifact("{}", 2) })
+    ]);
+    expect(replayOf(call!, "orig")).toMatchObject({ answered: null, repairAttempts: 0 });
+  });
+
+  it("a reply whose place in its call was not recorded is never replayed", () => {
+    const [call] = recordedCalls([
+      attempt({ callSiteKey: "JUDGE", outcome: "OK", promptFingerprint: "orig", artifact: { ...artifact("{}"), attempt: null } })
+    ]);
+    expect(replayOf(call!, "orig")).toBeNull();
   });
 });
 
@@ -211,20 +239,35 @@ describe("the replay book and the replaying gateway", () => {
     expect(sent).toEqual(["JUDGE"]);
   });
 
-  it("a review recorded under an earlier copy's node is this copy's once the node saved from the same reply is adopted", async () => {
-    const earlier = "11111111-1111-4111-8111-111111111111";
+  it("a node saved from the reply an earlier copy's node had keeps the EARLIEST copy's review site; any other node keeps its own", async () => {
+    const first = "11111111-1111-4111-8111-111111111111";
+    const second = "33333333-3333-4333-8333-333333333333";
     const now = "22222222-2222-4222-8222-222222222222";
     const book = createReplayBook({
-      calls: recordedCalls([attempt({ callSiteKey: `JUDGE:review:${earlier}:seat:main`, outcome: "OK",
+      calls: recordedCalls([attempt({ callSiteKey: `JUDGE:review:${first}:seat:main`, outcome: "OK",
         promptFingerprint: fp("review"), artifact: artifact(answer) })]),
-      earlierNodes: [{ nodeId: earlier, provenanceRef: "author-reply" }]
+      // Two earlier copies saved the node (the second replayed the first's reply), in save order.
+      earlierNodes: [{ nodeId: first, provenanceRef: "author-reply" }, { nodeId: second, provenanceRef: "AUTHOR-REPLY" }]
     });
+    expect(book.siteNodeId(now)).toBe(now);
+    book.adopt(now, "author-reply");
+    expect(book.siteNodeId(now)).toBe(first);
+    expect(book.siteNodeId("44444444-4444-4444-8444-444444444444")).toBe("44444444-4444-4444-8444-444444444444");
     const { sent, inner } = vendor();
-    const gateway = replayingGateway(book, inner);
-    expect(book.take({ callSiteKey: `JUDGE:review:${now}:seat:main`, providerRef: "preview:vendor", fingerprint: fp("review") })).toBeNull();
-    book.adopt(now, "AUTHOR-REPLY".toLowerCase());
-    expect((await gateway.call(request(`JUDGE:review:${now}:seat:main`, "review"))).content).toBe(answer);
+    expect((await replayingGateway(book, inner).call(request(`JUDGE:review:${book.siteNodeId(now)}:seat:main`, "review"))).content).toBe(answer);
     expect(sent).toEqual([]);
+  });
+
+  it("the keep-alive is asked before an answer is replayed: a copy that lost the run replays nothing", async () => {
+    const book = createReplayBook({ calls: recordedCalls([
+      attempt({ callSiteKey: "JUDGE", outcome: "OK", promptFingerprint: fp("question"), artifact: artifact(answer) })
+    ]), earlierNodes: [] });
+    const { sent, inner } = vendor();
+    const lost = Object.assign(new Error("RUNNER_CLAIM_LOST"), { code: "RUNNER_CLAIM_LOST" });
+    await expect(replayingGateway(book, inner, () => { throw lost; }).call(request("JUDGE", "question")))
+      .rejects.toMatchObject({ code: "RUNNER_CLAIM_LOST" });
+    expect(sent).toEqual([]);
+    expect(book.pending).toBe(1);
   });
 
   it("a closed book replays nothing", async () => {

@@ -34,11 +34,14 @@ The new copy runs the debate from the start, exactly as a first copy would. Two 
    same raw artifact and ledger entry, no vendor contact, no new ledger row, no money, no attempt counted. Anything
    else goes to the vendor as today.
    - **Prompt match:** the scorecard's `canonicalPromptFingerprint` (the random fence and canary masked) of the
-     request's messages equals the fingerprint of the FIRST attempt of the recorded call. A call is the run of attempts
-     at one site and member that ends in an OK row.
-   - **Site match:** the recorded call site key, with the dead copy's node ids translated to this copy's
-     (`JUDGE:review:<node>` is the only key that names a node). A node of this copy is the dead copy's node with the
-     same author reply (`provenance_ref`), so the translation is learnt as nodes are saved.
+     request's messages equals the fingerprint of the first attempt of the ANSWERED gateway call: the last `n` attempts
+     at that site and member, `n` being the OK reply's place in its call (`raw_artifact.metadata_json.attempt`). An
+     earlier call at the site that failed in full, and may have asked something else, never matches.
+   - **Site match:** the recorded call site key and member, exactly. `JUDGE:review:<node>` is the only key that names a
+     node: a node this copy saves from the same author reply (`provenance_ref`) as an earlier copy's node keeps the
+     EARLIEST copy's review site (`siteNodeId`), so its ledger key, its reviewer rotation (`seatRotationOffset`, on a
+     pinned role assignment) and the ledger-read seat restores (A15d/A16a) are the same on every copy.
+   - **The keep-alive:** a replayed answer is refused like a real call once the copy has lost its claim or its time.
    - **The answer:** the message content of the OK attempt's vendor reply, read as the gateway reads it (OpenAI shape;
      Anthropic normalised). When the step's own classifier does not accept it as a whole answer, the OK attempt was a
      patch: the content is the first reply with the patch merged (`planPatchFollowUp` + `mergePatchReply`, the
@@ -46,11 +49,18 @@ The new copy runs the debate from the start, exactly as a first copy would. Two 
      remembers its reading (`rememberingAcceptedReply`) reads it again. A content that cannot be rebuilt is not
      replayed (the call is made: correct, at today's price).
    - Each recorded call is replayed at most once, in ledger order.
-2. **The dead copy's rows are set aside.** Right after the replay book is read, every node of the run is marked
-   `generation_status = 'stale'` (a value the database already allows; the graph reader already skips stale nodes and
-   their edges). The copy then writes its own nodes, judgements, edges and reviews — identical to the dead copy's, since
+2. **The dead copy's rows are set aside.** Just before the arguing starts — after every claim-time refusal, and after an
+   answer the dead copy already served is settled — every node of the run is marked `generation_status = 'stale'` (a
+   value the database already allows; the graph reader already skips stale nodes and their edges). The copy then writes its own nodes, judgements, edges and reviews — identical to the dead copy's, since
    the answers are the same — so every read of "progress so far" sees only this copy's work, as on a first claim.
-   - Before scoring, any node of the run this copy did not save is set aside too (a dying copy that was still writing).
+   - Before scoring, any node of the run this copy did not save is set aside too (a dying copy that was still writing),
+     and a map position such a copy pointed at its own root is moved to this copy's root.
+   - **Fenced on the claim.** Setting nodes aside is the one write that changes rows another copy saved, so it runs only
+     while THIS copy holds the work item: in the same transaction, under a share lock, the item must be CLAIMED by this
+     worker with a deadline still ahead, at or within one claim length of the deadline this copy last set
+     (`RunKeepAlive.heldUntil`). A later claim by another copy (even a same-process retry with the same worker id) can
+     only start after that deadline passed, so its deadline lies beyond the window. Otherwise RUNNER_CLAIM_LOST and
+     nothing changes.
    - Readers that list a run's nodes or reviews skip stale nodes: the judgement reads (latest reviewer, reviewed,
      disputed, lineage), the serve reads (node projection, edges, review catch-up), the private evaluator's reads.
    - Debate shape: `core.map_position` (one row per argued answer, naming its root) keeps the dead copy's root; the
@@ -60,9 +70,11 @@ The new copy runs the debate from the start, exactly as a first copy would. Two 
 ## The database change (chain step 0118)
 
 - `debateai_runtime` may `UPDATE (generation_status) ON core.node`; a trigger lets an update change ONLY
-  `generation_status`, and only to `stale` from another value (never back).
-  It replaces 0000's blanket `reject_mutation` on `core.node`; DELETE stays refused, and an erased encrypted run
-  refuses the mark (`PRIVATE_CONTENT_ERASED`).
+  `generation_status`, and only to `stale` from another value (never back), and never once the run has a
+  `serve.answer` (NODE_RETIRE_AFTER_ANSWER: a served debate keeps its tree whoever asks). It replaces 0000's blanket
+  `reject_mutation` on `core.node`; DELETE stays refused, and an erased encrypted run refuses the mark
+  (`PRIVATE_CONTENT_ERASED`). The chain refuses to start a runner while 0118 is pending, so no runner without the grant
+  ever reaches the set-aside.
 - `core.map_position` itself cannot be changed: 0116's chain step digests its ACL and triggers on every later
   `migrate()`, so a grant or trigger there would read as drift. The move is a NEW append-only table,
   `core.map_position_repoint` (run, answer, from root, to root, maker; ids and codes only): a trigger allows a move only
@@ -73,7 +85,8 @@ The new copy runs the debate from the start, exactly as a first copy would. Two 
 
 ## What does not change
 
-- A first claim: the replay book is empty, nothing is set aside, every call goes to the vendor.
+- A first claim: the replay book is empty, nothing is wrapped, every call goes to the vendor. The only new statement is
+  the fenced, zero-row set-aside before scoring (the guard against a copy still writing).
 - The ledger keeps every attempt the dead copy made; attempt counts, seat restores (A15d/A16a) and spend read it as
   today. Replayed calls add nothing to it.
 - Story calls run after the work item is settled and are never replayed.
@@ -83,6 +96,10 @@ The new copy runs the debate from the start, exactly as a first copy would. Two 
 - A dead copy that died after `serve.persist` but before settling is not covered (today's behaviour).
 - A call answered while the copy was lost (its result never saved) is asked again: it was in flight.
 - A legacy run without recorded prompts (before 0090) replays nothing and is re-asked in full, but finishes.
+- A copy that lost the run but is still writing can add nodes and reviews while the new copy argues (only its setting
+  aside is fenced); they are set aside before scoring, but the new copy's "progress so far" reads may see them first.
+- Tested end to end on the legacy seat book only (the preview); the pinned role assignment's review-site rule is
+  covered by the review keys the resumed runs record.
 
 ## Tests
 

@@ -5262,9 +5262,14 @@ export class WalkingSkeletonRunner {
      */
     const replayBook = await readReplayBook(this.pool, run.runId, claimed.workItemId);
     replayBookInLease = replayBook;
+    /** Setting nodes aside changes rows another copy saved, so it is fenced on THIS copy's claim (RUNNER_CLAIM_LOST). */
+    const retireClaim = () => Object.freeze({
+      workItemId: claimed.workItemId, workerId: this.settings.workerId,
+      heldUntil: keepAlive.heldUntil(), claimMs: this.settings.claimMs
+    });
     const replayedMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {
       if (replayBook.pending === 0) return maker;
-      const provider = replayingGateway(replayBook, maker.provider);
+      const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall());
       return Object.freeze({ ...maker, provider, judge: new Judge(provider) });
     };
     const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, replayedMaker(maker)] as const));
@@ -6516,9 +6521,6 @@ export class WalkingSkeletonRunner {
       await this.#work.settle({ workItemId: claimed.workItemId, ...completable });
       return { kind: "COMPLETED", answerId: completable.artifactRef };
     }
-    // Reclaim resume: an earlier copy's nodes are set aside before anything is argued (an answer it already served,
-    // just above, keeps its own).
-    if (replayBook.earlierNodes > 0) await this.#graph.retireNodes(run.runId, []);
     for (const callSite of [
       {
         contractHash: this.settings.judgeContractHash,
@@ -6755,6 +6757,9 @@ export class WalkingSkeletonRunner {
      * root 0's own panel is recorded here too instead of failing the run.
      */
     let runBodyBudgetStop: EnvelopeStopKind | null = null;
+    // Reclaim resume: an earlier copy's nodes are set aside before anything is argued — after every claim-time refusal
+    // above (a run refused here keeps its tree as it was), and after an answer that copy already served was settled.
+    if (replayBook.earlierNodes > 0) await this.#graph.retireNodes(run.runId, [], retireClaim());
     const judgementScheduledAt = new Date();
     await this.#ledger.append({
       runId: run.runId,
@@ -7561,7 +7566,8 @@ export class WalkingSkeletonRunner {
     const chooseReviewer = (authoredNode: AuthoredDebateNode, latestReviewerMaker: string | null):
       | { readonly kind: "MEMBERS_SAT_OUT" }
       | { readonly kind: "REVIEW"; readonly reviewer: ReviewerChoice } => {
-      const reviewCallSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
+      // Reclaim resume: a node an earlier copy saved from the same reply keeps that copy's review site (`siteNodeId`).
+      const reviewCallSiteKey = `JUDGE:review:${replayBook.siteNodeId(authoredNode.nodeId)}`;
       // A15 (R5): reviewers come from the REVIEWER seats, and a seat may review
       // only through a member of a different maker than the author — checked
       // per member, so whichever member answers is held to the same rule.
@@ -7608,7 +7614,7 @@ export class WalkingSkeletonRunner {
       | { readonly kind: "STOPPED" };
     /** One node's review call, through the reviewer chosen for it. Nothing is written here but the call's own receipts. */
     const callReview = async (authoredNode: AuthoredDebateNode, reviewer: ReviewerChoice): Promise<ReviewCallOutcome> => {
-      const callSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
+      const callSiteKey = `JUDGE:review:${replayBook.siteNodeId(authoredNode.nodeId)}`;
       try {
         // B9: a review that has to move never moves onto the node's ACTUAL author.
         reviewAuthorMakers.set(callSiteKey, authoredNode.maker);
@@ -8799,8 +8805,14 @@ export class WalkingSkeletonRunner {
     const authoredMakerPositions = Array.from({ length: rootCount }, (_, index) => authoredNodes.get(index))
       .filter((candidate): candidate is AuthoredDebateNode => candidate !== undefined);
     // Reclaim resume: a node of this run that THIS copy did not save (a copy that lost the run, still writing) is set
-    // aside before the graph is scored, so the answer is built on this copy's tree alone.
-    await this.#graph.retireNodes(run.runId, authoredNodeList.map((node) => node.nodeId));
+    // aside before the graph is scored, so the answer is built on this copy's tree alone; a map position such a copy
+    // pointed at its own root is moved to this copy's root.
+    if (await this.#graph.retireNodes(run.runId, authoredNodeList.map((node) => node.nodeId), retireClaim()) > 0) {
+      for (let rootIndex = 0; rootIndex < rootCount; rootIndex += 1) {
+        const root = authoredNodes.get(rootIndex);
+        if (root !== undefined) await writeMapPosition(rootIndex, root);
+      }
+    }
     const { materialised, snapshot: operatorResolvedSnapshot } =
       await this.#resolveOperatorResolvedSnapshot(run.runId);
     let snapshot: EvaluationSnapshot = operatorResolvedSnapshot;

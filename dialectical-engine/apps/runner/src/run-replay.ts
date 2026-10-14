@@ -26,6 +26,8 @@ export interface RecordedArtifact {
   readonly maker: string;
   readonly modelVersion: string | null;
   readonly thinkingTokens: number | null;
+  /** The attempt's place in its gateway call (`raw_artifact.metadata_json.attempt`: 1 starts a call); null if unread. */
+  readonly attempt: number | null;
 }
 
 /** One recorded attempt of a model call: its ledger row, its prompt's fingerprint and its reply, in ledger order. */
@@ -43,7 +45,8 @@ export interface RecordedAttempt {
 
 /**
  * A recorded call that was ANSWERED: the attempts at one site and member, in ledger order, since the previous answer
- * there, the last one OK. Its first attempts may belong to an earlier gateway call at the site that failed in full.
+ * there, the last one OK. Its first attempts may belong to earlier gateway calls at the site that failed in full; the
+ * answered call is the last `accepted.artifact.attempt` of them (every attempt of a call has its ledger row, in order).
  */
 export interface RecordedCall {
   readonly callSiteKey: string;
@@ -76,25 +79,30 @@ export function recordedCalls(attempts: readonly RecordedAttempt[]): readonly Re
 }
 
 /**
- * How a recorded call answers a request whose prompt has `fingerprint`, or null when it does not: the request must be
- * one of the call's original packets (every gateway call starts with its original packet; a repair packet carries the
- * rejected reply, so no fresh request can match one). The repairs counted are those after that packet was last sent.
+ * How a recorded call answers a request whose prompt has `fingerprint`, or null when it does not. The answered gateway
+ * call is the last `n` attempts (n: the OK attempt's place in its call), and the request must be that call's ORIGINAL
+ * packet — its first attempt's prompt (a repair packet carries the rejected reply, so no fresh request matches one;
+ * an earlier, failed call at the site may have asked something else). `answered` is the call's last reply to its
+ * original packet when the OK attempt answered a repair; the repairs counted are those after the original packet was
+ * last sent. A reply whose place in its call was not recorded is never replayed.
  */
 export function replayOf(call: RecordedCall, fingerprint: string): Replay | null {
   const acceptedIndex = call.attempts.length - 1;
   const accepted = call.attempts[acceptedIndex];
   if (accepted === undefined || accepted.outcome !== "OK" || accepted.rawArtifactRef === null || accepted.artifact === null) return null;
-  const lastOriginal = call.attempts.findLastIndex((attempt) => attempt.promptFingerprint === fingerprint);
-  if (lastOriginal < 0) return null;
-  const before = call.attempts[acceptedIndex - 1];
+  const place = accepted.artifact.attempt;
+  if (place === null || !Number.isSafeInteger(place) || place < 1 || place > call.attempts.length) return null;
+  const start = acceptedIndex - (place - 1);
+  if (call.attempts[start]?.promptFingerprint !== fingerprint) return null;
+  const lastOriginal = call.attempts.findLastIndex((attempt, index) => index >= start && attempt.promptFingerprint === fingerprint);
+  const answered = lastOriginal === acceptedIndex ? null
+    : call.attempts.slice(start, acceptedIndex).findLast((attempt) => attempt.promptFingerprint === fingerprint && attempt.artifact !== null) ?? null;
   return Object.freeze({
     accepted: accepted as Replay["accepted"],
-    answered: lastOriginal === acceptedIndex || before === undefined || before.promptFingerprint !== fingerprint ? null : before,
+    answered,
     repairAttempts: acceptedIndex - lastOriginal
   });
 }
-
-const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
 
 export interface ReplayBook {
   /** The recorded calls not replayed yet. */
@@ -102,13 +110,20 @@ export interface ReplayBook {
   /** How many nodes earlier copies of the run saved (set aside at claim). */
   readonly earlierNodes: number;
   /**
-   * This copy saved `nodeId` from the author reply `provenanceRef`: an earlier copy's node with the same reply is the
-   * same node, so a recorded call site naming it (`JUDGE:review:<node>`) names this copy's node from now on.
+   * This copy saved `nodeId` from the author reply `provenanceRef`: the earliest copy's node with the same reply is the
+   * same node (`siteNodeId`).
    */
   adopt(nodeId: string, provenanceRef: string): void;
+  /**
+   * The node id a call site names for `nodeId` (`JUDGE:review:<node>`): the EARLIEST copy's id for a node an earlier
+   * copy saved from the same reply, so the review site is the same site on every copy — the same key in the ledger,
+   * the same reviewer rotation (`seatRotationOffset`), the same recorded answer; `nodeId` itself otherwise (a first
+   * claim, a new node).
+   */
+  siteNodeId(nodeId: string): string;
   /** The recorded answer to this request, consumed, or null. */
   take(request: Readonly<{ callSiteKey: string; providerRef: string; fingerprint: string }>): Replay | null;
-  /** Nothing is replayed any more (the run's content lease is over). */
+  /** Nothing is replayed any more and the recorded content is dropped (the run's content lease is over). */
   close(): void;
 }
 
@@ -117,24 +132,31 @@ export const EMPTY_REPLAY_BOOK: ReplayBook = createReplayBook({ calls: [], earli
 /** A book over the recorded calls; each is replayed at most once, the earliest match first. */
 export function createReplayBook(input: Readonly<{
   calls: readonly RecordedCall[];
+  /** Every node earlier copies saved, in save order. */
   earlierNodes: readonly Readonly<{ nodeId: string; provenanceRef: string | null }>[];
 }>): ReplayBook {
   const pending = [...input.calls];
-  const sameNode = new Map<string, string>();
-  const translated = (key: string): string => key.replace(UUID, (id) => sameNode.get(id.toLowerCase()) ?? id);
+  const earliestByReply = new Map<string, string>();
+  for (const node of input.earlierNodes) {
+    if (node.provenanceRef === null) continue;
+    const reply = node.provenanceRef.toLowerCase();
+    if (!earliestByReply.has(reply)) earliestByReply.set(reply, node.nodeId.toLowerCase());
+  }
+  const earlierNodes = input.earlierNodes.length;
+  const siteNode = new Map<string, string>();
   return {
     get pending() { return pending.length; },
-    earlierNodes: input.earlierNodes.length,
+    earlierNodes,
     adopt(nodeId, provenanceRef) {
-      for (const node of input.earlierNodes) {
-        if (node.provenanceRef !== null && node.provenanceRef.toLowerCase() === provenanceRef.toLowerCase()) {
-          sameNode.set(node.nodeId.toLowerCase(), nodeId);
-        }
-      }
+      const earliest = earliestByReply.get(provenanceRef.toLowerCase());
+      if (earliest !== undefined) siteNode.set(nodeId.toLowerCase(), earliest);
+    },
+    siteNodeId(nodeId) {
+      return siteNode.get(nodeId.toLowerCase()) ?? nodeId;
     },
     take(request) {
       for (const [index, call] of pending.entries()) {
-        if (call.actorRef !== request.providerRef || translated(call.callSiteKey) !== request.callSiteKey) continue;
+        if (call.actorRef !== request.providerRef || call.callSiteKey !== request.callSiteKey) continue;
         const replay = replayOf(call, request.fingerprint);
         if (replay === null) continue;
         pending.splice(index, 1);
@@ -144,6 +166,7 @@ export function createReplayBook(input: Readonly<{
     },
     close() {
       pending.splice(0, pending.length);
+      earliestByReply.clear();
     }
   };
 }
@@ -151,12 +174,19 @@ export function createReplayBook(input: Readonly<{
 /**
  * A member's gateway that answers a call the book holds from the record, and sends every other call on to `inner`
  * unchanged. The content is rebuilt as the gateway decided it (`rebuildRecordedCallContent`); a recorded call whose
- * content cannot be rebuilt is made again. Nothing is reserved, spent, counted or written for a replayed call.
+ * content cannot be rebuilt is made again. Nothing is reserved, spent, counted or written for a replayed call; the
+ * debate's keep-alive is asked first (`mayCall`), as before a real call, so a copy that lost the run replays nothing.
  */
-export function replayingGateway(book: ReplayBook, inner: ProviderGateway): ProviderGateway {
+export function replayingGateway(
+  book: ReplayBook,
+  inner: ProviderGateway,
+  /** Asked before an answer is replayed: a copy that must make no further call (its claim lost, its time up) stops. */
+  mayCall: () => void = () => undefined
+): ProviderGateway {
   return Object.freeze({
     call: async (request: ProviderCallRequest): Promise<ProviderCallResult> => {
       if (book.pending === 0) return inner.call(request);
+      mayCall();
       const replay = book.take({
         callSiteKey: request.callSiteKey,
         providerRef: request.providerRef,
@@ -198,13 +228,14 @@ export async function readReplayBook(pool: Pool, runId: string, workItemId: stri
     thinking_level: string | null; attempt_id: string | null;
     prompt_fingerprint: string | null; prompt_text: string | null; prompt_ciphertext: CryptoEnvelope | null;
     raw_text: string | null; artifact_ciphertext: CryptoEnvelope | null; provider: string | null; model_id: string | null;
-    maker: string | null; model_version: string | null; thinking_tokens: number | null;
+    maker: string | null; model_version: string | null; thinking_tokens: number | null; reply_attempt: string | null;
   }>(
     `SELECT entry.call_site_key, entry.actor_ref, entry.outcome, entry.ledger_entry_id::text,
             entry.raw_artifact_ref::text, entry.thinking_level, entry.attempt_id::text,
             prompt.prompt_fingerprint, prompt.prompt_text, prompt.content_ciphertext AS prompt_ciphertext,
             artifact.raw_text, artifact.content_ciphertext AS artifact_ciphertext, artifact.provider, artifact.model_id,
-            artifact.maker, artifact.model_version, artifact.thinking_tokens
+            artifact.maker, artifact.model_version, artifact.thinking_tokens,
+            artifact.metadata_json->>'attempt' AS reply_attempt
        FROM ledger.ledger_entry AS entry
        LEFT JOIN ledger.call_prompt AS prompt ON prompt.attempt_id = entry.attempt_id AND prompt.run_id = entry.run_id
        LEFT JOIN ledger.raw_artifact AS artifact ON artifact.raw_artifact_id = entry.raw_artifact_ref AND artifact.run_id = entry.run_id
@@ -230,7 +261,8 @@ export async function readReplayBook(pool: Pool, runId: string, workItemId: stri
         promptFingerprint: typeof prompt?.promptFingerprint === "string" ? prompt.promptFingerprint : null,
         artifact: reply === null || typeof reply.rawText !== "string" ? null : Object.freeze({
           rawText: reply.rawText, provider: row.provider!, modelId: row.model_id!, maker: row.maker!,
-          modelVersion: row.model_version, thinkingTokens: row.thinking_tokens
+          modelVersion: row.model_version, thinkingTokens: row.thinking_tokens,
+          attempt: row.reply_attempt === null || !/^[0-9]{1,3}$/u.test(row.reply_attempt) ? null : Number(row.reply_attempt)
         })
       });
     });

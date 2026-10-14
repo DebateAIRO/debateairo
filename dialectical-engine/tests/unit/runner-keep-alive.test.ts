@@ -105,6 +105,20 @@ describe("L4-F9 — a running debate keeps its claim", () => {
     keepAlive.stop();
   });
 
+  it("tells the deadline it holds: the claim's, then each renewal's (the fence of the reclaim resume's set-aside)", async () => {
+    const clock = manualClock();
+    const keepAlive = startRunKeepAlive({
+      claimDeadline: new Date(T0 + 30 * MINUTE),
+      renewEveryMs: 10 * MINUTE,
+      renew: async (): Promise<ClaimRenewal> => ({ kind: "RENEWED", claimDeadline: new Date(clock.now() + 30 * MINUTE) }),
+      clock
+    });
+    expect(keepAlive.heldUntil().getTime()).toBe(T0 + 30 * MINUTE);
+    await clock.advance(10 * MINUTE);
+    expect(keepAlive.heldUntil().getTime()).toBe(T0 + 40 * MINUTE);
+    keepAlive.stop();
+  });
+
   it("stops every further model call once another copy holds the claim", async () => {
     const clock = manualClock();
     let renewals = 0;
@@ -312,6 +326,7 @@ describe("the runner's model gateway obeys the keep-alive", () => {
     const keepAlive: RunKeepAlive = {
       assertMayCall: () => { if (stop !== null) throw new TypedDomainError(stop, stop); },
       progressed: () => { progress.push(1); },
+      heldUntil: () => new Date(0),
       stop: () => undefined
     };
     return { keepAlive, progress };

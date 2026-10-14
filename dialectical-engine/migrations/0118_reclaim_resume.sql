@@ -6,7 +6,8 @@
 -- Two changes, both decided by triggers for EVERY role, the table owner included (0052's measurement guard on
 -- core.edge is the model); the column grants are defence in depth:
 --   1. core.node: the runtime may change generation_status, only to 'stale', only from another value (one way: a
---      stale node never comes back), and nothing else in the row. DELETE stays refused.
+--      stale node never comes back), nothing else in the row, and never once the run has served an answer. DELETE
+--      stays refused.
 --   2. core.map_position (0116) names the root that argued each chosen answer. Its row cannot be changed: 0116's
 --      chain step digests that table's ACL, column ACLs and triggers in its postcondition evidence (compared on every
 --      later migrate()), so a grant or a trigger on it would read as drift of 0116. The re-point is therefore a NEW
@@ -47,6 +48,11 @@ BEGIN
   END IF;
   IF core.run_uses_content_encryption(NEW.run_id) AND NOT core.run_private_content_is_live(NEW.run_id) THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'PRIVATE_CONTENT_ERASED';
+  END IF;
+  -- A run that has served an answer keeps its tree: only a copy still arguing sets nodes aside (the runner fences it on
+  -- its claim too), so a copy that lost the run and woke up late can never empty a served debate.
+  IF EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = NEW.run_id) THEN
+    RAISE EXCEPTION 'NODE_RETIRE_AFTER_ANSWER: a run with a served answer keeps its tree' USING ERRCODE = '55000';
   END IF;
   RETURN NEW;
 END;
