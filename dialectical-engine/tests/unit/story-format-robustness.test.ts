@@ -486,7 +486,10 @@ describe("F — R15: the story checker's reasoning-then-verdict reply and its lo
     const tooLong = JSON.stringify({ ...JSON.parse(R15_646), objection: "x".repeat(4001) });
     const refused = classifyCheckerContent(tooLong, STOP);
     expect(refused.parseStatus).toBe("SCHEMA_FAILED");
-    expect(schemaFailureLocator(refused as Exclude<ContentClassification, { parseStatus: "PARSED" }>)).toEqual({ code: "SCHEMA_FAILED", path: "objection" });
+    // Practice 2026-10-14: the repair now also states the limit the objection must keep.
+    expect(schemaFailureLocator(refused as Exclude<ContentClassification, { parseStatus: "PARSED" }>)).toEqual({
+      code: "SCHEMA_FAILED", path: "objection", limit: { path: "objection", bound: "at most", size: 4000, unit: "characters" }
+    });
   });
 
   it("644: the real reply, whose trailing verdict left out the criteria, stays the PARSE_FAILED it was", () => {

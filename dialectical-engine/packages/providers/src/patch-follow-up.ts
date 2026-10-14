@@ -11,7 +11,7 @@
  * passes the step's own classifier, unchanged, or the call goes on to the full re-ask.
  */
 import { decodeModelJson, type ModelReplyFacts } from "./model-json.js";
-import { isPatchPath, isPatchPathList, type FramedPatchLocator } from "./prompt-frame.js";
+import { isPatchPath, isPatchPathList, schemaFailureLimits, type FramedPatchLocator } from "./prompt-frame.js";
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -108,9 +108,12 @@ export function planPatchFollowUp(input: {
   if (paths === null || paths.length === 0) return null;
   const base = decoded.value;
   if (!paths.every((path) => settable(base, path))) return null;
+  // Practice 2026-10-14: a size refusal states its limit (the 240-character line DeepSeek re-sent at 326); a refusal
+  // that states none leaves the locator, and so the block, exactly as before.
+  const limits = schemaFailureLimits(input.parseError, paths);
   return Object.freeze({
     base: Object.freeze(base),
-    locator: Object.freeze({ code: issueCode(input.parseError), paths })
+    locator: Object.freeze({ code: issueCode(input.parseError), paths, ...(limits.length === 0 ? {} : { limits }) })
   });
 }
 
