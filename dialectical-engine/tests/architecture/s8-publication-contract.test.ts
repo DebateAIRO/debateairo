@@ -155,8 +155,12 @@ describe("Accounts S8 publication architecture", () => {
     // it rests on and whether that label's basis was thin (M5 review, I2) —
     // never the reason code (owner-only `floor_reason`), a model or a count.
     expect(schema).toContain("floor: AnswerFloorSchema.optional()");
+    // Debate shape P2c (Task 4): the debate page's map view rides on the snapshot, optional (old
+    // snapshots parse), its own strict schema in map-view.ts: argued answers keyed by root node id
+    // and the also-raised claims, never a maker, a count, a mark or a map id.
+    expect(schema).toContain("map_view: DebateMapViewSchema.optional()");
     expect([...schema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
-      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor"]);
+      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor", "map_view"]);
     const floorStart = disclosure.indexOf("export const AnswerFloorSchema");
     const floorEnd = disclosure.indexOf("export type AnswerFloor =");
     expect(floorStart).toBeGreaterThan(-1);
