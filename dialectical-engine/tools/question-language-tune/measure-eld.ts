@@ -2,6 +2,7 @@ import { LEGAL_LOCALES, excludedLines, mixedQuestions, proseSentences, pureContr
 import {
   ELD_LANGUAGES, SITE_LANGUAGES_ELD_LACKS, loadEldReader, type EldDatabaseSize, type EldReading
 } from "../../apps/api/src/question-language/eld.js";
+import { ELD_TUNING_BARS } from "../../apps/api/src/question-language/eld-tuning.js";
 
 export type EldTuningRow = Readonly<{ size: EldDatabaseSize; minLetters: number; sentences: number;
   settlesOwnSite: number; wrongLockable: number; wrongLockableRoEn: number; roPlainSettles: number; roPlainWrong: number }>;
@@ -42,7 +43,7 @@ export async function measureEld(sizes: readonly EldDatabaseSize[], minLetters: 
 const SIZE_ORDER: readonly EldDatabaseSize[] = ["small", "medium", "large"];
 
 export function chooseEldTuning(rows: readonly EldTuningRow[]): EldTuningRow | null {
-  const safe = rows.filter((row) => row.wrongLockableRoEn === 0 && row.roPlainWrong === 0 && row.wrongLockable * 2000 <= row.sentences);
+  const safe = rows.filter((row) => row.wrongLockableRoEn === 0 && row.roPlainWrong === 0 && row.wrongLockable * ELD_TUNING_BARS.wrongLockableOneIn <= row.sentences);
   if (safe.length === 0) return null;
   return [...safe].sort((a, b) => b.settlesOwnSite - a.settlesOwnSite
     || SIZE_ORDER.indexOf(a.size) - SIZE_ORDER.indexOf(b.size) || a.minLetters - b.minLetters)[0]!;
@@ -121,7 +122,7 @@ export async function measureEldMix(size: EldDatabaseSize, segmentMinLetters: re
 }
 
 export function chooseSegmentMinLetters(rows: readonly EldMixRow[]): EldMixRow | null {
-  const safe = rows.filter((row) => row.pureFlagged * 20 <= row.pure);
+  const safe = rows.filter((row) => row.pureFlagged * ELD_TUNING_BARS.pureFlaggedOneIn <= row.pure);
   if (safe.length === 0) return null;
   return [...safe].sort((a, b) => b.mixCaught - a.mixCaught || b.segmentMinLetters - a.segmentMinLetters)[0]!;
 }
