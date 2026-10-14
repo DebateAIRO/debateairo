@@ -169,6 +169,9 @@ describe("fewer than two positions (pre-flight PF-B31)", () => {
   it("shapePositionCount: max(2, min(P, makers left)), refusing a P below two or a broken count", () => {
     expect([0, 1, 2, 3, 4, 9].map((makersLeft) => shapePositionCount(3, makersLeft))).toEqual([2, 2, 2, 3, 3, 3]);
     expect(shapePositionCount(2, 1)).toBe(2);
+    // Ruling T-P5, defence in depth: never more positions than the map can store (MAP_LIMITS.chooseAnswersMax), whatever
+    // a receipt says.
+    expect([4, 5, 9].map((answers) => shapePositionCount(answers, 9))).toEqual([4, 4, 4]);
     for (const [answers, makersLeft] of [[1, 3], [2.5, 3], [3, -1], [3, Number.NaN]] as const) {
       expect(() => shapePositionCount(answers, makersLeft), `${String(answers)}/${String(makersLeft)}`).toThrow("SHAPE_POSITION_COUNT_INVALID");
     }

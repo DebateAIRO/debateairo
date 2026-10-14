@@ -6767,6 +6767,7 @@ export class WalkingSkeletonRunner {
       const resolved = await resolveShapeMap({
         store: this.#mapChoices, runId: run.runId, runMap,
         // Pre-flight PF-B31: never fewer than two positions (buildShapePlan refuses fewer; the receipt's answers is ≥ 2).
+        // Ruling T-P5: never more than the map stores either (`shapePositionCount` holds MAP_LIMITS.chooseAnswersMax).
         answerCount: () => shapePositionCount(shapeRun.shape.answers, shapeDistinctMakers(rootSeats, seatSitsOut)),
         spendStopOfCode: (code) => expansionPhaseStop(new TypedDomainError(code, code))
       });
