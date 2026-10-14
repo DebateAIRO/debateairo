@@ -1672,7 +1672,7 @@ export const contractInventory = Object.freeze({
     ...staffContractInventory.resources,
     ...fundedStaffContractInventory.resources,
     FundingBasisSchema,
-    AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
+    AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, QuestionLanguageChoiceNeededSchema, AskRoomQuerySchema, AskRoomResponseSchema,
     BillingUsageResponseSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
     AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,

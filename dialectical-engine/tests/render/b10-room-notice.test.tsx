@@ -320,7 +320,7 @@ describe("/new hides the plan chooser and names the plan the server decided (spe
     expect(mocks.createDebate).toHaveBeenCalledWith(
       "Cities should ban cars downtown",
       expect.objectContaining({ plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 2 }),
-      "test-token"
+      "test-token", undefined, { siteLanguage: "en" }
     );
   });
 

@@ -1,4 +1,4 @@
-import { ContractHttpError } from "@debateai/contract";
+import { ContractHttpError, type QuestionLanguageOffer } from "@debateai/contract";
 import { t,type MessageCatalog } from "../i18n/translate.js";
 
 /**
@@ -146,7 +146,40 @@ const MODEL_STRENGTH_REFUSALS: Readonly<Record<string, RequestFailureKind>> = Ob
   ASK_MODEL_CANDIDATE_UNAVAILABLE: "MODEL_UNAVAILABLE"
 });
 
+/**
+ * Question language (spec 2026-10-13, D1): the server found a real mix in the question and offers a
+ * one-language version (`createDebate` with the page's language throws this; `lib/api.ts` re-exports
+ * it). It lives here, beside the stale-check refusals below, so the page can read both without
+ * importing the network module.
+ */
+export class QuestionLanguageChoiceNeededError extends Error {
+  readonly offer: QuestionLanguageOffer;
+  constructor(offer: QuestionLanguageOffer) {
+    super("QUESTION_LANGUAGE_CHOICE_NEEDED");
+    this.name = "QuestionLanguageChoiceNeededError";
+    this.offer = offer;
+  }
+}
+
+/**
+ * Question language (spec 2026-10-13; P2L pre-flight PF-L29, PF-L24): the 409 refusals of the
+ * person's answer to an offer — a forged or foreign reference, an expired one, or one for another
+ * question. Read from `serverCode`: the client's own `.code` for every 409 is "SERVER_FAILURE".
+ */
+const QUESTION_LANGUAGE_STALE_CHECKS: ReadonlySet<string> = new Set([
+  "QUESTION_LANGUAGE_CHECK_INVALID", "QUESTION_LANGUAGE_CHECK_EXPIRED", "QUESTION_LANGUAGE_CHOICE_MISMATCH"
+]);
+
+export function isQuestionLanguageCheckStale(failure: unknown): boolean {
+  return failure instanceof ContractHttpError && failure.status === 409
+    && QUESTION_LANGUAGE_STALE_CHECKS.has(failure.serverCode ?? "");
+}
+
 function kindOf(error: unknown): RequestFailureKind {
+  // Question language: /new answers an offer and re-checks a stale reference itself; one that still
+  // reaches a banner (its tries for this press used up) means "press Start again", which checks the
+  // question afresh. BUSY is the constant clause that says exactly that action; never a raw code.
+  if (error instanceof QuestionLanguageChoiceNeededError || isQuestionLanguageCheckStale(error)) return "BUSY";
   if (!(error instanceof ContractHttpError)) return "UNCLASSIFIED";
   if (error.status === 422 && error.serverCode !== null
     && Object.hasOwn(PLAN_TIER_REFUSALS, error.serverCode)) {

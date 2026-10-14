@@ -8,7 +8,9 @@ import {
   type AskRequest,
   type ContractClient,
   type DepthParams,
-  type RunProjection
+  type QuestionLanguageChoice,
+  type RunProjection,
+  type SiteLanguage
 } from "@debateai/contract";
 import type {
   DebateAdaptiveDepthApprovalRequest,
@@ -22,6 +24,7 @@ import type {
   WorkerStatus
 } from "./types.js";
 import { readAnswerFloor, type AnswerFloorRead } from "./v3/floorAnswer.js";
+import { QuestionLanguageChoiceNeededError } from "./v3/requestFailure.js";
 import { readAnswerMapView, type AnswerMapViewRead } from "./v3/mapView.js";
 import { isModelStrength } from "./modelStrength.js";
 import {
@@ -443,6 +446,14 @@ function optionalDepthChoice<K extends "depthMode" | "scrutiny" | "answerLength"
 }
 
 /**
+ * Question language (spec 2026-10-13): the server found a real mix and offers a one-language version
+ * (`QuestionLanguageChoiceNeededError`), or refuses a stale answer to an offer with a 409
+ * (`isQuestionLanguageCheckStale`). Both live in `./v3/requestFailure.ts` so a page can read them
+ * without this module; they are re-exported here as the ask's own outcomes.
+ */
+export { isQuestionLanguageCheckStale, QuestionLanguageChoiceNeededError } from "./v3/requestFailure.js";
+
+/**
  * Builds the V3 ask strictly from user-supplied fields (S14 precedent: every
  * contract value is explicit input — no hidden defaults, no invented
  * numbers). Missing or malformed fields fail loudly before any network call.
@@ -451,7 +462,12 @@ export async function createDebate(
   topic: string,
   config: AskConfig,
   token: string,
-  client: ContractClient = contractClient
+  client: ContractClient = contractClient,
+  /**
+   * Question language (spec 2026-10-13): the page's language, and the person's answer to an offer
+   * when there is one. Absent, the ask is today's ask, sent by today's call.
+   */
+  language?: Readonly<{ siteLanguage: SiteLanguage; choice?: QuestionLanguageChoice }>
 ): Promise<{ id: string }> {
   const riskTier = requiredString(config, "risk_tier");
   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
@@ -484,9 +500,16 @@ export async function createDebate(
     as_of: asOf.toISOString(),
     steering_presets: optionalLines(config, "steering_presets"),
     steering_annotations: optionalLines(config, "steering_annotations"),
-    ...(modelStrength === undefined ? {} : { model_strength: modelStrength })
+    ...(modelStrength === undefined ? {} : { model_strength: modelStrength }),
+    ...(language === undefined ? {} : { site_language: language.siteLanguage }),
+    ...(language?.choice === undefined ? {} : { question_language_choice: language.choice })
   };
   requireToken(token);
-  const accepted = await client.submitAsk(ask);
-  return { id: accepted.run_ref };
+  if (language === undefined) {                                   // today's call, unchanged
+    const accepted = await client.submitAsk(ask);
+    return { id: accepted.run_ref };
+  }
+  const outcome = await client.submitAskOrLanguageChoice(ask);
+  if (outcome.kind === "LANGUAGE_CHOICE_NEEDED") throw new QuestionLanguageChoiceNeededError(outcome.offer);
+  return { id: outcome.accepted.run_ref };
 }

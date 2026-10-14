@@ -1,7 +1,8 @@
 import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  AskRequestSchema, QUESTION_LANGUAGE_CHOICE_NEEDED, QuestionLanguageChoiceNeededSchema, SITE_LANGUAGE_CODES, createContractClient
+  AskRequestSchema, QUESTION_LANGUAGE_CHOICE_NEEDED, QuestionLanguageChoiceNeededSchema, SITE_LANGUAGE_CODES, contractInventory,
+  createContractClient
 } from "@debateai/contract";
 
 const SITE_LOCALES = readdirSync(new URL("../../apps/ui/messages/", import.meta.url), { withFileTypes: true })
@@ -53,6 +54,12 @@ describe("the ask's question-language fields (question-language spec 2026-10-13)
     expect(QuestionLanguageChoiceNeededSchema.safeParse({ ...needed(OFFER), extra: 1 }).success).toBe(false);
     expect(QuestionLanguageChoiceNeededSchema.safeParse(needed({ ...OFFER, extra: 1 })).success).toBe(false);
     expect(QuestionLanguageChoiceNeededSchema.safeParse(needed({ ...OFFER, proposed_question: "" })).success).toBe(false);
+  });
+
+  it("the offer body is inventoried beside the ask, as the 422 ASK_ALREADY_WAITING body is (P2L Task 18)", () => {
+    const resources = contractInventory.resources as unknown as Record<string, unknown>;
+    expect(resources.AskAlreadyWaitingSchema).toBeDefined();
+    expect(resources.QuestionLanguageChoiceNeededSchema).toBe(QuestionLanguageChoiceNeededSchema);
   });
 
   it("PF-L19 / L-B64: at most six languages, each once, each name at most 64 bytes", () => {

@@ -5,10 +5,15 @@ import { AiNotice } from "@/components/AiNotice";
 
 import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, expansionDepthMaxFor } from "@debateai/contract";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, expansionDepthMaxFor, type QuestionLanguageChoice } from "@debateai/contract";
 import { createDebate, contractClient } from "@/lib/api";
 import { modelDot } from "@/lib/models";
-import { classifyRequestFailure, requestFailureMessage } from "@/lib/v3/requestFailure";
+import {
+  classifyRequestFailure,
+  isQuestionLanguageCheckStale,
+  QuestionLanguageChoiceNeededError,
+  requestFailureMessage
+} from "@/lib/v3/requestFailure";
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { UsageBars } from "@/components/billing/UsageBars";
@@ -16,6 +21,8 @@ import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom, type AskRoomQuery
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
 import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
+import { useQuestionLanguageChoice } from "@/components/QuestionLanguageChoice";
+import { catalogLocale, isLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import type { ModelStrength } from "@debateai/kernel";
 import {
@@ -52,6 +59,13 @@ const displayPlanTierRosters = previewPlanRoster(process.env.NEXT_PUBLIC_PREVIEW
 // Owner ruling 2026-10-10: a preview build (its public model-list flag is set) offers a shallower ceiling,
 // declared beside the depth bound in @debateai/contract; hosted builds keep the whole range.
 const depthMax = expansionDepthMaxFor(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON !== undefined);
+
+/*
+ * Question language (spec 2026-10-13; P2L Task 18, ruling CR-5): one press of "Start debate" makes at
+ * most four asks — the first, the answer to the offer, one re-check after a stale reference, and the
+ * answer to a second offer — plus today's one retry after the consent screen.
+ */
+const LANGUAGE_ASKS_PER_PRESS = 4;
 
 /*
  * Debate shape P2c (spec 2026-10-12 §3.2, rulings S6–S8): Depth mode, Depth of scrutiny and
@@ -186,6 +200,20 @@ function NewDebateForm({
   const submitFlight = useRef(false);
   const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
   const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
+  // Question language (spec 2026-10-13): the page's language goes with the question (PF-L56: `locale` is a string).
+  const pageLocale: LocaleCode = isLocale(locale) ? locale : "en";
+  const languageChoice = useQuestionLanguageChoice({ catalog, locale: pageLocale });
+  const topicField = useRef<HTMLTextAreaElement | null>(null);
+  const topicRef = useCallback((field: HTMLTextAreaElement | null) => {
+    topicField.current = field;
+    grow(field);
+  }, []);
+  // "Edit" on the language pop-up puts the person back in the question box. Focus moves in an effect,
+  // so it lands after the closing pop-up has handed focus back to whatever opened it.
+  const [topicFocusRequest, setTopicFocusRequest] = useState(0);
+  useEffect(() => {
+    if (topicFocusRequest > 0) topicField.current?.focus();
+  }, [topicFocusRequest]);
   // Budget spec §2.11: the room for the ask this form would send. It is a
   // word (FITS/CLOSE/FULL/ALREADY_WAITING), never a figure.
   // Debate shape P2c (Contract deviation 7): true once a room read has said the deployment's shape row is
@@ -309,13 +337,56 @@ function NewDebateForm({
         // A21 O4: a locked control sends nothing, so the deployment's own default applies.
         modelStrength: strengthControl.locked ? null : modelStrength
       }, submitTime, catalog);
-      let debate;
-      try {
-        debate = await createDebate(topic.trim(), config, token);
-      } catch (refusal) {
-        if (!isSensitiveDataConsentRefusal(refusal)) throw refusal;
-        if (!await consent.ensureConsent({ known: "required" })) return;
-        debate = await createDebate(topic.trim(), config, token);
+      // Question language (spec 2026-10-13; ruling CR-5, D1 order). Every ask carries the page's
+      // language. A real mix is offered once per press; a second offer in the same press is answered
+      // with the person's own wording. A stale reference is never sent again: the question is checked
+      // once more, without a choice. Every other refusal goes on to today's handling below.
+      const siteLanguage = catalogLocale(pageLocale);
+      const question = topic.trim();
+      let next: Readonly<{ line: string; choice?: QuestionLanguageChoice }> = { line: question };
+      let asks = 0;
+      let consentRetried = false;
+      let offerShown = false;
+      let rechecked = false;
+      let debate: { id: string } | null = null;
+      while (debate === null) {
+        try {
+          debate = await createDebate(next.line, config, token, undefined,
+            next.choice === undefined ? { siteLanguage } : { siteLanguage, choice: next.choice });
+        } catch (refusal) {
+          // Today's one retry after the consent screen; it is not one of the four asks.
+          if (isSensitiveDataConsentRefusal(refusal) && !consentRetried) {
+            consentRetried = true;
+            if (!await consent.ensureConsent({ known: "required" })) return;
+            continue;
+          }
+          asks += 1;
+          if (asks >= LANGUAGE_ASKS_PER_PRESS) throw refusal;
+          if (refusal instanceof QuestionLanguageChoiceNeededError) {
+            const offer = refusal.offer;
+            if (offerShown) {
+              next = { line: question, choice: { check_ref: offer.check_ref, choice: "KEEP_MINE" } };
+              continue;
+            }
+            offerShown = true;
+            const answer = await languageChoice.ensureChoice(offer);
+            if (answer === "EDIT") {
+              setTopicFocusRequest((request) => request + 1);
+              return;
+            }
+            next = answer === "USE"
+              ? { line: offer.proposed_question,
+                choice: { check_ref: offer.check_ref, choice: "USE_REWRITE", original_question_line: question } }
+              : { line: question, choice: { check_ref: offer.check_ref, choice: "KEEP_MINE" } };
+            continue;
+          }
+          if (next.choice !== undefined && !rechecked && isQuestionLanguageCheckStale(refusal)) {
+            rechecked = true;
+            next = { line: question };
+            continue;
+          }
+          throw refusal;
+        }
       }
       router.push(`/debate/${encodeURIComponent(debate.id)}?starting=1`);
     } catch (exc) {
@@ -398,7 +469,7 @@ function NewDebateForm({
               <textarea
                 id="topic"
                 className="ndTopic"
-                ref={grow}
+                ref={topicRef}
                 rows={1}
                 value={topic}
                 onChange={(event) => {
@@ -556,6 +627,7 @@ function NewDebateForm({
         </form>
         {consent.dialog}
         {crisis.dialog}
+        {languageChoice.dialog}
       </div>
       <SupportWidget />
     </div>

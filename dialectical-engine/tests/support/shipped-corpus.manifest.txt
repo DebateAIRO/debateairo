@@ -474,6 +474,7 @@ apps/ui/components/PublicAnswerDisclosure.tsx
 apps/ui/components/PublicDebateOverview.tsx
 apps/ui/components/PublicHonestyDrawer.tsx
 apps/ui/components/PublicationControl.tsx
+apps/ui/components/QuestionLanguageChoice.tsx
 apps/ui/components/QuestionLanguageOffer.tsx
 apps/ui/components/RecommendedInvestigations.tsx
 apps/ui/components/ReferenceNodeMeta.tsx
