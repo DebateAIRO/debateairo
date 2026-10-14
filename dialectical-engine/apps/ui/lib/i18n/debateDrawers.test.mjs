@@ -42,6 +42,7 @@ const allowedCodeTokens = new Set([
   "dispute",
   "evidence_unverified",
   "gold",
+  "neutral",
   "claim_type_unknown",
   "refuted",
   "reopen",
