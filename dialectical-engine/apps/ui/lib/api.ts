@@ -20,6 +20,7 @@ import type {
   WorkerStatus
 } from "./types.js";
 import { readAnswerFloor, type AnswerFloorRead } from "./v3/floorAnswer.js";
+import { readAnswerMapView, type AnswerMapViewRead } from "./v3/mapView.js";
 import { isModelStrength } from "./modelStrength.js";
 import {
   adaptiveDepthUnavailable,
@@ -138,7 +139,7 @@ export async function validateSession(client: ContractClient = contractClient): 
  * the answer: a components-only answer's record, and nothing for any other.
  */
 export type DebateBundle =
-  | { kind: "served"; answer: Answer; detail: DebateDetail; run: null; questionLanguage: ArgumentLanguage | null; floorRead: AnswerFloorRead }
+  | { kind: "served"; answer: Answer; detail: DebateDetail; run: null; questionLanguage: ArgumentLanguage | null; floorRead: AnswerFloorRead; mapViewRead?: AnswerMapViewRead }
   | { kind: "loading"; answer: null; detail: DebateDetail; run: RunProjection; questionLanguage: ArgumentLanguage | null }
   | { kind: "failed"; answer: null; detail: DebateDetail; run: RunProjection; questionLanguage: ArgumentLanguage | null };
 
@@ -157,15 +158,18 @@ async function servedDebateBundle(
   answer: Answer,
   catalog: MessageCatalog,
   run: RunProjection | null,
-  client: Pick<ContractClient, "readAnswerDisclosure">
+  client: Pick<ContractClient, "readAnswerDisclosure" | "readAnswerMapView">
 ): Promise<DebateBundle> {
+  // The floor and the map view (debate shape P2c) both need only the answer: one round trip.
+  const [floorRead, mapViewRead] = await Promise.all([readAnswerFloor(client, answer), readAnswerMapView(client, answer)]);
   return {
     kind: "served",
     answer,
     detail: debateDetailFromAnswer(answer, catalog),
     run: null,
     questionLanguage: run?.argument_language ?? null,
-    floorRead: await readAnswerFloor(client, answer)
+    floorRead,
+    mapViewRead
   };
 }
 
