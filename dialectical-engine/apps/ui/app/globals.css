@@ -6827,20 +6827,12 @@ a:focus-visible {
 .ndOptionsCaret { font-size: 8px; }
 .ndOptionsRule { flex: 1; height: 1px; background: var(--line); }
 
-/* The V2 knobs the V3 contract has no slot for are drawn as a dashed aside. */
+/* The OPTIONS panel is drawn as a dashed aside (M12 pins this frame). */
 .ndLegacy {
   margin-top: 14px;
   border-style: dashed;
   border-color: var(--line-strong);
   opacity: 0.88;
-}
-.ndLegacyNotice {
-  margin: 0;
-  padding: 14px 0;
-  font-size: 12px;
-  font-style: italic;
-  color: var(--text-2);
-  border-bottom: 1px solid var(--line);
 }
 /* The document draws these as a box holding just the chosen label. A native
    select would instead size to its widest option, so the real control lies

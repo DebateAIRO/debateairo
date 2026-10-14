@@ -730,7 +730,6 @@ apps/ui/lib/scoringResponse.test.mjs
 apps/ui/lib/scoringResponse.ts
 apps/ui/lib/scoringStatusCopy.ts
 apps/ui/lib/scrutiny.ts
-apps/ui/lib/scrutinyDepth.ts
 apps/ui/lib/securityConfirmation.ts
 apps/ui/lib/serverApi.test.mjs
 apps/ui/lib/serverApi.ts

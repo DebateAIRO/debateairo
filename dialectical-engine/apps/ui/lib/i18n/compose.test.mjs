@@ -9,7 +9,6 @@ import { assertLocalizedCatalog, assertTranslationSample } from "./catalogContra
 const root = process.cwd();
 const ownedFiles = [
   "lib/scrutiny.ts",
-  "lib/scrutinyDepth.ts",
   "lib/models.ts",
   "lib/recommendation.ts",
   "lib/v3/adapter.ts"
@@ -147,15 +146,7 @@ test("model names, enum tokens, and adapter status identifiers stay in source", 
   }
 });
 
-test("compose migration preserves budget and recommendation behavior guards", () => {
-  const depth = sources.get("lib/scrutinyDepth.ts");
-  assert.match(depth, /if \(depth === "standard"\) \{\s*return null;/);
-  assert.match(depth, /max_rounds: 4, max_per_node: 3, max_per_debate: 14/);
-  // The ruled ceiling has a single source (apps/ui/lib/scrutinyDepth.ts, guarded by
-  // tests/unit/s1-1-depth-contract.test.ts); restating its numerals here would be a
-  // second definition, so this guard pins the default branch's shape, not its values.
-  assert.match(depth, /return \{ max_rounds: \d+, max_per_node: \d+, max_per_debate: \d+ \};\s*\}/);
-
+test("compose migration preserves recommendation and adapter behavior guards", () => {
   const recommendation = sources.get("lib/recommendation.ts");
   assert.match(recommendation, /left\.priority - right\.priority/);
   assert.match(recommendation, /compareCodeUnits\(left\.action, right\.action\)/);

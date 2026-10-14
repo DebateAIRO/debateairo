@@ -393,7 +393,11 @@ const CustomerAskRoomResponseSchema = z.object({
   // Final review Part 1b, Important 1: a question that would wait (or the one
   // waiting) waits only for the person's own running debates; `resets_at` is
   // then the waker's next tick, not a reset.
-  waits_for: WaitsForSchema.optional()
+  waits_for: WaitsForSchema.optional(),
+  // Debate shape P2c (Contract deviation 7): present, and only ever `true`, when the deployment's
+  // debateShapePolicy row is in force, so the /new page may offer depth mode, scrutiny and answer
+  // length. Absent otherwise: the API would drop them, so the page offers none of them.
+  shape_settings: z.literal(true).optional()
 }).strict().superRefine((answer, context) => {
   if (answer.waits_for !== undefined
     && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
@@ -413,7 +417,7 @@ const CustomerAskRoomResponseSchema = z.object({
 const InternalFundingUsageSchema = z.object({kind:z.literal("INTERNAL"),expires_at:z.iso.datetime()}).strict();
 const InternalAskRoomResponseSchema = z.object({
   room:z.enum(["FITS","CLOSE","FULL","ALREADY_WAITING"]),scope:z.enum(["SITE_DAY","PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]).nullable(),
-  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional()
+  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional(),shape_settings:z.literal(true).optional()
 }).strict().superRefine((answer,context)=>{
   if ((answer.room==="FITS") !== (answer.scope===null) || (answer.room==="FITS" && answer.resets_at!==null)
     || ((answer.room==="ALREADY_WAITING") !== (answer.waiting_run_ref!==null))

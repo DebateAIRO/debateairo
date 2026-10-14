@@ -8,12 +8,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, expansionDepthMaxFor } from "@debateai/contract";
 import { createDebate, contractClient } from "@/lib/api";
 import { modelDot } from "@/lib/models";
-import { SCRUTINY_DEPTHS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { classifyRequestFailure, requestFailureMessage } from "@/lib/v3/requestFailure";
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { UsageBars } from "@/components/billing/UsageBars";
-import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom } from "@/lib/billing/room";
+import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom, type AskRoomQuery } from "@/lib/billing/room";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
 import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
@@ -31,13 +30,20 @@ import {
 import { previewPlanRoster } from "@/lib/previewPlanRoster";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
+  ANSWER_LENGTHS,
   buildNewDebateAskConfig,
   DECISION_SCOPE_DEFAULT,
+  DEPTH_MODES,
   dateTimeLocalValue,
   deriveSessionAskDefaults,
+  fixedDepthAllowedFor,
   PROVISIONAL_COMPOSITION_BUDGET_DEFAULT,
+  SCRUTINY_LEVELS,
+  type AnswerLength,
   type CompositionBudgetTier,
-  type RiskTier
+  type DepthMode,
+  type RiskTier,
+  type Scrutiny
 } from "./defaults";
 import billingEnglish from "@/messages/en/billing.json";
 
@@ -47,14 +53,24 @@ const displayPlanTierRosters = previewPlanRoster(process.env.NEXT_PUBLIC_PREVIEW
 // declared beside the depth bound in @debateai/contract; hosted builds keep the whole range.
 const depthMax = expansionDepthMaxFor(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON !== undefined);
 
-type AdaptiveDepthMode = "fixed" | "manual" | "recommended" | "adaptive";
-
-const DEPTH_MODE_OPTIONS: Array<{ value: AdaptiveDepthMode; labelKey: string }> = [
-  { value: "fixed", labelKey: "newDebate.fixed" },
-  { value: "manual", labelKey: "newDebate.manual" },
-  { value: "recommended", labelKey: "newDebate.recommended" },
-  { value: "adaptive", labelKey: "newDebate.adaptive" }
-];
+/*
+ * Debate shape P2c (spec 2026-10-12 §3.2, rulings S6–S8): Depth mode, Depth of scrutiny and
+ * Answer length are real choices sent with the ask. These tables hold each value's words.
+ */
+const DEPTH_MODE_WORDS: Readonly<Record<DepthMode, { label: string; help: string }>> = {
+  adaptive: { label: "newDebate.adaptive", help: "newDebate.depthModeAdaptiveHelp" },
+  fixed: { label: "newDebate.fixed", help: "newDebate.depthModeFixedHelp" }
+};
+const SCRUTINY_WORDS: Readonly<Record<Scrutiny, { label: string; help: string }>> = {
+  standard: { label: "newDebate.scrutinyStandard", help: "newDebate.scrutinyStandardHelp" },
+  deep: { label: "newDebate.scrutinyDeep", help: "newDebate.scrutinyDeepHelp" },
+  exhaustive: { label: "newDebate.scrutinyExhaustive", help: "newDebate.scrutinyExhaustiveHelp" }
+};
+const ANSWER_LENGTH_WORDS: Readonly<Record<AnswerLength, string>> = {
+  short: "newDebate.answerLengthShort",
+  standard: "newDebate.answerLengthStandard",
+  detailed: "newDebate.answerLengthDetailed"
+};
 
 const RISK_TIER_OPTIONS: ReadonlyArray<{ value: RiskTier; labelKey: string }> = [
   { value: "casual", labelKey: "newDebate.casual" },
@@ -148,10 +164,12 @@ function NewDebateForm({
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
   const [planTier, setPlanTier] = useState<PlanTier>("free");
   const [optionsOpen, setOptionsOpen] = useState(false);
-  const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
-  const [scrutiny, setScrutiny] = useState<ScrutinyDepth>("standard");
+  // S6: Adaptive by default; S7: Standard scrutiny by default.
+  const [depthMode, setDepthMode] = useState<DepthMode>("adaptive");
+  const [scrutiny, setScrutiny] = useState<Scrutiny>("standard");
   const [depth, setDepth] = useState(2);
-  const [maxTokens, setMaxTokens] = useState(800);
+  // S8: Answer length is every plan's choice, so choosing Free never resets it.
+  const [answerLength, setAnswerLength] = useState<AnswerLength>("standard");
   const [riskTier, setRiskTier] = useState("standard");
   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
   // A21: null = the asker has not chosen; the ask then omits model_strength.
@@ -170,9 +188,21 @@ function NewDebateForm({
   const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
   // Budget spec §2.11: the room for the ask this form would send. It is a
   // word (FITS/CLOSE/FULL/ALREADY_WAITING), never a figure.
-  const [room, setRoom] = useAskRoom(contractClient, {
-    plan_tier: planTier, composition_budget_tier: budgetTier, depth
-  });
+  // Debate shape P2c (Contract deviation 7): true once a room read has said the deployment's shape row is
+  // in force. Kept for the page's life, like the decided plan below: a later failed, refused or
+  // ALREADY_WAITING read never hides the controls mid-edit. Without it the page offers and sends none of
+  // the three settings, which the API would otherwise drop without a word.
+  const [shapeSettings, setShapeSettings] = useState(false);
+  // Contract deviation 9: the room is read for the ask this form would send, the three choices included
+  // exactly when they are shown (and so sent).
+  const roomQuery: AskRoomQuery = {
+    plan_tier: planTier, composition_budget_tier: budgetTier, depth,
+    ...(shapeSettings ? { depth_mode: depthMode, scrutiny, answer_length: answerLength } : {})
+  };
+  const [room, setRoom] = useAskRoom(contractClient, roomQuery);
+  useEffect(() => {
+    if (room?.shape_settings === true) setShapeSettings(true);
+  }, [room]);
   // Paid plans (spec 2026-09-29 §2.3.4; ruling Q-8): the plan the SERVER decided
   // for this person (B8), as the room read (and B10c's usage read) names it. It
   // is remembered once known: a later failed or plan-less read never clears it,
@@ -230,9 +260,8 @@ function NewDebateForm({
     setModelStrength(null);
     setBudgetTier(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
     setDepth(2);
-    setDepthMode("fixed");
+    setDepthMode("adaptive");
     setScrutiny("standard");
-    setMaxTokens(800);
   }
 
   const strengthControl = modelStrengthControl({ scorecard: modelScorecard, planTier });
@@ -273,6 +302,8 @@ function NewDebateForm({
         decisionScope,
         asOf,
         depth,
+        // Debate shape P2c (Contract deviation 7): sent only when the room says the settings are in force.
+        ...(shapeSettings ? { depthMode, scrutiny, answerLength } : {}),
         asOfWasEdited: false,
         riskTierWasEdited,
         // A21 O4: a locked control sends nothing, so the deployment's own default applies.
@@ -297,9 +328,7 @@ function NewDebateForm({
       // from the room re-read, or, when that read fails, from the refusal's
       // own body. The banner is the last fallback, when neither has a time.
       if (classifyRequestFailure("DEBATE_CREATE", exc).kind === "ALREADY_WAITING") {
-        const fresh = await readAskRoom(contractClient, {
-          plan_tier: planTier, composition_budget_tier: budgetTier, depth
-        });
+        const fresh = await readAskRoom(contractClient, roomQuery);
         const shown = fresh === null ? waitingRoomOf(exc) : fresh;
         setRoom(shown);
         if (shown?.room !== "ALREADY_WAITING") setError(requestFailureMessage("DEBATE_CREATE", exc, catalog));
@@ -462,50 +491,48 @@ function NewDebateForm({
 
           {optionsOpen ? (
             <div id="additionalRunOptions" className="ndCard ndLegacy">
-              {/*
-                DR-115 honesty: the ruled Tree depth control is on the default
-                surface. The knobs below are named as not sent yet rather than
-                quietly posted into a config the ask builder drops.
-              */}
-              <p className="ndLegacyNotice">
-                {t(catalog, "newDebate.legacyNotice")}
-              </p>
-              <SelectRow
-                id="depthMode"
-                label={t(catalog, "newDebate.depthMode")}
-                hint={t(catalog, "newDebate.selectionStrategy")}
-                value={depthMode}
-                disabled={planTier === "free"}
-                onChange={(value) => setDepthMode(value as AdaptiveDepthMode)}
-                options={DEPTH_MODE_OPTIONS.map((option) => ({ value: option.value, label: t(catalog, option.labelKey) }))}
-              />
-              <SelectRow
-                id="scrutinyDepth"
-                label={t(catalog, "newDebate.scrutinyDepth")}
-                hint={t(catalog, `newDebate.scrutiny${scrutiny === "standard" ? "Standard" : scrutiny === "deep" ? "Deep" : "Exhaustive"}Hint`)}
-                value={scrutiny}
-                disabled={planTier === "free"}
-                onChange={(value) => setScrutiny(value as ScrutinyDepth)}
-                options={SCRUTINY_DEPTHS.map((depth) => ({
-                  value: depth,
-                  label: t(catalog, `newDebate.scrutiny${depth === "standard" ? "Standard" : depth === "deep" ? "Deep" : "Exhaustive"}`)
-                }))}
-              />
               {/* Parallel calls (owner ruling 2026-10-12): no Branching width and no
                   Concurrency control here. How many calls run at once is an owner-only
                   register setting; how wide a claim branches is the algorithm's choice
                   (one support and one attack reply). */}
-              <SliderRow
-                id="maxTokens"
-                label={t(catalog, "newDebate.maxTokens")}
-                hint={t(catalog, "newDebate.maxTokensHint")}
-                min={128}
-                max={4000}
-                step={32}
-                value={maxTokens}
-                disabled={planTier === "free"}
-                onChange={setMaxTokens}
-              />
+              {/* Debate shape P2c (Contract deviation 7): the three settings are offered only when the
+                  room says they are in force; otherwise the API would drop them silently. */}
+              {shapeSettings ? (
+                <>
+                  <SelectRow
+                    id="depthMode"
+                    label={t(catalog, "newDebate.depthMode")}
+                    hint={t(catalog, DEPTH_MODE_WORDS[depthMode].help)}
+                    value={depthMode}
+                    disabled={planTier === "free"}
+                    onChange={(value) => setDepthMode(value as DepthMode)}
+                    options={DEPTH_MODES.map((mode) => ({
+                      value: mode,
+                      label: t(catalog, DEPTH_MODE_WORDS[mode].label),
+                      // S6: Fixed is offered only where the plan allows it; the API normalises again.
+                      disabled: mode === "fixed" && !fixedDepthAllowedFor(planTier)
+                    }))}
+                  />
+                  <SelectRow
+                    id="scrutinyDepth"
+                    label={t(catalog, "newDebate.scrutinyDepth")}
+                    hint={t(catalog, SCRUTINY_WORDS[scrutiny].help)}
+                    value={scrutiny}
+                    disabled={planTier === "free"}
+                    onChange={(value) => setScrutiny(value as Scrutiny)}
+                    options={SCRUTINY_LEVELS.map((level) => ({ value: level, label: t(catalog, SCRUTINY_WORDS[level].label) }))}
+                  />
+                  {/* S8: Answer length replaces Max tokens and is every plan's choice, Free's included. */}
+                  <SegmentedRow
+                    field="answerLength"
+                    label={t(catalog, "newDebate.answerLength")}
+                    hint={t(catalog, "newDebate.answerLengthHint")}
+                    options={ANSWER_LENGTHS.map((length) => ({ value: length, label: t(catalog, ANSWER_LENGTH_WORDS[length]) }))}
+                    value={answerLength}
+                    onChange={(value) => setAnswerLength(value as AnswerLength)}
+                  />
+                </>
+              ) : null}
               <p className="ndProvenance">
                 {t(catalog, "newDebate.roleOverrides")}{" "}
                 <button type="button" className="ndSettingsLink" onClick={() => router.push("/settings")}>
@@ -626,7 +653,7 @@ function SelectRow({
   value: string;
   disabled?: boolean;
   onChange: (value: string) => void;
-  options: ReadonlyArray<{ value: string; label: string }>;
+  options: ReadonlyArray<{ value: string; label: string; disabled?: boolean }>;
 }) {
   return (
     <div className="ndRow">
@@ -646,7 +673,7 @@ function SelectRow({
           aria-label={label}
         >
           {options.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
+            <option key={option.value} value={option.value} disabled={option.disabled === true}>{option.label}</option>
           ))}
         </select>
       </span>

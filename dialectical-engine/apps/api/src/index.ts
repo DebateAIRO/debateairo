@@ -3583,7 +3583,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       waiting_run_ref: answer.waitingRunRef,
       plan_id: answer.planId,
       ...(answer.funding === undefined ? {} : {funding:{kind:"INTERNAL",expires_at:answer.funding.expiresAt.toISOString()}}),
-      ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor })
+      ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor }),
+      // Debate shape P2c (Contract deviation 7): the same row the normalisation above reads. After P2b, main.ts hands
+      // the API only an in-force row (`debateShapeInForce`); without one the member is never written, so the body is
+      // today's byte for byte, and the page offers none of the three settings it would drop.
+      ...(options.debateShapePolicy === undefined ? {} : { shape_settings: true as const })
     }));
   });
 

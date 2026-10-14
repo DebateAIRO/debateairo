@@ -1,11 +1,13 @@
 import {
   ContractHttpError,
   createContractClient,
+  DepthParamsSchema,
   PLAN_TIERS,
   type Answer,
   type ArgumentLanguage,
   type AskRequest,
   type ContractClient,
+  type DepthParams,
   type RunProjection
 } from "@debateai/contract";
 import type {
@@ -421,6 +423,26 @@ function optionalModelStrength(config: AskConfig): AskRequest["model_strength"] 
 }
 
 /**
+ * Debate shape P2c (spec 2026-10-12 §3.2): depth mode, scrutiny and answer length ride beside
+ * the depth in `depth_params`, each only when the page chose it. A missing one means the API's
+ * default, so older callers keep working. The contract's own field schema decides what is
+ * valid, so the page never restates the choices.
+ */
+function optionalDepthChoice<K extends "depthMode" | "scrutiny" | "answerLength">(
+  config: AskConfig,
+  configKey: "depth_mode" | "scrutiny" | "answer_length",
+  key: K
+): Partial<Pick<DepthParams, K>> {
+  const value = config[configKey];
+  if (value === undefined || value === null) return {};
+  const parsed = DepthParamsSchema.shape[key].safeParse(value);
+  if (!parsed.success || parsed.data === undefined) {
+    throw new Error(`ASK_FIELD_REQUIRED: ${configKey} must be one of the offered choices when supplied.`);
+  }
+  return { [key]: parsed.data } as Partial<Pick<DepthParams, K>>;
+}
+
+/**
  * Builds the V3 ask strictly from user-supplied fields (S14 precedent: every
  * contract value is explicit input — no hidden defaults, no invented
  * numbers). Missing or malformed fields fail loudly before any network call.
@@ -452,7 +474,12 @@ export async function createDebate(
     tier_source: tierSource,
     tier_provenance_ref: tierProvenanceRef,
     composition_budget_tier: budgetTier as AskRequest["composition_budget_tier"],
-    depth_params: { depth: requiredInteger(config, "depth", 0) },
+    depth_params: {
+      depth: requiredInteger(config, "depth", 0),
+      ...optionalDepthChoice(config, "depth_mode", "depthMode"),
+      ...optionalDepthChoice(config, "scrutiny", "scrutiny"),
+      ...optionalDepthChoice(config, "answer_length", "answerLength")
+    },
     decision_scope: requiredString(config, "decision_scope"),
     as_of: asOf.toISOString(),
     steering_presets: optionalLines(config, "steering_presets"),
