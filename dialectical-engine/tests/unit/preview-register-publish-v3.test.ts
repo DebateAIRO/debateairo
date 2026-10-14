@@ -249,7 +249,7 @@ describe('publish kit v3: the optional debateShapePolicy row and the sealed map 
     const f = await fixture();
     const base = sorted([...await v2(policy), ...owned()]);
     const plan = compose(await v3(), base);
-    expect(shapeRow(plan.rows as Row[])).toEqual(shapeRow(base));
+    expect(shapeRow([...plan.rows] as Row[])).toEqual(shapeRow(base));
     expect(plan.delta.map(entry => entry.rowKey)).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
     expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
     const broken = base.map(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"DEBATE_SHAPE_POLICY"', '"X"') } : row);
