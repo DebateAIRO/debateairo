@@ -4,7 +4,8 @@
  * Plain words: before a practice spends a cent it refuses unless
  *  - both forwarded gate sockets exist on this computer (PRACTICE_DEEPINFRA_SOCKET, PRACTICE_ANTHROPIC_SOCKET),
  *  - the operator has written PRACTICE_ACK=spends-real-money,
- *  - the live settings file holds only the allowed, non-secret runner/API settings and nothing key-shaped,
+ *  - the live settings file holds only the allowed, non-secret runner/API settings and nothing key-shaped (a hosted
+ *    preview's billing and country-file settings are set aside unread: see PRACTICE_HOSTED_SET_ASIDE_KEYS),
  *  - root's fresh `status` of each gate says it is active and has fewer than three connection failures in a row
  *    (the gate halts at five). "Too busy" refusals and cool-offs do not count: the gate never halts on them.
  * The gates' read-only "what is left today" answer is checked separately, once the sockets are known to work.
@@ -62,6 +63,22 @@ export const PRACTICE_SETTINGS_KEYS = Object.freeze([
   "STRANGER_SAMPLE_RATE", "BATTERY_VERSION", "SETTLEMENT_WATCH_HANDLE"
 ] as const);
 type SettingsKey = typeof PRACTICE_SETTINGS_KEYS[number];
+/**
+ * A HOSTED preview's API-only settings (deploy/preview-auth-dev/v1/environment.mjs: the country files and NETOPIA's,
+ * Quaderno's, SmartBill's and the owner report's settings; tests/unit/preview-practice-hosted.test.ts pins this list
+ * against that file). The practice never needs them: it boots no billing route, no country gate and no mail, and its
+ * ask goes straight to the ask application, never through the API's routes. Their values are server paths of files the
+ * Mac does not have (key files among them) and sandbox addresses the practice must never call. So a hosted settings
+ * file may carry them and they are SET ASIDE: screened for a key shape like every value, then never read again, never
+ * opened, never sent; the practice prints their names (never a value). In local mode they stay refused exactly as
+ * before (PRACTICE_SETTINGS_KEY_REFUSED): local mode has no billing (environment.mjs refuses them there too).
+ */
+export const PRACTICE_HOSTED_SET_ASIDE_KEYS = Object.freeze([
+  "GEOIP_COUNTRY_DB_PATH", "TOR_EXIT_LIST_PATH",
+  "NETOPIA_API_BASE_URL", "NETOPIA_POS_SIGNATURE", "NETOPIA_API_KEY_PATH", "NETOPIA_IPN_KEYS_PATH",
+  "QUADERNO_API_KEY_PATH", "QUADERNO_API_BASE_URL", "SMARTBILL_CREDENTIALS_PATH", "SMARTBILL_API_BASE_URL", "SMARTBILL_SERIES",
+  "OWNER_REPORT_EMAIL_PATH"
+] as const);
 const REQUIRED_KEYS: readonly SettingsKey[] = Object.freeze([
   "PREVIEW_PROVIDER_TEST_CONFIG_JSON", "PROVIDER_DISCOVERY_TARGETS_JSON", "REGISTER_VERSION", "CLAIM_MS", "CLAIM_MARGIN_MS",
   "MAX_RECOMPOSE", "JUDGEMENT_NUMBER_KIND", "JUDGEMENT_PRODUCER", "PROPAGATION_NUMBER_KIND", "PROPAGATION_PRODUCER",
@@ -74,6 +91,8 @@ export type PracticeSettings = Readonly<{
   strangerSampleRate: number;
   batteryVersion: string;
   settlementWatchHandle: string;
+  /** Hosted only: the names (never the values) of the server-only settings set aside unread, in file order. */
+  setAsideKeys: readonly string[];
 }>;
 
 /**
@@ -94,6 +113,11 @@ export function settingsValueIsKeyShaped(value: string): boolean {
  */
 export function parsePracticeSettings(text: string): PracticeSettings {
   const values = new Map<string, string>();
+  // Hosted only: each set-aside key and its line number (its value is dropped here, after the key-shape screen). Only
+  // a file that says DEBATEAI_DEPLOYMENT_MODE=hosted may carry them; in any other file they are refused at their own
+  // line, exactly as before hosted practice existed.
+  const setAside = new Map<string, number>();
+  const declaresHosted = text.split(/\r?\n/u).some((raw) => raw.trim() === "DEBATEAI_DEPLOYMENT_MODE=hosted");
   for (const [index, raw] of text.split(/\r?\n/u).entries()) {
     const line = raw.trim();
     if (line === "" || line.startsWith("#")) continue;
@@ -101,6 +125,12 @@ export function parsePracticeSettings(text: string): PracticeSettings {
     if (equals < 1) throw new PracticeRefusal("PRACTICE_SETTINGS_LINE_INVALID", `line ${String(index + 1)}`);
     const key = line.slice(0, equals);
     const value = line.slice(equals + 1);
+    if (declaresHosted && (PRACTICE_HOSTED_SET_ASIDE_KEYS as readonly string[]).includes(key)) {
+      if (setAside.has(key)) throw new PracticeRefusal("PRACTICE_SETTINGS_KEY_DUPLICATE", key);
+      if (settingsValueIsKeyShaped(value)) throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_KEY_SHAPED", key);
+      setAside.set(key, index + 1);
+      continue;
+    }
     if (!(PRACTICE_SETTINGS_KEYS as readonly string[]).includes(key)) {
       throw new PracticeRefusal("PRACTICE_SETTINGS_KEY_REFUSED", `line ${String(index + 1)}`);
     }
@@ -145,7 +175,10 @@ export function parsePracticeSettings(text: string): PracticeSettings {
   try { mode = resolveDeploymentMode(values.get("DEBATEAI_DEPLOYMENT_MODE"), nodeEnv); } catch {
     throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", "DEBATEAI_DEPLOYMENT_MODE");
   }
-  if (mode !== "local") throw new PracticeRefusal("PRACTICE_REQUIRES_LOCAL_MODE");
+  // Hosted is practised too (owner rulings 2026-10-13: the preview switches to hosted mode with NETOPIA's sandbox): the
+  // runner and the ask path are then composed as the two main.ts files compose them in hosted mode, with billing kept
+  // off in the practice (practice-ask-composition.ts says why). environment.mjs admits hosted on the preview only with
+  // the preview configuration, which the practice requires above.
   const rate = Number(get("STRANGER_SAMPLE_RATE"));
   if (!(rate >= 0 && rate <= 1)) throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", "STRANGER_SAMPLE_RATE");
   const runner: PracticeRunnerSettings = Object.freeze({
@@ -169,7 +202,8 @@ export function parsePracticeSettings(text: string): PracticeSettings {
     VLLM_MAKER: values.get("VLLM_MAKER")
   });
   return Object.freeze({ runner, previewConfig, strangerSampleRate: rate,
-    batteryVersion: get("BATTERY_VERSION"), settlementWatchHandle: get("SETTLEMENT_WATCH_HANDLE") });
+    batteryVersion: get("BATTERY_VERSION"), settlementWatchHandle: get("SETTLEMENT_WATCH_HANDLE"),
+    setAsideKeys: Object.freeze([...setAside.entries()].sort((a, b) => a[1] - b[1]).map(([key]) => key)) });
 }
 
 export function readPracticeSettings(path: string): PracticeSettings {

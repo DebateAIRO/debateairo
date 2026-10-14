@@ -155,6 +155,20 @@ export type PracticeDebateResult = Readonly<{
    * blanked (by kind; empty when nothing). `error` names why it could not be written. Not part of report.json.
    */
   transcript?: Readonly<{ path: string | null; attempts: number; bytes: number; blanked: Readonly<Record<string, number>>; error: string | null }>;
+  /**
+   * Hosted mode only (absent in local mode): the ask went through the room or the daily guard, billing as the register
+   * says it and as the practice ran it (always off), the ceilings the run was held to (micro-dollars), and the names
+   * of the server-only settings set aside unread.
+   */
+  deployment?: Readonly<{
+    mode: "hosted";
+    room: boolean;
+    billingInRegister: "on" | "off";
+    billingInPractice: "off";
+    ceilings: Readonly<{ perRunCeilingMicros: number; dailyCeilingMicros: number; perStoryCeilingMicros: number | null; band: boolean;
+      billingPlansSealed: boolean }> | null;
+    setAsideSettings: readonly string[];
+  }>;
 }>;
 
 const ROSTER_ORDER = Object.freeze(["JUDGE", "PANEL", "REVIEW", "SYNTHESIZER", "EVALUATOR", "STORYTELLER", "STORY_CHECKER", "UNMAPPED"]);
@@ -359,8 +373,12 @@ export async function runPracticeDebate(input: Readonly<{
     if (receipt.codeNext !== undefined && String(nextVersion) !== receipt.registerVersion) {
       throw Object.assign(new Error("PRACTICE_REGISTER_VERSION_MISMATCH"), { code: "PRACTICE_REGISTER_VERSION_MISMATCH" });
     }
+    // A next version composed by publish kit v3 is a hosted one: the server runs it in hosted mode (runbook H6 step 5
+    // switches both units to hosted with it), so the practice runs it in hosted mode too, whatever the settings said.
     const settings: PracticeSettings = receipt.codeNext === undefined ? input.settings
-      : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion }) });
+      : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion,
+        ...(receipt.codeNext.composer === undefined ? {} : { DEPLOYMENT_MODE: "hosted" as const }) }) });
+    const hosted = settings.runner.DEPLOYMENT_MODE === "hosted";
     progress(receipt.codeNext === undefined ? `register imported up to version ${receipt.registerVersion}`
       : `register imported up to live version ${liveVersion}; practising on this code's next version ${receipt.registerVersion}`
         + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
@@ -392,7 +410,9 @@ export async function runPracticeDebate(input: Readonly<{
     const ask = await composePracticeAsk({
       pool, provisionPool: database.extraPool(), serverAdmissionPool: database.extraPool(), legacyAdmissionPool: database.extraPool(),
       settings, sockets: input.sockets, budgetPorts: input.budgetPorts, teamUserIds: [userId],
-      dispatcher: { dispatch: async (job) => { dispatched.push({ ...job }); } }, log: progress
+      dispatcher: { dispatch: async (job) => { dispatched.push({ ...job }); } }, log: progress,
+      // Hosted only: the room's own decision pool (main.ts: API_DATABASE_POOLS.roomDecision).
+      ...(hosted ? { roomDecisionPool: database.extraPool() } : {})
     });
     const runner = await composePracticeRunner({ pool, environment: settings.runner, budgetPorts: input.budgetPorts,
       remaining: remainingPorts, keepAlivePool: database.extraPool(),
@@ -410,9 +430,20 @@ export async function runPracticeDebate(input: Readonly<{
     const admissionStarted = performance.now();
     let refusalCode: string | null = null;
     try {
-      await ask.application.submit(request, session, { kind: "server", userId, ownerRef });
+      const accepted = await ask.application.submit(request, session, { kind: "server", userId, ownerRef });
+      // Hosted with the band: the room may put the ask in line instead of starting it. The practice starts no waker,
+      // so a waiting ask is reported as not admitted, naming the limit it waits for.
+      if (accepted.status === "WAITING") refusalCode = `ASK_WAITING_IN_LINE:${accepted.waiting_scope ?? "UNKNOWN"}`;
     } catch (error) {
       refusalCode = codeOf(error);
+    }
+    const deployment: PracticeDebateResult["deployment"] = ask.hosted === null ? undefined : Object.freeze({
+      mode: "hosted" as const, room: ask.hosted.room, billingInRegister: ask.hosted.billingInRegister,
+      billingInPractice: ask.hosted.billingInPractice, ceilings: runner.money, setAsideSettings: input.settings.setAsideKeys
+    });
+    if (deployment !== undefined) {
+      progress(`hosted mode: the ask went through ${deployment.room ? "the room (the site's day, the waiting line)" : "the daily guard"};`
+        + ` billing is ${deployment.billingInRegister} in the register and kept off in the practice (no plan wall, no charge scope)`);
     }
     const admissionSeconds = (performance.now() - admissionStarted) / 1000;
     const job = dispatched[0];
@@ -432,7 +463,8 @@ export async function runPracticeDebate(input: Readonly<{
         run: { runId: null, workItemOutcome: null, failureCode: null, answer: null, story: null },
         byModelAndSite: [], probes, failures: [], formatFailures: 0, callsByModel: {}, repairKindsByModel: {}, answersByModel: {}, jsonRepairs: [],
         failedCalls: 0, refusedCalls: 0,
-        remaining, seconds: { admission: admissionSeconds, debate: 0 }, parallel: runner.callStats.summary()
+        remaining, seconds: { admission: admissionSeconds, debate: 0 }, parallel: runner.callStats.summary(),
+        ...(deployment === undefined ? {} : { deployment })
       });
     }
     const runRow = (await pool.query<{ discovered_panel: unknown }>("SELECT discovered_panel FROM core.run WHERE run_id=$1", [job.runId])).rows[0];
@@ -523,7 +555,8 @@ export async function runPracticeDebate(input: Readonly<{
       ...collected, probes: Object.freeze(probes), remaining,
       seconds: Object.freeze({ admission: admissionSeconds, debate: debateSeconds }),
       parallel: runner.callStats.summary(),
-      ...(transcript === undefined ? {} : { transcript })
+      ...(transcript === undefined ? {} : { transcript }),
+      ...(deployment === undefined ? {} : { deployment })
     });
   } finally {
     remaining.deepinfra.after ??= await readRemaining(remainingPorts.deepinfra);
