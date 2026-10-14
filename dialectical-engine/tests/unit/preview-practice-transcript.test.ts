@@ -180,6 +180,22 @@ describe("preview practice transcript: the file", () => {
     expect(readdirSync(join(folder, "out"))).toEqual(["transcript.json"]);
     expect(existsSync(written.path)).toBe(true);
   });
+
+  it("holds structure.map only for a debate-shape run (today's file keeps its keys)", () => {
+    expect(Object.keys(transcript().structure)).toEqual(["answer", "inspection", "story"]);
+    // As P2b's readers return them (pre-flight PF-D14: the real MapChoiceRecord and MapItem forms; HAIKU_REF is this file's).
+    const map = {
+      choice: { opening: "MAP", marks: [],
+        answers: [{ answerId: "a1", statement: "Da.", rootIndex: 0, rootNodeId: null, maker: null, filled: false }],
+        alsoRaised: [{ keyPointId: "kp01", claim: "Costul.", makers: ["anthropic"] }] },
+      items: [{ itemId: "pt01", seat: { aiRef: HAIKU_REF, maker: "anthropic" }, origin: "BLIND", angleId: "g1", angleKind: "PRACTICAL",
+        listIndex: 0, kind: "POINT", claim: "Costul.", whyItMatters: "Banii conteaza.", leans: "context" }]
+    };
+    const shaped = buildPracticeTranscript({ run: RUN, attempts: attempts(), answer: null, inspection: null, story: null, unavailable: [], map,
+      now: new Date("2026-10-12T10:06:00.000Z") });
+    expect(Object.keys(shaped.structure)).toEqual(["answer", "inspection", "story", "map"]);
+    expect(shaped.structure.map).toEqual(map);
+  });
 });
 
 describe("preview practice transcript: the flag", () => {

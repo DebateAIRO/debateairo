@@ -169,6 +169,11 @@ export type PracticeTranscript = Readonly<{
     inspection: unknown;
     /** The story as stored (StoryRepository.readForAnswer), its sealed body decrypted. */
     story: unknown;
+    /**
+     * Debate shape only (absent otherwise): the map's choice (the answers argued, the points also raised) and every map
+     * item (each point and candidate answer with the AI that wrote it), as P2b's readers return them, decrypted.
+     */
+    map?: unknown;
   }>;
   /** What this file could not hold, and why. */
   unavailable: readonly string[];
@@ -335,6 +340,7 @@ export function buildPracticeTranscript(input: Readonly<{
   inspection: unknown;
   story: unknown;
   unavailable: readonly string[];
+  map?: unknown;
   now?: Date;
 }>): PracticeTranscript {
   const bytes = (text: string | null | undefined) => (text === null || text === undefined ? 0 : Buffer.byteLength(text, "utf8"));
@@ -351,7 +357,8 @@ export function buildPracticeTranscript(input: Readonly<{
       replyBytes: input.attempts.reduce((sum, attempt) => sum + bytes(attempt.reply?.content), 0)
     }),
     attempts: input.attempts,
-    structure: Object.freeze({ answer: input.answer, inspection: input.inspection, story: input.story }),
+    structure: Object.freeze({ answer: input.answer, inspection: input.inspection, story: input.story,
+      ...(input.map === undefined ? {} : { map: input.map }) }),
     unavailable: Object.freeze([...input.unavailable])
   });
 }
@@ -398,6 +405,8 @@ export async function recordPracticeTranscript(input: Readonly<{
   ownerRef: string;
   answer: unknown;
   story: unknown;
+  /** Debate shape only: reads the map (practice-shape.ts readPracticeMap). Absent: no structure.map, as today. */
+  map?: () => Promise<unknown>;
 }>): Promise<ReturnType<typeof writePracticeTranscript> & Readonly<{ attempts: number }>> {
   const makers = new Map(input.run.panel.map((member) => [member.providerRef, member.maker]));
   const attempts = await readTranscriptAttempts(input.pool, input.run.runId, makers);
@@ -416,6 +425,24 @@ export async function recordPracticeTranscript(input: Readonly<{
     if (input.answer === null) unavailable.push("structure.answer: the site's reader returned nothing");
     if (input.story === null) unavailable.push("structure.story: no story was stored");
   }
-  const transcript = buildPracticeTranscript({ run: input.run, attempts, answer: input.answer, inspection, story: input.story, unavailable });
+  let map: unknown;
+  if (input.map !== undefined) {
+    try {
+      map = await input.map();
+      // Pre-flight PF-D12: a map that fell back still stores its choice (opening TODAYS_OPENING, no answers), so null
+      // means no map was stored at all.
+      const choice = (map as { choice?: { opening?: unknown } | null }).choice;
+      if (choice === null) {
+        unavailable.push("structure.map.choice: no map stored (the run never reached the map, or its content was erased)");
+      } else if (choice?.opening === "TODAYS_OPENING") {
+        unavailable.push("structure.map.choice: the map was unavailable, so it holds no answers and no points also raised");
+      }
+    } catch (error) {
+      map = null;
+      unavailable.push(`structure.map: ${error instanceof Error ? error.name : "UNKNOWN"}`);
+    }
+  }
+  const transcript = buildPracticeTranscript({ run: input.run, attempts, answer: input.answer, inspection, story: input.story, unavailable,
+    ...(input.map === undefined ? {} : { map }) });
   return Object.freeze({ ...writePracticeTranscript(input.directory, transcript), attempts: attempts.length });
 }

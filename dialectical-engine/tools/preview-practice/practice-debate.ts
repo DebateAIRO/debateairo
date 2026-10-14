@@ -47,6 +47,7 @@ import { PracticeRefusal, type PracticeSettings, type PracticeSockets } from "./
 import {
   practiceMapReaders,
   practiceShapeBlock,
+  readPracticeMap,
   readPracticeShapeFacts,
   type PracticeShapeBlock,
   type PracticeShapeFacts,
@@ -544,6 +545,7 @@ export async function runPracticeDebate(input: Readonly<{
       try {
         const written = await recordPracticeTranscript({
           pool, directory: input.transcriptDirectory, ownerRef, answer: projection, story: storedStory,
+          ...(shapeSource === null ? {} : { map: () => readPracticeMap(practiceMapReaders(pool), job.runId) }),
           run: Object.freeze({
             runId: job.runId, question: Object.freeze({ id: question.id, text: question.questionLine }), depth: input.depth,
             registerVersion, panel: panelFacts, satOut: Object.freeze(satOut), rotation,

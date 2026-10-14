@@ -271,3 +271,10 @@ export function practiceShapeLines(block: PracticeShapeBlock): readonly string[]
     ...(block.notExercised === null ? [] : [`- the new shape was not exercised: ${block.notExercised}`]),
     ""];
 }
+
+/** The map as transcript.json holds it (`structure.map`): P2b's choice and every map item, decrypted. */
+export async function readPracticeMap(readers: PracticeMapReaders, runId: string): Promise<Readonly<{
+  choice: PracticeMapChoice | null; items: readonly unknown[];
+}>> {
+  return Object.freeze({ choice: await readers.choice(runId), items: await readers.items(runId) });
+}
