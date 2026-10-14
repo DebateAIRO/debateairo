@@ -49,7 +49,7 @@ describe("the locked question language (question-language spec 2026-10-13, rulin
     for (const [tag, name] of [
       ["ro-Latn", "Romanian"], ["sr-latn", "Serbian"], ["sr-Grek", "Serbian"], ["en-US", "English"], ["eng", "English"],
       ["RO", "Romanian"], ["xx", "Xx"], ["", "Romanian"], ["ro", "Roma\nnian"], ["ro", "Rom\u0000anian"], ["ro", "Roma\u2028nian"],
-      ["ro", "x".repeat(65)], ["ro", "ă".repeat(33)]
+      ["ro", "x".repeat(65)], ["ro", "ă".repeat(33)], ["ro", "Roma\"nian"], ["ro", "Roma\\nian"], ["ro", "Roma\ud800nian"]
     ] as const) expect(questionLanguageFromRun(tag, name), JSON.stringify([tag, name])).toBeNull();
     // Every lock the kernel can make reads back unchanged (a real stored lock is never refused).
     for (const first of LETTERS) for (const second of LETTERS) for (const line of SCRIPT_LINES) {
@@ -71,6 +71,22 @@ describe("the locked question language (question-language spec 2026-10-13, rulin
       expect(framed(language), JSON.stringify(language)).toBeLessThanOrEqual(bound);
     }
     expect(accepted).toBeGreaterThan(0);
+  });
+
+  it("the bound is a 64-byte name on the longest tag, whatever today's names are (ruling L-B64, fix round 2)", () => {
+    const bytes = (text: string): number => new TextEncoder().encode(text).length;
+    const bound = questionLanguageForBounds();
+    expect(bytes(bound.name)).toBe(64);
+    expect(bytes(bound.code)).toBe(7);
+    // A stored lock with any accepted name reads back, even one no Node build names today, and frames within the bound.
+    for (const name of ["x".repeat(64), "ă".repeat(32), "語".repeat(21) + "x", "Azerbaijani (Cyrillic script), renamed by a later CLDR"]) {
+      const stored = questionLanguageFromRun("az-Cyrl", name);
+      expect(stored, name).toEqual({ code: "az-Cyrl", name });
+      expect(framed(stored!), name).toBeLessThanOrEqual(framed(bound));
+    }
+    expect(framed(questionLanguageFromRun("az-Cyrl", "x".repeat(64))!)).toBe(framed(bound));
+    expect(questionLanguageFromRun("az-Cyrl", "x".repeat(65))).toBeNull();
+    expect(questionLanguageForBounds()).toBe(bound);
   });
 
   it("is ONE named sentence: never the fallback form, never today's question-language wording", () => {

@@ -39,8 +39,13 @@ const SCRIPT_SUBTAGS: Readonly<Record<string, ReplyScript>> = Object.freeze({
 });
 const FALLBACK_NAME = "the same language as the question";
 const SCRIPT_LETTERS_MIN = 12;
-/** A stored name read back as a lock: one line, no control characters, at most this many UTF-8 bytes. */
-const STORED_NAME_MAX_BYTES = 64;
+/**
+ * A lock's name: one line, at most this many UTF-8 bytes, and no character JSON would escape (control characters, line
+ * and paragraph separators, lone surrogates, quotes, backslashes), so the name costs the same bytes in the sentence and
+ * in the field. Ruling L-B64: the money bound is a name of exactly this size, so it never depends on today's names.
+ */
+const LOCK_NAME_MAX_BYTES = 64;
+const LOCK_NAME_REFUSED = /[\p{Cc}\p{Zl}\p{Zp}\p{Cs}"\\]/u;
 /** A tag `questionLanguageOf` can emit: a two-letter primary, with `-Latn`/`-Cyrl` only for a two-script language. */
 const EMITTED_TAG = /^([a-z]{2})(?:-(Latn|Cyrl))?$/u;
 const ENGLISH_LANGUAGE_NAMES = new Intl.DisplayNames(["en"], { type: "language", fallback: "none" });
@@ -57,9 +62,10 @@ function englishNameOf(code: string): string | null {
   return name === undefined || name.trim() === "" || name === code ? null : name;
 }
 
-/** The UTF-8 bytes a lock adds to a call: its named sentence plus its material field. */
-function framedBytes(language: QuestionLanguage): number {
-  return UTF8.encode(questionLanguageSentence(language) + questionLanguageField(language).content).length;
+/** Whether a name may be locked: not blank, not today's fallback, one plain line of at most 64 UTF-8 bytes. */
+function lockableName(name: string): boolean {
+  return name.trim() !== "" && name !== FALLBACK_NAME && !LOCK_NAME_REFUSED.test(name)
+    && UTF8.encode(name).length <= LOCK_NAME_MAX_BYTES;
 }
 
 /**
@@ -74,13 +80,15 @@ export function questionLanguageOf(code: string, questionLine?: string): Questio
   if (!ISO_639_1.has(primary)) return null;
   const name = englishNameOf(primary);
   if (name === null) return null;
+  const lock = (code: string, lockName: string): QuestionLanguage | null =>
+    lockableName(lockName) ? Object.freeze({ code, name: lockName }) : null;
   if (questionLine !== undefined && TWO_SCRIPT_LANGUAGES.has(primary)) {
     const letters = questionLine.match(/\p{L}/gu)?.length ?? 0;
     const script = letters >= SCRIPT_LETTERS_MIN ? majorityScript(questionLine) : null;
-    if (script === "Latin") return Object.freeze({ code: `${primary}-Latn`, name: `${name} (Latin script)` });
-    if (script === "Cyrillic") return Object.freeze({ code: `${primary}-Cyrl`, name: `${name} (Cyrillic script)` });
+    if (script === "Latin") return lock(`${primary}-Latn`, `${name} (Latin script)`);
+    if (script === "Cyrillic") return lock(`${primary}-Cyrl`, `${name} (Cyrillic script)`);
   }
-  return Object.freeze({ code: primary, name });
+  return lock(primary, name);
 }
 
 /**
@@ -91,8 +99,9 @@ export function questionLanguageOf(code: string, questionLine?: string): Questio
  *
  * Null for anything `questionLanguageOf` could not have emitted: "und", today's fallback name, a tag that is not an
  * ISO 639-1 primary (with `-Latn`/`-Cyrl` only on a two-script language), or a name that is blank, spans lines, holds a
- * control character, is longer than 64 UTF-8 bytes, or would frame longer than `questionLanguageForBounds()` (the money
- * bound a price that must cover any lock frames with). So no stored value can make a call longer than that bound.
+ * control character, a quote or a backslash, or is longer than 64 UTF-8 bytes. The name is NOT compared with today's
+ * English names (ruling L-B64): a lock stored before a Node or CLDR rename still reads back, and
+ * `questionLanguageForBounds()` (a 64-byte name) still covers it.
  */
 export function questionLanguageFromRun(tag: string, name: string): QuestionLanguage | null {
   const parts = EMITTED_TAG.exec(tag);
@@ -100,10 +109,7 @@ export function questionLanguageFromRun(tag: string, name: string): QuestionLang
   const [, primary, script] = parts;
   if (!ISO_639_1.has(primary!) || englishNameOf(primary!) === null) return null;
   if (script !== undefined && !TWO_SCRIPT_LANGUAGES.has(primary!)) return null;
-  if (name.trim() === "" || name === FALLBACK_NAME || /[\p{Cc}\p{Zl}\p{Zp}]/u.test(name)) return null;
-  if (UTF8.encode(name).length > STORED_NAME_MAX_BYTES) return null;
-  const language: QuestionLanguage = Object.freeze({ code: tag, name });
-  return framedBytes(language) > framedBytes(questionLanguageForBounds()) ? null : language;
+  return lockableName(name) ? Object.freeze({ code: tag, name }) : null;
 }
 
 /**
@@ -170,9 +176,12 @@ export function replyLanguageCheckFor(
 }
 
 /**
- * Pre-flight PF-L38: the lock whose named sentence and field are the longest in UTF-8 bytes among every lock
- * `questionLanguageOf` can return (each two-script language in both scripts). A price that must cover ANY lock (the
- * API's B9 first-call price) frames with it. Ties: the first code in alphabetical order. Computed once per process.
+ * Pre-flight PF-L38 and ruling L-B64: the lock a price that must cover ANY lock (the API's B9 first-call price) frames
+ * with. Its code is the longest tag the kernel emits (a two-script tag, 7 bytes) and its name is the longest real name
+ * padded with ASCII "x" to exactly 64 UTF-8 bytes, the most any lock may carry. A lock's sentence and field are fixed
+ * text plus its name and code, which JSON never escapes, so no lock `questionLanguageOf` or `questionLanguageFromRun`
+ * returns frames longer, whatever names this Node build gives. Ties: the first candidate (codes in alphabetical order, each plain, then
+ * `-Latn`, then `-Cyrl`), so today it is "az-Latn" with the padded "Azerbaijani (Cyrillic script)". Computed once.
  */
 let boundsLanguage: QuestionLanguage | undefined;
 export function questionLanguageForBounds(): QuestionLanguage {
@@ -184,8 +193,14 @@ export function questionLanguageForBounds(): QuestionLanguage {
       ? [plain, Object.freeze({ code: `${code}-Latn`, name: `${plain.name} (Latin script)` }),
         Object.freeze({ code: `${code}-Cyrl`, name: `${plain.name} (Cyrillic script)` })]
       : [plain];
+  }).filter((candidate) => lockableName(candidate.name));
+  const bytes = (text: string): number => UTF8.encode(text).length;
+  const longest = (values: readonly string[]): string => values.reduce((best, value) => bytes(value) > bytes(best) ? value : best);
+  const name = longest(candidates.map((candidate) => candidate.name));
+  boundsLanguage = Object.freeze({
+    code: longest(candidates.map((candidate) => candidate.code)),
+    name: name + "x".repeat(LOCK_NAME_MAX_BYTES - bytes(name))
   });
-  boundsLanguage = candidates.reduce((longest, candidate) => framedBytes(candidate) > framedBytes(longest) ? candidate : longest);
   return boundsLanguage;
 }
 
