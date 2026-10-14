@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.2 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.3 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.2
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.3
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.2 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.3 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -114,7 +114,7 @@ Jos et ole varma, onko jokin sallittua, kysy meiltä ennen sen julkaisemista.
 
 **Sisältösi säilyy sinun sisältönäsi.** Säilytät kaikki oikeutesi lähettämiisi kysymyksiin, väitteisiin, huomautuksiin ja haastamisiin. Myönnät meille ei-yksinomaisen, maailmanlaajuisen ja maksuttoman käyttöluvan kyseisen sisällön isännöintiin, tallentamiseen, jäljentämiseen, mukauttamiseen ja käsittelyyn palvelun tarjoamista varten: väittelyn suorittamiseen, sen tallentamiseen uudelleen avaamista ja toistamista varten, tuen tarjoamiseen, lakisääteisten velvoitteidemme täyttämiseen sekä — vain jos päätät julkaista — kohdassa 9 mainittuihin tarkoituksiin. Tämä käyttölupa päättyy, kun sisältö poistetaan, paitsi siltä osin kuin kohta 9 tai laki muuta edellyttää.
 
-**Emme kouluta malleja sisällölläsi.** Emme kouluta malleja sisällölläsi. Käytämme tekoälypalveluntarjoajia vain ehdoilla, jotka eivät salli niiden käyttää sisältöäsi malliensa kouluttamiseen tai parantamiseen; tekoälypalveluntarjoajarekisteri näyttää kunkin palveluntarjoajan kohdalla, olemmeko vahvistaneet tämän, ja milloin.
+**Emme kouluta malleja sisällölläsi.** Käytämme tekoälypalveluntarjoajia vain ehdoilla, jotka eivät salli niiden käyttää sisältöäsi malliensa kouluttamiseen tai parantamiseen; tekoälypalveluntarjoajarekisteri näyttää kunkin palveluntarjoajan kohdalla, olemmeko vahvistaneet tämän, ja milloin.
 
 **Miten sisältösi päätyy tekoälypalveluntarjoajille.** Lähetämme väittelyn suorittamiseksi tekstiä yhdelle tai useammalle ulkoiselle mallipalveluntarjoajalle. Palveluntarjoaja saa kysymyksesi, asettamasi ohjaavat huomautukset ja väittelyn aikana järjestelmän koostamat lausumat — joten palveluntarjoaja näkee kirjoittamastasi tekstistä johdettua ja sen ympärille rakennettua tekstiä, ei ainoastaan alkuperäisiä sanojasi. Se ei koskaan saa sähköpostiosoitettasi, tilitunnisteitasi, istuntotietojasi tai maksutietojasi.
 
@@ -239,7 +239,7 @@ Kohdassa 8 käsitellään sisältöäsi ja tuotettujen sisältöjen asemaa. Jos 
 
 ## 17. Henkilötiedot
 
-Henkilötietojen käsittelymme kuvataan osoitteessa dezbatere.ro/privacy olevassa **tietosuojakäytännössä**. Siinä kerrotaan, mitä keräämme, kunkin tarkoituksen oikeusperuste, tietojen säilytysaika, tietojen vastaanottajat, tietojen siirrot ja oikeuksiesi käyttäminen. Myös kolme seuraavaa seikkaa kuuluvat tähän. Kohdassa 7 pyydetään, ettet sisällytä kysymykseen muiden henkilötietoja; jos teet niin, vastaat siitä, ja voimme poistaa sisällön. Jos Dialectical Engine -palvelussa julkaistu väittely sisältää sinua koskevia henkilötietoja, voit pyytää niiden poistamista ilman tiliä (kohta 9). Lisäksi säilytämme sopimuksen todisteena tiedon näiden käyttöehtojen hyväksymisestäsi — version, ajankohdan ja istunnon tekniset tiedot — tietosuojakäytännössä kuvatulla tavalla.
+Henkilötietojen käsittelymme kuvataan osoitteessa dezbatere.ro/privacy olevassa **tietosuojakäytännössä**. Siinä kerrotaan, mitä keräämme, kunkin tarkoituksen oikeusperuste, tietojen säilytysaika, tietojen vastaanottajat, tietojen siirrot ja oikeuksiesi käyttäminen. Myös kolme seuraavaa seikkaa kuuluvat tähän. Kohdassa 7 pyydetään, ettet sisällytä kysymykseen muiden henkilötietoja; jos teet niin, vastaat siitä, ja voimme poistaa sisällön. Jos Dialectical Engine -palvelussa julkaistu väittely sisältää sinua koskevia henkilötietoja, voit pyytää niiden poistamista ilman tiliä (kohta 9). Lisäksi säilytämme sopimuksen todisteena tiedon näiden käyttöehtojen hyväksymisestäsi — version, ajankohdan ja istunnon tekniset tiedot — tietosuojakäytännössä kuvatulla tavalla. Sähköpostit, jotka lähetämme sinulle, on kirjoitettu kielellä, jonka valitsit sivustollamme; tietosuojakäytännön kohta 13 kertoo, miten säilytämme tämän valinnan.
 
 ## 18. Sovellettava laki ja riitojen käsittelypaikka
 

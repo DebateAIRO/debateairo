@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Cookiefil (HttpOnly) — Holder dig logget ind. Den fornyes, mens du bruger tjenesten. — 14 dage",
         "__Host-debateai-csrf — Cookiefil — Forhindrer andre websteder i at indsende formularer i dit navn. — 14 dage",
         "__Host-debateai-age-refusal — Cookiefil (HttpOnly) — Når en alderskontrol er afvist, forhindrer den denne browser i at prøve igen i 30 dage. Den indeholder kun ordet „afvist“ og ingen personoplysninger. — 30 dage",
-        "debateai.locale — Cookiefil — Husker det brugerfladesprog, du har valgt. — 1 år",
+        "debateai.locale — Cookiefil — Husker det brugerfladesprog, du har valgt, og bestemmer sproget i de e-mails, vi sender dig. — 1 år",
         "__Host-debateai-staff — Cookiefil (HttpOnly) — Separat medarbejderadgang — Op til 8 timer; 15 minutters inaktivitet",
         "__Host-debateai-staff-csrf — Cookiefil — Forhindrer andre websteder i at indsende formularer i dit navn. — Op til 8 timer; 15 minutters inaktivitet",
         "__Host-debateai-password-reset — Cookiefil (HttpOnly) — Kun nulstilling af adgangskode — Op til 30 minutter",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Sessionslagring — Husker, hvilken besked om downloadlinket der skal vises i denne fane. — Indtil fanen lukkes, du logger ud, eller et nyt link åbnes"
         ]
       },
+      { kind: "p", text: "Hver e-mail, vi sætter i kø til dig, bevarer det sprog, du havde valgt, indtil vi sender den." },
       { kind: "p", text: "Ingen anden part indsamler via Dialectical Engine oplysninger om dine onlineaktiviteter over tid og på tværs af websteder." },
       { kind: "p", text: "Browsere kan sende et „Do Not Track“-signal eller et lignende signal. Dialectical Engine sporer dig ikke, så der er intet for et sådant signal at slå fra: tjenesten fungerer på samme måde med eller uden det." },
       { kind: "p", text: "For at afvise disse elementer skal du blokere eller slette cookies og webstedsdata for dette websted i dine browserindstillinger. Hvad der så holder op med at virke: at logge ind og at huske dine valg af sprog og visning; cookiemeddelelsen vises også igen." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Når vi ændrer denne politik, offentliggør vi den nye version med en oversigt over ændringerne og en ny ikrafttrædelsesdato og beholder de tidligere versioner på dezbatere.ro/privacy/versions. Ved en ændring, der tilføjer et nyt formål eller en ny modtager, underretter vi dig via e-mail og i produktet, før den nye behandling begynder, og giver dig tid til at gøre indsigelse. Hvor et nyt formål afhænger af dit samtykke — eksempelvis hvis vi nogensinde ønskede at bruge indhold til at forbedre modeller — beder vi særskilt og specifikt om dette samtykke; vi behandler aldrig accept af opdaterede Vilkår som samtykke til ny behandling. Ved præciseringer, der ikke ændrer noget ved det, vi gør, offentliggør vi blot den nye version." },
-      { kind: "p", text: "Denne politik blev senest opdateret den 12. oktober 2026. Version 3.3 erstattede version 3.2: den dækker kun de regioner, vi betjener, nævner vores virksomhed og i afsnit 5 vores hosting-, indholdsleverings- og e-mailudbydere og beskriver Cloudflares botkontrol." }
+      { kind: "p", text: "Denne politik blev senest opdateret den 12. oktober 2026. Version 3.4 erstattede version 3.3: afsnit 13 fastslår nu, at cookien debateai.locale også bestemmer, på hvilket sprog vi skriver de e-mails, vi sender dig, og der er tilføjet et afsnit om, at hver e-mail, vi sætter i kø til dig, bevarer det sprog, du havde valgt, indtil vi sender den." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "9f0f94467fa01dc6fb0ade8fc5d67eeb510ddcb32305f76d8ae8f86966b321b2",
-  eyebrow: "PRIVATLIVSPOLITIK · v3.3 · GÆLDENDE FRA 12. OKTOBER 2026",
+  version: "3.4",
+  sha256: "74275839f936c280f6a670b3619294b1bb37a5b3e432b96a115d19eea19fa8cc",
+  eyebrow: "PRIVATLIVSPOLITIK · v3.4 · GÆLDENDE FRA 12. OKTOBER 2026",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",
-  endMarker: "SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privatlivspolitikkens tekst",
   sectionIdPrefix: "policy-section-",

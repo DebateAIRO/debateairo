@@ -137,10 +137,11 @@ describe("Part C's migration step: the currency of every quote, charge and subsc
     const plan = await loadMigrationPlan();
     const before = await migrationState();
     expect(before.ledger.map((row) => row.name).filter((name) => name === PART_C_STEP)).toHaveLength(1);
-    // data-export S01 (V-41): the export's 0115 follows role rotation in the same migrate(), the debate shape's map
-    // 0116 follows the export, and the language check's site cost 0117 follows the map.
+    // data-export S01 (V-41): the export's 0115 follows role rotation in the same migrate(), the mail locale's 0116
+    // follows the export (S01-C05), the debate shape's map 0117 follows the mail locale, and the language check's site
+    // cost 0118 follows the map.
     expect(before.steps.map((row) => row.source_name)).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, "0115_data_export.sql",
-      "0116_debate_shape_map.sql", "0117_language_check_spend.sql"]);
+      "0116_mail_locale.sql", "0117_debate_shape_map.sql", "0118_language_check_spend.sql"]);
     const step = plan.forwardChain.find((entry) => entry.name === PART_C_STEP)!;
     const netopia = plan.forwardChain.find((entry) => entry.name === NETOPIA_STEP)!;
     const batch = plan.forwardChain.find((entry) => entry.name === BATCH_STEP)!;

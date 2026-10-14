@@ -40,7 +40,7 @@ describe("debateShapePolicy: one optional row, absent means today's shape (spec 
   it.each([
     ["a map size above its bound", (v: any) => { v.plans.free.mapAIs = 10; }, "plans.free.mapAIs"],
     ["one answer", (v: any) => { v.plans.pro.answers = 1; }, "plans.pro.answers"],
-    // Ruling T-P5: at most four answers, the map's own bound (MAP_LIMITS.chooseAnswersMax, 0116's `^a[1-4]$`), so a
+    // Ruling T-P5: at most four answers, the map's own bound (MAP_LIMITS.chooseAnswersMax, 0117's `^a[1-4]$`), so a
     // published plan can never ask the map's storage for a fifth answer after the map is paid.
     ["five answers", (v: any) => { v.plans.max.answers = 5; }, "plans.max.answers"],
     ["no grader", (v: any) => { v.plans.max.graders = 0; }, "plans.max.graders"],

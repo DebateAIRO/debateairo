@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPool, migrate, PostgresIdentityRepository, type PendingAccountInput, type Pool } from "@debateai/db";
@@ -162,7 +163,7 @@ describe("0095 encrypted manual phone and optional recovery", () => {
     await database.pool.query("UPDATE identity.channel_binding SET state='verified',verified_at=clock_timestamp() WHERE user_id=$1", [account.input.userId]);
     const erasureId = randomUUID();
     await database.pool.query("INSERT INTO identity.account_erasure_request(erasure_id,user_id,requested_at,execute_at) VALUES($1,$2,clock_timestamp()-interval '2 seconds',clock_timestamp()-interval '1 second')", [erasureId, account.input.userId]);
-    expect((await database.pool.query("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome", [erasureId])).rows[0].outcome).toBe("PREPARED");
+    expect((await withMailLocale(database.pool, 'en', (c) => c.query("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome", [erasureId]))).rows[0].outcome).toBe("PREPARED");
     const notices = (await database.pool.query("SELECT channel_type FROM identity.account_erasure_notification_outbox WHERE user_id=$1", [account.input.userId])).rows;
     expect(notices).toEqual([{ channel_type: "email" }]);
     await database.pool.query("UPDATE identity.account_erasure_notification_outbox SET claim_token=gen_random_uuid(),claim_expires_at=NULL,acknowledged_at=clock_timestamp(),last_error_code=NULL WHERE user_id=$1", [account.input.userId]);

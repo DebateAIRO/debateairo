@@ -977,28 +977,29 @@ move: `composerContractHash` and `conformanceContractHash`. No migration, no new
 
 This release adds the debate shape: before the debate, the AIs map the question (the points people raise and the
 answers worth arguing); then several answers are argued, each by a different AI, and the final answer has a set
-length. It adds two migrations: `migrations/0116_debate_shape_map.sql` (the three tables that keep each debate's map)
-and `migrations/0117_language_check_spend.sql` (the fast language check's cost, recorded as a site cost in the day's
-pot by its one writer, `ledger.record_language_check_spend`). It also adds new prompts, so two fingerprints move
+length. It adds two migrations: `migrations/0117_debate_shape_map.sql` (the three tables that keep each debate's map)
+and `migrations/0118_language_check_spend.sql` (the fast language check's cost, recorded as a site cost in the day's
+pot by its one writer, `ledger.record_language_check_spend`). They come after the mail language's
+`migrations/0116_mail_locale.sql`; `pnpm db:migrate` applies 0116 first if the host does not have it yet. It also adds new prompts, so two fingerprints move
 (`judgeContractHash` and `composerContractHash`) and a new one is sealed (`mapContractHash`). The shape itself stays
 off until a register version carries the `debateShapePolicy` member (`deploy/vps/register/README.md`); this upgrade
 only makes the hosts ready for it.
 
 The hosted fast language check (the short Claude Haiku call that settles a question's language before a debate
-starts) stays off until BOTH hold: 0117 is applied (the API checks at start that the writer exists and that its role
+starts) stays off until BOTH hold: 0118 is applied (the API checks at start that the writer exists and that its role
 may run it), and `SUPPORT_MODEL_TARGET_JSON` is the Anthropic Messages target (base URL exactly
 `https://api.anthropic.com/v1`), whose key it borrows. Until then the language is settled without it (the site
 language and the local detector), and the person is never blocked. It is also skipped, never blocking, while the
 day's site pot is at its ceiling or after the spend-record breaker latches (a refused grant, a missing writer or a check
 violation, or three failed records in a row: `api.question_language.spend_record_down` in the API log; a restart checks
-again). In 0117, the trigger `language_check_spend_writer_only` lets a `LANGUAGE_CHECK` row in only when the inserting
+again). In 0118, the trigger `language_check_spend_writer_only` lets a `LANGUAGE_CHECK` row in only when the inserting
 role is the writer's owner (`debateai_staff_security_owner`): the check is by role, not by function. It holds because
 that role's other definer writers record only RUN or STORY rows; a future definer writer owned by that role must keep
 it so.
 
 Do these in this order, with the new checkout in place:
 
-1. **Apply the migrations (0116 and 0117).** Open the migrator window (§4 step 2), run `pnpm db:migrate` and then `hardening.sql` as
+1. **Apply the migrations (0117 and 0118, after 0116 if it is not applied yet).** Open the migrator window (§4 step 2), run `pnpm db:migrate` and then `hardening.sql` as
    §4 step 3 does, and close the window (§4 step 5).
 2. **Publish a new hosted register version** from the new checkout (`pnpm register:publish-hosted --file
    /etc/debateai/register/hosted-register.json`, §11) and write the printed `REGISTER_VERSION=` line into both

@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Na een geweigerde leeftijdscontrole voorkomt deze dat deze browser het 30 dagen lang opnieuw probeert. Hij bevat alleen het woord ‘geweigerd’, geen persoonsgegevens.",
   "legal.cookies.ageRefusal.life": "30 dagen",
   "legal.cookies.locale.kind": "Cookiebestand",
-  "legal.cookies.locale.purpose": "Onthoudt de interfacetaal die u hebt gekozen.",
+  "legal.cookies.locale.purpose": "Onthoudt de interfacetaal die u hebt gekozen, en bepaalt de taal van de e-mails die wij u sturen.",
   "legal.cookies.locale.life": "1 jaar",
   "legal.cookies.storageTitle": "Opgeslagen in uw browser, niet in een cookie",
   "legal.cookies.storageIntro": "Vier items worden in de opslag van uw browser bewaard: twee in de lokale opslag, totdat u ze wist, en twee in de sessieopslag, totdat u het tabblad sluit. Anders dan cookies worden ze niet aan uw verzoeken meegegeven; het item van de hulpchat bewaart een kopie van een gesprek dat u met de hulp van Dialectical Engine hebt gevoerd, en de berichten daarvan kwamen bij Dialectical Engine aan toen u ze verstuurde.",

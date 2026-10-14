@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Kuki (HttpOnly) — Menjaga Anda tetap masuk. Kuki ini diperbarui selama Anda menggunakan layanan. — 14 hari",
         "__Host-debateai-csrf — Kuki — Mencegah situs web lain mengirimkan formulir atas nama Anda. — 14 hari",
         "__Host-debateai-age-refusal — Kuki (HttpOnly) — Setelah pemeriksaan usia ditolak, mencegah peramban ini mencoba lagi selama 30 hari. Isinya hanya kata “ditolak”, tanpa data pribadi. — 30 hari",
-        "debateai.locale — Kuki — Mengingat bahasa antarmuka yang Anda pilih. — 1 tahun",
+        "debateai.locale — Kuki — Mengingat bahasa antarmuka yang Anda pilih, dan menentukan bahasa email yang kami kirimkan kepada Anda. — 1 tahun",
         "__Host-debateai-staff — Kuki (HttpOnly) — Akses staf terpisah — Hingga 8 jam; 15 menit tidak aktif",
         "__Host-debateai-staff-csrf — Kuki — Mencegah situs web lain mengirimkan formulir atas nama Anda. — Hingga 8 jam; 15 menit tidak aktif",
         "__Host-debateai-password-reset — Kuki (HttpOnly) — Hanya pengaturan ulang kata sandi — Hingga 30 menit",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Penyimpanan sesi — Mengingat pesan tautan unduhan yang perlu ditampilkan di tab ini. — Hingga tab ditutup, keluar, atau tautan baru dibuka"
         ]
       },
+      { kind: "p", text: "Setiap email yang kami masukkan ke antrean untuk Anda tetap menggunakan bahasa yang sudah Anda pilih hingga kami mengirimkannya." },
       { kind: "p", text: "Tidak ada pihak lain yang mengumpulkan informasi tentang aktivitas online Anda dari waktu ke waktu dan di berbagai situs web melalui Dialectical Engine." },
       { kind: "p", text: "Browser dapat mengirim sinyal “Do Not Track” atau sinyal serupa. Dialectical Engine tidak melacak Anda, sehingga tidak ada yang perlu dimatikan oleh sinyal tersebut: layanan berfungsi sama dengan atau tanpa sinyal itu." },
       { kind: "p", text: "Untuk menolak item ini, blokir atau hapus kuki dan data situs untuk situs ini di pengaturan browser Anda. Yang kemudian berhenti berfungsi: masuk ke akun, dan pengingatan pilihan bahasa serta tampilan Anda; pemberitahuan kuki juga akan muncul lagi." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Ketika mengubah kebijakan ini, kami menerbitkan versi baru beserta ringkasan perubahan dan tanggal berlaku baru, serta menyimpan versi sebelumnya di dezbatere.ro/privacy/versions. Untuk perubahan yang menambahkan tujuan atau penerima baru, kami memberi tahu Anda sebelum pemrosesan baru dimulai, melalui email dan di dalam produk, serta memberi waktu untuk mengajukan keberatan. Jika tujuan baru bergantung pada persetujuan Anda — misalnya jika kami suatu saat ingin menggunakan konten untuk meningkatkan model — kami meminta persetujuan tersebut secara terpisah dan spesifik; kami tidak pernah menganggap penerimaan Ketentuan yang diperbarui sebagai persetujuan atas pemrosesan baru. Untuk klarifikasi yang tidak mengubah apa pun tentang tindakan kami, kami hanya menerbitkan versi baru." },
-      { kind: "p", text: "Kebijakan ini terakhir diperbarui pada 12 Oktober 2026. Versi 3.3 menggantikan versi 3.2: kebijakan ini hanya mencakup wilayah yang kami layani, menyebutkan nama perusahaan kami dan, di bagian 5, penyedia hos, pengiriman konten, dan email kami, serta menjelaskan pemeriksaan bot Cloudflare." }
+      { kind: "p", text: "Kebijakan ini terakhir diperbarui pada 12 Oktober 2026. Versi 3.4 menggantikan versi 3.3: bagian 13 kini menyatakan bahwa kuki debateai.locale juga menentukan bahasa tempat kami menulis email yang kami kirimkan kepada Anda, dan menambahkan paragraf yang menyatakan bahwa setiap email yang kami masukkan ke antrean untuk Anda tetap menggunakan bahasa yang sudah Anda pilih hingga kami mengirimkannya." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "163c7094e16dfe95c1fd737f5cbe64080a7a2ec396468c77ef03c66aeee890cf",
-  eyebrow: "KEBIJAKAN PRIVASI · v3.3 · BERLAKU 12 OKTOBER 2026",
+  version: "3.4",
+  sha256: "8396b136efbd40732eed90f435273a184954b41ba524e11c708b28ff895493ab",
+  eyebrow: "KEBIJAKAN PRIVASI · v3.4 · BERLAKU 12 OKTOBER 2026",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",
-  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Teks Kebijakan Privasi",
   sectionIdPrefix: "policy-section-",

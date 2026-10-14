@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.3 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
+eyebrow: CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.4 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
 title: Dữ liệu chúng tôi lưu trữ và lý do
 lede: Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.
-endMarker: HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.3
+endMarker: HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Nội dung Chính sách quyền riêng tư
 annexTitle: Phụ lục B — Điều khoản quyền riêng tư theo khu vực
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIE
 -->
 
-**Version 3.3 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/privacy/versions · Bên kiểm soát: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/privacy/versions · Bên kiểm soát: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Chúng tôi thu thập những gì cần thiết để tài khoản hoạt động và những gì bạn lựa chọn nhập. Câu hỏi của bạn được gửi đến các nhà cung cấp AI nêu trong Sổ đăng ký của chúng tôi; chúng không được dùng để huấn luyện mô hình. Nhà cung cấp dịch vụ lưu trữ của chúng tôi lưu trữ tài khoản và các cuộc tranh luận của bạn tại London, Vương quốc Anh; mục 5 cho biết dữ liệu của bạn còn được chuyển đến đâu nữa. Các cuộc tranh luận là riêng tư trừ khi bạn công khai chúng. Việc xóa tài khoản sẽ hủy khóa của dữ liệu riêng tư; khi lên lịch xóa, bạn chọn gỡ cả các cuộc tranh luận đã công khai hoặc để chúng tiếp tục công khai dưới bút danh đã ngừng sử dụng. Bạn có thể liên hệ với chúng tôi tại privacy@dezbatere.ro, và người được nêu tên trong một cuộc tranh luận có thể yêu cầu gỡ bỏ mà không cần tài khoản.
 
@@ -183,7 +183,7 @@ Dialectical Engine sử dụng 20 mục, tất cả đều thực sự cần thi
 | `__Host-debateai-session` | Tệp cookie (HttpOnly) | Duy trì trạng thái đăng nhập của bạn. Cookie này được gia hạn trong thời gian bạn sử dụng dịch vụ. | 14 ngày |
 | `__Host-debateai-csrf` | Tệp cookie | Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. | 14 ngày |
 | `__Host-debateai-age-refusal` | Tệp cookie (HttpOnly) | Sau khi một lần kiểm tra độ tuổi bị từ chối, ngăn trình duyệt này thử lại trong 30 ngày. Nó chỉ chứa từ “bị từ chối”, không có dữ liệu cá nhân. | 30 ngày |
-| `debateai.locale` | Tệp cookie | Ghi nhớ ngôn ngữ giao diện bạn đã chọn. | 1 năm |
+| `debateai.locale` | Tệp cookie | Ghi nhớ ngôn ngữ giao diện bạn đã chọn, và đặt ngôn ngữ của các email chúng tôi gửi cho bạn. | 1 năm |
 | `__Host-debateai-staff` | Tệp cookie (HttpOnly) | Quyền truy cập nhân viên riêng | Tối đa 8 giờ; 15 phút không hoạt động |
 | `__Host-debateai-staff-csrf` | Tệp cookie | Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. | Tối đa 8 giờ; 15 phút không hoạt động |
 | `__Host-debateai-password-reset` | Tệp cookie (HttpOnly) | Chỉ đặt lại mật khẩu | Tối đa 30 phút |
@@ -201,6 +201,8 @@ Dialectical Engine sử dụng 20 mục, tất cả đều thực sự cần thi
 | `debateai.exportPending` | Bộ nhớ phiên | Giữ liên kết xuất dữ liệu trong email ở thẻ này để đăng nhập và thử lại. | Cho đến khi đóng thẻ, đăng xuất, mở liên kết mới, tải xuống thành công lần đầu hoặc nhận kết quả liên kết không hợp lệ hay sai tài khoản |
 | `debateai.exportLinkOutcome` | Bộ nhớ phiên | Ghi nhớ thông báo về liên kết tải xuống cần hiển thị trong thẻ này. | Cho đến khi đóng thẻ, đăng xuất hoặc mở liên kết mới |
 
+Mỗi email chúng tôi lưu lại để gửi cho bạn giữ nguyên ngôn ngữ bạn đã chọn cho đến khi chúng tôi gửi email đó.
+
 Không có bên nào khác thu thập, thông qua Dialectical Engine, thông tin về các hoạt động trực tuyến của bạn theo thời gian và trên nhiều trang web khác nhau.
 
 Trình duyệt có thể gửi tín hiệu “Do Not Track” hoặc một tín hiệu tương tự. Dialectical Engine không theo dõi bạn, vì vậy không có gì để tín hiệu đó tắt đi: dịch vụ hoạt động như nhau dù có hay không có tín hiệu đó.
@@ -211,7 +213,7 @@ Trình duyệt có thể gửi tín hiệu “Do Not Track” hoặc một tín 
 
 Khi thay đổi chính sách này, chúng tôi đăng phiên bản mới kèm bản tóm tắt những thay đổi và ngày hiệu lực mới, đồng thời lưu các phiên bản trước tại dezbatere.ro/privacy/versions. Đối với thay đổi bổ sung mục đích mới hoặc bên nhận mới, chúng tôi thông báo cho bạn trước khi hoạt động xử lý mới bắt đầu, qua email và trong sản phẩm, đồng thời dành cho bạn thời gian phản đối. Khi mục đích mới phụ thuộc vào sự đồng ý của bạn — ví dụ nếu sau này chúng tôi muốn sử dụng nội dung để cải thiện mô hình — chúng tôi sẽ xin sự đồng ý đó một cách riêng biệt và cụ thể; chúng tôi không bao giờ coi việc chấp nhận Điều khoản cập nhật là sự đồng ý cho hoạt động xử lý mới. Đối với các nội dung làm rõ không làm thay đổi cách chúng tôi hành động, chúng tôi chỉ đăng phiên bản mới.
 
-Chính sách này được cập nhật lần cuối vào ngày 12 tháng 10 năm 2026. Phiên bản 3.3 thay thế phiên bản 3.2: phiên bản này chỉ bao gồm các khu vực chúng tôi phục vụ, nêu tên công ty của chúng tôi và, tại mục 5, các nhà cung cấp dịch vụ lưu trữ, phân phối nội dung và email của chúng tôi, đồng thời mô tả bước kiểm tra bot của Cloudflare.
+Chính sách này được cập nhật lần cuối vào ngày 12 tháng 10 năm 2026. Phiên bản 3.4 thay thế phiên bản 3.3: mục 13 nay nêu rõ cookie debateai.locale cũng đặt ngôn ngữ mà chúng tôi dùng để viết các email gửi cho bạn, và bổ sung một đoạn cho biết mỗi email chúng tôi lưu lại để gửi cho bạn giữ nguyên ngôn ngữ bạn đã chọn cho đến khi chúng tôi gửi email đó.
 
 ## Annex B — Điều khoản quyền riêng tư theo khu vực
 

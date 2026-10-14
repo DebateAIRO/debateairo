@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Çerez (HttpOnly) — Oturumunuzun açık kalmasını sağlar. Hizmeti kullandığınız sürece yenilenir. — 14 gün",
         "__Host-debateai-csrf — Çerez — Başka web sitelerinin sizin adınıza form göndermesini engeller. — 14 gün",
         "__Host-debateai-age-refusal — Çerez (HttpOnly) — Bir yaş kontrolü reddedildikten sonra bu tarayıcının 30 gün boyunca yeniden denemesini engeller. Yalnızca “reddedildi” sözcüğünü içerir, kişisel veri içermez. — 30 gün",
-        "debateai.locale — Çerez — Seçtiğiniz arayüz dilini hatırlar. — 1 yıl",
+        "debateai.locale — Çerez — Seçtiğiniz arayüz dilini hatırlar ve size gönderdiğimiz e-postaların dilini de belirler. — 1 yıl",
         "__Host-debateai-staff — Çerez (HttpOnly) — Ayrı personel erişimi — En fazla 8 saat; 15 dakika hareketsizlik",
         "__Host-debateai-staff-csrf — Çerez — Başka web sitelerinin sizin adınıza form göndermesini engeller. — En fazla 8 saat; 15 dakika hareketsizlik",
         "__Host-debateai-password-reset — Çerez (HttpOnly) — Yalnızca parola sıfırlama — En fazla 30 dakika",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Oturum depolaması — Bu sekmede hangi indirme bağlantısı iletisinin gösterileceğini hatırlar. — Sekme kapanana, oturum kapatılana veya yeni bağlantı açılana kadar"
         ]
       },
+      { kind: "p", text: "Sizin için sıraya aldığımız her e-posta, biz gönderene kadar seçtiğiniz dili korur." },
       { kind: "p", text: "Başka hiçbir taraf, Dialectical Engine aracılığıyla zaman içinde ve farklı web siteleri genelinde çevrimiçi etkinlikleriniz hakkında bilgi toplamaz." },
       { kind: "p", text: "Tarayıcılar “Do Not Track” sinyali veya benzeri bir sinyal gönderebilir. Dialectical Engine sizi izlemez, bu nedenle böyle bir sinyalin kapatacağı hiçbir şey yoktur: hizmet, sinyal olsa da olmasa da aynı şekilde çalışır." },
       { kind: "p", text: "Bu öğeleri reddetmek için tarayıcı ayarlarınızda bu sitenin çerezlerini ve site verilerini engelleyin veya silin. Bu durumda çalışmayı durduran şeyler: oturum açma ile dil ve görünüm seçimlerinizin hatırlanması; çerez bildirimi de yeniden gösterilir." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Bu politikayı değiştirdiğimizde yeni sürümü, değişikliklerin özeti ve yeni bir yürürlük tarihiyle birlikte yayımlar ve önceki sürümleri dezbatere.ro/privacy/versions adresinde tutarız. Yeni bir amaç veya yeni bir alıcı ekleyen değişikliklerde, yeni işleme başlamadan önce size e-postayla ve ürün içinde bilgi verir ve itiraz etmeniz için süre tanırız. Yeni bir amaç rızanıza bağlıysa — örneğin bir gün içeriği modelleri geliştirmek için kullanmak istersek — bu rızayı ayrıca ve özel olarak isteriz; güncellenmiş Koşulların kabulünü hiçbir zaman yeni işleme için rıza saymayız. Yaptıklarımızı değiştirmeyen açıklamalar bakımından yeni sürümü yayımlamakla yetiniriz." },
-      { kind: "p", text: "Bu politika en son 12 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.3, sürüm 3.2'nin yerine geçmiştir: yalnızca hizmet verdiğimiz bölgeleri kapsar, şirketimizi ve 5. bölümde barındırma, içerik dağıtımı ve e-posta sağlayıcılarımızı belirtir, ayrıca Cloudflare bot kontrolünü açıklar." }
+      { kind: "p", text: "Bu politika en son 12 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.4, sürüm 3.3'ün yerine geçmiştir: 13. bölüm, debateai.locale çerezinin size gönderdiğimiz e-postaların dilini de belirlediğini artık söylüyor ve sıraya aldığımız her e-postanın, biz gönderene kadar seçtiğiniz dili koruduğunu belirten bir paragraf ekliyor." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "f8c17a968569fd625266b30fdfe90416fe873176b72d1f97887df09a1d39d136",
-  eyebrow: "GİZLİLİK POLİTİKASI · v3.3 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
+  version: "3.4",
+  sha256: "24c0f376d86c6e0f6328dad4d3487fae6eb713551ffb002119c01cbb1c691dfd",
+  eyebrow: "GİZLİLİK POLİTİKASI · v3.4 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",
-  endMarker: "POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Gizlilik Politikası metni",
   sectionIdPrefix: "policy-section-",

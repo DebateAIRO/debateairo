@@ -44,7 +44,7 @@ describe("debate shape P2c — the debate map view contract", () => {
   });
 
   // Whole-branch review m-5: one limit everywhere. The page shows at most the answers the map can choose and store
-  // (MAP_LIMITS.chooseAnswersMax; 0116's answer ids a1..a4; the register's plan answers 2..4, debate-shape-policy test).
+  // (MAP_LIMITS.chooseAnswersMax; 0117's answer ids a1..a4; the register's plan answers 2..4, debate-shape-policy test).
   it("shows at most the answers the map can choose (one limit: four)", () => {
     expect(DEBATE_MAP_VIEW_LIMITS.maxPositions).toBe(MAP_LIMITS.chooseAnswersMax);
     expect(DEBATE_MAP_VIEW_LIMITS.maxPositions).toBe(4);

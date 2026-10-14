@@ -36,7 +36,7 @@ export type QuestionLanguageTrace = Readonly<{
 /**
  * Why no fast check ran (progress NOTE for Task 10: the reason beside every LOCAL_* code). SIGNED_OUT is the person's
  * (ruling L-NOCONSENT); the others are the deployment's, stated at composition (Task 12): local mode, a preview with
- * no Anthropic gate (L-ROUTE), hosted before 0117's run-less spend record exists (Task 19), hosted with no Anthropic
+ * no Anthropic gate (L-ROUTE), hosted before 0118's run-less spend record exists (Task 19), hosted with no Anthropic
  * support target to take the key from (Task 19), the row's fast check switched off.
  * NO_FAST_CHECK: the composition stated no reason.
  */

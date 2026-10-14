@@ -12,7 +12,7 @@ import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/dis
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * 0117 (question-language spec 2026-10-13, plan P2L Task 19): the fast language check's cost is a SITE cost in the
+ * 0118 (question-language spec 2026-10-13, plan P2L Task 19): the fast language check's cost is a SITE cost in the
  * day's pot (`readDaySpentMicros`), written before any debate exists, by ONE writer: the SECURITY DEFINER function
  * `ledger.record_language_check_spend`, which the API's runtime role may execute (pre-flight PF-L58, option (a)).
  * Embedded Postgres; run this file alone.
@@ -67,8 +67,8 @@ async function asRuntime<T>(work: (client: { query: TestDatabase["pool"]["query"
   }
 }
 
-describe("0117: the language check's site cost (one writer, the day's pot)", () => {
-  it("the boot probe sees the one writer once 0117 is applied", async () => {
+describe("0118: the language check's site cost (one writer, the day's pot)", () => {
+  it("the boot probe sees the one writer once 0118 is applied", async () => {
     expect(LANGUAGE_CHECK_SPEND_WRITER).toBe("ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)");
     expect(await asRuntime((client) => languageCheckSpendWriterPresent(client))).toBe(true);
   });
@@ -199,33 +199,33 @@ describe("0117: the language check's site cost (one writer, the day's pot)", () 
 });
 
 /**
- * Whole-branch review I-3, ruling W-0117: 0117's postcondition pins only what 0117 owns (its writer, its guard and the
+ * Whole-branch review I-3, ruling W-0117: 0118's postcondition pins only what 0118 owns (its writer, its guard and the
  * guard's trigger, and its own run-less CHECK). The source list `model_spend_spend_source_check` is 0074's, shared by
- * every spend source: 0117 widens it, but a later migration that widens it again must not stop every migrate() with a
- * postcondition drift on 0117.
+ * every spend source: 0118 widens it, but a later migration that widens it again must not stop every migrate() with a
+ * postcondition drift on 0118.
  */
-describe("0117's postcondition pins only what 0117 owns (W-0117)", () => {
-  const LANGUAGE_CHECK_STEP = "0117_language_check_spend.sql";
+describe("0118's postcondition pins only what 0118 owns (W-0117)", () => {
+  const LANGUAGE_CHECK_STEP = "0118_language_check_spend.sql";
   const constraintDef = async (name: string): Promise<string> => (await database.pool.query<{ def: string }>(
     "SELECT pg_get_constraintdef(oid) def FROM pg_constraint WHERE conname=$1 AND conrelid='ledger.model_spend'::regclass", [name]
   )).rows[0]!.def;
   const replaceCheck = (name: string, definition: string): Promise<unknown> =>
     database.pool.query(`ALTER TABLE ledger.model_spend DROP CONSTRAINT ${name}, ADD CONSTRAINT ${name} ${definition}`);
 
-  it("a later migration may widen the shared source list without a drift on 0117", async () => {
+  it("a later migration may widen the shared source list without a drift on 0118", async () => {
     const before = await constraintDef("model_spend_spend_source_check");
     expect(before).toContain("LANGUAGE_CHECK");
     await replaceCheck("model_spend_spend_source_check",
       "CHECK (spend_source IN ('RUN', 'SUPPORT', 'STORY', 'LANGUAGE_CHECK', 'FUTURE_SOURCE'))");
     try {
-      await migrate(database.pool);   // before W-0117: MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT 0117_language_check_spend.sql
+      await migrate(database.pool);   // before W-0117: MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT 0118_language_check_spend.sql
     } finally {
       await replaceCheck("model_spend_spend_source_check", before);
     }
     await migrate(database.pool);
   }, 180_000);
 
-  it("control: 0117's own run-less CHECK is still pinned", async () => {
+  it("control: 0118's own run-less CHECK is still pinned", async () => {
     const before = await constraintDef("model_spend_language_check_is_runless");
     await replaceCheck("model_spend_language_check_is_runless", "CHECK (spend_source <> 'LANGUAGE_CHECK' OR run_id IS NULL)");
     try {

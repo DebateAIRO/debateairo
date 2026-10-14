@@ -4,7 +4,7 @@
  * and the preview and hosted URLs are the same string, so the BOOT enforces the table. One test per row:
  *   preview + Anthropic gate socket → the guarded fetch, no key, no spend record (the gate settles preview money);
  *   preview without that socket      → NO transport, the fast check off, reason NO_GATE (never the hosted route);
- *   hosted, 0117's writer absent     → NO transport, reason HOSTED_BEFORE_SPEND_RECORD (never spend unrecorded);
+ *   hosted, 0118's writer absent     → NO transport, reason HOSTED_BEFORE_SPEND_RECORD (never spend unrecorded);
  *   hosted, no Anthropic support key → NO transport, reason NO_HOSTED_KEY;
  *   hosted (Task 19)                 → the support target's key, the exact Anthropic URL, its run-less spend record;
  *   local mode                       → NO transport, reason LOCAL_MODE;
@@ -86,12 +86,12 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
       hosted: never })).toEqual({ kind: "PREVIEW", fetch: previewRoute.fetch });
   });
 
-  it("with no preview configuration the hosted side decides: local, the check off, or 0117's writer absent build no transport", async () => {
+  it("with no preview configuration the hosted side decides: local, the check off, or 0118's writer absent build no transport", async () => {
     const local = hostedDeps({ mode: "local" });
     expect(await hostedQuestionLanguageRoute(local.input)).toEqual({ kind: "NONE", reason: "LOCAL_MODE" });
     const off = hostedDeps({ fastCheck: null });
     expect(await hostedQuestionLanguageRoute(off.input)).toEqual({ kind: "NONE", reason: "POLICY_OFF" });
-    // Never spend unrecorded: until 0117's writer exists the hosted API keeps the fast check off, and never reads the key.
+    // Never spend unrecorded: until 0118's writer exists the hosted API keeps the fast check off, and never reads the key.
     const before = hostedDeps({ writerPresent: false });
     expect(await hostedQuestionLanguageRoute(before.input)).toEqual({ kind: "NONE", reason: "HOSTED_BEFORE_SPEND_RECORD" });
     for (const deps of [local, off]) expect(deps.probes).toBe(0);
@@ -125,7 +125,7 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
       .toThrow("QUESTION_LANGUAGE_FAST_CHECK_MODEL_NOT_ON_PREVIEW");
   });
 
-  it("Task 19: with 0117's writer and the support target's key the route is HOSTED, and each check is one run-less site cost", async () => {
+  it("Task 19: with 0118's writer and the support target's key the route is HOSTED, and each check is one run-less site cost", async () => {
     const deps = hostedDeps({});
     const route = await hostedQuestionLanguageRoute(deps.input);
     expect(route).toMatchObject({ kind: "HOSTED", credential: "sk-ant-test-key" });
@@ -324,7 +324,7 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
     expect(["FALLBACK_SITE", "FALLBACK_ELD", "ELD_SITE"]).toContain(lock.source);
   });
 
-  it("route row 'hosted', end to end: a billed reply is recorded once through 0117's writer, at the cache-write price the frame asks for", async () => {
+  it("route row 'hosted', end to end: a billed reply is recorded once through 0118's writer, at the cache-write price the frame asks for", async () => {
     const bodies: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init?: RequestInit) => {
       bodies.push(String(init?.body));
@@ -389,7 +389,7 @@ function callLines(source: string, opener: string): string[] {
 }
 
 // I6 (final review): nothing else in CI reads these lines. A regression here turns no test red by itself: the guard
-// back on `debateShapePolicy` would load eld and probe 0117 with the row disabled (row-absent drift), and a guarded
+// back on `debateShapePolicy` would load eld and probe 0118 with the row disabled (row-absent drift), and a guarded
 // fetch swapped for the global one would bypass the preview gate (CR-6). The lines are copied from the shipped code.
 const QL_GUARD = "const questionLanguage = debateShapeInForcePolicy === null ? undefined : await boot.run(\"question-language\", async () => {";
 const QL_HOSTED_ROUTE = "const hostedRoute = previewConfig !== undefined ? undefined : await hostedQuestionLanguageRoute({";

@@ -19,7 +19,7 @@ import {
 
 /**
  * Debate shape (spec §3.4): the map's storage. Items, the run's choice and the roots that argued each answer, in the
- * three append-only tables of migration 0116. Debate text is sealed per row (carriers core.map_item / core.map_choice)
+ * three append-only tables of migration 0117. Debate text is sealed per row (carriers core.map_item / core.map_choice)
  * on an encrypted run and kept in the clear on a legacy run, exactly as the story's repository does.
  *
  * Every readable column holds a code (ruling T7-PRIV): the repository refuses, typed and before anything is sealed or
@@ -35,14 +35,14 @@ export type MapWriteOutcome = "INSERTED" | "ALREADY_PRESENT" | "RUN_ERASED";
 
 const SENTINEL = JSON.stringify(CONTENT_JSON_SENTINEL);
 
-// 0116's code shapes, held here too so a breach is refused typed (and value-free) before any seal.
+// 0117's code shapes, held here too so a breach is refused typed (and value-free) before any seal.
 const ITEM_ID = /^[a-z]{2}[0-9]{2,4}$/u;
 const ANGLE_ID = /^g[1-7]$/u;
 const ANSWER_ID = /^a[1-4]$/u;
 const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 /** 0069's core.jsonb_is_code_token: one token of 1..256 characters from a closed set (no whitespace). */
 const CODE_TOKEN = /^[[\]A-Za-z0-9_.:@/+>=#-]{1,256}$/u;
-/** 0116's closed sets (map_item_origin_closed, _kind_closed, _leans_closed, _angle_kind_closed). */
+/** 0117's closed sets (map_item_origin_closed, _kind_closed, _leans_closed, _angle_kind_closed). */
 const ORIGINS: ReadonlySet<string> = new Set<MapItemOrigin>(["BLIND", "SHOWN", "GAP"]);
 const KINDS: ReadonlySet<string> = new Set<MapItem["kind"]>(["POINT", "ANSWER"]);
 const LEANS: ReadonlySet<string> = new Set<string>(MAP_LEANS);
@@ -74,7 +74,7 @@ function isPrivateContentErased(error: unknown): boolean {
   return row !== null && row.code === "55000" && row.message === "PRIVATE_CONTENT_ERASED";
 }
 
-/** 0116's attestation guard fires before 0040's barrier: on a run erased as 0040 erases, it answers this first. */
+/** 0117's attestation guard fires before 0040's barrier: on a run erased as 0040 erases, it answers this first. */
 function isAttestationSecretUnresolved(error: unknown): boolean {
   const row = pgError(error);
   return row !== null && row.code === "55000" && row.message === "CONTENT_ATTESTATION_SECRET_UNRESOLVED";
@@ -304,7 +304,7 @@ export class MapChoiceRepository {
   }
 
   /**
-   * RUN_ERASED for 0040's barrier (or the lease's own check), and for 0116's attestation guard's missing secret ONLY
+   * RUN_ERASED for 0040's barrier (or the lease's own check), and for 0117's attestation guard's missing secret ONLY
    * when the run is an ENCRYPTED run (content_encryption_version = 1) whose private content is no longer live: a legacy
    * run is never classed as erased here, and on a live run a missing secret is a defect, and stays loud.
    */

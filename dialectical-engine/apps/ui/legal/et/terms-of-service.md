@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.2 · KEHTIB ALATES 12. OKTOOBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.3 · KEHTIB ALATES 12. OKTOOBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.2
+endMarker: TINGIMUSTE LÕPP · v2.3
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.2 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.3 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -114,7 +114,7 @@ Kui te ei ole kindel, kas miski on lubatud, küsige meilt enne selle postitamist
 
 **Teie sisu jääb teile.** Teile jäävad kõik õigused, mis teil on esitatud küsimuste, väidete, annotatsioonide ja vastuväidete suhtes. Annate meile lihtlitsentsi, mis kehtib kogu maailmas ja mille eest ei maksta litsentsitasu, selle sisu majutamiseks, säilitamiseks, reprodutseerimiseks, kohandamiseks ja töötlemiseks teenuse käitamise eesmärgil: väitluse läbiviimiseks, selle säilitamiseks, et saaksite selle uuesti avada ja taasesitada, kasutajatoe pakkumiseks, meie juriidiliste kohustuste täitmiseks ning — ainult juhul, kui otsustate sisu avaldada — jaotises 9 nimetatud eesmärkidel. Litsents lõpeb sisu kustutamisel, välja arvatud juhul, kui jaotis 9 või seadus nõuab teisiti.
 
-**Me ei kasuta teie sisu mudelite treenimiseks.** Me ei kasuta teie sisu mudelite treenimiseks. Kasutame tehisintellekti pakkujaid ainult tingimustel, mis ei luba neil kasutada teie sisu oma mudelite treenimiseks ega täiustamiseks; pakkujate register näitab iga pakkuja kohta, kas ja millal oleme seda kinnitanud.
+**Me ei kasuta teie sisu mudelite treenimiseks.** Kasutame tehisintellekti pakkujaid ainult tingimustel, mis ei luba neil kasutada teie sisu oma mudelite treenimiseks ega täiustamiseks; pakkujate register näitab iga pakkuja kohta, kas ja millal oleme seda kinnitanud.
 
 **Kuidas teie sisu jõuab tehisintellekti pakkujateni.** Väitluse läbiviimiseks saadame teksti ühele või mitmele välisele mudelipakkujale. Pakkuja saab teie küsimuse, teie määratud suunavad annotatsioonid ja väitluse käigus mootori koostatud väited — seega näeb pakkuja teie sisestatud tekstist tuletatud ja selle ümber loodud teksti, mitte ainult teie algseid sõnu. Pakkuja ei saa kunagi teie e-posti aadressi, konto tunnuseid, seansikirjeid ega makseandmeid.
 
@@ -239,7 +239,7 @@ Jaotises 8 käsitletakse teie sisu ja loodud väljundite staatust. Kui arvate, e
 
 ## 17. Isikuandmed
 
-Isikuandmete töötlemist kirjeldatakse **Privaatsuspoliitikas** aadressil dezbatere.ro/privacy. Selles selgitatakse, mida me kogume, iga eesmärgi õiguslikku alust, andmete säilitamise aega, andmete vastuvõtjaid, asjaomaseid edastamisi ning seda, kuidas oma õigusi kasutada. Lisaks rõhutame siin kolme asja. Jaotises 7 palutakse teil mitte lisada küsimusse teiste inimeste isikuandmeid; kui te seda siiski teete, vastutate nende eest ja me võime sisu eemaldada. Kui Dialectical Engine-s avaldatud väitlus sisaldab teie isikuandmeid, võite konto olemasolust olenemata paluda meil need eemaldada (jaotis 9). Samuti säilitame andmed selle kohta, et nõustusite nende Tingimustega — versioon, aeg ja seansi tehnilised üksikasjad — lepingu tõendina, nagu on selgitatud Privaatsuspoliitikas.
+Isikuandmete töötlemist kirjeldatakse **Privaatsuspoliitikas** aadressil dezbatere.ro/privacy. Selles selgitatakse, mida me kogume, iga eesmärgi õiguslikku alust, andmete säilitamise aega, andmete vastuvõtjaid, asjaomaseid edastamisi ning seda, kuidas oma õigusi kasutada. Lisaks rõhutame siin kolme asja. Jaotises 7 palutakse teil mitte lisada küsimusse teiste inimeste isikuandmeid; kui te seda siiski teete, vastutate nende eest ja me võime sisu eemaldada. Kui Dialectical Engine-s avaldatud väitlus sisaldab teie isikuandmeid, võite konto olemasolust olenemata paluda meil need eemaldada (jaotis 9). Samuti säilitame andmed selle kohta, et nõustusite nende Tingimustega — versioon, aeg ja seansi tehnilised üksikasjad — lepingu tõendina, nagu on selgitatud Privaatsuspoliitikas. Teile saadetavad e-kirjad on kirjutatud keeles, mille valisite meie saidil; Privaatsuspoliitika jaotis 13 selgitab, kuidas me selle valiku säilitame.
 
 ## 18. Kohaldatav õigus ja vaidluste lahendamise koht
 

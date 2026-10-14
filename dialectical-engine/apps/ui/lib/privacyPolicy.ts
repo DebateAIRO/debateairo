@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Cookie (HttpOnly) — Keeps you signed in. It is renewed while you use the service. — 14 days",
         "__Host-debateai-csrf — Cookie — Stops other websites from submitting forms in your name. — 14 days",
         "__Host-debateai-age-refusal — Cookie (HttpOnly) — After an age check is refused, stops this browser from trying again for 30 days. It holds only the word “refused”, no personal data. — 30 days",
-        "debateai.locale — Cookie — Remembers the interface language you picked. — 1 year",
+        "debateai.locale — Cookie — Remembers the interface language you picked, and sets the language of the emails we send you. — 1 year",
         "__Host-debateai-staff — Cookie (HttpOnly) — Separate staff access — Up to 8 hours; 15-minute idle expiry",
         "__Host-debateai-staff-csrf — Cookie — Stops other websites from submitting forms in your name. — Up to 8 hours; 15-minute idle expiry",
         "__Host-debateai-password-reset — Cookie (HttpOnly) — Password reset only — Up to 30 minutes",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Session storage — Remembers which download-link message to show in this tab. — Until tab close, sign-out, or a new link"
         ]
       },
+      { kind: "p", text: "Each email we queue for you keeps the language you had selected until we send it." },
       { kind: "p", text: "No other party collects information about your online activities over time and across websites through Dialectical Engine." },
       { kind: "p", text: "Browsers can send a “Do Not Track” signal or a similar signal. Dialectical Engine does not track you, so there is nothing for such a signal to switch off: the service works the same with or without it." },
       { kind: "p", text: "To refuse these items, block or delete cookies and site data for this site in your browser settings. What then stops working: signing in, and the remembering of your language and display choices; the cookie notice will also show again." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version." },
-      { kind: "p", text: "This policy was last updated on 12 October 2026. Version 3.3 replaced version 3.2: it covers only the regions we serve, names our company and, in section 5, our hosting, content-delivery and email providers, and describes the Cloudflare bot check." }
+      { kind: "p", text: "This policy was last updated on 12 October 2026. Version 3.4 replaced version 3.3: section 13 now says that the cookie debateai.locale also sets the language in which we write the emails we send you, and it adds a paragraph saying that each email we queue for you keeps the language you had selected until we send it." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "35c957d530b2c57071cbbe8db0a28cb957f1fb1bd9d96e43eb46dab87ed22b7c",
-  eyebrow: "PRIVACY POLICY · v3.3 · EFFECTIVE 12 OCTOBER 2026",
+  version: "3.4",
+  sha256: "2c2f688b8be538e9e2f47123c4a16051da4be81ce344f6c2994519892d688c63",
+  eyebrow: "PRIVACY POLICY · v3.4 · EFFECTIVE 12 OCTOBER 2026",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",
-  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privacy Policy text",
   sectionIdPrefix: "policy-section-",

@@ -20,6 +20,7 @@ export {
   MailTemplateError,
   companyFacts,
   companyFactsOf,
+  copyOf,
   loadMailCatalogues,
   mailLinkOf,
   mailMessagesDirectory,

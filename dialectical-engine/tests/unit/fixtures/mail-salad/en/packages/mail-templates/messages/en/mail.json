@@ -1,0 +1,5 @@
+{
+  "auth.common.greeting": "Hello,",
+  "auth.common.signoff": "The DebateAI team",
+  "auth.pwr.proof.body": "A password reset was requested for your DebateAI account. Use this link before {expiry}."
+}

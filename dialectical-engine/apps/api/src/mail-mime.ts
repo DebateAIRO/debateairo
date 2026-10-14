@@ -32,6 +32,12 @@ function base64Lines(bytes: Uint8Array): string {
   return (Buffer.from(bytes).toString("base64").match(/.{1,76}/g) ?? [""]).join("\r\n");
 }
 
+/** C16 (V-24): one rule for every message body. ASCII text is written unchanged; any other text is base64 of its UTF-8 bytes. */
+export function transferBody(text: string): { contentTransferEncoding: "base64" | null; body: string } {
+  if (/^[\x09\x0a\x0d\x20-\x7e]*$/.test(text)) return { contentTransferEncoding: null, body: text };
+  return { contentTransferEncoding: "base64", body: base64Lines(Buffer.from(text, "utf8")) };
+}
+
 export function buildTemplatedMessage(input: Readonly<{
   from: string;
   to: string;
@@ -41,8 +47,11 @@ export function buildTemplatedMessage(input: Readonly<{
   html: string;
   attachments: ReadonlyArray<MailAttachment>;
   boundary: string;
+  /** C12 (R-31): the catalogue code of the text, e.g. ro; a user mail always names it. */
+  contentLanguage?: string;
 }>): string {
   if (!BOUNDARY.test(input.boundary)) throw new TypeError("MAIL_BOUNDARY_INVALID");
+  if (input.contentLanguage !== undefined && !/^[a-z]{2}$/.test(input.contentLanguage)) throw new TypeError("MAIL_LANGUAGE_INVALID");
   const mixed = `mixed-${input.boundary}`;
   const alternative = `alt-${input.boundary}`;
   const lines = [
@@ -50,6 +59,7 @@ export function buildTemplatedMessage(input: Readonly<{
     `To: ${input.to}`,
     ...(input.messageId === null ? [] : [`Message-ID: <${input.messageId}@debateai.local>`]),
     `Subject: ${encodeHeaderText(input.subject)}`,
+    ...(input.contentLanguage === undefined ? [] : [`Content-Language: ${input.contentLanguage}`]),
     "MIME-Version: 1.0",
     `Content-Type: multipart/mixed; boundary="${mixed}"`,
     "",

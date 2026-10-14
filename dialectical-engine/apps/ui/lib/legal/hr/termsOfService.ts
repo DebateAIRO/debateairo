@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Vaš sadržaj ostaje vaš. Zadržavate sva prava koja imate na pitanja, tvrdnje, bilješke i osporavanja koja šaljete. Dajete nam neisključivu, svjetsku i besplatnu licenciju za smještaj, pohranu, umnožavanje, prilagodbu i obradu tog sadržaja u svrhu rada usluge: provedbe rasprave, njezine pohrane kako biste je mogli ponovno otvoriti i reproducirati, pružanja podrške, ispunjavanja naših pravnih obveza te — samo ako je odlučite objaviti — u svrhe iz odjeljka 9. Ta licencija prestaje kada se sadržaj izbriše, osim kada odjeljak 9. ili zakon zahtijeva drukčije." },
-      { kind: "p", text: "Ne treniramo modele na vašem sadržaju. Ne treniramo modele na vašem sadržaju. Pružatelje usluga umjetne inteligencije koristimo samo uz uvjete koji im ne dopuštaju da vaš sadržaj upotrebljavaju za treniranje ili poboljšavanje svojih modela; Registar pružatelja usluga umjetne inteligencije za svakog pružatelja navodi jesmo li to potvrdili i kada." },
+      { kind: "p", text: "Ne treniramo modele na vašem sadržaju. Pružatelje usluga umjetne inteligencije koristimo samo uz uvjete koji im ne dopuštaju da vaš sadržaj upotrebljavaju za treniranje ili poboljšavanje svojih modela; Registar pružatelja usluga umjetne inteligencije za svakog pružatelja navodi jesmo li to potvrdili i kada." },
       { kind: "p", text: "Kako vaš sadržaj dolazi do pružatelja usluga umjetne inteligencije. Radi provedbe rasprave šaljemo tekst jednom ili više vanjskih pružatelja modela. Pružatelj prima vaše pitanje, usmjeravajuće bilješke koje ste postavili i izjave koje sustav sastavlja tijekom rasprave — stoga pružatelj vidi tekst izveden iz onoga što ste upisali i izgrađen oko toga, a ne samo vaše izvorne riječi. Nikada ne prima vašu adresu e-pošte, identifikatore računa, zapise o sesijama ni podatke o plaćanju." },
       { kind: "p", text: "Što šalje chat za podršku. Pomoćnik za podršku također je model umjetne inteligencije. Kada mu pišete, vašu poruku šaljemo vanjskom pružatelju modela kako bi model mogao odgovoriti, zajedno s člancima pomoći na kojima temelji odgovor. Prije slanja maskiramo sve što izgleda kao lozinka, jednokratni kôd ili ključ. Ako zatražite razgovor s osobom, modelu šaljemo i razgovor, maskiran na isti način, kako bi napisao kratak sažetak za člana našeg tima koji preuzima vaš slučaj. Ne prilažemo vašu adresu e-pošte, identifikatore računa ni podatke o plaćanju, ali model prima sve ostalo što upišete u chat, stoga ondje ne pišite ništa što ne biste htjeli da pročita." },
       { kind: "p", text: "Koji pružatelji i gdje. Naš Registar pružatelja usluga umjetne inteligencije na dezbatere.ro/providers sastavni je dio ovih Uvjeta. U njemu je za svakog pružatelja kojeg možemo upotrebljavati navedeno: njegov pravni subjekt i država; što prima i zašto; gdje obrađuje podatke; njegovi rokovi čuvanja; je li za krajnju točku koju upotrebljavamo aktivirano nulto zadržavanje podataka; smije li prema našem ugovoru upotrebljavati ulazne podatke za treniranje; mehanizam prijenosa na koji se oslanjamo; i datum posljednje provjere svakog unosa. Pružatelji se mogu nalaziti izvan vaše države i izvan Europskoga gospodarskog prostora. Naša Pravila o privatnosti objašnjavaju zaštitne mjere." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Osobni podaci",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Način na koji postupamo s osobnim podacima utvrđen je u Pravilima o privatnosti na dezbatere.ro/privacy. Ona objašnjavaju što prikupljamo, pravnu osnovu za svaku svrhu, koliko dugo čuvamo pojedine podatke, tko prima podatke, uključene prijenose i kako ostvariti svoja prava. Ovdje valja istaknuti još tri točke. Odjeljak 7. traži od vas da u pitanje ne unosite osobne podatke drugih osoba; ako to ipak učinite, odgovorni ste za njih, a mi možemo ukloniti sadržaj. Ako rasprava objavljena na Dialectical Engine-u sadržava vaše osobne podatke, možete zatražiti da je uklonimo iako nemate račun (odjeljak 9.). Čuvamo i zapis o vašem prihvaćanju ovih Uvjeta — verziju, vrijeme i tehničke pojedinosti sesije — kao dokaz ugovora, kako je objašnjeno u Pravilima o privatnosti." }
+      { kind: "p", text: "Način na koji postupamo s osobnim podacima utvrđen je u Pravilima o privatnosti na dezbatere.ro/privacy. Ona objašnjavaju što prikupljamo, pravnu osnovu za svaku svrhu, koliko dugo čuvamo pojedine podatke, tko prima podatke, uključene prijenose i kako ostvariti svoja prava. Ovdje valja istaknuti još tri točke. Odjeljak 7. traži od vas da u pitanje ne unosite osobne podatke drugih osoba; ako to ipak učinite, odgovorni ste za njih, a mi možemo ukloniti sadržaj. Ako rasprava objavljena na Dialectical Engine-u sadržava vaše osobne podatke, možete zatražiti da je uklonimo iako nemate račun (odjeljak 9.). Čuvamo i zapis o vašem prihvaćanju ovih Uvjeta — verziju, vrijeme i tehničke pojedinosti sesije — kao dokaz ugovora, kako je objašnjeno u Pravilima o privatnosti. E-poruke koje vam šaljemo pišemo na jeziku koji ste odabrali na našoj stranici; odjeljak 13. Pravila o privatnosti objašnjavaju kako čuvamo taj izbor." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "08bf82ff252b71eac3ac827bb8a9481803a1890a8a05b514472fde4b17a158a0",
-  eyebrow: "UVJETI KORIŠTENJA · v2.2 · NA SNAZI OD 12. LISTOPADA 2026.",
+  version: "2.3",
+  sha256: "13a53f35d6e595353bece2235912c20dd1c221aa51ae277ffc90a85f9d6e9526",
+  eyebrow: "UVJETI KORIŠTENJA · v2.3 · NA SNAZI OD 12. LISTOPADA 2026.",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",
-  endMarker: "KRAJ UVJETA · v2.2",
+  endMarker: "KRAJ UVJETA · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tekst Uvjeta korištenja",
   sectionIdPrefix: "terms-section-",

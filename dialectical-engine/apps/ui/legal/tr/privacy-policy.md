@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: GİZLİLİK POLİTİKASI · v3.3 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
+eyebrow: GİZLİLİK POLİTİKASI · v3.4 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
 title: Neleri neden saklıyoruz?
 lede: GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.
-endMarker: POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.3
+endMarker: POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Gizlilik Politikası metni
 annexTitle: Ek B — Bölgesel gizlilik hükümleri
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 ÇEREZLER
 -->
 
-**Version 3.3 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Bir hesabın ihtiyaç duyduğu bilgileri ve yazmayı seçtiğiniz içerikleri toplarız. Sorularınız Sicilimizde listelenen yapay zekâ sağlayıcılarına gider; model eğitimi için kullanılmazlar. Barındırma sağlayıcımız hesabınızı ve tartışmalarınızı Birleşik Krallık'taki Londra'da saklar; verilerinizin başka nerelere gittiğini bölüm 5 anlatır. Tartışmalar, siz yayımlamadıkça gizlidir. Hesabınızı silmek özel verilerinizin anahtarlarını imha eder; silme işlemini planlarken yayımlanmış tartışmalarınızın da kaldırılmasını veya kullanımdan kaldırılmış takma adınız altında herkese açık kalmasını seçersiniz. Bize privacy@dezbatere.ro adresinden ulaşabilirsiniz; bir tartışmada adı geçen kişiler de hesapları olmadan kaldırma talebinde bulunabilir.
 
@@ -183,7 +183,7 @@ Dialectical Engine, tamamı talep ettiğiniz hizmet için kesinlikle gerekli ola
 | `__Host-debateai-session` | Çerez (HttpOnly) | Oturumunuzun açık kalmasını sağlar. Hizmeti kullandığınız sürece yenilenir. | 14 gün |
 | `__Host-debateai-csrf` | Çerez | Başka web sitelerinin sizin adınıza form göndermesini engeller. | 14 gün |
 | `__Host-debateai-age-refusal` | Çerez (HttpOnly) | Bir yaş kontrolü reddedildikten sonra bu tarayıcının 30 gün boyunca yeniden denemesini engeller. Yalnızca “reddedildi” sözcüğünü içerir, kişisel veri içermez. | 30 gün |
-| `debateai.locale` | Çerez | Seçtiğiniz arayüz dilini hatırlar. | 1 yıl |
+| `debateai.locale` | Çerez | Seçtiğiniz arayüz dilini hatırlar ve size gönderdiğimiz e-postaların dilini de belirler. | 1 yıl |
 | `__Host-debateai-staff` | Çerez (HttpOnly) | Ayrı personel erişimi | En fazla 8 saat; 15 dakika hareketsizlik |
 | `__Host-debateai-staff-csrf` | Çerez | Başka web sitelerinin sizin adınıza form göndermesini engeller. | En fazla 8 saat; 15 dakika hareketsizlik |
 | `__Host-debateai-password-reset` | Çerez (HttpOnly) | Yalnızca parola sıfırlama | En fazla 30 dakika |
@@ -201,6 +201,8 @@ Dialectical Engine, tamamı talep ettiğiniz hizmet için kesinlikle gerekli ola
 | `debateai.exportPending` | Oturum depolaması | E-postayla gelen dışa aktarma bağlantısını oturum açma ve yeniden deneme için bu sekmede tutar. | Sekme kapanana, oturum kapatılana, yeni bağlantı açılana, ilk başarılı indirme yapılana veya geçersiz bağlantı ya da yanlış hesap sonucu alınana kadar |
 | `debateai.exportLinkOutcome` | Oturum depolaması | Bu sekmede hangi indirme bağlantısı iletisinin gösterileceğini hatırlar. | Sekme kapanana, oturum kapatılana veya yeni bağlantı açılana kadar |
 
+Sizin için sıraya aldığımız her e-posta, biz gönderene kadar seçtiğiniz dili korur.
+
 Başka hiçbir taraf, Dialectical Engine aracılığıyla zaman içinde ve farklı web siteleri genelinde çevrimiçi etkinlikleriniz hakkında bilgi toplamaz.
 
 Tarayıcılar “Do Not Track” sinyali veya benzeri bir sinyal gönderebilir. Dialectical Engine sizi izlemez, bu nedenle böyle bir sinyalin kapatacağı hiçbir şey yoktur: hizmet, sinyal olsa da olmasa da aynı şekilde çalışır.
@@ -211,7 +213,7 @@ Bu öğeleri reddetmek için tarayıcı ayarlarınızda bu sitenin çerezlerini 
 
 Bu politikayı değiştirdiğimizde yeni sürümü, değişikliklerin özeti ve yeni bir yürürlük tarihiyle birlikte yayımlar ve önceki sürümleri dezbatere.ro/privacy/versions adresinde tutarız. Yeni bir amaç veya yeni bir alıcı ekleyen değişikliklerde, yeni işleme başlamadan önce size e-postayla ve ürün içinde bilgi verir ve itiraz etmeniz için süre tanırız. Yeni bir amaç rızanıza bağlıysa — örneğin bir gün içeriği modelleri geliştirmek için kullanmak istersek — bu rızayı ayrıca ve özel olarak isteriz; güncellenmiş Koşulların kabulünü hiçbir zaman yeni işleme için rıza saymayız. Yaptıklarımızı değiştirmeyen açıklamalar bakımından yeni sürümü yayımlamakla yetiniriz.
 
-Bu politika en son 12 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.3, sürüm 3.2'nin yerine geçmiştir: yalnızca hizmet verdiğimiz bölgeleri kapsar, şirketimizi ve 5. bölümde barındırma, içerik dağıtımı ve e-posta sağlayıcılarımızı belirtir, ayrıca Cloudflare bot kontrolünü açıklar.
+Bu politika en son 12 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.4, sürüm 3.3'ün yerine geçmiştir: 13. bölüm, debateai.locale çerezinin size gönderdiğimiz e-postaların dilini de belirlediğini artık söylüyor ve sıraya aldığımız her e-postanın, biz gönderene kadar seçtiğiniz dili koruduğunu belirten bir paragraf ekliyor.
 
 ## Annex B — Bölgesel gizlilik hükümleri
 

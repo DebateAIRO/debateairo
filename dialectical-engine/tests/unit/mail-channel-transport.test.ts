@@ -19,7 +19,7 @@ const senders = [
   { name: "verification", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
     send: (overrides: Partial<typeof options> = {}) => new SendmailMailSender({ ...options, ...overrides }).sendVerification({ attemptId: "opaque", recipient, token, expiresAt }) },
   { name: "security notification", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
-    send: (overrides: Partial<typeof options> = {}) => new SendmailSecurityNotificationSender({ ...options, ...overrides }).sendSecurityNotification({ messageId: "11111111-1111-4111-8111-111111111111", recipient, eventKind: "SCHEDULED", executeAt: expiresAt }) },
+    send: (overrides: Partial<typeof options> = {}) => new SendmailSecurityNotificationSender({ ...options, ...overrides }).sendSecurityNotification({ messageId: "11111111-1111-4111-8111-111111111111", recipient, eventKind: "SCHEDULED", executeAt: expiresAt, display: { locale: "en", timeZone: null } }) },
   {
     name: "email change", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
     send: (overrides: Partial<typeof options> = {}) => new SendmailEmailChangeMailSender({ ...options, ...overrides })

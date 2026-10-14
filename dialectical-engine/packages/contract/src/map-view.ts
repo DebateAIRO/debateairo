@@ -10,7 +10,7 @@ import { z } from "zod";
  */
 export const DEBATE_MAP_VIEW_LIMITS = Object.freeze({
   // Whole-branch review m-5: the map chooses and stores at most four answers (@debateai/map MAP_LIMITS.chooseAnswersMax,
-  // 0116's answer ids a1..a4, the register's plan answers 2..4). The contract imports only zod, so the value is
+  // 0117's answer ids a1..a4, the register's plan answers 2..4). The contract imports only zod, so the value is
   // written here and a unit test (debate-shape-map-view-contract) holds it equal to the map's.
   maxPositions: 4,
   maxAnswerChars: 600,

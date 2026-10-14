@@ -534,7 +534,7 @@ describe("C-I2 the reservation covers the wait for a first charge", () => {
 });
 
 /**
- * Question language, P2L Task 19 (migration 0117): the fast language check is a run-less SITE cost. Its charge is the
+ * Question language, P2L Task 19 (migration 0118): the fast language check is a run-less SITE cost. Its charge is the
  * vendor's (or the projected maximum) token counts at the price handed in, rounded UP once; its one writer is the
  * database function (pre-flight PF-L58, option (a)), so the store's direct INSERT refuses the source before any query.
  */

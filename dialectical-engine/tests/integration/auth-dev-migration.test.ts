@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import {afterAll,beforeAll,describe,expect,it} from 'vitest';
 import {migrate} from '@debateai/db';
 import {createHash,randomUUID} from 'node:crypto';
@@ -35,13 +36,13 @@ describe('auth and Dev forward migration capabilities',()=>{
    VALUES($1,$2,'{}','{}','synthetic-password',$3,'active',clock_timestamp())`,[user,createHash('sha256').update(user).digest(),user]);
   await database.pool.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,created_at,verified_at)
    VALUES($1,'email','{}','verified',clock_timestamp(),clock_timestamp())`,[user]);
-  await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at)
-   VALUES($1,$2,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[factor,user]);
+  await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at)
+   VALUES($1,$2,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[factor,user]));
   const eligible=async()=> (await database.pool.query('SELECT identity.mfa_recovery_eligible($1) allowed',[user])).rows[0].allowed as boolean;
   expect(await eligible()).toBe(false);
   await database.pool.query("INSERT INTO identity.consumer_passkey_subject(user_id,user_handle) VALUES($1,$2)",[user,'A'.repeat(43)]);
-  await database.pool.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin)
-   VALUES($1,'synthetic-passkey','YQ',0,'singleDevice',false,'example.test','https://example.test')`,[user]);
+  await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin)
+   VALUES($1,'synthetic-passkey','YQ',0,'singleDevice',false,'example.test','https://example.test')`,[user]));
   expect(await eligible()).toBe(false);
  });
 });

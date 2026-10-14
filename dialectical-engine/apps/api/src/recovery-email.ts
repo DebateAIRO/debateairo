@@ -73,7 +73,7 @@ export class RecoveryEmailService {
     if (result !== "PENDING")
       throw new RecoveryEmailError("STEP_UP_REQUIRED");
     await this.dependencies.mail.sendRecoveryEmail({
-      kind: "confirmation", recipient: email, token, expiresAt
+      kind: "confirmation", recipient: email, token, expiresAt, display: { locale: source.mailLocale ?? "en", timeZone: null }
     });
     const settings = await this.recoveryEmail(session);
     if (settings === null)

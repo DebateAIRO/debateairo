@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: TJENESTEVILKÅR · v2.2 · GÆLDENDE FRA 12. OKTOBER 2026
+eyebrow: TJENESTEVILKÅR · v2.3 · GÆLDENDE FRA 12. OKTOBER 2026
 title: Det, du accepterer
 lede: Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.
-endMarker: SLUT PÅ VILKÅRENE · v2.2
+endMarker: SLUT PÅ VILKÅRENE · v2.3
 bodyLabel: Tjenestevilkårenes tekst
 annexTitle: Bilag A — Regionale vilkår
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LOVVALG
 -->
 
-**Version 2.2 · Effective 12. oktober 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
+**Version 2.3 · Effective 12. oktober 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
 
 **In short.** Du skal være fyldt 18 år. Dialectical Engine opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. Dine debatter er private, medmindre du offentliggør dem; hvis du offentliggør dem, kan alle læse dem. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, og bruges ikke til at træne modeller. Anmeld ulovligt indhold på support@dezbatere.ro, uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse.
 
@@ -56,7 +56,7 @@ Du accepterer disse vilkår ved at markere feltet **"Jeg har læst og accepterer
 
 Vores **privatlivspolitik** på dezbatere.ro/privacy forklarer, hvordan vi behandler personoplysninger. Det er oplysninger, vi skal give dig, ikke en aftale, du accepterer, og intet i disse vilkår gør den til et samtykke til behandling. Vores **cookiepolitik** på dezbatere.ro/cookies og vores **register over AI-udbydere** på dezbatere.ro/providers indgår i disse vilkår ved henvisning.
 
-Inden du indgår en aftale med os elektronisk, viser brugergrænsefladen dig de relevante trin, giver dig mulighed for at gennemgå og rette det, du har indtastet, før du indsender det, og oplyser dig om de sprog, som aftalen kan indgås på. Disse vilkår findes i en form, du kan gemme og udskrive. Når du køber et betalt abonnement, sender vi dig den version, du accepterede, pr. e-mail. Du kan til enhver tid bede om en kopi. e-mail, og du kan til enhver tid anmode om en kopi. Intet i disse vilkår begrænser rettigheder, som du har efter rumænsk eller EU-retlig forbrugerbeskyttelseslovgivning eller lovgivningen i det land, hvor du bor, og som ikke kan begrænses ved aftale.
+Inden du indgår en aftale med os elektronisk, viser brugergrænsefladen dig de relevante trin, giver dig mulighed for at gennemgå og rette det, du har indtastet, før du indsender det, og oplyser dig om de sprog, som aftalen kan indgås på. Disse vilkår findes i en form, du kan gemme og udskrive. Når du køber et betalt abonnement, sender vi dig den version, du accepterede, pr. e-mail. Du kan til enhver tid bede om en kopi. Intet i disse vilkår begrænser rettigheder, som du har efter rumænsk eller EU-retlig forbrugerbeskyttelseslovgivning eller lovgivningen i det land, hvor du bor, og som ikke kan begrænses ved aftale.
 
 ## 4. Hvem må bruge Dialectical Engine
 
@@ -114,7 +114,7 @@ Hvis du er i tvivl om, hvorvidt noget er tilladt, skal du spørge os, før du sl
 
 **Dit indhold forbliver dit.** Du beholder alle de rettigheder, du måtte have til de spørgsmål, påstande, bemærkninger og indsigelser, du indsender. Du giver os en ikke-eksklusiv, verdensomspændende, royaltyfri licens til at hoste, opbevare, reproducere, tilpasse og behandle dette indhold med henblik på at drive tjenesten: gennemføre debatten, opbevare den, så du kan genåbne og afspille den igen, yde support, opfylde vores retlige forpligtelser og — kun hvis du vælger at offentliggøre — formålene i afsnit 9. Denne licens ophører, når indholdet slettes, medmindre andet følger af afsnit 9 eller lovgivningen.
 
-**Vi træner ikke på dit indhold.** Vi træner ikke modeller på dit indhold. Vi bruger kun AI-udbydere på vilkår, der ikke tillader dem at bruge dit indhold til at træne eller forbedre deres modeller; udbyderregisteret viser for hver udbyder, om vi har bekræftet dette, og hvornår.
+**Vi træner ikke på dit indhold.** Vi bruger kun AI-udbydere på vilkår, der ikke tillader dem at bruge dit indhold til at træne eller forbedre deres modeller; udbyderregisteret viser for hver udbyder, om vi har bekræftet dette, og hvornår.
 
 **Sådan når dit indhold frem til AI-udbydere.** For at gennemføre en debat sender vi tekst til en eller flere eksterne modeludbydere. En udbyder modtager dit spørgsmål, de styrende bemærkninger, du angiver, og udsagn, som motoren sammensætter under debatten — udbyderen ser således tekst, der er afledt af og opbygget omkring det, du skrev, og ikke kun dine oprindelige ord. Udbyderen modtager aldrig din e-mailadresse, dine kontoidentifikatorer, dine sessionsregistreringer eller dine betalingsoplysninger.
 
@@ -239,7 +239,7 @@ Afsnit 8 omhandler dit indhold og status for genereret output. Hvis du mener, at
 
 ## 17. Personoplysninger
 
-Det fremgår af **privatlivspolitikken** på dezbatere.ro/privacy, hvordan vi behandler personoplysninger. Den forklarer, hvad vi indsamler, behandlingsgrundlaget for hvert formål, hvor længe vi opbevarer oplysninger, hvem der modtager data, hvilke overførsler der finder sted, og hvordan du udøver dine rettigheder. Tre punkter hører også hjemme her. Afsnit 7 beder dig om ikke at angive andre personers personoplysninger i et spørgsmål; hvis du gør det, er du ansvarlig herfor, og vi kan fjerne indholdet. Hvis en debat, der er offentliggjort på Dialectical Engine, indeholder personoplysninger om dig, kan du bede os om at fjerne den uden at have en konto (afsnit 9). Og vi registrerer din accept af disse vilkår — version, tidspunkt og sessionens tekniske oplysninger — som dokumentation for aftalen, som forklaret i privatlivspolitikken.
+Det fremgår af **privatlivspolitikken** på dezbatere.ro/privacy, hvordan vi behandler personoplysninger. Den forklarer, hvad vi indsamler, behandlingsgrundlaget for hvert formål, hvor længe vi opbevarer oplysninger, hvem der modtager data, hvilke overførsler der finder sted, og hvordan du udøver dine rettigheder. Tre punkter hører også hjemme her. Afsnit 7 beder dig om ikke at angive andre personers personoplysninger i et spørgsmål; hvis du gør det, er du ansvarlig herfor, og vi kan fjerne indholdet. Hvis en debat, der er offentliggjort på Dialectical Engine, indeholder personoplysninger om dig, kan du bede os om at fjerne den uden at have en konto (afsnit 9). Og vi registrerer din accept af disse vilkår — version, tidspunkt og sessionens tekniske oplysninger — som dokumentation for aftalen, som forklaret i privatlivspolitikken. E-mails, vi sender dig, er skrevet på det sprog, du valgte på vores websted; afsnit 13 i privatlivspolitikken forklarer, hvordan vi bevarer dette valg.
 
 ## 18. Lovvalg og værneting
 

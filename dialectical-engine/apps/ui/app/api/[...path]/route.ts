@@ -71,6 +71,9 @@ const MFA_RECOVERY_CSRF_COOKIE_NAME = "__Host-debateai-mfa-recovery-csrf";
 const AUTH_COOKIE_NAMES = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, PASSWORD_RESET_COOKIE_NAME, PASSWORD_RESET_CSRF_COOKIE_NAME, MFA_RECOVERY_COOKIE_NAME, MFA_RECOVERY_CSRF_COOKIE_NAME] as const;
 const STAFF_ABSOLUTE_MAX_AGE_SECONDS = 28800;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
+/** C03.1 (R-09): the dropdown's language cookie, forwarded so the API resolves the mail language (R-06). */
+const LOCALE_COOKIE_NAME = "debateai.locale";
+const LOCALE_COOKIE_PATTERN = /^[A-Za-z]{2}(-[A-Za-z]{2})?$/;
 /** The API's support capability grammar (apps/api/src/support/session.ts CAPABILITY_PATTERN). */
 const SUPPORT_SESSION_TOKEN_HEADER = "x-support-session-token";
 /** DL1-F5c/DL3-F4: the case bearer, which used to travel in the path. */
@@ -142,6 +145,7 @@ function createUpstreamHeaders(request: Request): Headers {
 function filteredSessionCookies(raw: string | null): string | null {
   if (raw === null || /[\r\n\0]/.test(raw)) return null;
   const selected = new Map<string, string>();
+  let localeSeen = false;
   for (const member of raw.split(";")) {
     const index = member.indexOf("=");
     if (index < 1) {
@@ -151,6 +155,12 @@ function filteredSessionCookies(raw: string | null): string | null {
     const name = member.slice(0, index).trim();
     const rawValue = member.slice(index + 1);
     const value = name === STAFF_COOKIE_NAME || name === STAFF_CSRF_COOKIE_NAME ? rawValue : rawValue.trim();
+    // C03.1 (R-09): the first occurrence decides; a second one, or a malformed value, is dropped and never refuses the request.
+    if (name === LOCALE_COOKIE_NAME) {
+      if (!localeSeen && LOCALE_COOKIE_PATTERN.test(value)) selected.set(name, value);
+      localeSeen = true;
+      continue;
+    }
     // Age gate (8j): the lockout travels only in its one constant value.
     if (name === AGE_REFUSAL_COOKIE_NAME) {
       if (selected.has(name) || value !== AGE_REFUSAL_COOKIE_VALUE) return null;
@@ -161,7 +171,7 @@ function filteredSessionCookies(raw: string | null): string | null {
     if (selected.has(name) || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
     selected.set(name, value);
   }
-  const pairs = [...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME].flatMap((name) => {
+  const pairs = [...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME, LOCALE_COOKIE_NAME].flatMap((name) => {
     const value = selected.get(name);
     return value === undefined ? [] : [`${name}=${value}`];
   });

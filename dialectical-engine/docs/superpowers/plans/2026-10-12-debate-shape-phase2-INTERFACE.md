@@ -1,5 +1,7 @@
 # Debate shape Phase 2 — binding interface contract for the plan drafters
 
+> **Renumbered 2026-10-14:** the migrations this plan calls 0116 (the debate shape map) and 0117 (the language check's site cost) are now 0117 and 0118: the merge of `origin/dev` 221d784db brought dev's own 0116 (`0116_mail_locale.sql`) first. The numbers below are historical.
+
 Spec: docs/superpowers/specs/2026-10-12-debate-shape-design.md (§3–§6 are Phase 2). Phase 1 (packages/map + practice
 `openings`) is built on branch design/2026-10-12-debate-shape. This file fixes the NAMES every Phase 2 sub-plan uses so
 sub-plans written in parallel agree. A drafter who finds a name impossible (clash, convention) proposes the change in

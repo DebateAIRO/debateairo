@@ -203,7 +203,7 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "packages/judgement/src/index.ts",
       "packages/ledger/src/index.ts",
       "packages/liveness/src/index.ts",
-      // Debate shape (0116): the map repository seals and reads core.map_item / core.map_choice inside withRunContentLease.
+      // Debate shape (0117): the map repository seals and reads core.map_item / core.map_choice inside withRunContentLease.
       "packages/map/src/repository.ts",
       "packages/memory/src/index.ts",
       "packages/serve/src/index.ts",
@@ -236,7 +236,7 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // It opens no lease and reads no content.
       "apps/runner/src/call-lane-gateway.ts",
       "apps/runner/src/index.ts",
-      // Debate shape (0116, c5e0b2862): the map stage's caller sends each map call through the member gateway the
+      // Debate shape (0117, c5e0b2862): the map stage's caller sends each map call through the member gateway the
       // runner hands it (lane, sit-out book, keep-alive, the run-required leased gateway), naming the run. It opens
       // no lease and reads no content of its own; the map's storage goes through packages/map/src/repository.ts above.
       "apps/runner/src/map-stage.ts",

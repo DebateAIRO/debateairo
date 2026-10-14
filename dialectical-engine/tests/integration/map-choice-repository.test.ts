@@ -13,7 +13,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 import { runOwnerCheckFrom } from "../../apps/api/src/map-views.js";
 
 /**
- * Debate shape, Task 8: the map's repository over migration 0116 (core.map_item, core.map_choice, core.map_position),
+ * Debate shape, Task 8: the map's repository over migration 0117 (core.map_item, core.map_choice, core.map_position),
  * and the database-level behaviour of those three tables (Task 7 review, binding on this task): sealed rows round-trip,
  * plaintext on an encrypted run is refused, an envelope cannot move to another row, nothing is updated, deleted or
  * truncated, an erased run takes no new row (and the repository answers RUN_ERASED), and an AI-written slug cannot sit
@@ -141,7 +141,7 @@ async function sealFor(runId: string, carrier: "core.map_item" | "core.map_choic
 const POINT_CONTENT = Object.freeze({ claim: "A raw point.", why: "A raw reason." });
 const CHOICE_CONTENT = Object.freeze({ answers: [], alsoRaised: [], result: null });
 
-/** A direct INSERT into core.map_item, bypassing the repository and its lease: the row meets 0116's triggers as given. */
+/** A direct INSERT into core.map_item, bypassing the repository and its lease: the row meets 0117's triggers as given. */
 function insertRawItem(row: Readonly<{ runId: string; itemId: string; content: unknown; envelope: unknown; attestation: Buffer | null;
   angleId?: string | null }>) {
   return database.pool.query(
@@ -180,7 +180,7 @@ async function rowCounts(runId: string): Promise<Readonly<{ items: number; choic
 
 const FAKE_ROOT = "00000000-0000-4000-8000-000000000001";
 
-describe("MapChoiceRepository (0116)", () => {
+describe("MapChoiceRepository (0117)", () => {
   it.each(["legacy", "encrypted"] as const)("writes and reads back a %s run's map", async (mode) => {
     const pool = database.pool;
     const runId = await newRun(mode);
@@ -296,7 +296,7 @@ describe("MapChoiceRepository (0116)", () => {
     expect(await readMapChoiceForRun(database.pool, runId)).toBeNull();
     expect(await readMapItemsForRun(database.pool, runId)).toEqual([]);
     expect(await repository.readMapResultForRun(runId)).toBeNull();
-    // No real root: 0116's erasure barrier on core.map_position (pre-flight PF-B26) refuses BEFORE the root_node_id
+    // No real root: 0117's erasure barrier on core.map_position (pre-flight PF-B26) refuses BEFORE the root_node_id
     // foreign key is checked, so this answers RUN_ERASED, never a 23503.
     expect(await repository.writeMapPosition({ runId, answerId: "a2", rootIndex: 1, rootNodeId: FAKE_ROOT, maker: "maker-1" })).toBe("RUN_ERASED");
 
@@ -324,7 +324,7 @@ describe("MapChoiceRepository (0116)", () => {
       index === 1 ? { ...answer, answerId: SLUG } : answer) } } as MapResult;
     const slugItem = { ...RESULT, items: RESULT.items.map((item, index) => index === 2 ? { ...item, itemId: SLUG } as MapItem : item) } as MapResult;
     const spacedMaker = { ...RESULT, items: RESULT.items.map((item, index) => index === 1 ? { ...item, seat: { aiRef: "preview:ref-1", maker: "It helps riders" } } : item) } as MapResult;
-    // 0116's closed sets and the int4 range, held by the repository too (Task 8 review): no CHECK or range error is
+    // 0117's closed sets and the int4 range, held by the repository too (Task 8 review): no CHECK or range error is
     // reachable from repository input. Each value is cast past the types, as a malformed reply could be.
     const withItem = (index: number, patch: Record<string, unknown>): MapResult =>
       ({ ...RESULT, items: RESULT.items.map((item, at) => at === index ? { ...item, ...patch } as unknown as MapItem : item) }) as MapResult;
@@ -399,7 +399,7 @@ describe("MapChoiceRepository: one write per run (pre-flight PF-B28a, Task 8 rev
   });
 });
 
-describe("0116 at the database level (Task 7 review, binding on Task 8)", () => {
+describe("0117 at the database level (Task 7 review, binding on Task 8)", () => {
   it("an encrypted run's sealed item and choice are accepted and read back", async () => {
     const runId = await newRun("encrypted");
     const item = await sealFor(runId, "core.map_item", "pt01", POINT_CONTENT);

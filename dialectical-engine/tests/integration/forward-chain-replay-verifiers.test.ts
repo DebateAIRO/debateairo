@@ -57,9 +57,10 @@ it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch 
   // First in this file: the probe steps below add ledger rows that the real migrate() would refuse as unknown.
   const real = await loadMigrationPlan();
   // data-export S01 (V-41): the export (0115) follows role rotation and keeps the same effective verifier; so do the
-  // debate shape's map (0116), after the export, and the language check's site cost (0117), after the map.
+  // mail locale (0116, S01-C05), after the export, the debate shape's map (0117), after the mail locale, and the language
+  // check's site cost (0118), after the map.
   expect(real.forwardChain.map((step) => step.name)).toEqual([NETOPIA, AUTH_DB_BATCH_MIGRATION, PART_C, ROLE_ROTATION, "0115_data_export.sql",
-    "0116_debate_shape_map.sql", "0117_language_check_spend.sql"]);
+    "0116_mail_locale.sql", "0117_debate_shape_map.sql", "0118_language_check_spend.sql"]);
   const [netopia, batch, partC, rotation] = real.forwardChain;
   const applied = new Set(await ledger());
   expect(applied.has(NETOPIA) && applied.has(AUTH_DB_BATCH_MIGRATION) && applied.has(PART_C) && applied.has(ROLE_ROTATION)).toBe(true);

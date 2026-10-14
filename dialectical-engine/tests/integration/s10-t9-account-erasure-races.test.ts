@@ -15,6 +15,23 @@ function opaqueHash(): string {
   return `sha256:${randomBytes(32).toString("hex")}`;
 }
 
+// C11 (RULING S01-GUARD-FIXTURES): a raw seed write that stands in for a request runs in its own transaction with the mail
+// language carrier set to en (no fixture here is about a locale). A write that queues a mail row without it is refused.
+async function seedWithCarrier(sql: string, values: unknown[]): Promise<void> {
+  const client = await database.pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('debateai.mail_locale', 'en', true)");
+    await client.query(sql, values);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function encryptedRunDocument(
   client: Pick<Pool,"query"> | Pick<PoolClient,"query">,
   input: Readonly<{ runId:string;ownerRef:string;executionRef:string;provenance:string }>
@@ -118,7 +135,7 @@ async function fixtureAccount(label: string): Promise<Fixture> {
     ) VALUES ($1,$2,clock_timestamp()-interval '1 minute',
       clock_timestamp()+interval '1 hour',clock_timestamp()-interval '30 seconds')
   `,[verificationTokenHash,emailChannelId]);
-  await database.pool.query(`
+  await seedWithCarrier(`
     INSERT INTO identity.mfa_factor(
       mfa_factor_id,user_id,factor_type,secret_ciphertext,credential_id,public_key,
       state,created_at,verified_at,revoked_at,last_accepted_step
@@ -292,6 +309,9 @@ async function accountChildSnapshot(fixture: Fixture): Promise<string> {
 async function prepare(
   client: PoolClient,erasureId: string,runIds: readonly string[] = []
 ): Promise<string> {
+  // C11 (RULING S01-GUARD-FIXTURES): this call stands in for the erasure worker; the fixture erasure has no SCHEDULED row
+  // to take a value from, so the carrier is en. Every caller runs it inside its own transaction.
+  await client.query("SELECT set_config('debateai.mail_locale', 'en', true)");
   const result = await client.query<{ outcome: string }>(`
     SELECT identity.prepare_account_erasure(
       $1,$2::uuid[],'{}'::uuid[],'{}'::uuid[]
@@ -579,6 +599,8 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
       const erasureClient = await database.pool.connect();
       try {
         await writerClient.query("BEGIN");
+        // C11 (RULING S01-GUARD-FIXTURES): the writer stands in for a request; a queue row it writes takes en.
+        await writerClient.query("SELECT set_config('debateai.mail_locale', 'en', true)");
         await writerClient.query(`SET LOCAL ROLE ${writer.role}`);
         await writerClient.query("SELECT identity.begin_runtime_audit_attempt()");
         await writer.invoke(writerClient,writerFirst);
@@ -686,6 +708,8 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
           outcome: "PREPARED",erasure_id: resumeFirst.privateErasureId
         });
         await writerClient.query("BEGIN");
+        // C11 (RULING S01-GUARD-FIXTURES): the writer stands in for a request; a queue row it writes takes en.
+        await writerClient.query("SELECT set_config('debateai.mail_locale', 'en', true)");
         await writerClient.query(`SET LOCAL ROLE ${writer.role}`);
         if (writer.beginsAuditAttempt) {
           await writerClient.query("SELECT identity.begin_runtime_audit_attempt()");
@@ -850,7 +874,7 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
       const finalizeFirst = await encryptedRunFixture(`${carrier}-finalize-first`);
       const finalizeBaseline = carrier === "session_assignment"
         ? await seedRoutingDecision(finalizeFirst) : undefined;
-      await database.pool.query(
+      await seedWithCarrier(
         "SELECT identity.prepare_account_erasure($1,$2::uuid[],'{}','{}')",
         [finalizeFirst.erasureId,[finalizeFirst.runId]]
       );
@@ -880,7 +904,7 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
       const writerFirst = await encryptedRunFixture(`${carrier}-before-finalize`);
       const writerBaseline = carrier === "session_assignment"
         ? await seedRoutingDecision(writerFirst) : undefined;
-      await database.pool.query(
+      await seedWithCarrier(
         "SELECT identity.prepare_account_erasure($1,$2::uuid[],'{}','{}')",
         [writerFirst.erasureId,[writerFirst.runId]]
       );
@@ -997,6 +1021,8 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
         await finalizer.query("SET LOCAL ROLE debateai_erasure_runtime");
         expect(await finalizePrivate(finalizer,finalizeFirst)).toBe("COMMITTED");
         await writerClient.query("BEGIN");
+        // C11 (RULING S01-GUARD-FIXTURES): the writer stands in for a request; a queue row it writes takes en.
+        await writerClient.query("SELECT set_config('debateai.mail_locale', 'en', true)");
         await writerClient.query(`SET LOCAL ROLE ${writer.role}`);
         await writerClient.query("SELECT identity.begin_runtime_audit_attempt()");
         const writing = writer.invoke(writerClient,finalizeFirst);

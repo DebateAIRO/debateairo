@@ -2405,7 +2405,7 @@ export const CONTENT_CARRIERS = Object.freeze([
   "serve.answer_story",
   // Model scorecard (migration 0090): the exact prompt of one model-call attempt.
   "ledger.call_prompt",
-  // Debate shape (migration 0116): the map's points and candidate answers, and the chosen answers with their notes.
+  // Debate shape (migration 0117): the map's points and candidate answers, and the chosen answers with their notes.
   "core.map_item",
   "core.map_choice"
 ] as const);

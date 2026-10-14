@@ -236,8 +236,8 @@ changed row: stop and ask.
 
 1. **Practice first, with `--register-next`** (`tools/preview-practice/README.md`). Without it the practice
    debate stops at `REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`. Its progress line must name exactly the rows above.
-2. **Apply migrations 0116 and 0117** with the release's database step (step 6 above, `apply-and-plan`, then
-   the native operator once). Without 0116 every debate page fails: the page asks for the debate's map, and
+2. **Apply migrations 0117 and 0118** (after the mail language's 0116 if the preview does not have it yet) with the
+   release's database step (step 6 above, `apply-and-plan`, then the native operator once). Without 0117 every debate page fails: the page asks for the debate's map, and
    the table it reads does not exist yet.
 3. **Publish the new version from this code, without `--debate-shape`**: the plan, the owner's review of the
    delta, then the publish, as "Publishing a new register version on the preview" below describes. The plan

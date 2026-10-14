@@ -674,10 +674,10 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION billing.read_internal_run_state(uuid)"
   ]
 },
-// P2L Task 19 (migration 0117): the fast language check's one site-cost writer, a definer owned like 0093's.
+// P2L Task 19 (migration 0118): the fast language check's one site-cost writer, a definer owned like 0093's.
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0117_language_check_spend.sql",
+  "source": "migrations/0118_language_check_spend.sql",
   "grants": [
     "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)"
   ]

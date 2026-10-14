@@ -387,7 +387,7 @@ A debate asked for the new shape that did not run it is NOT_PROVEN (exit 30), wi
 Without `--shape-policy`, on a register without the row, nothing changes: today's shape, and no `shape` block.
 
 Switching the new shape on for the site is a separate set of owner steps, listed in the plans and not done by this
-tool: publish a register version with this code's prompt fingerprints; run migration 0117 before the hosted mode;
+tool: publish a register version with this code's prompt fingerprints; run migration 0118 before the hosted mode;
 keep the row out of force until the /new page's language pop-up (P2L Task 18) is deployed (L-POPUP-FIRST); fix the
 re-claim bug first (task_205182c8); publish the support article (C-ARTICLE); and let running debates finish first.
 

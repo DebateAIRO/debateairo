@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: PRAVILA O PRIVATNOSTI · v3.3 · NA SNAZI OD 12. LISTOPADA 2026.
+eyebrow: PRAVILA O PRIVATNOSTI · v3.4 · NA SNAZI OD 12. LISTOPADA 2026.
 title: Što pohranjujemo i zašto
 lede: Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.
-endMarker: KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.3
+endMarker: KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Tekst Pravila o privatnosti
 annexTitle: Prilog B — Regionalne odredbe o privatnosti
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 KOLAČIĆI
 -->
 
-**Version 3.3 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/privacy/versions · Voditelj obrade: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/privacy/versions · Voditelj obrade: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Prikupljamo ono što je potrebno za račun i ono što odlučite upisati. Vaša se pitanja šalju pružateljima usluga umjetne inteligencije navedenima u našem Registru; ne upotrebljavaju se za treniranje modela. Naš pružatelj usluga smještaja pohranjuje vaš račun i vaše rasprave u Londonu, u Ujedinjenoj Kraljevini; odjeljak 5 navodi kamo još idu vaši podaci. Rasprave su privatne osim ako ih objavite. Brisanjem računa uništavaju se ključevi vaših privatnih podataka; pri zakazivanju birate hoće li se i vaše objavljene rasprave ukloniti ili ostati javne pod vašim pseudonimom koji se više ne upotrebljava. Možete nam se obratiti na privacy@dezbatere.ro, a osobe imenovane u raspravi mogu zatražiti uklanjanje i bez računa.
 
@@ -183,7 +183,7 @@ Dialectical Engine koristi 20 stavki, sve strogo nužne za uslugu koju ste zatra
 | `__Host-debateai-session` | Kolačić (HttpOnly) | Zadržava vas prijavljenima. Obnavlja se dok upotrebljavate uslugu. | 14 dana |
 | `__Host-debateai-csrf` | Kolačić | Sprječava druga web-mjesta da u vaše ime šalju obrasce. | 14 dana |
 | `__Host-debateai-age-refusal` | Kolačić (HttpOnly) | Nakon odbijene provjere dobi sprječava ovaj preglednik da pokuša ponovno tijekom 30 dana. Sadrži samo riječ „odbijeno”, bez osobnih podataka. | 30 dana |
-| `debateai.locale` | Kolačić | Pamti jezik sučelja koji ste odabrali. | 1 godina |
+| `debateai.locale` | Kolačić | Pamti jezik sučelja koji ste odabrali i određuje jezik e-poruka koje vam šaljemo. | 1 godina |
 | `__Host-debateai-staff` | Kolačić (HttpOnly) | Odvojeni pristup osoblja | Do 8 sati; 15 minuta neaktivnosti |
 | `__Host-debateai-staff-csrf` | Kolačić | Sprječava druga web-mjesta da u vaše ime šalju obrasce. | Do 8 sati; 15 minuta neaktivnosti |
 | `__Host-debateai-password-reset` | Kolačić (HttpOnly) | Samo ponovno postavljanje lozinke | Do 30 minuta |
@@ -201,6 +201,8 @@ Dialectical Engine koristi 20 stavki, sve strogo nužne za uslugu koju ste zatra
 | `debateai.exportPending` | Pohrana sesije | Čuva poveznicu za izvoz poslanu e-poštom u ovoj kartici za prijavu i ponovni pokušaj. | Do zatvaranja kartice, odjave, nove poveznice, prvog uspješnog preuzimanja ili ishoda nevaljane poveznice ili pogrešnog računa |
 | `debateai.exportLinkOutcome` | Pohrana sesije | Pamti koju poruku o poveznici za preuzimanje treba prikazati u ovoj kartici. | Do zatvaranja kartice, odjave ili nove poveznice |
 
+Svaka e-poruka koju za vas stavimo u red čekanja zadržava jezik koji ste odabrali dok je ne pošaljemo.
+
 Nijedna druga strana putem Dialectical Engine-ja ne prikuplja informacije o vašim internetskim aktivnostima tijekom vremena i na različitim web-mjestima.
 
 Preglednici mogu slati signal „Do Not Track” ili sličan signal. Dialectical Engine vas ne prati, pa takav signal nema što isključiti: usluga radi jednako s njim ili bez njega.
@@ -211,7 +213,7 @@ Da biste odbili ove stavke, blokirajte ili izbrišite kolačiće i podatke web-m
 
 Kada izmijenimo ova pravila, objavljujemo novu verziju sa sažetkom izmjena i novim datumom stupanja na snagu te čuvamo prethodne verzije na dezbatere.ro/privacy/versions. Za izmjenu kojom se dodaje nova svrha ili novi primatelj obavještavamo vas prije početka nove obrade, e-poštom i u proizvodu, te vam dajemo vrijeme za prigovor. Ako nova svrha ovisi o vašoj privoli — primjerice ako ikada poželimo upotrebljavati sadržaj za poboljšavanje modela — tu privolu tražimo zasebno i određeno; prihvaćanje ažuriranih Uvjeta nikada ne smatramo privolom za novu obradu. Za pojašnjenja koja ništa ne mijenjaju u vezi s našim postupanjem jednostavno objavljujemo novu verziju.
 
-Ova su pravila posljednji put ažurirana 12. listopada 2026. Verzija 3.3 zamijenila je verziju 3.2: obuhvaća samo regije u kojima pružamo uslugu, imenuje našu tvrtku te u odjeljku 5 naše pružatelje usluga smještaja, isporuke sadržaja i e-pošte, i opisuje Cloudflareovu provjeru botova.
+Ova su pravila posljednji put ažurirana 12. listopada 2026. Verzija 3.4 zamijenila je verziju 3.3: u odjeljku 13. sada stoji da kolačić debateai.locale također određuje jezik kojim pišemo e-poruke koje vam šaljemo, a dodan je odlomak prema kojem svaka e-poruka koju za vas stavimo u red čekanja zadržava jezik koji ste odabrali dok je ne pošaljemo.
 
 ## Annex B — Regionalne odredbe o privatnosti
 

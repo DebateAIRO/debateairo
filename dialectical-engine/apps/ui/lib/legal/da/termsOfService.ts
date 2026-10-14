@@ -72,7 +72,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Du accepterer disse vilkår ved at markere feltet \"Jeg har læst og accepterer tjenestevilkårene\" og klikke på Opret konto. Derved indgås en aftale mellem dig og DMS Merchandise Shop S.R.L. Vilkårene omfatter reglerne om acceptabel brug i afsnit 7, reglerne om offentliggørelse i afsnit 9, ansvarsbestemmelserne i afsnit 15 og bestemmelserne om lovvalg og tvister i afsnit 18. Vi registrerer, hvilken version du accepterede og hvornår, som forklaret i vores privatlivspolitik." },
       { kind: "p", text: "Vores privatlivspolitik på dezbatere.ro/privacy forklarer, hvordan vi behandler personoplysninger. Det er oplysninger, vi skal give dig, ikke en aftale, du accepterer, og intet i disse vilkår gør den til et samtykke til behandling. Vores cookiepolitik på dezbatere.ro/cookies og vores register over AI-udbydere på dezbatere.ro/providers indgår i disse vilkår ved henvisning." },
-      { kind: "p", text: "Inden du indgår en aftale med os elektronisk, viser brugergrænsefladen dig de relevante trin, giver dig mulighed for at gennemgå og rette det, du har indtastet, før du indsender det, og oplyser dig om de sprog, som aftalen kan indgås på. Disse vilkår findes i en form, du kan gemme og udskrive. Når du køber et betalt abonnement, sender vi dig den version, du accepterede, pr. e-mail. Du kan til enhver tid bede om en kopi. e-mail, og du kan til enhver tid anmode om en kopi. Intet i disse vilkår begrænser rettigheder, som du har efter rumænsk eller EU-retlig forbrugerbeskyttelseslovgivning eller lovgivningen i det land, hvor du bor, og som ikke kan begrænses ved aftale." }
+      { kind: "p", text: "Inden du indgår en aftale med os elektronisk, viser brugergrænsefladen dig de relevante trin, giver dig mulighed for at gennemgå og rette det, du har indtastet, før du indsender det, og oplyser dig om de sprog, som aftalen kan indgås på. Disse vilkår findes i en form, du kan gemme og udskrive. Når du køber et betalt abonnement, sender vi dig den version, du accepterede, pr. e-mail. Du kan til enhver tid bede om en kopi. Intet i disse vilkår begrænser rettigheder, som du har efter rumænsk eller EU-retlig forbrugerbeskyttelseslovgivning eller lovgivningen i det land, hvor du bor, og som ikke kan begrænses ved aftale." }
     ]
   },
   {
@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Dit indhold forbliver dit. Du beholder alle de rettigheder, du måtte have til de spørgsmål, påstande, bemærkninger og indsigelser, du indsender. Du giver os en ikke-eksklusiv, verdensomspændende, royaltyfri licens til at hoste, opbevare, reproducere, tilpasse og behandle dette indhold med henblik på at drive tjenesten: gennemføre debatten, opbevare den, så du kan genåbne og afspille den igen, yde support, opfylde vores retlige forpligtelser og — kun hvis du vælger at offentliggøre — formålene i afsnit 9. Denne licens ophører, når indholdet slettes, medmindre andet følger af afsnit 9 eller lovgivningen." },
-      { kind: "p", text: "Vi træner ikke på dit indhold. Vi træner ikke modeller på dit indhold. Vi bruger kun AI-udbydere på vilkår, der ikke tillader dem at bruge dit indhold til at træne eller forbedre deres modeller; udbyderregisteret viser for hver udbyder, om vi har bekræftet dette, og hvornår." },
+      { kind: "p", text: "Vi træner ikke på dit indhold. Vi bruger kun AI-udbydere på vilkår, der ikke tillader dem at bruge dit indhold til at træne eller forbedre deres modeller; udbyderregisteret viser for hver udbyder, om vi har bekræftet dette, og hvornår." },
       { kind: "p", text: "Sådan når dit indhold frem til AI-udbydere. For at gennemføre en debat sender vi tekst til en eller flere eksterne modeludbydere. En udbyder modtager dit spørgsmål, de styrende bemærkninger, du angiver, og udsagn, som motoren sammensætter under debatten — udbyderen ser således tekst, der er afledt af og opbygget omkring det, du skrev, og ikke kun dine oprindelige ord. Udbyderen modtager aldrig din e-mailadresse, dine kontoidentifikatorer, dine sessionsregistreringer eller dine betalingsoplysninger." },
       { kind: "p", text: "Hvad supportchatten sender. Supportassistenten er også en AI-model. Når du skriver til den, sender vi din besked til en ekstern modeludbyder, så modellen kan svare, sammen med de hjælpeartikler, den baserer sit svar på. Før afsendelsen maskerer vi alt, der ligner en adgangskode, en engangskode eller en nøgle. Hvis du beder om at tale med en person, sender vi også samtalen, maskeret på samme måde, til modellen, så den kan skrive et kort resumé til det medlem af vores team, der overtager din sag. Vi vedhæfter ikke din e-mailadresse, dine kontoidentifikatorer eller dine betalingsoplysninger, men modellen modtager alt andet, du skriver i chatten, så skriv ikke noget der, som du ikke ønsker, at den skal læse." },
       { kind: "p", text: "Hvilke udbydere og hvor. Vores register over AI-udbydere på dezbatere.ro/providers er en del af disse vilkår. Det angiver for hver udbyder, vi kan bruge: dennes juridiske enhed og land; hvad udbyderen modtager og hvorfor; hvor behandlingen finder sted; opbevaringsvilkår; om nulopbevaring af data er aktiveret for det slutpunkt, vi bruger; om udbyderen i henhold til vores aftale må bruge input til træning; den overførselsmekanisme, vi baserer os på; og datoen, hvor vi senest kontrollerede hver registrering. Udbydere kan befinde sig uden for dit land og uden for Det Europæiske Økonomiske Samarbejdsområde. Vores privatlivspolitik forklarer beskyttelsesforanstaltningerne." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Personoplysninger",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Det fremgår af privatlivspolitikken på dezbatere.ro/privacy, hvordan vi behandler personoplysninger. Den forklarer, hvad vi indsamler, behandlingsgrundlaget for hvert formål, hvor længe vi opbevarer oplysninger, hvem der modtager data, hvilke overførsler der finder sted, og hvordan du udøver dine rettigheder. Tre punkter hører også hjemme her. Afsnit 7 beder dig om ikke at angive andre personers personoplysninger i et spørgsmål; hvis du gør det, er du ansvarlig herfor, og vi kan fjerne indholdet. Hvis en debat, der er offentliggjort på Dialectical Engine, indeholder personoplysninger om dig, kan du bede os om at fjerne den uden at have en konto (afsnit 9). Og vi registrerer din accept af disse vilkår — version, tidspunkt og sessionens tekniske oplysninger — som dokumentation for aftalen, som forklaret i privatlivspolitikken." }
+      { kind: "p", text: "Det fremgår af privatlivspolitikken på dezbatere.ro/privacy, hvordan vi behandler personoplysninger. Den forklarer, hvad vi indsamler, behandlingsgrundlaget for hvert formål, hvor længe vi opbevarer oplysninger, hvem der modtager data, hvilke overførsler der finder sted, og hvordan du udøver dine rettigheder. Tre punkter hører også hjemme her. Afsnit 7 beder dig om ikke at angive andre personers personoplysninger i et spørgsmål; hvis du gør det, er du ansvarlig herfor, og vi kan fjerne indholdet. Hvis en debat, der er offentliggjort på Dialectical Engine, indeholder personoplysninger om dig, kan du bede os om at fjerne den uden at have en konto (afsnit 9). Og vi registrerer din accept af disse vilkår — version, tidspunkt og sessionens tekniske oplysninger — som dokumentation for aftalen, som forklaret i privatlivspolitikken. E-mails, vi sender dig, er skrevet på det sprog, du valgte på vores websted; afsnit 13 i privatlivspolitikken forklarer, hvordan vi bevarer dette valg." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "58c3af16549cb5ec0e9f6a58567023d714c901e847b92b42261c421d64a9c996",
-  eyebrow: "TJENESTEVILKÅR · v2.2 · GÆLDENDE FRA 12. OKTOBER 2026",
+  version: "2.3",
+  sha256: "7219d701b475fd957db873c9bf2ede40f048c3ec8ca50b1426ea169b0abe0496",
+  eyebrow: "TJENESTEVILKÅR · v2.3 · GÆLDENDE FRA 12. OKTOBER 2026",
   title: "Det, du accepterer",
   lede: "Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",
-  endMarker: "SLUT PÅ VILKÅRENE · v2.2",
+  endMarker: "SLUT PÅ VILKÅRENE · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tjenestevilkårenes tekst",
   sectionIdPrefix: "terms-section-",

@@ -620,16 +620,18 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     expect(plan.forward108.name).toBe("0108_preview_recovery_verified_bindings.sql");
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
     // The chain in merge order (migrations/lineage/README.md, "renumber"): NETOPIA, then the auth DB batch, then Part C's
-    // prices (spec 2026-10-05 §2.16.6), then role rotation (spec 2026-10-11 Part 3), then the data export (V-41), then
-    // the debate shape's map (spec 2026-10-12 §3.4), then the language check's site cost, last (spec 2026-10-13).
+    // prices (spec 2026-10-05 §2.16.6), then role rotation (spec 2026-10-11 Part 3), then the data export (V-41), then the
+    // mail-locale step (S01-C05), then the debate shape's map (spec 2026-10-12 §3.4), then the language check's site cost,
+    // last (spec 2026-10-13).
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
       "0113_billing_price_currencies.sql",
       "0114_role_rotation.sql",
       "0115_data_export.sql",
-      "0116_debate_shape_map.sql",
-      "0117_language_check_spend.sql"
+      "0116_mail_locale.sql",
+      "0117_debate_shape_map.sql",
+      "0118_language_check_spend.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });

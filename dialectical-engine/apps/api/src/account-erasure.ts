@@ -6,7 +6,8 @@ import {
 import {
   PostgresAccountErasureRepository,
   PrivateRunErasureCoordinator,
-  type AccountErasureNotificationClaim
+  type AccountErasureNotificationClaim,
+  type AuthSourceContext
 } from "@debateai/db";
 import {
   MailDeliveryError,
@@ -26,10 +27,11 @@ export interface AccountErasureApplication {
     authenticated:AuthenticatedSession;
     grantToken:string;
     deletePublicDebates?:boolean;
+    source?:AuthSourceContext;
   }>):Promise<AccountErasureView|"NOTIFICATION_CHANNEL_REQUIRED"|null>;
   current(authenticated:AuthenticatedSession):Promise<AccountErasureView>;
   cancel(input:Readonly<{
-    authenticated:AuthenticatedSession;cancellationRef:string;
+    authenticated:AuthenticatedSession;cancellationRef:string;source?:AuthSourceContext;
   }>):Promise<boolean>;
   deletePrivateDebate(input:Readonly<{
     runId:string;
@@ -49,6 +51,7 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
     authenticated:AuthenticatedSession;
     grantToken:string;
     deletePublicDebates?:boolean;
+    source?:AuthSourceContext;
   }>):Promise<AccountErasureView|"NOTIFICATION_CHANNEL_REQUIRED"|null> {
     let scheduled:Awaited<ReturnType<PostgresAccountErasureRepository["schedule"]>>;
     try {
@@ -57,7 +60,8 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
         ownerRef:input.authenticated.ownerRef,
         sessionId:input.authenticated.session.session_id,
         grantTokenHash:hashToken("step-up-grant", input.grantToken),
-        deletePublicDebates:input.deletePublicDebates === true
+        deletePublicDebates:input.deletePublicDebates === true,
+        ...(input.source === undefined ? {} : { source:input.source })
       });
     } catch (error) {
       if (error instanceof Error
@@ -88,13 +92,14 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
   }
 
   cancel(input:Readonly<{
-    authenticated:AuthenticatedSession;cancellationRef:string;
+    authenticated:AuthenticatedSession;cancellationRef:string;source?:AuthSourceContext;
   }>):Promise<boolean> {
     return this.repository.cancelCurrent({
       userId:input.authenticated.userId,
       ownerRef:input.authenticated.ownerRef,
       sessionId:input.authenticated.session.session_id,
-      cancellationRef:input.cancellationRef
+      cancellationRef:input.cancellationRef,
+      ...(input.source === undefined ? {} : { source:input.source })
     });
   }
 
@@ -166,11 +171,13 @@ export class AccountErasureNotificationReconciler {
       if (!/^[^\s@]+@[^\s@]+$/.test(recipient) || /[\r\n]/.test(recipient)) {
         throw new MailDeliveryError("MAIL_INPUT_INVALID");
       }
+      // C11.4 (R-13): the mail is written in the language stored on the claimed row, never a profile or cookie.
       await this.sender.sendSecurityNotification({
         messageId:claim.messageId,
         recipient,
         eventKind:claim.eventKind,
-        executeAt:claim.executeAt
+        executeAt:claim.executeAt,
+        display:{ locale:claim.mailLocale, timeZone:null }
       });
       return await this.repository.acknowledgeNotification(
         claim.messageId,claim.claimToken

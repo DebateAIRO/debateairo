@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Cookie-Datei (HttpOnly) — Hält Sie angemeldet. Das Cookie wird verlängert, solange Sie den Dienst nutzen. — 14 Tage",
         "__Host-debateai-csrf — Cookie-Datei — Verhindert, dass andere Websites in Ihrem Namen Formulare absenden. — 14 Tage",
         "__Host-debateai-age-refusal — Cookie-Datei (HttpOnly) — Nach einer abgelehnten Altersprüfung hindert er diesen Browser 30 Tage lang an einem neuen Versuch. Er enthält nur das Wort „abgelehnt“, keine personenbezogenen Daten. — 30 Tage",
-        "debateai.locale — Cookie-Datei — Speichert die von Ihnen gewählte Sprache der Benutzeroberfläche. — 1 Jahr",
+        "debateai.locale — Cookie-Datei — Speichert die von Ihnen gewählte Sprache der Benutzeroberfläche und legt die Sprache der E-Mails fest, die wir Ihnen senden. — 1 Jahr",
         "__Host-debateai-staff — Cookie-Datei (HttpOnly) — Getrennter Mitarbeiterzugang — Bis zu 8 Stunden; 15 Minuten Inaktivität",
         "__Host-debateai-staff-csrf — Cookie-Datei — Verhindert, dass andere Websites in Ihrem Namen Formulare absenden. — Bis zu 8 Stunden; 15 Minuten Inaktivität",
         "__Host-debateai-password-reset — Cookie-Datei (HttpOnly) — Nur Passwortzurücksetzung — Bis zu 30 Minuten",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Sitzungsspeicher — Merkt sich, welche Meldung zum Downloadlink in diesem Tab angezeigt werden soll. — Bis zum Schließen des Tabs, zur Abmeldung oder zu einem neuen Link"
         ]
       },
+      { kind: "p", text: "Jede E-Mail, die wir für Sie in die Warteschlange stellen, behält die Sprache, die Sie ausgewählt hatten, bis wir sie senden." },
       { kind: "p", text: "Keine andere Partei erhebt über Dialectical Engine Informationen über Ihre Online-Aktivitäten im Zeitverlauf und über verschiedene Websites hinweg." },
       { kind: "p", text: "Browser können ein „Do Not Track“-Signal oder ein ähnliches Signal senden. Dialectical Engine verfolgt Sie nicht, daher gibt es nichts, was ein solches Signal abschalten könnte: Der Dienst funktioniert mit und ohne dieses Signal gleich." },
       { kind: "p", text: "Um diese Elemente abzulehnen, blockieren oder löschen Sie Cookies und Websitedaten für diese Website in Ihren Browsereinstellungen. Was dann nicht mehr funktioniert: die Anmeldung und das Merken Ihrer Sprach- und Darstellungswahl; auch der Cookie-Hinweis erscheint erneut." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Wenn wir diese Datenschutzerklärung ändern, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und einem neuen Gültigkeitsdatum und bewahren die früheren Fassungen unter dezbatere.ro/privacy/versions auf. Bei einer Änderung, durch die ein neuer Zweck oder ein neuer Empfänger hinzukommt, informieren wir Sie vor Beginn der neuen Verarbeitung per E-Mail und im Produkt und geben Ihnen Zeit zum Widerspruch. Hängt ein neuer Zweck von Ihrer Einwilligung ab – etwa wenn wir Inhalte jemals zur Verbesserung von Modellen nutzen wollten –, holen wir diese Einwilligung gesondert und ausdrücklich ein; die Annahme aktualisierter Nutzungsbedingungen behandeln wir niemals als Einwilligung in eine neue Verarbeitung. Bei Klarstellungen, die nichts an unserem Vorgehen ändern, veröffentlichen wir lediglich die neue Fassung." },
-      { kind: "p", text: "Diese Datenschutzerklärung wurde zuletzt am 12. Oktober 2026 aktualisiert. Version 3.3 ersetzte Version 3.2: Sie betrifft nur die Regionen, die wir bedienen, nennt unser Unternehmen sowie in Abschnitt 5 unsere Hosting-, Auslieferungs- und E-Mail-Anbieter und beschreibt die Bot-Prüfung von Cloudflare." }
+      { kind: "p", text: "Diese Datenschutzerklärung wurde zuletzt am 12. Oktober 2026 aktualisiert. Version 3.4 ersetzte Version 3.3: Abschnitt 13 nennt nun, dass das Cookie debateai.locale auch die Sprache festlegt, in der wir die E-Mails schreiben, die wir Ihnen senden, und ein Absatz ergänzt, dass jede E-Mail, die wir für Sie in die Warteschlange stellen, die Sprache behält, die Sie ausgewählt hatten, bis wir sie senden." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "c43813c09380885fc5542525955f7a276ce96447f8cfd7327e1907f4b485b6f5",
-  eyebrow: "DATENSCHUTZERKLÄRUNG · v3.3 · GÜLTIG AB 12. OKTOBER 2026",
+  version: "3.4",
+  sha256: "9e48b8c89beec47b7f84a7641379df234344de7b8976712f9abe3c639d504b10",
+  eyebrow: "DATENSCHUTZERKLÄRUNG · v3.4 · GÜLTIG AB 12. OKTOBER 2026",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",
-  endMarker: "ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.3",
+  endMarker: "ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Text der Datenschutzerklärung",
   sectionIdPrefix: "policy-section-",

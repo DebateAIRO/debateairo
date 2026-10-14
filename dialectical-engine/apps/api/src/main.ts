@@ -665,7 +665,7 @@ const readSupportCredentialOnce = (path: string): string => {
 // charges the person for it.
 const questionLanguage = debateShapeInForcePolicy === null ? undefined : await boot.run("question-language", async () => {
   const policy = await readQuestionLanguagePolicy(pool, environment.REGISTER_VERSION);
-  // Task 19: with no preview configured the hosted side decides, awaited before the composition. It probes for 0117's
+  // Task 19: with no preview configured the hosted side decides, awaited before the composition. It probes for 0118's
   // one writer (absent = the fast check stays off, HOSTED_BEFORE_SPEND_RECORD: never spend unrecorded) and reads the
   // support target's Anthropic key once, through the same custody loader the support chat uses. Each check is then one
   // run-less site cost in the day's pot, never the person's; a failed record is one code-only line.

@@ -1,5 +1,7 @@
 # Debate Shape Phase 2c (what people see) Implementation Plan
 
+> **Renumbered 2026-10-14:** the migrations this plan calls 0116 (the debate shape map) and 0117 (the language check's site cost) are now 0117 and 0118: the merge of `origin/dev` 221d784db brought dev's own 0116 (`0116_mail_locale.sql`) first. The numbers below are historical.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Show people the new debate shape: the story mentions what was raised but not debated, the debate page lists it and titles every position "The case for …, argued by …", and the /new page's Depth mode, Depth of scrutiny and Answer length become real choices sent with the ask.

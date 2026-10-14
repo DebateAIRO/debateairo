@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.2 · GÄLLER FRÅN 12 OKTOBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.3 · GÄLLER FRÅN 12 OKTOBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.2
+endMarker: SLUT PÅ VILLKOREN · v2.3
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.2 · Effective 12 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.3 · Effective 12 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -114,7 +114,7 @@ Om du är osäker på om något är tillåtet ska du fråga oss innan du publice
 
 **Ditt innehåll förblir ditt.** Du behåller alla rättigheter som du har till de frågor, påståenden, anteckningar och ifrågasättanden som du skickar in. Du ger oss en icke-exklusiv, världsomspännande och royaltyfri licens att hysa, lagra, återge, anpassa och behandla innehållet i syfte att driva tjänsten: genomföra debatten, lagra den så att du kan öppna och spela upp den igen, tillhandahålla support, fullgöra våra rättsliga skyldigheter och — endast om du väljer att publicera — för de ändamål som anges i avsnitt 9. Licensen upphör när innehållet raderas, utom i den mån avsnitt 9 eller lagen kräver annat.
 
-**Vi tränar inte på ditt innehåll.** Vi tränar inte modeller på ditt innehåll. Vi använder AI-leverantörer endast på villkor som inte tillåter dem att använda ditt innehåll för att träna eller förbättra sina modeller; vårt register över AI-leverantörer visar för varje leverantör om vi har bekräftat detta, och när.
+**Vi tränar inte på ditt innehåll.** Vi använder AI-leverantörer endast på villkor som inte tillåter dem att använda ditt innehåll för att träna eller förbättra sina modeller; vårt register över AI-leverantörer visar för varje leverantör om vi har bekräftat detta, och när.
 
 **Hur ditt innehåll når AI-leverantörer.** För att genomföra en debatt skickar vi text till en eller flera externa modelleverantörer. Det en leverantör tar emot är din fråga, de styranteckningar som du har angett och uttalanden som motorn sammanställer under debatten — en leverantör ser således text som härrör från och har byggts kring det du skrev, inte bara dina ursprungliga ord. Leverantören tar aldrig emot din e-postadress, dina kontoidentifierare, dina sessionsuppgifter eller dina betalningsuppgifter.
 
@@ -239,7 +239,7 @@ Avsnitt 8 reglerar ditt innehåll och statusen för genererade resultat. Om du a
 
 ## 17. Personuppgifter
 
-Hur vi behandlar personuppgifter anges i **integritetspolicyn** på dezbatere.ro/privacy. Den förklarar vad vi samlar in, den rättsliga grunden för varje ändamål, hur länge vi behåller uppgifter, vilka som tar emot uppgifter, vilka överföringar som sker och hur du utövar dina rättigheter. Tre punkter hör även hemma här. Enligt avsnitt 7 ska du inte ange andra personers personuppgifter i en fråga; om du ändå gör det ansvarar du för detta, och vi kan ta bort innehållet. Om en debatt som publicerats på Dialectical Engine innehåller personuppgifter om dig kan du begära att vi tar bort dem utan att ha ett konto (avsnitt 9). Vi bevarar dessutom en uppgift om ditt godkännande av dessa villkor — version, tidpunkt och sessionens tekniska uppgifter — som bevis för avtalet, i enlighet med integritetspolicyn.
+Hur vi behandlar personuppgifter anges i **integritetspolicyn** på dezbatere.ro/privacy. Den förklarar vad vi samlar in, den rättsliga grunden för varje ändamål, hur länge vi behåller uppgifter, vilka som tar emot uppgifter, vilka överföringar som sker och hur du utövar dina rättigheter. Tre punkter hör även hemma här. Enligt avsnitt 7 ska du inte ange andra personers personuppgifter i en fråga; om du ändå gör det ansvarar du för detta, och vi kan ta bort innehållet. Om en debatt som publicerats på Dialectical Engine innehåller personuppgifter om dig kan du begära att vi tar bort dem utan att ha ett konto (avsnitt 9). Vi bevarar dessutom en uppgift om ditt godkännande av dessa villkor — version, tidpunkt och sessionens tekniska uppgifter — som bevis för avtalet, i enlighet med integritetspolicyn. E-postmeddelanden som vi skickar till dig skrivs på det språk du valde på vår webbplats; avsnitt 13 i integritetspolicyn förklarar hur vi behåller det valet.
 
 ## 18. Tillämplig lag och forum för tvister
 
