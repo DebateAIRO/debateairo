@@ -17,7 +17,11 @@ export const SITE_LANGUAGES_ELD_LACKS: readonly string[] = Object.freeze(["ga", 
 
 export type EldDatabaseSize = "small" | "medium" | "large";
 export type EldSegmentReading = Readonly<{ code: string | null; reliable: boolean; letters: number }>;
-/** The whole question's reading, and one reading per clause that has plain words (ruling L-MIX). */
+/**
+ * The question's plain-word reading (ruling L-TUNE: eld reads only the plain words of all its clauses together, so
+ * names, brands, addresses and codes never decide its language; `letters` counts those plain letters only), and one
+ * reading per clause that has plain words (ruling L-MIX).
+ */
 export type EldReading = Readonly<{ code: string | null; reliable: boolean; letters: number; segments: readonly EldSegmentReading[] }>;
 export interface EldReader {
   read(text: string): EldReading;
@@ -76,14 +80,12 @@ export async function loadEldReader(size: EldDatabaseSize): Promise<EldReader> {
   };
   return Object.freeze({
     read(text: string): EldReading {
-      const letters = letterCount(text);
-      if (letters === 0) return Object.freeze({ code: null, reliable: false, letters, segments: Object.freeze([]) });
-      const whole = readOne(text, letters);
-      const segments = questionSegments(text).flatMap((segment) => {
-        const plain = plainWordsOf(segment);
-        const plainLetters = letterCount(plain);
-        return plainLetters === 0 ? [] : [readOne(plain, plainLetters)];
-      });
+      const plains = questionSegments(text).map(plainWordsOf).filter((plain) => letterCount(plain) > 0);
+      const letters = plains.reduce((sum, plain) => sum + letterCount(plain), 0);
+      if (letters === 0) return Object.freeze({ code: null, reliable: false, letters: 0, segments: Object.freeze([]) });
+      // Ruling L-TUNE: the whole-question reading never decides; only the plain words of every clause, read together.
+      const whole = readOne(plains.join(" "), letters);
+      const segments = plains.map((plain) => readOne(plain, letterCount(plain)));
       return Object.freeze({ ...whole, segments: Object.freeze(segments) });
     },
     languages(): readonly string[] {
