@@ -1532,6 +1532,61 @@ function observedFinishReason(decoded: unknown): string | null {
   return parsed.success ? parsed.data.choices[0]!.finish_reason ?? null : null;
 }
 
+/** Reclaim resume: one recorded reply as the gateway read it — its message content (null: none) and how it ended. */
+export type RecordedProviderReply = Readonly<{ content: string | null; reply: ModelReplyFacts }>;
+
+/**
+ * Reclaim resume (docs/superpowers/specs/2026-10-14-reclaim-resume-design.md): a RECORDED vendor reply — an attempt's
+ * `raw_artifact.raw_text`, the vendor's own bytes, and its `raw_artifact.provider` — read back exactly as this gateway
+ * read it when it arrived: an Anthropic reply normalised, the strict body's message content, and its finish reason.
+ */
+export function readRecordedProviderReply(rawText: string, provider: string): RecordedProviderReply {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(rawText);
+  } catch {
+    decoded = null;
+  }
+  if (provider === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) {
+    const native = readAnthropicMessagesReply(decoded);
+    if (native.failure) return Object.freeze({ content: null, reply: Object.freeze({ finishReason: null }) });
+    decoded = native.normalized;
+  }
+  const strict = responseSchema.safeParse(decoded);
+  return Object.freeze({
+    content: strict.success ? strict.data.choices[0]!.message.content : null,
+    reply: Object.freeze({ finishReason: observedFinishReason(decoded) })
+  });
+}
+
+/**
+ * Reclaim resume: the content a RECORDED call handed back, rebuilt from its recorded replies, as the gateway decided
+ * it. `accepted` is the reply of the call's OK attempt; `answered` is the reply of the attempt right before it when
+ * the OK attempt was a repair and that one answered the call's original packet (null otherwise). When `answered` could
+ * be patched (`planPatchFollowUp`) and the OK reply merges into it as an accepted answer, the OK attempt was the patch
+ * and the merge is the content (`mergePatchReply`); otherwise the OK reply itself, when the step's classifier accepts
+ * it. Null when neither holds: the call cannot be replayed and is made again. The classifier runs on the returned
+ * content last, as the gateway runs it, so a step that remembers its reading (`rememberingAcceptedReply`) has it.
+ */
+export function rebuildRecordedCallContent(input: Readonly<{
+  accepted: RecordedProviderReply;
+  answered: RecordedProviderReply | null;
+  classifyContent?: (content: string, reply?: ModelReplyFacts) => ContentClassification;
+}>): string | null {
+  const { accepted, answered, classifyContent } = input;
+  if (accepted.content === null) return null;
+  if (classifyContent === undefined) return accepted.content;
+  if (answered !== null && answered.content !== null && answered.reply.finishReason !== PROVIDER_FINISH_REASON_LENGTH) {
+    const first = classifyContent(answered.content, answered.reply);
+    const plan = first.parseStatus === "SCHEMA_FAILED"
+      ? planPatchFollowUp({ content: answered.content, reply: answered.reply, parseStatus: first.parseStatus, parseError: first.parseError })
+      : null;
+    const merged = plan === null ? null : mergePatchReply(plan, accepted.content, accepted.reply);
+    if (merged !== null && merged.ok && classifyContent(merged.content, accepted.reply).parseStatus === "PARSED") return merged.content;
+  }
+  return classifyContent(accepted.content, accepted.reply).parseStatus === "PARSED" ? accepted.content : null;
+}
+
 /**
  * W10/2 (D58 — the outcome is the ticket's, the mechanism is this seat's): the
  * bound a retry asks for after `n` length failures on the same call.

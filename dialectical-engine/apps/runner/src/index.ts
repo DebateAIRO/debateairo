@@ -234,6 +234,7 @@ import {
   shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeWriterSeat
 } from "./shape-seats.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
+import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } from "./run-replay.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
@@ -4999,6 +5000,8 @@ export class WalkingSkeletonRunner {
         | ({ readonly kind: "SNAPSHOT_FAILED" } & StorySnapshotFailure)
         | null;
     } = { story: null };
+    /** Reclaim resume: the replay book read inside the lease, closed when the lease ends (nothing replays after it). */
+    let replayBookInLease: ReplayBook = EMPTY_REPLAY_BOOK;
     let executed: RunnerExecutionResult;
     try {
     executed = await this.#memory.withDisclosureContentLease([claimedRunId],async () => {
@@ -5250,7 +5253,21 @@ export class WalkingSkeletonRunner {
       await this.#work.recordTerminalFailure({ runId: run.runId, workItemId: claimed.workItemId, reason: "RUN_ROLE_ROTATION_INVALID" });
       throw new TypedDomainError("RUN_ROLE_ROTATION_INVALID", "The run's pinned role rotation cannot seat a debate");
     }
-    const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, maker] as const));
+    /**
+     * Reclaim resume (spec 2026-10-14-reclaim-resume-design.md; owner ruling 2026-10-14) — what earlier copies of this
+     * run left: every model call they got answered for this work item, REPLAYED from the record by each member's
+     * gateway (`replayingGateway`, under every other wrapper) instead of bought again, and every node they saved, set
+     * aside (stale) before anything is argued, so this copy argues and reads back its own work only, as a first claim
+     * does. Empty on a first claim: nothing is wrapped and nothing is set aside.
+     */
+    const replayBook = await readReplayBook(this.pool, run.runId, claimed.workItemId);
+    replayBookInLease = replayBook;
+    const replayedMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {
+      if (replayBook.pending === 0) return maker;
+      const provider = replayingGateway(replayBook, maker.provider);
+      return Object.freeze({ ...maker, provider, judge: new Judge(provider) });
+    };
+    const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, replayedMaker(maker)] as const));
     const absentAtClaim: Array<{ readonly member: DiscoveredPanelMember; readonly failureCode: string }> = [];
     const configuredMakers: Array<{
       readonly judge: Judge;
@@ -6499,6 +6516,9 @@ export class WalkingSkeletonRunner {
       await this.#work.settle({ workItemId: claimed.workItemId, ...completable });
       return { kind: "COMPLETED", answerId: completable.artifactRef };
     }
+    // Reclaim resume: an earlier copy's nodes are set aside before anything is argued (an answer it already served,
+    // just above, keeps its own).
+    if (replayBook.earlierNodes > 0) await this.#graph.retireNodes(run.runId, []);
     for (const callSite of [
       {
         contractHash: this.settings.judgeContractHash,
@@ -7430,6 +7450,8 @@ export class WalkingSkeletonRunner {
         }
         return { created, minted: Object.freeze(minted) };
       });
+      // Reclaim resume: an earlier copy's node with this author reply is this node; its recorded review is this one's.
+      replayBook.adopt(childNodeId, childJudged.provenanceRef);
       if (childJudged.wayOfKnowingDowngrade !== null) {
         wayOfKnowingDowngrades.push(bindWayOfKnowingDowngrade(childJudged.wayOfKnowingDowngrade, childNodeId));
       }
@@ -8776,6 +8798,9 @@ export class WalkingSkeletonRunner {
       .map(([, authored]) => authored);
     const authoredMakerPositions = Array.from({ length: rootCount }, (_, index) => authoredNodes.get(index))
       .filter((candidate): candidate is AuthoredDebateNode => candidate !== undefined);
+    // Reclaim resume: a node of this run that THIS copy did not save (a copy that lost the run, still writing) is set
+    // aside before the graph is scored, so the answer is built on this copy's tree alone.
+    await this.#graph.retireNodes(run.runId, authoredNodeList.map((node) => node.nodeId));
     const { materialised, snapshot: operatorResolvedSnapshot } =
       await this.#resolveOperatorResolvedSnapshot(run.runId);
     let snapshot: EvaluationSnapshot = operatorResolvedSnapshot;
@@ -10433,6 +10458,8 @@ export class WalkingSkeletonRunner {
         "RUNNER_DISCLOSURE_PIPELINE_FAILED",
         "The runner failed inside its private-content disclosure lease"
       );
+    } finally {
+      replayBookInLease.close();
     }
     /**
      * VERDICT STORY (spec §3, amended): the run's lease is released, the work
