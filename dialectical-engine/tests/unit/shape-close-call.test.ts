@@ -38,18 +38,33 @@ describe("the close-call extension (spec §3.3 step 6; §6: the highest-voice ru
     expect(shapeCloseCallExtraSeats({ seatMakers: ["a", "b"], called: [false, true], authorMaker: "a", onPanelMakers: ["b"], extra: 2, offset: 0 })).toEqual([]);
   });
 
+  // Final review M-4: the FULL product, not a seeded pick (whose extras were always 0.9 and 0.1): every base panel of
+  // three voices (each tau, each family, in every order) × one or two extras (each tau, each family, in every order),
+  // the extras heard after the base as the fold adds them.
   it("extra voices only RAISE the selected score or WIDEN the spread, never lower either (every order, every family mix)", () => {
     const taus = [0.1, 0.35, 0.6, 0.9];
     const families = [null, "f1", "f2"];
-    for (let seed = 0; seed < 500; seed += 1) {
-      const pick = <T,>(list: readonly T[], at: number): T => list[(seed * 7 + at * 13) % list.length]!;
-      const base: Voice[] = [0, 1, 2].map((at) => ({ ref: `j${String(at)}`, tau: pick(taus, at), family: pick(families, at + seed) }));
-      const extras: Voice[] = [3, 4].map((at) => ({ ref: `j${String(at)}`, tau: pick(taus, at + seed), family: pick(families, at) }));
+    const voices = taus.flatMap((tau) => families.map((family) => ({ tau, family })));
+    const tuples = (length: number): (typeof voices)[] => length === 0 ? [[]]
+      : tuples(length - 1).flatMap((head) => voices.map((voice) => [...head, voice]));
+    const named = (from: number, list: typeof voices): Voice[] => list.map((voice, at) => ({ ref: `j${String(from + at)}`, ...voice }));
+    const extraSets = [...tuples(1), ...tuples(2)];
+    expect(extraSets).toHaveLength(12 + 144);
+    const lowered: string[] = [];
+    let compared = 0;
+    for (const baseVoices of tuples(3)) {
+      const base = named(0, baseVoices);
       const before = reduce(base);
-      const after = reduce([...base, ...extras]);
-      expect(after.score, `seed ${String(seed)}`).toBeGreaterThanOrEqual(before.score);
-      expect(after.spread, `seed ${String(seed)}`).toBeGreaterThanOrEqual(before.spread);
+      for (const extraVoices of extraSets) {
+        const after = reduce([...base, ...named(3, extraVoices)]);
+        compared += 1;
+        if (after.score < before.score || after.spread < before.spread) {
+          lowered.push(JSON.stringify({ base: baseVoices, extras: extraVoices, before, after }));
+        }
+      }
     }
+    expect(compared).toBe(12 ** 3 * (12 + 144));
+    expect(lowered.slice(0, 5)).toEqual([]);
   });
 
   // Pre-flight PF-B32 (law: always an answer). The extension is a SECOND panel run on the same node; on root 0 it must

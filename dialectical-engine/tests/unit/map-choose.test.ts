@@ -242,3 +242,43 @@ describe("map choose (fix round 1): answers are de-duplicated before the cut to 
     expect(marksOf(out.marks).filter((mark) => mark.startsWith("ANSWERS_FILLED"))).toEqual([]);
   });
 });
+
+/**
+ * Final review M-3 (closes the deferred T2 minor): an answer made only of signs ("—", "?!": no letter or digit) is never
+ * chosen or argued. The choose check refuses it (MAP_ANSWER_NO_WORDS, so the repair re-asks that member), and the code's
+ * own fallback and fill skip a merged answer or an OPPOSITE_CASE list answer that normalises to nothing.
+ */
+describe("map choose (M-3): an answer with no letter or digit is never chosen", () => {
+  const signs = mapAssignItemIds([
+    point(A, 0, 0, "Shared opposite", "OPPOSITE_CASE", "against_some_answer"),
+    point(C, 2, 0, "Worry", "ASKER_WORRY", "for_some_answer"),
+    answer(A, 0, "—"), answer(B, 1, "—"), answer(B, 1, "Yes, with conditions."), answer(C, 2, "?!", "OPPOSITE_CASE"),
+    answer(C, 2, "No, keep it as it is.", "OPPOSITE_CASE")
+  ], "seed-signs");
+  const signsById = mapItemsById(signs);
+  const signIds = (text: string) => signs.filter((item) => item.kind === "ANSWER" && item.answer === text).map((item) => item.itemId);
+  const pointIds = (text: string) => signs.filter((item) => item.kind === "POINT" && item.claim === text).map((item) => item.itemId);
+  const signKeyPoints = [mapKeyPoint("kp01", "Shared opposite", pointIds("Shared opposite"), signsById),
+    mapKeyPoint("kp02", "Worry", pointIds("Worry"), signsById)];
+  // The sign-only merged answer is the best supported (two lists), so a rule that only ranks would pick it first.
+  const signMerged = [mapMergedAnswer("an01", "—", signIds("—"), signsById),
+    mapMergedAnswer("an02", "Yes, with conditions.", signIds("Yes, with conditions."), signsById)];
+  const base = { keyPoints: signKeyPoints, items: signs, languageTag: "en", maxAnswers: 4, pointsPerAnswer: 3 };
+
+  it("the fallback (no choose reply) skips a sign-only merged answer", () => {
+    const out = mapFinishChoice({ ...base, mergedAnswers: signMerged, reply: null });
+    expect(out.choice.answers.map((entry) => entry.statement)).not.toContain("—");
+    expect(out.choice.answers[0]!.statement).toBe("Yes, with conditions.");
+  });
+
+  it("the fill skips a sign-only merged answer and a sign-only OPPOSITE_CASE list answer", () => {
+    const fromMap = mapFinishChoice({ ...base, mergedAnswers: [signMerged[0]!, signMerged[1]!],
+      reply: { answers: [chosen("a1", "Maybe, later.", [], ["kp01"], null)] } });
+    expect(fromMap.choice.answers.map((entry) => entry.statement)).toEqual(["Maybe, later.", "Yes, with conditions."]);
+    // No usable merged answer left: the OPPOSITE_CASE list's own answer, never its sign-only one.
+    const fromOpposite = mapFinishChoice({ ...base, mergedAnswers: [signMerged[0]!],
+      reply: { answers: [chosen("a1", "Maybe, later.", [], ["kp01"], null)] } });
+    expect(fromOpposite.choice.answers.map((entry) => entry.statement)).toEqual(["Maybe, later.", "No, keep it as it is."]);
+    expect(marksOf(fromOpposite.marks)).toContain("ANSWERS_FILLED:OPPOSITE_CASE_LIST");
+  });
+});

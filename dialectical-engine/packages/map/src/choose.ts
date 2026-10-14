@@ -80,6 +80,9 @@ function mapFirstOfEachStatement<T>(entries: readonly T[], statement: (entry: T)
   return out;
 }
 
+/** Final review M-3: a text with at least one letter or digit (one that does not normalise to nothing). */
+const hasWords = (text: string): boolean => mapNormaliseText(text) !== "";
+
 export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice: MapChoice; marks: readonly MapMarkRecord[] }> {
   const marks: MapMarkRecord[] = [];
   const ranked = mapRankKeyPoints(input.keyPoints);
@@ -107,8 +110,9 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
 
   if (input.reply === null) {
     marks.push(Object.freeze({ mark: "MAP_CHOOSE_FALLBACK", step: "CHOOSE", detail: "choose reply missing" }));
-    const candidates = mapFirstOfEachStatement(mapRankMergedAnswers(input.mergedAnswers), (answer) => answer.answer)
-      .slice(0, Math.max(1, maxAnswers));
+    // Final review M-3: a merged answer with no letter or digit is never chosen.
+    const candidates = mapFirstOfEachStatement(mapRankMergedAnswers(input.mergedAnswers).filter((answer) => hasWords(answer.answer)),
+      (answer) => answer.answer).slice(0, Math.max(1, maxAnswers));
     candidates.forEach((answer, index) => {
       drafts.push({ answerId: `a${String(index + 1)}`, statement: answer.answer, forIds: [], againstIds: [], rival: null, filled: false,
         opposite: isOpposite(answer.answer) });
@@ -130,9 +134,11 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
     // `taken` keeps the old rule on purpose (an empty normalised key IS taken): if an answer that normalises to nothing
     // matched nothing here, the same merged answer could be filled in twice while drafts start empty.
     const taken = new Set(drafts.map((draft) => mapNormaliseText(draft.statement)));
-    const fromMap = mapRankMergedAnswers(input.mergedAnswers).find((answer) => !taken.has(mapNormaliseText(answer.answer)));
+    // Final review M-3: an answer with no letter or digit never fills a place (the template is the last resort).
+    const fromMap = mapRankMergedAnswers(input.mergedAnswers).find((answer) => hasWords(answer.answer)
+      && !taken.has(mapNormaliseText(answer.answer)));
     const fromOpposite = input.items.find((item): item is MapAnswerItem => item.kind === "ANSWER"
-      && item.angleKind === "OPPOSITE_CASE" && !taken.has(mapNormaliseText(item.answer)));
+      && item.angleKind === "OPPOSITE_CASE" && hasWords(item.answer) && !taken.has(mapNormaliseText(item.answer)));
     const first = drafts[0];
     const [statement, source]: readonly [string, string] = fromMap !== undefined ? [fromMap.answer, "MAP_CANDIDATE"]
       : fromOpposite !== undefined ? [fromOpposite.answer, "OPPOSITE_CASE_LIST"]

@@ -188,8 +188,10 @@ export function mapChooseCheck(keyPointIds: ReadonlySet<string>, expected: Reply
       if (rival !== null && (rival === answer.answer_id || !ids.includes(rival))) {
         issues.push({ path: ["answers", index, "strongest_rival"], code: "MAP_UNKNOWN_RIVAL" });
       }
-      // A statement that normalises to nothing (only signs) duplicates nothing.
+      // A statement that normalises to nothing (only signs: no letter or digit) duplicates nothing, and is no answer at
+      // all (final review M-3): refused at its own statement, so the repair re-asks that member.
       const statement = mapNormaliseText(answer.statement);
+      if (statement === "") issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_NO_WORDS" });
       if (statement !== "" && statements.has(statement)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_DUPLICATE" });
       if (statement !== "") statements.add(statement);
     });

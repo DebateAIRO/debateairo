@@ -127,6 +127,10 @@ describe("a text that normalises to nothing matches nothing", () => {
     const out = mapClassifyReply(content, { finishReason: "stop" }, mapChooseReplySchema, check);
     const codes = (JSON.parse(out.classification.parseError ?? "[]") as { message: string }[]).map((issue) => issue.message);
     expect(codes).not.toContain("MAP_ANSWER_DUPLICATE");
+    // Final review M-3: each is refused as an answer with no words, at its own statement, so the repair re-asks it.
+    const issues = (JSON.parse(out.classification.parseError ?? "[]") as { message: string; path: (string | number)[] }[])
+      .filter((issue) => issue.message === "MAP_ANSWER_NO_WORDS").map((issue) => issue.path.join("."));
+    expect(issues).toEqual(["answers.1.statement", "answers.2.statement"]);
   });
 
   describe("choose", () => {
