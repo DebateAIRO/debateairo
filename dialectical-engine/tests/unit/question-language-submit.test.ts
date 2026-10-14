@@ -26,6 +26,7 @@ import {
 } from "@debateai/register";
 import { ServeRepository } from "@debateai/serve";
 import type { Pool, PoolClient, QueryResult } from "pg";
+import type { PersonWindow } from "@debateai/budget";
 import type { AskBilling } from "../../apps/api/src/ask-billing.js";
 import type { AskRoomPort, RoomDecision } from "../../apps/api/src/ask-room.js";
 import {
@@ -59,13 +60,19 @@ const PANEL = [...PLAN_TIER_ROSTERS.free, ...PLAN_TIER_ROSTERS.premium].map((mod
   probe_evidence_ref: `probe:${index}`, probed_at: "2026-10-13T00:00:00.000Z"
 }));
 
-function billingFor(planId: PlanId) {
+// Final review M14: a premium person with one roomy window, so the coarse fit reads the allowance, the spend and the
+// estimate (a free ask or no window returns before any of them, and the CR-1 spies would watch nothing).
+const ROOMY_WINDOW: PersonWindow = Object.freeze({ scope: "PERSON_MONTH", limitMicros: 1_000_000_000,
+  periodStart: new Date("2026-10-01T00:00:00.000Z"), resetsAt: new Date("2026-11-01T00:00:00.000Z"),
+  finishBasisPoints: 11_000, closeBasisPoints: 9_500 });
+
+function billingFor(planId: PlanId, windows: readonly PersonWindow[] = []) {
   const estimateMicros = vi.fn(async (_settings: unknown) => 1_000);
   const billing: AskBilling = Object.freeze({
     plans,
     entitlements: { current: vi.fn(async () => ({ planId, eventId: EVENT_ID })) },
     coarseFit: Object.freeze({
-      personAllowance: { read: async () => [] },
+      personAllowance: { read: async () => windows },
       spend: { readOwnerSpentMicros: async () => 0, readOwnerCountedHoldsMicros: async () => 0 },
       estimator: { estimateMicros }
     }),
@@ -106,22 +113,27 @@ const Q = "Ar trebui România să adopte euro?";
 const ask = (extra: Partial<AskRequest> = {}): AskRequest => ({ question_line: Q, risk_tier: "casual", tier_source: "ASKER",
   tier_provenance_ref: "asker:test", composition_budget_tier: "medium", depth_params: { depth: 2 }, decision_scope: "question language submit",
   as_of: "2026-10-13T00:00:00.000Z", steering_presets: [], plan_tier: "free", steering_annotations: [], ...extra });
-const LOCK: QuestionLanguageLock = Object.freeze({ language: { code: "ro", name: "Romanian" }, source: "ELD_SITE", siteLanguage: "ro",
-  rewriteAccepted: false, originalQuestionLine: null, trace: { eld: { code: "ro", reliable: true, confident: true }, fast: null, contractHash: null },
+// Final review I7: a lock the guesser can never produce for Q (Q reads as Romanian), so a startRun call site that drops
+// the lock for today's guesser turns these tests red.
+const LOCK: QuestionLanguageLock = Object.freeze({ language: { code: "sr-Latn", name: "Serbian (Latin script)" }, source: "ELD_SITE", siteLanguage: "ro",
+  rewriteAccepted: false, originalQuestionLine: null, trace: { eld: { code: "sr", reliable: true, confident: true }, fast: null, contractHash: null },
   recordCode: "ELD_SITE", localReason: null });
+// Final review I2 (ruling L-SHAPED-ONLY): one maker, so admission mints no shape receipt (resolveDebateShape needs two).
+const ONE_MAKER_PANEL = PANEL.map((seat) => Object.freeze({ ...seat, maker: "maker:0" as const }));
 const OFFER = { check_ref: "a.b", main_language: { code: "ro", name: "Romanian" },
   languages_seen: [{ code: "ro", name: "Romanian" }, { code: "en", name: "English" }], proposed_question: "Ar trebui România să adopte euro sau să aștepte?" };
 
 const START: RoomDecision = Object.freeze({ kind: "START", worst: "FITS", worstScope: null });
 const ROOM_TX = Object.freeze({ query: vi.fn() }) as unknown as PoolClient;
-const startingRoom: AskRoomPort = {
+// A fresh room per test, so a test can spy on its decide (final review I7: the room's path is proven taken).
+const startingRoom = (): AskRoomPort => ({
   precheck: async () => ({ admission: START, estimateMicros: 1_000, now: NOW, personUses: [],
     waitReason: Object.freeze({ waitsFor: "SITE" as const, personRecheckAt: null }) }),
   decide: async (_question, apply) => apply({ admission: START, estimateMicros: 1_000, now: NOW, tx: ROOM_TX }),
   enterWait: async () => undefined,
   openStart: async () => undefined,
   expectedStart: async () => null
-};
+});
 
 function arrangeWith(input: Readonly<{ policy: boolean; port?: QuestionLanguagePort; billing?: AskBilling; room?: AskRoomPort;
   openAdmissionLock?: () => unknown; resolveDiscoveredPanel?: () => Promise<typeof PANEL>; extra?: Partial<RunCreationSettings> }>) {
@@ -178,20 +190,60 @@ describe("submit with the question-language step (question-language spec 2026-10
     await application.submit(ask({ site_language: "ro" }), serverSession, serverPrincipal);
     expect(decide).toHaveBeenCalledWith({ ask: expect.objectContaining({ question_line: Q, site_language: "ro" }), ownerScope: `owner:${serverPrincipal.ownerRef}`,
       fastCheckAllowed: true });
-    expect(started[0]).toMatchObject({ argumentLanguageTag: "ro", argumentLanguageName: "Romanian" });
-    expect(started[0]!.askContract).toMatchObject({ question_language: { code: "ro", source: "ELD_SITE", site_language: "ro", rewrite_accepted: false } });
+    expect(detectArgumentLanguage(Q).tag).not.toBe(LOCK.language.code);
+    expect(started[0]!.envelopeBasis.shape).toBeDefined();
+    expect(started[0]).toMatchObject({ argumentLanguageTag: "sr-Latn", argumentLanguageName: "Serbian (Latin script)" });
+    expect(started[0]!.askContract).toMatchObject({ question_language: { code: "sr-Latn", source: "ELD_SITE", site_language: "ro", rewrite_accepted: false } });
     expect(Object.keys(started[0]!.askContract!)).toEqual([...TODAYS_ASK_CONTRACT_KEYS, "question_language"]);
   });
 
   it("the row present, the room's path: the second startRun carries the same lock and record", async () => {
     const decide = vi.fn(async () => LOCK);
-    const { application, started } = arrangeWith({ policy: true, port: { decide }, room: startingRoom });
+    const room = startingRoom();
+    const roomDecide = vi.spyOn(room, "decide");
+    const { application, started } = arrangeWith({ policy: true, port: { decide }, room });
     await application.submit(ask({ site_language: "ro" }), serverSession, serverPrincipal);
     expect(decide).toHaveBeenCalledTimes(1);
+    expect(roomDecide).toHaveBeenCalledTimes(1);
     expect(started).toHaveLength(1);
-    expect(started[0]).toMatchObject({ argumentLanguageTag: "ro", argumentLanguageName: "Romanian" });
+    expect(started[0]!.envelopeBasis.shape).toBeDefined();
+    expect(started[0]).toMatchObject({ argumentLanguageTag: "sr-Latn", argumentLanguageName: "Serbian (Latin script)" });
     expect(Object.keys(started[0]!.askContract!)).toEqual([...TODAYS_ASK_CONTRACT_KEYS, "question_language"]);
-    expect(started[0]!.askContract).toMatchObject({ question_language: { code: "ro", source: "ELD_SITE" } });
+    expect(started[0]!.askContract).toMatchObject({ question_language: { code: "sr-Latn", source: "ELD_SITE" } });
+  });
+
+  // Final review I2, ruling L-SHAPED-ONLY: the lock is stored only when admission minted a shape receipt. A one-maker
+  // run has none, so the runner argues it with today's directive and today's reply check: it must store today's guess.
+  it("ruling L-SHAPED-ONLY: one maker (no shape minted) stores today's guess and today's four keys, on both startRun paths", async () => {
+    for (const room of [undefined, startingRoom()]) {
+      const path = room === undefined ? "today's path" : "the room's path";
+      const roomDecide = room === undefined ? undefined : vi.spyOn(room, "decide");
+      const decide = vi.fn(async () => LOCK);
+      const { application, started } = arrangeWith({ policy: true, port: { decide }, resolveDiscoveredPanel: async () => ONE_MAKER_PANEL,
+        ...(room === undefined ? {} : { room }) });
+      await application.submit(ask({ site_language: "ro" }), serverSession, serverPrincipal);
+      expect(decide, path).toHaveBeenCalledTimes(1);
+      if (roomDecide !== undefined) expect(roomDecide, path).toHaveBeenCalledTimes(1);
+      expect(started, path).toHaveLength(1);
+      expect(started[0]!.envelopeBasis.shape, path).toBeUndefined();
+      expect(started[0], path).toMatchObject({ argumentLanguageTag: detectArgumentLanguage(Q).tag, argumentLanguageName: detectArgumentLanguage(Q).nameEn });
+      expect(Object.keys(started[0]!.askContract!), path).toEqual(TODAYS_ASK_CONTRACT_KEYS);
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("ruling L-SHAPED-ONLY: an accepted rewrite on a run with no shape keeps the rewrite as the question and stores no original", async () => {
+    const original = "Ar trebui România să adopte the euro?";
+    const rewritten: QuestionLanguageLock = Object.freeze({ ...LOCK, source: "CHOICE", recordCode: "CHOICE", rewriteAccepted: true,
+      originalQuestionLine: original, trace: { eld: null, fast: null, contractHash: "hash" } });
+    const { application, started } = arrangeWith({ policy: true, port: { decide: async () => rewritten }, resolveDiscoveredPanel: async () => ONE_MAKER_PANEL });
+    await application.submit(ask({ question_language_choice: { check_ref: "a.b", choice: "USE_REWRITE", original_question_line: original } }),
+      serverSession, serverPrincipal);
+    expect(started[0]!.questionLine).toBe(Q);
+    expect(started[0]!.envelopeBasis.shape).toBeUndefined();
+    expect(started[0]).toMatchObject({ argumentLanguageTag: detectArgumentLanguage(Q).tag, argumentLanguageName: detectArgumentLanguage(Q).nameEn });
+    expect(Object.keys(started[0]!.askContract!)).toEqual(TODAYS_ASK_CONTRACT_KEYS);
+    expect(JSON.stringify(started[0]!.askContract)).not.toContain("the euro");
   });
 
   it("an accepted rewrite: the original question is kept only inside the stored ask contract", async () => {
@@ -205,30 +257,31 @@ describe("submit with the question-language step (question-language spec 2026-10
       original_question_line: "Ar trebui România să adopte the euro?" } });
   });
 
+  // Pre-flight PF-L31: billing on, so each spy watches a port the request would otherwise reach. Final review M14: a
+  // premium person with a window, and the control below proves every spy is reached when the decider locks instead.
+  const arrangeCr1 = (port: QuestionLanguagePort) => {
+    const { billing, estimateMicros } = billingFor("PRO", [ROOMY_WINDOW]);
+    const spies = { entitlements: billing.entitlements.current as ReturnType<typeof vi.fn>, estimateMicros,
+      allowanceRead: vi.spyOn(billing.coarseFit.personAllowance, "read"),
+      spentRead: vi.spyOn(billing.coarseFit.spend, "readOwnerSpentMicros"),
+      resolveDiscoveredPanel: vi.fn(async () => PANEL) };
+    const { application, started } = arrangeWith({ policy: true, billing, resolveDiscoveredPanel: spies.resolveDiscoveredPanel, port });
+    return { application, started, spies };
+  };
+
   it("CR-1: an offer starts no run and touches neither the person's allowance nor money", async () => {
-    // Pre-flight PF-L31: billing on, so each spy watches a port the request would otherwise reach.
-    const { billing, estimateMicros } = billingFor("FREE");
-    const allowanceRead = vi.spyOn(billing.coarseFit.personAllowance, "read");
-    const spentRead = vi.spyOn(billing.coarseFit.spend, "readOwnerSpentMicros");
-    const openAdmissionLock = vi.fn();
-    const resolveDiscoveredPanel = vi.fn(async () => PANEL);
-    const { application, started } = arrangeWith({ policy: true, billing, openAdmissionLock, resolveDiscoveredPanel,
-      port: { decide: async () => { throw new QuestionLanguageChoiceNeeded(OFFER, { eld: null, fast: null, contractHash: null }); } } });
-    await expect(application.submit(ask({ site_language: "ro" }), serverSession, serverPrincipal)).rejects.toBeInstanceOf(QuestionLanguageChoiceNeeded);
+    const { application, started, spies } = arrangeCr1({
+      decide: async () => { throw new QuestionLanguageChoiceNeeded(OFFER, { eld: null, fast: null, contractHash: null }); } });
+    await expect(application.submit(ask({ site_language: "ro", plan_tier: "premium" }), serverSession, serverPrincipal))
+      .rejects.toBeInstanceOf(QuestionLanguageChoiceNeeded);
     expect(started).toEqual([]);
-    expect(billing.entitlements.current).not.toHaveBeenCalled();
-    expect(estimateMicros).not.toHaveBeenCalled();
-    expect(allowanceRead).not.toHaveBeenCalled();
-    expect(spentRead).not.toHaveBeenCalled();
-    expect(resolveDiscoveredPanel).not.toHaveBeenCalled();
-    expect(openAdmissionLock).not.toHaveBeenCalled();
+    for (const [name, spy] of Object.entries(spies)) expect(spy, name).not.toHaveBeenCalled();
   });
 
-  it("CR-1 control: the same arrangement with a lock reaches billing (the spies above watch live ports)", async () => {
-    const { billing } = billingFor("FREE");
-    const { application, started } = arrangeWith({ policy: true, billing, port: { decide: async () => LOCK } });
-    await application.submit(ask({ site_language: "ro" }), serverSession, serverPrincipal);
-    expect(billing.entitlements.current).toHaveBeenCalled();
+  it("CR-1 control: the same arrangement with a lock reaches every port the offer test watches", async () => {
+    const { application, started, spies } = arrangeCr1({ decide: async () => LOCK });
+    await application.submit(ask({ site_language: "ro", plan_tier: "premium" }), serverSession, serverPrincipal);
+    for (const [name, spy] of Object.entries(spies)) expect(spy, name).toHaveBeenCalled();
     expect(started).toHaveLength(1);
   });
 
@@ -270,7 +323,7 @@ describe("submit with the question-language step (question-language spec 2026-10
   });
 
   it("with the row and a decider, an unknown plan tier is today's ASK_PLAN_TIER_INVALID and the decider is never asked", async () => {
-    for (const room of [undefined, startingRoom]) {
+    for (const room of [undefined, startingRoom()]) {
       const decide = vi.fn(async () => LOCK);
       const { application, started } = arrangeWith({ policy: true, port: { decide }, ...(room === undefined ? {} : { room }) });
       await expect(application.submit(ask({ site_language: "ro", plan_tier: "gold" as never }), serverSession, serverPrincipal))

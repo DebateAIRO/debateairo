@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { argumentLanguageDirective, questionLanguageSentence } from "@debateai/kernel";
 import { stripLanguageDirectiveForTest } from "../support/preview-gate-stubs.js";
+import { runQuestionLanguageLock } from "../../apps/runner/src/index.js";
 
 // Pre-flight PF-L51 (BLOCKER): the strip pattern is the WHOLE directive in each form, both sentences, because the second
 // sentence names "fatalFlags[].type" and would send every review and checker call to PANEL if it stayed. So the inputs
@@ -25,11 +26,12 @@ describe("the test doubles read all three language forms", () => {
 describe("the runner passes a shaped run's lock to every call site", async () => {
   const { readFile } = await import("node:fs/promises");
   const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
-  const declared = source.indexOf("const shapeLanguage: QuestionLanguage | null = shapeRun === null ? null");
+  const declared = source.indexOf("const shapeLanguage: QuestionLanguage | null = runQuestionLanguageLock(shapeShape, run);");
 
   it("decides the lock by the shape receipt, before the map stage sizes root 0's room", () => {
+    // Final review I2 (ruling L-SHAPED-ONLY): the RECEIPT decides, not `shapeRun` (which is null for one maker at claim).
+    expect(declared).toBeGreaterThan(source.indexOf("const shapeShape = envelopeBasis.shape ?? null;"));
     expect(declared).toBeGreaterThan(source.indexOf("const shapeRun = "));
-    expect(source.slice(declared, declared + 200)).toContain(": questionLanguageFromRun(run.argumentLanguageTag, run.argumentLanguageName);");
     const room = source.indexOf("rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({");
     expect(room).toBeGreaterThan(declared);
     expect(source.slice(room, source.indexOf("}) });", room))).toContain("questionLanguage: shapeLanguage");
@@ -48,5 +50,36 @@ describe("the runner passes a shaped run's lock to every call site", async () =>
     expect(source).toContain("questionLine: run.questionLine,\n          ...shapeLanguageInput\n        }, reply));");
     expect(source).toContain("classifyEvaluatorContent(content, reply, run.questionLine, shapeLanguage)");
     expect(source).toContain("languageLocked: shapeLanguage !== null,");
+  });
+});
+
+/**
+ * Final review I2, ruling L-SHAPED-ONLY: the runner reads the lock whenever the run's RECEIPT has a shape — so a shaped
+ * receipt left with one maker at claim (no `shapeRun`, today's single-position path) keeps its lock and is told and
+ * checked in ONE language — and never for a receipt with no shape, whatever pair it stored.
+ */
+describe("runQuestionLanguageLock: the receipt's shape decides the lock", () => {
+  const SHAPE = Object.freeze({ plan: "free", answers: 2 });
+  const stored = { argumentLanguageTag: "sr-Latn", argumentLanguageName: "Serbian (Latin script)" };
+
+  it("a shaped receipt reads the stored pair back as the lock, whatever the maker count at claim", () => {
+    expect(runQuestionLanguageLock(SHAPE, stored)).toEqual({ code: "sr-Latn", name: "Serbian (Latin script)" });
+  });
+
+  it("a receipt with no shape is never locked, even with a lock-looking stored pair", () => {
+    expect(runQuestionLanguageLock(null, stored)).toBeNull();
+    expect(runQuestionLanguageLock(undefined, stored)).toBeNull();
+  });
+
+  it("a shaped receipt with a stored pair that cannot be a lock (\"und\", the fallback name) is not locked", () => {
+    expect(runQuestionLanguageLock(SHAPE, { argumentLanguageTag: "und", argumentLanguageName: "" })).toBeNull();
+  });
+
+  it("the call site reads the receipt's shape, not the claim's shape context", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    expect(source.match(/runQuestionLanguageLock\(/gu)).toHaveLength(2);
+    expect(source).toContain("const shapeLanguage: QuestionLanguage | null = runQuestionLanguageLock(shapeShape, run);");
+    expect(source).not.toContain("shapeRun === null ? null\n      : questionLanguageFromRun(");
   });
 });

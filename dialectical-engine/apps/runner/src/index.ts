@@ -2667,6 +2667,20 @@ interface ComposedCitationContext {
   readonly questionLanguage?: QuestionLanguage;
 }
 
+/**
+ * Question language (spec 2026-10-13 L6; ruling L-SHAPED-ONLY, final review I2): THE RUN'S LOCK, decided by its
+ * RECEIPT. A receipt with a shape (`envelope_basis.shape`) reads the stored tag and name back as the lock
+ * (`questionLanguageFromRun`: null for "und" or a stored fallback name) — also when the run is left with one maker at
+ * claim, so it is told and checked in the one language the API stored for it. A receipt with no shape is never locked,
+ * whatever pair it stored: today's directive, fields and reply check, byte for byte.
+ */
+export function runQuestionLanguageLock(
+  receiptShape: unknown, run: Readonly<{ argumentLanguageTag: string; argumentLanguageName: string }>
+): QuestionLanguage | null {
+  return receiptShape === null || receiptShape === undefined ? null
+    : questionLanguageFromRun(run.argumentLanguageTag, run.argumentLanguageName);
+}
+
 /** Reply language (2026-10-12): the answer's prose, and the checker's objection (the next round's material). */
 export const COMPOSED_PROSE = Object.freeze(["segments.*.text"] as const);
 export const EVALUATOR_PROSE = Object.freeze(["objection"] as const);
@@ -5711,15 +5725,16 @@ export class WalkingSkeletonRunner {
       ? Object.freeze({ shape: shapeShape, settings: shapeSettings, mapContractHash: this.settings.debateShape.mapContractHash })
       : null;
     /**
-     * Question language (spec 2026-10-13 L6; P2L Task 17) — THE RUN'S LOCK, decided by its SHAPE RECEIPT: a shaped run
-     * reads its stored tag and name back as a lock (`questionLanguageFromRun`; null for "und" or a stored fallback name);
-     * a run without a shape is never locked, whatever tag it stored, so every one of its calls keeps today's directive,
-     * fields and reply check byte for byte. Computed before the map stage, whose root-0 room frames it (PF-L38). Every
-     * call of a shaped run carries it: the judge legs, root 0's room, the review, the panel, the writer and its
-     * reading, the checker and its reading, the map (which reads the same stored pair itself) and the story.
+     * Question language (spec 2026-10-13 L6; P2L Task 17) — THE RUN'S LOCK, decided by its SHAPE RECEIPT
+     * (`runQuestionLanguageLock`): a shaped receipt reads its stored tag and name back as a lock; a receipt without a
+     * shape is never locked, whatever tag it stored, so every one of its calls keeps today's directive, fields and
+     * reply check byte for byte. Ruling L-SHAPED-ONLY (final review I2): the RECEIPT decides, not `shapeRun`, so a
+     * shaped run left with one maker at claim (today's single-position path) keeps the lock the API stored for it.
+     * Computed before the map stage, whose root-0 room frames it (PF-L38). Every call of a locked run carries it: the
+     * judge legs, root 0's room, the review, the panel, the writer and its reading, the checker and its reading, the
+     * map (which reads the same stored pair itself) and the story.
      */
-    const shapeLanguage: QuestionLanguage | null = shapeRun === null ? null
-      : questionLanguageFromRun(run.argumentLanguageTag, run.argumentLanguageName);
+    const shapeLanguage: QuestionLanguage | null = runQuestionLanguageLock(shapeShape, run);
     const shapeLanguageInput = shapeLanguage === null ? {} : { questionLanguage: shapeLanguage };
     /**
      * A15 (R5) and controller ruling A14 (carry 1): debaters come from distinct

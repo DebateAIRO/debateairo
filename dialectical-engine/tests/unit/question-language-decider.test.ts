@@ -231,6 +231,32 @@ describe("the question-language decider (question-language spec 2026-10-13)", ()
     expect(outcomes.map((outcome) => outcome instanceof QuestionLanguageChoiceNeeded ? "OFFER" : outcome.source)).toEqual(["OFFER", "CHOICE"]);
   });
 
+  // Final review I5(b), ruling L-POPUP-FIRST: a client that sends no site_language (practice, today's page) cannot show
+  // the pop-up, so a real mix is never thrown at it: the fast AI's main language is locked, by its own record code.
+  it("ruling L-POPUP-FIRST: no site_language and a real mix locks the fast AI's main language, never an offer", async () => {
+    const outcomes: Array<QuestionLanguageLock | QuestionLanguageChoiceNeeded> = [];
+    const fast = fastSaying(RO_EN_MIX);
+    const decider = new QuestionLanguageDecider({ eld: eldSaying(UNSURE_RO), fastCheck: fast.check, key: newQuestionLanguageReferenceKey(),
+      clock: () => NOW, maxQuestionBytes: 8192, onDecided: (outcome) => outcomes.push(outcome) });
+    const ask = { ask: askOf(MIX_Q), ownerScope: "owner:a", fastCheckAllowed: true };
+    const lock = await decider.decide(ask);
+    expect(lock).toMatchObject({ language: { code: "ro", name: "Romanian" }, source: "FAST_MIX_NO_OFFER", siteLanguage: "en",
+      rewriteAccepted: false, originalQuestionLine: null, recordCode: "FAST_MIX_NO_OFFER:NO_SITE_LANGUAGE", localReason: null,
+      trace: { fast: { outcome: "MIX", main: "ro" } } });
+    expect(fast.read).toHaveBeenCalledTimes(1);
+    expect(questionLanguageAskContractMember(lock)).toMatchObject({ question_language: { source: "FAST_MIX_NO_OFFER",
+      record_code: "FAST_MIX_NO_OFFER:NO_SITE_LANGUAGE" } });
+    expect(outcomes.map((outcome) => outcome instanceof QuestionLanguageChoiceNeeded ? "OFFER" : outcome.source)).toEqual(["FAST_MIX_NO_OFFER"]);
+    // Nothing was shown, so nothing is remembered as shown: the same person's page that CAN show the pop-up still gets it.
+    await expect(decider.decide({ ...ask, ask: askOf(MIX_Q, { site_language: "ro" }) })).rejects.toBeInstanceOf(QuestionLanguageChoiceNeeded);
+  });
+
+  it("ruling L-POPUP-FIRST: with a site_language the same real mix is still the 409 offer", async () => {
+    await expect(deciderWith(eldSaying(UNSURE_RO), fastSaying(RO_EN_MIX).check)
+      .decide({ ask: askOf(MIX_Q, { site_language: "en" }), ownerScope: "owner:a", fastCheckAllowed: true }))
+      .rejects.toBeInstanceOf(QuestionLanguageChoiceNeeded);
+  });
+
   it("ownerScopeOf: owner:<ownerRef> for a signed-in person, legacy:<id> otherwise", () => {
     expect(ownerScopeOf({ kind: "server", ownerRef: "o-1" })).toBe("owner:o-1");
     expect(ownerScopeOf({ kind: "legacy", legacyAskerId: "a-1" })).toBe("legacy:a-1");
@@ -265,6 +291,11 @@ describe("the question-language decider (question-language spec 2026-10-13)", ()
     expect(Object.keys(needed)).not.toContain("trace");
     expect(JSON.stringify(needed)).not.toContain("salariile");
     expect(inspect(needed)).not.toContain("salariile");
+    // Final review M14: the other ways an error reaches a log line.
+    expect(String(needed)).not.toContain("salariile");
+    expect(needed.stack ?? "").not.toContain("salariile");
+    expect(JSON.stringify({ ...needed })).not.toContain("salariile");
+    expect(Object.values({ ...needed }).join(" ")).not.toContain("salariile");
     expect(Object.isFrozen(needed.offer) && Object.isFrozen(needed.offer.languages_seen)).toBe(true);
   });
 

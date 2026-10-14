@@ -20,7 +20,8 @@ import { signQuestionLanguageReference, verifyQuestionLanguageChoice, type Quest
  *                  └─ the fast check (Task 5; its time limit is the row's, inside createFastCheck; any throw = DOWN)
  *                       └─ decideAfterFast ─► withoutRepeatOffer (CR-5, L-REPEAT) ─► LOCK, or an OFFER that the
  *                          contract's 409 body must accept (PF-L19: else LOCK the main language) ─► thrown
- *                          QuestionLanguageChoiceNeeded
+ *                          QuestionLanguageChoiceNeeded — only to a client that sent site_language (L-POPUP-FIRST:
+ *                          one that did not cannot show the pop-up, so it gets the main-language lock instead)
  *
  * It never blocks the person: every failure ends in a lock. It logs nothing, and no error it raises carries the
  * question, the rewrite or the reply: codes and hashes only. It holds no lock (mutex, row or admission) while it
@@ -177,6 +178,13 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
       const skipped = fast.kind !== "DOWN" ? null : fast.reason === "SKIPPED_DAY_POT" ? "FAST_CHECK_SKIPPED_DAY_POT"
         : fast.reason === "SPEND_RECORD_DOWN" ? "FAST_CHECK_SPEND_RECORD_DOWN" : null;
       return this.#lock(site, decision, trace, null, skipped);
+    }
+    // Ruling L-POPUP-FIRST (final review I5b): an ask with no site_language comes from a client that cannot show the
+    // pop-up (practice, today's page), so a real mix is never thrown at it: the fast AI's main language is locked, as
+    // the table's own FAST_MIX_NO_OFFER does. Nothing was shown, so nothing is signed or remembered as shown.
+    if (input.ask.site_language === undefined) {
+      return this.#done(Object.freeze({ language: decision.main, source: "FAST_MIX_NO_OFFER", siteLanguage: site.code,
+        rewriteAccepted: false, originalQuestionLine: null, trace, recordCode: "FAST_MIX_NO_OFFER:NO_SITE_LANGUAGE", localReason: null }));
     }
 
     const checkRef = signQuestionLanguageReference(this.#deps.key, { ownerScope: input.ownerScope, site: site.code, questionLine,

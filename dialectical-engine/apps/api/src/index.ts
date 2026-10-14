@@ -4742,7 +4742,10 @@ export class PostgresAskApplication implements AskApplication {
       ? undefined : this.settings.previewBudgetGate?.openAdmissionLock?.();
     try {
     const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment, roleRotation } = await evaluateAskAdmission(this.settings, ask, null, previewAdmissionLock, shapePlan);
-    const argumentLanguage = runLanguageOf(questionLanguageLock, ask.question_line);
+    // Ruling L-SHAPED-ONLY (final review I2): the lock is the run's only when admission minted a shape receipt, the
+    // receipt the runner locks by. A run with no shape (one maker) stores today's guess and today's ask contract.
+    const storedLanguageLock = (envelopeBasis.shape ?? null) === null ? null : questionLanguageLock;
+    const argumentLanguage = runLanguageOf(storedLanguageLock, ask.question_line);
     let runId:string;
     // Set the moment startRun commits: the lease's release can still throw
     // after that, and the run then exists with nothing to start it.
@@ -4779,7 +4782,7 @@ export class PostgresAskApplication implements AskApplication {
             steering_presets: ask.steering_presets,
             steering_annotations: ask.steering_annotations,
             critic_unavailable_cap: criticUnavailableCap,
-            ...questionLanguageAskContractMember(questionLanguageLock)
+            ...questionLanguageAskContractMember(storedLanguageLock)
           },
           batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
         },lease.client);
@@ -4968,7 +4971,6 @@ export class PostgresAskApplication implements AskApplication {
       throw new AskRefusal(new TypedDomainError("ASK_PLAN_TIER_INVALID", "The plan tier must be free or premium"));
     }
     const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask,this.settings.previewProviderTestConfig,shapePlan), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
-    const argumentLanguage = runLanguageOf(questionLanguageLock, ask.question_line);
     const admissionPool = principal.kind === "server"
       ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
     let createdRunId: string | undefined;
@@ -5024,6 +5026,10 @@ export class PostgresAskApplication implements AskApplication {
             : startEvaluation;
           const evaluated: PlannedAskAdmission | AskRefusal = keepsPlan ? plannedEvaluation : chosen;
           if (evaluated instanceof AskRefusal) throw evaluated;
+          // Ruling L-SHAPED-ONLY (final review I2): the lock is stored only when the admission this run is created
+          // from minted a shape receipt; a run with no shape stores today's guess and today's ask contract.
+          const storedLanguageLock = (evaluated.envelopeBasis.shape ?? null) === null ? null : questionLanguageLock;
+          const argumentLanguage = runLanguageOf(storedLanguageLock, ask.question_line);
           await this.#liveness.recordQuery(ask.question_line, ownership, new Date(ask.as_of));
           const runId = await this.#runs.startRun({
             questionLine: runAsk.question_line,
@@ -5050,7 +5056,7 @@ export class PostgresAskApplication implements AskApplication {
               steering_presets: runAsk.steering_presets,
               steering_annotations: runAsk.steering_annotations,
               critic_unavailable_cap: evaluated.criticUnavailableCap,
-              ...questionLanguageAskContractMember(questionLanguageLock)
+              ...questionLanguageAskContractMember(storedLanguageLock)
             },
             batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
           }, lease.client);
