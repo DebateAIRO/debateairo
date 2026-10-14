@@ -2540,11 +2540,14 @@ export {
   buildFramedRepairPrompt,
   promptContractFingerprintText,
   readPromptFrame,
+  schemaFailureLimits,
   schemaFailureLocator,
   splitCacheablePrefix,
   type FramedMaterialField,
+  type FramedPatchLocator,
   type FramedPrompt,
   type FramedRepairLocator,
+  type FramedSizeLimit,
   type PromptContract,
   type PromptFramePresence
 } from "./prompt-frame.js";
