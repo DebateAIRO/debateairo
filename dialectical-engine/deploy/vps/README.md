@@ -973,6 +973,45 @@ move: `composerContractHash` and `conformanceContractHash`. No migration, no new
 - **Rolling back** the code means pinning the register version the older code was running on again (the older code
   has no such check, and on the new version it would record its v2 prompts under the v3 fingerprints).
 
+### Upgrading to the debate shape
+
+This release adds the debate shape: before the debate, the AIs map the question (the points people raise and the
+answers worth arguing); then several answers are argued, each by a different AI, and the final answer has a set
+length. It adds one migration, `migrations/0116_debate_shape_map.sql` (the three tables that keep each debate's map),
+and new prompts, so two fingerprints move (`judgeContractHash` and `composerContractHash`) and a new one is sealed
+(`mapContractHash`). The shape itself stays off until a register version carries the `debateShapePolicy` member
+(`deploy/vps/register/README.md`); this upgrade only makes the hosts ready for it.
+
+Do these in this order, with the new checkout in place:
+
+1. **Apply the migration.** Open the migrator window (§4 step 2), run `pnpm db:migrate` and then `hardening.sql` as
+   §4 step 3 does, and close the window (§4 step 5).
+2. **Publish a new hosted register version** from the new checkout (`pnpm register:publish-hosted --file
+   /etc/debateai/register/hosted-register.json`, §11) and write the printed `REGISTER_VERSION=` line into both
+   `api.env` and `runner.env`. Nothing changes yet: the running units read the version only when they start.
+3. **Wait until no debate is queued or running.** Run the command from the verdict-story section above and wait
+   until `unfinished` is 0:
+
+   ```sh
+   sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created_at_seq) AS oldest, max(created_at_seq) AS newest FROM core.work_item WHERE state IN ('READY', 'CLAIMED')"
+   ```
+
+   Why: the fingerprints are also the keys under which the runner finds a debate's earlier attempts. A debate still
+   running when they change no longer sees those attempts, so it may ask (and pay for) some calls again.
+4. **Restart the API and the runner together**, while `unfinished` is still 0:
+
+   ```sh
+   systemctl restart debateai-api debateai-runner
+   ```
+
+   The runner refuses to start on a register that does not carry the fingerprints of its own prompts
+   (`REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`, `MAP_CONTRACT_HASH_MISMATCH`): if it does, the version pinned is not the
+   one published in step 2.
+
+**Rolling back** means the older checkout and the register version it was running on, pinned again in both files,
+and the same wait for `unfinished` at 0 before the restart. The migration's tables stay; the older code never reads
+them.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,

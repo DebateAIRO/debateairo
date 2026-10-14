@@ -13,7 +13,7 @@ import {
 } from "@debateai/budget";
 import type { DebateShapeSettings } from "@debateai/contract";
 import { createPool, migrate, type Pool } from "@debateai/db";
-import { mapPromptContractHash } from "@debateai/map";
+import { MAP_CONTRACT_IDS, mapPromptContractHash } from "@debateai/map";
 import type { ProviderCostEnvelopeSeam } from "@debateai/providers";
 import { debateShapeSiteCounts, type DebateShapeCeilingInput } from "@debateai/register";
 import { readFramedMaterial, wirePacket, type FramedMaterial } from "../support/framed-packet.js";
@@ -103,7 +103,8 @@ describe("the debate shape in the runner (spec §3.3)", () => {
   // note: a neutral label ("measured" reads as an empirical claim, which the fixture composition map does not rate).
   it("never makes more nodes or map sites than the receipt priced (fixed rounds, on the ledger)", async () => {
     const fixed = { depthMode: "fixed", scrutiny: "standard", answerLength: "standard" } as const;
-    const { debate, shape, calls } = await argue("ceiling", "pro", fixed, 2);
+    // Final review I-3: the choose names four answers, so the run argues every position the receipt priced (P = 4).
+    const { debate, shape, calls } = await argue("ceiling", "pro", fixed, 2, { chooseAnswers: 4 });
     const priced = debateShapeSiteCounts(shape, 2);
     const nodes = await q(database.pool, `SELECT count(*)::int AS n FROM core.node WHERE run_id=$1`, debate.runId);
     expect(nodes[0]!.n).toBeLessThanOrEqual(priced.nodes);
@@ -118,7 +119,9 @@ describe("the debate shape in the runner (spec §3.3)", () => {
   // kind by site kind, against `debateShapeSiteCounts` — and the deeper legs that WERE kept did run.
   it("an adaptive Pro run stays within the priced sites, site kind by site kind, and its kept chains go deeper", async () => {
     const depth = 3;
-    const { debate, shape, calls } = await argue("adaptive-ceiling", "pro", STANDARD, depth);
+    // Final review I-3: the choose names four answers, so all P = 4 priced positions are argued — no position's worth of
+    // slack for a runner that kept every chain on one of them.
+    const { debate, shape, calls } = await argue("adaptive-ceiling", "pro", STANDARD, depth, { chooseAnswers: 4 });
     const priced = debateShapeSiteCounts(shape, depth);
     const kinds = {
       map: (key: string) => key.startsWith("MAP:"),
@@ -149,6 +152,23 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     // At most `deeperTopPoints` chains per position reach round 2 (each chain one reply and one defence per round).
     expect(calls.filter((call) => call.outcome === "OK" && roundOf(call.call_site_key) === 2).length)
       .toBeLessThanOrEqual(2 * shape.answers * shape.deeperTopPoints);
+    // Final review I-3, PER POSITION: every priced position was argued, and each kept at most `deeperTopPoints` chains
+    // into round 2. A leg's key names its own plan position p<n>; the plan numbers the roots, then every round-1 point,
+    // then the cross-replies, then each chain's round-2 reply and defence side by side — so the round-2 block starts at
+    // s = roots + points + cross-replies, and the chain of a round-2 leg at n is floor((n − s) / 2).
+    const okSites = (kind: (key: string) => boolean) => new Set(calls.filter((call) => call.outcome === "OK" && kind(call.call_site_key))
+      .map((call) => call.call_site_key));
+    expect(okSites(kinds.positions).size).toBe(shape.answers);
+    const roundTwoStart = shape.answers + okSites(kinds.points).size + okSites(kinds.cross).size;
+    const leg = (key: string) => { const match = /^JUDGE:(?:defender|critic):root([0-9]+):r[0-9]+:p([0-9]+)$/u.exec(key)!; return { root: Number(match[1]), at: Number(match[2]) }; };
+    const chainsByRoot = new Map<number, Set<number>>();
+    for (const key of okSites((key) => roundOf(key) === 2)) {
+      const { root, at } = leg(key);
+      expect(at, key).toBeGreaterThanOrEqual(roundTwoStart);
+      chainsByRoot.set(root, new Set([...(chainsByRoot.get(root) ?? []), Math.floor((at - roundTwoStart) / 2)]));
+    }
+    expect(chainsByRoot.size).toBeGreaterThan(0);
+    for (const [root, chains] of chainsByRoot) expect(chains.size, `root ${String(root)}`).toBeLessThanOrEqual(shape.deeperTopPoints);
     const nodes = await q(database.pool, `SELECT count(*)::int AS n FROM core.node WHERE run_id=$1`, debate.runId);
     expect(nodes[0]!.n).toBeLessThanOrEqual(priced.nodes);
   }, 600_000);
@@ -203,6 +223,7 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     expect([...legs, ...crossReplies].every((child) => makers.has(child.id) && makers.has(child.parent))).toBe(true);
     expect(legs.filter((child) => makers.get(child.id) === makers.get(child.parent))
       .map((child) => `${makers.get(child.id)!} answered ${makers.get(child.parent)!}`)).toEqual([]);
+    expect(crossReplies.length).toBeGreaterThan(0);
     for (const reply of crossReplies) {
       expect(makers.get(reply.id)).toBe(makers.get(reply.parent));
       const attacked = edges.filter((edge) => edge.source === reply.id && edge.target !== reply.parent).map((edge) => makers.get(edge.target));
@@ -229,10 +250,13 @@ describe("the debate shape in the runner (spec §3.3)", () => {
   }, 600_000);
 
   it("a money stop mid-map ends with an answer: root 0 is argued, the stop is disclosed, nothing else is asked", async () => {
-    const { result, calls } = await argue("money-stop", "free", STANDARD, 2, { stopAt: "MERGE" });
+    const { debate, result, calls } = await argue("money-stop", "free", STANDARD, 2, { stopAt: "MERGE" });
     expect(result.kind).toBe("COMPLETED");
     expect(calls.some((call) => call.call_site_key === "MAP:choose")).toBe(false);
     expect(calls.filter((call) => call.call_site_key.startsWith("JUDGE:root:"))).toEqual([]);
+    // Final review M-5: root 0 IS argued — one answered root-0 call — and it argues the answer the code's map chose.
+    expect(calls.filter((call) => call.call_site_key === "JUDGE" && call.outcome === "OK")).toHaveLength(1);
+    expect(await q(database.pool, `SELECT root_index FROM core.map_position WHERE run_id=$1`, debate.runId)).toEqual([{ root_index: 0 }]);
     const rows = await q(database.pool, `SELECT mark FROM serve.condition_mark WHERE answer_id=$1`, result.answerId);
     expect(rows.map((row) => row.mark)).toEqual(expect.arrayContaining(["ENVELOPE_EXHAUSTED", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK"]));
   }, 600_000);
@@ -399,6 +423,45 @@ describe("the debate shape in the runner (spec §3.3)", () => {
       expect(marks).not.toContain("ENVELOPE_EXHAUSTED");
       expect((await harness.bodyFactsOf(result.answerId))!.body_stop).toBeNull();
     }, 600_000);
+
+    /**
+     * Final review I-3 (Review Focus #1, "a lost claim during the map abandons"): the run loses its claim while the map's
+     * lists are being asked (the keep-alive refuses, as `keepAliveStop` reads a lost claim or the time limit). The run is
+     * abandoned exactly as today — it rejects; nothing is argued, no map is stored, no answer is written — and the map
+     * calls already sent settle before it leaves (ruling T12-W): each has its MODEL_CALL row and its charge. With the
+     * owner's call concurrency, so lists are in flight together when the claim is lost.
+     */
+    it("a lost claim during the map abandons the run: no root asked, no map stored, no answer, every map call sent settled", async () => {
+      const hosted = hostedMoney(1_000_000_000, () => CHEAP);
+      const shape = shapeForTest({ plan: "free", makers: PANEL_REFS.length, settings: STANDARD });
+      const debate = await harness.admittedRun("lost-claim-map", { panelRefs: PANEL_REFS, depth: 1, shape, settings: STANDARD });
+      const scripted = scriptedShapeAnswers(debate.question);
+      const lists = new Set<string>([MAP_CONTRACT_IDS.listAngle, MAP_CONTRACT_IDS.listOpen, MAP_CONTRACT_IDS.listSnowball]);
+      const lost = new AbortController();
+      const gates = await harness.startGates({}, undefined, (request, chat) => {
+        // The claim is lost as the first list call arrives; that call (and any sent beside it) is still answered.
+        if (request.kind === "MAP" && lists.has(materialOf(request).contractId)) lost.abort();
+        return scripted(request, chat);
+      });
+      const composed = await harness.previewRunner(gates, "resend", { callConcurrency: OWNER_CALL_CONCURRENCY,
+        debateShape: { mapContractHash: mapPromptContractHash() }, money: hosted.money });
+      await expect(composed.runner.executeWorkItem(debate.workItemId, { executionLimitMs: 3_600_000, signal: lost.signal }))
+        .rejects.toMatchObject({ code: "RUNNER_TIME_LIMIT_REACHED" });
+      expect(lost.signal.aborted).toBe(true);
+      const mapRequests = gates.requests.filter((request) => request.kind === "MAP");
+      expect(mapRequests.filter((request) => lists.has(materialOf(request).contractId)).length).toBeGreaterThan(0);
+      // Nothing was argued: no root (no JUDGE request at all), no panel.
+      expect(gates.requests.filter((request) => request.kind === "JUDGE" || request.kind === "PANEL")).toEqual([]);
+      // No map stored, no position, no answer.
+      for (const table of ["core.map_item", "core.map_choice", "core.map_position", "serve.answer"]) {
+        expect(await q(database.pool, `SELECT 1 FROM ${table} WHERE run_id=$1`, debate.runId), table).toEqual([]);
+      }
+      // Every map call that was sent settled before the run left: a MODEL_CALL row and a charge for each, none after.
+      const mapRows = (await harness.modelCalls(debate.runId)).filter((call) => call.call_site_key.startsWith("MAP:"));
+      expect(mapRows).toHaveLength(mapRequests.length);
+      expect((await harness.modelCalls(debate.runId)).filter((call) => !call.call_site_key.startsWith("MAP:"))).toEqual([]);
+      expect(hosted.charges.filter((entry) => entry.runId === debate.runId)).toHaveLength(mapRequests.length);
+    }, 600_000);
   });
 
   // Binding notes 5 and 6 (Tasks 11/14): the extension's wiring at runner level — the extra seats are makers not yet
@@ -529,7 +592,8 @@ describe("the debate shape in the runner (spec §3.3)", () => {
       const frame = materialOf(writer);
       expect(frame.contractId).toBe("serve.synthesizer.length.v1");
       expect(frame.fields.at(-1)).toEqual({ name: "answer_length", content: `about ${String(shape.answerWords)} words` });
-      expect(Number(writer.body.max_tokens)).toBeGreaterThanOrEqual(shape.writerBound);
+      // Final review M-5: exactly max(sealed, writerBound), as the title says — never only "at least the writer bound".
+      expect(Number(writer.body.max_tokens)).toBe(Math.max(POLICY.bounds.COMPOSER.tokenCeiling, shape.writerBound));
     }
   }, 600_000);
 
