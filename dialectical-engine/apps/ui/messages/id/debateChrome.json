@@ -182,7 +182,7 @@
   "debateChrome.condition.panelPartial": "Beberapa penilai tidak dapat menilai poin ini",
   "debateChrome.condition.panelDegradedSingleVoice": "Hanya penilaian penulis sendiri yang bertahan",
   "debateChrome.condition.mapAnglesFallback": "Pertanyaan dikaji dari serangkaian sudut pandang standar",
-  "debateChrome.condition.mapMergeFallback": "Poin-poin yang mirip digabungkan dengan aturan sederhana",
+  "debateChrome.condition.mapMergeFallback": "Hanya poin yang menyatakan hal yang persis sama yang digabungkan",
   "debateChrome.condition.mapChooseFallback": "Jawaban yang akan diperdebatkan dipilih dengan aturan sederhana",
   "debateChrome.condition.mapUnavailable": "Setiap model AI memulai dari jawabannya sendiri",
   "debateChrome.condition.answersFilled": "Jawaban lain ditambahkan agar jawaban-jawaban bisa dibandingkan",

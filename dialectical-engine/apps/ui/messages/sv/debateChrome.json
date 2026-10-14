@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Vissa domare kunde inte bedöma den här punkten",
   "debateChrome.condition.panelDegradedSingleVoice": "Endast författarens egen bedömning återstod",
   "debateChrome.condition.mapAnglesFallback": "Frågan undersöktes utifrån en standardlista med synvinklar",
-  "debateChrome.condition.mapMergeFallback": "Liknande punkter slogs ihop enligt en enkel regel",
+  "debateChrome.condition.mapMergeFallback": "Endast punkter som sade exakt samma sak slogs ihop",
   "debateChrome.condition.mapChooseFallback": "De svar som skulle debatteras valdes med en enkel regel",
   "debateChrome.condition.mapUnavailable": "Varje AI-modell började med sitt eget svar",
   "debateChrome.condition.answersFilled": "Ett andra svar lades till så att två svar kunde jämföras",

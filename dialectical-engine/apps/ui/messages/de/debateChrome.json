@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Einige Bewertungsmodelle konnten diesen Punkt nicht beurteilen",
   "debateChrome.condition.panelDegradedSingleVoice": "Nur die eigene Beurteilung des verfassenden Modells blieb erhalten",
   "debateChrome.condition.mapAnglesFallback": "Die Frage wurde anhand einer Standardliste von Blickwinkeln untersucht",
-  "debateChrome.condition.mapMergeFallback": "Ähnliche Punkte wurden nach einer einfachen festen Regel zusammengefasst",
+  "debateChrome.condition.mapMergeFallback": "Nur Punkte mit genau gleicher Aussage wurden zusammengefasst",
   "debateChrome.condition.mapChooseFallback": "Die zu debattierenden Antworten wurden nach einer einfachen Regel ausgewählt",
   "debateChrome.condition.mapUnavailable": "Jede KI begann mit ihrer eigenen Antwort",
   "debateChrome.condition.answersFilled": "Eine zweite Antwort wurde hinzugefügt, damit zwei Antworten gegenübergestellt werden konnten",

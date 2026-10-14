@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Nekateri ocenjevalci te točke niso mogli oceniti",
   "debateChrome.condition.panelDegradedSingleVoice": "Ohranila se je samo avtorjeva lastna ocena",
   "debateChrome.condition.mapAnglesFallback": "Vprašanje je bilo raziskano iz standardnega nabora gledišč",
-  "debateChrome.condition.mapMergeFallback": "Podobne točke so bile združene po preprostem pravilu",
+  "debateChrome.condition.mapMergeFallback": "Združene so bile le točke, ki so povedale popolnoma isto",
   "debateChrome.condition.mapChooseFallback": "Odgovori za razpravo so bili izbrani s preprostim pravilom",
   "debateChrome.condition.mapUnavailable": "Vsak model UI je začel z lastnim odgovorom",
   "debateChrome.condition.answersFilled": "Dodan je bil drugi odgovor, da bi bila mogoča primerjava dveh odgovorov",

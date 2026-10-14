@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Ní raibh roinnt breithiúna in ann an pointe seo a mheas",
   "debateChrome.condition.panelDegradedSingleVoice": "Níor mhair ach measúnú an údair féin",
   "debateChrome.condition.mapAnglesFallback": "Rinneadh iniúchadh ar an gceist ó dhearcthaí caighdeánacha",
-  "debateChrome.condition.mapMergeFallback": "Grúpáladh pointí cosúla le riail shimplí",
+  "debateChrome.condition.mapMergeFallback": "Níor cumascadh ach pointí a dúirt díreach an rud céanna",
   "debateChrome.condition.mapChooseFallback": "Roghnaíodh na freagraí don díospóireacht le riail shimplí",
   "debateChrome.condition.mapUnavailable": "Thosaigh gach samhail IS lena freagra féin",
   "debateChrome.condition.answersFilled": "Cuireadh freagra eile leis, ionas go bhféadfaí na freagraí a chur i gcomparáid le chéile",

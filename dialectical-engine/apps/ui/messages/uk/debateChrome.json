@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Деякі судді не змогли оцінити цей пункт",
   "debateChrome.condition.panelDegradedSingleVoice": "Збереглася лише власна оцінка автора",
   "debateChrome.condition.mapAnglesFallback": "Питання досліджено за стандартним набором точок зору",
-  "debateChrome.condition.mapMergeFallback": "Схожі пункти згруповано за простим правилом",
+  "debateChrome.condition.mapMergeFallback": "Об’єднано лише пункти, які казали точно те саме",
   "debateChrome.condition.mapChooseFallback": "Відповіді для обговорення обрано простим правилом",
   "debateChrome.condition.mapUnavailable": "Кожна модель ШІ почала зі своєї відповіді",
   "debateChrome.condition.answersFilled": "Додано другу відповідь, щоб можна було порівняти дві відповіді",

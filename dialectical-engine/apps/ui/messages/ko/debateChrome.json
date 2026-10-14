@@ -182,7 +182,7 @@
   "debateChrome.condition.panelPartial": "일부 심사자가 이 쟁점을 평가하지 못함",
   "debateChrome.condition.panelDegradedSingleVoice": "작성자 자신의 평가만 남음",
   "debateChrome.condition.mapAnglesFallback": "질문을 표준 관점 목록에 따라 탐색함",
-  "debateChrome.condition.mapMergeFallback": "비슷한 쟁점들은 단순한 규칙으로 함께 묶임",
+  "debateChrome.condition.mapMergeFallback": "완전히 같은 말을 한 쟁점만 합침",
   "debateChrome.condition.mapChooseFallback": "토론할 답변은 단순한 규칙에 따라 선택됨",
   "debateChrome.condition.mapUnavailable": "각 AI 모델이 자신의 답변에서 출발함",
   "debateChrome.condition.answersFilled": "답변끼리 비교할 수 있도록 다른 답변을 추가함",

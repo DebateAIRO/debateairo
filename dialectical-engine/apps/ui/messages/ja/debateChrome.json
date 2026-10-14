@@ -182,7 +182,7 @@
   "debateChrome.condition.panelPartial": "一部の審査員がこの点を評価できず",
   "debateChrome.condition.panelDegradedSingleVoice": "作成者自身の評価だけが残存",
   "debateChrome.condition.mapAnglesFallback": "質問は、あらかじめ用意された標準的な観点から検討されました",
-  "debateChrome.condition.mapMergeFallback": "似た論点は、単純なルールでまとめられました",
+  "debateChrome.condition.mapMergeFallback": "まったく同じことを述べた論点だけがまとめられました",
   "debateChrome.condition.mapChooseFallback": "ディベートで争う回答は、単純なルールで選ばれました",
   "debateChrome.condition.mapUnavailable": "各AIモデルは、それぞれ自分の回答から始めました",
   "debateChrome.condition.answersFilled": "別の回答を加え、回答同士を比べられるようにしました",

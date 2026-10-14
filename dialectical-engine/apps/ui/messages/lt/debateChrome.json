@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Kai kurie vertintojai negalėjo įvertinti šio punkto",
   "debateChrome.condition.panelDegradedSingleVoice": "Išliko tik paties autoriaus vertinimas",
   "debateChrome.condition.mapAnglesFallback": "Klausimas išnagrinėtas pagal standartinį požiūrių rinkinį",
-  "debateChrome.condition.mapMergeFallback": "Panašūs punktai sugrupuoti pagal paprastą taisyklę",
+  "debateChrome.condition.mapMergeFallback": "Sujungti tik tie punktai, kurie sakė tiksliai tą patį",
   "debateChrome.condition.mapChooseFallback": "Debatams skirti atsakymai parinkti paprasta taisykle",
   "debateChrome.condition.mapUnavailable": "Kiekvienas DI modelis pradėjo nuo savo atsakymo",
   "debateChrome.condition.answersFilled": "Pridėtas antras atsakymas, kad būtų galima palyginti du atsakymus",

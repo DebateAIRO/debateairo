@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Néhány bíró nem tudta értékelni ezt a pontot",
   "debateChrome.condition.panelDegradedSingleVoice": "Csak a szerző saját értékelése maradt fenn",
   "debateChrome.condition.mapAnglesFallback": "A kérdést szokásos, előre megadott nézőpontok alapján vizsgálták",
-  "debateChrome.condition.mapMergeFallback": "A hasonló pontokat egy egyszerű szabály szerint összevonták",
+  "debateChrome.condition.mapMergeFallback": "Csak a pontosan ugyanazt mondó pontokat vonták össze",
   "debateChrome.condition.mapChooseFallback": "A vitára kerülő válaszokat egy egyszerű szabály alapján választották ki",
   "debateChrome.condition.mapUnavailable": "Minden MI-modell a saját válaszával kezdte",
   "debateChrome.condition.answersFilled": "Újabb válasz is bekerült, hogy a válaszokat össze lehessen hasonlítani",

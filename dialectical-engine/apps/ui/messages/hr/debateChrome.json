@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Neki suci nisu mogli procijeniti ovu točku",
   "debateChrome.condition.panelDegradedSingleVoice": "Ostala je samo autorova vlastita procjena",
   "debateChrome.condition.mapAnglesFallback": "Pitanje je istraženo iz standardnog skupa gledišta",
-  "debateChrome.condition.mapMergeFallback": "Slične točke grupirane su prema jednostavnom pravilu",
+  "debateChrome.condition.mapMergeFallback": "Spojene su samo točke koje su rekle potpuno isto",
   "debateChrome.condition.mapChooseFallback": "Odgovori o kojima se raspravljalo odabrani su jednostavnim pravilom",
   "debateChrome.condition.mapUnavailable": "Svaki model umjetne inteligencije započeo je vlastitim odgovorom",
   "debateChrome.condition.answersFilled": "Dodan je drugi odgovor kako bi se mogla usporediti dva odgovora",

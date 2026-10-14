@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Ορισμένοι κριτές δεν μπόρεσαν να αξιολογήσουν αυτό το σημείο",
   "debateChrome.condition.panelDegradedSingleVoice": "Διατηρήθηκε μόνο η αξιολόγηση του ίδιου του συντάκτη",
   "debateChrome.condition.mapAnglesFallback": "Η ερώτηση διερευνήθηκε από ένα τυπικό σύνολο οπτικών γωνιών",
-  "debateChrome.condition.mapMergeFallback": "Παρόμοια σημεία ομαδοποιήθηκαν σύμφωνα με έναν απλό κανόνα",
+  "debateChrome.condition.mapMergeFallback": "Συνδυάστηκαν μόνο σημεία που έλεγαν ακριβώς το ίδιο πράγμα",
   "debateChrome.condition.mapChooseFallback": "Οι απαντήσεις για αντιπαράθεση επιλέχθηκαν με έναν απλό κανόνα",
   "debateChrome.condition.mapUnavailable": "Κάθε μοντέλο ΤΝ ξεκίνησε με τη δική του απάντηση",
   "debateChrome.condition.answersFilled": "Προστέθηκε μια ακόμη απάντηση, ώστε να μπορούν να συγκριθούν μεταξύ τους",

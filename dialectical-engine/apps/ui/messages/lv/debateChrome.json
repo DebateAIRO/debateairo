@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Daži tiesneši nevarēja izvērtēt šo punktu",
   "debateChrome.condition.panelDegradedSingleVoice": "Saglabājās tikai paša autora vērtējums",
   "debateChrome.condition.mapAnglesFallback": "Jautājums izpētīts pēc standarta skatījumu kopas",
-  "debateChrome.condition.mapMergeFallback": "Līdzīgi punkti sagrupēti pēc vienkārša noteikuma",
+  "debateChrome.condition.mapMergeFallback": "Apvienoti tika tikai punkti, kas teica tieši to pašu",
   "debateChrome.condition.mapChooseFallback": "Debatēm paredzētās atbildes izvēlētas ar vienkāršu noteikumu",
   "debateChrome.condition.mapUnavailable": "Katrs MI modelis sāka ar savu atbildi",
   "debateChrome.condition.answersFilled": "Pievienota otra atbilde, lai varētu salīdzināt divas atbildes",

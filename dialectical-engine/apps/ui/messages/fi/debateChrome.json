@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Osa tuomareista ei pystynyt arvioimaan tätä kohtaa",
   "debateChrome.condition.panelDegradedSingleVoice": "Vain kirjoittajan oma arvio säilyi",
   "debateChrome.condition.mapAnglesFallback": "Kysymystä tarkasteltiin valmiin, vakiomuotoisen näkökulmajoukon kautta",
-  "debateChrome.condition.mapMergeFallback": "Samankaltaiset kohdat ryhmiteltiin yksinkertaisella säännöllä",
+  "debateChrome.condition.mapMergeFallback": "Yhdistettiin vain kohdat, jotka sanoivat täsmälleen saman asian",
   "debateChrome.condition.mapChooseFallback": "Väittelyyn otettavat vastaukset valittiin yksinkertaisen säännön mukaan",
   "debateChrome.condition.mapUnavailable": "Jokainen tekoälymalli aloitti omasta vastauksestaan",
   "debateChrome.condition.answersFilled": "Lisättiin toinen vastaus, jotta kahta vastausta voitaisiin verrata keskenään",

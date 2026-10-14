@@ -184,7 +184,7 @@
   "debateChrome.condition.panelPartial": "Algunos jueces no pudieron evaluar este punto",
   "debateChrome.condition.panelDegradedSingleVoice": "Solo se conservó la evaluación del propio autor",
   "debateChrome.condition.mapAnglesFallback": "La pregunta se examinó desde una lista estándar de perspectivas",
-  "debateChrome.condition.mapMergeFallback": "Los puntos parecidos se agruparon con una regla sencilla",
+  "debateChrome.condition.mapMergeFallback": "Solo se agruparon los puntos que decían exactamente lo mismo",
   "debateChrome.condition.mapChooseFallback": "Las respuestas que se iban a debatir se eligieron con una regla sencilla",
   "debateChrome.condition.mapUnavailable": "Cada IA empezó con su propia respuesta",
   "debateChrome.condition.answersFilled": "Se añadió una segunda respuesta para poder contrastar dos respuestas",

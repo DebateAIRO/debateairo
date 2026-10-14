@@ -184,7 +184,7 @@
   "debateChrome.condition.panelPartial": "Unii evaluatori nu au putut evalua acest punct",
   "debateChrome.condition.panelDegradedSingleVoice": "A rămas doar evaluarea autorului",
   "debateChrome.condition.mapAnglesFallback": "Întrebarea a fost examinată dintr-o listă standard de perspective",
-  "debateChrome.condition.mapMergeFallback": "Punctele asemănătoare au fost grupate după o regulă simplă",
+  "debateChrome.condition.mapMergeFallback": "Au fost combinate doar punctele care spuneau exact același lucru",
   "debateChrome.condition.mapChooseFallback": "Răspunsurile de dezbătut au fost alese după o regulă simplă",
   "debateChrome.condition.mapUnavailable": "Fiecare AI a început cu propriul răspuns",
   "debateChrome.condition.answersFilled": "A fost adăugat un al doilea răspuns, pentru a putea compara două răspunsuri",

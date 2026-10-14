@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Někteří hodnotitelé tento bod nemohli posoudit",
   "debateChrome.condition.panelDegradedSingleVoice": "Přetrvalo pouze vlastní hodnocení autora",
   "debateChrome.condition.mapAnglesFallback": "Otázka byla prozkoumána ze standardní sady úhlů pohledu",
-  "debateChrome.condition.mapMergeFallback": "Podobné body byly seskupeny podle jednoduchého pravidla",
+  "debateChrome.condition.mapMergeFallback": "Spojeny byly jen body, které říkaly přesně totéž",
   "debateChrome.condition.mapChooseFallback": "Odpovědi k debatě byly vybrány podle jednoduchého pravidla",
   "debateChrome.condition.mapUnavailable": "Každý model AI začal od své vlastní odpovědi",
   "debateChrome.condition.answersFilled": "Byla přidána druhá odpověď, aby bylo možné porovnat dvě odpovědi",

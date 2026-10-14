@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Някои оценители не можаха да преценят тази точка",
   "debateChrome.condition.panelDegradedSingleVoice": "Оцеля само собствената оценка на автора",
   "debateChrome.condition.mapAnglesFallback": "Въпросът беше разгледан от стандартен набор гледни точки",
-  "debateChrome.condition.mapMergeFallback": "Сходните точки бяха групирани по просто правило",
+  "debateChrome.condition.mapMergeFallback": "Обединени бяха само точките, които казваха точно едно и също",
   "debateChrome.condition.mapChooseFallback": "Отговорите за обсъждане бяха избрани по просто правило",
   "debateChrome.condition.mapUnavailable": "Всеки модел с ИИ започна със собствения си отговор",
   "debateChrome.condition.answersFilled": "Добавен беше втори отговор, за да могат два отговора да се сравнят",

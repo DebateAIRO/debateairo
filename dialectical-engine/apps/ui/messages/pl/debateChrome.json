@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Niektórzy sędziowie nie mogli ocenić tego punktu",
   "debateChrome.condition.panelDegradedSingleVoice": "Pozostała tylko własna ocena autora",
   "debateChrome.condition.mapAnglesFallback": "Pytanie zbadano ze standardowego zestawu punktów widzenia",
-  "debateChrome.condition.mapMergeFallback": "Podobne punkty zgrupowano według prostej reguły",
+  "debateChrome.condition.mapMergeFallback": "Połączono tylko punkty mówiące dokładnie to samo",
   "debateChrome.condition.mapChooseFallback": "Odpowiedzi poddane debacie wybrano prostą regułą",
   "debateChrome.condition.mapUnavailable": "Każdy model AI zaczął od własnej odpowiedzi",
   "debateChrome.condition.answersFilled": "Dodano drugą odpowiedź, aby można było porównać dwie odpowiedzi",

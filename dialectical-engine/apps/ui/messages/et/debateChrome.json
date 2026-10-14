@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Mõni kohtunik ei saanud seda punkti hinnata",
   "debateChrome.condition.panelDegradedSingleVoice": "Alles jäi ainult autori enda hinnang",
   "debateChrome.condition.mapAnglesFallback": "Küsimust uuriti standardsest vaatenurkade hulgast lähtudes",
-  "debateChrome.condition.mapMergeFallback": "Sarnased punktid ühendati lihtsa reegli järgi",
+  "debateChrome.condition.mapMergeFallback": "Ühendati ainult punktid, mis ütlesid täpselt sama asja",
   "debateChrome.condition.mapChooseFallback": "Väitlusse võetavad vastused valiti lihtsa reegli alusel",
   "debateChrome.condition.mapUnavailable": "Iga tehisintellektimudel alustas oma vastusest",
   "debateChrome.condition.answersFilled": "Lisati teine vastus, et kahte vastust saaks omavahel võrrelda",

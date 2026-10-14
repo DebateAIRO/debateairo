@@ -182,7 +182,7 @@
   "debateChrome.condition.panelPartial": "部分评审无法评估此要点",
   "debateChrome.condition.panelDegradedSingleVoice": "仅保留了作者本人的评估",
   "debateChrome.condition.mapAnglesFallback": "问题按照现成的标准角度进行了探讨",
-  "debateChrome.condition.mapMergeFallback": "相似的要点按照简单规则合并在一起",
+  "debateChrome.condition.mapMergeFallback": "仅合并了表述完全相同的论点",
   "debateChrome.condition.mapChooseFallback": "进入辩论的答案按照简单规则挑选",
   "debateChrome.condition.mapUnavailable": "每个 AI 模型都从自己的答案出发",
   "debateChrome.condition.answersFilled": "另外补充了答案，使答案之间能够相互比较",

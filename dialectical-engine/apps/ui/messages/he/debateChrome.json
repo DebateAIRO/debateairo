@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "חלק מהשופטים לא הצליחו להעריך נקודה זו",
   "debateChrome.condition.panelDegradedSingleVoice": "רק ההערכה של המחבר עצמו נותרה",
   "debateChrome.condition.mapAnglesFallback": "השאלה נחקרה מתוך קבוצה סטנדרטית של זוויות מבט",
-  "debateChrome.condition.mapMergeFallback": "נקודות דומות קובצו יחד לפי כלל פשוט",
+  "debateChrome.condition.mapMergeFallback": "אוחדו רק נקודות שאמרו בדיוק אותו דבר",
   "debateChrome.condition.mapChooseFallback": "התשובות שייכנסו לדיון נבחרו לפי כלל פשוט",
   "debateChrome.condition.mapUnavailable": "כל מודל בינה מלאכותית התחיל מתשובה משלו",
   "debateChrome.condition.answersFilled": "נוספה עוד תשובה כדי שאפשר יהיה להשוות בין התשובות",

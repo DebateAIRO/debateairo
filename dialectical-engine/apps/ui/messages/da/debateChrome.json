@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Nogle dommere kunne ikke bedømme dette punkt",
   "debateChrome.condition.panelDegradedSingleVoice": "Kun forfatterens egen vurdering bestod",
   "debateChrome.condition.mapAnglesFallback": "Spørgsmålet blev undersøgt ud fra en standardliste over synsvinkler",
-  "debateChrome.condition.mapMergeFallback": "Lignende punkter blev samlet efter en simpel regel",
+  "debateChrome.condition.mapMergeFallback": "Kun punkter, der sagde præcis det samme, blev slået sammen",
   "debateChrome.condition.mapChooseFallback": "De svar, der skulle drøftes, blev valgt efter en simpel regel",
   "debateChrome.condition.mapUnavailable": "Hver AI-model startede med sit eget svar",
   "debateChrome.condition.answersFilled": "Der blev tilføjet et andet svar, så to svar kunne sammenlignes",

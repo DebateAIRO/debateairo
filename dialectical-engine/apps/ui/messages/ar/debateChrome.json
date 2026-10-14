@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "تعذّر على بعض الحُكّام تقييم هذه النقطة",
   "debateChrome.condition.panelDegradedSingleVoice": "لم يبقَ سوى تقييم المؤلف نفسه",
   "debateChrome.condition.mapAnglesFallback": "استُكشف السؤال وفق مجموعة قياسية من الزوايا",
-  "debateChrome.condition.mapMergeFallback": "جُمعت النقاط المتشابهة معًا وفق قاعدة بسيطة",
+  "debateChrome.condition.mapMergeFallback": "جُمعت فقط النقاط التي قالت الشيء نفسه تمامًا",
   "debateChrome.condition.mapChooseFallback": "اختيرت الإجابات المطروحة للمناظرة بقاعدة بسيطة",
   "debateChrome.condition.mapUnavailable": "بدأ كل نموذج ذكاء اصطناعي من إجابته الخاصة",
   "debateChrome.condition.answersFilled": "أُضيفت إجابة أخرى كي تُقارَن الإجابات ببعضها",

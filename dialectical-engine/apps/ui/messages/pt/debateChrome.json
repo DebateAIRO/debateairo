@@ -184,7 +184,7 @@
   "debateChrome.condition.panelPartial": "Alguns avaliadores não conseguiram avaliar este ponto",
   "debateChrome.condition.panelDegradedSingleVoice": "Só subsistiu a avaliação do modelo que a formulou",
   "debateChrome.condition.mapAnglesFallback": "A pergunta foi examinada a partir de uma lista padrão de perspetivas",
-  "debateChrome.condition.mapMergeFallback": "Os pontos semelhantes foram agrupados por uma regra simples",
+  "debateChrome.condition.mapMergeFallback": "Só foram agrupados os pontos que diziam exatamente o mesmo",
   "debateChrome.condition.mapChooseFallback": "As respostas a debater foram escolhidas por uma regra simples",
   "debateChrome.condition.mapUnavailable": "Cada IA começou com a sua própria resposta",
   "debateChrome.condition.answersFilled": "Foi acrescentada uma segunda resposta para que duas respostas pudessem ser comparadas",

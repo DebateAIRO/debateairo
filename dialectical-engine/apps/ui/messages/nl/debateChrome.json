@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "Sommige beoordelaars konden dit punt niet beoordelen",
   "debateChrome.condition.panelDegradedSingleVoice": "Alleen de eigen beoordeling van de auteur bleef over",
   "debateChrome.condition.mapAnglesFallback": "De vraag werd onderzocht vanuit een standaardreeks invalshoeken",
-  "debateChrome.condition.mapMergeFallback": "Vergelijkbare punten werden volgens een eenvoudige regel samengevoegd",
+  "debateChrome.condition.mapMergeFallback": "Alleen punten die precies hetzelfde zeiden, zijn samengevoegd",
   "debateChrome.condition.mapChooseFallback": "De antwoorden om over te debatteren werden met een eenvoudige regel gekozen",
   "debateChrome.condition.mapUnavailable": "Elk AI-model begon met zijn eigen antwoord",
   "debateChrome.condition.answersFilled": "Er werd een tweede antwoord toegevoegd, zodat twee antwoorden vergeleken konden worden",

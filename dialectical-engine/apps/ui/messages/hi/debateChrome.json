@@ -183,7 +183,7 @@
   "debateChrome.condition.panelPartial": "कुछ निर्णायक इस बिंदु का आकलन नहीं कर सके",
   "debateChrome.condition.panelDegradedSingleVoice": "केवल लेखक का अपना आकलन शेष रहा",
   "debateChrome.condition.mapAnglesFallback": "प्रश्न पर मानक दृष्टिकोणों के तय समूह से विचार किया गया",
-  "debateChrome.condition.mapMergeFallback": "मिलते-जुलते बिंदुओं को सरल नियम से समूहों में रखा गया",
+  "debateChrome.condition.mapMergeFallback": "केवल ठीक एक ही बात कहने वाले बिंदु मिलाए गए",
   "debateChrome.condition.mapChooseFallback": "वाद-विवाद के लिए रखे गए उत्तर सरल नियम से चुने गए",
   "debateChrome.condition.mapUnavailable": "हर AI मॉडल ने अपने उत्तर से शुरुआत की",
   "debateChrome.condition.answersFilled": "कोई और उत्तर जोड़ा गया ताकि उत्तरों की आपस में तुलना की जा सके",

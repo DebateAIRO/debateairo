@@ -184,7 +184,7 @@
   "debateChrome.condition.panelPartial": "Certains juges n’ont pas pu évaluer ce point",
   "debateChrome.condition.panelDegradedSingleVoice": "Seule l’évaluation de l’auteur a subsisté",
   "debateChrome.condition.mapAnglesFallback": "La question a été examinée à partir d’une liste standard de points de vue",
-  "debateChrome.condition.mapMergeFallback": "Des points semblables ont été regroupés selon une règle simple",
+  "debateChrome.condition.mapMergeFallback": "Seuls les points qui disaient exactement la même chose ont été regroupés",
   "debateChrome.condition.mapChooseFallback": "Les réponses à débattre ont été choisies selon une règle simple",
   "debateChrome.condition.mapUnavailable": "Chaque IA a commencé avec sa propre réponse",
   "debateChrome.condition.answersFilled": "Une deuxième réponse a été ajoutée pour pouvoir comparer deux réponses",
