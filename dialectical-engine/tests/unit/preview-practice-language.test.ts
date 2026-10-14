@@ -363,6 +363,11 @@ describe("practice language: --dry and the README", () => {
       }
     }
     expect(language.some((line) => line.includes(" --dry "))).toBe(true);
+    // Final review M-4: S-8's rerun after NOT_PROVEN goes into a NEW --out folder (the first one holds language.jsonl and
+    // is refused); no two language commands share a folder.
+    const outs = language.map((line) => parsePracticeArgs(argvOf(line)).flags.get("--out"));
+    expect(outs).toContain("$P/language-report-2");
+    expect(new Set(outs).size).toBe(outs.length);
     const mixDebate = readme.split("\n").filter((line) => line.includes("tools/preview-practice/practice.ts debate ") && line.includes("--question lang-ro-en-mix"));
     expect(mixDebate).toHaveLength(1);
     const args = parsePracticeArgs(argvOf(mixDebate[0]!));

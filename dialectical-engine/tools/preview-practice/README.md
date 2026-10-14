@@ -780,7 +780,17 @@ cp -Rp "$P/compare" "$HOME/debate-shape-s8-compare-$(date +%Y-%m-%d)"
 
 1. Day 1: run S-3, then S-6's formats. It must PASS. For exit 10 the owner decides, as in the table above.
 2. Then the language mode (above): first `--dry`, then the real run. It must PASS. A FAIL stops everything: nothing is
-   uploaded. NOT_PROVEN: run it again later the same day.
+   uploaded. NOT_PROVEN: run it again later the same day, into a NEW `--out` folder. The first run's folder already
+   holds its `language.jsonl`, so the mode refuses it (`PRACTICE_OUT_ALREADY_HOLDS_LANGUAGE`, nothing spent). For the
+   second try, for example:
+
+   ```sh
+   scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+   PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts language --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/language-report-2"
+   echo "exit: $?"
+   ```
+
+   A third try goes into `"$P/language-report-3"`, and so on.
 3. Then, the same day, one full practice debate on `lang-ro-en-mix` in the new shape (the command at the end of "The
    question language"). It must PASS, and its "Question language" paragraph must say the offer was made and the
    rewrite used. It costs about $0.30 and takes 1 to 2 hours, like one new-shape debate.
