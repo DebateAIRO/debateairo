@@ -24,6 +24,17 @@
  * runtime (read back from its rows), and `importPracticeRegister` publishes the result through the same general
  * publication as one more version. The practice then runs on it, and its report names every row that changed, which
  * is the delta the owner will be shown for approval on the server (the server re-measures only its runtime row).
+ *
+ * Kit v3 (2026-10-14, the hosted preview): the server's `native-plan --operation plan --hosted-billing '<JSON>'`
+ * composes with publish kit v3 (deploy/preview-auth-dev/v1/publish-register-v3.ts), the first hosted version on a
+ * local base and every later version on a hosted one (a hosted base without the inputs refuses there,
+ * HOSTED_BILLING_REQUIRED). `--register-next --hosted-billing '<JSON>'` does the same here:
+ * `composePracticeHostedNextRegisterVersion` runs the kit's own `buildPreviewSourceRowsV3` and
+ * `composePreviewSnapshotV3` (with its hosted boot questions) with the plan's inputs, the same JSON the plan takes,
+ * checked first by the release tool's own validators in native-operator.mjs. Its checker, rotation and call-concurrency
+ * inputs follow the PLAN's rules, not the base's (GLM, on, and the base's call-concurrency row carried, unless
+ * `--checker`, `--role-rotation` or `--register-call-concurrency` say otherwise), so the same flags print the same
+ * changed rows as the server's proposal; where those defaults move a row away from the base, the practice says so.
  */
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
@@ -37,6 +48,7 @@ import {
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
   type BootstrapRegister,
+  type CallConcurrencyPolicy,
   type DebateShapePolicy,
   type RegisterPublicationRow
 } from "@debateai/register";
@@ -49,6 +61,12 @@ import {
   type PreviewCheckerChoice,
   type PreviewRoleRotationChoice
 } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
+import {
+  buildPreviewSourceRowsV3,
+  composePreviewSnapshotV3,
+  STORY_COST_ENVELOPE_POLICY_ROW_KEY,
+  type PreviewHostedBillingChoice
+} from "../../deploy/preview-auth-dev/v1/publish-register-v3.js";
 
 export const PRACTICE_REGISTER_EXPORT_SCHEMA = "preview-practice-register-export-v1" as const;
 
@@ -180,6 +198,30 @@ export type PracticeNextRegisterVersion = Readonly<{
   deltaSha256: string;
   checker: "glm" | "deepseek";
   roleRotation: PreviewRoleRotationChoice;
+  /** Kit v3 only: the composer the server's proposal names, the plan's hosted inputs, and what the defaults moved. */
+  composer?: "preview-register-composer-v3";
+  hostedBilling?: PreviewHostedBillingChoice;
+  /** Plain lines: where the plan's defaults (GLM, rotation on) move a row away from the base's choice. */
+  notes?: readonly string[];
+}>;
+
+/**
+ * The plan's three optional choices (release-artifacts.mjs native-plan `--checker`/`--deepseek-enabled-on-gate`,
+ * `--role-rotation`, `--call-concurrency`), as the practice's `--checker`, `--deepseek-enabled-on-gate`,
+ * `--role-rotation` and `--register-call-concurrency` give them. Absent: kit v2 reads the base's choice (as before);
+ * kit v3 takes the plan's default (GLM, on, the base's call-concurrency row carried).
+ */
+export type PracticeNextRegisterChoices = Readonly<{
+  checker?: PreviewCheckerChoice;
+  roleRotation?: PreviewRoleRotationChoice;
+  callConcurrency?: CallConcurrencyPolicy;
+  /**
+   * `--shape-policy` with `--register-next` (controller ruling D-REGNEXT): handed to the kit's own source build as its
+   * `debateShape` (kit v2 directly, kit v3 through kit v2, as the plan's `--debate-shape`), so the code's next version
+   * carries the row exactly as the server's publish would. Absent: no row from the code (a base's own row is carried
+   * unchanged, R19).
+   */
+  debateShape?: DebateShapePolicy;
 }>;
 
 export type PracticeRegisterImportReceipt = Readonly<{
@@ -193,12 +235,91 @@ export type PracticeRegisterImportReceipt = Readonly<{
   importedRegisterVersion?: string;
   steps: readonly PracticeRegisterImportStep[];
   /** Present when the practice runs on the code's next version (`--register-next`): what that version changed. */
-  codeNext?: Readonly<{ baseRegisterVersion: string; addedKeys: readonly string[]; changedKeys: readonly string[]; deltaSha256: string }>;
+  codeNext?: Readonly<{ baseRegisterVersion: string; addedKeys: readonly string[]; changedKeys: readonly string[]; deltaSha256: string;
+    /** Kit v3 only (hosted). */
+    composer?: "preview-register-composer-v3"; hostedBilling?: PreviewHostedBillingChoice; notes?: readonly string[] }>;
 }>;
+
+/** The release tool's own validators of the plan's JSON inputs (native-operator.mjs), loaded as the release tool loads them. */
+type NativeOperatorChecks = Readonly<{
+  validateHostedBillingChoice: (value: unknown) => PreviewHostedBillingChoice;
+  validateCallConcurrencyChoice: (value: unknown) => CallConcurrencyPolicy;
+}>;
+const NATIVE_OPERATOR_MODULE = new URL("../../deploy/preview-auth-dev/v1/native-operator.mjs", import.meta.url).href;
+
+/**
+ * The practice's `--register-next` inputs, checked by the same rules as the server's `native-plan --operation plan`
+ * (release-artifacts.mjs): `--hosted-billing` and `--register-call-concurrency` are one JSON object each, checked by
+ * native-operator.mjs's own validators; `--checker` is glm or deepseek, deepseek only with
+ * `--deepseek-enabled-on-gate yes`; `--role-rotation` is on or off. `kit` is v3 exactly when `--hosted-billing` is given.
+ * A refusal names the flag (PRACTICE_REGISTER_NEXT_INPUT_INVALID) or the server's own code.
+ */
+export async function parsePracticeNextRegisterInputs(flags: Readonly<{
+  hostedBilling?: string | undefined;
+  checker?: string | undefined;
+  deepseekEnabledOnGate?: string | undefined;
+  roleRotation?: string | undefined;
+  callConcurrency?: string | undefined;
+  /**
+   * `--shape-policy`'s policy, already checked by the register's own parser (practice-shape.ts); with `--register-next`
+   * it goes into the next version (controller ruling D-REGNEXT), as the plan's `--debate-shape '<JSON>'`. It does not
+   * choose the kit.
+   */
+  debateShape?: DebateShapePolicy | null | undefined;
+}>, load: () => Promise<NativeOperatorChecks> = async () => await import(NATIVE_OPERATOR_MODULE) as NativeOperatorChecks):
+  Promise<Readonly<{ kit: "v2" | "v3"; hostedBilling: PreviewHostedBillingChoice | null; choices: PracticeNextRegisterChoices }>> {
+  const invalid = (flag: string): never => { throw new PracticeRegisterError("PRACTICE_REGISTER_NEXT_INPUT_INVALID", flag); };
+  const json = (text: string, flag: string): unknown => { try { return JSON.parse(text) as unknown; } catch { return invalid(flag); } };
+  if (flags.checker !== undefined && flags.checker !== "glm" && flags.checker !== "deepseek") invalid("--checker");
+  if (flags.checker === "deepseek" && flags.deepseekEnabledOnGate !== "yes") {
+    throw new PracticeRegisterError("CHECKER_DEEPSEEK_NOT_ENABLED_ON_GATE", "--checker deepseek needs --deepseek-enabled-on-gate yes");
+  }
+  if (flags.deepseekEnabledOnGate !== undefined && flags.checker !== "deepseek") invalid("--deepseek-enabled-on-gate");
+  if (flags.roleRotation !== undefined && flags.roleRotation !== "on" && flags.roleRotation !== "off") invalid("--role-rotation");
+  const needsOperator = flags.hostedBilling !== undefined || flags.callConcurrency !== undefined;
+  const operator = needsOperator ? await load() : null;
+  let hostedBilling: PreviewHostedBillingChoice | null = null;
+  if (flags.hostedBilling !== undefined) {
+    const value = json(flags.hostedBilling, "--hosted-billing");
+    try { hostedBilling = operator!.validateHostedBillingChoice(value); } catch { invalid("--hosted-billing"); }
+  }
+  let callConcurrency: CallConcurrencyPolicy | undefined;
+  if (flags.callConcurrency !== undefined) {
+    const value = json(flags.callConcurrency, "--register-call-concurrency");
+    try { callConcurrency = operator!.validateCallConcurrencyChoice(value); } catch { invalid("--register-call-concurrency"); }
+  }
+  const choices: PracticeNextRegisterChoices = Object.freeze({
+    ...(flags.checker === undefined ? {} : { checker: flags.checker === "deepseek"
+      ? Object.freeze({ checker: "deepseek" as const, deepseekEnabledOnGate: true as const }) : Object.freeze({ checker: "glm" as const }) }),
+    ...(flags.roleRotation === undefined ? {} : { roleRotation: flags.roleRotation as PreviewRoleRotationChoice }),
+    ...(callConcurrency === undefined ? {} : { callConcurrency }),
+    ...(flags.debateShape === undefined || flags.debateShape === null ? {} : { debateShape: flags.debateShape })
+  });
+  return Object.freeze({ kit: hostedBilling === null ? "v2" as const : "v3" as const, hostedBilling, choices });
+}
+
+/** True when the version carries the hosted story money row, which only publish kit v3 seals (a hosted base). */
+export function practiceBaseIsHosted(document: PracticeRegisterExport): boolean {
+  const base = document.versions[document.versions.length - 1]!;
+  return practiceVersionRows(document, base.register_version).some((row) => row.rowKey === STORY_COST_ENVELOPE_POLICY_ROW_KEY);
+}
 
 /** The measured runtime the server's publish recorded in the base's `nodeRuntimeVersion` row (publish-register-v2.ts). */
 const NODE_RUNTIME_SOURCE_REF =
   /^preview-auth-dev-v1 actual Node (v[0-9]+\.[0-9]+\.[0-9]+); measured ([^;]+); source ([0-9a-f]{40})\/([0-9a-f]{40}); operator sha256:([0-9a-f]{64})$/u;
+
+/** The base's own runtime observation, read back from its `nodeRuntimeVersion` and `pnpmVersion` rows (both kits). */
+function practiceBaseRuntime(baseRows: readonly RegisterPublicationRow[], unsupported: (detail: string) => never) {
+  const row = (key: string): RegisterPublicationRow => baseRows.find((entry) => entry.rowKey === key) ?? unsupported(`base has no ${key}`);
+  const value = (key: string): unknown => JSON.parse(row(key).valueJsonText) as unknown;
+  const measured = NODE_RUNTIME_SOURCE_REF.exec(row("nodeRuntimeVersion").sourceRef) ?? unsupported("nodeRuntimeVersion source reference");
+  const pnpmVersion = value("pnpmVersion");
+  if (value("nodeRuntimeVersion") !== measured[1] || typeof pnpmVersion !== "string") unsupported("runtime rows");
+  return Object.freeze({
+    nodeVersion: measured[1]!, pnpmVersion: pnpmVersion as string, observedAt: measured[2]!,
+    sourceRevision: measured[3]!, sourceTree: measured[4]!, operatorSha256: measured[5]!
+  });
+}
 
 /**
  * Composes the code's next preview register version on the exported newest version, exactly as the server's
@@ -208,38 +329,41 @@ const NODE_RUNTIME_SOURCE_REF =
  *  - the role-rotation switch: the base's `answerRoleRotationPolicy.enabled` ('on' when the base has no such row);
  *  - the runtime observation: the base's `nodeRuntimeVersion` row and its source reference, and its `pnpmVersion` row.
  * Anything else in the base that cannot be read that way refuses (PRACTICE_REGISTER_NEXT_UNSUPPORTED), and so does a
- * code that changes no row (there is then no next version to practise).
+ * code that changes no row (there is then no next version to practise). `choices` (the plan's `--checker`,
+ * `--role-rotation`, `--call-concurrency`) replace the base's reading when given; `choices.debateShape` (the plan's
+ * `--debate-shape`, the practice's `--shape-policy`) adds the debate-shape row. A hosted base (one kit v3 sealed)
+ * refuses: the server's plan needs the hosted inputs there too (PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED).
  */
 export async function composePracticeNextRegisterVersion(
   document: PracticeRegisterExport,
   bootstrap?: BootstrapRegister,
-  /**
-   * `--shape-policy` with `--register-next` (controller ruling D-REGNEXT): handed to the kit's own source build as its
-   * `debateShape`, so the code's next version carries the row exactly as the server's publish would. Null: no row
-   * from the code (a base's own row is carried unchanged, R19).
-   */
-  debateShape: DebateShapePolicy | null = null
+  choices: PracticeNextRegisterChoices = {}
 ): Promise<PracticeNextRegisterVersion> {
+  if (practiceBaseIsHosted(document)) {
+    throw new PracticeRegisterError("PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED",
+      "the newest version is a hosted one (publish kit v3): give --hosted-billing as the server's plan does");
+  }
   const unsupported = (detail: string): never => { throw new PracticeRegisterError("PRACTICE_REGISTER_NEXT_UNSUPPORTED", detail); };
   const base = document.versions[document.versions.length - 1]!;
   const baseRows = practiceVersionRows(document, base.register_version);
   const row = (key: string): RegisterPublicationRow => baseRows.find((entry) => entry.rowKey === key) ?? unsupported(`base has no ${key}`);
   const value = (key: string): unknown => JSON.parse(row(key).valueJsonText) as unknown;
-  const evaluator = value("evaluatorRoleRef") as { providerRef?: unknown } | null;
-  const checker: PreviewCheckerChoice = evaluator?.providerRef === PREVIEW_DEEPSEEK_CHECKER_ROLE_REF
-    ? Object.freeze({ checker: "deepseek" as const, deepseekEnabledOnGate: true as const })
-    : evaluator?.providerRef === PREVIEW_EVALUATOR_ROLE_REF ? Object.freeze({ checker: "glm" as const }) : unsupported("evaluatorRoleRef");
-  const rotationRow = baseRows.find((entry) => entry.rowKey === "answerRoleRotationPolicy");
-  const rotationEnabled = rotationRow === undefined ? true : (JSON.parse(rotationRow.valueJsonText) as { enabled?: unknown }).enabled;
-  if (typeof rotationEnabled !== "boolean") unsupported("answerRoleRotationPolicy");
-  const roleRotation: PreviewRoleRotationChoice = rotationEnabled === true ? "on" : "off";
-  const measured = NODE_RUNTIME_SOURCE_REF.exec(row("nodeRuntimeVersion").sourceRef) ?? unsupported("nodeRuntimeVersion source reference");
-  const pnpmVersion = value("pnpmVersion");
-  if (value("nodeRuntimeVersion") !== measured[1] || typeof pnpmVersion !== "string") unsupported("runtime rows");
-  const sourceRows = await buildPreviewSourceRowsV2(bootstrap ?? await loadBootstrapRegister(), {
-    nodeVersion: measured[1]!, pnpmVersion: pnpmVersion as string, observedAt: measured[2]!,
-    sourceRevision: measured[3]!, sourceTree: measured[4]!, operatorSha256: measured[5]!
-  }, checker, roleRotation, null, debateShape);
+  const checker: PreviewCheckerChoice = choices.checker ?? (() => {
+    const evaluator = value("evaluatorRoleRef") as { providerRef?: unknown } | null;
+    return evaluator?.providerRef === PREVIEW_DEEPSEEK_CHECKER_ROLE_REF
+      ? Object.freeze({ checker: "deepseek" as const, deepseekEnabledOnGate: true as const })
+      : evaluator?.providerRef === PREVIEW_EVALUATOR_ROLE_REF ? Object.freeze({ checker: "glm" as const }) : unsupported("evaluatorRoleRef");
+  })();
+  const roleRotation: PreviewRoleRotationChoice = choices.roleRotation ?? (() => {
+    const rotationRow = baseRows.find((entry) => entry.rowKey === "answerRoleRotationPolicy");
+    const rotationEnabled = rotationRow === undefined ? true : (JSON.parse(rotationRow.valueJsonText) as { enabled?: unknown }).enabled;
+    if (typeof rotationEnabled !== "boolean") unsupported("answerRoleRotationPolicy");
+    return rotationEnabled === true ? "on" as const : "off" as const;
+  })();
+  const runtime = practiceBaseRuntime(baseRows, unsupported);
+  // `choices.debateShape` (controller ruling D-REGNEXT): the kit's own source build's `debateShape`.
+  const sourceRows = await buildPreviewSourceRowsV2(bootstrap ?? await loadBootstrapRegister(), runtime, checker, roleRotation,
+    choices.callConcurrency ?? null, choices.debateShape ?? null);
   const baseSnapshotSha256 = computeRegisterSnapshotSha256(baseRows);
   const snapshot = composePreviewSnapshotV2({
     sourceRows, baseRows, baseRegisterVersion: base.register_version, baseSnapshotSha256
@@ -250,6 +374,62 @@ export async function composePracticeNextRegisterVersion(
     rows: snapshot.rows, snapshotSha256: snapshot.snapshotSha256,
     addedKeys: snapshot.addedKeys, changedKeys: snapshot.changedKeys, deltaSha256: snapshot.deltaSha256,
     checker: checker.checker, roleRotation
+  });
+}
+
+/**
+ * Kit v3 (the hosted preview): composes the code's next version on the exported newest version exactly as the
+ * server's `native-plan --operation plan --hosted-billing '<JSON>'` composes its proposal (native-operator.mjs: kit
+ * v3's `buildPreviewSourceRowsV3` with the plan's hosted inputs, checker, rotation and call-concurrency choices, then
+ * `composePreviewSnapshotV3`, which asks the hosted API's boot questions of the composed rows). The base may be local
+ * (the first hosted version, runbook H6) or hosted (H7 and every later release). The choices follow the plan's
+ * defaults, never the base's: GLM, rotation on, the base's call-concurrency row carried. Where those defaults move the
+ * checker or the rotation away from the base, `notes` says so (the server's proposal will show the same row change
+ * unless the plan is given the same flag). The runtime observation is the base's own, as for kit v2; so the server's
+ * proposal differs from this one by `nodeRuntimeVersion`'s source reference (re-measured there) and so by its hashes.
+ */
+export async function composePracticeHostedNextRegisterVersion(
+  document: PracticeRegisterExport,
+  hostedBilling: PreviewHostedBillingChoice,
+  choices: PracticeNextRegisterChoices = {},
+  bootstrap?: BootstrapRegister
+): Promise<PracticeNextRegisterVersion> {
+  const unsupported = (detail: string): never => { throw new PracticeRegisterError("PRACTICE_REGISTER_NEXT_UNSUPPORTED", detail); };
+  const base = document.versions[document.versions.length - 1]!;
+  const baseRows = practiceVersionRows(document, base.register_version);
+  const runtime = practiceBaseRuntime(baseRows, unsupported);
+  const checker: PreviewCheckerChoice = choices.checker ?? Object.freeze({ checker: "glm" as const });
+  const roleRotation: PreviewRoleRotationChoice = choices.roleRotation ?? "on";
+  const notes: string[] = [];
+  const baseValue = (key: string): Record<string, unknown> | null => {
+    const found = baseRows.find((entry) => entry.rowKey === key);
+    const parsed = found === undefined ? null : JSON.parse(found.valueJsonText) as unknown;
+    return typeof parsed === "object" && parsed !== null ? parsed as Record<string, unknown> : null;
+  };
+  const baseChecker = baseValue("evaluatorRoleRef")?.providerRef;
+  if (choices.checker === undefined && baseChecker === PREVIEW_DEEPSEEK_CHECKER_ROLE_REF) {
+    notes.push("the newest version's answer checker is DeepSeek; without --checker deepseek --deepseek-enabled-on-gate yes the next "
+      + "version moves it back to GLM (so does the server's plan without the same flags)");
+  }
+  if (choices.roleRotation === undefined && baseValue("answerRoleRotationPolicy")?.enabled === false) {
+    notes.push("the newest version has role rotation off; without --role-rotation off the next version switches it on "
+      + "(so does the server's plan without the same flag)");
+  }
+  // `choices.debateShape` (controller ruling D-REGNEXT): kit v3 hands it to kit v2's source build, as the plan's own
+  // `--debate-shape` does (publish-register-v3.ts), and asks the runner's debate-shape boot refusals before sealing.
+  const sourceRows = await buildPreviewSourceRowsV3(bootstrap ?? await loadBootstrapRegister(), runtime, hostedBilling, checker, roleRotation,
+    choices.callConcurrency ?? null, choices.debateShape ?? null);
+  const baseSnapshotSha256 = computeRegisterSnapshotSha256(baseRows);
+  const snapshot = composePreviewSnapshotV3({
+    sourceRows, baseRows, baseRegisterVersion: base.register_version, baseSnapshotSha256
+  });
+  if (snapshot.addedKeys.length === 0 && snapshot.changedKeys.length === 0) unsupported("the code changes no register row");
+  return Object.freeze({
+    baseRegisterVersion: base.register_version, baseSnapshotSha256,
+    rows: snapshot.rows, snapshotSha256: snapshot.snapshotSha256,
+    addedKeys: snapshot.addedKeys, changedKeys: snapshot.changedKeys, deltaSha256: snapshot.deltaSha256,
+    checker: checker.checker, roleRotation,
+    composer: snapshot.composer, hostedBilling, notes: Object.freeze(notes)
   });
 }
 
@@ -331,7 +511,8 @@ export async function importPracticeRegister(pool: Pool, document: PracticeRegis
   return Object.freeze({
     registerVersion: receipt.registerVersion, steps: Object.freeze(steps),
     codeNext: Object.freeze({ baseRegisterVersion: next.baseRegisterVersion, addedKeys: next.addedKeys,
-      changedKeys: next.changedKeys, deltaSha256: next.deltaSha256 })
+      changedKeys: next.changedKeys, deltaSha256: next.deltaSha256,
+      ...(next.composer === undefined ? {} : { composer: next.composer, hostedBilling: next.hostedBilling!, notes: next.notes ?? [] }) })
   });
 }
 

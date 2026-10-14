@@ -200,7 +200,7 @@ describe("practice debate shape: the throwaway register version", () => {
       rows: base.map((entry) => ({ register_version: "11", row_key: entry.rowKey, value_json: entry.valueJsonText, source_ref: entry.sourceRef }))
     }));
     await expect(composePracticeNextRegisterVersion(document)).rejects.toMatchObject({ code: "PRACTICE_REGISTER_NEXT_UNSUPPORTED" });
-    const next = await composePracticeNextRegisterVersion(document, undefined, debateShapePolicyStartValues());
+    const next = await composePracticeNextRegisterVersion(document, undefined, { debateShape: debateShapePolicyStartValues() });
     expect([next.addedKeys, next.changedKeys]).toEqual([[DEBATE_SHAPE_POLICY_ROW_KEY], []]);
     expect(next.rows).toHaveLength(base.length + 1);
     expect(JSON.parse(next.rows.find((entry) => entry.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)!.valueJsonText))

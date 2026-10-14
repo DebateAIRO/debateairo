@@ -74,7 +74,13 @@ import { openingsQuestionRotations, runPracticeOpenings } from "./practice-openi
 import { practiceDebateLanguageFromArgs, practiceLanguageDryPorts, practiceLanguagePolicy, runPracticeLanguageMode } from "./practice-language.js";
 import { parsePracticeCallConcurrency } from "./practice-parallel.js";
 import { practiceDebateQuestion } from "./practice-questions.js";
-import { composePracticeNextRegisterVersion, parsePracticeRegisterExport, PracticeRegisterError } from "./practice-register-import.js";
+import {
+  composePracticeHostedNextRegisterVersion,
+  composePracticeNextRegisterVersion,
+  parsePracticeNextRegisterInputs,
+  parsePracticeRegisterExport,
+  PracticeRegisterError
+} from "./practice-register-import.js";
 import {
   abortedReport,
   assertOutsideRepository,
@@ -114,10 +120,19 @@ export function repositoryRoot(): string {
 
 type Args = Readonly<{ mode: "formats" | "debate" | "openings" | "language" | "report"; flags: ReadonlyMap<string, string>; switches: ReadonlySet<string> }>;
 
+/**
+ * The server plan's inputs for `--register-next` (release-artifacts.mjs native-plan --operation plan): the owner's
+ * hosted-billing JSON (kit v3), the checker and its gate statement, the rotation switch, and the call-concurrency row
+ * as the plan's JSON (`--register-call-concurrency`; the practice's own `--call-concurrency` is a different thing: it
+ * sets this practice's runner only and is never written to any register).
+ */
+const REGISTER_NEXT_INPUT_FLAGS = Object.freeze(["--hosted-billing", "--checker", "--deepseek-enabled-on-gate", "--role-rotation",
+  "--register-call-concurrency"]);
+
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels",
   "--side-by-side", "--questions", "--arms", "--call-concurrency", "--shape-policy", "--depth-mode", "--scrutiny",
-  "--answer-length", "--site-language", "--language-choice"]);
+  "--answer-length", "--site-language", "--language-choice", ...REGISTER_NEXT_INPUT_FLAGS]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--register-next"]);
 
 /**
@@ -400,6 +415,10 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     if (args.flags.has("--side-by-side") && args.mode !== "report") {
       throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--side-by-side (report mode only)");
     }
+    const nextInputFlag = REGISTER_NEXT_INPUT_FLAGS.find((flag) => args.flags.has(flag));
+    if (nextInputFlag !== undefined && !args.switches.has("--register-next")) {
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${nextInputFlag} (with --register-next only)`);
+    }
     if (args.mode === "report") {
       const folder = required(args, "--out");
       const sideBySideLog = args.flags.get("--side-by-side");
@@ -472,6 +491,15 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     directory = assertOutsideRepository(args.flags.get("--out") ?? defaultReportDirectory(mode, startedAt), repositoryRoot());
     const sockets = practiceSocketsFromEnvironment(env);
     const settings = readPracticeSettings(required(args, "--settings"));
+    if (settings.runner.DEPLOYMENT_MODE === "hosted") {
+      log(mode === "debate"
+        ? "settings: hosted mode (the hosted runner and ask path, their ceilings and the story's money row; billing kept off in "
+          + "the practice: no NETOPIA, Quaderno, SmartBill or mail, no key file read)"
+        : "settings: hosted mode (formats mode asks the same jobs in both modes; no billing setting is read)");
+    }
+    if (settings.setAsideKeys.length > 0) {
+      log(`settings: server-only settings set aside unread (never opened, never sent): ${settings.setAsideKeys.join(", ")}`);
+    }
     // Formats: the models of this run, and (spec 2026-10-12 §4.8) the --levels plan, checked before any gate is asked.
     const wanted = args.flags.get("--models")?.split(",").map((model) => model.trim()).filter((model) => model !== "")
       ?? [...settings.previewConfig.premium_model_ids];
@@ -499,12 +527,29 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     // --register-next: the code's next register version, composed before anything is spent (a refusal costs nothing).
     if (args.switches.has("--register-next") && mode !== "debate") throw new PracticeRefusal("PRACTICE_FLAG_UNKNOWN", "--register-next (debate only)");
     // Debate shape with --register-next (controller ruling D-REGNEXT): the --shape-policy policy goes into the code's
-    // next version itself, through the kit's own source build, so the practice publishes no second version on top.
+    // next version itself, through the kit's own source build (kit v2, or kit v3 with --hosted-billing), so the practice
+    // publishes no second version on top.
     const nextShape = shapeOverride === null ? null : shapeOverride.policy;
-    const registerNext = register !== null && args.switches.has("--register-next")
-      ? nextShape === null ? await composePracticeNextRegisterVersion(register)
-        : await composePracticeNextRegisterVersion(register, undefined, nextShape)
-      : null;
+    // The server plan's own inputs, checked by the release tool's own rules; `--hosted-billing` selects publish kit v3.
+    const nextInputs = register !== null && args.switches.has("--register-next") ? await parsePracticeNextRegisterInputs({
+      hostedBilling: args.flags.get("--hosted-billing"), checker: args.flags.get("--checker"),
+      deepseekEnabledOnGate: args.flags.get("--deepseek-enabled-on-gate"), roleRotation: args.flags.get("--role-rotation"),
+      callConcurrency: args.flags.get("--register-call-concurrency"), debateShape: nextShape
+    }) : null;
+    // As the server's plan: a hosted preview's next version needs the hosted inputs (HOSTED_BILLING_REQUIRED there).
+    if (nextInputs?.kit === "v2" && settings.runner.DEPLOYMENT_MODE === "hosted") {
+      throw new PracticeRegisterError("PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED",
+        "the preview runs hosted: give --hosted-billing '<JSON>' as the server's plan does");
+    }
+    const registerNext = register === null || nextInputs === null ? null
+      : nextInputs.kit === "v3" ? await composePracticeHostedNextRegisterVersion(register, nextInputs.hostedBilling!, nextInputs.choices)
+        : Object.keys(nextInputs.choices).length === 0 ? await composePracticeNextRegisterVersion(register)
+          : await composePracticeNextRegisterVersion(register, undefined, nextInputs.choices);
+    if (registerNext?.composer !== undefined) {
+      log(`register-next: publish kit v3 (${registerNext.composer}), billing ${registerNext.hostedBilling!.billing} in the next version; `
+        + "the practice runs it in hosted mode, with billing kept off");
+      for (const note of registerNext.notes ?? []) log(`register-next: ${note}`);
+    }
     // The brake counts connection failures in a row, from root's streak at the start (practice-gate-observer.ts).
     observer = new PracticeGateObserver({ unsentStreakAtStart });
     options.onObserver?.(observer, stop);

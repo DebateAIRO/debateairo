@@ -672,6 +672,67 @@ describe("preview practice: debate mode", () => {
     expect(existsSync(join(out, "transcript.json"))).toBe(false);
   }, 600_000);
 
+  it("hosted (2026-10-14): a hosted settings export with the server-only billing settings, --register-next --hosted-billing (billing on): kit v3's next version, the hosted runner and room, billing kept off: PASS (exit 0)", async () => {
+    const { stubs, env, common, quiet, out } = await scenario();
+    // The hosted preview's export: hosted mode, plus the api.env lines runbook H6/H7 adds (set aside unread).
+    const hostedSettings = join(folder, `hosted-settings-${randomUUID()}.env`);
+    await writeFile(hostedSettings, settingsText().replace("DEBATEAI_DEPLOYMENT_MODE=local", "DEBATEAI_DEPLOYMENT_MODE=hosted")
+      + ["GEOIP_COUNTRY_DB_PATH=/var/lib/debateai-geoip/dbip-country-lite.mmdb", "TOR_EXIT_LIST_PATH=/var/lib/debateai-geoip/tor-exit-list.txt",
+        "NETOPIA_API_BASE_URL=https://secure-sandbox.netopia-payments.com", "NETOPIA_API_KEY_PATH=/etc/debateai-v3-preview/billing/netopia-api-key",
+        "NETOPIA_IPN_KEYS_PATH=/etc/debateai-v3-preview/billing/netopia-ipn-keys.pem", ""].join("\n"));
+    const logged: string[] = [];
+    const hostedBilling = JSON.stringify({ billing: "on", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
+      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } });
+    const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
+    const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--depth", "1", "--register-next",
+      "--hosted-billing", hostedBilling], env, { ...quiet, log: (line) => logged.push(line) });
+    const report = outcome.report as unknown as {
+      verdict: string; reasons: string[]; admission: { admitted: boolean; panel: { modelId: string }[] };
+      run: { workItemOutcome: string; answer: { served: boolean }; story: { outcome: string } };
+      register: { registerVersion: string; steps: { path: string }[]; codeNext: { composer: string; addedKeys: string[]; changedKeys: string[] } };
+      deployment: { mode: string; room: boolean; billingInRegister: string; billingInPractice: string; setAsideSettings: string[];
+        ceilings: { perRunCeilingMicros: number; dailyCeilingMicros: number; perStoryCeilingMicros: number | null; band: boolean } };
+    };
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(report.register.registerVersion).toBe("6");
+    expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION", "CODE_NEXT_VERSION"]);
+    expect(report.register.codeNext).toMatchObject({ composer: "preview-register-composer-v3", addedKeys: expect.arrayContaining(["storyCostEnvelopePolicy"]) });
+    expect(report.register.codeNext.changedKeys).toEqual(expect.arrayContaining(["admissionPolicy", "billingPolicy", "costEnvelopePolicy"]));
+    expect(report.deployment).toEqual({ mode: "hosted", room: true, billingInRegister: "on", billingInPractice: "off",
+      setAsideSettings: ["GEOIP_COUNTRY_DB_PATH", "TOR_EXIT_LIST_PATH", "NETOPIA_API_BASE_URL", "NETOPIA_API_KEY_PATH", "NETOPIA_IPN_KEYS_PATH"],
+      ceilings: { perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000, perStoryCeilingMicros: 50_000, band: true, billingPlansSealed: true } });
+    expect(report.admission.admitted).toBe(true);
+    expect(report.admission.panel.map((member) => member.modelId).sort()).toEqual([...FIVE].sort());
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    // The log names what was set aside (names only) and how billing ran; no set-aside value is printed or written.
+    expect(logged).toContain("settings: server-only settings set aside unread (never opened, never sent): GEOIP_COUNTRY_DB_PATH, TOR_EXIT_LIST_PATH, NETOPIA_API_BASE_URL, NETOPIA_API_KEY_PATH, NETOPIA_IPN_KEYS_PATH");
+    expect(logged.some((line) => line.startsWith("hosted mode: the ask went through the room"))).toBe(true);
+    const written = readFileSync(join(out, "report.json"), "utf8") + readFileSync(join(out, "report.md"), "utf8") + logged.join("\n");
+    for (const secretPath of ["/etc/debateai-v3-preview/billing", "netopia-payments.com", "dbip-country-lite"]) expect(written).not.toContain(secretPath);
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain("- billing: on in the register, kept off in the practice");
+  }, 600_000);
+
+  // The hosted money rules are live in the practice, not decoration: a per-debate ceiling of one micro-dollar. The
+  // boot's own RUN_CEILING_BELOW_ONE_CALL cannot fire on the preview (it prices the plan rosters' models, none of which
+  // is a preview model, and no scorecard is in force there: firstCallPlanModels, assertRunCeilingCoversOneCall), so on
+  // the server such a version would start and fail its first debate; the practice shows exactly that, before upload.
+  it("hosted (2026-10-14), control: a per-debate ceiling below one call: the hosted runner's envelope refuses the first call (RUN_CEILING_BELOW_FIRST_CALL): FAIL (exit 20)", async () => {
+    const { stubs, env, common, quiet } = await scenario();
+    const hostedSettings = join(folder, `hosted-settings-${randomUUID()}.env`);
+    await writeFile(hostedSettings, settingsText().replace("DEBATEAI_DEPLOYMENT_MODE=local", "DEBATEAI_DEPLOYMENT_MODE=hosted"));
+    const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
+    const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--register-next", "--hosted-billing",
+      JSON.stringify({ billing: "off", perRunCeilingMicros: 1, dailyCeilingMicros: 10_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } })],
+    env, quiet);
+    expect(outcome.exitCode).toBe(20);
+    expect(outcome.report).toMatchObject({ verdict: "FAIL", admission: { admitted: true },
+      run: { workItemOutcome: "THREW", failureCode: "RUN_CEILING_BELOW_FIRST_CALL" } });
+    // Only the health probes went out: the envelope refused the first debate call before it was sent.
+    expect(stubs.requests.filter((request) => request.kind !== "PROBE")).toEqual([]);
+  }, 600_000);
+
   it("--transcript: transcript.json holds every model call of the ledger in order, with the prompts the gates received and the replies they gave, decrypted", async () => {
     const { stubs, env, common, quiet, out } = await scenario(mimoFirstPanelSlips({ patch: "PATCH" }));
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1", "--transcript"], env, quiet);
