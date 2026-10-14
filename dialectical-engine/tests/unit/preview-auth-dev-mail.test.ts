@@ -80,3 +80,84 @@ describe('authenticator recovery WAITING and FINISH mails',()=>{
   ['authenticator recovery PROOF',()=>packet('mfa_recovery','PROOF').toString().replace('/recover-authenticator#cancel=','/recover-authenticator#finish=')],
  ])('refuses a finish link where the producer never writes one: %s',(_name,make)=>{const text=make();expect(text).toContain('#finish=');refused(text);});
 });
+
+// Owner rulings 2026-10-13 (hosted preview with NETOPIA's sandbox): the API's templated mail (billing, legal and
+// data-export notices) is handed to sendmail only for the installed allow-listed recipients.
+describe('templated mail (billing and legal) to the allow-listed recipients only', async () => {
+ const { buildTemplatedMessage } = await import('../../apps/api/src/mail-mime.js');
+ const { MemoryTemplatedMailSender } = await import('../../apps/api/src/mail-channel.js');
+ const templated = { ...options, buildTemplatedMessage };
+ const ID = '22222222-2222-4222-8222-222222222222';
+ /** What the API's TemplatedMailSender hands to sendmail for M6 (plan moved), through its own renderer. */
+ async function apiMail(to: string) {
+  const sender = new MemoryTemplatedMailSender('noreply@dezbatere.ro');
+  await sender.sendTemplated({ to, templateId: 'M6', locale: 'en', params: { plan: 'PLUS', pricingUrl: 'https://v3-preview.dezbatere.ro/pricing' }, messageId: ID });
+  return Buffer.from(sender.messages[0]!.raw, 'utf8');
+ }
+ const pdf = (bytes: number) => Buffer.alloc(bytes, 0x25);
+ const withFiles = (to: string, attachments: { filename: string; contentType: 'application/pdf' | 'text/plain; charset=UTF-8'; content: Buffer }[], subject = 'Confirmare plată — Plus', messageId: string | null = null) =>
+  Buffer.from(buildTemplatedMessage({ from: 'noreply@dezbatere.ro', to, messageId, subject, text: 'Plan activ.\r\nMulțumim.', html: '<p>Plan activ.</p>', attachments, boundary: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6' }), 'utf8');
+ it('admits the API\'s own message to the proving address, unchanged', async () => {
+  const message = await apiMail('proof@example.test');
+  const selected = mail.selectCanonicalMail(message, templated);
+  expect(selected).toMatchObject({ family: 'templated', recipient: 'proof@example.test' });
+  expect(selected.message.equals(message)).toBe(true);
+ });
+ it('admits a Terms PDF beyond the account mail bound, with a UTF-8 subject and no Message-ID', () => {
+  const message = withFiles('notice@example.test', [{ filename: 'terms-v3.pdf', contentType: 'application/pdf', content: pdf(600_000) }, { filename: 'withdrawal-form.txt', contentType: 'text/plain; charset=UTF-8', content: Buffer.from('Formular') }]);
+  expect(message.length).toBeGreaterThan(262_144);
+  expect(mail.selectCanonicalMail(message, templated)).toMatchObject({ family: 'templated', recipient: 'notice@example.test' });
+ });
+ it.each(['primary@example.test', 'secondary@example.test'])('sends a verification forward alias (%s) to the installed forward target, changing only To', async alias => {
+  const message = await apiMail(alias);
+  const selected = mail.selectCanonicalMail(message, templated);
+  expect(selected.recipient).toBe('secondary@example.test');
+  expect(selected.message.toString()).toBe(message.toString().replace(`To: ${alias}\r\n`, 'To: secondary@example.test\r\n'));
+ });
+ const swap = (message: Buffer, from: string, to: string) => { const text = message.toString(); expect(text).toContain(from); return Buffer.from(text.replace(from, to)); };
+ it.each([
+  ['a recipient outside the allow-list', async () => apiMail('stranger@example.com')],
+  ['another sender', async () => swap(await apiMail('proof@example.test'), 'From: noreply@dezbatere.ro', 'From: billing@dezbatere.ro')],
+  ['a display-name sender', async () => swap(await apiMail('proof@example.test'), 'From: noreply@dezbatere.ro', 'From: dezbatere.ro <noreply@dezbatere.ro>')],
+  ['a Message-ID on another domain', async () => swap(await apiMail('proof@example.test'), `<${ID}@debateai.local>`, `<${ID}@example.com>`)],
+  ['an extra header', async () => swap(await apiMail('proof@example.test'), 'MIME-Version: 1.0', 'Reply-To: x@example.com\r\nMIME-Version: 1.0')],
+  ['a second recipient', async () => swap(await apiMail('proof@example.test'), 'To: proof@example.test', 'To: proof@example.test, stranger@example.com')],
+  ['a text/html attachment', async () => swap(withFiles('proof@example.test', [{ filename: 'a.pdf', contentType: 'application/pdf', content: pdf(10) }]), 'Content-Type: application/pdf; name="a.pdf"', 'Content-Type: text/html; name="a.pdf"')],
+  ['a renamed attachment (disposition differs)', async () => swap(withFiles('proof@example.test', [{ filename: 'a.pdf', contentType: 'application/pdf', content: pdf(10) }]), 'filename="a.pdf"', 'filename="b.pdf"')],
+  ['text after the closing boundary', async () => Buffer.concat([await apiMail('proof@example.test'), Buffer.from('trailer\r\n')])],
+  ['a body line rewrapped', async () => { const text = withFiles('proof@example.test', [{ filename: 'a.pdf', contentType: 'application/pdf', content: pdf(200) }]).toString(); const line = text.split('\r\n').find(l => l.length === 76)!; return Buffer.from(text.replace(line, `${line.slice(0, 40)}\r\n${line.slice(40)}`)); }],
+  ['a fifth attachment', async () => withFiles('proof@example.test', [1, 2, 3, 4, 5].map(n => ({ filename: `f${n}.pdf`, contentType: 'application/pdf' as const, content: pdf(10) })))],
+  ['attachments over 8 MiB together', async () => withFiles('proof@example.test', [1, 2, 3].map(n => ({ filename: `f${n}.pdf`, contentType: 'application/pdf' as const, content: pdf(2_900_000) })))],
+  ['a message over the templated bound', async () => withFiles('proof@example.test', [1, 2].map(n => ({ filename: `f${n}.pdf`, contentType: 'application/pdf' as const, content: pdf(4_800_000) })))],
+  ['an account-sized cap passed by a plain message over it', async () => Buffer.from(packet('reset', 'PROOF').toString() + 'x'.repeat(300_000))]
+ ])('refuses %s', async (_name, make) => {
+  const message = await make();
+  expect(() => mail.selectCanonicalMail(message, templated)).toThrow(/^PREVIEW_MAIL_REFUSED$/);
+ });
+ it('makes exactly one templated delivery, to the chosen recipient, and calls no other transport', async () => {
+  const calls: unknown[] = [];
+  const message = await apiMail('primary@example.test');
+  await mail.submitComposite({ message, argv: ['-i', '-t', '-f', options.from], options: templated,
+   submitExternal: async () => { calls.push('external'); }, submitAccount: async () => { calls.push('account'); },
+   submitTemplated: async (packet: Buffer, recipient: string) => { calls.push([recipient, packet.toString().includes('To: secondary@example.test\r\n')]); } });
+  expect(calls).toEqual([['secondary@example.test', true]]);
+ });
+ it('hands the message to sendmail for that one recipient only: no shell, no -t, a clean environment, its own process group', async () => {
+  const message = await apiMail('proof@example.test');
+  let observed: any; let captured = Buffer.alloc(0);
+  const spawnImpl = (command: string, args: string[], opts: any) => { observed = { command, args, opts }; const child: any = new EventEmitter(); child.pid = 33333; child.stdin = new PassThrough(); child.stdin.on('data', (b: Buffer) => { captured = Buffer.concat([captured, b]); }); child.stdin.on('finish', () => queueMicrotask(() => child.emit('close', 0, null))); return child; };
+  await mail.submitTemplatedMail({ message, recipient: 'proof@example.test', deadline: Date.now() + 1000, spawnImpl, killGroup: () => { throw Error('unexpected kill'); } });
+  expect(observed).toMatchObject({ command: '/usr/sbin/sendmail', args: ['-i', '-f', 'noreply@dezbatere.ro', '--', 'proof@example.test'], opts: { shell: false, detached: true, stdio: ['pipe', 'ignore', 'ignore'], env: { PATH: '/usr/sbin:/usr/bin:/bin' } } });
+  expect(captured.equals(message)).toBe(true);
+  for (const recipient of ['-oQ/tmp@example.test', 'a b@example.test', 'nobody']) {
+   await expect(mail.submitTemplatedMail({ message, recipient, deadline: Date.now() + 1000, spawnImpl: () => { throw Error('unexpected spawn'); } })).rejects.toThrow(/^PREVIEW_MAIL_REFUSED$/);
+  }
+ });
+ it('reads stdin up to the templated bound and no further', async () => {
+  const stream = (bytes: number) => { const s = new PassThrough(); s.end(Buffer.alloc(bytes, 0x41)); return s; };
+  expect((await mail.readMailInput(stream(1000), { deadline: Date.now() + 1000 })).length).toBe(1000);
+  await expect(mail.readMailInput(stream(2000), { deadline: Date.now() + 1000, maxBytes: 1000 })).rejects.toThrow(/^PREVIEW_MAIL_REFUSED$/);
+  await expect(mail.readMailInput(stream(0), { deadline: Date.now() + 1000 })).rejects.toThrow(/^PREVIEW_MAIL_REFUSED$/);
+  expect(mail.TEMPLATED_MAIL_MAX_BYTES).toBe(12 * 1024 * 1024);
+ });
+});

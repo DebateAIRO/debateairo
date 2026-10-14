@@ -49,13 +49,35 @@ export function validateDebateShapeChoice(value) {
  if(value===null||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  return value;
 }
+/**
+ * Sanity bounds on the owner's hosted-preview ceilings (publish-register-v3.ts PREVIEW_HOSTED_CEILING_BOUNDS; a unit
+ * test pins the two equal). They catch a typed extra digit; the ceilings themselves are always the owner's inputs.
+ */
+export const HOSTED_CEILING_BOUNDS=Object.freeze({perRunMaxMicros:50_000_000,dailyMaxMicros:200_000_000});
+/**
+ * The owner's hosted-preview inputs (publish-register-v3.ts PreviewHostedBillingChoice, owner rulings 2026-10-13):
+ * exactly `billing` ('on' or 'off'), `perRunCeilingMicros` and `dailyCeilingMicros` (whole micro-dollars, per run at
+ * most the day) and `askRoomReads` ({limit, windowMs, capacity}: the room read's budget, the register's own bounds).
+ * A plan that carries it composes with kit v3 (hosted rows); without it, with kit v2 (local rows, billing off). The
+ * kit checks it again before it builds a row. Returns the choice in one fixed key order.
+ */
+export function validateHostedBillingChoice(value) {
+ const count=(number,max)=>Number.isSafeInteger(number)&&number>=1&&number<=max;
+ exactKeys(value,['billing','perRunCeilingMicros','dailyCeilingMicros','askRoomReads'],'PREVIEW_NATIVE_PLAN_REFUSED');
+ exactKeys(value.askRoomReads,['limit','windowMs','capacity'],'PREVIEW_NATIVE_PLAN_REFUSED');
+ const reads=value.askRoomReads;
+ if(!['on','off'].includes(value.billing)||!count(value.perRunCeilingMicros,HOSTED_CEILING_BOUNDS.perRunMaxMicros)||!count(value.dailyCeilingMicros,HOSTED_CEILING_BOUNDS.dailyMaxMicros)
+  ||value.perRunCeilingMicros>value.dailyCeilingMicros||!count(reads.limit,1_000_000)||!count(reads.windowMs,86_400_000)||!count(reads.capacity,1_048_576))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ return {billing:value.billing,perRunCeilingMicros:value.perRunCeilingMicros,dailyCeilingMicros:value.dailyCeilingMicros,askRoomReads:{limit:reads.limit,windowMs:reads.windowMs,capacity:reads.capacity}};
+}
 /** The reviewed native-plan schema check; the release tool runs it before writing a plan. */
 export function validateNativePlan(plan) {
  const chosen=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'checkerChoice');
  const rotation=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'roleRotation');
  const concurrency=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'callConcurrency');
  const shape=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'debateShape');
- exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[])]);
+ const hosted=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'hostedBilling');
+ exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[]),...(hosted?['hostedBilling']:[])]);
  if(plan.schema!=='preview-auth-dev-native-plan-v1'||!['apply-and-plan','plan','publish','verify'].includes(plan.operation)
   ||!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(plan.sourceRoot))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  if(chosen){
@@ -71,6 +93,9 @@ export function validateNativePlan(plan) {
   validateDebateShapeChoice(plan.debateShape);
   if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  }
+ // Unlike the three choices above, every operation may carry it: once a hosted version is the base, verify and
+ // apply-and-plan compose with kit v3 too (kit v2 refuses a base with billing on).
+ if(hosted)validateHostedBillingChoice(plan.hostedBilling);
  return plan;
 }
 /**
@@ -90,7 +115,10 @@ export async function runNativeOperator() {
  await verifySourceManifest(source,{sourceRevision:plan.sourceRevision,sourceTree:plan.sourceTree,sourceRoot:plan.sourceRoot,role:'api',manifestSha256:plan.sourceManifest.sha256,execution:{entryUrl:import.meta.url,entryName:'native-operator.mjs',operatorManifestSha256:plan.operatorManifestSha256}});
  if(operatorManifestSha256(source)!==plan.operatorManifestSha256)refuse('PREVIEW_OPERATOR_SOURCE_REFUSED');
  const engine=join(plan.sourceRoot,'dialectical-engine');
- const [db,lineage,register,publisher,verify]=await Promise.all([tsImport(join(engine,'packages/db/src/index.ts'),import.meta.url),tsImport(join(engine,'packages/db/src/migration-lineage.ts'),import.meta.url),tsImport(join(engine,'packages/register/src/index.ts'),import.meta.url),tsImport('./publish-register-v2.ts',import.meta.url),tsImport('./verify-native.ts',import.meta.url)]);
+ // Owner rulings 2026-10-13: a plan with the owner's hosted-billing inputs composes with kit v3 (hosted rows); every
+ // other plan with kit v2, exactly as before.
+ const hosted=Object.hasOwn(plan,'hostedBilling');
+ const [db,lineage,register,publisher,verify]=await Promise.all([tsImport(join(engine,'packages/db/src/index.ts'),import.meta.url),tsImport(join(engine,'packages/db/src/migration-lineage.ts'),import.meta.url),tsImport(join(engine,'packages/register/src/index.ts'),import.meta.url),tsImport(hosted?'./publish-register-v3.ts':'./publish-register-v2.ts',import.meta.url),tsImport('./verify-native.ts',import.meta.url)]);
  const migration=await lineage.loadMigrationPlan();
  return withActiveNativePool({publicPeerModule:'/opt/debateai-v3-preview/operator/recovery106-v1/native-common106.mjs',auth106Names:migration.manifest.cohorts.auth106},async pool=>{
   if(plan.operation==='apply-and-plan')await db.migrate(pool);
@@ -99,8 +127,11 @@ export async function runNativeOperator() {
   // Publish kit v2: plan and publish compose from the CURRENT published version (nothing sealed above the base but this publication's own replay).
   if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
   const runtimeObservedAt=plan.approval?.runtimeObservedAt??new Date().toISOString();
-  const rows=await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null);
-  const snapshot=publisher.composePreviewSnapshotV2({sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256});
+  const observation={nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt};
+  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null)
+   :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null);
+  const composition={sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256};
+  const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);
   const metadata=snapshotProposal({runtimeObservedAt,source,plan,snapshot});
   if(plan.operation==='plan'||plan.operation==='apply-and-plan')return metadata;
   if(!plan.approval)refuse('PREVIEW_SNAPSHOT_REVIEW_REQUIRED');
@@ -108,13 +139,14 @@ export async function runNativeOperator() {
   if(typeof approvedRuntimeObservedAt!=='string')refuse('PREVIEW_RUNTIME_OBSERVATION_REQUIRED');
   // Only apply-and-plan applies SQL. publish and verify refuse a pending forward step before writing anything.
   if(plan.operation==='publish')await verify.refusePendingForwardSteps(pool);
-  const receipt=plan.operation==='publish'?await publisher.publishPreviewRegisterV2(pool,{publicationId:plan.publicationId,sourceRef:`preview-auth-dev-v1 ${source.sourceRevision}/${source.sourceTree}; operator sha256:${plan.operatorManifestSha256}`,snapshot,approval}):publication;
+  const input={publicationId:plan.publicationId,sourceRef:`preview-auth-dev-v1 ${source.sourceRevision}/${source.sourceTree}; operator sha256:${plan.operatorManifestSha256}`,snapshot,approval};
+  const receipt=plan.operation!=='publish'?publication:hosted?await publisher.publishPreviewRegisterV3(pool,input):await publisher.publishPreviewRegisterV2(pool,input);
   return verify.verifyNativeState(pool,{sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,nativeSourceSha256:source.nativeSha256,publication:receipt});
  });
 }
 /** The exact refusal verify-native.ts gives a database that lacks a forward step of this source (any number of steps). */
 const PENDING_FORWARD_STEP=/^PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: \d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63}\. Verify never applies a migration; run the native operator with operation apply-and-plan first\.$/;
-/** Fixed text of publish-register-v2.ts BASE_NOT_CURRENT (that module is loaded lazily through tsx; a unit test pins the two equal). */
+/** Fixed text of publish-register-v2.ts BASE_NOT_CURRENT, which v3 re-exports (both load lazily through tsx; a unit test pins the two equal). */
 export const BASE_NOT_CURRENT_LINE='PREVIEW_REGISTER_BASE_NOT_CURRENT: a sealed register version exists above the selected base; plan again from the newest publication';
 /** Every failure stays opaque except a pending forward step (its line says to run apply-and-plan) or a stale register base (its line says to plan again). */
 export function operatorRefusalLine(error){

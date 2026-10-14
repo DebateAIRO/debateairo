@@ -1,0 +1,230 @@
+import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW } from '@debateai/register';
+import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
+import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, PREVIEW_SOURCE_ROW_KEYS_V2 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
+import {
+  buildPreviewSourceRowsV3, composePreviewSnapshotV3, publishPreviewRegisterV3, previewHostedBillingChoice, assertHostedPreviewBootRows,
+  PREVIEW_SOURCE_ROW_KEYS_V3, PREVIEW_HOSTED_CEILING_BOUNDS, STORY_COST_ENVELOPE_POLICY_ROW_KEY
+} from '../../deploy/preview-auth-dev/v1/publish-register-v3.js';
+
+type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
+const sha = (text: string) => createHash('sha256').update(text).digest('hex');
+const runtime = { nodeVersion: 'v26.8.2', pnpmVersion: '11.20.0', sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), operatorSha256: 'c'.repeat(64), observedAt: '2026-10-13T12:00:00.000Z' };
+const canonical = (value: unknown) => parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value))) as string;
+const owned = () => [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
+const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(b.rowKey, 'en'));
+/** The owner's suggested values (pending confirmation): $3 per debate, $10 per day; the kit's example room-read budget. */
+const ON = { billing: 'on', perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } } as const;
+const OFF = { ...ON, billing: 'off' } as const;
+const OWNER_KEYS = ['admissionPolicy', 'billingPolicy', 'costEnvelopePolicy'];
+/** A register refusal is a TypedDomainError (its code on `.code`) or a TypeError whose message is the code. */
+const refusal = (run: () => unknown) => { try { run(); } catch (error: any) { return `${error?.code ?? ''} ${error?.message ?? ''}`; } return 'no refusal'; };
+const value = (rows: readonly Row[], key: string) => JSON.parse(rows.find(row => row.rowKey === key)!.valueJsonText);
+
+/** The live register 12 shape: v2's local source plus the two base-owned rows (billing off, no story money row, no ask_room_reads). */
+async function fixture() {
+  const bootstrap = await loadBootstrapRegister();
+  const v2: Row[] = [...await buildPreviewSourceRowsV2(bootstrap, runtime)] as Row[];
+  const v12 = sorted([...v2, ...owned()]);
+  return { bootstrap, v2, v12 };
+}
+const compose = (source: readonly Row[], base: Row[], version = '12') => composePreviewSnapshotV3({ sourceRows: source as any, baseRows: base as any, baseRegisterVersion: version, baseSnapshotSha256: computeRegisterSnapshotSha256(base as any) });
+
+describe('publish kit v3: the hosted source', () => {
+  it('is v2\'s source with the story money row added and only the three owner rows changed', async () => {
+    const f = await fixture();
+    for (const choice of [ON, OFF]) {
+      const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, choice)] as Row[];
+      expect(rows.map(row => row.rowKey).sort()).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V3].sort());
+      expect(PREVIEW_SOURCE_ROW_KEYS_V3).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2, STORY_COST_ENVELOPE_POLICY_ROW_KEY].sort());
+      const differing = rows.filter(row => JSON.stringify(row) !== JSON.stringify(f.v2.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey).sort();
+      expect(differing).toEqual(choice.billing === 'on' ? [...OWNER_KEYS, STORY_COST_ENVELOPE_POLICY_ROW_KEY] : ['admissionPolicy', 'costEnvelopePolicy', STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+    }
+  });
+
+  it('carries the owner\'s ceilings and room-read budget, keeps every other member, and switches billing on with the US withdrawal right', async () => {
+    const f = await fixture();
+    const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[];
+    const cost = value(rows, 'costEnvelopePolicy'), oldCost = value(f.v2, 'costEnvelopePolicy');
+    expect(cost).toMatchObject({ per_run_ceiling_micros: 3_000_000, daily_ceiling_micros: 10_000_000, provisional: true });
+    for (const member of ['admission_close_basis_points', 'finish_up_to_basis_points', 'waiting_line_per_person', 'serve_reserve_basis_points', 'serve_overrun_basis_points', 'currency', 'kind', 'minor_units_per_unit'])
+      expect(cost[member]).toEqual(oldCost[member]);
+    expect([oldCost.admission_close_basis_points, oldCost.finish_up_to_basis_points, oldCost.waiting_line_per_person]).toEqual([9500, 11500, 1]);
+    const admission = value(rows, 'admissionPolicy'), oldAdmission = value(f.v2, 'admissionPolicy');
+    expect(oldAdmission.ask_room_reads).toBeUndefined();
+    expect(admission).toEqual({ ...oldAdmission, ask_room_reads: { key: 'owner', limit: 60, window_ms: 60_000, capacity: 65_536 } });
+    const billing = value(rows, 'billingPolicy');
+    expect(billing).toEqual({ ...value(f.v2, 'billingPolicy'), enabled: true, withdrawal_countries: [...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value.withdrawal_countries, 'US'] });
+    expect(rows.find(row => row.rowKey === 'billingPolicy')!.sourceRef).toContain('NETOPIA\'s sandbox');
+    expect(value(rows, STORY_COST_ENVELOPE_POLICY_ROW_KEY)).toMatchObject({ kind: 'STORY_COST_ENVELOPE_POLICY', currency: 'USD', per_story_ceiling_micros: 50_000, per_story_overrun_basis_points: 2_000 });
+    expect(value([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], 'billingPolicy')).toEqual(value(f.v2, 'billingPolicy'));
+  });
+
+  it('passes the checker, rotation and call-concurrency choices through to v2 (the hosted story rows follow the checker)', async () => {
+    const f = await fixture();
+    const policy = { perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50, deepinfra: 150 } };
+    const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON, { checker: 'deepseek', deepseekEnabledOnGate: true }, 'off', policy)] as Row[];
+    expect(value(rows, 'storyCheckerRoleRef').providerRef).toBe('preview:deepseek-v4-1-flash');
+    expect(value(rows, 'answerRoleRotationPolicy').enabled).toBe(false);
+    expect(value(rows, 'callConcurrencyPolicy')).toMatchObject(policy);
+  });
+
+  it.each([
+    ['no choice', undefined, 'hosted-billing-choice'],
+    ['an extra key', { ...ON, extra: true }, 'hosted-billing-choice'],
+    ['billing that is not on or off', { ...ON, billing: 'yes' }, 'hosted-billing-choice'],
+    ['a per-run ceiling above the day', { ...ON, perRunCeilingMicros: 11_000_000 }, 'hosted-billing-ceilings'],
+    ['a zero ceiling', { ...ON, perRunCeilingMicros: 0 }, 'hosted-billing-ceilings'],
+    ['a fractional ceiling', { ...ON, dailyCeilingMicros: 10_000_000.5 }, 'hosted-billing-ceilings'],
+    ['a ceiling in dollars typed as text', { ...ON, perRunCeilingMicros: '3000000' }, 'hosted-billing-ceilings'],
+    ['a per-run ceiling past the sanity bound (an extra digit)', { ...ON, perRunCeilingMicros: PREVIEW_HOSTED_CEILING_BOUNDS.perRunMaxMicros + 1, dailyCeilingMicros: PREVIEW_HOSTED_CEILING_BOUNDS.dailyMaxMicros }, 'hosted-billing-ceilings'],
+    ['a daily ceiling past the sanity bound', { ...ON, dailyCeilingMicros: PREVIEW_HOSTED_CEILING_BOUNDS.dailyMaxMicros + 1 }, 'hosted-billing-ceilings'],
+    ['a room-read budget without its capacity', { ...ON, askRoomReads: { limit: 60, windowMs: 60_000 } }, 'hosted-billing-ask-room-reads'],
+    ['a room-read budget in the register\'s spelling', { ...ON, askRoomReads: { key: 'owner', limit: 60, window_ms: 60_000, capacity: 65_536 } }, 'hosted-billing-ask-room-reads'],
+    ['a room-read window over a day', { ...ON, askRoomReads: { ...ON.askRoomReads, windowMs: 86_400_001 } }, 'hosted-billing-ask-room-reads']
+  ])('refuses %s before anything is built', async (_name, choice, rule) => {
+    const f = await fixture();
+    expect(() => previewHostedBillingChoice(choice)).toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
+    await expect(buildPreviewSourceRowsV3(f.bootstrap, runtime, choice)).rejects.toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
+  });
+
+  it('refuses a day that cannot hold one run plus its story (the API\'s own boot rule)', async () => {
+    const f = await fixture();
+    // 3.00 + the answer's 20% overrun is 3.60, plus the story's 0.06: a 3.65 day holds no full run.
+    const tight = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 3_650_000 })] as Row[];
+    expect(refusal(() => compose(tight, f.v12))).toContain('STORY_DAILY_CEILING_INSUFFICIENT');
+    await expect(buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 3_660_000 }).then(rows => compose([...rows] as Row[], f.v12))).resolves.toBeTruthy();
+  });
+
+  it('keeps v2\'s runtime gate', async () => {
+    const f = await fixture();
+    await expect(buildPreviewSourceRowsV3(f.bootstrap, { ...runtime, nodeVersion: 'v22.23.1' }, ON)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+  });
+});
+
+describe('publish kit v3: composing from the current version', () => {
+  it('from the live register 12 shape: the story money row is added and the three owner rows change, each shown with its old and new value', async () => {
+    const f = await fixture();
+    const before = structuredClone(f.v12);
+    const plan = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], f.v12);
+    expect(plan.composer).toBe('preview-register-composer-v3');
+    expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+    expect(plan.changedKeys).toEqual(OWNER_KEYS);
+    expect(plan.rows).toHaveLength(f.v12.length + 1);
+    for (const key of OWNER_KEYS) {
+      const entry = plan.delta.find(row => row.rowKey === key)!;
+      expect(entry).toMatchObject({ change: 'changed', reason: 'owner-hosted-billing-input', oldValueJsonText: f.v12.find(row => row.rowKey === key)!.valueJsonText });
+      expect(entry.newValueSha256).toBe(sha(entry.newValueJsonText));
+    }
+    expect(plan.delta.find(row => row.rowKey === STORY_COST_ENVELOPE_POLICY_ROW_KEY)).toMatchObject({ change: 'added', reason: 'added-source-key', oldValueJsonText: null });
+    expect(f.v12).toEqual(before);
+  });
+
+  it('a first provider-only publication (billing off) changes only the ceilings and the room-read budget', async () => {
+    const f = await fixture();
+    const plan = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], f.v12);
+    expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+    expect(plan.changedKeys).toEqual(['admissionPolicy', 'costEnvelopePolicy']);
+  });
+
+  it('then billing on over that version changes the billing row alone; billing off again is a republish; v2 can no longer compose on it', async () => {
+    const f = await fixture();
+    const first = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], f.v12);
+    const v13 = [...first.rows] as Row[];
+    const on = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], v13, '13');
+    expect(on.addedKeys).toEqual([]);
+    expect(on.changedKeys).toEqual(['billingPolicy']);
+    const v14 = [...on.rows] as Row[];
+    const off = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], v14, '14');
+    expect(off.changedKeys).toEqual(['billingPolicy']);
+    expect(value([...off.rows] as Row[], 'billingPolicy').enabled).toBe(false);
+    // Kit v2 refuses a hosted base: once the preview is hosted, every later publication goes through v3.
+    expect(() => composePreviewSnapshotV2({ sourceRows: f.v2 as any, baseRows: v14 as any, baseRegisterVersion: '14', baseSnapshotSha256: computeRegisterSnapshotSha256(v14 as any) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+    expect(() => composePreviewSnapshotV2({ sourceRows: f.v2 as any, baseRows: v13 as any, baseRegisterVersion: '13', baseSnapshotSha256: computeRegisterSnapshotSha256(v13 as any) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+  });
+
+  it('the same inputs on the same base compose the same snapshot (publish recomposes what the owner approved)', async () => {
+    const f = await fixture();
+    const a = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], f.v12);
+    const b = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], f.v12);
+    expect(b.snapshotSha256).toBe(a.snapshotSha256);
+    expect(b.deltaSha256).toBe(a.deltaSha256);
+    const other = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, { ...ON, dailyCeilingMicros: 9_000_000 })] as Row[], f.v12);
+    expect(other.deltaSha256).not.toBe(a.deltaSha256);
+  });
+
+  const edit = (rows: Row[], key: string, change: (value: any) => void) => rows.map(row => row.rowKey === key ? { ...row, valueJsonText: canonical((v => (change(v), v))(JSON.parse(row.valueJsonText))) } : row);
+  it.each([
+    ['billing on without the sandbox host\'s US withdrawal right', (rows: Row[]) => edit(rows, 'billingPolicy', v => { v.withdrawal_countries = v.withdrawal_countries.filter((c: string) => c !== 'US'); }), 'billing-policy-source'],
+    ['billing off with a US withdrawal right', (rows: Row[]) => edit(rows, 'billingPolicy', v => { v.enabled = false; }), 'billing-policy-source'],
+    ['a billing row with other rules', (rows: Row[]) => edit(rows, 'billingPolicy', v => { v.quote_ttl_seconds = 600; }), 'billing-policy-source'],
+    ['a source without the story money row', (rows: Row[]) => rows.filter(row => row.rowKey !== STORY_COST_ENVELOPE_POLICY_ROW_KEY), 'source-key-list'],
+    ['a source with a scorecard row', (rows: Row[]) => [...rows, { rowKey: 'modelScorecard', valueJsonText: '{}', sourceRef: 'x' }], 'support-or-scorecard-row'],
+    ['a source with a base-owned row', (rows: Row[]) => [...rows, owned()[0]!], 'base-owned-row-in-source']
+  ])('refuses %s', async (_name, tamper, rule) => {
+    const f = await fixture();
+    const rows = tamper([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[]);
+    expect(() => compose(rows, f.v12)).toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
+  });
+
+  it.each([
+    ['the room-read budget', (rows: Row[]) => edit(rows, 'admissionPolicy', v => { delete v.ask_room_reads; }), 'ASK_ROOM_ADMISSION_UNSEALED'],
+    ['the notify budget', (rows: Row[]) => edit(rows, 'admissionPolicy', v => { delete v.billing_notify; }), 'BILLING_ADMISSION_UNSEALED'],
+    ['the checkout budget', (rows: Row[]) => edit(rows, 'admissionPolicy', v => { delete v.billing_checkout; }), 'BILLING_ADMISSION_UNSEALED'],
+    ['a support budget', (rows: Row[]) => edit(rows, 'admissionPolicy', v => { delete v.support_reads; }), 'SUPPORT_ADMISSION_SCOPES_NOT_SEALED'],
+    ['the country gate\'s scope', (rows: Row[]) => edit(rows, 'admissionPolicy', v => { delete v.geo_availability; }), 'GEO_AVAILABILITY_ADMISSION_UNSEALED'],
+    ['the budget band', (rows: Row[]) => edit(rows, 'costEnvelopePolicy', v => { delete v.admission_close_basis_points; delete v.finish_up_to_basis_points; delete v.waiting_line_per_person; }), 'BILLING_REQUIRES_ENVELOPE_MEMBERS'],
+    ['the story money row', (rows: Row[]) => rows.filter(row => row.rowKey !== STORY_COST_ENVELOPE_POLICY_ROW_KEY), 'hosted-story-money-row'],
+    ['the country policy while billing is on', (rows: Row[]) => rows.filter(row => row.rowKey !== 'countryPolicy'), 'BILLING_CONFIGURATION_INCOMPLETE']
+  ])('the hosted boot questions refuse a version without %s', async (_name, tamper, code) => {
+    const f = await fixture();
+    const rows: Row[] = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON), ...owned()];
+    expect(() => assertHostedPreviewBootRows(rows as any)).not.toThrow();
+    expect(refusal(() => assertHostedPreviewBootRows(tamper(rows) as any))).toContain(code);
+  });
+
+  it.each([
+    ['a base whose billing row is malformed', (rows: Row[]) => edit(rows, 'billingPolicy', v => { v.enabled = 'yes'; }), 'BILLING_POLICY_INVALID'],
+    ['a base with a row the source no longer builds', (rows: Row[]) => sorted([...rows, { rowKey: 'outboundMailPolicy', valueJsonText: '{}', sourceRef: 'x' }]), 'base-row-dropped'],
+    ['a base without the staff policy', (rows: Row[]) => rows.filter(row => row.rowKey !== 'staffAccessPolicy'), 'base-owned-row-missing'],
+    ['a base with a scorecard row', (rows: Row[]) => sorted([...rows, { rowKey: 'modelScorecard', valueJsonText: '{}', sourceRef: 'x' }]), 'support-or-scorecard-row']
+  ])('refuses %s', async (_name, tamper, code) => {
+    const f = await fixture();
+    const source = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[];
+    expect(refusal(() => compose(source, tamper(f.v12)))).toContain(code);
+  });
+
+  it('refuses a base whose snapshot hash is not the selected one', async () => {
+    const f = await fixture();
+    const source = await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON);
+    expect(() => composePreviewSnapshotV3({ sourceRows: source, baseRows: f.v12 as any, baseRegisterVersion: '12', baseSnapshotSha256: 'd'.repeat(64) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: base-snapshot');
+  });
+
+  it('publishes only a v3 snapshot', async () => {
+    const f = await fixture();
+    const v2 = composePreviewSnapshotV2({ sourceRows: f.v2 as any, baseRows: f.v12 as any, baseRegisterVersion: '12', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v12 as any) });
+    const pool = { query: async () => { throw new Error('no database call expected'); } } as any;
+    await expect(publishPreviewRegisterV3(pool, { publicationId: '11111111-1111-4111-8111-111111111111', sourceRef: 'x', snapshot: v2 as any, approval: { baseRegisterVersion: '12', baseSnapshotSha256: v2.baseSnapshotSha256, snapshotSha256: v2.snapshotSha256, deltaSha256: v2.deltaSha256 } })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+  });
+});
+
+describe('the native operator chooses the kit by the plan', () => {
+  const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
+  const body = text.slice(text.indexOf('export async function runNativeOperator('));
+  it('loads kit v3 only for a plan with the owner\'s hosted inputs, and hands them to the builder', () => {
+    expect(body).toContain("const hosted=Object.hasOwn(plan,'hostedBilling');");
+    expect(body).toContain("tsImport(hosted?'./publish-register-v3.ts':'./publish-register-v2.ts',import.meta.url)");
+    expect(body.split('publisher.buildPreviewSourceRowsV3(')).toHaveLength(2);
+    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null\)/);
+    expect(body).toContain('const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);');
+  });
+  it('publishes with kit v3 only after the pending-forward-step check, like kit v2', () => {
+    const preCheck = body.indexOf("if(plan.operation==='publish')await verify.refusePendingForwardSteps(pool);");
+    expect(preCheck).toBeGreaterThan(-1);
+    expect(body.indexOf('publisher.publishPreviewRegisterV3(')).toBeGreaterThan(preCheck);
+    expect(body.indexOf('publisher.publishPreviewRegisterV2(')).toBeGreaterThan(preCheck);
+  });
+});

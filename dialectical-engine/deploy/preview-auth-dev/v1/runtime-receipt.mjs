@@ -4,6 +4,8 @@ const HASH = /^[0-9a-f]{64}$/;
 const GIT = /^[0-9a-f]{40}$/;
 const VERSION = /^[1-9][0-9]{0,15}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** The two deployment modes the preview may run (environment.mjs narrowEnvironment; hosted: owner rulings 2026-10-13). */
+const MODES = Object.freeze(['local', 'hosted']);
 const BINDING = ['sourceRevision','sourceTree','sourceManifestSha256','operatorManifestSha256','contractSha256','apiMainSha256'];
 const KEYS = ['schemaVersion','service',...BINDING,'pid','uid','bootId','startTicks','selectedRegisterVersion','nativeRequestSha256','nativeSnapshotSha256','deploymentMode'];
 export function validatePublication(receipt) {
@@ -22,7 +24,7 @@ export function validateRuntimeEvent(event) {
     || BINDING.slice(2).some(key => !HASH.test(event[key]))
     || !Number.isSafeInteger(event.pid) || event.pid < 1 || !Number.isSafeInteger(event.uid) || event.uid < 1
     || !UUID.test(event.bootId) || !/^[1-9][0-9]{0,19}$/.test(event.startTicks)
-    || !VERSION.test(event.selectedRegisterVersion) || event.deploymentMode !== 'local'
+    || !VERSION.test(event.selectedRegisterVersion) || !MODES.includes(event.deploymentMode)
     || !HASH.test(event.nativeRequestSha256) || !HASH.test(event.nativeSnapshotSha256)) refuse('PREVIEW_RUNTIME_RECEIPT_REFUSED');
   return Object.freeze({ ...event });
 }
@@ -38,8 +40,8 @@ export async function linuxProcessIdentity() {
 function selected(source, publication) {
   const version = String(source.REGISTER_VERSION);
   if (!VERSION.test(version) || !Number.isSafeInteger(Number(version)) || version !== publication.registerVersion
-    || source.DEBATEAI_DEPLOYMENT_MODE !== 'local') refuse('PREVIEW_RUNTIME_SELECTION_REFUSED');
-  return { selectedRegisterVersion: version, deploymentMode: 'local' };
+    || !MODES.includes(source.DEBATEAI_DEPLOYMENT_MODE)) refuse('PREVIEW_RUNTIME_SELECTION_REFUSED');
+  return { selectedRegisterVersion: version, deploymentMode: source.DEBATEAI_DEPLOYMENT_MODE };
 }
 /** Pure orchestration seam; the executable supplies the real main import and Linux identity. */
 export async function afterApiListen({ binding, publication, identity, readSelection, importMain, emit }) {
@@ -76,7 +78,7 @@ export function validateRunnerRuntimeEvent(event) {
     || RUNNER_BINDING.slice(2).some(key => !HASH.test(event[key]))
     || !Number.isSafeInteger(event.pid) || event.pid < 1 || !Number.isSafeInteger(event.uid) || event.uid < 1
     || !UUID.test(event.bootId) || !/^[1-9][0-9]{0,19}$/.test(event.startTicks)
-    || !VERSION.test(event.selectedRegisterVersion) || event.deploymentMode !== 'local'
+    || !VERSION.test(event.selectedRegisterVersion) || !MODES.includes(event.deploymentMode)
     || !HASH.test(event.nativeRequestSha256) || !HASH.test(event.nativeSnapshotSha256)
     || !Number.isSafeInteger(event.startupDispatched) || event.startupDispatched < 0 || event.startupDispatched > 100) refuse('PREVIEW_RUNTIME_RECEIPT_REFUSED');
   return Object.freeze({ ...event });
