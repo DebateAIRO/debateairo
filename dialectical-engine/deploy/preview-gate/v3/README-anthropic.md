@@ -533,7 +533,7 @@ systemctl stop debateai-preview-anthropic-budget
 ```
 
 **Change the daily budget or another limit.** Write the new GO by changing only that value in the
-current GO (as README.md "Change the daily budget or another limit" shows, with its `diff` check;
+current GO (as README.md "Change the daily budget or another limit" shows, with its `cmp` check;
 re-running install step 5's `jq -n` would also reset every value changed since the install), same
 `scope_id`, then `stop` and `activate`. If `max_concurrent_calls` changed, also restart the
 service: calls refuse with `SERVE_RESTART_REQUIRED` until you do.

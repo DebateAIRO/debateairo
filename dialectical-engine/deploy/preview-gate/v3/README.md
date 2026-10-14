@@ -700,15 +700,18 @@ for the DeepInfra gate; for the Anthropic gate use
 2. `stop` (Daily operations, "Emergency off", level 1).
 3. Install both gate files from the reviewed release (install step 1 of that gate's README) and
    check their hashes as that step says.
-4. Write the GO again, changing ONLY its two hashes. `diff` must print exactly the two changed hash
-   lines (`bridge_sha256`, `helper_sha256`) and nothing else; the last line must list the same
-   models as before:
+4. Write the GO again, changing ONLY its two hashes. The `diff` is for reading: it shows the two
+   changed hash lines (`bridge_sha256`, `helper_sha256`). The `cmp` line is the check: it compares
+   the two GOs without those two keys, prints `ONLY_HASHES_CHANGED` and only then installs the new GO.
+   If anything else changed, the GO is left as it was and it prints `GO_NOT_REPLACED: stop here`
+   (in a `set -euo pipefail` batch it also ends the batch): do not go on to step 5. The last line
+   printed must list the same models as before:
 
    ```sh
    umask 077
    jq --arg b "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" --arg h "$(sha256sum "$G/preview_budget_helper.py" | cut -d' ' -f1)" '.bridge_sha256=$b | .helper_sha256=$h' "$GO" > "$GO.new"
-   diff <(jq -S . "$GO") <(jq -S . "$GO.new")
-   install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c .enabled_models "$GO"
+   diff <(jq -S . "$GO") <(jq -S . "$GO.new") || true
+   cmp <(jq -S 'del(.bridge_sha256,.helper_sha256)' "$GO") <(jq -S 'del(.bridge_sha256,.helper_sha256)' "$GO.new") && echo ONLY_HASHES_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c .enabled_models "$GO" || { echo "GO_NOT_REPLACED: stop here"; false; }
    ```
    `deploy/preview-release/v1/README.md` "Publishing the call-concurrency row", step 0, checks both
    files and both hashes against the release and stops on any difference.
@@ -782,7 +785,8 @@ systemctl stop debateai-preview-provider-budget
 **Change the daily budget or another limit.**
 1. Write the new GO: in the current GO change only that value, the way "Redeploy (2026-10-12)" step 4
    changes the two hashes (for example `jq '.max_paid_posts_per_day=2500'`), with the same `diff`
-   check (only that line changes) and the same `scope_id`. Never re-run install step 4's `jq -n`: it
+   to read and the same `cmp` check before `install`, the changed key named in `del(...)` instead of
+   the two hashes (`del(.max_paid_posts_per_day)`), and the same `scope_id`. Never re-run install step 4's `jq -n`: it
    writes the first-install GO, GLM only, and would switch the other models off.
 2. Run `stop`, then `activate`.
 3. If `max_concurrent_calls` changed, also restart the service. Calls refuse with
