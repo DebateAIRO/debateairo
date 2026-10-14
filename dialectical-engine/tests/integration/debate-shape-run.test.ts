@@ -30,6 +30,7 @@ import { stubChatBody, type GateOverride, type GateRequest } from "../support/pr
 import { runShapeDebate, scriptedShapeAnswers, shapeForTest, type ShapeDebateOptions, type ShapeScriptOptions } from "../support/debate-shape-harness.js";
 import { copyDatabase, dropDatabase, savedDebate, type SavedDebate } from "../support/saved-debate.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 
 let database: TestDatabase;
 /** A connection to the cluster's maintenance database, for making and dropping the per-run copies. */
@@ -143,6 +144,8 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     }
     // The kept chains really went deeper: the price is not met by arguing nothing past round 1.
     expect(measured.deeper).toBeGreaterThan(0);
+    // Every planned round ran, down to the depth (the δ case's control: δ = 0 never stops early).
+    expect(calls.filter((call) => call.outcome === "OK" && roundOf(call.call_site_key) === depth).length).toBeGreaterThan(0);
     // At most `deeperTopPoints` chains per position reach round 2 (each chain one reply and one defence per round).
     expect(calls.filter((call) => call.outcome === "OK" && roundOf(call.call_site_key) === 2).length)
       .toBeLessThanOrEqual(2 * shape.answers * shape.deeperTopPoints);
@@ -262,10 +265,11 @@ describe("the debate shape in the runner (spec §3.3)", () => {
         readDaySpentMicros: async () => 0,
         admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
       };
+      // As main.ts: the guard counts each call's projection while it is in flight (`inFlight: moneyInFlight`).
       const guard = new CostEnvelopeGuard({ store, policy: {
         perRunCeilingMicros: bodyCeilingMicros * 5, dailyCeilingMicros: Number.MAX_SAFE_INTEGER,
         serveReserveBasisPoints: RESERVE_BASIS_POINTS, serveOverrunBasisPoints: 0
-      } });
+      }, inFlight: createRunInFlight() });
       const seamLog: SeamCall[] = [];
       /** The story spends its own envelope (spec §8): not what this case measures, so its seam admits every call. */
       const storySeam: ProviderCostEnvelopeSeam = {
@@ -312,7 +316,11 @@ describe("the debate shape in the runner (spec §3.3)", () => {
       expect(mapCalls.length).toBeGreaterThan(3);
       const rootZero = body[body.indexOf(mapCalls.at(-1)!) + 1]!;
       expect(rootZero.room).toBe(0);
-      return { mapCalls, rootZero };
+      // Root 0's first grader: the first panel request after root 0's author call (one call at a time).
+      const rootZeroAsked = run.gates.requests.findIndex((request) => request.kind === "JUDGE" && materialOf(request).contractId.startsWith("judge.assigned-root."));
+      const graderModel = run.gates.requests.slice(rootZeroAsked).find((request) => request.kind === "PANEL")!.model;
+      const rootZeroGrader = TARGETS.find((target) => PANEL_REFS.includes(target.providerRef) && target.model === graderModel)!.providerRef;
+      return { mapCalls, rootZero, rootZeroGrader };
     }
     /**
      * The first map call after the first one (mid-map) at which a ceiling exists that admits every earlier map call
@@ -326,7 +334,9 @@ describe("the debate shape in the runner (spec §3.3)", () => {
           call.spent + rootZero.projected);
         const crossing = call.spent + call.projected;
         if (refusal === "MONEY" && lowest < crossing) return { index, ceiling: lowest + Math.floor((crossing - lowest) / 2) };
-        if (refusal === "ROOM" && Math.max(lowest, crossing) < crossing + call.room) return { index, ceiling: Math.max(lowest, crossing) };
+        // ROOM: any ceiling from max(lowest, crossing) up to (not including) crossing + room; the midpoint, never an edge.
+        const fits = Math.max(lowest, crossing);
+        if (refusal === "ROOM" && fits < crossing + call.room) return { index, ceiling: fits + Math.floor((crossing + call.room - 1 - fits) / 2) };
       }
       throw new Error(`test: no map call can be refused for ${refusal} mid-map`);
     }
@@ -334,16 +344,18 @@ describe("the debate shape in the runner (spec §3.3)", () => {
 
     it("a body ceiling below a map call's projection stops the map for money: root 0 is sent and charged, and the answer is written", async () => {
       const question = "debate-shape-hosted-money-1234567890";
-      // Root 0's maker is priced cheap and every other maker dear, so a dear map call can cross a ceiling that root 0's
-      // room (priced at root 0's own seat, T12-R2) and every earlier map call fit under.
+      // Root 0's maker is priced cheap and the others dear, so a dear map call can cross a ceiling that root 0's room
+      // (priced at root 0's own seat, T12-R2) and every earlier map call fit under. Root 0's first grader is cheap too:
+      // it fits after the stop, so the only thing that holds every other root back is the run-wide stop at rank [].
       const first = await measured("hosted-money-who", question, () => CHEAP);
       const rootZeroRef = first.rootZero.providerRef;
-      const priceOf = (providerRef: string) => providerRef === rootZeroRef ? CHEAP : DEAR;
+      const cheapRefs = new Set([rootZeroRef, first.rootZeroGrader]);
+      const priceOf = (providerRef: string) => cheapRefs.has(providerRef) ? CHEAP : DEAR;
       const { mapCalls, rootZero } = await measured("hosted-money-measure", question, priceOf);
       expect(rootZero.providerRef).toBe(rootZeroRef);
       const stop = stopAt(mapCalls, rootZero, "MONEY");
       const hosted = hostedMoney(stop.ceiling, priceOf);
-      const { debate, result, calls } = await argue("hosted-money-stop", "free", STANDARD, 1, {}, false, { money: hosted.money, question });
+      const { debate, gates, result, calls } = await argue("hosted-money-stop", "free", STANDARD, 1, {}, false, { money: hosted.money, question });
       expect(result.kind).toBe("COMPLETED");
       // The map call was refused before it was sent, as the run's real money stop; nothing of the map was asked after it.
       expect(outcomes(hosted.seamLog)).toEqual([...Array.from({ length: stop.index }, () => "ADMITTED"), "RUN_COST_ENVELOPE_MONEY_REACHED"]);
@@ -354,12 +366,17 @@ describe("the debate shape in the runner (spec §3.3)", () => {
       expect(rootZeroCall).toMatchObject({ providerRef: rootZeroRef, outcome: "ADMITTED" });
       expect(calls.filter((call) => call.call_site_key === "JUDGE" && call.outcome === "OK")).toHaveLength(1);
       expect(calls.filter((call) => call.call_site_key.startsWith("JUDGE:root:"))).toEqual([]);
+      expect(gates.requests.filter((request) => request.kind === "JUDGE")).toHaveLength(1);
+      // Root 0's first grader was asked and answered after the stop (it fits): the stop, not the money left, held the rest.
+      expect(hosted.seamLog.filter((entry) => entry.phase === "BODY" && entry.providerRef === first.rootZeroGrader && entry.room === 0
+        && entry.outcome === "ADMITTED").length).toBeGreaterThan(0);
       expect(hosted.charges.filter((entry) => entry.runId === debate.runId && entry.spendPhase === "BODY" && entry.providerRef === rootZeroRef).length)
         .toBeGreaterThan(0);
       const marks = await q(database.pool, `SELECT mark FROM serve.condition_mark WHERE answer_id=$1`, result.answerId);
       expect(marks.map((row) => row.mark)).toEqual(expect.arrayContaining(["ENVELOPE_EXHAUSTED"]));
       expect(marks.map((row) => row.mark).some((mark) => String(mark).startsWith("MAP_"))).toBe(true);
-      expect((await harness.bodyFactsOf(result.answerId))!.body_stop).not.toBeNull();
+      // The stop is the run-wide MONEY stop raised during the map (at rank [], before everything): the body's stop.
+      expect((await harness.bodyFactsOf(result.answerId))!.body_stop).toBe("MONEY");
       // The answer was written under the answer's own ceiling.
       expect(hosted.seamLog.some((entry) => entry.phase === "SERVE" && entry.outcome === "ADMITTED")).toBe(true);
     }, 600_000);
@@ -564,10 +581,20 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     expect(new Set(makers).size).toBe(shape.answers - 1);
     const busyMaker = TARGETS.find((target) => target.model === busy.busy())!.maker;
     expect(makers).not.toContain(busyMaker);
-    // The arguing went on with at least two distinct makers: points written, every review by another maker.
-    const written = await authorMakers(database.pool, debate.runId);
-    expect(new Set(written.values()).size).toBeGreaterThanOrEqual(2);
-    expect(calls.filter((call) => call.outcome === "OK" && roundOf(call.call_site_key) === 1).length).toBeGreaterThan(0);
+    // The arguing went on with at least two distinct makers: round-1 points written by two makers or more, every
+    // review by another maker.
+    const makerOfRef = (providerRef: string) => TARGETS.find((target) => target.providerRef === providerRef)!.maker;
+    const pointAuthors = calls.filter((call) => call.outcome === "OK" && roundOf(call.call_site_key) === 1).map((call) => makerOfRef(call.actor_ref));
+    expect(pointAuthors.length).toBeGreaterThan(0);
+    expect(new Set(pointAuthors).size).toBeGreaterThanOrEqual(2);
+    // Controller ruling T15-S: a maker never replies to itself — the cross-reply between the two positions one maker
+    // holds is skipped (never sent); every other position still gets its one cross-reply.
+    const crossPairs = calls.filter((call) => call.call_site_key.startsWith("JUDGE:cross-root:")).map((call) => {
+      const [from, to] = call.call_site_key.slice("JUDGE:cross-root:".length).split("->").map(Number);
+      return `${makers[from!]!} -> ${makers[to!]!}`;
+    });
+    expect(crossPairs.length).toBeGreaterThan(0);
+    expect(crossPairs.filter((pair) => pair.split(" -> ")[0] === pair.split(" -> ")[1])).toEqual([]);
     const sameMakerReviews = await q(database.pool, `SELECT review.node_id FROM ledger.node_review AS review
       JOIN ledger.raw_artifact AS author ON author.raw_artifact_id = review.author_raw_artifact_ref
       JOIN ledger.raw_artifact AS reviewer ON reviewer.raw_artifact_id = review.review_raw_artifact_ref
@@ -618,8 +645,13 @@ describe("the debate shape in the runner (spec §3.3)", () => {
    * keep-alive's time limit: the same abandon as a lost claim, `keepAliveStop`) is claimed again: the second copy argues
    * the STORED map — no map call is asked or charged again — and the scrutiny slots (keys bound to slot positions)
    * serve the same nodes as an uninterrupted run of the same admitted debate.
+   *
+   * OWED COVERAGE (blocked): a re-claim AFTER a node was saved — scrutiny slot keys reused for re-ranked nodes, and
+   * core.map_position.root_node_id left pointing at the first pass's root — cannot be tested yet: every run re-claimed
+   * after a saved node fails with STRENGTH_LINEAGE_UNRESOLVED (a pre-existing engine bug on dev since 2026-08-11,
+   * shaped or not; its own task). This case therefore loses the debate before any node is saved.
    */
-  it("a re-claimed shaped run argues its stored map, never asks or charges the map again, and its scrutiny slots serve the same nodes", async () => {
+  it("a re-claimed shaped run, lost before any node is saved, argues its stored map, never asks or charges the map again, and its scrutiny slots serve the same nodes", async () => {
     const shape = shapeForTest({ plan: "pro", makers: PANEL_REFS.length, settings: DEEP });
     const seedName = "debate_shape_reclaim_seed";
     await copyDatabase(admin, MIGRATED_COPY, seedName);

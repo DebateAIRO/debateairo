@@ -8284,6 +8284,10 @@ export class WalkingSkeletonRunner {
         const [ownPosition, otherMakersPosition] = await Promise.all([statements[shapeLeg.rootIndex]!.promise, statements[target]!.promise]);
         // As today: a dropped root neither defends nor is attacked, and a root never written has no cross-reply.
         if (ownPosition === null || otherMakersPosition === null || arguingStopped()) return;
+        // Controller ruling T15-S (owner principle: positions argued by different AIs): after a SHARE hand-over two
+        // positions can have one maker, and a maker never replies to itself — that cross-reply is skipped, never sent
+        // (so it stays within the price). Read from who REALLY wrote each root (`answeredMakers`).
+        if (answeredMakers[shapeLeg.rootIndex] !== undefined && answeredMakers[shapeLeg.rootIndex] === answeredMakers[target]) return;
         // Pre-flight PF-B42: keyed by root index in a shaped run.
         const writer = positionAnswerers.get(shapeLeg.rootIndex);
         if (writer === undefined) {
