@@ -7,7 +7,10 @@ import type { DebateShapeSettings } from "@debateai/contract";
 import { MAP_CONTRACT_IDS, mapPromptContractHash } from "@debateai/map";
 import { debateShapePolicyStartValues, resolveDebateShape, type DebateShapeCeilingInput, type DebateShapePlanKey } from "@debateai/register";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
-import { OWNER_CALL_CONCURRENCY, PANEL_REFS, type AdmittedRun, type PreviewGates, type previewDebateHarness } from "./preview-debate-harness.js";
+import {
+  OWNER_CALL_CONCURRENCY, PANEL_REFS, RUN_RESILIENCE, type AdmittedRun, type PreviewGates, type PreviewRunnerMoney,
+  type previewDebateHarness
+} from "./preview-debate-harness.js";
 import type { GateOverride, GateRequest } from "./preview-gate-stubs.js";
 import { scriptedAnswers } from "./scripted-answers.js";
 
@@ -26,6 +29,13 @@ const why = "It could change the answer for the people affected.";
 export type ShapeScriptOptions = Readonly<{
   fail?: ReadonlySet<"ANGLES" | "MERGE" | "CHOOSE" | "LISTS_BUT_ONE" | "CHOOSE_ONE_ANSWER">;
   stopAt?: "MERGE"; stopCloseCallAfter?: number; reviews?: "agree" | "dispute"; panelSpread?: boolean;
+  /**
+   * Plan Task 15 (binding note 5, the TRAVEL route): with `stopCloseCallAfter`, the first `stopCloseCallSkip` nodes whose
+   * panel reaches the close-call extension are graded in full; the stop applies from the next such node on.
+   */
+  stopCloseCallSkip?: number;
+  /** How many of the merged answers the choose names (default 3; plan Task 15's SHARE case names all four). */
+  chooseAnswers?: number;
 }>;
 
 /**
@@ -39,6 +49,10 @@ export function scriptedShapeAnswers(question: string, options: ShapeScriptOptio
   // every member of one node's panel). With `stopCloseCallAfter: n`, the (n+1)-th and later grading request of a node
   // (the close-call extension's extra members) is refused as the run's money ceiling.
   const gradingSeen = new Map<string, number>();
+  /** The nodes whose panel reached its extension, in the order they reached it (`stopCloseCallSkip`). */
+  const extended: string[] = [];
+  /** `panelSpread`: per node (its framed material), the model that grades it low. */
+  const spreadLow = new Map<string, string>();
   return (request: GateRequest, chat: string): GateOverride | null => {
     if (request.kind === "MAP") {
       const contractId = readFramedMaterial(wirePacket(chat)).contractId;
@@ -76,7 +90,7 @@ export function scriptedShapeAnswers(question: string, options: ShapeScriptOptio
         if (fail.has("CHOOSE")) return { content: "not json" };
         const keyPoints = (JSON.parse(field(chat, "key_points")) as { key_point_id: string }[]).map((row) => row.key_point_id);
         const answers = JSON.parse(field(chat, "answers")) as { answer_id: string; answer: string }[];
-        const named = (fail.has("CHOOSE_ONE_ANSWER") ? answers.slice(0, 1) : answers.slice(0, 3)).map((answer, index, all) => ({
+        const named = (fail.has("CHOOSE_ONE_ANSWER") ? answers.slice(0, 1) : answers.slice(0, options.chooseAnswers ?? 3)).map((answer, index, all) => ({
           answer_id: answer.answer_id, statement: answer.answer,
           for: keyPoints.filter((_id, at) => at % all.length === index).slice(0, 2),
           // Pre-flight PF-B52: with one answer, `for` and `against` would name the same key points, which the choose
@@ -92,7 +106,10 @@ export function scriptedShapeAnswers(question: string, options: ShapeScriptOptio
       const node = digestOf(JSON.stringify(material.fields));
       const seen = (gradingSeen.get(node) ?? 0) + 1;
       gradingSeen.set(node, seen);
-      if (seen > options.stopCloseCallAfter) return { gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" };
+      if (seen > options.stopCloseCallAfter) {
+        if (!extended.includes(node)) extended.push(node);
+        if (extended.indexOf(node) >= (options.stopCloseCallSkip ?? 0)) return { gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" };
+      }
     }
     const answer = others(request, chat);
     if (answer === null || !("content" in answer)) return answer;
@@ -101,8 +118,14 @@ export function scriptedShapeAnswers(question: string, options: ShapeScriptOptio
       return { content: JSON.stringify({ ...parsed, outcome: options.reviews }) };
     }
     if (request.kind === "PANEL" && options.panelSpread === true) {
+      // Plan Task 15: EVERY node with two graders is a close call — the first model to grade a node grades it low, every
+      // other model high. (Keyed by model, not by maker name, as before: the old "Qwen grades low" rule left root 0
+      // without a close call whenever the rotation made Qwen root 0's author or left it off root 0's panel, about one
+      // run in six, so the root-0 cases depended on the random question.)
+      const node = digestOf(JSON.stringify(readFramedMaterial(wirePacket(chat)).fields));
+      if (!spreadLow.has(node)) spreadLow.set(node, request.model);
       const parsed = JSON.parse(answer.content) as { steelman: { fidelity: number } };
-      return { content: JSON.stringify({ ...parsed, steelman: { ...parsed.steelman, fidelity: request.model.includes("Qwen") ? 0.05 : 0.95 } }) };
+      return { content: JSON.stringify({ ...parsed, steelman: { ...parsed.steelman, fidelity: spreadLow.get(node) === request.model ? 0.05 : 0.95 } }) };
     }
     return answer;
   };
@@ -114,6 +137,14 @@ export type ShapeDebateOptions = Readonly<{
   label?: string; plan?: "free" | "pro"; settings?: DebateShapeSettings; depth?: number;
   script?: ShapeScriptOptions; concurrency?: boolean;
   language?: Readonly<{ tag: string; name: string }>; question?: string;
+  /** Plan Task 15: the adaptive stopping row (δ, ε); absent, the harness's δ = ε = 0 (nothing stops early). */
+  stoppingPolicy?: Readonly<{ delta: number; epsilon: number }>;
+  /** Plan Task 15 (hand-over cases): the preview's run resilience (the sit-out book), as main.ts composes it. */
+  resilience?: boolean;
+  /** Plan Task 15: asked before the script for every gate request; null lets the script answer. */
+  before?: (request: GateRequest, chat: string) => GateOverride | null;
+  /** Plan Task 15 (T12-R0): a hosted runner's money seam and prices. */
+  money?: PreviewRunnerMoney;
 }>;
 export type ShapeDebateRun = Readonly<{
   debate: AdmittedRun; gates: PreviewGates; shape: DebateShapeCeilingInput;
@@ -136,10 +167,16 @@ export async function runShapeDebate(harness: ShapeDebateHarness, options: Shape
     ...(options.language === undefined ? {} : { language: options.language }),
     ...(options.question === undefined ? {} : { question: options.question })
   });
-  const gates = await harness.startGates({}, undefined, scriptedShapeAnswers(debate.question, options.script ?? {}));
+  const scripted = scriptedShapeAnswers(debate.question, options.script ?? {});
+  const before = options.before;
+  const gates = await harness.startGates({}, undefined, before === undefined ? scripted
+    : (request, chat) => before(request, chat) ?? scripted(request, chat));
   const composed = await harness.previewRunner(gates, "resend", {
     ...((options.concurrency ?? true) ? { callConcurrency: OWNER_CALL_CONCURRENCY } : {}),
-    debateShape: { mapContractHash: mapPromptContractHash() }
+    debateShape: { mapContractHash: mapPromptContractHash() },
+    ...(options.stoppingPolicy === undefined ? {} : { stoppingPolicy: options.stoppingPolicy }),
+    ...(options.resilience === true ? { resilience: RUN_RESILIENCE } : {}),
+    ...(options.money === undefined ? {} : { money: options.money })
   });
   const result = await harness.completedRun(composed, debate, gates);
   return { debate, gates, shape, result, calls: await harness.modelCalls(debate.runId) };

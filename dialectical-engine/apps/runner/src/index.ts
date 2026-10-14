@@ -6335,9 +6335,9 @@ export class WalkingSkeletonRunner {
           const folded = shapeCloseCallFold({ heard, notes, extension, stopOf: (error) => panelSpendStop(error, input.onSpendStop) });
           heard = folded.heard;
           notes = folded.notes;
-          closeCallAdded = folded.added;
+          const heardExtras = folded.added;
           closeCallStop = folded.spendStop;
-          if (closeCallAdded > 0) reduced = reduceHeard(heard);
+          if (heardExtras > 0) reduced = reduceHeard(heard);
           // Controller ruling T14-P: the extension's count is the extras that REDUCED (a heard extra the reduction
           // could not use is not a voice on this node), never the extras merely heard.
           closeCallAdded = reduced.reducedMembers.length - baseReduced.reducedMembers.length;
@@ -6787,9 +6787,16 @@ export class WalkingSkeletonRunner {
      * the answer as an envelope record — and the run goes on to its answer with what it has. Set once, never unset.
      */
     let membersSatOutStop = false;
+    /**
+     * The members left to argue. Debate shape (Task 15, binding note 3): a SHARE hand-over puts one seat in two
+     * positions, so a shaped run counts the distinct MAKERS of the seats that do not sit out (`shapeDistinctMakers`,
+     * what P is sized with) — a seat counted twice is still one maker. Row absent: today's count of seats.
+     */
+    const membersLeftToArgue = (): number => shapeRun !== null ? shapeDistinctMakers(rootSeats, seatSitsOut)
+      : rootSeats.filter((_seat, rootIndex) => !rootSitsOut(rootIndex)).length;
     const tooFewLeftToArgue = (): boolean => {
       if (sitOut !== null && effectiveMakerCount > 1 && !membersSatOutStop) {
-        membersSatOutStop = rootSeats.filter((_seat, rootIndex) => !rootSitsOut(rootIndex)).length < 2;
+        membersSatOutStop = membersLeftToArgue() < 2;
       }
       return membersSatOutStop;
     };
@@ -6802,7 +6809,7 @@ export class WalkingSkeletonRunner {
     const noteTooFew = (rank: readonly number[]): void => { tooFewRank ??= rank; };
     afterFailedCall = () => {
       if (tooFewRank !== null || effectiveMakerCount <= 1) return;
-      if (rootSeats.filter((_seat, rootIndex) => !rootSitsOut(rootIndex)).length < 2) noteTooFew(chainStageScope.getStore()?.rank ?? []);
+      if (membersLeftToArgue() < 2) noteTooFew(chainStageScope.getStore()?.rank ?? []);
     };
     /**
      * Parallel AI calls (spec 2026-10-12 §2.1) — THE PLAN, KNOWN BEFORE ROOT 0. Both plans are pure functions of the
@@ -7909,9 +7916,12 @@ export class WalkingSkeletonRunner {
     }
 
     const haltedIndices = new Set<number>();
+    // Task 15 (Task 14 minor): the walk reaches the scrutiny legs too, once scrutiny has planned them (`scrutinyLegs`,
+    // parents before children, after every leg of the plan), so a halted scrutiny reply counts the legs beneath it.
+    // Empty on today's run and before scrutiny chose: today's walk.
     const subtreeIndices = (rootIndex: number): readonly number[] => {
       const indices = new Set([rootIndex]);
-      for (const candidate of expansionPlan) {
+      for (const candidate of [...expansionPlan, ...scrutinyLegs.values()]) {
         if (indices.has(candidate.parentIndex)) indices.add(candidate.childIndex);
       }
       return Object.freeze([...indices]);

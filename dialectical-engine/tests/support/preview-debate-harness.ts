@@ -50,7 +50,7 @@ import {
   type DebateShapeCeilingInput
 } from "@debateai/register";
 import type { DebateShapeSettings } from "@debateai/contract";
-import { createPostgresProviderGateway, WalkingSkeletonRunner, type WalkingSkeletonSettings } from "@debateai/runner";
+import { createPostgresProviderGateway, WalkingSkeletonRunner, type ProviderPriceMap, type WalkingSkeletonSettings } from "@debateai/runner";
 import {
   pickRotatedRoles,
   ROLE_ROTATION_RULE,
@@ -170,6 +170,18 @@ export type LaneEvent = Readonly<
   | { kind: "STARTED"; priority: CallPriority; model: string }
   | { kind: "FAILED"; priority: CallPriority; model: string; error: unknown }
 >;
+
+/**
+ * Debate shape (plan Task 15, ruling T12-R0): a HOSTED runner's money, on this preview composition — the run's money
+ * seam built per call (`buildCostEnvelopeSeam`, as main.ts builds it from its CostEnvelopeGuard), the story's own seam,
+ * and the price of every target (`providerPrices`, as main.ts's `buildProviderPriceMap` in hosted mode).
+ */
+export type PreviewRunnerMoney = Readonly<{
+  /** The seam builder of one target's gateway (main.ts builds it with that target's own price). */
+  buildCostEnvelopeSeam: (providerRef: string) => NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildCostEnvelopeSeam"]>;
+  buildStoryCostEnvelopeSeam?: (providerRef: string) => NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildStoryCostEnvelopeSeam"]>;
+  providerPrices: ProviderPriceMap;
+}>;
 
 export type ComposedPreviewRunner = ReturnType<ReturnType<typeof previewDebateHarness>["previewRunner"]>;
 export type AdmittedRun = Awaited<ReturnType<ReturnType<typeof previewDebateHarness>["admittedRun"]>>;
@@ -299,6 +311,8 @@ export function previewDebateHarness(input: Readonly<{
       stoppingPolicy?: Readonly<{ delta: number; epsilon: number }>;
       /** Debate shape (plan Task 15): the runner's shape settings (the sealed map hash), passed as main.ts passes them. */
       debateShape?: DebateShapeRunnerSettings;
+      /** Plan Task 15 (T12-R0): a hosted runner's money seam and prices; absent, no money bound (local mode). */
+      money?: PreviewRunnerMoney;
     }> = {}
   ) {
     const probeSleeps: number[] = [];
@@ -353,7 +367,11 @@ export function previewDebateHarness(input: Readonly<{
     const topology = createRunnerProviderTopology(TARGETS, (target) => withPreviewProviderCallPolicy(
       createPostgresProviderGateway(pool(), {
         fetchImplementation: gates.guardedFetch, endpoint: target.baseUrl, model: target.model, maker: target.maker,
-        ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(PREVIEW, target), inFlight: gatewayInFlight
+        ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(PREVIEW, target), inFlight: gatewayInFlight,
+        ...(options.money === undefined ? {} : {
+          buildCostEnvelopeSeam: options.money.buildCostEnvelopeSeam(target.providerRef),
+          ...(options.money.buildStoryCostEnvelopeSeam === undefined ? {} : { buildStoryCostEnvelopeSeam: options.money.buildStoryCostEnvelopeSeam(target.providerRef) })
+        })
       }),
       PREVIEW, target, { sleep: async (milliseconds) => { callSleeps.push(milliseconds); }, busy }
     ));
@@ -407,6 +425,7 @@ export function previewDebateHarness(input: Readonly<{
       ...(options.resilience === undefined ? {} : { runResilience: options.resilience }),
       callScheduler,
       ...(options.debateShape === undefined ? {} : { debateShape: options.debateShape }),
+      ...(options.money === undefined ? {} : { providerPrices: options.money.providerPrices }),
       callSubjects: previewCallSubjects(PREVIEW),
       holdRecorder: {
         countCooldownHolds: async () => holdWaits.length,
