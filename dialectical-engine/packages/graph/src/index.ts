@@ -335,6 +335,16 @@ export class GraphWriter {
     return inserted.rows[0]!.node_id;
   }
 
+  /** See GraphRepository.retireNodes. */
+  async retireNodes(keepNodeIds: readonly string[]): Promise<number> {
+    const retired = await this.client.query(
+      `UPDATE core.node SET generation_status='stale'
+       WHERE run_id=$1 AND generation_status <> 'stale' AND NOT (node_id = ANY($2::uuid[]))`,
+      [this.runId, [...keepNodeIds]]
+    );
+    return retired.rowCount ?? 0;
+  }
+
   async addEdge(input: AddEdgeInput): Promise<string> {
     if (input.runId !== this.runId) throw new TypedDomainError("GRAPH_RUN_MISMATCH", "Edge belongs to another graph");
     const targetId = input.targetNodeId ?? input.targetEdgeId;
@@ -532,6 +542,17 @@ export class GraphRepository {
     return this.withGraphWrite(input.runId, (writer) => writer.spawnPendingChild(input));
   }
 
+  /**
+   * Reclaim resume (spec 2026-10-14, migration 0118): sets aside every node of the run that is not already set aside
+   * and is not one of `keepNodeIds` (generation_status 'stale'), under the run's graph-write lock, and answers how many
+   * it set aside. A copy that takes a run over calls it with no ids before it writes anything (the dead copy's nodes),
+   * and with its own saved ids before scoring (a dying copy that was still writing). 0118's trigger lets the runtime
+   * change nothing but that one column, one way: a stale node never comes back, and its readers skip it.
+   */
+  async retireNodes(runId: string, keepNodeIds: readonly string[]): Promise<number> {
+    return this.withGraphWrite(runId, async (writer) => writer.retireNodes(keepNodeIds));
+  }
+
   async readNodeLifecycleEvents(runId: string, signal?: AbortSignal): Promise<readonly NodeLifecycleEvent[]> {
     const [spawned, judging, scored] = await Promise.all([
       queryPrivateStream<{
@@ -556,6 +577,7 @@ export class GraphRepository {
          FROM ledger.ledger_entry AS entry
          JOIN core.node AS node
            ON node.run_id=entry.run_id AND node.node_id::text=entry.subject_item_id
+          AND node.generation_status <> 'stale'
          WHERE entry.run_id=$1 AND entry.action_kind='JUDGEMENT_SCHEDULED'`,
         [runId], signal
       ),
@@ -576,6 +598,7 @@ export class GraphRepository {
          JOIN ledger.propagation_run AS propagation
            ON propagation.propagation_run_id=strength.propagation_run_id
          JOIN core.node AS node ON node.node_id=strength.node_id AND node.run_id=propagation.run_id
+          AND node.generation_status <> 'stale'
          WHERE propagation.run_id=$1`,
         [runId], signal
       )

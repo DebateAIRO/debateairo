@@ -1077,6 +1077,11 @@ export class JudgementRepository {
     });
   }
 
+  /**
+   * Reclaim resume (spec 2026-10-14, migration 0118): every read of the run's reviews and judgements here counts only
+   * the nodes of the live copy. A copy that took the run over sets the dead copy's nodes aside (generation_status
+   * 'stale') and writes its own, so a stale node's review or judgement is the dead copy's and must not steer this one.
+   */
   async readLatestReviewerMaker(runId: string, authorMaker: string): Promise<string | null> {
     const result = await this.pool.query<{ reviewer_maker: string }>(
       `SELECT reviewer.maker AS reviewer_maker
@@ -1085,6 +1090,8 @@ export class JudgementRepository {
          ON author.raw_artifact_id = review.author_raw_artifact_ref
        JOIN ledger.raw_artifact AS reviewer
          ON reviewer.raw_artifact_id = review.review_raw_artifact_ref
+       JOIN core.node AS node
+         ON node.node_id = review.node_id AND node.generation_status <> 'stale'
        WHERE review.run_id=$1 AND author.maker=$2
        ORDER BY review.at_seq DESC
        LIMIT 1`,
@@ -1120,10 +1127,11 @@ export class JudgementRepository {
    */
   async readReviewedNodeIds(runId: string): Promise<readonly string[]> {
     const result = await this.pool.query<{ node_id: string }>(
-      `SELECT node_id::text
-       FROM ledger.node_review
-       WHERE run_id=$1 AND outcome IN ('agree', 'dispute')
-       ORDER BY at_seq`,
+      `SELECT review.node_id::text
+       FROM ledger.node_review AS review
+       JOIN core.node AS node ON node.node_id=review.node_id AND node.generation_status <> 'stale'
+       WHERE review.run_id=$1 AND review.outcome IN ('agree', 'dispute')
+       ORDER BY review.at_seq`,
       [runId]
     );
     return Object.freeze(result.rows.map((row) => row.node_id));
@@ -1141,10 +1149,11 @@ export class JudgementRepository {
    */
   async readDisputedNodeIds(runId: string): Promise<readonly string[]> {
     const result = await this.pool.query<{ node_id: string }>(
-      `SELECT node_id::text
-       FROM ledger.node_review
-       WHERE run_id=$1 AND outcome = 'dispute'
-       ORDER BY at_seq`,
+      `SELECT review.node_id::text
+       FROM ledger.node_review AS review
+       JOIN core.node AS node ON node.node_id=review.node_id AND node.generation_status <> 'stale'
+       WHERE review.run_id=$1 AND review.outcome = 'dispute'
+       ORDER BY review.at_seq`,
       [runId]
     );
     return Object.freeze(result.rows.map((row) => row.node_id));
@@ -1236,6 +1245,7 @@ export class JudgementRepository {
               judgement.reduced_judgement_id::text, judgement.raw_artifact_ref::text,
               judgement.way_of_knowing
        FROM ledger.reduced_judgement AS judgement
+       JOIN core.node AS node ON node.node_id=judgement.node_id AND node.generation_status <> 'stale'
        WHERE judgement.run_id=$1
        ORDER BY judgement.node_id, judgement.at_seq DESC`,
       [runId]

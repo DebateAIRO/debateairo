@@ -418,6 +418,17 @@ export const mapPosition = core.table("map_position", {
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
 });
 
+// Reclaim resume (0118): an answer's root moved from a root a later copy set aside ('stale') to that copy's own root.
+// Append-only, ids and codes only; the root in force is the last move's (packages/map's readMapChoiceForRun).
+export const mapPositionRepoint = core.table("map_position_repoint", {
+  runId: uuid("run_id").notNull(),
+  answerId: text("answer_id").notNull(),
+  fromRootNodeId: uuid("from_root_node_id").notNull(),
+  rootNodeId: uuid("root_node_id").notNull(),
+  maker: text("maker").notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
+});
+
 export const nodeReview = ledger.table("node_review", {
   nodeReviewId: uuid("node_review_id").primaryKey(),
   runId: uuid("run_id").notNull(),

@@ -31,9 +31,29 @@ export type MapChoiceAnswerRecord = Readonly<{ answerId: string; statement: stri
 export type MapAlsoRaisedRecord = Readonly<{ keyPointId: string; claim: string; makers: readonly string[] }>;
 export type MapChoiceRecord = Readonly<{ opening: "MAP" | "TODAYS_OPENING"; answers: readonly MapChoiceAnswerRecord[];
   alsoRaised: readonly MapAlsoRaisedRecord[]; marks: readonly MapMark[] }>;
-export type MapWriteOutcome = "INSERTED" | "ALREADY_PRESENT" | "RUN_ERASED";
+/**
+ * REPOINTED (writeMapPosition only, migration 0118): the answer's position already named a root that a copy which took
+ * the run over has set aside ('stale'), and now names the given root. A caller treats it as INSERTED.
+ */
+export type MapWriteOutcome = "INSERTED" | "ALREADY_PRESENT" | "REPOINTED" | "RUN_ERASED";
 
 const SENTINEL = JSON.stringify(CONTENT_JSON_SENTINEL);
+
+/**
+ * Each position's root IN FORCE (migration 0118): the last re-point's root (the move no later move of the answer starts
+ * from), else the position's own; its maker likewise; and whether that root has been set aside ('stale'). Ids and codes
+ * only. `$1` is the run; a caller may append `AND position.answer_id = $2`.
+ */
+const ROOT_IN_FORCE_SQL = `SELECT position.answer_id, COALESCE(moved.root_node_id, position.root_node_id)::text AS root_node_id,
+         COALESCE(moved.maker, position.maker) AS maker, node.generation_status = 'stale' AS stale
+    FROM core.map_position AS position
+    LEFT JOIN core.map_position_repoint AS moved
+      ON moved.run_id = position.run_id AND moved.answer_id = position.answer_id
+     AND NOT EXISTS (SELECT 1 FROM core.map_position_repoint AS later
+                      WHERE later.run_id = moved.run_id AND later.answer_id = moved.answer_id
+                        AND later.from_root_node_id = moved.root_node_id)
+    JOIN core.node AS node ON node.run_id = position.run_id AND node.node_id = COALESCE(moved.root_node_id, position.root_node_id)
+   WHERE position.run_id = $1`;
 
 // 0116's code shapes, held here too so a breach is refused typed (and value-free) before any seal.
 const ITEM_ID = /^[a-z]{2}[0-9]{2,4}$/u;
@@ -190,7 +210,14 @@ export class MapChoiceRepository {
     }
   }
 
-  /** Which root argued a chosen answer, once that root is saved (ids and codes only: not a content carrier). */
+  /**
+   * Which root argued a chosen answer, once that root is saved (ids and codes only: not a content carrier). A re-claimed
+   * run finds the first pass's row (ALREADY_PRESENT). When that row's root in force has been set aside (reclaim resume,
+   * migration 0118: the copy that took the run over marked the dead copy's nodes 'stale' and saved its own), the
+   * answer's root moves to the given one: one append-only row of core.map_position_repoint (0118's trigger checks that
+   * the move starts from the root in force, which is stale, and ends on a live node of the run) — REPOINTED. The
+   * position's root_index stays the first pass's. An erased run answers RUN_ERASED (0040's barrier on either table).
+   */
   async writeMapPosition(input: Readonly<{ runId: string; answerId: string; rootIndex: number; rootNodeId: string; maker: string }>): Promise<MapWriteOutcome> {
     if (!ANSWER_ID.test(input.answerId)) throw recordInvalid("answerId");
     if (!Number.isSafeInteger(input.rootIndex) || input.rootIndex < 0) throw recordInvalid("rootIndex");
@@ -202,7 +229,17 @@ export class MapChoiceRepository {
          ON CONFLICT (run_id, answer_id) DO NOTHING`,
         [input.runId, input.answerId, input.rootIndex, input.rootNodeId, input.maker]
       );
-      return inserted.rowCount === 1 ? "INSERTED" : "ALREADY_PRESENT";
+      if (inserted.rowCount === 1) return "INSERTED";
+      const inForce = (await this.pool.query<{ root_node_id: string; stale: boolean }>(
+        `${ROOT_IN_FORCE_SQL} AND position.answer_id = $2`, [input.runId, input.answerId])).rows[0];
+      if (inForce === undefined || !inForce.stale || inForce.root_node_id.toLowerCase() === input.rootNodeId.toLowerCase()) {
+        return "ALREADY_PRESENT";
+      }
+      await this.pool.query(
+        `INSERT INTO core.map_position_repoint (run_id, answer_id, from_root_node_id, root_node_id, maker) VALUES ($1,$2,$3,$4,$5)`,
+        [input.runId, input.answerId, inForce.root_node_id, input.rootNodeId, input.maker]
+      );
+      return "REPOINTED";
     } catch (error) {
       if (await this.#erased(error, input.runId)) return "RUN_ERASED";
       throw error;
@@ -225,8 +262,7 @@ export class MapChoiceRepository {
   async readMapChoiceForRun(runId: string): Promise<MapChoiceRecord | null> {
     const read = await this.#leasedRead(runId, null, () => this.#readChoiceLeased(runId));
     if (read === null) return null;
-    const positions = await this.pool.query<{ answer_id: string; root_node_id: string; maker: string }>(
-      `SELECT answer_id, root_node_id::text AS root_node_id, maker FROM core.map_position WHERE run_id = $1`, [runId]);
+    const positions = await this.pool.query<{ answer_id: string; root_node_id: string; maker: string }>(ROOT_IN_FORCE_SQL, [runId]);
     const byAnswer = new Map(positions.rows.map((row) => [row.answer_id, row] as const));
     return Object.freeze({
       opening: read.opening,

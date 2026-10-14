@@ -118,9 +118,12 @@ function claimKey(claim: string): string {
  * show. So is one with no node, or a second answer on the same node. Also-raised claims are
  * merged when they say the same (their makers joined), come most-raised first, ties in the map's
  * order, and only the claims travel.
- * After a re-claim, P2b keeps the first pass's `root_node_id` (`core.map_position` is written
- * with ON CONFLICT DO NOTHING). If that node is not in the answer the position is dropped
- * here: its title just does not show (pre-flight PF-C19).
+ * After a re-claim, `core.map_position` keeps the first pass's `root_node_id` (it is written
+ * with ON CONFLICT DO NOTHING), but a copy that took the run over after a crash set that root
+ * aside and moved the answer to its own root (migration 0118's `core.map_position_repoint`);
+ * `readMapChoiceForRun` carries the root in force, so the title shows. If the recorded node is
+ * still not in the answer the position is dropped here: its title just does not show
+ * (pre-flight PF-C19).
  */
 export function debateMapViewFrom(record: MapViewSource, nodeIds: ReadonlySet<string>): DebateMapView {
   const seen = new Set<string>();

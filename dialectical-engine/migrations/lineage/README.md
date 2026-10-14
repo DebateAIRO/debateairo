@@ -10,12 +10,12 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the debate shape's map (0116, below) the sixth and the language check's site cost (0117, below) the seventh. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the debate shape's map (0116, below) the sixth, the language check's site cost (0117, below) the seventh and the reclaim resume (0118, below) the eighth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0117: 0117,
-   `language-check-spend-forward0117.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0117 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0118: 0118,
+   `reclaim-resume-forward0118.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0118 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -123,6 +123,27 @@ postcondition digest (the writer's and the guard's owners, rights, settings, def
 and the two CHECKs by name and definition). If `origin/dev` takes 0117 first, renumber this step at merge time (its manifest, loader name and
 `previous` follow), as C1's recipe above says.
 
+## The reclaim resume (0118)
+
+The eighth chain step, after the language check's site cost 0117 (spec
+`docs/superpowers/specs/2026-10-14-reclaim-resume-design.md`, "The database change"): `0118_reclaim_resume.sql`,
+`reclaim-resume-forward0118.json`, `packages/db/src/migration-forward0118.ts` (`loadForward0118`, appended last to
+`STEPS`, `MIGRATION_FORWARD0118_*` refusals). A copy that takes a run over after a crash sets the dead copy's nodes
+aside instead of deleting them. `debateai_runtime` gets `UPDATE (generation_status) ON core.node`, and the trigger
+`reject_mutation_except_retire` (function `core.reject_node_mutation_except_retire()`, replacing 0000's
+`reject_mutation` on `core.node`) decides for every role, the owner included: DELETE is refused, an UPDATE may change
+nothing but `generation_status`, only to `stale` and never from `stale` (one way), and not on an erased encrypted run
+(`PRIVATE_CONTENT_ERASED`). An answer's map root moves in a NEW append-only table, `core.map_position_repoint`
+(run, answer, the root moved from, the root moved to, maker; trigger `enforce_map_position_repoint`, 0040's erasure
+barrier, `reject_mutation`, the TRUNCATE guard; `debateai_runtime` may SELECT and INSERT, `debateai_replay` may
+SELECT): a move starts from the root in force (the position's own, or the last move's), which must be stale, and ends
+on a live node of the same run. `core.map_position` itself is not touched, because 0116's postcondition digests its
+ACL, column ACLs and triggers, and a grant or trigger there would read as drift of 0116. No billing relation or
+function, so `verify-effective-capabilities-111.sql` stays the verifier in force; no `replayVerifierSql`: its checks
+are its postcondition digest (the two trigger functions, core.node's guard trigger with 0000's `reject_mutation`
+absent, the runtime's rights on core.node, and the new table whole). If `origin/dev` takes 0118 first, renumber this
+step at merge time (its manifest, loader name and `previous` follow), as C1's recipe above says.
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -131,9 +152,9 @@ own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again 
 COMMIT — so a step's promises (for example the batch's "no runtime may
 publish staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
 changes something an earlier step's verifier pins must change that verifier through its own reviewed step design; it
-cannot silently pass. The effective-capability verifier of the last applied step (after 0117: 0111's, which the batch,
-Part C's step, role rotation, the data export, the debate shape map and the language check's site cost keep) still runs
-at the end of every `migrate()`.
+cannot silently pass. The effective-capability verifier of the last applied step (after 0118: 0111's, which the batch,
+Part C's step, role rotation, the data export, the debate shape map, the language check's site cost and the reclaim
+resume keep) still runs at the end of every `migrate()`.
 
 ## Merge order: check the preview first
 
