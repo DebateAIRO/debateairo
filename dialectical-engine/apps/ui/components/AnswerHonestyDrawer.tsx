@@ -40,6 +40,21 @@ import composeEnglish from "@/messages/en/compose.json";
  */
 const SHAPE_MARKS: ReadonlySet<string> = new Set<string>(DEBATE_SHAPE_MARKS);
 
+/**
+ * Debate shape P2c, ruling C-ONCE: a shape mark's record shows its label only (C-DRAWER), and the runner writes one
+ * record per scrutinised node or map mark occurrence, so the same line would repeat once per record — a count by
+ * another name. Each shape mark keeps its first record; every other record keeps its own line, as today.
+ */
+function shapeMarksOnce<T extends Readonly<{ mark: string }>>(records: readonly T[]): readonly T[] {
+  const shown = new Set<string>();
+  return records.filter((record) => {
+    if (!SHAPE_MARKS.has(record.mark)) return true;
+    if (shown.has(record.mark)) return false;
+    shown.add(record.mark);
+    return true;
+  });
+}
+
 function labeledNumberLine(
   catalog: MessageCatalog,
   number: { value: number; source: string; replay_handle: string }
@@ -252,7 +267,7 @@ export function AnswerHonestyDrawer({
             )}
             {answer.condition_mark_records.length > 0 ? (
               <ul className="drawerFindingList" aria-label={t(catalog, "misc.answerHonesty.namedConditionMarks")}>
-                {answer.condition_mark_records.map((record) => {
+                {shapeMarksOnce(answer.condition_mark_records).map((record) => {
                   // S1b: the runner's two BACKUP-MODEL-USED records in the page's language; every
                   // other record exactly as the engine wrote it.
                   if (SHAPE_MARKS.has(record.mark)) {

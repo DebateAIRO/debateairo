@@ -119,6 +119,30 @@ describe("debate shape P2c — the shape marks in the drawers", () => {
     expect(drawer.querySelector('[title="OWED-CHECK-UNEXECUTED"]')).not.toBeNull();
   });
 
+  // Ruling C-ONCE: the runner writes one SCRUTINY-EXTENDED record per scrutinised node and one map record per mark
+  // occurrence. A label repeated once per record would be a count by another name, so each shows once.
+  it("the honesty drawer shows each shape mark's label once, however many records carry it", () => {
+    const scrutinised = ["node:shape-a", "node:shape-b", "node:shape-c", "node:shape-d", "node:shape-e"];
+    const many = buildFairShapedAnswer({
+      condition_marks: [...BASE.condition_marks, "SCRUTINY-EXTENDED", "MAP_MERGE_FALLBACK"],
+      condition_mark_records: [
+        ...BASE.condition_mark_records,
+        ...scrutinised.map((node, index) => shapeRecord("SCRUTINY-EXTENDED", "node", node, `SCRUTINY_EXTENDED:${String(index)}`)),
+        shapeRecord("MAP_MERGE_FALLBACK", "answer", `${RUN_ID}:1`, MERGE_REASON),
+        shapeRecord("MAP_MERGE_FALLBACK", "answer", `${RUN_ID}:2`, MERGE_REASON)
+      ]
+    });
+    const list = honestyDrawer(many).querySelector(`ul[aria-label="${miscEn["misc.answerHonesty.namedConditionMarks"]!}"]`);
+    expect(list).not.toBeNull();
+    const items = [...list!.querySelectorAll<HTMLElement>("li.drawerFindingItem")].map((item) => item.textContent?.trim() ?? "");
+    const scrutiny = words("debateChrome.condition.scrutinyExtended");
+    const merge = words("debateChrome.condition.mapMergeFallback");
+    expect(items.filter((text) => text === scrutiny)).toHaveLength(1);
+    expect(items.filter((text) => text === merge)).toHaveLength(1);
+    // Every other record keeps its own line, as today.
+    expect(items).toHaveLength(BASE.condition_mark_records.length + 2);
+  });
+
   it("the node drawer shows the shape marks in the neutral tone, without a code tooltip", () => {
     const v3 = { ...SHAPED.nodes[0]!, condition_marks: [...DEBATE_SHAPE_MARKS, "SINGLE-LINEAGE" as const] };
     const drawer = parsed(renderToStaticMarkup(
