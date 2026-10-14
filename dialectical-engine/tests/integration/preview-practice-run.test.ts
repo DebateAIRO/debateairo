@@ -892,6 +892,47 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 Â
     expect(transcript.run.registerVersion).toBe("6");
   }, 900_000);
 
+  // Final review M-5: the one-language offer and its answer, through the real decider and the ask's own resubmission
+  // (the signed check reference, the owner's scope). The fast check reads lang-ro-en-mix as a real mix with a usable
+  // rewrite (the dry script's reading); every other request is the doubles' own.
+  const MIX_CASE = PRACTICE_LANGUAGE_CASES.find((entry) => entry.id === "lang-ro-en-mix")!;
+  const MIX_REWRITE = PRACTICE_LANGUAGE_DRY_REWRITES["lang-ro-en-mix"]!;
+  const questionLineOf = (request: GateRequest): string | undefined =>
+    readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body))).fields.find((field) => field.name === "question_line")?.content;
+  const mixScript = (request: GateRequest): GateOverride | null =>
+    request.kind === "QUESTION_LANGUAGE" ? { content: practiceLanguageDryReading(questionLineOf(request) ?? "") } : null;
+  const offerDebate = async (choice: readonly string[]) => {
+    const { stubs, env, common, quiet, out } = await scenario(mixScript);
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--register-next", "--depth", "1",
+      "--question", "lang-ro-en-mix", ...choice, "--shape-policy", SHAPE_POLICY_START, "--transcript"], env, quiet);
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as { run: { question: { id: string; text: string } } };
+    const angles = stubs.requests.filter((request) => request.kind === "MAP" && questionLineOf(request) !== undefined);
+    return { outcome, report: outcome.report as unknown as ShapeReport, stubs, transcript, mapQuestions: new Set(angles.map(questionLineOf)) };
+  };
+
+  it("lang-ro-en-mix with --language-choice use: the offer is made, the ask is sent again with the server's rewrite, and the debate argues it: PASS (exit 0)", async () => {
+    const { outcome, report, stubs, transcript, mapQuestions } = await offerDebate(["--site-language", "ro", "--language-choice", "use"]);
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
+    // The lock came from the person's choice on the server's signed offer; the rewrite was used and stored as Romanian.
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: true, choice: "USE_REWRITE", rewriteUsed: true,
+      lock: { code: "ro", source: "CHOICE", recordCode: "CHOICE", fast: { outcome: "MIX", main: "ro" } }, storedLanguage: "ro" });
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true } });
+    // The map planned the rewrite, never the mixed wording; the transcript still names the case's own question.
+    expect([...mapQuestions]).toEqual([MIX_REWRITE]);
+    expect(transcript.run.question).toEqual({ id: "lang-ro-en-mix", text: MIX_CASE.questionLine });
+  }, 900_000);
+
+  it("lang-ro-en-mix with the default answer (keep), asked on the case's own site: the offer is made and the person's wording is kept: PASS (exit 0)", async () => {
+    const { outcome, report, mapQuestions } = await offerDebate([]);
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: true, choice: "KEEP_MINE", rewriteUsed: false,
+      lock: { code: "ro", source: "CHOICE", recordCode: "CHOICE" }, storedLanguage: "ro" });
+    expect([...mapQuestions]).toEqual([MIX_CASE.questionLine]);
+  }, 900_000);
+
   it("no --shape-policy and a register without the row: today's shape, nothing new in the report, no map call", async () => {
     const { stubs, env, common, quiet, out } = await scenario();
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1", "--transcript"], env, quiet);
