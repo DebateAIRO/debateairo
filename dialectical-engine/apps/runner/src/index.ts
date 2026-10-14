@@ -171,7 +171,7 @@ import {
   type VerdictLabelDerivation
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from "@debateai/contract";
-import { MapChoiceRepository, type MapResult } from "@debateai/map";
+import { MapChoiceRepository, mapAnswersArgued, type MapResult } from "@debateai/map";
 import {
   argumentLanguageDirective,
   questionLanguageFromRun,
@@ -6893,8 +6893,10 @@ export class WalkingSkeletonRunner {
     const shapeMapPositions = shapeRun === null || debateShapeMap === null || debateShapeMap.choice === null ? null
       : shapePositionsFromMap({ choice: debateShapeMap.choice, keyPoints: debateShapeMap.keyPoints,
         answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer });
+    /** Ruling C-TWO: the map's own answers are argued (two or more); the story and the debate page share this rule. */
+    const shapeMapArgued = shapeMapPositions !== null && mapAnswersArgued(shapeMapPositions.length);
     const shapePositions: readonly ShapePositionPlan[] | null = shapeRun === null ? null
-      : shapeMapPositions !== null && shapeMapPositions.length >= 2 ? shapeMapPositions
+      : shapeMapArgued ? shapeMapPositions
         : shapePositionsForTodaysOpening({ answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer });
     const shapePlan: ShapePlan | null = shapeRun === null || shapePositions === null ? null : buildShapePlan({
       positions: shapePositions, depth: expansionDepth,
@@ -10328,11 +10330,11 @@ export class WalkingSkeletonRunner {
               positionNodeIds: makerPositionNodeIds,
               // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's unchosen points, for the story's "also
               // raised, not debated" paragraph, only when the map's own answers were argued; undefined otherwise.
-              alsoRaised: storyAlsoRaisedFrom(shapeMapPositions !== null && shapeMapPositions.length >= 2 ? debateShapeMap : null),
+              alsoRaised: storyAlsoRaisedFrom(shapeMapArgued ? debateShapeMap : null),
               // Owner ruling C-STORY: one plain sentence when the answers came from a map fallback, read from the map's
               // whole result (debateShapeMap is null on a fallback); undefined on today's run.
               answersNote: storyAnswersNoteFrom(shapeMapResult,
-                shapeRun !== null && (shapeMapPositions === null || shapeMapPositions.length < 2)),
+                shapeRun !== null && !shapeMapArgued),
               baseStrengths: materialised.nodes,
               finalStrengths: propagation.strengths,
               // The WHOLE graph's arrows, in the engine's fixed order, so every

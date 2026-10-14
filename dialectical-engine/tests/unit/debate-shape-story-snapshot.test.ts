@@ -107,14 +107,16 @@ describe("debate shape P2c — the story snapshot's also-raised points", () => {
     // The call's own arguments: up to the next statement the hook makes after building the snapshot.
     const call = runner.slice(start, start + 8_000);
     expect(call).toContain("positionNodeIds: makerPositionNodeIds,");
-    // Pre-flight PF-C11: also_raised only when the map's own answers were argued.
-    expect(call).toContain(
-      "alsoRaised: storyAlsoRaisedFrom(shapeMapPositions !== null && shapeMapPositions.length >= 2 ? debateShapeMap : null),"
+    // Pre-flight PF-C11: also_raised only when the map's own answers were argued. Ruling C-TWO: that rule is the one
+    // shared helper the debate page's map view also calls (mapAnswersArgued), never a second copy of the threshold.
+    expect(runner).toContain(
+      "const shapeMapArgued = shapeMapPositions !== null && mapAnswersArgued(shapeMapPositions.length);"
     );
+    expect(call).toContain("alsoRaised: storyAlsoRaisedFrom(shapeMapArgued ? debateShapeMap : null),");
     expect(call.indexOf("alsoRaised: storyAlsoRaisedFrom(")).toBeGreaterThan(call.indexOf("positionNodeIds: makerPositionNodeIds,"));
     // Pre-flight PF-C6: the note reads the map's whole result, never debateShapeMap (null on a fallback).
     expect(call).toContain("answersNote: storyAnswersNoteFrom(shapeMapResult,");
-    expect(call).toContain("shapeRun !== null && (shapeMapPositions === null || shapeMapPositions.length < 2))");
+    expect(call).toContain("shapeRun !== null && !shapeMapArgued)");
     expect(call).not.toContain("storyAnswersNoteFrom(debateShapeMap");
     expect(call.indexOf("answersNote: storyAnswersNoteFrom(")).toBeGreaterThan(call.indexOf("alsoRaised: storyAlsoRaisedFrom("));
   });

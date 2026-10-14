@@ -1,5 +1,6 @@
 import { DEBATE_MAP_VIEW_LIMITS, DebateMapViewSchema, type Answer, type DebateMapView } from "@debateai/contract";
 import { normalizeRunOwnership, type RunOwnershipAccess } from "@debateai/db";
+import { mapAnswersArgued } from "@debateai/map";
 
 /**
  * DEBATE SHAPE P2c (spec 2026-10-12 §3.3 step 8, §3.4) — the debate page's view of the map:
@@ -184,7 +185,8 @@ function ownershipOrNull(ownership: RunOwnershipAccess): RunOwnershipAccess | nu
 
 /**
  * A run with no map choice has no view. That covers a run without the new shape, an erased run,
- * and a map that fell back to today's opening and chose no answer. The page then shows exactly
+ * a map that fell back to today's opening and chose no answer, and (ruling C-TWO) a map whose
+ * fewer than two answers left the debate arguing today's opening. The page then shows exactly
  * what it shows today. A caller who does not own the run has no view either, and the map is not
  * read for them. An ownership naming nobody (or both principals) is refused before any query, as
  * `StoryRepository.readForAnswer` refuses it.
@@ -208,7 +210,9 @@ export class RepositoryAnswerMapViewApplication implements AnswerMapViewApplicat
     if (ownership === null) return null;
     if (!await this.owner.owns(input.runId, ownership)) return null;
     const record = await this.reader.readMapChoiceForRun(input.runId);
-    if (record === null || record.answers.length === 0) return null;
+    // Ruling C-TWO: the runner's own story rule. With fewer than two map answers the debate argued today's opening
+    // and the story got no also-raised points, so the page gets no view either.
+    if (record === null || !mapAnswersArgued(record.answers.length)) return null;
     return debateMapViewFrom(record, input.nodeIds);
   }
 }

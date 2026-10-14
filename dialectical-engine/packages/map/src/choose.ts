@@ -33,6 +33,20 @@ export function mapOppositeTemplate(statement: string, languageTag: string): str
  */
 export const mapChosenAnswerCodeId = (index: number): string => `a${String(index + 1)}`;
 
+/** A debate argues its map's own answers only when there are at least this many of them. */
+const MAP_ARGUED_ANSWERS_MIN = 2;
+
+/**
+ * Debate shape P2c, ruling C-TWO — were the map's own answers argued? `answerCount` is how many of the map's chosen
+ * answers the run planned to argue (the runner's map positions; the stored choice keeps exactly those, as
+ * `writeMapRun` cuts it to the run's P). Fewer than two, and the run argued today's opening instead. ONE rule for both
+ * sides: the runner hands the story the "also raised" points only when it holds, and the debate page shows the map view
+ * only when it holds, so the page never shows a map the story left out.
+ */
+export function mapAnswersArgued(answerCount: number): boolean {
+  return Number.isSafeInteger(answerCount) && answerCount >= MAP_ARGUED_ANSWERS_MIN;
+}
+
 export type MapFinishChoiceInput = Readonly<{
   /** The choose AI's checked reply, or null when the step failed (MAP_CHOOSE_FALLBACK). */
   reply: MapChooseReply | null;

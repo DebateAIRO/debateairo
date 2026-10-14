@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { DEBATE_MAP_VIEW_LIMITS, DebateMapViewSchema, type Answer, type DebateMapView } from "@debateai/contract";
 import type { RunOwnershipAccess } from "@debateai/db";
+import { mapAnswersArgued } from "@debateai/map";
 import {
   NO_MAP_VIEWS, RepositoryAnswerMapViewApplication, answerNodeIds, debateMapViewFrom, runOwnerCheckFrom,
   type AnswerMapViewApplication, type MapRunFindInput, type MapViewReadInput, type MapViewReader, type MapViewSource, type RunOwnerCheck
@@ -215,10 +217,40 @@ describe("debate shape P2c — the map view from P2b's map choice", () => {
     expect(await NO_MAP_VIEWS.readMapView(input)).toBeNull();
   });
 
+  // Ruling C-TWO: the page follows the runner's story rule. With fewer than two map answers the debate argued today's
+  // opening and the story got no also-raised points, so the page shows no view (never "No other points came up").
+  it("reads no view when fewer than two map answers were argued, the runner's own story rule", async () => {
+    const reader = (record: MapViewSource) => new RepositoryAnswerMapViewApplication({
+      readMapOpeningForRun: async () => "MAP", readMapChoiceForRun: async () => record
+    }, OWNED);
+    const input: MapViewReadInput = { runId: STORY_TEST_RUN_ID, nodeIds: roots, ownership: OWNERSHIP };
+    const alsoRaised = [{ claim: "Ask the school.", makers: ["A"] }];
+    expect(await reader({ answers: [{ statement: "Move gradually.", rootNodeId: ROOT_A }], alsoRaised }).readMapView(input)).toBeNull();
+    expect(await reader({
+      answers: [{ statement: "Move gradually.", rootNodeId: ROOT_A }, { statement: "Move now.", rootNodeId: ROOT_B }], alsoRaised
+    }).readMapView(input)).toEqual({
+      positions: [{ node_id: ROOT_A, answer: "Move gradually." }, { node_id: ROOT_B, answer: "Move now." }],
+      also_raised: ["Ask the school."]
+    });
+    expect([0, 1].map(mapAnswersArgued)).toEqual([false, false]);
+    expect([2, 3, 4].map(mapAnswersArgued)).toEqual([true, true, true]);
+  });
+
+  it("the runner and the map view share ONE copy of the rule (mapAnswersArgued), not two", () => {
+    const runner = readFileSync(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    const mapViews = readFileSync(new URL("../../apps/api/src/map-views.ts", import.meta.url), "utf8");
+    expect(mapViews).toMatch(/mapAnswersArgued\(record\.answers\.length\)/u);
+    expect(runner).toMatch(/mapAnswersArgued\(shapeMapPositions\.length\)/u);
+    // No second copy of the threshold beside the runner's map positions.
+    expect(runner).not.toMatch(/shapeMapPositions\.length\s*(?:>=|<)\s*2/u);
+  });
+
   // Pre-flight PF-C16: the second owner check. A caller who does not own the run gets no view,
   // and the map is never read for them.
   it("checks the caller owns the run before it reads the map, and reads nothing otherwise", async () => {
-    const record: MapViewSource = { answers: [{ statement: "Move gradually.", rootNodeId: ROOT_A }], alsoRaised: [] };
+    const record: MapViewSource = {
+      answers: [{ statement: "Move gradually.", rootNodeId: ROOT_A }, { statement: "Move now.", rootNodeId: ROOT_B }], alsoRaised: []
+    };
     const mapReads: string[] = [];
     const ownerChecks: { runId: string; ownership: RunOwnershipAccess }[] = [];
     const reader = {
@@ -250,7 +282,7 @@ describe("debate shape P2c — the map view from P2b's map choice", () => {
 
     // The caller's run: checked, then read once.
     expect(await new RepositoryAnswerMapViewApplication(reader, owner(true)).readMapView(input))
-      .toEqual({ positions: [{ node_id: ROOT_A, answer: "Move gradually." }], also_raised: [] });
+      .toEqual({ positions: [{ node_id: ROOT_A, answer: "Move gradually." }, { node_id: ROOT_B, answer: "Move now." }], also_raised: [] });
     expect(ownerChecks).toHaveLength(2);
     expect(mapReads).toEqual([STORY_TEST_RUN_ID]);
   });
