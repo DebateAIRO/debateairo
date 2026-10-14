@@ -14,7 +14,7 @@ import type { AskRequest } from "@debateai/contract";
 import { ContentCipher, generateDek, MemoryRunContentKeyStore, type KeyDestroyResult, type ReadableUserDekStore } from "@debateai/crypto";
 import { configureContentEncryption, decryptContentForRun, migrate, readCallPrompt } from "@debateai/db";
 import type { Session } from "@debateai/contract";
-import type { CallConcurrencyPolicy } from "@debateai/register";
+import { DEBATE_SHAPE_POLICY_ROW_KEY, debateShapeInForce, readDebateShapePolicy, type CallConcurrencyPolicy } from "@debateai/register";
 import { PREVIEW_PROVIDER_REF_MODELS, previewModelRow, type PreviewBudgetPorts, type PreviewGateRemaining } from "@debateai/providers";
 import { ServeRepository } from "@debateai/serve";
 import { StoryRepository } from "@debateai/story";
@@ -32,16 +32,19 @@ import {
   replyContentOf
 } from "./practice-lanes.js";
 import type { PracticeParallelBlock } from "./practice-parallel.js";
-import { practiceQuestion } from "./practice-questions.js";
+import { practiceDebateQuestion } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
 import {
   importPracticeRegister,
+  publishPracticeShapeVersion,
   type PracticeNextRegisterVersion,
   type PracticeRegisterExport,
-  type PracticeRegisterImportReceipt
+  type PracticeRegisterImportReceipt,
+  type PracticeShapeVersion
 } from "./practice-register-import.js";
 import { composePracticeRunner } from "./practice-runner-composition.js";
-import type { PracticeSettings, PracticeSockets } from "./practice-settings.js";
+import { PracticeRefusal, type PracticeSettings, type PracticeSockets } from "./practice-settings.js";
+import type { PracticeShapeOverride } from "./practice-shape.js";
 import { startPracticeDatabase, type PracticeDatabase } from "./practice-throwaway-db.js";
 import { recordPracticeTranscript } from "./practice-transcript.js";
 import {
@@ -324,6 +327,8 @@ export async function runPracticeDebate(input: Readonly<{
   progress?: (line: string) => void;
   /** `--transcript`: the folder transcript.json is written to, before the throwaway database is deleted; null: none. */
   transcriptDirectory?: string | null;
+  /** Debate shape (`--shape-policy`, the three ask settings): absent: today's debate command. */
+  shape?: PracticeShapeOverride;
 }>): Promise<PracticeDebateResult> {
   const progress = input.progress ?? (() => undefined);
   const remainingPorts = practiceRemainingPorts(input.settings, input.sockets);
@@ -359,11 +364,46 @@ export async function runPracticeDebate(input: Readonly<{
     if (receipt.codeNext !== undefined && String(nextVersion) !== receipt.registerVersion) {
       throw Object.assign(new Error("PRACTICE_REGISTER_VERSION_MISMATCH"), { code: "PRACTICE_REGISTER_VERSION_MISMATCH" });
     }
-    const settings: PracticeSettings = receipt.codeNext === undefined ? input.settings
+    // Debate shape (--shape-policy) WITHOUT --register-next: ONE more version, in this throwaway database only: the
+    // export's last version with the debate-shape row added (or its own replaced) and this code's four contract hashes.
+    // It is the live version + 1, the number --register-next would take. WITH --register-next the code's next version
+    // already carries the row (practice.ts handed the policy to composePracticeNextRegisterVersion, the kit's own
+    // source build), so nothing more is published: a second version on top would undo the rows it changed (controller
+    // ruling D-REGNEXT). Both compositions below run on the version `settings` names, so the ask path and the runner
+    // read the row exactly as the live services would. The export file is only read; the live register is never reached.
+    const shapeVersion: PracticeShapeVersion | null = input.shape === undefined || input.shape.policy === null
+      || receipt.codeNext !== undefined ? null : await publishPracticeShapeVersion(pool, input.register, receipt, input.shape.policy);
+    const settings: PracticeSettings = receipt.codeNext === undefined && shapeVersion === null ? input.settings
       : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion }) });
     progress(receipt.codeNext === undefined ? `register imported up to version ${receipt.registerVersion}`
       : `register imported up to live version ${liveVersion}; practising on this code's next version ${receipt.registerVersion}`
         + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
+    if (shapeVersion !== null) {
+      progress(`the debate-shape row ${shapeVersion.row === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
+        + `${shapeVersion.registerVersion}, with this code's contract hashes`);
+    }
+    // The version both compositions read: the live one, the code's next one, or the practice's own.
+    const registerVersion = String(settings.runner.REGISTER_VERSION);
+    // FLAG only: what the debate-shape row did in that version (with --register-next, as the code's next version's delta).
+    const shapeRowChange: "ADDED" | "REPLACED" | null = shapeVersion !== null ? shapeVersion.row
+      : input.shape === undefined || input.shape.policy === null || receipt.codeNext === undefined ? null
+        : receipt.codeNext.addedKeys.includes(DEBATE_SHAPE_POLICY_ROW_KEY) ? "ADDED" : "REPLACED";
+    // The row the debate runs on, read as the ask path and the runner read it (absent: today's shape, byte for byte).
+    // A row switched off (P2b's `enabled: false`, the preview's rollback) is no row, as the API reads it.
+    const readRow = await readDebateShapePolicy(pool, settings.runner.REGISTER_VERSION);
+    const shapeRow = readRow !== null && debateShapeInForce(readRow) ? readRow : null;
+    if (input.shape !== undefined && input.shape.policy !== null && shapeRow === null) {
+      // Only a caller that composed --register-next without the policy can get here (practice.ts never does).
+      throw new PracticeRefusal("PRACTICE_SHAPE_POLICY_NOT_PUBLISHED", "the code's next version was composed without --shape-policy");
+    }
+    const asked = input.shape?.ask ?? {};
+    if (shapeRow === null && Object.keys(asked).length > 0) {
+      // Without the row the ask path would drop them silently: refused before any AI is asked.
+      throw new PracticeRefusal("PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW",
+        "--depth-mode, --scrutiny and --answer-length need a debate-shape row (--shape-policy)");
+    }
+    const shapeSource = input.shape !== undefined && input.shape.policy !== null ? "FLAG" as const
+      : shapeRow !== null ? "REGISTER" as const : null;
     // Content encryption ON, as on the live preview, with a key that lives only in this process.
     const users = new PracticeUserDekStore();
     configureContentEncryption(pool, new ContentCipher(new MemoryRunContentKeyStore(users, async (ownerRef) => {
@@ -398,11 +438,11 @@ export async function runPracticeDebate(input: Readonly<{
       remaining: remainingPorts, keepAlivePool: database.extraPool(),
       ...(input.callConcurrency === undefined ? {} : { callConcurrency: input.callConcurrency }),
       ...(input.wait === undefined ? {} : { wait: input.wait }), ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
-    const question = practiceQuestion(input.questionId);
+    const question = practiceDebateQuestion(input.questionId);
     const request = {
       question_line: question.questionLine, risk_tier: "casual", tier_source: "ASKER",
       tier_provenance_ref: "asker-declaration:preview-practice", composition_budget_tier: "high", plan_tier: "premium",
-      depth_params: { depth: input.depth }, decision_scope: "preview practice", as_of: new Date().toISOString(),
+      depth_params: { depth: input.depth, ...asked }, decision_scope: "preview practice", as_of: new Date().toISOString(),
       steering_presets: [], steering_annotations: []
     } as unknown as AskRequest;
     const session = { asker_id: `owner:${ownerRef}`, session_id: sessionId, caller_scope: "ASKER",
@@ -493,7 +533,7 @@ export async function runPracticeDebate(input: Readonly<{
           pool, directory: input.transcriptDirectory, ownerRef, answer: projection, story: storedStory,
           run: Object.freeze({
             runId: job.runId, question: Object.freeze({ id: question.id, text: question.questionLine }), depth: input.depth,
-            registerVersion: receipt.registerVersion, panel: panelFacts, satOut: Object.freeze(satOut), rotation,
+            registerVersion, panel: panelFacts, satOut: Object.freeze(satOut), rotation,
             startedAt: debateStartedAt.toISOString(), finishedAt: debateFinishedAt.toISOString(),
             workItemOutcome, failureCode, answerId, answer, story
           })

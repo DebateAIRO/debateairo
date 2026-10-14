@@ -774,4 +774,12 @@ describe("preview practice: debate mode", () => {
     expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_ACK_REQUIRED"]);
     expect(stubs.requests).toEqual([]);
   }, 60_000);
+
+  it("debate shape (P2d Task 2): the command hands the ask settings to the debate, which refuses them on a register without a debate-shape row before any AI is asked (HARNESS_ERROR, exit 40)", async () => {
+    const { stubs, env, common, quiet } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--answer-length", "short"], env, quiet);
+    expect(outcome.exitCode).toBe(40);
+    expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW"]);
+    expect(stubs.requests).toEqual([]);
+  }, 300_000);
 });

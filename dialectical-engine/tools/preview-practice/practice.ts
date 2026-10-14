@@ -460,8 +460,13 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     })() : null;
     // --register-next: the code's next register version, composed before anything is spent (a refusal costs nothing).
     if (args.switches.has("--register-next") && mode !== "debate") throw new PracticeRefusal("PRACTICE_FLAG_UNKNOWN", "--register-next (debate only)");
+    // Debate shape with --register-next (controller ruling D-REGNEXT): the --shape-policy policy goes into the code's
+    // next version itself, through the kit's own source build, so the practice publishes no second version on top.
+    const nextShape = shapeOverride === null ? null : shapeOverride.policy;
     const registerNext = register !== null && args.switches.has("--register-next")
-      ? await composePracticeNextRegisterVersion(register) : null;
+      ? nextShape === null ? await composePracticeNextRegisterVersion(register)
+        : await composePracticeNextRegisterVersion(register, undefined, nextShape)
+      : null;
     // The brake counts connection failures in a row, from root's streak at the start (practice-gate-observer.ts).
     observer = new PracticeGateObserver({ unsentStreakAtStart });
     options.onObserver?.(observer, stop);
