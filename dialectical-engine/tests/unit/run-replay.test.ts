@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  buildFramedPrompt,
   readRecordedProviderReply,
   rebuildRecordedCallContent,
   type ContentClassification,
+  type PromptContract,
   type ProviderCallRequest,
   type ProviderCallResult,
   type ProviderGateway
@@ -147,13 +149,19 @@ describe("recorded attempts grouped into answered calls", () => {
 });
 
 describe("the replay book and the replaying gateway", () => {
-  const messages = (text: string) => [{ role: "system" as const, content: "frame" }, { role: "user" as const, content: text }];
+  const CONTRACT: PromptContract = Object.freeze({
+    contractId: "test.reclaim.v1",
+    instruction: "Judge the statement on its merits.",
+    answerForm: 'Return only one JSON object {"verdict": "yes" | "no", "value_laden": boolean}.'
+  });
+  // Every call frames its packet afresh (its own fence and canary), as a later copy's call does.
+  const packetOf = (text: string) => buildFramedPrompt({ contract: CONTRACT, material: [{ name: "question_line", content: text }] }).packet;
   const request = (callSiteKey: string, text: string, providerRef = "preview:vendor"): ProviderCallRequest => ({
     runId: "00000000-0000-4000-8000-000000000001", subjectItemId: "item", callSiteKey, role: "JUDGE", lane: "served",
     bound: { maxAttempts: 3, deadlineMs: 1000, tokenCeiling: 100 }, contractHash: "contract", providerRef,
-    packet: { messages: messages(text) }, classifyContent: classify
-  } as unknown as ProviderCallRequest);
-  const fp = (text: string): string => canonicalPromptFingerprint(messages(text));
+    packet: packetOf(text), classifyContent: classify
+  });
+  const fp = (text: string): string => canonicalPromptFingerprint(packetOf(text).messages);
   const vendor = () => {
     const sent: string[] = [];
     const inner: ProviderGateway = {
