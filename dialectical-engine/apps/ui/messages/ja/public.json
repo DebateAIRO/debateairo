@@ -116,7 +116,7 @@
   "public.story.pathsListName": "ディベートで検討した立場",
   "public.alsoRaised.title": "ほかに挙がった論点（議論はされず）",
   "public.alsoRaised.empty": "ほかの論点は挙がりませんでした。",
-  "public.positionTitle": "この立場を支持する論拠（{ai}執筆）：{answer}",
+  "public.positionTitle": "この立場を支持する論拠（{ai}が主張）：{answer}",
   "public.story.hide": "非表示",
   "public.story.show": "表示",
   "public.story.floorLead": "私たちの最善の回答：",
