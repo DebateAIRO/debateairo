@@ -5,9 +5,10 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT, PanelMemberFailure } from "@debateai/judgement";
+import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT, PanelMemberFailure, judgeLegFrameSpec } from "@debateai/judgement";
 import { TypedDomainError, type DebateRole } from "@debateai/kernel";
 import {
+  buildFramedPrompt,
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
   buildFramedRepairPrompt,
@@ -141,6 +142,25 @@ describe("A18 · the same prompt, rebuilt from recorded material, for every deba
     const inputs = builderFromRecordedPacket("ANSWER_WRITER", "COMPOSER:SYNTHESIZER:INITIAL:1", recorded);
     expect(inputs).toEqual(locked);
     expect(canonicalPromptFingerprint((await captureMomentPacket(inputs)).messages)).toBe(canonicalPromptFingerprint(recorded.messages));
+  });
+
+  it("Minor 2: a recorded or given lock the kernel would not accept is refused, never replayed into a prompt", () => {
+    const refused = [{ code: "und", name: "Romanian" }, { code: "ro", name: "Ro\"manian" }, { code: "ro", name: "x".repeat(65) },
+      { code: "ro-Latn", name: "Romanian" }];
+    const contract = judgeLegFrameSpec({ kind: "primary-root" }, "unknown").contract;
+    for (const lock of refused) {
+      // A hand-built packet: the live builders can no longer frame such a lock (`questionLanguageSentence` refuses it).
+      const packet = buildFramedPrompt({ contract, material: [{ name: "question_line", content: QUESTION },
+        { name: "question_language", content: JSON.stringify(lock) }] }).packet;
+      expect(() => builderFromRecordedPacket("POSITION", "JUDGE", packet), JSON.stringify(lock))
+        .toThrowError(expect.objectContaining({ code: "MOMENT_RECORDED_PROMPT_UNREADABLE" }));
+      expect(() => parseMomentBuilder({ family: "JUDGE_JUDGE", inputs: { questionLine: QUESTION, leg: { kind: "primary-root" }, questionLanguage: lock } }))
+        .toThrowError(expect.objectContaining({ code: "MOMENT_BUILDER_INVALID" }));
+    }
+    // The same packet with an accepted lock reads back.
+    const accepted = buildFramedPrompt({ contract, material: [{ name: "question_line", content: QUESTION },
+      { name: "question_language", content: JSON.stringify({ code: "ro", name: "Romanian" }) }] }).packet;
+    expect(builderFromRecordedPacket("POSITION", "JUDGE", accepted).inputs).toMatchObject({ questionLanguage: { code: "ro", name: "Romanian" } });
   });
 
   it("refuses a repair packet, a leg under the wrong role and a contract the role never uses", async () => {

@@ -10,7 +10,9 @@ import {
   judgeLegModelRole,
   type JudgeLeg
 } from "@debateai/judgement";
-import { QUESTION_LANGUAGE_FIELD, TypedDomainError, exhaustive, type DebateRole, type QuestionLanguage } from "@debateai/kernel";
+import {
+  QUESTION_LANGUAGE_FIELD, TypedDomainError, exhaustive, questionLanguageFromRun, type DebateRole, type QuestionLanguage
+} from "@debateai/kernel";
 import {
   PROVIDER_CONTEXT_WINDOW_EXCEEDED,
   PROVIDER_USAGE_CAP,
@@ -78,9 +80,11 @@ const DEFAULT_ARGUMENT_LANGUAGE_NAME = "the same language as the question";
 /**
  * Question language (spec 2026-10-13 L6, pre-flight PF-L39): a shaped run's locked language, read back from the trailing
  * `question_language` field a locked call carries. Absent on every moment recorded without a lock, so their ids are
- * unchanged.
+ * unchanged. Only a lock the kernel accepts (`questionLanguageFromRun`: an emitted tag, a plain name of at most 64 UTF-8
+ * bytes) is read back, the same rule the named sentence frames by (P2L Task 13 review, Minor 2).
  */
-const questionLanguageSchema = z.object({ code: z.string(), name: z.string() }).strict();
+const questionLanguageSchema = z.object({ code: z.string(), name: z.string() }).strict()
+  .refine((value) => questionLanguageFromRun(value.code, value.name) !== null, "a lock the kernel accepts");
 const judgeLegSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("primary-root") }).strict(),
   z.object({ kind: z.literal("independent-root") }).strict(),

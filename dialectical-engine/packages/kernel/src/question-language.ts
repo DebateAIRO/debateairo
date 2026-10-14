@@ -116,10 +116,16 @@ export function questionLanguageFromRun(tag: string, name: string): QuestionLang
  * THE one sentence every new-shape call carries (ruling L6). It always names the language; there is no fallback
  * form. It is code, not owner text: the sealed fingerprints exclude it, so a change needs no new register version
  * (the story's per-call hash includes it, as it includes today's directive).
+ *
+ * Defence in depth (P2L Task 13 review, Minor 2): it frames only a lock `questionLanguageFromRun` would accept (an
+ * emitted tag, a plain single-line name of at most 64 UTF-8 bytes), so no caller can put an unchecked name into a
+ * prompt, nor one that frames longer than `questionLanguageForBounds()` (the money bound). Refused with the code
+ * QUESTION_LANGUAGE_INVALID (a blank name keeps its own code, QUESTION_LANGUAGE_NAME_REQUIRED).
  */
 export function questionLanguageSentence(language: QuestionLanguage): string {
   const name = language.name.trim();
   if (name === "") throw new TypeError("QUESTION_LANGUAGE_NAME_REQUIRED");
+  if (questionLanguageFromRun(language.code, language.name) === null) throw new TypeError("QUESTION_LANGUAGE_INVALID");
   return `Write every natural-language field in ${name}, the language this debate was set to and named in question_language, even where the material quotes another language. Keep JSON keys, enum tokens, JSON literals (null, true, false), and identifier-shaped values (including claim_type, basis, outcome, fatalFlags[].type, segment_id, node_refs, served_number_refs and question_language) in English exactly as specified; never translate an identifier or literal.`;
 }
 

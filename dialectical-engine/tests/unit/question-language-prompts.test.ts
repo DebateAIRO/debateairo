@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { questionLanguageSentence } from "@debateai/kernel";
-import { readPromptFrame, type ProviderGateway } from "@debateai/providers";
+import { argumentLanguageDirective, questionLanguageSentence } from "@debateai/kernel";
+import { buildFramedPrompt, readPromptFrame, type PromptContract, type PromptPacket, type ProviderGateway } from "@debateai/providers";
 import {
-  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT, Judge, framedJudgePromptForTest, rootPositionRequestBytesBound
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT, Judge, PANEL_PROMPT_CONTRACT, framedJudgePromptForTest, judgePromptContract,
+  reviewPromptContract, rootPositionRequestBytesBound
 } from "@debateai/judgement";
 import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT } from "@debateai/serve";
 import { buildSynthesisRolePrompt, classifyComposedContent, classifyEvaluatorContent } from "../../apps/runner/src/index.js";
@@ -14,6 +15,22 @@ const JUDGE_HASH_AFTER_P2B = "aac534075f292189027590dcbde6256a9684f085814ad2ab2b
 const RO = { code: "ro", name: "Romanian" };
 const fixed = () => Buffer.alloc(16, 7);
 const systemOf = (packet: { messages: readonly { role: string; content: string }[] }) => packet.messages.find((m) => m.role === "system")!.content;
+
+/**
+ * Review Minor 1 — AN INDEPENDENT ORACLE for today's (unlocked) packets, built by hand as a17-synthesis-role-prompt
+ * builds the writer's: the sealed contract with today's directive appended, and the material written out field by field.
+ * The fence and canary differ per call, so the system text is compared without its last three lines (PF-L41(a)).
+ */
+function todaysPacket(contract: PromptContract, material: readonly { name: string; content: string }[]): PromptPacket {
+  return buildFramedPrompt({
+    contract: { ...contract, instruction: `${contract.instruction} ${argumentLanguageDirective("Romanian")}` }, material
+  }).packet;
+}
+function expectTodaysPacket(actual: PromptPacket, expected: PromptPacket): void {
+  expect(readPromptFrame(actual).contractId).toBe(readPromptFrame(expected).contractId);
+  expect(systemOf(actual).split("\n").slice(0, -3)).toEqual(systemOf(expected).split("\n").slice(0, -3));
+  expect(readPromptFrame(actual).fields).toEqual(readPromptFrame(expected).fields);
+}
 
 async function firstPacket(run: (gateway: ProviderGateway) => Promise<unknown>) {
   let captured: unknown;
@@ -42,12 +59,11 @@ describe("judge-side and answer calls in the locked language (question-language 
 
   it("a judge leg without a lock is today's packet; with one it carries the sentence and the field, last", () => {
     const leg = { kind: "support" as const, positionUnderDebate: "P" };
-    const today = framedJudgePromptForTest(leg, "Q?", "Romanian", "unknown");
-    const none = framedJudgePromptForTest(leg, "Q?", "Romanian", "unknown", null);
-    // Pre-flight PF-L41(a): the system text ends heading, fence, canary, end — drop the last THREE lines (the fence and
-    // canary differ per call), and compare the material fields too.
-    expect(systemOf(none.packet).split("\n").slice(0, -3)).toEqual(systemOf(today.packet).split("\n").slice(0, -3));
-    expect(readPromptFrame(none.packet).fields).toEqual(readPromptFrame(today.packet).fields);
+    // Today's support leg, by hand: its sealed contract + today's directive, and its two fields.
+    const today = todaysPacket(judgePromptContract("support", "unknown"),
+      [{ name: "question_line", content: "Q?" }, { name: "position_under_debate", content: "P" }]);
+    expectTodaysPacket(framedJudgePromptForTest(leg, "Q?", "Romanian", "unknown").packet, today);
+    expectTodaysPacket(framedJudgePromptForTest(leg, "Q?", "Romanian", "unknown", null).packet, today);
     const locked = readPromptFrame(framedJudgePromptForTest(leg, "Q?", "Romanian", "unknown", RO).packet);
     expect(locked.fields.map((field) => field.name)).toEqual(["question_line", "position_under_debate", "question_language"]);
     expect(locked.fields.at(-1)!.content).toBe('{"code":"ro","name":"Romanian"}');
@@ -64,16 +80,16 @@ describe("judge-side and answer calls in the locked language (question-language 
       expect(systemOf(packet)).toContain(questionLanguageSentence(RO));
       expect(readPromptFrame(packet as never).fields.at(-1)!.name).toBe("question_language");
     }
-    // PF-L41(a): unlocked judge, review and panel calls send today's fields and no named sentence.
-    for (const run of [
-      (gateway: ProviderGateway) => new Judge(gateway).judge(judgeInput({})),
-      (gateway: ProviderGateway) => new Judge(gateway).review(reviewInput({})),
-      (gateway: ProviderGateway) => new Judge(gateway).assess(panelInput({}))
-    ]) {
-      const unlocked = await firstPacket(run);
-      expect(readPromptFrame(unlocked as never).fields.map((field) => field.name)).not.toContain("question_language");
-      expect(systemOf(unlocked)).not.toContain(questionLanguageSentence(RO));
-    }
+    // PF-L41(a) and review Minor 1: unlocked judge, review and panel calls send today's packet, checked against the
+    // hand-built oracle (contract + today's directive, fields written out), never against the code under test.
+    const unlockedJudge = await firstPacket((gateway) => new Judge(gateway).judge(judgeInput({}))) as PromptPacket;
+    const claim = readPromptFrame(unlockedJudge).contractId.endsWith(".resolved.v1") ? "resolved" : "unknown";
+    expectTodaysPacket(unlockedJudge, todaysPacket(judgePromptContract("primary-root", claim), [{ name: "question_line", content: "Q?" }]));
+    expectTodaysPacket(await firstPacket((gateway) => new Judge(gateway).review(reviewInput({}))) as PromptPacket,
+      todaysPacket(reviewPromptContract(0), [{ name: "question_line", content: "Q?" }, { name: "statement", content: "S" },
+        { name: "edges_sourced_by_this_node", content: "[]" }]));
+    expectTodaysPacket(await firstPacket((gateway) => new Judge(gateway).assess(panelInput({}))) as PromptPacket,
+      todaysPacket(PANEL_PROMPT_CONTRACT, [{ name: "question_line", content: "Q?" }, { name: "statement", content: "S" }]));
   });
 
   it("PF-L38: root 0's room frames the lock — today's bound without it, the locked worst case with it", () => {

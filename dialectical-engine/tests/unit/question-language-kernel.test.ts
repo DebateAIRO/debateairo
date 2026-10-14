@@ -96,6 +96,15 @@ describe("the locked question language (question-language spec 2026-10-13, rulin
     expect(sentence).not.toContain("the same language as the question");
     expect(sentence).not.toContain("the language of the question");
     expect(() => questionLanguageSentence({ code: "ro", name: " " })).toThrow(/QUESTION_LANGUAGE_NAME_REQUIRED/u);
+    // P2L Task 13 review, Minor 2 (defence in depth): only a lock `questionLanguageFromRun` accepts is ever framed.
+    for (const refused of [{ code: "und", name: "Romanian" }, { code: "ro-Latn", name: "Romanian" }, { code: "xx", name: "Xish" },
+      { code: "ro", name: "Ro\"manian" }, { code: "ro", name: "Ro\\manian" }, { code: "ro", name: "Roma\nnian" },
+      { code: "ro", name: "x".repeat(65) }, { code: "ro", name: "\u00e4".repeat(33) }]) {
+      expect(questionLanguageFromRun(refused.code, refused.name), JSON.stringify(refused)).toBeNull();
+      expect(() => questionLanguageSentence(refused), JSON.stringify(refused)).toThrow(/QUESTION_LANGUAGE_INVALID/u);
+    }
+    expect(() => questionLanguageSentence(questionLanguageForBounds())).not.toThrow();
+    expect(questionLanguageSentence({ code: "sr-Cyrl", name: "x".repeat(64) })).toContain(`in ${"x".repeat(64)},`);
     expect(languageDirectiveFor("Romanian", null)).toBe(argumentLanguageDirective("Romanian"));
     expect(languageDirectiveFor(undefined, undefined)).toBe(argumentLanguageDirective(""));
     expect(languageDirectiveFor("French", RO)).toBe(sentence);

@@ -492,10 +492,11 @@ export const framedJudgePromptForTest: typeof framedJudgePrompt = framedJudgePro
  * under the longest lock the kernel can make (`questionLanguageForBounds`: the
  * named sentence and the `question_language` field) and keeps the largest of
  * the four (pre-flight PF-L38); without it, today's two only, today's number.
- * So the figure is never below any first call an admitted ask can make. The completion bound is the
- * judge bound's first-attempt max_tokens. Each projection names its target's
- * `model`, so the boot can group the calls by plan (`firstCallsByPlanRoster`).
- * A target with no price (local mode) is left out.
+ * So the figure is never below any first call an admitted ask can make. The
+ * completion bound is the judge bound's first-attempt max_tokens. Each
+ * projection names its target's `model`, so the boot can group the calls by
+ * plan (`firstCallsByPlanRoster`). A target with no price (local mode) is left
+ * out.
  */
 export function firstPositionCallProjections(input: Readonly<{
   targets: readonly ProviderDiscoveryTarget[];
