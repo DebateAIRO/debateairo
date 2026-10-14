@@ -10,6 +10,13 @@ const SITE_LOCALES = readdirSync(new URL("../../apps/ui/messages/", import.meta.
   .filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
 const RO = Object.freeze({ code: "ro", name: "Romanian" });
 const FRENCH_REPLY = { statement: "Le gouvernement doit maintenir la monnaie nationale pour les citoyens et les entreprises du pays." };
+const LATIN_QUESTION = "Should Thailand and Iran keep their national currencies instead of adopting the euro?";
+const THAI_STATEMENT = "รัฐบาลควรรักษาสกุลเงินบาทไว้เพื่อประโยชน์ของประชาชนและธุรกิจทั้งหมดในประเทศไทย";
+const PERSIAN_STATEMENT = "دولت باید پول ملی را برای شهروندان و کسب و کارهای کشور حفظ کند و از آن محافظت کند.";
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+const SCRIPT_LINES = [undefined, "Da li bi Srbija trebalo da uvede evro umesto dinara?", "Да ли би Србија требало да уведе евро уместо динара?"];
+const framed = (language: { code: string; name: string }): number =>
+  new TextEncoder().encode(questionLanguageSentence(language) + questionLanguageField(language).content).length;
 
 describe("the locked question language (question-language spec 2026-10-13, ruling L6)", () => {
   it("names our 35 site languages exactly as the runs already store them, and other ISO 639-1 codes in English", () => {
@@ -36,6 +43,34 @@ describe("the locked question language (question-language spec 2026-10-13, rulin
     expect(questionLanguageFromRun("und", "the same language as the question")).toBeNull();
     expect(questionLanguageFromRun("ro", "")).toBeNull();
     expect(questionLanguageFromRun("ro", "the same language as the question")).toBeNull();
+  });
+
+  it("reads back only what questionLanguageOf can emit, with a short single-line name (fix round 1)", () => {
+    for (const [tag, name] of [
+      ["ro-Latn", "Romanian"], ["sr-latn", "Serbian"], ["sr-Grek", "Serbian"], ["en-US", "English"], ["eng", "English"],
+      ["RO", "Romanian"], ["xx", "Xx"], ["", "Romanian"], ["ro", "Roma\nnian"], ["ro", "Rom\u0000anian"], ["ro", "Roma\u2028nian"],
+      ["ro", "x".repeat(65)], ["ro", "ă".repeat(33)]
+    ] as const) expect(questionLanguageFromRun(tag, name), JSON.stringify([tag, name])).toBeNull();
+    // Every lock the kernel can make reads back unchanged (a real stored lock is never refused).
+    for (const first of LETTERS) for (const second of LETTERS) for (const line of SCRIPT_LINES) {
+      const language = questionLanguageOf(`${first}${second}`, line);
+      if (language !== null) expect(questionLanguageFromRun(language.code, language.name), language.code).toEqual(language);
+    }
+  });
+
+  it("the bound covers every lock questionLanguageFromRun can return (pre-flight PF-L38, fix round 1)", () => {
+    const bound = framed(questionLanguageForBounds());
+    expect(questionLanguageForBounds()).toBe(questionLanguageForBounds());
+    const names = ["Romanian", "x".repeat(64), "ă".repeat(32), "語".repeat(21), "\"".repeat(64), "\\".repeat(64),
+      ...Array.from({ length: 64 }, (_, index) => "n".repeat(index + 1))];
+    let accepted = 0;
+    for (const first of LETTERS) for (const second of LETTERS) for (const suffix of ["", "-Latn", "-Cyrl"]) for (const name of names) {
+      const language = questionLanguageFromRun(`${first}${second}${suffix}`, name);
+      if (language === null) continue;
+      accepted += 1;
+      expect(framed(language), JSON.stringify(language)).toBeLessThanOrEqual(bound);
+    }
+    expect(accepted).toBeGreaterThan(0);
   });
 
   it("is ONE named sentence: never the fallback form, never today's question-language wording", () => {
@@ -67,7 +102,20 @@ describe("the locked question language (question-language spec 2026-10-13, rulin
     expect(lockedReplyLanguageExpectation({ code: "ja", name: "Japanese" }, "x")).toEqual({ tag: "ja", script: "CJK" });
     expect(lockedReplyLanguageExpectation({ code: "ca", name: "Catalan" }, "Hauria Barcelona de limitar els pisos turístics?"))
       .toEqual({ tag: "ca", script: "Latin" });
-    expect(lockedReplyLanguageExpectation({ code: "ca", name: "Catalan" }, "?")).toEqual({ tag: "ca", script: null });
+    // Fix round 1: the script comes from the CODE (Catalan is written in Latin letters), not from a one-mark question.
+    expect(lockedReplyLanguageExpectation({ code: "ca", name: "Catalan" }, "?")).toEqual({ tag: "ca", script: "Latin" });
+    expect(lockedReplyLanguageExpectation({ code: "th", name: "Thai" }, LATIN_QUESTION)).toEqual({ tag: "th", script: "Other" });
+    expect(lockedReplyLanguageExpectation({ code: "fa", name: "Persian" }, LATIN_QUESTION)).toEqual({ tag: "fa", script: "Arabic" });
+    expect(replyScriptOfTag("constructor")).toBeUndefined();
+  });
+
+  it("a kept-wording question in Latin letters never makes a Thai or Persian lock refuse a correct reply (fix round 1)", () => {
+    const thai = { code: "th", name: "Thai" };
+    const persian = { code: "fa", name: "Persian" };
+    expect(replyLanguageCheckFor(LATIN_QUESTION, thai, ["statement"])({ statement: THAI_STATEMENT })).toEqual([]);
+    expect(replyLanguageCheckFor(LATIN_QUESTION, persian, ["statement"])({ statement: PERSIAN_STATEMENT })).toEqual([]);
+    expect(replyLanguageCheckFor(LATIN_QUESTION, thai, ["statement"])(FRENCH_REPLY)).toEqual([
+      { code: "TEXT_NOT_IN_QUESTION_LANGUAGE", path: ["statement"], message: "TEXT_NOT_IN_QUESTION_LANGUAGE" }]);
   });
 
   it("replyLanguageCheckFor: today's check without a lock, the locked check with one", () => {

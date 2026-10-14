@@ -39,23 +39,35 @@ const SCRIPT_SUBTAGS: Readonly<Record<string, ReplyScript>> = Object.freeze({
 });
 const FALLBACK_NAME = "the same language as the question";
 const SCRIPT_LETTERS_MIN = 12;
+/** A stored name read back as a lock: one line, no control characters, at most this many UTF-8 bytes. */
+const STORED_NAME_MAX_BYTES = 64;
+/** A tag `questionLanguageOf` can emit: a two-letter primary, with `-Latn`/`-Cyrl` only for a two-script language. */
+const EMITTED_TAG = /^([a-z]{2})(?:-(Latn|Cyrl))?$/u;
+const ENGLISH_LANGUAGE_NAMES = new Intl.DisplayNames(["en"], { type: "language", fallback: "none" });
+const UTF8 = new TextEncoder();
 
 function englishNameOf(code: string): string | null {
-  const known = (ARGUMENT_LANGUAGE_NAMES as Readonly<Record<string, string>>)[code];
-  if (known !== undefined) return known;
+  if (Object.hasOwn(ARGUMENT_LANGUAGE_NAMES, code)) return ARGUMENT_LANGUAGE_NAMES[code]!;
   let name: string | undefined;
   try {
-    name = new Intl.DisplayNames(["en"], { type: "language", fallback: "none" }).of(code);
+    name = ENGLISH_LANGUAGE_NAMES.of(code);
   } catch {
     return null;
   }
   return name === undefined || name.trim() === "" || name === code ? null : name;
 }
 
+/** The UTF-8 bytes a lock adds to a call: its named sentence plus its material field. */
+function framedBytes(language: QuestionLanguage): number {
+  return UTF8.encode(questionLanguageSentence(language) + questionLanguageField(language).content).length;
+}
+
 /**
  * The lock for a code: our 35 named as the runs already store them, any other ISO 639-1 code in English. A two-script
  * language gets the question's script ("sr-Latn", "Serbian (Latin script)"). Null for anything else ("und",
- * "unknown", regional or three-letter codes): such a value is never locked.
+ * "unknown", regional or three-letter codes): such a value is never locked. A decider's answer that carries a region or
+ * script subtag ("pt-BR", "sr-Latn") must be reduced by the CALLER to its primary tag before it is passed here; a
+ * two-script language then takes its script from the `questionLine` passed beside it.
  */
 export function questionLanguageOf(code: string, questionLine?: string): QuestionLanguage | null {
   const primary = code.trim().toLowerCase();
@@ -71,10 +83,27 @@ export function questionLanguageOf(code: string, questionLine?: string): Questio
   return Object.freeze({ code: primary, name });
 }
 
-/** A run's stored language as a lock; null for "und" or today's fallback name (a run decided without a lock). */
+/**
+ * A run's stored tag and name read back as a lock value. It does NOT decide whether the run is locked: the CALLER
+ * decides that from the run's shape receipt, never from this function's non-null result. Today's unshaped runs store
+ * the detector's tag and name (for example "ro", "Romanian"), which read back non-null here, and they keep today's
+ * directive and today's reply check.
+ *
+ * Null for anything `questionLanguageOf` could not have emitted: "und", today's fallback name, a tag that is not an
+ * ISO 639-1 primary (with `-Latn`/`-Cyrl` only on a two-script language), or a name that is blank, spans lines, holds a
+ * control character, is longer than 64 UTF-8 bytes, or would frame longer than `questionLanguageForBounds()` (the money
+ * bound a price that must cover any lock frames with). So no stored value can make a call longer than that bound.
+ */
 export function questionLanguageFromRun(tag: string, name: string): QuestionLanguage | null {
-  if (tag === "und" || name.trim() === "" || name === FALLBACK_NAME) return null;
-  return Object.freeze({ code: tag, name });
+  const parts = EMITTED_TAG.exec(tag);
+  if (parts === null) return null;
+  const [, primary, script] = parts;
+  if (!ISO_639_1.has(primary!) || englishNameOf(primary!) === null) return null;
+  if (script !== undefined && !TWO_SCRIPT_LANGUAGES.has(primary!)) return null;
+  if (name.trim() === "" || name === FALLBACK_NAME || /[\p{Cc}\p{Zl}\p{Zp}]/u.test(name)) return null;
+  if (UTF8.encode(name).length > STORED_NAME_MAX_BYTES) return null;
+  const language: QuestionLanguage = Object.freeze({ code: tag, name });
+  return framedBytes(language) > framedBytes(questionLanguageForBounds()) ? null : language;
 }
 
 /**
@@ -100,7 +129,23 @@ export function withQuestionLanguageField<T extends Readonly<{ name: string; con
   return Object.freeze([...material, questionLanguageField(language)]);
 }
 
-/** What a reply is checked against: the locked code and its script (own table, script subtag, or the question's letters). */
+/** The writing system a language code is written in by default (CLDR likely subtags), or undefined when unknown. */
+function scriptOfCode(primary: string): ReplyScript | undefined {
+  let script: string | undefined;
+  try {
+    script = new Intl.Locale(primary).maximize().script;
+  } catch {
+    return undefined;
+  }
+  if (script === undefined) return undefined;
+  return Object.hasOwn(SCRIPT_SUBTAGS, script) ? SCRIPT_SUBTAGS[script] : "Other";
+}
+
+/**
+ * What a reply is checked against: the locked code and its script, read from the CODE (own table, script subtag, our
+ * 35, then the code's default script: Thai → Other, Persian → Arabic); the question's letters only when the code names
+ * no script. A kept-wording question in Latin letters never makes a Thai lock expect Latin replies.
+ */
 export function lockedReplyLanguageExpectation(language: QuestionLanguage, questionLine: string): ReplyLanguageExpectation {
   const [primaryRaw, ...rest] = language.code.split("-");
   const primary = (primaryRaw ?? "").toLowerCase();
@@ -109,6 +154,8 @@ export function lockedReplyLanguageExpectation(language: QuestionLanguage, quest
   const known = replyScriptOfTag(primary) ?? fromSubtag;
   if (known !== undefined) return Object.freeze({ tag: primary, script: known });
   if (Object.hasOwn(ARGUMENT_LANGUAGE_NAMES, primary)) return Object.freeze({ tag: primary, script: "Latin" });
+  const ofCode = scriptOfCode(primary);
+  if (ofCode !== undefined) return Object.freeze({ tag: primary, script: ofCode });
   const letters = questionLine.match(/\p{L}/gu)?.length ?? 0;
   return Object.freeze({ tag: primary, script: letters >= SCRIPT_LETTERS_MIN ? majorityScript(questionLine) : null });
 }
@@ -125,11 +172,11 @@ export function replyLanguageCheckFor(
 /**
  * Pre-flight PF-L38: the lock whose named sentence and field are the longest in UTF-8 bytes among every lock
  * `questionLanguageOf` can return (each two-script language in both scripts). A price that must cover ANY lock (the
- * API's B9 first-call price) frames with it. Ties: the first code in alphabetical order.
+ * API's B9 first-call price) frames with it. Ties: the first code in alphabetical order. Computed once per process.
  */
+let boundsLanguage: QuestionLanguage | undefined;
 export function questionLanguageForBounds(): QuestionLanguage {
-  const size = (language: QuestionLanguage): number =>
-    new TextEncoder().encode(questionLanguageSentence(language) + questionLanguageField(language).content).length;
+  if (boundsLanguage !== undefined) return boundsLanguage;
   const candidates = [...ISO_639_1].sort().flatMap((code) => {
     const plain = questionLanguageOf(code);
     if (plain === null) return [];
@@ -138,7 +185,8 @@ export function questionLanguageForBounds(): QuestionLanguage {
         Object.freeze({ code: `${code}-Cyrl`, name: `${plain.name} (Cyrillic script)` })]
       : [plain];
   });
-  return candidates.reduce((longest, candidate) => size(candidate) > size(longest) ? candidate : longest);
+  boundsLanguage = candidates.reduce((longest, candidate) => framedBytes(candidate) > framedBytes(longest) ? candidate : longest);
+  return boundsLanguage;
 }
 
 /** Today's directive without a lock (byte for byte); the named sentence with one. */
