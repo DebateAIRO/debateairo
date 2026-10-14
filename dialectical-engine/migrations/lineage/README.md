@@ -120,7 +120,9 @@ and the hosted API probes at boot that the function exists and its role may EXEC
 until both hold (`HOSTED_BEFORE_SPEND_RECORD`). No billing relation or function, so
 `verify-effective-capabilities-111.sql` stays the verifier in force; no `replayVerifierSql`: its checks are its
 postcondition digest (the writer's and the guard's owners, rights, settings, definitions and ACLs, the guard's trigger,
-and the two CHECKs by name and definition). If `origin/dev` takes 0117 first, renumber this step at merge time (its manifest, loader name and
+and its own run-less CHECK by name and definition). It never pins 0074's shared source list
+`model_spend_spend_source_check`: 0117 widens it but does not own it, and a later spend source must be able to widen it
+again without a postcondition drift on 0117 (whole-branch review I-3). If `origin/dev` takes 0117 first, renumber this step at merge time (its manifest, loader name and
 `previous` follow), as C1's recipe above says.
 
 ## Replay: every applied step keeps its own checks

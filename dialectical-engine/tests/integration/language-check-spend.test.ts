@@ -197,3 +197,42 @@ describe("0117: the language check's site cost (one writer, the day's pot)", () 
       runtime: true, replay: false, recovery: false, public: false });
   });
 });
+
+/**
+ * Whole-branch review I-3, ruling W-0117: 0117's postcondition pins only what 0117 owns (its writer, its guard and the
+ * guard's trigger, and its own run-less CHECK). The source list `model_spend_spend_source_check` is 0074's, shared by
+ * every spend source: 0117 widens it, but a later migration that widens it again must not stop every migrate() with a
+ * postcondition drift on 0117.
+ */
+describe("0117's postcondition pins only what 0117 owns (W-0117)", () => {
+  const LANGUAGE_CHECK_STEP = "0117_language_check_spend.sql";
+  const constraintDef = async (name: string): Promise<string> => (await database.pool.query<{ def: string }>(
+    "SELECT pg_get_constraintdef(oid) def FROM pg_constraint WHERE conname=$1 AND conrelid='ledger.model_spend'::regclass", [name]
+  )).rows[0]!.def;
+  const replaceCheck = (name: string, definition: string): Promise<unknown> =>
+    database.pool.query(`ALTER TABLE ledger.model_spend DROP CONSTRAINT ${name}, ADD CONSTRAINT ${name} ${definition}`);
+
+  it("a later migration may widen the shared source list without a drift on 0117", async () => {
+    const before = await constraintDef("model_spend_spend_source_check");
+    expect(before).toContain("LANGUAGE_CHECK");
+    await replaceCheck("model_spend_spend_source_check",
+      "CHECK (spend_source IN ('RUN', 'SUPPORT', 'STORY', 'LANGUAGE_CHECK', 'FUTURE_SOURCE'))");
+    try {
+      await migrate(database.pool);   // before W-0117: MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT 0117_language_check_spend.sql
+    } finally {
+      await replaceCheck("model_spend_spend_source_check", before);
+    }
+    await migrate(database.pool);
+  }, 180_000);
+
+  it("control: 0117's own run-less CHECK is still pinned", async () => {
+    const before = await constraintDef("model_spend_language_check_is_runless");
+    await replaceCheck("model_spend_language_check_is_runless", "CHECK (spend_source <> 'LANGUAGE_CHECK' OR run_id IS NULL)");
+    try {
+      await expect(migrate(database.pool)).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${LANGUAGE_CHECK_STEP}`);
+    } finally {
+      await replaceCheck("model_spend_language_check_is_runless", before);
+    }
+    await migrate(database.pool);
+  }, 180_000);
+});
