@@ -24,6 +24,7 @@ import {
   type CallBound,
   type FramedPrompt,
   type PromptContract,
+  type PromptPacket,
   type ProviderDiscoveryTarget,
   type ProviderGateway
 } from "@debateai/providers";
@@ -510,12 +511,32 @@ export function firstPositionCallProjections(input: Readonly<{
  * length frames longer. Both claim-type variants of both contracts, the largest kept, measured as the gateway's
  * `{model, max_tokens, messages}` body with an EMPTY model member: the caller adds its target's model id.
  */
-export function rootPositionRequestBytesBound(input: Readonly<{
+export function rootPositionRequestBytesBound(input: RootPositionBoundInput): number {
+  return rootPositionBodyBytesBound(input, (framed) => framed.packet);
+}
+
+/**
+ * Debate shape (controller ruling T12-R3) — THE MOST BYTES ROOT 0'S FORMAT REPAIR CAN CARRY: the full re-ask the judge
+ * builds when a reply fails its check (`buildContentRepairPacket`: the first packet, unchanged, then one fenced block with
+ * the rejection's code and machine path). The code and the path are the longest the frame lets a repair carry
+ * (`appendFramedRejection` refuses longer ones), made of characters that do not grow on the way, so no real repair of
+ * the same root frames longer. Measured as `rootPositionRequestBytesBound` measures the first packet.
+ */
+export function rootPositionRepairRequestBytesBound(input: RootPositionBoundInput): number {
+  return rootPositionBodyBytesBound(input, (framed) => buildFramedRepairPrompt(framed, LONGEST_REPAIR_LOCATOR));
+}
+
+type RootPositionBoundInput = Readonly<{
   questionLine: string;
   argumentLanguageName: string;
   completionTokenCeiling: number;
   assignedMaterialChars: Readonly<{ answer: number; points: number }>;
-}>): number {
+}>;
+
+/** The longest typed code (`[A-Z][A-Z0-9_]{0,63}`) and machine path (200 characters) a repair packet may carry. */
+const LONGEST_REPAIR_LOCATOR = Object.freeze({ code: "A".repeat(64), path: "a".repeat(200) });
+
+function rootPositionBodyBytesBound(input: RootPositionBoundInput, packetOf: (framed: FramedPrompt) => PromptPacket): number {
   const { answer, points } = input.assignedMaterialChars;
   if (!Number.isSafeInteger(input.completionTokenCeiling) || input.completionTokenCeiling < 1
     || !Number.isSafeInteger(answer) || answer < 1 || !Number.isSafeInteger(points) || points < 1) {
@@ -528,7 +549,7 @@ export function rootPositionRequestBytesBound(input: Readonly<{
   return Math.max(...legs.flatMap((leg) => (["unknown", "resolved"] as const).map((claim) => Buffer.byteLength(JSON.stringify({
     model: "",
     max_tokens: input.completionTokenCeiling,
-    messages: framedJudgePrompt(leg, input.questionLine, input.argumentLanguageName, claim).packet.messages
+    messages: packetOf(framedJudgePrompt(leg, input.questionLine, input.argumentLanguageName, claim)).messages
   }), "utf8"))));
 }
 

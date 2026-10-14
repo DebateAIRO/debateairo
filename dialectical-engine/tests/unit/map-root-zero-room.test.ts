@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { CostEnvelopeGuard, decideRunCostEnvelope, type ModelSpendStore } from "@debateai/budget";
+import { CostEnvelopeGuard, decideRunCostEnvelope, projectedCallCeilingMicros, type ModelSpendStore } from "@debateai/budget";
 import { framedJudgePromptForTest, rootPositionRequestBytesBound } from "@debateai/judgement";
 import { TypedDomainError } from "@debateai/kernel";
 import { MAP_LIMITS, mapPromptContractHash } from "@debateai/map";
 import {
+  buildFramedRepairPrompt,
+  lengthRetryTokenCeiling,
   OpenAICompatibleProviderGateway,
   type ProviderCallRequest,
   type ProviderCostEnvelopeSeam,
@@ -15,6 +17,9 @@ import {
   resolveShapeMap,
   rootZeroKeepRoomMicros,
   rootZeroMapMaterialChars,
+  rootZeroRepairRequestBytes,
+  rootZeroRequestBytes,
+  rootZeroRoomAttempts,
   rootZeroRoomRefs,
   runMapStage,
   shapeRootMaterial,
@@ -153,15 +158,71 @@ describe("root 0's worst-case call", () => {
     const prices = new Map([["opener", PRICE], ["opener-backup", PRICE], ["next", PRICE],
       ["dear-third", { inputMicrosPerMillionTokens: 50_000_000, outputMicrosPerMillionTokens: 50_000_000 }]]);
     const priced = rootZeroRoomRefs({ seats, membersOf, canHandOver: true, sitsOut: () => false }).map((ref) => prices.get(ref)!);
-    expect(rootZeroKeepRoomMicros({ prices: priced, requestBytes: 1_000, completionTokenCeiling: 100 })).toBe(600);
+    expect(rootZeroKeepRoomMicros({ prices: priced, first: { requestBytes: 1_000, completionTokenCeiling: 100 }, retries: [] })).toBe(600);
   });
 
   it("is priced at the dearest member it is given, never below one call's projection; no price (local) keeps no room", () => {
     const cheap = { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 };
     const dear = { inputMicrosPerMillionTokens: 2_000_000, outputMicrosPerMillionTokens: 3_000_000 };
+    const first = { requestBytes: 1_000, completionTokenCeiling: 100 };
     // ceil(1000 / 2) x 2 + 100 x 3 = 1 300 for the dear seat; 600 for the cheap one.
-    expect(rootZeroKeepRoomMicros({ prices: [cheap, dear], requestBytes: 1_000, completionTokenCeiling: 100 })).toBe(1_300);
-    expect(rootZeroKeepRoomMicros({ prices: [], requestBytes: 1_000, completionTokenCeiling: 100 })).toBe(0);
+    expect(rootZeroKeepRoomMicros({ prices: [cheap, dear], first, retries: [] })).toBe(1_300);
+    expect(rootZeroKeepRoomMicros({ prices: [], first, retries: [{ requestBytes: 1_000, completionTokenCeiling: 200 }] })).toBe(0);
+    // T12-R3: plus the dearest retry at the dearest member — a length retry (2 x 500 + 200 x 3 = 1 600) or a repair
+    // (2 x 700 + 100 x 3 = 1 700): 1 300 + 1 700. The retry may be the backup's, so its price is never tied to the first's.
+    expect(rootZeroKeepRoomMicros({ prices: [cheap, dear], first, retries: [{ requestBytes: 1_000, completionTokenCeiling: 200 },
+      { requestBytes: 1_400, completionTokenCeiling: 100 }] })).toBe(3_000);
+  });
+
+  it("bounds root 0's format repair: the runner's full re-ask, its first packet and the longest rejection a repair carries (T12-R3)", () => {
+    const repairBound = rootZeroRepairRequestBytes({ questionLine: QUESTION, argumentLanguageName: "English", completionTokenCeiling: CEILING });
+    const firstBound = rootZeroRequestBytes({ questionLine: QUESTION, argumentLanguageName: "English", completionTokenCeiling: CEILING });
+    expect(repairBound).toBeGreaterThan(firstBound);
+    // The longest code and path a repair packet may carry (the frame refuses longer ones), in other characters than the
+    // bound's own: any repair the judge's check can ask is covered.
+    const locators = [{ code: "SCHEMA_FAILED", path: "claim" }, { code: `Z${"9".repeat(63)}`, path: "-".repeat(200) }];
+    const assigned = { kind: "assigned-root" as const, assignedAnswer: "\"".repeat(rootZeroMapMaterialChars.answer),
+      mapPoints: "\"".repeat(rootZeroMapMaterialChars.points) };
+    for (const leg of [{ kind: "primary-root" as const }, assigned]) {
+      for (const claim of ["unknown", "resolved"] as const) {
+        for (const locator of locators) {
+          const repair = buildFramedRepairPrompt(framedJudgePromptForTest(leg, QUESTION, "English", claim), locator);
+          expect(repairBound).toBeGreaterThanOrEqual(bodyBytes(repair) + 256);
+        }
+      }
+    }
+  });
+
+  it("T12-R3: the room covers root 0's first attempt AND one retry — the larger of a length retry and a format repair", () => {
+    const input = { questionLine: QUESTION, argumentLanguageName: "English" };
+    const attempts = rootZeroRoomAttempts({ ...input, tokenCeiling: CEILING });
+    expect(attempts.first).toEqual({ requestBytes: rootZeroRequestBytes({ ...input, completionTokenCeiling: CEILING }),
+      completionTokenCeiling: lengthRetryTokenCeiling(CEILING, 0) });
+    const lengthRetry = { requestBytes: rootZeroRequestBytes({ ...input, completionTokenCeiling: lengthRetryTokenCeiling(CEILING, 1) }),
+      completionTokenCeiling: lengthRetryTokenCeiling(CEILING, 1) };
+    const repair = { requestBytes: rootZeroRepairRequestBytes({ ...input, completionTokenCeiling: CEILING }), completionTokenCeiling: CEILING };
+    expect(attempts.retries).toEqual([lengthRetry, repair]);
+    for (const price of [PRICE, { inputMicrosPerMillionTokens: 40_000_000, outputMicrosPerMillionTokens: 1_000_000 }]) {
+      const room = rootZeroKeepRoomMicros({ prices: [price], ...attempts });
+      const projected = (attempt: typeof repair) => projectedCallCeilingMicros(price, attempt);
+      expect(room).toBe(projected(attempts.first) + Math.max(projected(lengthRetry), projected(repair)));
+      expect(room).toBeGreaterThanOrEqual(projected(attempts.first) + projected(lengthRetry));
+      expect(room).toBeGreaterThanOrEqual(projected(attempts.first) + projected(repair));
+    }
+  });
+
+  it("T12-R3, through the real seam: after the map spends down to the room, root 0's first attempt and either retry are admitted", async () => {
+    const attempts = rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "English", tokenCeiling: CEILING });
+    const room = rootZeroKeepRoomMicros({ prices: [PRICE], ...attempts });
+    const decide = (spent: number, projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>) =>
+      Promise.resolve(seamAt(spent).assertCallAllowed(projection)).then(() => "ADMITTED", (error: unknown) => (error as TypedDomainError).code);
+    const afterMap = BODY_CEILING - room;
+    expect(await decide(afterMap, attempts.first)).toBe("ADMITTED");
+    const afterFirst = afterMap + projectedCallCeilingMicros(PRICE, attempts.first);
+    for (const retry of attempts.retries) expect(await decide(afterFirst, retry)).toBe("ADMITTED");
+    // The room of the first attempt alone (before T12-R3) would leave the length retry refused for money: no answer.
+    const firstOnly = BODY_CEILING - projectedCallCeilingMicros(PRICE, attempts.first);
+    expect(await decide(firstOnly + projectedCallCeilingMicros(PRICE, attempts.first), attempts.retries[0]!)).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
   });
 });
 

@@ -1,12 +1,12 @@
 import { projectedCallCeilingMicros, type ProviderTargetPrice } from "@debateai/budget";
-import { rootPositionRequestBytesBound } from "@debateai/judgement";
+import { rootPositionRepairRequestBytesBound, rootPositionRequestBytesBound } from "@debateai/judgement";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import {
   MAP_LIMITS, mapErrorCodeOf, mapProviderPieces, mapRunAngleMap, mapRunBlindLists, mapRunSnowball,
   type MapCallOutcome, type MapCallRequest, type MapCaller, type MapChoiceRepository, type MapResult, type MapRunInput, type MapSeat,
   type MapStep
 } from "@debateai/map";
-import type { CallBound, ProviderGateway } from "@debateai/providers";
+import { lengthRetryTokenCeiling, type CallBound, type ProviderGateway } from "@debateai/providers";
 import type { DebateShapeOpening } from "@debateai/register";
 import type { ConditionMarkRecord } from "@debateai/serve";
 import type { EnvelopeStopKind } from "./index.js";
@@ -236,18 +236,53 @@ export function rootZeroRequestBytes(input: Readonly<{ questionLine: string; arg
     + ROOT_ZERO_BODY_ALLOWANCES.modelIdBytes;
 }
 
+/** Ruling T12-R3: the most bytes root 0's FORMAT REPAIR (the judge's full re-ask) can carry for this question. */
+export function rootZeroRepairRequestBytes(input: Readonly<{ questionLine: string; argumentLanguageName: string; completionTokenCeiling: number }>): number {
+  return rootPositionRepairRequestBytesBound({ ...input, assignedMaterialChars: rootZeroMapMaterialChars })
+    + ROOT_ZERO_BODY_ALLOWANCES.modelIdBytes;
+}
+
+/** One attempt of root 0's call, as the money seam projects it. */
+export type RootZeroAttempt = Readonly<{ requestBytes: number; completionTokenCeiling: number }>;
+
 /**
- * Root 0's worst-case call, in micro-units: the money seam's own projection (`projectedCallCeilingMicros`) of its largest
- * request at its first attempt's completion ceiling, at the dearest price among the members that could write it
- * (`rootZeroRoomRefs`). No price (local mode: no money ceiling) keeps no room.
- *
- * ONE CALL, ITS FIRST ATTEMPT — the same "one call" rule as the boot's RUN_CEILING_BELOW_ONE_CALL check
- * (`firstPositionCallProjections`): the room covers root 0's first attempt only. Its retries and repairs, like every
- * attempt of every call, are checked one by one by the money seam as today.
+ * Ruling T12-R3 — THE ATTEMPTS ROOT 0'S ROOM PAYS FOR: its first attempt (the judge bound's first `max_tokens`) and ONE
+ * retry, whichever is dearer: a length retry (the first packet again at `lengthRetryTokenCeiling(tc, 1)`, as the gateway
+ * re-sends it after a cut reply) or a format repair (the full re-ask at the first attempt's bound, as the gateway sends it
+ * after a reply that failed its check). The backup answering after a billed failure of the main is the first packet at
+ * the first bound, under both. Each is sized the conservative way the first attempt is (`rootPositionRequestBytesBound`).
  */
-export function rootZeroKeepRoomMicros(input: Readonly<{ prices: readonly ProviderTargetPrice[]; requestBytes: number; completionTokenCeiling: number }>): number {
-  return input.prices.reduce((most, price) => Math.max(most,
-    projectedCallCeilingMicros(price, { requestBytes: input.requestBytes, completionTokenCeiling: input.completionTokenCeiling })), 0);
+export function rootZeroRoomAttempts(input: Readonly<{ questionLine: string; argumentLanguageName: string; tokenCeiling: number }>):
+  Readonly<{ first: RootZeroAttempt; retries: readonly RootZeroAttempt[] }> {
+  const question = { questionLine: input.questionLine, argumentLanguageName: input.argumentLanguageName };
+  const firstBound = lengthRetryTokenCeiling(input.tokenCeiling, 0);
+  const lengthRetryBound = lengthRetryTokenCeiling(input.tokenCeiling, 1);
+  return Object.freeze({
+    first: Object.freeze({ requestBytes: rootZeroRequestBytes({ ...question, completionTokenCeiling: firstBound }), completionTokenCeiling: firstBound }),
+    retries: Object.freeze([
+      Object.freeze({ requestBytes: rootZeroRequestBytes({ ...question, completionTokenCeiling: lengthRetryBound }), completionTokenCeiling: lengthRetryBound }),
+      Object.freeze({ requestBytes: rootZeroRepairRequestBytes({ ...question, completionTokenCeiling: firstBound }), completionTokenCeiling: firstBound })
+    ])
+  });
+}
+
+/**
+ * Root 0's room, in micro-units: the money seam's own projection (`projectedCallCeilingMicros`) of root 0's FIRST ATTEMPT
+ * PLUS ONE RETRY (ruling T12-R3, `rootZeroRoomAttempts`), each at the dearest price among the members that could write it
+ * (`rootZeroRoomRefs`) — the retry may be the backup's, so its price is never tied to the first attempt's. No price
+ * (local mode: no money ceiling) keeps no room.
+ *
+ * FIRST ATTEMPT + ONE RETRY: so a root 0 whose first reply slips its format, is cut at the token bound, or whose main
+ * fails after billing still has the money for one more try once the map has spent down to the room (the owner's "always
+ * an answer"). Later attempts, like every attempt of every call, are checked one by one by the money seam as today. A
+ * map call refused only because of this room still stops only the map (T12-R1).
+ */
+export function rootZeroKeepRoomMicros(input: Readonly<{ prices: readonly ProviderTargetPrice[]; first: RootZeroAttempt;
+  retries: readonly RootZeroAttempt[] }>): number {
+  if (input.prices.length === 0) return 0;
+  const dearest = (attempts: readonly RootZeroAttempt[]) => input.prices.reduce((most, price) => Math.max(most,
+    ...attempts.map((attempt) => projectedCallCeilingMicros(price, attempt))), 0);
+  return dearest([input.first]) + dearest(input.retries);
 }
 
 /**

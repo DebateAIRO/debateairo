@@ -219,7 +219,7 @@ import {
   type ScrutinyCandidate
 } from "./shape-select.js";
 import {
-  createRunnerMapCaller, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroRequestBytes,
+  createRunnerMapCaller, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroRoomAttempts,
   rootZeroRoomRefs, runMapStage, shapeRootMaterial
 } from "./map-stage.js";
 import {
@@ -6697,9 +6697,9 @@ export class WalkingSkeletonRunner {
      * and asks nothing again; a spend stop that map met is restored (`resolveShapeMap`). A copy of the run that loses the
      * race to store its map argues the stored one. A stop during the map (money, attempts, lane) ends it with the code's
      * fallbacks; the arguing then stops after root 0 and the answer is written (O6). Controller ruling T12-R0: every map
-     * call keeps room for root 0's worst-case call (`rootZeroKeepRoomMicros`), so a started debate can always pay its
-     * first position. A keep-alive refusal abandons the run, as today. Never on today's run (`shapeRun === null`): no
-     * map, no call, no storage.
+     * call keeps room for root 0's first attempt + one retry (`rootZeroKeepRoomMicros`, ruling T12-R3), so a started
+     * debate can always pay its first position. A keep-alive refusal abandons the run, as today. Never on today's run
+     * (`shapeRun === null`): no map, no call, no storage.
      */
     let debateShapeMap: MapResult | null = null;
     let shapeMapResult: MapResult | null = null;
@@ -6708,15 +6708,15 @@ export class WalkingSkeletonRunner {
       const runMap = async (): Promise<Readonly<{ result: MapResult; spendStop: EnvelopeStopKind | null }>> => {
         /** PF-B40: map seats outside the claim-eligible list, wrapped once each. */
         const mapOnlyMembers = new Map<string, ConfiguredSeatMaker>();
-        // T12-R0 / T12-R2: root 0's worst-case call, at the dearest member of root 0's OWN seat (and the seat it is
-        // handed to when its member sits out); hosted prices only. It covers root 0's first attempt (`rootZeroKeepRoomMicros`).
+        // T12-R0 / T12-R2 / T12-R3: root 0's room, at the dearest member of root 0's OWN seat (and the seat it is handed
+        // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
+        // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`).
         const providerPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
         const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
           .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
-        const rootZeroCompletion = lengthRetryTokenCeiling(this.settings.judgeBound.tokenCeiling, 0);
-        const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, completionTokenCeiling: rootZeroCompletion,
-          requestBytes: rootZeroRequestBytes({ questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName,
-            completionTokenCeiling: rootZeroCompletion }) });
+        const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
+          questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName,
+          tokenCeiling: this.settings.judgeBound.tokenCeiling }) });
         const mapCaller = createRunnerMapCaller({
           runId: run.runId, subjectItemId: claimed.workItemId, mapContractHash: shapeRun.mapContractHash,
           judgeBound: this.settings.judgeBound,
