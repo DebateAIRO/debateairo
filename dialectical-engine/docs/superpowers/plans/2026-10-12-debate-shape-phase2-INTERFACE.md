@@ -5,6 +5,10 @@ Spec: docs/superpowers/specs/2026-10-12-debate-shape-design.md (§3–§6 are Ph
 sub-plans written in parallel agree. A drafter who finds a name impossible (clash, convention) proposes the change in
 its plan's "Contract deviations" section instead of silently renaming.
 
+**Status (2026-10-14): historical.** This was the drafters' starting contract; the built code and the sub-plans'
+deviations superseded parts of it, and where they differ the code wins. Known differences are marked "Superseded"
+below (§1 answers, §4 storage, §5 page keys).
+
 Sub-plans (each its own plan file, its own SDD run, in this order):
 - P2a — settings and money: register row `debateShapePolicy`, ask-contract fields, plan normalisation, start-of-debate
   estimate + attempt ceiling + four money places, preview publish kit + hosted optional member.
@@ -31,7 +35,7 @@ Sub-plans (each its own plan file, its own SDD run, in this order):
   answerLength: { short: { words: 300, writerBound: 8192 }, standard: { words: 700, writerBound: 12288 },
                   detailed: { words: 1500, writerBound: 16384 } },
   mapStepBounds: { merge: int 8192..32768, choose: int 8192..32768 } }   // optional member, X1
-PlanShape = { mapAIs: int 2..9, answers: int 2..5, graders: int 1..5, pointsPerAnswer: int 1..6, deeperTopPoints: int 1..6,
+PlanShape = { mapAIs: int 2..9, answers: int 2..5 (Superseded: 2..4, ruling T-P5), graders: int 1..5, pointsPerAnswer: int 1..6, deeperTopPoints: int 1..6,
               gapRoundsMax: int 0..3, closeCallExtraGraders: int 0..4, fixedDepthAllowed: boolean,
               scrutiny: { deep: null | { roundsPerPoint: int 1..5, pointsPerDebate: int 1..30 },
                           exhaustive: null | { roundsPerPoint: int 1..8, pointsPerDebate: int 1..60 },
@@ -88,6 +92,9 @@ New migration (next free number at build time) with:
   angle_id text NULL, angle_kind text NULL, kind text CHECK IN ('POINT','ANSWER'), claim text, why text NULL, leans text NULL,
   list_index int NULL, position int NOT NULL, PRIMARY KEY (run_id, item_id))`
 - `core.map_choice(run_id uuid PRIMARY KEY, answers jsonb, also_raised jsonb, marks jsonb, notes jsonb, opening text)`
+- Superseded (built in `migrations/0116_debate_shape_map.sql`): `core.map_choice` holds `opening`, `marks` and the
+  choice as encrypted `content` (`content_ciphertext`); `core.map_item` holds each item's text as encrypted content too;
+  a third table, `core.map_position`, records which root argued each chosen answer.
 - Both: append-only guards, runtime grants like other core carriers, content encryption like other debate text where
   enabled, TRUNCATE guard, erasure coverage. Read model: `readMapChoiceForRun(runId)`.
 
@@ -95,7 +102,8 @@ New migration (next free number at build time) with:
 
 - Story material: `alsoRaised: { claim: string; raisedBy: number }[]` (bounded by the story budget); story-shapes
   common.md paragraph "Also raised" (owner-editable text; the owner picks among 3 phrasings).
-- Debate page: section "Also raised, not debated" (message keys `debate.alsoRaised.title`, `debate.alsoRaised.empty`);
+- Debate page: section "Also raised, not debated" (message keys `debate.alsoRaised.title`, `debate.alsoRaised.empty`;
+  Superseded: built as `public.alsoRaised.title` and `public.alsoRaised.empty`);
   position title "The case for {answer}, argued by {ai}" (`debate.positionTitle`); 3 phrasings offered to the owner,
   option 1 in code.
 - /new: Depth mode (Fixed / Adaptive), Depth of scrutiny (Standard / Deep / Exhaustive), Answer length (Short /

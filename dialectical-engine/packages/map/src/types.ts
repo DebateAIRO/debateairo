@@ -42,7 +42,7 @@ export const MAP_LIMITS = Object.freeze({
   gapRoundNewPointsToContinue: 2
 });
 
-/** The marks the spec names (§1.1, §1.2). Phase 2 adds them to the kernel's CONDITION_MARKS with typed records. */
+/** The marks the spec names (§1.1, §1.2). The kernel's CONDITION_MARKS lists them too (Phase 2), with typed records. */
 export const MAP_MARKS = Object.freeze(["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK",
   "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED"] as const);
 export type MapMark = typeof MAP_MARKS[number];
