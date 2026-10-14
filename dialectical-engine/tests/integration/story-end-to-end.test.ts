@@ -100,6 +100,25 @@ const CHECKER_OBJECTS = JSON.stringify({
 const UUID_SHAPED = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu;
 
 /**
+ * Reply language (#154): the scripted replies are English, checked against the question's language. A label with a
+ * UUID's hex letters read as Portuguese (lone "e", "a"), so the replies were refused; a label's fresh part is digits
+ * only, so the label always reads as no named language ("und", Latin script).
+ */
+const digitsOnlyId = (): string => randomUUID().replace(/[a-f]/gu, (hex) => String(hex.charCodeAt(0) - 87));
+
+/**
+ * The language directive every structured step carries names identifiers (`served_number_refs`, `fatalFlags`, …),
+ * and the double below routes on those words, so the directive is removed from the body before any branch reads it.
+ */
+const ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN = new RegExp(
+  argumentLanguageDirective("\u0000")
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    // Reply language (2026-10-12): a named language is followed by ", the language of the question"; the fallback is not.
+    .replace("\u0000, the language of the question", "[^.]+?"),
+  "gu"
+);
+
+/**
  * The storyteller never sees a node id: a one-maker debate has one node, the
  * position, and the material calls it `P1` (skeleton: positions first). The
  * writer must restore `P1` to the real node id before storing.
@@ -179,15 +198,16 @@ async function startStoryDebateProvider(input: {
       if (input.checker === "objects-then-invalid") return checkerCalls === 1 ? CHECKER_OBJECTS : "not a verdict";
       return CHECKER_SATISFIED;
     }
-    if (body.includes("fairness_to_losers")) return EVALUATOR_SATISFIED;
-    if (body.includes("restatement_text")) {
+    const contract = body.replace(ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN, "");
+    if (contract.includes("fairness_to_losers")) return EVALUATOR_SATISFIED;
+    if (contract.includes("restatement_text")) {
       return input.positionStatement === undefined ? JUDGEMENT : JSON.stringify({
         ...JSON.parse(JUDGEMENT) as Record<string, unknown>,
         statement: input.positionStatement,
         restatement_text: input.positionStatement
       });
     }
-    if (body.includes("served_number_refs")) return COMPOSITION;
+    if (contract.includes("served_number_refs")) return COMPOSITION;
     throw new Error("STORY_E2E_UNEXPECTED_REQUEST");
   };
   const server: Server = createServer((request, response) => {
@@ -320,7 +340,7 @@ async function createStoryDebate(
 }> {
   // Unique without being id-shaped, so the material check below can refuse ANY
   // UUID-shaped text the story's models are handed.
-  const question = `${label}-${randomUUID().replaceAll("-", "")}`;
+  const question = `${label}-${digitsOnlyId().replaceAll("-", "")}`;
   const askerId = `asker:${question}`;
   const runId = await new RunRepository(database.pool).startRun({
     questionLine: question, principal: { kind: "legacy", legacyAskerId: askerId },
