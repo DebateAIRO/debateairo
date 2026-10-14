@@ -14,7 +14,7 @@ import {
   type RegisterPublicationRow
 } from "@debateai/register";
 import { buildPreviewSourceRowsV2 } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
-import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
+import { buildDevelopmentRunnerRegisterRows, DEVELOPMENT_RUNNER_SOURCE_REF } from "../../apps/runner/src/dev-deployment-register.js";
 import { INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW, STAFF_ACCESS_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
 import { parsePracticeArgs } from "../../tools/preview-practice/practice.js";
 import { callFamilyOf, practiceMapStepOf, recheckReply } from "../../tools/preview-practice/practice-lanes.js";
@@ -171,8 +171,10 @@ describe("practice debate shape: the throwaway register version", () => {
     for (const key of PRACTICE_CODE_HASH_ROW_KEYS) {
       const value = dev.find((entry) => entry.rowKey === key)?.value;
       expect(typeof value, key).toBe("string");
+      // The builder's own source ref too (P2d Task 6): the runner's policy reader (apps/runner/src/dev-runner-policy.ts)
+      // refuses a judge, composer or conformance hash row sealed by anyone else (DEV_RUNNER_POLICY_PROVENANCE_INVALID).
       expect(CODE.find((entry) => entry.rowKey === key))
-        .toEqual({ rowKey: key, valueJsonText: canonicalRegisterJson(value as string), sourceRef: PRACTICE_SHAPE_SOURCE_REF });
+        .toEqual({ rowKey: key, valueJsonText: canonicalRegisterJson(value as string), sourceRef: DEVELOPMENT_RUNNER_SOURCE_REF });
     }
     expect(CODE.find((entry) => entry.rowKey === "mapContractHash")!.valueJsonText).toBe(canonicalRegisterJson(mapPromptContractHash()));
     // The export's own (live) hashes are superseded, never kept beside the code's.

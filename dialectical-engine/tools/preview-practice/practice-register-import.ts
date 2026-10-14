@@ -353,14 +353,17 @@ export const PRACTICE_CODE_HASH_ROW_KEYS = Object.freeze(["composerContractHash"
 
 /**
  * The code's own values of those four rows, exactly as the development register builder seals them
- * (apps/runner/src/dev-deployment-register.ts), with the practice's source ref. Throwaway database only.
+ * (apps/runner/src/dev-deployment-register.ts), its source ref included: the runner's policy reader
+ * (apps/runner/src/dev-runner-policy.ts) refuses a judge, composer or conformance hash row sealed by anyone else
+ * (DEV_RUNNER_POLICY_PROVENANCE_INVALID; found by P2d Task 6's whole shape debate). The version itself is still
+ * published under PRACTICE_SHAPE_SOURCE_REF, and so is the debate-shape row. Throwaway database only.
  */
 export async function practiceCodeContractHashRows(): Promise<readonly RegisterPublicationRow[]> {
   const rows = await buildDevelopmentRunnerRegisterRows();
   return Object.freeze(PRACTICE_CODE_HASH_ROW_KEYS.map((rowKey) => {
-    const value = rows.find((row) => row.rowKey === rowKey)?.value;
-    if (typeof value !== "string") throw new PracticeRegisterError("PRACTICE_CODE_HASH_MISSING", rowKey);
-    return Object.freeze({ rowKey, valueJsonText: canonicalRegisterJson(value), sourceRef: PRACTICE_SHAPE_SOURCE_REF });
+    const row = rows.find((entry) => entry.rowKey === rowKey);
+    if (row === undefined || typeof row.value !== "string") throw new PracticeRegisterError("PRACTICE_CODE_HASH_MISSING", rowKey);
+    return Object.freeze({ rowKey, valueJsonText: canonicalRegisterJson(row.value), sourceRef: row.sourceRef });
   }));
 }
 
