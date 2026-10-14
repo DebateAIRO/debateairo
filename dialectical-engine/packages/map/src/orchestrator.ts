@@ -1,9 +1,10 @@
-import { replyLanguageExpectation } from "@debateai/kernel";
+import { lockedReplyLanguageExpectation, questionLanguageOf, replyLanguageExpectation } from "@debateai/kernel";
 import { mapFinishChoice } from "./choose.js";
 import { mapAssignItemIds, mapNextItemNumbers, type MapItemDraft } from "./items.js";
 import { mapAddGapPoints, mapApplyMerge, mapCodeMerge, mapSingletonMap, type MapMergedMap } from "./keypoints.js";
 import type { MapPromptContractSet } from "./prompts.js";
-import type { MapListReply } from "./replies.js";
+import type { MapAnglesReply, MapListReply } from "./replies.js";
+import { mapPrimarySubtag } from "./text.js";
 import {
   MAP_FALLBACK_ANGLES,
   mapDistinctMakers,
@@ -20,6 +21,7 @@ import {
 import {
   mapAnglesSpec,
   mapChooseSpec,
+  mapLockedLanguage,
   mapGapSpec,
   mapListSpec,
   mapMergeSpec,
@@ -132,12 +134,17 @@ class MapRun {
   readonly notes: MapNoteRecord[] = [];
   readonly ctx: MapSpecContext;
   stoppedBy: string | null = null;
+  /** What the angle planner named (a primary subtag), once its reply was accepted; null otherwise (operators only). */
+  plannerLanguage: string | null = null;
   #next = 0;
 
   constructor(readonly input: MapRunInput, readonly arm: MapArm) {
-    // Ruling R-5: the reply-language expectation is built once, from the question line, and every step's check reads it.
+    // Ruling R-5: the reply-language expectation is built once, from the question line, and every step's check reads it
+    // (question-language spec 2026-10-13: the lock, never a re-guess). A tag or name with no lock ("und", a stored
+    // fallback name) keeps today's expectation; it never crashes.
+    const lock = mapLockedLanguage(input);
     this.ctx = Object.freeze({ questionLine: input.questionLine, languageName: input.languageName, languageTag: input.languageTag,
-      replyLanguage: replyLanguageExpectation(input.questionLine),
+      replyLanguage: lock === null ? replyLanguageExpectation(input.questionLine) : lockedReplyLanguageExpectation(lock, input.questionLine),
       ...(input.contracts === undefined ? {} : { contracts: input.contracts }) });
   }
 
@@ -176,6 +183,21 @@ class MapRun {
     this.marks.push(Object.freeze({ mark, step, detail }));
   }
 
+  /**
+   * The planner's question_language (question-language spec 2026-10-13, L7; ruling CR-3): kept as `plannerLanguage`
+   * when it is an ISO 639-1 code (reduced to its primary subtag), else null. When it names another language than the
+   * lock, ONE operator-only note with both codes (never text): measurement only, never a mark, never a switch.
+   */
+  mapPlannerLanguage(reply: MapAnglesReply): void {
+    const subtag = reply.question_language === undefined ? null : mapPrimarySubtag(reply.question_language);
+    const named = subtag !== null && questionLanguageOf(subtag) !== null ? subtag : null;
+    this.plannerLanguage = named;
+    const locked = mapPrimarySubtag(this.input.languageTag);
+    if (named !== null && named !== locked && this.input.languageTag !== "und") {
+      this.mapNote("LANGUAGE_PLANNER_DISAGREES", "ANGLES", `${locked}:${named}`);
+    }
+  }
+
   /** The seats not sitting out, in plan order. */
   get available(): readonly MapSeat[] {
     return this.input.seats.filter((seat) => !this.out.has(seat.aiRef));
@@ -187,7 +209,7 @@ class MapRun {
       arm: this.arm,
       ...parts,
       stoppedBy: this.stoppedBy,
-      plannerLanguage: null,
+      plannerLanguage: this.plannerLanguage,
       marks: Object.freeze([...this.marks]),
       notes: Object.freeze([...this.notes]),
       // Pushed as calls finish; returned in plan order, never finish order.
@@ -315,6 +337,7 @@ export async function mapRunAngleMap(input: MapRunInput): Promise<MapResult> {
     angles = MAP_FALLBACK_ANGLES;
     run.mapMark("MAP_ANGLES_FALLBACK", "ANGLES", planner === null ? "no seat to plan" : "angles reply missing");
   } else {
+    run.mapPlannerLanguage(planned);
     angles = mapOrderAngles(planned);
   }
   const first = await mapRunLists(run, mapListAssignments(angles, order, run.out), 1);

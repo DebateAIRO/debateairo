@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { argumentLanguageDirective } from "@debateai/kernel";
+import { languageDirectiveFor, type QuestionLanguage } from "@debateai/kernel";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { MAP_LIMITS } from "./types.js";
 
@@ -101,7 +101,9 @@ const POINT_FORM = `{ "claim": non-empty string of at most ${String(L.claimMaxCh
 const LIST_FORM = `${STRICT}\n{ "points": [${POINT_FORM}, ...], "candidate_answers": [non-empty string of at most ${String(L.candidateAnswerMaxChars)} characters, ...] }\npoints has ${String(L.listPointsMin)} to ${String(L.listPointsMax)} entries; candidate_answers has ${String(L.listAnswersMin)} to ${String(L.listAnswersMax)} entries.`;
 
 export const MAP_ANSWER_FORMS: Readonly<Record<MapContractName, string>> = Object.freeze({
-  angles: `${STRICT}\n{ "angles": [{ "angle_id": ${ID_FORM}, "kind": "OPPOSITE_CASE" | "ASKER_WORRY" | "PRACTICAL" | "SPECIFIC", "label": non-empty string of at most ${String(L.angleLabelMaxChars)} characters, "focus": non-empty string of at most ${String(L.angleFocusMaxChars)} characters }, ...] }\nangles has ${String(L.anglesMin)} to ${String(L.anglesMax)} entries: exactly one each of OPPOSITE_CASE, ASKER_WORRY and PRACTICAL, and ${String(L.specificAnglesMin)} to ${String(L.specificAnglesMax)} of SPECIFIC; every angle_id is different.`,
+  // Question-language spec 2026-10-13 (L7): the planner names the question's language FIRST. The request sits in this
+  // code-owned form, not in the owners' instruction text, so an owner edit cannot drop it (pre-flight PF-L48).
+  angles: `${STRICT}\n{ "question_language": FIRST, the two-letter ISO 639-1 code of the language the question in question_line is written in, in lower case, "angles": [{ "angle_id": ${ID_FORM}, "kind": "OPPOSITE_CASE" | "ASKER_WORRY" | "PRACTICAL" | "SPECIFIC", "label": non-empty string of at most ${String(L.angleLabelMaxChars)} characters, "focus": non-empty string of at most ${String(L.angleFocusMaxChars)} characters }, ...] }\nangles has ${String(L.anglesMin)} to ${String(L.anglesMax)} entries: exactly one each of OPPOSITE_CASE, ASKER_WORRY and PRACTICAL, and ${String(L.specificAnglesMin)} to ${String(L.specificAnglesMax)} of SPECIFIC; every angle_id is different.`,
   listAngle: LIST_FORM,
   listOpen: LIST_FORM,
   listSnowball: `${STRICT}\n{ "points": [${POINT_FORM}, ...], "candidate_answers": [non-empty string of at most ${String(L.candidateAnswerMaxChars)} characters, ...] }\npoints has 0 to ${String(L.snowballPointsMax)} entries; candidate_answers has 0 to ${String(L.snowballAnswersMax)} entries.`,
@@ -130,7 +132,7 @@ export function mapPromptContractHash(contracts: MapPromptContractSet = mapPromp
   return createHash("sha256").update(mapPromptFingerprintText(contracts)).digest("hex");
 }
 
-/** The contract a call sends: the instruction followed by the argument-language directive (as the story's contracts do). */
-export function mapContractInLanguage(contract: PromptContract, languageName: string): PromptContract {
-  return Object.freeze({ ...contract, instruction: `${contract.instruction}\n\n${argumentLanguageDirective(languageName)}` });
+/** The contract a call sends: the instruction, then the locked language's one sentence (today's directive only for "und"). */
+export function mapContractInLanguage(contract: PromptContract, language: QuestionLanguage | null, languageName: string): PromptContract {
+  return Object.freeze({ ...contract, instruction: `${contract.instruction}\n\n${languageDirectiveFor(languageName, language)}` });
 }

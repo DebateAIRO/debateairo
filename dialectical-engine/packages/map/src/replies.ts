@@ -20,6 +20,9 @@ const mapPoint = z.object({
 }).strict();
 
 export const mapAnglesReplySchema = z.object({
+  // Question-language spec 2026-10-13 (L7, deviation 5): REQUIRED in the answer form, OPTIONAL here. A missing one
+  // records nothing and costs no re-ask. It is a code, never prose: mapAnglesCheck never reads it.
+  question_language: z.string().trim().min(1).max(35).optional(),
   angles: z.array(z.object({
     angle_id: mapId,
     kind: z.enum(["OPPOSITE_CASE", "ASKER_WORRY", "PRACTICAL", "SPECIFIC"]),

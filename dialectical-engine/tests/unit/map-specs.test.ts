@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { argumentLanguageDirective, replyLanguageExpectation } from "@debateai/kernel";
+import { questionLanguageSentence, replyLanguageExpectation } from "@debateai/kernel";
 import { readPromptFrame } from "@debateai/providers";
 import {
   MAP_CONTRACT_IDS,
@@ -88,14 +88,15 @@ describe("map specs: what each step sends", () => {
       MAP_CONTRACT_IDS.angles, MAP_CONTRACT_IDS.listAngle, MAP_CONTRACT_IDS.listOpen, MAP_CONTRACT_IDS.listSnowball,
       MAP_CONTRACT_IDS.merge, MAP_CONTRACT_IDS.gap, MAP_CONTRACT_IDS.choose]);
     expect(ALL.map((spec) => spec.material.map((entry) => entry.name).join(","))).toEqual([
-      "question_line", "question_line,angle_label,angle_focus", "question_line", "question_line,points_so_far",
-      "question_line,points,candidate_answers", "question_line,key_points,answers", "question_line,key_points,answers"]);
+      "question_line,question_language", "question_line,angle_label,angle_focus,question_language", "question_line,question_language",
+      "question_line,points_so_far,question_language", "question_line,points,candidate_answers,question_language",
+      "question_line,key_points,answers,question_language", "question_line,key_points,answers,question_language"]);
     expect(ALL.map((spec) => spec.step)).toEqual(["ANGLES", "LIST", "LIST", "SNOWBALL", "MERGE", "GAP", "CHOOSE"]);
   });
 
-  it("asks every step in the question's language", () => {
+  it("asks every step in the question's language (the context's tag is a lock: the named sentence)", () => {
     for (const spec of ALL) {
-      expect(mapProviderPieces(spec).framed.packet.messages[0]!.content).toContain(argumentLanguageDirective("English"));
+      expect(mapProviderPieces(spec).framed.packet.messages[0]!.content).toContain(questionLanguageSentence({ code: "en", name: "English" }));
     }
   });
 

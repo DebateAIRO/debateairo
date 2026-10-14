@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { argumentLanguageDirective } from "@debateai/kernel";
+import { argumentLanguageDirective, questionLanguageSentence } from "@debateai/kernel";
 import { buildFramedPrompt, promptContractFingerprintText, readPromptFrame } from "@debateai/providers";
 import {
   MAP_ANSWER_FORMS,
@@ -39,9 +39,11 @@ describe("map prompts: seven contracts, owner text and code forms", () => {
   });
 
   it("appends the argument-language directive to the instruction, never to the material", () => {
-    const contract = mapContractInLanguage(mapPromptContracts().listOpen, "Romanian");
+    const contract = mapContractInLanguage(mapPromptContracts().listOpen, null, "Romanian");
     expect(contract.instruction.endsWith(argumentLanguageDirective("Romanian"))).toBe(true);
     expect(contract.answerForm).toBe(MAP_ANSWER_FORMS.listOpen);
+    expect(mapContractInLanguage(mapPromptContracts().listOpen, { code: "ro", name: "Romanian" }, "Romanian").instruction
+      .endsWith(questionLanguageSentence({ code: "ro", name: "Romanian" }))).toBe(true);
   });
 
   it("fingerprints all seven, and an owner's edit is a new fingerprint", () => {

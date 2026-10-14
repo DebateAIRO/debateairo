@@ -1,5 +1,11 @@
 import type { z } from "zod";
-import { TypedDomainError, type ReplyLanguageExpectation } from "@debateai/kernel";
+import {
+  questionLanguageFromRun,
+  TypedDomainError,
+  withQuestionLanguageField,
+  type QuestionLanguage,
+  type ReplyLanguageExpectation
+} from "@debateai/kernel";
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
@@ -53,21 +59,34 @@ export type MapSpecContext = Readonly<{
   /** Its tag, e.g. "ro" (kept with the name; the language check reads `replyLanguage`, never this tag). */
   languageTag: string;
   /**
-   * What every reply's prose is checked against (ruling R-5): `replyLanguageExpectation(questionLine)`, built ONCE per
-   * question by the caller and threaded through. A field is refused only when the kernel's verdict is "OTHER".
+   * What every reply's prose is checked against (ruling R-5), built ONCE per question by the caller and threaded
+   * through: with a lock (`mapLockedLanguage`), `lockedReplyLanguageExpectation(lock, questionLine)`, never a re-guess
+   * (question-language spec 2026-10-13); without one, `replyLanguageExpectation(questionLine)`. A field is refused only
+   * when the kernel's verdict is "OTHER".
    */
   replyLanguage: ReplyLanguageExpectation;
   /** The owners' contracts; default the shipped text. */
   contracts?: MapPromptContractSet;
 }>;
 
+/**
+ * The map's locked language (question-language spec 2026-10-13, L6): the context's stored tag and name read back as a
+ * lock. Null for "und" (old practice data) and for anything `questionLanguageFromRun` refuses (a stored fallback name):
+ * those calls keep today's directive, material and reply check, byte for byte.
+ */
+export function mapLockedLanguage(ctx: Pick<MapSpecContext, "languageTag" | "languageName">): QuestionLanguage | null {
+  return ctx.languageTag === "und" ? null : questionLanguageFromRun(ctx.languageTag, ctx.languageName);
+}
+
 function mapSpecOf<T>(step: MapStep, ctx: MapSpecContext, name: MapContractName, material: readonly FramedMaterialField[],
   schema: z.ZodType<T>, check: MapReplyCheck<T>): MapStepSpec<T> {
-  const contract = mapContractInLanguage((ctx.contracts ?? mapPromptContracts())[name], ctx.languageName);
+  const lock = mapLockedLanguage(ctx);
+  const contract = mapContractInLanguage((ctx.contracts ?? mapPromptContracts())[name], lock, ctx.languageName);
   return Object.freeze({
     step,
     contract,
-    material: Object.freeze(material.map((entry) => Object.freeze({ ...entry }))),
+    // With a lock, the question_language field comes LAST; without one, the same material as today.
+    material: Object.freeze(withQuestionLanguageField(material, lock).map((entry) => Object.freeze({ ...entry }))),
     classify: (content: string, reply?: ModelReplyFacts) => mapClassifyReply(content, reply, schema, check).classification,
     read: (content: string, reply?: ModelReplyFacts) => {
       const out = mapClassifyReply(content, reply, schema, check);
