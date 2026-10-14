@@ -1896,9 +1896,14 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `HOSTED_REGISTER_DEBATE_SHAPE_INVALID` | the file's optional `debateShapePolicy` is not an object, carries `kind`, or the register's own parser refuses it (a size outside its bounds, a missing plan, an unknown field). Nothing was sealed. |
 | `DEBATE_SHAPE_MAP_HASH_UNSEALED` | the version seals a `debateShapePolicy` row without its `mapContractHash` row (a hand-made version, or one sealed by an older publisher): the runner refuses to start on it, and the publish's boot check refuses it as `HOSTED_REGISTER_BOOT_CHECK_FAILED:DEBATE_SHAPE_MAP_HASH_UNSEALED` after sealing (`HOSTED_REGISTER_NOT_BOOT_READY`): pin nothing; publish again from this code, whose plan seals `mapContractHash`. |
 | `MAP_CONTRACT_HASH_MISMATCH` / `MAP_CONTRACT_HASH_INVALID` | the version's sealed `mapContractHash` is not this runner's map prompts (a version published from other code), or is not a 64-character hex hash: the runner refuses to start, and the publish's boot check says so as `HOSTED_REGISTER_BOOT_CHECK_FAILED:<code>`: pin nothing; deploy the runner that matches the version, or publish again from the deployed code. |
+| `DEBATE_SHAPE_RUNNER_UNCONFIGURED` | a run admitted with the debate shape was claimed by a runner without the shape settings (no sealed map hash, or no call scheduler): the run is refused. Restart the runner on the register version that seals the `debateShapePolicy` row (with `mapContractHash`), then ask again. |
 | `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
 | `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
 | `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |
+
+**A malformed shaped unfinished receipt** — every preview ask is refused and the API logs `preview.estimate.refused`
+with "malformed debate shape": fail that run's job (its work item), which drops it from `PREVIEW_UNFINISHED_RUNS_SQL`;
+nothing else is needed.
 
 Before restarting anything on a new version, check that the newest version carries the four
 rows a hosted start-up refuses without:
