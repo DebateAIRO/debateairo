@@ -71,8 +71,11 @@ async function readBoundedReply(response: Response): Promise<string> {
  * sent record nothing.
  *
  * A failing `onUsage` never replaces the transport's own code: on a failure path that code is thrown; on a good
- * reply the call fails as QUESTION_LANGUAGE_FAST_CHECK_USAGE_UNRECORDED (a spend that could not be recorded is
- * never silent; the fast check reads it as DOWN, which never blocks the person).
+ * reply a recorder that throws makes the call fail as QUESTION_LANGUAGE_FAST_CHECK_USAGE_UNRECORDED (a spend that
+ * could not be recorded is never silent; the fast check reads it as DOWN, which never blocks the person). No
+ * deployment reaches that branch today: the preview passes no onUsage (the gate settles its money), and hosted's
+ * recorder (boot.ts, recordSpend) never throws. It logs one code line, counts the failure, and latches the breaker
+ * until restart after 42501, 42883 or 23514, or after three failures in a row (a success resets that count only).
  */
 export function anthropicFastCheckTransport(deps: Readonly<{
   fetch: typeof fetch; url: string; credential: string | undefined; settings: QuestionLanguageFastCheck;
@@ -118,6 +121,8 @@ export function anthropicFastCheckTransport(deps: Readonly<{
       }
       if (skip !== null) throw failure(skip);
     }
+    // M1: the gate's read may have outlasted the time limit. Aborted before the send: nothing is sent, nothing recorded.
+    if (signal.aborted) throw failure("QUESTION_LANGUAGE_FAST_CHECK_ABORTED");
     let response: Response;
     try {
       response = await deps.fetch(deps.url, { method: "POST", headers: anthropicMessagesRequestHeaders(deps.credential), body, signal });

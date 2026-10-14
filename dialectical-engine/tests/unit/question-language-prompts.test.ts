@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { argumentLanguageDirective, questionLanguageSentence } from "@debateai/kernel";
-import { buildFramedPrompt, readPromptFrame, type PromptContract, type PromptPacket, type ProviderGateway } from "@debateai/providers";
+import { TEXT_NOT_IN_QUESTION_LANGUAGE, argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
+import {
+  buildFramedPrompt, readPromptFrame, type PromptContract, type PromptPacket, type ProviderCallRequest, type ProviderGateway
+} from "@debateai/providers";
 import {
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT, Judge, PANEL_PROMPT_CONTRACT, framedJudgePromptForTest, judgePromptContract,
   reviewPromptContract, rootPositionRequestBytesBound
@@ -138,5 +140,58 @@ describe("judge-side and answer calls in the locked language (question-language 
     const citation = { digest: synthesisRequestFixture().digest, servedNodes: [], exemptTokens: new Set<string>(), questionLine: englishQuestion };
     expect(classifyComposedContent(composed, citation).parseStatus).toBe("PARSED");
     expect(classifyComposedContent(composed, { ...citation, questionLanguage: RO }).parseStatus).toBe("SCHEMA_FAILED");
+  });
+});
+
+/**
+ * Review I8: every judge-side reply check reads the LOCK, never a re-guess of the question. The question below is one
+ * today's guesser cannot name ("und"), so today's check lets a French reply through; under a Romanian lock the same
+ * reply must be refused with TEXT_NOT_IN_QUESTION_LANGUAGE. Each call's own classifier is taken from the request it
+ * hands the gateway (packages/judgement/src/index.ts: judge, review, assess).
+ */
+describe("judge, review and panel replies are checked against the lock (review I8)", () => {
+  const UND_QUESTION = "Ar trebui sa renuntam la leu si sa trecem la euro cat mai repede?";
+  const STOP = Object.freeze({ finishReason: "stop" });
+  const FR_A = "Le gouvernement doit maintenir la monnaie nationale pour les citoyens et les entreprises du pays.";
+  const FR_B = "Les entreprises du pays perdraient leur protection si la banque centrale abandonnait la monnaie nationale.";
+  const FRENCH_ASSESSMENT = {
+    steelman: { summary: FR_A, fidelity: 0.8 },
+    critic: { summary: FR_B, counterargumentStrength: 0.5, basis: "REAL_ATTACK" },
+    evidence: { quality: 0.5, relevance: 0.5 },
+    context: { fit: 0.5, ambiguityFlags: [] },
+    fallacy: { severity: 0.1, fatalFlags: [] }
+  };
+  const FRENCH = {
+    judge: JSON.stringify({ statement: FR_A, way_of_knowing: "REASONING", locator: null, restatement_text: FR_B,
+      restatement_status: "PASS", value_laden: false, ...FRENCH_ASSESSMENT }),
+    review: JSON.stringify({ outcome: "dispute", reasons: [FR_A, FR_B], edge_bearings: [] }),
+    panel: JSON.stringify(FRENCH_ASSESSMENT)
+  } as const;
+  const withQuestion = (input: never) => ({ ...(input as object), questionLine: UND_QUESTION }) as never;
+
+  async function classifierOf(run: (gateway: ProviderGateway) => Promise<unknown>) {
+    let captured: ProviderCallRequest | undefined;
+    const gateway = { call: async (request: ProviderCallRequest) => { captured = request; throw new Error("captured"); } } as unknown as ProviderGateway;
+    await run(gateway).catch(() => undefined);
+    return captured!.classifyContent!;
+  }
+  const calls = {
+    judge: (lock: object) => (gateway: ProviderGateway) => new Judge(gateway).judge(withQuestion(judgeInput(lock))),
+    review: (lock: object) => (gateway: ProviderGateway) => new Judge(gateway).review(withQuestion(reviewInput(lock))),
+    panel: (lock: object) => (gateway: ProviderGateway) => new Judge(gateway).assess(withQuestion(panelInput(lock)))
+  } as const;
+
+  it("the question is one today's guesser cannot name", () => {
+    expect(detectArgumentLanguage(UND_QUESTION).tag).toBe("und");
+  });
+
+  it.each(["judge", "review", "panel"] as const)("%s: a French reply is refused under a Romanian lock and parses without one", async (call) => {
+    const locked = (await classifierOf(calls[call]({ questionLanguage: RO })))(FRENCH[call], STOP);
+    expect(locked.parseStatus).toBe("SCHEMA_FAILED");
+    const issues = JSON.parse(locked.parseError!) as { code: string }[];
+    expect(issues.length).toBeGreaterThan(0);
+    expect(issues.every((issue) => issue.code === TEXT_NOT_IN_QUESTION_LANGUAGE)).toBe(true);
+    expect((await classifierOf(calls[call]({})))(FRENCH[call], STOP).parseStatus).toBe("PARSED");
+    expect((await classifierOf(calls[call]({ questionLanguage: null })))(FRENCH[call], STOP).parseStatus).toBe("PARSED");
   });
 });

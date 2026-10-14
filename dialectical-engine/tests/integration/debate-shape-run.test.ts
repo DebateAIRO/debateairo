@@ -32,7 +32,7 @@ import { copyDatabase, dropDatabase, savedDebate, type SavedDebate } from "../su
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import { rootZeroKeepRoomMicros, rootZeroRoomAttempts } from "../../apps/runner/src/map-stage.js";
-import { questionLanguageFromRun } from "@debateai/kernel";
+import { argumentLanguageDirective, questionLanguageFromRun } from "@debateai/kernel";
 
 let database: TestDatabase;
 /** A connection to the cluster's maintenance database, for making and dropping the per-run copies. */
@@ -107,10 +107,19 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     const run = await runShapeDebate(harness, { label: "question-language", language: { tag: "ro", name: "Romanian" }, question: "Ar trebui sa renuntam la leu?" });
     const { prompts } = run;
     expect(prompts.length).toBeGreaterThan(0);
+    // Review M14: every call kind the claim names really reached a gate (a kind that never ran proves nothing).
+    expect([...new Set(run.gates.requests.map((request) => request.kind))]).toEqual(expect.arrayContaining(
+      ["MAP", "JUDGE", "PANEL", "REVIEW", "COMPOSE", "EVALUATOR", "STORYTELLER", "STORY_CHECKER"]));
     for (const prompt of prompts) {
       expect(prompt.system).toContain("in Romanian, the language this debate was set to");
       expect(prompt.system).not.toContain("the same language as the question");
+      // Review M14: never today's vague directive either (argumentLanguageDirective's own ", the language of the
+      // question," — the bare phrase is also in the sealed story pack's owner text, which is not the directive), and the
+      // field carries the lock itself.
+      expect(prompt.system).not.toContain(", the language of the question,");
+      expect(prompt.system).not.toContain(argumentLanguageDirective("Romanian"));
       expect(prompt.fields.at(-1)?.name).toBe("question_language");
+      expect(JSON.parse(prompt.fields.at(-1)!.content)).toEqual({ code: "ro", name: "Romanian" });
     }
     expect(run.result.kind).toBe("COMPLETED");   // the locked Romanian replies are accepted, not refused (PF-L52)
   }, 600_000);

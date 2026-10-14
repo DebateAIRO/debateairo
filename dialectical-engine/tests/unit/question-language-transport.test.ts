@@ -179,4 +179,33 @@ describe("the fast check's transport", () => {
     expect(unrecorded).toMatchObject({ code: "QUESTION_LANGUAGE_FAST_CHECK_USAGE_UNRECORDED" });
     expect(String((unrecorded as Error).message)).not.toContain("Romania");
   });
+
+  it("M1: a time limit that fires while beforeSend runs (a slow day-pot read) sends nothing and records nothing", async () => {
+    let sent = 0;
+    // As the real fetch: a signal already aborted rejects without sending.
+    const realLikeFetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      sent += 1;
+      if (init?.signal?.aborted) throw init.signal.reason;
+      return new Response(message('{"main_language":"en"}'), { status: 200 });
+    }) as typeof fetch;
+    const usage: FastCheckUsage[] = [];
+    const transport = anthropicFastCheckTransport({ fetch: realLikeFetch, url: HOSTED_URL, credential: "sk-ant-test", settings,
+      onUsage: (u) => { usage.push(u); },
+      // The read resolves only after the time limit (10 ms) has fired.
+      beforeSend: () => new Promise<string | null>((resolve) => { setTimeout(() => resolve(null), 60); }) });
+    await expect(transport({ packet, signal: AbortSignal.timeout(10) })).rejects.toMatchObject({ code: "QUESTION_LANGUAGE_FAST_CHECK_ABORTED" });
+    expect(sent).toBe(0);
+    expect(usage).toEqual([]);
+  });
+
+  it("M14: the projected input is the sent body's UTF-8 bytes plus the 2048-byte template allowance, exactly", async () => {
+    const sent: string[] = [];
+    const usage: FastCheckUsage[] = [];
+    const noUsage = JSON.stringify({ id: "msg_6", type: "message", role: "assistant", model: "claude-haiku-5-5",
+      content: [{ type: "text", text: '{"main_language":"en"}' }], stop_reason: "end_turn" });
+    await anthropicFastCheckTransport({ fetch: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      sent.push(String(init?.body)); return new Response(noUsage, { status: 200 }); }) as typeof fetch,
+    url: HOSTED_URL, credential: "sk-ant-test", settings, onUsage: (u) => { usage.push(u); } })({ packet, signal: AbortSignal.timeout(5000) });
+    expect(usage).toEqual([{ inputTokens: Buffer.byteLength(sent[0]!, "utf8") + 2048, outputTokens: settings.maxOutputTokens, projected: true }]);
+  });
 });

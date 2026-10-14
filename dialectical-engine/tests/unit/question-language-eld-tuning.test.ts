@@ -40,10 +40,15 @@ describe("eld's confidence, tuned on the legal-page set (question-language spec 
     expect(sentences).toBe(ELD_TUNING.measured.sentences);
     expect(roEn).toBe(0);
     expect(wrongLockable).toBeLessThanOrEqual(ELD_TUNING.measured.wrongLockable);
-    for (const sentence of proseSentences("ro")) {
+    // Precondition first: the set has Romanian prose, and eld is confident on some of it, so the loop cannot pass by
+    // reading nothing. Each sentence is then asserted (a reading that is not confident claims nothing: it stands as "ro").
+    const roClaims = proseSentences("ro").map((sentence) => {
       const reading = reader.read(withoutDiacritics(sentence));
-      if (eldConfident(reading)) expect(reading.code, sentence.slice(0, 40)).toBe("ro");
-    }
+      return { sentence, confident: eldConfident(reading), code: reading.code };
+    });
+    expect(roClaims.length).toBeGreaterThan(0);
+    expect(roClaims.filter((claim) => claim.confident).length).toBeGreaterThan(0);
+    for (const claim of roClaims) expect(claim.confident ? claim.code : "ro", claim.sentence.slice(0, 40)).toBe("ro");
   }, 120_000);
 
   it("CR-2: the recorded confused sites are exactly the sites the set confuses at the chosen configuration", async () => {

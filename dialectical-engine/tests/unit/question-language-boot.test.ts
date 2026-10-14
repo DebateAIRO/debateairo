@@ -10,6 +10,7 @@
  *   local mode                       → NO transport, reason LOCAL_MODE;
  *   the row's fastCheck: null        → NO transport, reason POLICY_OFF.
  */
+import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ANTHROPIC_MESSAGES_BASE_URL, ANTHROPIC_MESSAGES_PATH, PREVIEW_ANTHROPIC_MESSAGES_URL } from "@debateai/providers";
 import { questionLanguagePolicyStartValues } from "@debateai/register";
@@ -268,24 +269,38 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
       [start, { kind: "NONE", reason: "LOCAL_MODE" }, "LOCAL_MODE"],
       [{ ...start, fastCheck: null }, previewRoute, "POLICY_OFF"]
     ] as const;
-    for (const [policy, route, reason] of cases) {
-      const decider = await compose(policy, route);
-      const lock = await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:a", fastCheckAllowed: true });
-      expect(lock.source === "LOCAL_SITE" || lock.source === "LOCAL_ELD" || lock.source === "ELD_SITE").toBe(true);
-      if (lock.source !== "ELD_SITE") expect(lock.localReason).toBe(reason);
+    // M14: no global fetch either (the spy is restored in the finally, whatever fails).
+    const globalFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => { throw new Error("the global fetch is never used without a paid route"); });
+    try {
+      for (const [policy, route, reason] of cases) {
+        const decider = await compose(policy, route);
+        const lock = await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:a", fastCheckAllowed: true });
+        // Precondition first: eld does not settle this mixed question, so the local lock is the one under test.
+        expect(["LOCAL_SITE", "LOCAL_ELD"], reason).toContain(lock.source);
+        expect(lock.localReason, reason).toBe(reason);
+      }
+      expect(globalFetch).not.toHaveBeenCalled();
+    } finally {
+      globalFetch.mockRestore();
     }
   });
 
   it("route row 'preview without a gate': the guarded fetch is never called, whatever the question", async () => {
     const recorded = recordingFetch();
-    const route = questionLanguageRouteFor({ previewConfigured: true, previewFetch: recorded.fetch, anthropicSocket: undefined,
-      hosted: () => { throw new Error("never asked on the preview"); } });
-    const decider = await compose(null, route);
-    for (const [question, site] of [[MIX_Q, "ro"], ["Should cities price congestion?", "en"], ["Ar trebui orașele să taxeze traficul?", "ro"]]) {
-      const lock = await decider.decide({ ask: askOf(question!, site!), ownerScope: "owner:a", fastCheckAllowed: true });
-      expect(lock.source === "ELD_SITE" || lock.localReason === "NO_GATE").toBe(true);
+    const globalFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => { throw new Error("the global fetch is never used without a gate"); });
+    try {
+      const route = questionLanguageRouteFor({ previewConfigured: true, previewFetch: recorded.fetch, anthropicSocket: undefined,
+        hosted: () => { throw new Error("never asked on the preview"); } });
+      const decider = await compose(null, route);
+      for (const [question, site] of [[MIX_Q, "ro"], ["Should cities price congestion?", "en"], ["Ar trebui orașele să taxeze traficul?", "ro"]]) {
+        const lock = await decider.decide({ ask: askOf(question!, site!), ownerScope: "owner:a", fastCheckAllowed: true });
+        expect(lock.source === "ELD_SITE" || lock.localReason === "NO_GATE").toBe(true);
+      }
+      expect(recorded.spy).not.toHaveBeenCalled();
+      expect(globalFetch).not.toHaveBeenCalled();
+    } finally {
+      globalFetch.mockRestore();
     }
-    expect(recorded.spy).not.toHaveBeenCalled();
   });
 
   it("route row 'preview with the gate': the guarded fetch, the preview URL, no vendor key, and a failing gate is the fallback", async () => {
@@ -353,5 +368,59 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
       maxQuestionBytes: 8192, referenceKey: newQuestionLanguageReferenceKey(), onDecided: (outcome) => seen.push("source" in outcome ? outcome.source : "OFFER") });
     const lock = await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:a", fastCheckAllowed: true });
     expect(seen).toEqual([lock.source]);
+  });
+});
+
+/** How many times `needle` occurs in `source`. */
+function countOf(source: string, needle: string): number {
+  return source.split(needle).length - 1;
+}
+
+/**
+ * The lines of the call that opens at `opener`, up to its closing line (the composition's own `    }),` at four
+ * spaces), trimmed. A missing opener or closing line fails the test, never passes it.
+ */
+function callLines(source: string, opener: string): string[] {
+  const open = source.indexOf(opener);
+  expect(open, opener).toBeGreaterThan(-1);
+  const close = source.indexOf("\n    }),", open);
+  expect(close, opener).toBeGreaterThan(open);
+  return source.slice(open, close).split("\n").map((line) => line.trim());
+}
+
+// I6 (final review): nothing else in CI reads these lines. A regression here turns no test red by itself: the guard
+// back on `debateShapePolicy` would load eld and probe 0117 with the row disabled (row-absent drift), and a guarded
+// fetch swapped for the global one would bypass the preview gate (CR-6). The lines are copied from the shipped code.
+const QL_GUARD = "const questionLanguage = debateShapeInForcePolicy === null ? undefined : await boot.run(\"question-language\", async () => {";
+const QL_HOSTED_ROUTE = "const hostedRoute = previewConfig !== undefined ? undefined : await hostedQuestionLanguageRoute({";
+const QL_PREVIEW_SOCKET = "anthropicSocket: previewConfig === undefined ? undefined : previewProviderSocket(previewConfig, \"anthropic\"),";
+const QL_SPREAD = "...(questionLanguage === undefined ? {} : { questionLanguage }),";
+const PRACTICE_GUARD = "const questionLanguage = debateShapeInForcePolicy === null ? undefined : await composeQuestionLanguage({";
+const PRACTICE_SOCKET = "anthropicSocket: input.budgetPorts.anthropic === undefined ? undefined : input.sockets.anthropic,";
+const PRACTICE_HOSTED_REFUSAL = "hosted: () => { throw new TypeError(\"PRACTICE_QUESTION_LANGUAGE_HOSTED_ROUTE\"); }";
+
+describe("I6: the question-language wiring in the API's main.ts and the practice's composition is pinned as source text", () => {
+  it("apps/api/src/main.ts: the guard after the shape row, no hosted route on a preview, the guarded fetch and socket, the settings spread once", async () => {
+    const main = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+    expect(countOf(main, QL_GUARD)).toBe(1);
+    expect(main.indexOf(QL_GUARD)).toBeGreaterThan(main.indexOf("const debateShapeInForcePolicy ="));
+    expect(countOf(main, QL_HOSTED_ROUTE)).toBe(1);
+    const route = callLines(main, "questionLanguageRouteFor({");
+    expect(route).toContain("previewFetch,");
+    expect(route).toContain(QL_PREVIEW_SOCKET);
+    expect(countOf(main, QL_SPREAD)).toBe(1);
+    expect(countOf(main, "composeQuestionLanguage(")).toBe(1);
+  });
+
+  it("tools/preview-practice/practice-ask-composition.ts: the same guard, no hosted route on a preview, the guarded fetch and socket, the spread once", async () => {
+    const practice = await readFile(new URL("../../tools/preview-practice/practice-ask-composition.ts", import.meta.url), "utf8");
+    expect(countOf(practice, PRACTICE_GUARD)).toBe(1);
+    expect(practice.indexOf(PRACTICE_GUARD)).toBeGreaterThan(practice.indexOf("const debateShapeInForcePolicy ="));
+    const route = callLines(practice, "questionLanguageRouteFor({");
+    expect(route).toContain("previewFetch,");
+    expect(route).toContain(PRACTICE_SOCKET);
+    expect(route).toContain(PRACTICE_HOSTED_REFUSAL);
+    expect(countOf(practice, QL_SPREAD)).toBe(1);
+    expect(countOf(practice, "composeQuestionLanguage(")).toBe(1);
   });
 });

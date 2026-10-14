@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { argumentLanguageDirective, questionLanguageSentence, replyLanguageExpectation } from "@debateai/kernel";
+import { argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence, replyLanguageExpectation } from "@debateai/kernel";
 import { readPromptFrame } from "@debateai/providers";
 import {
   MAP_ANSWER_FORMS, MAP_CONTRACT_IDS, MAP_DEFAULT_INSTRUCTIONS, mapAnglesReplySchema, mapAnglesSpec, mapChooseSpec, mapGapSpec, mapListSpec,
@@ -105,5 +105,48 @@ describe("a map with no lock keeps today's prompts (tag und)", () => {
       instruction: `${MAP_DEFAULT_INSTRUCTIONS.angles}\n\n${argumentLanguageDirective(FALLBACK_NAME)}`, answerForm: MAP_ANSWER_FORMS.angles });
     expect(spec.material).toEqual([{ name: "question_line", content: Q }]);
     expect(readPromptFrame(mapProviderPieces(spec).framed.packet).fields).toEqual([{ name: "question_line", content: Q }]);
+  });
+});
+
+/**
+ * Review I8: the map's reply check reads the LOCK (mapRunAngleMap builds its expectation once, in MapRun), never a
+ * re-guess of the question. The question is one today's guesser cannot name ("und"), so without a lock a French list
+ * passes; under a Romanian lock the same list must be refused (MAP_WRONG_LANGUAGE, the map's own language code). The
+ * classifier is the one each LIST request carries out of the real orchestrator.
+ */
+describe("the map's replies are checked against the lock (review I8)", () => {
+  const UND_QUESTION = "Ar trebui sa renuntam la leu si sa trecem la euro cat mai repede?";
+  const STOP = Object.freeze({ finishReason: "stop" });
+  const FR = [
+    "Le gouvernement doit maintenir la monnaie nationale pour les citoyens et les entreprises du pays.",
+    "Les entreprises du pays perdraient leur protection si la banque centrale abandonnait la monnaie nationale.",
+    "Les familles qui vivent avec un petit salaire paieraient plus cher les produits de tous les jours."
+  ];
+  const FRENCH_LIST = JSON.stringify({
+    points: FR.map((claim) => ({ claim, why_it_matters: "Cela change ce que les citoyens paient chaque mois pour vivre.", leans: "context" })),
+    candidate_answers: ["Il faut garder la monnaie nationale encore quelques années avant de décider."]
+  });
+
+  async function firstListRequest(context: { languageName: string; languageTag: string }) {
+    const lists: MapCallRequest<unknown>[] = [];
+    const caller: MapCaller = { call: async <T>(request: MapCallRequest<T>): Promise<MapCallOutcome<T>> => {
+      if (request.step === "ANGLES") return { kind: "OK", value: request.spec.read(ANGLES()) } as MapCallOutcome<T>;
+      if (request.step === "LIST") lists.push(request as MapCallRequest<unknown>);
+      return { kind: "FAILED", code: "TEST_STOP" } as MapCallOutcome<T>;
+    } };
+    await mapRunAngleMap({ questionLine: UND_QUESTION, ...context, seats: [{ aiRef: "a", maker: "ma" }, { aiRef: "b", maker: "mb" }],
+      caller, seed: "q1", gapRoundsMax: 1, maxAnswers: 2, pointsPerAnswer: 2 } as never);
+    expect(lists.length).toBeGreaterThan(0);
+    return lists[0]!;
+  }
+
+  it("a French list is refused under a Romanian lock and accepted without one", async () => {
+    expect(detectArgumentLanguage(UND_QUESTION).tag).toBe("und");
+    const locked = (await firstListRequest({ languageName: "Romanian", languageTag: "ro" })).spec.classify(FRENCH_LIST, STOP);
+    expect(locked.parseStatus).toBe("SCHEMA_FAILED");
+    expect((JSON.parse(locked.parseError!) as { message: string }[]).map((issue) => issue.message)).toContain("MAP_WRONG_LANGUAGE");
+    // No lock: an "und" context (old practice data) keeps today's check, which cannot name the question.
+    const unlocked = (await firstListRequest({ languageName: "the same language as the question", languageTag: "und" })).spec.classify(FRENCH_LIST, STOP);
+    expect(unlocked.parseStatus).toBe("PARSED");
   });
 });
