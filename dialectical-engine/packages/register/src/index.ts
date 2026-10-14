@@ -1229,6 +1229,17 @@ export {
   type DebateShapeScrutinyBudget
 } from "./debate-shape-policy.js";
 export {
+  QUESTION_LANGUAGE_CHECK_DEFAULT_INSTRUCTION,
+  QUESTION_LANGUAGE_FAST_CHECK_PROVIDERS,
+  QUESTION_LANGUAGE_POLICY_ROW_KEY,
+  parseQuestionLanguagePolicy,
+  questionLanguagePolicyRow,
+  questionLanguagePolicyStartValues,
+  readQuestionLanguagePolicy,
+  type QuestionLanguageFastCheck,
+  type QuestionLanguagePolicy
+} from "./question-language-policy.js";
+export {
   DEBATE_SHAPE_FORMULA_VERSION,
   assertDebateShapeCeilingInput,
   debateShapeOfReceipt,

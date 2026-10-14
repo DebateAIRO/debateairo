@@ -1028,6 +1028,7 @@ packages/register/src/model-scorecard-policy.ts
 packages/register/src/password-reset-policy.ts
 packages/register/src/product-role-policy.ts
 packages/register/src/publication-check-policy.ts
+packages/register/src/question-language-policy.ts
 packages/register/src/recovery-policy.ts
 packages/register/src/register-publication.ts
 packages/register/src/runtime-environment.ts
