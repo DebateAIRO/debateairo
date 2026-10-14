@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { migrate } from "@debateai/db";
 import {
+  DEBATE_SHAPE_POLICY_ROW_KEY,
   canonicalRegisterJson,
   createPostgresRegisterPublicationPort,
   loadBootstrapRegister,
@@ -788,7 +789,9 @@ describe("preview practice: debate mode", () => {
 describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 ยง5)", () => {
   const SHAPE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/shape-policy-start.json", import.meta.url));
   type ShapeReport = {
-    verdict: string; reasons: string[]; ask: unknown; register: { steps: { path: string }[] };
+    verdict: string; reasons: string[]; ask: unknown;
+    register: { registerVersion: string; importedRegisterVersion?: string; steps: { path: string }[];
+      codeNext?: { baseRegisterVersion: string; addedKeys: string[]; changedKeys: string[] } };
     run: { runId: string; workItemOutcome: string; answer: { served: boolean }; story: { outcome: string } };
     byModelAndSite: { model: string; site: string }[];
     shape?: { source: string; registerVersion: string; row: string | null; storedDepthParams: unknown; sizes: Record<string, unknown> | null;
@@ -818,6 +821,8 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 ย
     // The export is only read; the import itself is today's; the practice's own version is one above it.
     expect(exportDigest()).toBe(before);
     expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION"]);
+    // Final review M-2: the register block names the version the debate ran on, the imported newest under its own name.
+    expect(report.register).toMatchObject({ registerVersion: "6", importedRegisterVersion: "5" });
     expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
     // Both compositions read the row: the ask path stored the four settings, admission froze the sizes, the runner ran the map.
     expect(report.shape).toMatchObject({
@@ -851,6 +856,40 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 ย
     expect(transcript.attempts.some((attempt) => attempt.family === "MAP")).toBe(true);
     expect(transcript.structure.map?.choice?.alsoRaised.length ?? 0).toBeGreaterThan(0);
     expect(transcript.structure.map?.items.length ?? 0).toBeGreaterThan(0);
+  }, 900_000);
+
+  it("--register-next --shape-policy (the path every branch debate takes, ruling D-BOTHNEXT): the code's next version carries the row, nothing more is published: PASS (exit 0)", async () => {
+    // Final review M-1: the export is one the publish kit itself would publish from this code, so the code's next
+    // version is the live one plus the debate-shape row the kit's own source build adds (controller ruling D-REGNEXT).
+    const before = exportDigest();
+    const logs: string[] = [];
+    const { stubs, env, common, quiet, out } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--register-next", "--depth", "1",
+      "--shape-policy", SHAPE_POLICY_START, "--transcript"], env, { ...quiet, log: (line: string) => { logs.push(line); } });
+    const report = outcome.report as unknown as ShapeReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(exportDigest()).toBe(before);
+    // The import brought in 4 and 5, then the code's next version (6) with the row ADDED; nothing was published on top.
+    expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION", "CODE_NEXT_VERSION"]);
+    expect(report.register).toMatchObject({ registerVersion: "6", codeNext: { baseRegisterVersion: "5", addedKeys: [DEBATE_SHAPE_POLICY_ROW_KEY] } });
+    expect(report.register.codeNext!.changedKeys).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
+    expect("importedRegisterVersion" in report.register).toBe(false);
+    expect(logs.some((line) => line.includes("practising on this code's next version 6"))).toBe(true);
+    expect(logs.some((line) => line.includes("in this throwaway copy as version"))).toBe(false);
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
+    // A real shape block, read from the database: both compositions read the row in the code's next version.
+    expect(report.shape).toMatchObject({
+      source: "FLAG", registerVersion: "6", row: "ADDED", opening: "ANGLE_MAP", chosenAnswers: 2, notExercised: null,
+      storedDepthParams: { depth: 1, depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" },
+      sizes: { plan: "premium", mapAIs: 5, graders: 3, opening: "ANGLE_MAP" }
+    });
+    expect(report.shape!.mapCallsByStep).toMatchObject({ angles: 1, merge: 1, choose: 1 });
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: false, lock: { code: "ro", source: "FAST" }, storedLanguage: "ro" });
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as { run: { registerVersion: string } };
+    expect(transcript.run.registerVersion).toBe("6");
   }, 900_000);
 
   it("no --shape-policy and a register without the row: today's shape, nothing new in the report, no map call", async () => {
