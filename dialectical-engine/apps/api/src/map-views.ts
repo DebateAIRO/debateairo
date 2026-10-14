@@ -59,17 +59,15 @@ export function runOwnerCheckFrom(query: RunOwnerQuery): RunOwnerCheck {
 const NODE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * The answer's root nodes: its UUID nodes that answer no other node or edge. An opening position
- * is such a node; a reply (a defeater, a support, an attack on an edge) never is. Only these may
- * carry a position's title, so a title never lands on a reply, nor on a node the page cannot show.
+ * The answer's own UUID node ids: the sanity check on the nodes the MAP recorded (controller
+ * ruling C-ROOTS). Which node is a position is the map's record (`core.map_position`, written by
+ * P2b's `writeMapPosition` and carried as `rootNodeId` by `readMapChoiceForRun`), never inferred
+ * from the edge graph, so an opening position that replies to another position keeps its title.
+ * This set only drops a recorded node the answer does not hold, so a title never names a node
+ * the page cannot show.
  */
-export function answerRootNodeIds(answer: Pick<Answer, "nodes" | "edges">): ReadonlySet<string> {
-  const replies = new Set(answer.edges
-    .filter((edge) => edge.from_node_ref !== edge.target_ref)
-    .map((edge) => edge.from_node_ref));
-  return new Set(answer.nodes
-    .map((node) => node.node_id)
-    .filter((nodeId) => NODE_UUID.test(nodeId) && !replies.has(nodeId)));
+export function answerNodeIds(answer: Pick<Answer, "nodes">): ReadonlySet<string> {
+  return new Set(answer.nodes.map((node) => node.node_id).filter((nodeId) => NODE_UUID.test(nodeId)));
 }
 
 /** Trimmed, and cut to `limit` UTF-16 units with an ellipsis, never splitting a character. */
@@ -90,8 +88,8 @@ function claimKey(claim: string): string {
 }
 
 /**
- * The view, against the answer's own root nodes (`answerRootNodeIds`). A position whose node is
- * not a UUID the caller's set holds is dropped, so a title never points at a node the page cannot
+ * The view. Each position's node is the one the map recorded for it; it is kept only when it is
+ * a UUID the answer holds (`answerNodeIds`), so a title never points at a node the page cannot
  * show. So is one with no node, or a second answer on the same node. Also-raised claims are
  * merged when they say the same (their makers joined), come most-raised first, ties in the map's
  * order, and only the claims travel.
@@ -124,7 +122,7 @@ export function debateMapViewFrom(record: MapViewSource, nodeIds: ReadonlySet<st
   return DebateMapViewSchema.parse({ positions, also_raised: alsoRaised });
 }
 
-/** Whose run, against which root nodes, read as whom (pre-flight PF-C16). */
+/** Whose run, against which of the answer's nodes, read as whom (pre-flight PF-C16). */
 export type MapViewReadInput = Readonly<{
   runId: string;
   nodeIds: ReadonlySet<string>;

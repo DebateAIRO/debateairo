@@ -254,7 +254,7 @@ import type { PublicationApplication } from "./publications.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
-import { answerRootNodeIds, type AnswerMapViewApplication } from "./map-views.js";
+import { answerNodeIds, type AnswerMapViewApplication } from "./map-views.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { DataExportApplication } from "./data-export/service.js";
 import {
@@ -3681,8 +3681,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // The answer read is the first ownership check, as for the disclosure; the application
   // checks again (core.run_is_owned_by) before it reads the map (pre-flight PF-C16).
   // "Not yours", "malformed", "no reader" and "no map choice" (incl. an erased run) are one
-  // closed 404. The view is read against the answer's own ROOT nodes, so a title never names a
-  // reply or a node the page cannot show. A corrupt map row stays the closed 500 (PF-C19).
+  // closed 404. Titles land on the nodes the map recorded (C-ROOTS), kept only when the
+  // answer holds them, so a title never names a node the page cannot show. A corrupt map
+  // row stays the closed 500 (PF-C19).
   api.get<{ Params: { id: string } }>("/v1/answers/:id/map", routePolicy("GET /v1/answers/{id}/map"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     const mapViews = options.mapViews;
@@ -3692,7 +3693,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (answer === null) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
     const view = await mapViews.readMapView({
       runId: answer.run_ref,
-      nodeIds: answerRootNodeIds(answer),
+      nodeIds: answerNodeIds(answer),
       ownership
     });
     return view === null

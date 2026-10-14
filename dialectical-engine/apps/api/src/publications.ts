@@ -25,7 +25,7 @@ import {
   PostgresPublicationRepository,
   type AuthSourceContext
 } from "@debateai/db";
-import { NO_MAP_VIEWS, answerRootNodeIds, type AnswerMapViewApplication } from "./map-views.js";
+import { NO_MAP_VIEWS, answerNodeIds, type AnswerMapViewApplication } from "./map-views.js";
 import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
@@ -269,7 +269,7 @@ function logFloorNotPublished(requestId: string, diagnostic: string): void {
  * story and the floor, it never blocks publishing. A failed read publishes no view, and the
  * log records only a bounded diagnostic, never the error's text. It is read as the publisher
  * (owner-scoped, like the story and the floor), so the map reader's own owner check applies
- * here too (pre-flight PF-C16), and against the answer's root nodes, as the owner's route reads it.
+ * here too (pre-flight PF-C16), and against the answer's nodes, as the owner's route reads it.
  * The snapshot then goes through the publication content check with the rest (Task 4).
  */
 export async function readPublishableMapView(
@@ -279,7 +279,7 @@ export async function readPublishableMapView(
   try {
     return await mapViews.readMapView({
       runId: input.runId,
-      nodeIds: answerRootNodeIds(input.answer),
+      nodeIds: answerNodeIds(input.answer),
       ownership: { ownerRef: input.authenticated.ownerRef, legacyAskerId: null }
     });
   } catch (error) {

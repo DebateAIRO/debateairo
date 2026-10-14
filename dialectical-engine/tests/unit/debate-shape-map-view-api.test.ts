@@ -3,7 +3,7 @@ import { buildApi, type AskApplication } from "@debateai/api";
 import { DEBATE_MAP_VIEW_LIMITS, DebateMapViewSchema, type Answer, type DebateMapView } from "@debateai/contract";
 import type { RunOwnershipAccess } from "@debateai/db";
 import {
-  NO_MAP_VIEWS, RepositoryAnswerMapViewApplication, answerRootNodeIds, debateMapViewFrom, runOwnerCheckFrom,
+  NO_MAP_VIEWS, RepositoryAnswerMapViewApplication, answerNodeIds, debateMapViewFrom, runOwnerCheckFrom,
   type AnswerMapViewApplication, type MapViewReadInput, type MapViewSource, type RunOwnerCheck
 } from "../../apps/api/src/map-views.js";
 import { readPublishableMapView } from "../../apps/api/src/publications.js";
@@ -18,8 +18,11 @@ import { STORY_TEST_ANSWER_ID, STORY_TEST_RUN_ID } from "../support/storyApiFixt
  * GET /v1/answers/{id}/map, and the copy a publication takes. As with the disclosure route,
  * the answer read is the first ownership check, and "not yours", "no map" and "malformed" are
  * one closed 404. The application checks again (core.run_is_owned_by) before it reads the map.
- * A position's node must be a UUID naming a ROOT node of this answer (one that answers no
- * other node or edge): a title never lands on a reply, nor on a node the page cannot show.
+ * Controller ruling C-ROOTS: a position's title lands on the node the MAP recorded for it
+ * (P2b's core.map_position, carried as `rootNodeId` by readMapChoiceForRun), never on a node
+ * inferred from the edge graph. The answer's own UUID node ids are only a sanity check: a
+ * recorded node the answer does not hold is dropped, so a title never names a node the page
+ * cannot show.
  */
 
 const OWNER = testHttpIdentity("map-view-owner");
@@ -30,7 +33,7 @@ const OWNERSHIP: RunOwnershipAccess = Object.freeze({ ownerRef: OWNER.authentica
 /** An owner check that always says yes, for the tests about the view's content. */
 const OWNED: RunOwnerCheck = Object.freeze({ owns: async () => true });
 
-/** Two opening positions (roots) and one reply that attacks the first. */
+/** Two opening positions, the second of which replies to the first, and one reply that attacks the first. */
 const ROOT_A = "a0000000-0000-4000-8000-00000000000a";
 const ROOT_B = "b0000000-0000-4000-8000-00000000000b";
 const REPLY = "c0000000-0000-4000-8000-00000000000c";
@@ -47,7 +50,10 @@ function answerOf(): Answer {
       { ...position!, node_id: ROOT_B, claim: "The second position.", defeater_refs: [] },
       { ...defeater!, node_id: REPLY }
     ],
-    edges: [{ ...base.edges[0]!, from_node_ref: REPLY, target_ref: ROOT_A }]
+    edges: [
+      { ...base.edges[0]!, from_node_ref: REPLY, target_ref: ROOT_A },
+      { ...base.edges[0]!, edge_id: "edge:attack:2", from_node_ref: ROOT_B, target_ref: ROOT_A }
+    ]
   });
 }
 
@@ -97,30 +103,31 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("debate shape P2c — the map view from P2b's map choice", () => {
   const answer = answerOf();
-  const roots = answerRootNodeIds(answer);
+  const roots = answerNodeIds(answer);
 
-  it("takes as roots only the answer's UUID nodes that answer no other node or edge", () => {
-    expect([...roots].sort()).toEqual([ROOT_A, ROOT_B]);
+  it("checks recorded nodes against every UUID node the answer holds, whatever its edges", () => {
+    // The edge graph decides nothing: ROOT_B replies to ROOT_A and is still a candidate.
+    expect([...roots].sort()).toEqual([ROOT_A, ROOT_B, REPLY]);
     const odd = buildFairShapedAnswer({
       nodes: [{ ...answer.nodes[0]!, node_id: "node:not-a-uuid", defeater_refs: [] }, answer.nodes[1]!, { ...answer.nodes[2]!, node_id: REPLY }],
       edges: [{ ...answer.edges[0]!, from_node_ref: REPLY, target_kind: "EDGE", target_ref: "edge:attack:other" }]
     });
-    // A non-UUID node is never a root; a node that answers an edge is a reply, not a root.
-    expect([...answerRootNodeIds(odd)]).toEqual([ROOT_B]);
+    // A non-UUID node is never a candidate (P2b records only UUID nodes).
+    expect([...answerNodeIds(odd)].sort()).toEqual([ROOT_B, REPLY]);
   });
 
-  it("drops positions whose node is not a root of the answer, has none, repeats one, or is no UUID", () => {
+  it("titles the nodes the map recorded, even one that replies to another position; drops one not in the answer, none, a repeat or no UUID", () => {
     const record: MapViewSource = {
       answers: [
         { statement: "  Move gradually.  ", rootNodeId: ROOT_A },
         { statement: "Stay where you are.", rootNodeId: "d0000000-0000-4000-8000-00000000000d" },
         { statement: "A second answer on the same node.", rootNodeId: ROOT_A },
         { statement: "No position argued this.", rootNodeId: null },
-        { statement: "Answer on a reply.", rootNodeId: REPLY },
         { statement: "Move now.", rootNodeId: ROOT_B }
       ],
       alsoRaised: []
     };
+    expect(answer.edges.some((edge) => edge.from_node_ref === ROOT_B)).toBe(true);
     expect(debateMapViewFrom(record, roots).positions).toEqual([
       { node_id: ROOT_A, answer: "Move gradually." },
       { node_id: ROOT_B, answer: "Move now." }
@@ -265,7 +272,7 @@ describe("debate shape P2c — GET /v1/answers/{id}/map", () => {
     await server.close();
   });
 
-  it("reads the view of the answer's own run, against the answer's own root nodes, as the caller", async () => {
+  it("reads the view of the answer's own run, against the answer's own nodes, as the caller", async () => {
     const calls: MapViewReadInput[] = [];
     const reads: { answerId: string; ownership: unknown }[] = [];
     const server = api({ answer: answerOf(), mapViews: views(view, calls), reads: reads as unknown[] });
@@ -275,7 +282,7 @@ describe("debate shape P2c — GET /v1/answers/{id}/map", () => {
     expect(reads.map((read) => [read.answerId, read.ownership])).toEqual([[STORY_TEST_ANSWER_ID, OWNERSHIP]]);
     expect(calls).toHaveLength(1);
     expect(calls[0]!.runId).toBe(STORY_TEST_RUN_ID);
-    expect([...calls[0]!.nodeIds].sort()).toEqual([ROOT_A, ROOT_B]);
+    expect([...calls[0]!.nodeIds].sort()).toEqual([ROOT_A, ROOT_B, REPLY]);
     expect(calls[0]!.ownership).toEqual(OWNERSHIP);
     await server.close();
   });
@@ -286,12 +293,12 @@ describe("debate shape P2c — the published copy", () => {
     runId: STORY_TEST_RUN_ID, answer: answerOf(), authenticated: OWNER.authenticated, source: { requestId: "req-map" } as never
   };
 
-  it("copies the owner's view, read as the publisher against the root nodes, and never blocks publishing when the read fails", async () => {
+  it("copies the owner's view, read as the publisher against the answer's nodes, and never blocks publishing when the read fails", async () => {
     const view: DebateMapView = { positions: [], also_raised: ["Ask the school."] };
     const calls: MapViewReadInput[] = [];
     expect(await readPublishableMapView(views(view, calls), input)).toEqual(view);
     expect(calls.map((call) => call.ownership)).toEqual([OWNERSHIP]);
-    expect(calls.map((call) => [...call.nodeIds].sort())).toEqual([[ROOT_A, ROOT_B]]);
+    expect(calls.map((call) => [...call.nodeIds].sort())).toEqual([[ROOT_A, ROOT_B, REPLY]]);
     expect(await readPublishableMapView(NO_MAP_VIEWS, input)).toBeNull();
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const failing: AnswerMapViewApplication = { readMapView: async () => { throw new Error("database unreachable"); } };
