@@ -52,6 +52,11 @@ describe("S01 seals the content rule", () => {
   // contract version is needed for a pack edit; each story records the hash it was written with), and no register row
   // carries a story hash. Before this edit: v1 storyteller 9c4d5255..., v1 checker 31038759..., v2 storyteller
   // b138db9d..., v3 storyteller 1419737c..., v2 checker e92de07b....
+  // Debate shape P2c (2026-10-14): the owners' pack (story-shapes/common.md and checker.md, version 2026-10-14.1)
+  // now explains also_raised and answers_note, so every story row below moves again, as on 2026-10-12. The answer
+  // forms and contract ids are unchanged, and no register row carries a story hash. Before this edit: v1 storyteller
+  // 4803cf19..., v1 checker 403a837a..., v2 storyteller 68dd9b31..., v3 storyteller 73b2caba..., v2 checker
+  // c5d7860d..., v3 checker 37df1d19....
   // Property: all eight sealed families move from their independently measured base
   // hashes to the PLAN's exact post-change hashes, with no unsealed family left behind.
   it.each([
@@ -70,8 +75,8 @@ describe("S01 seals the content rule", () => {
     ["evaluator.blind-judge-grade.v1", () => BLIND_JUDGE_GRADE_CONTRACT_HASH, "8aeaf308a59c5c9d77349c2888cccfda2f9d6589eba991cad85ef3fc03744e31", "b23685cf8ac31e68f151573b83f1e807af73fe93098d026f5e23ca70f83fabe8"],
     ["evaluator.domain-tagger.v1", () => DOMAIN_TAGGER_CONTRACT_HASH, "02fc1d4e36df8d137a1673c85b5c8d03c3379b52c00bee627f84497d65ffd7f5", "0dfa57266bb57d90481e60e9d184fed8fd61eca6fab70c93a765d79e7ec3d509"],
     ["evaluator.consumer-aggregate.v1", () => sha256(promptContractFingerprintText(CONSUMER_AGGREGATE_PROMPT_CONTRACT)), "82bf46b39a0eca190425c4e8d9d01eb100ab61c39145d0af8551de1a65d70ac4", "33ce6f2ec2ff87f03cd5f4e76123e8d61f23235d88d32808a21adbd53a85f0ab"],
-    ["story.storyteller.v1", () => storyContractHash({ ...buildStorytellerContract(pack), contractId: STORYTELLER_V1_CONTRACT_ID, answerForm: STORYTELLER_V1_ANSWER_FORM }), "753f8918cf139d28b0da6e7f447c5e4c3b9343eba11f13f6f2f3f1bdc22d9c08", "4803cf19c70f159fe1ba38d68aebf9a5e6799be41cc1a22d952425f578160ffb"],
-    ["story.checker.v1", () => storyContractHash({ ...buildStoryCheckerContract(pack), contractId: STORY_CHECKER_V1_CONTRACT_ID, answerForm: STORY_CHECKER_V1_ANSWER_FORM }), "7096736f9831d968275dcb4ae3a367d81c35daf822733d96d8ce515d9a3e51e9", "403a837adc5d4cc813cc21b13ce4be4961c6ff0476f9a0014d42b21e5d947172"]
+    ["story.storyteller.v1", () => storyContractHash({ ...buildStorytellerContract(pack), contractId: STORYTELLER_V1_CONTRACT_ID, answerForm: STORYTELLER_V1_ANSWER_FORM }), "753f8918cf139d28b0da6e7f447c5e4c3b9343eba11f13f6f2f3f1bdc22d9c08", "5e52c7fdea2c996eabd83a8b3bc9d8109845e877588df145a8682afe552a46e4"],
+    ["story.checker.v1", () => storyContractHash({ ...buildStoryCheckerContract(pack), contractId: STORY_CHECKER_V1_CONTRACT_ID, answerForm: STORY_CHECKER_V1_ANSWER_FORM }), "7096736f9831d968275dcb4ae3a367d81c35daf822733d96d8ce515d9a3e51e9", "f49502317cfd383ebad0871f3b57f04250d07a952f42815b37ce678616942f64"]
   ] as const)("R7-a moves %s to its exact new seal", (name, current, base, after) => {
     const now = current();
     console.log(`R7 ${name} base=${base} now=${now}`);
@@ -105,7 +110,7 @@ describe("S01 seals the content rule", () => {
   });
   it("keeps the reviewed compact storyteller v2 distinct from the preserved V1 seal", () => {
     expect(storyContractHash({ ...buildStorytellerContract(pack), contractId: STORYTELLER_V2_CONTRACT_ID, answerForm: STORYTELLER_V2_ANSWER_FORM }))
-      .toBe("68dd9b31344f93d1f29e2db5bb49a2c24c4d659ec7568dd381f87dfb8183321a");
+      .toBe("38d21dd9c996924e36372ff8598a74388903f2afa03a8d10c3a1b09d5b44059e");
   });
   // Story format robustness (2026-10-12): storyteller v3 and checker v2 supersede v2 and v1 (how to quote; the
   // checker's criteria always required). The earlier seals above stay as history; these are the current ones.
@@ -116,9 +121,9 @@ describe("S01 seals the content rule", () => {
     const checker = storyContractHash({ ...buildStoryCheckerContract(pack), contractId: STORY_CHECKER_V2_CONTRACT_ID, answerForm: STORY_CHECKER_V2_ANSWER_FORM });
     expect(buildStorytellerContract(pack).contractId).toBe("story.storyteller.v3");
     expect(STORY_CHECKER_V2_CONTRACT_ID).toBe("story.checker.v2");
-    expect(storyteller).not.toBe("68dd9b31344f93d1f29e2db5bb49a2c24c4d659ec7568dd381f87dfb8183321a");
-    expect(checker).not.toBe("403a837adc5d4cc813cc21b13ce4be4961c6ff0476f9a0014d42b21e5d947172");
-    expect([storyteller, checker]).toEqual(["73b2caba3018cf663b86315b22afa82cc158162f611807c171d0e1d51028e81e", "c5d7860d12c839e14094dd5bb0fa052c6b27d5f3509289a22e320bb5f79e5530"]);
+    expect(storyteller).not.toBe("38d21dd9c996924e36372ff8598a74388903f2afa03a8d10c3a1b09d5b44059e");
+    expect(checker).not.toBe("f49502317cfd383ebad0871f3b57f04250d07a952f42815b37ce678616942f64");
+    expect([storyteller, checker]).toEqual(["d8bdfb5c9b5edee59e024eb4e6c4461015a724925d9d1cdf80f49dc3402f86f2", "c6638e2cd927b0ba41765abaadfeba01a8bfae623d6d7bec6404ae4701c4b9ef"]);
   });
   // Checker v3 (R15 practice debate, 2026-10-13): v2's form with the objection's limit raised from 2000 to 4000
   // characters, because the checker now lists every problem in one objection and a real 2,739-character verdict was
@@ -126,7 +131,7 @@ describe("S01 seals the content rule", () => {
   it("seals the current checker v3, distinct from the checker v2 it supersedes", () => {
     const checker = storyContractHash(buildStoryCheckerContract(pack));
     expect(buildStoryCheckerContract(pack).contractId).toBe("story.checker.v3");
-    expect(checker).not.toBe("c5d7860d12c839e14094dd5bb0fa052c6b27d5f3509289a22e320bb5f79e5530");
-    expect(checker).toBe("37df1d19fa32ad6efbace9a837ebeaf2728457c905d9941d91b8eeed82e80fd3");
+    expect(checker).not.toBe("c6638e2cd927b0ba41765abaadfeba01a8bfae623d6d7bec6404ae4701c4b9ef");
+    expect(checker).toBe("7ad6684c3cc421f2c75df312bbc8ec3f1871ba71a6584103b61ca5c0ce3ad60a");
   });
 });

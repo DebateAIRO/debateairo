@@ -246,11 +246,15 @@ describe("verdict story — the shipped pack", () => {
           nodeId: "p", claim: "Yes.", isPosition: true, wayOfKnowing: "REASONING", baseScore: 0.8, finalStrength: 0.8,
           excludedReason: null, authorModel: null, panelDispersion: null, criticSummary: null
         }],
-        arrows: [], sensitivity: [], setAside: []
+        arrows: [], sensitivity: [], setAside: [],
+        // Debate shape P2c: the snapshot ranks by raisedBy; the material carries the claims only (ruling C-ORDER).
+        alsoRaised: [{ claim: "Ask the school about a mid-year move.", raisedBy: 2 }],
+        answersNote: "MAP_UNAVAILABLE"
       },
       enrichment: new Map(), budgetBytes: 40_000, shapeIds: new Set(["general"])
     })).material, "prior").map((field) => field.name);
     expect(material).toContain("prior_objection");
+    expect(material).toEqual(expect.arrayContaining(["also_raised", "answers_note"]));
     const short = Object.keys(StoryBodySchema.shape.short.shape).map((member) => `short.${member}`);
     for (const name of [
       ...material, ...short, "why.reasons", "long.sections", "reviewer_note", "node_refs", "position_ref",
@@ -265,6 +269,26 @@ describe("verdict story — the shipped pack", () => {
       expect([criterion, pack.checker.includes(criterion)]).toEqual([criterion, true]);
     }
     expect(pack.checker).toContain("candidate_story");
+  });
+
+  /**
+   * Debate shape P2c. Controller ruling C-ORDER: also_raised reaches the storyteller and the checker as claims in
+   * order, most-raised first, with no count, so the pack names no raised_by and both files say the story never
+   * states how many AIs raised a point (the checker refuses a story that does). Owner ruling C-STORY (pre-flight
+   * PF-C6): answers_note is one plain sentence the story retells once, in its own words.
+   */
+  it("tells the checker about the points raised but not debated, and the answers note (debate shape P2c)", () => {
+    expect(pack.checker).toContain("also_raised");
+    expect(pack.checker).toContain("answers_note");
+    for (const text of [pack.common, pack.checker]) {
+      expect(text).not.toContain("raised_by");
+      expect(text).toContain("most-raised first");
+      expect(text).toContain("with no count");
+    }
+    expect(pack.common).toContain("never say who raised it or how many did");
+    expect(pack.checker).toContain("never says who raised them or how many AIs did");
+    expect(pack.checker).toContain("a story that states one is not faithful_to_material");
+    expect(pack.common).toContain("## Also raised, not debated");
   });
 
   /**
