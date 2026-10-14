@@ -851,6 +851,7 @@ packages/contract/src/http-error.ts
 packages/contract/src/index.ts
 packages/contract/src/lineage.ts
 packages/contract/src/locale.ts
+packages/contract/src/map-view.ts
 packages/contract/src/mfa-recovery.ts
 packages/contract/src/password-reset.ts
 packages/contract/src/plan-tiers.ts

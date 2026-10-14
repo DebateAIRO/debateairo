@@ -51,6 +51,7 @@ import {
   AnswerIndexSchema,
   AnswerStorySchema,
   AnswerDisclosureSchema,
+  DebateMapViewSchema,
   AskAcceptedSchema,
   AskAlreadyWaitingSchema,
   QuestionLanguageChoiceNeededSchema,
@@ -102,6 +103,7 @@ import {
   type AnswerStory,
   type AccountEmail,
   type AnswerDisclosure,
+  type DebateMapView,
   type AskAccepted,
   type AskRequest,
   type AskRoomResponse,
@@ -504,6 +506,8 @@ export interface ContractClient {
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
   readAnswerStory(answerId: string): Promise<AnswerStory>;
   readAnswerDisclosure(answerId: string): Promise<AnswerDisclosure>;
+  /** Debate shape P2c: the owner's map view of an answer (404 when the run had no map choice). */
+  readAnswerMapView(answerId: string): Promise<DebateMapView>;
   readNode(answerId: string, nodeId: string): Promise<Node>;
   recordInvestigation(answerId: string, gapRef: string, input: InvestigationRequest): Promise<InvestigationAccepted>;
   unlinkMemory(answerId: string): Promise<{ memory_link_id: string; state: "UNLINKED" }>;
@@ -904,6 +908,7 @@ export function createContractClient(
     readLedgerDigest: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, ExecutionLedgerDigestSchema),
     readAnswerStory: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/story`, AnswerStorySchema),
     readAnswerDisclosure: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/disclosure`, AnswerDisclosureSchema),
+    readAnswerMapView: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/map`, DebateMapViewSchema),
     readNode: (answerId: string, nodeId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/nodes/${encodeURIComponent(nodeId)}`, NodeSchema),
     recordInvestigation: (answerId: string, gapRef: string, input: InvestigationRequest) => request(`/v1/answers/${encodeURIComponent(answerId)}/investigations/${encodeURIComponent(gapRef)}`, InvestigationAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
     unlinkMemory: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/memory-link/unlink`, UnlinkSchema, { method: "POST" }),

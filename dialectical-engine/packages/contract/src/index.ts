@@ -17,6 +17,7 @@ import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js
 import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
+import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
 export * from "./crisis.js";
 export * from "./romania-address.js";
 export * from "./billing-address.js";
@@ -1358,7 +1359,11 @@ export const PublicDebateSchema = z.object({
   // engine derived and the published position it rests on, whose own
   // statement the public page shows. No reason code, no model: optional, so
   // every snapshot published before it still parses.
-  floor: AnswerFloorSchema.optional()
+  floor: AnswerFloorSchema.optional(),
+  // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map view copied at publish time,
+  // so the public page can list what was raised but not debated and title each position.
+  // Optional: every snapshot published before it still parses.
+  map_view: DebateMapViewSchema.optional()
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
@@ -1627,6 +1632,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/answers/{id}/ledger-digest",
     "GET /v1/answers/{id}/story",
     "GET /v1/answers/{id}/disclosure",
+    "GET /v1/answers/{id}/map",
     "POST /v1/answers/{id}/investigations/{gapRef}",
     "POST /v1/answers/{id}/memory-link/unlink",
     "GET /v1/runs/{id}",
@@ -1685,7 +1691,7 @@ export const contractInventory = Object.freeze({
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
-    AnswerStorySchema, AnswerDisclosureSchema, BillingPlansResponseSchema,
+    AnswerStorySchema, AnswerDisclosureSchema, DebateMapViewSchema, BillingPlansResponseSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,
