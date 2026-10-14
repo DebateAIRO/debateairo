@@ -152,6 +152,6 @@ describe("debate shape P2c — the shape marks in the drawers", () => {
   });
 
   it("words a merge fallback as combining only points that said the same thing (pre-flight PF-C33)", () => {
-    expect(words("debateChrome.condition.mapMergeFallback")).toBe("Points that said the same thing were combined");
+    expect(words("debateChrome.condition.mapMergeFallback")).toBe("Only points that said exactly the same thing were combined");
   });
 });
