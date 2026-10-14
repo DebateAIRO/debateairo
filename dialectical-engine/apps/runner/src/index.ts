@@ -10349,7 +10349,8 @@ export class WalkingSkeletonRunner {
               positionNodeIds: makerPositionNodeIds,
               // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's unchosen points, for the story's "also
               // raised, not debated" paragraph, only when the map's own answers were argued; undefined otherwise.
-              alsoRaised: storyAlsoRaisedFrom(shapeMapArgued ? debateShapeMap : null),
+              // Ruling W-CUT: a chosen answer past the positions argued is listed too (the page's stored list agrees).
+              alsoRaised: storyAlsoRaisedFrom(shapeMapArgued ? debateShapeMap : null, shapeMapPositions?.length ?? 0),
               // Owner ruling C-STORY: one plain sentence when the answers came from a map fallback, read from the map's
               // whole result (debateShapeMap is null on a fallback); undefined on today's run.
               answersNote: storyAnswersNoteFrom(shapeMapResult,

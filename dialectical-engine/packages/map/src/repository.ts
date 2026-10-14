@@ -11,7 +11,7 @@ import {
   type Pool
 } from "@debateai/db";
 import { TypedDomainError, exhaustive } from "@debateai/kernel";
-import { mapRankKeyPoints } from "./items.js";
+import { mapAlsoRaisedOf } from "./items.js";
 import {
   MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS, MAP_MARKS, type MapAngleKind, type MapItem, type MapItemOrigin, type MapMark,
   type MapResult
@@ -134,9 +134,11 @@ export class MapChoiceRepository {
     if (breach !== null) throw recordInvalid(breach);
     const answers = (result.choice?.answers ?? []).slice(0, input.answerCount)
       .map((answer, rootIndex) => Object.freeze({ answerId: answer.answerId, statement: answer.statement, rootIndex, filled: answer.filled }));
-    const byId = new Map(result.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
-    const alsoRaised = mapRankKeyPoints((result.choice?.alsoRaised ?? []).flatMap((id) => byId.get(id) ?? []))
-      .map((keyPoint) => Object.freeze({ keyPointId: keyPoint.keyPointId, claim: keyPoint.claim, makers: [...keyPoint.makers] }));
+    // Ruling W-CUT and review m-4: the chosen answers past answerCount (never argued) and the points only they took are
+    // also raised, not debated; one shared rule (mapAlsoRaisedOf) builds the list for the page and the story alike.
+    const alsoRaised = mapAlsoRaisedOf({ choice: result.choice, keyPoints: result.keyPoints, mergedAnswers: result.mergedAnswers,
+      arguedAnswers: input.answerCount })
+      .map((entry) => Object.freeze({ keyPointId: entry.keyPointId, claim: entry.claim, makers: [...entry.makers] }));
     const { items: _items, calls: _calls, ...rest } = result;
     const content: ChoiceContent = choiceContent.parse({ answers, alsoRaised, result: rest });
     const opening = result.kind === "MAP" ? "MAP" : "TODAYS_OPENING";

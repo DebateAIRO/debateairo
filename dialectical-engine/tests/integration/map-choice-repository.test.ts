@@ -233,6 +233,22 @@ describe("MapChoiceRepository (0116)", () => {
     expect((await readMapChoiceForRun(database.pool, runId))!.answers.map((answer) => answer.answerId)).toEqual(["a1"]);
   });
 
+  // Whole-branch review m-3, ruling W-CUT: a chosen answer cut by answerCount was raised and never debated, so the page's
+  // stored list holds it (a filled one never: no AI raised it), beside the choice's own also-raised points.
+  it("lists a chosen answer cut by answerCount as also raised (W-CUT)", async () => {
+    const runId = await newRun("legacy");
+    const repository = new MapChoiceRepository(database.pool);
+    const raised = { ...RESULT, choice: { ...RESULT.choice!, answers: RESULT.choice!.answers.map((answer) => ({ ...answer, filled: false })) } } as MapResult;
+    expect(await repository.writeMapRun({ runId, result: raised, answerCount: 1 })).toBe("INSERTED");
+    expect((await readMapChoiceForRun(database.pool, runId))!.alsoRaised).toEqual([
+      { keyPointId: "a2", claim: "No.", makers: ["maker-0"] },
+      { keyPointId: "kp03", claim: "Night buses.", makers: ["maker-1"] }
+    ]);
+    const filled = await newRun("legacy");
+    await repository.writeMapRun({ runId: filled, result: RESULT, answerCount: 1 });
+    expect((await readMapChoiceForRun(database.pool, filled))!.alsoRaised.map((entry) => entry.claim)).toEqual(["Night buses."]);
+  });
+
   it("joins the root that argued each answer once it is saved", async () => {
     const runId = await newRun("legacy");
     const rootNodeId = await legacyRoot(runId);

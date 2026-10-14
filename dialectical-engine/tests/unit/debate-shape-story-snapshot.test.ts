@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { ProviderGateway } from "@debateai/providers";
 import type { StoryCostFallback, StoryStepLease } from "@debateai/story";
+import { mapAlsoRaisedOf, type MapChosenAnswer, type MapKeyPoint } from "@debateai/map";
+import { debateMapViewFrom } from "../../apps/api/src/map-views.js";
 import {
-  buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, type StorySnapshotSource
+  buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, type StoryMapSource, type StorySnapshotSource
 } from "../../apps/runner/src/story-snapshot.js";
 
 /**
@@ -43,18 +45,26 @@ function source(overrides: Partial<StorySnapshotSource> = {}): StorySnapshotSour
   };
 }
 
-const MAP = {
+const keyPoint = (keyPointId: string, claim: string, makers: readonly string[]): MapKeyPoint => ({
+  keyPointId, claim, memberItemIds: [], blindMakers: [...new Set(makers)], gapMakers: [], makers: [...new Set(makers)],
+  fixedAngleKinds: [], leansAgainst: false
+});
+const answer = (answerId: string, statement: string, forKeyPointIds: readonly string[], filled = false): MapChosenAnswer => ({
+  answerId, statement, forKeyPointIds, againstKeyPointIds: [], strongestRival: "a1", filled
+});
+const MAP: StoryMapSource = {
   keyPoints: [
-    { keyPointId: "kp01", claim: "Chosen point.", makers: ["A", "B"] },
-    { keyPointId: "kp02", claim: "Raised by three makers.", makers: ["A", "B", "C"] },
-    { keyPointId: "kp03", claim: `A point quoting ${ROOT} by id.`, makers: ["C", "C"] }
+    keyPoint("kp01", "Chosen point.", ["A", "B"]),
+    keyPoint("kp02", "Raised by three makers.", ["A", "B", "C"]),
+    keyPoint("kp03", `A point quoting ${ROOT} by id.`, ["C", "C"])
   ],
-  choice: { alsoRaised: ["kp02", "kp03", "kp99"] }
-} as const;
+  mergedAnswers: [],
+  choice: { answers: [answer("a1", "Yes.", ["kp01"]), answer("a2", "No.", [])], alsoRaised: ["kp02", "kp03", "kp99"] }
+};
 
 describe("debate shape P2c — the story snapshot's also-raised points", () => {
   it("reads the choice's also-raised ids in order, with distinct makers, skipping unknown ids", () => {
-    const items = storyAlsoRaisedFrom(MAP);
+    const items = storyAlsoRaisedFrom(MAP, 2);
     expect(items?.map((item) => item.raisedBy)).toEqual([3, 1]);
     expect(items?.[0]?.claim).toBe("Raised by three makers.");
     // Node ids never reach the material (the snapshot's own rule for free text).
@@ -62,12 +72,51 @@ describe("debate shape P2c — the story snapshot's also-raised points", () => {
   });
 
   it("has nothing to say without a map or without a choice", () => {
-    expect(storyAlsoRaisedFrom(null)).toBeUndefined();
-    expect(storyAlsoRaisedFrom({ keyPoints: MAP.keyPoints, choice: null })).toBeUndefined();
+    expect(storyAlsoRaisedFrom(null, 2)).toBeUndefined();
+    expect(storyAlsoRaisedFrom({ ...MAP, choice: null }, 2)).toBeUndefined();
+  });
+
+  /**
+   * Whole-branch review m-3, ruling W-CUT: a chosen answer the run did not argue (a maker sat out after the map chose)
+   * was raised and never debated: it is listed, with the points only it took; a point an argued answer took is not.
+   */
+  it("lists a chosen answer that was never argued, and the points only it took (W-CUT)", () => {
+    const cut: StoryMapSource = {
+      ...MAP,
+      keyPoints: [...MAP.keyPoints, keyPoint("kp04", "Only the third answer's point.", ["B"])],
+      mergedAnswers: [{ answerId: "an01", answer: "Wait a year.", memberItemIds: [], blindMakers: ["A", "C"], makers: ["A", "C"], fromOppositeCase: false }],
+      choice: { answers: [answer("a1", "Yes.", ["kp01"]), answer("a2", "No.", []), answer("a3", "Wait a year.", ["kp04", "kp01"])],
+        alsoRaised: ["kp02", "kp03"] }
+    };
+    expect(storyAlsoRaisedFrom(cut, 2)?.map((item) => item.claim)).toEqual([
+      "Raised by three makers.", "Wait a year.", "A point quoting (a point) by id.", "Only the third answer's point."
+    ]);
+    expect(storyAlsoRaisedFrom(cut, 2)?.find((item) => item.claim === "Wait a year.")?.raisedBy).toBe(2);
+    // Argued, it is not listed; and a filled answer (added by code) is never listed.
+    expect(storyAlsoRaisedFrom(cut, 3)?.map((item) => item.claim)).toEqual(["Raised by three makers.", "A point quoting (a point) by id."]);
+    const filled = { ...cut, choice: { ...cut.choice!, answers: cut.choice!.answers.map((entry) => ({ ...entry, filled: entry.answerId === "a3" })) } };
+    expect(storyAlsoRaisedFrom(filled, 2)?.map((item) => item.claim)).not.toContain("Wait a year.");
+  });
+
+  /** Whole-branch review m-4: the story and the page list the same claims, in the same order, merged by one rule. */
+  it("the story and the debate page share one rule: the same claims, merged, in the same order (m-4)", () => {
+    const repeated: StoryMapSource = {
+      ...MAP,
+      keyPoints: [...MAP.keyPoints, keyPoint("kp05", "  raised by THREE makers. ", ["D"]), keyPoint("kp06", "Once.", ["A"])],
+      // kp03 is left out here: it quotes a node id, which the story (never the page) rewrites.
+      choice: { answers: MAP.choice!.answers, alsoRaised: ["kp06", "kp02", "kp05"] }
+    };
+    const stored = mapAlsoRaisedOf({ choice: repeated.choice, keyPoints: repeated.keyPoints, mergedAnswers: [], arguedAnswers: 2 });
+    const page = debateMapViewFrom({ answers: [], alsoRaised: stored }, new Set()).also_raised;
+    const story = storyAlsoRaisedFrom(repeated, 2)!;
+    expect(story.map((item) => item.claim)).toEqual(page);
+    // The two spellings of one claim are one entry, raised by four makers (A, B, C and D).
+    expect(story[0]).toEqual({ claim: "Raised by three makers.", raisedBy: 4 });
+    expect(page).toEqual(["Raised by three makers.", "Once."]);
   });
 
   it("passes the points to the snapshot, and leaves the key out when there are none", () => {
-    expect(buildStoryRunSnapshot(source({ alsoRaised: storyAlsoRaisedFrom(MAP) })).alsoRaised)
+    expect(buildStoryRunSnapshot(source({ alsoRaised: storyAlsoRaisedFrom(MAP, 2) })).alsoRaised)
       .toEqual([{ claim: "Raised by three makers.", raisedBy: 3 }, { claim: "A point quoting (a point) by id.", raisedBy: 1 }]);
     expect("alsoRaised" in buildStoryRunSnapshot(source())).toBe(false);
     expect("alsoRaised" in buildStoryRunSnapshot(source({ alsoRaised: undefined }))).toBe(false);
@@ -112,7 +161,7 @@ describe("debate shape P2c — the story snapshot's also-raised points", () => {
     expect(runner).toContain(
       "const shapeMapArgued = shapeMapPositions !== null && mapAnswersArgued(shapeMapPositions.length);"
     );
-    expect(call).toContain("alsoRaised: storyAlsoRaisedFrom(shapeMapArgued ? debateShapeMap : null),");
+    expect(call).toContain("alsoRaised: storyAlsoRaisedFrom(shapeMapArgued ? debateShapeMap : null, shapeMapPositions?.length ?? 0),");
     expect(call.indexOf("alsoRaised: storyAlsoRaisedFrom(")).toBeGreaterThan(call.indexOf("positionNodeIds: makerPositionNodeIds,"));
     // Pre-flight PF-C6: the note reads the map's whole result, never debateShapeMap (null on a fallback).
     expect(call).toContain("answersNote: storyAnswersNoteFrom(shapeMapResult,");
