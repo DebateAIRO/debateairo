@@ -61,7 +61,17 @@ export function framedQuestionLanguageCheck(instruction: string, questionLine: s
 export type FastCheckReading =
   | Readonly<{ kind: "DOWN"; reason: "TIMEOUT" | "TRANSPORT" | "UNREADABLE" | "UNKNOWN_LANGUAGE" }>
   | Readonly<{ kind: "ONE"; main: QuestionLanguage }>
-  | Readonly<{ kind: "MIX"; main: QuestionLanguage; seen: readonly QuestionLanguage[]; proposed: string }>;
+  | Readonly<{ kind: "MIX"; main: QuestionLanguage; seen: readonly QuestionLanguage[]; proposed: string }>
+  /**
+   * Controller ruling L-REWRITE (2026-10-14): a real mix whose rewrite cannot be offered. Only the rewrite is discarded;
+   * main_language is still the best reading, so the decider locks it, keeps the person's wording and offers nothing.
+   * The code goes to the decision record; the refused text goes nowhere.
+   */
+  | Readonly<{ kind: "MIX"; main: QuestionLanguage; seen: readonly QuestionLanguage[]; proposed: null; rewriteRefusal: FastCheckRewriteRefusal }>;
+
+/** Why a rewrite was discarded (ruling L-REWRITE). Codes only. */
+export type FastCheckRewriteRefusal =
+  | "REWRITE_UNUSABLE:BLANK" | "REWRITE_UNUSABLE:TOO_LONG" | "REWRITE_UNUSABLE:UNCHANGED" | "REWRITE_UNUSABLE:OTHER_LANGUAGE";
 
 /** Bounds on the reply itself: the call's own output bound is far smaller, so a longer text is not this answer form. */
 const READER_BOUNDS = Object.freeze({ replyChars: 65_536, codeChars: 16, seen: 6 });
@@ -70,8 +80,8 @@ const replySchema = z.object({
   main_language: z.string().min(1).max(READER_BOUNDS.codeChars),
   languages_seen: z.array(z.string().min(1).max(READER_BOUNDS.codeChars)).max(READER_BOUNDS.seen),
   is_real_mix: z.boolean(),
-  // The ask's own limit (askQuestionMaxBytes) is in bytes; a string longer in characters is longer in bytes too.
-  proposed_question: z.string().max(askQuestionMaxBytes()).nullable()
+  // Bounded by the whole reply's bound; the ask's own byte limit is a rewrite refusal below (ruling L-REWRITE), not off-form.
+  proposed_question: z.string().max(READER_BOUNDS.replyChars).nullable()
 }).strict();
 
 const REPLY_KEYS: ReadonlySet<string> = new Set(Object.keys(replySchema.shape));
@@ -99,6 +109,14 @@ function languageOf(code: string, questionLine: string): QuestionLanguage | null
 /** For "unchanged": the same words, whatever the spacing or the Unicode composition. */
 const sameText = (left: string, right: string): boolean =>
   left.normalize("NFC").replace(/\s+/gu, " ").trim() === right.normalize("NFC").replace(/\s+/gu, " ").trim();
+
+function rewriteRefusalOf(proposed: string, main: QuestionLanguage, questionLine: string): FastCheckRewriteRefusal | null {
+  if (proposed === "") return "REWRITE_UNUSABLE:BLANK";
+  if (Buffer.byteLength(proposed, "utf8") > askQuestionMaxBytes()) return "REWRITE_UNUSABLE:TOO_LONG";
+  if (sameText(proposed, questionLine)) return "REWRITE_UNUSABLE:UNCHANGED";
+  if (replyTextLanguageVerdict(lockedReplyLanguageExpectation(main, questionLine), proposed) === "OTHER") return "REWRITE_UNUSABLE:OTHER_LANGUAGE";
+  return null;
+}
 
 function strictReading(text: string, questionLine: string): FastCheckReading {
   if (text.length > READER_BOUNDS.replyChars) return down("UNREADABLE");
@@ -129,13 +147,11 @@ function strictReading(text: string, questionLine: string): FastCheckReading {
   }
   if (!seen.some((language) => language.code === main.code) || seen.length < 2) return down("UNREADABLE");
 
-  // The rewrite (controller binding, Task 5): bounded by the ask's own limit, and refused when it is blank, the question
-  // unchanged, or clearly in another language than the one it claims. Every refusal falls back; none blocks.
+  // The rewrite (ruling L-REWRITE): bounded by the ask's own limit, and discarded when it is blank, the question
+  // unchanged, or clearly in another language than the one it claims. Only the rewrite goes; the reading stays.
   const proposed = parsed.proposed_question!.trim();
-  if (proposed === "" || Buffer.byteLength(proposed, "utf8") > askQuestionMaxBytes() || sameText(proposed, questionLine)) {
-    return down("UNREADABLE");
-  }
-  if (replyTextLanguageVerdict(lockedReplyLanguageExpectation(main, questionLine), proposed) === "OTHER") return down("UNREADABLE");
+  const refusal = rewriteRefusalOf(proposed, main, questionLine);
+  if (refusal !== null) return Object.freeze({ kind: "MIX", main, seen: Object.freeze(seen), proposed: null, rewriteRefusal: refusal });
   return Object.freeze({ kind: "MIX", main, seen: Object.freeze(seen), proposed });
 }
 

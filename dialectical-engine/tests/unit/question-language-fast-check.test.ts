@@ -120,15 +120,31 @@ describe("the fast check's frame, reader and time limit hold whatever the owners
       .toThrow(/^QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN$/u);
   });
 
+  /**
+   * Controller ruling L-REWRITE (2026-10-14): a bad rewrite discards ONLY the rewrite. The fast AI's main language is
+   * still the best reading, so the result keeps it (and the languages seen), carries no rewrite and names why, by code.
+   * The decider then locks main_language, keeps the person's wording and offers nothing (Task 7, FAST_MIX_NO_OFFER).
+   */
   it.each([
-    ["a blank rewrite", mixReply("   ")],
-    ["the question itself, unchanged", mixReply(`  ${Q} `)],
-    ["a rewrite longer than an ask may be", mixReply("Ar trebui România să adopte euro sau să aștepte? ".repeat(Math.ceil(askQuestionMaxBytes() / 40)))],
-    ["a rewrite in another language", mixReply("Should Romania adopt the euro or wait until wages catch up with the rest of Europe?")],
+    ["a blank rewrite", mixReply("   "), "REWRITE_UNUSABLE:BLANK"],
+    ["the question itself, unchanged", mixReply(`  ${Q} `), "REWRITE_UNUSABLE:UNCHANGED"],
+    ["a rewrite longer than an ask may be",
+      mixReply("Ar trebui România să adopte euro sau să aștepte? ".repeat(Math.ceil(askQuestionMaxBytes() / 40))), "REWRITE_UNUSABLE:TOO_LONG"],
+    ["a rewrite in another language",
+      mixReply("Should Romania adopt the euro or wait until wages catch up with the rest of Europe?"), "REWRITE_UNUSABLE:OTHER_LANGUAGE"]
+  ])("keeps the main language and drops %s, by code (ruling L-REWRITE)", (_name, text, code) => {
+    const reading = readQuestionLanguageReply(text, Q);
+    expect(reading).toEqual({ kind: "MIX", main: RO_SITE, seen: [RO_SITE, { code: "en", name: "English" }], proposed: null, rewriteRefusal: code });
+    // Codes only: the refused rewrite's text is not carried anywhere in the result.
+    expect(JSON.stringify(reading)).not.toMatch(/Should Romania|aștepte|wages/u);
+  });
+
+  it.each([
     ["a mix that names one language", mixReply("Ar trebui România să adopte euro sau să aștepte până cresc salariile?", ["ro"])],
     ["a mix whose languages leave out its main one", mixReply("Ar trebui România să adopte euro sau să aștepte până cresc salariile?", ["en", "fr"])],
-    ["a mix that names the same language twice", mixReply("Ar trebui România să adopte euro sau să aștepte până cresc salariile?", ["ro", "ro-RO"])]
-  ])("refuses %s as UNREADABLE (the caller falls back, never blocks)", (_name, text) => {
+    ["a mix that names the same language twice", mixReply("Ar trebui România să adopte euro sau să aștepte până cresc salariile?", ["ro", "ro-RO"])],
+    ["a blank rewrite in a mix that names one language", mixReply("   ", ["ro"])]
+  ])("refuses %s as UNREADABLE: off-form, so the caller falls back (never blocks)", (_name, text) => {
     expect(readQuestionLanguageReply(text, Q)).toEqual({ kind: "DOWN", reason: "UNREADABLE" });
   });
 
